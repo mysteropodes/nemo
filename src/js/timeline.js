@@ -8018,6 +8018,66 @@ window.addEventListener('blur',function(){
 document.addEventListener('pointerdown',function(){if(state.spaceDown)state.spaceUsedForPan=true;},true);
 
 document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);
+// Cmd/Ctrl-HOLD temporarily switches to Select (2026-08-27, feedback #64
+// — "pomme en cliquant pour passer a l'outil selection", and Cyril:
+// "command est utilisé un peu dans tout logiciel, voit comment mettre ça
+// en place sans faire de conflit"). Illustrator/Photoshop convention:
+// hold Cmd while using another tool, canvas clicks act like Select;
+// release, back to what you were doing.
+//
+// The hazard: Cmd/Ctrl is the FIRST key of ~15 shortcuts already in
+// onKeyDown (Z, S, C, X, V, A, G, D, L…) — a real keypress of any combo
+// fires a genuine 'keydown' with key:'Meta'/'Control' the instant the
+// modifier itself goes down, BEFORE the letter's own keydown. Switching
+// tools on that alone would flicker the tool (and its cursor) on every
+// single Cmd+shortcut the user already relies on.
+// Fix: a short arm-delay (matches the SPACE_TAP_MS precedent above for
+// the exact same class of tap-vs-hold ambiguity). The modifier alone
+// only counts as "hold to select" if it's STILL down, with no other key
+// pressed meanwhile, after this delay — a real shortcut's letter always
+// lands well inside that window. Any other keydown while armed cancels
+// immediately (this is what actually prevents the conflict, the delay
+// alone is just what makes cancellation possible in the first place).
+var _cmdHoldTimer=null,_cmdHoldPrevTool=null,_cmdHoldDown=false;
+var CMD_HOLD_MS=180;
+function _cmdHoldEligible(){
+  return !(document.activeElement&&(document.activeElement.tagName==='INPUT'||document.activeElement.tagName==='SELECT'||document.activeElement.tagName==='TEXTAREA'||document.activeElement.isContentEditable))
+    &&!state.playing&&state.tool!=='select'&&state.tool!=='subselect'
+    &&!(_pen&&_pen.path)&&!state.spaceDown;
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Meta'||e.key==='Control'){
+    if(_cmdHoldDown)return; // already tracking this hold (no native repeat for modifiers, but stay safe)
+    _cmdHoldDown=true;
+    if(!_cmdHoldEligible())return;
+    _cmdHoldTimer=setTimeout(function(){
+      _cmdHoldTimer=null;
+      if(!_cmdHoldDown||!_cmdHoldEligible())return; // released, or state changed during the wait
+      _cmdHoldPrevTool=state.tool;
+      window.SM.setTool('select');
+    },CMD_HOLD_MS);
+  }else if(_cmdHoldTimer){
+    // A real key landed while the modifier was still just "maybe about to
+    // be a hold" — this IS a shortcut combo, not a hold gesture. Cancel
+    // silently; the shortcut's own Cmd+<key> handler (already gated on
+    // event.metaKey/ctrlKey) fires completely normally afterward.
+    clearTimeout(_cmdHoldTimer);_cmdHoldTimer=null;
+  }
+});
+document.addEventListener('keyup',function(e){
+  if(e.key!=='Meta'&&e.key!=='Control')return;
+  _cmdHoldDown=false;
+  if(_cmdHoldTimer){clearTimeout(_cmdHoldTimer);_cmdHoldTimer=null;return;} // never actually armed — nothing to restore
+  if(_cmdHoldPrevTool){window.SM.setTool(_cmdHoldPrevTool);_cmdHoldPrevTool=null;}
+});
+// Same stuck-modifier safety net as state.spaceDown's own window-blur
+// listener above (e.g. Cmd+Tab stealing focus mid-hold) — without this,
+// losing focus while armed would leave the tool stuck on Select forever.
+window.addEventListener('blur',function(){
+  if(_cmdHoldTimer){clearTimeout(_cmdHoldTimer);_cmdHoldTimer=null;}
+  _cmdHoldDown=false;
+  if(_cmdHoldPrevTool){window.SM.setTool(_cmdHoldPrevTool);_cmdHoldPrevTool=null;}
+});
 document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('click',function(){window.SM.setTool(this.dataset.tool);});});
 // Shape-tool group (2026-08, "regrouper les shape dans un mini menu comme
 // dans illustrator ou rive... click un peu longtemps ça affiche le menu").
