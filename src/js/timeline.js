@@ -1727,6 +1727,12 @@ window.SM={
       markers:state.markers||[],shyEnabled:!!state.shyEnabled,
       bpm:state.bpm,bpmOffset:state.bpmOffset,bpmShow:!!state.bpmShow,
       motionBlurOn:!!state.motionBlurOn,motionBlurSamples:state.motionBlurSamples,motionBlurShutter:state.motionBlurShutter,
+      // Rulers/guides (2026-08-27, "mettre en place les repères et rulers
+      // comme dans tout bon soft") — document-level, world-space (not
+      // canvas-local), same reason perspectiveVPs/symmetryAxis above are
+      // world-space: they must stay put across pan/zoom, only rebuild the
+      // ruler ticks around them.
+      guides:state.guides||{h:[],v:[]},
       exprGlobals:state.exprGlobals||''});
   },
   mergeRemoteSnapshot:function(remoteData,remoteProfile){return mergeRemoteSnapshot(remoteData,remoteProfile);},
@@ -2003,6 +2009,8 @@ window.SM={
     state.bpm=d.bpm!=null?d.bpm:120;state.bpmOffset=d.bpmOffset||0;state.bpmShow=!!d.bpmShow;
     state.exprGlobals=d.exprGlobals||'';
     state.motionBlurOn=!!d.motionBlurOn;state.motionBlurSamples=d.motionBlurSamples||6;state.motionBlurShutter=d.motionBlurShutter!=null?d.motionBlurShutter:0.5;
+    state.guides=d.guides||{h:[],v:[]};
+    if(window.SMRulers)SMRulers.render();
     if(typeof refreshFbAvatars==='function')refreshFbAvatars(); // avatar stack mirrors state.comments — resync on project import
     state.cameraKeys=d.cameraKeys||[];state.cameraLayerOn=!!d.cameraLayerOn;state.cameraView=false;
     // Explicit fallback to the app default, not just "leave whatever was
@@ -8521,6 +8529,14 @@ document.getElementById('p-ch').addEventListener('change',function(){window.SM.s
 document.getElementById('p-cbg').addEventListener('input',function(){window.SM.setCanvasBg(this.value);});
 document.getElementById('btn-clip').addEventListener('click',function(){window.SM.setCanvasClip(!state.canvasClip);this.classList.toggle('active',state.canvasClip);});
 document.getElementById('btn-safety').addEventListener('click',function(){window.SM.setSafetyZones(!state.safetyZones);this.classList.toggle('active',state.safetyZones);});
+var _btnRulers=document.getElementById('btn-rulers');
+if(_btnRulers){
+  _btnRulers.classList.toggle('active',!!state.rulersOn);
+  _btnRulers.addEventListener('click',function(){
+    if(window.SMRulers)SMRulers.toggleOn();
+    this.classList.toggle('active',!!state.rulersOn);
+  });
+}
 // Flou/Ombre au sol/effect-layer type/param wiring all moved into
 // effects-panel.js's unified Effects stack (2026-07 rewrite).
 // Perspective/Symmetry Guide (feedback 2026-07: "les onglet guide symétrie
@@ -8716,9 +8732,22 @@ document.getElementById('zoom-scrub').addEventListener('input',function(){
 });
 document.getElementById('canvas-fit-btn').addEventListener('click',function(e){
   var r=this.getBoundingClientRect();
-  window.showContextMenu(r.left,r.top-70,[
+  // Rulers/guides toggle (2026-08-27, "l'affichage des regle et rulers
+  // dans un menu ici") — pointed at THIS exact menu (Fit/zoom dropdown),
+  // alongside the pre-existing standalone toolbar button next to Safety
+  // Zones rather than replacing it (more discoverable from two places,
+  // costs nothing to keep both in sync — both read/write the same
+  // state.rulersOn via SMRulers.toggleOn). showContextMenu has no native
+  // checkbox item type, so the ON state is a plain checkmark prefix, same
+  // convention used elsewhere in this menu system.
+  window.showContextMenu(r.left,r.top-98,[
     {label:'Fit',action:function(){window.SM.fitCanvas();}},
     {label:'Reset View (100%)',action:function(){window.SM.resetView();}},
+    {sep:true},
+    {label:(state.rulersOn?'✓ ':'')+(SM&&SM.t?SM.t('rulersMenuLabel'):'Rulers & Guides'),action:function(){
+      if(window.SMRulers)SMRulers.toggleOn();
+      var btn=document.getElementById('btn-rulers');if(btn)btn.classList.toggle('active',!!state.rulersOn);
+    }},
   ]);
 });
 document.getElementById('p-resamp').addEventListener('input',function(){window.SM.setResamplePts(parseInt(this.value));});

@@ -87,6 +87,7 @@
     state.mediaLibrary=[];if(window.SMMediaLibrary)SMMediaLibrary.reload();
     state.layerFolders={};state.layerLinkGroups={};
     state.cameraKeys=[];state.cameraLayerOn=false;state.cameraView=false;
+    state.guides={h:[],v:[]};
     createUserLayer('Layer 1');activateUL(0);
     drawStage();loadFrame(0);renderOS();renderArcs();updateUI();renderSymbolTabs();
     // view.zoom/center aren't part of the project data (never saved), so
