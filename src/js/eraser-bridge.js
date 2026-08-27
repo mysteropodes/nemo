@@ -25,6 +25,32 @@
   // the circle you're about to erase with" affordance either way.
   var sizing = false, sizeStartX = 0, sizeStartVal = 0, sizeAnchorW = null;
 
+  // Stabilizer (2026-08-27, feedback #74 — "il faudrait que la gomme
+  // puisse se regler comme le pinceau, et se comporter comme le pinceau,
+  // comme dans animate"): #tool-opts-sec (Stabilizer/Smooth) was ALREADY
+  // shown for the eraser tool (TOOL_OPTS_TOOLS, timeline.js includes
+  // 'eraser') — the dropdown was visibly settable and did nothing at all,
+  // since nothing here ever read state.stabilizer. Mirrors draw-bridge.js's
+  // own stabilizePoint() (same simple moving-average queue, same maxQ
+  // steps) rather than sharing that closure-private function directly.
+  // Only the moving-average levels (0-3, Off/Low/Medium/High) — the
+  // higher "Plume" ink-stroke-modeler levels (4-6) need a stateful
+  // upsampling modeler instance threaded through onDown/onMove/onUp,
+  // real scope creep for what's fundamentally still a point-erase tool,
+  // not a stroke-drawing one; a Plume setting is treated as its own
+  // strongest moving-average level here instead of silently no-oping.
+  var eraseStabQueue = [];
+  function stabilizeErasePoint(w) {
+    var stab = Math.min(3, state.stabilizer || 0);
+    if (!stab) { eraseStabQueue.length = 0; return w; }
+    eraseStabQueue.push(w);
+    var maxQ = stab === 1 ? 3 : stab === 2 ? 6 : 10;
+    while (eraseStabQueue.length > maxQ) eraseStabQueue.shift();
+    var ax = 0, ay = 0;
+    for (var i = 0; i < eraseStabQueue.length; i++) { ax += eraseStabQueue[i][0]; ay += eraseStabQueue[i][1]; }
+    return [ax / eraseStabQueue.length, ay / eraseStabQueue.length];
+  }
+
   function shouldIntercept() {
     return (
       window.SMEngineBridge && window.SMEngineBridge.isEnabled() &&
@@ -137,7 +163,8 @@
     pushUndo();
     ensureKeyframe();
     lastPenPressure = null;
-    var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    eraseStabQueue.length = 0;
+    var w = stabilizeErasePoint(window.SMEngineBridge.screenToWorld(e.clientX, e.clientY));
     var radius = eraseRadiusFor(e);
     pointerIsDown = true;
     erasing = false;
@@ -163,7 +190,7 @@
     if (!shouldIntercept()) return;
     e.stopImmediatePropagation();
     e.preventDefault();
-    var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    var w = stabilizeErasePoint(window.SMEngineBridge.screenToWorld(e.clientX, e.clientY));
     var radius = eraseRadiusFor(e);
     window.SMEngineBridge.setEraserCursor(w, radius);
     if (pointerIsDown) eraseAt(new Point(w[0], w[1]), radius);
