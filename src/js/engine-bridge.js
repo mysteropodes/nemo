@@ -2427,7 +2427,22 @@
     // pipeline draws correctly; 1.5px (vs Motion's 1px) since this box often
     // coincides exactly with the shape's own edge and needs to read over both
     // the shape's fill and the page background.
-    return [boundsRectItem(hb.left, hb.top, hb.right, hb.bottom, null, [74, 158, 255, 220], 1.5 * hzs)];
+    var col = [74, 158, 255, 220], sw = 1.5 * hzs;
+    var b = hb.b;
+    // hb is now an ORIENTED box (orientedBoxForPath, tools.js): {b,angle,pivot}
+    // in the shape's own de-rotated space — same shape as orientedSelBox's
+    // return, so a rotated shape draws its true rotated outline instead of
+    // an axis-aligned box that no longer matches its size/rotation (2026-08
+    // fix, "la box du hover ne correspond pas à la forme du bounding box").
+    if (!hb.angle) return [boundsRectItem(b.left, b.top, b.right, b.bottom, null, col, sw)];
+    var c1 = selBoxPt(b.left, b.top, hb), c2 = selBoxPt(b.right, b.top, hb);
+    var c3 = selBoxPt(b.right, b.bottom, hb), c4 = selBoxPt(b.left, b.bottom, hb);
+    return [
+      lineItem([c1.x, c1.y], [c2.x, c2.y], col, sw),
+      lineItem([c2.x, c2.y], [c3.x, c3.y], col, sw),
+      lineItem([c3.x, c3.y], [c4.x, c4.y], col, sw),
+      lineItem([c4.x, c4.y], [c1.x, c1.y], col, sw),
+    ];
   }
   function buildTransformBoxItems() {
     if (state.tool !== 'select') return [];

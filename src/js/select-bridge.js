@@ -63,6 +63,23 @@
     _hoverPathA2D = itemA2D;
     return true;
   }
+  // Oriented-box containment scan (2026-08, click-inside-the-hover-box
+  // fallback — see the onDown call site's own comment for why this is a
+  // fresh scan rather than trusting the last hover result). Topmost child
+  // first, same z-order convention as Paper's own hitTest.
+  function hitTestOrientedBoxA2D(pt, targetLayer) {
+    var kids = targetLayer.children;
+    for (var i = kids.length - 1; i >= 0; i--) {
+      var c = kids[i];
+      if (!(c instanceof Path || c instanceof Raster)) continue;
+      if (!isSelectablePathChild(c)) continue;
+      var ob = orientedBoxForPath(c);
+      if (!ob) continue;
+      var lp = ob.angle ? pt.rotate(-ob.angle, ob.pivot) : pt;
+      if (ob.b.contains(lp)) return c;
+    }
+    return null;
+  }
   // Dynamic shapes phase 3 (2026-08-18) — canvas drag handles for a rect's
   // corner radius, Figma's own interaction (a small grip sitting on each
   // rounded corner's arc, draggable independently). Self-contained state,
@@ -972,6 +989,42 @@
         }
         var oh = pl.hitTest(oPt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
         if (oh) { hit = oh; hitOtherLayerIdx = oli; break; }
+      }
+    }
+
+    // Click-inside-the-visible-hover-box fallback (2026-08, feedback: "peu
+    // importe où on clic si celle-ci [la box de hover] est affichée ça doit
+    // select l'objet"). The hover box (getHoverBounds/buildHoverBoxItems,
+    // engine-bridge.js) is the shape's ORIENTED bounding box, which for a
+    // rotated shape is generally a bit larger than its exact stroke/fill —
+    // the precise hitTest above can miss near a corner while the box is
+    // still visibly on screen there. Deliberately does its OWN box-containment
+    // scan (mirroring the two precise-hitTest passes just above: active
+    // layer first, then every other visible/unlocked layer, topmost child
+    // first) rather than trusting _hoverPathA2D — that flag reflects the
+    // LAST pointermove's precise hit, which for a real drag-into-the-gap
+    // gesture is often already null by the time onDown fires (mousemove
+    // re-runs the same precise hitTest at ~the same coordinates a moment
+    // before mousedown), so relying on it would silently do nothing for
+    // exactly the corner-click case this is meant to fix. Motion mode has
+    // its own separate hit-testing (SMMotion.onDown, tried first above) and
+    // never reaches this far with anything left to do here.
+    if (!hit && state.appMode !== 'motion') {
+      var boxHitLd = state.layers[state.activeLayerIdx];
+      if (!(boxHitLd && boxHitLd.locked && !boxHitLd.symbolId)) {
+        var boxHit = hitTestOrientedBoxA2D(hitPt, layer);
+        if (boxHit) { hit = { item: boxHit }; }
+      }
+      if (!hit) {
+        for (var bpli = project.layers.length - 1; bpli >= 0; bpli--) {
+          var bpl = project.layers[bpli];
+          var boli = userLayers.indexOf(bpl);
+          if (boli < 0 || boli === state.activeLayerIdx) continue;
+          var bld2 = state.layers[boli];
+          if (!bld2 || bld2.locked || !bld2.visible || bld2.symbolId) continue;
+          var bh = hitTestOrientedBoxA2D(pt, bpl);
+          if (bh) { hit = { item: bh }; hitOtherLayerIdx = boli; break; }
+        }
       }
     }
 
@@ -2368,7 +2421,10 @@
     },
     getMultiLayerBox: multiLayerSelectionBox,
     getHoverBounds: function () {
-      return (_hoverPathA2D && !_hoverPathA2D.removed) ? _hoverPathA2D.strokeBounds : null;
+      // Oriented (rotated) box, not the raw axis-aligned strokeBounds (2026-08
+      // fix — see orientedBoxForPath's own comment, tools.js): a rotated
+      // shape's AABB is bigger than and doesn't match its actual outline.
+      return (_hoverPathA2D && !_hoverPathA2D.removed) ? orientedBoxForPath(_hoverPathA2D) : null;
     },
     // Switching tools mid-marquee-drag (2026-07-29, QA-confirmed) used to
     // leave a stuck ghost selection rectangle: onUp's own finalization
