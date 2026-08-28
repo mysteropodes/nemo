@@ -50,6 +50,22 @@ web-sys = { version = "0.3", features = ["HtmlCanvasElement", "console"] }
 
 [dev-dependencies]
 naga = { version = "29.0.4", features = ["wgsl-in"] }
+# Native (non-wasm32) diagnostic test only (feedback #104 dab-render-drop
+# repro, tests/dab_dense_overlap_repro.rs) — blocks on the async wgpu
+# device/adapter negotiation and buffer readback outside a browser event
+# loop. Never touches the wasm32 release build (dev-dependency only).
+pollster = "0.3"
+# Diagnostic-only feature flip on vello: exposes Scene::bump_estimate(), a
+# CPU-side estimate of GPU bump-allocator demand for a built scene, purely
+# for the feedback #104 repro test to compare against vello's fixed,
+# hand-picked buffer sizes (vello_encoding::config::BufferSizes::new) —
+# never consulted by render_to_texture itself (checked: not referenced
+# anywhere in vello's render.rs/config.rs), so this does NOT change
+# render() or render_to_pixels() behavior, only adds a diagnostic method
+# available to `cargo test`. Cargo unifies dev-dependency features into the
+# `cargo test` build only — the wasm32 release build (wasm-pack build,
+# which never touches dev-dependencies) is unaffected.
+vello = { version = "0.9", features = ["bump_estimate"] }
 
 [profile.release]
 opt-level = "s"
