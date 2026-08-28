@@ -6758,6 +6758,13 @@ function updateTextPropsPanel(){
   // as every other live-bound numeric field in this file).
   var content=document.getElementById('tp-content');
   if(document.activeElement!==content)content.value=d.text||'';
+  // #tp-font (feedback #86, "je n'ai toujours que un choix de typo") — was
+  // never synced from d.vectorFont at all. Strip the -Regular/-Bold suffix
+  // buildVectorTextGroup's own resolvedFontKey stores there (vector-text-
+  // bridge.js) since the <option> values are bare family names — Bold is
+  // this panel's separate B toggle, not a second Font entry.
+  var fontEl=document.getElementById('tp-font');
+  if(document.activeElement!==fontEl)fontEl.value=(d.vectorFont||'Roboto-Regular').replace(/-(Bold|Regular)$/,'');
   var sizeEl=document.getElementById('tp-size');
   if(document.activeElement!==sizeEl)sizeEl.value=d.size||48;
   var colorEl=document.getElementById('tp-color');
@@ -6791,6 +6798,10 @@ function applyTextPropsEdit(){
   var d=root.data;
   var text=document.getElementById('tp-content').value;
   if(!text.trim())return; // never rebuild into an empty block — same guard commitText uses
+  // #tp-font (feedback #86) — bare family name; buildVectorTextGroup itself
+  // strips any -Bold/-Regular suffix before resolving against opts.bold, so
+  // passing the bare name straight through is already the right shape.
+  var fontKey=document.getElementById('tp-font').value||d.vectorFont||'Roboto';
   var size=parseInt(document.getElementById('tp-size').value,10)||d.size||48;
   var color=document.getElementById('tp-color').value||d.color;
   var alignBtn=document.querySelector('.tp-align-btn.ac');
@@ -6826,7 +6837,7 @@ function applyTextPropsEdit(){
   }
   pushUndo();
   window.SMVectorText.vectorTextGroupMembers(root).forEach(function(p){p.remove();});
-  window.SMVectorText.buildVectorTextGroup(text,d.vectorFont,size,color,align,fixedWidthWorld,topLeft,layer,opts).then(function(res){
+  window.SMVectorText.buildVectorTextGroup(text,fontKey,size,color,align,fixedWidthWorld,topLeft,layer,opts).then(function(res){
     // Re-point the selection at every glyph of the freshly-built group, not
     // just its root — the old paths were just removed above, and
     // textPropsRoot() requires the CURRENT selection to be exactly the
@@ -6845,7 +6856,7 @@ function applyTextPropsEdit(){
   var contentEl=document.getElementById('tp-content');
   if(!contentEl)return; // this file is also loaded in contexts without the full panel markup
   contentEl.addEventListener('blur',applyTextPropsEdit);
-  ['tp-size','tp-color','tp-letter-spacing','tp-line-height','tp-word-spacing','tp-fixed-width'].forEach(function(id){
+  ['tp-font','tp-size','tp-color','tp-letter-spacing','tp-line-height','tp-word-spacing','tp-fixed-width'].forEach(function(id){
     document.getElementById(id).addEventListener('change',applyTextPropsEdit);
   });
   document.querySelectorAll('.tp-align-btn').forEach(function(b){

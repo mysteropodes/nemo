@@ -17,9 +17,21 @@
 // character Motion animation/expressions work the instant vector text is
 // placed — no separate "Découper par caractère" bake step needed, unlike
 // the raster text tool's per-character split.
+// DejaVu Sans/Serif added 2026-08-28 (feedback #86, "je n'ai toujours que
+// un choix de typo si je veux changer") — the Typography panel's #tp-font
+// select had exactly one real option (Roboto) and, separately, wasn't even
+// wired to a change handler (see the (function(){...})() block at the
+// bottom of timeline.js's text-props section). DejaVu ships under a
+// permissive license explicit about embedding/redistribution (same terms
+// matplotlib redistributes it under) — a genuinely different family
+// (serif option included), not just another weight of the same face.
 var VECTOR_FONTS = {
   'Roboto-Regular': { url: 'fonts/Roboto-Regular.ttf', label: 'Roboto' },
   'Roboto-Bold': { url: 'fonts/Roboto-Bold.ttf', label: 'Roboto Bold' },
+  'DejaVuSans-Regular': { url: 'fonts/DejaVuSans.ttf', label: 'DejaVu Sans' },
+  'DejaVuSans-Bold': { url: 'fonts/DejaVuSans-Bold.ttf', label: 'DejaVu Sans Bold' },
+  'DejaVuSerif-Regular': { url: 'fonts/DejaVuSerif.ttf', label: 'DejaVu Serif' },
+  'DejaVuSerif-Bold': { url: 'fonts/DejaVuSerif-Bold.ttf', label: 'DejaVu Serif Bold' },
 };
 var _vecFontCache = {};
 function loadVectorFont(key) {
@@ -29,11 +41,14 @@ function loadVectorFont(key) {
   _vecFontCache[key] = fetch(spec.url).then(function (r) { return r.arrayBuffer(); }).then(function (buf) { return opentype.parse(buf); });
   return _vecFontCache[key];
 }
-// Pre-warm both bundled weights on script load — Regular is the common
-// case, warmed first, so the FIRST vector-text placement doesn't stall on
-// a network fetch.
+// Pre-warm the Regular weight of every bundled family on script load — the
+// common case for a first placement, so it doesn't stall on a network
+// fetch. Bold weights load lazily (on first actual use, via the Bold
+// toggle or picking a "* Bold" option) rather than up front.
 loadVectorFont('Roboto-Regular');
 loadVectorFont('Roboto-Bold');
+loadVectorFont('DejaVuSans-Regular');
+loadVectorFont('DejaVuSerif-Regular');
 
 // opentype.js glyph paths carry command types M/L/Q/C/Z with coordinates
 // ALREADY in final pixel space (glyph.getPath(x,y,fontSize) applies
