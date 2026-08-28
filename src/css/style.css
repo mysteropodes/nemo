@@ -1808,6 +1808,24 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 .bp-item-del:hover{background:var(--red);color:#fff;}
 .bp-edit-btn{margin-top:6px;padding:7px;border-radius:4px;border:1px dashed var(--border2);background:transparent;color:var(--text-dim);font-size:10px;cursor:pointer;}
 .bp-edit-btn:hover{color:var(--text);border-color:var(--accent);}
+/* Favorite star toggle on each popover row (feedback #81) — sits where
+   .bp-item-del sits for a custom preset, so a custom row gets both (star
+   further left, delete stays pinned to the edge). Hidden until hover/active
+   so the row doesn't look cluttered by default, same convention as most
+   icon-only row actions elsewhere in this app. */
+.bp-item{position:relative;padding-right:22px;}
+.bp-item-custom{padding-right:40px;}
+.bp-item-fav{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;color:var(--text-dim);opacity:0;cursor:pointer;}
+.bp-item-custom .bp-item-fav{right:20px;}
+.bp-item:hover .bp-item-fav,.bp-item-fav.is-fav{opacity:1;}
+.bp-item-fav.is-fav{color:#ffc94a;}
+.bp-item-fav:hover{color:#ffc94a;transform:translateY(-50%) scale(1.15);}
+/* Favorites quick strip under the Brush row in Stroke (feedback #81) */
+.bp-fav-row{display:flex;flex-wrap:wrap;gap:4px;padding-top:2px;}
+.bp-fav-item{width:26px;height:26px;border-radius:5px;border:1px solid var(--border2);background:var(--panel3);padding:0;cursor:pointer;overflow:hidden;flex:none;}
+.bp-fav-item:hover{border-color:var(--accent);}
+.bp-fav-item.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
+.bp-fav-item canvas{width:100%;height:100%;display:block;}
 /* Brush floating menu (2026-07, brush-menu-bridge.js) — reuses .bp-grid/
    .bp-item/.bp-group-label above verbatim for the thumbnail lists (same
    visual language, no second style to keep in sync); only new rules are

@@ -132,6 +132,47 @@
   function customKeys() {
     return Object.keys((window.state && state.customBrushPresets) || {});
   }
+  // Favorites (feedback #81) — a personal picker preference, not project
+  // data (no brush-preset FIELD travels with a stroke's own dict, only the
+  // key it referenced — CLAUDE.md §1's "new tag" concern doesn't apply
+  // here), so this lives in localStorage like nemo-app-mode rather than in
+  // exportJSON/state.customBrushPresets. Global across projects on purpose,
+  // matching the "favorite brush" convention in every drawing app that has
+  // one — the whole point is not re-finding the same brush in every file.
+  var FAV_KEY = 'sm-brush-favorites';
+  function loadFavorites() {
+    try { var raw = localStorage.getItem(FAV_KEY); return raw ? JSON.parse(raw) : []; } catch (e) { return []; }
+  }
+  var favorites = loadFavorites();
+  function isFavorite(key) { return favorites.indexOf(key) >= 0; }
+  function toggleFavorite(key) {
+    var i = favorites.indexOf(key);
+    if (i >= 0) favorites.splice(i, 1); else favorites.push(key);
+    try { localStorage.setItem(FAV_KEY, JSON.stringify(favorites)); } catch (e) { }
+    renderFavoritesRow();
+  }
+  // A favorited custom preset can be deleted from under it (customKeys()
+  // filters it out below), or a favorited built-in can vanish if a future
+  // build renames/removes a preset key — resolveBrushPreset returning null
+  // is the one signal available for "this key doesn't exist anymore",
+  // filtered out here rather than left to draw a blank/broken thumbnail.
+  function renderFavoritesRow() {
+    var row = document.getElementById('p-brushfav-row');
+    if (!row) return;
+    var live = favorites.filter(function (k) { return window.resolveBrushPreset && window.resolveBrushPreset(k); });
+    if (live.length !== favorites.length) { favorites = live; try { localStorage.setItem(FAV_KEY, JSON.stringify(favorites)); } catch (e) { } }
+    row.style.display = live.length ? '' : 'none';
+    row.innerHTML = '';
+    live.forEach(function (k) {
+      var btn = document.createElement('button');
+      btn.className = 'bp-fav-item' + (window.state && state.brushPreset === k ? ' active' : '');
+      btn.title = labelFor(k);
+      btn.innerHTML = '<canvas width="26" height="26"></canvas>';
+      btn.addEventListener('click', function () { selectPreset(k); renderFavoritesRow(); });
+      row.appendChild(btn);
+      drawPreview(btn.querySelector('canvas'), k);
+    });
+  }
   function labelFor(key) {
     if (key === 'none') return 'None (solid)';
     if (window.state && state.customBrushPresets && state.customBrushPresets[key] && state.customBrushPresets[key].label) return state.customBrushPresets[key].label;
@@ -143,6 +184,13 @@
     var label = document.getElementById('p-brushpreset-label');
     if (canvas) drawPreview(canvas, presetKey);
     if (label) label.textContent = labelFor(presetKey || 'none');
+    // Keeps the favorites strip's own active highlight in sync with every
+    // caller of paintButton (popover pick, eyedropper, floating Brush
+    // menu…) — not just clicks on the strip itself.
+    document.querySelectorAll('#p-brushfav-row .bp-fav-item').forEach(function (b, i) {
+      var k = favorites[i];
+      if (k !== undefined) b.classList.toggle('active', presetKey === k);
+    });
   }
   // Sets state.brushPreset directly rather than round-tripping through the
   // hidden legacy <select id="p-brushpreset"> — that select's static
@@ -174,11 +222,18 @@
     var el = document.createElement('div');
     el.className = 'ctx-menu bp-picker-pop';
     var html = '';
+    // Star SVG (feedback #81) — inline data URI convention avoided here
+    // since it's just markup, not a cursor; skipped on 'none' (favoriting
+    // "no brush" isn't meaningful).
+    function favStar(k) {
+      if (k === 'none') return '';
+      return '<span class="bp-item-fav' + (isFavorite(k) ? ' is-fav' : '') + '" data-fav="' + k + '" title="' + (isFavorite(k) ? 'Retirer des favoris' : 'Ajouter aux favoris') + '">' + (isFavorite(k) ? '★' : '☆') + '</span>';
+    }
     builtinGroups().forEach(function (g) {
       html += '<div class="bp-group-label">' + g.label + '</div><div class="bp-grid">';
       g.keys.forEach(function (k) {
         html += '<button class="bp-item' + (k === currentKey ? ' active' : '') + '" data-key="' + k + '" title="' + labelFor(k) + '">' +
-          '<canvas width="150" height="20"></canvas><span>' + labelFor(k) + '</span></button>';
+          '<canvas width="150" height="20"></canvas><span>' + labelFor(k) + '</span>' + favStar(k) + '</button>';
       });
       html += '</div>';
     });
@@ -187,7 +242,7 @@
       html += '<div class="bp-group-label">Mes brushes</div><div class="bp-grid">';
       custom.forEach(function (k) {
         html += '<button class="bp-item bp-item-custom' + (k === currentKey ? ' active' : '') + '" data-key="' + k + '" title="' + labelFor(k) + '">' +
-          '<canvas width="150" height="20"></canvas><span>' + labelFor(k) + '</span>' +
+          '<canvas width="150" height="20"></canvas><span>' + labelFor(k) + '</span>' + favStar(k) +
           '<span class="bp-item-del" data-del="' + k + '" title="Supprimer">&times;</span></button>';
       });
       html += '</div>';
@@ -202,7 +257,7 @@
       btn.addEventListener('mouseenter', function () { hoverPreview(btn.dataset.key); });
       btn.addEventListener('mouseleave', function () { revertHoverPreview(); });
       btn.addEventListener('click', function (e) {
-        if (e.target.classList.contains('bp-item-del')) return;
+        if (e.target.classList.contains('bp-item-del') || e.target.classList.contains('bp-item-fav')) return;
         // Revert the hover preview BEFORE the real commit — onSelect's own
         // pushUndo (via setBrushPreset) must snapshot the true pre-hover
         // state, not the already-mutated preview, or Ctrl+Z would restore
@@ -217,12 +272,23 @@
         el.querySelectorAll('.bp-item').forEach(function (b) { b.classList.toggle('active', b.dataset.key === btn.dataset.key); });
       });
     });
+    el.querySelectorAll('.bp-item-fav').forEach(function (favBtn) {
+      favBtn.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        toggleFavorite(favBtn.dataset.fav);
+        var nowFav = isFavorite(favBtn.dataset.fav);
+        favBtn.classList.toggle('is-fav', nowFav);
+        favBtn.textContent = nowFav ? '★' : '☆';
+        favBtn.title = nowFav ? 'Retirer des favoris' : 'Ajouter aux favoris';
+      });
+    });
     el.querySelectorAll('.bp-item-del').forEach(function (delBtn) {
       delBtn.addEventListener('click', function (e) {
         e.preventDefault(); e.stopPropagation();
         var key = delBtn.dataset.del;
         if (window.state && state.customBrushPresets) delete state.customBrushPresets[key];
         if (state.brushPreset === key) { state.brushPreset = 'none'; paintButton('none'); }
+        renderFavoritesRow();
         closePopover();
         open(anchorEl, currentKey, onSelect);
       });
@@ -257,6 +323,7 @@
     // reuses this file's exact catalog/preview/select logic rather than
     // keeping a second copy that could drift out of sync.
     groups: builtinGroups, customKeys: customKeys,
+    isFavorite: isFavorite, toggleFavorite: toggleFavorite,
   };
 
   function init() {
@@ -267,6 +334,7 @@
       open(btn, state.brushPreset || 'none', selectPreset);
     });
     paintButton(state.brushPreset || 'none');
+    renderFavoritesRow();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
