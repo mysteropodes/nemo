@@ -3093,7 +3093,10 @@
       [[bc1, bc2], [bc2, bc3], [bc3, bc4], [bc4, bc1]].forEach(function (seg) {
         items.push({ segments: [{ point: [seg[0].x, seg[0].y] }, { point: [seg[1].x, seg[1].y] }], closed: false, fillColor: null, strokeColor: boxCol, strokeWidth: 1 * zs });
       });
-      [mh.corners.nw, mh.corners.ne, mh.corners.se, mh.corners.sw].forEach(function (p) {
+      // Corners + edge midpoints (feedback #98) — same square style for
+      // both, matching Animation 2D's own buildTransformBoxItems (no visual
+      // distinction there either between a corner and an n/s/e/w handle).
+      [mh.corners.nw, mh.corners.ne, mh.corners.se, mh.corners.sw, mh.corners.n, mh.corners.s, mh.corners.e, mh.corners.w].forEach(function (p) {
         var hs = 3.5 * zs;
         items.push({ segments: [{ point: [p.x - hs, p.y - hs] }, { point: [p.x + hs, p.y - hs] }, { point: [p.x + hs, p.y + hs] }, { point: [p.x - hs, p.y + hs] }], closed: true, fillColor: [255, 255, 255, 255], strokeColor: [74, 158, 255, 255], strokeWidth: 1.2 * zs });
       });
@@ -3409,9 +3412,19 @@
     // outerMotionMaps' own comment). Corners used to be plain g.fwd(...)
     // with no outer wrapping at all, so a parented layer's box never
     // agreed with where it actually renders.
+    // Edge midpoints (feedback #98, "scale en width ou height séparément...
+    // en Animation 2D mais pas en motion") added alongside the 4 corners —
+    // this dict's own keys are already what hitMotionBoxHandle iterates
+    // generically (Object.keys) and what multiLayerBox unions via min/max,
+    // so both stay correct with no further change; only onDown/onDrag's
+    // motionScale branch needs to tell a single-letter dir (n/s/e/w) apart
+    // from a two-letter corner to know which axis/axes to scale.
+    var midX = (b.left + b.right) / 2, midY = (b.top + b.bottom) / 2;
     var corners = {
       nw: outerWorldPoint(t, g.fwd(b.left, b.top)), ne: outerWorldPoint(t, g.fwd(b.right, b.top)),
       se: outerWorldPoint(t, g.fwd(b.right, b.bottom)), sw: outerWorldPoint(t, g.fwd(b.left, b.bottom)),
+      n: outerWorldPoint(t, g.fwd(midX, b.top)), s: outerWorldPoint(t, g.fwd(midX, b.bottom)),
+      e: outerWorldPoint(t, g.fwd(b.right, midY)), w: outerWorldPoint(t, g.fwd(b.left, midY)),
     };
     var zs = 1 / Math.max(0.0001, view.zoom);
     // Rotate RING (2026-07, replacing the tiny offset stem+dot — same
@@ -3784,7 +3797,17 @@
         } else {
           var corner = motionHandlePositions(t).corners[boxHit.dir];
           var origDist = Math.hypot(corner.x - g.pivot.x, corner.y - g.pivot.y) || 1;
-          _motionDrag = { mode: 'motionScale', t: t, pivot: g.pivot, origDist: origDist, origScale: g.scl.slice() };
+          // Single-axis edge handle (feedback #98) — the handle's own
+          // world-space direction from the pivot (already rotation-correct,
+          // since it's the ACTUAL rendered position, same box the corner
+          // branch already trusts) becomes the axis to project the drag
+          // onto, so only n/s scales Y and only e/w scales X. Two-letter
+          // corners keep the untouched uniform-ratio path below.
+          var axisDir = null;
+          if (boxHit.dir === 'n' || boxHit.dir === 's' || boxHit.dir === 'e' || boxHit.dir === 'w') {
+            axisDir = { ux: (corner.x - g.pivot.x) / origDist, uy: (corner.y - g.pivot.y) / origDist };
+          }
+          _motionDrag = { mode: 'motionScale', t: t, pivot: g.pivot, dir: boxHit.dir, axisDir: axisDir, origDist: origDist, origScale: g.scl.slice() };
         }
         return true;
       }
@@ -3957,12 +3980,26 @@
       else if (_motionDrag.axis === 'y') setValue(_motionDrag.t.holder, 'rotationY', [newRot3D]);
       else setValue(_motionDrag.t.holder, 'rotation', [newRot3D]);
     } else if (_motionDrag.mode === 'motionScale') {
-      // v1 scope: uniform scale only (both axes move by the same ratio) —
-      // no per-edge single-axis handles yet, matching this increment's
-      // corner-only hit-test.
-      var dist = Math.hypot(event.point.x - _motionDrag.pivot.x, event.point.y - _motionDrag.pivot.y);
-      var ratio = dist / _motionDrag.origDist;
-      setValue(_motionDrag.t.holder, 'scale', [_motionDrag.origScale[0] * ratio, _motionDrag.origScale[1] * ratio]);
+      if (_motionDrag.axisDir) {
+        // Edge handle (feedback #98) — signed projection of the drag onto
+        // the handle's OWN axis (captured at grab time in onDown), so only
+        // the corresponding scale component moves; dragging past the pivot
+        // legally flips the sign, same as the uniform corner path below
+        // never guarding against it either.
+        var edx = event.point.x - _motionDrag.pivot.x, edy = event.point.y - _motionDrag.pivot.y;
+        var eProj = edx * _motionDrag.axisDir.ux + edy * _motionDrag.axisDir.uy;
+        var eRatio = eProj / _motionDrag.origDist;
+        if (_motionDrag.dir === 'n' || _motionDrag.dir === 's') {
+          setValue(_motionDrag.t.holder, 'scale', [_motionDrag.origScale[0], _motionDrag.origScale[1] * eRatio]);
+        } else {
+          setValue(_motionDrag.t.holder, 'scale', [_motionDrag.origScale[0] * eRatio, _motionDrag.origScale[1]]);
+        }
+      } else {
+        // Corner handle — uniform scale, both axes move by the same ratio.
+        var dist = Math.hypot(event.point.x - _motionDrag.pivot.x, event.point.y - _motionDrag.pivot.y);
+        var ratio = dist / _motionDrag.origDist;
+        setValue(_motionDrag.t.holder, 'scale', [_motionDrag.origScale[0] * ratio, _motionDrag.origScale[1] * ratio]);
+      }
     } else {
       var k = _motionDrag.key, pv = _motionDrag.pv;
       var localPointer=outerLocalPoint(_motionDrag.t,{x:event.point.x,y:event.point.y});
