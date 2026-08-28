@@ -947,6 +947,13 @@
             </optgroup>
           </select>
         </div>
+        <!-- Brush favorites strip (feedback #81, "on doit pouvoir mettre en
+             favoris une brush... et celle ci doivent s'afficher en petit
+             bouton previz sous le menu brush dans stroke") — small preview
+             buttons for quick one-click access, built/filled by
+             brush-preset-picker.js's renderFavoritesRow(). Hidden entirely
+             when there are no favorites yet. -->
+        <div class="pr bp-fav-row" id="p-brushfav-row" style="display:none"></div>
         <!-- "Apply to selection" button and the whole Bitmap Brush section
              (checkbox + Tip/Spacing/Scatter/Opacity/Pressure/Import .abr/
              Apply/Remove rows) moved OUT of Stroke (2026-07, harmonization
