@@ -1953,13 +1953,23 @@ function fillCloseOverlayItems(){
 // fill click uses it or a tool switch discards it (see window.SM.setTool,
 // timeline.js, which clears _fillCloseStrokes on leaving 'fill').
 function fillCloseStrokesOverlayItems(){
-  if(!_fillCloseStrokes.length)return[];
+  // Closing lines are invisible by design (Harmony's Close Gap model) — which
+  // leaves no way to see that one is there, or where. Harmony answers this with
+  // an explicit show-strokes display; same idea here, scoped to the tool that
+  // owns them: while the paint bucket is active they show as a dashed guide,
+  // and the moment you switch tools they are invisible again. Purely an
+  // overlay — nothing is added to the document, so this never reaches export.
+  if(!window.state||state.tool!=='fill')return[];
+  var layer=(typeof userLayers!=='undefined')&&userLayers[state.activeLayerIdx];
+  if(!layer)return[];
   var zs=1/Math.max(0.0001,view.zoom);
-  return _fillCloseStrokes.map(function(entry){
+  return layer.children.filter(function(c){
+    return c instanceof Path&&c.data&&c.data.isFillCloseLine&&c.segments.length>=2;
+  }).map(function(c){
     return{
-      segments:entry.points.map(function(p){return{point:p};}),
+      segments:c.segments.map(function(sg){return{point:[sg.point.x,sg.point.y]};}),
       closed:false,fillColor:null,
-      strokeColor:[255,152,0,230],strokeWidth:2*zs,dashPattern:[6*zs,4*zs],
+      strokeColor:[255,152,0,200],strokeWidth:1.5*zs,dashPattern:[5*zs,4*zs],
     };
   });
 }
