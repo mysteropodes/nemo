@@ -3790,7 +3790,22 @@
       // Skipped entirely for a 3D layer — the box isn't drawn there (see
       // buildOverlayItems' is3DTargetForBox), so it must not still be a
       // live (invisible) hit-target either.
-      var boxHit = (t.li != null && state.layers[t.li] && state.layers[t.li].threeD && !t.strokeId) ? null : hitMotionBoxHandle(event.point, t);
+      // Also skipped for a Null layer (feedback #59, "un petit bounding box
+      // que l'on peu déplacer" never actually moved on drag): motionBoxGeom
+      // gives a Null a fixed tiny 24px-equivalent box (hs=12/zoom) so
+      // ringRadius (30% of that) collapses to ~7.2px — right on top of
+      // hitMotionBoxHandle's own ±7px ring tolerance. The tolerance band
+      // then swallows the ENTIRE clickable marker, so every click matched
+      // 'rotate' and the correctly-working move handler in select-bridge.js
+      // (mode:'null-drag', a few lines below this file's own onDown return)
+      // never got a chance to run — confirmed live, dragging always rotated,
+      // position never budged. A Null has no real use for a canvas
+      // rotate/scale drag anyway (both properties stay reachable from the
+      // panel) — skip the box gizmo outright so a plain click always falls
+      // through to the dedicated move handler instead of chasing a
+      // per-layer-type ring-radius tune.
+      var isNullTarget = t.li != null && state.layers[t.li] && state.layers[t.li].isNullLayer;
+      var boxHit = (isNullTarget || (t.li != null && state.layers[t.li] && state.layers[t.li].threeD && !t.strokeId)) ? null : hitMotionBoxHandle(event.point, t);
       if (boxHit) {
         pushUndo();
         var g = motionBoxGeom(t);
