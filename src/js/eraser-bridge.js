@@ -164,13 +164,21 @@
     ensureKeyframe();
     lastPenPressure = null;
     eraseStabQueue.length = 0;
-    var w = stabilizeErasePoint(window.SMEngineBridge.screenToWorld(e.clientX, e.clientY));
+    var rawW = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    var w = stabilizeErasePoint(rawW);
     var radius = eraseRadiusFor(e);
     pointerIsDown = true;
     erasing = false;
     lastErasePt = null;
     window.SMEngineBridge.suspend();
-    window.SMEngineBridge.setEraserCursor(w, radius);
+    // Feedback #93 ("le rond de guide de la gomme est en decalage par
+    // rapport à la souris"): the cursor circle used the STABILIZED point
+    // (a running average over up to 10 samples — see stabilizeErasePoint
+    // above), which is exactly right for the actual erase path but visibly
+    // lags the real cursor, worst with a high Stabilizer setting or a fast
+    // stroke/stop. The guide now tracks the raw, unsmoothed point — only
+    // the erase hit-test itself stays stabilized.
+    window.SMEngineBridge.setEraserCursor(rawW, radius);
     eraseAt(new Point(w[0], w[1]), radius);
     window.SMEngineBridge.renderNow();
   }
@@ -190,9 +198,10 @@
     if (!shouldIntercept()) return;
     e.stopImmediatePropagation();
     e.preventDefault();
-    var w = stabilizeErasePoint(window.SMEngineBridge.screenToWorld(e.clientX, e.clientY));
+    var rawW = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    var w = stabilizeErasePoint(rawW);
     var radius = eraseRadiusFor(e);
-    window.SMEngineBridge.setEraserCursor(w, radius);
+    window.SMEngineBridge.setEraserCursor(rawW, radius); // raw point — see onDown's comment on this
     if (pointerIsDown) eraseAt(new Point(w[0], w[1]), radius);
     window.SMEngineBridge.renderNow();
   }

@@ -156,11 +156,11 @@
   // there's no per-user concept here — the layer IS the "owner" of an
   // imported asset), and import date.
   var KIND_LABEL = { video: 'Vidéo', image: 'Image', audio: 'Audio' };
-  function render() {
-    var grid = document.getElementById('media-grid'); if (!grid) return;
-    grid.innerHTML = '';
-    var orphanCount = 0;
-    (state.mediaLibrary || []).forEach(function (m) {
+  var _orphanCount = 0; // set fresh by buildRow() on every render() pass, read back after
+  // Builds ONE row for a media entry — unchanged from the old flat-list
+  // version, just no longer appends itself directly (the caller decides
+  // which folder body to append into, see render() below).
+  function buildRow(m) {
       var row = document.createElement('div'); row.className = 'media-row' + (m.status === 'loading' ? ' loading' : ''); row.title = m.name;
       var thumb = document.createElement('div'); thumb.className = 'media-row-thumb';
       if (m.status === 'loading') {
@@ -195,8 +195,7 @@
         waitEl.textContent = SM && SM.t ? SM.t('mediaDecoding') : 'Décodage…';
         main.appendChild(waitEl);
         row.appendChild(main);
-        grid.appendChild(row);
-        return; // no context menu / drag / owner lookup on a not-yet-real entry
+        return row; // no context menu / drag / owner lookup on a not-yet-real entry
       }
 
       var meta = document.createElement('div'); meta.className = 'media-row-meta';
@@ -219,7 +218,7 @@
       // this makes it visible without having to click first).
       var srcLayer = resolveSrcLayer(m);
       if (m.layerName || m.layerUid) {
-        if (!srcLayer) orphanCount++;
+        if (!srcLayer) _orphanCount++;
         var owner = document.createElement('span'); owner.className = 'media-row-owner' + (srcLayer ? '' : ' orphan');
         if (srcLayer) { var dot = document.createElement('span'); dot.className = 'media-row-owner-dot'; dot.style.background = srcLayer.color || 'var(--text-dim)'; owner.appendChild(dot); }
         var ownerLbl = document.createElement('span'); ownerLbl.textContent = srcLayer ? srcLayer.name : 'Orphelin';
@@ -269,16 +268,54 @@
           e.dataTransfer.effectAllowed = 'copy';
         });
       }
-      grid.appendChild(row);
+      return row;
+  }
+
+  // Real hierarchy pass (2026-08, feedback: "on est pas encore sur une vrai
+  // hierarchie avec label, folder..., ou composition" — AEP Transplant
+  // reference). Folders are AUTOMATIC by kind (scope decision this
+  // session — no user-managed create/rename/drag-into-folder), plus a
+  // "Composants" folder surfacing state.symbols (Nemo's precomp
+  // equivalent) since the reference screenshot's PRECOMPS group is exactly
+  // that concept. asset-tree.js owns the folder header/chevron/collapse
+  // widget; this function only groups entries and builds rows into it.
+  function render() {
+    var grid = document.getElementById('media-grid'); if (!grid) return;
+    grid.innerHTML = '';
+    _orphanCount = 0;
+    if (!window.SMAssetTree) return; // asset-tree.js not loaded — nothing to group into
+    var symIds = Object.keys(state.symbols || {});
+    if (symIds.length) {
+      var compBody = SMAssetTree.folderGroup(grid, { label: SMAssetTree.componentsLabel(), color: SMAssetTree.FOLDER_COLORS.components, count: symIds.length });
+      symIds.forEach(function (sid) {
+        var sym = state.symbols[sid];
+        var row = document.createElement('div'); row.className = 'bp-item'; row.title = sym.name;
+        var icon = document.createElement('span'); icon.className = 'bp-item-icon'; icon.textContent = '▤';
+        row.appendChild(icon);
+        var span = document.createElement('span'); span.textContent = sym.name || 'Composant';
+        row.appendChild(span);
+        compBody.appendChild(row);
+      });
+    }
+    ['image', 'video', 'audio'].forEach(function (kind) {
+      var entries = (state.mediaLibrary || []).filter(function (m) { return m.kind === kind; });
+      if (!entries.length) return;
+      var body = SMAssetTree.folderGroup(grid, { label: SMAssetTree.KIND_GROUP_LABEL[kind], color: SMAssetTree.FOLDER_COLORS[kind], count: entries.length });
+      entries.forEach(function (m) { body.appendChild(buildRow(m)); });
     });
+    if (!symIds.length && !(state.mediaLibrary || []).length) {
+      var empty = document.createElement('div'); empty.className = 'asset-folder-empty-hint';
+      empty.textContent = SM && SM.t ? SM.t('mediaDropHint') : 'Aucun média importé.';
+      grid.appendChild(empty);
+    }
     // Bulk cleanup (2026-07-31) — catalog-only (never touches the
     // underlying layer, which has its own trash button already): shows/
     // hides based on whether there's anything TO clean, and labels the
     // count so it isn't a mystery button.
     var cleanupBtn = document.getElementById('btn-media-cleanup');
     if (cleanupBtn) {
-      cleanupBtn.style.display = orphanCount ? '' : 'none';
-      cleanupBtn.textContent = 'Nettoyer (' + orphanCount + ')';
+      cleanupBtn.style.display = _orphanCount ? '' : 'none';
+      cleanupBtn.textContent = 'Nettoyer (' + _orphanCount + ')';
     }
   }
   // Catalog-only cleanup: removes entries whose source layer no longer

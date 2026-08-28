@@ -8365,6 +8365,10 @@
 
   window.SMMotion = {
     valueAtFrame: valueAtFrame,
+    // motion-preset-picker.js: refresh the Transform group's displayed
+    // values right after overwriting ld.motion/motionStatic wholesale
+    // (applying a preset), same as any other bulk Motion mutation.
+    renderMotionPropsPanel: renderMotionPropsPanel,
     // Parent in Time on-timeline connector (2026-07-30, Van Dijk 2.1) —
     // layer-inout.js calls this directly so the 3 on-bar anchor points
     // (in/out/whole layer) share the exact same drag/cycle-check/link-

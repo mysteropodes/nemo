@@ -3321,8 +3321,21 @@
         lastSceneVersion = window._sceneVersion;
       }
     } catch (e) {
+      // A WASM trap (an internal Rust panic — most commonly the boolean-op
+      // library choking on degenerate geometry from a tool like the
+      // eraser, see eraser.rs's dedup/ring-length guards) poisons the
+      // WHOLE wasm module instance, not just the one call that triggered
+      // it — every future engine.render() throws the exact same way, so
+      // disabling for the rest of this session (falling back to Paper.js,
+      // same as the manual toggle) is the only safe response. Silently
+      // switching render backends with nothing but a console.error is how
+      // this surfaced as several unrelated-looking "fill/gomme/lasso font
+      // rien" reports before anyone thought to check devtools — a distinct,
+      // explicit toast (not setEnabled's own generic "Rendu: Paper.js")
+      // makes the actual cause visible instead of just the symptom.
       console.error('[engine-bridge] render failed, disabling', e);
-      setEnabled(false);
+      if (window.showToast) showToast('Moteur de rendu Rust interrompu (géométrie invalide) — passage en Paper.js. Sauvegardez et rechargez pour le restaurer.');
+      setEnabled(false, true);
       return;
     }
     rafId = requestAnimationFrame(tick);
@@ -3376,10 +3389,17 @@
     }
   }
 
-  async function ensureEngine() {
+  // Set on every failed attempt, read once by autoEnable() after its
+  // retries are exhausted to decide the boot-time modal's message
+  // (webgpuUnavailableModal, below) — 'canvas'/'wasm' are almost always
+  // transient-turned-permanent script/layout problems, not a WebGPU
+  // capability issue, so only 'webgpu' gets the browser-specific hint.
+  var _lastEnsureFailReason = null;
+  async function ensureEngine(silent) {
     if (engine) return true;
     if (!window.GeometryWasm || !window.GeometryWasm.ready) {
-      showToast(SM.t('toastRustEngineUnavailableWasm'));
+      _lastEnsureFailReason = 'wasm';
+      if (!silent) showToast(SM.t('toastRustEngineUnavailableWasm'));
       return false;
     }
     var paperCanvas = document.getElementById('drawing-canvas');
@@ -3388,7 +3408,8 @@
     // 0×0 (or 0×N) surface.configure() during create_engine() is just as
     // fatal to the WebGPU surface as during a later resize.
     if (paperCanvas.width <= 0 || paperCanvas.height <= 0) {
-      showToast(SM.t('toastRustEngineCanvasNotReady'));
+      _lastEnsureFailReason = 'canvas';
+      if (!silent) showToast(SM.t('toastRustEngineCanvasNotReady'));
       return false;
     }
     rustCanvas = document.createElement('canvas');
@@ -3424,15 +3445,39 @@
       return true;
     } catch (e) {
       console.error('[engine-bridge] engine creation failed', e);
-      showToast(SM.t('toastRustEngineWebgpuFailedSuffix') + e);
+      _lastEnsureFailReason = 'webgpu';
+      // Actionable, not just diagnostic (2026-08, live report: "Failed to
+      // create WebGPU Context Provider" ×15 then "no compatible WebGPU
+      // adapter" on an M3/Sequoia Mac IN A BROWSER, not the desktop app —
+      // ruling out "old hardware" as the cause). Browsers differ in
+      // whether WebGPU needs enabling by hand, so the raw error alone
+      // ("échec WebGPU — NotFound {...}") gives a beta tester nothing to
+      // actually DO about it. This never blocks anything either way — the
+      // app already falls back to Paper.js regardless of which hint fires.
+      // Suppressed when silent (the automatic boot-time retry loop,
+      // autoEnable below) — up to 15 attempts flashing the same toast is
+      // worse than the one clear modal autoEnable shows once retries are
+      // actually exhausted, not per-attempt noise.
+      if (!silent) showToast(SM.t('toastRustEngineWebgpuFailedSuffix') + webgpuFailureHint());
       rustCanvas.remove();
       rustCanvas = null;
       return false;
     }
   }
+  function webgpuFailureHint() {
+    var ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+    var isSafari = /Safari/.test(ua) && !/Chrome|Chromium|Edg|OPR/.test(ua);
+    var isFirefox = /Firefox/.test(ua);
+    if (typeof navigator === 'undefined' || !navigator.gpu) {
+      if (isSafari) return SM.t('webgpuHintSafari');
+      if (isFirefox) return SM.t('webgpuHintFirefox');
+      return SM.t('webgpuHintGeneric');
+    }
+    return SM.t('webgpuHintAdapter');
+  }
 
   async function setEnabled(on, silent) {
-    if (on && !(await ensureEngine())) return;
+    if (on && !(await ensureEngine(silent))) return;
     enabled = on;
     if (rustCanvas) rustCanvas.style.display = on ? 'block' : 'none';
     // Paper's own canvas is fully hidden under the opaque rust canvas while
@@ -3459,6 +3504,29 @@
   // bridge keeps synced — used by draw-bridge.js so an intercepted tool's
   // pointer events land at the exact spot the Rust canvas is showing.
   function screenToWorld(clientX, clientY) {
+    // No WASM engine (WebGPU adapter creation failed — reported live on an
+    // M3/Sequoia Mac, "Failed to create WebGPU Context Provider" ×15 then
+    // "no compatible WebGPU adapter") leaves rustCanvas null (ensureEngine's
+    // own catch block). Every properly-gated bridge already skips calling
+    // this at all in that case (shouldIntercept() etc. check isEnabled()
+    // first) — but at least one caller (_fsPromoteDrag's raw document
+    // pointermove/pointerup in tools.js) never went through that gate, so
+    // this threw a bare "Cannot read properties of null
+    // (reading 'getBoundingClientRect')" on literally every click for
+    // anyone without a working WebGPU adapter — not a rare edge case, the
+    // WHOLE app for that user. Falling back to Paper's own view here
+    // (paperCanvasEl is set early in ensureEngine, before creation can
+    // fail, and sits at the exact same position/size as rustCanvas would)
+    // is correct, not just crash-proof: Paper's viewToProject already
+    // applies the same pan/zoom/rotation the two canvases are kept in
+    // sync on (syncViewport).
+    if (!rustCanvas) {
+      if (!paperCanvasEl || typeof view === 'undefined' || !view) return [0, 0];
+      var prect = paperCanvasEl.getBoundingClientRect();
+      var pLocal = new Point((clientX - prect.left) * (paperCanvasEl.width / prect.width), (clientY - prect.top) * (paperCanvasEl.height / prect.height));
+      var proj = view.viewToProject(pLocal);
+      return [proj.x, proj.y];
+    }
     var rect = rustCanvas.getBoundingClientRect();
     var sx = (clientX - rect.left) * (engineW / rect.width);
     var sy = (clientY - rect.top) * (engineH / rect.height);
@@ -3891,8 +3959,47 @@
   // toast) since this isn't a user-initiated action.
   function autoEnable(attemptsLeft) {
     setEnabled(true, true).then(function () {
-      if (!enabled && attemptsLeft > 0) setTimeout(function () { autoEnable(attemptsLeft - 1); }, 200);
+      if (!enabled && attemptsLeft > 0) { setTimeout(function () { autoEnable(attemptsLeft - 1); }, 200); return; }
+      // Retries exhausted and still off — 'canvas'/'wasm' are its own
+      // separate problems (layout never settling, the wasm script itself
+      // failing to load) the retry loop can't help with anyway; only a
+      // persistent 'webgpu' failure gets this modal, and only on the web
+      // build (2026-08, explicit ask: "détection sur la version web avec
+      // un popup" — the Tauri desktop build's WKWebView capability isn't
+      // something a user picks the way a browser is, so the same
+      // "try a different browser" advice doesn't apply there).
+      if (!enabled && _lastEnsureFailReason === 'webgpu' && !tauriOk()) showWebgpuUnavailableModal();
     });
+  }
+  function tauriOk() { return typeof window.__TAURI__ !== 'undefined'; }
+  var _webgpuModalShown = false;
+  function showWebgpuUnavailableModal() {
+    if (_webgpuModalShown) return; // once per session — the per-attempt toast is already suppressed during autoEnable's own retries, this is the ONE notice
+    _webgpuModalShown = true;
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    // This fires from autoEnable's boot-time retry, which starts as soon
+    // as the app loads — very likely BEFORE the user has even dismissed
+    // #start-screen (New Project/Open Project), which sits at z-index:500,
+    // well above .modal-overlay's own base 200. Confirmed live: without
+    // this override the modal builds correctly (right text, right size)
+    // but renders fully hidden behind the start screen — no visible
+    // failure, just silently never seen.
+    overlay.style.zIndex = '600';
+    overlay.innerHTML =
+      '<div class="modal-box">' +
+      '<div class="modal-hdr"><span>' + SM.t('webgpuModalTitle') + '</span><button class="modal-x" id="webgpu-modal-close">&times;</button></div>' +
+      '<div class="modal-bdy" style="display:flex;flex-direction:column;gap:10px">' +
+      '<div>' + SM.t('webgpuModalBody') + '</div>' +
+      '<div style="font-size:11px;color:var(--text-dim)">' + webgpuFailureHint() + '</div>' +
+      '<div class="pr" style="gap:6px;justify-content:flex-end">' +
+      '<button class="pbtn ac" id="webgpu-modal-ok">' + SM.t('webgpuModalOk') + '</button>' +
+      '</div></div></div>';
+    document.body.appendChild(overlay);
+    function close() { overlay.remove(); }
+    overlay.querySelector('#webgpu-modal-close').addEventListener('click', close);
+    overlay.querySelector('#webgpu-modal-ok').addEventListener('click', close);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
   }
   function init() {
     autoEnable(15);

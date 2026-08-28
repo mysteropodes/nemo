@@ -33,6 +33,15 @@ vello = "0.9"
 # create_engine; bump to Debug locally for per-frame atlas tracing).
 log = "0.4"
 console_log = "1"
+# Rust panics inside a wasm-bindgen module otherwise surface to JS as a
+# bare "RuntimeError: unreachable" with zero information about WHERE or
+# WHY (release profile compiles panic=abort down to the unreachable
+# instruction for code size) — this hook routes the real panic message
+# (file/line/reason) to console.error instead, the standard fix for
+# exactly this opacity. Added 2026-08 chasing a silent erase_at_point
+# panic that left `renderNow` throwing "unreachable" on every subsequent
+# call with no way to tell what had actually broken.
+console_error_panic_hook = "0.1"
 wasm-bindgen-futures = "0.4"
 # Tiny oneshot channel used to await wgpu's callback-style buffer map_async
 # from an async wasm export (GPU->CPU pixel readback for the export pipeline).

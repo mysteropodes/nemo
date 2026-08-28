@@ -2182,6 +2182,7 @@ pub async fn create_engine(
     // once per wasm module; ignore the error if a second engine is ever
     // created.
     let _ = console_log::init_with_level(log::Level::Warn);
+    console_error_panic_hook::set_once();
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::BROWSER_WEBGPU,
         ..wgpu::InstanceDescriptor::new_without_display_handle()

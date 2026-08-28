@@ -135,28 +135,19 @@
     return (hit && hit.item instanceof Path) ? hit.item : null;
   }
 
-  // A textured stroke's visible surface is its DABS (isBrushTextureCopy,
-  // stamped ABOVE the anchor — applyBrushTexture, tools.js), so a click
-  // almost always lands on one of those, not the (usually invisible) anchor
-  // that actually carries strokeColor/strokeWidth/brushTexturePreset. A dab
-  // itself only has fillColor=baseColor/strokeColor=null (its own paint, not
-  // the stroke's real style) and no brushTexturePreset at all — resolve back
-  // to the sibling anchor sharing the same brushGroupId so the eyedropper
-  // picks up the real per-stroke style instead of one dab's repurposed fill.
-  function resolveBrushAnchor(ep) {
-    if (!ep.data || !ep.data.isBrushTextureCopy || !ep.data.brushGroupId) return ep;
-    var gid = ep.data.brushGroupId, siblings = ep.parent ? ep.parent.children : [];
-    for (var i = 0; i < siblings.length; i++) {
-      var c = siblings[i];
-      if (c.data && c.data.brushGroupId === gid && !c.data.isBrushTextureCopy) return c;
-    }
-    return ep;
-  }
-
   function pick(e) {
     var hitEp = hitPickable(e.clientX, e.clientY);
     if (!hitEp) return;
-    var ep = resolveBrushAnchor(hitEp);
+    var layer = userLayers[state.activeLayerIdx];
+    // A textured stroke's visible ink is its DABS (applyBrushTexture,
+    // tools.js) — the real anchor is invisible (opacity 0, or strokeColor
+    // nulled) and carries data.brushTexturePreset alone; a dab has no such
+    // stamp. Without resolving through the anchor first, clicking the
+    // (overwhelmingly likely) visible dab found nothing to restore the
+    // preset from — see the brushTexturePreset pick below. resolveBrushAnchor
+    // is the shared global (tools.js) also used by select-bridge.js, not a
+    // local copy — keeps the sibling-lookup logic in one place.
+    var ep = resolveBrushAnchor(hitEp, layer) || hitEp;
     var isVB = !!(ep.data && ep.data.isVectorBrush);
     if (isVB && ep.fillColor) {
       setColorUI('stroke', ep.fillColor.toCSS(true));
@@ -164,18 +155,31 @@
       if (ep.strokeColor) setColorUI('stroke', ep.strokeColor.toCSS(true));
       if (ep.fillColor) setColorUI('fill', ep.fillColor.toCSS(true));
     }
-    if (ep.strokeWidth) {
+    // A vector-brush ribbon (isVectorBrush) is a filled outline shape, not
+    // a real Paper stroke — its visible "width" lives in data.widthProfile
+    // (per-segment, from buildWidthProfile at draw time), not
+    // ep.strokeWidth (0/unset for these). Falling through to the plain
+    // strokeWidth branch below picked up nothing for a VB stroke, so
+    // drawing right after only matched by accident.
+    if (isVB && ep.data.widthProfile && ep.data.widthProfile.length) {
+      var avgW = ep.data.widthProfile.reduce(function (sum, p) { return sum + p.width; }, 0) / ep.data.widthProfile.length;
+      state.brushSize = avgW;
+      var swVB = document.getElementById('p-sw'); if (swVB) swVB.value = Math.round(avgW);
+    } else if (ep.strokeWidth) {
       state.brushSize = ep.strokeWidth;
       var sw = document.getElementById('p-sw'); if (sw) sw.value = Math.round(ep.strokeWidth);
     }
-    // Brush preset (feedback #80, "récupérer... la brush preset quand y en a
-    // une") — a texture-camouflaged anchor's OWN strokeColor/strokeWidth are
-    // nulled/repurposed (see applyBrushTexture, tools.js), which is exactly
-    // why the color/width picks above already special-case isVectorBrush —
-    // same reasoning applies to the preset: pick up data.brushTexturePreset
-    // when the hit item carries one, and reset to 'none' when it doesn't, so
-    // the eyedropper copies the WHOLE style rather than leaving a stale
-    // preset from a previous pick silently applied to the next stroke.
+    // Brush preset (feedback #80/#90, "récupérer... la brush preset quand y
+    // en a une") — a texture-camouflaged anchor's OWN strokeColor/strokeWidth
+    // are nulled/repurposed (see applyBrushTexture, tools.js), which is
+    // exactly why the color/width picks above already special-case
+    // isVectorBrush — same reasoning applies to the preset: pick up
+    // data.brushTexturePreset when the hit item carries one, and reset to
+    // 'none' when it doesn't, so the eyedropper copies the WHOLE style
+    // rather than leaving a stale preset from a previous pick silently
+    // applied to the next stroke. selectPreset (not setBrushPreset+
+    // paintButton separately) is the canonical combined call — it already
+    // does both internally, see brush-preset-picker.js.
     if (window.BrushPresetPicker) window.BrushPresetPicker.selectPreset((ep.data && ep.data.brushTexturePreset) || 'none');
     showToast('Color picked');
   }

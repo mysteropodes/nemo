@@ -4177,6 +4177,27 @@ function clearKeyframe(){
   syncLinkedKeyframeFolder(state.activeLayerIdx,cf);
   loadFrame(cf);renderOS();renderArcs();updateUI();showToast(SM.t('toastKeyframeCleared'));
 }
+// Feedback #92: "il manque une fonction pour supprimer les tween en clic
+// droit dessus sans suprimer le nombre d'image" — removeFrameSpan deletes
+// FRAMES (splices the array, shifts total length); this instead un-tweens
+// a span in place: the interpolated frames between the pair revert to a
+// plain hold of the START keyframe's content (same as any ordinary gap
+// between two keyframes with no tween generated), and neither keyframe
+// nor the timeline's total frame count is touched. li/fromF/toF are the
+// pair's own frame indices (tweenPairForCell, timeline.js) — the END
+// keyframe (toF) is deliberately left untouched: only what's STRICTLY
+// between the two keys was ever tween-generated content.
+function removeTweenSpan(li,fromF,toF){
+  var ld=state.layers[li];
+  if(!ld||ld.locked){showToast(SM.t('toastLayerLocked'));return;}
+  pushUndo();
+  for(var fi=fromF+1;fi<toF;fi++){
+    var f=ld.frames[fi];if(!f)continue;
+    f.strokes=[];f.isKeyframe=false;f.isInterpolated=false;
+  }
+  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
+  showToast(SM.t('toastTweenRemoved'));
+}
 // Animate's "Convert to Keyframes" — bakes whatever's currently displayed
 // (a tweened inbetween, or content inherited from an earlier keyframe) into
 // an independent real keyframe on every frame in the selection (or just the

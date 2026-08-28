@@ -1834,6 +1834,41 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 .bp-item-del:hover{background:var(--red);color:#fff;}
 .bp-edit-btn{margin-top:6px;padding:7px;border-radius:4px;border:1px dashed var(--border2);background:transparent;color:var(--text-dim);font-size:10px;cursor:pointer;}
 .bp-edit-btn:hover{color:var(--text);border-color:var(--accent);}
+/* Unified Media/Presets panel (2026-08, feedback: "un vrai panel de gestion
+   de fichier projet... visuellement que ça ressemble plus à un panel de
+   gestion d'éléments" — AEP Transplant / MotionStack / a project asset-tree
+   as references). #assets-sec (index.html) merges the old #media-sec and
+   #motion-presets-sec under one header with a MotionStack-style horizontal
+   top tab bar (reuses .settings-tab/.settings-tabs verbatim — same
+   underline-on-active look already established for the Settings modal).
+   assets-panel.js owns the two-tab switch; media-library.js/
+   motion-preset-picker.js render their own content unchanged inside. */
+.asset-toptabs{padding:6px 10px 0;}
+.asset-view{padding:8px 14px 12px;display:flex;flex-direction:column;gap:8px;}
+/* .asset-tree: applied to both #media-grid (.media-row is its own richer
+   layout, images.js/media-library.js) and #motion-preset-grid (.bp-item) —
+   gives preset rows the same icon-square + label rhythm the media rows
+   already have (media-library.js's own comment: "l'organisation file des
+   footage importé... project-list-table"), so the two tabs read as one
+   consistent element list rather than two different widget styles. */
+.asset-tree .bp-item{padding:5px 6px;gap:9px;border-radius:5px;}
+.asset-tree .bp-item-icon{width:20px;height:20px;flex:none;border-radius:5px;background:var(--panel3);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:11px;}
+.asset-tree .bp-item.active,.asset-tree .bp-item:hover{background:var(--panel3);}
+/* Folder groups (asset-tree.js) — automatic kind-based grouping
+   (Composants/Images/Vidéos/Audio), CSS-drawn folder icon (tab+body, no
+   SVG) colored per kind via --folder-color, chevron collapse. */
+.asset-folder+.asset-folder{margin-top:2px;}
+.asset-folder-hdr{display:flex;align-items:center;gap:6px;padding:5px 4px;cursor:pointer;border-radius:4px;user-select:none;}
+.asset-folder-hdr:hover{background:var(--panel3);}
+.asset-folder-chevron{width:10px;flex:none;font-size:8px;color:var(--text-dim);display:inline-block;transition:transform .12s ease;}
+.asset-folder-hdr.collapsed .asset-folder-chevron{transform:rotate(-90deg);}
+.asset-folder-icon{width:14px;height:10px;flex:none;border-radius:1px 3px 3px 3px;background:var(--folder-color,var(--text-dim));position:relative;opacity:.9;}
+.asset-folder-icon::before{content:'';position:absolute;top:-3px;left:0;width:7px;height:3px;border-radius:2px 2px 0 0;background:var(--folder-color,var(--text-dim));}
+.asset-folder-label{font-size:10.5px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.asset-folder-count{font-size:9px;color:var(--text-dim);flex:none;}
+.asset-folder-body{padding-left:15px;display:flex;flex-direction:column;gap:2px;margin-top:1px;}
+.asset-folder-body.collapsed{display:none;}
+.asset-folder-empty-hint{font-size:9.5px;color:var(--text-dim);padding:3px 4px;}
 /* Favorite star toggle on each popover row (feedback #81) — sits where
    .bp-item-del sits for a custom preset, so a custom row gets both (star
    further left, delete stays pinned to the edge). Hidden until hover/active

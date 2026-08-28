@@ -1083,23 +1083,41 @@
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrMotionProps">Propriétés du calque</span></div>
       <div class="pbdy" id="motion-props-body"></div>
     </div>
-    <div class="psec" id="media-sec">
-      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrMedia">Médias</span></div>
-      <div class="pbdy">
-        <div class="pr" style="gap:4px">
-          <button class="pbtn" id="btn-media-import-img" style="flex:1" data-i18n="mediaImportImg">Image(s)…</button>
-          <button class="pbtn" id="btn-media-import-video" style="flex:1" data-i18n="mediaImportVideo">Vidéo…</button>
+    <div class="psec" id="assets-sec">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrAssets">Médias &amp; Presets</span></div>
+      <div class="pbdy" style="padding:0;gap:0">
+        <div class="settings-tabs asset-toptabs">
+          <button class="settings-tab active" id="assets-tab-media" data-i18n="assetsTabMedia">Média</button>
+          <button class="settings-tab" id="assets-tab-presets" data-i18n="assetsTabPresets">Presets</button>
         </div>
-        <div id="media-drop" class="media-drop" data-i18n="mediaDropHint">Glisser des images/vidéos ici, ou cliquer Importer…</div>
-        <div class="pr media-panel-hdr" style="gap:4px">
-          <button class="pbtn" id="btn-media-cleanup" style="flex:1;display:none;font-size:9px">Nettoyer (0)</button>
-          <div class="media-expand-toggle" id="media-expand-toggle" title="Agrandir / réduire la liste">
-            <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div id="assets-view-media" class="asset-view">
+          <div class="pr" style="gap:4px">
+            <button class="pbtn" id="btn-media-import-img" style="flex:1" data-i18n="mediaImportImg">Image(s)…</button>
+            <button class="pbtn" id="btn-media-import-video" style="flex:1" data-i18n="mediaImportVideo">Vidéo…</button>
+          </div>
+          <div id="media-drop" class="media-drop" data-i18n="mediaDropHint">Glisser des images/vidéos ici, ou cliquer Importer…</div>
+          <div class="pr media-panel-hdr" style="gap:4px">
+            <button class="pbtn" id="btn-media-cleanup" style="flex:1;display:none;font-size:9px">Nettoyer (0)</button>
+            <div class="media-expand-toggle" id="media-expand-toggle" title="Agrandir / réduire la liste">
+              <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+          </div>
+          <div id="media-grid" class="media-grid asset-tree"></div>
+          <div class="pr" style="gap:4px;border-top:1px solid var(--border);padding-top:6px;margin-top:2px">
+            <button class="pbtn" id="btn-transplant-open" style="flex:1" data-i18n-title="transplantBtnTitle" title="Importer des calques et médias depuis un autre fichier projet Nemo, sans l'ouvrir en entier" data-i18n="transplantBtn">Transplanter depuis un projet…</button>
           </div>
         </div>
-        <div id="media-grid" class="media-grid"></div>
+        <div id="assets-view-presets" class="asset-view" style="display:none">
+          <div class="pr" style="gap:4px">
+            <button class="pbtn ac" id="btn-mp-save" style="flex:1" data-i18n="mpSaveBtn">Enregistrer le calque comme preset</button>
+            <button class="pbtn" id="btn-mp-new-tab" title="Nouvel onglet" style="width:26px;flex:none">+</button>
+          </div>
+          <div id="motion-preset-tabs" class="palette-tabs"></div>
+          <div id="motion-preset-grid" class="bp-grid asset-tree"></div>
+        </div>
       </div>
     </div>
+    <input type="file" id="transplant-file-input" accept=".json" style="display:none">
     <div class="psec" id="tween-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrTween">Tween</span></div>
       <div class="pbdy">
@@ -1981,7 +1999,11 @@
 <script src="js/kitsu.js"></script>
 <script src="js/images.js"></script>
 <script src="js/psd-import-bridge.js"></script>
+<script src="js/asset-tree.js"></script>
 <script src="js/media-library.js"></script>
+<script src="js/transplant.js"></script>
+<script src="js/motion-preset-picker.js"></script>
+<script src="js/assets-panel.js"></script>
 <script type="module" src="js/geometry-wasm-loader.js"></script>
 <script src="js/engine-bridge.js"></script>
 <script src="js/second-viewer.js"></script>

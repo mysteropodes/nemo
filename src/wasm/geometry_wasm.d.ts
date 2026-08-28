@@ -335,7 +335,6 @@ export interface InitOutput {
     readonly auto_match: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly resample_stroke: (a: number, b: number, c: number) => [number, number, number, number];
     readonly fill_find: (a: number, b: number) => [number, number, number, number];
-    readonly erase_at_point: (a: number, b: number) => [number, number, number, number];
     readonly __wbg_strokemodeler_free: (a: number, b: number) => void;
     readonly boolean_op: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly boolean_op_multi: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
@@ -350,6 +349,7 @@ export interface InitOutput {
     readonly strokemodeler_new: (a: number, b: number) => number;
     readonly strokemodeler_up: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly strokemodeler_up_packed: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly erase_at_point: (a: number, b: number) => [number, number, number, number];
     readonly effective_frame_index: (a: number, b: number, c: number) => [number, number, number];
     readonly hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly resolve_symbol_frame: (a: number, b: number, c: number) => [number, number, number];
@@ -362,8 +362,8 @@ export interface InitOutput {
     readonly __wbindgen_exn_store: (a: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
-    readonly __wbindgen_destroy_closure: (a: number, b: number) => void;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
+    readonly __wbindgen_destroy_closure: (a: number, b: number) => void;
     readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_start: () => void;
 }
