@@ -475,7 +475,7 @@ window.SM={
   togglePingPongPlayback:function(){state.pingPongPlayback=!state.pingPongPlayback;if(state.pingPongPlayback)state.loopPlayback=true;var b=document.getElementById('btn-loop');if(b){b.classList.toggle('active',state.loopPlayback);b.classList.toggle('pingpong',state.pingPongPlayback);b.title=SM.t(state.pingPongPlayback?'loopPingPongTitle':'loopWorkAreaTitle');}showToast(SM.t(state.pingPongPlayback?'toastPingPongOn':'toastPingPongOff'));},
   setPointType:setPointType,booleanOp:booleanOp,
   generateTweens:generateTweens,insertFrame:insertFrame,insertKeyframe:insertKeyframe,insertBlankKeyframe:insertBlankKeyframe,removeFrame:removeFrame,
-  clearKeyframe:clearKeyframe,convertToKeyframes:convertToKeyframes,removeFrameSpan:removeFrameSpan,duplicateSelectedFrames:duplicateSelectedFrames,
+  clearKeyframe:clearKeyframe,convertToKeyframes:convertToKeyframes,removeFrameSpan:removeFrameSpan,removeTweenSpan:removeTweenSpan,duplicateSelectedFrames:duplicateSelectedFrames,
   // Tool settings double as selection editors (Animate behavior): with the
   // Select tool active and strokes selected, changing width/style/color/
   // cap/join restyles the selection instead of only future strokes.
@@ -4189,7 +4189,7 @@ document.getElementById('frame-grid').addEventListener('contextmenu',function(e)
   // tween-curve-strip's own click-to-edit, reachable even with
   // state.showTweenCurves off.
   var twPair=tweenPairForCell(li,fi);
-  var twMenuItems=twPair?[{label:'Éditer la courbe de ce tween…',action:function(){openTweenCurveInset(li,twPair.a,twPair.b);}},{sep:true}]:[];
+  var twMenuItems=twPair?[{label:'Éditer la courbe de ce tween…',action:function(){openTweenCurveInset(li,twPair.a,twPair.b);}},{label:'Supprimer le tween',action:function(){window.SM.removeTweenSpan(li,twPair.a,twPair.b);}},{sep:true}]:[];
   window.showContextMenu(e.clientX,e.clientY,twMenuItems.concat([
     {label:'Copier',shortcut:'⌘C',action:function(){window.SM.copyFrames();}},
     {label:'Couper',shortcut:'⌘X',action:function(){window.SM.cutFrames();}},
