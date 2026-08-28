@@ -6273,7 +6273,7 @@ function closeTextPopover(){var pop=document.getElementById('text-popover');if(p
 // (style.css, 'Nemo Vector Text') loads the SAME bundled Roboto TTFs
 // vector-text-bridge.js parses for glyph outlines, so the overlay LOOKS
 // like the vector result it's about to become, not a generic stand-in.
-var _inplaceTa=null,_inplaceRoot=null,_inplaceHidden=null,_inplaceIsNew=false;
+var _inplaceTa=null,_inplaceRoot=null,_inplaceHidden=null,_inplaceIsNew=false,_inplaceHandle=null;
 // Area-text creation (2026-08-17, same ask as openInPlaceTextEditor above:
 // "comme AI ou Figma" also means the INITIAL drag-a-box placement, not just
 // re-editing) — builds a throwaway single-glyph vector-text root (needed
@@ -6315,7 +6315,16 @@ function openInPlaceTextEditor(root,isNew){
   // re-edit (reported 2026-08-27, feedback #79, with a screenshot).
   var groupBounds=members.reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null);
   var bounds=d.anchorTopLeft?new Rectangle(new Point(d.anchorTopLeft.x,d.anchorTopLeft.y),new Size(groupBounds.width,groupBounds.height)):groupBounds;
-  members.forEach(function(p){p.visible=false;});
+  // opacity, not .visible (feedback #83, "un M apparait décalé alors que de
+  // devrait avoir une barre de texte clignotante") — the Rust engine's
+  // buildSceneJson never reads a Path's .visible flag (only layer-level
+  // visibility is checked anywhere in it, CLAUDE.md §5's "view.autoUpdate=
+  // false quand le moteur Rust est actif": Paper's own raster is disabled
+  // entirely, so .visible has nothing left to affect), but it DOES read
+  // c.opacity — same field buildSceneJson already uses for a normal fade.
+  // Stashed per-glyph rather than forced to 1 on restore, in case a glyph
+  // ever legitimately had non-1 opacity to begin with.
+  members.forEach(function(p){p.data.__inplacePrevOpacity=p.opacity;p.opacity=0;});
   _inplaceHidden=members;_inplaceRoot=root;
   var ta=document.createElement('textarea');
   ta.id='tp-inplace-editor';
@@ -6323,6 +6332,35 @@ function openInPlaceTextEditor(root,isNew){
   ta.spellcheck=false;
   document.body.appendChild(ta);
   _inplaceTa=ta;
+  // Resize handle (feedback #83, "la box de texte orange n'est pas
+  // resizable") — the orange box itself is just a Rust-rendered overlay
+  // rectangle (buildTextDragBoxItems, engine-bridge.js) with no hit-testing
+  // of its own, so this is a real DOM element pinned to its bottom-right
+  // corner instead of trying to hit-test the engine's canvas.
+  var handle=document.createElement('div');
+  handle.id='tp-inplace-resize-handle';
+  document.body.appendChild(handle);
+  _inplaceHandle=handle;
+  var resizing=false,resizeStartX=0,resizeStartWidth=0;
+  handle.addEventListener('pointerdown',function(e){
+    e.preventDefault();e.stopPropagation();
+    resizing=true;resizeStartX=e.clientX;
+    // First drag on a not-yet-fixed-width (auto-grow) box starts from its
+    // CURRENT rendered width, not an arbitrary default — so the box doesn't
+    // visibly jump the instant you grab the handle.
+    resizeStartWidth=d.fixedWidth||(parseFloat(ta.style.width)/view.zoom);
+    handle.setPointerCapture(e.pointerId);
+  });
+  handle.addEventListener('pointermove',function(e){
+    if(!resizing)return;
+    e.preventDefault();e.stopPropagation();
+    var deltaWorld=(e.clientX-resizeStartX)/view.zoom;
+    d.fixedWidth=Math.max(20,resizeStartWidth+deltaWorld);
+    reposition();
+  });
+  function endResize(e){if(!resizing)return;resizing=false;try{handle.releasePointerCapture(e.pointerId);}catch(err){}}
+  handle.addEventListener('pointerup',endResize);
+  handle.addEventListener('pointercancel',endResize);
   function reposition(){
     var topLeftView=view.projectToView(bounds.topLeft);
     var canvasEl=document.getElementById('drawing-canvas');
@@ -6351,6 +6389,8 @@ function openInPlaceTextEditor(root,isNew){
       right:bounds.left+parseFloat(ta.style.width)/view.zoom,
       bottom:bounds.top+parseFloat(ta.style.height)/view.zoom,
     };
+    handle.style.left=(cr.left+topLeftView.x+parseFloat(ta.style.width))+'px';
+    handle.style.top=(cr.top+topLeftView.y+parseFloat(ta.style.height))+'px';
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
   }
   reposition();
@@ -6364,9 +6404,10 @@ function openInPlaceTextEditor(root,isNew){
   ta.focus();ta.select();
 }
 function closeInPlaceTextEditor(cancel){
-  var ta=_inplaceTa,root=_inplaceRoot,hidden=_inplaceHidden,isNew=_inplaceIsNew;
+  var ta=_inplaceTa,root=_inplaceRoot,hidden=_inplaceHidden,isNew=_inplaceIsNew,handle=_inplaceHandle;
   if(!ta)return;
-  _inplaceTa=null;_inplaceRoot=null;_inplaceHidden=null;_inplaceIsNew=false;
+  if(handle)handle.remove();
+  _inplaceTa=null;_inplaceRoot=null;_inplaceHidden=null;_inplaceIsNew=false;_inplaceHandle=null;
   window._inplaceTextBoxBounds=null;
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
   var newText=ta.value;
@@ -6376,7 +6417,7 @@ function closeInPlaceTextEditor(cancel){
   // it outright instead of restoring its visibility (unlike a discarded
   // re-edit, which restores the real pre-existing glyphs untouched).
   var discardNew=function(){if(hidden)hidden.forEach(function(p){if(p&&!p.removed)p.remove();});if(window.SMEngineBridge)SMEngineBridge.renderNow();};
-  var restore=function(){if(hidden)hidden.forEach(function(p){if(p&&!p.removed)p.visible=true;});};
+  var restore=function(){if(hidden)hidden.forEach(function(p){if(p&&!p.removed)p.opacity=p.data.__inplacePrevOpacity!==undefined?p.data.__inplacePrevOpacity:1;});};
   if(cancel||!root||!root.data||!newText.trim()||(!isNew&&newText===root.data.text)){if(isNew)discardNew();else{restore();if(window.SMEngineBridge)SMEngineBridge.renderNow();}return;}
   var d=root.data;
   var opts={bold:d.bold,italic:d.italic,underline:d.underline,strike:d.strike,letterSpacing:d.letterSpacing,wordSpacing:d.wordSpacing,lineHeightMult:d.lineHeightMult,textCase:d.textCase};

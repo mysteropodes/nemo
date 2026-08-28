@@ -31,6 +31,14 @@
 @font-face{font-family:'Nemo Vector Text';font-weight:700;src:url('../fonts/Roboto-Bold.ttf') format('truetype');}
 #tp-inplace-editor{position:fixed;z-index:210;background:transparent;border:none;outline:none;resize:none;
   overflow:hidden;padding:0;margin:0;font-family:'Nemo Vector Text',sans-serif;white-space:pre;}
+/* Resize handle for the orange in-place text box (feedback #83, "la box de
+   texte orange n'est pas resizable") — resize:none above is deliberate (a
+   native textarea resize handle has no way to feed back into d.fixedWidth
+   or reflow world-space glyph geometry), so this is the custom stand-in:
+   a small square pinned to the box's bottom-right corner, dragged in
+   timeline.js's openInPlaceTextEditor. */
+#tp-inplace-resize-handle{position:fixed;z-index:211;width:10px;height:10px;margin:-5px 0 0 -5px;
+  background:#ffb86c;border:1.5px solid #1a1a1a;border-radius:2px;cursor:nwse-resize;}
 html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:var(--text);
   font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   /* -webkit-user-select alongside the unprefixed property (2026-07,
