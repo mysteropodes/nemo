@@ -35,6 +35,14 @@
   // whatever state.canvasRotation already was, so a rotate gesture never
   // "snaps" the stage to a new absolute angle at drag-start.
   var rotating = false, rotateStartAngle = 0, rotateStartRotation = 0;
+  // Eyedropper hover cursor (feedback #80, "la souris doit prendre l'apparence
+  // de la pipette et la croix... quand elle hover un élément que l'on peut
+  // pipetter") — plain 'crosshair' otherwise, this dropper+cross glyph only
+  // while actually over something pick() would hit. Same black-outline-then-
+  // white-fill SVG convention as ROTATE_CURSOR (select-bridge.js) for
+  // legibility on any canvas background.
+  var EYEDROP_CURSOR = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22'><path d='M14.5 2.5 19.5 7.5 8 19 3 19 3 14Z' fill='none' stroke='black' stroke-width='2.6' stroke-linejoin='round'/><path d='M14.5 2.5 19.5 7.5 8 19 3 19 3 14Z' fill='white' stroke='none'/><line x1='11.5' y1='5.5' x2='16.5' y2='10.5' stroke='black' stroke-width='2.2'/></svg>\") 3 19, crosshair";
+  var pickHover = false;
 
   function engineOn() { return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && !state.playing; }
   function shouldPan() { return engineOn() && (state.tool === 'hand' || state.spaceDown); }
@@ -117,19 +125,29 @@
     }
   }
 
-  function pick(e) {
-    var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+  // Shared by pick() (click, commits the values) and the hover check in
+  // onMove (read-only, just needs to know whether there's anything HERE).
+  function hitPickable(clientX, clientY) {
+    var w = window.SMEngineBridge.screenToWorld(clientX, clientY);
     var pt = new Point(w[0], w[1]);
     var layer = userLayers[state.activeLayerIdx];
     var hit = layer.hitTest(pt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
-    if (!(hit && hit.item instanceof Path)) return;
+    return (hit && hit.item instanceof Path) ? hit.item : null;
+  }
+
+  function pick(e) {
+    var hitEp = hitPickable(e.clientX, e.clientY);
+    if (!hitEp) return;
+    var layer = userLayers[state.activeLayerIdx];
     // A textured stroke's visible ink is its DABS (applyBrushTexture,
     // tools.js) — the real anchor is invisible (opacity 0, or strokeColor
     // nulled) and carries data.brushTexturePreset alone; a dab has no such
     // stamp. Without resolving through the anchor first, clicking the
     // (overwhelmingly likely) visible dab found nothing to restore the
-    // preset from — see the brushTexturePreset pick below.
-    var ep = resolveBrushAnchor(hit.item, layer) || hit.item;
+    // preset from — see the brushTexturePreset pick below. resolveBrushAnchor
+    // is the shared global (tools.js) also used by select-bridge.js, not a
+    // local copy — keeps the sibling-lookup logic in one place.
+    var ep = resolveBrushAnchor(hitEp, layer) || hitEp;
     var isVB = !!(ep.data && ep.data.isVectorBrush);
     if (isVB && ep.fillColor) {
       setColorUI('stroke', ep.fillColor.toCSS(true));
@@ -151,17 +169,18 @@
       state.brushSize = ep.strokeWidth;
       var sw = document.getElementById('p-sw'); if (sw) sw.value = Math.round(ep.strokeWidth);
     }
-    // Feedback #90 ("pick une brush preset... celui-ci n'est pas tout à
-    // fait pareil"): the eyedropper only ever restored color+width, never
-    // the PRESET itself (brush tip/texture/spacing) — applyBrushTexture
-    // (tools.js) stamps the preset id used at draw time onto
-    // data.brushTexturePreset, so it's right there to restore. Without
-    // this, drawing again after a pick used whatever preset happened to
-    // already be active, not the one actually picked.
-    if (ep.data && ep.data.brushTexturePreset && ep.data.brushTexturePreset !== 'none' && window.SM && window.SM.setBrushPreset) {
-      window.SM.setBrushPreset(ep.data.brushTexturePreset);
-      if (window.BrushPresetPicker) BrushPresetPicker.paintButton(ep.data.brushTexturePreset);
-    }
+    // Brush preset (feedback #80/#90, "récupérer... la brush preset quand y
+    // en a une") — a texture-camouflaged anchor's OWN strokeColor/strokeWidth
+    // are nulled/repurposed (see applyBrushTexture, tools.js), which is
+    // exactly why the color/width picks above already special-case
+    // isVectorBrush — same reasoning applies to the preset: pick up
+    // data.brushTexturePreset when the hit item carries one, and reset to
+    // 'none' when it doesn't, so the eyedropper copies the WHOLE style
+    // rather than leaving a stale preset from a previous pick silently
+    // applied to the next stroke. selectPreset (not setBrushPreset+
+    // paintButton separately) is the canonical combined call — it already
+    // does both internally, see brush-preset-picker.js.
+    if (window.BrushPresetPicker) window.BrushPresetPicker.selectPreset((ep.data && ep.data.brushTexturePreset) || 'none');
     showToast('Color picked');
   }
 
@@ -235,7 +254,21 @@
       window.SMEngineBridge.renderNow();
       return;
     }
-    if (!panning) return;
+    if (!panning) {
+      // Eyedropper hover cursor (feedback #80) — passive, no
+      // stopImmediatePropagation/preventDefault: this isn't a gesture, just
+      // a read-only "is there anything under the cursor right now" check so
+      // the cursor can hint whether a click would actually pick something.
+      if (shouldPick()) {
+        var hovering = !!hitPickable(e.clientX, e.clientY);
+        if (hovering !== pickHover) {
+          pickHover = hovering;
+          var canvasEl2 = document.getElementById('drawing-canvas');
+          if (canvasEl2) canvasEl2.style.cursor = hovering ? EYEDROP_CURSOR : 'crosshair';
+        }
+      }
+      return;
+    }
     e.stopImmediatePropagation();
     e.preventDefault();
     var dx2 = e.movementX || 0, dy2 = e.movementY || 0;

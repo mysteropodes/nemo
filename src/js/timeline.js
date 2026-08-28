@@ -525,6 +525,17 @@ window.SM={
             p.data.bitmapBrushSpec.size=v;
             SMBitmapBrush.regenerate(p,userLayers[state.activeLayerIdx]);
           }
+          // Same gap for a plain VECTOR texture preset (feedback #82, "si je
+          // select une brush avec texture vecto et que je change sa width
+          // cela n'agit pas") — the bitmap case above was fixed but this one
+          // never was: applyBrushTexture's dabs are stamped ONCE at apply
+          // time using the anchor's strokeWidth as baseWidth (tools.js), so
+          // just setting p.strokeWidth above only resizes the invisible
+          // anchor while the visible dabs stay at their old size.
+          // regenerateBrushTexture re-stamps from the NOW-updated strokeWidth.
+          else if(p.data&&p.data.brushTexturePreset&&p.data.brushGroupId){
+            regenerateBrushTexture(p,userLayers[state.activeLayerIdx]);
+          }
         }
       });
       saveActiveLayerFrame();updateUI();
@@ -3138,8 +3149,21 @@ function renderTimeline(){
   // happened to shrink-to-fit while the ruler (and whatever's behind
   // #bars-row) kept going, showing through as a lighter seam partway
   // across. Sizing it explicitly to match fixes the seam.
+  //
+  // Width is whichever is LARGER: the real frame content (state.totalFrames
+  // *FC, so a long/zoomed-in timeline still scrolls to its true end — the
+  // original reason these three lines exist) or #fg-wrap's own visible
+  // width (so a SHORT scene on a wide window still fills the panel instead
+  // of leaving a dead gap on the right — feedback #84, "la timeline ne va
+  // pas jusqu'au bout de l'écran en fonction de la taille de la fenêtre").
+  // Exact same Math.max(content, wrap.clientWidth/Height) idiom this file
+  // already uses for the playhead line's HEIGHT a bit further down
+  // (mph.style.height, "le curseur de temps devrait descendre jusqu'au
+  // niveau de la scroll bar en bas") — same family of bug, other axis.
+  var fgWrapW=document.getElementById('fg-wrap');
+  var gridMinWidth=Math.max(state.totalFrames*FC,fgWrapW?fgWrapW.clientWidth:0);
   var barsRow=document.getElementById('bars-row');
-  if(barsRow)barsRow.style.width=(state.totalFrames*FC)+'px';
+  if(barsRow)barsRow.style.width=gridMinWidth+'px';
   // #frame-hdr needs the SAME explicit width, for the same reason — the
   // comment above claimed flexbox sized it from its .fhc children, but it
   // is a flex-direction:column CHILD of #fg-wrap, so its width is its CROSS
@@ -3150,7 +3174,7 @@ function renderTimeline(){
   // apparaissent au niveau des rulers de timing en haut à droite". Exactly
   // the #bars-row and #frame-grid bug, in the one place it was assumed not
   // to apply.
-  hdr.style.width=(state.totalFrames*FC)+'px';
+  hdr.style.width=gridMinWidth+'px';
   // Bug found 2026-07 ("le highlight d'un layer selectionné ne va pas
   // jusqu'au bout de la timeline") — same root cause family as #bars-row
   // above, one level down: #frame-grid is `flex-direction:column`, so
@@ -3169,7 +3193,7 @@ function renderTimeline(){
   // timeline's real end. Confirmed live: `.frow.act` measured exactly
   // #fg-wrap's clientWidth instead of state.totalFrames*FC before this
   // fix. Sized explicitly here, exactly like #bars-row above it.
-  grid.style.width=(state.totalFrames*FC)+'px';
+  grid.style.width=gridMinWidth+'px';
   // Bug found 2026-07 ("la barre de scroll doit pouvoir aller d'un bout à
   // l'autre... pas d'offset derrière"): the custom zoom scrollbar
   // (timeline-zoom.js) sizes its thumb off state.totalFrames but only
@@ -6262,7 +6286,7 @@ function closeTextPopover(){var pop=document.getElementById('text-popover');if(p
 // (style.css, 'Nemo Vector Text') loads the SAME bundled Roboto TTFs
 // vector-text-bridge.js parses for glyph outlines, so the overlay LOOKS
 // like the vector result it's about to become, not a generic stand-in.
-var _inplaceTa=null,_inplaceRoot=null,_inplaceHidden=null,_inplaceIsNew=false;
+var _inplaceTa=null,_inplaceRoot=null,_inplaceHidden=null,_inplaceIsNew=false,_inplaceHandle=null;
 // Area-text creation (2026-08-17, same ask as openInPlaceTextEditor above:
 // "comme AI ou Figma" also means the INITIAL drag-a-box placement, not just
 // re-editing) — builds a throwaway single-glyph vector-text root (needed
@@ -6304,7 +6328,16 @@ function openInPlaceTextEditor(root,isNew){
   // re-edit (reported 2026-08-27, feedback #79, with a screenshot).
   var groupBounds=members.reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null);
   var bounds=d.anchorTopLeft?new Rectangle(new Point(d.anchorTopLeft.x,d.anchorTopLeft.y),new Size(groupBounds.width,groupBounds.height)):groupBounds;
-  members.forEach(function(p){p.visible=false;});
+  // opacity, not .visible (feedback #83, "un M apparait décalé alors que de
+  // devrait avoir une barre de texte clignotante") — the Rust engine's
+  // buildSceneJson never reads a Path's .visible flag (only layer-level
+  // visibility is checked anywhere in it, CLAUDE.md §5's "view.autoUpdate=
+  // false quand le moteur Rust est actif": Paper's own raster is disabled
+  // entirely, so .visible has nothing left to affect), but it DOES read
+  // c.opacity — same field buildSceneJson already uses for a normal fade.
+  // Stashed per-glyph rather than forced to 1 on restore, in case a glyph
+  // ever legitimately had non-1 opacity to begin with.
+  members.forEach(function(p){p.data.__inplacePrevOpacity=p.opacity;p.opacity=0;});
   _inplaceHidden=members;_inplaceRoot=root;
   var ta=document.createElement('textarea');
   ta.id='tp-inplace-editor';
@@ -6312,6 +6345,35 @@ function openInPlaceTextEditor(root,isNew){
   ta.spellcheck=false;
   document.body.appendChild(ta);
   _inplaceTa=ta;
+  // Resize handle (feedback #83, "la box de texte orange n'est pas
+  // resizable") — the orange box itself is just a Rust-rendered overlay
+  // rectangle (buildTextDragBoxItems, engine-bridge.js) with no hit-testing
+  // of its own, so this is a real DOM element pinned to its bottom-right
+  // corner instead of trying to hit-test the engine's canvas.
+  var handle=document.createElement('div');
+  handle.id='tp-inplace-resize-handle';
+  document.body.appendChild(handle);
+  _inplaceHandle=handle;
+  var resizing=false,resizeStartX=0,resizeStartWidth=0;
+  handle.addEventListener('pointerdown',function(e){
+    e.preventDefault();e.stopPropagation();
+    resizing=true;resizeStartX=e.clientX;
+    // First drag on a not-yet-fixed-width (auto-grow) box starts from its
+    // CURRENT rendered width, not an arbitrary default — so the box doesn't
+    // visibly jump the instant you grab the handle.
+    resizeStartWidth=d.fixedWidth||(parseFloat(ta.style.width)/view.zoom);
+    handle.setPointerCapture(e.pointerId);
+  });
+  handle.addEventListener('pointermove',function(e){
+    if(!resizing)return;
+    e.preventDefault();e.stopPropagation();
+    var deltaWorld=(e.clientX-resizeStartX)/view.zoom;
+    d.fixedWidth=Math.max(20,resizeStartWidth+deltaWorld);
+    reposition();
+  });
+  function endResize(e){if(!resizing)return;resizing=false;try{handle.releasePointerCapture(e.pointerId);}catch(err){}}
+  handle.addEventListener('pointerup',endResize);
+  handle.addEventListener('pointercancel',endResize);
   function reposition(){
     var topLeftView=view.projectToView(bounds.topLeft);
     var canvasEl=document.getElementById('drawing-canvas');
@@ -6340,6 +6402,8 @@ function openInPlaceTextEditor(root,isNew){
       right:bounds.left+parseFloat(ta.style.width)/view.zoom,
       bottom:bounds.top+parseFloat(ta.style.height)/view.zoom,
     };
+    handle.style.left=(cr.left+topLeftView.x+parseFloat(ta.style.width))+'px';
+    handle.style.top=(cr.top+topLeftView.y+parseFloat(ta.style.height))+'px';
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
   }
   reposition();
@@ -6353,9 +6417,10 @@ function openInPlaceTextEditor(root,isNew){
   ta.focus();ta.select();
 }
 function closeInPlaceTextEditor(cancel){
-  var ta=_inplaceTa,root=_inplaceRoot,hidden=_inplaceHidden,isNew=_inplaceIsNew;
+  var ta=_inplaceTa,root=_inplaceRoot,hidden=_inplaceHidden,isNew=_inplaceIsNew,handle=_inplaceHandle;
   if(!ta)return;
-  _inplaceTa=null;_inplaceRoot=null;_inplaceHidden=null;_inplaceIsNew=false;
+  if(handle)handle.remove();
+  _inplaceTa=null;_inplaceRoot=null;_inplaceHidden=null;_inplaceIsNew=false;_inplaceHandle=null;
   window._inplaceTextBoxBounds=null;
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
   var newText=ta.value;
@@ -6365,7 +6430,7 @@ function closeInPlaceTextEditor(cancel){
   // it outright instead of restoring its visibility (unlike a discarded
   // re-edit, which restores the real pre-existing glyphs untouched).
   var discardNew=function(){if(hidden)hidden.forEach(function(p){if(p&&!p.removed)p.remove();});if(window.SMEngineBridge)SMEngineBridge.renderNow();};
-  var restore=function(){if(hidden)hidden.forEach(function(p){if(p&&!p.removed)p.visible=true;});};
+  var restore=function(){if(hidden)hidden.forEach(function(p){if(p&&!p.removed)p.opacity=p.data.__inplacePrevOpacity!==undefined?p.data.__inplacePrevOpacity:1;});};
   if(cancel||!root||!root.data||!newText.trim()||(!isNew&&newText===root.data.text)){if(isNew)discardNew();else{restore();if(window.SMEngineBridge)SMEngineBridge.renderNow();}return;}
   var d=root.data;
   var opts={bold:d.bold,italic:d.italic,underline:d.underline,strike:d.strike,letterSpacing:d.letterSpacing,wordSpacing:d.wordSpacing,lineHeightMult:d.lineHeightMult,textCase:d.textCase};
@@ -6639,7 +6704,20 @@ function updateTextActionsPanel(){
   if(!sec)return;
   var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
   var isWholeText=!!(p&&p.data&&p.data.isText&&!p.data.isTextChar&&!p.data.isVectorText);
-  var animGroupId=window.SMTextAnimator?window.SMTextAnimator.groupIdForItem(p):null;
+  // Multi-glyph selection (feedback #87, "je n'ai toujours pas d'option
+  // pour animer le texte") — groupIdForItem(p) above only ever fired for
+  // an EXACT single-Path selection, but a plain click on vector text (or
+  // an already-split raster block) selects every glyph sharing its
+  // groupId — one Path per character, so any real word/sentence is
+  // ALREADY more than one selected Path the instant you click it. "Animer
+  // le texte…" was reachable only for a one-character block, effectively
+  // never in practice. Same "whole selection matches one group" contract
+  // textPropsRoot() already enforces for the Typography panel a bit
+  // further down this file — one mismatched member (a partial/mixed
+  // pick) still hides the button rather than animating the wrong set.
+  var SMTA=window.SMTextAnimator;
+  var animGroupId=(SMTA&&state.tool==='select'&&selectedPaths.length)?SMTA.groupIdForItem(selectedPaths[0]):null;
+  if(animGroupId&&!selectedPaths.every(function(sp){return SMTA.groupIdForItem(sp)===animGroupId;}))animGroupId=null;
   sec.style.display=(isWholeText||animGroupId)?'':'none';
   document.getElementById('text-split-desc').style.display=isWholeText?'':'none';
   document.getElementById('btn-text-split-chars').parentElement.style.display=isWholeText?'':'none';

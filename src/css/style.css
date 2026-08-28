@@ -31,6 +31,14 @@
 @font-face{font-family:'Nemo Vector Text';font-weight:700;src:url('../fonts/Roboto-Bold.ttf') format('truetype');}
 #tp-inplace-editor{position:fixed;z-index:210;background:transparent;border:none;outline:none;resize:none;
   overflow:hidden;padding:0;margin:0;font-family:'Nemo Vector Text',sans-serif;white-space:pre;}
+/* Resize handle for the orange in-place text box (feedback #83, "la box de
+   texte orange n'est pas resizable") — resize:none above is deliberate (a
+   native textarea resize handle has no way to feed back into d.fixedWidth
+   or reflow world-space glyph geometry), so this is the custom stand-in:
+   a small square pinned to the box's bottom-right corner, dragged in
+   timeline.js's openInPlaceTextEditor. */
+#tp-inplace-resize-handle{position:fixed;z-index:211;width:10px;height:10px;margin:-5px 0 0 -5px;
+  background:#ffb86c;border:1.5px solid #1a1a1a;border-radius:2px;cursor:nwse-resize;}
 html,body{width:100%;height:100%;overflow:hidden;background:var(--gutter);color:var(--text);
   font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   /* -webkit-user-select alongside the unprefixed property (2026-07,
@@ -243,7 +251,12 @@ body.tools-docked-away #tools-panel-resize{display:none;}
   position:relative;transition:background .15s,color .15s;}
 .tool-btn:hover{background:rgba(255,255,255,.06);color:var(--text);}
 .tool-btn.active{background:var(--accent-dim);color:var(--accent-hover);box-shadow:none;}
-.tool-btn .sk{position:absolute;bottom:0;right:1px;font-size:7px;color:var(--text-dark);pointer-events:none;font-family:monospace;}
+/* bottom-LEFT, not right (feedback #85, "le lettre de raccourcis doivent
+   être en bas à gauche... car elles cachent les submenu") — the submenu
+   hint triangle for a stacked shape tool (.tool-stack .stack-front::before,
+   just below) sits bottom-right, same corner this used to occupy, so the
+   shortcut letter was drawn right on top of it. */
+.tool-btn .sk{position:absolute;bottom:0;left:1px;font-size:7px;color:var(--text-dark);pointer-events:none;font-family:monospace;}
 .tool-btn.active .sk{color:rgba(255,255,255,.5);}
 .tool-sep{width:24px;height:1px;background:var(--border);margin:4px 0;}
 /* Shape-tool group (timeline.js, 2026-08) — Illustrator/Rive-style single
@@ -260,6 +273,19 @@ body.tools-docked-away #tools-panel-resize{display:none;}
   width:0;height:0;border-style:solid;border-width:0 0 4px 4px;
   border-color:transparent transparent rgba(236,234,231,.4) transparent;pointer-events:none;}
 .tool-stack .tool-btn.stack-front.active::before{border-bottom-color:rgba(255,255,255,.55);}
+/* Uniformize the shape-tool icons as solid/filled forms (feedback #85,
+   "pour les icons de shape uniformisé en formes pleine les icons") —
+   Speech bubble and Star are already solid custom SVGs (fill=currentColor),
+   but Rectangle/Line/Ellipse use Material Symbols Rounded glyphs, which
+   render OUTLINE-style by the app-wide default just above ('FILL' 0) —
+   the same 5-tool group mixed two icon styles. Scoped to just this group
+   (not the global .material-symbols-rounded rule) so every other Material
+   icon in the app keeps its intentional outline look. Two selectors: the
+   toolbar stack itself, and the long-press flyout, which clones the SAME
+   button markup (openFlyout, timeline.js) into a sibling DOM tree outside
+   .tool-stack — a rule scoped to only one of the two would leave the other
+   inconsistent.*/
+.tool-stack .material-symbols-rounded,.shape-tool-flyout-item .material-symbols-rounded{font-variation-settings:'FILL' 1,'wght' 300,'GRAD' 0,'opsz' 20;}
 .shape-tool-flyout{position:fixed;z-index:9999;display:flex;gap:2px;padding:4px;
   background:var(--panel,#2a2a2e);border:1px solid var(--border);border-radius:8px;
   box-shadow:0 4px 16px rgba(0,0,0,.4);}
@@ -1843,6 +1869,24 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 .asset-folder-body{padding-left:15px;display:flex;flex-direction:column;gap:2px;margin-top:1px;}
 .asset-folder-body.collapsed{display:none;}
 .asset-folder-empty-hint{font-size:9.5px;color:var(--text-dim);padding:3px 4px;}
+/* Favorite star toggle on each popover row (feedback #81) — sits where
+   .bp-item-del sits for a custom preset, so a custom row gets both (star
+   further left, delete stays pinned to the edge). Hidden until hover/active
+   so the row doesn't look cluttered by default, same convention as most
+   icon-only row actions elsewhere in this app. */
+.bp-item{position:relative;padding-right:22px;}
+.bp-item-custom{padding-right:40px;}
+.bp-item-fav{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;color:var(--text-dim);opacity:0;cursor:pointer;}
+.bp-item-custom .bp-item-fav{right:20px;}
+.bp-item:hover .bp-item-fav,.bp-item-fav.is-fav{opacity:1;}
+.bp-item-fav.is-fav{color:#ffc94a;}
+.bp-item-fav:hover{color:#ffc94a;transform:translateY(-50%) scale(1.15);}
+/* Favorites quick strip under the Brush row in Stroke (feedback #81) */
+.bp-fav-row{display:flex;flex-wrap:wrap;gap:4px;padding-top:2px;}
+.bp-fav-item{width:26px;height:26px;border-radius:5px;border:1px solid var(--border2);background:var(--panel3);padding:0;cursor:pointer;overflow:hidden;flex:none;}
+.bp-fav-item:hover{border-color:var(--accent);}
+.bp-fav-item.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
+.bp-fav-item canvas{width:100%;height:100%;display:block;}
 /* Brush floating menu (2026-07, brush-menu-bridge.js) — reuses .bp-grid/
    .bp-item/.bp-group-label above verbatim for the thumbnail lists (same
    visual language, no second style to keep in sync); only new rules are
