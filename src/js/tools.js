@@ -1313,6 +1313,15 @@ function rotateCenterSegments(segs,angleDeg,cx,cy){
     s.handleOut=rotVec(s.handleOut[0],s.handleOut[1]);
   });
 }
+function shearCenterSegments(segs,shx,shy,cx,cy){
+  function shearVec(x,y){return[x+shx*y,shy*x+y];}
+  segs.forEach(function(s){
+    var r=shearVec(s.point[0]-cx,s.point[1]-cy);
+    s.point=[cx+r[0],cy+r[1]];
+    s.handleIn=shearVec(s.handleIn[0],s.handleIn[1]);
+    s.handleOut=shearVec(s.handleOut[0],s.handleOut[1]);
+  });
+}
 // Bug found live (2026-07, while testing the new subselect marquee-without-
 // pre-selection feature): clearSel() never cleared `nodeHandles` (the
 // module-level hit-test array renderNodeHandles() populates) — a stale

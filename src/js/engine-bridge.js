@@ -2668,6 +2668,32 @@
       var isDistortHover = state.xformDistortHoverDir === k;
       items.push(rectItem(p[0], p[1], (isDistortHover ? 4.5 : 3.5) * zs, [255, 255, 255, 255], isDistortHover ? [255, 159, 10, 255] : [74, 158, 255, 255], 1.2 * zs));
     });
+    // Skew tick marks (2026-08, Graphite-style skew-on-hover — user
+    // reference) — two short marks flanking each edge-midpoint handle,
+    // running PARALLEL to that edge: dragging from here shears the grabbed
+    // edge ALONG its own direction (matching the EW/NS-resize cursor
+    // select-bridge.js shows for it), relative to the fixed opposite edge.
+    // Hidden on an edge too short to grab both ticks cleanly.
+    // SKEW_MIN_EDGE_PX/INNER/OUTER must match select-bridge.js's own
+    // hitTestHandles thresholds exactly (same duplication-with-agreement
+    // shape as ringRadius above) — a mark drawn where a click wouldn't be
+    // recognized (or vice versa) would be a UI lie.
+    var SKEW_MIN_EDGE_PX = 48, SKEW_INNER_PX = 9, SKEW_OUTER_PX = 20;
+    var EDGE_PAIRS = { n: ['nw', 'ne'], s: ['sw', 'se'], w: ['nw', 'sw'], e: ['ne', 'se'] };
+    Object.keys(EDGE_PAIRS).forEach(function (k) {
+      var a = corners[EDGE_PAIRS[k][0]], b2 = corners[EDGE_PAIRS[k][1]];
+      var ex = b2[0] - a[0], ey = b2[1] - a[1];
+      var edgeLen = Math.sqrt(ex * ex + ey * ey);
+      if (edgeLen * view.zoom < SKEW_MIN_EDGE_PX) return;
+      var dx = ex / edgeLen, dy = ey / edgeLen;
+      var mid = corners[k];
+      var isSkewHover = state.xformSkewHoverEdge === k;
+      var col = isSkewHover ? [255, 159, 10, 255] : [74, 158, 255, 255];
+      [-1, 1].forEach(function (side) {
+        var c0 = side * SKEW_INNER_PX * zs, c1 = side * SKEW_OUTER_PX * zs;
+        items.push(lineItem([mid[0] + dx * c0, mid[1] + dy * c0], [mid[0] + dx * c1, mid[1] + dy * c1], col, 1.6 * zs));
+      });
+    });
     // Anchor/pivot marker (redesign 2026-07-09, AE-style anchor point) — a
     // small ringed crosshair AT the point rotation actually pivots around
     // (tools.js xformAnchorPoint), so a non-center anchor is visible on the
