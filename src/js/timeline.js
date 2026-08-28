@@ -525,6 +525,17 @@ window.SM={
             p.data.bitmapBrushSpec.size=v;
             SMBitmapBrush.regenerate(p,userLayers[state.activeLayerIdx]);
           }
+          // Same gap for a plain VECTOR texture preset (feedback #82, "si je
+          // select une brush avec texture vecto et que je change sa width
+          // cela n'agit pas") — the bitmap case above was fixed but this one
+          // never was: applyBrushTexture's dabs are stamped ONCE at apply
+          // time using the anchor's strokeWidth as baseWidth (tools.js), so
+          // just setting p.strokeWidth above only resizes the invisible
+          // anchor while the visible dabs stay at their old size.
+          // regenerateBrushTexture re-stamps from the NOW-updated strokeWidth.
+          else if(p.data&&p.data.brushTexturePreset&&p.data.brushGroupId){
+            regenerateBrushTexture(p,userLayers[state.activeLayerIdx]);
+          }
         }
       });
       saveActiveLayerFrame();updateUI();
