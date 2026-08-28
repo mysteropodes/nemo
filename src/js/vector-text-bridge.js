@@ -25,6 +25,20 @@
 // permissive license explicit about embedding/redistribution (same terms
 // matplotlib redistributes it under) — a genuinely different family
 // (serif option included), not just another weight of the same face.
+// Manrope/Inter added same day (follow-up ask: "peux t'on avoir d'autre
+// typo sans probleme de droit genre les google fonts ?") — both straight
+// from the official google/fonts repo (OFL-licensed, the standard Google
+// Fonts license, explicit about embedding/redistribution — the exact
+// thing that was asked for by name). Manrope doubles as the app's OWN UI
+// face (style.css) so it reads as a deliberate, on-brand choice, not just
+// another generic sans. Both ship ONLY as variable fonts upstream (no
+// static Bold instance in the repo) — opentype.js reads a variable font's
+// default master, which for both families IS the Regular weight, so the
+// Regular entry works exactly like the static fonts above; there is no
+// -Bold entry for either, so toggling Bold on text using one of these
+// simply has no effect (resolvedFontKey's own fallback in
+// buildVectorTextGroup below already handles a missing weight gracefully
+// — same as any family that ships without one).
 var VECTOR_FONTS = {
   'Roboto-Regular': { url: 'fonts/Roboto-Regular.ttf', label: 'Roboto' },
   'Roboto-Bold': { url: 'fonts/Roboto-Bold.ttf', label: 'Roboto Bold' },
@@ -32,6 +46,8 @@ var VECTOR_FONTS = {
   'DejaVuSans-Bold': { url: 'fonts/DejaVuSans-Bold.ttf', label: 'DejaVu Sans Bold' },
   'DejaVuSerif-Regular': { url: 'fonts/DejaVuSerif.ttf', label: 'DejaVu Serif' },
   'DejaVuSerif-Bold': { url: 'fonts/DejaVuSerif-Bold.ttf', label: 'DejaVu Serif Bold' },
+  'Manrope-Regular': { url: 'fonts/Manrope-Regular.ttf', label: 'Manrope' },
+  'Inter-Regular': { url: 'fonts/Inter-Regular.ttf', label: 'Inter' },
 };
 var _vecFontCache = {};
 function loadVectorFont(key) {
