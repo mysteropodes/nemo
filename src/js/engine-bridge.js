@@ -3321,8 +3321,21 @@
         lastSceneVersion = window._sceneVersion;
       }
     } catch (e) {
+      // A WASM trap (an internal Rust panic — most commonly the boolean-op
+      // library choking on degenerate geometry from a tool like the
+      // eraser, see eraser.rs's dedup/ring-length guards) poisons the
+      // WHOLE wasm module instance, not just the one call that triggered
+      // it — every future engine.render() throws the exact same way, so
+      // disabling for the rest of this session (falling back to Paper.js,
+      // same as the manual toggle) is the only safe response. Silently
+      // switching render backends with nothing but a console.error is how
+      // this surfaced as several unrelated-looking "fill/gomme/lasso font
+      // rien" reports before anyone thought to check devtools — a distinct,
+      // explicit toast (not setEnabled's own generic "Rendu: Paper.js")
+      // makes the actual cause visible instead of just the symptom.
       console.error('[engine-bridge] render failed, disabling', e);
-      setEnabled(false);
+      if (window.showToast) showToast('Moteur de rendu Rust interrompu (géométrie invalide) — passage en Paper.js. Sauvegardez et rechargez pour le restaurer.');
+      setEnabled(false, true);
       return;
     }
     rafId = requestAnimationFrame(tick);
@@ -3459,6 +3472,29 @@
   // bridge keeps synced — used by draw-bridge.js so an intercepted tool's
   // pointer events land at the exact spot the Rust canvas is showing.
   function screenToWorld(clientX, clientY) {
+    // No WASM engine (WebGPU adapter creation failed — reported live on an
+    // M3/Sequoia Mac, "Failed to create WebGPU Context Provider" ×15 then
+    // "no compatible WebGPU adapter") leaves rustCanvas null (ensureEngine's
+    // own catch block). Every properly-gated bridge already skips calling
+    // this at all in that case (shouldIntercept() etc. check isEnabled()
+    // first) — but at least one caller (_fsPromoteDrag's raw document
+    // pointermove/pointerup in tools.js) never went through that gate, so
+    // this threw a bare "Cannot read properties of null
+    // (reading 'getBoundingClientRect')" on literally every click for
+    // anyone without a working WebGPU adapter — not a rare edge case, the
+    // WHOLE app for that user. Falling back to Paper's own view here
+    // (paperCanvasEl is set early in ensureEngine, before creation can
+    // fail, and sits at the exact same position/size as rustCanvas would)
+    // is correct, not just crash-proof: Paper's viewToProject already
+    // applies the same pan/zoom/rotation the two canvases are kept in
+    // sync on (syncViewport).
+    if (!rustCanvas) {
+      if (!paperCanvasEl || typeof view === 'undefined' || !view) return [0, 0];
+      var prect = paperCanvasEl.getBoundingClientRect();
+      var pLocal = new Point((clientX - prect.left) * (paperCanvasEl.width / prect.width), (clientY - prect.top) * (paperCanvasEl.height / prect.height));
+      var proj = view.viewToProject(pLocal);
+      return [proj.x, proj.y];
+    }
     var rect = rustCanvas.getBoundingClientRect();
     var sx = (clientX - rect.left) * (engineW / rect.width);
     var sy = (clientY - rect.top) * (engineH / rect.height);

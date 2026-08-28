@@ -5226,7 +5226,17 @@ function _eraseDegenerateSelfLoops(path){
   // signal that this path is one of those, so the refit is skipped for it —
   // and only for it, leaving the ordinary unite()-output case this pass was
   // written for untouched.
-  if(!keptRevisit)path.simplify(2.5);
+  //
+  // Segment-count guard (2026-08, live crash: "Cannot read properties of
+  // undefined (reading 'subtract')" inside Paper.js's own simplify()→fit
+  // internals). The splice loop above can legitimately reduce a path to
+  // 1-2 segments on genuinely degenerate/near-zero source geometry (the
+  // same class of input the Rust erase_at_point path now guards against
+  // separately, eraser.rs) — Paper's curve-fit algorithm indexes
+  // neighboring segments assuming at least a real closed triangle to work
+  // with, and throws a bare TypeError instead of a catchable error on
+  // fewer. Nothing to simplify below that anyway.
+  if(!keptRevisit&&path.segments.length>=3)path.simplify(2.5);
 }
 // strokeInfo (optional, 2026-07 — "l'eraser supprime le stroke entier"):
 // every branch below used to hardcode strokeColor=null on its island(s),

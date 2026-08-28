@@ -29,7 +29,6 @@ export const align_pair: (a: number, b: number, c: number, d: number) => [number
 export const auto_match: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const resample_stroke: (a: number, b: number, c: number) => [number, number, number, number];
 export const fill_find: (a: number, b: number) => [number, number, number, number];
-export const erase_at_point: (a: number, b: number) => [number, number, number, number];
 export const __wbg_strokemodeler_free: (a: number, b: number) => void;
 export const boolean_op: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
 export const boolean_op_multi: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
@@ -44,6 +43,7 @@ export const strokemodeler_move_packed: (a: number, b: number, c: number, d: num
 export const strokemodeler_new: (a: number, b: number) => number;
 export const strokemodeler_up: (a: number, b: number, c: number, d: number, e: number) => [number, number];
 export const strokemodeler_up_packed: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+export const erase_at_point: (a: number, b: number) => [number, number, number, number];
 export const effective_frame_index: (a: number, b: number, c: number) => [number, number, number];
 export const hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
 export const resolve_symbol_frame: (a: number, b: number, c: number) => [number, number, number];
@@ -56,7 +56,7 @@ export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) =>
 export const __wbindgen_exn_store: (a: number) => void;
 export const __externref_table_alloc: () => number;
 export const __wbindgen_externrefs: WebAssembly.Table;
-export const __wbindgen_destroy_closure: (a: number, b: number) => void;
 export const __wbindgen_free: (a: number, b: number, c: number) => void;
+export const __wbindgen_destroy_closure: (a: number, b: number) => void;
 export const __externref_table_dealloc: (a: number) => void;
 export const __wbindgen_start: () => void;

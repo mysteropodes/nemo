@@ -14,13 +14,49 @@ use serde::Deserialize;
 use vello::kurbo::{flatten, stroke, PathEl, Stroke, StrokeOpts};
 use wasm_bindgen::prelude::*;
 
+// geo_booleanop's sweep-line algorithm panics (surfaces to JS as a bare
+// "RuntimeError: unreachable" — see engine.rs's console_error_panic_hook
+// comment) on degenerate input: near-coincident consecutive vertices, or
+// a ring collapsed to fewer than 3 distinct points. A repeated erase on
+// the same small area (fast dab-like drag samples, or a capsule whose
+// two endpoints land within flatten's own 0.25 tolerance of each other)
+// can produce exactly that. Deduplicating consecutive near-identical
+// points here is cheap and applies to every caller uniformly, unlike
+// trying to catch the panic after the fact (wasm-bindgen's panic=abort
+// profile has no working catch_unwind to recover through anyway).
+const DEDUP_EPS_SQ: f64 = 1e-6; // (1e-3)^2 world units — well under flatten's own 0.25 tolerance
 fn bezpath_to_polygon_in(path: &vello::kurbo::BezPath) -> PolygonIn {
     let mut exterior: Vec<[f64; 2]> = Vec::new();
     flatten(path.elements().iter().copied(), 0.25, |el| match el {
-        PathEl::MoveTo(p) | PathEl::LineTo(p) => exterior.push([p.x, p.y]),
+        PathEl::MoveTo(p) | PathEl::LineTo(p) => {
+            let pt = [p.x, p.y];
+            let is_dup = exterior.last().map_or(false, |last: &[f64; 2]| {
+                let dx = last[0] - pt[0];
+                let dy = last[1] - pt[1];
+                dx * dx + dy * dy < DEDUP_EPS_SQ
+            });
+            if !is_dup {
+                exterior.push(pt);
+            }
+        }
         _ => {}
     });
+    // Drop a closing point that landed back on the start within epsilon —
+    // geo_types' Polygon doesn't need (and geo_booleanop can choke on) an
+    // explicitly duplicated first/last vertex.
+    if exterior.len() > 1 {
+        let first = exterior[0];
+        let last = *exterior.last().unwrap();
+        let dx = first[0] - last[0];
+        let dy = first[1] - last[1];
+        if dx * dx + dy * dy < DEDUP_EPS_SQ {
+            exterior.pop();
+        }
+    }
     PolygonIn { exterior, holes: Vec::new() }
+}
+fn is_usable_ring(pts: &[[f64; 2]]) -> bool {
+    pts.len() >= 3
 }
 
 fn circle_bezpath(cx: f64, cy: f64, r: f64) -> vello::kurbo::BezPath {
@@ -97,6 +133,17 @@ pub fn erase_at_point(json: &str) -> Result<String, JsValue> {
         _ => circle_bezpath(input.eraser_x, input.eraser_y, r),
     };
     let eraser_poly_in = bezpath_to_polygon_in(&eraser_bez);
+
+    // Bail out to a controlled JS error (caught by eraseAtPointWasm's own
+    // try/catch, tools.js — falls back to the Paper.js implementation)
+    // instead of handing geo_booleanop a ring it can panic on. Both sides
+    // collapsing to <3 points is rare but real: a very small/near-zero
+    // eraser_radius, or a target whose entire visible geometry sits
+    // within one flatten tolerance step (e.g. an almost-fully-erased
+    // sliver from a prior pass in the same drag).
+    if !is_usable_ring(&target_poly_in.exterior) || !is_usable_ring(&eraser_poly_in.exterior) {
+        return Err(JsValue::from_str("degenerate geometry, skipping erase"));
+    }
 
     let target_poly = to_polygon(&target_poly_in);
     let eraser_poly = to_polygon(&eraser_poly_in);
