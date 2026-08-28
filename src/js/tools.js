@@ -2002,6 +2002,17 @@ function fillConsumeCloseStrokes(wallIds){
 var FILL_CLOSE_SNAP_TOL=18;
 function fillMaterializeTempCloseStrokes(layer){
   var realWalls=layer.children.filter(function(c){
+    // Feedback (slow + wrong shape with a textured/preset vector brush,
+    // Alt+drag closing stroke): same gap as feedback #110's crash, just in
+    // a SECOND wall-gathering function fillCollectWalls's own fix (below)
+    // never reached — data.isBrushTextureCopy dabs (hundreds per textured
+    // stroke, each with a real fillColor) and data.isLinkedFillCompanion
+    // backdrops were passing this filter, so every closing-stroke sample
+    // point ran getNearestPoint against every dab below (O(points×dabs)) —
+    // the actual slowdown — AND could snap onto a dab's own small edge
+    // instead of the ribbon's true outline, producing a garbled wall that
+    // fillVectorFind then traced wrong. Same exclusion as fillCollectWalls.
+    if(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy))return false;
     return c instanceof Path&&(c.strokeColor||c.fillColor||(c.data&&c.data.isVectorBrush))&&!(c.data&&c.data.isFillTempClose)&&c.segments.length>=2;
   });
   return _fillCloseStrokes.map(function(entry){
