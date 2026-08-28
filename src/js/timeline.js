@@ -8154,6 +8154,17 @@ function onKeyDown(event){
       }
     }
     else if(state.tool==='select'&&selectedPaths.length>0)window.SM.deleteSelStrokes();
+    // Delete key on the Select tool with nothing on canvas selected — but a
+    // layer row IS (feedback #107: "la touche supprimer ne marche pas pour
+    // supprimer un calque dans la timeline"). Every branch above only ever
+    // deletes strokes/nodes/frames; a plain layer-row selection with no
+    // canvas selection fell all the way through to nothing (Shift+Delete
+    // hits removeFrame() below, which this must not shadow — hence the
+    // !event.shiftKey guard). Matches the same trash-button/context-menu
+    // action (window.SM.deleteLayer(), already scoped to _layerSel/
+    // activeLayerIdx with its own last-layer/camera-layer guards) rather
+    // than duplicating that logic here.
+    else if(state.tool==='select'&&!event.shiftKey&&state.layers.length){event.preventDefault();window.SM.deleteLayer();}
     else if(event.shiftKey)removeFrame();
   }
   else if(k==='F5'){event.preventDefault();insertFrame();}
