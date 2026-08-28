@@ -2883,7 +2883,14 @@ function fillPropagateAcrossFrames(fillPath){
   for(var fi=0;fi<ld.frames.length;fi++){
     if(fi===srcFrame)continue;
     var f=ld.frames[fi];
-    if(!f||!f.strokes)continue; // inherits from a keyframe — nothing of its own
+    // Only frames that OWN content. A held frame (neither keyframe nor
+    // interpolated) carries an empty strokes array and renders the keyframe it
+    // inherits from — so it already shows that keyframe's propagated fill, and
+    // writing to it is a no-op that saveActiveLayerFrame refuses anyway.
+    // Measured before this guard: ~100 of 119 frames on a real project were
+    // held, so the pass spent most of its time producing nothing and reported
+    // them as "filled".
+    if(!f||!f.strokes||!(f.isKeyframe||f.isInterpolated))continue;
     frames++;
     goToFrame(fi);
     var lyr=userLayers[li];
