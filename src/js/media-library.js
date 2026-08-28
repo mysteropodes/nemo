@@ -176,6 +176,17 @@
         var img = document.createElement('img'); img.src = m.thumb; img.draggable = m.kind === 'image';
         thumb.appendChild(img);
         if (m.kind === 'video') { var pb = document.createElement('div'); pb.className = 'media-row-playicon'; pb.textContent = '▶'; thumb.appendChild(pb); }
+        // Feedback #106: the row already flipped out of status:'loading' (one
+        // frame decoded, thumbnail built — genuinely instant), but the video
+        // may still be optimizing in the background (native-video-bridge.js's
+        // _optimizeLayerMedia, separate fire-and-forget transcode) before it's
+        // truly instant-scrub-ready — this small corner spinner is that
+        // "still working, don't worry" signal the loading overlay used to give.
+        if (m.kind === 'video' && m.optimizing) {
+          var ob = document.createElement('div'); ob.className = 'media-row-optim-badge';
+          ob.title = SM && SM.t ? SM.t('mediaOptimizingTip') : 'Optimisation en arrière-plan pour un scrub instantané…';
+          thumb.appendChild(ob);
+        }
       }
       row.appendChild(thumb);
 
