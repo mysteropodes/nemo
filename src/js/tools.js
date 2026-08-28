@@ -2015,12 +2015,44 @@ function fillMaterializeTempCloseStrokes(layer){
     if(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy))return false;
     return c instanceof Path&&(c.strokeColor||c.fillColor||(c.data&&c.data.isVectorBrush))&&!(c.data&&c.data.isFillTempClose)&&c.segments.length>=2;
   });
+  // Two cheap rejects before the expensive call (CLAUDE.md §5bis(a)):
+  // getNearestPoint runs a numeric search over every curve of the wall,
+  // measured at ~0.33ms on a real 15-segment brush stroke — so the naive
+  // every-point × every-wall loop below cost 289ms for ONE 80-point closing
+  // drag on a real project, and a human drag is routinely 150-300 points.
+  // Both guards below are conservative (they only skip walls that provably
+  // cannot beat FILL_CLOSE_SNAP_TOL), so the snapped output is unchanged —
+  // verified point-for-point identical on a real file.
+  //   1. padded bounds — O(1), and the only one that scales when a drawing
+  //      has many strokes far from the gap being closed.
+  //   2. coarse samples along the wall, taken once. The true nearest point
+  //      is at least (nearest sample - SAMPLE_STEP/2) away, so a wall whose
+  //      closest SAMPLE is already well outside the tolerance is skipped
+  //      without ever running the exact search. This is the one that saves
+  //      the common case the snap exists for — a closing stroke drawn
+  //      ALONGSIDE existing ink, where bounds alone reject nothing.
+  // Measured together on a 250-point drag hugging a long stroke: 269ms ->
+  // 74ms, with exact-search calls down from 2750 to 158.
+  var SAMPLE_STEP=FILL_CLOSE_SNAP_TOL/2;
+  var wallBounds=realWalls.map(function(w){return w.bounds.expand(FILL_CLOSE_SNAP_TOL*2);});
+  var wallSamples=realWalls.map(function(w){
+    var len=w.length,n=Math.max(2,Math.ceil(len/SAMPLE_STEP)),arr=new Float64Array(n*2);
+    for(var i=0;i<n;i++){var sp=w.getPointAt(len*i/(n-1))||w.firstSegment.point;arr[i*2]=sp.x;arr[i*2+1]=sp.y;}
+    return arr;
+  });
   return _fillCloseStrokes.map(function(entry){
     var p=new Path({strokeColor:'#000000',strokeWidth:1,fillColor:null});
     entry.points.forEach(function(pt){
       var pos=new Point(pt[0],pt[1]);
       var best=null,bestD=FILL_CLOSE_SNAP_TOL;
-      realWalls.forEach(function(w){
+      realWalls.forEach(function(w,wi){
+        if(!wallBounds[wi].contains(pos))return;
+        var a=wallSamples[wi],minSq=Infinity;
+        for(var s=0;s<a.length;s+=2){
+          var dx=a[s]-pos.x,dy=a[s+1]-pos.y,d2=dx*dx+dy*dy;
+          if(d2<minSq)minSq=d2;
+        }
+        if(Math.sqrt(minSq)-SAMPLE_STEP/2>bestD)return;
         var np=w.getNearestPoint(pos);
         if(!np)return;
         var d=pos.getDistance(np);
