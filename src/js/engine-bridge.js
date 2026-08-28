@@ -2980,7 +2980,18 @@
   // this function silently swallowed it via the same gate.
   function setPressureCursor(worldPt, radius, forced) { pressureCursorWorld = worldPt; pressureCursorRadius = radius; pressureCursorForced = !!forced; }
   function buildPressureCursorItems() {
-    if (state.tool !== 'draw' || !pressureCursorWorld || !(state.vectorBrush || pressureCursorForced)) return [];
+    if (!pressureCursorWorld) return [];
+    if (!pressureCursorForced) {
+      // Mirrors draw-bridge.js's onHoverMove gate exactly (feedback: "une
+      // vraie sensation de dessin comme sur Flash/Animate" — Fill Brush and
+      // Bitmap Brush now call setPressureCursor on hover too, but this was
+      // the one place that still only ever built the circle for tool==='draw'
+      // + vectorBrush, silently swallowing the other two modes' calls).
+      var isDraw = state.tool === 'draw';
+      var isFillBrush = state.tool === 'fillbrush';
+      if (!isDraw && !isFillBrush) return [];
+      if (isDraw && !state.vectorBrush && !(state.bitmapBrushOn && state.strokeEnabled)) return [];
+    }
     // Rim was pure white — invisible against a white canvas background
     // (reported). The app's own blue accent stays visible on any bg.
     return [circleItem(pressureCursorWorld[0], pressureCursorWorld[1], pressureCursorRadius, [255, 255, 255, 40], [74, 158, 255, 220], 1 / view.zoom)];

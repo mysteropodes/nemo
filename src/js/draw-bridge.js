@@ -686,8 +686,18 @@
   // while `dragging` so it never fights onMove's live pressure-driven size
   // during an actual stroke).
   function onHoverMove(e) {
-    if (dragging || !window.SMEngineBridge || !window.SMEngineBridge.isEnabled()) return;
-    if (state.tool !== 'draw' || !state.vectorBrush || state.playing) return;
+    if (dragging || !window.SMEngineBridge || !window.SMEngineBridge.isEnabled() || state.playing) return;
+    // Feedback ("une vraie sensation de dessin comme sur Flash/Animate"):
+    // this brush-footprint preview used to be vectorBrush-only — Fill
+    // Brush and Bitmap Brush fell through to a plain crosshair instead,
+    // with no way to gauge the brush's actual size before the first
+    // stroke (Flash/Animate always show it, for every brush mode).
+    // widthFor() already resolves the right size field per mode
+    // (fillBrushSize vs brushSize) — this only widens WHEN the circle
+    // shows, not how big it is.
+    var isDraw = state.tool === 'draw';
+    if (!isDraw && !isFillBrush()) return;
+    if (isDraw && !state.vectorBrush && !(state.bitmapBrushOn && state.strokeEnabled)) return;
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     window.SMEngineBridge.setPressureCursor(w, widthFor(0.5) / 2);
     window.SMEngineBridge.renderNow();
