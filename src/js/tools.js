@@ -2014,7 +2014,20 @@ function fillMaterializeTempCloseStrokes(layer){
     // fillVectorFind then traced wrong. Same exclusion as fillCollectWalls.
     if(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy))return false;
     return c instanceof Path&&(c.strokeColor||c.fillColor||(c.data&&c.data.isVectorBrush))&&!(c.data&&c.data.isFillTempClose)&&c.segments.length>=2;
-  });
+  // Snap against the same geometry the FILL GRAPH uses — fillWallPath, i.e.
+  // a pressure/brush stroke's CENTERLINE, not the ribbon outline stored on
+  // the item (CLAUDE.md §1: fillWallPath is the shared "what counts as a
+  // wall" transform and this function was the one wall-consumer that never
+  // called it). Snapping to the raw item pulled each closing-stroke end onto
+  // the ribbon's OUTER EDGE, half a brush-width away from the centerline the
+  // graph then traces — so a closing stroke the user drew exactly end-to-end
+  // still left a systematic ~half-brush-width hole at BOTH ends and could
+  // not close at gapThr 0. Reproduced minimally: two 6px vertical brush
+  // strokes 220px apart, bridged top and bottom, found nothing at gapThr 0
+  // or 10 and only closed at 24 (the snapped ends sat at x=855.0/1065.0
+  // against centerlines at x=850/1070). This is the "je ferme tous les
+  // bouts proprement et il ne comprend pas la forme" report.
+  }).map(fillWallPath).filter(function(w){return w.segments.length>=2;});
   // Two cheap rejects before the expensive call (CLAUDE.md §5bis(a)):
   // getNearestPoint runs a numeric search over every curve of the wall,
   // measured at ~0.33ms on a real 15-segment brush stroke — so the naive
