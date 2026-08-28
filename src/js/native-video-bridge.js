@@ -770,6 +770,13 @@
     if (nv.optimizedPath && !/\.mjpeg$/.test(nv.optimizedPath)) nv.optimizedPath = null;
     if (nv.optimizedPath || _isAllIntra(nv.codec) || _optimizing[nv.path]) return;
     _optimizing[nv.path] = true;
+    // Media panel badge (feedback #106) — the entry already flipped to
+    // status:'ready' back in importAsLayer() the instant one frame decoded;
+    // this separate flag says "still optimizing in the background" without
+    // reviving the full loading spinner (the video already plays fine
+    // meanwhile). Cleared in the finally block below regardless of outcome.
+    var _mlEntry = window.SMMediaLibrary ? (state.mediaLibrary || []).find(function (m) { return m.layerUid && m.layerUid === ld.layerUid; }) : null;
+    if (_mlEntry) SMMediaLibrary.updateEntry(_mlEntry.id, { optimizing: true });
     try {
       var res = await invoke('optimized_media_target', { path: nv.path });
       var target = res[0], exists = res[1];
@@ -809,6 +816,7 @@
       if (window.showToast) showToast(SM.t('toastVideoOptimizationFailedForSuffix') + (nv.path.split('/').pop()) + ' (scrub restera plus lent) — ' + (e && e.message || e), 'warn');
     } finally {
       delete _optimizing[nv.path];
+      if (_mlEntry) SMMediaLibrary.updateEntry(_mlEntry.id, { optimizing: false });
     }
   }
 
@@ -976,11 +984,6 @@
     }
     var pxThumb = target0 === 0 ? px0 : null;
     if (!pxThumb) { try { pxThumb = await frameBytes(info.session_id, 0); } catch (e) { /* thumbnail stays cosmetic-only, no fallback needed */ } }
-    // Fire-and-forget: transcode long-GOP sources to all-intra in the
-    // background and swap the session when ready — import stays instant,
-    // and now that frame 0 is already decoded+registered above, there's
-    // nothing left for this background job to visibly delay.
-    _optimizeLayerMedia(idx);
     // Thumbnail for the Médias panel — reuses pxThumb (frame 0 specifically,
     // no second decode in the common case where the playhead was already
     // at frame 0 on import). This is also the point where the 'loading'
@@ -1009,6 +1012,15 @@
       if (pendingMediaId) SMMediaLibrary.updateEntry(pendingMediaId, readyPatch);
       else SMMediaLibrary.addEntry(name, 'video', readyPatch.thumb || null, ld.name, readyPatch);
     }
+    // Fire-and-forget: transcode long-GOP sources to all-intra in the
+    // background and swap the session when ready — import stays instant,
+    // and now that frame 0 is already decoded+registered above, there's
+    // nothing left for this background job to visibly delay. Started AFTER
+    // the Médias entry above has its real layerUid/status:'ready' (feedback
+    // #106) — _optimizeLayerMedia looks the entry up by layerUid to show its
+    // own "still optimizing" badge, which would silently no-op if called
+    // while the entry was still the pre-layerUid loading placeholder.
+    _optimizeLayerMedia(idx);
     if (window.activateUL) activateUL(idx);
     if (window.loadFrame) loadFrame(state.currentFrame);
     if (window.updateUI) updateUI();
