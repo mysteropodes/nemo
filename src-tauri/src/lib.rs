@@ -118,6 +118,73 @@ async fn upload_feedback_attachment(filename: String, content_base64: String) ->
     }
 }
 
+// Live Google Fonts (2026-08-28, feedback: "peux t'on avoir d'autre typo
+// sans probleme de droit genre les google fonts ?" then "un vrai catalogue
+// Google Fonts en ligne") — fetches ANY of the 1800+ OFL-licensed Google
+// Fonts on demand, not just the handful bundled as local TTFs
+// (vector-text-bridge.js). Graphite's own web editor does the same idea
+// (editor.graphite.art) via their own backend proxying Google's official
+// Fonts Developer API — that API needs a server-side secret key, so it
+// can't be called straight from a browser without exposing it. This avoids
+// needing any key at all: Google Fonts' public CSS2 endpoint
+// (fonts.googleapis.com/css2) serves a DIFFERENT font file format
+// depending on the request's User-Agent (browsers get woff2, IE9-era UAs
+// get woff/eot) — an old Android 2.2 UA specifically gets a plain,
+// uncompressed .ttf URL, exactly what opentype.js (the same glyph-outline
+// parser vector-text-bridge.js already uses for the bundled fonts) needs,
+// with zero decoding step. Confirmed live via curl before writing this:
+// modern UA → woff2, this UA → "format('truetype')" pointing at a plain
+// fonts.gstatic.com/.../*.ttf, itself CORS-open (access-control-allow-
+// origin: *) — this second fetch could in principle happen straight from
+// the webview, but reqwest is the one thing that can actually SEND a
+// custom User-Agent: browsers/webviews treat User-Agent as a forbidden
+// header a page's own fetch() may never override, which is the one thing
+// this whole trick depends on — hence a Tauri command instead of plain JS.
+// The Cloudflare Worker equivalent for the web build (mirrors
+// worker-feedback/'s own trust-boundary role, see that folder's README)
+// is a separate, not-yet-built piece — this command only covers desktop.
+#[tauri::command]
+async fn fetch_google_font(family: String, weight: u32, italic: bool) -> Result<String, String> {
+    use base64::Engine;
+    let axis = if italic { "ital,wght@1," } else { "wght@" };
+    let css_url = format!(
+        "https://fonts.googleapis.com/css2?family={}:{}{}&display=swap",
+        family.replace(' ', "+"),
+        axis,
+        weight
+    );
+    let client = reqwest::Client::new();
+    let css = client
+        .get(&css_url)
+        .header("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.2)")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .text()
+        .await
+        .map_err(|e| e.to_string())?;
+    // The response is one @font-face block per requested weight/style —
+    // just one here since exactly one weight/italic combo was asked for.
+    // Extract the URL inside its first src: url(...) rather than a full
+    // CSS parse — this endpoint's own output shape is stable/simple enough
+    // (confirmed via curl) that a real parser would be pure overhead.
+    let ttf_url = css
+        .split("url(")
+        .nth(1)
+        .and_then(|rest| rest.split(')').next())
+        .ok_or_else(|| format!("no font URL found for '{}' — family name may not exist on Google Fonts", family))?
+        .to_string();
+    let bytes = client
+        .get(&ttf_url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .bytes()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
+}
+
 // Native stylus pressure (macOS): tablet drivers (XP-Pen, Huion, Wacom…)
 // deliver pen pressure through AppKit NSEvents — mouse events carrying the
 // NSEventSubtypeTabletPoint subtype — which WKWebView does not forward to
@@ -205,6 +272,7 @@ pub fn run() {
             run_ffmpeg,
             submit_feedback_issue,
             upload_feedback_attachment,
+            fetch_google_font,
             video_decode::open_video_session,
             video_decode::decode_video_frame,
             video_decode::close_video_session,

@@ -8,9 +8,11 @@
 	"name": "nemo-feedback",
 	"main": "src/index.js",
 	"compatibility_date": "2026-08-01",
-	// nemo-editor's real deployed origin — CORS is restricted to this so
-	// only the actual editor build can call this Worker.
+	// nemo-editor's real deployed origins — CORS is restricted to these so
+	// only the actual editor build can call this Worker. nemomotion.org is
+	// the custom domain (2026-08-28); the workers.dev origin is kept during
+	// the transition in case anything still points at it.
 	"vars": {
-		"ALLOWED_ORIGINS": "https://nemo-editor.mysteropodes-auth.workers.dev"
+		"ALLOWED_ORIGINS": "https://nemomotion.org,https://www.nemomotion.org,https://nemo-editor.mysteropodes-auth.workers.dev"
 	}
 }

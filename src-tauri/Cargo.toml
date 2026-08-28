@@ -32,6 +32,10 @@ tauri-plugin-dialog = "2.7.1"
 tauri-plugin-http = "2"
 tauri-plugin-process = "2"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# Live Google Fonts (fetch_google_font, lib.rs) — encodes a fetched TTF's
+# raw bytes to base64 for the trip back to JS, same shape as the existing
+# feedback-attachment content_base64 convention.
+base64 = "0.22"
 # Native video decode (src/video_decode.rs): feeds decoded RGBA8 frames to
 # the webview for engine.register_image() (the same GPU-texture entry
 # point static images already use, geometry-wasm/src/engine.rs). Decodes

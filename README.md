@@ -42,7 +42,7 @@ app that files an issue for you, screenshot attached.
 **In the browser** — no install, requires a WebGPU-capable browser (recent Chrome, Edge,
 or Safari 26+):
 
-> https://nemo-editor.mysteropodes-auth.workers.dev
+> https://nemomotion.org
 
 **On the desktop** — build from source (see [Building](#building) below). Packaged
 releases are not published yet.

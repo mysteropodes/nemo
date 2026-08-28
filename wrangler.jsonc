@@ -5,5 +5,13 @@
 	// no "main" field is needed, just the directory to serve.
 	"name": "nemo-editor",
 	"compatibility_date": "2026-08-01",
-	"assets": { "directory": "./src" }
+	// "main" intercepts /api/google-font (live Google Fonts proxy for the web
+	// build, worker/index.js) and falls through to the ASSETS binding for
+	// everything else — same static site as before, just with one dynamic route.
+	"main": "worker/index.js",
+	"assets": { "directory": "./src", "binding": "ASSETS" },
+	"routes": [
+		{ "pattern": "nemomotion.org", "custom_domain": true },
+		{ "pattern": "www.nemomotion.org", "custom_domain": true }
+	]
 }
