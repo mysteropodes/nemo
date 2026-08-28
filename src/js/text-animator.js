@@ -42,7 +42,14 @@
     easeIn:EASE_IN_CURVE,
     easeOut:[{x:0,y:0},{x:0.25,y:0.09},{x:0.5,y:0.5},{x:0.75,y:0.75},{x:1,y:1}],
   };
-  var EASING_LABELS={'default':'Par défaut du style',linear:'Linéaire',easeInOut:'Douce (in/out)',easeIn:'Accélérer',easeOut:'Décélérer'};
+  // i18n keys, not static strings (feedback: "l'ui de animate text encore
+  // en français") — looked up at PANEL-BUILD time via SM.t(), same "fresh
+  // every time, no reload" contract the rest of the app's i18n already
+  // guarantees (i18n.js's own header comment), not baked in at module load
+  // when the panel is built once but can be reopened after a language
+  // switch.
+  var EASING_KEYS={'default':'easingDefault',linear:'easingLinear',easeInOut:'easingEaseInOut',easeIn:'easingEaseIn',easeOut:'easingEaseOut'};
+  function easingLabel(k){return (window.SM&&SM.t)?SM.t(EASING_KEYS[k]||k):k;}
 
   // Every text-carrying stroke dict in this layer belonging to `groupId`
   // (vector: sd.groupId from vector-text-bridge.js; raster split:
@@ -95,15 +102,22 @@
     popIn:{props:['opacity','scale'],from:{opacity:[0],scale:[140,140]},to:{opacity:[100],scale:[100,100]},curve:POP_CURVE,exit:false},
     popOut:{props:['opacity','scale'],from:{opacity:[100],scale:[100,100]},to:{opacity:[0],scale:[140,140]},curve:EASE_IN_CURVE,exit:true},
   };
-  var PRESET_LABELS={
-    fadeIn:'Fondu (apparition)',fadeOut:'Fondu (disparition)',
-    slideUp:'Glisser vers le haut (apparition)',slideUpOut:'Glisser vers le haut (disparition)',
-    slideDown:'Glisser vers le bas (apparition)',slideDownOut:'Glisser vers le bas (disparition)',
-    slideLeft:'Glisser vers la gauche (apparition)',slideLeftOut:'Glisser vers la gauche (disparition)',
-    slideRight:'Glisser vers la droite (apparition)',slideRightOut:'Glisser vers la droite (disparition)',
-    scaleIn:'Zoom (apparition)',scaleOut:'Zoom (disparition)',
-    popIn:'Rebond (apparition)',popOut:'Rebond (disparition)',
+  var PRESET_KEYS={
+    fadeIn:'presetFadeIn',fadeOut:'presetFadeOut',
+    slideUp:'presetSlideUp',slideUpOut:'presetSlideUpOut',
+    slideDown:'presetSlideDown',slideDownOut:'presetSlideDownOut',
+    slideLeft:'presetSlideLeft',slideLeftOut:'presetSlideLeftOut',
+    slideRight:'presetSlideRight',slideRightOut:'presetSlideRightOut',
+    scaleIn:'presetScaleIn',scaleOut:'presetScaleOut',
+    popIn:'presetPopIn',popOut:'presetPopOut',
   };
+  function presetLabel(k){return (window.SM&&SM.t)?SM.t(PRESET_KEYS[k]||k):k;}
+  // Kept as a live getter-shaped object (not a plain map) for
+  // window.SMTextAnimator.PRESET_LABELS's existing external readers, which
+  // expect PRESET_LABELS[k] to just work syntactically — a Proxy re-runs
+  // presetLabel() (fresh SM.t() lookup) on every property access rather
+  // than freezing today's language into a snapshot at module load.
+  var PRESET_LABELS=new Proxy({},{get:function(_,k){return presetLabel(k);}});
 
   // Every prop any preset can touch — used to clear a stale run before
   // re-writing (live preview re-applies on every slider tweak; without
@@ -231,66 +245,79 @@
     if(window.pushUndo){pushUndo();_panelUndoTaken=true;}
     var p=document.createElement('div');
     p.id='text-animator-panel';
+    p.className='psec';
     p.style.cssText='position:fixed;top:80px;right:280px;z-index:300;width:260px;'+
       'background:var(--panel2);border:1px solid var(--border);border-radius:10px;'+
-      'box-shadow:0 8px 24px rgba(0,0,0,.4);padding:12px;font-size:12px;color:var(--text)';
+      'box-shadow:0 8px 24px rgba(0,0,0,.4);font-size:12px;color:var(--text)';
+    var body=document.createElement('div');
+    body.className='pbdy';
+    body.style.padding='12px';
+    // .pr/.pl/.psel/.pi (feedback: "mise en page ui forme comme le reste")
+    // — this panel used to be built with ad-hoc inline flex rows, which is
+    // exactly what drifted out of alignment the instant a label got long
+    // ("Décalage entre unités (frames)" wrapped instead of truncating).
+    // Reusing the SAME row/label/field classes every other panel in the
+    // app is built from (.pl is a fixed 68px truncate-with-ellipsis column,
+    // .psel/.pi fill the rest) fixes both asks in one move: visual
+    // consistency AND alignment, for free, from CSS this app already ships.
     function row(labelTxt){
       var r=document.createElement('div');
-      r.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px';
-      var lab=document.createElement('span'); lab.textContent=labelTxt; lab.style.color='var(--text-dim)';
+      r.className='pr';
+      var lab=document.createElement('span'); lab.className='pl'; lab.textContent=labelTxt; lab.title=labelTxt;
       r.appendChild(lab);
       return r;
     }
     var title=document.createElement('div');
-    title.textContent='Animer le texte';
+    title.textContent=SM.t('textAnimTitle');
     title.style.cssText='font-weight:600;margin-bottom:10px';
-    p.appendChild(title);
+    body.appendChild(title);
 
     var unitSel=document.createElement('select');
-    ['char','word','line'].forEach(function(v){
-      var o=document.createElement('option'); o.value=v;
-      o.textContent=v==='char'?'Lettres':v==='word'?'Mots':'Lignes';
+    unitSel.className='psel';
+    [['char','textAnimUnitChar'],['word','textAnimUnitWord'],['line','textAnimUnitLine']].forEach(function(pair){
+      var o=document.createElement('option'); o.value=pair[0]; o.textContent=SM.t(pair[1]);
       unitSel.appendChild(o);
     });
     unitSel.value=_lastSettings.mode;
-    var rUnit=row('Unité'); rUnit.appendChild(unitSel); p.appendChild(rUnit);
+    var rUnit=row(SM.t('textAnimUnit')); rUnit.appendChild(unitSel); body.appendChild(rUnit);
 
     var presetSel=document.createElement('select');
-    var grpIn=document.createElement('optgroup'); grpIn.label='Apparition';
-    var grpOut=document.createElement('optgroup'); grpOut.label='Disparition';
+    presetSel.className='psel';
+    var grpIn=document.createElement('optgroup'); grpIn.label=SM.t('textAnimGroupIn');
+    var grpOut=document.createElement('optgroup'); grpOut.label=SM.t('textAnimGroupOut');
     presetSel.appendChild(grpIn); presetSel.appendChild(grpOut);
     Object.keys(PRESETS).forEach(function(k){
-      var o=document.createElement('option'); o.value=k; o.textContent=PRESET_LABELS[k]||k;
+      var o=document.createElement('option'); o.value=k; o.textContent=presetLabel(k);
       (PRESETS[k].exit?grpOut:grpIn).appendChild(o);
     });
     presetSel.value=_lastSettings.preset;
-    var rPreset=row('Style'); rPreset.appendChild(presetSel); p.appendChild(rPreset);
+    var rPreset=row(SM.t('textAnimStyle')); rPreset.appendChild(presetSel); body.appendChild(rPreset);
 
     var easeSel=document.createElement('select');
+    easeSel.className='psel';
     Object.keys(EASING_CURVES).forEach(function(k){
-      var o=document.createElement('option'); o.value=k; o.textContent=EASING_LABELS[k];
+      var o=document.createElement('option'); o.value=k; o.textContent=easingLabel(k);
       easeSel.appendChild(o);
     });
     easeSel.value=_lastSettings.easing;
-    var rEase=row('Accélération'); rEase.appendChild(easeSel); p.appendChild(rEase);
+    var rEase=row(SM.t('textAnimAccel')); rEase.appendChild(easeSel); body.appendChild(rEase);
 
     function numInput(val,step){
       var inp=document.createElement('input');
       inp.type='number'; inp.value=val; inp.className='pi scrub'; inp.dataset.step=step||1;
-      inp.style.width='64px';
       return inp;
     }
     var startInp=numInput(state.currentFrame,1);
-    var rStart=row('Frame de départ'); rStart.appendChild(startInp); p.appendChild(rStart);
+    var rStart=row(SM.t('textAnimStartFrame')); rStart.appendChild(startInp); body.appendChild(rStart);
 
     var durInp=numInput(_lastSettings.unitFrames,1);
-    var rDur=row('Durée / unité (frames)'); rDur.appendChild(durInp); p.appendChild(rDur);
+    var rDur=row(SM.t('textAnimDuration')); rDur.appendChild(durInp); body.appendChild(rDur);
 
     var stagInp=numInput(_lastSettings.staggerFrames,1);
-    var rStag=row('Décalage entre unités (frames)'); rStag.appendChild(stagInp); p.appendChild(rStag);
+    var rStag=row(SM.t('textAnimStagger')); rStag.appendChild(stagInp); body.appendChild(rStag);
 
     var randChk=document.createElement('input'); randChk.type='checkbox'; randChk.checked=_lastSettings.randomize;
-    var rRand=row('Ordre aléatoire'); rRand.appendChild(randChk); p.appendChild(rRand);
+    var rRand=row(SM.t('textAnimRandomize')); rRand.appendChild(randChk); body.appendChild(rRand);
 
     // Scrub slider — previews the animation's own span (start → last
     // unit's end) without touching the app's main timeline/playhead UI,
@@ -301,13 +328,14 @@
     scrubWrap.style.cssText='margin:2px 0 10px';
     var scrubLabelRow=document.createElement('div');
     scrubLabelRow.style.cssText='display:flex;justify-content:space-between;color:var(--text-dim);margin-bottom:4px';
-    var scrubLabel=document.createElement('span'); scrubLabel.textContent='Aperçu';
+    var scrubLabel=document.createElement('span'); scrubLabel.textContent=SM.t('textAnimPreview');
     var scrubFrameLabel=document.createElement('span');
     scrubLabelRow.appendChild(scrubLabel); scrubLabelRow.appendChild(scrubFrameLabel);
     var scrubInp=document.createElement('input');
     scrubInp.type='range'; scrubInp.style.width='100%'; scrubInp.value=state.currentFrame;
     scrubWrap.appendChild(scrubLabelRow); scrubWrap.appendChild(scrubInp);
-    p.appendChild(scrubWrap);
+    body.appendChild(scrubWrap);
+    p.appendChild(body);
 
     var lastUnitCount=0;
     function currentOpts(){
@@ -334,7 +362,7 @@
       scrubInp.min=Math.max(0,opts.startFrame-2);
       scrubInp.max=Math.min(state.totalFrames-1,span+2);
       if(+scrubInp.value<+scrubInp.min||+scrubInp.value>+scrubInp.max)scrubInp.value=opts.startFrame;
-      scrubFrameLabel.textContent='frame '+scrubInp.value;
+      scrubFrameLabel.textContent=SM.t('textAnimFramePrefix')+scrubInp.value;
       scrubToValue();
     }
     function scrubToValue(){
@@ -342,7 +370,7 @@
       state.currentFrame=f;
       if(window.loadFrame)loadFrame(f);
       if(window.SMEngineBridge)SMEngineBridge.renderNow();
-      scrubFrameLabel.textContent='frame '+f;
+      scrubFrameLabel.textContent=SM.t('textAnimFramePrefix')+f;
     }
     [unitSel,presetSel,easeSel,randChk].forEach(function(el){el.addEventListener('change',preview);});
     [startInp,durInp,stagInp].forEach(function(el){el.addEventListener('input',preview);el.addEventListener('change',preview);});
@@ -351,19 +379,19 @@
     var btnRow=document.createElement('div');
     btnRow.style.cssText='display:flex;gap:8px;margin-top:4px';
     var cancelBtn=document.createElement('button');
-    cancelBtn.textContent='Annuler'; cancelBtn.className='pbtn'; cancelBtn.style.flex='1';
+    cancelBtn.textContent=SM.t('btnCancel2'); cancelBtn.className='pbtn'; cancelBtn.style.flex='1';
     cancelBtn.onclick=function(){
       if(_panelUndoTaken&&window.undo)undo();
       closePanel();
     };
     var applyBtn=document.createElement('button');
-    applyBtn.textContent='Terminé'; applyBtn.className='pbtn ac'; applyBtn.style.flex='1';
+    applyBtn.textContent=SM.t('textAnimDone'); applyBtn.className='pbtn ac'; applyBtn.style.flex='1';
     applyBtn.onclick=function(){
       if(window.showToast)showToast(lastUnitCount?(SM.t('toastTextAnimatedSuffix')+lastUnitCount+SM.t('toastUnitSuffix')+(lastUnitCount>1?'s':'')):SM.t('toastNoUnitToAnimate'));
       closePanel();
     };
     btnRow.appendChild(cancelBtn); btnRow.appendChild(applyBtn);
-    p.appendChild(btnRow);
+    body.appendChild(btnRow);
 
     document.body.appendChild(p);
     _panel=p;
