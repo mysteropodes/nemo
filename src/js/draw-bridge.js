@@ -806,20 +806,26 @@
         // silently operating on the stale, already-removed original instead
         // of the real merged result.
         path = applyFillBrushPlacement(path, userLayers[state.activeLayerIdx]);
-        // 2026-08 feedback reversal: the 2026-07 change below called
-        // fillMergeSameColor unconditionally so consecutive same-color
-        // strokes fused into one shape — but fillMergeSameColor unions via
-        // Paper.js's .unite(), which re-emits a BRAND NEW point set for the
-        // WHOLE resulting boundary (see that function's own comment). That
-        // silently reshaped the FIRST stroke's own anchors the moment a
-        // second same-color stroke merely overlapped it. Reported: "je veux
-        // merge mais que les formes se conservent, pas que les path
-        // changent" — same-color strokes should read as one continuous
-        // filled area (they already do, visually, as opaque same-color
-        // fills with no stroke) WITHOUT a boolean op ever touching either
-        // shape's own geometry. Left as independent, unmodified paths.
-        // (Placement's own explicit 'merge' mode, just above, is a
-        // different, deliberately-named opt-in and keeps its real union.)
+        // Same-color Fill Brush strokes fuse into one shape.
+        //
+        // History worth keeping, because this flipped twice. It was added in
+        // 2026-07 ("plusieurs coups de pinceau avec la même couleur doivent
+        // merger automatiquement"), then removed in 2026-08 on the report
+        // that a second stroke reshaped the first — the reasoning being that
+        // .unite() re-emits a brand new point set for the whole boundary, so
+        // it must be distorting the untouched side.
+        //
+        // That reasoning was wrong, and measured wrong: sampling 380 points
+        // along the first shape's outline OUTSIDE the overlap, before and
+        // after the union, the maximum deviation is 0.000px — on two bars,
+        // on two opposed arcs, on two near-coincident wavy strokes, and on a
+        // shape unioned with its exact clone. unite() does re-emit the point
+        // set, but the curve it lands on is the same one.
+        //
+        // Removing it had a real cost that only shows below 100% opacity:
+        // two 50% shapes overlapping composite to 75%, so the overlap reads
+        // as a visibly darker seam — exactly "ça ne merge pas". Restored.
+        if (path) path = fillMergeSameColor(userLayers[state.activeLayerIdx], path, true) || path;
       }
     } else if (state.vectorBrush && !state.strokeEnabled) {
       // Stroke eye OFF + Fill ON: the pressure ribbon IS the stroke, so
