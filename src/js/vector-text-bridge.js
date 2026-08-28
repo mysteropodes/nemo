@@ -366,9 +366,20 @@ function base64ToArrayBuffer(b64) {
 function fetchGoogleFontWeight(family, weight, italic) {
   var key = 'Google:' + family + '-' + (weight >= 600 ? 'Bold' : 'Regular');
   if (_vecFontCache[key]) return _vecFontCache[key];
-  if (!tauriOk()) return Promise.reject(new Error('Live Google Fonts needs the desktop app — no web-build proxy yet'));
-  var p = window.__TAURI__.core.invoke('fetch_google_font', { family: family, weight: weight, italic: !!italic })
-    .then(function (b64) { return opentype.parse(base64ToArrayBuffer(b64)); });
+  var p;
+  if (tauriOk()) {
+    p = window.__TAURI__.core.invoke('fetch_google_font', { family: family, weight: weight, italic: !!italic })
+      .then(function (b64) { return opentype.parse(base64ToArrayBuffer(b64)); });
+  } else {
+    // Web build: same UA-trick, proxied server-side (browsers forbid
+    // overriding the User-Agent header from fetch()) by the nemo-editor
+    // Worker's /api/google-font route (worker/index.js).
+    var qs = 'family=' + encodeURIComponent(family) + '&weight=' + weight + (italic ? '&italic=1' : '');
+    p = fetch('/api/google-font?' + qs).then(function (r) {
+      if (!r.ok) throw new Error('Google Fonts: family not found or fetch failed');
+      return r.arrayBuffer();
+    }).then(function (buf) { return opentype.parse(buf); });
+  }
   _vecFontCache[key] = p;
   VECTOR_FONTS[key] = { url: null, label: family + (weight >= 600 ? ' Bold' : '') };
   return p;

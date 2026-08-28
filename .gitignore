@@ -41,3 +41,5 @@ geometry-wasm/target/
 #    (branch names, feedback triage), not documentation for contributors.
 /index.html
 /CODEX_HANDOFF.md
+
+.wrangler/
