@@ -308,7 +308,16 @@
     function addBtn(n) {
       var btn = document.createElement('button');
       btn.className = 'labs-float-btn' + (registered[n] ? ' active' : '');
-      btn.title = SM.t(SHORT_NAME[n]) || n;
+      // Guarded (found live testing feedback #110's fill fix, unrelated to
+      // it): this file's own init() (below) calls renderLabsFloatPanel()
+      // on DOMContentLoaded — which fires BEFORE timeline.js's wholesale
+      // `window.SM={...}` reassignment defines SM.t (see this file's own
+      // 'load'-deferred afterI18n registration below, whose comment
+      // documents the same ordering) — so the very first paint threw
+      // "SM.t is not a function" on every fresh load. The afterI18n
+      // requeue already repaints with real titles moments later; this
+      // guard just stops that first paint from throwing uncaught.
+      btn.title = (window.SM && SM.t ? SM.t(SHORT_NAME[n]) : null) || n;
       btn.innerHTML = ICONS[n] || '';
       btn.addEventListener('click', function () {
         // ACTIONS entries manage their own re-render (BrushMenu.toggle
