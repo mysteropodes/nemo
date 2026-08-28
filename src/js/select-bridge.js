@@ -347,6 +347,14 @@
   var _multiLayerDrag = null;
   var xformDir = null, xformAnchor = null, xformOrigHandlePos = null, xformLastSx = 1, xformLastSy = 1;
   var xformMap = null; // geometry<->rendered-world mapper when the active layer has a Motion transform
+  // Skew-on-hover (2026-08, Graphite-style — user reference: the edge
+  // midpoints of the transform box, past the plain resize handle's own
+  // hit radius, grab a single-axis shear instead of a resize). Shear
+  // composes ADDITIVELY for a fixed axis+anchor (unlike scale, which is
+  // multiplicative) — xformLastShx/Shy track the cumulative shear applied
+  // so far so onMove can apply just the per-tick DELTA, same incremental-
+  // step pattern xformLastSx/Sy already use for scale.
+  var xformSkewEdge = null, xformSkewPerp = 1, xformLastShx = 0, xformLastShy = 0;
   // Ctrl+drag corner = free-transform DISTORT pins (2026-07, "avec l'outil
   // de sélection si on fait ctrl il ne faudrait pas le menu droit mais des
   // pin de transformation libre pour modifier la sélection" — confirmed
@@ -538,7 +546,44 @@
       var d = pt.getDistance(h.corners[k]);
       if (d < bestD) { bestD = d; best = { type: 'scale', dir: k }; }
     });
-    return best;
+    if (best) return best;
+    // Skew zones (2026-08) — checked only once no corner/edge scale handle
+    // matched, so a resize handle always wins a tie. Two small hit-zones
+    // flank each edge's midpoint handle, running ALONG that edge, starting
+    // just past the scale handle's own tolerance (SKEW_INNER) so the two
+    // never overlap. Mirrors buildTransformBoxItems' (engine-bridge.js) own
+    // tick-mark geometry exactly — the two must agree, or a mark could be
+    // drawn somewhere a click here won't recognize.
+    var skewHit = skewZoneHitTest(h, pt);
+    if (skewHit) return skewHit;
+    return null;
+  }
+  var SKEW_MIN_EDGE_PX = 48, SKEW_INNER_PX = 9, SKEW_OUTER_PX = 20;
+  var EDGE_ENDPOINTS = { n: ['nw', 'ne'], s: ['sw', 'se'], w: ['nw', 'sw'], e: ['ne', 'se'] };
+  function skewZoneHitTest(h, pt) {
+    var zs = 1 / view.zoom;
+    var found = null;
+    Object.keys(EDGE_ENDPOINTS).forEach(function (k) {
+      if (found) return;
+      var ep = EDGE_ENDPOINTS[k];
+      var a = h.corners[ep[0]], b2 = h.corners[ep[1]];
+      var edgeVec = b2.subtract(a);
+      var edgeLenPx = edgeVec.length * view.zoom;
+      if (edgeLenPx < SKEW_MIN_EDGE_PX) return;
+      var dir = edgeVec.normalize();
+      var mid = h.corners[k];
+      [-1, 1].forEach(function (side) {
+        if (found) return;
+        var base = mid.add(dir.multiply(side * (SKEW_INNER_PX + SKEW_OUTER_PX) / 2 * zs));
+        var ext = pt.subtract(base);
+        var along = ext.dot(dir);
+        var perp = ext.subtract(dir.multiply(along)).length;
+        if (Math.abs(along) <= (SKEW_OUTER_PX - SKEW_INNER_PX) / 2 * zs && perp <= SKEW_INNER_PX * zs) {
+          found = { type: 'skew', edge: k };
+        }
+      });
+    });
+    return found;
   }
 
   // ---- Free-transform distort (Ctrl+drag a corner pin) ----
@@ -840,6 +885,21 @@
         var ptg0 = xformMap ? (function () { var g = xformMap.inv(pt.x, pt.y); return new Point(g[0], g[1]); })() : pt;
         rotStartAngle = Math.atan2(ptg0.y - rotCenter.y, ptg0.x - rotCenter.x) * 180 / Math.PI;
         rotLastAngle = 0;
+      } else if (hh.type === 'skew') {
+        mode = 'xform-skew';
+        xformSkewEdge = hh.edge;
+        // Same opposite-edge anchor convention as scale's ANCHOR_MAP (the
+        // edge you DIDN'T grab stays fixed) — geometry-space, since the
+        // gesture mutates raw Paper geometry directly.
+        xformAnchor = h.gCorners[ANCHOR_MAP[hh.edge]].clone();
+        xformOrigHandlePos = h.gCorners[hh.edge].clone();
+        xformMap = h.map;
+        // Perpendicular box dimension normalizes the shear amount (Graphite
+        // convention) so the visual skew angle stays consistent regardless
+        // of box size — a drag of N px always skews by the same ANGLE, not
+        // the same absolute offset.
+        xformSkewPerp = Math.abs((hh.edge === 'n' || hh.edge === 's') ? h.bounds.height : h.bounds.width) || 1;
+        xformLastShx = 0; xformLastShy = 0;
       } else {
         mode = 'xform-scale';
         xformDir = hh.dir;
@@ -1379,10 +1439,23 @@
         var hoverHit = e.altKey ? null : hitTestHandles(hpt, false);
         var nextCursor = hoverHit && hoverHit.type === 'scale' ? (HANDLE_CURSORS[hoverHit.dir] || 'default')
           : hoverHit && hoverHit.type === 'rotate' ? ROTATE_CURSOR
+          // Skew cursor (2026-08): top/bottom edge shears horizontally (the
+          // handle slides left/right) so it gets the EW cursor; left/right
+          // shears vertically so it gets NS — matches Graphite's own mapping.
+          : hoverHit && hoverHit.type === 'skew' ? ((hoverHit.edge === 'n' || hoverHit.edge === 's') ? 'ew-resize' : 'ns-resize')
           : 'default';
         if (canvasEl.dataset.xformCursor !== nextCursor) {
           canvasEl.style.cursor = nextCursor;
           canvasEl.dataset.xformCursor = nextCursor;
+        }
+        // Skew tick-mark hover highlight (2026-08) — same passive-hover
+        // pattern as xformDistortHoverDir just below: engine-bridge.js's
+        // buildTransformBoxItems reads this to recolor the hovered edge's
+        // ticks before any drag starts.
+        var skewHoverEdge = (hoverHit && hoverHit.type === 'skew') ? hoverHit.edge : null;
+        if (skewHoverEdge !== (state.xformSkewHoverEdge || null)) {
+          state.xformSkewHoverEdge = skewHoverEdge;
+          window.SMEngineBridge.renderNow();
         }
         // Rotate-ring hover grow (2026-07, "le rond de rotation peut un peu
         // grossir au roll hover") — same light "you can grab this" pattern
@@ -1409,6 +1482,7 @@
           delete canvasEl.dataset.xformCursor;
         }
         if (state.xformDistortHoverDir) { state.xformDistortHoverDir = null; window.SMEngineBridge.renderNow(); }
+        if (state.xformSkewHoverEdge) { state.xformSkewHoverEdge = null; window.SMEngineBridge.renderNow(); }
       }
       return;
     }
@@ -1767,6 +1841,58 @@
       });
       xformLastSx = sx; xformLastSy = sy;
       symGestureAccumulate(new Matrix().scale(stepSx, stepSy, anchor));
+    } else if (mode === 'xform-skew') {
+      // Graphite-style skew (2026-08): grabbing an edge midpoint's skew
+      // zone shears the box along that edge's own direction, anchored at
+      // the OPPOSITE edge (which stays fixed) — top/bottom shear
+      // horizontally (x as a function of y), left/right shear vertically
+      // (y as a function of x). Shear composes ADDITIVELY for a fixed
+      // axis+anchor (unlike scale's multiplicative ratio), so the total
+      // amount is recomputed fresh from the drag start every tick (same
+      // "total-from-anchor, then diff against last tick" shape as scale's
+      // sx/sy) and only the per-tick DELTA is actually applied.
+      var ptK = pt;
+      if (xformMap) { var ptgK = xformMap.inv(pt.x, pt.y); ptK = new Point(ptgK[0], ptgK[1]); }
+      var edgeK = xformSkewEdge;
+      var parallelToX = (edgeK === 'n' || edgeK === 's');
+      // Dragging the TOP/LEFT edge needs the opposite sign from BOTTOM/
+      // RIGHT for the same drag direction to read as the same visual skew
+      // (matches Graphite's own sign convention — verified against its
+      // source, not re-derived from scratch).
+      var signK = (edgeK === 'n' || edgeK === 'w') ? -1 : 1;
+      var dxK = ptK.x - xformOrigHandlePos.x, dyK = ptK.y - xformOrigHandlePos.y;
+      var shxTotal = 0, shyTotal = 0;
+      if (parallelToX) {
+        shxTotal = (signK * dxK) / xformSkewPerp;
+        // Ctrl = free/biaxial movement (Graphite convention): also lets the
+        // OTHER axis shear a little, instead of a pure single-axis shear.
+        if (e.ctrlKey) shyTotal = (signK * dyK) / xformSkewPerp;
+      } else {
+        shyTotal = (signK * dyK) / xformSkewPerp;
+        if (e.ctrlKey) shxTotal = (signK * dxK) / xformSkewPerp;
+      }
+      var stepShx = shxTotal - xformLastShx, stepShy = shyTotal - xformLastShy;
+      var anchorK = xformAnchor;
+      // Motion mode never reaches 'xform-skew' — hitTestHandles() (its only
+      // producer) is only consulted in Animation 2D (see onDown's `hh` gate
+      // above), so there's no per-mode branch to write here, unlike scale/
+      // rotate which are reachable from Motion's own separate hit-test.
+      selectedPaths.forEach(function (p) {
+        p.shear(stepShx, stepShy, anchorK);
+        transformFillGradient(p, function (gp) {
+          var lx = gp.x - anchorK.x, ly = gp.y - anchorK.y;
+          return new Point(anchorK.x + lx + stepShx * ly, anchorK.y + ly + stepShy * lx);
+        });
+        if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
+          shearCenterSegments(p.data.centerSegments, stepShx, stepShy, anchorK.x, anchorK.y);
+          rebuildVectorBrushOutline(p);
+        }
+        if (p.data && p.data.brushCompanions) {
+          p.data.brushCompanions.forEach(function (c) { if (!c.removed) c.shear(stepShx, stepShy, anchorK); });
+        }
+      });
+      symGestureAccumulate(new Matrix().shear(stepShx, stepShy, anchorK));
+      xformLastShx = shxTotal; xformLastShy = shyTotal;
     } else if (mode === 'xform-distort') {
       var ptD = pt;
       if (xformMap) { var ptgD = xformMap.inv(pt.x, pt.y); ptD = new Point(ptgD[0], ptgD[1]); }
@@ -1907,7 +2033,7 @@
       draggingArc = null;
       arcDragCache = null;
       generateTweens();
-    } else if (mode === 'xform-scale' || mode === 'xform-rotate') {
+    } else if (mode === 'xform-scale' || mode === 'xform-rotate' || mode === 'xform-skew') {
       // Motion mode: geometry was never touched during this gesture (see
       // onMove's early-return) — none of the fork/regenerate/save-frame
       // work below applies to anything this drag actually changed, and
