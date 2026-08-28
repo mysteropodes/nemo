@@ -2025,6 +2025,17 @@ function fillCollectWalls(layer,excludePath,onlyIds){
   var open=[],closed=[],openSrc=[],closedSrc=[];
   layer.children.forEach(function(c){
     if(c===excludePath||!(c instanceof Path))return;
+    // Feedback #110 (crash): a textured vector-brush stroke's dabs
+    // (data.isBrushTextureCopy — hundreds of small filled companion shapes
+    // stamped along the anchor, see buildBrushDabs/tools.js) each carry a
+    // real fillColor, so the check below alone let every one of them in as
+    // a SEPARATE wall candidate — same "dabs must never enter a matching/
+    // tracing algorithm" family of bug CLAUDE.md §1 already documents for
+    // tween matching (splitTweenables), just never fixed here. Hundreds of
+    // tiny overlapping closed candidates blew up the wall-graph/crossing
+    // pass. fillFindExistingMatch and fillMergeSameColor already exclude
+    // both tags below — this collector was the one gap.
+    if(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy))return;
     if(!(c.strokeColor||c.fillColor||(c.data&&c.data.isVectorBrush)))return;
     if(c.segments.length<2)return;
     var sid=ensureStrokeId(c);
