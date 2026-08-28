@@ -2000,52 +2000,15 @@ function fillConsumeCloseStrokes(wallIds){
 // while leaving it untouched wherever it's genuinely crossing open space
 // (nothing within tolerance there, so it stays exactly as drawn).
 var FILL_CLOSE_SNAP_TOL=18;
-function fillMaterializeTempCloseStrokes(layer){
-  var realWalls=layer.children.filter(function(c){
-    // Feedback (slow + wrong shape with a textured/preset vector brush,
-    // Alt+drag closing stroke): same gap as feedback #110's crash, just in
-    // a SECOND wall-gathering function fillCollectWalls's own fix (below)
-    // never reached — data.isBrushTextureCopy dabs (hundreds per textured
-    // stroke, each with a real fillColor) and data.isLinkedFillCompanion
-    // backdrops were passing this filter, so every closing-stroke sample
-    // point ran getNearestPoint against every dab below (O(points×dabs)) —
-    // the actual slowdown — AND could snap onto a dab's own small edge
-    // instead of the ribbon's true outline, producing a garbled wall that
-    // fillVectorFind then traced wrong. Same exclusion as fillCollectWalls.
-    if(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy))return false;
-    return c instanceof Path&&(c.strokeColor||c.fillColor||(c.data&&c.data.isVectorBrush))&&!(c.data&&c.data.isFillTempClose)&&c.segments.length>=2;
-  // Snap against the same geometry the FILL GRAPH uses — fillWallPath, i.e.
-  // a pressure/brush stroke's CENTERLINE, not the ribbon outline stored on
-  // the item (CLAUDE.md §1: fillWallPath is the shared "what counts as a
-  // wall" transform and this function was the one wall-consumer that never
-  // called it). Snapping to the raw item pulled each closing-stroke end onto
-  // the ribbon's OUTER EDGE, half a brush-width away from the centerline the
-  // graph then traces — so a closing stroke the user drew exactly end-to-end
-  // still left a systematic ~half-brush-width hole at BOTH ends and could
-  // not close at gapThr 0. Reproduced minimally: two 6px vertical brush
-  // strokes 220px apart, bridged top and bottom, found nothing at gapThr 0
-  // or 10 and only closed at 24 (the snapped ends sat at x=855.0/1065.0
-  // against centerlines at x=850/1070). This is the "je ferme tous les
-  // bouts proprement et il ne comprend pas la forme" report.
-  }).map(fillWallPath).filter(function(w){return w.segments.length>=2;});
-  // Two cheap rejects before the expensive call (CLAUDE.md §5bis(a)):
-  // getNearestPoint runs a numeric search over every curve of the wall,
-  // measured at ~0.33ms on a real 15-segment brush stroke — so the naive
-  // every-point × every-wall loop below cost 289ms for ONE 80-point closing
-  // drag on a real project, and a human drag is routinely 150-300 points.
-  // Both guards below are conservative (they only skip walls that provably
-  // cannot beat FILL_CLOSE_SNAP_TOL), so the snapped output is unchanged —
-  // verified point-for-point identical on a real file.
-  //   1. padded bounds — O(1), and the only one that scales when a drawing
-  //      has many strokes far from the gap being closed.
-  //   2. coarse samples along the wall, taken once. The true nearest point
-  //      is at least (nearest sample - SAMPLE_STEP/2) away, so a wall whose
-  //      closest SAMPLE is already well outside the tolerance is skipped
-  //      without ever running the exact search. This is the one that saves
-  //      the common case the snap exists for — a closing stroke drawn
-  //      ALONGSIDE existing ink, where bounds alone reject nothing.
-  // Measured together on a 250-point drag hugging a long stroke: 269ms ->
-  // 74ms, with exact-search calls down from 2750 to 158.
+// The point-snapper shared by the transient Alt+drag preview
+// (fillMaterializeTempCloseStrokes) and the persistent closing line
+// (fillCommitCloseLine). Built once per gesture; returns a function that maps
+// a raw drag point onto nearby real ink, or leaves it where it is when it's
+// crossing open space. Kept as ONE definition on purpose — CLAUDE.md §3: two
+// copies of this snap would drift apart and only the fill's shape would
+// silently change.
+function fillBuildWallSnapper(layer){
+  var realWalls=fillSnapWalls(layer);
   var SAMPLE_STEP=FILL_CLOSE_SNAP_TOL/2;
   var wallBounds=realWalls.map(function(w){return w.bounds.expand(FILL_CLOSE_SNAP_TOL*2);});
   var wallSamples=realWalls.map(function(w){
@@ -2053,26 +2016,69 @@ function fillMaterializeTempCloseStrokes(layer){
     for(var i=0;i<n;i++){var sp=w.getPointAt(len*i/(n-1))||w.firstSegment.point;arr[i*2]=sp.x;arr[i*2+1]=sp.y;}
     return arr;
   });
+  return function(pos){
+    var best=null,bestD=FILL_CLOSE_SNAP_TOL;
+    realWalls.forEach(function(w,wi){
+      if(!wallBounds[wi].contains(pos))return;
+      var a=wallSamples[wi],minSq=Infinity;
+      for(var s=0;s<a.length;s+=2){
+        var dx=a[s]-pos.x,dy=a[s+1]-pos.y,d2=dx*dx+dy*dy;
+        if(d2<minSq)minSq=d2;
+      }
+      if(Math.sqrt(minSq)-SAMPLE_STEP/2>bestD)return;
+      var np=w.getNearestPoint(pos);
+      if(!np)return;
+      var d=pos.getDistance(np);
+      if(d<bestD){bestD=d;best=np;}
+    });
+    return best||pos;
+  };
+}
+// Persistent, INVISIBLE closing line — Toon Boom Harmony's Close Gap model
+// ("creates small, invisible strokes... taken into account to determine the
+// outline of the shape to fill"). Before this, an Alt+drag closing stroke was
+// transient: it lived in `_fillCloseStrokes`, was materialized for exactly one
+// fillVectorFind call and thrown away, so it existed on no frame, survived no
+// save, and had to be redrawn for every single click. Committing it as a real
+// path in the layer instead means it is tweened, saved and matched like any
+// other stroke — which is also what makes a fill re-traceable on OTHER frames.
+// No colour of its own: serP writes hasRealStroke:false and desP treats that
+// as authoritative, so it round-trips invisible instead of resurrecting as the
+// historical '#ffffff' fallback stroke (CLAUDE.md §1).
+function fillCommitCloseLine(layer,points){
+  if(!layer||!points||points.length<2)return null;
+  var snap=fillBuildWallSnapper(layer);
+  var p=new Path({strokeColor:null,fillColor:null});
+  points.forEach(function(pt){
+    p.add(snap(pt instanceof Point?pt:new Point(pt[0],pt[1])));
+  });
+  p.data.isFillCloseLine=true;
+  ensureStrokeId(p);
+  layer.addChild(p);
+  return p;
+}
+// The walls a closing stroke may snap ONTO. Excludes texture dabs and linked
+// fill backdrops (feedback: with a textured preset every dab was a snap
+// candidate — O(points x dabs), the reported slowdown, and a point could snap
+// onto a stray dab edge instead of the real line). Excludes closing lines
+// themselves: a closing stroke bridges a gap in the ARTWORK, it should never
+// magnetise onto another closing stroke. Mapped through fillWallPath so the
+// snap targets the same CENTERLINE geometry the fill graph traces, not the
+// ribbon outline stored on the item (PR #262 - snapping to the outline left a
+// systematic half-brush-width hole at both ends and could not close at
+// gapThr 0).
+function fillSnapWalls(layer){
+  return layer.children.filter(function(c){
+    if(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy))return false;
+    if(c.data&&(c.data.isFillTempClose||c.data.isFillCloseLine))return false;
+    return c instanceof Path&&(c.strokeColor||c.fillColor||(c.data&&c.data.isVectorBrush))&&c.segments.length>=2;
+  }).map(fillWallPath).filter(function(w){return w.segments.length>=2;});
+}
+function fillMaterializeTempCloseStrokes(layer){
+  var snap=fillBuildWallSnapper(layer);
   return _fillCloseStrokes.map(function(entry){
     var p=new Path({strokeColor:'#000000',strokeWidth:1,fillColor:null});
-    entry.points.forEach(function(pt){
-      var pos=new Point(pt[0],pt[1]);
-      var best=null,bestD=FILL_CLOSE_SNAP_TOL;
-      realWalls.forEach(function(w,wi){
-        if(!wallBounds[wi].contains(pos))return;
-        var a=wallSamples[wi],minSq=Infinity;
-        for(var s=0;s<a.length;s+=2){
-          var dx=a[s]-pos.x,dy=a[s+1]-pos.y,d2=dx*dx+dy*dy;
-          if(d2<minSq)minSq=d2;
-        }
-        if(Math.sqrt(minSq)-SAMPLE_STEP/2>bestD)return;
-        var np=w.getNearestPoint(pos);
-        if(!np)return;
-        var d=pos.getDistance(np);
-        if(d<bestD){bestD=d;best=np;}
-      });
-      p.add(best||pos);
-    });
+    entry.points.forEach(function(pt){p.add(snap(new Point(pt[0],pt[1])));});
     p.data.strokeId=entry.id;
     p.data.isFillTempClose=true;
     layer.addChild(p);
@@ -2101,7 +2107,10 @@ function fillCollectWalls(layer,excludePath,onlyIds){
     // pass. fillFindExistingMatch and fillMergeSameColor already exclude
     // both tags below — this collector was the one gap.
     if(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy))return;
-    if(!(c.strokeColor||c.fillColor||(c.data&&c.data.isVectorBrush)))return;
+    // isFillCloseLine has NO colour by design (Harmony's invisible Close Gap
+    // stroke) so it would fail the colour test below — but bounding a fill is
+    // its entire purpose, so it has to be admitted explicitly here.
+    if(!(c.strokeColor||c.fillColor||(c.data&&(c.data.isVectorBrush||c.data.isFillCloseLine))))return;
     if(c.segments.length<2)return;
     var sid=ensureStrokeId(c);
     if(onlyIds&&onlyIds.indexOf(sid)<0)return;
@@ -2696,6 +2705,7 @@ function fillRegenerateLinked(layer,touchedPath){
     layer.insertChild(Math.min(idx,layer.children.length),res.path);
   });
 }
+
 // gapThr is a plain world-space distance — "how far apart can two stroke
 // ends be and still count as one closed shape" — matching the Gap Size
 // presets directly, no scale/resolution conversion involved anywhere.

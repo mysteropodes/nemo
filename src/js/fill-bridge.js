@@ -140,11 +140,23 @@
     e.stopImmediatePropagation();
     e.preventDefault();
     try { e.target.releasePointerCapture(e.pointerId); } catch (err) {}
-    if (_fillCloseDrag.points.length >= 2) _fillCloseStrokes.push({ id: 'fc' + Date.now().toString(36) + '_' + (++_fillCloseIdCounter), points: _fillCloseDrag.points.map(function (p) { return [p.x, p.y]; }) });
+    // Committed as a PERSISTENT invisible line in the drawing rather than
+    // queued as a single-use hint (Toon Boom Harmony's Close Gap model — see
+    // fillCommitCloseLine, tools.js). It therefore survives the fill click,
+    // the frame, the save, and is tweened/matched like any other stroke,
+    // which is what lets a fill be re-traced on other frames at all. Undoable
+    // as one step with whatever fill follows it.
+    var committed = null;
+    if (_fillCloseDrag.points.length >= 2) {
+      pushUndo();
+      ensureKeyframe();
+      committed = fillCommitCloseLine(userLayers[state.activeLayerIdx], _fillCloseDrag.points);
+      if (committed) saveActiveLayerFrame();
+    }
     _fillCloseDrag = null;
     window.SMEngineBridge.resume();
     window.SMEngineBridge.renderNow();
-    showToast(_fillCloseStrokes.length + ' trait(s) de fermeture en attente — clic sans Alt pour remplir');
+    if (committed) showToast(SM.t('toastFillCloseLineAdded'));
   }
   // Belt-and-suspenders alongside setPointerCapture in onDown: a bare
   // document-level pointerup ALSO finalizes a stuck drag (bubble phase, so
