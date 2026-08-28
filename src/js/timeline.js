@@ -2663,6 +2663,11 @@ function updatePropsContext(){
   if(taperRow)taperRow.style.display=isFillBrush?'none':'flex';
   var fbSizeRow=document.getElementById('p-fillbrushsize-row');
   if(fbSizeRow)fbSizeRow.style.display=isFillBrush?'flex':'none';
+  // Propagation is a paint-bucket operation: it re-traces an EXISTING bucket
+  // fill (data.fillSeed) frame by frame, which the Fill Brush's freehand
+  // patches have no equivalent of.
+  var fpRow=document.getElementById('p-fillpropagate-row');
+  if(fpRow)fpRow.style.display=(state.tool==='fill')?'flex':'none';
   // Brush presets apply to Draw's plain constant-width commit path (see
   // draw-bridge.js's commitStroke) AND, now, retroactively to an already-
   // drawn plain stroke via "Apply to selection" below — but not to a

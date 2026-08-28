@@ -181,11 +181,33 @@
     }
   }
 
+  // "Propager sur toutes les frames" — re-traces the bucket fill under the
+  // cursor (or the only one on the frame) across the whole layer. Explicit
+  // rather than automatic on every fill click: it costs ~3.5s on a 120-frame
+  // project, which would be punishing when colouring many zones in a row.
+  function onPropagateClick() {
+    if (state.layers[state.activeLayerIdx].locked) { showToast(SM.t('toastLayerLocked')); return; }
+    var layer = userLayers[state.activeLayerIdx];
+    var fills = layer.children.filter(function (c) { return c.data && c.data.fillSeed; });
+    if (!fills.length) { showToast(SM.t('toastPropagateNoFill')); return; }
+    // Most recently added fill = the one just painted, the usual intent.
+    var target = fills[fills.length - 1];
+    pushUndo();
+    var res = null;
+    try { res = fillPropagateAcrossFrames(target); } catch (err) { console.warn('[fill] propagate failed', err); }
+    updateUI();
+    window.SMEngineBridge.renderNow();
+    if (!res) { showToast(SM.t('toastPropagateFailed')); return; }
+    showToast(SM.t('toastPropagateDone').replace('{filled}', res.filled).replace('{skipped}', res.skipped));
+  }
+
   function init() {
     var target = document.getElementById('canvas-area') || document.getElementById('drawing-canvas');
     target.addEventListener('pointerdown', onDown, { capture: true });
     target.addEventListener('pointermove', onMove, { capture: true });
     document.addEventListener('keydown', onKeyDown);
+    var propBtn = document.getElementById('btn-fill-propagate');
+    if (propBtn) propBtn.addEventListener('click', onPropagateClick);
     target.addEventListener('pointerup', onUp, { capture: true });
     target.addEventListener('pointercancel', onUp, { capture: true });
     document.addEventListener('pointerup', onDocUp);
