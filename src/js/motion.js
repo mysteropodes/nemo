@@ -1211,7 +1211,23 @@
   function setValue(ld, prop, values) {
     if (isAnimated(ld, prop)) setKeyAtCurrentFrame(ld, prop, values);
     else { if (!ld.motionStatic) ld.motionStatic = {}; ld.motionStatic[prop] = values.slice(); }
+    // Order (feedback #97, "l'order n'a pas l'air de marcher... dans le
+    // canvas"): z-stacking is engine-only, same as 3D layers/Motion Blur
+    // (see exportHasEngineOnlyMotion's own comment) — the Paper.js fallback
+    // canvas (used whenever the Rust/WebGPU engine is off, e.g. WebGPU
+    // unavailable, or a prior WASM panic disabled it for the rest of the
+    // session, see engine-bridge.js's tick() catch) just draws userLayers in
+    // their natural document order and has never known about this property.
+    // Without a warning this silently does nothing — a live "the layer
+    // won't go behind" report is one confusing symptom of an engine outage
+    // that started somewhere else entirely. One-shot per session so a scrub
+    // gesture (many setValue calls per drag) doesn't spam toasts.
+    if (prop === 'order' && !_orderEngineWarnShown && window.SMEngineBridge && !window.SMEngineBridge.isEnabled()) {
+      _orderEngineWarnShown = true;
+      if (window.showToast) showToast(SM.t('toastOrderNeedsEngine'));
+    }
   }
+  var _orderEngineWarnShown = false;
 
   // ---- render-time transform (engine-bridge.js hook — see header
   // comment: NEVER applied to the live userLayers[i], only to the JSON
