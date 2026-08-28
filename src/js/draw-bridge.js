@@ -806,15 +806,20 @@
         // silently operating on the stale, already-removed original instead
         // of the real merged result.
         path = applyFillBrushPlacement(path, userLayers[state.activeLayerIdx]);
-        // 2026-07 feedback ("plusieurs coup de pinceau avec la même couleur
-        // doivent merger automatiquement") — Placement's own 'merge' option
-        // unions with whatever fill it happens to overlap regardless of
-        // color; genuine same-color fusion already exists
-        // (fillMergeSameColor, used by the paint bucket) but was never
-        // called from the Fill Brush's own commit. Wired in here
-        // unconditionally so consecutive same-color strokes merge into one
-        // shape no matter which Placement mode is active.
-        if (path) path = fillMergeSameColor(userLayers[state.activeLayerIdx], path, true) || path;
+        // 2026-08 feedback reversal: the 2026-07 change below called
+        // fillMergeSameColor unconditionally so consecutive same-color
+        // strokes fused into one shape — but fillMergeSameColor unions via
+        // Paper.js's .unite(), which re-emits a BRAND NEW point set for the
+        // WHOLE resulting boundary (see that function's own comment). That
+        // silently reshaped the FIRST stroke's own anchors the moment a
+        // second same-color stroke merely overlapped it. Reported: "je veux
+        // merge mais que les formes se conservent, pas que les path
+        // changent" — same-color strokes should read as one continuous
+        // filled area (they already do, visually, as opaque same-color
+        // fills with no stroke) WITHOUT a boolean op ever touching either
+        // shape's own geometry. Left as independent, unmodified paths.
+        // (Placement's own explicit 'merge' mode, just above, is a
+        // different, deliberately-named opt-in and keeps its real union.)
       }
     } else if (state.vectorBrush && !state.strokeEnabled) {
       // Stroke eye OFF + Fill ON: the pressure ribbon IS the stroke, so

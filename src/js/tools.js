@@ -6606,15 +6606,14 @@ function onMouseUp(event){
         // Placement (Above/Below/Merge) — see applyFillBrushPlacement's own
         // comment; replaces the old unconditional "always at the back".
         currentPath=applyFillBrushPlacement(currentPath,userLayers[state.activeLayerIdx]);
-        // 2026-07 feedback ("plusieurs coup de pinceau avec la même couleur
-        // doivent merger automatiquement") — Placement's own 'merge' option
-        // unions with whatever fill it happens to overlap regardless of
-        // color (see applyFillBrushPlacement); genuine same-color fusion
-        // already exists (fillMergeSameColor, used by the paint bucket) but
-        // was never called from the Fill Brush's own commit. Wired in here
-        // unconditionally so consecutive same-color strokes merge into one
-        // shape no matter which Placement mode is active.
-        if(currentPath)currentPath=fillMergeSameColor(userLayers[state.activeLayerIdx],currentPath,true)||currentPath;
+        // 2026-08 feedback reversal — mirrors draw-bridge.js's own commit
+        // path (CLAUDE.md §3, keep these two in sync): calling
+        // fillMergeSameColor here unconditionally reshaped the FIRST
+        // stroke's own anchors via Paper.js's .unite() the moment a second
+        // same-color stroke merely overlapped it. Reported: "je veux merge
+        // mais que les formes se conservent, pas que les path changent" —
+        // left as independent, unmodified paths instead (Placement's own
+        // explicit 'merge' mode, just above, is unaffected).
       }
       if(currentPath)tagOwner(currentPath);
     }
