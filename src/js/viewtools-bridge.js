@@ -35,6 +35,14 @@
   // whatever state.canvasRotation already was, so a rotate gesture never
   // "snaps" the stage to a new absolute angle at drag-start.
   var rotating = false, rotateStartAngle = 0, rotateStartRotation = 0;
+  // Eyedropper hover cursor (feedback #80, "la souris doit prendre l'apparence
+  // de la pipette et la croix... quand elle hover un élément que l'on peut
+  // pipetter") — plain 'crosshair' otherwise, this dropper+cross glyph only
+  // while actually over something pick() would hit. Same black-outline-then-
+  // white-fill SVG convention as ROTATE_CURSOR (select-bridge.js) for
+  // legibility on any canvas background.
+  var EYEDROP_CURSOR = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22'><path d='M14.5 2.5 19.5 7.5 8 19 3 19 3 14Z' fill='none' stroke='black' stroke-width='2.6' stroke-linejoin='round'/><path d='M14.5 2.5 19.5 7.5 8 19 3 19 3 14Z' fill='white' stroke='none'/><line x1='11.5' y1='5.5' x2='16.5' y2='10.5' stroke='black' stroke-width='2.2'/></svg>\") 3 19, crosshair";
+  var pickHover = false;
 
   function engineOn() { return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && !state.playing; }
   function shouldPan() { return engineOn() && (state.tool === 'hand' || state.spaceDown); }
@@ -117,13 +125,38 @@
     }
   }
 
-  function pick(e) {
-    var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+  // Shared by pick() (click, commits the values) and the hover check in
+  // onMove (read-only, just needs to know whether there's anything HERE).
+  function hitPickable(clientX, clientY) {
+    var w = window.SMEngineBridge.screenToWorld(clientX, clientY);
     var pt = new Point(w[0], w[1]);
     var layer = userLayers[state.activeLayerIdx];
     var hit = layer.hitTest(pt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
-    if (!(hit && hit.item instanceof Path)) return;
-    var ep = hit.item;
+    return (hit && hit.item instanceof Path) ? hit.item : null;
+  }
+
+  // A textured stroke's visible surface is its DABS (isBrushTextureCopy,
+  // stamped ABOVE the anchor — applyBrushTexture, tools.js), so a click
+  // almost always lands on one of those, not the (usually invisible) anchor
+  // that actually carries strokeColor/strokeWidth/brushTexturePreset. A dab
+  // itself only has fillColor=baseColor/strokeColor=null (its own paint, not
+  // the stroke's real style) and no brushTexturePreset at all — resolve back
+  // to the sibling anchor sharing the same brushGroupId so the eyedropper
+  // picks up the real per-stroke style instead of one dab's repurposed fill.
+  function resolveBrushAnchor(ep) {
+    if (!ep.data || !ep.data.isBrushTextureCopy || !ep.data.brushGroupId) return ep;
+    var gid = ep.data.brushGroupId, siblings = ep.parent ? ep.parent.children : [];
+    for (var i = 0; i < siblings.length; i++) {
+      var c = siblings[i];
+      if (c.data && c.data.brushGroupId === gid && !c.data.isBrushTextureCopy) return c;
+    }
+    return ep;
+  }
+
+  function pick(e) {
+    var hitEp = hitPickable(e.clientX, e.clientY);
+    if (!hitEp) return;
+    var ep = resolveBrushAnchor(hitEp);
     var isVB = !!(ep.data && ep.data.isVectorBrush);
     if (isVB && ep.fillColor) {
       setColorUI('stroke', ep.fillColor.toCSS(true));
@@ -135,6 +168,15 @@
       state.brushSize = ep.strokeWidth;
       var sw = document.getElementById('p-sw'); if (sw) sw.value = Math.round(ep.strokeWidth);
     }
+    // Brush preset (feedback #80, "récupérer... la brush preset quand y en a
+    // une") — a texture-camouflaged anchor's OWN strokeColor/strokeWidth are
+    // nulled/repurposed (see applyBrushTexture, tools.js), which is exactly
+    // why the color/width picks above already special-case isVectorBrush —
+    // same reasoning applies to the preset: pick up data.brushTexturePreset
+    // when the hit item carries one, and reset to 'none' when it doesn't, so
+    // the eyedropper copies the WHOLE style rather than leaving a stale
+    // preset from a previous pick silently applied to the next stroke.
+    if (window.BrushPresetPicker) window.BrushPresetPicker.selectPreset((ep.data && ep.data.brushTexturePreset) || 'none');
     showToast('Color picked');
   }
 
@@ -208,7 +250,21 @@
       window.SMEngineBridge.renderNow();
       return;
     }
-    if (!panning) return;
+    if (!panning) {
+      // Eyedropper hover cursor (feedback #80) — passive, no
+      // stopImmediatePropagation/preventDefault: this isn't a gesture, just
+      // a read-only "is there anything under the cursor right now" check so
+      // the cursor can hint whether a click would actually pick something.
+      if (shouldPick()) {
+        var hovering = !!hitPickable(e.clientX, e.clientY);
+        if (hovering !== pickHover) {
+          pickHover = hovering;
+          var canvasEl2 = document.getElementById('drawing-canvas');
+          if (canvasEl2) canvasEl2.style.cursor = hovering ? EYEDROP_CURSOR : 'crosshair';
+        }
+      }
+      return;
+    }
     e.stopImmediatePropagation();
     e.preventDefault();
     var dx2 = e.movementX || 0, dy2 = e.movementY || 0;
