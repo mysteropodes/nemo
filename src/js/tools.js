@@ -2706,6 +2706,232 @@ function fillRegenerateLinked(layer,touchedPath){
   });
 }
 
+// ---- FILL PROPAGATION ACROSS FRAMES (Auto-Paint) ----
+// A bucket fill only ever existed on the frame it was clicked on. The tween
+// engine has no notion of fills at all (no fillSeed/fillWalls anywhere in
+// tweens.js), so a fill fell through to the `held` bucket of
+// splitTweenables and was copied VERBATIM into every generated inbetween —
+// measured on a real project: identical area (56775) and identical bounds on
+// frame 0 and frame 6 while the drawing underneath had visibly moved, i.e.
+// the colour stayed frozen in place and detached from the line.
+//
+// The fix is not to interpolate the fill's outline but to RE-TRACE the
+// region per frame — exactly the treatment splitTweenables already gives a
+// vector brush's linked fill backdrop ("regenerated fresh from the ribbon's
+// own INTERPOLATED centerline every frame... same single-source-of-truth
+// principle as the live-edit path"). Same principle, applied to a bucket
+// fill: the walls are the truth, the fill is derived.
+//
+// Re-tracing needs a seed that FOLLOWS the drawing. A stored click point is
+// in absolute canvas space and goes stale the moment the shape moves, so the
+// seed is instead expressed RELATIVE to the walls that bound it (below) and
+// rebuilt on each target frame.
+//
+// Wall identity across frames is resolved in two stages, per the user's
+// call: data.strokeId first (tween-generated frames inherit the source
+// stroke's id verbatim — tweens.js's `piece.strokeId=sd.strokeId` — so on an
+// interpolated span this matches for free and costs nothing), falling back
+// to the tween matcher for frames drawn independently, where no id is shared.
+
+// The seed, expressed in each nearby wall's own local (tangent, normal)
+// frame at the point closest to it. Rebuilding from these follows the wall
+// wherever it moves/rotates. Verified: rebuilding on the SOURCE frame
+// returns the original point to 0.00px.
+function fillSeedAnchors(layer,seed,wallIds){
+  var anchors=[];
+  layer.children.forEach(function(c){
+    if(!(c instanceof Path))return;
+    if(c.data&&(c.data.isBrushTextureCopy||c.data.isLinkedFillCompanion))return;
+    // A closing line is itself propagated content, not a stable reference —
+    // anchoring to one would chase a moving target.
+    if(c.data&&c.data.isFillCloseLine)return;
+    var id=c.data&&c.data.strokeId;
+    if(!id)return;
+    if(wallIds&&wallIds.length&&wallIds.indexOf(id)<0)return;
+    // Same centerline-not-outline rule the rest of the fill engine uses.
+    var w=fillWallPath(c);
+    if(w.segments.length<2)return;
+    var loc=w.getNearestLocation(seed);
+    if(!loc)return;
+    var len=w.length||1;
+    var T=loc.tangent||new Point(1,0);
+    var N=new Point(-T.y,T.x);
+    var d=seed.subtract(loc.point);
+    anchors.push({id:id,t:loc.offset/len,along:d.dot(T),perp:d.dot(N),dist:d.length});
+  });
+  // Nearest walls first, capped: a far-away wall's local frame is a poor
+  // predictor of where the seed should sit, and every extra anchor is
+  // another getNearestLocation on the source frame.
+  anchors.sort(function(a,b){return a.dist-b.dist;});
+  return anchors.slice(0,FILL_SEED_ANCHOR_MAX);
+}
+var FILL_SEED_ANCHOR_MAX=6;
+
+// Rebuild the seed on `layer` from anchors captured on another frame.
+// `idMap` (optional) redirects a source strokeId to this frame's own id —
+// that's the tween-matcher fallback's output; when ids already match across
+// frames it is simply absent. Candidates are averaged with 1/distance
+// weighting so the walls that were closest to the original click dominate.
+function fillSeedFromAnchors(layer,anchors,idMap){
+  if(!anchors||!anchors.length)return null;
+  var byId={};
+  layer.children.forEach(function(c){
+    if(!(c instanceof Path))return;
+    var id=c.data&&c.data.strokeId;
+    if(id&&!byId[id])byId[id]=c;
+  });
+  var sx=0,sy=0,wsum=0,matched=0;
+  anchors.forEach(function(a){
+    var id=(idMap&&idMap[a.id])||a.id;
+    var c=byId[id];if(!c)return;
+    var w=fillWallPath(c);if(w.segments.length<2)return;
+    var len=w.length||1;
+    var off=Math.max(0,Math.min(len,a.t*len));
+    var P=w.getPointAt(off),T=w.getTangentAt(off);
+    if(!P||!T)return;
+    var N=new Point(-T.y,T.x);
+    var p=P.add(T.multiply(a.along)).add(N.multiply(a.perp));
+    var weight=1/Math.max(1,a.dist);
+    sx+=p.x*weight;sy+=p.y*weight;wsum+=weight;matched++;
+  });
+  if(!wsum)return null;
+  return {point:new Point(sx/wsum,sy/wsum),matched:matched};
+}
+
+// Strokes eligible to identify a wall across frames. Dabs are excluded for
+// the reason CLAUDE.md §1 spells out — letting hundreds of them into
+// autoMatch explodes the Hungarian in O(n^3) and produces nonsense pairings.
+function _fillMatchable(sd){
+  return sd&&sd.strokeId&&!sd.isBrushTextureCopy&&!sd.isLinkedFillCompanion&&
+    !sd.isRevisionGhost&&!sd.fillSeed&&!(sd.fillSeeds&&sd.fillSeeds.length);
+}
+// Stage 2 of wall identity: when the source frame's ids simply aren't present
+// on the target (two independently drawn keyframes), pair the two frames'
+// strokes with the SAME matcher the tween engine uses and translate the ids
+// through it. Only computed when stage 1 (direct id lookup) came up short,
+// since on an interpolated span ids already match and this is pure cost.
+function fillMatchWallIds(srcStrokes,dstStrokes){
+  if(!srcStrokes.length||!dstStrokes.length)return null;
+  if(typeof autoMatch!=='function')return null;
+  var map={},matches;
+  try{matches=autoMatch(srcStrokes,dstStrokes);}catch(e){return null;}
+  if(!matches||!matches.length)return null;
+  matches.forEach(function(m){
+    var a=srcStrokes[m.a],b=dstStrokes[m.b];
+    if(a&&b&&a.strokeId&&b.strokeId)map[a.strokeId]=b.strokeId;
+  });
+  return map;
+}
+
+// Re-trace `fillPath` on every frame of the active layer that stores its own
+// strokes. Frames that merely INHERIT (held, no own `strokes`) are skipped on
+// purpose: they already show the keyframe's fill, and writing to them would
+// silently promote them to real keyframes and destroy the hold structure.
+//
+// The closing lines travel too. Measured: a closing line committed on one
+// keyframe does NOT survive tween generation (0 on every interpolated frame)
+// — with no partner on the next keyframe the matcher lets it fade, exactly as
+// it would any stroke drawn on one keyframe only. So each one is re-anchored
+// and re-emitted per frame, as a straight segment between its two rebuilt
+// endpoints — which is precisely what Harmony's Close Gap draws in the first
+// place ("an invisible straight line connecting them").
+//
+// Every emitted item carries the SOURCE item's strokeId as a lineage key, so
+// re-running propagation replaces its own previous output instead of stacking
+// a second copy on every frame. No new persisted tag is needed for that
+// (CLAUDE.md §1) — strokeId already round-trips through serP/desP.
+function fillPropagateAcrossFrames(fillPath){
+  var li=state.activeLayerIdx,ld=state.layers[li];
+  if(!ld||!fillPath||!fillPath.data||!fillPath.data.fillSeed)return null;
+  var srcFrame=state.currentFrame;
+  var layer=userLayers[li];
+  var seed=new Point(fillPath.data.fillSeed[0],fillPath.data.fillSeed[1]);
+  var col=fillPath.fillColor?colorHex8(fillPath.fillColor):null;
+  var op=fillPath.opacity;
+  var gapCap=fillPath.data.fillGapPx;
+  // How cleanly the SOURCE closed — the bar every propagated frame must meet.
+  var srcGapPx=(typeof gapCap==='number')?gapCap:0;
+  var lineageId=ensureStrokeId(fillPath);
+  var anchors=fillSeedAnchors(layer,seed,fillPath.data.fillWalls);
+  if(!anchors.length)return null;
+  // Capture each closing line as (its own lineage id + an anchor set per end).
+  var closeLines=layer.children.filter(function(c){
+    return c instanceof Path&&c.data&&c.data.isFillCloseLine&&c.segments.length>=2;
+  }).map(function(c){
+    return {
+      id:ensureStrokeId(c),
+      a:fillSeedAnchors(layer,c.firstSegment.point,null),
+      b:fillSeedAnchors(layer,c.lastSegment.point,null),
+    };
+  }).filter(function(cl){return cl.a.length&&cl.b.length;});
+  var srcStrokes=((ld.frames[srcFrame]&&ld.frames[srcFrame].strokes)||[]).filter(_fillMatchable);
+  var lineageIds={};
+  lineageIds[lineageId]=1;
+  closeLines.forEach(function(cl){lineageIds[cl.id]=1;});
+
+  var filled=0,skipped=0,frames=0;
+  for(var fi=0;fi<ld.frames.length;fi++){
+    if(fi===srcFrame)continue;
+    var f=ld.frames[fi];
+    if(!f||!f.strokes)continue; // inherits from a keyframe — nothing of its own
+    frames++;
+    goToFrame(fi);
+    var lyr=userLayers[li];
+    // Clear this propagation's own previous output on the frame.
+    lyr.children.filter(function(c){
+      return c.data&&lineageIds[c.data.strokeId]&&(c.data.fillSeed||c.data.isFillCloseLine);
+    }).forEach(function(c){c.remove();});
+    // The id map is only computed if the direct strokeId lookup came up short.
+    var idMap=null;
+    function rebuild(anchorSet){
+      var r=fillSeedFromAnchors(lyr,anchorSet,null);
+      if(!r||r.matched<anchorSet.length){
+        if(idMap===null)idMap=fillMatchWallIds(srcStrokes,(f.strokes||[]).filter(_fillMatchable))||false;
+        if(idMap){
+          var r2=fillSeedFromAnchors(lyr,anchorSet,idMap);
+          if(r2&&(!r||r2.matched>r.matched))r=r2;
+        }
+      }
+      return r?r.point:null;
+    }
+    closeLines.forEach(function(cl){
+      var pa=rebuild(cl.a),pb=rebuild(cl.b);
+      if(!pa||!pb)return;
+      var line=fillCommitCloseLine(lyr,[pa,pb]);
+      if(line)line.data.strokeId=cl.id;
+    });
+    var pt=rebuild(anchors)||seed;
+    var res=null;
+    try{res=fillVectorFind(pt,lyr,null,gapCap);}catch(e){}
+    // The rebuilt seed can land just outside a thin region; the original click
+    // point is the obvious second guess before giving up.
+    if(!res)try{res=fillVectorFind(seed,lyr,null,gapCap);}catch(e){}
+    // Quality gate. The seed/closing-line reconstruction degrades in the
+    // MIDDLE of a long tween span, where the walls have deformed far from the
+    // frame the anchors were captured on — measured on a real project: a 12px
+    // gap's rebuilt bridge stretched to 309px by frame 15, and the trace then
+    // found a small wrong sub-region. Those failures announce themselves: every
+    // good frame closed at the source's own gapPx (0, usedGap false) while every
+    // bad one needed the tracer to bridge (24+). So a frame that cannot close as
+    // cleanly as the source did is LEFT ALONE rather than written with a fill
+    // that is visibly wrong — a missing colour is obvious and fixable by hand, a
+    // subtly wrong one is worse than nothing.
+    if(res&&res.gapPx>srcGapPx){res.path.remove();res=null;}
+    if(!res){skipped++;saveActiveLayerFrame();continue;}
+    lyr.insertChild(fillInsertIndexFor(lyr,pt,res.path),res.path);
+    if(col)res.path.fillColor=col;
+    res.path.strokeColor=null;
+    res.path.opacity=op;
+    res.path.data.fillSeed=[pt.x,pt.y];
+    res.path.data.fillGapPx=res.gapPx;
+    res.path.data.strokeId=lineageId;
+    if(res.wallIds&&res.wallIds.length)res.path.data.fillWalls=res.wallIds;
+    saveActiveLayerFrame();
+    filled++;
+  }
+  goToFrame(srcFrame);
+  return {filled:filled,skipped:skipped,frames:frames,closeLines:closeLines.length};
+}
 // gapThr is a plain world-space distance — "how far apart can two stroke
 // ends be and still count as one closed shape" — matching the Gap Size
 // presets directly, no scale/resolution conversion involved anywhere.
