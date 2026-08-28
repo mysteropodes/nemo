@@ -212,18 +212,6 @@
     document.addEventListener('keydown', onKeyDown);
     var propBtn = document.getElementById('btn-fill-propagate');
     if (propBtn) propBtn.addEventListener('click', onPropagateClick);
-    var nibA = document.getElementById('p-nib-angle');
-    if (nibA) nibA.addEventListener('change', function () {
-      var v = parseFloat(this.value);
-      if (!isNaN(v)) state.brushAngle = ((v % 180) + 180) % 180;
-      window.SMEngineBridge.renderNow();
-    });
-    var nibF = document.getElementById('p-nib-factor');
-    if (nibF) nibF.addEventListener('change', function () {
-      var v = parseFloat(this.value);
-      if (!isNaN(v)) state.brushAngleFactor = Math.max(0, Math.min(100, v));
-      window.SMEngineBridge.renderNow();
-    });
     var gcSel = document.getElementById('p-fillgapclose');
     if (gcSel) gcSel.addEventListener('change', function () {
       state.fillGapCloseMode = this.value;

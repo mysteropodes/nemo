@@ -6144,37 +6144,6 @@ function applyPressureCurve(p){
   }
 }
 window.applyPressureCurve=applyPressureCurve;
-// ---- CALLIGRAPHIC NIB (angle + factor) ----
-// A flat nib held at a fixed angle: full width when the stroke runs along
-// state.brushAngle, thinning to (1 - factor) when it runs perpendicular.
-// Blender's Grease Pencil calls this out as "a convenient way to fake pen
-// pressure while using a mouse", which is exactly the gap here — Nemo's plain
-// vector brush drives width from PRESSURE alone (vbWidthFor/widthFor), so
-// without a tablet every line comes out the same weight. Calligraphy did
-// exist, but only inside dab presets (BRUSH_PRESETS' fixedAngle + rect tip),
-// which costs hundreds of companion paths per stroke and drags in everything
-// that entails for filling and performance. This gives the same line quality
-// on the plain ribbon, for one multiplier.
-//
-// |cos| (not cos) because a nib has no front or back: drawing the same line in
-// the opposite direction must give the same width.
-function brushAngleWidthMul(dx,dy){
-  var f=(state.brushAngleFactor||0)/100;
-  if(f<=0||(!dx&&!dy))return 1;
-  var a=(state.brushAngle||0)*Math.PI/180;
-  return (1-f)+f*Math.abs(Math.cos(Math.atan2(dy,dx)-a));
-}
-// Central difference (previous -> next) rather than the backward difference a
-// push-time hook would give: the direction at a point is genuinely the one
-// through it, and it keeps the very first sample from having no direction at
-// all. `get` reads a point from whatever shape the caller stores.
-function brushAngleWidths(n,get,widths){
-  if(!((state.brushAngleFactor||0)>0))return widths;
-  return widths.map(function(w,i){
-    var a=get(i>0?i-1:i),b=get(i<n-1?i+1:i);
-    return w*brushAngleWidthMul(b.x-a.x,b.y-a.y);
-  });
-}
 function vbWidthFor(p){
   if(state.pressureInvert)p=1-p;
   p=applyPressureCurve(p);
@@ -6184,7 +6153,6 @@ function vbWidthFor(p){
 function vbRebuildPreview(){
   if(_vb.pts.length<2)return;
   var widths=_vb.pts.map(function(p,i){return vbWidthFor(_vb.widths[i]);});
-  widths=brushAngleWidths(_vb.pts.length,function(i){return _vb.pts[i];},widths);
   if(state.taperEnds)widths=combineTaper(_vb.pts,widths,0.15);
   var outline=buildVariableWidthPath(_vb.pts,widths);
   if(outline){
@@ -6949,7 +6917,6 @@ function onMouseUp(event){
         // closed filled shape instead of the pressure ribbon (mirrors
         // draw-bridge.js's own fill-only branch in commitStroke).
         var rawWidthsF=_vb.pts.map(function(p,i){return vbWidthFor(_vb.widths[i]);});
-      rawWidthsF=brushAngleWidths(_vb.pts.length,function(i){return _vb.pts[i];},rawWidthsF);
         var csF=buildCenterSegmentsFromRawStroke(_vb.pts,rawWidthsF,state.smoothing);
         currentPath.removeSegments();
         csF.forEach(function(s){currentPath.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
@@ -6962,7 +6929,6 @@ function onMouseUp(event){
       }
       else{
         var rawWidths=_vb.pts.map(function(p,i){return vbWidthFor(_vb.widths[i]);});
-      rawWidths=brushAngleWidths(_vb.pts.length,function(i){return _vb.pts[i];},rawWidths);
         var cs=buildCenterSegmentsFromRawStroke(_vb.pts,rawWidths,state.smoothing);
         if(state.taperEnds)applyTaperToCenterSegments(cs,0.15);
         currentPath.data.centerSegments=cs;
@@ -7011,7 +6977,6 @@ function onMouseUp(event){
     if(_vb.pts.length<2){currentPath.remove();if(state.undoStack.length)state.undoStack.pop();}
     else{
       var fbWidths=_vb.pts.map(function(p,i){return vbWidthFor(_vb.widths[i]);});
-      fbWidths=brushAngleWidths(_vb.pts.length,function(i){return _vb.pts[i];},fbWidths);
       var fbCs=buildCenterSegmentsFromRawStroke(_vb.pts,fbWidths,state.smoothing);
       currentPath.data.centerSegments=fbCs;
       currentPath.data.widthProfile=fbCs.widthProfile;

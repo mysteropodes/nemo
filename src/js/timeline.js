@@ -2674,13 +2674,6 @@ function updatePropsContext(){
   // The size only means anything once a mode is picked.
   var gsRow=document.getElementById('p-fillgapsize-row');
   if(gsRow)gsRow.style.display=(isBucket&&state.fillGapCloseMode&&state.fillGapCloseMode!=='off')?'flex':'none';
-  // Calligraphic nib is a property of the freehand ribbon (Draw / Fill Brush).
-  var nibRow=document.getElementById('p-nib-row');
-  if(nibRow)nibRow.style.display=(state.tool==='draw'||isFillBrush)?'flex':'none';
-  var nibA=document.getElementById('p-nib-angle');
-  if(nibA&&document.activeElement!==nibA)nibA.value=state.brushAngle;
-  var nibF=document.getElementById('p-nib-factor');
-  if(nibF&&document.activeElement!==nibF)nibF.value=state.brushAngleFactor;
   var gcSel=document.getElementById('p-fillgapclose');
   if(gcSel&&gcSel.value!==state.fillGapCloseMode)gcSel.value=state.fillGapCloseMode;
   var gsInp=document.getElementById('p-fillgapsize');

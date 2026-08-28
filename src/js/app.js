@@ -98,7 +98,7 @@ var state={
   // floor-ing at 30% width. Purely a default — both remain user-editable
   // (checkbox + P.min field, right panel) same as before.
   strokeStyle:'solid',vectorBrush:true,taperEnds:false,
-  drawMode:'front',fillBrushMode:'below',fillGapCloseMode:'off',fillGapCloseSize:24,brushAngle:0,brushAngleFactor:0,pressureMin:5,pressureMax:170,pressureInvert:false,pressureCurve:'linear',
+  drawMode:'front',fillBrushMode:'below',fillGapCloseMode:'off',fillGapCloseSize:24,pressureMin:5,pressureMax:170,pressureInvert:false,pressureCurve:'linear',
   // eraseAtPoint() already does a REAL vector boolean subtract (Paper.js
   // .subtract() / Rust erase_at_point), not item.remove() — verified by
   // reading it end to end. The "gomme supprime des objets entiers" report
