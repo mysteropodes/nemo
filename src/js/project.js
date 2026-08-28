@@ -401,7 +401,21 @@
     // feedback thread and this project's own history/sync folders always
     // agree on which project they belong to without re-deriving the logic.
     getProjectKey:historyKey,profileDir:profileDir,isDirty:isDirty,markSaved:function(){try{markSaved(window.SM.exportJSON());}catch(e){}},getCurrentLabel:getCurrentLabel,
-    refreshActiveTabDirtyDot:refreshActiveTabDirtyDot};
+    refreshActiveTabDirtyDot:refreshActiveTabDirtyDot,
+    // Read-only list of every OTHER open project tab (feedback #109: "voir
+    // apparaître les différents projet test1, test2... afin de pouvoir les
+    // glisser comme un componant dans un autre projet") — transplant.js
+    // consumes this to offer picking a source project without a file dialog.
+    // Each tab already holds a full exportJSON()-format snapshot the moment
+    // it's not the active one (switchToTab's own snapshotActiveIntoTab), so
+    // this needed no new storage — just a reader. The active tab is excluded
+    // outright (nothing to transplant from yourself, and its own .json field
+    // is stale until the next tab switch — see snapshotActiveIntoTab).
+    getOpenTabs:function(){
+      return tabs.filter(function(t){return t.id!==activeTabId;})
+        .map(function(t){return {id:t.id,name:t.name,json:t.json};})
+        .filter(function(t){return !!t.json;});
+    }};
 
   // ---- Close-with-unsaved-work guard ----
   // Cmd+Q / window-close with unsaved changes asked NOTHING before this —

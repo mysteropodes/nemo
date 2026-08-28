@@ -25,6 +25,7 @@
       '<div class="modal-hdr"><span id="tp-title" data-i18n="transplantTitle">Transplanter depuis un projet</span><button class="modal-x" id="tp-close">&times;</button></div>' +
       '<div class="modal-bdy" style="display:flex;flex-direction:column;gap:8px;overflow-y:auto">' +
       '<div id="tp-empty" style="font-size:11px;color:var(--text-dim)" data-i18n="transplantEmptyHint">Choisissez un fichier projet Nemo (.json) — vous pourrez ensuite cocher les calques et médias à importer, sans toucher au reste de ce projet-là.</div>' +
+      '<div id="tp-open-tabs" style="display:none;flex-direction:column;gap:4px"></div>' +
       '<div id="tp-lists" style="display:none;flex-direction:column;gap:10px">' +
       '<div id="tp-layer-list" class="bp-grid asset-tree"></div>' +
       '<div id="tp-media-list" class="bp-grid asset-tree"></div>' +
@@ -51,7 +52,32 @@
     return modalEl;
   }
 
-  function open() { ensureModal().style.display = 'flex'; }
+  // Open project tabs as a pickable source (feedback #109: "voir apparaître
+  // les différents projet test1, test2... afin de pouvoir les glisser comme
+  // un componant dans un autre projet") — same loadForeign() the file-picker
+  // path already uses, just fed a tab's in-memory JSON snapshot directly
+  // instead of a file read. Rendered fresh on every open() since tabs can be
+  // added/closed/renamed between transplant modal openings.
+  function renderOpenTabsList() {
+    var wrap = modalEl.querySelector('#tp-open-tabs');
+    wrap.innerHTML = '';
+    var openTabs = (window.SMProject && window.SMProject.getOpenTabs) ? window.SMProject.getOpenTabs() : [];
+    if (!openTabs.length) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'flex';
+    var label = document.createElement('div');
+    label.style.cssText = 'font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.03em;';
+    label.textContent = SM && SM.t ? SM.t('transplantOpenTabsLabel') : 'Onglets de projet ouverts';
+    wrap.appendChild(label);
+    openTabs.forEach(function (t) {
+      var row = document.createElement('button');
+      row.className = 'pbtn';
+      row.style.cssText = 'text-align:left;justify-content:flex-start;';
+      row.textContent = t.name || 'Untitled';
+      row.addEventListener('click', function () { loadForeign(t.json, t.name); });
+      wrap.appendChild(row);
+    });
+  }
+  function open() { ensureModal().style.display = 'flex'; renderOpenTabsList(); }
   function close() { if (modalEl) modalEl.style.display = 'none'; }
   function showError(msg) {
     var el = modalEl.querySelector('#tp-error');
