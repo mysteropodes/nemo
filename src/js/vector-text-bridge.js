@@ -324,9 +324,75 @@ function vectorTextGroupMembers(root) {
   var gid = root.data.groupId;
   return root.parent.children.filter(function (c) { return c.data && c.data.groupId === gid; });
 }
+// ---- Live Google Fonts (2026-08-28) ----
+// Follow-up to the bundled-fonts work above ("peux t'on avoir d'autre typo
+// sans probleme de droit genre les google fonts ?", then, once told
+// Graphite's web editor does a real live catalog: "un vrai catalogue
+// Google Fonts en ligne"). Fetches ANY of Google's 1800+ OFL-licensed
+// families on demand, not just the handful bundled as local TTFs above.
+//
+// Why this needs a Tauri command (fetch_google_font, src-tauri/src/lib.rs)
+// instead of a plain fetch() here: Google's public CSS2 endpoint
+// (fonts.googleapis.com/css2) serves a DIFFERENT font file format
+// depending on the request's User-Agent — modern browsers get woff2, an
+// old Android 2.2 UA specifically gets back a plain, uncompressed .ttf URL
+// (confirmed live via curl before any of this was written), exactly what
+// opentype.js needs with zero extra decoding. But User-Agent is a
+// "forbidden header" the Fetch spec never lets a page's own script
+// override — only reqwest, from the Rust side, can actually send that
+// custom UA. This is also why there's no key/backend-proxy needed at all
+// (unlike Graphite's own api.graphite.art, which fronts Google's OFFICIAL
+// Fonts Developer API — that one needs a server-side secret key): the
+// UA trick sidesteps needing that API/key entirely, just a way to send an
+// unusual header, which the Tauri command provides.
+//
+// Desktop-only for now — the web build (nemo-web-public-beta) has no Rust
+// backend at runtime to send that header from, and would need its own
+// small Cloudflare Worker doing the same UA-spoofed relay (mirrors
+// worker-feedback/'s own trust-boundary role) — not yet built.
+function tauriOk() { return typeof window.__TAURI__ !== 'undefined'; }
+function base64ToArrayBuffer(b64) {
+  var bin = atob(b64);
+  var bytes = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+// Registers ONE weight of a family into VECTOR_FONTS/_vecFontCache under
+// 'Google:<family>-Regular'/'-Bold' — same key shape as the bundled fonts
+// above, so buildVectorTextGroup's existing baseFamily/resolvedFontKey
+// logic (the regex-strip-then-reattach-Bold-or-Regular dance) treats a
+// live-fetched family identically to a bundled one, Bold toggle included,
+// with no special-casing needed anywhere else in this file.
+function fetchGoogleFontWeight(family, weight, italic) {
+  var key = 'Google:' + family + '-' + (weight >= 600 ? 'Bold' : 'Regular');
+  if (_vecFontCache[key]) return _vecFontCache[key];
+  if (!tauriOk()) return Promise.reject(new Error('Live Google Fonts needs the desktop app — no web-build proxy yet'));
+  var p = window.__TAURI__.core.invoke('fetch_google_font', { family: family, weight: weight, italic: !!italic })
+    .then(function (b64) { return opentype.parse(base64ToArrayBuffer(b64)); });
+  _vecFontCache[key] = p;
+  VECTOR_FONTS[key] = { url: null, label: family + (weight >= 600 ? ' Bold' : '') };
+  return p;
+}
+// Adds a family by NAME (what the UI actually collects) — fetches Regular
+// (required: failure here means the typed name doesn't exist on Google
+// Fonts, or there's no network, and the caller needs to know) then Bold
+// best-effort (some families genuinely have none; caught separately so a
+// missing Bold doesn't fail the whole add — same "gracefully do without"
+// precedent buildVectorTextGroup's own fallback already establishes).
+// Resolves to the Regular key, ready to pass straight into
+// buildVectorTextGroup as fontKey.
+function addGoogleFont(family) {
+  family = (family || '').trim();
+  if (!family) return Promise.reject(new Error('empty family name'));
+  return fetchGoogleFontWeight(family, 400, false).then(function () {
+    fetchGoogleFontWeight(family, 700, false).catch(function () {});
+    return 'Google:' + family + '-Regular';
+  });
+}
 window.SMVectorText = {
   VECTOR_FONTS: VECTOR_FONTS,
   loadVectorFont: loadVectorFont,
   buildVectorTextGroup: buildVectorTextGroup,
   vectorTextGroupMembers: vectorTextGroupMembers,
+  addGoogleFont: addGoogleFont,
 };

@@ -6816,6 +6816,60 @@ function applyTextPropsEdit(){
       applyTextPropsEdit();
     });
   });
+  // Live Google Fonts (2026-08-28) — "+" reveals a name field instead of
+  // adding yet another modal; addGoogleFont (vector-text-bridge.js) is the
+  // one place that knows how to actually fetch/parse/register it (desktop
+  // only for now, see that file's own comment on why).
+  var fontAddBtn=document.getElementById('tp-font-add-btn');
+  var fontAddRow=document.getElementById('tp-font-add-row');
+  var fontAddInput=document.getElementById('tp-font-add-input');
+  var fontAddConfirm=document.getElementById('tp-font-add-confirm');
+  if(fontAddBtn&&fontAddRow&&fontAddInput&&fontAddConfirm){
+    fontAddBtn.addEventListener('click',function(){
+      var showing=fontAddRow.style.display!=='none';
+      fontAddRow.style.display=showing?'none':'flex';
+      if(!showing){fontAddInput.value='';fontAddInput.focus();}
+    });
+    function confirmAddGoogleFont(){
+      var family=fontAddInput.value.trim();
+      if(!family||!window.SMVectorText)return;
+      fontAddConfirm.disabled=true;fontAddInput.disabled=true;
+      if(window.showToast)showToast(SM.t('toastGoogleFontFetching').replace('{family}',family),'info');
+      window.SMVectorText.addGoogleFont(family).then(function(){
+        fontAddConfirm.disabled=false;fontAddInput.disabled=false;
+        fontAddRow.style.display='none';
+        var fontSel=document.getElementById('tp-font');
+        // Option value is the bare 'Google:<family>' base (no -Regular/
+        // -Bold suffix) — same convention every built-in <option> already
+        // uses (e.g. value="DejaVuSans" for keys 'DejaVuSans-Regular'/
+        // '-Bold'): applyTextPropsEdit reads this value straight into
+        // buildVectorTextGroup, which strips/reattaches the suffix itself
+        // based on the Bold toggle. Using the fontKey addGoogleFont
+        // resolved to (already suffixed) here would mismatch that and
+        // silently 404 on the next rebuild.
+        var value='Google:'+family;
+        var already=Array.prototype.find.call(fontSel.options,function(o){return o.value===value;});
+        if(!already){
+          var opt=document.createElement('option');
+          opt.value=value;opt.textContent=family;
+          fontSel.appendChild(opt);
+        }
+        fontSel.value=value;
+        applyTextPropsEdit();
+        if(window.showToast)showToast(SM.t('toastGoogleFontAdded').replace('{family}',family),'success');
+      }).catch(function(e){
+        fontAddConfirm.disabled=false;fontAddInput.disabled=false;
+        console.warn('[google font]',e);
+        if(window.showToast)showToast(SM.t('toastGoogleFontFailed').replace('{family}',family),'error');
+      });
+    }
+    fontAddConfirm.addEventListener('click',confirmAddGoogleFont);
+    fontAddInput.addEventListener('keydown',function(e){
+      e.stopPropagation();
+      if(e.key==='Enter'){e.preventDefault();confirmAddGoogleFont();}
+      else if(e.key==='Escape'){e.preventDefault();fontAddRow.style.display='none';}
+    });
+  }
 })();
 // Effects stack panel (2026-07 rewrite) — see effects-panel.js; the
 // separate #effect-layer-sec-specific rendering that used to live here
