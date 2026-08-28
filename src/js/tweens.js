@@ -3416,10 +3416,41 @@ function _trimmedStroke(sd,f0,f1){
 function dabRecordsForTween(rec,presetKey,colorHexStr,baseWidth,seed,opacityMul){
   var preset=resolveBrushPreset(presetKey);
   if(!preset)return[];
+  // Pressure ribbon: stamp along the CENTERLINE, never rec.segments — for a
+  // vector-brush tween record rec.segments is the ribbon's OUTLINE
+  // (outlineFromCenterSegs a few hundred lines up, always closed:true), so
+  // walking it ringed the dabs around the stroke's silhouette instead of
+  // running them down its middle: the generated inbetweens came out as a
+  // hollow double contour while the keyframes drew solid ("les inbetween...
+  // donne une espèce de stroke avec outline", feedback #89 — reproduced live
+  // and confirmed identical with the Rust engine off, i.e. geometry, not
+  // rendering). This mirrors applyBrushTexture's own isPressure branch
+  // (tools.js) — see its comment for why the centerline is both the
+  // geometrically correct brush path AND the arc length widthProfile's `t`
+  // fractions are measured against. CLAUDE.md §3's duplicated-pair rule:
+  // these two dab builders must stay in step.
+  var isPressure=!!(rec.isVectorBrush&&rec.centerSegments&&rec.centerSegments.length>1);
+  var srcSegs=isPressure?rec.centerSegments:rec.segments;
   var p=new Path({insert:false});
-  rec.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
-  if(rec.closed)p.closed=true;
-  var dabs=buildBrushDabs(p,preset,baseWidth||3,seededRng(seed));
+  srcSegs.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),s.handleIn?new Point(s.handleIn[0],s.handleIn[1]):undefined,s.handleOut?new Point(s.handleOut[0],s.handleOut[1]):undefined));});
+  // Only the OUTLINE is inherently closed; a centerline generally isn't, and
+  // applyBrushTexture never closes the one it rebuilds either.
+  if(rec.closed&&!isPressure)p.closed=true;
+  // widthProfile equivalent, synthesized from the interpolated
+  // centerSegments' own per-point widths (interpStroke lerps them into
+  // centerSegs). A tween record carries no data.widthProfile of its own, so
+  // without this buildBrushDabs would size every dab from one flat
+  // baseWidth and drop the taper the keyframes have. Same {t,width} shape
+  // and same normalised-arc-length `t` as buildWidthProfile (tools.js).
+  var wp,bw=baseWidth||3;
+  if(isPressure){
+    var lens=[0];
+    for(var wi=1;wi<srcSegs.length;wi++)lens.push(lens[wi-1]+new Point(srcSegs[wi].point[0],srcSegs[wi].point[1]).getDistance(new Point(srcSegs[wi-1].point[0],srcSegs[wi-1].point[1])));
+    var totalLen=lens[lens.length-1]||1;
+    wp=srcSegs.map(function(s,i){return{t:lens[i]/totalLen,width:s.width||bw};});
+    bw=wp.reduce(function(sum,q){return sum+q.width;},0)/wp.length;
+  }
+  var dabs=buildBrushDabs(p,preset,bw,seededRng(seed),wp);
   p.remove();
   return dabs.map(function(dab){
     var segs=dab.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});
