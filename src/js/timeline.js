@@ -513,6 +513,22 @@ window.SM={
           // renders — untouched, so dragging Width visibly did nothing.
           if(p.data.widthProfile)p.data.widthProfile.forEach(function(pt){pt.width=(pt.width||v)*ratio;});
           rebuildVectorBrushOutline(p);
+          // Same gap as the plain-texture-preset branch below (feedback #82,
+          // "si je select une brush avec texture vecto et que je change sa
+          // width cela n'agit pas") — a PRESSURE vector-brush ribbon (this
+          // branch: isVectorBrush + centerSegments, e.g. Chalk/Charcoal) can
+          // ALSO carry a dab texture on top of its own ribbon geometry. The
+          // rescale above only touches the ribbon's width profile; the dabs
+          // (what's actually visible — the ribbon anchor is camouflaged,
+          // see CLAUDE.md's own note on the two camouflage modes) were
+          // stamped once at apply time and never got re-stamped, so Width
+          // visibly did nothing on exactly this combination. This branch
+          // and the `else if` below it are mutually exclusive by construction
+          // (isVectorBrush+centerSegments vs the else), so a preset that
+          // sets both flags always landed here and never reached the fix.
+          if(p.data.brushTexturePreset&&p.data.brushGroupId){
+            regenerateBrushTexture(p,userLayers[state.activeLayerIdx]);
+          }
         }else{
           p.strokeWidth=v;applyStrokeStyle(p);
           // Width unification (2026-07-17, "il ne change pas la taille du
