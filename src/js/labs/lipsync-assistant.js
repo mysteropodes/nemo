@@ -68,12 +68,12 @@
       n++;
     }
     goToFrame(startCf);
-    if (typeof showToast === 'function') showToast('Lip-sync amplitude : ' + n + ' frame(s) posée(s)');
+    if (typeof showToast === 'function') showToast(SM.t('labsToastLipsyncPrefix') + n + SM.t('labsToastLipsyncSuffix'));
     return n;
   };
 
   window.SMLabs.register('lipsync-assistant', {
     flag: 'nemo-labs-lipsync',
-    describe: 'Lip-sync par amplitude (Moho/TB, amplitude seule — pas de phonèmes) : lipsyncFromAudio(trackIdx,f0,f1,{closed,mid,open}) tamponne un kit de bouches (pose-library) selon le volume par frame',
+    describe: 'labsDescribeLipsyncAssistant',
   });
 })();

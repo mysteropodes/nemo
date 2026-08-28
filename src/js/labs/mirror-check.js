@@ -49,7 +49,7 @@
 
   window.SMLabs.register('mirror-check', {
     flag: 'nemo-labs-mirror',
-    describe: 'Coup de miroir : maintenir M retourne la vue horizontalement (contrôle des proportions), relâcher ou cliquer revient au normal',
+    describe: 'labsDescribeMirrorCheck',
     onDisable: function () { flip(false); },
   });
 })();

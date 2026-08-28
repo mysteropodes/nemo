@@ -39,14 +39,14 @@
     opts = opts || {};
     var li = state.activeLayerIdx;
     var ld = state.layers[li];
-    if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast('Calque invalide/verrouillé'); return 0; }
+    if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalidLocked')); return 0; }
     var layer = userLayers[li];
     var traj = null;
     layer.children.forEach(function (c) { if (c instanceof Path && c.data && c.data.strokeId === opts.pathId) traj = c; });
-    if (!traj) { if (typeof showToast === 'function') showToast('Trajectoire introuvable (pathId)'); return 0; }
-    if (typeof selectedPaths === 'undefined' || !selectedPaths.length) { if (typeof showToast === 'function') showToast('Sélectionne les traits à animer (outil Sélection)'); return 0; }
+    if (!traj) { if (typeof showToast === 'function') showToast(SM.t('labsToastTrajectoryNotFound')); return 0; }
+    if (typeof selectedPaths === 'undefined' || !selectedPaths.length) { if (typeof showToast === 'function') showToast(SM.t('labsToastSelectStrokesToAnimate')); return 0; }
     var targets = selectedPaths.filter(function (p) { return p && p.parent && p !== traj; });
-    if (!targets.length) { if (typeof showToast === 'function') showToast('Sélection vide (la trajectoire ne compte pas)'); return 0; }
+    if (!targets.length) { if (typeof showToast === 'function') showToast(SM.t('labsToastEmptySelectionExcludingTrajectory')); return 0; }
     var nFrames = Math.max(2, Math.min(120, opts.frames || 12));
     var fn = EASES[opts.ease || 'inout'] || EASES.inout;
     var cf = state.currentFrame;
@@ -103,12 +103,12 @@
     if (typeof clearSel === 'function') clearSel();
     loadFrame(state.currentFrame); renderOS(); renderArcs(); updateUI();
     if (typeof renderTimeline === 'function') renderTimeline();
-    if (typeof showToast === 'function') showToast('Follow path : ' + nFrames + ' frames bakées le long de la trajectoire');
+    if (typeof showToast === 'function') showToast(SM.t('labsToastFollowPathPrefix') + nFrames + SM.t('labsToastFollowPathSuffix'));
     return nFrames;
   };
 
   window.SMLabs.register('follow-path', {
     flag: 'nemo-labs-followpath',
-    describe: 'Bake le long d\'une trajectoire : SMLabs.followPath({pathId,frames,ease}) bake la sélection le long d\'un trait-trajectoire en keyframes successives',
+    describe: 'labsDescribeFollowPath',
   });
 })();

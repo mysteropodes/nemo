@@ -169,32 +169,38 @@
   // being confused for the current tool's own context.
   var ALWAYS = ['flip-roll', 'mirror-check', 'lagoon-menu'];
 
+  // Values are i18n KEYS (not literal text), resolved via SM.t() in addBtn()
+  // below — never here, at file-parse time: labs-float-panel.js loads
+  // BEFORE timeline.js/i18n.js in index.html's script order (feedback #105:
+  // this is exactly why the floating icon strip stayed French under an
+  // English app language — SHORT_NAME held literal strings with no i18n
+  // hookup at all).
   var SHORT_NAME = {
-    'brush-menu': 'Brosses (vecteur/bitmap)',
+    'brush-menu': 'lfsShortBrushMenu',
     // UI/UX audit (2026-07-30): the only real explanation of this tool
     // lived in English on a checkbox buried in Export options, nowhere
     // near this icon — the actual discovery point for a first-time user.
-    'shadow-brush': 'Shadow Brush — dessine des lignes de délimitation dans une couleur dédiée, pour séparer trait/fond/ombre sans que ce soit du dessin final',
+    'shadow-brush': 'lfsShortShadowBrush',
     // UI/UX audit (2026-07-30): both of these restated their own name —
     // the ONLY tooltip either tool has anywhere (their sole discovery
     // point is this Labs icon), so a first-time user had no way to learn
     // what enabling them actually does before poking around. No After
     // Effects equivalent for either, unlike most of this panel's tools.
-    'symmetry': 'Guide de symétrie — dessine en miroir de part et d’autre d’un axe déplaçable',
-    'perspective': 'Guide de perspective — trace des rayons convergents vers un ou plusieurs points de fuite déplaçables',
-    'predictive-stroke': 'Trait prédictif',
-    'multiframe-draw': 'Dessin multi-frames',
-    'canvas-grid': 'Grille',
-    'view-filter': 'Contrôle des valeurs',
-    'french-curve': 'Gabarit courbe (maintenir F)',
-    'vector-sculpt': 'Sculpt vectoriel — glisser, Shift pour lisser, Alt+glisser pour le rayon',
-    'out-of-pegs': 'Décalage des fantômes onion',
-    'flip-roll': "Rouleau d'animateur (maintenir R)",
-    'mirror-check': 'Miroir de contrôle (maintenir M)',
-    'lagoon-menu': "Menu radial d'outils (maintenir Q)",
-    'fs-select-rect': 'Sélection rectangle (Fill/Stroke Select)',
-    'fs-select-lasso': 'Sélection lasso (Fill/Stroke Select) — Alt+glisser inverse temporairement',
-    'fs-break-intersect': 'Casser aux intersections — glisser sur un trait pour marquer ses croisements avec d\'autres traits, relâcher pour les couper',
+    'symmetry': 'lfsShortSymmetry',
+    'perspective': 'lfsShortPerspective',
+    'predictive-stroke': 'lfsShortPredictiveStroke',
+    'multiframe-draw': 'lfsShortMultiframeDraw',
+    'canvas-grid': 'lfsShortCanvasGrid',
+    'view-filter': 'lfsShortViewFilter',
+    'french-curve': 'lfsShortFrenchCurve',
+    'vector-sculpt': 'lfsShortVectorSculpt',
+    'out-of-pegs': 'lfsShortOutOfPegs',
+    'flip-roll': 'lfsShortFlipRoll',
+    'mirror-check': 'lfsShortMirrorCheck',
+    'lagoon-menu': 'lfsShortLagoonMenu',
+    'fs-select-rect': 'lfsShortFsSelectRect',
+    'fs-select-lasso': 'lfsShortFsSelectLasso',
+    'fs-break-intersect': 'lfsShortFsBreakIntersect',
   };
 
   // Solid/filled icons (2026-07, "les icônes ne sont pas trop flat design
@@ -251,12 +257,15 @@
   // (object-shaped guide position) and out-of-pegs (4 independent
   // numbers) stay Réglages/console-only, a stepper pair or quad would be
   // more UI than this compact strip should carry.
+  // `labelKey` is an i18n key, resolved via SM.t() where the pill is built
+  // (inside renderLabsFloatPanel, at render time — safe, unlike this
+  // top-level object literal itself).
   var PARAMS = {
-    'vector-sculpt': [{ key: 'nemo-labs-sculpt-radius', label: 'Rayon', def: 60, min: 8, max: 400, step: 10, set: function (v) { window.SMLabs.setSculptRadius(v); } }],
-    'canvas-grid': [{ key: 'nemo-labs-grid-step', label: 'Pas', def: 100, min: 4, max: 500, step: 10, set: function (v) { window.SMLabs.setGridStep(v); } }],
+    'vector-sculpt': [{ key: 'nemo-labs-sculpt-radius', labelKey: 'lfsLabelRadius', def: 60, min: 8, max: 400, step: 10, set: function (v) { window.SMLabs.setSculptRadius(v); } }],
+    'canvas-grid': [{ key: 'nemo-labs-grid-step', labelKey: 'lfsLabelStep', def: 100, min: 4, max: 500, step: 10, set: function (v) { window.SMLabs.setGridStep(v); } }],
     'flip-roll': [
-      { key: 'nemo-labs-flip-speed', label: 'Vitesse', def: 6, min: 2, max: 24, step: 1, set: function (v) { window.SMLabs.setFlipSpeed(v); } },
-      { key: 'nemo-labs-flip-span', label: 'Portée', def: 2, min: 1, max: 6, step: 1, set: function (v) { window.SMLabs.setFlipSpan(v); } },
+      { key: 'nemo-labs-flip-speed', labelKey: 'lfsLabelSpeed', def: 6, min: 2, max: 24, step: 1, set: function (v) { window.SMLabs.setFlipSpeed(v); } },
+      { key: 'nemo-labs-flip-span', labelKey: 'lfsLabelSpan', def: 2, min: 1, max: 6, step: 1, set: function (v) { window.SMLabs.setFlipSpan(v); } },
     ],
   };
   function paramValue(p) {
@@ -273,8 +282,10 @@
   }
   var SYM_MODES = ['y', 'x', 'free', 'radial'];
   var PERSP_MODES = ['1pt', '2pt', '3pt', 'fisheye'];
-  var PERSP_MODE_LABEL = { '1pt': '1pt', '2pt': '2pt', '3pt': '3pt', fisheye: 'Fisheye' };
-  var SYM_MODE_LABEL = { y: 'Y', x: 'X', free: 'Libre', radial: 'Radial' };
+  // Values are i18n keys, resolved via SM.t() at every usage site below
+  // (never here — see the SHORT_NAME comment above for why).
+  var PERSP_MODE_LABEL = { '1pt': 'lfsPersp1pt', '2pt': 'lfsPersp2pt', '3pt': 'lfsPersp3pt', fisheye: 'lfsPerspFisheye' };
+  var SYM_MODE_LABEL = { y: 'lfsSymY', x: 'lfsSymX', free: 'lfsSymFree', radial: 'lfsSymRadial' };
 
   function renderLabsFloatPanel() {
     var panel = document.getElementById('labs-float-panel');
@@ -297,7 +308,7 @@
     function addBtn(n) {
       var btn = document.createElement('button');
       btn.className = 'labs-float-btn' + (registered[n] ? ' active' : '');
-      btn.title = SHORT_NAME[n] || n;
+      btn.title = SM.t(SHORT_NAME[n]) || n;
       btn.innerHTML = ICONS[n] || '';
       btn.addEventListener('click', function () {
         // ACTIONS entries manage their own re-render (BrushMenu.toggle
@@ -350,7 +361,7 @@
     if (registered.symmetry) {
       anyParams = true;
       var modePill = stepperPill('symmetry');
-      var modeLbl = document.createElement('span'); modeLbl.className = 'lfs-label'; modeLbl.textContent = 'Mode';
+      var modeLbl = document.createElement('span'); modeLbl.className = 'lfs-label'; modeLbl.textContent = SM.t('lfsLabelMode');
       var modePrev = document.createElement('button'); modePrev.className = 'lfs-btn'; modePrev.textContent = '−';
       var modeVal = document.createElement('span'); modeVal.className = 'lfs-val';
       var modeNext = document.createElement('button'); modeNext.className = 'lfs-btn'; modeNext.textContent = '+';
@@ -360,17 +371,17 @@
         if (window.setSymmetryMode) window.setSymmetryMode(next);
         var sel = document.getElementById('p-sym-mode'); if (sel) sel.value = next;
         if (window.syncSymmetryPanelVisibility) window.syncSymmetryPanelVisibility();
-        modeVal.textContent = SYM_MODE_LABEL[next];
+        modeVal.textContent = SM.t(SYM_MODE_LABEL[next]);
         renderLabsFloatPanel(); // sectors pill needs to appear/disappear when entering/leaving radial
       }
-      modeVal.textContent = SYM_MODE_LABEL[state.symmetryMode] || state.symmetryMode;
+      modeVal.textContent = SM.t(SYM_MODE_LABEL[state.symmetryMode]) || state.symmetryMode;
       modePrev.addEventListener('click', function () { cycleMode(-1); });
       modeNext.addEventListener('click', function () { cycleMode(1); });
       modePill.appendChild(modeLbl); modePill.appendChild(modePrev); modePill.appendChild(modeVal); modePill.appendChild(modeNext);
       paramsWrap.appendChild(modePill);
       if (state.symmetryMode === 'radial') {
         var secPill = stepperPill('symmetry');
-        var secLbl = document.createElement('span'); secLbl.className = 'lfs-label'; secLbl.textContent = 'Secteurs';
+        var secLbl = document.createElement('span'); secLbl.className = 'lfs-label'; secLbl.textContent = SM.t('lfsLabelSectors');
         var secMinus = document.createElement('button'); secMinus.className = 'lfs-btn'; secMinus.textContent = '−';
         var secVal = document.createElement('span'); secVal.className = 'lfs-val'; secVal.textContent = state.symmetryRadialSectors;
         var secPlus = document.createElement('button'); secPlus.className = 'lfs-btn'; secPlus.textContent = '+';
@@ -392,7 +403,7 @@
       // shape as Perspective's own Lock/Reset just below.
       var extPill = stepperPill('symmetry');
       var extBtn = document.createElement('button'); extBtn.className = 'lfs-btn wide' + (state.symmetryExtend ? ' on' : '');
-      extBtn.textContent = 'Extend'; extBtn.title = "Off: a stroke crossing the axis is cut right at it, so it and its mirror never overlap at the fold";
+      extBtn.textContent = SM.t('lfsBtnExtend'); extBtn.title = SM.t('lfsExtendTitle');
       extBtn.addEventListener('click', function () {
         state.symmetryExtend = !state.symmetryExtend;
         extBtn.classList.toggle('on', state.symmetryExtend);
@@ -401,7 +412,7 @@
       paramsWrap.appendChild(extPill);
       var symResetPill = stepperPill('symmetry');
       var symResetBtn = document.createElement('button'); symResetBtn.className = 'lfs-btn wide';
-      symResetBtn.textContent = 'Reset'; symResetBtn.title = 'Reset position';
+      symResetBtn.textContent = SM.t('lfsBtnReset'); symResetBtn.title = SM.t('lfsResetPositionTitle');
       symResetBtn.addEventListener('click', function () { if (window.resetSymmetryGuide) window.resetSymmetryGuide(); });
       symResetPill.appendChild(symResetBtn);
       paramsWrap.appendChild(symResetPill);
@@ -413,7 +424,7 @@
       // before, so this panel had no Mode control at all yet either.
       anyParams = true;
       var pModePill = stepperPill('perspective');
-      var pModeLbl = document.createElement('span'); pModeLbl.className = 'lfs-label'; pModeLbl.textContent = 'Mode';
+      var pModeLbl = document.createElement('span'); pModeLbl.className = 'lfs-label'; pModeLbl.textContent = SM.t('lfsLabelMode');
       var pModePrev = document.createElement('button'); pModePrev.className = 'lfs-btn'; pModePrev.textContent = '−';
       var pModeVal = document.createElement('span'); pModeVal.className = 'lfs-val';
       var pModeNext = document.createElement('button'); pModeNext.className = 'lfs-btn'; pModeNext.textContent = '+';
@@ -421,15 +432,15 @@
         var i = PERSP_MODES.indexOf(state.perspectiveMode);
         var next = PERSP_MODES[(i + dir + PERSP_MODES.length) % PERSP_MODES.length];
         if (window.setPerspectiveMode) window.setPerspectiveMode(next);
-        pModeVal.textContent = PERSP_MODE_LABEL[next];
+        pModeVal.textContent = SM.t(PERSP_MODE_LABEL[next]);
       }
-      pModeVal.textContent = PERSP_MODE_LABEL[state.perspectiveMode] || state.perspectiveMode;
+      pModeVal.textContent = SM.t(PERSP_MODE_LABEL[state.perspectiveMode]) || state.perspectiveMode;
       pModePrev.addEventListener('click', function () { cyclePerspMode(-1); });
       pModeNext.addEventListener('click', function () { cyclePerspMode(1); });
       pModePill.appendChild(pModeLbl); pModePill.appendChild(pModePrev); pModePill.appendChild(pModeVal); pModePill.appendChild(pModeNext);
       paramsWrap.appendChild(pModePill);
       var densPill = stepperPill('perspective');
-      var densLbl = document.createElement('span'); densLbl.className = 'lfs-label'; densLbl.textContent = 'Densité';
+      var densLbl = document.createElement('span'); densLbl.className = 'lfs-label'; densLbl.textContent = SM.t('lfsLabelDensity');
       var densMinus = document.createElement('button'); densMinus.className = 'lfs-btn'; densMinus.textContent = '−';
       var densVal = document.createElement('span'); densVal.className = 'lfs-val'; densVal.textContent = state.perspectiveDensity;
       var densPlus = document.createElement('button'); densPlus.className = 'lfs-btn'; densPlus.textContent = '+';
@@ -444,7 +455,7 @@
       paramsWrap.appendChild(densPill);
       var lockPill = stepperPill('perspective');
       var lockBtn = document.createElement('button'); lockBtn.className = 'lfs-btn wide';
-      lockBtn.textContent = 'Lock'; lockBtn.title = 'Prevents dragging any vanishing point with the Perspective tool';
+      lockBtn.textContent = SM.t('lfsBtnLock'); lockBtn.title = SM.t('lfsLockTitle');
       var vpsNow = window.ensurePerspectiveVPs ? window.ensurePerspectiveVPs() : [];
       lockBtn.classList.toggle('on', !!(vpsNow.length && vpsNow.every(function (vp) { return vp.locked; })));
       lockBtn.addEventListener('click', function () {
@@ -457,7 +468,7 @@
       paramsWrap.appendChild(lockPill);
       var perspResetPill = stepperPill('perspective');
       var perspResetBtn = document.createElement('button'); perspResetBtn.className = 'lfs-btn wide';
-      perspResetBtn.textContent = 'Reset'; perspResetBtn.title = 'Reset positions';
+      perspResetBtn.textContent = SM.t('lfsBtnReset'); perspResetBtn.title = SM.t('lfsResetPositionsTitle');
       perspResetBtn.addEventListener('click', function () { if (window.resetPerspectiveVPs) window.resetPerspectiveVPs(); });
       perspResetPill.appendChild(perspResetBtn);
       paramsWrap.appendChild(perspResetPill);
@@ -468,7 +479,7 @@
         anyParams = true;
         var pill = document.createElement('div');
         pill.className = 'labs-float-stepper';
-        var lbl = document.createElement('span'); lbl.className = 'lfs-label'; lbl.textContent = p.label;
+        var lbl = document.createElement('span'); lbl.className = 'lfs-label'; lbl.textContent = SM.t(p.labelKey);
         var minus = document.createElement('button'); minus.className = 'lfs-btn'; minus.textContent = '−';
         var val = document.createElement('input');
         val.type = 'number';
@@ -597,4 +608,12 @@
   else init();
 
   window.renderLabsFloatPanel = renderLabsFloatPanel;
+  // Repaint on language switch — same rationale/timing as labs-panel.js's
+  // own afterI18n registration (see its comment): this file loads BEFORE
+  // timeline.js, whose `window.SM={...}` is a full reassignment, so the
+  // push is deferred to 'load' rather than done at parse time.
+  window.addEventListener('load', function () {
+    window.SM = window.SM || {};
+    (window.SM.afterI18n = window.SM.afterI18n || []).push(renderLabsFloatPanel);
+  });
 })();

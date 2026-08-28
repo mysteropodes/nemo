@@ -16,13 +16,13 @@
 (function () {
   window.SMLabs.register('retime-exposure', {
     flag: 'nemo-labs-retime',
-    describe: 'Action : SMLabs.retimeExposure(n) re-cale les keyframes de la plage sélectionnée sur des expositions fixes (1=ones, 2=twos, 3=threes...)',
+    describe: 'labsDescribeRetimeExposure',
   });
 
   window.SMLabs.retimeExposure = function (spacing) {
     if (typeof selBounds !== 'function') return;
     var b = selBounds();
-    if (!b) { if (typeof showToast === 'function') showToast('Sélectionne d\'abord une plage de frames dans la timeline'); return; }
+    if (!b) { if (typeof showToast === 'function') showToast(SM.t('labsToastSelectFrameRangeFirst')); return; }
     spacing = Math.max(1, Math.min(12, parseInt(spacing, 10) || 2));
     pushUndoLayers();
     saveAllLayerFrames();
@@ -42,7 +42,7 @@
       totalNeeded = Math.max(totalNeeded, endF + 1);
       plans.push({ l: l, keys: keys, endF: endF });
     }
-    if (!plans.length) { if (typeof showToast === 'function') showToast('Aucune keyframe dans la plage'); return; }
+    if (!plans.length) { if (typeof showToast === 'function') showToast(SM.t('labsToastNoKeyframeInRange')); return; }
     if (totalNeeded > state.totalFrames) {
       var add = totalNeeded - state.totalFrames;
       for (var li = 0; li < state.layers.length; li++) { for (var a = 0; a < add; a++) state.layers[li].frames.push({ strokes: [], isKeyframe: false, isInterpolated: false }); }
@@ -59,6 +59,10 @@
     });
     loadFrame(state.currentFrame); renderOS(); renderArcs(); updateUI();
     if (typeof renderTimeline === 'function') renderTimeline();
-    if (typeof showToast === 'function') showToast('Exposition re-calée sur ' + spacing + ' (' + (spacing === 1 ? 'ones' : spacing === 2 ? 'twos' : spacing === 3 ? 'threes' : spacing) + ')');
+    // "ones"/"twos"/"threes" are the standard animation-jargon terms for
+    // exposure spacing, kept untranslated in every language — same
+    // convention already used for the 'Ones (1)'/'Twos (2)'/'Threes (3)'
+    // option labels in labs-panel.js's own retime-exposure select.
+    if (typeof showToast === 'function') showToast(SM.t('labsToastExposureRetimedPrefix') + spacing + ' (' + (spacing === 1 ? 'ones' : spacing === 2 ? 'twos' : spacing === 3 ? 'threes' : spacing) + ')');
   };
 })();

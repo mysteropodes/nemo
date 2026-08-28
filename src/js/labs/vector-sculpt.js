@@ -292,7 +292,7 @@
 
   window.SMLabs.register('vector-sculpt', {
     flag: 'nemo-labs-sculpt',
-    describe: 'Pousse-vecteurs : glisser pousse les points sous la brosse, Shift lisse, Alt+glisser règle le rayon',
+    describe: 'labsDescribeVectorSculpt',
     onDisable: function () {
       dragging = false; resizing = false; lastW = null; touched = [];
       if (cursor) cursor.style.display = 'none';

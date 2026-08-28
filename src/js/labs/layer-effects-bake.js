@@ -55,12 +55,12 @@
   window.SMLabs.bakeLayerEffect = function (layerIdx, effect, opts) {
     opts = opts || {};
     var ld = state.layers[layerIdx];
-    if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast('Calque invalide/verrouillé'); return false; }
+    if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalidLocked')); return false; }
     var cssFilter = PRESETS[effect] || effect;
     var overscan = effect === 'bloom' ? 20 : (opts.overscan !== undefined ? opts.overscan : 12);
     var frame = state.currentFrame;
     var baked = rasterizeLayer(layerIdx, frame, cssFilter, overscan);
-    if (!baked.hadContent) { if (typeof showToast === 'function') showToast('Calque vide sur cette frame'); return false; }
+    if (!baked.hadContent) { if (typeof showToast === 'function') showToast(SM.t('labsToastLayerEmptyOnFrame')); return false; }
 
     pushUndo();
     ensureKeyframeAt(layerIdx, frame);
@@ -73,7 +73,7 @@
     desR(rd, layer);
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (typeof showToast === 'function') showToast('Effet appliqué (baké, frame ' + (frame + 1) + ') : ' + cssFilter);
+    if (typeof showToast === 'function') showToast(SM.t('labsToastEffectAppliedPrefix') + (frame + 1) + SM.t('labsToastEffectAppliedMid') + cssFilter);
     return true;
   };
 
@@ -90,6 +90,6 @@
 
   window.SMLabs.register('layer-effects-bake', {
     flag: 'nemo-labs-effects',
-    describe: 'Effets non-destructifs BAKÉS (pas live — voir feature-scouting #2) : SMLabs.bakeLayerEffect(layerIdx, cssFilter|\'bloom\') rastérise la frame courante avec un filtre canvas',
+    describe: 'labsDescribeLayerEffectsBake',
   });
 })();

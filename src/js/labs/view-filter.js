@@ -29,13 +29,13 @@
     var t = area(); if (!t) return;
     var css = PRESETS.hasOwnProperty(nameOrCss) ? PRESETS[nameOrCss] : String(nameOrCss || '');
     t.style.filter = css;
-    if (typeof showToast === 'function') showToast(css ? 'Filtre de vue : ' + (PRESETS.hasOwnProperty(nameOrCss) ? nameOrCss : css) : 'Vue normale');
+    if (typeof showToast === 'function') showToast(css ? SM.t('labsToastViewFilterPrefix') + (PRESETS.hasOwnProperty(nameOrCss) ? nameOrCss : css) : SM.t('labsToastViewNormal'));
     return css;
   };
 
   window.SMLabs.register('view-filter', {
     flag: 'nemo-labs-viewfilter',
-    describe: 'Contrôle des valeurs : SMLabs.setViewFilter(\'values\'|\'contrast\'|\'dim\'|\'none\'|cssFilter) — affichage seulement, le dessin reste intact',
+    describe: 'labsDescribeViewFilter',
     // Turning the prototype on used to set the flag and NOTHING else: the
     // filter only ever applied via the console API, so the floating panel's
     // "Contrôle des valeurs" button was a dead button for anyone who hadn't
@@ -48,7 +48,7 @@
       var t = area(); if (!t) return;
       if (!t.style.filter) {
         t.style.filter = PRESETS.values;
-        if (typeof showToast === 'function') showToast('Contrôle des valeurs — niveaux de gris (SMLabs.setViewFilter pour les autres)');
+        if (typeof showToast === 'function') showToast(SM.t('labsToastViewFilterGrayscaleOn'));
       }
     },
     onDisable: function () { var t = area(); if (t) t.style.filter = ''; },

@@ -14,16 +14,16 @@
 (function () {
   window.SMLabs.register('pingpong-cycle', {
     flag: 'nemo-labs-pingpong-cycle',
-    describe: 'Action : SMLabs.pingpongCycle(n) répète la plage sélectionnée en aller-retour (A B C B A...) au lieu de boucler en avant',
+    describe: 'labsDescribePingpongCycle',
   });
 
   window.SMLabs.pingpongCycle = function (times) {
     if (typeof selBounds !== 'function') return;
     var b = selBounds();
-    if (!b) { if (typeof showToast === 'function') showToast('Sélectionne d\'abord une plage de frames dans la timeline'); return; }
+    if (!b) { if (typeof showToast === 'function') showToast(SM.t('labsToastSelectFrameRangeFirst')); return; }
     times = Math.max(1, Math.min(50, parseInt(times, 10) || 1));
     var span = b.maxF - b.minF + 1;
-    if (span < 2) { if (typeof showToast === 'function') showToast('Il faut au moins 2 frames pour un ping-pong'); return; }
+    if (span < 2) { if (typeof showToast === 'function') showToast(SM.t('labsToastNeedAtLeast2FramesPingpong')); return; }
     pushUndoLayers();
     saveAllLayerFrames();
     // Each appended block is span-1 frames (the turnaround frame is shared
@@ -52,6 +52,6 @@
     }
     loadFrame(state.currentFrame); renderOS(); renderArcs(); updateUI();
     if (typeof renderTimeline === 'function') renderTimeline();
-    if (typeof showToast === 'function') showToast('Ping-pong : plage répétée ' + times + ' fois en aller-retour');
+    if (typeof showToast === 'function') showToast(SM.t('labsToastPingpongPrefix') + times + SM.t('labsToastPingpongSuffix'));
   };
 })();

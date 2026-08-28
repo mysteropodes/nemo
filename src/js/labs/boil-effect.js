@@ -25,12 +25,12 @@
     opts = opts || {};
     var li = state.activeLayerIdx;
     var ld = state.layers[li];
-    if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast('Calque invalide/verrouillé'); return 0; }
+    if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalidLocked')); return 0; }
     var nFrames = Math.max(1, Math.min(24, opts.frames || 3));
     var amp = opts.amplitude !== undefined ? Math.max(0.2, +opts.amplitude) : 2.5;
     var cf = state.currentFrame;
     var src = getEffectiveStrokes(li, cf);
-    if (!src.length) { if (typeof showToast === 'function') showToast('Rien à faire bouillir sur cette frame'); return 0; }
+    if (!src.length) { if (typeof showToast === 'function') showToast(SM.t('labsToastNothingToBoil')); return 0; }
 
     pushUndoLayers();
     saveAllLayerFrames();
@@ -59,12 +59,12 @@
     }
     loadFrame(state.currentFrame); renderOS(); renderArcs(); updateUI();
     if (typeof renderTimeline === 'function') renderTimeline();
-    if (typeof showToast === 'function') showToast('Boil : ' + nFrames + ' variante(s) tremblée(s) posée(s) après la frame ' + (cf + 1));
+    if (typeof showToast === 'function') showToast(SM.t('labsToastBoilPrefix') + nFrames + SM.t('labsToastBoilSuffix') + (cf + 1));
     return nFrames;
   };
 
   window.SMLabs.register('boil-effect', {
     flag: 'nemo-labs-boil',
-    describe: 'Ligne bouillante : SMLabs.boil({frames,amplitude}) pose N keyframes-variantes tremblées du dessin courant sur les frames suivantes',
+    describe: 'labsDescribeBoilEffect',
   });
 })();

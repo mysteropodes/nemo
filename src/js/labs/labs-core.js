@@ -25,7 +25,7 @@
     localStorage.setItem(p.flag, on ? '1' : '0');
     if (on && p.onEnable) p.onEnable();
     if (!on && p.onDisable) p.onDisable();
-    if (!silent && typeof showToast === 'function') showToast('Labs — ' + name + ' : ' + (on ? 'activé' : 'désactivé'));
+    if (!silent && typeof showToast === 'function') showToast('Labs — ' + name + ' : ' + (on ? SM.t('labsToastEnabledWord') : SM.t('labsToastDisabledWord')));
     return on;
   }
 
@@ -39,7 +39,17 @@
   L.toggle = function (n) { return setOn(n, !isOn(n)); };
   L.list = function () {
     return Object.keys(protos).map(function (n) {
-      return { name: n, on: isOn(n), what: protos[n].describe || '' };
+      // `describe` is stored as an i18n KEY (not literal text) so the
+      // Réglages > Labs panel (labs-panel.js's describeOf) always shows it
+      // in the app's current language — resolved here, at read time, since
+      // this file (and every labs/*.js registration) runs BEFORE i18n.js in
+      // index.html's script order, so SM.t isn't available yet at the
+      // moment SMLabs.register() itself is called (feedback #105: Labs
+      // stayed French under an English app language because these strings
+      // were hardcoded literals instead of going through SM.t).
+      var key = protos[n].describe || '';
+      var what = (window.SM && SM.t && key) ? SM.t(key) : key;
+      return { name: n, on: isOn(n), what: what };
     });
   };
   // Flags are plain origin-scoped localStorage, with no project identity

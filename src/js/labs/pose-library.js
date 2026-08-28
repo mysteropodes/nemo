@@ -30,7 +30,7 @@
   window.SMLabs.savePose = function (name) {
     if (!name) { console.warn('[labs] savePose(nom)'); return 0; }
     if (typeof selectedPaths === 'undefined' || !selectedPaths.length) {
-      if (typeof showToast === 'function') showToast('Sélectionne d\'abord des traits (outil Sélection)');
+      if (typeof showToast === 'function') showToast(SM.t('labsToastSelectStrokesFirst'));
       return 0;
     }
     var snap = [];
@@ -40,7 +40,7 @@
       if (p.data && p.data.linkedFill && p.data.linkedFill.parent) snap.push(serP(p.data.linkedFill));
     });
     var m = load(); m[name] = snap; save(m);
-    if (typeof showToast === 'function') showToast('Pose « ' + name + ' » : ' + snap.length + ' trait(s)');
+    if (typeof showToast === 'function') showToast(SM.t('labsToastPosePrefix') + name + SM.t('labsToastPoseSavedMid') + snap.length + SM.t('labsToastStrokeCountSuffix'));
     return snap.length;
   };
 
@@ -48,7 +48,7 @@
     var m = load(), snap = m[name];
     if (!snap) { console.warn('[labs] pose inconnue:', name, Object.keys(m)); return 0; }
     var ld = state.layers[state.activeLayerIdx];
-    if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast('Calque invalide/verrouillé'); return 0; }
+    if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalidLocked')); return 0; }
     var dx = opts && +opts.dx || 0, dy = opts && +opts.dy || 0;
     pushUndo();
     ensureKeyframe();
@@ -69,7 +69,7 @@
     });
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (typeof showToast === 'function') showToast('Pose « ' + name + ' » posée (' + n + ' trait(s))');
+    if (typeof showToast === 'function') showToast(SM.t('labsToastPosePrefix') + name + SM.t('labsToastPoseStampedMid') + n + SM.t('labsToastStrokeCountCloseSuffix'));
     return n;
   };
 
@@ -81,6 +81,6 @@
 
   window.SMLabs.register('pose-library', {
     flag: 'nemo-labs-poses',
-    describe: 'Substitution de dessins : savePose(\'nom\') sur une sélection, stampPose(\'nom\',{dx,dy}) la pose sur la frame courante — bouches lip-sync, kits de mains',
+    describe: 'labsDescribePoseLibrary',
   });
 })();

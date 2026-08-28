@@ -47,9 +47,15 @@
       }
       rows.push(tr + '</tr>');
     }
+    // Guarded SM.t (not a bare call): this build() can run at SCRIPT PARSE
+    // TIME, before timeline.js has even created window.SM (see index.html's
+    // script order — labs/*.js loads before timeline.js/i18n.js), whenever
+    // the xsheet flag was already on from a previous session (the
+    // "resume after reload" call at the bottom of this file).
+    var t2 = (window.SM && SM.t) ? SM.t : function (k) { return k; };
     panel.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 8px 6px;border-bottom:1px solid rgba(255,255,255,.08);">' +
-      '<b style="font-size:11px;">X-sheet</b><span style="color:#666;">● clé &nbsp;◆ tween &nbsp;│ tenu</span></div>' +
+      '<b style="font-size:11px;">X-sheet</b><span style="color:#666;">● ' + t2('labsXsheetKeyWord') + ' &nbsp;◆ tween &nbsp;│ ' + t2('labsXsheetHeldWord') + '</span></div>' +
       '<table style="border-collapse:collapse;">' + head + rows.join('') + '</table>';
     panel.querySelectorAll('tr[data-frame]').forEach(function (tr) {
       tr.addEventListener('click', function () { goToFrame(parseInt(tr.dataset.frame, 10)); });
@@ -67,7 +73,7 @@
 
   window.SMLabs.register('xsheet', {
     flag: 'nemo-labs-xsheet',
-    describe: 'Feuille d\'exposition flottante : frames × calques, ●=clé ◆=tween │=tenu, clic = aller à la frame',
+    describe: 'labsDescribeXsheet',
     onEnable: function () { observe(); build(); },
     onDisable: function () { if (panel) { panel.remove(); panel = null; } },
   });

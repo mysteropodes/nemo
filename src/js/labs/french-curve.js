@@ -31,7 +31,7 @@
       ? { type: 'line', x1: +opts.x1 || 0, y1: +opts.y1 || 0, x2: opts.x2 !== undefined ? +opts.x2 : (state.canvasW || 1920), y2: opts.y2 !== undefined ? +opts.y2 : (state.canvasH || 1080) }
       : { type: 'ellipse', cx: opts.cx !== undefined ? +opts.cx : (state.canvasW || 1920) / 2, cy: opts.cy !== undefined ? +opts.cy : (state.canvasH || 1080) / 2, rx: +opts.rx || (state.canvasW || 1920) * 0.35, ry: +opts.ry || (state.canvasH || 1080) * 0.35 };
     localStorage.setItem(GUIDE_KEY, JSON.stringify(g));
-    if (typeof showToast === 'function') showToast('Labs — gabarit ' + g.type + ' positionné');
+    if (typeof showToast === 'function') showToast(SM.t('labsToastCurveGuidePrefix') + g.type + SM.t('labsToastCurveGuideSuffix'));
     return g;
   };
   window.SMLabs.getCurveGuide = loadGuide;
@@ -138,7 +138,7 @@
 
   window.SMLabs.register('french-curve', {
     flag: 'nemo-labs-frenchcurve',
-    describe: 'Gabarit courbe/ellipse aimanté : maintenir F + glisser dessine un trait collé au gabarit (SMLabs.setCurveGuide(\'ellipse\'|\'line\', opts))',
+    describe: 'labsDescribeFrenchCurve',
     onDisable: function () { armed = false; dragging = false; pts = []; if (guidePath) { guidePath.remove(); guidePath = null; } },
   });
 })();

@@ -267,11 +267,11 @@
     closeBtn.style.cssText = 'position:absolute;top:4px;right:6px;background:rgba(0,0,0,.4);color:#fff;border:none;border-radius:4px;width:20px;height:20px;cursor:pointer;';
     closeBtn.addEventListener('click', function (e) { e.stopPropagation(); close(); });
     var label = document.createElement('div');
-    label.textContent = title || 'Référence 3D';
+    label.textContent = title || SM.t('labsRef3dDefaultTitle');
     label.style.cssText = 'position:absolute;top:7px;left:9px;color:rgba(255,255,255,.8);font:600 10px system-ui;pointer-events:none;text-shadow:0 1px 2px #000;';
     var views = document.createElement('div');
     views.style.cssText = 'position:absolute;left:8px;bottom:8px;display:flex;gap:4px;cursor:default;';
-    [['Face', 0, 0], ['Profil', Math.PI / 2, 0], ['Dos', Math.PI, 0], ['Reset', .6, -.3]].forEach(function (v) { var b = document.createElement('button'); b.textContent = v[0]; b.style.cssText = 'font:10px system-ui;padding:3px 5px;border:0;border-radius:4px;background:rgba(12,13,20,.7);color:#eee;cursor:pointer;'; b.addEventListener('pointerdown', function (e) { e.stopPropagation(); if (glState) { glState.yaw = v[1]; glState.pitch = v[2]; } }); views.appendChild(b); });
+    [[SM.t('labsRef3dViewFront'), 0, 0], [SM.t('labsRef3dViewProfile'), Math.PI / 2, 0], [SM.t('labsRef3dViewBack'), Math.PI, 0], [SM.t('labsRef3dViewReset'), .6, -.3]].forEach(function (v) { var b = document.createElement('button'); b.textContent = v[0]; b.style.cssText = 'font:10px system-ui;padding:3px 5px;border:0;border-radius:4px;background:rgba(12,13,20,.7);color:#eee;cursor:pointer;'; b.addEventListener('pointerdown', function (e) { e.stopPropagation(); if (glState) { glState.yaw = v[1]; glState.pitch = v[2]; } }); views.appendChild(b); });
     panel.appendChild(cv); panel.appendChild(label); panel.appendChild(closeBtn); panel.appendChild(views);
     document.body.appendChild(panel);
 
@@ -286,7 +286,7 @@
     // classic symptom of this flag being off in a floating/overlay canvas
     // that isn't guaranteed to redraw every single compositor frame.
     var gl = cv.getContext('webgl', { preserveDrawingBuffer: true }) || cv.getContext('experimental-webgl', { preserveDrawingBuffer: true });
-    if (!gl) { if (typeof showToast === 'function') showToast('WebGL indisponible ici'); close(); return false; }
+    if (!gl) { if (typeof showToast === 'function') showToast(SM.t('labsToastWebglUnavailable')); close(); return false; }
     var prog = compileProgram(gl);
     var aPos = gl.getAttribLocation(prog, 'aPos'), aNorm = gl.getAttribLocation(prog, 'aNorm'), aColor = gl.getAttribLocation(prog, 'aColor'), aUV = gl.getAttribLocation(prog, 'aUV');
     var uModel = gl.getUniformLocation(prog, 'uModel'), uView = gl.getUniformLocation(prog, 'uView'), uProj = gl.getUniformLocation(prog, 'uProj');
@@ -353,8 +353,8 @@
   }
   window.SMLabs.open3DReference = function (objText) {
     var mesh = parseOBJ(objText);
-    if (!mesh) { if (typeof showToast === 'function') showToast('OBJ invalide ou vide (v/f manquants)'); return false; }
-    return openMeshReference(mesh, 'OBJ · référence 3D', 'obj');
+    if (!mesh) { if (typeof showToast === 'function') showToast(SM.t('labsToastObjInvalidOrEmpty')); return false; }
+    return openMeshReference(mesh, SM.t('labsRef3dTitleObj'), 'obj');
   };
   window.SMLabs.openCC0AvatarReference = async function () {
     try {
@@ -362,10 +362,10 @@
       if (!res.ok) throw new Error('asset absent (' + res.status + ')');
       var mesh = parseGLB(await res.arrayBuffer());
       await loadMeshTextures(mesh);
-      return openMeshReference(mesh, 'Avatar anime CC0 · repos', 'avatar');
+      return openMeshReference(mesh, SM.t('labsRef3dTitleAvatar'), 'avatar');
     } catch (e) {
       console.error('[reference-3d] avatar CC0', e);
-      if (typeof showToast === 'function') showToast('Avatar CC0 indisponible : ' + e.message);
+      if (typeof showToast === 'function') showToast(SM.t('labsToastAvatarCC0UnavailablePrefix') + e.message);
       return false;
     }
   };
@@ -375,15 +375,15 @@
       if (!res.ok) throw new Error('asset absent (' + res.status + ')');
       var mesh = parseOBJ(await res.text());
       if (!mesh) throw new Error('OBJ invalide');
-      return openMeshReference(mesh, 'Bras & mains CC0 · riggés', 'hand');
+      return openMeshReference(mesh, SM.t('labsRef3dTitleHands'), 'hand');
     } catch (e) {
       console.error('[reference-3d] hands CC0', e);
-      if (typeof showToast === 'function') showToast('Mains CC0 indisponibles : ' + e.message);
+      if (typeof showToast === 'function') showToast(SM.t('labsToastHandsCC0UnavailablePrefix') + e.message);
       return false;
     }
   };
-  window.SMLabs.openCharacterReference = function (pose) { return openMeshReference(characterMesh(pose === 'action' ? 'action' : 'neutral'), pose === 'action' ? 'Personnage · pose action' : 'Personnage · mannequin', 'character'); };
-  window.SMLabs.openHandReference = function (pose) { pose = pose === 'fist' || pose === 'point' ? pose : 'open'; return openMeshReference(handMesh(pose), 'Main · ' + (pose === 'fist' ? 'poing' : pose === 'point' ? 'index' : 'ouverte'), 'hand'); };
+  window.SMLabs.openCharacterReference = function (pose) { return openMeshReference(characterMesh(pose === 'action' ? 'action' : 'neutral'), pose === 'action' ? SM.t('labsRef3dTitleCharacterAction') : SM.t('labsRef3dTitleCharacterNeutral'), 'character'); };
+  window.SMLabs.openHandReference = function (pose) { pose = pose === 'fist' || pose === 'point' ? pose : 'open'; return openMeshReference(handMesh(pose), SM.t('labsRef3dTitleHandPrefix') + (pose === 'fist' ? SM.t('labsRef3dHandFist') : pose === 'point' ? SM.t('labsRef3dHandPoint') : SM.t('labsRef3dHandOpen')), 'hand'); };
   window.SMLabs.set3DRotation = function (yaw, pitch) { if (glState) { glState.yaw = yaw; glState.pitch = pitch; if (glState.draw) glState.draw(); } };
   window.SMLabs.redraw3D = function () { if (glState && glState.draw) glState.draw(); };
   window.SMLabs.close3DReference = close;
@@ -391,7 +391,7 @@
 
   window.SMLabs.register('reference-3d', {
     flag: 'nemo-labs-3dref',
-    describe: 'Référence 3D rotative : avatar anime CC0, bras/mains riggés CC0, mannequins de secours ou OBJ — drag pour orbiter, molette pour zoomer, jamais exporté/baké',
+    describe: 'labsDescribeReference3d',
     onEnable: function () { window.SMLabs.openCC0AvatarReference(); },
     onDisable: close,
   });
