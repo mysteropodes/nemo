@@ -2668,6 +2668,16 @@ function updatePropsContext(){
   // patches have no equivalent of.
   var fpRow=document.getElementById('p-fillpropagate-row');
   if(fpRow)fpRow.style.display=(state.tool==='fill')?'flex':'none';
+  var isBucket=state.tool==='fill';
+  var gcRow=document.getElementById('p-fillgapclose-row');
+  if(gcRow)gcRow.style.display=isBucket?'flex':'none';
+  // The size only means anything once a mode is picked.
+  var gsRow=document.getElementById('p-fillgapsize-row');
+  if(gsRow)gsRow.style.display=(isBucket&&state.fillGapCloseMode&&state.fillGapCloseMode!=='off')?'flex':'none';
+  var gcSel=document.getElementById('p-fillgapclose');
+  if(gcSel&&gcSel.value!==state.fillGapCloseMode)gcSel.value=state.fillGapCloseMode;
+  var gsInp=document.getElementById('p-fillgapsize');
+  if(gsInp&&document.activeElement!==gsInp)gsInp.value=state.fillGapCloseSize;
   // Brush presets apply to Draw's plain constant-width commit path (see
   // draw-bridge.js's commitStroke) AND, now, retroactively to an already-
   // drawn plain stroke via "Apply to selection" below — but not to a
