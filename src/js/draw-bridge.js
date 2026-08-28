@@ -340,25 +340,43 @@
     return Math.max(0.2, Math.min(2.5, widthFor(pressure) / ref));
   }
 
+  // Calligraphic nib applied as ONE pass over the finished sample array rather
+  // than at each of the dozen widthFor() push sites — the width at a point
+  // depends on the direction THROUGH it, which only exists once its neighbours
+  // do. Shares its maths with the Paper-native pipeline via brushAngleWidths
+  // (tools.js), so the two cannot drift (CLAUDE.md §3). Returns a copy: the
+  // live preview must not bake the multiplier back into `samples` and compound
+  // it on the next move.
+  function angledSamples(src) {
+    if (!((state.brushAngleFactor || 0) > 0) || !window.brushAngleWidths) return src;
+    var widths = window.brushAngleWidths(
+      src.length,
+      function (i) { return { x: src[i][0], y: src[i][1] }; },
+      src.map(function (s) { return s[2]; })
+    );
+    return src.map(function (s, i) { return [s[0], s[1], widths[i]]; });
+  }
+
   function overlayItem() {
+    var pts = angledSamples(samples);
     if (isFillBrush()) {
-      return { centerline: samples, fillColor: hexToRgba(state.fillColor, state.opacity) };
+      return { centerline: pts, fillColor: hexToRgba(state.fillColor, state.opacity) };
     }
     if (state.vectorBrush) {
-      var ribbon = { centerline: samples, fillColor: hexToRgba(state.strokeColor, state.opacity) };
+      var ribbon = { centerline: pts, fillColor: hexToRgba(state.strokeColor, state.opacity) };
       // Vector brush-preset texture live preview, pressure-ribbon case
       // (2026-08-27, same bug/fix as the plain-stroke branch below —
       // applyBrushTexture's `isPressure` path is what actually runs at
       // commit for a pressure ribbon with a preset selected, so the ribbon
       // preview above is what a chalk/charcoal stroke showed for the whole
       // gesture before this). Mirrors applyBrushTexture: centerline +
-      // per-sample width profile (samples already carry width as their
+      // per-sample width profile (pts already carry width as their
       // 3rd element) fed to the same buildBrushDabs used at commit.
-      if (state.strokeEnabled && state.brushPreset && state.brushPreset !== 'none' && samples.length >= 2) {
+      if (state.strokeEnabled && state.brushPreset && state.brushPreset !== 'none' && pts.length >= 2) {
         var ribbonPreset = resolveBrushPreset(state.brushPreset);
         if (ribbonPreset) {
-          var rPts = samples.map(function (s) { return new Point(s[0], s[1]); });
-          var rWidths = samples.map(function (s) { return s[2]; });
+          var rPts = pts.map(function (s) { return new Point(s[0], s[1]); });
+          var rWidths = pts.map(function (s) { return s[2]; });
           var rProfile = buildWidthProfile(rPts, rWidths);
           var rBaseW = rProfile.reduce(function (sum, p) { return sum + p.width; }, 0) / rProfile.length;
           var rCenterline = new Path({ insert: false });
@@ -379,7 +397,7 @@
       // the enclosed region's fill, matching what commitStroke() will
       // actually produce in that mode.
       var regionPreview = {
-        segments: samples.map(function (s) { return { point: [s[0], s[1]], handleIn: [0, 0], handleOut: [0, 0] }; }),
+        segments: pts.map(function (s) { return { point: [s[0], s[1]], handleIn: [0, 0], handleOut: [0, 0] }; }),
         closed: true,
         fillColor: hexToRgba(state.fillColor, state.opacity),
       };
@@ -403,26 +421,26 @@
     // (the canvas renderer fills an open path across the implicit
     // start-to-end closing edge, same as every vector app does).
     //
-    // Raw pointermove samples land only a pixel or two apart at typical
+    // Raw pointermove pts land only a pixel or two apart at typical
     // mouse-move rates, producing runs of near-zero-length segments. Found
     // by testing: vello's stroke expansion (scene.stroke in engine.rs)
     // silently renders NOTHING for a many-segment path like that — a
     // 3-4-point test stroke rendered fine, a ~30-point freehand curve
     // showed the fill but no stroke at all, even at a thick width. fill()
     // tolerates the same degenerate geometry fine, which is why only the
-    // stroke went missing. Filtering out samples closer than ~2 screen px
+    // stroke went missing. Filtering out pts closer than ~2 screen px
     // to the last KEPT point avoids feeding the stroker that degenerate
     // input — same visual fidelity (final commit still runs Paper's own
-    // simplify() on the untouched raw `samples`), just fixes the live
+    // simplify() on the untouched raw `pts`), just fixes the live
     // preview.
     var minGap = 2 / view.zoom;
-    var decimated = [samples[0]];
-    for (var di = 1; di < samples.length; di++) {
+    var decimated = [pts[0]];
+    for (var di = 1; di < pts.length; di++) {
       var last = decimated[decimated.length - 1];
-      var s = samples[di];
+      var s = pts[di];
       if (Math.hypot(s[0] - last[0], s[1] - last[1]) >= minGap) decimated.push(s);
     }
-    if (decimated.length < 2 && samples.length > 1) decimated.push(samples[samples.length - 1]);
+    if (decimated.length < 2 && pts.length > 1) decimated.push(pts[pts.length - 1]);
     // Bitmap Brush: the dabs on bitmap-brush.js's own canvas ARE the stroke
     // preview, so drawing this vector line too showed a thin hard-edged
     // path running under (and ahead of) them for the whole gesture, then
@@ -709,6 +727,10 @@
   function commitStroke() {
     if (window.SMBitmapBrush) window.SMBitmapBrush.endLivePreview(); // clear the screen-space preview — the real baked Raster (if any) takes over below
     if (samples.length < 2) return;
+    // Bake the calligraphic nib once, here, so every consumer below (centerline
+    // + width profile, brush-preset dabs, bitmap brush, symmetry/Labs hooks)
+    // sees the same widths the live preview showed.
+    samples = angledSamples(samples);
     // Both paint channels switched off via the left-panel eyes — committing
     // would insert a fully invisible path (pollutes the layer, participates
     // in tween matching, un-hit-testable). Tell the user why instead.
