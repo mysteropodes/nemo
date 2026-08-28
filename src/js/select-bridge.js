@@ -1538,6 +1538,22 @@
       // keyframe here would be a pure unrelated side effect — same
       // reasoning as the onUp guards for all three modes.
       if (!moveStarted) {
+        // Cross-layer selection (2026-08, feedback #46 follow-on: a
+        // marquee spanning several shapes INSIDE a component selects
+        // across multiple Paper layers — see the marquee-finalize comment
+        // above). ensureKeyframe() below only ever promotes/rebuilds the
+        // ACTIVE layer's own frame (tools.js) — per loadFrame's identity-
+        // based reuse (CLAUDE.md §5quater), every OTHER involved layer
+        // keeps its existing Paper object refs untouched, so only the
+        // active layer's own members need the re-grab below; the rest are
+        // stashed by strokeId (survives a rebuild unchanged, same
+        // established invariant CLAUDE.md §5ter/§1 already rely on) and
+        // re-added afterward. A no-op for every ordinary (single-layer)
+        // selection, since none of its members live outside the active
+        // layer to begin with.
+        var crossLayerOthers = selectedPaths
+          .filter(function (p) { return p.layer !== userLayers[state.activeLayerIdx]; })
+          .map(function (p) { return { layer: p.layer, strokeId: p.data && p.data.strokeId }; });
         pushUndo();
         if (state.appMode !== 'motion') ensureKeyframe();
         // Re-grab by index because ensureKeyframe() just above can rebuild
@@ -1561,6 +1577,10 @@
         selectedPaths = state.selectedStrokeIndices.length
           ? state.selectedStrokeIndices.map(function (i) { return userLayers[state.activeLayerIdx].children[i]; }).filter(Boolean)
           : userLayers[state.activeLayerIdx].children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); });
+        crossLayerOthers.forEach(function (o) {
+          if (!o.strokeId) return;
+          o.layer.children.forEach(function (c) { if (c.data && c.data.strokeId === o.strokeId && selectedPaths.indexOf(c) < 0) selectedPaths.push(c); });
+        });
         moveStarted = true;
       }
       var delta = pt.subtract(lastPt);
@@ -2035,37 +2055,63 @@
           _marquee.rect.closePath();
           lassoPath = _marquee.rect;
         }
-        var layer2 = userLayers[state.activeLayerIdx];
+        var scanLayerIdx = function (li, allowLockException) {
+          var ld = state.layers[li], pl = userLayers[li];
+          if (!ld || !pl) return;
+          if (ld.locked && !(allowLockException && ld.symbolId)) return;
+          if (li !== state.activeLayerIdx && !ld.visible) return; // sibling layers: skip hidden ones, matches the click hit-test's own visible check
+          pl.children.forEach(function (c) {
+            // A linkedFill backdrop (c.data.isLinkedFillCompanion) is never
+            // its own selectable thing — it always moves as part of its
+            // parent ribbon's own selectedPaths entry (see that flag's own
+            // comment in draw-bridge.js for the double-translate bug this
+            // exclusion fixes). Marquee bounds-intersection would otherwise
+            // pick it up as a second, independent hit whenever the box
+            // covered both.
+            if (((c instanceof Path && c.segments.length > 0 && (c.strokeColor || c.fillColor)) || c instanceof Raster) && mb.intersects(c.bounds) && isSelectablePathChild(c)) {
+              // Lasso : le test bounds ne suffit pas (le lasso peut serpenter) —
+              // l'item doit avoir son centre DANS le trace, ou le croiser.
+              if (lassoPath && !(lassoPath.contains(c.position) || (c instanceof Path && lassoPath.intersects(c)))) return;
+              // Non-destructive combine groups (2026-07-29): a bounds-only
+              // intersection is correct/expected for a REAL marquee drag (a
+              // rectangle surrounding a donut's own bounding box legitimately
+              // selects it, hole included — standard marquee semantics in
+              // every design tool) but wrongly over-selects when onDown's own
+              // precise hitTest already missed and this degenerated into a
+              // near-zero-size rect — i.e. what was actually just a CLICK on
+              // a visually cut-away region. Only that degenerate case gets
+              // the extra precision check; a genuine drag is untouched.
+              if (!lassoPath && mb.width < 3 / view.zoom && mb.height < 3 / view.zoom && !combineVisibleAt(c, mb.center, li)) return;
+              if (selectedPaths.indexOf(c) < 0) selectedPaths.push(c);
+            }
+          });
+        };
         var activeLdForMarqueeLock = state.layers[state.activeLayerIdx];
         // Same lock gate as the click-select hit-test above (and same
         // component exception — a component's own .locked=true must not
         // block marquee-selecting it as a whole either).
-        ((activeLdForMarqueeLock.locked && !activeLdForMarqueeLock.symbolId) ? [] : layer2.children).forEach(function (c) {
-          // A linkedFill backdrop (c.data.isLinkedFillCompanion) is never
-          // its own selectable thing — it always moves as part of its
-          // parent ribbon's own selectedPaths entry (see that flag's own
-          // comment in draw-bridge.js for the double-translate bug this
-          // exclusion fixes). Marquee bounds-intersection would otherwise
-          // pick it up as a second, independent hit whenever the box
-          // covered both.
-          if (((c instanceof Path && c.segments.length > 0 && (c.strokeColor || c.fillColor)) || c instanceof Raster) && mb.intersects(c.bounds) && isSelectablePathChild(c)) {
-            // Lasso : le test bounds ne suffit pas (le lasso peut serpenter) —
-            // l'item doit avoir son centre DANS le trace, ou le croiser.
-            if (lassoPath && !(lassoPath.contains(c.position) || (c instanceof Path && lassoPath.intersects(c)))) return;
-            // Non-destructive combine groups (2026-07-29): a bounds-only
-            // intersection is correct/expected for a REAL marquee drag (a
-            // rectangle surrounding a donut's own bounding box legitimately
-            // selects it, hole included — standard marquee semantics in
-            // every design tool) but wrongly over-selects when onDown's own
-            // precise hitTest already missed and this degenerated into a
-            // near-zero-size rect — i.e. what was actually just a CLICK on
-            // a visually cut-away region. Only that degenerate case gets
-            // the extra precision check; a genuine drag is untouched.
-            if (!lassoPath && mb.width < 3 / view.zoom && mb.height < 3 / view.zoom && !combineVisibleAt(c, mb.center, state.activeLayerIdx)) return;
-            if (selectedPaths.indexOf(c) < 0) selectedPaths.push(c);
-          }
-        });
-        state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
+        if (!(activeLdForMarqueeLock.locked && !activeLdForMarqueeLock.symbolId)) scanLayerIdx(state.activeLayerIdx, true);
+        // Cross-layer marquee INSIDE a component (2026-08, feedback #46:
+        // "dans un composant il est impossible de select plusieurs éléments
+        // en même temps") — entering a Component auto-splits it into one
+        // layer per shape (CLAUDE.md §8, splitLayerIntoElementsCore), so a
+        // marquee scoped to only the active layer can structurally never
+        // grab more than one shape at a time in there, unlike Animation 2D's
+        // ordinary single-layer-holds-many-shapes case this scoping was
+        // built for. state.layers IS the symbol's own small layer array
+        // while activeSymbolId is set (enterSymbol aliasing) — "every other
+        // layer" here means "every other shape of this one component", not
+        // the whole outer scene, so this stays bounded to exactly the
+        // component being edited.
+        if (state.activeSymbolId) {
+          state.layers.forEach(function (ld, li) { if (li !== state.activeLayerIdx) scanLayerIdx(li, false); });
+        }
+        // A selection spanning more than one Paper.js layer has no single
+        // per-layer index list to report — same "cross-layer selection ⇒
+        // clear the index cache" precedent the component-layer branch above
+        // already takes (line ~2090: selectedStrokeIndices=[]).
+        var spansLayers = state.activeSymbolId && selectedPaths.some(function (p) { return p.layer !== userLayers[state.activeLayerIdx]; });
+        state.selectedStrokeIndices = spansLayers ? [] : selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
         _marquee.rect.remove(); _marquee.rect = null;
       }
       _marquee.active = false;
