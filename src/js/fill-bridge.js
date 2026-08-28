@@ -67,9 +67,13 @@
       return;
     }
 
+    // Automatic gap closure first (tools.js) — derived from this frame's own
+    // strokes, transient, removed again below alongside the manual ones.
+    var _autoClose = fillAutoCloseWalls(layer, state.fillGapCloseMode, state.fillGapCloseSize);
     var _tempCloseWalls = fillMaterializeTempCloseStrokes(layer);
     var res = fillVectorFind(pt, layer, null);
     fillRemoveTempCloseStrokes(_tempCloseWalls);
+    fillRemoveTempCloseStrokes(_autoClose);
     // Only discards the closing stroke(s) that actually bounded THIS
     // result (via its wallIds) — drawing several closing strokes for
     // different zones and filling them one at a time keeps every other
@@ -208,6 +212,18 @@
     document.addEventListener('keydown', onKeyDown);
     var propBtn = document.getElementById('btn-fill-propagate');
     if (propBtn) propBtn.addEventListener('click', onPropagateClick);
+    var gcSel = document.getElementById('p-fillgapclose');
+    if (gcSel) gcSel.addEventListener('change', function () {
+      state.fillGapCloseMode = this.value;
+      updateUI();
+      window.SMEngineBridge.renderNow();
+    });
+    var gsInp = document.getElementById('p-fillgapsize');
+    if (gsInp) gsInp.addEventListener('change', function () {
+      var v = parseFloat(this.value);
+      if (!isNaN(v)) state.fillGapCloseSize = Math.max(1, Math.min(400, v));
+      window.SMEngineBridge.renderNow();
+    });
     target.addEventListener('pointerup', onUp, { capture: true });
     target.addEventListener('pointercancel', onUp, { capture: true });
     document.addEventListener('pointerup', onDocUp);

@@ -2080,10 +2080,96 @@ function fillCommitCloseLine(layer,points){
 function fillSnapWalls(layer){
   return layer.children.filter(function(c){
     if(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy))return false;
-    if(c.data&&(c.data.isFillTempClose||c.data.isFillCloseLine))return false;
+    if(c.data&&(c.data.isFillTempClose||c.data.isFillCloseLine||c.data.isFillAutoClose))return false;
     return c instanceof Path&&(c.strokeColor||c.fillColor||(c.data&&c.data.isVectorBrush))&&c.segments.length>=2;
   }).map(fillWallPath).filter(function(w){return w.segments.length>=2;});
 }
+// ---- AUTOMATIC GAP CLOSURE ----
+// Closing every gap by hand (Alt+drag, one gesture per gap) does not scale to
+// a real drawing — the reporter's own frame has 11 walls whose ends sit 11 to
+// 118px apart. Blender's Grease Pencil fill closes them from a single setting
+// instead, and its two modes are both worth having because they fail
+// differently:
+//
+//   extend — each open end is continued ALONG ITS OWN TANGENT until it hits
+//     another stroke. This is the one that matters: the tracer's built-in gap
+//     escalation bridges with a straight chord between whatever two points are
+//     nearest, which is exactly what produced the visibly wrong region on this
+//     project at gapThr 160 (long chords cutting across the head). Continuing
+//     the line the artist was actually drawing closes the same gap along the
+//     shape instead of across it. An extension that hits nothing is discarded
+//     rather than left dangling, so it can never invent a boundary.
+//
+//   radius — bridges two open ENDS that are within `size` of each other,
+//     regardless of direction. More forgiving on ragged, hooked line ends where
+//     the terminal tangent points somewhere useless, but it will also close a
+//     gap that was meant to stay open.
+//
+// Both are recomputed from the frame's OWN strokes on every use, which is why
+// they also fix propagation: there is nothing to transport across frames, so
+// none of the anchor drift that made the middle of a tween span unreliable
+// applies. Emitted paths are transient — tagged isFillAutoClose (deliberately
+// NOT the persisted isFillCloseLine) and removed by the caller in the same
+// synchronous handler, so they never reach a save.
+function fillAutoCloseWalls(layer,mode,size){
+  if(!layer||!mode||mode==='off')return[];
+  size=Math.max(1,size||FILL_GAPCLOSE_DEFAULT);
+  var walls=fillSnapWalls(layer);
+  var ends=[];
+  walls.forEach(function(w,wi){
+    if(w.closed||w.segments.length<2)return;
+    var len=w.length;if(!(len>0))return;
+    var t0=w.getTangentAt(0),t1=w.getTangentAt(len);
+    if(t0)ends.push({wi:wi,pt:w.firstSegment.point,dir:t0.multiply(-1)});
+    if(t1)ends.push({wi:wi,pt:w.lastSegment.point,dir:t1});
+  });
+  var out=[];
+  function emit(a,b){
+    var p=new Path({strokeColor:null,fillColor:null});
+    p.add(a);p.add(b);
+    p.data.isFillAutoClose=true;
+    ensureStrokeId(p);
+    layer.addChild(p);
+    out.push(p);
+  }
+  if(mode==='extend'){
+    var rays=ends.map(function(e){
+      var d=e.dir&&e.dir.length?e.dir.normalize(size):null;
+      return d?{e:e,from:e.pt,to:e.pt.add(d),probe:null}:null;
+    }).filter(Boolean);
+    rays.forEach(function(r){
+      r.probe=new Path({insert:false});r.probe.add(r.from);r.probe.add(r.to);
+    });
+    rays.forEach(function(r){
+      var best=null,bestD=Infinity;
+      function consider(other){
+        var ix;
+        try{ix=r.probe.getIntersections(other);}catch(e){return;}
+        ix.forEach(function(loc){
+          var d=r.from.getDistance(loc.point);
+          if(d>0.01&&d<bestD){bestD=d;best=loc.point;}
+        });
+      }
+      walls.forEach(function(w,wi){if(wi!==r.e.wi)consider(w);});
+      // Only if nothing real was hit: two ends reaching for each other across
+      // the same gap close on one another (Blender's extension-to-extension
+      // case). Real ink always wins, so a stroke is never cut short by a
+      // speculative line.
+      if(!best)rays.forEach(function(o){if(o!==r&&o.e.wi!==r.e.wi)consider(o.probe);});
+      if(best)emit(r.from,best);
+    });
+  }else if(mode==='radius'){
+    for(var i=0;i<ends.length;i++){
+      for(var j=i+1;j<ends.length;j++){
+        if(ends[i].wi===ends[j].wi)continue;
+        if(ends[i].pt.getDistance(ends[j].pt)>size)continue;
+        emit(ends[i].pt,ends[j].pt);
+      }
+    }
+  }
+  return out;
+}
+var FILL_GAPCLOSE_DEFAULT=24;
 function fillMaterializeTempCloseStrokes(layer){
   var snap=fillBuildWallSnapper(layer);
   return _fillCloseStrokes.map(function(entry){
@@ -2120,7 +2206,7 @@ function fillCollectWalls(layer,excludePath,onlyIds){
     // isFillCloseLine has NO colour by design (Harmony's invisible Close Gap
     // stroke) so it would fail the colour test below — but bounding a fill is
     // its entire purpose, so it has to be admitted explicitly here.
-    if(!(c.strokeColor||c.fillColor||(c.data&&(c.data.isVectorBrush||c.data.isFillCloseLine))))return;
+    if(!(c.strokeColor||c.fillColor||(c.data&&(c.data.isVectorBrush||c.data.isFillCloseLine||c.data.isFillAutoClose))))return;
     if(c.segments.length<2)return;
     var sid=ensureStrokeId(c);
     if(onlyIds&&onlyIds.indexOf(sid)<0)return;
@@ -2918,11 +3004,16 @@ function fillPropagateAcrossFrames(fillPath){
       if(line)line.data.strokeId=cl.id;
     });
     var pt=rebuild(anchors)||seed;
+    // Automatic closure is recomputed from THIS frame's strokes, so it needs no
+    // anchoring and does not drift — it is the part of the boundary that stays
+    // reliable where the transported closing lines do not.
+    var autoClose=fillAutoCloseWalls(lyr,state.fillGapCloseMode,state.fillGapCloseSize);
     var res=null;
     try{res=fillVectorFind(pt,lyr,null,gapCap);}catch(e){}
     // The rebuilt seed can land just outside a thin region; the original click
     // point is the obvious second guess before giving up.
     if(!res)try{res=fillVectorFind(seed,lyr,null,gapCap);}catch(e){}
+    fillRemoveTempCloseStrokes(autoClose);
     // Quality gate. The seed/closing-line reconstruction degrades in the
     // MIDDLE of a long tween span, where the walls have deformed far from the
     // frame the anchors were captured on — measured on a real project: a 12px
@@ -6489,9 +6580,13 @@ function onMouseDown(event){
     // after this click regardless of whether the fill succeeded, matching
     // "une fois le pot de peinture sans alt est fait dedans celle-ci
     // s'efface et disparaît complètement".
+    // Mirrors fill-bridge.js's own click handler (CLAUDE.md §3 — these two
+    // must stay in step): automatic gap closure, then the manual lines.
+    var _autoClose=fillAutoCloseWalls(layer,state.fillGapCloseMode,state.fillGapCloseSize);
     var _tempCloseWalls=fillMaterializeTempCloseStrokes(layer);
     var res=fillVectorFind(event.point,layer,null);
     fillRemoveTempCloseStrokes(_tempCloseWalls);
+    fillRemoveTempCloseStrokes(_autoClose);
     if(res)fillConsumeCloseStrokes(res.wallIds);
     if(!res){
       // No traceable closed region from the surrounding walls — but if the
