@@ -6704,7 +6704,20 @@ function updateTextActionsPanel(){
   if(!sec)return;
   var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
   var isWholeText=!!(p&&p.data&&p.data.isText&&!p.data.isTextChar&&!p.data.isVectorText);
-  var animGroupId=window.SMTextAnimator?window.SMTextAnimator.groupIdForItem(p):null;
+  // Multi-glyph selection (feedback #87, "je n'ai toujours pas d'option
+  // pour animer le texte") — groupIdForItem(p) above only ever fired for
+  // an EXACT single-Path selection, but a plain click on vector text (or
+  // an already-split raster block) selects every glyph sharing its
+  // groupId — one Path per character, so any real word/sentence is
+  // ALREADY more than one selected Path the instant you click it. "Animer
+  // le texte…" was reachable only for a one-character block, effectively
+  // never in practice. Same "whole selection matches one group" contract
+  // textPropsRoot() already enforces for the Typography panel a bit
+  // further down this file — one mismatched member (a partial/mixed
+  // pick) still hides the button rather than animating the wrong set.
+  var SMTA=window.SMTextAnimator;
+  var animGroupId=(SMTA&&state.tool==='select'&&selectedPaths.length)?SMTA.groupIdForItem(selectedPaths[0]):null;
+  if(animGroupId&&!selectedPaths.every(function(sp){return SMTA.groupIdForItem(sp)===animGroupId;}))animGroupId=null;
   sec.style.display=(isWholeText||animGroupId)?'':'none';
   document.getElementById('text-split-desc').style.display=isWholeText?'':'none';
   document.getElementById('btn-text-split-chars').parentElement.style.display=isWholeText?'':'none';
