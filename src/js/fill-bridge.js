@@ -224,6 +224,13 @@
       if (!isNaN(v)) state.brushAngleFactor = Math.max(0, Math.min(100, v));
       window.SMEngineBridge.renderNow();
     });
+    var teChk = document.getElementById('p-trimends');
+    if (teChk) teChk.addEventListener('change', function () { state.trimStrokeEnds = this.checked; });
+    var teMax = document.getElementById('p-trimends-max');
+    if (teMax) teMax.addEventListener('change', function () {
+      var v = parseFloat(this.value);
+      if (!isNaN(v)) state.trimStrokeEndsMax = Math.max(1, Math.min(200, v));
+    });
     var gcSel = document.getElementById('p-fillgapclose');
     if (gcSel) gcSel.addEventListener('change', function () {
       state.fillGapCloseMode = this.value;

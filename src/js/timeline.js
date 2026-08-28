@@ -2681,6 +2681,12 @@ function updatePropsContext(){
   if(nibA&&document.activeElement!==nibA)nibA.value=state.brushAngle;
   var nibF=document.getElementById('p-nib-factor');
   if(nibF&&document.activeElement!==nibF)nibF.value=state.brushAngleFactor;
+  var teRow=document.getElementById('p-trimends-row');
+  if(teRow)teRow.style.display=(state.tool==='draw'||state.tool==='pen')?'flex':'none';
+  var teChk=document.getElementById('p-trimends');
+  if(teChk)teChk.checked=!!state.trimStrokeEnds;
+  var teMax=document.getElementById('p-trimends-max');
+  if(teMax&&document.activeElement!==teMax)teMax.value=state.trimStrokeEndsMax;
   var gcSel=document.getElementById('p-fillgapclose');
   if(gcSel&&gcSel.value!==state.fillGapCloseMode)gcSel.value=state.fillGapCloseMode;
   var gsInp=document.getElementById('p-fillgapsize');

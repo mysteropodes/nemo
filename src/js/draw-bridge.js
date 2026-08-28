@@ -980,6 +980,13 @@
     // calling applyShadowBrushTag a second time here is harmless (same
     // swatch, same result) but skip the redundant re-set for that one case.
     if (state.shadowMode && path && !isFillBrush()) applyShadowBrushTag(path, shadowPreferFill);
+    // Trim Stroke Ends — runs BEFORE the hooks below so the Labs/symmetry
+    // copies and the saved frame all see the trimmed geometry, and after the
+    // path is in the layer so it can find the strokes it crosses.
+    if (path && state.trimStrokeEnds && typeof trimStrokeEnds === 'function' && !isFillBrush()) {
+      try { trimStrokeEnds(path, userLayers[state.activeLayerIdx], state.trimStrokeEndsMax); }
+      catch (err) { console.warn('[draw] trim stroke ends failed', err); }
+    }
     if (path) tagOwner(path);
     // Labs prototype hook (docs/feature-scouting.md) — no-op unless
     // window.SMLabs is loaded AND the relevant prototype's own flag is on.
