@@ -123,7 +123,13 @@
     var layer = userLayers[state.activeLayerIdx];
     var hit = layer.hitTest(pt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
     if (!(hit && hit.item instanceof Path)) return;
-    var ep = hit.item;
+    // A textured stroke's visible ink is its DABS (applyBrushTexture,
+    // tools.js) — the real anchor is invisible (opacity 0, or strokeColor
+    // nulled) and carries data.brushTexturePreset alone; a dab has no such
+    // stamp. Without resolving through the anchor first, clicking the
+    // (overwhelmingly likely) visible dab found nothing to restore the
+    // preset from — see the brushTexturePreset pick below.
+    var ep = resolveBrushAnchor(hit.item, layer) || hit.item;
     var isVB = !!(ep.data && ep.data.isVectorBrush);
     if (isVB && ep.fillColor) {
       setColorUI('stroke', ep.fillColor.toCSS(true));
@@ -131,9 +137,30 @@
       if (ep.strokeColor) setColorUI('stroke', ep.strokeColor.toCSS(true));
       if (ep.fillColor) setColorUI('fill', ep.fillColor.toCSS(true));
     }
-    if (ep.strokeWidth) {
+    // A vector-brush ribbon (isVectorBrush) is a filled outline shape, not
+    // a real Paper stroke — its visible "width" lives in data.widthProfile
+    // (per-segment, from buildWidthProfile at draw time), not
+    // ep.strokeWidth (0/unset for these). Falling through to the plain
+    // strokeWidth branch below picked up nothing for a VB stroke, so
+    // drawing right after only matched by accident.
+    if (isVB && ep.data.widthProfile && ep.data.widthProfile.length) {
+      var avgW = ep.data.widthProfile.reduce(function (sum, p) { return sum + p.width; }, 0) / ep.data.widthProfile.length;
+      state.brushSize = avgW;
+      var swVB = document.getElementById('p-sw'); if (swVB) swVB.value = Math.round(avgW);
+    } else if (ep.strokeWidth) {
       state.brushSize = ep.strokeWidth;
       var sw = document.getElementById('p-sw'); if (sw) sw.value = Math.round(ep.strokeWidth);
+    }
+    // Feedback #90 ("pick une brush preset... celui-ci n'est pas tout à
+    // fait pareil"): the eyedropper only ever restored color+width, never
+    // the PRESET itself (brush tip/texture/spacing) — applyBrushTexture
+    // (tools.js) stamps the preset id used at draw time onto
+    // data.brushTexturePreset, so it's right there to restore. Without
+    // this, drawing again after a pick used whatever preset happened to
+    // already be active, not the one actually picked.
+    if (ep.data && ep.data.brushTexturePreset && ep.data.brushTexturePreset !== 'none' && window.SM && window.SM.setBrushPreset) {
+      window.SM.setBrushPreset(ep.data.brushTexturePreset);
+      if (window.BrushPresetPicker) BrushPresetPicker.paintButton(ep.data.brushTexturePreset);
     }
     showToast('Color picked');
   }
