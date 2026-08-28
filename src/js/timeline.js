@@ -6262,7 +6262,7 @@ function closeTextPopover(){var pop=document.getElementById('text-popover');if(p
 // (style.css, 'Nemo Vector Text') loads the SAME bundled Roboto TTFs
 // vector-text-bridge.js parses for glyph outlines, so the overlay LOOKS
 // like the vector result it's about to become, not a generic stand-in.
-var _inplaceTa=null,_inplaceRoot=null,_inplaceHidden=null,_inplaceIsNew=false,_inplaceHandle=null;
+var _inplaceTa=null,_inplaceRoot=null,_inplaceHidden=null,_inplaceIsNew=false,_inplaceHandle=null,_inplaceGeomDirty=false;
 // Area-text creation (2026-08-17, same ask as openInPlaceTextEditor above:
 // "comme AI ou Figma" also means the INITIAL drag-a-box placement, not just
 // re-editing) — builds a throwaway single-glyph vector-text root (needed
@@ -6290,7 +6290,7 @@ function openInPlaceTextEditor(root,isNew){
   var d=root.data;
   var members=window.SMVectorText.vectorTextGroupMembers(root);
   if(!members.length)return;
-  _inplaceIsNew=!!isNew;
+  _inplaceIsNew=!!isNew;_inplaceGeomDirty=false;
   // Anchor at d.anchorTopLeft, NOT the group's own ink bounding-box top —
   // same bug/fix as rebuildVectorTextFromPopover's identical comment a
   // few hundred lines up (feedback #37): buildVectorTextGroup places
@@ -6330,21 +6330,34 @@ function openInPlaceTextEditor(root,isNew){
   handle.id='tp-inplace-resize-handle';
   document.body.appendChild(handle);
   _inplaceHandle=handle;
-  var resizing=false,resizeStartX=0,resizeStartWidth=0;
+  var resizing=false,resizeStartX=0,resizeStartY=0,resizeStartWidth=0,resizeStartSize=0;
   handle.addEventListener('pointerdown',function(e){
     e.preventDefault();e.stopPropagation();
-    resizing=true;resizeStartX=e.clientX;
+    resizing=true;resizeStartX=e.clientX;resizeStartY=e.clientY;
     // First drag on a not-yet-fixed-width (auto-grow) box starts from its
     // CURRENT rendered width, not an arbitrary default — so the box doesn't
     // visibly jump the instant you grab the handle.
     resizeStartWidth=d.fixedWidth||(parseFloat(ta.style.width)/view.zoom);
+    resizeStartSize=d.size||48;
     handle.setPointerCapture(e.pointerId);
   });
   handle.addEventListener('pointermove',function(e){
     if(!resizing)return;
     e.preventDefault();e.stopPropagation();
-    var deltaWorld=(e.clientX-resizeStartX)/view.zoom;
-    d.fixedWidth=Math.max(20,resizeStartWidth+deltaWorld);
+    _inplaceGeomDirty=true;
+    var deltaWorldX=(e.clientX-resizeStartX)/view.zoom;
+    d.fixedWidth=Math.max(20,resizeStartWidth+deltaWorldX);
+    // Vertical drag (feedback: "Impossible de resize la box orange à la
+    // verticale actuellement") — the box has no independent fixed-HEIGHT
+    // concept (height is always ta.scrollHeight, driven by content + font
+    // size, never a stored field the way fixedWidth is), so there's no
+    // "just resize the box" equivalent on this axis. Scaling d.size (font
+    // size) by the same 1:1 world-unit delta the horizontal drag already
+    // uses for fixedWidth is the natural analogue: drag down = bigger
+    // text = taller box, drag up = smaller. Reflowed live via reposition()
+    // exactly like every other field this panel edits live.
+    var deltaWorldY=(e.clientY-resizeStartY)/view.zoom;
+    d.size=Math.max(4,resizeStartSize+deltaWorldY);
     reposition();
   });
   function endResize(e){if(!resizing)return;resizing=false;try{handle.releasePointerCapture(e.pointerId);}catch(err){}}
@@ -6393,10 +6406,10 @@ function openInPlaceTextEditor(root,isNew){
   ta.focus();ta.select();
 }
 function closeInPlaceTextEditor(cancel){
-  var ta=_inplaceTa,root=_inplaceRoot,hidden=_inplaceHidden,isNew=_inplaceIsNew,handle=_inplaceHandle;
+  var ta=_inplaceTa,root=_inplaceRoot,hidden=_inplaceHidden,isNew=_inplaceIsNew,handle=_inplaceHandle,geomDirty=_inplaceGeomDirty;
   if(!ta)return;
   if(handle)handle.remove();
-  _inplaceTa=null;_inplaceRoot=null;_inplaceHidden=null;_inplaceIsNew=false;_inplaceHandle=null;
+  _inplaceTa=null;_inplaceRoot=null;_inplaceHidden=null;_inplaceIsNew=false;_inplaceHandle=null;_inplaceGeomDirty=false;
   window._inplaceTextBoxBounds=null;
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
   var newText=ta.value;
@@ -6407,7 +6420,14 @@ function closeInPlaceTextEditor(cancel){
   // re-edit, which restores the real pre-existing glyphs untouched).
   var discardNew=function(){if(hidden)hidden.forEach(function(p){if(p&&!p.removed)p.remove();});if(window.SMEngineBridge)SMEngineBridge.renderNow();};
   var restore=function(){if(hidden)hidden.forEach(function(p){if(p&&!p.removed)p.opacity=p.data.__inplacePrevOpacity!==undefined?p.data.__inplacePrevOpacity:1;});};
-  if(cancel||!root||!root.data||!newText.trim()||(!isNew&&newText===root.data.text)){if(isNew)discardNew();else{restore();if(window.SMEngineBridge)SMEngineBridge.renderNow();}return;}
+  // geomDirty (bug found while verifying the vertical-resize feature just
+  // added below): the resize handle mutates d.fixedWidth/d.size directly
+  // but never touches the textarea's OWN text — a resize-only edit (no
+  // text change) used to satisfy `newText===root.data.text` and take the
+  // "nothing changed" discard/restore branch, silently reverting the drag
+  // the instant you blurred out. A drag on either axis marks geomDirty so
+  // that alone is enough to still commit through the real rebuild below.
+  if(cancel||!root||!root.data||!newText.trim()||(!isNew&&!geomDirty&&newText===root.data.text)){if(isNew)discardNew();else{restore();if(window.SMEngineBridge)SMEngineBridge.renderNow();}return;}
   var d=root.data;
   var opts={bold:d.bold,italic:d.italic,underline:d.underline,strike:d.strike,letterSpacing:d.letterSpacing,wordSpacing:d.wordSpacing,lineHeightMult:d.lineHeightMult,textCase:d.textCase};
   var layer=root.parent;
