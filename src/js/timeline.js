@@ -3138,8 +3138,21 @@ function renderTimeline(){
   // happened to shrink-to-fit while the ruler (and whatever's behind
   // #bars-row) kept going, showing through as a lighter seam partway
   // across. Sizing it explicitly to match fixes the seam.
+  //
+  // Width is whichever is LARGER: the real frame content (state.totalFrames
+  // *FC, so a long/zoomed-in timeline still scrolls to its true end — the
+  // original reason these three lines exist) or #fg-wrap's own visible
+  // width (so a SHORT scene on a wide window still fills the panel instead
+  // of leaving a dead gap on the right — feedback #84, "la timeline ne va
+  // pas jusqu'au bout de l'écran en fonction de la taille de la fenêtre").
+  // Exact same Math.max(content, wrap.clientWidth/Height) idiom this file
+  // already uses for the playhead line's HEIGHT a bit further down
+  // (mph.style.height, "le curseur de temps devrait descendre jusqu'au
+  // niveau de la scroll bar en bas") — same family of bug, other axis.
+  var fgWrapW=document.getElementById('fg-wrap');
+  var gridMinWidth=Math.max(state.totalFrames*FC,fgWrapW?fgWrapW.clientWidth:0);
   var barsRow=document.getElementById('bars-row');
-  if(barsRow)barsRow.style.width=(state.totalFrames*FC)+'px';
+  if(barsRow)barsRow.style.width=gridMinWidth+'px';
   // #frame-hdr needs the SAME explicit width, for the same reason — the
   // comment above claimed flexbox sized it from its .fhc children, but it
   // is a flex-direction:column CHILD of #fg-wrap, so its width is its CROSS
@@ -3150,7 +3163,7 @@ function renderTimeline(){
   // apparaissent au niveau des rulers de timing en haut à droite". Exactly
   // the #bars-row and #frame-grid bug, in the one place it was assumed not
   // to apply.
-  hdr.style.width=(state.totalFrames*FC)+'px';
+  hdr.style.width=gridMinWidth+'px';
   // Bug found 2026-07 ("le highlight d'un layer selectionné ne va pas
   // jusqu'au bout de la timeline") — same root cause family as #bars-row
   // above, one level down: #frame-grid is `flex-direction:column`, so
@@ -3169,7 +3182,7 @@ function renderTimeline(){
   // timeline's real end. Confirmed live: `.frow.act` measured exactly
   // #fg-wrap's clientWidth instead of state.totalFrames*FC before this
   // fix. Sized explicitly here, exactly like #bars-row above it.
-  grid.style.width=(state.totalFrames*FC)+'px';
+  grid.style.width=gridMinWidth+'px';
   // Bug found 2026-07 ("la barre de scroll doit pouvoir aller d'un bout à
   // l'autre... pas d'offset derrière"): the custom zoom scrollbar
   // (timeline-zoom.js) sizes its thumb off state.totalFrames but only
