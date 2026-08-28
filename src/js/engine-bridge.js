@@ -3437,11 +3437,30 @@
       return true;
     } catch (e) {
       console.error('[engine-bridge] engine creation failed', e);
-      showToast(SM.t('toastRustEngineWebgpuFailedSuffix') + e);
+      // Actionable, not just diagnostic (2026-08, live report: "Failed to
+      // create WebGPU Context Provider" ×15 then "no compatible WebGPU
+      // adapter" on an M3/Sequoia Mac IN A BROWSER, not the desktop app —
+      // ruling out "old hardware" as the cause). Browsers differ in
+      // whether WebGPU needs enabling by hand, so the raw error alone
+      // ("échec WebGPU — NotFound {...}") gives a beta tester nothing to
+      // actually DO about it. This never blocks anything either way — the
+      // app already falls back to Paper.js regardless of which hint fires.
+      showToast(SM.t('toastRustEngineWebgpuFailedSuffix') + webgpuFailureHint());
       rustCanvas.remove();
       rustCanvas = null;
       return false;
     }
+  }
+  function webgpuFailureHint() {
+    var ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+    var isSafari = /Safari/.test(ua) && !/Chrome|Chromium|Edg|OPR/.test(ua);
+    var isFirefox = /Firefox/.test(ua);
+    if (typeof navigator === 'undefined' || !navigator.gpu) {
+      if (isSafari) return SM.t('webgpuHintSafari');
+      if (isFirefox) return SM.t('webgpuHintFirefox');
+      return SM.t('webgpuHintGeneric');
+    }
+    return SM.t('webgpuHintAdapter');
   }
 
   async function setEnabled(on, silent) {
