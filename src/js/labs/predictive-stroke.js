@@ -132,7 +132,7 @@
 
   window.SMLabs.register('predictive-stroke', {
     flag: 'nemo-labs-predictive',
-    describe: 'Reconnaît ligne / cercle-ellipse / rectangle dessinés à main levée et les corrige en forme parfaite au lâcher',
+    describe: 'labsDescribePredictiveStroke',
     onStroke: function (path) {
       if (!path.segments || path.segments.length < 3) return;
       // Vector-brush ribbons & fill shapes: geometry is a rebuilt outline,

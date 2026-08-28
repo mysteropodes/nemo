@@ -16,7 +16,7 @@
 (function () {
   window.SMLabs.register('multiframe-draw', {
     flag: 'nemo-labs-multiframe',
-    describe: 'Un trait dessiné est aussi ajouté à toutes les frames sélectionnées dans la timeline (même calque)',
+    describe: 'labsDescribeMultiframeDraw',
     onStroke: function (path) {
       if (typeof _sel === 'undefined' || !_sel.frames || !_sel.frames.length) return;
       if (typeof serP !== 'function' || typeof getEffectiveStrokes !== 'function') return;
@@ -71,7 +71,7 @@
         if (sdFill) f.strokes.push(JSON.parse(JSON.stringify(sdFill)));
         stamped++;
       });
-      if (stamped && typeof showToast === 'function') showToast('Labs — trait ajouté sur ' + stamped + ' autre(s) frame(s)');
+      if (stamped && typeof showToast === 'function') showToast(SM.t('labsToastMultiframePrefix') + stamped + SM.t('labsToastMultiframeSuffix'));
       // Current frame's own copy is handled by the normal commit; the
       // timeline needs a redraw so newly-promoted keyframes show their dot.
       if (stamped && typeof renderTimeline === 'function') renderTimeline();

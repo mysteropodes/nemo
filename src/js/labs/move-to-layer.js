@@ -17,18 +17,18 @@
 (function () {
   window.SMLabs.register('move-to-layer', {
     flag: 'nemo-labs-move-to-layer',
-    describe: 'Action : SMLabs.moveSelectionToLayer(idx) déplace les traits sélectionnés (outil Sélection) vers le calque idx, même frame',
+    describe: 'labsDescribeMoveToLayer',
   });
 
   window.SMLabs.moveSelectionToLayer = function (targetIdx) {
     if (typeof selectedPaths === 'undefined' || !selectedPaths.length) {
-      if (typeof showToast === 'function') showToast('Sélectionne d\'abord des traits (outil Sélection)');
+      if (typeof showToast === 'function') showToast(SM.t('labsToastSelectStrokesFirst'));
       return 0;
     }
     var tl = state.layers[targetIdx];
-    if (!tl || targetIdx === state.activeLayerIdx) { if (typeof showToast === 'function') showToast('Calque cible invalide'); return 0; }
-    if (tl.locked) { if (typeof showToast === 'function') showToast('Calque cible verrouillé'); return 0; }
-    if (tl.symbolId) { if (typeof showToast === 'function') showToast('Impossible vers un calque composant'); return 0; }
+    if (!tl || targetIdx === state.activeLayerIdx) { if (typeof showToast === 'function') showToast(SM.t('labsToastTargetLayerInvalid')); return 0; }
+    if (tl.locked) { if (typeof showToast === 'function') showToast(SM.t('labsToastTargetLayerLocked')); return 0; }
+    if (tl.symbolId) { if (typeof showToast === 'function') showToast(SM.t('labsToastCannotMoveToComponentLayer')); return 0; }
 
     pushUndo();
     // Promote the target layer's current frame BEFORE re-parenting, so its
@@ -59,7 +59,7 @@
     saveAllLayerFrames();
     loadFrame(state.currentFrame);
     renderOS(); renderArcs(); updateUI();
-    if (typeof showToast === 'function') showToast(moved + ' trait(s) déplacé(s) vers « ' + tl.name + ' »');
+    if (typeof showToast === 'function') showToast(moved + SM.t('labsToastMovedToLayerMid') + tl.name + ' »');
     return moved;
   };
 })();

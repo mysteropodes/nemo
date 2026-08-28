@@ -20,7 +20,7 @@
   window.SMLabs.setGridStep = function (n) {
     localStorage.setItem(STEP_KEY, String(Math.max(4, +n || 100)));
     lastKey = ''; // force redraw
-    if (typeof showToast === 'function') showToast('Labs — grille : pas de ' + gridStep() + 'px monde');
+    if (typeof showToast === 'function') showToast(SM.t('labsToastGridStepPrefix') + gridStep() + SM.t('labsToastGridStepSuffix'));
     return gridStep();
   };
 
@@ -131,7 +131,7 @@
 
   window.SMLabs.register('canvas-grid', {
     flag: 'nemo-labs-grid',
-    describe: 'Grille monde superposée au canvas (pas réglable via SMLabs.setGridStep, défaut 100px), suit pan/zoom/rotation',
+    describe: 'labsDescribeCanvasGrid',
     onEnable: function () { lastKey = ''; schedule(); },
     onDisable: function () { if (overlay) { overlay.remove(); overlay = null; } },
   });

@@ -11,13 +11,17 @@
 // friends intercept in the capture phase), so a hold gesture would race
 // every bridge. A keyboard trigger sidesteps that entirely.
 (function () {
+  // `label` holds an i18n KEY (not literal text), resolved via SM.t() at
+  // button-build time in open() below — this array is safe to read at
+  // parse time since it's just data, but open() runs later (keydown), well
+  // after i18n.js has loaded.
   var TOOLS = [
-    { tool: 'draw', label: 'Pinceau', glyph: 'B' },
-    { tool: 'eraser', label: 'Gomme', glyph: 'E' },
-    { tool: 'fill', label: 'Pot', glyph: 'G' },
-    { tool: 'select', label: 'Sélection', glyph: 'V' },
-    { tool: 'pen', label: 'Plume', glyph: 'P' },
-    { tool: 'hand', label: 'Main', glyph: 'H' },
+    { tool: 'draw', label: 'labsLagoonToolBrush', glyph: 'B' },
+    { tool: 'eraser', label: 'labsLagoonToolEraser', glyph: 'E' },
+    { tool: 'fill', label: 'labsLagoonToolFill', glyph: 'G' },
+    { tool: 'select', label: 'labsLagoonToolSelect', glyph: 'V' },
+    { tool: 'pen', label: 'labsLagoonToolPen', glyph: 'P' },
+    { tool: 'hand', label: 'labsLagoonToolHand', glyph: 'H' },
   ];
   var R = 78; // ring radius px
   var el = null, lastMouse = { x: 0, y: 0 };
@@ -34,7 +38,7 @@
       var a = -Math.PI / 2 + i * 2 * Math.PI / TOOLS.length;
       var b = document.createElement('button');
       b.textContent = t.glyph;
-      b.title = t.label;
+      b.title = SM.t(t.label);
       b.style.cssText =
         'position:fixed;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.14);' +
         'background:#26252c;color:#eceae7;font:600 14px system-ui;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4);' +
@@ -81,7 +85,7 @@
 
   window.SMLabs.register('lagoon-menu', {
     flag: 'nemo-labs-lagoon',
-    describe: 'Menu radial d\'outils autour du curseur sur la touche Q ',
+    describe: 'labsDescribeLagoonMenu',
     onDisable: close,
   });
 })();

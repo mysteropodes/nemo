@@ -65,14 +65,14 @@
   window.SMLabs.macroStart = function () {
     if (!window.SMLabs.isOn('auto-actions')) { console.warn('[labs] enable(\'auto-actions\') d\'abord'); return; }
     recording = [];
-    if (typeof showToast === 'function') showToast('Macro : enregistrement… (macroStop(\'nom\') pour sauver)');
+    if (typeof showToast === 'function') showToast(SM.t('labsToastMacroRecording'));
   };
   window.SMLabs.macroStop = function (name) {
     if (!recording) { console.warn('[labs] pas d\'enregistrement en cours'); return; }
     var steps = recording; recording = null;
     if (!name) { console.warn('[labs] macroStop(nom) — enregistrement jeté'); return; }
     var m = load(); m[name] = steps; save(m);
-    if (typeof showToast === 'function') showToast('Macro « ' + name + ' » : ' + steps.length + ' étape(s)');
+    if (typeof showToast === 'function') showToast(SM.t('labsToastMacroPrefix') + name + SM.t('labsToastMacroSavedMid') + steps.length + SM.t('labsToastStepCountSuffix'));
     return steps.length;
   };
   window.SMLabs.macroPlay = function (name) {
@@ -82,7 +82,7 @@
     // beat between steps so each one's UI settles like a human sequence.
     var i = 0;
     (function next() {
-      if (i >= steps.length) { if (typeof showToast === 'function') showToast('Macro « ' + name + ' » rejouée'); return; }
+      if (i >= steps.length) { if (typeof showToast === 'function') showToast(SM.t('labsToastMacroPrefix') + name + SM.t('labsToastMacroReplayedSuffix')); return; }
       var s = steps[i++];
       var loc = SURFACE[s.cmd] && SURFACE[s.cmd]();
       if (loc && loc[0] && typeof loc[0][loc[1]] === 'function') loc[0][loc[1]].apply(loc[0], s.args);
@@ -97,7 +97,7 @@
 
   window.SMLabs.register('auto-actions', {
     flag: 'nemo-labs-macros',
-    describe: 'Auto Actions (Clip Studio) : macroStart() → actions → macroStop(\'nom\') → macroPlay(\'nom\') — enregistre les COMMANDES (outils/frames/calques), pas les traits',
+    describe: 'labsDescribeAutoActions',
     onEnable: install,
     onDisable: uninstall,
   });

@@ -81,7 +81,7 @@
 
   window.SMLabs.register('timeline-markers', {
     flag: 'nemo-labs-markers',
-    describe: 'Marqueurs nommés/colorés sur les frames (SMLabs.addMarker(frame,label,couleur))',
+    describe: 'labsDescribeTimelineMarkers',
     onEnable: function () { observe(); decorate(); },
     onDisable: function () { document.querySelectorAll('.labs-marker-flag').forEach(function (el) { el.remove(); }); },
   });

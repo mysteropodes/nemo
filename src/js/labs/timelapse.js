@@ -54,7 +54,7 @@
     rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
     rec.start(1000); // periodic chunks — a crash mid-session keeps prior data
     t0 = Date.now();
-    if (typeof showToast === 'function') showToast('Timelapse : enregistrement…');
+    if (typeof showToast === 'function') showToast(SM.t('labsToastTimelapseRecording'));
     return true;
   };
 
@@ -71,7 +71,7 @@
         var a = document.createElement('a');
         a.href = u; a.download = 'nemo-timelapse.webm'; a.click();
         URL.revokeObjectURL(u);
-        if (typeof showToast === 'function') showToast('Timelapse : ' + secs + 's — nemo-timelapse.webm');
+        if (typeof showToast === 'function') showToast(SM.t('labsToastTimelapseDonePrefix') + secs + SM.t('labsToastTimelapseDoneSuffix'));
         resolve({ seconds: secs, bytes: blob.size });
       };
       rec.stop();
@@ -80,7 +80,7 @@
 
   window.SMLabs.register('timelapse', {
     flag: 'nemo-labs-timelapse',
-    describe: 'Timelapse (Clip Studio) : timelapseStart() enregistre le canvas visible, timelapseStop() télécharge le .webm',
+    describe: 'labsDescribeTimelapse',
     onDisable: function () {
       if (rec) { try { rec.stop(); } catch (e) {} rec = null; chunks = []; }
       if (compTimer) { clearInterval(compTimer); compTimer = null; }

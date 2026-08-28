@@ -11,13 +11,13 @@
 (function () {
   window.SMLabs.register('speed-lines', {
     flag: 'nemo-labs-speedlines',
-    describe: 'Lignes de vitesse : SMLabs.speedLines({cx,cy,count,r0,r1,jitter}) génère un éclat radial de traits ordinaires',
+    describe: 'labsDescribeSpeedLines',
   });
 
   window.SMLabs.speedLines = function (opts) {
     opts = opts || {};
     var ld = state.layers[state.activeLayerIdx];
-    if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast('Calque invalide/verrouillé'); return 0; }
+    if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalidLocked')); return 0; }
     var cx = opts.cx !== undefined ? +opts.cx : (state.canvasW || 1920) / 2;
     var cy = opts.cy !== undefined ? +opts.cy : (state.canvasH || 1080) / 2;
     var count = Math.max(3, Math.min(400, opts.count || 60));
@@ -45,7 +45,7 @@
     }
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (typeof showToast === 'function') showToast(count + ' lignes de vitesse générées (1 undo pour tout retirer)');
+    if (typeof showToast === 'function') showToast(count + SM.t('labsToastSpeedLinesGeneratedSuffix'));
     return count;
   };
 })();

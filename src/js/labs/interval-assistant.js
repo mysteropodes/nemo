@@ -23,20 +23,20 @@
 
   window.SMLabs.register('interval-assistant', {
     flag: 'nemo-labs-interval',
-    describe: 'Action : SMLabs.intervalAssistant(n, ease?) pose n keyframes de breakdown à intervalles éasés entre les 2 bouts de la plage sélectionnée',
+    describe: 'labsDescribeIntervalAssistant',
   });
 
   window.SMLabs.intervalAssistant = function (count, ease) {
     if (typeof selBounds !== 'function') return;
     var b = selBounds();
-    if (!b) { if (typeof showToast === 'function') showToast('Sélectionne d\'abord une plage de frames dans la timeline'); return; }
+    if (!b) { if (typeof showToast === 'function') showToast(SM.t('labsToastSelectFrameRangeFirst')); return; }
     var li = state.activeLayerIdx;
     if (b.minL > li || b.maxL < li) li = b.minL; // work on a layer actually in the selection
     var ld = state.layers[li];
-    if (!ld || ld.symbolId) { if (typeof showToast === 'function') showToast('Calque invalide'); return; }
+    if (!ld || ld.symbolId) { if (typeof showToast === 'function') showToast(SM.t('labsToastLayerInvalid')); return; }
     var span = b.maxF - b.minF;
     count = Math.max(1, Math.min(span - 1, parseInt(count, 10) || 1));
-    if (span < 2) { if (typeof showToast === 'function') showToast('Il faut au moins 2 frames d\'écart'); return; }
+    if (span < 2) { if (typeof showToast === 'function') showToast(SM.t('labsToastNeedAtLeast2FramesGap')); return; }
     var fn = EASES[ease || 'inout'] || EASES.inout;
 
     // Eased slot positions, deduped and clamped strictly inside the range.
@@ -45,7 +45,7 @@
       var f = b.minF + Math.round(fn(k / (count + 1)) * span);
       if (f > b.minF && f < b.maxF && slots.indexOf(f) < 0 && !ld.frames[f].isKeyframe) slots.push(f);
     }
-    if (!slots.length) { if (typeof showToast === 'function') showToast('Aucun emplacement libre pour des breakdowns'); return; }
+    if (!slots.length) { if (typeof showToast === 'function') showToast(SM.t('labsToastNoFreeSlotForBreakdowns')); return; }
 
     pushUndoLayers();
     saveAllLayerFrames();
@@ -59,7 +59,7 @@
     });
     loadFrame(state.currentFrame); renderOS(); renderArcs(); updateUI();
     if (typeof renderTimeline === 'function') renderTimeline();
-    if (typeof showToast === 'function') showToast(slots.length + ' breakdown(s) posé(s) : frames ' + slots.map(function (f) { return f + 1; }).join(', '));
+    if (typeof showToast === 'function') showToast(slots.length + SM.t('labsToastBreakdownsPlacedMid') + slots.map(function (f) { return f + 1; }).join(', '));
     return slots;
   };
 })();

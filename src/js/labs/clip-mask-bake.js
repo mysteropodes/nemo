@@ -45,13 +45,13 @@
   window.SMLabs.bakeClipMask = function (maskLayerIdx, targetLayerIdx, opts) {
     opts = opts || {};
     var mLd = state.layers[maskLayerIdx], tLd = state.layers[targetLayerIdx];
-    if (!mLd || !tLd || mLd.symbolId || tLd.symbolId) { if (typeof showToast === 'function') showToast('Calques invalides'); return 0; }
-    if (tLd.locked) { if (typeof showToast === 'function') showToast('Calque cible verrouillé'); return 0; }
+    if (!mLd || !tLd || mLd.symbolId || tLd.symbolId) { if (typeof showToast === 'function') showToast(SM.t('labsToastLayersInvalid')); return 0; }
+    if (tLd.locked) { if (typeof showToast === 'function') showToast(SM.t('labsToastTargetLayerLocked')); return 0; }
     var maskLayer = userLayers[maskLayerIdx], targetLayer = userLayers[targetLayerIdx];
     var maskPaths = collectMaskable(maskLayer);
-    if (!maskPaths.length) { if (typeof showToast === 'function') showToast('Calque masque vide/sans forme fermée'); return 0; }
+    if (!maskPaths.length) { if (typeof showToast === 'function') showToast(SM.t('labsToastMaskLayerEmpty')); return 0; }
     var targets = collectMaskable(targetLayer);
-    if (!targets.length) { if (typeof showToast === 'function') showToast('Calque cible vide'); return 0; }
+    if (!targets.length) { if (typeof showToast === 'function') showToast(SM.t('labsToastTargetLayerEmpty')); return 0; }
 
     pushUndo();
     var clip = unionAll(maskPaths.map(function (p) { return p.clone({ insert: false }); }));
@@ -79,12 +79,12 @@
     if (typeof fillRegenerateLinked === 'function' && targetLayer.children.length) fillRegenerateLinked(targetLayer, targetLayer.children[0]);
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (typeof showToast === 'function') showToast('Masque appliqué (baked) : ' + kept + ' île(s), ' + dropped + ' trait(s) entièrement masqué(s)');
+    if (typeof showToast === 'function') showToast(SM.t('labsToastMaskAppliedPrefix') + kept + SM.t('labsToastMaskAppliedMid') + dropped + SM.t('labsToastMaskAppliedSuffix'));
     return kept;
   };
 
   window.SMLabs.register('clip-mask-bake', {
     flag: 'nemo-labs-clipmask',
-    describe: 'Masque de découpe BAKÉ (pas live — voir feature-scouting #1) : SMLabs.bakeClipMask(maskLayerIdx, targetLayerIdx) intersecte le calque cible avec le calque masque via le pipeline Boolean Ops existant',
+    describe: 'labsDescribeClipMaskBake',
   });
 })();

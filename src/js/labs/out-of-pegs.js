@@ -43,12 +43,12 @@
   window.SMLabs.resetPegs = function () {
     offs.prev = [0, 0]; offs.next = [0, 0];
     if (typeof renderOS === 'function') renderOS();
-    if (typeof showToast === 'function') showToast('Fantômes remis sur pegs');
+    if (typeof showToast === 'function') showToast(SM.t('labsToastGhostsBackOnPegs'));
   };
 
   window.SMLabs.register('out-of-pegs', {
     flag: 'nemo-labs-pegs',
-    describe: 'Décalage des fantômes onion : décale les fantômes onion prev/next pour caler l\'intervalle (SMLabs.setPegOffset(\'prev\',dx,dy), resetPegs())',
+    describe: 'labsDescribeOutOfPegs',
     onEnable: function () {
       if (!origRenderOS && typeof window.renderOS === 'function') {
         origRenderOS = window.renderOS;

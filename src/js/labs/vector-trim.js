@@ -144,7 +144,7 @@
     var knifePath = new Path({ insert: false, segments: pts.map(function (p) { return new Point(p[0], p[1]); }) });
     var plan = buildPlan(layer, knifePath);
     if (!plan.length) {
-      if (typeof showToast === 'function') showToast('Aucun trait sous le couteau');
+      if (typeof showToast === 'function') showToast(SM.t('labsToastNoStrokeUnderKnife'));
       return false;
     }
     pushUndo();
@@ -152,7 +152,7 @@
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     if (typeof showToast === 'function') {
-      showToast(plan.length === 1 ? 'Trait coupé' : plan.length + ' traits coupés');
+      showToast(plan.length === 1 ? SM.t('labsToastStrokeCutSingular') : plan.length + SM.t('labsToastStrokesCutSuffix'));
     }
     return true;
   }
@@ -242,7 +242,7 @@
     }
     if (target) target.style.cursor = armed ? 'crosshair' : '';
     if (window.renderLabsFloatPanel) window.renderLabsFloatPanel();
-    if (typeof showToast === 'function' && armed) showToast('Couteau vectoriel : glisser à travers un trait pour le couper');
+    if (typeof showToast === 'function' && armed) showToast(SM.t('labsToastKnifeArmedHint'));
   };
   window.SMLabs.isKnifeTrimActive = function () { return armed; };
 
@@ -259,6 +259,6 @@
 
   window.SMLabs.register('vector-trim', {
     flag: 'nemo-labs-trim',
-    describe: 'Couteau vectoriel CSP : glisser un trait-couteau à travers une ou plusieurs lignes pour les couper à leurs intersections les plus proches',
+    describe: 'labsDescribeVectorTrim',
   });
 })();

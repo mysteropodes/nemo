@@ -28,7 +28,7 @@
   window.SMLabs.referenceFill = function (wx, wy) {
     var li = state.activeLayerIdx;
     var ld = state.layers[li];
-    if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast('Calque actif invalide/verrouillé'); return false; }
+    if (!ld || ld.locked || ld.symbolId) { if (typeof showToast === 'function') showToast(SM.t('labsToastActiveLayerInvalidLocked')); return false; }
     var layer = userLayers[li];
     var pt = new Point(wx, wy);
 
@@ -54,7 +54,7 @@
     try { res = fillVectorFind(pt, layer, null); }
     finally { temps.forEach(function (p) { p.remove(); }); }
 
-    if (!res) { if (typeof showToast === 'function') showToast('Aucune zone fermée ici (toutes couches confondues)'); return false; }
+    if (!res) { if (typeof showToast === 'function') showToast(SM.t('labsToastNoClosedAreaAllLayers')); return false; }
     pushUndo();
     // A 'closedWall' result IS a wall copy derived from one of our temp
     // clones — it inherits the clone's data wholesale, including the
@@ -74,12 +74,12 @@
     if (typeof tagOwner === 'function') tagOwner(res.path);
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
-    if (typeof showToast === 'function') showToast('Fill posé (murs : toutes les couches visibles)');
+    if (typeof showToast === 'function') showToast(SM.t('labsToastFillPlacedAllLayers'));
     return true;
   };
 
   window.SMLabs.register('reference-fill', {
     flag: 'nemo-labs-reffill',
-    describe: 'Ink & paint (CSP reference layer) : SMLabs.referenceFill(x,y) remplit sur le calque actif en lisant les traits de TOUS les calques visibles comme murs',
+    describe: 'labsDescribeReferenceFill',
   });
 })();
