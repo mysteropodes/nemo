@@ -2147,8 +2147,19 @@ function resolveLinkedTime(ld,which,seen,depth){
 // ld.inPoint/ld.outPoint directly and would therefore skip the range check
 // entirely for a layer whose range comes from a LINK (CLAUDE.md §1: a new
 // field that one reader doesn't know about).
-function layerHasTimeRange(ld){
-  return !!(ld&&(ld.inPoint!=null||ld.outPoint!=null||ld.timeLink));
+function layerHasTimeRange(ld,_depth){
+  if(!ld)return false;
+  if(ld.inPoint!=null||ld.outPoint!=null||ld.timeLink)return true;
+  // Folder duration cascading (2026-08) — a child with NO explicit range of
+  // its own (the common case) still needs gating whenever its folder
+  // PARENT has one, otherwise getEffectiveStrokes' own `layerHasTimeRange
+  // && (frame<layerInPoint...)` guard short-circuits before layerInPoint/
+  // layerOutPoint (below) ever run their own folder-clamp — the two must
+  // agree on "does a range apply here at all" or the clamp silently never
+  // fires for the overwhelmingly common unranged-child case.
+  var depth=_depth||0;
+  var fp=depth<8?_layerFolderParent(ld):null;
+  return !!(fp&&layerHasTimeRange(fp,depth+1));
 }
 // Both resolvers clamp their result into the CURRENT timeline (2026-08-16).
 // Shrinking the project length (SM.setTotalFrames, timeline.js) deliberately
@@ -2162,12 +2173,37 @@ function layerHasTimeRange(ld){
 // hides the overflow everywhere at once while keeping ld.inPoint/outPoint
 // untouched, so the layer's real range comes back if the timeline grows again.
 function _clampToTimeline(f){var last=state.totalFrames-1;return f<0?0:(f>last?last:f);}
+// Folder layer duration cascading (2026-08, "trimming the folder's in/out
+// clips/contains all its children's own ranges within it") — resolved here,
+// the one chokepoint every in/out reader (render gate, both bars, drag
+// handlers) already goes through, so nothing downstream needs to know a
+// folder was even involved. Non-destructive by design: a child's OWN
+// ld.inPoint/outPoint is never rewritten, only the RESOLVED value is
+// intersected with its folder parent's own resolved range — drag the
+// child out of the folder later (SM.removeLayerFromFolder) and its
+// original numbers are exactly where they were. depth guard mirrors
+// resolveLinkedTime's own convention; nested folders are v1-unsupported
+// (see engine.rs is_folder_layer) so this should never actually recurse
+// past one level in practice, but a hand-edited/migrated file could
+// otherwise cycle.
+function _layerFolderParent(ld){
+  if(!ld||!ld.parentLayerUid)return null;
+  for(var i=0;i<state.layers.length;i++){
+    var o=state.layers[i];
+    if(o!==ld&&o.layerUid===ld.parentLayerUid)return o.isFolderLayer?o:null;
+  }
+  return null;
+}
 function layerInPoint(ld,_seen,_depth){
-  var linked=resolveLinkedTime(ld,'in',_seen,_depth||0);
-  if(linked!=null)return _clampToTimeline(linked);
-  if(ld.inPoint!=null)return _clampToTimeline(ld.inPoint);
-  var auto=autoInPointFromBlankKeyframe(ld);
-  return auto!=null?_clampToTimeline(auto):0;
+  var depth=_depth||0;
+  var linked=resolveLinkedTime(ld,'in',_seen,depth);
+  var v;
+  if(linked!=null)v=_clampToTimeline(linked);
+  else if(ld.inPoint!=null)v=_clampToTimeline(ld.inPoint);
+  else{var auto=autoInPointFromBlankKeyframe(ld);v=auto!=null?_clampToTimeline(auto):0;}
+  var fp=depth<8?_layerFolderParent(ld):null;
+  if(fp)v=Math.max(v,layerInPoint(fp,_seen,depth+1));
+  return v;
 }
 // Unclamped counterpart (2026-08, "les layer dans motion doivent pouvoir
 // aller au delà de la timeline ou en amont comme sur cavalry") — same
@@ -2179,11 +2215,15 @@ function layerInPoint(ld,_seen,_depth){
 // inout.js's updateBar/drag handlers) needs the raw value, purely to draw
 // and drag past the timeline's edges like an AE/Cavalry trim handle.
 function layerInPointRaw(ld,_seen,_depth){
-  var linked=resolveLinkedTime(ld,'in',_seen,_depth||0);
-  if(linked!=null)return linked;
-  if(ld.inPoint!=null)return ld.inPoint;
-  var auto=autoInPointFromBlankKeyframe(ld);
-  return auto!=null?auto:0;
+  var depth=_depth||0;
+  var linked=resolveLinkedTime(ld,'in',_seen,depth);
+  var v;
+  if(linked!=null)v=linked;
+  else if(ld.inPoint!=null)v=ld.inPoint;
+  else{var auto=autoInPointFromBlankKeyframe(ld);v=auto!=null?auto:0;}
+  var fp=depth<8?_layerFolderParent(ld):null;
+  if(fp)v=Math.max(v,layerInPointRaw(fp,_seen,depth+1));
+  return v;
 }
 // When the user hasn't manually dragged an out point, default to where the
 // layer's own drawing actually stops (its last blank keyframe — F7,
@@ -2206,19 +2246,27 @@ function autoOutPointFromBlankKeyframe(ld){
   return(lastNonBlank>=0&&lastNonBlank<frames.length-1)?lastNonBlank:null;
 }
 function layerOutPoint(ld,_seen,_depth){
-  var linked=resolveLinkedTime(ld,'out',_seen,_depth||0);
-  if(linked!=null)return _clampToTimeline(linked);
-  if(ld.outPoint!=null)return _clampToTimeline(ld.outPoint);
-  var auto=autoOutPointFromBlankKeyframe(ld);
-  return auto!=null?_clampToTimeline(auto):state.totalFrames-1;
+  var depth=_depth||0;
+  var linked=resolveLinkedTime(ld,'out',_seen,depth);
+  var v;
+  if(linked!=null)v=_clampToTimeline(linked);
+  else if(ld.outPoint!=null)v=_clampToTimeline(ld.outPoint);
+  else{var auto=autoOutPointFromBlankKeyframe(ld);v=auto!=null?_clampToTimeline(auto):state.totalFrames-1;}
+  var fp=depth<8?_layerFolderParent(ld):null;
+  if(fp)v=Math.min(v,layerOutPoint(fp,_seen,depth+1));
+  return v;
 }
 // Unclamped counterpart — see layerInPointRaw's own comment just above.
 function layerOutPointRaw(ld,_seen,_depth){
-  var linked=resolveLinkedTime(ld,'out',_seen,_depth||0);
-  if(linked!=null)return linked;
-  if(ld.outPoint!=null)return ld.outPoint;
-  var auto=autoOutPointFromBlankKeyframe(ld);
-  return auto!=null?auto:state.totalFrames-1;
+  var depth=_depth||0;
+  var linked=resolveLinkedTime(ld,'out',_seen,depth);
+  var v;
+  if(linked!=null)v=linked;
+  else if(ld.outPoint!=null)v=ld.outPoint;
+  else{var auto=autoOutPointFromBlankKeyframe(ld);v=auto!=null?auto:state.totalFrames-1;}
+  var fp=depth<8?_layerFolderParent(ld):null;
+  if(fp)v=Math.min(v,layerOutPointRaw(fp,_seen,depth+1));
+  return v;
 }
 // Right-click unlink (2026-07-30, on-timeline anchors/badges/Temps row) must
 // leave the layer exactly where it LOOKED while linked — a bare `delete
