@@ -3618,9 +3618,23 @@ function buildTweenCurveSVG(li,fA,fB,svgW,svgH){
 
   var ipad=6;
   function toSX(px){return ipad+px*(svgW-2*ipad);}
-  function toSY(py){return svgH-ipad-py*(svgH-2*ipad);}
+  // Feedback #99: "il faudrait pouvoir resize vers le bas les graph editor
+  // car sinon on a pas accès aux poignées du haut" — toSY used to map plain
+  // [0,1] to the strip's full height, but fromSY (the drag input side, just
+  // below) already clamps to [-0.3,1.3] for overshoot easing (back/elastic
+  // curves routinely place a point above y=1 or below y=0). A point at
+  // y=1.2 mapped through the OLD toSY landed above the SVG's own y=0 —
+  // genuinely off-canvas, not just visually cramped, so no resize would
+  // have helped reach it; the coordinate space itself didn't cover where
+  // the point could legally be. Mapping the SAME [-0.3,1.3] domain toSY
+  // already clamps to guarantees every point fromSY can ever produce has a
+  // toSY position inside the strip, at every width — this fixes the actual
+  // reachability instead of trading one fixed height for another fixed
+  // (still eventually cramped) height.
+  var Y_LO=-0.3,Y_HI=1.3,Y_SPAN=Y_HI-Y_LO;
+  function toSY(py){return ipad+(Y_HI-py)/Y_SPAN*(svgH-2*ipad);}
   function fromSX(sx){return Math.max(0,Math.min(1,(sx-ipad)/(svgW-2*ipad)));}
-  function fromSY(sy){return Math.max(-0.3,Math.min(1.3,(svgH-ipad-sy)/(svgH-2*ipad)));}
+  function fromSY(sy){return Math.max(Y_LO,Math.min(Y_HI,Y_HI-(sy-ipad)/(svgH-2*ipad)*Y_SPAN));}
 
   function redraw(){
     while(svg.firstChild)svg.removeChild(svg.firstChild);
