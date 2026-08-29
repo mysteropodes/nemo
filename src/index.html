@@ -768,6 +768,18 @@
           <button class="pbtn ac" id="btn-media-mode-embedded" type="button" data-mode="embedded" data-i18n="mediaModeEmbedded" style="flex:1">Intégrés</button>
           <button class="pbtn" id="btn-media-mode-linked" type="button" data-mode="linked" data-i18n="mediaModeLinked" style="flex:1">Liés</button>
         </div>
+        <!-- Bulk convert (2026-08-29, linked-media.js follow-up) — closes the
+             gap the toggle above deliberately left open: flipping "Médias"
+             only ever governs NEW imports. This is an EXPLICIT action the
+             user runs on purpose (never fired automatically by the toggle
+             click above — a bulk filesystem write firing invisibly off a
+             checkbox would be a bad surprise), converting every image
+             ALREADY in the project to match whichever mode is selected
+             above. Label/enabled-state are dynamic (see updateConvertButtonUI
+             in linked-media.js — mirrors syncUI's own afterI18n repaint). -->
+        <div class="pr" id="media-convert-row" style="margin-top:2px">
+          <button class="pbtn" id="btn-convert-media" type="button" style="width:100%">Convertir les médias…</button>
+        </div>
         <!-- dims-row (2026-07 feedback: "aligner les icônes avec bg") — BG's
              label used the default .pl (min-width:50px), pushing its swatch
              ~40px further right than every sibling row's value column (W/H,
