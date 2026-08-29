@@ -1281,6 +1281,26 @@ window.SM={
     // back flat, with its positionZ/rotationX/rotationY keys (inside
     // src.motion, already copied) now dead data nothing reads.
     if(src.threeD)state.layers[ni].threeD=true;
+    // Drapeaux d'IDENTITÉ de calque (audit 2026-08-29) — même forme de
+    // field-drop que tout ce qui précède : exportJSON les persiste tous
+    // (voir sa ligne de sérialisation), duplicateLayer n'en copiait aucun.
+    // Confirmé en direct : dupliquer un Dossier donnait un calque de dessin
+    // ORDINAIRE nommé « … copy » (isFolderLayer/isNullLayer perdus) — plus
+    // un dossier, plus un null, plus parentable comme tel. Même perte pour
+    // un Null (pivot nullPos/nullShape), un calque Guide (position/
+    // orientation) et un calque Texte (isTextLayer gate l'édition texte).
+    // Un dossier dupliqué arrive VIDE — ses enfants pointent toujours
+    // l'uid du dossier source (créer aussi des copies des enfants est une
+    // décision de design à trancher avec Cyril, pas un sous-produit de ce
+    // fix — même convention que convertLayersToComponent §8).
+    if(src.isNullLayer)state.layers[ni].isNullLayer=true;
+    if(src.nullPos)state.layers[ni].nullPos=JSON.parse(JSON.stringify(src.nullPos));
+    if(src.nullShape)state.layers[ni].nullShape=src.nullShape;
+    if(src.isFolderLayer){state.layers[ni].isFolderLayer=true;state.layers[ni].folderCollapsed=!!src.folderCollapsed;}
+    if(src.isGuideLayer)state.layers[ni].isGuideLayer=true;
+    if(src.guidePos)state.layers[ni].guidePos=JSON.parse(JSON.stringify(src.guidePos));
+    if(src.guideOrientation)state.layers[ni].guideOrientation=src.guideOrientation;
+    if(src.isTextLayer)state.layers[ni].isTextLayer=true;
     activateUL(ni);_layerSel=[ni];_layerSelAnchor=ni;loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx,preserveLayerSel){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
