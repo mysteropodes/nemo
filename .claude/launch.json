@@ -48,6 +48,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "51907", "-d", "src"],
       "port": 51907
+    },
+    {
+      "name": "nemo-fb123-fill-propagate-qa",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "56912", "-d", "src"],
+      "port": 56912
     }
   ]
 }

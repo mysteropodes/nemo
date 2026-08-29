@@ -2947,6 +2947,17 @@ function fillMatchWallIds(srcStrokes,dstStrokes){
 // re-running propagation replaces its own previous output instead of stacking
 // a second copy on every frame. No new persisted tag is needed for that
 // (CLAUDE.md §1) — strokeId already round-trips through serP/desP.
+//
+// One FILL_GAP_STEPS tier of slack above how cleanly the source frame closed
+// (feedback #123). FILL_GAP_STEPS is declared further down this file as a
+// top-level var — safe to reference here since this function only ever runs
+// after the whole script has loaded, never at module-eval time.
+function fillPropagateGapCeiling(srcGapPx){
+  for(var i=0;i<FILL_GAP_STEPS.length;i++){
+    if(FILL_GAP_STEPS[i]>=srcGapPx)return FILL_GAP_STEPS[Math.min(i+1,FILL_GAP_STEPS.length-1)];
+  }
+  return FILL_GAP_STEPS[FILL_GAP_STEPS.length-1];
+}
 function fillPropagateAcrossFrames(fillPath){
   var li=state.activeLayerIdx,ld=state.layers[li];
   if(!ld||!fillPath||!fillPath.data||!fillPath.data.fillSeed)return null;
@@ -2958,6 +2969,7 @@ function fillPropagateAcrossFrames(fillPath){
   var gapCap=fillPath.data.fillGapPx;
   // How cleanly the SOURCE closed — the bar every propagated frame must meet.
   var srcGapPx=(typeof gapCap==='number')?gapCap:0;
+  var srcWallIds=fillPath.data.fillWalls;
   var lineageId=ensureStrokeId(fillPath);
   var anchors=fillSeedAnchors(layer,seed,fillPath.data.fillWalls);
   if(!anchors.length)return null;
@@ -2997,12 +3009,16 @@ function fillPropagateAcrossFrames(fillPath){
     }).forEach(function(c){c.remove();});
     // The id map is only computed if the direct strokeId lookup came up short.
     var idMap=null;
+    function ensureIdMap(){
+      if(idMap===null)idMap=fillMatchWallIds(srcStrokes,(f.strokes||[]).filter(_fillMatchable))||false;
+      return idMap;
+    }
     function rebuild(anchorSet){
       var r=fillSeedFromAnchors(lyr,anchorSet,null);
       if(!r||r.matched<anchorSet.length){
-        if(idMap===null)idMap=fillMatchWallIds(srcStrokes,(f.strokes||[]).filter(_fillMatchable))||false;
-        if(idMap){
-          var r2=fillSeedFromAnchors(lyr,anchorSet,idMap);
+        var im=ensureIdMap();
+        if(im){
+          var r2=fillSeedFromAnchors(lyr,anchorSet,im);
           if(r2&&(!r||r2.matched>r.matched))r=r2;
         }
       }
@@ -3015,15 +3031,56 @@ function fillPropagateAcrossFrames(fillPath){
       if(line)line.data.strokeId=cl.id;
     });
     var pt=rebuild(anchors)||seed;
+    // Restrict the retrace to THIS fill's own recorded boundary strokes,
+    // translated to this frame's ids (direct id match first — an
+    // interpolated span inherits ids verbatim — then the same tween-matcher
+    // fallback the anchor rebuild above already uses). Mirrors
+    // fillRegenerateLinked's onlyIds handling (CLAUDE.md §3 — same
+    // wall-restriction pattern, two call sites; that one's own comment:
+    // "the wall restriction — not a distance cap — is what guarantees the
+    // fill can never balloon onto unrelated artwork"). Previously this call
+    // never passed onlyIds at all and always fell back to the LEGACY
+    // seed-only + gapCap-limited path even for modern wall-tracked fills —
+    // gapCap being srcGapPx meant the escalation loop physically could not
+    // try one step beyond whatever the source needed, so a target frame
+    // whose reconstruction landed even a few px off (tween interpolation is
+    // never pixel-exact) had zero tolerance to close (feedback #123: "il
+    // manque parfois des frames alors que les lignes de fermeture ont l'air
+    // d'être clair" — closing lines that read as connected on screen).
+    var onlyIds=null;
+    if(srcWallIds&&srcWallIds.length){
+      var byId={};
+      lyr.children.forEach(function(c){if(c.data&&c.data.strokeId)byId[c.data.strokeId]=1;});
+      var im=srcWallIds.some(function(id){return !byId[id];})?ensureIdMap():null;
+      var mapped=srcWallIds.map(function(id){return byId[id]?id:(im&&im[id]);}).filter(Boolean);
+      if(mapped.length)onlyIds=mapped;
+    }
+    // Legacy fills with no recorded wall association keep the original
+    // seed-only search, still capped at the source's own gapPx — that cap
+    // was the only guard they ever had against grabbing unrelated strokes.
+    // Modern wall-restricted fills get ONE FILL_GAP_STEPS tier of slack
+    // above the source's own closure quality (gapCeiling below) rather than
+    // an unbounded search: fillVectorFind picks whichever escalation tier
+    // yields the SMALLEST resulting area across every tier it tries — and
+    // since join_eps itself grows with gapThr (fill.rs: 1.5..gapThr*0.15),
+    // a far-higher tier can occasionally weld a small, genuine gap slightly
+    // more tightly than the correct, nearby tier and win that comparison,
+    // silently reporting a much larger gapPx than the reconstruction
+    // actually needed (confirmed empirically: an 8px drift, one tier above
+    // an exact 0px source touch, surfaced as gapPx 90 when the search was
+    // left uncapped). Capping the SEARCH at the ceiling, not just the
+    // post-hoc accept check below, keeps that from ever being a candidate.
+    var gapCeiling=fillPropagateGapCeiling(srcGapPx);
+    var localGapCap=(onlyIds&&onlyIds.length)?gapCeiling:gapCap;
     // Automatic closure is recomputed from THIS frame's strokes, so it needs no
     // anchoring and does not drift — it is the part of the boundary that stays
     // reliable where the transported closing lines do not.
     var autoClose=fillAutoCloseWalls(lyr,state.fillGapCloseMode,state.fillGapCloseSize);
     var res=null;
-    try{res=fillVectorFind(pt,lyr,null,gapCap);}catch(e){}
+    try{res=fillVectorFind(pt,lyr,null,localGapCap,onlyIds);}catch(e){}
     // The rebuilt seed can land just outside a thin region; the original click
     // point is the obvious second guess before giving up.
-    if(!res)try{res=fillVectorFind(seed,lyr,null,gapCap);}catch(e){}
+    if(!res)try{res=fillVectorFind(seed,lyr,null,localGapCap,onlyIds);}catch(e){}
     fillRemoveTempCloseStrokes(autoClose);
     // Quality gate. The seed/closing-line reconstruction degrades in the
     // MIDDLE of a long tween span, where the walls have deformed far from the
@@ -3031,11 +3088,20 @@ function fillPropagateAcrossFrames(fillPath){
     // gap's rebuilt bridge stretched to 309px by frame 15, and the trace then
     // found a small wrong sub-region. Those failures announce themselves: every
     // good frame closed at the source's own gapPx (0, usedGap false) while every
-    // bad one needed the tracer to bridge (24+). So a frame that cannot close as
-    // cleanly as the source did is LEFT ALONE rather than written with a fill
-    // that is visibly wrong — a missing colour is obvious and fixable by hand, a
-    // subtly wrong one is worse than nothing.
-    if(res&&res.gapPx>srcGapPx){res.path.remove();res=null;}
+    // bad one needed the tracer to bridge several tiers further (24+). So a
+    // frame that cannot close within one escalation tier of the source is LEFT
+    // ALONE rather than written with a fill that is visibly wrong — a missing
+    // colour is obvious and fixable by hand, a subtly wrong one is worse than
+    // nothing.
+    // ONE tier of slack (not a hard equality bar — feedback #123, gapCeiling
+    // computed above): the source itself rarely lands exactly on a
+    // FILL_GAP_STEPS value once reconstructed on another frame, and a single
+    // extra tier (e.g. 0 -> 10px) is exactly the kind of gap that reads as
+    // fully closed on screen. Mostly redundant with localGapCap already
+    // bounding the search at gapCeiling (wall-restricted fills) or at
+    // srcGapPx itself (legacy fills, so res.gapPx can never exceed it) —
+    // kept as defense in depth in case a future caller passes a looser cap.
+    if(res&&res.gapPx>gapCeiling){res.path.remove();res=null;}
     if(!res){skipped++;saveActiveLayerFrame();continue;}
     lyr.insertChild(fillInsertIndexFor(lyr,pt,res.path),res.path);
     if(col)res.path.fillColor=col;
