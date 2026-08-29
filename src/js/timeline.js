@@ -4390,8 +4390,7 @@ document.getElementById('frame-grid').addEventListener('contextmenu',function(e)
         try{res=fillPropagateAcrossFrames(target);}catch(err){console.warn('[fill] propagate failed',err);}
         updateUI();
         if(window.SMEngineBridge)SMEngineBridge.renderNow();
-        if(!res){if(window.showToast)showToast(SM.t('toastPropagateFailed'));return;}
-        if(window.showToast)showToast(SM.t('toastPropagateDone').replace('{filled}',res.filled).replace('{skipped}',res.skipped));
+        if(window.showToast)showToast(describePropagateResult(res));
       }
     },
     {sep:true},
