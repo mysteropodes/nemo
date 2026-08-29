@@ -3051,6 +3051,23 @@ function fillPropagateAcrossFrames(fillPath){
   goToFrame(srcFrame);
   return {filled:filled,skipped:skipped,frames:frames,closeLines:closeLines.length};
 }
+// Turns a fillPropagateAcrossFrames() result into the right toast text —
+// factored out (CLAUDE.md §3) so both call sites (the Tool Options button,
+// fill-bridge.js, and the frame right-click menu, timeline.js) show the
+// same message. Feedback #118 ("pourquoi la propagation n'a pas marché
+// ici ?"): reproduced live — a layer with ONE keyframe and every other
+// frame merely "held" (inheriting it automatically, by design) has NO
+// frame eligible for propagation at all: frames===0, filled===0,
+// skipped===0. That's not a failure — the held frames already show the
+// fill, nothing needed doing — but the generic "0 frame(s) filled, 0 left
+// untouched" message read as a silent failure with no explanation. This
+// case gets its own, clearer message instead of falling through to the
+// generic count.
+function describePropagateResult(res){
+  if(!res)return SM.t('toastPropagateFailed');
+  if(res.frames===0)return SM.t('toastPropagateNothing');
+  return SM.t('toastPropagateDone').replace('{filled}',res.filled).replace('{skipped}',res.skipped);
+}
 // gapThr is a plain world-space distance — "how far apart can two stroke
 // ends be and still count as one closed shape" — matching the Gap Size
 // presets directly, no scale/resolution conversion involved anywhere.

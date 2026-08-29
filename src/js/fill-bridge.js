@@ -212,8 +212,7 @@
     try { res = fillPropagateAcrossFrames(target); } catch (err) { console.warn('[fill] propagate failed', err); }
     updateUI();
     window.SMEngineBridge.renderNow();
-    if (!res) { showToast(SM.t('toastPropagateFailed')); return; }
-    showToast(SM.t('toastPropagateDone').replace('{filled}', res.filled).replace('{skipped}', res.skipped));
+    showToast(describePropagateResult(res));
   }
 
   function init() {
