@@ -416,10 +416,36 @@
       (window._motionRevealedLayers && window._motionRevealedLayers.indexOf(li) >= 0) ||
       (motionViewIsNarrowed() && layerMatchesMotionView(state.layers[li]));
   }
+  // Does ANY per-element holder on this layer carry animated content?
+  // Text-animator's per-glyph offsets (opacity/position/scale — see
+  // text-animator.js's ALL_PRESET_PROPS) and any hand-keyed per-shape
+  // property live ONLY on ld.elementMotion[strokeId], never on the
+  // layer's own holder — U's reveal (below) needs this to know whether a
+  // target layer's animated content is hiding down in the Elements tree.
+  function layerHasAnimatedElements(ld) {
+    if (!ld.elementMotion) return false;
+    for (var k in ld.elementMotion) {
+      var h = ld.elementMotion[k];
+      if (h && PROPS.some(function (p) { return propHasContent(h, p); })) return true;
+    }
+    return false;
+  }
   function handleRevealAnimatedShortcut() {
     if (state.appMode !== 'motion') return false;
     var targets = (window._layerSel && window._layerSel.length) ? window._layerSel.slice() : state.layers.map(function (_l, i) { return i; });
     window._motionRevealedLayers = targets;
+    // Also open the Elements tree for any target layer whose animated
+    // content lives per-element rather than on the layer's own Transform
+    // (feedback #145: "le raccourci U ne révèle pas toute les keyframes
+    // notamment des text animation") — deliberately only the layers that
+    // actually HAVE per-element keys, not every revealed layer: opening it
+    // unconditionally would reintroduce feedback #42's original complaint
+    // (U cascading into every layer's full per-shape breakdown even when
+    // nothing down there is animated).
+    window._motionRevealedElementLayers = targets.filter(function (li) {
+      var ld = state.layers[li];
+      return ld && layerHasAnimatedElements(ld);
+    });
     _hideUnanimated = true;
     renderLayerList(); renderTimeline();
     return true;
@@ -4424,6 +4450,10 @@
           var ri2 = window._motionRevealedLayers.indexOf(li);
           if (ri2 >= 0) window._motionRevealedLayers.splice(ri2, 1);
         }
+        if (window._motionRevealedElementLayers) {
+          var rei2 = window._motionRevealedElementLayers.indexOf(li);
+          if (rei2 >= 0) window._motionRevealedElementLayers.splice(rei2, 1);
+        }
         window._motionExpandedLayer = isLayerExpanded(li) ? null : li;
         window._motionExpandedElement = null;
         _propFilter = null; // a hand-opened layer shows all its properties
@@ -4571,6 +4601,10 @@
         if (window._motionRevealedLayers) {
           var ri = window._motionRevealedLayers.indexOf(li);
           if (ri >= 0) window._motionRevealedLayers.splice(ri, 1);
+        }
+        if (window._motionRevealedElementLayers) {
+          var rei = window._motionRevealedElementLayers.indexOf(li);
+          if (rei >= 0) window._motionRevealedElementLayers.splice(rei, 1);
         }
         // Selecting no longer EXPANDS (2026-07-27: "quand on select un calque
         // cela ne doit pas ouvrir son dropdown de property, on doit le faire
@@ -4724,7 +4758,12 @@
       // element's breakdown too (feedback #42, "il ne faut pas afficher
       // éléments"). A real row click still shows elements exactly as
       // before — this only narrows what a SHORTCUT-driven reveal shows.
-      if (window._motionExpandedLayer === li) renderElementsList(list, li, ld);
+      // EXCEPT _motionRevealedElementLayers (feedback #145): U specifically
+      // also opens this for a layer it already determined HAS animated
+      // per-element content (text-animator glyphs, hand-keyed shapes) —
+      // narrower than "every U-revealed layer", so #42's clutter complaint
+      // stays fixed for the common case of a layer with no per-element keys.
+      if (window._motionExpandedLayer === li || (window._motionRevealedElementLayers && window._motionRevealedElementLayers.indexOf(li) >= 0)) renderElementsList(list, li, ld);
     });
     // Right-panel mirror of the active layer's Transform group ("il
     // faudrait afficher les properties d'un calque sélectionné et la
@@ -6838,7 +6877,10 @@
       // must not pull in the per-element tree here either, or this side
       // renders MORE rows than the panel for the exact same layer, which
       // is precisely the row-count divergence CLAUDE.md §11 warns about.
-      var els = (window._motionExpandedLayer === li) ? buildShapeTree(li, ld) : [];
+      // Same _motionRevealedElementLayers exception as the panel side
+      // (feedback #145) — kept identical on both sides for the same
+      // CLAUDE.md §11 reason this whole gate exists.
+      var els = (window._motionExpandedLayer === li || (window._motionRevealedElementLayers && window._motionRevealedElementLayers.indexOf(li) >= 0)) ? buildShapeTree(li, ld) : [];
       if (els.length) {
         var elHdrSpacer = document.createElement('div'); elHdrSpacer.className = 'frow motion-group-row';
         grid.appendChild(elHdrSpacer);
@@ -8440,6 +8482,7 @@
     // whatever U last revealed.
     if (state.appMode === 'motion' && mode !== 'motion') {
       window._motionRevealedLayers = null;
+      window._motionRevealedElementLayers = null;
       removeKeySelectionBox();
       removeLayerStaggerBox();
       // The graph editor hides #frame-grid while it's open — leaving Motion
