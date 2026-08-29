@@ -694,6 +694,26 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   textAlign:(p.data&&p.data.isTextRoot)?p.data.align:undefined,
   textFixedWidth:(p.data&&p.data.isTextRoot&&p.data.fixedWidth)?p.data.fixedWidth:undefined,
   anchorTopLeft:(p.data&&p.data.isTextRoot&&p.data.anchorTopLeft)?{x:p.data.anchorTopLeft.x,y:p.data.anchorTopLeft.y}:undefined,
+  // Typography panel formatting (2026-08-16, vector-text-bridge.js's own
+  // header comment: "opts... bold/italic/underline/strike/letterSpacing/
+  // wordSpacing/lineHeightMult/textCase") — added to buildVectorTextGroup's
+  // opts and to updateTextPropsPanel's read-back (which drives these
+  // straight off root.data.*) at the time, but never added HERE. A save/
+  // reload silently dropped all 8: the ALREADY-BUILT glyph geometry still
+  // looked right immediately after reopening (segments are baked, real
+  // geometry), but the Typography panel showed Bold/Italic/etc. unchecked,
+  // and the very next edit through that panel (applyTextPropsEdit rebuilds
+  // from the panel's — now wrong — state) visibly reverted the text to
+  // unformatted. Found by cross-checking every writer of p.data on a vector
+  // text root against this whitelist (CLAUDE.md §1), not reported live.
+  bold:(p.data&&p.data.isTextRoot&&p.data.bold)?true:undefined,
+  italic:(p.data&&p.data.isTextRoot&&p.data.italic)?true:undefined,
+  underline:(p.data&&p.data.isTextRoot&&p.data.underline)?true:undefined,
+  strike:(p.data&&p.data.isTextRoot&&p.data.strike)?true:undefined,
+  letterSpacing:(p.data&&p.data.isTextRoot&&p.data.letterSpacing)?p.data.letterSpacing:undefined,
+  wordSpacing:(p.data&&p.data.isTextRoot&&p.data.wordSpacing)?p.data.wordSpacing:undefined,
+  lineHeightMult:(p.data&&p.data.isTextRoot&&p.data.lineHeightMult&&p.data.lineHeightMult!==1.25)?p.data.lineHeightMult:undefined,
+  textCase:(p.data&&p.data.isTextRoot&&p.data.textCase&&p.data.textCase!=='none')?p.data.textCase:undefined,
   // Vector mask (2026-08, AE-style "Mask") — see engine-bridge.js's
   // buildSceneJson mask-extraction comment for how these three drive the
   // engine's clip. §1 consumer check: buildSceneJson reads them (done),
@@ -747,7 +767,12 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // live object here for its per-clone 3D projector cache — the one real,
   // current consumer.
   if(d.dupCloneId)p.data.dupCloneId=d.dupCloneId;if(d.dup3D)p.data.dup3D=d.dup3D;
-  if(d.isTextRoot){p.data.isTextRoot=true;p.data.text=d.text||'';p.data.vectorFont=d.vectorFont||'Roboto-Regular';p.data.size=d.textSize||48;p.data.color=d.textColor||'#000000';p.data.align=d.textAlign||'left';if(d.textFixedWidth)p.data.fixedWidth=d.textFixedWidth;if(d.anchorTopLeft)p.data.anchorTopLeft={x:d.anchorTopLeft.x,y:d.anchorTopLeft.y};}
+  if(d.isTextRoot){p.data.isTextRoot=true;p.data.text=d.text||'';p.data.vectorFont=d.vectorFont||'Roboto-Regular';p.data.size=d.textSize||48;p.data.color=d.textColor||'#000000';p.data.align=d.textAlign||'left';if(d.textFixedWidth)p.data.fixedWidth=d.textFixedWidth;if(d.anchorTopLeft)p.data.anchorTopLeft={x:d.anchorTopLeft.x,y:d.anchorTopLeft.y};
+    // Typography panel formatting — see serP's own comment on this same
+    // field set for the full story of why this was missing.
+    if(d.bold)p.data.bold=true;if(d.italic)p.data.italic=true;if(d.underline)p.data.underline=true;if(d.strike)p.data.strike=true;
+    if(d.letterSpacing)p.data.letterSpacing=d.letterSpacing;if(d.wordSpacing)p.data.wordSpacing=d.wordSpacing;
+    p.data.lineHeightMult=d.lineHeightMult||1.25;if(d.textCase&&d.textCase!=='none')p.data.textCase=d.textCase;}
   if(d.isMask){p.data.isMask=true;p.data.maskMode=d.maskMode||'add';if(d.maskFeather)p.data.maskFeather=d.maskFeather;}
   if(d.strokeGradientAlongPath)p.data.strokeGradientAlongPath=d.strokeGradientAlongPath;
   // Retained-path stamp (engine-bridge.js, 2026-07-28): the stored stroke

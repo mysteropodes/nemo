@@ -56,9 +56,14 @@
 //     otherwise decompose, not fetching a fill's source bitmap). Fetched
 //     as a blob (not linked directly — the Tauri build's `img-src` CSP is
 //     `'self' data: blob:`, no external host, and S3's signed-URL host
-//     isn't a fixed domain worth allowlisting) and inserted as a plain
-//     Raster, same shape as psd-import-bridge.js's layer.canvas -> Raster
-//     step.
+//     isn't a fixed domain worth allowlisting), then converted to a base64
+//     data: URI (FileReader, 2026-08-29 persistence-audit fix — a blob: URL
+//     doesn't survive past the current page's lifetime, but this value gets
+//     written verbatim into the Raster's persisted data.src on save; the
+//     first version of this file used URL.createObjectURL and any project
+//     saved with a Figma-imported image would show it broken on the next
+//     real reload) and inserted as a plain Raster, same self-contained
+//     shape as psd-import-bridge.js's layer.canvas -> Raster step.
 //
 // Scope of THIS pass, stated honestly (mirrors svg-import.js's own
 // "scope, stated honestly" section):
@@ -265,15 +270,34 @@
     if (node.type !== 'GROUP') out.skipped.push(node.type + ' (' + (node.name || '?') + ')');
   }
 
-  // Fetches one image fill's bytes and returns an object URL — kept as a
-  // blob: URL (already allowed by the Tauri build's img-src CSP) rather
-  // than pointing a Raster straight at the returned S3 URL, whose host
-  // isn't a fixed domain worth (or even reliably possible) allowlisting.
-  function fetchImageAsObjectUrl(url) {
+  // Fetches one image fill's bytes and returns a self-contained base64
+  // data: URI — NOT a blob: URL (kept fixed 2026-08-29, persistence audit):
+  // a blob: URL is only valid for the lifetime of the page/tab that created
+  // it, but this value gets written verbatim into a Raster's persisted
+  // data.src (serR, app.js) the moment the project is saved. A project
+  // saved with a Figma-imported image, then reopened in any later session,
+  // would try to load that stale blob: reference and show a broken image —
+  // the exact "no data loss on reload" contract serR's own header comment
+  // promises ("fully self-contained in the project JSON, no external file
+  // dependency after import"), silently violated for this one import path.
+  // psd-import-bridge.js's equivalent step (layer.canvas.toDataURL) already
+  // produces a real data: URI; this mirrors that via FileReader since the
+  // source here is an already-fetched Blob, not a canvas. Still avoids
+  // pointing a Raster straight at the returned S3 URL (Tauri's img-src CSP
+  // doesn't allowlist that host, and it's a signed URL that expires anyway)
+  // — the fetch-as-blob step is unchanged, only what happens to the blob is.
+  function fetchImageAsDataUrl(url) {
     return fetch(url).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.blob();
-    }).then(function (blob) { return URL.createObjectURL(blob); });
+    }).then(function (blob) {
+      return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(reader.result); };
+        reader.onerror = function () { reject(reader.error || new Error('FileReader failed')); };
+        reader.readAsDataURL(blob);
+      });
+    });
   }
 
   // Converts an already-fetched Figma file JSON (GET /v1/files/:key?geometry=paths
@@ -375,16 +399,16 @@
           var srcUrl = opts.imageMap[img.imageRef];
           if (!srcUrl) { out.skipped.push('IMAGE fill (' + img.name + '): no imageMap entry for ' + img.imageRef); continue; }
           try {
-            var objUrl = await fetchImageAsObjectUrl(srcUrl);
+            var dataUrl = await fetchImageAsDataUrl(srcUrl);
             var prevActive = project.activeLayer; layer.activate();
             /* eslint-disable no-loop-func */
             await new Promise(function (resolve) {
-              var r = new Raster(objUrl);
+              var r = new Raster(dataUrl);
               r.onLoad = function () {
                 r.size = new Size(Math.max(1, img.w), Math.max(1, img.h));
                 r.position = new Point(img.mat.e + img.w / 2, img.mat.f + img.h / 2);
                 r.opacity = img.opacity;
-                r.data.src = objUrl;
+                r.data.src = dataUrl;
                 resolve();
               };
               r.onError = function () { resolve(); };
