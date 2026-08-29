@@ -36,6 +36,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "33871", "-d", "src"],
       "port": 33871
+    },
+    {
+      "name": "nemo-fb104-dab-render",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "48213", "-d", "src"],
+      "port": 48213
     }
   ]
 }
