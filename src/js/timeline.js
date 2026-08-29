@@ -7397,6 +7397,15 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
       // front door for a logo or a turnaround.
       {label:tt('menuImportSvg'),id:'ctx-import-svg',
         action:function(){if(window.SMSvgImport)SMSvgImport.openFile();}},
+      // Figma import (feedback #138) reuses the token-paste UX the GitHub
+      // feedback triage field already established (Réglages), rather than
+      // a file picker — there's no local file to pick, just a token + a
+      // pasted file URL. Opens straight to that Settings tab.
+      {label:tt('menuImportFigma'),id:'ctx-import-figma',action:function(){
+        clickEl('btn-settings');
+        var t=document.querySelector('#settings-tabs .settings-tab[data-tab="figma"]');
+        if(t)t.click();
+      }},
       // The OBJ reference viewer's loader existed and worked, with nothing
       // anywhere calling it — SMLabs.open3DReference had zero call sites, so
       // only the two bundled CC0 models were ever reachable. This is that
