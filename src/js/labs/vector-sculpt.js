@@ -34,6 +34,43 @@
   var wasInterpolated = false;
   var resizeStartX = 0, resizeStartRadius = 60;
   var cursor = null;
+  // Feedback #139 ("le sculpt deform n'est pas en temps réel sur une brush
+  // avec un preset"): #129 fixed regenerateBrushTexture() never being called
+  // at all, but only wired it into onUp (drag-END) — regenerateBrushTexture's
+  // own header comment in tools.js is explicit: "buildBrushDabs is a full
+  // rebuild, not cheap per mousemove" (remove every old dab Path + walk the
+  // anchor's current geometry stamping up to BRUSH_MAX_DABS=900 fresh Path
+  // objects — measured ~14.8ms worst case per full rebuild, see tools.js's
+  // BRUSH_MAX_DABS comment). So onMove moved the anchor but the visible dabs
+  // stayed put until release — exactly the "not real-time" complaint. Same
+  // fix shape as feedback #128 (motion-graph.js, CLAUDE.md §5bis): the DATA
+  // write (segment positions, in applyPush/applySmooth) stays synchronous on
+  // every move, but the expensive re-stamp is coalesced to one rAF tick —
+  // a mouse/stylet fires far more move events per frame than the screen can
+  // show anyway, so re-stamping once per SCREEN REFRESH instead of once per
+  // input event loses nothing visible. onUp already forces one final
+  // synchronous regenerateBrushTexture call (added by #129) so the very last
+  // position is never left showing a stale/queued texture.
+  var texRafQueued = false, texLayer = null;
+  function scheduleTextureUpdate(layer) {
+    texLayer = layer;
+    if (texRafQueued) return;
+    texRafQueued = true;
+    requestAnimationFrame(function () {
+      texRafQueued = false;
+      flushTextureUpdate();
+    });
+  }
+  function flushTextureUpdate() {
+    var layer = texLayer;
+    if (!layer || !touched.length) return;
+    // regenerateBrushTexture no-ops instantly on a path with no
+    // brushTexturePreset (its own guard, tools.js) — safe/cheap to call for
+    // every touched path regardless of whether it's textured, so a
+    // non-textured stroke's sculpt behavior is unaffected by this at all.
+    touched.forEach(function (p) { if (typeof regenerateBrushTexture === 'function') regenerateBrushTexture(p, layer); });
+    SMEngineBridge.renderNow();
+  }
 
   function isActive() {
     return !!(window.SMLabs && window.SMLabs.isOn('vector-sculpt') &&
@@ -282,7 +319,14 @@
     if (!undoPushed) { pushUndo(); ensureKeyframe(); undoPushed = true; }
     var moved = e.shiftKey ? applySmooth(layer, cur, R) : applyPush(layer, cur, cur.subtract(lastW), R);
     lastW = cur;
-    if (moved) { saveActiveLayerFrame(); SMEngineBridge.renderNow(); }
+    if (moved) {
+      saveActiveLayerFrame();
+      SMEngineBridge.renderNow();
+      // #139: re-stamp textured strokes' visible dabs during the drag too,
+      // not just at release — coalesced to one rAF tick (see
+      // scheduleTextureUpdate's header comment above).
+      scheduleTextureUpdate(layer);
+    }
   }
   function onUp(e) {
     if (resizing) {

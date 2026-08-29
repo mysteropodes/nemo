@@ -888,18 +888,33 @@
     var t = f * f * (3 - 2 * f); // smoothstep
     return a + (b - a) * t;
   }
+  // dim is the PROPERTY's PROP_DIM (1 for rotation/opacity, 2 for
+  // position/anchor/scale) — NOT a single axis index. A 1D property gets a
+  // bare number back (axis 0's own noise stream); a 2D one gets [wx, wy]
+  // IN ONE CALL, each axis its own independent noise stream (offsetting the
+  // seed by axis, same idea as the octave loop below) so X and Y don't move
+  // in lockstep along a diagonal line — this is what lets the "Exemples"
+  // menu (below) write plain `value[0] + wiggle(2,10)[0]` / `[1]` instead of
+  // calling wiggle() twice with no way to correlate/decorrelate the axes
+  // from user code (bug found via feedback #134: the single-scalar wiggle()
+  // this replaced could never produce a valid [x,y] for a 2D property in
+  // the first place — `value + wiggle(...)` string-concats an array with a
+  // number in JS, it doesn't add per-axis, so the shipped Position example
+  // could never have worked).
   function makeWiggle(seed, dim) {
-    // Independent noise per dimension (offsetting the seed) so a 2D
-    // property's X/Y wiggle don't move in lockstep along a diagonal line.
-    return function (freqPerSec, amp, octaves) {
+    function axisNoise(axis, freqPerSec, amp, octaves) {
       var t = (state.currentFrame / (state.fps || 24));
       var n = 0, amp2 = 1, freq2 = 1, norm = 0;
-      octaves = Math.max(1, octaves || 1);
       for (var o = 0; o < octaves; o++) {
-        n += (hashNoise1D(seed + dim * 101 + o * 977, t * freqPerSec * freq2) - 0.5) * 2 * amp2;
+        n += (hashNoise1D(seed + axis * 101 + o * 977, t * freqPerSec * freq2) - 0.5) * 2 * amp2;
         norm += amp2; amp2 *= 0.5; freq2 *= 2;
       }
       return (n / norm) * amp;
+    }
+    return function (freqPerSec, amp, octaves) {
+      octaves = Math.max(1, octaves || 1);
+      if (dim === 2) return [axisNoise(0, freqPerSec, amp, octaves), axisNoise(1, freqPerSec, amp, octaves)];
+      return axisNoise(0, freqPerSec, amp, octaves);
     };
   }
   // loopOut() — cycles `frame` back into this SAME property's own keyed
@@ -1067,14 +1082,14 @@
         frame,
         rawValue.length === 1 ? rawValue[0] : rawValue.slice(),
         function (ref) { return layerSnapshot(ref, frame); },
-        makeWiggle(seed, prop === 'rotation' || prop === 'opacity' ? 0 : 0),
+        makeWiggle(seed, PROP_DIM[prop]),
         function () { return loopOutRaw(holder, prop, frame); },
         function (i) { return exprKeyAt(holder, prop, i); },
         function (t) { return exprNearestKey(holder, prop, t); },
         exprNumKeys(holder, prop)
       );
       var normalized = normalizeExprResult(result, prop);
-      if (normalized === null) { ex.lastError = 'L’expression doit retourner un nombre' + (PROP_DIM[prop] === 2 ? ' ou un tableau [x,y]' : '') + '.'; return null; }
+      if (normalized === null) { ex.lastError = SM.t(PROP_DIM[prop] === 2 ? 'exprErrorMustReturnNumberOrXY' : 'exprErrorMustReturnNumber'); return null; }
       ex.lastError = null;
       return normalized;
     } catch (e) {
@@ -5484,10 +5499,24 @@
         commit();
         ta.focus();
       }
+      // wiggle()/Math.sin() examples: `value` is a bare [x,y] ARRAY on a 2D
+      // property (position/anchor/scale) — JS's `+` on an array string-
+      // concatenates instead of adding per-axis, so the 1D-only
+      // `value + wiggle(2, 10)` form silently produced an invalid result
+      // (feedback #134: this exact example, inserted on Position, always
+      // hit "expression must return a number or [x,y] array"). PROP_DIM-
+      // branch the inserted code so the SAME menu item is always valid for
+      // the property it was invoked on — wiggle() itself already returns
+      // [wx, wy] for a 2D property (see makeWiggle above).
+      var is2D = PROP_DIM[prop] === 2;
       window.showContextMenu(e.clientX, e.clientY, [
         { label: 'value — pas de changement', action: function () { insert('value'); } },
-        { label: 'value + wiggle(2, 10) — tremblement aléatoire', action: function () { insert('value + wiggle(2, 10)'); } },
-        { label: 'value + Math.sin(time * 3) * 10 — oscillation régulière', action: function () { insert('value + Math.sin(time * 3) * 10'); } },
+        is2D
+          ? { label: 'value + wiggle(2, 10) — tremblement aléatoire', action: function () { insert('[value[0] + wiggle(2, 10)[0], value[1] + wiggle(2, 10)[1]]'); } }
+          : { label: 'value + wiggle(2, 10) — tremblement aléatoire', action: function () { insert('value + wiggle(2, 10)'); } },
+        is2D
+          ? { label: 'value + Math.sin(time * 3) * 10 — oscillation régulière', action: function () { insert('[value[0] + Math.sin(time * 3) * 10, value[1] + Math.sin(time * 3) * 10]'); } }
+          : { label: 'value + Math.sin(time * 3) * 10 — oscillation régulière', action: function () { insert('value + Math.sin(time * 3) * 10'); } },
         { label: 'loopOut() — boucle en continu après la dernière clé', action: function () { insert('loopOut()'); } },
         { label: 'key(1).value — reste sur la valeur de la 1ère clé', action: function () { insert('key(1).value'); } },
         { label: 'layer(\'Nom du calque\').' + followProp + ' — suivre un autre calque', action: function () { insert('layer(\'Nom du calque\').' + followProp); } },
@@ -5505,7 +5534,11 @@
     var gutter = document.createElement('div'); gutter.className = 'motion-expr-gutter';
     var ta = document.createElement('textarea'); ta.className = 'motion-expr-code';
     ta.value = expr.code; ta.spellcheck = false;
-    ta.placeholder = 'value + wiggle(2, 10)';
+    // Placeholder mirrors the "Exemples" menu's own PROP_DIM branch below —
+    // `value` is a bare [x,y] array on a 2D property, so the 1D-only form
+    // would be just as invalid to copy from here as it was from the menu
+    // (feedback #134).
+    ta.placeholder = PROP_DIM[prop] === 2 ? '[value[0] + wiggle(2, 10)[0], value[1] + wiggle(2, 10)[1]]' : 'value + wiggle(2, 10)';
     // Discoverability (2026-08-16, Cyril: "agrémenter la library
     // d'expressions... ID keyframes et layers") — layer()/key()/nearestKey()/
     // numKeys existed (or now exist) with zero UI surface telling anyone
