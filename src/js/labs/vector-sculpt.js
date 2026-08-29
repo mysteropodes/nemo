@@ -25,6 +25,13 @@
 (function () {
   var RAD_KEY = 'nemo-labs-sculpt-radius';
   var dragging = false, resizing = false, lastW = null, undoPushed = false, touched = [];
+  // #122: snapshot BEFORE the gesture whether the current frame is a
+  // generated tween in-between — saveActiveLayerFrame (onUp) promotes it to
+  // a real keyframe the instant content actually changes, so by onUp time
+  // isInterpolated is already gone; this is the only place that can still
+  // tell "this edit just performed the promotion" from "this frame was
+  // already a real keyframe" (see harmonizeAfterEdit's own comment, tweens.js).
+  var wasInterpolated = false;
   var resizeStartX = 0, resizeStartRadius = 60;
   var cursor = null;
 
@@ -232,6 +239,9 @@
       return;
     }
     dragging = true; undoPushed = false; touched = [];
+    var curLd = state.layers[state.activeLayerIdx];
+    var curF = curLd && curLd.frames[state.currentFrame];
+    wasInterpolated = !!(curF && curF.isInterpolated);
     var w = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     lastW = new Point(w[0], w[1]);
   }
@@ -288,7 +298,9 @@
     // Fills whose walls were sculpted re-trace against the new geometry.
     touched.forEach(function (p) { if (typeof fillRegenerateLinked === 'function') fillRegenerateLinked(layer, p); });
     touched = [];
-    saveActiveLayerFrame(); updateUI();
+    saveActiveLayerFrame();
+    if (wasInterpolated && typeof harmonizeAfterEdit === 'function') harmonizeAfterEdit(state.currentFrame);
+    updateUI();
     SMEngineBridge.renderNow();
   }
 

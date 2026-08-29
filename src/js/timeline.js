@@ -491,7 +491,7 @@ window.SM={
   // startPlay's interval) — implied on when picked, doesn't force loop off.
   togglePingPongPlayback:function(){state.pingPongPlayback=!state.pingPongPlayback;if(state.pingPongPlayback)state.loopPlayback=true;var b=document.getElementById('btn-loop');if(b){b.classList.toggle('active',state.loopPlayback);b.classList.toggle('pingpong',state.pingPongPlayback);b.title=SM.t(state.pingPongPlayback?'loopPingPongTitle':'loopWorkAreaTitle');}showToast(SM.t(state.pingPongPlayback?'toastPingPongOn':'toastPingPongOff'));},
   setPointType:setPointType,booleanOp:booleanOp,
-  generateTweens:generateTweens,insertFrame:insertFrame,insertKeyframe:insertKeyframe,insertBlankKeyframe:insertBlankKeyframe,removeFrame:removeFrame,
+  generateTweens:generateTweens,harmonizeAfterEdit:harmonizeAfterEdit,insertFrame:insertFrame,insertKeyframe:insertKeyframe,insertBlankKeyframe:insertBlankKeyframe,removeFrame:removeFrame,
   clearKeyframe:clearKeyframe,convertToKeyframes:convertToKeyframes,removeFrameSpan:removeFrameSpan,removeTweenSpan:removeTweenSpan,duplicateSelectedFrames:duplicateSelectedFrames,
   // Tool settings double as selection editors (Animate behavior): with the
   // Select tool active and strokes selected, changing width/style/color/
@@ -9098,6 +9098,7 @@ document.getElementById('canvas-fit-btn').addEventListener('click',function(e){
 document.getElementById('p-resamp').addEventListener('input',function(){window.SM.setResamplePts(parseInt(this.value));});
 document.getElementById('p-step').addEventListener('change',function(){window.SM.setTweenStep(this.value);});
 document.getElementById('p-skipmanual').addEventListener('change',function(){state.tweenSkipManual=this.checked;});
+document.getElementById('p-harmonize-tween').addEventListener('change',function(){state.tweenHarmonizeEdits=this.checked;});
 document.getElementById('btn-tw').addEventListener('click',function(){window.SM.generateTweens();});
 document.getElementById('btn-os').addEventListener('click',function(){window.SM.toggleOnion();});
 document.getElementById('btn-ghost-all').addEventListener('click',function(){window.SM.toggleGhostAll();});
