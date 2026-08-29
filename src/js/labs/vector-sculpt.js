@@ -297,6 +297,16 @@
     var layer = userLayers[state.activeLayerIdx];
     // Fills whose walls were sculpted re-trace against the new geometry.
     touched.forEach(function (p) { if (typeof fillRegenerateLinked === 'function') fillRegenerateLinked(layer, p); });
+    // Feedback #129 ("le sculpt brush marche pas sur des stroke texturé"): a
+    // brush-texture anchor's dabs are disposable stamps computed once at
+    // apply-time — they never re-follow an edited anchor on their own (see
+    // regenerateBrushTexture's own header comment, tools.js). subselect-
+    // bridge.js's node-drag already re-stamps on drag-end; this tool's own
+    // push/smooth drag moves the anchor's segments exactly the same way but
+    // never called the same re-stamp, so sculpting a textured stroke visibly
+    // did nothing — the anchor itself moved (invisible, camouflaged), the
+    // dabs stayed put.
+    touched.forEach(function (p) { if (typeof regenerateBrushTexture === 'function') regenerateBrushTexture(p, layer); });
     touched = [];
     saveActiveLayerFrame();
     if (wasInterpolated && typeof harmonizeAfterEdit === 'function') harmonizeAfterEdit(state.currentFrame);
