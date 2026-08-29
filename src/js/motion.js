@@ -4702,7 +4702,7 @@
           // resolves to a Folder specifically (an ordinary Null parent
           // leaves this disabled, same guard the drag-out gesture uses —
           // see folderLayerParentIdx, timeline.js).
-          { label: 'Retirer du dossier', disabled: (typeof folderLayerParentIdx !== 'function' || folderLayerParentIdx(li) < 0), action: function () { window.SM.removeLayerFromFolder(li); } },
+          { label: SM.t('ctxRemoveFromFolderParent'), disabled: (typeof folderLayerParentIdx !== 'function' || folderLayerParentIdx(li) < 0), action: function () { window.SM.removeLayerFromFolder(li); } },
           { label: SM.t('ctxSplitIntoLayers'), disabled: !!ld.symbolId || !!ld.lfsGroup, action: function () { window.SM.splitLayerIntoElements(li); } },
           { label: SM.t('ctxCutAtPlayhead'), action: function () { window.SM.splitLayerAtPlayhead(li); } },
           { label: ld.shy ? SM.t('ctxRemoveShyMark') : SM.t('ctxMarkAsShy'), action: function () { window.SM.toggleLayerShy(li); } },
