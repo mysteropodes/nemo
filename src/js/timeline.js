@@ -755,7 +755,33 @@ window.SM={
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){
       pushUndo();
       var op=Math.max(0,Math.min(100,parseInt(v)||0))/100;
-      selectedPaths.forEach(function(p){p.opacity=op;});
+      // Lives under the Fill header (#p-opacity, #fill-sec) — feedback #48:
+      // "la partie fill... s'applique au stroke". Writing whole-item opacity
+      // dimmed the stroke right along with the fill, which reads as "Fill
+      // opacity" doing the wrong thing for anyone coming from Figma's own
+      // convention (fill opacity is per-paint, separate from a layer's own
+      // opacity — mirrors how #p-stroke-alpha already only touches
+      // strokeColor's alpha, never the whole item). Only fall back to
+      // item.opacity when there's no fillColor to touch (rasters/images/
+      // video frames, or a shape with fill currently disabled) — keeps the
+      // fix this comment used to describe (opacity doing nothing on those).
+      // Reassign a brand-new hex8 STRING, not fillColor.alpha=op in place —
+      // mutating the existing live Color object left the retained-path
+      // engine cache (CLAUDE.md §5ter) unrefreshed on screen even though
+      // path.fillColor.alpha read back correctly afterward; every other
+      // color writer in this codebase (setFillColor/setStrokeColor/
+      // #p-stroke-alpha) already goes through a full string reassignment,
+      // which its `_changed` hook is proven to catch.
+      var touchedFillHex=null;
+      selectedPaths.forEach(function(p){
+        if(p.fillColor){
+          var rgb=colorHex8(p.fillColor).replace('#','').slice(0,6);
+          var a=Math.round(op*255).toString(16).padStart(2,'0').toUpperCase();
+          var hex8='#'+rgb+(op<1?a:'');
+          p.fillColor=hex8;touchedFillHex=hex8;
+        } else p.opacity=op;
+      });
+      if(touchedFillHex){state.fillColor=touchedFillHex;paintFillSwatches(touchedFillHex);}
       saveActiveLayerFrame();updateUI();
     }
   },
@@ -5063,9 +5089,12 @@ function paintFillSwatches(v){
   var fw=document.getElementById('fill-well'); if(fw)fw.style.background=v;
   var pf=document.getElementById('pm-fill');   if(pf)pf.style.background=v;
   ['color-fill','pm-fill-c'].forEach(function(id){setHex8Input(document.getElementById(id),v);});
-  // No fill-side alpha field exists (only the stroke has one) — the fill's
-  // alpha rides in dataset.hex8 above.
   var fhex=document.getElementById('p-fill-hex');if(fhex&&document.activeElement!==fhex)fhex.value=hexDisplayValue(v);
+  // #p-opacity (feedback #48 fix) now IS the fill's own alpha field, same
+  // convention as #p-stroke-alpha just below for stroke — keep it in sync
+  // with whatever selection/color change just painted this swatch, instead
+  // of showing a stale percentage left over from a previous shape.
+  var fop=document.getElementById('p-opacity');if(fop&&document.activeElement!==fop)fop.value=alphaPctFromHex(v);
 }
 // `frameOnly` — same contract as updateUI's: nothing but state.currentFrame
 // changed. Animation 2D's rows are frame-INDEPENDENT (name, colour dot,

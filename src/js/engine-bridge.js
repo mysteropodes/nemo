@@ -105,6 +105,18 @@
   // single-writer behavior a live preview during an intercepted drag needs.
   var suspended = false;
 
+  // Callers below MUST hand this colorHex8(color) — never color.toCSS(true).
+  // Paper.js's toCSS(true) hard-codes alpha=1 into the string it returns
+  // regardless of the Color object's actual .alpha (documented Paper.js
+  // quirk, CLAUDE.md §2's colorHex8 comment in app.js) — every one of these
+  // call sites used to pass toCSS(true), so a fill/stroke color's OWN alpha
+  // byte (#rrggbbaa, set via the Fill/Stroke opacity fields or the RGBA
+  // picker) silently never reached the renderer: only the item's separate
+  // opacity scalar (`op`/`op2` below) ever visibly dimmed anything, even
+  // though this function was already written to multiply BOTH together
+  // correctly (feedback #48, confirmed by sampling actual rendered pixels
+  // via renderFrameToPixelsPNG — a 40%-alpha fill and a 20%-alpha stroke
+  // both rendered fully opaque before this fix).
   function cssColorToRgba(css, opacity) {
     if (!css) return null;
     var h = String(css).replace('#', '');
@@ -1622,13 +1634,13 @@
           }
           var item;
           if (pathRef) {
-            item = { pathRef: pathRef, fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op) };
+            item = { pathRef: pathRef, fillColor: cssColorToRgba(c.fillColor ? colorHex8(c.fillColor) : null, op) };
             if (pathTf) item.pathTransform = pathTf;
           } else {
             item = {
               segments: rounded,
               closed: !!sd.closed,
-              fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op),
+              fillColor: cssColorToRgba(c.fillColor ? colorHex8(c.fillColor) : null, op),
             };
           }
           // Extended per-shape property: Fill color (2026-07) — overrides
@@ -1705,7 +1717,7 @@
             item.fillColor = null;
             delete item.fillGradient;
           }
-          var sc = cssColorToRgba(c.strokeColor ? c.strokeColor.toCSS(true) : null, op);
+          var sc = cssColorToRgba(c.strokeColor ? colorHex8(c.strokeColor) : null, op);
           if (sc) {
             item.strokeColor = sc;
             // With pathTransform the engine strokes THROUGH the affine, which
@@ -1897,9 +1909,9 @@
           var extraItem = {
             segments: roundSegs(exSegs),
             closed: !!ex.path.closed,
-            fillColor: cssColorToRgba(ex.path.fillColor ? ex.path.fillColor.toCSS(true) : null, op2),
+            fillColor: cssColorToRgba(ex.path.fillColor ? colorHex8(ex.path.fillColor) : null, op2),
           };
-          var exSc = cssColorToRgba(ex.path.strokeColor ? ex.path.strokeColor.toCSS(true) : null, op2);
+          var exSc = cssColorToRgba(ex.path.strokeColor ? colorHex8(ex.path.strokeColor) : null, op2);
           if (exSc) { extraItem.strokeColor = exSc; extraItem.strokeWidth = ex.path.strokeWidth || 1; }
           items.push(extraItem);
         });
@@ -2268,8 +2280,8 @@
           // outline mode would otherwise report closed:false and render with
           // a gap where the fill used to close the loop.
           closed: !!sub.closed,
-          fillColor: cssColorToRgba(c.fillColor ? c.fillColor.toCSS(true) : null, op),
-          strokeColor: cssColorToRgba(c.strokeColor ? c.strokeColor.toCSS(true) : null, op),
+          fillColor: cssColorToRgba(c.fillColor ? colorHex8(c.fillColor) : null, op),
+          strokeColor: cssColorToRgba(c.strokeColor ? colorHex8(c.strokeColor) : null, op),
           strokeWidth: c.strokeWidth || 1,
           // typeof-guarded — same Option<String> boundary as the main
           // per-item loop above (buildSceneJson).
