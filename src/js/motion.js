@@ -5833,7 +5833,22 @@
     var flat = layerElements(li, ld);
     var out = [], emittedGroups = {};
     flat.forEach(function (entry) {
-      var gid = entry.sd.groupId;
+      // Feedback #143 ("toujours pas de keyframes de properties par rapport
+      // au animation de texte dans la timeline motion"): vector-text glyphs
+      // (vector-text-bridge.js) share their run's data.groupId — the SAME
+      // field a normal Cmd+G/Combine group uses to opaquely collapse its
+      // members into one summary row below. That collapse is right for an
+      // ordinary group (you usually want to animate the whole thing
+      // together), but wrong for text: text-animator.js's whole point is a
+      // per-letter/word/line STAGGER, each unit with its OWN keyframes, and
+      // collapsing them left nothing to see or edit here even though the
+      // keys are real and the animation renders correctly. Raster-split
+      // characters never had this problem — splitTextIntoCharacters tags
+      // them with data.textGroupId, a DIFFERENT field this collapse never
+      // checked, so they already listed individually. Vector text now gets
+      // the same treatment: skip the group-collapse, list each glyph as its
+      // own expandable element row, exactly like every other ungrouped shape.
+      var gid = entry.sd.isVectorText ? null : entry.sd.groupId;
       if (gid) {
         if (!emittedGroups[gid]) {
           emittedGroups[gid] = true;
