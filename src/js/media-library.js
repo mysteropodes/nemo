@@ -320,7 +320,7 @@
       // a filesystem path persists) — a real asset panel needs this
       // distinction since it determines what "broken" even means (2026-07-31).
       if (m.linked) {
-        var linkBadge = document.createElement('span'); linkBadge.className = 'media-row-badge kind-linked'; linkBadge.textContent = 'Fichier lié'; linkBadge.title = m.path || '';
+        var linkBadge = document.createElement('span'); linkBadge.className = 'media-row-badge kind-linked'; linkBadge.textContent = SM.t('mediaLinkedFileBadge'); linkBadge.title = m.path || '';
         meta.appendChild(linkBadge);
       } else if (m.sizeBytes) {
         var sizeEl = document.createElement('span'); sizeEl.className = 'media-row-size'; sizeEl.textContent = formatBytes(m.sizeBytes);
@@ -336,7 +336,7 @@
         if (!srcLayer) _orphanCount++;
         var owner = document.createElement('span'); owner.className = 'media-row-owner' + (srcLayer ? '' : ' orphan');
         if (srcLayer) { var dot = document.createElement('span'); dot.className = 'media-row-owner-dot'; dot.style.background = srcLayer.color || 'var(--text-dim)'; owner.appendChild(dot); }
-        var ownerLbl = document.createElement('span'); ownerLbl.textContent = srcLayer ? srcLayer.name : 'Orphelin';
+        var ownerLbl = document.createElement('span'); ownerLbl.textContent = srcLayer ? srcLayer.name : SM.t('mediaOrphanBadge');
         owner.appendChild(ownerLbl);
         meta.appendChild(owner);
       }
@@ -351,15 +351,15 @@
         e.preventDefault(); e.stopPropagation();
         if (!window.showContextMenu) return;
         var items = [];
-        if (srcLayer) items.push({ label: 'Sélectionner le calque', action: function () { jumpToLayer(m); } });
-        if (m.kind === 'image') items.push({ label: 'Insérer une copie sur le calque actif', action: function () { insertImageOnCanvas(m); } });
+        if (srcLayer) items.push({ label: SM.t('ctxSelectLayer'), action: function () { jumpToLayer(m); } });
+        if (m.kind === 'image') items.push({ label: SM.t('ctxInsertCopyOnActiveLayer'), action: function () { insertImageOnCanvas(m); } });
         // Relink (2026-07-31): only nativeVideo entries can go offline (a
         // moved/deleted file — the embedded kinds never can, their bytes
         // live IN the project). replaceNativeVideoSource is native-video-
         // bridge.js's own relink flow, same dialog/session-swap shape as
         // images.js's replaceFootageSource for the embedded raster kinds.
         if (m.linked && srcLayer && window.SMNativeVideo && window.SMNativeVideo.replaceNativeVideoSource) {
-          items.push({ label: 'Relier / remplacer le fichier…', action: function () {
+          items.push({ label: SM.t('ctxRelinkReplaceFile'), action: function () {
             var li = state.layers.indexOf(srcLayer);
             window.SMNativeVideo.replaceNativeVideoSource(li);
           } });
@@ -369,11 +369,11 @@
         // duplicated here (same divergence risk CLAUDE.md flags for propsFor/
         // panel-grid). Only delete, reusing that file's own stop+splice.
         if (m.kind === 'audio' && m.audioId) {
-          items.push({ label: 'Supprimer la piste', action: function () {
+          items.push({ label: SM.t('ctxDeleteTrack'), action: function () {
             if (window.SMAudio && SMAudio.removeTrackByAudioId(m.audioId)) removeEntry(m.id);
           } });
         } else {
-          items.push({ label: 'Retirer de la bibliothèque', action: function () { removeEntry(m.id); } });
+          items.push({ label: SM.t('ctxRemoveFromLibrary'), action: function () { removeEntry(m.id); } });
         }
         window.showContextMenu(e.clientX, e.clientY, items);
       });

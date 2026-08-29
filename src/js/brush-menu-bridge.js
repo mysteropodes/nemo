@@ -219,7 +219,7 @@
     // montrer).
     var createRow = document.createElement('div'); createRow.className = 'pr';
     var createLbl = document.createElement('span'); createLbl.className = 'pl';
-    var createBtn = document.createElement('button'); createBtn.className = 'pbtn'; createBtn.style.cssText = 'flex:1;font-size:10px'; createBtn.type = 'button'; createBtn.textContent = 'Créer un brush personnalisé…';
+    var createBtn = document.createElement('button'); createBtn.className = 'pbtn'; createBtn.style.cssText = 'flex:1;font-size:10px'; createBtn.type = 'button'; createBtn.textContent = window.SM.t('brushCreateCustomBtn');
     createBtn.addEventListener('click', function () {
       if (!window.BrushEditor) return;
       var startKey = state.brushPreset && state.brushPreset !== 'none' ? state.brushPreset : null;
@@ -330,7 +330,7 @@
       // second bouton dédié : DOUBLE-CLIC sur une entrée personnalisée pour
       // l'éditer est le même geste déjà établi ailleurs dans l'app pour
       // "ouvrir/entrer dans" un élément (double-clic sur un Component).
-      btn.title = 'Cliquer pour sélectionner — double-clic pour éditer';
+      btn.title = window.SM.t('titleClickSelectDblClickEdit');
       btn.addEventListener('dblclick', function (e) {
         e.preventDefault(); e.stopPropagation();
         if (window.BrushEditor) window.BrushEditor.open(key, function (newKey) {

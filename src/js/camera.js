@@ -357,7 +357,7 @@
     // detonnait dans une UI flat monochrome.
     var ico = document.createElement('div'); ico.className = 'lico';
     ico.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14"><path d="M4 7a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2H4Z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m17 10 4-2.2v8.4L17 14v-4Z" fill="currentColor"/></svg>';
-    var eye = document.createElement('div'); eye.className = 'lico'; eye.title = 'Vue caméra — verrouille le viewport sur la caméra';
+    var eye = document.createElement('div'); eye.className = 'lico'; eye.title = window.SM.t('titleCameraViewLockHint');
     eye.innerHTML = state.cameraView ? ICO_EYE : ICO_EYE_CLOSED;
     eye.style.color = state.cameraView ? '#ffaa28' : '';
     eye.addEventListener('click', function (e) {
@@ -367,7 +367,7 @@
       applyCameraView();
       renderLayerList();
     });
-    var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = 'Caméra'; nm.style.fontWeight = '600';
+    var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = window.SM.t('hdrCamera'); nm.style.fontWeight = '600';
     row.appendChild(ico); row.appendChild(eye); row.appendChild(nm);
     // renderNow() after setTool('camera') — live feedback: the guides only
     // reappeared after scrubbing (goToFrame's own render calls elsewhere in
@@ -384,9 +384,9 @@
       // against the right context, and the shared editor panel is visible.
       window.SM.setTool('camera'); renderLayerList(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       window.showContextMenu(e.clientX, e.clientY, [
-        { label: 'Modifier la courbe d\'accélération…', action: openCameraEaseEditor },
+        { label: window.SM.t('ctxEditEaseCurve'), action: openCameraEaseEditor },
         { sep: true },
-        { label: 'Supprimer le calque caméra', action: function () { state.cameraLayerOn = false; state.cameraKeys = []; state.cameraView = false; if (state.tool === 'camera') window.SM.setTool('select'); renderLayerList(); renderTimeline(); updateCameraPanel(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } },
+        { label: window.SM.t('ctxDeleteCameraLayer'), action: function () { state.cameraLayerOn = false; state.cameraKeys = []; state.cameraView = false; if (state.tool === 'camera') window.SM.setTool('select'); renderLayerList(); renderTimeline(); updateCameraPanel(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } },
       ]);
     });
     list.appendChild(row);
@@ -415,7 +415,7 @@
           e.preventDefault(); e.stopPropagation();
           goToFrame(fi); window.SM.setTool('camera');
           window.showContextMenu(e.clientX, e.clientY, [
-            { label: 'Modifier la courbe d\'accélération…', action: openCameraEaseEditor },
+            { label: window.SM.t('ctxEditEaseCurve'), action: openCameraEaseEditor },
           ]);
         });
       })(i);
@@ -461,7 +461,7 @@
       var fi = Math.floor(e.offsetX / FC);
       goToFrame(fi); window.SM.setTool('camera');
       window.showContextMenu(e.clientX, e.clientY, [
-        { label: 'Modifier la courbe d\'accélération…', action: openCameraEaseEditor },
+        { label: window.SM.t('ctxEditEaseCurve'), action: openCameraEaseEditor },
       ]);
     });
     var pad = 4;

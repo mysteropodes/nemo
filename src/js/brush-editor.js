@@ -160,9 +160,9 @@
     // the captured path's own fill/stroke/color never matters.
     function refreshCaptureStatus() {
       if (params.customStamp && params.customStamp.segments && params.customStamp.segments.length) {
-        captureStatus.textContent = 'Forme capturée (' + params.customStamp.segments.length + ' points)';
+        captureStatus.textContent = SM.t('toastShapeCapturedSuffix') + params.customStamp.segments.length + SM.t('brushCapturePointsSuffix');
       } else {
-        captureStatus.textContent = 'Aucune forme — ellipse utilisée en attendant';
+        captureStatus.textContent = SM.t('brushCaptureEmptyHint');
       }
     }
     function syncCaptureRowVisibility() {
