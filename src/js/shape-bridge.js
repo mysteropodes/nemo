@@ -13,6 +13,24 @@
   var shapeStart = null; // world [x,y]
   var shapeTool = null;
 
+  // Motion transform (2026-08-29, feedback #135: "si je dessine dans le
+  // layer dont la position a été changé dans motion... le dessin se
+  // recale") — same fix/reasoning as draw-bridge.js's toLocalPoint (see its
+  // header comment for the full story). shapeStart/the live drag endpoint
+  // are rendered/world-space (screenToWorld), correct for the live overlay
+  // preview built by overlayItem() below; only commitShape needs to map
+  // them into the active layer's raw document space before building the
+  // real Path, so a Motion-transformed layer doesn't apply its offset a
+  // second time on top at the next render.
+  function toLocalPoint(pt, layerIdx) {
+    if (!window.SMMotion) return pt;
+    var map = SMMotion.layerMotionPointMap ? SMMotion.layerMotionPointMap(layerIdx) : null;
+    if (!map && SMMotion.layerMotion3DPointMap) map = SMMotion.layerMotion3DPointMap(layerIdx);
+    if (!map) return pt;
+    var lp = map.inv(pt.x, pt.y);
+    return new Point(lp[0], lp[1]);
+  }
+
   function shouldIntercept() {
     return (
       window.SMEngineBridge && window.SMEngineBridge.isEnabled() &&
@@ -197,10 +215,18 @@
   }
 
   function commitShape(ex, ey) {
-    var start = new Point(shapeStart[0], shapeStart[1]);
-    var end = new Point(ex, ey);
+    // World-space endpoints — the <2px drag-discard check below stays
+    // against THESE (a screen-space "did you actually drag" threshold,
+    // unaffected by the layer's Motion transform).
+    var worldStart = new Point(shapeStart[0], shapeStart[1]);
+    var worldEnd = new Point(ex, ey);
     var layer = userLayers[state.activeLayerIdx];
     layer.activate();
+    // Motion transform fix (feedback #135, see toLocalPoint's header
+    // comment above) — map into the layer's raw document space before
+    // building the actual shape geometry.
+    var start = toLocalPoint(worldStart, state.activeLayerIdx);
+    var end = toLocalPoint(worldEnd, state.activeLayerIdx);
     var geom = shapeGeom(shapeTool, start.x, start.y, end.x, end.y);
     var path = new Path();
     geom.segments.forEach(function (sd) {
@@ -219,7 +245,7 @@
     } else {
       path.fillColor = state.fillEnabled ? state.fillColor : null;
     }
-    if (start.getDistance(end) < 2) {
+    if (worldStart.getDistance(worldEnd) < 2) {
       path.remove();
       if (state.undoStack.length) state.undoStack.pop();
     } else {
