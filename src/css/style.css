@@ -998,6 +998,9 @@ body.mode-motion #btn-tween-curves{display:none;}
 .motion-anchor-grid-btn{color:var(--text-dark);cursor:pointer;}
 .motion-anchor-grid-btn:hover{background:var(--panel3);color:var(--text);}
 .motion-anchor-grid-btn.on{color:var(--accent);}
+.motion-scale-lock{color:var(--text-dark);cursor:pointer;flex:none;}
+.motion-scale-lock:hover{background:var(--panel3);color:var(--text);}
+.motion-scale-lock.on{color:var(--accent);}
 .motion-anchor-grid-row{height:auto;justify-content:center;padding:6px 8px;cursor:default;background:rgba(255,255,255,.02);}
 .motion-anchor-grid{display:grid;grid-template-columns:repeat(3,18px);grid-template-rows:repeat(3,18px);gap:3px;}
 .motion-anchor-cell{width:18px;height:18px;padding:0;border:1px solid var(--border2);border-radius:3px;background:var(--panel2);cursor:pointer;position:relative;}
