@@ -607,6 +607,10 @@ input[type="checkbox"]:disabled{opacity:.4;cursor:not-allowed;}
 .pbtn:hover{background:#2c2a31;color:var(--text);}
 .pbtn.ac{background:var(--accent);border-color:var(--accent);color:#fff;}
 .pbtn.ac:hover{background:#5254d9;}
+/* Bulk media conversion button, disabled state (2026-08-29, linked-media.js
+   — "Convertir les médias…" is hidden-via-disable on a browser with neither
+   Tauri nor showDirectoryPicker, same idiom as .bp-swatch-btn:disabled). */
+.pbtn:disabled,.pbtn:disabled:hover{opacity:.4;cursor:not-allowed;background:var(--panel3);color:rgba(236,234,231,.75);}
 .fb-tag.active{background:var(--accent);color:#fff;}
 .icon-grp{display:flex;flex:1;background:var(--panel3);border:none;border-radius:7px;overflow:hidden;}
 /* Value boxes/dropdowns/buttons inside the right panel darkened to match

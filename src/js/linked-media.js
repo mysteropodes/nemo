@@ -305,12 +305,284 @@
     }
   }
 
+  // ---- bulk conversion (2026-08-29, follow-up to "un seul réglage" above)
+  // — flipping state.mediaMode only ever governed NEW imports (this file's
+  // own header comment: "never retroactively converts already-embedded
+  // media"). This closes that gap with an EXPLICIT, user-triggered action
+  // (never an automatic side-effect of flipping the toggle itself — a bulk
+  // filesystem write firing invisibly off a checkbox click would be a bad
+  // surprise) that retroactively converts every image ALREADY in the
+  // project to match whichever direction the Document panel toggle
+  // currently points at.
+  //
+  // Scope: media-library-entry driven, same as relinkImageEntry above —
+  // only an entry's own SOURCE layer (layerUid/layerName) is touched, never
+  // a copy dragged out of the library onto another layer afterward. Same
+  // documented limitation this file's own sequence-relink flow already
+  // carries (only the representative first file is offered/updated for a
+  // sequence entry), not a new one introduced here.
+
+  // Given a `d`-shaped reference ({linkedPath} or {linkedHandleId}), resolves
+  // its bytes ONCE and returns a promise — the synchronous-cache-or-kick-
+  // off-background-resolve dance resolveAsync does for desR's render loop
+  // doesn't fit a batch conversion that needs to know the outcome (success
+  // or missing/broken) before deciding what to write. Reuses the EXACT same
+  // read implementations resolveAsync itself calls
+  // (_resolveDesktopPath/_resolveWebHandle) and the exact same cache
+  // (getCachedSrc/primeCache) — never a second, parallel bytes-reading path.
+  function resolveOnce(d) {
+    var cached = getCachedSrc(d);
+    if (cached) return Promise.resolve(cached);
+    if (!d) return Promise.reject(new Error('référence invalide'));
+    var p = d.linkedPath ? _resolveDesktopPath(d.linkedPath) : (d.linkedHandleId ? _resolveWebHandle(d.linkedHandleId) : null);
+    if (!p) return Promise.reject(new Error('référence invalide'));
+    return p.then(function (dataUrl) { primeCache(d, dataUrl); return dataUrl; });
+  }
+
+  // Every DISTINCT linked reference found across every frame of a layer —
+  // usually just one (a still, duplicated verbatim into every frame by
+  // images.js's import loop, see its own comment), but a sequence layer
+  // holds one per numbered file, so this can't assume a single value the
+  // way relink's own _updateLayerLinkedRefs (single old→new rewrite) does.
+  function _collectLinkedRefs(ld) {
+    var seen = {}, out = [];
+    (ld.frames || []).forEach(function (f) {
+      (f.strokes || []).forEach(function (s) {
+        if (!s || !s.isRaster || !s.linked) return;
+        var k = s.linkedPath ? ('p:' + s.linkedPath) : (s.linkedHandleId ? ('w:' + s.linkedHandleId) : null);
+        if (k && !seen[k]) { seen[k] = true; out.push({ linkedPath: s.linkedPath || null, linkedHandleId: s.linkedHandleId || null }); }
+      });
+    });
+    return out;
+  }
+  // Same idea for the embedded side — a still has ONE distinct `src` shared
+  // by every frame, an embedded sequence has one per frame-group.
+  function _collectEmbeddedSrcs(ld) {
+    var seen = {}, out = [];
+    (ld.frames || []).forEach(function (f) {
+      (f.strokes || []).forEach(function (s) {
+        if (s && s.isRaster && !s.linked && s.src && !seen[s.src]) { seen[s.src] = true; out.push(s.src); }
+      });
+    });
+    return out;
+  }
+  // In-place field mutation on every matching frame's stroke dict — never an
+  // object-literal REPLACEMENT, so any other field already on the dict
+  // (rotation, isBitmapBrush, brushGroupId, groupId…) survives untouched.
+  function _applyToLinkedFrames(ld, ref, fn) {
+    (ld.frames || []).forEach(function (f) {
+      (f.strokes || []).forEach(function (s) {
+        if (!s || !s.isRaster || !s.linked) return;
+        if (ref.linkedPath != null ? s.linkedPath === ref.linkedPath : s.linkedHandleId === ref.linkedHandleId) fn(s);
+      });
+    });
+  }
+  function _applyToEmbeddedFrames(ld, srcValue, fn) {
+    (ld.frames || []).forEach(function (f) {
+      (f.strokes || []).forEach(function (s) {
+        if (s && s.isRaster && !s.linked && s.src === srcValue) fn(s);
+      });
+    });
+  }
+
+  function extFromDataUrl(dataUrl) {
+    var m = /^data:image\/([a-zA-Z0-9+.-]+);/.exec(dataUrl || '');
+    var sub = m ? m[1].toLowerCase() : 'png';
+    var map = { png: 'png', jpeg: 'jpg', jpg: 'jpg', gif: 'gif', webp: 'webp', bmp: 'bmp', 'x-ms-bmp': 'bmp', avif: 'avif' };
+    return map[sub] || 'png';
+  }
+  function dataUrlToBytes(dataUrl) {
+    var b64 = (dataUrl || '').split(',')[1] || '';
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  }
+  // Collision guard across the WHOLE batch (Cyril's brief: two library
+  // entries sharing a name must be numbered, never silently overwrite one
+  // another) — tracked in a Set shared by the entire conversion run, not
+  // per-entry, since a sequence writes several files for ONE entry too.
+  function _uniqueFileName(usedSet, baseName, ext) {
+    var clean = String(baseName || 'media').replace(/[\\/:*?"<>|]/g, '_').trim() || 'media';
+    var candidate = clean, n = 1;
+    while (usedSet[(candidate + '.' + ext).toLowerCase()]) { n++; candidate = clean + ' (' + n + ')'; }
+    var full = candidate + '.' + ext;
+    usedSet[full.toLowerCase()] = true;
+    return full;
+  }
+
+  // ---- Linked → Embedded — the simpler, lower-risk direction: just READS
+  // bytes back (via resolveOnce above, reusing the shipped resolve cache)
+  // and writes them into `src`, the exact shape the embedded import path
+  // already produces. A currently-missing/broken file can't be embedded —
+  // skipped and reported, never a blank placeholder baked in as `src`.
+  async function convertLinkedToEmbedded() {
+    var entries = (state.mediaLibrary || []).filter(function (m) { return m.kind === 'image' && m.linked; });
+    if (!entries.length) { if (window.showToast) showToast('Aucun média lié à intégrer.', 'info'); return; }
+    if (window.saveAllLayerFrames) saveAllLayerFrames();
+    if (window.pushUndo) pushUndo(true); // ONE undo step for the whole batch
+    var converted = 0, skipped = 0;
+    for (var i = 0; i < entries.length; i++) {
+      var m = entries[i];
+      var srcLayer = _resolveEntryLayer(m);
+      if (!srcLayer) { skipped++; continue; }
+      var refs = _collectLinkedRefs(srcLayer);
+      var okCount = 0;
+      for (var j = 0; j < refs.length; j++) {
+        var ref = refs[j];
+        var dataUrl;
+        try { dataUrl = await resolveOnce(ref); }
+        catch (e) { skipped++; continue; } // missing/broken — left untouched
+        _applyToLinkedFrames(srcLayer, ref, (function (du) { return function (s) { delete s.linked; delete s.linkedPath; delete s.linkedHandleId; s.src = du; }; })(dataUrl));
+        converted++; okCount++;
+      }
+      if (okCount > 0) {
+        var primaryRef = m.path != null ? { linkedPath: m.path } : { linkedHandleId: m.webHandleId };
+        var primaryDataUrl = getCachedSrc(primaryRef);
+        // primaryDataUrl is null only when the REPRESENTATIVE file itself
+        // (as opposed to some other frame of a sequence) failed to resolve
+        // — leave the catalog entry linked/broken rather than guess a thumb,
+        // same "representative file only" scope this file's relink flow
+        // already documents for sequences.
+        if (primaryDataUrl && window.SMMediaLibrary) {
+          SMMediaLibrary.updateEntry(m.id, { linked: false, path: null, webHandleId: null, thumb: primaryDataUrl, linkedBroken: false, linkedBrokenReason: null });
+        }
+      }
+    }
+    _rerender();
+    if (window.SMMediaLibrary) SMMediaLibrary.reload();
+    var msg = converted + (converted === 1 ? ' média intégré' : ' médias intégrés');
+    if (skipped) msg += ', ' + skipped + (skipped === 1 ? ' ignoré (fichier introuvable)' : ' ignorés (fichiers introuvables)');
+    if (window.showToast) showToast(msg, skipped ? 'warn' : 'success');
+  }
+
+  // ---- Embedded → Linked — the harder direction: the bytes only exist
+  // INSIDE the project today, so this WRITES new files to disk (desktop) or
+  // into a user-granted directory (web) before it can link to them — unlike
+  // the direction above, there's no existing external file to just point
+  // at. Destination is picked ONCE for the whole batch (a directory, not a
+  // save-dialog per file — the entire reason to use the directory pickers
+  // below instead of one native dialog per image).
+  async function _pickDestinationDir() {
+    if (tauriOk()) {
+      var dir = await window.__TAURI__.dialog.open({ directory: true, title: 'Dossier de destination pour les médias liés' });
+      return dir ? { kind: 'desktop', path: dir } : null;
+    }
+    if (isWebLinkingSupported() && typeof window.showDirectoryPicker === 'function') {
+      // {mode:'readwrite'} requests write permission up front, at the SAME
+      // user gesture as the folder pick — createWritable() below then needs
+      // no separate permission prompt per file (same "one grant covers the
+      // batch" idea as showOpenFilePicker's own permission model).
+      try { var handle = await window.showDirectoryPicker({ mode: 'readwrite' }); return { kind: 'web', handle: handle }; }
+      catch (e) { return null; } // cancelled — AbortError
+    }
+    return null;
+  }
+  async function convertEmbeddedToLinked() {
+    var entries = (state.mediaLibrary || []).filter(function (m) { return m.kind === 'image' && !m.linked; });
+    if (!entries.length) { if (window.showToast) showToast('Aucun média intégré à relier.', 'info'); return; }
+    if (!tauriOk() && !isWebLinkingSupported()) {
+      if (window.showToast) showToast('Cette action nécessite l\'app de bureau ou un navigateur compatible (Chrome/Edge) pour écrire les fichiers sur le disque.', 'warn');
+      return;
+    }
+    var dest;
+    try { dest = await _pickDestinationDir(); } catch (e) { dest = null; }
+    if (!dest) return; // cancelled — nothing touched, no undo entry pushed
+    if (window.showToast) showToast('Conversion des médias en liés…', 'info');
+    if (window.saveAllLayerFrames) saveAllLayerFrames();
+    if (window.pushUndo) pushUndo(true); // ONE undo step for the whole batch
+    var usedNames = {};
+    var converted = 0, skipped = 0;
+    for (var i = 0; i < entries.length; i++) {
+      var m = entries[i];
+      var srcLayer = _resolveEntryLayer(m);
+      if (!srcLayer) { skipped++; continue; }
+      var srcs = _collectEmbeddedSrcs(srcLayer);
+      var primaryRefForEntry = null;
+      for (var k = 0; k < srcs.length; k++) {
+        var dataUrl = srcs[k];
+        try {
+          var ext = extFromDataUrl(dataUrl);
+          var base = (m.name || srcLayer.name || 'media') + (srcs.length > 1 ? '_' + (k + 1) : '');
+          var fileName = _uniqueFileName(usedNames, base, ext);
+          var bytes = dataUrlToBytes(dataUrl);
+          var ref;
+          if (dest.kind === 'desktop') {
+            var fullPath = dest.path.replace(/[\\/]+$/, '') + '/' + fileName;
+            await window.__TAURI__.fs.writeFile(fullPath, bytes);
+            ref = { linkedPath: fullPath };
+          } else {
+            var fh = await dest.handle.getFileHandle(fileName, { create: true });
+            var writable = await fh.createWritable();
+            await writable.write(bytes);
+            await writable.close();
+            var newId = uid();
+            await putHandle(newId, fh); // SAME SMIdb-backed handle store as pickWebImages above
+            ref = { linkedHandleId: newId };
+          }
+          primeCache(ref, dataUrl); // instant render, no resolve round-trip
+          _applyToEmbeddedFrames(srcLayer, dataUrl, (function (r) { return function (s) { delete s.src; s.linked = true; if (r.linkedPath) s.linkedPath = r.linkedPath; else s.linkedHandleId = r.linkedHandleId; }; })(ref));
+          converted++;
+          if (k === 0) primaryRefForEntry = ref;
+        } catch (e) { skipped++; }
+      }
+      if (primaryRefForEntry) {
+        var nat = await naturalSizeFromDataUrl(srcs[0]);
+        var smallThumb = (window.SM && window.SM._makeSmallImageThumb) ? await window.SM._makeSmallImageThumb(srcs[0], nat.w, nat.h) : null;
+        if (window.SMMediaLibrary) {
+          var patch = { linked: true, naturalW: nat.w, naturalH: nat.h, thumb: smallThumb, sizeBytes: null, linkedBroken: false, linkedBrokenReason: null, webHandleId: null, path: null };
+          if (primaryRefForEntry.linkedPath) patch.path = primaryRefForEntry.linkedPath; else patch.webHandleId = primaryRefForEntry.linkedHandleId;
+          SMMediaLibrary.updateEntry(m.id, patch);
+        }
+      }
+    }
+    _rerender();
+    if (window.SMMediaLibrary) SMMediaLibrary.reload();
+    var msg = converted + (converted === 1 ? ' média lié' : ' médias liés');
+    if (skipped) msg += ', ' + skipped + (skipped === 1 ? ' ignoré' : ' ignorés');
+    if (window.showToast) showToast(msg, skipped ? 'warn' : 'success');
+  }
+
+  // Embedding direction only ever READS (always attempt-able — worst case
+  // it just finds nothing linked to convert); linking direction WRITES new
+  // files, which needs either Tauri or a Chromium-only web API — disabled/
+  // explained rather than silently doing nothing on Safari/Firefox, same
+  // graceful-degradation idiom as every other Tauri-only feature here.
+  function convertActionSupported() {
+    return state.mediaMode === 'linked' ? (tauriOk() || isWebLinkingSupported()) : true;
+  }
+  async function onConvertMediaClick() {
+    var btn = document.getElementById('btn-convert-media');
+    if (btn) btn.disabled = true;
+    try {
+      if (state.mediaMode === 'linked') await convertEmbeddedToLinked();
+      else await convertLinkedToEmbedded();
+    } catch (e) {
+      if (window.showToast) showToast('Conversion échouée : ' + ((e && e.message) || e), 'warn');
+    } finally {
+      if (btn) btn.disabled = !convertActionSupported();
+    }
+  }
+  function convertBtnLabel() {
+    return (window.SM && SM.t) ? SM.t(state.mediaMode === 'linked' ? 'mediaConvertToLinked' : 'mediaConvertToEmbedded')
+      : (state.mediaMode === 'linked' ? 'Convertir les médias en liés…' : 'Convertir les médias en intégrés…');
+  }
+  function updateConvertButtonUI() {
+    var btn = document.getElementById('btn-convert-media');
+    if (!btn) return;
+    btn.textContent = convertBtnLabel();
+    var supported = convertActionSupported();
+    btn.disabled = !supported;
+    btn.title = (window.SM && SM.t) ? SM.t(supported ? 'mediaConvertTip' : 'mediaConvertUnsupportedTip') : '';
+  }
+
   // ---- project-wide setting UI (Document panel, index.html) ----
   function setMediaMode(mode) {
     state.mediaMode = (mode === 'linked') ? 'linked' : 'embedded';
     var bE = document.getElementById('btn-media-mode-embedded'), bL = document.getElementById('btn-media-mode-linked');
     if (bE) bE.classList.toggle('ac', state.mediaMode === 'embedded');
     if (bL) bL.classList.toggle('ac', state.mediaMode === 'linked');
+    updateConvertButtonUI();
   }
   function initSettingUI() {
     var bE = document.getElementById('btn-media-mode-embedded'), bL = document.getElementById('btn-media-mode-linked');
@@ -332,6 +604,8 @@
     if (dismissBtn) dismissBtn.addEventListener('click', function () { var el = document.getElementById('linked-media-banner'); if (el) el.classList.remove('show'); });
     var reqBtn = document.getElementById('linked-media-banner-btn');
     if (reqBtn) reqBtn.addEventListener('click', requestPermissionForAll);
+    var convertBtn = document.getElementById('btn-convert-media');
+    if (convertBtn) convertBtn.addEventListener('click', onConvertMediaClick);
   }
   // syncDocFields (timeline.js) re-stamps the plain value fields (W/H/FPS…)
   // from state on every updateUI() — this toggle isn't a plain value field
@@ -345,6 +619,7 @@
     if (bE) bE.classList.toggle('ac', !linked);
     if (bL) bL.classList.toggle('ac', linked);
     _updateBanner();
+    updateConvertButtonUI();
   }
   window.SM = window.SM || {};
   window.SM.afterI18n = window.SM.afterI18n || [];
@@ -361,10 +636,16 @@
     getCachedSrc: getCachedSrc,
     primeCache: primeCache,
     resolveAsync: resolveAsync,
+    resolveOnce: resolveOnce,
     readLinkedDesktop: readLinkedDesktop,
     pickWebImages: pickWebImages,
     relinkImageEntry: relinkImageEntry,
     requestPermissionForAll: requestPermissionForAll,
     syncUI: syncUI,
+    // Bulk conversion (2026-08-29) — exposed mainly for tests/automation;
+    // the normal entry point is the Document panel button (#btn-convert-media).
+    convertLinkedToEmbedded: convertLinkedToEmbedded,
+    convertEmbeddedToLinked: convertEmbeddedToLinked,
+    convertActionSupported: convertActionSupported,
   };
 })();

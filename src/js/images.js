@@ -601,4 +601,9 @@
   // must stay identical" applies just as much to two calls to ONE function
   // as to two hand-written copies).
   window.SM._readImageAsDataUrl=readAsDataUrl;
+  // Exposed for linked-media.js's Embedded→Linked bulk conversion
+  // (2026-08-29, "convert existing media" follow-up to the above) — reuses
+  // the SAME 96px-preview generation an import already uses for a linked
+  // entry's thumbnail, instead of a second copy of this canvas-resize logic.
+  window.SM._makeSmallImageThumb=makeSmallThumb;
 })();
