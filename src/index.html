@@ -1101,8 +1101,17 @@
             <button class="pbtn" id="btn-media-import-video" style="flex:1" data-i18n="mediaImportVideo">Vidéo…</button>
           </div>
           <div id="media-drop" class="media-drop" data-i18n="mediaDropHint">Glisser des images/vidéos ici, ou cliquer Importer…</div>
+          <div class="media-search-row">
+            <svg class="media-search-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="media-search" class="media-search-input" data-i18n-placeholder="mediaSearchPlaceholder" placeholder="Rechercher un média…" spellcheck="false">
+            <span class="media-search-clear" id="media-search-clear" title="Effacer">×</span>
+          </div>
+          <div id="media-filter-chips" class="media-filter-chips"></div>
           <div class="pr media-panel-hdr" style="gap:4px">
             <button class="pbtn" id="btn-media-cleanup" style="flex:1;display:none;font-size:9px">Nettoyer (0)</button>
+            <div class="media-view-toggle" id="media-view-toggle" data-i18n-title="mediaViewToggleTitle" title="Vue liste / grille">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            </div>
             <div class="media-expand-toggle" id="media-expand-toggle" title="Agrandir / réduire la liste">
               <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </div>

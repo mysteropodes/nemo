@@ -157,6 +157,110 @@
   // imported asset), and import date.
   var KIND_LABEL = { video: 'Vidéo', image: 'Image', audio: 'Audio' };
   var _orphanCount = 0; // set fresh by buildRow() on every render() pass, read back after
+  // ---- Search / type filter / view mode (2026-08-29, gap-analysis pass
+  // against the "Stash" AE panel Cyril pointed at as a reference) — plain
+  // module state, not persisted: reopening the panel/project starts back at
+  // "All / list", same convention as _viewMode below and unlike the actually-
+  // persisted expand-toggle (that one survives because it's a layout
+  // preference, not a transient browsing filter).
+  var _searchQuery = '';
+  var _activeFilter = 'all'; // 'all' | 'image' | 'video' | 'audio' | 'missing'
+  var _viewMode = 'list'; // 'list' | 'grid'
+  var FILTER_CHIPS = [
+    { id: 'all', get label() { return t('mediaFilterAll', 'Tout'); } },
+    { id: 'image', get label() { return t('assetGroupImages', 'Images'); } },
+    { id: 'video', get label() { return t('assetGroupVideos', 'Vidéos'); } },
+    { id: 'audio', get label() { return t('assetGroupAudio', 'Audio'); } },
+    { id: 'missing', get label() { return t('mediaFilterMissing', 'Introuvable'); } },
+  ];
+  function t(key, fallback) { return (window.SM && SM.t) ? SM.t(key) : fallback; }
+  // An entry counts as "missing" the same way the existing orphan-cleanup
+  // button already does — its source layer no longer resolves (deleted, or
+  // renamed on a pre-migration entry with no uid). This is NOT filesystem-
+  // level "the linked file moved on disk" detection (Stash's own Missing
+  // filter is exactly that) — Nemo has no path-exists check exposed from
+  // Tauri to build that on, and almost everything here is embedded bytes
+  // anyway, so "the catalog entry can no longer be resolved at all" is the
+  // realistic definition of broken for this app today, not a smaller
+  // stand-in for the real thing.
+  function isMissing(m) { return !!(m.layerName || m.layerUid) && !resolveSrcLayer(m); }
+  // Matches the SAME fields a user would recognize the entry by: its name,
+  // and its source layer's name (so searching "background" finds every clip
+  // that layer owns, not just files literally named that).
+  function matchesSearch(m, q) {
+    if (!q) return true;
+    var hay = (m.name || '') + ' ' + (m.layerName || '');
+    return hay.toLowerCase().indexOf(q) >= 0;
+  }
+  function matchesFilter(m) {
+    if (_activeFilter === 'all') return true;
+    if (_activeFilter === 'missing') return isMissing(m);
+    return m.kind === _activeFilter;
+  }
+  function filteredEntries() {
+    var q = _searchQuery.trim().toLowerCase();
+    return (state.mediaLibrary || []).filter(function (m) { return matchesFilter(m) && matchesSearch(m, q); });
+  }
+  function renderFilterChips() {
+    var wrap = document.getElementById('media-filter-chips');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    FILTER_CHIPS.forEach(function (c) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'media-filter-chip' + (_activeFilter === c.id ? ' active' : '');
+      btn.textContent = c.label;
+      if (c.id === 'missing') {
+        var n = (state.mediaLibrary || []).filter(isMissing).length;
+        if (!n) return; // no point offering a filter that would always show nothing
+        btn.textContent = c.label + ' (' + n + ')';
+      }
+      btn.addEventListener('click', function () { _activeFilter = c.id; render(); });
+      wrap.appendChild(btn);
+    });
+  }
+  // Compact tile for grid mode — thumbnail-forward, name below, same click/
+  // context-menu/drag wiring as a list row but built fresh rather than
+  // reusing buildRow() outright: a list row's rich per-field layout
+  // (kind+size+owner+date all on their own line) has no equivalent grid
+  // arrangement that wouldn't just be a squeezed, unreadable copy of the
+  // list row — Stash's own grid tiles are thumbnail+name only too.
+  function buildTile(m) {
+    var tile = document.createElement('div'); tile.className = 'media-tile' + (m.status === 'loading' ? ' loading' : ''); tile.title = m.name;
+    var thumb = document.createElement('div'); thumb.className = 'media-tile-thumb';
+    if (m.status === 'loading') {
+      thumb.classList.add('media-tile-thumb-loading');
+      var sp = document.createElement('div'); sp.className = 'media-row-spinner'; thumb.appendChild(sp);
+    } else if (m.kind === 'audio') {
+      thumb.classList.add('media-tile-thumb-icon'); thumb.textContent = '♪';
+    } else {
+      var img = document.createElement('img'); img.src = m.thumb; img.draggable = m.kind === 'image';
+      thumb.appendChild(img);
+      if (m.kind === 'video') { var pb = document.createElement('div'); pb.className = 'media-row-playicon'; pb.textContent = '▶'; thumb.appendChild(pb); }
+      if (m.kind === 'image') {
+        img.addEventListener('dragstart', function (e) {
+          e.dataTransfer.setData('application/x-nemo-media-id', m.id);
+          e.dataTransfer.effectAllowed = 'copy';
+        });
+      }
+    }
+    if (isMissing(m)) { var mb = document.createElement('div'); mb.className = 'media-tile-missing-badge'; mb.title = t('mediaMissingTip', 'Calque source introuvable'); mb.textContent = '!'; thumb.appendChild(mb); }
+    tile.appendChild(thumb);
+    if (m.status !== 'loading') {
+      var nameEl = document.createElement('div'); nameEl.className = 'media-tile-name'; nameEl.textContent = m.name;
+      tile.appendChild(nameEl);
+      tile.addEventListener('click', function () { jumpToLayer(m); });
+      tile.addEventListener('contextmenu', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        // Reuses buildRow's own context-menu construction by delegating to
+        // a synthetic row (never inserted) — avoids a second copy of the
+        // same item-actions list drifting out of sync with the list view's.
+        var proxyRow = buildRow(m);
+        proxyRow.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: e.clientX, clientY: e.clientY }));
+      });
+    }
+    return tile;
+  }
   // Builds ONE row for a media entry — unchanged from the old flat-list
   // version, just no longer appends itself directly (the caller decides
   // which folder body to append into, see render() below).
@@ -293,9 +397,19 @@
   function render() {
     var grid = document.getElementById('media-grid'); if (!grid) return;
     grid.innerHTML = '';
+    grid.classList.toggle('media-grid-view', _viewMode === 'grid');
     _orphanCount = 0;
+    renderFilterChips();
     if (!window.SMAssetTree) return; // asset-tree.js not loaded — nothing to group into
-    var symIds = Object.keys(state.symbols || {});
+    var q = _searchQuery.trim().toLowerCase();
+    // Composants (symbols) is its own axis (not a state.mediaLibrary kind) —
+    // only offered under "Tout"/no type filter, same reasoning as Stash's
+    // own Comps chip being mutually exclusive with Video/Images/etc there:
+    // narrowing to a media KIND has no sensible reading of "also show
+    // components". Search still applies, by symbol name.
+    var symIds = _activeFilter === 'all' ? Object.keys(state.symbols || {}).filter(function (sid) {
+      return !q || ((state.symbols[sid].name || '').toLowerCase().indexOf(q) >= 0);
+    }) : [];
     if (symIds.length) {
       var compBody = SMAssetTree.folderGroup(grid, { label: SMAssetTree.componentsLabel(), color: SMAssetTree.FOLDER_COLORS.components, count: symIds.length });
       symIds.forEach(function (sid) {
@@ -308,15 +422,27 @@
         compBody.appendChild(row);
       });
     }
+    var visible = filteredEntries();
+    var anyShown = symIds.length > 0;
     ['image', 'video', 'audio'].forEach(function (kind) {
-      var entries = (state.mediaLibrary || []).filter(function (m) { return m.kind === kind; });
+      var entries = visible.filter(function (m) { return m.kind === kind; });
+      // _orphanCount must count EVERY orphan regardless of the active
+      // filter/search (the cleanup button acts on the whole catalog, not
+      // just what's currently visible) — computed from the unfiltered
+      // list, not `entries`.
+      (state.mediaLibrary || []).filter(function (m) { return m.kind === kind; }).forEach(function (m) { if (isMissing(m)) _orphanCount++; });
       if (!entries.length) return;
+      anyShown = true;
       var body = SMAssetTree.folderGroup(grid, { label: SMAssetTree.KIND_GROUP_LABEL[kind], color: SMAssetTree.FOLDER_COLORS[kind], count: entries.length });
-      entries.forEach(function (m) { body.appendChild(buildRow(m)); });
+      body.classList.toggle('media-grid-view', _viewMode === 'grid');
+      entries.forEach(function (m) { body.appendChild(_viewMode === 'grid' ? buildTile(m) : buildRow(m)); });
     });
-    if (!symIds.length && !(state.mediaLibrary || []).length) {
+    if (!anyShown) {
       var empty = document.createElement('div'); empty.className = 'asset-folder-empty-hint';
-      empty.textContent = SM && SM.t ? SM.t('mediaDropHint') : 'Aucun média importé.';
+      var hasAnyContent = !!((state.mediaLibrary || []).length || Object.keys(state.symbols || {}).length);
+      empty.textContent = hasAnyContent
+        ? t('mediaNoMatch', 'Aucun média ne correspond à ce filtre.')
+        : (SM && SM.t ? SM.t('mediaDropHint') : 'Aucun média importé.');
       grid.appendChild(empty);
     }
     // Bulk cleanup (2026-07-31) — catalog-only (never touches the
@@ -400,11 +526,40 @@
     });
   }
 
+  function initSearchAndViewToggle() {
+    var input = document.getElementById('media-search');
+    var clearBtn = document.getElementById('media-search-clear');
+    if (input) {
+      input.addEventListener('input', function () {
+        _searchQuery = input.value;
+        if (clearBtn) clearBtn.classList.toggle('show', !!input.value);
+        render();
+      });
+      input.addEventListener('keydown', function (e) { if (e.key === 'Escape') { input.value = ''; _searchQuery = ''; input.blur(); if (clearBtn) clearBtn.classList.remove('show'); render(); } });
+    }
+    if (clearBtn) {
+      clearBtn.addEventListener('click', function () {
+        _searchQuery = ''; if (input) input.value = '';
+        clearBtn.classList.remove('show');
+        render();
+      });
+    }
+    var viewBtn = document.getElementById('media-view-toggle');
+    if (viewBtn) {
+      viewBtn.addEventListener('click', function () {
+        _viewMode = _viewMode === 'grid' ? 'list' : 'grid';
+        viewBtn.classList.toggle('active', _viewMode === 'grid');
+        render();
+      });
+    }
+  }
+
   function init() {
     render();
     initDropZone();
     initCanvasDropTarget();
     initExpandToggle();
+    initSearchAndViewToggle();
     var bImg = document.getElementById('btn-media-import-img'); if (bImg) bImg.addEventListener('click', function () { if (window.SM) SM.importImages(); });
     var bVid = document.getElementById('btn-media-import-video'); if (bVid) bVid.addEventListener('click', function () { if (window.SM) SM.importVideo(); });
     var bClean = document.getElementById('btn-media-cleanup'); if (bClean) bClean.addEventListener('click', cleanupOrphans);
