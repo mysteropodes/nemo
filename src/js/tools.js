@@ -4920,6 +4920,88 @@ function sampleVectorBrushCenterline(cs,profile){
   return {pts:pts,widths:widths,centerSegments:centerSegs};
 }
 window.sampleVectorBrushCenterline=sampleVectorBrushCenterline;
+// ---- TRIM STROKE ENDS ----
+// Where two strokes meet you rarely stop exactly on the junction — you run a
+// little past it, which is faster and more natural to draw. Those leftover
+// tails are Blender's "Trim Stroke Ends" case, and they cost twice here:
+// visible nibs at every junction, and — the expensive one — each overshoot
+// closes a tiny parasitic region against the stroke it crossed. fillVectorFind
+// picks the SMALLEST closed region containing the click, so a few-pixel sliver
+// always wins over the shape actually aimed at.
+//
+// Measured on the reporter's own drawing, wall endpoints sit 11-118px from
+// their neighbour, so a cap is essential: only a SHORT tail is an overshoot.
+// A long one is deliberate line (a limb continuing past a torso), and cutting
+// it would be destructive. Hence maxOvershoot rather than an unconditional
+// truncate to the outermost crossing.
+//
+// Works on the CENTERLINE (fillWallPath — the same "what counts as a wall"
+// transform the fill engine uses), never the ribbon outline: intersecting two
+// outlines finds where their EDGES touch, which is not where the lines cross.
+function trimStrokeEnds(path,layer,maxOvershoot){
+  if(!path||!layer||!(path instanceof Path))return false;
+  var cap=maxOvershoot>0?maxOvershoot:0;
+  if(!cap)return false;
+  var isVB=!!(path.data&&path.data.isVectorBrush&&path.data.centerSegments&&path.data.centerSegments.length>1);
+  var work=fillWallPath(path);
+  if(!work||work.segments.length<2||work.closed)return false; // a closed loop has no dangling end
+  var srcLen=work.length;
+  if(!(srcLen>0))return false;
+  var others=layer.children.filter(function(c){
+    if(c===path||!(c instanceof Path)||c.segments.length<2)return false;
+    if(c.data&&(c.data.isBrushTextureCopy||c.data.isLinkedFillCompanion))return false;
+    if(c.data&&(c.data.isFillTempClose||c.data.isFillCloseLine||c.data.isFillAutoClose))return false;
+    return !!(c.strokeColor||c.fillColor||(c.data&&c.data.isVectorBrush));
+  }).map(fillWallPath).filter(function(w){return w.segments.length>=2;});
+  if(!others.length)return false;
+  var offs=[];
+  others.forEach(function(w){
+    try{(work.getIntersections(w)||[]).forEach(function(loc){offs.push(loc.offset);});}catch(e){}
+  });
+  if(!offs.length)return false;
+  offs.sort(function(a,b){return a-b;});
+  var head=offs[0],tail=srcLen-offs[offs.length-1];
+  var cutHead=head>0.01&&head<=cap;
+  var cutTail=tail>0.01&&tail<=cap;
+  if(!cutHead&&!cutTail)return false;
+  // Guard against eating the whole stroke when every crossing sits at one end.
+  if(srcLen-(cutHead?head:0)-(cutTail?tail:0)<Math.max(1,cap*0.25))return false;
+  // Tail first: cutting the head would shift every offset measured from start.
+  if(cutTail){
+    var off=work.splitAt(work.getLocationAt(srcLen-tail));
+    if(off&&off.remove)off.remove();
+  }
+  var headCut=0;
+  if(cutHead){
+    var rest=work.splitAt(work.getLocationAt(head));
+    if(rest){headCut=head;work.remove();work=rest;}
+  }
+  if(work.segments.length<2)return false;
+  if(isVB){
+    // Widths are per-anchor on the centerline, so they have to be resampled at
+    // the anchors' NEW arc positions, expressed back in the ORIGINAL path's
+    // parameter space (hence + headCut).
+    var profile=path.data.widthProfile,newLen=work.length||1;
+    var acc=0,pts=work.segments;
+    path.data.centerSegments=pts.map(function(sg,i){
+      if(i>0)acc+=sg.point.getDistance(pts[i-1].point);
+      var w=profile?widthAtFrac(profile,(headCut+acc)/srcLen):path.strokeWidth;
+      return{point:[sg.point.x,sg.point.y],
+             handleIn:[sg.handleIn.x,sg.handleIn.y],
+             handleOut:[sg.handleOut.x,sg.handleOut.y],
+             width:w};
+    });
+    path.data.widthProfile=buildWidthProfile(
+      pts.map(function(sg){return sg.point;}),
+      path.data.centerSegments.map(function(c){return c.width;}));
+    rebuildVectorBrushOutline(path);
+  }else{
+    path.removeSegments();
+    path.addSegments(work.segments);
+  }
+  if(work&&work.remove)work.remove();
+  return true;
+}
 function rebuildVectorBrushOutline(path){
   var cs=path.data&&path.data.centerSegments;
   if(!cs||cs.length<2)return;
