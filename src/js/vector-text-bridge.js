@@ -346,10 +346,12 @@ function vectorTextGroupMembers(root) {
 // UA trick sidesteps needing that API/key entirely, just a way to send an
 // unusual header, which the Tauri command provides.
 //
-// Desktop-only for now — the web build (nemo-web-public-beta) has no Rust
-// backend at runtime to send that header from, and would need its own
-// small Cloudflare Worker doing the same UA-spoofed relay (mirrors
-// worker-feedback/'s own trust-boundary role) — not yet built.
+// Works on both builds: desktop sends the spoofed UA itself via Tauri
+// (fetch_google_font, reqwest); the web build (nemo-editor) has no Rust
+// backend to do that from, so it instead proxies through a small Cloudflare
+// Worker route doing the same UA-spoofed relay (worker/index.js's
+// /api/google-font, added 2026-08-28 — mirrors worker-feedback/'s own
+// trust-boundary role).
 function tauriOk() { return typeof window.__TAURI__ !== 'undefined'; }
 function base64ToArrayBuffer(b64) {
   var bin = atob(b64);
