@@ -16,6 +16,13 @@
 (function () {
   var FOLDER_COLORS = {
     components: 'var(--purple)',
+    // Distinct from `components` (state.symbols already inside THIS
+    // project) — compositions are OTHER currently-open project tabs,
+    // sourced from SMProject.getOpenTabs() (feedback #140). `--red` is the
+    // one FOLDER_COLORS value not already claimed by another kind here
+    // (accent=image, orange=video, green=audio, purple=components) — no new
+    // CSS var needed.
+    compositions: 'var(--red)',
     image: 'var(--accent)',
     video: 'var(--orange)',
     audio: 'var(--green)',
@@ -34,6 +41,7 @@
     FOLDER_COLORS: FOLDER_COLORS,
     KIND_GROUP_LABEL: KIND_GROUP_LABEL,
     componentsLabel: function () { return t('assetGroupComponents', 'Composants'); },
+    compositionsLabel: function () { return t('assetGroupCompositions', 'Compositions'); },
     layersLabel: function () { return t('assetGroupLayers', 'Calques'); },
     // container: element to append the folder into.
     // opts: { key (unique per container, for collapse-state persistence),

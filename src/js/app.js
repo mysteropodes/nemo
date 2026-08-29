@@ -2709,6 +2709,92 @@ function convertLayersToComponent(indices){
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
   showToast(SM.t('toastComponentCreatedWith')+indices.length+' calques');
 }
+// ---- Cross-project compositions (2026-08, feedback #140) ----
+// "les différents projets ouverts dans nemo (onglet de projet) devraient
+// apparaître comme des compositions dans média et preset — si on drop après
+// ces compositions elles apparaissent comme des composant dans la timeline."
+// media-library.js lists SMProject.getOpenTabs() as a "Compositions" folder
+// group (distinct from the existing "Composants" group, which is this
+// project's OWN state.symbols); dropping one of those rows onto the canvas
+// or timeline calls instantiateForeignProjectAsComponent() below.
+//
+// DESIGN DECISION — one-time deep copy, NOT a live cross-project reference.
+// A dropped composition becomes a brand-new state.symbols[] entry (the SAME
+// Component construct convertLayerToComponent/convertLayersToComponent
+// already build above), never a pointer back at the source tab. Reusing
+// that one construct means Motion/StoryBoard/render/export all already know
+// how to read it for free (CLAUDE.md §8, "Component lu par les 3 parties")
+// — no parallel "cross-project instance" system to build or keep in sync.
+// A live link was considered and rejected: nothing else in this app keeps a
+// Component's content synced to anything outside its own state.symbols[id]
+// once created (not convertLayerToComponent, not transplant.js's identical
+// "pull from another open tab" path for feedback #109) — a live link here
+// would be the first of its kind, adding invalidation/diffing plumbing this
+// codebase has never needed, for a benefit (source tab edits retroactively
+// reappearing here) nobody asked for. Snapshot-at-drop-time also matches
+// the ordinary mental model of dragging an asset into a timeline elsewhere
+// in this app (an image library entry inserts a copy of its pixels, not a
+// live link to the original file either).
+//
+// Recursively deep-copies a symbol tree from ANOTHER project's exportJSON()
+// snapshot (foreignData) into THIS project's state.symbols, remapping ids
+// via idMap so a raw id collision with an unrelated local symbol (both
+// projects mint ids from the same genSymbolId() scheme) can never happen.
+// Returns the new LOCAL symbol id, or null if foreignSymId doesn't resolve.
+function importForeignSymbolTree(foreignData,foreignSymId,idMap){
+  if(idMap[foreignSymId])return idMap[foreignSymId];
+  var foreignSym=(foreignData.symbols||{})[foreignSymId];
+  if(!foreignSym)return null;
+  var newId=genSymbolId();
+  idMap[foreignSymId]=newId; // stamped before recursing — guards a (shouldn't-happen) cyclic symbolId reference
+  var clonedLayers=JSON.parse(JSON.stringify(foreignSym.layers||[]));
+  clonedLayers.forEach(function(l){if(l.symbolId)l.symbolId=importForeignSymbolTree(foreignData,l.symbolId,idMap);});
+  state.symbols[newId]={name:foreignSym.name,totalFrames:foreignSym.totalFrames||state.totalFrames,fps:foreignSym.fps||state.fps,layers:clonedLayers};
+  return newId;
+}
+// Builds a brand-new state.symbols[] Component from another project's FULL
+// exportJSON()-format snapshot — every root layer of the foreign project
+// becomes a symLayer of the new Component (symbols already support multiple
+// layers, see convertLayersToComponent above), and any symbolId a root
+// layer references gets its own symbol tree deep-copied too via
+// importForeignSymbolTree so nested components survive the trip. Returns
+// the new symbol id.
+function createComponentFromForeignProject(foreignData,name){
+  if(!state.symbols)state.symbols={};
+  var idMap={};
+  var symId=genSymbolId();
+  var clonedLayers=JSON.parse(JSON.stringify(foreignData.layers||[]));
+  clonedLayers.forEach(function(l){if(l.symbolId)l.symbolId=importForeignSymbolTree(foreignData,l.symbolId,idMap);});
+  state.symbols[symId]={name:name,totalFrames:foreignData.totalFrames||state.totalFrames,fps:foreignData.fps||state.fps,layers:clonedLayers};
+  return symId;
+}
+// Places a fresh instance of symId as a new layer in the CURRENT project —
+// same instance-stamping convertLayerToComponent uses just above (symMatrix
+// left unset = identity placement, symPlayMode 'once' default). createUserLayer
+// already builds a correctly-sized empty frames array (all-empty, keyframe on
+// frame 0), so unlike convertLayerToComponent's in-place conversion there's
+// no existing content on this brand-new layer that needs wiping first.
+function placeComponentInstance(symId,layerName){
+  var idx=createUserLayer(layerName);
+  var nl=state.layers[idx];
+  nl.symbolId=symId;nl.locked=true;nl.symPlayMode='once';nl.symSpeed=1;nl.symPlacedAt=0;nl.symSingleFrame=0;
+  return idx;
+}
+// Entry point called from media-library.js's drop handlers when a
+// "Compositions" row (another open project tab) is dropped onto the canvas
+// or the timeline. foreignData is that tab's own exportJSON()-format JSON
+// (already parsed) — same source transplant.js's getOpenTabs()-fed picker
+// uses for feedback #109, just placed automatically as a Component instance
+// instead of offering a checklist of individual layers/media to cherry-pick.
+function instantiateForeignProjectAsComponent(foreignData,name){
+  if(state.activeSymbolId){showToast(SM.t?SM.t('toastCloseComponentFirst'):'Close the component you\'re currently editing first');return;}
+  saveAllLayerFrames();pushUndo(true);
+  var symId=createComponentFromForeignProject(foreignData,name+' (Comp)');
+  if(window.SMStoryboard)SMStoryboard.addInstanceAuto(symId);
+  placeComponentInstance(symId,name);
+  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();
+  showToast((SM.t?SM.t('toastComponentCreated'):'Component created: ')+name);
+}
 // "Release to Layers" (Illustrator-style) — Motion's double-click-a-layer-row
 // gesture (2026-07) EXPLODES the layer into N real top-level layers, one per
 // element, rather than opening an in-place grouped view (explicit reversal
