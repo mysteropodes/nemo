@@ -4113,7 +4113,7 @@
     var lastScrubValue = mixed ? 0 : (Number(value) || 0);
     inp.type = 'number'; inp.className = 'pi scrub motion-val' + (mixed ? ' mixed' : '');
     inp.value = mixed ? '' : fmtVal(value);
-    if (mixed) { inp.placeholder = '—'; inp.title = 'Valeurs multiples — saisir une valeur pour l’appliquer aux clés sélectionnées'; }
+    if (mixed) { inp.placeholder = '—'; inp.title = SM.t('titleMixedValuesHint'); }
     inp.step = 1;
     inp.addEventListener('change', function () {
       if (inp.value === '' || !isFinite(parseFloat(inp.value))) return;
@@ -4337,7 +4337,7 @@
         var snapRow = document.createElement('label'); snapRow.className = 'motion-filter-check';
         var snap = document.createElement('input'); snap.type = 'checkbox'; snap.checked = _motionSnapEnabled;
         snapRow.appendChild(snap); snapRow.appendChild(document.createTextNode(' Magnétisme des clés'));
-        var hint = document.createElement('div'); hint.className = 'motion-filter-hint'; hint.textContent = 'Cmd/Ctrl pendant le glisser désactive temporairement le magnétisme.';
+        var hint = document.createElement('div'); hint.className = 'motion-filter-hint'; hint.textContent = SM.t('motionSnapDragHint');
         pop.appendChild(search); pop.appendChild(filterLabel); pop.appendChild(filter); pop.appendChild(colLabel); pop.appendChild(cols); pop.appendChild(snapRow); pop.appendChild(hint);
         document.body.appendChild(pop);
         var br = btn.getBoundingClientRect();
@@ -4411,7 +4411,7 @@
       // computeLayerRenderOrder's splice, not re-derived here.
       row.className = 'lrow' + (_layerSel.indexOf(li) >= 0 ? ' act motion-selected' : '') + (entry.folderLayerParent != null ? ' in-folder' : '');
       row.dataset.layer = li;
-      if (isComponent) row.title = 'Composant — Position/Anchor/Rotation/Scale/Opacity animent l\'instance entière (le contenu interne s\'édite via "Éditer le composant…")';
+      if (isComponent) row.title = SM.t('titleComponentRowHint');
       // Every row reserves this slot (real chevron OR invisible spacer),
       // never just folder-related ones — same "spacer" idiom the plain
       // twirl `arrow` right below and Animation 2D's own folder rows
@@ -4520,7 +4520,7 @@
         state.layers.forEach(function (o, oi) { if (o !== ld && o.layerUid === ld.timeLink.uid) tlIdx2 = oi; });
         var tlName2 = tlIdx2 >= 0 ? (state.layers[tlIdx2].name || ('Layer ' + (tlIdx2 + 1))) : 'source introuvable';
         var tlb2 = document.createElement('div'); tlb2.className = 'lico comp-badge';
-        tlb2.title = 'Temps lié à « ' + tlName2 + ' » — clic droit pour délier';
+        tlb2.title = SM.t('titleTimeLinkedToPrefix') + tlName2 + SM.t('titleTimeLinkedToSuffix');
         tlb2.innerHTML = '<span style="font-size:9px;line-height:1;font-weight:700">Tp</span>';
         tlb2.addEventListener('click', function (e) { e.stopPropagation(); });
         tlb2.addEventListener('contextmenu', function (e) {
@@ -4676,17 +4676,17 @@
           // had the entry Animation 2D's row menu has. startLayerRename
           // (timeline.js) works unmodified against Motion rows (same
           // .lrow[data-layer]/.lnm DOM shape). F2 is the keyboard path.
-          { label: 'Renommer  (F2)', action: function () { startLayerRename(li); } },
+          { label: SM.t('elementsRename') + '  (F2)', action: function () { startLayerRename(li); } },
           // Folder layer (2026-08) — disabled unless this row's parent
           // resolves to a Folder specifically (an ordinary Null parent
           // leaves this disabled, same guard the drag-out gesture uses —
           // see folderLayerParentIdx, timeline.js).
           { label: 'Retirer du dossier', disabled: (typeof folderLayerParentIdx !== 'function' || folderLayerParentIdx(li) < 0), action: function () { window.SM.removeLayerFromFolder(li); } },
-          { label: 'Éclater en calques (une forme par calque)', disabled: !!ld.symbolId || !!ld.lfsGroup, action: function () { window.SM.splitLayerIntoElements(li); } },
-          { label: 'Couper au niveau de la tête de lecture  (⌘⇧D)', action: function () { window.SM.splitLayerAtPlayhead(li); } },
-          { label: ld.shy ? 'Retirer le marquage « shy »' : 'Marquer comme « shy »', action: function () { window.SM.toggleLayerShy(li); } },
-          { label: ld.motionBlur ? 'Désactiver le flou de mouvement' : 'Activer le flou de mouvement', action: function () { window.SM.toggleLayerMotionBlur(li); } },
-          { label: ld.effectsFrom ? 'Ne plus hériter des effets' : 'Hériter des effets d\u2019un calque…', action: function () {
+          { label: SM.t('ctxSplitIntoLayers'), disabled: !!ld.symbolId || !!ld.lfsGroup, action: function () { window.SM.splitLayerIntoElements(li); } },
+          { label: SM.t('ctxCutAtPlayhead'), action: function () { window.SM.splitLayerAtPlayhead(li); } },
+          { label: ld.shy ? SM.t('ctxRemoveShyMark') : SM.t('ctxMarkAsShy'), action: function () { window.SM.toggleLayerShy(li); } },
+          { label: ld.motionBlur ? SM.t('ctxDisableMotionBlur') : SM.t('ctxEnableMotionBlur'), action: function () { window.SM.toggleLayerMotionBlur(li); } },
+          { label: ld.effectsFrom ? SM.t('ctxStopInheritEffects') : SM.t('ctxInheritEffectsFromEllipsis'), action: function () {
             if (ld.effectsFrom) { pushUndo(); delete ld.effectsFrom; renderLayerList(); renderTimeline(); if (window.SMEngineBridge) SMEngineBridge.renderNow(); return; }
             var items = [];
             state.layers.forEach(function (other, oi) {
@@ -4696,26 +4696,26 @@
                 ld.effectsFrom = ensureLayerUid(other);
                 renderLayerList(); renderTimeline();
                 if (window.SMEngineBridge) SMEngineBridge.renderNow();
-                if (window.showToast) showToast(SM.t('toastEffectsInheritedFromSuffix') + (other.name || ('Layer ' + (oi + 1))) + ' » — ils suivent leurs propres keyframes');
+                if (window.showToast) showToast(SM.t('toastEffectsInheritedFromSuffix') + (other.name || ('Layer ' + (oi + 1))) + SM.t('toastEffectsInheritedFollowOwnKeysSuffix'));
               } });
             });
-            if (!items.length) { if (window.showToast) showToast('Aucun autre calque ne porte d\u2019effets'); return; }
+            if (!items.length) { if (window.showToast) showToast(SM.t('toastNoOtherLayerWithEffects')); return; }
             window.showContextMenu(e.clientX + 8, e.clientY + 8, items);
           } },
           // Menu-based Parent-in-Time (2026-07-31) \u2014 creation used to be
           // pickwhip-drag ONLY; reachable now from any right-click on the
           // row regardless of what else (keyframes, bars) is selected.
-          { label: 'Parent in Time \u2014 lier le temps \u00e0\u2026', action: function () {
+          { label: SM.t('ctxParentInTimeLinkTimeEllipsis'), action: function () {
             window.showContextMenu(e.clientX + 8, e.clientY + 8, window.buildTimeLinkMenuItems(li, ld, function () { renderLayerList(); renderTimeline(); }));
           } },
           { sep: true },
           // showContextMenu has no submenus — a disabled row is the honest
           // way to title a group rather than a button that does nothing.
-          { label: 'Verrouiller les keyframes sur :', disabled: true, action: function () {} },
-          { label: '   • le point d\u2019entrée' + (ld.keyLock === 'in' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'in' ? null : 'in'); } },
-          { label: '   • le point de sortie' + (ld.keyLock === 'out' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'out' ? null : 'out'); } },
-          { label: '   • le calque entier' + (ld.keyLock === 'layer' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'layer' ? null : 'layer'); } },
-          { label: 'Ajouter un repère sur ce calque', action: function () { if (window.SMMarkers) SMMarkers.addLayerMarker(li, state.currentFrame, ''); } },
+          { label: SM.t('ctxLockKeyframesOnColon'), disabled: true, action: function () {} },
+          { label: SM.t('ctxKeyLockInPoint') + (ld.keyLock === 'in' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'in' ? null : 'in'); } },
+          { label: SM.t('ctxKeyLockOutPoint') + (ld.keyLock === 'out' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'out' ? null : 'out'); } },
+          { label: SM.t('ctxKeyLockWholeLayer') + (ld.keyLock === 'layer' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'layer' ? null : 'layer'); } },
+          { label: SM.t('ctxAddMarkerOnLayer'), action: function () { if (window.SMMarkers) SMMarkers.addLayerMarker(li, state.currentFrame, ''); } },
           // UI/UX audit (2026-07-30): used to grey this out via `disabled`
           // when the layer isn't a Component — showContextMenu has no
           // hover-title mechanism for disabled rows, so that state
@@ -4724,12 +4724,12 @@
           // calques composants') — leaving the row always clickable lets
           // that existing message do the explaining instead of a silent
           // grey row.
-          { label: ld.timeRemap ? 'Désactiver le remappage temporel' : 'Activer le remappage temporel',
+          { label: ld.timeRemap ? SM.t('ctxDisableTimeRemap') : SM.t('ctxEnableTimeRemap'),
             action: function () { ld.timeRemap ? disableTimeRemap(li) : enableTimeRemap(li); } },
-          { label: 'Fusionner les calques sélectionnés', disabled: !multi, action: function () { window.SM.mergeLayersIntoOne(_layerSel.slice()); } },
+          { label: SM.t('ctxMergeSelectedLayers'), disabled: !multi, action: function () { window.SM.mergeLayersIntoOne(_layerSel.slice()); } },
           { sep: true },
-          { label: 'Échelonner les calques sélectionnés…', disabled: !multi, action: function () {
-            var v = prompt('Décalage entre calques (frames)', '2');
+          { label: SM.t('ctxStaggerSelectedLayersEllipsis'), disabled: !multi, action: function () {
+            var v = prompt(SM.t('promptStaggerOffsetFrames'), '2');
             var step = parseInt(v, 10);
             if (!isNaN(step) && step !== 0) staggerSelectedLayers(step);
           } },
@@ -4845,7 +4845,7 @@
     var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
     // 2026-08 fix: hardcoded French, shown regardless of locale.
     var label = document.createElement('span'); label.textContent = SM.t('fieldFollowPath'); label.style.minWidth = '70px';
-    label.title = 'Fait suivre la Position de ce calque le long du tracé d’un autre calque (Position sur le chemin, en %) — comme un rail de déplacement.';
+    label.title = SM.t('titleFollowPathHint');
     row.appendChild(label);
 
     var fp = ld.followPath;
@@ -4854,7 +4854,7 @@
 
     var pill = document.createElement('div');
     pill.className = 'lparent motion-parent-pill' + (tName ? '' : ' none');
-    pill.title = tName ? ('Chemin : ' + tName + ' — cliquer pour changer') : 'Aucun chemin — cliquer pour en choisir un';
+    pill.title = tName ? (SM.t('titleFollowPathCurrentPrefix') + tName + SM.t('titleFollowPathCurrentSuffix')) : SM.t('titleFollowPathNone');
     var lbl = document.createElement('span'); lbl.className = 'mp-label'; lbl.textContent = tName || '—';
     pill.appendChild(lbl);
     pill.addEventListener('click', function (e) {
@@ -4876,8 +4876,8 @@
     if (tName) {
       var alignBtn = document.createElement('button');
       alignBtn.type = 'button'; alignBtn.className = 'mp-align-btn' + (fp.align ? ' on' : '');
-      alignBtn.textContent = 'Aligner';
-      alignBtn.title = 'Aligne aussi la Rotation sur la tangente du chemin (réglable via Influence)';
+      alignBtn.textContent = SM.t('btnAlign');
+      alignBtn.title = SM.t('titleAlignRotationHint');
       alignBtn.addEventListener('click', function (e) {
         e.stopPropagation(); pushUndo();
         ld.followPath.align = !ld.followPath.align;
@@ -4929,7 +4929,7 @@
 
     var pick = document.createElement('span');
     pick.className = 'lpick';
-    pick.title = 'Glisser sur un calque pour le définir comme parent (A)';
+    pick.title = SM.t('titleDragLayerSetParentA');
     pick.addEventListener('mousedown', function (e) { startParentPickwhip(li, pick, e); });
     pill.appendChild(pick);
 
@@ -5017,12 +5017,12 @@
     var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
     // 2026-08 fix: hardcoded French, shown regardless of locale.
     var label = document.createElement('span'); label.textContent = SM.t('fieldTimeLink'); label.style.minWidth = '70px';
-    label.title = 'Lie le temps de ce calque à celui d’un autre — quand le calque source avance, recule ou est décalé dans la timeline, celui-ci suit. Utile pour garder plusieurs calques synchronisés sans les animer un par un.';
+    label.title = SM.t('titleTimeLinkRowHint');
     row.appendChild(label);
 
     var whip = document.createElement('span');
     whip.className = 'lpick';
-    whip.title = 'Glisser sur un calque : ses points d\u2019entrée/sortie pilotent ceux-ci';
+    whip.title = SM.t('titleTimeLinkWhipHint');
     whip.addEventListener('mousedown', function (e) { startTimeLinkPickwhip(li, whip, e); });
     row.appendChild(whip);
 
@@ -5035,7 +5035,7 @@
     name.style.marginLeft = '4px';
     name.textContent = srcIdx >= 0 ? (state.layers[srcIdx].name || ('Layer ' + (srcIdx + 1)))
       : (ld.timeLink ? 'source introuvable' : '—');
-    name.title = srcIdx >= 0 ? 'Cliquer pour délier (menu), ou clic droit pour délier directement' : 'Aucun lien temporel';
+    name.title = srcIdx >= 0 ? SM.t('titleTimeLinkNameHint') : SM.t('titleNoTimeLink');
     // Shared by both unlink gestures below — direct right-click AND the
     // click-then-menu path, so the two can never drift (2026-07-30, Cyril:
     // "il était impossible de désactiver le parent in time" — turned out
@@ -5064,7 +5064,7 @@
       if (!window.showContextMenu) return;
       var r = name.getBoundingClientRect();
       window.showContextMenu(r.left, r.bottom + 2, [
-        { label: 'Délier le temps', action: unlinkTime },
+        { label: SM.t('ctxUnlinkTime'), action: unlinkTime },
       ]);
     });
     row.appendChild(name);
@@ -5271,7 +5271,7 @@
     var grp = document.createElement('div'); grp.className = 'lrow motion-group-row';
     var arrow = document.createElement('span'); arrow.className = 'lico larrow'; arrow.textContent = isDupGroupExpanded(holder) ? '▾' : '▸';
     var label = document.createElement('span'); label.textContent = 'Duplicator';
-    grp.title = 'Décalages par copie du Duplicator (position, rotation, échelle, opacité…) — cliquer pour replier/déplier';
+    grp.title = SM.t('titleDuplicatorGroupHint');
     grp.appendChild(arrow); grp.appendChild(label);
     grp.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -5535,18 +5535,18 @@
     var rawWrap = document.createElement('span');
     rawWrap.className = 'motion-expr-raw';
     var raw = rawValueAtFrame(holder, prop, state.currentFrame);
-    rawWrap.textContent = 'sans expression : ' + raw.map(function (n) { return Math.round(n * 100) / 100; }).join(', ') + ' ' + (PROP_UNIT[prop] || '');
-    rawWrap.title = 'Valeur de la propriété avant application de l’expression, à la frame courante';
+    rawWrap.textContent = SM.t('exprRawValuePrefix') + raw.map(function (n) { return Math.round(n * 100) / 100; }).join(', ') + ' ' + (PROP_UNIT[prop] || '');
+    rawWrap.title = SM.t('titleRawValueHint');
     row.appendChild(rawWrap);
     // Project-wide preamble (7.2) — reachable from the same place you write
     // the expression that uses it, rather than a settings panel away.
     var glob = document.createElement('button');
     glob.className = 'motion-expr-glob';
-    glob.textContent = exprGlobals() ? 'Variables globales ✓' : 'Variables globales…';
-    glob.title = 'Code exécuté avant CHAQUE expression du projet — déclare ici ce que tu réutilises partout';
+    glob.textContent = exprGlobals() ? SM.t('btnGlobalVarsOn') : SM.t('btnGlobalVarsEllipsis');
+    glob.title = SM.t('titleGlobalVarsHint');
     glob.addEventListener('click', function (e) {
       e.preventDefault(); e.stopPropagation();
-      var v = prompt('Variables globales — exécutées avant chaque expression\nex : var beat = 60 / 120 * ' + (state.fps || 24) + ';', exprGlobals());
+      var v = prompt(SM.t('promptGlobalVarsPrefix') + (state.fps || 24) + ';', exprGlobals());
       if (v === null) return;
       pushUndo();
       window.SMMotion.setExprGlobals(v);
@@ -5620,12 +5620,7 @@
     // numKeys existed (or now exist) with zero UI surface telling anyone
     // they're callable; a hover tooltip on the one place you're already
     // looking beats a separate docs page nobody opens.
-    ta.title = 'Variables : time (s), frame, value (brute, avant expression)\n'
-      + 'Fonctions : wiggle(freq, amp, octaves?), loopOut()\n'
-      + 'layer(nom) — snapshot d’un autre calque par son NOM (position/anchor/rotation/scale/opacity/name/index)\n'
-      + 'key(i) — clé n°i (1-indexé) de CETTE propriété : {time, frame, value, index}\n'
-      + 'nearestKey(t) — clé la plus proche de l’instant t (secondes)\n'
-      + 'numKeys — nombre de clés sur cette propriété';
+    ta.title = SM.t('titleExprCodeHint');
     pane.appendChild(gutter); pane.appendChild(ta);
     // The line number the error points at, when the message carries one.
     // new Function() reports positions against the wrapper we build in
@@ -5675,7 +5670,7 @@
     // change has to re-render the timeline, or the two panels drift apart
     // by exactly the amount the editor grew.
     var grip = document.createElement('div'); grip.className = 'motion-expr-grip';
-    grip.title = 'Glisser pour redimensionner l\u2019éditeur';
+    grip.title = SM.t('titleResizeEditorHint');
     grip.addEventListener('mousedown', function (e) {
       e.preventDefault(); e.stopPropagation();
       var startY = e.clientY, startH = ta.offsetHeight;
@@ -5708,7 +5703,7 @@
     // updated in N places.
     var whip = document.createElement('span');
     whip.className = 'motion-expr-whip';
-    whip.title = 'Glisser sur une autre propriété : insère sa référence.\nAlt+glisser : clone SON expression.';
+    whip.title = SM.t('titleExprWhipHint');
     whip.addEventListener('mousedown', function (e) { startExprPickwhip(holder, prop, ta, commit, whip, e); });
     head.appendChild(whip);
     return row;
@@ -6310,7 +6305,7 @@
     var expanded = window._motionExpandedTrimHolder === holder;
     var arrow = document.createElement('span'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
     var label = document.createElement('span'); label.textContent = 'Trim Paths';
-    grp.title = 'Révèle/masque le trait en animant son parcours (Start/End/Offset, comme After Effects) — clic pour replier/déplier';
+    grp.title = SM.t('titleTrimPathGroupHint');
     grp.appendChild(arrow); grp.appendChild(label);
     grp.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -6676,20 +6671,20 @@
           var track = trackFor(ld, prop);
           var menu = [
             key
-              ? { label: 'Supprimer cette clé', action: function () { pushUndo(); var tr = trackFor(ld, prop); tr.keys.splice(tr.keys.indexOf(key), 1); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } }
-              : { label: 'Ajouter une clé ici', action: function () { pushUndo(); setKeyAtCurrentFrame(ld, prop, isAnimated(ld, prop) ? valueAtFrame(ld, prop, frameIdx) : staticValue(ld, prop)); renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } },
+              ? { label: SM.t('ctxDeleteThisKey'), action: function () { pushUndo(); var tr = trackFor(ld, prop); tr.keys.splice(tr.keys.indexOf(key), 1); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } }
+              : { label: SM.t('ctxAddKeyHere'), action: function () { pushUndo(); setKeyAtCurrentFrame(ld, prop, isAnimated(ld, prop) ? valueAtFrame(ld, prop, frameIdx) : staticValue(ld, prop)); renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } },
           ];
           if (track && track.keys.length) {
             // A single-key track auto-creates its missing second key on open
             // (see openMotionEaseEditor's header comment) — no need to
             // require a full segment already existing before offering this.
-            menu.push({ label: 'Éditer la courbe d’accélération…', action: function () { pushUndo(); openMotionEaseEditor(ld, prop); } });
+            menu.push({ label: SM.t('ctxEditEaseCurve'), action: function () { pushUndo(); openMotionEaseEditor(ld, prop); } });
           }
           if (key) {
             // Hold keyframe (2026-07): no interpolation out of this key —
             // the value snaps to the NEXT key's value the instant it's
             // reached. Renders as a square (see the .hold class above).
-            menu.push({ label: key.hold ? 'Retirer le maintien (hold)' : 'Maintenir (hold)', action: function () { pushUndo(); key.hold = !key.hold; renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } });
+            menu.push({ label: key.hold ? SM.t('ctxRemoveHold') : SM.t('ctxMakeHold'), action: function () { pushUndo(); key.hold = !key.hold; renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } });
           }
           // Interpolation presets, mirroring the keyboard layer added
           // alongside them (timeline.js onKeyDown) so neither is the only way
@@ -6699,10 +6694,10 @@
           // above already did that by the time this fires).
           if (_motionKeySel.length) {
             menu.push({ sep: true });
-            menu.push({ label: 'Easy Ease  (F9)', action: function () { applyEasyEase('ease'); } });
-            menu.push({ label: 'Easy Ease In  (Maj+F9)', action: function () { applyEasyEase('easeIn'); } });
-            menu.push({ label: 'Easy Ease Out  (Cmd+Maj+F9)', action: function () { applyEasyEase('easeOut'); } });
-            menu.push({ label: 'Linéaire  (Cmd+Alt+K)', action: function () { setKeyInterp('linear'); } });
+            menu.push({ label: SM.t('ctxEasyEaseF9'), action: function () { applyEasyEase('ease'); } });
+            menu.push({ label: SM.t('ctxEasyEaseInShiftF9'), action: function () { applyEasyEase('easeIn'); } });
+            menu.push({ label: SM.t('ctxEasyEaseOutCmdShiftF9'), action: function () { applyEasyEase('easeOut'); } });
+            menu.push({ label: SM.t('ctxLinearCmdAltK'), action: function () { setKeyInterp('linear'); } });
           }
           // Batch ops act on the WHOLE current multi-selection, offered
           // regardless of which key/cell was right-clicked. No Align here
@@ -6710,27 +6705,27 @@
           // doesn't map onto a single point.
           if (_motionKeySel.length >= 2) {
             menu.push({ sep: true });
-            menu.push({ label: 'Distribuer uniformément', action: distributeKeys });
-            menu.push({ label: 'Inverser l’ordre (flip)', action: flipKeys });
-            menu.push({ label: 'Subdiviser (clé à mi-chemin)', action: subdivideKeys });
-            menu.push({ label: 'Colorer les clés…', action: function () {
+            menu.push({ label: SM.t('ctxDistributeEvenly'), action: distributeKeys });
+            menu.push({ label: SM.t('ctxFlipOrder'), action: flipKeys });
+            menu.push({ label: SM.t('ctxSubdivideMidpoint'), action: subdivideKeys });
+            menu.push({ label: SM.t('ctxColorKeysEllipsis'), action: function () {
               var palette = ['#e8b64c', '#4ea9ff', '#59d38a', '#ff6b8b', '#b98cff', '#ffffff'];
-              var names = ['Ambre', 'Bleu', 'Vert', 'Rose', 'Violet', 'Blanc'];
+              var names = [SM.t('colorAmber'), SM.t('colorBlue'), SM.t('colorGreen'), SM.t('colorPink'), SM.t('colorPurple'), SM.t('colorWhite')];
               window.showContextMenu(e.clientX + 8, e.clientY + 8,
                 names.map(function (n, i) { return { label: n, action: function () { colorSelectedKeys(palette[i]); } }; })
-                  .concat([{ sep: true }, { label: 'Retirer la couleur', action: function () { colorSelectedKeys(null); } }]));
+                  .concat([{ sep: true }, { label: SM.t('ctxRemoveColor'), action: function () { colorSelectedKeys(null); } }]));
             } });
-            menu.push({ label: 'Sélectionner 1 sur 2', action: function () { selectEveryNthKey(2); } });
-            menu.push({ label: 'Sélectionner 1 sur N…', action: function () {
-              var v = prompt('Garder une clé sur combien ?', '3');
+            menu.push({ label: SM.t('ctxSelectEvery2nd'), action: function () { selectEveryNthKey(2); } });
+            menu.push({ label: SM.t('ctxSelectEveryNthEllipsis'), action: function () {
+              var v = prompt(SM.t('promptKeepOneKeyOutOf'), '3');
               if (v !== null) selectEveryNthKey(v);
             } });
-            menu.push({ label: 'Garder au hasard…', action: function () {
-              var v = prompt('Garder quel pourcentage de la sélection ?', '50');
+            menu.push({ label: SM.t('ctxKeepRandomEllipsis'), action: function () {
+              var v = prompt(SM.t('promptKeepPercentOfSelection'), '50');
               if (v !== null) grabRandomKeys(v);
             } });
           }
-          if (_motionKeySel.length >= 1) menu.push({ label: 'Inverser la sélection', action: invertKeySelection });
+          if (_motionKeySel.length >= 1) menu.push({ label: SM.t('ctxInvertSelection'), action: invertKeySelection });
           // Menu-based Parent-in-Time (2026-07-31) — third surface after the
           // Motion layer-row and in/out-bar menus, for full symmetry: a
           // right-click on a keyframe cell can link ITS layer's time without
@@ -6740,7 +6735,7 @@
           // with Cyril), the offsets seed from the current gap as always.
           if (window.buildTimeLinkMenuItems && state.layers[state.activeLayerIdx]) {
             menu.push({ sep: true });
-            menu.push({ label: 'Parent in Time — lier le temps à…', action: function () {
+            menu.push({ label: SM.t('ctxParentInTimeLinkTimeEllipsis'), action: function () {
               window.showContextMenu(e.clientX + 8, e.clientY + 8, window.buildTimeLinkMenuItems(state.activeLayerIdx, state.layers[state.activeLayerIdx], function () { renderLayerList(); renderTimeline(); }));
             } });
           }
@@ -7424,7 +7419,7 @@
     ['top', 'bottom'].forEach(function (pos) {
       var edge = document.createElement('div');
       edge.className = 'motion-keysel-edge motion-keysel-edge-' + pos;
-      edge.title = 'Glisser horizontalement pour skewer les clés (ce bord bouge, l\'autre reste ancré)';
+      edge.title = SM.t('titleSkewKeysHint');
       edge.addEventListener('mousedown', function (e) {
         e.stopPropagation(); e.preventDefault();
         // .grabbing thickens the edge bar a touch further than plain hover
@@ -7448,7 +7443,7 @@
     ['left', 'right'].forEach(function (pos) {
       var edge = document.createElement('div');
       edge.className = 'motion-keysel-edge motion-keysel-edge-' + pos;
-      edge.title = 'Glisser pour espacer / resserrer les clés dans le temps (le bord opposé reste ancré)';
+      edge.title = SM.t('titleSpaceKeysHint');
       edge.addEventListener('mousedown', function (e) {
         e.stopPropagation(); e.preventDefault();
         edge.classList.add('grabbing');
@@ -7461,7 +7456,7 @@
   function addMoveFill(boxEl, onStart) {
     var fill = document.createElement('div');
     fill.className = 'motion-keysel-fill';
-    fill.title = 'Glisser pour déplacer toutes les clés sélectionnées ensemble'
+    fill.title = SM.t('titleMoveAllSelectedKeysHint')
       + '\n⌘/Ctrl + glisser : liquify — les clés proches du curseur suivent plus que les lointaines';
     fill.addEventListener('mousedown', function (e) {
       e.stopPropagation(); e.preventDefault();
