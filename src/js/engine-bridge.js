@@ -999,6 +999,20 @@
       // own start/end convention.
       var brushGroupDabs = null;
       var brushAnchorItem = null;
+      // Linked-fill companion (feedback #103: "y a juste le stroke qui se
+      // déplace et pas le fill") — same shape as brushAnchorStrokeId just
+      // above, one pre-pass building linkedFillId -> ANCHOR's strokeId. A
+      // fill companion carries its OWN strokeId (draw-bridge.js stamps it
+      // independently, see motion.js's layerElements comment on
+      // __linkedFillStrokeId), never the anchor's — but the Elements panel
+      // folds the companion OUT of the list entirely (motion.js:
+      // "isLinkedFillCompanion: return // folded into its owning stroke
+      // below"), so per-element Motion (position/scale/rotation drags,
+      // keyframes) is only ever RECORDED under the anchor's strokeId. Below,
+      // cStrokeId fell through to the companion's own (different) strokeId
+      // for every OTHER lookup keyed by cStrokeId, so elementMotionAt found
+      // no entry for it and the fill silently never moved with its stroke.
+      var fillAnchorStrokeId = null;
       for (var bi = 0; bi < children.length; bi++) {
         var bc = children[bi];
         if (bc.data && bc.data.brushGroupId) {
@@ -1016,6 +1030,10 @@
             if (!brushAnchorItem) brushAnchorItem = {};
             brushAnchorItem[bc.data.brushGroupId] = bc;
           }
+        }
+        if (bc.data && bc.data.linkedFillId && !bc.data.isLinkedFillCompanion && bc.data.strokeId) {
+          if (!fillAnchorStrokeId) fillAnchorStrokeId = {};
+          fillAnchorStrokeId[bc.data.linkedFillId] = bc.data.strokeId;
         }
       }
       var dabOrdinal = null;
@@ -1308,7 +1326,9 @@
         // around this item's OWN bounds (never the whole layer's), matching
         // AE's shape-group-inside-a-layer composition. null in the common
         // case (this item has no per-element motion of its own).
-        var cStrokeId = c.data && ((c.data.isBrushTextureCopy && brushAnchorStrokeId && brushAnchorStrokeId[c.data.brushGroupId]) || c.data.strokeId);
+        var cStrokeId = c.data && ((c.data.isBrushTextureCopy && brushAnchorStrokeId && brushAnchorStrokeId[c.data.brushGroupId])
+          || (c.data.isLinkedFillCompanion && fillAnchorStrokeId && fillAnchorStrokeId[c.data.linkedFillId])
+          || c.data.strokeId);
         // Path-CONTENT mutations (Trim, per-vertex offsets, animated corner
         // radii, path-vertex-follow, text-bounds-follow) must never run on a
         // texture-copy dab's own tiny stamp geometry (isBrushTextureCopy,
