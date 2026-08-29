@@ -7947,12 +7947,32 @@
         if (!track || !track.keys.length) return;
         rects.forEach(function (r) {
           var sel;
-          if (r.getAttribute('class') === 'motion-key-connect') {
-            var i = +r.getAttribute('data-i');
-            sel = track.keys[i] && track.keys[i + 1] && isKeySelected(rowEl._smHolder, rowEl._smProp, track.keys[i]) && isKeySelected(rowEl._smHolder, rowEl._smProp, track.keys[i + 1]);
-          } else {
+          // classList.contains, NOT getAttribute('class')===… (2026-08-29
+          // fix, feedback #149: "si je select une keyframe plus un in/out
+          // point... la barre verte de suit pas pendant le drag"). A
+          // connector whose BOTH endpoints are already selected renders
+          // with class "motion-key-connect sel" (see its own build-time
+          // `.sel` suffix a few hundred lines up) — the strict `===` check
+          // here only ever matched the UNselected/single-line-class case,
+          // so a fully-selected connector (the exact state a click on the
+          // connector itself, or a marquee over both diamonds, produces)
+          // fell into the durblock `else` branch instead. There it read a
+          // nonexistent `data-ki` (connectors only ever carry `data-i`),
+          // `+null` coerced to 0, and by sheer coincidence checked
+          // track.keys[0]'s selection instead of its own two endpoints —
+          // reproduced live: a 3-key track with only keys[1]/keys[2]
+          // selected (their connector IS `.sel`) dragged an in-point handle
+          // with that selection active; both diamonds translated live but
+          // the connector between them stayed at transform:'' the whole
+          // drag, visibly detaching from the diamonds it connects, though
+          // the data committed correctly at drop either way (this was a
+          // live-preview-only bug, not a data bug).
+          if (r.classList.contains('motion-key-durblock')) {
             var ki = +r.getAttribute('data-ki');
             sel = track.keys[ki] && isKeySelected(rowEl._smHolder, rowEl._smProp, track.keys[ki]);
+          } else {
+            var i = +r.getAttribute('data-i');
+            sel = track.keys[i] && track.keys[i + 1] && isKeySelected(rowEl._smHolder, rowEl._smProp, track.keys[i]) && isKeySelected(rowEl._smHolder, rowEl._smProp, track.keys[i + 1]);
           }
           if (sel) r.style.transform = 'translateX(' + px + 'px)';
         });
