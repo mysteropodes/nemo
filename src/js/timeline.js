@@ -3658,7 +3658,18 @@ function buildTweenCurveSVG(li,fA,fB,svgW,svgH){
       c.style.cursor='grab';
       c.addEventListener('pointerdown',function(e){
         e.stopPropagation();e.preventDefault();
-        c.setPointerCapture(e.pointerId);
+        // Feedback #124 ("parfois le point s'arète alors que je drag
+        // encore"): capture used to be set on `c`, the individual <circle>
+        // — but redraw() (called on every move below) tears down and
+        // rebuilds EVERY circle from scratch, including the one currently
+        // captured. Per the Pointer Events spec, capture is released the
+        // instant its target leaves the document, and re-establishing it on
+        // a freshly created element mid-drag is unreliable across browsers
+        // (observed intermittently, matching "parfois"/sometimes) — capture
+        // could silently drop and stop delivering move/up to this drag
+        // entirely. `svg` itself is never destroyed by redraw() (only its
+        // children are), so capturing there instead survives every redraw.
+        svg.setPointerCapture(e.pointerId);
         function move(ev){
           var r=svg.getBoundingClientRect();
           var nx=fromSX(ev.clientX-r.left),ny=fromSY(ev.clientY-r.top);
@@ -3668,7 +3679,7 @@ function buildTweenCurveSVG(li,fA,fB,svgW,svgH){
           redraw();
           scheduleRegen();
         }
-        function up(ev){c.releasePointerCapture(ev.pointerId);svg.removeEventListener('pointermove',move);svg.removeEventListener('pointerup',up);regenNow();}
+        function up(ev){svg.releasePointerCapture(ev.pointerId);svg.removeEventListener('pointermove',move);svg.removeEventListener('pointerup',up);regenNow();}
         svg.addEventListener('pointermove',move);svg.addEventListener('pointerup',up);
       });
       c.addEventListener('dblclick',function(e){
