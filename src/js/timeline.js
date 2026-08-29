@@ -1817,6 +1817,10 @@ window.SM={
       }
     }
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
+      // Media mode (2026-08-29, linked-media.js) — project-wide, document-
+      // level setting like canvasW/fps above (not per-layer, not per-
+      // symbol/montage snapshot — a linked-vs-embedded choice is global).
+      mediaMode:state.mediaMode||'embedded',
       layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,effects:l.effects,footage:l.footage,
         // Layer parenting (2026-07-25). BOTH of these were missing from this
         // list, so every parent link was silently dropped on save — a rig
@@ -1875,7 +1879,18 @@ window.SM={
       // real asset-panel pass — a field written here but missing from the
       // import restore below is the exact "writer updated, reader forgotten"
       // shape CLAUDE.md §1 warns about; kept in sync with the import side.
-      mediaLibrary:(state.mediaLibrary||[]).map(function(m){return{id:m.id,name:m.name,kind:m.kind,thumb:m.thumb,layerName:m.layerName,layerUid:m.layerUid,linked:m.linked,path:m.path,audioId:m.audioId,sizeBytes:m.sizeBytes,importedAt:m.importedAt};}),
+      // webHandleId/naturalW/naturalH (2026-08-29, linked-media.js): a
+      // web-linked entry's IndexedDB reference and the ORIGINAL pixel size
+      // (needed to re-fit a drag-out-of-the-library insert correctly — the
+      // panel's own `thumb` is a small preview for a linked entry, see
+      // media-library.js's own comment, so it can't supply this itself).
+      // linkedBroken/linkedBrokenReason deliberately NOT persisted here —
+      // session-derived ("was this file reachable THIS session"), re-
+      // checked fresh on every load rather than trusted stale across a save
+      // (CLAUDE.md §1's "a field written by one side but not the other" is
+      // the opposite mistake; this is the reverse — a field that must NOT
+      // round-trip because its truth expires the moment the file changes).
+      mediaLibrary:(state.mediaLibrary||[]).map(function(m){return{id:m.id,name:m.name,kind:m.kind,thumb:m.thumb,layerName:m.layerName,layerUid:m.layerUid,linked:m.linked,path:m.path,webHandleId:m.webHandleId,naturalW:m.naturalW,naturalH:m.naturalH,audioId:m.audioId,sizeBytes:m.sizeBytes,importedAt:m.importedAt};}),
       perspectiveEnabled:state.perspectiveEnabled,perspectiveMode:state.perspectiveMode,perspectiveDensity:state.perspectiveDensity,perspectiveVPs:state.perspectiveVPs,
       symmetryEnabled:state.symmetryEnabled,symmetryMode:state.symmetryMode,symmetryAxis:state.symmetryAxis,symmetryRadialCenter:state.symmetryRadialCenter,symmetryRadialSectors:state.symmetryRadialSectors,symmetryExtend:state.symmetryExtend,
       motionArcs:state.motionArcs,easingCurve:state.easingCurve,resamplePts:state.resamplePts,tweenStep:state.tweenStep,
@@ -2202,6 +2217,12 @@ window.SM={
     if(window.SMReference)SMReference.reload();
     state.mediaLibrary=d.mediaLibrary||[];
     if(window.SMMediaLibrary)SMMediaLibrary.reload();
+    // Media mode (2026-08-29, linked-media.js) — see exportJSON's own
+    // comment on this same field. syncUI() re-stamps the Document panel's
+    // two toggle buttons (they don't go through syncDocFields below, which
+    // only handles plain value inputs).
+    state.mediaMode=d.mediaMode||'embedded';
+    if(window.SMLinkedMedia)SMLinkedMedia.syncUI();
     state.perspectiveEnabled=d.perspectiveEnabled||false;state.perspectiveMode=d.perspectiveMode||'2pt';state.perspectiveDensity=d.perspectiveDensity||24;state.perspectiveVPs=d.perspectiveVPs||null;
     state.symmetryEnabled=d.symmetryEnabled||false;state.symmetryMode=d.symmetryMode||'y';state.symmetryAxis=d.symmetryAxis||null;state.symmetryRadialCenter=d.symmetryRadialCenter||null;state.symmetryRadialSectors=d.symmetryRadialSectors||6;state.symmetryExtend=d.symmetryExtend!==undefined?d.symmetryExtend:true;
     if(window.renderPaletteGrid)window.renderPaletteGrid();

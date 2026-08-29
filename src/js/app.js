@@ -228,6 +228,14 @@ var state={
   xformAnchorCustom:null, // [x,y] world-space override from Alt+click (select-bridge.js) — takes priority over xformAnchorKey when set
   refMedia:null, // rotoscopy reference {type:'video'|'imageseq'|'image',...} — reference-bridge.js
   mediaLibrary:[], // {id,name,kind:'image'|'video',thumb,layerName} — browsable catalog of imports, media-library.js
+  // Project-wide media setting (2026-08-29, linked-media.js): 'embedded'
+  // (default, unchanged behavior — base64 baked into the project JSON) or
+  // 'linked' (new imports reference an external file/handle instead —
+  // desktop: a real filesystem path; web: a FileSystemFileHandle stashed in
+  // IndexedDB, see linked-media.js). Deliberately ONE setting for the whole
+  // project, not per-media (Cyril: "un seul réglage") — governs new imports
+  // going forward only; existing embedded media is untouched when flipped.
+  mediaMode:'embedded',
   symbols:{},activeSymbolId:null,openSymbolTabs:[],
   // Tracked roles (2026-08-29, feedback #151, "attacher un objet à un autre
   // même sans identité stable entre frames" — hand-drawn Animation 2D
@@ -996,7 +1004,24 @@ function serR(r){
   var useY=(!r.loaded&&pending)?pending.y:r.position.y;
   var useW=(!r.loaded&&pending)?pending.width:(rot?Math.abs(r.scaling.x)*r.width:r.bounds.width);
   var useH=(!r.loaded&&pending)?pending.height:(rot?Math.abs(r.scaling.y)*r.height:r.bounds.height);
-  var d={isRaster:true,src:r.data&&r.data.src?r.data.src:r.source,x:useX,y:useY,width:useW,height:useH,opacity:r.opacity!==undefined?r.opacity:1};if(r.data&&r.data.isBitmapBrush)d.isBitmapBrush=true;
+  var d={isRaster:true,x:useX,y:useY,width:useW,height:useH,opacity:r.opacity!==undefined?r.opacity:1};if(r.data&&r.data.isBitmapBrush)d.isBitmapBrush=true;
+  // Linked media (2026-08-29, linked-media.js): a raster imported while the
+  // project's mediaMode is 'linked' carries r.data.linked + the reference
+  // (linkedPath on desktop, linkedHandleId on web) instead of embedded
+  // bytes. This is the ENTIRE weight win of "linked" mode — d.src is
+  // deliberately omitted here so the giant base64 payload never round-trips
+  // into the saved JSON. desR resolves the actual pixels back from disk/
+  // IndexedDB at load time (see linked-media.js's resolveAsync + desR's own
+  // comment). r.data.src still holds a resolved data: URL in-memory for
+  // THIS session's rendering (kept off r.data.linked's own check so it
+  // never leaks into d) — see linked-media.js's getCachedSrc.
+  if(r.data&&r.data.linked){
+    d.linked=true;
+    if(r.data.linkedPath)d.linkedPath=r.data.linkedPath;
+    if(r.data.linkedHandleId)d.linkedHandleId=r.data.linkedHandleId;
+  }else{
+    d.src=r.data&&r.data.src?r.data.src:r.source;
+  }
   if(rot)d.rotation=rot;
   // Companion linkage (v2 anchor+companion architecture, bitmap-brush.js):
   // brushGroupId is how relinkBrushCompanions() regroups this raster with
@@ -1107,12 +1132,29 @@ window.__imgCacheStats=function(){return{entries:_imgCache.size,mo:+( _imgCacheB
 window.__imgCacheReset=function(){_imgCache.clear();_imgCacheBytes=0;_imgCacheHits=0;_imgCacheMisses=0;};
 var _imgCacheHits=0,_imgCacheMisses=0;
 function desR(d,layer,op){var prev=project.activeLayer;layer.activate();
+  // Linked media (2026-08-29, linked-media.js): d.src is absent for a
+  // linked raster (serR's own comment) — d.linkedPath (desktop)/
+  // d.linkedHandleId (web) is the reference instead. getCachedSrc returns
+  // an already-resolved data: URL SYNCHRONOUSLY when one is cached from a
+  // prior resolve this session; a cache miss kicks off the async fs/
+  // IndexedDB read in the background (resolveAsync) and this call falls
+  // through to a correctly-SIZED-AND-POSITIONED but blank placeholder
+  // raster below (new Raster(Size) — synchronously "loaded" per Paper.js,
+  // no onLoad wait) until the resolve lands and forces a rebuild.
+  var srcForRaster=d.src;
+  if(d.linked&&window.SMLinkedMedia){
+    srcForRaster=SMLinkedMedia.getCachedSrc(d);
+    if(!srcForRaster)SMLinkedMedia.resolveAsync(d);
+  }
   // Cache hit: hand Paper the ALREADY-DECODED element, which makes the
   // Raster synchronously `loaded` — place() runs inline below and the
   // async onLoad path (and its self-healing renderNow) is never needed.
-  var _cached=_imgCacheGet(d.src);
-  if(_cached)_imgCacheHits++;else{_imgCacheMisses++;_imgCacheWarm(d.src);}
-  var r=new Raster(_cached||d.src);r.data.src=d.src;if(d.isBitmapBrush)r.data.isBitmapBrush=true;if(d.brushGroupId)r.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)r.data.isBrushTextureCopy=true;if(d.groupId)r.data.groupId=d.groupId;
+  var _cached=srcForRaster?_imgCacheGet(srcForRaster):null;
+  if(srcForRaster){if(_cached)_imgCacheHits++;else{_imgCacheMisses++;_imgCacheWarm(srcForRaster);}}
+  var r=new Raster(_cached||srcForRaster||new Size(Math.max(1,d.width||1),Math.max(1,d.height||1)));
+  r.data.src=srcForRaster||null;
+  if(d.linked){r.data.linked=true;if(d.linkedPath)r.data.linkedPath=d.linkedPath;if(d.linkedHandleId)r.data.linkedHandleId=d.linkedHandleId;if(!srcForRaster)r.data.linkedMissing=true;}
+  if(d.isBitmapBrush)r.data.isBitmapBrush=true;if(d.brushGroupId)r.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)r.data.isBrushTextureCopy=true;if(d.groupId)r.data.groupId=d.groupId;
   if(d.isText){r.data.isText=true;r.data.text=d.text||'';r.data.font=d.font||'sans-serif';r.data.size=d.size||48;r.data.color=d.color||'#000000';r.data.align=d.align||'left';if(d.fixedWidth)r.data.fixedWidth=d.fixedWidth;if(d.isTextChar)r.data.isTextChar=true;if(d.textGroupId)r.data.textGroupId=d.textGroupId;if(d.charIndex!=null)r.data.charIndex=d.charIndex;if(d.wordIndex!=null)r.data.wordIndex=d.wordIndex;if(d.lineIndex!=null)r.data.lineIndex=d.lineIndex;}
   r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;
   // serR()'s mid-decode fallback reads this — see its own comment. Cleared
