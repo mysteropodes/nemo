@@ -1473,9 +1473,17 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
    including free ones, while .is-child/.is-parent opt back into visibility
    unconditionally regardless of Alt, since an already-engaged point's role
    should never depend on a held key to be legible. */
-#frame-grid.timelink-alt .layer-inout-bar .timelink-anchor,
 .layer-inout-bar .timelink-anchor.is-child,
 .layer-inout-bar .timelink-anchor.is-parent{opacity:1;pointer-events:auto;}
+/* Feedback #108: "avec alt aucun petit rond n'apparait" — the dot DOES
+   reveal (opacity 0->1, confirmed live), but the base free-anchor color
+   (dim text-color border on a near-black --panel2 fill) barely registers
+   against a default/untrimmed bar, which is the near-transparent white
+   overlay .full-range style just above, not a bright custom color — a
+   near-black dot on a near-black bar is functionally invisible even at
+   opacity:1. Brighter border + fill specifically for the revealed state,
+   so it actually pops instead of just technically existing. */
+#frame-grid.timelink-alt .layer-inout-bar .timelink-anchor{opacity:1;pointer-events:auto;border-color:#fff;background:var(--accent,#3F6BF5);}
 .layer-inout-bar .timelink-anchor:hover{border-color:var(--accent,#5b6cff);box-shadow:0 0 0 2px rgba(91,108,255,.25);}
 .layer-inout-bar .timelink-anchor.in{left:0;}
 .layer-inout-bar .timelink-anchor.out{left:100%;}
@@ -1494,7 +1502,13 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 
 /* Multi-select (marquee rect -> group-drag several layers' bars together,
    layer-inout.js) */
-.layer-inout-bar.sel{box-shadow:0 0 0 1.5px #fff;}
+/* Feedback #56: "les in et out point pas assez contrasté quand c'est
+   select" — a bare 1.5px white ring barely read against the bar's own
+   colored pill fill (see the reporter's screenshot: green/purple/orange
+   bars). Matches .layer-inout-handle.sel's own already-visible language
+   just above (white ring + accent glow) instead of a plain thin outline,
+   so bar-level and handle-level selection read as the same visual system. */
+.layer-inout-bar.sel{box-shadow:0 0 0 1.5px #fff,0 0 0 4px rgba(74,158,255,.55);}
 .layer-inout-marquee-rect{position:fixed;border:1px solid var(--accent);background:rgba(63,107,245,.15);pointer-events:none;z-index:50;}
 .fc.io-dim{background:rgba(0,0,0,.35);opacity:.4;}
 /* Per-keyframe tick marks inside the in/out bar (layer-inout.js
