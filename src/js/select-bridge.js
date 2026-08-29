@@ -2524,6 +2524,18 @@
     var profilable = (window.selectedPaths || []).some(function (p) { return p && p.segments && p.segments.length >= 2; });
     if (profilable) {
       items.push({ sep: true });
+      // Feedback #102 ("comme dans Animate... convertir les lines en fill,
+      // pour le confort de dessin"): the underlying conversion already
+      // existed as the "even" stroke profile below (a constant-width
+      // profile turns a stroke into a same-width filled ribbon, in place —
+      // same machinery, zero new geometry code), but nothing in the menu
+      // read as "convert to fill" to someone looking for that specific,
+      // named Animate command. Adding the Animate-style label as its own
+      // top-level entry rather than renaming the profile option — a
+      // constant-width profile and "convert to fill" are the same operation
+      // here, but users coming from the tapering submenu still want that
+      // wording, so both stay.
+      items.push({ label: 'Convertir le trait en remplissage (Fill)', action: function () { window.SM.applyStrokeProfile('even'); } });
       items.push({ label: 'Profil de contour :', disabled: true, action: function () {} });
       [['taper-both', '   • effilé aux deux bouts'],
        ['taper-in', '   • effilé au début'],
