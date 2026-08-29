@@ -49,7 +49,16 @@
     // AND whatever this click does, as one step. Doing it lazily per-branch
     // also left a "Aucune zone fermée ici" miss's keyframe promotion
     // permanently un-undoable.
-    pushUndo();
+    // pushUndoActiveFrame() (tweens.js), not the full pushUndo() — measured
+    // on a real 120-keyframe project: the fill click itself only ever
+    // mutates state.currentFrame (across possibly-linked layers via
+    // ensureKeyframe's syncLinkedKeyframeFolder fan-out, still covered since
+    // this snapshots every layer's copy of just that one frame), so cloning
+    // the other 119 frames on every click was 166-298ms of dead weight —
+    // 80%+ of the whole click's cost. Fill Brush/paint bucket propagation
+    // (onPropagateClick, below) legitimately touches OTHER frames and keeps
+    // the full pushUndo().
+    pushUndoActiveFrame();
     ensureKeyframe();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var pt = new Point(w[0], w[1]);
@@ -152,7 +161,9 @@
     // as one step with whatever fill follows it.
     var committed = null;
     if (_fillCloseDrag.points.length >= 2) {
-      pushUndo();
+      // Same reasoning as the click handler above — a closing-line commit
+      // only ever touches the current frame.
+      pushUndoActiveFrame();
       ensureKeyframe();
       committed = fillCommitCloseLine(userLayers[state.activeLayerIdx], _fillCloseDrag.points);
       if (committed) saveActiveLayerFrame();
