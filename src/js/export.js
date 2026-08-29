@@ -453,8 +453,19 @@ function exportHasActiveEffects(){
 // (CLAUDE.md §3's whole point). Blend ALSO gets a native Paper fallback in
 // exportBuildFrame for the paths this routing can't cover (SVG, scale>1).
 function exportHasLayerCompositing(){
+  // isFolderLayer (audit 2026-08-29, prouvé au pixel près) : un Dossier
+  // (#319) est une feature de COMPOSITING moteur — composite_scene rend
+  // ses enfants dans une passe isolée À LA POSITION Z DU DOSSIER, alors
+  // que le fallback Paper.js ci-dessous peint tout dans l'ordre brut de
+  // state.layers. Dès qu'un calque étranger s'intercale entre un enfant
+  // et son dossier dans l'ordre brut, l'export fallback inverse la
+  // superposition visible à l'écran (mesuré : pixel de chevauchement
+  // rouge à l'écran/moteur, bleu dans exportFrameDataURL — même scène).
+  // Même logique de routage que blend/matte/3D/motionBlur/order : toute
+  // feature que le chemin Paper ne sait pas reproduire route l'export par
+  // le moteur.
   return state.layers.some(function(ld){
-    return (ld.blendMode&&ld.blendMode!=='normal')||(ld.matteMode&&ld.matteMode!=='none');
+    return (ld.blendMode&&ld.blendMode!=='normal')||(ld.matteMode&&ld.matteMode!=='none')||!!ld.isFolderLayer;
   });
 }
 // 3D layers and Motion Blur (2026-08-17 audit, "vérifie les export de
