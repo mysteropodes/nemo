@@ -211,6 +211,32 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
     return best;
   }
 
+  // Per-vertex weight hit-test (feedback #112, "l'autoweight" — Shapper's
+  // own strength per its actual source isn't a smarter auto-weight
+  // algorithm (it doesn't have one — pure manual weight table, confirmed
+  // reading its shipped code), it's that a bad auto/default weight is
+  // always hand-correctable afterward. Nemo already had rigAutoAssignLayer
+  // (app.js) but nothing to touch up ONE vertex's result — this is that
+  // missing manual step, additive to the existing radius-handle drag, not
+  // a replacement for it (radius = coarse per-bone reach, this = fine
+  // per-vertex override). Hits the LIVE (posed) position, `bind._live`,
+  // not `bind.rest` — the user is clicking what they SEE on canvas, which
+  // is wherever the shape currently sits, posed or not.
+  function hitBoundVertex(pt) {
+    var ld = state.layers[state.activeLayerIdx];
+    if (!ld || !ld.rig) return null;
+    var tol = 10 / view.zoom, best = null, bestD = tol;
+    ld.rig.binds.forEach(function (b) {
+      if (!b._live || !b._live.segments) return;
+      var segs = b._live.segments;
+      for (var i = 0; i < segs.length; i++) {
+        var d = pt.getDistance(segs[i].point);
+        if (d < bestD) { bestD = d; best = { bind: b, vi: i }; }
+      }
+    });
+    return best;
+  }
+
   function onDown(e) {
     if (!shouldIntercept()) return;
     e.stopImmediatePropagation();
@@ -230,7 +256,16 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
         pushUndo();
         _radiusDrag = { ld: ld, boneId: rh.boneId, center: rh.center };
         window.SMEngineBridge.suspend();
+        return;
       }
+      // Missed every radius handle — try a bound vertex instead (manual
+      // per-vertex weight override, see hitBoundVertex's own comment).
+      // Opening the popover doesn't mutate anything by itself, so no
+      // pushUndo here; openRigWeightPopover pushes one on the FIRST actual
+      // edit inside it, same "checkpoint at the first real mutation, not
+      // at UI-open time" convention _radiusDrag/_posing already follow.
+      var bv = hitBoundVertex(pt);
+      if (bv) openRigWeightPopover(bv.bind, bv.vi, e);
       return;
     }
 
@@ -499,6 +534,152 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
     _rigDraw.path = null; _rigDraw.boneId = null; _rigDraw.ld = null; _rigDraw.draggingHandle = false;
     if (window.renderLayerList) renderLayerList();
     if (window.renderRigModeUI) renderRigModeUI();
+  }
+
+  // ---- Manual per-vertex weight override popover (feedback #112) -------
+  // Dynamic DOM popover, same idiom as color-picker.js/brush-preset-picker.js
+  // (built once on first use, positioned+clamped near the click, closed on
+  // outside-click/Escape) rather than static markup in index.html — this is
+  // one advanced tool's one interaction, not a panel other code needs to
+  // reference by a stable id.
+  var _weightPop = null, _weightPopClose = null;
+  function closeRigWeightPopover() {
+    if (!_weightPop) return;
+    _weightPop.remove();
+    _weightPop = null;
+    if (_weightPopClose) { _weightPopClose(); _weightPopClose = null; }
+  }
+  function boneLabel(ld, boneId) {
+    var idx = Object.keys(ld.rig.bones).indexOf(boneId);
+    return 'Os ' + (idx >= 0 ? idx + 1 : '?');
+  }
+  // First real edit inside the popover gets ONE undo checkpoint — same
+  // "checkpoint at first mutation, not at UI-open time" convention every
+  // other Rig interaction in this file follows (_radiusDrag, _posing).
+  function openRigWeightPopover(bind, vi, e) {
+    closeRigWeightPopover();
+    var ld = state.layers[state.activeLayerIdx];
+    if (!ld || !ld.rig) return;
+    var undoPushed = false;
+    function ensureUndo() { if (!undoPushed) { pushUndo(); undoPushed = true; } }
+    function liveUpdate() {
+      applyRigDeform(ld);
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    }
+
+    var el = document.createElement('div');
+    el.className = 'rig-weight-popover';
+    document.body.appendChild(el);
+
+    function render() {
+      el.innerHTML = '';
+      var title = document.createElement('div');
+      title.className = 'rig-weight-title';
+      title.textContent = 'Poids du vertex #' + (vi + 1);
+      el.appendChild(title);
+
+      var entries = bind.weights[vi] || (bind.weights[vi] = []);
+      var boundIds = {};
+      entries.forEach(function (we) { boundIds[we.boneId] = true; });
+
+      entries.slice().forEach(function (we) {
+        var row = document.createElement('div');
+        row.className = 'rig-weight-row';
+        var lbl = document.createElement('span');
+        lbl.className = 'rig-weight-lbl';
+        lbl.textContent = boneLabel(ld, we.boneId);
+        row.appendChild(lbl);
+        var inp = document.createElement('input');
+        inp.type = 'number'; inp.className = 'pi scrub rig-weight-input';
+        inp.min = '0'; inp.max = '100'; inp.step = '1';
+        inp.value = Math.round(we.w * 100);
+        inp.addEventListener('input', function () {
+          ensureUndo();
+          we.w = Math.max(0, Math.min(100, parseFloat(inp.value) || 0)) / 100;
+          liveUpdate();
+        });
+        row.appendChild(inp);
+        var pct = document.createElement('span');
+        pct.className = 'rig-weight-pct'; pct.textContent = '%';
+        row.appendChild(pct);
+        var del = document.createElement('button');
+        del.className = 'rig-weight-del'; del.textContent = '×';
+        del.title = 'Retirer cet os de ce vertex';
+        del.addEventListener('click', function () {
+          ensureUndo();
+          var idx = entries.indexOf(we);
+          if (idx >= 0) entries.splice(idx, 1);
+          liveUpdate();
+          render();
+        });
+        row.appendChild(del);
+        el.appendChild(row);
+      });
+
+      // "+ ajouter" — every bone NOT already influencing this vertex
+      // (usually because auto-weight's radius never reached it).
+      var addable = Object.keys(ld.rig.bones).filter(function (bid) { return !boundIds[bid]; });
+      if (addable.length) {
+        var addRow = document.createElement('div');
+        addRow.className = 'rig-weight-row rig-weight-add';
+        var sel = document.createElement('select');
+        sel.className = 'pi';
+        addable.forEach(function (bid) {
+          var opt = document.createElement('option');
+          opt.value = bid; opt.textContent = boneLabel(ld, bid);
+          sel.appendChild(opt);
+        });
+        addRow.appendChild(sel);
+        var addBtn = document.createElement('button');
+        addBtn.className = 'pbtn'; addBtn.textContent = '+ Ajouter';
+        addBtn.addEventListener('click', function () {
+          ensureUndo();
+          var bone = ld.rig.bones[sel.value];
+          var bp = _boneSegsToPath(bone.restSegments, bone.closed);
+          var restPt = bind.rest[vi];
+          var loc = bp.getNearestLocation(new Point(restPt[0], restPt[1]));
+          bp.remove();
+          entries.push({ boneId: sel.value, offset: loc ? loc.offset : 0, w: 0.5 });
+          liveUpdate();
+          render();
+        });
+        addRow.appendChild(addBtn);
+        el.appendChild(addRow);
+      }
+
+      var resetRow = document.createElement('div');
+      resetRow.className = 'rig-weight-row';
+      var resetBtn = document.createElement('button');
+      resetBtn.className = 'pbtn';
+      resetBtn.textContent = 'Réinitialiser (auto)';
+      resetBtn.title = 'Recalcule ce vertex avec la formule de poids automatique (distance aux os, rayon + adoucissement du panneau)';
+      resetBtn.addEventListener('click', function () {
+        ensureUndo();
+        var boneIds = Object.keys(ld.rig.bones);
+        var restPt = bind.rest[vi];
+        bind.weights[vi] = rigWeighOnePoint(ld.rig, boneIds, new Point(restPt[0], restPt[1]), panelDefaultRadius(), panelSoftness());
+        liveUpdate();
+        render();
+      });
+      resetRow.appendChild(resetBtn);
+      el.appendChild(resetRow);
+    }
+    render();
+
+    var left = Math.min(e.clientX + 12, window.innerWidth - 220);
+    var top = Math.min(e.clientY - 8, window.innerHeight - 260);
+    el.style.left = Math.max(4, left) + 'px';
+    el.style.top = Math.max(4, top) + 'px';
+
+    function onOutside(ev) { if (!el.contains(ev.target)) closeRigWeightPopover(); }
+    function onKey(ev) { if (ev.key === 'Escape') closeRigWeightPopover(); }
+    document.addEventListener('mousedown', onOutside, true);
+    document.addEventListener('keydown', onKey);
+    _weightPopClose = function () {
+      document.removeEventListener('mousedown', onOutside, true);
+      document.removeEventListener('keydown', onKey);
+    };
+    _weightPop = el;
   }
 
   function init() {

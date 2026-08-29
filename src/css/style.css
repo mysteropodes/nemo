@@ -165,6 +165,20 @@ body.mac-overlay-titlebar #app{padding-top:28px;}
 #history-btn{flex:none;width:24px;height:24px;border-radius:6px;background:transparent;border:none;color:rgba(236,234,231,.45);cursor:pointer;display:flex;align-items:center;justify-content:center;}
 #history-btn:hover{background:var(--panel3);color:var(--accent-hover);}
 #history-pop{display:none;position:fixed;width:280px;max-height:420px;overflow-y:auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:600;padding:6px;}
+/* Rig manual weight-override popover (feedback #112) — rig-bridge.js's
+   openRigWeightPopover, same fixed/panel2/shadow convention as #history-pop
+   above, built dynamically rather than static markup (one advanced tool's
+   one interaction, see that function's own comment). */
+.rig-weight-popover{position:fixed;width:200px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:600;padding:8px;display:flex;flex-direction:column;gap:6px;}
+.rig-weight-title{font-size:10px;font-weight:600;color:var(--text-dim);margin-bottom:2px;}
+.rig-weight-row{display:flex;align-items:center;gap:5px;}
+.rig-weight-lbl{flex:1;font-size:10px;color:var(--text);}
+.rig-weight-input{flex:0 0 48px;}
+.rig-weight-pct{font-size:9px;color:var(--text-dim);}
+.rig-weight-del{flex:none;width:16px;height:16px;border-radius:50%;background:transparent;border:none;color:var(--text-dim);cursor:pointer;font-size:11px;line-height:1;}
+.rig-weight-del:hover{background:var(--red);color:#fff;}
+.rig-weight-add select{flex:1;font-size:10px;}
+.rig-weight-add .pbtn,.rig-weight-row>.pbtn{font-size:10px;padding:4px 8px;}
 #history-pop.open{display:block;}
 #history-pop .hist-item{display:flex;gap:8px;align-items:center;padding:7px 8px;border-radius:6px;font-size:11px;cursor:pointer;color:var(--text);}
 #history-pop .hist-item:hover{background:var(--panel3);}
