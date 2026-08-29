@@ -4367,6 +4367,34 @@ document.getElementById('frame-grid').addEventListener('contextmenu',function(e)
     // already exists (e.g. after editing an endpoint's content).
     {label:'Générer / refaire le tween',shortcut:'T',action:function(){window.SM.generateTweens();}},
     {sep:true},
+    // Feedback #117 ("où est la propagation de la couleur aux autres
+    // frames, il la faudrait au clic droit sur la frame") — the command
+    // already existed (fillPropagateAcrossFrames, tools.js, wired to
+    // #btn-fill-propagate in Tool Options while the Fill tool is active),
+    // just not reachable from here. Mirrors onPropagateClick's own logic
+    // exactly (fill-bridge.js) — same "most recently added fill on this
+    // frame" target heuristic, same toasts — rather than looping it over
+    // EVERY fill on the frame: that function's own comment measures
+    // ~3.5s per call on a 120-frame project, so a bulk multi-fill version
+    // needs its own progress/cost story, not a silent loop here.
+    {
+      label:'Propager ce remplissage → toutes les frames',
+      disabled:!(userLayers[li]&&userLayers[li].children.some(function(c){return c.data&&c.data.fillSeed;})),
+      action:function(){
+        var layer=userLayers[li];
+        var fills=layer.children.filter(function(c){return c.data&&c.data.fillSeed;});
+        if(!fills.length)return;
+        var target=fills[fills.length-1];
+        pushUndo();
+        var res=null;
+        try{res=fillPropagateAcrossFrames(target);}catch(err){console.warn('[fill] propagate failed',err);}
+        updateUI();
+        if(window.SMEngineBridge)SMEngineBridge.renderNow();
+        if(!res){if(window.showToast)showToast(SM.t('toastPropagateFailed'));return;}
+        if(window.showToast)showToast(SM.t('toastPropagateDone').replace('{filled}',res.filled).replace('{skipped}',res.skipped));
+      }
+    },
+    {sep:true},
     {label:'Supprimer les images',action:function(){window.SM.removeFrameSpan();}},
   ]));
 });
