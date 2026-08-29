@@ -301,6 +301,14 @@
   // untouched default-value property gets hidden). Global toggle (not
   // per-layer/per-group) — one button affects everything.
   var _hideUnanimated = false;
+  // Scale X/Y aspect-ratio lock (feedback #120, "il manque le cadenas pour
+  // que le x et y scale soit lié") — per-holder, not persisted with the
+  // project (exportJSON's layer serialization, timeline.js, is an explicit
+  // field whitelist — this is an editing convenience like _hideUnanimated
+  // above, not project data, so a WeakSet avoids needing to add a field
+  // there+on import for a purely-UI toggle). Cleared automatically when a
+  // holder is garbage-collected, no explicit cleanup needed.
+  var _scaleLockedHolders = new WeakSet();
   // Motion timeline workspace filters. They are UI-only: project data stays
   // untouched, while the column/filter preferences follow the workstation.
   var _motionSearch = '';
@@ -5308,6 +5316,29 @@
               nvals[dim] = nv;
               setValue(holder, prop, nvals);
             }
+            // Aspect-ratio lock (feedback #120) — carries THIS dimension's
+            // multiplicative change onto the other one, same convention
+            // After Effects' own Scale chain-link uses (a ratio, not an
+            // identical additive delta — 100%→110% on X takes a 50% Y to
+            // 55%, not to 60%). Reads the OTHER dimension's PRE-edit value
+            // from `vals` (this row's own render-time snapshot, same
+            // fallback `display.value` already uses) rather than
+            // re-deriving it, so a mixed multi-selection locks onto the
+            // same reference every dimension's display used.
+            if (prop === 'scale' && PROP_DIM[prop] === 2 && _scaleLockedHolders.has(holder)) {
+              var otherDim = dim === 0 ? 1 : 0;
+              var beforeThis = Number(vals[dim]) || 0;
+              var beforeOther = Number(vals[otherDim]) || 0;
+              if (beforeThis !== 0) {
+                var afterOther = beforeOther * (nv / beforeThis);
+                var otherChanged = setSelectedKeyDimension(holder, prop, otherDim, afterOther);
+                if (!otherChanged) {
+                  var onvals = isAnimated(holder, prop) ? valueAtFrame(holder, prop, state.currentFrame) : staticValue(holder, prop);
+                  onvals[otherDim] = afterOther;
+                  setValue(holder, prop, onvals);
+                }
+              }
+            }
             // renderLayerList too (not just the timeline, the original
             // single-panel behavior): these same rows now render in TWO
             // places (bottom Transform group + right-panel mirror,
@@ -5320,6 +5351,24 @@
           }, display.mixed);
           fieldWrap.appendChild(f);
         })(d);
+      }
+      // Aspect-ratio lock toggle (feedback #120) — Scale only, right after
+      // its X/Y fields so it reads as "these two are chained" rather than
+      // a generic row control.
+      if (prop === 'scale' && PROP_DIM[prop] === 2) {
+        var lockBtn = document.createElement('div');
+        lockBtn.className = 'lico motion-scale-lock' + (_scaleLockedHolders.has(holder) ? ' on' : '');
+        lockBtn.title = 'Lier Scale X et Y (garder le ratio)';
+        lockBtn.innerHTML = _scaleLockedHolders.has(holder)
+          ? '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'
+          : '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>';
+        lockBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (_scaleLockedHolders.has(holder)) _scaleLockedHolders.delete(holder);
+          else _scaleLockedHolders.add(holder);
+          renderLayerList(); renderTimeline();
+        });
+        fieldWrap.appendChild(lockBtn);
       }
       var unit = document.createElement('span'); unit.className = 'motion-unit'; unit.textContent = PROP_UNIT[prop];
       fieldWrap.appendChild(unit);
