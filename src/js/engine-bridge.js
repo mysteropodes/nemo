@@ -3271,7 +3271,23 @@
     // 3D-toggled layer even with real rotationX/rotationY set; layerMotion3DPointMap
     // is the dedicated perspective-correct counterpart (motion.js).
     if (!motionMap && window.SMMotion && SMMotion.layerMotion3DPointMap) motionMap = SMMotion.layerMotion3DPointMap(state.activeLayerIdx);
-    function toRendered(x, y) { return motionMap ? motionMap.fwd(x, y) : [x, y]; }
+    // 2026-08-29 fix (feedback #125) — see subselect-bridge.js's toLocalPoint
+    // comment for the full story: a Component's own instance placement
+    // (`ld.symMatrix`, set by dragging/resizing the instance with the Select
+    // tool) is a second render-time-only transform, applied in
+    // getEffectiveStrokes (app.js) BEFORE Motion, that this overlay never
+    // composed in either — same symptom as the Motion gap above (handles
+    // drawn at the shape's raw position while the ribbon itself renders
+    // wherever symMatrix placed it). symMatrix is a plain Paper Matrix
+    // (already-baked translation, no pivot decomposition needed), applied
+    // FIRST so the result feeds into the SAME Motion mapping above, mirroring
+    // the forward order in app.js (raw -> symMatrix -> Motion -> world).
+    var symLd = state.layers[state.activeLayerIdx];
+    var symMat = (symLd && symLd.symMatrix && typeof symMatrixOf === 'function') ? symMatrixOf(symLd) : null;
+    function toRendered(x, y) {
+      if (symMat) { var sp = symMat.transform(new Point(x, y)); x = sp.x; y = sp.y; }
+      return motionMap ? motionMap.fwd(x, y) : [x, y];
+    }
     segs.forEach(function (s, i) {
       var pt = toRendered(s.point[0], s.point[1]);
       var hi = s.handleIn, ho = s.handleOut;
