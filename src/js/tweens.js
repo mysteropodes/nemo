@@ -4077,6 +4077,23 @@ function harmonizeAfterEdit(fi){
   if(prevKey>=0)restrictTo[prevKey]=true;
   if(nextKey>=0)restrictTo[fi]=true;
   generateTweens(restrictTo);
+  // #126 ("plutôt 2"): a harmonized correction stays a SOFT tween-frame
+  // fix, not a hard new keyframe — the whole point of Harmonize is to
+  // blend the edit into the existing tween on both sides, not fork the
+  // span in two permanently. Without this, the promotion
+  // _maybePromoteInterpolated already performed (app.js, on the save that
+  // ran right before this function was called) would stick, and the next
+  // full "Tween (T)" regen would treat this frame as a hard boundary
+  // forever. generateTweens() above never writes to fA/fB themselves —
+  // only the frames strictly between — so this frame's corrected strokes
+  // survive the regen call untouched; only its classification flips back
+  // down here. isManualEdit is what makes it show green (tw-manual, see
+  // style.css) and what "Skip manually-edited frames" (state.tweenSkipManual,
+  // read in generateTweens' own per-frame loop below) now has something
+  // real to actually skip on a future whole-layer regen.
+  if(prevKey>=0&&nextKey>=0){
+    f.isKeyframe=false;f.isInterpolated=true;f.isManualEdit=true;
+  }
 }
 
 // ---- ARCS ----
