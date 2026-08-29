@@ -341,7 +341,12 @@
     title.style.cssText='font-weight:600;margin-bottom:10px';
     p.appendChild(title);
 
-    var unitSel=document.createElement('select');
+    // Feedback #142 ("y a pas d'autre dropdown en fond blanc"): these 3
+    // <select>s were built with zero styling, so the browser's own default
+    // (white background, system font) rendered instead of matching the
+    // app's dark chrome — every other dropdown in Nemo uses .psel
+    // (style.css) for exactly this reason.
+    var unitSel=document.createElement('select'); unitSel.className='psel';
     ['char','word','line'].forEach(function(v){
       var o=document.createElement('option'); o.value=v;
       o.textContent=v==='char'?SM.t('textAnimUnitChar'):v==='word'?SM.t('textAnimUnitWord'):SM.t('textAnimUnitLine');
@@ -350,7 +355,7 @@
     unitSel.value=_lastSettings.mode;
     var rUnit=row(SM.t('textAnimUnitLabel')); rUnit.appendChild(unitSel); p.appendChild(rUnit);
 
-    var presetSel=document.createElement('select');
+    var presetSel=document.createElement('select'); presetSel.className='psel';
     var grpIn=document.createElement('optgroup'); grpIn.label=SM.t('textAnimGroupIn');
     var grpOut=document.createElement('optgroup'); grpOut.label=SM.t('textAnimGroupOut');
     presetSel.appendChild(grpIn); presetSel.appendChild(grpOut);
@@ -361,7 +366,7 @@
     presetSel.value=_lastSettings.preset;
     var rPreset=row(SM.t('textAnimStyleLabel')); rPreset.appendChild(presetSel); p.appendChild(rPreset);
 
-    var easeSel=document.createElement('select');
+    var easeSel=document.createElement('select'); easeSel.className='psel';
     Object.keys(EASING_CURVES).forEach(function(k){
       var o=document.createElement('option'); o.value=k; o.textContent=SM.t(EASING_I18N_KEY[k])||EASING_LABELS[k];
       easeSel.appendChild(o);
