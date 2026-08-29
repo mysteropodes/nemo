@@ -1505,6 +1505,24 @@
           <span id="app-update-status" style="flex:1;font-size:10px;color:var(--text-dim)"><span data-i18n="settingsVersionLabel">Version</span> <span id="app-version-txt">—</span></span>
           <button class="pbtn" id="app-check-update" style="font-size:10px;padding:5px 8px" data-i18n="settingsCheckUpdates">Vérifier les mises à jour</button>
         </div>
+        <!-- Web-build changelog (feedback #121, "dans config>update sur la
+             version web ça serait bien d'avoir les derniers update qui
+             apparissent en résumé de tes PR, un menu déroulant avec les
+             dates heures") — the desktop build's "Vérifier les mises à
+             jour" button above means something real there (the Tauri
+             updater plugin); on the web build it can only ever show
+             "unavailable" (updater-bridge.js's tauriOk() guard), so this
+             is a web-only substitute: recent squash-merge commits on main
+             (each IS a merged PR's own title, by this repo's own PR
+             convention) via GitHub's public commits API — no auth needed,
+             same "read is public" precedent feedback-bridge.js's own
+             fetchGithubIssues() already relies on. Hidden by default,
+             revealed only when !tauriOk() (initWebChangelog,
+             updater-bridge.js) — a desktop build never shows this. -->
+        <div class="pr" id="web-changelog-row" style="gap:6px;display:none;margin-top:6px">
+          <button class="pbtn" id="web-changelog-toggle" style="flex:1;font-size:10px;padding:5px" data-i18n="settingsWebChangelogBtn">Voir les derniers changements…</button>
+        </div>
+        <div id="web-changelog-list" style="display:none;flex-direction:column;gap:2px;margin-top:6px;max-height:220px;overflow-y:auto"></div>
       </div>
       <div class="settings-pane" data-pane="collab" style="display:none">
         <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsSyncHdr">Sync équipe (dossier partagé)</div>
