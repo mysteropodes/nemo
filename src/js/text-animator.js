@@ -42,7 +42,18 @@
     easeIn:EASE_IN_CURVE,
     easeOut:[{x:0,y:0},{x:0.25,y:0.09},{x:0.5,y:0.5},{x:0.75,y:0.75},{x:1,y:1}],
   };
+  // French fallback strings, kept as the last resort t() itself already
+  // falls back to (missing key -> the key name) — see EASING_I18N_KEY below
+  // for the actual i18n lookup used when building the panel.
   var EASING_LABELS={'default':'Par défaut du style',linear:'Linéaire',easeInOut:'Douce (in/out)',easeIn:'Accélérer',easeOut:'Décélérer'};
+  // i18n.js key per EASING_LABELS/PRESET_LABELS entry (2026-08-29, feedback
+  // #130: this whole panel was hardcoded French, the one user-facing surface
+  // in the app that never went through SM.t()). Looked up fresh every time
+  // openPanel() builds the <select> options — NOT baked into EASING_LABELS/
+  // PRESET_LABELS at module-load time — so a live language switch (i18n.js's
+  // documented "no reload" contract) is picked up the next time the panel
+  // opens, same as every other SM.t() call site in the app.
+  var EASING_I18N_KEY={'default':'textAnimEaseDefault',linear:'textAnimEaseLinear',easeInOut:'textAnimEaseInOut',easeIn:'textAnimEaseIn',easeOut:'textAnimEaseOut'};
 
   // Every text-carrying stroke dict in this layer belonging to `groupId`
   // (vector: sd.groupId from vector-text-bridge.js; raster split:
@@ -95,6 +106,7 @@
     popIn:{props:['opacity','scale'],from:{opacity:[0],scale:[140,140]},to:{opacity:[100],scale:[100,100]},curve:POP_CURVE,exit:false},
     popOut:{props:['opacity','scale'],from:{opacity:[100],scale:[100,100]},to:{opacity:[0],scale:[140,140]},curve:EASE_IN_CURVE,exit:true},
   };
+  // French fallback strings — see EASING_LABELS' own comment above.
   var PRESET_LABELS={
     fadeIn:'Fondu (apparition)',fadeOut:'Fondu (disparition)',
     slideUp:'Glisser vers le haut (apparition)',slideUpOut:'Glisser vers le haut (disparition)',
@@ -103,6 +115,15 @@
     slideRight:'Glisser vers la droite (apparition)',slideRightOut:'Glisser vers la droite (disparition)',
     scaleIn:'Zoom (apparition)',scaleOut:'Zoom (disparition)',
     popIn:'Rebond (apparition)',popOut:'Rebond (disparition)',
+  };
+  var PRESET_I18N_KEY={
+    fadeIn:'textAnimPresetFadeIn',fadeOut:'textAnimPresetFadeOut',
+    slideUp:'textAnimPresetSlideUp',slideUpOut:'textAnimPresetSlideUpOut',
+    slideDown:'textAnimPresetSlideDown',slideDownOut:'textAnimPresetSlideDownOut',
+    slideLeft:'textAnimPresetSlideLeft',slideLeftOut:'textAnimPresetSlideLeftOut',
+    slideRight:'textAnimPresetSlideRight',slideRightOut:'textAnimPresetSlideRightOut',
+    scaleIn:'textAnimPresetScaleIn',scaleOut:'textAnimPresetScaleOut',
+    popIn:'textAnimPresetPopIn',popOut:'textAnimPresetPopOut',
   };
 
   // Every prop any preset can touch — used to clear a stale run before
@@ -225,13 +246,64 @@
   // tool here anyway — these are per-EDIT preferences, not app settings.
   var _lastSettings={mode:'char',preset:'fadeIn',easing:'default',unitFrames:12,staggerFrames:3,randomize:false};
   function closePanel(){ if(_panel){_panel.remove();_panel=null;} _panelUndoTaken=false; }
+  var PANEL_W=260;
+  // Anchor rect for the panel (2026-08-29, feedback #130: a hardcoded
+  // `top:80px;right:280px` landed INSIDE the right-side properties panel
+  // whenever that panel was wider than 280+260px — the two opaque panels
+  // then overlapped, and the properties panel's own rows showed through
+  // around the floating panel's edges (confirmed against the reporter's
+  // screenshot: "23 ELEMENTS SELEC…" and other prop rows visible around
+  // it). Anchoring off the SELECTED text's own on-canvas position instead
+  // — same world→screen projection openInPlaceTextEditor's reposition()
+  // already uses (view.projectToView + the canvas element's own rect) —
+  // keeps the panel inside the canvas area by construction, so it can
+  // never land on top of the (independently resizable) properties panel.
+  function computeAnchorRect(){
+    var canvasEl=document.getElementById('drawing-canvas');
+    if(!canvasEl||typeof view==='undefined'||!view.projectToView)return null;
+    var cr=canvasEl.getBoundingClientRect();
+    var b=null;
+    (window.selectedPaths||[]).forEach(function(p){
+      if(!p||!p.bounds)return;
+      b=b?b.unite(p.bounds):p.bounds.clone();
+    });
+    if(!b)return {left:cr.left,top:cr.top,right:cr.right,bottom:cr.top,canvasRect:cr};
+    var tl=view.projectToView(b.topLeft), br=view.projectToView(b.bottomRight);
+    return {
+      left:cr.left+Math.min(tl.x,br.x), top:cr.top+Math.min(tl.y,br.y),
+      right:cr.left+Math.max(tl.x,br.x), bottom:cr.top+Math.max(tl.y,br.y),
+      canvasRect:cr,
+    };
+  }
+  // Places `p` (already filled with its rows, not yet in the document) near
+  // `anchor`, clamped so it always stays fully inside the canvas area — both
+  // axes, unlike openLayerColorSwatches/openTweenCurveInset's own
+  // horizontal-only clamp, since this panel is tall enough to run off the
+  // bottom of a short window too. Prefers opening to the right of the
+  // selection (out of the text's own way); flips to the left if there's no
+  // room, same "flip rather than clip" rule those two popovers use for X.
+  function positionPanel(p, anchor){
+    var margin=12;
+    document.body.appendChild(p);
+    _panel=p;
+    var cr=(anchor&&anchor.canvasRect)||{left:margin,right:window.innerWidth-margin,top:margin,bottom:window.innerHeight-margin};
+    var w=p.offsetWidth||PANEL_W, h=p.offsetHeight||360;
+    var a=anchor||{left:cr.left,top:cr.top,right:cr.left,bottom:cr.top};
+    var left=a.right+margin;
+    if(left+w>cr.right-margin)left=a.left-w-margin;
+    if(left<cr.left+margin)left=Math.max(cr.left+margin,Math.min(a.left,cr.right-w-margin));
+    var top=Math.max(cr.top+margin,Math.min(a.top,window.innerHeight-h-margin));
+    p.style.left=Math.round(left)+'px';
+    p.style.top=Math.round(top)+'px';
+  }
   function openPanel(li, groupId){
     closePanel();
     var ld=state.layers[li]; if(!ld)return;
     if(window.pushUndo){pushUndo();_panelUndoTaken=true;}
+    var anchor=computeAnchorRect();
     var p=document.createElement('div');
     p.id='text-animator-panel';
-    p.style.cssText='position:fixed;top:80px;right:280px;z-index:300;width:260px;'+
+    p.style.cssText='position:fixed;visibility:hidden;z-index:300;width:'+PANEL_W+'px;'+
       'background:var(--panel2);border:1px solid var(--border);border-radius:10px;'+
       'box-shadow:0 8px 24px rgba(0,0,0,.4);padding:12px;font-size:12px;color:var(--text)';
     function row(labelTxt){
@@ -242,37 +314,37 @@
       return r;
     }
     var title=document.createElement('div');
-    title.textContent='Animer le texte';
+    title.textContent=SM.t('textAnimPanelTitle');
     title.style.cssText='font-weight:600;margin-bottom:10px';
     p.appendChild(title);
 
     var unitSel=document.createElement('select');
     ['char','word','line'].forEach(function(v){
       var o=document.createElement('option'); o.value=v;
-      o.textContent=v==='char'?'Lettres':v==='word'?'Mots':'Lignes';
+      o.textContent=v==='char'?SM.t('textAnimUnitChar'):v==='word'?SM.t('textAnimUnitWord'):SM.t('textAnimUnitLine');
       unitSel.appendChild(o);
     });
     unitSel.value=_lastSettings.mode;
-    var rUnit=row('Unité'); rUnit.appendChild(unitSel); p.appendChild(rUnit);
+    var rUnit=row(SM.t('textAnimUnitLabel')); rUnit.appendChild(unitSel); p.appendChild(rUnit);
 
     var presetSel=document.createElement('select');
-    var grpIn=document.createElement('optgroup'); grpIn.label='Apparition';
-    var grpOut=document.createElement('optgroup'); grpOut.label='Disparition';
+    var grpIn=document.createElement('optgroup'); grpIn.label=SM.t('textAnimGroupIn');
+    var grpOut=document.createElement('optgroup'); grpOut.label=SM.t('textAnimGroupOut');
     presetSel.appendChild(grpIn); presetSel.appendChild(grpOut);
     Object.keys(PRESETS).forEach(function(k){
-      var o=document.createElement('option'); o.value=k; o.textContent=PRESET_LABELS[k]||k;
+      var o=document.createElement('option'); o.value=k; o.textContent=SM.t(PRESET_I18N_KEY[k])||PRESET_LABELS[k]||k;
       (PRESETS[k].exit?grpOut:grpIn).appendChild(o);
     });
     presetSel.value=_lastSettings.preset;
-    var rPreset=row('Style'); rPreset.appendChild(presetSel); p.appendChild(rPreset);
+    var rPreset=row(SM.t('textAnimStyleLabel')); rPreset.appendChild(presetSel); p.appendChild(rPreset);
 
     var easeSel=document.createElement('select');
     Object.keys(EASING_CURVES).forEach(function(k){
-      var o=document.createElement('option'); o.value=k; o.textContent=EASING_LABELS[k];
+      var o=document.createElement('option'); o.value=k; o.textContent=SM.t(EASING_I18N_KEY[k])||EASING_LABELS[k];
       easeSel.appendChild(o);
     });
     easeSel.value=_lastSettings.easing;
-    var rEase=row('Accélération'); rEase.appendChild(easeSel); p.appendChild(rEase);
+    var rEase=row(SM.t('textAnimEasingLabel')); rEase.appendChild(easeSel); p.appendChild(rEase);
 
     function numInput(val,step){
       var inp=document.createElement('input');
@@ -281,16 +353,16 @@
       return inp;
     }
     var startInp=numInput(state.currentFrame,1);
-    var rStart=row('Frame de départ'); rStart.appendChild(startInp); p.appendChild(rStart);
+    var rStart=row(SM.t('textAnimStartFrame')); rStart.appendChild(startInp); p.appendChild(rStart);
 
     var durInp=numInput(_lastSettings.unitFrames,1);
-    var rDur=row('Durée / unité (frames)'); rDur.appendChild(durInp); p.appendChild(rDur);
+    var rDur=row(SM.t('textAnimDuration')); rDur.appendChild(durInp); p.appendChild(rDur);
 
     var stagInp=numInput(_lastSettings.staggerFrames,1);
-    var rStag=row('Décalage entre unités (frames)'); rStag.appendChild(stagInp); p.appendChild(rStag);
+    var rStag=row(SM.t('textAnimStagger')); rStag.appendChild(stagInp); p.appendChild(rStag);
 
     var randChk=document.createElement('input'); randChk.type='checkbox'; randChk.checked=_lastSettings.randomize;
-    var rRand=row('Ordre aléatoire'); rRand.appendChild(randChk); p.appendChild(rRand);
+    var rRand=row(SM.t('textAnimRandomOrder')); rRand.appendChild(randChk); p.appendChild(rRand);
 
     // Scrub slider — previews the animation's own span (start → last
     // unit's end) without touching the app's main timeline/playhead UI,
@@ -301,7 +373,7 @@
     scrubWrap.style.cssText='margin:2px 0 10px';
     var scrubLabelRow=document.createElement('div');
     scrubLabelRow.style.cssText='display:flex;justify-content:space-between;color:var(--text-dim);margin-bottom:4px';
-    var scrubLabel=document.createElement('span'); scrubLabel.textContent='Aperçu';
+    var scrubLabel=document.createElement('span'); scrubLabel.textContent=SM.t('textAnimPreviewLabel');
     var scrubFrameLabel=document.createElement('span');
     scrubLabelRow.appendChild(scrubLabel); scrubLabelRow.appendChild(scrubFrameLabel);
     var scrubInp=document.createElement('input');
@@ -334,7 +406,7 @@
       scrubInp.min=Math.max(0,opts.startFrame-2);
       scrubInp.max=Math.min(state.totalFrames-1,span+2);
       if(+scrubInp.value<+scrubInp.min||+scrubInp.value>+scrubInp.max)scrubInp.value=opts.startFrame;
-      scrubFrameLabel.textContent='frame '+scrubInp.value;
+      scrubFrameLabel.textContent=SM.t('textAnimFramePrefix')+scrubInp.value;
       scrubToValue();
     }
     function scrubToValue(){
@@ -342,7 +414,7 @@
       state.currentFrame=f;
       if(window.loadFrame)loadFrame(f);
       if(window.SMEngineBridge)SMEngineBridge.renderNow();
-      scrubFrameLabel.textContent='frame '+f;
+      scrubFrameLabel.textContent=SM.t('textAnimFramePrefix')+f;
     }
     [unitSel,presetSel,easeSel,randChk].forEach(function(el){el.addEventListener('change',preview);});
     [startInp,durInp,stagInp].forEach(function(el){el.addEventListener('input',preview);el.addEventListener('change',preview);});
@@ -351,13 +423,13 @@
     var btnRow=document.createElement('div');
     btnRow.style.cssText='display:flex;gap:8px;margin-top:4px';
     var cancelBtn=document.createElement('button');
-    cancelBtn.textContent='Annuler'; cancelBtn.className='pbtn'; cancelBtn.style.flex='1';
+    cancelBtn.textContent=SM.t('textAnimCancel'); cancelBtn.className='pbtn'; cancelBtn.style.flex='1';
     cancelBtn.onclick=function(){
       if(_panelUndoTaken&&window.undo)undo();
       closePanel();
     };
     var applyBtn=document.createElement('button');
-    applyBtn.textContent='Terminé'; applyBtn.className='pbtn ac'; applyBtn.style.flex='1';
+    applyBtn.textContent=SM.t('textAnimDone'); applyBtn.className='pbtn ac'; applyBtn.style.flex='1';
     applyBtn.onclick=function(){
       if(window.showToast)showToast(lastUnitCount?(SM.t('toastTextAnimatedSuffix')+lastUnitCount+SM.t('toastUnitSuffix')+(lastUnitCount>1?'s':'')):SM.t('toastNoUnitToAnimate'));
       closePanel();
@@ -365,8 +437,8 @@
     btnRow.appendChild(cancelBtn); btnRow.appendChild(applyBtn);
     p.appendChild(btnRow);
 
-    document.body.appendChild(p);
-    _panel=p;
+    positionPanel(p, anchor); // appends p, sets _panel, clamps to the canvas area
+    p.style.visibility='';
     preview(); // show the default preset live the moment the panel opens
   }
 
