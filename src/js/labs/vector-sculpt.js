@@ -238,6 +238,24 @@
   function onMove(e) {
     updateCursor(e);
     if (!isActive()) return;
+    // Feedback #94: "après avoir utilisé sculpt vector j'ai des lags sur
+    // l'affichage et les outils" — a pointerup/pointercancel can be missed
+    // by the browser (released outside the window, Alt-Tab mid-drag, a
+    // right-click interrupting) and this listener never resets dragging.
+    // With no safety net, EVERY subsequent mousemove — including ones that
+    // have nothing to do with sculpting, as long as Select/Subselect stays
+    // the active tool — silently re-ran the full applyPush/applySmooth
+    // pass (walk every sculptable path in the layer, distance-test every
+    // segment) forever, which reads exactly as "lag after using the tool"
+    // since nothing on screen hints sculpting is still armed. e.buttons is
+    // the actual live button state (unlike a stored flag it can't go
+    // stale) — bit 1 is the primary button; if it's not set the drag
+    // already ended somewhere this listener never heard about.
+    if ((dragging || resizing) && !(e.buttons & 1)) {
+      dragging = false; resizing = false; lastW = null; touched = [];
+      updateCursor(e);
+      return;
+    }
     if (resizing) {
       e.stopImmediatePropagation(); e.preventDefault();
       window.SMLabs.setSculptRadius(resizeStartRadius + (e.clientX - resizeStartX));
