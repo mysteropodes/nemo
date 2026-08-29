@@ -181,9 +181,66 @@
     } catch (e) { console.warn('[updater] mac silent check failed', e); }
   }
 
+  // Web-build changelog (feedback #121) — recent squash-merge commits on
+  // main via GitHub's public commits API (no auth: this repo is public,
+  // same precedent feedback-bridge.js's fetchGithubIssues() already
+  // relies on for reads). Each commit message's first line IS a merged
+  // PR's own title, by this repo's own squash-merge convention — no
+  // separate "list merged PRs" endpoint needed.
+  var _webChangelogLoaded = false;
+  function initWebChangelog() {
+    var row = document.getElementById('web-changelog-row');
+    if (!row || tauriOk()) return; // desktop build never shows this
+    row.style.display = 'flex';
+    var toggle = document.getElementById('web-changelog-toggle');
+    var list = document.getElementById('web-changelog-list');
+    if (!toggle || !list) return;
+    toggle.addEventListener('click', async function () {
+      if (list.style.display === 'flex') { list.style.display = 'none'; return; }
+      list.style.display = 'flex';
+      if (_webChangelogLoaded) return; // fetched once per session, not on every re-open
+      list.textContent = '';
+      var loading = document.createElement('div');
+      loading.style.cssText = 'font-size:10px;color:var(--text-dim);padding:4px';
+      loading.textContent = (window.SM && SM.t) ? SM.t('settingsWebChangelogLoading') : 'Chargement…';
+      list.appendChild(loading);
+      try {
+        var res = await fetch('https://api.github.com/repos/mysteropodes/nemo/commits?sha=main&per_page=15', {
+          headers: { Accept: 'application/vnd.github+json' },
+        });
+        if (!res.ok) throw new Error('GitHub API ' + res.status);
+        var commits = await res.json();
+        list.textContent = '';
+        commits.forEach(function (c) {
+          var title = ((c.commit && c.commit.message) || '').split('\n')[0];
+          var dateStr = c.commit && c.commit.author && c.commit.author.date;
+          var when = dateStr ? new Date(dateStr).toLocaleString() : '';
+          var row2 = document.createElement('div');
+          row2.style.cssText = 'font-size:10px;color:var(--text);padding:4px 2px;border-bottom:1px solid var(--border)';
+          var titleEl = document.createElement('div');
+          titleEl.textContent = title;
+          var whenEl = document.createElement('div');
+          whenEl.style.cssText = 'font-size:9px;color:var(--text-dim);margin-top:1px';
+          whenEl.textContent = when;
+          row2.appendChild(titleEl); row2.appendChild(whenEl);
+          list.appendChild(row2);
+        });
+        _webChangelogLoaded = true;
+      } catch (e) {
+        list.textContent = '';
+        var err = document.createElement('div');
+        err.style.cssText = 'font-size:10px;color:var(--text-dim);padding:4px';
+        err.textContent = (window.SM && SM.t) ? SM.t('settingsWebChangelogFailed') : 'Impossible de récupérer les derniers changements.';
+        list.appendChild(err);
+        console.warn('[updater] web changelog fetch failed', e);
+      }
+    });
+  }
+
   function init() {
     showVersion();
     initMacUpdateButton();
+    initWebChangelog();
     var btn = document.getElementById('app-check-update');
     if (btn) btn.addEventListener('click', function () { checkForUpdate(false); });
     // "Vérifier les mises à jour…" in the Nemo app menu (top-left,
