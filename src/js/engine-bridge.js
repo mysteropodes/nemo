@@ -858,6 +858,50 @@
     } else
     for (var i = 0; i < state.layers.length; i++) {
       if (!layerIsEffectivelyVisible(i) || !userLayers[i]) { layers.push(userLayerEntries[i] = { items: [] }); continue; }
+      // Folder layer (2026-08, "grouper les layer dans des dossiers qui
+      // agiront comme un null de control parentage") — checked BEFORE the
+      // plain isNullLayer branch right below since a Folder is ALSO
+      // isNullLayer:true (same pivot/no-content/parenting-target
+      // machinery, reused unmodified — see addFolderLayer, timeline.js).
+      // What's different: it carries isFolderLayer + folderChildIndices
+      // (every OTHER layer whose parentLayerUid resolves to THIS layer's
+      // own uid, wherever they sit in the stack — order doesn't matter
+      // here, engine.rs looks each index up after the whole array is
+      // built) + its own `effects` stack, so engine.rs's composite_scene
+      // can render just that subtree in isolation and apply the folder's
+      // effects to ONLY that flattened result — see is_folder_layer's doc
+      // comment in engine.rs for the full contrast with isEffectLayer's
+      // "everything below in z-order" mechanism. Children are NOT
+      // filtered by visibility here — an invisible child already emits
+      // {items:[]} at its own index (line above), which naturally
+      // contributes nothing to the folder's flattened render, same as
+      // everywhere else invisible layers already resolve to a no-op.
+      if (state.layers[i].isFolderLayer) {
+        var folderUid = window.SMMotion && SMMotion.ensureLayerUid ? SMMotion.ensureLayerUid(state.layers[i]) : state.layers[i].layerUid;
+        var childIdxs = [];
+        if (folderUid) {
+          for (var fci = 0; fci < state.layers.length; fci++) {
+            if (fci !== i && state.layers[fci].parentLayerUid === folderUid) childIdxs.push(fci);
+          }
+        }
+        // _folderChildStateIdxs holds state.layers[] indices (this loop's
+        // own coordinate space) — NOT the final wire array position. The
+        // real `folderChildIndices` (what engine.rs actually reads) is
+        // resolved in the SAME final pass as matteSourceLayerUid below,
+        // via layers.indexOf(userLayerEntries[...]) object identity, after
+        // every unshift/splice (bg rect, onion, guides, null markers…) has
+        // already happened — resolving eagerly here (raw state indices)
+        // was WRONG the first time this shipped: buildSceneJson unshifts a
+        // background rect onto the FRONT of `layers` further down, which
+        // offsets every wire index by one relative to state.layers, so a
+        // folder's children silently pointed at the wrong wire entries
+        // (confirmed live: the bg rect got sucked into the folder's
+        // isolated pass and painted opaque-white on top of everything).
+        // _folderChildStateIdxs itself must never reach JSON.stringify —
+        // deleted once resolved, see the final pass.
+        layers.push(userLayerEntries[i] = { items: [], isFolderLayer: true, folderChildIndices: [], _folderChildStateIdxs: childIdxs, effects: sceneEffectsOf(state.layers[i]) });
+        continue;
+      }
       // Null layer (2026-07, Motion) — pure organizational/pivot layer,
       // never painted (AE's "Null Object"), same "no content, no paint"
       // shape as an invisible layer above, but still emitted as its OWN
@@ -2224,6 +2268,26 @@
       if (mSrcIdx < 0 || !userLayerEntries[mSrcIdx]) continue;
       var mFinal = layers.indexOf(userLayerEntries[mSrcIdx]);
       if (mFinal >= 0) mEntry.matteSourceIndex = mFinal;
+    }
+    // Folder layer child resolution (2026-08) — same "runs LAST, resolves
+    // via object identity" contract as the matte pass right above, and for
+    // the identical reason: folderChildIndices must be positions in the
+    // FINAL `layers` wire array, not state.layers indices, and only this
+    // point in the function has seen every unshift (bg rect below) that
+    // could have shifted them.
+    for (var fi = 0; fi < state.layers.length; fi++) {
+      var fEntry = userLayerEntries[fi];
+      if (!fEntry || !fEntry.isFolderLayer) continue;
+      var stateIdxs = fEntry._folderChildStateIdxs || [];
+      var resolved = [];
+      for (var fk = 0; fk < stateIdxs.length; fk++) {
+        var childEntry = userLayerEntries[stateIdxs[fk]];
+        if (!childEntry) continue;
+        var finalIdx = layers.indexOf(childEntry);
+        if (finalIdx >= 0) resolved.push(finalIdx);
+      }
+      fEntry.folderChildIndices = resolved;
+      delete fEntry._folderChildStateIdxs;
     }
     var frameForFx = renderFrame || 0;
     var fpsForFx = Math.max(1, state.fps || 24);

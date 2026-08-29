@@ -872,6 +872,54 @@ window.SM={
     }
     activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();
   },
+  // Pure disclosure toggle (2026-08) — never a mode change, unlike
+  // entering a Component (enterComponentLayer/enterSymbol, CLAUDE.md §8):
+  // a folder's children stay flat, real, directly editable rows in the
+  // SAME list at all times, this only flips whether they're shown.
+  // Re-renders both panels since Motion's own renderLayerListMotion and
+  // Animation 2D's renderLayerList both read the SAME computeLayerRenderOrder.
+  toggleFolderLayerCollapsed:function(li){
+    var ld=state.layers[li];if(!ld||!ld.isFolderLayer)return;
+    ld.folderCollapsed=!ld.folderCollapsed;
+    renderLayerList();renderTimeline();
+  },
+  // Drag-and-drop / menu reparenting entry point (2026-08) — the ONE place
+  // that turns "these layer indices" + "this folder index" into actual
+  // parentLayerUid assignments, so the drag handler (finishLayerReorder,
+  // above) and a future menu action can't drift. Delegates entirely to
+  // SMMotion.setLayerParent — same keep-transform-compensation, same cycle
+  // guard, same uid-based mechanism any other parenting target already
+  // uses; a Folder is just another valid parent, per Cyril's own framing
+  // ("agiront comme un null de control parentage").
+  reparentLayersIntoFolder:function(idxs,folderIdx){
+    var fld=state.layers[folderIdx];
+    if(!fld||!fld.isFolderLayer||!window.SMMotion)return;
+    var folderUid=SMMotion.ensureLayerUid(fld);
+    saveAllLayerFrames();pushUndoLayers(true);
+    var moved=0;
+    idxs.forEach(function(idx){
+      if(idx===folderIdx)return;
+      var ld=state.layers[idx];
+      if(!ld||ld.isFolderLayer)return; // no nested folders in v1 (see engine.rs is_folder_layer)
+      SMMotion.setLayerParent(idx,folderUid);
+      moved++;
+    });
+    if(moved&&fld.folderCollapsed){fld.folderCollapsed=false;} // reveal what was just dropped in
+    loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
+    if(moved)showToast(moved>1?(moved+' calques déplacés dans « '+(fld.name||'Dossier')+' »'):('Calque déplacé dans « '+(fld.name||'Dossier')+' »'));
+  },
+  // Explicit un-parent (2026-08) — context-menu counterpart to dragging a
+  // layer out via the plain reorder gesture (finishLayerReorder above),
+  // for when the layer isn't easy to drag (long list, small target) or the
+  // user just wants a guaranteed one-click action.
+  removeLayerFromFolder:function(idx){
+    var ld=state.layers[idx];if(!ld||!window.SMMotion)return;
+    if(folderLayerParentIdx(idx)<0)return; // parented to something other than a folder (or not parented) — leave it alone
+    saveAllLayerFrames();pushUndoLayers(true);
+    SMMotion.setLayerParent(idx,null);
+    loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
+    showToast('Calque retiré du dossier');
+  },
   // Effect (adjustment) layer (2026-07, Motion) — AE's "Adjustment Layer":
   // no painted content of its own (frames/strokes ignored on purpose,
   // same as a Null layer), but its effectType/effectP1/effectP2 apply to
@@ -891,6 +939,47 @@ window.SM={
   // offsets from; Rotation sets the angle) — zero new keyframe machinery.
   // Defaults to horizontal through canvas center.
   addGuideLayer:function(){saveAllLayerFrames();pushUndoLayers(true);var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Guide'));state.layers[idx].isGuideLayer=true;state.layers[idx].guidePos=[state.canvasW/2,state.canvasH/2];state.layers[idx].guideOrientation='horizontal';state.layers[idx].color='#00baff';activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
+  // Folder layer (2026-08, "grouper les layer dans des dossiers qui
+  // agiront comme un null de control parentage") — structurally a Null
+  // (isNullLayer:true too, same pivot/no-content/parenting-target
+  // machinery, same nullPos on-canvas marker, added FIRST so a folder is
+  // never mistaken for "just" a null anywhere that checks isNullLayer
+  // alone) PLUS isFolderLayer:true, which is what actually changes
+  // behavior: engine-bridge.js's buildSceneJson gives it a distinct wire
+  // shape (folderChildIndices + its own effects stack scoped to JUST that
+  // subtree, engine.rs's is_folder_layer branch — see that function's own
+  // doc comment for why this is deliberately NOT the same mechanism as
+  // isEffectLayer's "everything below in z-order"), and the layer-list
+  // renderers (motion.js/timeline.js) give it a disclosure triangle +
+  // indented children instead of the plain marker row a bare Null gets.
+  // Explicitly NOT a precomp/Component — children stay flat, ordinary,
+  // directly editable layers in the SAME list at all times; open/close is
+  // a pure visibility toggle (ld.folderCollapsed), never a mode change
+  // (contrast enterComponentLayer/enterSymbol, CLAUDE.md §8).
+  // Same auto-center-on-selection + auto-parent convenience addNullLayer
+  // already has (feedback #59) — dropping a folder around an existing
+  // selection is the overwhelmingly common way this gets used.
+  addFolderLayer:function(){
+    saveAllLayerFrames();pushUndoLayers(true);
+    var preSel=_layerSel.slice();
+    var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Dossier'));
+    var ld=state.layers[idx];
+    ld.isNullLayer=true;ld.isFolderLayer=true;ld.folderCollapsed=false;
+    ld.nullShape='cross';ld.effects=[];
+    ld.color='#ffb020';
+    var validSel=preSel.filter(function(li){return li!==idx&&state.layers[li];});
+    var center=null;
+    if(window.SMMotion&&validSel.length){
+      var u=SMMotion.layerWorldBoundsUnion(validSel,state.currentFrame);
+      if(u)center=[u.cx,u.cy];
+    }
+    ld.nullPos=center||[state.canvasW/2,state.canvasH/2];
+    if(window.SMMotion&&validSel.length){
+      var folderUid=SMMotion.ensureLayerUid(ld);
+      validSel.forEach(function(li){SMMotion.setLayerParent(li,folderUid);});
+    }
+    activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();
+  },
   deleteLayer:function(){
     // The camera row isn't in state.layers (synthetic pseudo-layer, see
     // camera.js) — the generic layer-panel trash button silently did
@@ -1728,7 +1817,7 @@ window.SM={
       }
     }
     return JSON.stringify({version:13,totalFrames:sceneTotal,fps:sceneFps,canvasW:state.canvasW,canvasH:state.canvasH,canvasBg:state.canvasBg,waIn:sceneWaIn,waOut:sceneWaOut,
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,effects:l.effects,footage:l.footage,
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,effects:l.effects,footage:l.footage,
         // Layer parenting (2026-07-25). BOTH of these were missing from this
         // list, so every parent link was silently dropped on save — a rig
         // survived the session and nothing more. `uid` is the stable identity
@@ -1971,6 +2060,7 @@ window.SM={
       if(ld.isTextLayer)state.layers[idx].isTextLayer=true;
       if(ld.isNullLayer){state.layers[idx].isNullLayer=true;state.layers[idx].nullPos=(ld.nullPos||[state.canvasW/2,state.canvasH/2]).slice();state.layers[idx].nullShape=ld.nullShape||'cross';}
       if(ld.isEffectLayer){state.layers[idx].isEffectLayer=true;}
+      if(ld.isFolderLayer){state.layers[idx].isFolderLayer=true;state.layers[idx].folderCollapsed=!!ld.folderCollapsed;}
       if(ld.isGuideLayer){state.layers[idx].isGuideLayer=true;state.layers[idx].guidePos=(ld.guidePos||[state.canvasW/2,state.canvasH/2]).slice();state.layers[idx].guideOrientation=ld.guideOrientation||'horizontal';}
       state.layers[idx].effects=ld.effects||[];
       if(ld.symbolId){state.layers[idx].symbolId=ld.symbolId;state.layers[idx].symPlayMode=ld.symPlayMode||'loop';state.layers[idx].symSpeed=ld.symSpeed||1;state.layers[idx].symPlacedAt=ld.symPlacedAt||0;state.layers[idx].symSingleFrame=ld.symSingleFrame||0;if(ld.symMatrix)state.layers[idx].symMatrix=ld.symMatrix;}
@@ -4659,9 +4749,62 @@ function renderShapeTreeRowsInto(list,li,ld){
 // layers in display order; a collapsed folder's members are marked
 // hidden:true instead of omitted outright, so callers that need the real
 // layer index (frame grid columns) can still find it if they need to.
+// Folder LAYER (2026-08, ld.isFolderLayer — distinct from the plain
+// ld.folderId/state.layerFolders UI-only grouping above, which has no
+// transform/effects of its own) — a real state.layers[] entry whose
+// children are every OTHER layer with parentLayerUid === this folder's
+// own uid, wherever they physically sit in the array (SMMotion's existing
+// parenting mechanism doesn't require adjacency). Resolved once up front
+// so the main high-to-low loop below can splice a folder's children in
+// as nested entries right after it and skip them at their own natural
+// position (folderLayerChildOf), the same "hidden, not omitted" technique
+// folderId/linkGroupId already use for collapse. A layer that is ITSELF a
+// folder is never absorbed as someone else's child here — nested folders
+// are v1-unsupported (mirrors engine.rs's is_folder_layer doc comment):
+// rather than silently losing its own children's rows from the list, a
+// folder-shaped layer always renders as its own independent top-level-ish
+// row. The UI drop handler (installLayerReorderGrip) additionally refuses
+// to let you create this situation via drag in the first place.
+function folderLayerChildMap(){
+  var folderUidByIdx={},childrenOf={},childOf={};
+  for(var k=state.layers.length-1;k>=0;k--){
+    var lk=state.layers[k];
+    if(lk.isFolderLayer){
+      var fuid=(window.SMMotion&&SMMotion.ensureLayerUid)?SMMotion.ensureLayerUid(lk):lk.layerUid;
+      if(fuid)folderUidByIdx[k]=fuid;
+    }
+  }
+  for(var k2=state.layers.length-1;k2>=0;k2--){
+    var lk2=state.layers[k2];
+    if(!lk2.parentLayerUid||lk2.isFolderLayer)continue;
+    for(var fidx in folderUidByIdx){
+      if(folderUidByIdx[fidx]===lk2.parentLayerUid){
+        fidx=+fidx;
+        (childrenOf[fidx]=childrenOf[fidx]||[]).push(k2);
+        childOf[k2]=fidx;
+        break;
+      }
+    }
+  }
+  return {childrenOf:childrenOf,childOf:childOf};
+}
+// Resolves layer idx's parent, IF that parent is a Folder layer (not just
+// any parentLayerUid target — a layer parented to an ordinary Null must
+// NOT show "Retirer du dossier" or be un-parented by the plain drag-out
+// gesture). Single source of truth for the menu item's disabled state,
+// the context-menu action, and finishLayerReorder's drag-out un-parent.
+function folderLayerParentIdx(idx){
+  var ld=state.layers[idx];if(!ld||!ld.parentLayerUid)return -1;
+  for(var pi=0;pi<state.layers.length;pi++){
+    if(pi!==idx&&state.layers[pi].layerUid===ld.parentLayerUid)return state.layers[pi].isFolderLayer?pi:-1;
+  }
+  return -1;
+}
 function computeLayerRenderOrder(){
   var order=[],seenFolder={},folderEntry={},seenLinkGroup={};
+  var flMap=folderLayerChildMap(),flChildrenOf=flMap.childrenOf,flChildOf=flMap.childOf;
   for(var i=state.layers.length-1;i>=0;i--){
+    if(flChildOf.hasOwnProperty(i))continue; // placed under its folder layer below instead
     var ld=state.layers[i];
     var fid=ld.folderId;
     if(fid&&state.layerFolders[fid]){
@@ -4698,6 +4841,18 @@ function computeLayerRenderOrder(){
       order.push({type:'layer',idx:i,hidden:collapsed&&!isHead,linkGroupId:gid,linkGroupHead:isHead});
     }else{
       order.push({type:'layer',idx:i,hidden:false});
+    }
+    // Folder layer (2026-08) — splice its children in as nested entries
+    // directly below its own row, in their existing high-to-low order
+    // among themselves. hidden mirrors ld.folderCollapsed exactly like
+    // the folderId/linkGroupId collapse above; folderLayerParent lets the
+    // row renderers (renderLayerListMotion, renderLayerList) indent the
+    // row and skip re-deriving the relationship themselves.
+    if(ld.isFolderLayer&&flChildrenOf[i]){
+      var flCollapsed=!!ld.folderCollapsed;
+      flChildrenOf[i].forEach(function(ci){
+        order.push({type:'layer',idx:ci,hidden:flCollapsed,folderLayerParent:i});
+      });
     }
   }
   // Shy (AE's own switch, 2026-07-25): a per-layer flag plus one global
@@ -5259,7 +5414,7 @@ function renderLayerList(frameOnly){
     }
     if(entry.hidden)return;
     var i=entry.idx;
-    var ld=state.layers[i];var row=document.createElement('div');row.className='lrow'+(ld.symbolId?' is-comp':'')+(ld.folderId?' in-folder':'')+(ld.linkGroupId?' in-linkgroup':'');row.dataset.layer=i;if(i===state.activeLayerIdx)row.classList.add('act');
+    var ld=state.layers[i];var row=document.createElement('div');row.className='lrow'+(ld.symbolId?' is-comp':'')+(ld.folderId||entry.folderLayerParent!=null?' in-folder':'')+(ld.linkGroupId?' in-linkgroup':'');row.dataset.layer=i;if(i===state.activeLayerIdx)row.classList.add('act');
     if(_layerSel.indexOf(i)>=0)row.classList.add('sel');
     // Mirror renderTimeline's per-row tween-curve extra height exactly (same
     // layerCurveRowExtraHeight source) — the #layer-list/#frame-grid
@@ -5280,7 +5435,17 @@ function renderLayerList(frameOnly){
     // deliberately NOT a folder header: the row underneath it is still this
     // same real layer's own normal row (own eye/lock/solo/name), just with
     // an arrow prepended.
-    if(entry.linkGroupHead){
+    if(ld.isFolderLayer){
+      // Folder LAYER (2026-08) — real disclosure arrow, same "hidden not
+      // omitted" collapse technique as the link-group head right below,
+      // toggling ld.folderCollapsed (SM.toggleFolderLayerCollapsed) which
+      // computeLayerRenderOrder reads back to mark its children hidden.
+      var farr=document.createElement('div');farr.className='lico larrow';farr.style.cursor='pointer';
+      farr.textContent=ld.folderCollapsed?'▸':'▾';
+      farr.title=ld.folderCollapsed?'Déplier le dossier':'Replier le dossier';
+      farr.addEventListener('click',function(e){e.stopPropagation();window.SM.toggleFolderLayerCollapsed(i);});
+      row.appendChild(farr);
+    }else if(entry.linkGroupHead){
       var garr=document.createElement('div');garr.className='lico larrow';garr.style.cursor='pointer';
       var gmeta=state.layerLinkGroups[entry.linkGroupId];
       garr.textContent=gmeta.collapsed?'▸':'▾';
@@ -5508,6 +5673,7 @@ function renderLayerList(frameOnly){
       window.showContextMenu(e.clientX,e.clientY,[
         {label:'Insérer un calque',action:function(){window.SM.addLayer();}},
         {label:'Insérer un calque Null',action:function(){window.SM.addNullLayer();}},
+        {label:'Insérer un dossier',action:function(){window.SM.addFolderLayer();}},
         {label:'Insérer un calque d’effet',action:function(){window.SM.addEffectLayer();}},
         {label:'Insérer un calque Guide',action:function(){window.SM.addGuideLayer();}},
         {label:'Dupliquer le calque',action:function(){window.SM.duplicateLayer();}},
@@ -5525,6 +5691,7 @@ function renderLayerList(frameOnly){
         {label:l4.shy?'Retirer le marquage « shy »':'Marquer comme « shy »',action:function(){window.SM.toggleLayerShy(idx4);}},
         {label:'Fusionner les calques sélectionnés',disabled:_layerSel.length<2,action:function(){window.SM.mergeLayersIntoOne(_layerSel.slice());}},
         {label:'Retirer du dossier',disabled:!l4.folderId,action:function(){delete l4.folderId;renderLayerList();renderTimeline();}},
+        {label:'Retirer du dossier (parent)',disabled:folderLayerParentIdx(idx4)<0,action:function(){window.SM.removeLayerFromFolder(idx4);}},
         {label:'Convertir en composant',disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToComponent();}},
         {label:'Décomposer le composant',disabled:!l4.symbolId,action:function(){window.SM.convertComponentToLayer();}},
         {sep:true},
@@ -5577,7 +5744,7 @@ function renderLayerList(frameOnly){
 // Manual mouse-based drag-to-reorder (kept consistent with the frame grid's
 // custom drag rather than HTML5 draggable, which behaves inconsistently
 // inside the Tauri webview).
-var _layerDrag={active:false,srcIdx:-1,startX:0,startY:0,moved:false,dropGap:-1,indicator:null,ghost:null,origin:'panel',grabOffsetY:0};
+var _layerDrag={active:false,srcIdx:-1,startX:0,startY:0,moved:false,dropGap:-1,dropFolderTarget:-1,indicator:null,ghost:null,origin:'panel',grabOffsetY:0};
 function armLayerReorder(e,srcIdx,origin,sourceRow){
   if(e.button!==0||_layerDrag.active)return;
   var r=sourceRow&&sourceRow.getBoundingClientRect?sourceRow.getBoundingClientRect():null;
@@ -5672,6 +5839,10 @@ function updateLayerDragGhost(e){
 function clearLayerDropIndicator(){
   if(_layerDrag.indicator){_layerDrag.indicator.remove();_layerDrag.indicator=null;}
   _layerDrag.dropGap=-1;
+  if(_layerDrag.dropFolderTarget>=0){
+    document.querySelectorAll('.lrow.folder-drop-target,#frame-grid .frow.folder-drop-target').forEach(function(r){r.classList.remove('folder-drop-target');});
+  }
+  _layerDrag.dropFolderTarget=-1;
 }
 function moveLayerReorder(e){
   if(!_layerDrag.active)return;
@@ -5689,6 +5860,29 @@ function moveLayerReorder(e){
   var row=el&&el.closest('.lrow[data-layer],#frame-grid .frow[data-layer]');
   if(row&&row.dataset.layer!==undefined){
     var rr=row.getBoundingClientRect();
+    var targetIdx=parseInt(row.dataset.layer);
+    var targetLd=state.layers[targetIdx];
+    // Folder reparenting (2026-08) — dropping onto the MIDDLE band of a
+    // folder row (not its top/bottom edge, which stays the ordinary
+    // insert-before/after gesture) parents the dragged layer(s) into it
+    // instead of reordering their position. Refused when the folder IS
+    // the thing being dragged (can't parent into yourself) or when the
+    // dragged layer is itself a folder (no nested folders in v1 — see
+    // engine.rs's is_folder_layer doc comment and folderLayerChildMap's
+    // own comment above for why) — those cases just fall through to the
+    // plain gap-based reorder below.
+    var relY=(e.clientY-rr.top)/Math.max(1,rr.height);
+    var draggingFolder=state.layers[_layerDrag.srcIdx]&&state.layers[_layerDrag.srcIdx].isFolderLayer;
+    if(targetLd&&targetLd.isFolderLayer&&targetIdx!==_layerDrag.srcIdx&&!draggingFolder&&relY>0.25&&relY<0.75){
+      clearLayerDropIndicator();
+      _layerDrag.dropFolderTarget=targetIdx;
+      row.classList.add('folder-drop-target');
+      return;
+    }
+    if(_layerDrag.dropFolderTarget>=0){
+      document.querySelectorAll('.lrow.folder-drop-target,#frame-grid .frow.folder-drop-target').forEach(function(r){r.classList.remove('folder-drop-target');});
+      _layerDrag.dropFolderTarget=-1;
+    }
     var after=e.clientY>=rr.top+rr.height/2;
     // Layer rows are painted top-to-bottom in reverse state-array order:
     // visually BEFORE layer i is array gap i+1, visually AFTER it is gap i.
@@ -5713,16 +5907,28 @@ function finishLayerReorder(){
   if(!_layerDrag.active)return;
   if(_layerDrag.moved){
     window._layerDragJustEnded=true;
-    if(_layerDrag.dropGap>=0){
-      // Dragging one row of an active multi-selection moves the WHOLE
-      // selection together, as one contiguous block — dragging a row that
-      // isn't part of it moves only that row. The gap-based API keeps the
-      // visible insertion line and the committed ordering identical.
-      var moving=(_layerSel.length>1&&_layerSel.indexOf(_layerDrag.srcIdx)>=0)?_layerSel.slice():[_layerDrag.srcIdx];
+    // Dragging one row of an active multi-selection moves the WHOLE
+    // selection together, as one contiguous block — dragging a row that
+    // isn't part of it moves only that row.
+    var moving=(_layerSel.length>1&&_layerSel.indexOf(_layerDrag.srcIdx)>=0)?_layerSel.slice():[_layerDrag.srcIdx];
+    if(_layerDrag.dropFolderTarget>=0){
+      window.SM.reparentLayersIntoFolder(moving,_layerDrag.dropFolderTarget);
+    }else if(_layerDrag.dropGap>=0){
+      // Un-parent (2026-08) — dropping a currently-folder-child layer via
+      // the ordinary gap-based reorder (i.e. NOT onto a folder's middle
+      // band above) takes it out of its folder, same "drag it into the
+      // flat list" gesture Illustrator/Photoshop use. Folder membership is
+      // purely ld.parentLayerUid-driven (not array position — see
+      // folderLayerChildMap's own comment), so this must be an explicit
+      // setLayerParent(null) call; a position-only reorder would leave the
+      // layer re-appearing nested under its old folder next render.
+      moving.forEach(function(mi){
+        if(window.SMMotion&&folderLayerParentIdx(mi)>=0)SMMotion.setLayerParent(mi,null);
+      });
       window.SM.reorderLayersAtGap(moving,_layerDrag.dropGap);
     }
   }
-  document.querySelectorAll('.lrow,.frow').forEach(function(r){r.classList.remove('dragging','drag-over');});
+  document.querySelectorAll('.lrow,.frow').forEach(function(r){r.classList.remove('dragging','drag-over','folder-drop-target');});
   if(_layerDrag.ghost){_layerDrag.ghost.remove();_layerDrag.ghost=null;}
   clearLayerDropIndicator();
   _layerDrag.active=false;_layerDrag.moved=false;
@@ -9378,6 +9584,7 @@ document.getElementById('btn-al').addEventListener('click',function(e){
   window.showContextMenu(r.left,r.bottom+4,[
     {label:'Calque',action:function(){window.SM.addLayer();}},
     {label:'Calque Null',action:function(){window.SM.addNullLayer();}},
+    {label:'Dossier',action:function(){window.SM.addFolderLayer();}},
     {label:'Calque d’effet',action:function(){window.SM.addEffectLayer();}},
     {label:'Calque Guide',action:function(){window.SM.addGuideLayer();}},
   ]);
