@@ -217,6 +217,29 @@
         });
       });
     });
+    // Reveal this layer's per-element tracks in the Motion timeline
+    // (2026-08-29, feedback #132: "l'animation de texte marche bien mais
+    // pas de keyframes visible... dans la timeline motion") — the keys
+    // above are real elementMotion, written through the exact same
+    // ensureElementHolder/setKeyAtFrame primitives a manual stopwatch click
+    // uses, and they DO render correctly; what was missing is that
+    // motion.js's renderLayerListMotion/renderTimelineMotion only ever
+    // show a layer's per-element row list while
+    // window._motionExpandedLayer === li (see their own comment: gated on
+    // the MANUAL accordion specifically, not the broader multi-layer
+    // window._motionRevealedLayers, so a property-shortcut reveal like U
+    // doesn't cascade into every element's breakdown too). A manual key
+    // only ever happens after the user has ALREADY clicked that layer's
+    // row open, which sets _motionExpandedLayer — apply() skipped that
+    // step entirely, so the keys existed but the row showing them was
+    // still collapsed. Only touched the first time this group reveals the
+    // layer (not on every live-preview tweak) so it doesn't keep
+    // collapsing a per-element row the user drilled into by hand while
+    // adjusting sliders.
+    if(units.length&&window._motionExpandedLayer!==li){
+      window._motionExpandedLayer=li;
+      window._motionExpandedElement=null;
+    }
     if(window.renderLayerList)renderLayerList();
     if(window.renderTimeline)renderTimeline();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
