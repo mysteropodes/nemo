@@ -1496,6 +1496,7 @@
       <button class="settings-tab" data-tab="updates" data-i18n="settingsTabUpdates">Mises à jour</button>
       <button class="settings-tab" data-tab="collab" data-i18n="settingsTabCollab">Collaboration</button>
       <button class="settings-tab" data-tab="feedback" data-i18n="settingsTabFeedback">Feedback</button>
+      <button class="settings-tab" data-tab="figma" data-i18n="settingsTabFigma">Figma</button>
       <button class="settings-tab" data-tab="shortcuts" data-i18n="settingsTabShortcuts">Raccourcis</button>
       <button class="settings-tab" data-tab="labs" data-i18n="settingsTabLabs">Labs</button>
       <button class="settings-tab" data-tab="about" data-i18n="settingsTabAbout">À propos</button>
@@ -1598,6 +1599,20 @@
         </div>
         <div class="pr" style="gap:6px;margin-top:6px">
           <button class="pbtn" id="fb-dashboard-open" style="flex:1;font-size:10px;padding:6px;font-weight:600" data-i18n="btnOpenFeedbackBoard">📋 Ouvrir le tableau de feedback</button>
+        </div>
+      </div>
+      <div class="settings-pane" data-pane="figma" style="display:none">
+        <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="settingsFigmaHdr">Import Figma</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px" data-i18n="settingsFigmaDesc">Importe les artboards (frames) d'un fichier Figma comme calques Nemo : formes vectorielles éditables, textes éditables, images. Colle ton propre token d'accès personnel Figma (Figma > Réglages du compte > Personal access tokens) — il reste uniquement sur ta machine, jamais distribué.</div>
+        <div class="pr" style="gap:6px">
+          <input type="password" id="figma-token" placeholder="Ton token d'accès personnel Figma" data-i18n-placeholder="settingsFigmaTokenPh" style="flex:1;font-size:10px;padding:5px;border-radius:6px;border:1px solid var(--border2);background:var(--panel3);color:var(--text)">
+          <button class="pbtn" id="figma-token-save" style="font-size:10px;padding:5px" data-i18n="btnSave">Enregistrer</button>
+        </div>
+        <div class="pr" style="gap:6px;margin-top:6px">
+          <input type="text" id="figma-url" placeholder="Lien du fichier Figma (figma.com/file/... ou /design/...)" data-i18n-placeholder="settingsFigmaUrlPh" style="flex:1;font-size:10px;padding:5px;border-radius:6px;border:1px solid var(--border2);background:var(--panel3);color:var(--text)">
+        </div>
+        <div class="pr" style="gap:6px;margin-top:6px">
+          <button class="pbtn ac" id="figma-import-btn" style="flex:1;font-size:10px;padding:6px;font-weight:600" data-i18n="btnImportFigma">Importer les frames</button>
         </div>
       </div>
       <div class="settings-pane" data-pane="shortcuts" style="display:none">
@@ -2083,6 +2098,7 @@
 <script src="js/kitsu.js"></script>
 <script src="js/images.js"></script>
 <script src="js/psd-import-bridge.js"></script>
+<script src="js/figma-import.js"></script>
 <script src="js/asset-tree.js"></script>
 <script src="js/media-library.js"></script>
 <script src="js/transplant.js"></script>

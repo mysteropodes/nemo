@@ -54,6 +54,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "56912", "-d", "src"],
       "port": 56912
+    },
+    {
+      "name": "nemo-fb138-figma-import-qa",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "58223", "-d", "src"],
+      "port": 58223
     }
   ]
 }

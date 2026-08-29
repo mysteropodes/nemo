@@ -115,7 +115,20 @@
     return inserted;
   }
 
-  function importSVGString(svgText) {
+  // `opts.noFit` (2026-08, added for figma-import.js): skips the shrink-to-
+  // fit + recenter step below. That step exists for the icon/logo/
+  // turnaround case this importer was built for — dropped-in artwork of
+  // unknown size, better centered on the canvas than pinned at (0,0). A
+  // Figma frame import wants the OPPOSITE: shapes already carry their
+  // exact absolute-canvas coordinates (baked in by figma-import.js to
+  // match the frame's own layout 1:1) and must land EXACTLY there —
+  // recentering the whole group would silently shift every shape by
+  // however far its combined bbox center sits from the canvas center,
+  // defeating "non destructif niveau mise en page". Omitted/false
+  // preserves the exact prior behavior for every existing caller
+  // (SMLabs/menu SVG import) — zero change to that already-shipped path.
+  function importSVGString(svgText, opts) {
+    opts = opts || {};
     var root;
     try { root = project.importSVG(svgText, { insert: false, expandShapes: true }); }
     catch (e) { if (typeof showToast === 'function') showToast('SVG invalide : ' + e.message); return 0; }
@@ -144,9 +157,10 @@
     // fitSize() already uses for bitmap import, kept consistent.
     var b = baked[0].bounds.clone();
     for (var i = 1; i < baked.length; i++) b = b.unite(baked[i].bounds);
-    var s = (b.width > 0 && b.height > 0) ? Math.min(1, state.canvasW / b.width, state.canvasH / b.height) : 1;
+    var s = opts.noFit ? 1 : ((b.width > 0 && b.height > 0) ? Math.min(1, state.canvasW / b.width, state.canvasH / b.height) : 1);
     var targetCx = state.canvasW / 2, targetCy = state.canvasH / 2;
     baked.forEach(function (c) {
+      if (opts.noFit) return; // coordinates are already final absolute canvas positions
       c.scale(s, b.center);
       c.translate(targetCx - b.center.x, targetCy - b.center.y);
     });

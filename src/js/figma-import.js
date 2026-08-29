@@ -1,0 +1,433 @@
+// ---- Figma import (2026-08, feedback #138 — "importer des artboard figma") ----
+// Audit outcome + scoped v1: Cyril asked for "un audit" ("il faudrait que tu
+// vois comment faire") before a blind full build. Researched Figma's REST
+// API (developers.figma.com/docs/rest-api), confirmed live (curl against
+// api.figma.com) that unlike GitHub's API this app already proxies through
+// a Tauri command / Cloudflare Worker (feedback-bridge.js, CLAUDE.md §6),
+// Figma's REST API sends `access-control-allow-origin: *` on BOTH the
+// actual GET and its OPTIONS preflight, explicitly allowing the
+// `X-Figma-Token` header — a plain browser `fetch()` with a user-pasted
+// personal access token works directly, identically on desktop (Tauri
+// webview) and the plain web build. No Worker/Rust proxy needed here,
+// simpler than the GitHub-feedback precedent this task was pointed at.
+// The one real trust-boundary this app DOES enforce is its Tauri CSP
+// (src-tauri/tauri.conf.json's `connect-src`) — `https://api.figma.com` was
+// added there alongside this file so the desktop build isn't silently
+// blocked; the web build has no CSP at all today so needed no change.
+//
+// Node-tree shape (confirmed via Figma's docs + community references,
+// NOT live-tested end to end — no personal access token or real .fig file
+// was available in this environment; see the PR description for exactly
+// what that leaves unverified):
+//   - GET /v1/files/:key?geometry=paths returns `document` -> pages
+//     (CANVAS nodes) -> top-level FRAME nodes (artboards) -> arbitrarily
+//     nested GROUP/FRAME/COMPONENT/INSTANCE/BOOLEAN_OPERATION/VECTOR/
+//     RECTANGLE/ELLIPSE/LINE/REGULAR_POLYGON/STAR/TEXT children.
+//   - `?geometry=paths` is REQUIRED to get `fillGeometry`/`strokeGeometry`
+//     on each node: arrays of `{path, windingRule}` where `path` is already
+//     an SVG path string (Figma's own docs: a subset of SVG path commands,
+//     M/L/Q/C/Z) — so Figma vector geometry drops straight into an SVG
+//     `<path d="...">` with ZERO reprojection of curve math. This makes
+//     svg-import.js (Paper.js's own importSVG, already handling nested
+//     transforms + CompoundPath/hole-merging) the natural reuse target
+//     instead of writing a second geometry importer from scratch: this
+//     file builds an in-memory SVG string per Figma FRAME and hands it to
+//     `SMSvgImport.importString`, so every leaf lands as a real editable
+//     Nemo Path via the SAME battle-tested insertion path SVG import
+//     already uses (world-transform baking, hole slit-merging,
+//     ensureStrokeId/tagOwner, saveActiveLayerFrame, CLAUDE.md §1's
+//     consumer checklist) — zero new Paper.js item type, zero new
+//     `layer.children` consumer to audit.
+//   - TEXT nodes are NOT representable as SVG `<text>` in any editable way
+//     Nemo understands (svg-import.js's own header notes `<text>` has
+//     nowhere to go) — routed instead through `SMVectorText.
+//     buildVectorTextGroup`, the SAME real-glyph-outline builder the
+//     Typography tool uses, so an imported Figma text block stays
+//     genuinely editable in place (its `text`/`vectorFont`/`size`/`color`
+//     survive on `data.isTextRoot`, re-editable via the in-place text
+//     editor) — NOT baked to dead geometry. This is the "conserver les
+//     texts... non destructif" part of the ask, done for real rather than
+//     flattening to shapes.
+//   - IMAGE fills (a node's `fills[].type === 'IMAGE'`, referencing an
+//     `imageRef` hash) need a SECOND request, `GET /v1/files/:key/images`,
+//     which returns `{images: {<imageRef>: <S3 URL>}}` — NOT the same
+//     endpoint as `/v1/images/:key` (that one renders/exports whole NODES
+//     as PNG/SVG, a different feature: rasterizing a node you can't
+//     otherwise decompose, not fetching a fill's source bitmap). Fetched
+//     as a blob (not linked directly — the Tauri build's `img-src` CSP is
+//     `'self' data: blob:`, no external host, and S3's signed-URL host
+//     isn't a fixed domain worth allowlisting) and inserted as a plain
+//     Raster, same shape as psd-import-bridge.js's layer.canvas -> Raster
+//     step.
+//
+// Scope of THIS pass, stated honestly (mirrors svg-import.js's own
+// "scope, stated honestly" section):
+//   DONE, real and reusable independent of the fetch/token UI below:
+//     `convertFileJson(figmaJson, opts)` — pure(ish) conversion given an
+//     ALREADY-FETCHED Figma file JSON. One new Nemo layer per top-level
+//     FRAME, vector geometry through SMSvgImport, text through
+//     SMVectorText, image fills through Raster when `opts.imageMap` is
+//     supplied. Verified against a hand-built fixture matching the
+//     documented schema (see the PR description) — NOT against a live
+//     Figma response, since no token was available here.
+//   DONE, live network glue, CORS-confirmed but NOT live-tested (no
+//   token/file available): `importFromToken(fileKeyOrUrl, token, opts)`.
+//   NOT attempted, left for Cyril to decide (see PR description):
+//     Auto Layout / constraints (Nemo has no live layout solver — a
+//     Figma frame's children are placed at their exact absolute pixel
+//     positions, which is the closest honest reading of "non destructif
+//     niveau mise en page" without inventing a layout engine), gradient/
+//     pattern fills (flattened to their first solid stop, same
+//     "documented degrade" svg-import.js already accepts for gradients),
+//     component INSTANCE overrides (an INSTANCE is walked like a plain
+//     GROUP — its OWN children as returned by the API, not a live link to
+//     the master component), effects (shadows/blurs — skipped, counted).
+(function () {
+  // ---- Affine 2x3 matrix helpers (a,b,c,d,e,f — SVG matrix() convention:
+  // x' = a*x + c*y + e, y' = b*x + d*y + f). Hand-rolled rather than
+  // reusing Paper.js's Matrix class here: this is the one piece of this
+  // file's math that can't be exercised against a live Figma response in
+  // this environment, so it's kept in a form that's easy to hand-verify
+  // (see the PR description's worked example) instead of depending on
+  // Paper.js's own append()/invert() compose-order semantics.
+  function matIdentity() { return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }; }
+  // m1 ∘ m2 — applying the result to a point equals applying m2 THEN m1.
+  function matMultiply(m1, m2) {
+    return {
+      a: m1.a * m2.a + m1.c * m2.b,
+      b: m1.b * m2.a + m1.d * m2.b,
+      c: m1.a * m2.c + m1.c * m2.d,
+      d: m1.b * m2.c + m1.d * m2.d,
+      e: m1.a * m2.e + m1.c * m2.f + m1.e,
+      f: m1.b * m2.e + m1.d * m2.f + m1.f,
+    };
+  }
+  function matInvert(m) {
+    var det = m.a * m.d - m.b * m.c;
+    if (!det) return matIdentity();
+    return {
+      a: m.d / det, b: -m.b / det, c: -m.c / det, d: m.a / det,
+      e: (m.c * m.f - m.d * m.e) / det, f: (m.b * m.e - m.a * m.f) / det,
+    };
+  }
+  // Figma's `absoluteTransform` is documented as the top two rows of a 2D
+  // matrix, [[a,c,e],[b,d,f]] — same convention as SVG matrix(). Falls back
+  // to a pure translation from `absoluteBoundingBox` when absent (older/
+  // partial JSON), which is enough for an unrotated node.
+  function nodeAbsMatrix(node) {
+    var t = node.absoluteTransform;
+    if (t && t.length === 2) return { a: t[0][0], c: t[0][1], e: t[0][2], b: t[1][0], d: t[1][1], f: t[1][2] };
+    var bb = node.absoluteBoundingBox;
+    return { a: 1, b: 0, c: 0, d: 1, e: bb ? bb.x : 0, f: bb ? bb.y : 0 };
+  }
+
+  function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  // First VISIBLE SOLID paint in a fills/strokes array — gradients/patterns/
+  // images are handled by their own callers (or skipped), matching
+  // svg-import.js's "documented degrade, not a silent drop" contract.
+  function firstSolidPaint(paints) {
+    if (!paints) return null;
+    for (var i = 0; i < paints.length; i++) {
+      var p = paints[i];
+      if (p && p.visible !== false && p.type === 'SOLID') return p;
+    }
+    return null;
+  }
+  function paintToCss(paint, nodeOpacity) {
+    if (!paint) return null;
+    var c = paint.color || { r: 0, g: 0, b: 0, a: 1 };
+    var a = clamp01((paint.opacity != null ? paint.opacity : 1) * (nodeOpacity != null ? nodeOpacity : 1) * (c.a != null ? c.a : 1));
+    return 'rgba(' + Math.round(clamp01(c.r) * 255) + ',' + Math.round(clamp01(c.g) * 255) + ',' + Math.round(clamp01(c.b) * 255) + ',' + a + ')';
+  }
+  function firstImagePaint(paints) {
+    if (!paints) return null;
+    for (var i = 0; i < paints.length; i++) {
+      var p = paints[i];
+      if (p && p.visible !== false && p.type === 'IMAGE' && p.imageRef) return p;
+    }
+    return null;
+  }
+
+  // Groups a node's fillGeometry/strokeGeometry path fragments by winding
+  // rule (usually all the same rule, but kept correct if Figma ever mixes
+  // them) and emits one `<path>` element per group, positioned by `mat`
+  // (already frame-local — see walkNode below).
+  function geometryToPathTags(geomArr, cssColor, mat) {
+    if (!geomArr || !geomArr.length || !cssColor) return [];
+    var byRule = {};
+    geomArr.forEach(function (g) {
+      if (!g || !g.path) return;
+      var rule = g.windingRule === 'EVENODD' ? 'evenodd' : 'nonzero';
+      byRule[rule] = (byRule[rule] || '') + ' ' + g.path;
+    });
+    var mtx = 'matrix(' + mat.a + ' ' + mat.b + ' ' + mat.c + ' ' + mat.d + ' ' + mat.e + ' ' + mat.f + ')';
+    return Object.keys(byRule).map(function (rule) {
+      return '<path transform="' + mtx + '" d="' + byRule[rule].trim() + '" fill-rule="' + rule + '" fill="' + cssColor + '"/>';
+    });
+  }
+
+  var ALIGN_MAP = { LEFT: 'left', CENTER: 'center', RIGHT: 'right', JUSTIFIED: 'left' };
+  // Best-effort match against the bundled/live-fetchable vector fonts —
+  // NOT a live Google Fonts lookup (that needs a Tauri command on desktop,
+  // untestable here — see file header). An unmatched family falls back to
+  // Roboto rather than failing the whole node.
+  function resolveFontKey(figmaFamily) {
+    var fam = (figmaFamily || '').toLowerCase();
+    var VF = window.SMVectorText ? window.SMVectorText.VECTOR_FONTS : {};
+    var keys = Object.keys(VF);
+    for (var i = 0; i < keys.length; i++) {
+      var label = (VF[keys[i]].label || '').toLowerCase();
+      if (label.indexOf(fam) === 0 || fam.indexOf(label) === 0) return keys[i].replace(/-Bold$/, '-Regular');
+    }
+    return 'Roboto-Regular';
+  }
+
+  // Walks one Figma node (and its descendants) collecting SVG path tags,
+  // text-node descriptors and image-fill descriptors — all already
+  // transformed into FRAME-LOCAL space via `frameInv` (the inverse of the
+  // owning frame's own absoluteTransform, computed once by the caller).
+  // Geometry leaves (fillGeometry/strokeGeometry present) stop recursion —
+  // BOOLEAN_OPERATION nodes carry their OWN resolved geometry, recursing
+  // into their children too would double-import the same shape.
+  function walkNode(node, frameInv, out) {
+    if (!node || node.visible === false) return;
+    var mat = matMultiply(frameInv, nodeAbsMatrix(node));
+    var imagePaint = firstImagePaint(node.fills);
+    if (imagePaint && !(node.fillGeometry && node.fillGeometry.length)) {
+      var bb = node.absoluteBoundingBox;
+      out.images.push({ imageRef: imagePaint.imageRef, mat: mat, w: bb ? bb.width : 0, h: bb ? bb.height : 0, opacity: node.opacity != null ? node.opacity : 1, name: node.name });
+      return;
+    }
+    var hasFillGeo = node.fillGeometry && node.fillGeometry.length;
+    var hasStrokeGeo = node.strokeGeometry && node.strokeGeometry.length;
+    if (hasFillGeo || hasStrokeGeo) {
+      if (hasFillGeo) {
+        var fillCss = paintToCss(firstSolidPaint(node.fills), node.opacity);
+        out.svgTags = out.svgTags.concat(geometryToPathTags(node.fillGeometry, fillCss, mat));
+      }
+      if (hasStrokeGeo) {
+        var strokeCss = paintToCss(firstSolidPaint(node.strokes), node.opacity);
+        out.svgTags = out.svgTags.concat(geometryToPathTags(node.strokeGeometry, strokeCss, mat));
+      }
+      if (!hasFillGeo && !hasStrokeGeo) out.skipped.push(node.type + ' (' + node.name + ', no paintable geometry)');
+      return;
+    }
+    if (node.type === 'TEXT') {
+      var tbb = node.absoluteBoundingBox;
+      out.texts.push({
+        text: node.characters || '', node: node,
+        x: mat.e, y: mat.f, w: tbb ? tbb.width : 200,
+        style: node.style || {},
+        color: paintToCss(firstSolidPaint(node.fills), node.opacity) || 'rgba(0,0,0,1)',
+      });
+      return;
+    }
+    if (node.children && node.children.length) {
+      node.children.forEach(function (c) { walkNode(c, frameInv, out); });
+      return;
+    }
+    if (node.type !== 'GROUP') out.skipped.push(node.type + ' (' + (node.name || '?') + ')');
+  }
+
+  // Fetches one image fill's bytes and returns an object URL — kept as a
+  // blob: URL (already allowed by the Tauri build's img-src CSP) rather
+  // than pointing a Raster straight at the returned S3 URL, whose host
+  // isn't a fixed domain worth (or even reliably possible) allowlisting.
+  function fetchImageAsObjectUrl(url) {
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.blob();
+    }).then(function (blob) { return URL.createObjectURL(blob); });
+  }
+
+  // Converts an already-fetched Figma file JSON (GET /v1/files/:key?geometry=paths
+  // response body) into real Nemo layers. `opts.imageMap` (optional):
+  // {imageRef: sourceUrl} from GET /v1/files/:key/images, needed to bring
+  // in image fills — omit it to skip images (counted, not silently lost).
+  // `opts.frameNames` (optional array) restricts import to frames whose
+  // name is in the list; default imports every top-level FRAME on the
+  // first CANVAS (page).
+  async function convertFileJson(figmaJson, opts) {
+    opts = opts || {};
+    var report = { framesImported: 0, shapesImported: 0, textsImported: 0, imagesImported: 0, skipped: [] };
+    var doc = figmaJson && figmaJson.document;
+    if (!doc || !doc.children || !doc.children.length) { report.skipped.push('empty document'); return report; }
+    var page = doc.children[opts.pageIndex || 0] || doc.children[0];
+    var frames = (page.children || []).filter(function (n) { return n.type === 'FRAME'; });
+    if (opts.frameNames && opts.frameNames.length) {
+      frames = frames.filter(function (f) { return opts.frameNames.indexOf(f.name) >= 0; });
+    }
+    if (!frames.length) { report.skipped.push('no FRAME node found on this page'); return report; }
+
+    for (var fi = 0; fi < frames.length; fi++) {
+      var frame = frames[fi];
+      if (frame.visible === false) continue;
+      var frameAbs = nodeAbsMatrix(frame);
+      var frameInv = matInvert(frameAbs);
+      var out = { svgTags: [], texts: [], images: [], skipped: [] };
+      (frame.children || []).forEach(function (c) { walkNode(c, frameInv, out); });
+
+      var idx = createUserLayer(frame.name || ('Figma ' + (fi + 1)));
+      activateUL(idx);
+      var layer = userLayers[idx];
+      var bb = frame.absoluteBoundingBox;
+      // Match canvas size to the first imported frame — same "trust the
+      // source material's own dimensions" precedent psd-import-bridge.js
+      // already set for PSD import, so a Figma artboard lands 1:1, not
+      // squeezed/upscaled into whatever size the Nemo doc happened to be.
+      if (fi === 0 && bb && bb.width > 0 && bb.height > 0 && window.SM && window.SM.setCanvasSize) {
+        window.SM.setCanvasSize(Math.round(bb.width), Math.round(bb.height));
+      }
+
+      if (out.svgTags.length) {
+        var svgW = bb ? Math.round(bb.width) : state.canvasW;
+        var svgH = bb ? Math.round(bb.height) : state.canvasH;
+        var svgText = '<svg xmlns="http://www.w3.org/2000/svg" width="' + svgW + '" height="' + svgH + '">' + out.svgTags.join('') + '</svg>';
+        // Reuses svg-import.js as-is (see file header) — it targets
+        // state.activeLayerIdx, already pointed at this frame's new layer
+        // above, and handles its own pushUndo/ensureKeyframe/save/render.
+        // {noFit:true} (added alongside this file, svg-import.js): our
+        // paths already carry exact frame-relative absolute coordinates —
+        // svg-import's own shrink+recenter step (built for a dropped-in
+        // icon of unknown size) would otherwise shift the whole imported
+        // group to the canvas center, destroying the original Figma
+        // layout. Caught by actually running a synthetic fixture through
+        // this file in a live browser (see PR description) — reading the
+        // code alone would have missed it.
+        var n = window.SMSvgImport ? window.SMSvgImport.importString(svgText, { noFit: true }) : 0;
+        report.shapesImported += n || 0;
+      }
+
+      for (var ti = 0; ti < out.texts.length; ti++) {
+        var t = out.texts[ti];
+        if (!t.text) continue;
+        var fontKey = resolveFontKey(t.style.fontFamily);
+        var size = t.style.fontSize || 24;
+        var align = ALIGN_MAP[t.style.textAlignHorizontal] || 'left';
+        try {
+          await window.SMVectorText.buildVectorTextGroup(
+            t.text, fontKey, size, t.color, align, null,
+            { x: t.x, y: t.y }, layer,
+            { bold: (t.style.fontWeight || 400) >= 700, italic: !!t.style.italic }
+          );
+          report.textsImported++;
+        } catch (e) {
+          out.skipped.push('TEXT (' + (t.node.name || '?') + '): ' + (e && e.message));
+        }
+      }
+
+      if (opts.imageMap) {
+        for (var ii = 0; ii < out.images.length; ii++) {
+          var img = out.images[ii];
+          var srcUrl = opts.imageMap[img.imageRef];
+          if (!srcUrl) { out.skipped.push('IMAGE fill (' + img.name + '): no imageMap entry for ' + img.imageRef); continue; }
+          try {
+            var objUrl = await fetchImageAsObjectUrl(srcUrl);
+            var prevActive = project.activeLayer; layer.activate();
+            /* eslint-disable no-loop-func */
+            await new Promise(function (resolve) {
+              var r = new Raster(objUrl);
+              r.onLoad = function () {
+                r.size = new Size(Math.max(1, img.w), Math.max(1, img.h));
+                r.position = new Point(img.mat.e + img.w / 2, img.mat.f + img.h / 2);
+                r.opacity = img.opacity;
+                r.data.src = objUrl;
+                resolve();
+              };
+              r.onError = function () { resolve(); };
+            });
+            prevActive.activate();
+            report.imagesImported++;
+          } catch (e) {
+            out.skipped.push('IMAGE fill (' + img.name + '): ' + (e && e.message));
+          }
+        }
+      } else if (out.images.length) {
+        out.skipped.push(out.images.length + ' image fill(s) skipped — pass opts.imageMap (GET /v1/files/:key/images) to import them');
+      }
+
+      saveActiveLayerFrame(); updateUI();
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      report.framesImported++;
+      report.skipped = report.skipped.concat(out.skipped);
+    }
+    return report;
+  }
+
+  // Accepts either a bare file key or any Figma file/design URL
+  // (figma.com/file/:key/... or figma.com/design/:key/...).
+  function parseFileKey(urlOrKey) {
+    if (!urlOrKey) return null;
+    var s = urlOrKey.trim();
+    var m = s.match(/figma\.com\/(?:file|design|proto)\/([a-zA-Z0-9]+)/);
+    if (m) return m[1];
+    if (/^[a-zA-Z0-9]+$/.test(s)) return s;
+    return null;
+  }
+
+  // Live network glue (CORS-confirmed, NOT live-tested — see file header).
+  // `token` is the user's own personal access token (Settings -> Figma),
+  // sent ONLY to api.figma.com, never persisted anywhere but this
+  // machine's localStorage (same trust model as the GitHub feedback
+  // token — see feedback-bridge.js / CLAUDE.md §6).
+  async function importFromToken(fileKeyOrUrl, token, opts) {
+    var key = parseFileKey(fileKeyOrUrl);
+    if (!key) throw new Error('URL ou clé de fichier Figma invalide');
+    if (!token) throw new Error('Token Figma manquant (Réglages > Figma)');
+    var headers = { 'X-Figma-Token': token };
+    var fileRes = await fetch('https://api.figma.com/v1/files/' + key + '?geometry=paths', { headers: headers });
+    if (!fileRes.ok) throw new Error('Figma API: HTTP ' + fileRes.status + (fileRes.status === 403 ? ' (token invalide ou sans accès à ce fichier)' : ''));
+    var figmaJson = await fileRes.json();
+    var mergedOpts = Object.assign({}, opts);
+    try {
+      var imgRes = await fetch('https://api.figma.com/v1/files/' + key + '/images', { headers: headers });
+      if (imgRes.ok) {
+        var imgJson = await imgRes.json();
+        mergedOpts.imageMap = imgJson.images || {};
+      }
+    } catch (e) { /* image fills degrade to "skipped", not a hard failure */ }
+    return convertFileJson(figmaJson, mergedOpts);
+  }
+
+  window.SMFigmaImport = {
+    convertFileJson: convertFileJson,
+    importFromToken: importFromToken,
+    parseFileKey: parseFileKey,
+    // exposed for the fixture-based sanity check (see PR description) —
+    // not part of the "public" surface other modules should call.
+    _internal: { matMultiply: matMultiply, matInvert: matInvert, nodeAbsMatrix: nodeAbsMatrix, geometryToPathTags: geometryToPathTags },
+  };
+
+  // ---- Settings UI wiring (Réglages > Figma) ----
+  var TOKEN_KEY = 'sm-figma-token';
+  function init() {
+    var tokenInput = document.getElementById('figma-token');
+    var tokenSave = document.getElementById('figma-token-save');
+    var urlInput = document.getElementById('figma-url');
+    var importBtn = document.getElementById('figma-import-btn');
+    if (!tokenInput || !importBtn) return;
+    try { tokenInput.value = localStorage.getItem(TOKEN_KEY) || ''; } catch (e) {}
+    if (tokenSave) tokenSave.addEventListener('click', function () {
+      try { localStorage.setItem(TOKEN_KEY, tokenInput.value || ''); } catch (e) {}
+      if (window.showToast) showToast('Token Figma enregistré');
+    });
+    importBtn.addEventListener('click', function () {
+      var token = (function () { try { return localStorage.getItem(TOKEN_KEY) || tokenInput.value; } catch (e) { return tokenInput.value; } })();
+      var url = urlInput ? urlInput.value : '';
+      if (!token) { if (window.showToast) showToast('Colle ton token Figma personnel d\'abord'); return; }
+      if (!url) { if (window.showToast) showToast('Colle un lien ou une clé de fichier Figma'); return; }
+      if (window.showToast) showToast('Import Figma…');
+      importFromToken(url, token).then(function (report) {
+        var msg = report.framesImported + ' frame(s), ' + report.shapesImported + ' forme(s), ' + report.textsImported + ' texte(s), ' + report.imagesImported + ' image(s) importé(s)';
+        if (report.skipped.length) msg += ' — ' + report.skipped.length + ' élément(s) ignoré(s) (voir console)';
+        if (window.showToast) showToast(msg);
+        if (report.skipped.length && window.console) console.warn('[figma-import] skipped:', report.skipped);
+      }).catch(function (err) {
+        console.error('[figma-import] failed', err);
+        if (window.showToast) showToast('Import Figma échoué : ' + (err && err.message ? err.message : 'erreur inconnue'));
+      });
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();

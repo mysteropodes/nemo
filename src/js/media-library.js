@@ -422,8 +422,41 @@
         compBody.appendChild(row);
       });
     }
+    // Compositions (feedback #140: "les différents projets ouverts dans
+    // nemo (onglet de projet) devraient apparaître comme des compositions
+    // dans média et preset") — every OTHER open project tab, read straight
+    // from SMProject.getOpenTabs() (project.js; already built for the
+    // near-identical feedback #109, consumed there by transplant.js's
+    // picker modal). Same "all filter only" + name-search rule as
+    // Composants just above — a project tab isn't a media KIND either.
+    var openTabs = (_activeFilter === 'all' && window.SMProject && SMProject.getOpenTabs)
+      ? SMProject.getOpenTabs().filter(function (t) { return !q || (t.name || '').toLowerCase().indexOf(q) >= 0; })
+      : [];
+    if (openTabs.length) {
+      var compoBody = SMAssetTree.folderGroup(grid, { label: SMAssetTree.compositionsLabel(), color: SMAssetTree.FOLDER_COLORS.compositions, count: openTabs.length });
+      openTabs.forEach(function (t) {
+        var row = document.createElement('div'); row.className = 'bp-item'; row.title = t.name;
+        row.draggable = true;
+        var icon = document.createElement('span'); icon.className = 'bp-item-icon'; icon.textContent = '⧉';
+        row.appendChild(icon);
+        var span = document.createElement('span'); span.textContent = t.name || 'Untitled';
+        row.appendChild(span);
+        // Internal DnD, same idiom as an image row's 'application/x-nemo-
+        // media-id' below — the payload is just the tab id, re-resolved
+        // against a FRESH SMProject.getOpenTabs() at drop time (see
+        // media-library.js's canvas/timeline drop targets and
+        // instantiateForeignProjectAsComponent in app.js) rather than
+        // carrying the (possibly large) JSON snapshot through
+        // dataTransfer itself.
+        row.addEventListener('dragstart', function (e) {
+          e.dataTransfer.setData('application/x-nemo-project-tab', t.id);
+          e.dataTransfer.effectAllowed = 'copy';
+        });
+        compoBody.appendChild(row);
+      });
+    }
     var visible = filteredEntries();
-    var anyShown = symIds.length > 0;
+    var anyShown = symIds.length > 0 || openTabs.length > 0;
     ['image', 'video', 'audio'].forEach(function (kind) {
       var entries = visible.filter(function (m) { return m.kind === kind; });
       // _orphanCount must count EVERY orphan regardless of the active
@@ -439,7 +472,8 @@
     });
     if (!anyShown) {
       var empty = document.createElement('div'); empty.className = 'asset-folder-empty-hint';
-      var hasAnyContent = !!((state.mediaLibrary || []).length || Object.keys(state.symbols || {}).length);
+      var hasAnyContent = !!((state.mediaLibrary || []).length || Object.keys(state.symbols || {}).length
+        || (window.SMProject && SMProject.getOpenTabs && SMProject.getOpenTabs().length));
       empty.textContent = hasAnyContent
         ? t('mediaNoMatch', 'Aucun média ne correspond à ce filtre.')
         : (SM && SM.t ? SM.t('mediaDropHint') : 'Aucun média importé.');
@@ -511,6 +545,44 @@
     });
   }
 
+  // Canvas + timeline drop targets for a "Compositions" row drag (feedback
+  // #140) — internal DnD via the custom 'application/x-nemo-project-tab'
+  // MIME, same coexistence idiom as initCanvasDropTarget's own
+  // 'application/x-nemo-media-id' just above (each listener only reacts to
+  // its own dataTransfer type, so OS-file drops via drop-import.js and the
+  // media-thumbnail drop just above both keep working untouched on the same
+  // elements). Wired on BOTH #canvas-area and #timeline-area — the issue's
+  // own wording ("si on drop... elles apparaissent comme des composant dans
+  // la timeline") points at the timeline, but the canvas is the more
+  // discoverable drop target for a media-panel drag, so both accept it.
+  //
+  // Re-resolves the tab against a FRESH SMProject.getOpenTabs() at drop
+  // time rather than trusting anything captured at dragstart — a tab can be
+  // renamed, edited (changing its live-but-not-yet-snapshotted .json), or
+  // closed in the moments between picking it up and releasing the drop.
+  function initCompositionDropTargets() {
+    function wire(id) {
+      var el = document.getElementById(id); if (!el) return;
+      el.addEventListener('dragover', function (e) {
+        if (e.dataTransfer && e.dataTransfer.types.indexOf('application/x-nemo-project-tab') >= 0) e.preventDefault();
+      });
+      el.addEventListener('drop', function (e) {
+        var tabId = e.dataTransfer && e.dataTransfer.getData('application/x-nemo-project-tab');
+        if (!tabId) return;
+        e.preventDefault();
+        var openTabs = (window.SMProject && SMProject.getOpenTabs) ? SMProject.getOpenTabs() : [];
+        var tab = openTabs.find(function (t) { return t.id === tabId; });
+        if (!tab || !tab.json) { if (window.showToast) showToast('Cet onglet de projet n\'est plus disponible.'); return; }
+        var foreignData;
+        try { foreignData = JSON.parse(tab.json); }
+        catch (e2) { if (window.showToast) showToast('Impossible de lire cet onglet de projet.'); return; }
+        if (window.instantiateForeignProjectAsComponent) window.instantiateForeignProjectAsComponent(foreignData, tab.name || 'Untitled');
+      });
+    }
+    wire('canvas-area');
+    wire('timeline-area');
+  }
+
   // Compact/expand toggle (2026-07-31, Cyril: "un petit bouton qui ouvrira
   // un plus grand en hauteur") — #media-grid defaults to a bounded, scrolling
   // height (css); the chevron just flips a class, same idiom as effects-
@@ -558,6 +630,7 @@
     render();
     initDropZone();
     initCanvasDropTarget();
+    initCompositionDropTargets();
     initExpandToggle();
     initSearchAndViewToggle();
     var bImg = document.getElementById('btn-media-import-img'); if (bImg) bImg.addEventListener('click', function () { if (window.SM) SM.importImages(); });
