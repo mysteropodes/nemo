@@ -343,6 +343,32 @@
     if(isPressureMode())return;
     if(window.SM)window.SM.setCurve(clonePts(cs.points));upP();
   }
+  // Feedback #91 ("des lenteurs dans l'édition de curves"): pushCurve() ran
+  // on every raw mousemove tick, unthrottled — in tween-pair mode that's a
+  // full generateTweens() re-bake (every intermediate frame's interpolated
+  // geometry) per tick, not just a cheap state write, and a mouse/stylet
+  // firing well above 60 events/s made a single drag call it far more often
+  // than the screen could ever show a new result. Same rAF-coalescing
+  // pattern already proven for the scrub inputs (dispatchLiveChange, below
+  // in this file) — draw() stays synchronous every tick (cheap: one canvas
+  // repaint) so the point still tracks the cursor with no visible lag, only
+  // the expensive regeneration is capped at one call per animation frame.
+  var pushCurveRaf=0,pushCurveDirty=false;
+  function pushCurveLive(){
+    pushCurveDirty=true;
+    if(pushCurveRaf)return;
+    pushCurveRaf=requestAnimationFrame(function(){
+      pushCurveRaf=0;
+      if(pushCurveDirty){pushCurveDirty=false;pushCurve();}
+    });
+  }
+  // Called on mouseup — a still-pending coalesced call must fire synchronously
+  // right away, or the final point position (the one the user actually let go
+  // on) would never get its own generateTweens/setCurve commit.
+  function flushPushCurve(){
+    if(pushCurveRaf){cancelAnimationFrame(pushCurveRaf);pushCurveRaf=0;}
+    if(pushCurveDirty){pushCurveDirty=false;pushCurve();}
+  }
 
   // Camera-mode drag state — which control handle (0 or 1) is being moved.
   var camDragWhich=null;
@@ -434,7 +460,7 @@
       // itself in x, which has no meaning on a timing axis.
       var ntx=dragTangent.dir*3*(fX(tmx)-tp.x),nty=dragTangent.dir*3*(fY(tmy,yrt)-tp.y);
       tp.tx=Math.max(0.001,ntx);tp.ty=nty;
-      draw();pushCurve();
+      draw();pushCurveLive();
       return;
     }
     if(dragging==null)return;
@@ -451,16 +477,15 @@
       p.x=Math.max(lo,Math.min(hi,nx));
     }
     p.y=Math.max(-1,Math.min(2,ny));
-    draw();pushCurve();
+    draw();pushCurveLive();
   });
   window.addEventListener('mouseup',function(){
-    // No extra commit needed here (verified live, 2026-07-30 — an earlier
-    // version of this fix added one and it double-pushed): mousemove above
-    // already calls pushCurve() on EVERY tick, including the last one right
-    // before mouseup, so the final point position and its generateTweens
-    // re-bake are already applied by the time this fires. All this needs to
-    // do is close out the gesture — clearing _scrubLiveActive is what lets
-    // the NEXT unrelated pushUndoLayers() call through again.
+    // pushCurveLive() (feedback #91) coalesces to one call per animation
+    // frame — the tick for the very last mousemove before release may still
+    // be a pending, unfired rAF at this point, so it must be flushed
+    // synchronously here or the final point position (the one actually let
+    // go on) would never get its own generateTweens/setCurve commit.
+    if(dragging!=null||dragTangent)flushPushCurve();
     dragging=null;camDragWhich=null;dragTangent=null;
     window._scrubLiveActive=false;
   });
