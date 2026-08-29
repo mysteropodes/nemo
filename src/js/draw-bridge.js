@@ -31,7 +31,49 @@
   // every mainstream drawing app. viewtools-bridge.js's global
   // Alt-drag-to-rotate explicitly cedes Alt to the brushes for this.
   var sizing = false, sizeStartX = 0, sizeStartVal = 0, sizeAnchorW = null;
-  var samples = []; // [x,y,width]
+  var samples = []; // [x,y,width] — RENDERED/world space while dragging (see commitStroke)
+
+  // Motion transform (2026-08-29, feedback #135: "si je dessine dans le
+  // layer dont la position a été changé dans motion... le dessin se
+  // recale"). `samples` is captured via screenToWorld — RENDERED/world
+  // space, correct for the live overlay preview (which must track the
+  // cursor at its true on-screen position, matching whatever else is
+  // already drawn on a Motion-transformed layer). But a layer's Motion
+  // Position/Rotation/Scale is, by design, applied ONLY at render time
+  // (buildSceneJson's pathTransform — see motion.js's computeMotionMat
+  // header) and is NEVER baked into the Paper.js document's own segments —
+  // same contract every other interaction file in this codebase already
+  // honors (subselect-bridge.js's/rig-bridge.js's own toLocalPoint,
+  // select-bridge.js's hitPt, timeline.js's openInPlaceTextEditor fix for
+  // #131). This file committed the raw world-space samples straight into
+  // the real Path, so a Motion-transformed layer applied its offset a
+  // SECOND time on top at the next render — the freshly-drawn shape
+  // visibly snapped away from where it was actually drawn, while existing
+  // content (already living correctly in local space) stayed put — exactly
+  // the reported "ceux qui sont déjà dedans reste avec la transformation".
+  // Mapped once, right before commitStroke does anything else with
+  // `samples`, so every downstream consumer (angledSamples, centerline/
+  // outline building, trim-stroke-ends — which compares against OTHER
+  // layer content already in local space) sees consistent coordinates.
+  function toLocalPoint(pt, layerIdx) {
+    if (!window.SMMotion) return pt;
+    var map = SMMotion.layerMotionPointMap ? SMMotion.layerMotionPointMap(layerIdx) : null;
+    // 3D layers — layerMotionPointMap only recognizes the base 2D
+    // properties and returns null for a 3D-toggled layer even with real
+    // rotationX/rotationY set; layerMotion3DPointMap is the dedicated
+    // (perspective-correct, not affine) counterpart — see its own header
+    // comment in motion.js for the ray-plane-intersection math.
+    if (!map && SMMotion.layerMotion3DPointMap) map = SMMotion.layerMotion3DPointMap(layerIdx);
+    if (!map) return pt;
+    var lp = map.inv(pt.x, pt.y);
+    return new Point(lp[0], lp[1]);
+  }
+  function mapSamplesToLocal(smp, layerIdx) {
+    return smp.map(function (s) {
+      var lp = toLocalPoint(new Point(s[0], s[1]), layerIdx);
+      return [lp.x, lp.y, s[2]];
+    });
+  }
   // Live brush-preset dab cache (2026-08-27): buildBrushDabs is a full
   // rebuild "not cheap per mousemove" (see its other caller,
   // regenerateBrushTexture, tools.js) — a stylus fires 120-240 events/s
@@ -727,6 +769,12 @@
   function commitStroke() {
     if (window.SMBitmapBrush) window.SMBitmapBrush.endLivePreview(); // clear the screen-space preview — the real baked Raster (if any) takes over below
     if (samples.length < 2) return;
+    // Map from rendered/world space into the active layer's raw document
+    // space BEFORE anything else touches `samples` — see the header comment
+    // above (feedback #135). A no-op (returns points unchanged) whenever
+    // the layer has no effective Motion transform, which is the
+    // overwhelmingly common case.
+    samples = mapSamplesToLocal(samples, state.activeLayerIdx);
     // Bake the calligraphic nib once, here, so every consumer below (centerline
     // + width profile, brush-preset dabs, bitmap brush, symmetry/Labs hooks)
     // sees the same widths the live preview showed.

@@ -21,6 +21,30 @@
   var reshapingSeg = null;
   var canvasEl = null; // set in init(), read by the cursor-affordance hover check in onMove
 
+  // Motion transform (2026-08-29, feedback #135: "si je dessine dans le
+  // layer dont la position a été changé dans motion... le dessin se
+  // recale") — same fix/reasoning as draw-bridge.js's toLocalPoint (see its
+  // header comment for the full story). Unlike Draw/Shape, the Pen tool
+  // mutates a real Paper.js Path (_pen.path, shared with tools.js)
+  // continuously across the whole multi-click gesture rather than
+  // deferring to one commit at the end — every anchor placement and
+  // proximity/tangent check against _pen.path's existing (raw, local-
+  // space) segments below must map the pointer's rendered/world position
+  // through this FIRST, or a Motion-transformed layer places each new
+  // anchor at its raw click position instead of the equivalent local one
+  // (same failure mode subselect-bridge.js/rig-bridge.js already document
+  // for hit-testing). setPenPreview's rubber-band line is deliberately fed
+  // the UNMAPPED world point (w) instead — it's a live overlay, must track
+  // the cursor at its true on-screen position.
+  function toLocalPoint(pt, layerIdx) {
+    if (!window.SMMotion) return pt;
+    var map = SMMotion.layerMotionPointMap ? SMMotion.layerMotionPointMap(layerIdx) : null;
+    if (!map && SMMotion.layerMotion3DPointMap) map = SMMotion.layerMotion3DPointMap(layerIdx);
+    if (!map) return pt;
+    var lp = map.inv(pt.x, pt.y);
+    return new Point(lp[0], lp[1]);
+  }
+
   function shouldIntercept() {
     return (
       window.SMEngineBridge && window.SMEngineBridge.isEnabled() &&
@@ -33,7 +57,10 @@
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    var pt = new Point(w[0], w[1]);
+    // Motion transform fix (feedback #135, see toLocalPoint's header
+    // comment above) — every anchor placed/hit-tested below must live in
+    // the same raw document space as _pen.path's existing segments.
+    var pt = toLocalPoint(new Point(w[0], w[1]), state.activeLayerIdx);
     var layer = userLayers[state.activeLayerIdx];
 
     // Alt+drag directly on an ALREADY-PLACED anchor of the in-progress path
@@ -148,7 +175,10 @@
     window.SMEngineBridge.setPenPreview(w);
     if (draggingHandle && _pen.path) {
       var seg = reshapingSeg || _pen.path.lastSegment;
-      var pt = new Point(w[0], w[1]);
+      // Motion transform fix (feedback #135) — seg.point lives in raw
+      // document space; the pointer must be mapped the same way before the
+      // handle delta is computed against it.
+      var pt = toLocalPoint(new Point(w[0], w[1]), state.activeLayerIdx);
       var delta = pt.subtract(seg.point);
       seg.handleOut = delta;
       // Alt/Option held: break the handle's symmetry (only the OUT side
@@ -172,7 +202,10 @@
       // Both are dynamic overrides of the tool's normal static cursor
       // (SM.setTool's cc['pen']='crosshair'), so anything that doesn't
       // match falls back to that same default rather than getting stuck.
-      var pt = new Point(w[0], w[1]);
+      // Motion transform fix (feedback #135) — _pen.path.segments live in
+      // raw document space; map the pointer the same way for these
+      // proximity checks.
+      var pt = toLocalPoint(new Point(w[0], w[1]), state.activeLayerIdx);
       var tol = 10 / view.zoom;
       var nearAnchor = false;
       if (e.altKey) {
