@@ -414,6 +414,31 @@
       }
     }
     var hit=hitT(mx,my);
+    // Cmd/Ctrl+click on a point deletes it (2026-08-29, feedback #152:
+    // "impossible de supprimer un point de tangents... avec alt" — Alt was
+    // already spoken for at this same click site, one line below: it reveals
+    // the point's tangent handles, an existing feature, not available to
+    // repurpose for delete). Delete/Backspace-while-hovering-a-selected-point
+    // (see the keydown handler below) already did this, just wasn't
+    // discoverable — this is an additional, more standard-feeling gesture,
+    // not a replacement. Same endpoint guard, same pushUndo-before-mutate
+    // convention as every other gesture in this widget — and the SAME
+    // _scrubLiveActive bracket the drag gestures use: pushUndo/pushUndoLayers
+    // are literally the same function (see tweens.js), so without this,
+    // pushCurve()'s own generateTweens()→pushUndoLayers() call (tween mode)
+    // would push a SECOND, redundant entry right after mine, and Ctrl+Z
+    // would need pressing twice to undo one delete.
+    if(hit>=0&&(e.metaKey||e.ctrlKey)){
+      var delPts=activePoints();
+      if(hit!==0&&hit!==delPts.length-1){
+        if(window.pushUndo)window.pushUndo();
+        delPts.splice(hit,1);
+        selected=null;dragging=null;
+        draw();
+        window._scrubLiveActive=true;pushCurve();window._scrubLiveActive=false;
+      }
+      return;
+    }
     // 2026-07-30 fix: unlike the camera-handle and tangent-handle drags just
     // above (both already call pushUndo once per gesture), plain point-drag
     // had NEITHER a pre-gesture snapshot NOR the _scrubLiveActive guard —
@@ -499,7 +524,17 @@
       // to the derived (auto) Catmull-Rom — the escape hatch matching
       // the drag that set it (green handles turn orange again).
       var dpts=activePoints(),dp=dpts[dblHit];
-      if(typeof dp.tx==='number'){delete dp.tx;delete dp.ty;selected=dblHit;draw();pushCurve();}
+      if(typeof dp.tx==='number'){
+        // pushUndo added 2026-08-29 (feedback #152, "ctrl + z ne marche pas
+        // pour ça") — this and the add-point/delete-point gestures below
+        // were the only point-editing actions in this widget with no
+        // pre-mutate snapshot at all, unlike every drag gesture above.
+        // _scrubLiveActive bracket: see the Cmd/Ctrl-click delete handler's
+        // comment a few lines up for why it's needed here too.
+        if(window.pushUndo)window.pushUndo();
+        delete dp.tx;delete dp.ty;selected=dblHit;draw();
+        window._scrubLiveActive=true;pushCurve();window._scrubLiveActive=false;
+      }
       return;
     }
     var yr=yRange();
@@ -507,9 +542,11 @@
     var pts=activePoints();
     var idx=pts.length;
     for(var i=1;i<pts.length;i++){if(pts[i].x>nx){idx=i;break;}}
+    if(window.pushUndo)window.pushUndo(); // see comment above
     pts.splice(idx,0,{x:nx,y:ny});
     selected=idx;
-    draw();pushCurve();
+    draw();
+    window._scrubLiveActive=true;pushCurve();window._scrubLiveActive=false;
   });
   cvs.addEventListener('mouseenter',function(){hovering=true;});
   cvs.addEventListener('mouseleave',function(){hovering=false;});
@@ -519,9 +556,11 @@
     var pts=activePoints();
     if(selected===0||selected===pts.length-1)return; // endpoints are permanent
     e.preventDefault();
+    if(window.pushUndo)window.pushUndo(); // feedback #152, see dblclick handler's comment above
     pts.splice(selected,1);
     selected=null;
-    draw();pushCurve();
+    draw();
+    window._scrubLiveActive=true;pushCurve();window._scrubLiveActive=false;
   });
 
   function isMatch(p){
