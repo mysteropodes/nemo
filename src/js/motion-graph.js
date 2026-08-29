@@ -287,6 +287,32 @@
       e.preventDefault(); e.stopPropagation();
     }
   }
+  // Feedback #128 ("dur à contrôler parfois... saccadé"): onMove used to call
+  // render() (a full rebuild: re-samples EVERY frame of EVERY plotted curve
+  // via M().valueAtFrame, rebuilds the whole SVG as a string, replaces
+  // el.innerHTML) PLUS renderLayerList() PLUS SMEngineBridge.renderNow() —
+  // all synchronously on every single raw mousemove tick, no coalescing at
+  // all. On a graph with more than a couple of animated properties or a
+  // longer timeline this is exactly the "drag lags behind the cursor, feels
+  // saccadé" symptom — same class of bug CLAUDE.md §5bis already documents
+  // for other raw-drag paths in this app (timeline zoom handle, in/out bars),
+  // fixed the same way here: the DATA write (k.v/k.frame/cps[wi].x/y) stays
+  // synchronous on every move so no motion is ever dropped, but the actual
+  // re-render is coalesced to one rAF tick — a mouse fires far more move
+  // events per frame than the screen can show anyway. onUp still forces one
+  // final synchronous render so the very last position is never left
+  // waiting on a queued frame that never fires (drag ended, no more moves).
+  var _renderQueued = false;
+  function scheduleRender() {
+    if (_renderQueued) return;
+    _renderQueued = true;
+    requestAnimationFrame(function () {
+      _renderQueued = false;
+      render();
+      if (window.renderLayerList) renderLayerList();
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    });
+  }
   function onMove(e) {
     if (!_drag) return;
     var p = localPt(e), rg = _el._rg, innerH = _el._innerH;
@@ -322,15 +348,15 @@
       cps[_drag.wi].y = Math.max(-1, Math.min(2, ny));
       delete cps[_drag.wi].tx; delete cps[_drag.wi].ty;
     }
-    render();
-    if (window.renderLayerList) renderLayerList();
-    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    scheduleRender();
   }
   function onUp() {
     if (!_drag) return;
     _drag = null;
     if (window.renderTimeline) renderTimeline();
     render();
+    if (window.renderLayerList) renderLayerList();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
 
   function toggle(on) {
