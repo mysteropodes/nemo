@@ -25,6 +25,37 @@
   // the circle you're about to erase with" affordance either way.
   var sizing = false, sizeStartX = 0, sizeStartVal = 0, sizeAnchorW = null;
 
+  // Motion transform (2026-08-29, same bug/fix as draw-bridge.js/shape-
+  // bridge.js/pen-bridge.js's toLocalPoint — feedback #135, "si je dessine
+  // dans le layer dont la position a été changé dans motion... le dessin se
+  // recale"). eraseAt()'s hitTest and eraseAtPoint() both operate on the
+  // layer's real Paper.js children, which — same as every other bridge in
+  // this codebase — live in RAW/local document space; Motion Position/
+  // Rotation/Scale is applied only at render time (buildSceneJson) and is
+  // never baked into the document. This file's onDown/onMove built their
+  // erase point straight from screenToWorld (RENDERED/world space) with no
+  // mapping at all, so on a Motion-transformed layer the eraser's hitTest
+  // missed the content entirely wherever the click didn't coincidentally
+  // land on the untransformed geometry — reproduced live: dragging directly
+  // across a visibly-rendered shape erased nothing, while the layer's raw
+  // Path bounds (confirmed via inspection) sat well away from the click.
+  // Closest analog is pen-bridge.js, not draw-bridge/shape-bridge: like the
+  // Pen tool, the eraser mutates real Paper.js geometry continuously across
+  // the whole drag (eraseAtPoint runs per pointermove, not once at
+  // pointerup), so every sample needs mapping, not just one commit. The
+  // hover cursor circle (setEraserCursor) is deliberately fed the
+  // UNMAPPED/raw world point — same as pen-bridge's setPenPreview — since
+  // it's a live overlay that must track the cursor at its true on-screen
+  // position.
+  function toLocalPoint(pt, layerIdx) {
+    if (!window.SMMotion) return pt;
+    var map = SMMotion.layerMotionPointMap ? SMMotion.layerMotionPointMap(layerIdx) : null;
+    if (!map && SMMotion.layerMotion3DPointMap) map = SMMotion.layerMotion3DPointMap(layerIdx);
+    if (!map) return pt;
+    var lp = map.inv(pt.x, pt.y);
+    return new Point(lp[0], lp[1]);
+  }
+
   // Stabilizer (2026-08-27, feedback #74 — "il faudrait que la gomme
   // puisse se regler comme le pinceau, et se comporter comme le pinceau,
   // comme dans animate"): #tool-opts-sec (Stabilizer/Smooth) was ALREADY
@@ -179,7 +210,11 @@
     // stroke/stop. The guide now tracks the raw, unsmoothed point — only
     // the erase hit-test itself stays stabilized.
     window.SMEngineBridge.setEraserCursor(rawW, radius);
-    eraseAt(new Point(w[0], w[1]), radius);
+    // Motion transform fix (feedback #135, see toLocalPoint's header comment
+    // above) — layer.hitTest/eraseAtPoint below compare against the layer's
+    // raw document geometry, so the (stabilized) world point must be mapped
+    // into that same local space first.
+    eraseAt(toLocalPoint(new Point(w[0], w[1]), state.activeLayerIdx), radius);
     window.SMEngineBridge.renderNow();
   }
   function onMove(e) {
@@ -202,7 +237,9 @@
     var w = stabilizeErasePoint(rawW);
     var radius = eraseRadiusFor(e);
     window.SMEngineBridge.setEraserCursor(rawW, radius); // raw point — see onDown's comment on this
-    if (pointerIsDown) eraseAt(new Point(w[0], w[1]), radius);
+    // Motion transform fix (feedback #135, see toLocalPoint's header comment
+    // in onDown) — same mapping, every erase sample during the drag.
+    if (pointerIsDown) eraseAt(toLocalPoint(new Point(w[0], w[1]), state.activeLayerIdx), radius);
     window.SMEngineBridge.renderNow();
   }
   function onUp(e) {
