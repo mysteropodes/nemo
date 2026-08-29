@@ -391,7 +391,24 @@ window.SM={
     // its old (stale) height, easing curve included (feedback: "il faut ça
     // aussi avec la partie keyframes... afficher les easing comme avant").
     var _camToolChanged=(t==='camera')!==(state.tool==='camera');
+    // Feedback #76/#100: "je change d'outil, tous les réglages de ma brush
+    // ont été perdus" — switching to Select/Subselect/Fsselect and clicking
+    // an EXISTING shape adopts that shape's own color/width/cap/join/etc.
+    // into these same state.* fields (updateSelPropsPanel, above) so the
+    // panel can double as both "next stroke's defaults" AND "this shape's
+    // live properties" — coming back to a drawing tool inherited whatever
+    // was last adopted instead of the user's own brush settings. Snapshot on
+    // the way OUT of a drawing tool (still the user's own values at that
+    // point) and restore on the way back IN — round-trips through any
+    // number of selection-tool visits stay stable. Deliberately scoped to
+    // color/width/cap/join/miter/dash/paint-order — the fields
+    // updateSelPropsPanel itself adopts from a selection; bitmap-brush sub-
+    // settings (tip/spacing/scatter) aren't part of that adoption path so
+    // aren't at risk here.
+    var _wasDrawTool=_isDrawingTool[state.tool],_isDrawTool=_isDrawingTool[t];
+    if(_wasDrawTool&&!_isDrawTool)_snapshotDrawingDefaults();
     state.tool=t;renderArcs();
+    if(_isDrawTool&&!_wasDrawTool)_restoreDrawingDefaults();
     if(_camToolChanged)renderTimeline();
     document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tool===t);});
     if(window.SMShapeGroup)SMShapeGroup.ensureFront(t);
@@ -2767,6 +2784,38 @@ function updatePropsContext(){
     });
   }
   updateStatusBarHelp();
+}
+// "Drawing" tools are the ones for which strokeColor/fillColor/brushSize/
+// etc. mean "next stroke's defaults" — see _snapshotDrawingDefaults below.
+var _isDrawingTool={draw:1,pen:1,line:1,rect:1,ellipse:1,speechbubble:1,star:1,fillbrush:1,fill:1};
+var _drawingDefaultsSnapshot=null;
+function _snapshotDrawingDefaults(){
+  _drawingDefaultsSnapshot={
+    strokeColor:state.strokeColor,strokeEnabled:state.strokeEnabled,
+    fillColor:state.fillColor,fillEnabled:state.fillEnabled,
+    strokeCap:state.strokeCap,strokeJoin:state.strokeJoin,
+    miterLimit:state.miterLimit,dashOffset:state.dashOffset,
+    paintOrder:state.paintOrder,brushSize:state.brushSize,
+  };
+}
+function _restoreDrawingDefaults(){
+  var d=_drawingDefaultsSnapshot;if(!d)return;
+  state.strokeColor=d.strokeColor;state.strokeEnabled=d.strokeEnabled;
+  state.fillColor=d.fillColor;state.fillEnabled=d.fillEnabled;
+  state.strokeCap=d.strokeCap;state.strokeJoin=d.strokeJoin;
+  state.miterLimit=d.miterLimit;state.dashOffset=d.dashOffset;
+  state.paintOrder=d.paintOrder;state.brushSize=d.brushSize;
+  // Same UI-paint calls updateSelPropsPanel's own staleness fixes use below
+  // — writing state.* alone doesn't touch the DOM (these fields are only
+  // ever repainted as a side effect of the setter/adopt path that changed
+  // them, never on a plain per-render basis).
+  paintStrokeSwatches(state.strokeColor);paintFillSwatches(state.fillColor);
+  window.SM._syncStrokeEnabledUI(state.strokeEnabled);window.SM._syncFillEnabledUI(state.fillEnabled);
+  paintIconGroup('p-cap-grp',state.strokeCap);paintIconGroup('p-join-grp',state.strokeJoin);
+  paintIconGroup('p-paintorder-grp',state.paintOrder);if(window.syncMiterLimitEnabled)syncMiterLimitEnabled();
+  var _mlEl=document.getElementById('p-miterlimit');if(_mlEl)_mlEl.value=state.miterLimit;
+  var _doEl=document.getElementById('p-dashoffset');if(_doEl)_doEl.value=state.dashOffset;
+  var _swEl=document.getElementById('p-sw');if(_swEl)_swEl.value=Math.round(state.brushSize);
 }
 // Populates the Transform section's fields (position/size/rotation/point-
 // type/boolean-op rows) — visibility itself is now owned by
