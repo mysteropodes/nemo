@@ -313,11 +313,16 @@
   // untouched, while the column/filter preferences follow the workstation.
   var _motionSearch = '';
   var _motionFilterMode = 'all';
-  var _motionColumnPreset = 'animation';
+  // Default column preset (2026-08-29, Cyril: "3D/mograph par default") — the
+  // 3D Layer/Duplicator toggle icons only show under this preset (see
+  // style.css's `[data-motion-columns]` rules); 'animation' (the prior
+  // default) hid them, which read as "these icons disappeared" until you
+  // knew to open the column picker and switch presets.
+  var _motionColumnPreset = '3d';
   var _motionSnapEnabled = true;
   try {
     _motionFilterMode = localStorage.getItem('nemo-motion-filter') || 'all';
-    _motionColumnPreset = localStorage.getItem('nemo-motion-columns') || 'animation';
+    _motionColumnPreset = localStorage.getItem('nemo-motion-columns') || '3d';
     _motionSnapEnabled = localStorage.getItem('nemo-motion-snap') !== '0';
   } catch (e) {}
   function propHasContent(holder, prop) { return isAnimated(holder, prop) || !!(holder.motionStatic && holder.motionStatic[prop]); }
