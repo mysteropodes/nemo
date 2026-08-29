@@ -2660,8 +2660,8 @@ function fillMergeSameColor(layer,newFill,allowFillShapeAbsorb){
   // else (insertBooleanResult below, or a FUTURE merge/regeneration pass
   // that would otherwise unite() this already-messy result again and
   // compound the degeneracy) — see _eraseDegenerateSelfLoops' own comment.
-  if(acc instanceof CompoundPath)acc.children.forEach(function(ch){_eraseDegenerateSelfLoops(ch);});
-  else _eraseDegenerateSelfLoops(acc);
+  if(acc instanceof CompoundPath)acc.children.forEach(function(ch){_eraseDegenerateSelfLoops(ch,true);});
+  else _eraseDegenerateSelfLoops(acc,true);
   var op=newFill.opacity;
   // Highest stacking position among the participants, adjusted for the
   // removals below it — the union visually replaces ALL of them, so it
@@ -2670,7 +2670,7 @@ function fillMergeSameColor(layer,newFill,allowFillShapeAbsorb){
   var topIdx=Math.max.apply(null,idxs);
   var removedBelow=idxs.filter(function(i){return i<topIdx;}).length;
   newFill.remove();absorbed.forEach(function(c){c.remove();});
-  var parts=insertBooleanResult(layer,Math.min(topIdx-removedBelow,layer.children.length),acc,newFill.fillColor,op,null,newFill.data);
+  var parts=insertBooleanResult(layer,Math.min(topIdx-removedBelow,layer.children.length),acc,newFill.fillColor,op,null,newFill.data,true);
   if(mergedSeeds.length){
     parts.forEach(function(part){
       part.data.fillSeeds=mergedSeeds;
@@ -5635,7 +5635,7 @@ function _mergeHoleIntoExterior(extSegs,holeSegs){
 // repeat until no repeats remain) recovers the true minimal boundary.
 // Verified live: 292 points -> 48, zero repeats left, shape area unchanged
 // to within 0.3% (the removed loops really were negligible slivers).
-function _eraseDegenerateSelfLoops(path){
+function _eraseDegenerateSelfLoops(path,skipRefit){
   if(!path||!path.segments)return;
   // Distance-based (not rounded-key) revisit detection: two of Paper's own
   // union() outputs from the SAME real junction routinely land a fraction
@@ -5738,7 +5738,15 @@ function _eraseDegenerateSelfLoops(path){
   // neighboring segments assuming at least a real closed triangle to work
   // with, and throws a bare TypeError instead of a catchable error on
   // fewer. Nothing to simplify below that anyway.
-  if(!keptRevisit&&path.segments.length>=3)path.simplify(2.5);
+  // `skipRefit` (2026-08, Fill Brush same-color merge): the refit below
+  // REPLACES the boundary's own anchors with a fresh Douglas-Peucker fit —
+  // measured on a two-stroke merge, 174 anchors in, 31 out, and 1.25% of
+  // sampled silhouette pixels moved versus the exact union (which is itself
+  // 0.000px from the source outlines: every anchor of a unite() result IS a
+  // source anchor or a true intersection). For a merge whose whole point is
+  // "the shapes must keep their contours" that trade is wrong, so the caller
+  // can keep the degenerate-loop splice above while declining the refit.
+  if(!skipRefit&&!keptRevisit&&path.segments.length>=3)path.simplify(2.5);
 }
 // strokeInfo (optional, 2026-07 — "l'eraser supprime le stroke entier"):
 // every branch below used to hardcode strokeColor=null on its island(s),
@@ -5767,7 +5775,13 @@ function _eraseDegenerateSelfLoops(path){
 // all describe how to REBUILD the outline, and a notched outline no longer
 // has a valid centerline to rebuild from (see eraseAtPoint's own comment on
 // origStrokeInfo — that tradeoff is intentional and predates this).
-var BOOL_KEEP_DATA_ALL=['groupId','ownerId','ownerName','ownerColor','channelTag','shadowSwatchId','tweenOn','boxAngle','xformAnchorKey','xformAnchorCustom','effects','fillGradient'];
+// isFillShape added 2026-08 (CLAUDE.md §1 family): pen-bridge's close-path/
+// endpoint-snap exclusion and vector-sculpt's sculptables filter both read it,
+// but every boolean fusion (same-color Fill Brush merge included) silently
+// dropped it — the merged shape then behaved subtly differently from the
+// strokes it was built from. Conditional copy, so a non-fill source is
+// unaffected.
+var BOOL_KEEP_DATA_ALL=['groupId','ownerId','ownerName','ownerColor','channelTag','shadowSwatchId','tweenOn','boxAngle','xformAnchorKey','xformAnchorCustom','effects','fillGradient','isFillShape'];
 // Keys that must stay UNIQUE across the layer: strokeId is a lookup map key
 // (motion.js:1413 scans for the first data.strokeId match), so copying it
 // onto every island of a split would make all but one unreachable. The
@@ -5807,11 +5821,11 @@ function carryBooleanData(isl,srcData,isFirst){
 // styling + real layer insertion. Hoisted out unchanged from what used to be
 // inline in insertBooleanResult — see that function's own history for why
 // hole-merging/degenerate-loop cleanup work the way they do.
-function flattenBooleanResult(result){
+function flattenBooleanResult(result,preserveGeometry){
   if(!(result instanceof CompoundPath)){
     // The op produced one seamless Path, no holes or islands at all (e.g.
     // two same-color fills merging into a single continuous outline).
-    _eraseDegenerateSelfLoops(result);
+    _eraseDegenerateSelfLoops(result,preserveGeometry);
     return[result];
   }
   var children=result.children.slice();
@@ -5854,7 +5868,7 @@ function flattenBooleanResult(result){
     // slit anchor — every extra hole compounds another revisit of that one
     // coordinate, same degenerate-loop shape _eraseDegenerateSelfLoops
     // already fixes after Paper's own unite() (see that function's comment).
-    _eraseDegenerateSelfLoops(merged);
+    _eraseDegenerateSelfLoops(merged,preserveGeometry);
     return merged;
   });
   result.remove();
@@ -6117,12 +6131,12 @@ function applyParamShapeRect(path){
   built.remove();
 }
 window.applyParamShapeRect=applyParamShapeRect;
-function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo,srcData){
+function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo,srcData,preserveGeometry){
   function applyStroke(isl){
     if(strokeInfo&&strokeInfo.color){isl.strokeColor=strokeInfo.color;isl.strokeWidth=strokeInfo.width;isl.strokeCap=strokeInfo.cap;isl.strokeJoin=strokeInfo.join;}
     else isl.strokeColor=null;
   }
-  var flat=flattenBooleanResult(result);
+  var flat=flattenBooleanResult(result,preserveGeometry);
   flat.forEach(function(isl,k){
     if(fillColor!==undefined)isl.fillColor=fillColor;
     applyStroke(isl);
@@ -7129,14 +7143,12 @@ function onMouseUp(event){
         // Placement (Above/Below/Merge) — see applyFillBrushPlacement's own
         // comment; replaces the old unconditional "always at the back".
         currentPath=applyFillBrushPlacement(currentPath,userLayers[state.activeLayerIdx]);
-        // 2026-08 feedback reversal — mirrors draw-bridge.js's own commit
-        // path (CLAUDE.md §3, keep these two in sync): calling
-        // fillMergeSameColor here unconditionally reshaped the FIRST
-        // stroke's own anchors via Paper.js's .unite() the moment a second
-        // same-color stroke merely overlapped it. Reported: "je veux merge
-        // mais que les formes se conservent, pas que les path changent" —
-        // left as independent, unmodified paths instead (Placement's own
-        // explicit 'merge' mode, just above, is unaffected).
+        // Same-color Fill Brush strokes fuse into one shape. Mirrors
+        // draw-bridge.js's own commit path (CLAUDE.md §3) — see its longer
+        // comment for why this was removed in 2026-08 and restored: the
+        // "unite() distorts the first shape" reasoning was never measured,
+        // and measuring it gives 0.000px deviation outside the overlap.
+        if(currentPath)currentPath=fillMergeSameColor(userLayers[state.activeLayerIdx],currentPath,true)||currentPath;
       }
       if(currentPath)tagOwner(currentPath);
     }
