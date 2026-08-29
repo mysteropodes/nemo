@@ -122,12 +122,22 @@
   }
 
   function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
-  // First VISIBLE SOLID paint in a fills/strokes array — gradients/patterns/
-  // images are handled by their own callers (or skipped), matching
+  // TOP-most visible SOLID paint in a fills/strokes array — gradients/
+  // patterns/images are handled by their own callers (or skipped), matching
   // svg-import.js's "documented degrade, not a silent drop" contract.
+  // 2026-08-29 fix (feedback #144, "problème de couleur"): Figma's own
+  // Plugin API docs are explicit that `fills`/`strokes` arrays are ordered
+  // BOTTOM to TOP — index 0 is the bottom-most paint, later entries render
+  // OVER it. A node with two stacked solid fills (a base color + an
+  // overlay tweak, a very common Figma pattern) therefore shows whichever
+  // one is LAST in the array, not the first — walking from index 0 (as
+  // this file originally did) silently picked the bottom, often-invisible
+  // fill instead of what the design actually shows. Walking from the END
+  // fixes that; a node with only one solid fill (the overwhelming common
+  // case) is unaffected either way.
   function firstSolidPaint(paints) {
     if (!paints) return null;
-    for (var i = 0; i < paints.length; i++) {
+    for (var i = paints.length - 1; i >= 0; i--) {
       var p = paints[i];
       if (p && p.visible !== false && p.type === 'SOLID') return p;
     }
@@ -139,9 +149,12 @@
     var a = clamp01((paint.opacity != null ? paint.opacity : 1) * (nodeOpacity != null ? nodeOpacity : 1) * (c.a != null ? c.a : 1));
     return 'rgba(' + Math.round(clamp01(c.r) * 255) + ',' + Math.round(clamp01(c.g) * 255) + ',' + Math.round(clamp01(c.b) * 255) + ',' + a + ')';
   }
+  // Same bottom-to-top fix as firstSolidPaint above, for consistency — a
+  // node with an image fill stacked under/over another paint should still
+  // resolve to whichever is on TOP.
   function firstImagePaint(paints) {
     if (!paints) return null;
-    for (var i = 0; i < paints.length; i++) {
+    for (var i = paints.length - 1; i >= 0; i--) {
       var p = paints[i];
       if (p && p.visible !== false && p.type === 'IMAGE' && p.imageRef) return p;
     }
@@ -269,18 +282,35 @@
   // in image fills — omit it to skip images (counted, not silently lost).
   // `opts.frameNames` (optional array) restricts import to frames whose
   // name is in the list; default imports every top-level FRAME on the
-  // first CANVAS (page).
+  // first CANVAS (page). `opts.scopedNode` (optional, from a "Copy link to
+  // selection" URL — see parseNodeId/importFromToken below): a single
+  // already-resolved Figma node (GET /v1/files/:key/nodes response's
+  // nodes[id].document) to import INSTEAD of walking the whole file —
+  // takes priority over figmaJson/pageIndex/frameNames entirely.
   async function convertFileJson(figmaJson, opts) {
     opts = opts || {};
     var report = { framesImported: 0, shapesImported: 0, textsImported: 0, imagesImported: 0, skipped: [] };
-    var doc = figmaJson && figmaJson.document;
-    if (!doc || !doc.children || !doc.children.length) { report.skipped.push('empty document'); return report; }
-    var page = doc.children[opts.pageIndex || 0] || doc.children[0];
-    var frames = (page.children || []).filter(function (n) { return n.type === 'FRAME'; });
-    if (opts.frameNames && opts.frameNames.length) {
-      frames = frames.filter(function (f) { return opts.frameNames.indexOf(f.name) >= 0; });
+    var frames;
+    if (opts.scopedNode) {
+      var sn = opts.scopedNode;
+      // The selection IS the artboard, or a container (Section/Canvas/
+      // Group) holding one or more artboards — never fall back to "every
+      // frame in the whole file" here, that's exactly the bug being fixed.
+      frames = sn.type === 'FRAME' ? [sn] : (sn.children || []).filter(function (n) { return n.type === 'FRAME'; });
+      if (!frames.length) {
+        report.skipped.push('La sélection Figma ne contient pas d’artboard (frame) — sélectionne un artboard, ou un groupe/section qui en contient, avant de copier le lien');
+        return report;
+      }
+    } else {
+      var doc = figmaJson && figmaJson.document;
+      if (!doc || !doc.children || !doc.children.length) { report.skipped.push('empty document'); return report; }
+      var page = doc.children[opts.pageIndex || 0] || doc.children[0];
+      frames = (page.children || []).filter(function (n) { return n.type === 'FRAME'; });
+      if (opts.frameNames && opts.frameNames.length) {
+        frames = frames.filter(function (f) { return opts.frameNames.indexOf(f.name) >= 0; });
+      }
+      if (!frames.length) { report.skipped.push('no FRAME node found on this page'); return report; }
     }
-    if (!frames.length) { report.skipped.push('no FRAME node found on this page'); return report; }
 
     for (var fi = 0; fi < frames.length; fi++) {
       var frame = frames[fi];
@@ -387,6 +417,23 @@
     if (/^[a-zA-Z0-9]+$/.test(s)) return s;
     return null;
   }
+  // Extracts `?node-id=...` from a "Copy link to selection" URL (feedback
+  // #144: "quand j'importe via link of selection il import tous les
+  // artboard" — the old code only ever read the file key and always fetched
+  // the WHOLE file, silently ignoring any node-id, so a selection link
+  // behaved exactly like a plain file link). Figma's shareable URL encodes
+  // the node id's ':' separator as '-' (a real id "79:421" becomes
+  // "79-421" in the query string) — only substitute the first '-' when the
+  // value doesn't already contain a literal ':' (e.g. someone pasting a
+  // bare id copied from elsewhere).
+  function parseNodeId(urlOrKey) {
+    if (!urlOrKey) return null;
+    var m = String(urlOrKey).match(/[?&]node-id=([^&]+)/);
+    if (!m) return null;
+    var raw = decodeURIComponent(m[1]);
+    if (raw.indexOf(':') < 0) raw = raw.replace('-', ':');
+    return raw;
+  }
 
   // Live network glue (CORS-confirmed, NOT live-tested — see file header).
   // `token` is the user's own personal access token (Settings -> Figma),
@@ -398,10 +445,24 @@
     if (!key) throw new Error('URL ou clé de fichier Figma invalide');
     if (!token) throw new Error('Token Figma manquant (Réglages > Figma)');
     var headers = { 'X-Figma-Token': token };
-    var fileRes = await fetch('https://api.figma.com/v1/files/' + key + '?geometry=paths', { headers: headers });
-    if (!fileRes.ok) throw new Error('Figma API: HTTP ' + fileRes.status + (fileRes.status === 403 ? ' (token invalide ou sans accès à ce fichier)' : ''));
-    var figmaJson = await fileRes.json();
     var mergedOpts = Object.assign({}, opts);
+    var figmaJson;
+    var nodeId = parseNodeId(fileKeyOrUrl);
+    if (nodeId) {
+      // "Copy link to selection" (feedback #144) — fetch ONLY that node via
+      // the /nodes endpoint instead of the whole file via /files, so the
+      // import is scoped to the selection instead of every top-level frame.
+      var nodeRes = await fetch('https://api.figma.com/v1/files/' + key + '/nodes?ids=' + encodeURIComponent(nodeId) + '&geometry=paths', { headers: headers });
+      if (!nodeRes.ok) throw new Error('Figma API: HTTP ' + nodeRes.status + (nodeRes.status === 403 ? ' (token invalide ou sans accès à ce fichier)' : ''));
+      var nodeJson = await nodeRes.json();
+      var entry = nodeJson.nodes && nodeJson.nodes[nodeId];
+      if (!entry || !entry.document) throw new Error('Nœud Figma introuvable (node-id ' + nodeId + ') — le lien de sélection ne correspond plus à un élément de ce fichier');
+      mergedOpts.scopedNode = entry.document;
+    } else {
+      var fileRes = await fetch('https://api.figma.com/v1/files/' + key + '?geometry=paths', { headers: headers });
+      if (!fileRes.ok) throw new Error('Figma API: HTTP ' + fileRes.status + (fileRes.status === 403 ? ' (token invalide ou sans accès à ce fichier)' : ''));
+      figmaJson = await fileRes.json();
+    }
     try {
       var imgRes = await fetch('https://api.figma.com/v1/files/' + key + '/images', { headers: headers });
       if (imgRes.ok) {
@@ -416,6 +477,7 @@
     convertFileJson: convertFileJson,
     importFromToken: importFromToken,
     parseFileKey: parseFileKey,
+    parseNodeId: parseNodeId,
     // exposed for the fixture-based sanity check (see PR description) —
     // not part of the "public" surface other modules should call.
     _internal: { matMultiply: matMultiply, matInvert: matInvert, nodeAbsMatrix: nodeAbsMatrix, geometryToPathTags: geometryToPathTags },
