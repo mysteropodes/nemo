@@ -3796,6 +3796,91 @@ function applyStrokeStyle(p){
 // width at each sample point", just with a different width(t) source
 // (taper profile vs. pressure/speed). Inspired by Cacani's stroke-taper /
 // pressure-stroke pipeline (see research notes in conversation).
+//
+// GitHub issue #104 ("le smooth... casse la courbe"): naive perpendicular
+// offsetting (offset each centerline sample by ±halfWidth along its local
+// normal, then independently curve-fit each edge) folds back over itself on
+// a tight loop relative to stroke width — a well-known failure mode of
+// offset-curve construction, independent of this codebase (verified live: a
+// filled ribbon with 4 self-intersections even BEFORE Smooth is applied, on
+// a shape with a tight loop; 0 on ordinary straight/gentle-curve strokes,
+// same as the earlier investigation on this issue found).
+//
+// First attempt at a fix — CLAMPING the offset distance per-sample to the
+// local radius of curvature — was tried and rejected after live testing: it
+// measurably made things WORSE (6→8, 4→8 self-intersections on the same
+// synthetic tight-loop shapes), because pushing some samples' offset down
+// to near-zero while neighbors stay at full width feeds
+// `leftPath.smooth({type:'continuous'})` below a wildly uneven point
+// spacing, and continuous curve-fitting overshoots PAST its own control
+// points on exactly that kind of input — creating brand new crossings
+// instead of removing the original ones.
+//
+// What actually works, verified the same way: build the outline exactly as
+// before, THEN check whether it self-intersects and — only then — run it
+// through Paper.js's own resolveCrossings()+reorient(true,true) (the same
+// machinery its boolean ops use internally) and flatten the result back to
+// a single Path. nonzero (not even-odd) matters: a physical brush's ink
+// doesn't gain a hole where a loop overlaps itself, so the double-covered
+// region must stay solid — even-odd introduced a false hole plus 4-5
+// spurious slivers in testing, nonzero left the loop's own center correctly
+// inked with zero self-intersections in every tight-loop case tried. This
+// only ever engages on paths that were ALREADY self-intersecting, so an
+// already-clean stroke (straight, gentle curve, ordinary corner) is
+// untouched by it — verified identical before/after.
+function _ribbonHasRealSelfIntersections(path){
+  var contours=path.className==='CompoundPath'?path.children:[path];
+  for(var c=0;c<contours.length;c++){
+    var contour=contours[c],ix;
+    try{ix=contour.getIntersections(contour);}catch(e){continue;}
+    if(!ix||!ix.length)continue;
+    var n=contour.curves.length;
+    for(var k=0;k<ix.length;k++){
+      var loc=ix[k],t=loc.time,isB=t<1e-6||t>1-1e-6;
+      var other=loc.intersection,oT=other?other.time:0,oB=other&&(oT<1e-6||oT>1-1e-6);
+      if(isB&&oB){
+        var ci=loc.curve.index,oi=other.curve.index;
+        // Adjacent curves always "touch" at their shared endpoint — that's
+        // not a defect, only a genuine mid-curve crossing counts.
+        if(Math.abs(ci-oi)===1||Math.abs(ci-oi)===n-1||ci===oi)continue;
+      }
+      return true;
+    }
+  }
+  return false;
+}
+function _flattenResolvedRibbon(resolved){
+  if(resolved.className!=='CompoundPath')return resolved;
+  var children=resolved.children;
+  if(!children||!children.length)return null;
+  // Nonzero-rule reorient already folded any spurious opposite-winding
+  // slivers back into solid ink or discarded them as holes; what's left, if
+  // more than one child, are genuinely disjoint ink islands (a loop tight
+  // enough to pinch the ribbon into two separate blobs) — keep only the
+  // largest, the same "pick the dominant blob" fallback buildClosedRingOutline
+  // already uses below for its own degenerate case.
+  var largest=children.reduce(function(a,b){return Math.abs(a.area)>=Math.abs(b.area)?a:b;});
+  var flat=largest.clone({insert:false});
+  flat.closed=true;
+  return flat;
+}
+function _cleanupSelfIntersectingOutline(outline){
+  if(!outline||!_ribbonHasRealSelfIntersections(outline))return outline;
+  var resolved=null,clean=null;
+  try{
+    resolved=outline.resolveCrossings();
+    if(resolved){
+      if(resolved.reorient)resolved.reorient(true,true);
+      clean=_flattenResolvedRibbon(resolved);
+    }
+  }catch(e){clean=null;}
+  if(clean){
+    if(resolved&&resolved!==clean&&resolved.remove)resolved.remove();
+    outline.remove();
+    return clean;
+  }
+  return outline; // resolve failed for some reason — keep the original rather than lose the stroke
+}
 function buildVariableWidthPath(pts,widths){
   if(pts.length<2)return null;
   // Closed-gesture detection: the artist's stroke came back near its own
@@ -3810,7 +3895,7 @@ function buildVariableWidthPath(pts,widths){
     var closeThresh=Math.max(6,avgW*0.6);
     if(pts[0].getDistance(pts[pts.length-1])<closeThresh&&travel>avgW*3){
       var ring=buildClosedRingOutline(pts,widths,avgW);
-      if(ring)return ring;
+      if(ring)return _cleanupSelfIntersectingOutline(ring);
     }
   }
   var left=[],right=[],tangents=[];
@@ -3880,7 +3965,7 @@ function buildVariableWidthPath(pts,widths){
   startCapMid.forEach(function(s){outline.add(s);});
   outline.closed=true;
   leftPath.remove();rightPath.remove();
-  return outline;
+  return _cleanupSelfIntersectingOutline(outline);
 }
 // Closed-gesture variant of the sweep above. The open-stroke sweep forces
 // two round end-caps at the start/end points — fine for a real open stroke,
