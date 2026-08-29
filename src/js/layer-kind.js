@@ -40,6 +40,15 @@
     // addFolderLayer/timeline.js) that also groups+scopes-effects for its
     // children, so it gets its own badge rather than showing as 'null'.
     folder: SVG('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>'),
+    // Open-folder variant (2026-08-29, feedback #148: "quand on clic dessus
+    // pour ouvrir faudrait avoir la même icon en icon folder ouvert") — same
+    // tab-on-top silhouette as the closed icon above, split into a back wall
+    // (drawn only down to the fold line) and a front flap tilted open below
+    // it, the standard two-path "open folder" convention. Selected by
+    // keyOf/of below based on ld.folderCollapsed, not a separate `key` (the
+    // CSS class / i18n label stay 'folder' either way — this is purely a
+    // glyph swap, not a different layer kind).
+    folderOpen: SVG('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1H3Z"/><path d="M3 8l1.3 8.3A2 2 0 0 0 6.3 18h11.4a2 2 0 0 0 2-1.7L21 8Z"/>'),
     // Two overlapping squares ("an instance stamped from a shared
     // definition"), not the isometric-cube glyph this used to be
     // (2026-07-29 fix, "l'icon component du calque est le même que celui
@@ -112,7 +121,11 @@
     // {key, label, icon} — key is stable and safe as a CSS class suffix.
     of: function (ld) {
       var k = keyOf(ld);
-      return { key: k, label: labelOf(k), icon: ICONS[k] || ICONS.draw };
+      // Folder: same key/label/CSS class whether collapsed or open (it's
+      // still the same layer kind) — only the glyph swaps, mirroring the
+      // disclosure arrow right next to it (feedback #148).
+      var iconKey = (k === 'folder' && ld && !ld.folderCollapsed) ? 'folderOpen' : k;
+      return { key: k, label: labelOf(k), icon: ICONS[iconKey] || ICONS.draw };
     },
     keyOf: keyOf,
     labelOf: labelOf,
