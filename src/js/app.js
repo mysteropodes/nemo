@@ -1560,6 +1560,27 @@ function relinkRigBinds(ld,layer){
 // re-sampled at pose time via getLocationAt — same offset, current bone
 // geometry — so both position AND local tangent stay correctly anchored
 // to the SAME point on the bone as it's posed.
+// Weight of ONE point against a set of candidate bones — same distance-
+// falloff formula rigBindStroke's own weighForPoints uses per-vertex during
+// a full bind pass, factored out so a single vertex can be recomputed later
+// (the manual weight-override popover's "Réinitialiser (auto)" button,
+// rig-bridge.js, feedback #112) without a second copy of this math.
+function rigWeighOnePoint(rig,boneIds,p,radius,softness){
+  var w=[];
+  boneIds.forEach(function(bid){
+    var bone=rig.bones[bid];if(!bone)return;
+    var bp=_boneSegsToPath(bone.restSegments,bone.closed);
+    var loc=bp.getNearestLocation(p);
+    bp.remove();
+    if(!loc)return;
+    var dist=loc.point.getDistance(p);
+    var boneRadius=bone.radius||radius;
+    var t=Math.max(0,1-dist/boneRadius);
+    var infl=softness?t+(t*t*(3-2*t)-t)*softness:t;
+    if(infl>0)w.push({boneId:bid,offset:loc.offset,w:infl});
+  });
+  return w;
+}
 function rigBindStroke(ld,path,boneIds,radius,rotate,softness){
   var rig=ensureLayerRig(ld);
   // CompoundPath BEFORE the segments/length guard, deliberately: a
@@ -1607,28 +1628,15 @@ function rigBindStroke(ld,path,boneIds,radius,rotate,softness){
   softness=Math.max(0,Math.min(1,softness||0));
   // Shared by the ribbon's own boundary AND (below) its centerSegments —
   // same per-point "nearest offset on each bone's rest curve, falloff by
-  // distance" weighting, just fed a different point list.
+  // distance" weighting, just fed a different point list. The actual
+  // per-point formula is rigWeighOnePoint (below this function), factored
+  // out so the manual weight-override popover's "Réinitialiser (auto)"
+  // button (rig-bridge.js, feedback #112) can recompute ONE vertex the
+  // exact same way a full bind pass would, instead of a second,
+  // independently-maintained copy of this formula (CLAUDE.md §3).
   function weighForPoints(pts){
     return pts.map(function(pt){
-      var w=[],p=new Point(pt[0],pt[1]);
-      boneIds.forEach(function(bid){
-        var bone=rig.bones[bid];if(!bone)return;
-        var bp=_boneSegsToPath(bone.restSegments,bone.closed);
-        var loc=bp.getNearestLocation(p);
-        bp.remove();
-        if(!loc)return;
-        var dist=loc.point.getDistance(p);
-        // Per-bone radius override (2026-07-29, Shapper-style influence
-        // circles, rig-bridge.js Assign mode) — bone.radius is set by dragging
-        // that bone's own on-canvas circle; falls back to the passed-in
-        // default (the panel's Rayon de poids field) for a bone that's never
-        // been adjusted, so existing single-radius projects are unaffected.
-        var boneRadius=bone.radius||radius;
-        var t=Math.max(0,1-dist/boneRadius);
-        var infl=softness?t+(t*t*(3-2*t)-t)*softness:t;
-        if(infl>0)w.push({boneId:bid,offset:loc.offset,w:infl});
-      });
-      return w;
+      return rigWeighOnePoint(rig,boneIds,new Point(pt[0],pt[1]),radius,softness);
     });
   }
   var rest=path.segments.map(function(s){return[s.point.x,s.point.y];});
