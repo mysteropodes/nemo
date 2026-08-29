@@ -5602,17 +5602,38 @@ function installLayerReorderGrip(row,li){
     // physically under this grip: every native click there resolves to
     // the grip first, making the handle unclickable (feedback 2026-08:
     // "quand les calques sont calé au tout début c'est compliqué
-    // d'attraper le in point"). Hit-test for a handle FIRST — same ±6px
-    // tolerance as the handle's own CSS ::before hitbox — and hand off to
-    // its real onDown instead of reordering when the click is really on
-    // one; native reordering is unaffected everywhere else, including the
+    // d'attraper le in point"). Hit-test for a handle FIRST and hand off
+    // to its real onDown instead of reordering when one is really there;
+    // native reordering is unaffected everywhere else, including the
     // long-bar-scrolled-under-the-grip case this grip exists for (a
     // handle is never physically there in that case).
+    //
+    // feedback #137 ("des difficultés à attraper le in point... et va
+    // interférer avec le déplacement de layer en index"): the original
+    // version of this hand-off distance-tested the CLICK POINT against
+    // each handle's rect with a fixed ±6px tolerance — reachable in
+    // theory, but fragile in practice. A click that misses that radius by
+    // a hair (real mouse/trackpad imprecision, HiDPI rounding) falls
+    // through to armLayerReorder below; armLayerReorder itself stays
+    // inert for a purely-horizontal drag (moveLayerReorder requires
+    // dy>=4 AND dy>=dx*.55 before it actually reorders anything), but a
+    // real hand's natural vertical wobble while dragging "horizontally"
+    // is often enough to cross that threshold — turning a missed trim
+    // grab into a genuinely unwanted reorder, exactly the interference
+    // reported. Testing rect OVERLAP instead of click-point distance
+    // removes the magic-number fragility: whenever a handle is visually
+    // co-located with the grip at all (the only time this ambiguity can
+    // exist in the first place), every click anywhere on the grip
+    // unconditionally favors that handle — there is no legitimate "I
+    // meant reorder" click in that overlapping region anyway, and the
+    // layer-list panel's own row-drag (a separate, non-overlapping
+    // affordance) still reorders layers normally in the meantime.
     if(window.SMLayerInOut&&window.SMLayerInOut.onDown){
+      var gripRect=grip.getBoundingClientRect();
       var handles=row.querySelectorAll('.layer-inout-handle');
       for(var hi=0;hi<handles.length;hi++){
         var h=handles[hi],r=h.getBoundingClientRect();
-        if(e.clientX>=r.left-6&&e.clientX<=r.right+6&&e.clientY>=r.top-6&&e.clientY<=r.bottom+6){
+        if(r.left<=gripRect.right&&r.right>=gripRect.left&&r.top<=gripRect.bottom&&r.bottom>=gripRect.top){
           e.preventDefault();e.stopPropagation();
           window.SMLayerInOut.onDown(li,row,h.classList.contains('left')?'in':'out',e,h);
           return;
