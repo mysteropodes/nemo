@@ -275,7 +275,20 @@ function initUserProfile(){
     // never required anywhere it's read (feedback-bridge.js's issue body).
     if(saved&&saved.id){if(!saved.role)saved.role='animator';if(saved.email===undefined)saved.email='';state.userProfile=saved;return;}
   }catch(e){}
-  state.userProfile={id:'u_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),name:'Animateur',color:'#4a9eff',role:'animator',email:''};
+  // Default name (feedback #115, "attribuer un nom dynamique aux
+  // différents utilisateurs... si ils rentrent pas leurs noms"): every
+  // fresh install used to get the literal, IDENTICAL string 'Animateur' —
+  // harmless on one person's own machine, but on the public web build
+  // every anonymous tester who never opens Settings > Profil shows up as
+  // the exact same name in every GitHub feedback issue, with no way to
+  // tell two different people's reports apart short of the raw internal
+  // id (which the comment above says stays internal on purpose). A short
+  // uppercase slice of that SAME id, already being generated on the line
+  // below, gives each browser/session a distinct-but-still-recognizable
+  // default ("Animateur X7K2") at zero extra randomness/complexity — still
+  // freely overwritten the moment someone sets a real name in Settings.
+  var _uid='u_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);
+  state.userProfile={id:_uid,name:'Animateur '+_uid.slice(-4).toUpperCase(),color:'#4a9eff',role:'animator',email:''};
   try{localStorage.setItem('nemo-profile',JSON.stringify(state.userProfile));}catch(e){}
 }
 function saveUserProfile(){

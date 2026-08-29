@@ -365,6 +365,20 @@
       '- Projet: ' + entry.projectKey,
       '- Enregistré précisément: ' + (entry.recorded ? 'oui' : 'non (dernières actions)'),
       '',
+      // Feedback #115 ("des infos non intrusive pour le debugguage et des
+      // rapports de connexion simple") — only values already sitting in
+      // the page (navigator/screen/document.title, the same source
+      // updater-bridge.js's showVersion() keeps in sync — CLAUDE.md §7's
+      // single-source-of-truth version display, so no new version-tracking
+      // needed here). No IP, no geolocation, no analytics SDK — this is
+      // the same privacy profile the click/action trail below already has.
+      '**Infos techniques**',
+      '- Plateforme: ' + (tauriOk() ? 'App bureau' : 'Navigateur web'),
+      '- Version: ' + (document.title.match(/v[\d.]+/) || ['inconnue'])[0],
+      '- Navigateur: ' + navigator.userAgent,
+      '- Fenêtre: ' + window.innerWidth + '×' + window.innerHeight + ' (écran ' + screen.width + '×' + screen.height + ')',
+      '- Connexion: ' + (navigator.onLine ? 'en ligne' : 'hors ligne'),
+      '',
       '**Trail d\'actions**',
       '```json', JSON.stringify(entry.actionTrail || [], null, 2), '```',
       '',
