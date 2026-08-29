@@ -61,6 +61,7 @@
     while(userLayers.length>0)userLayers.pop().remove();state.layers=[];
     Object.keys(_symbolPaperLayers).forEach(function(k){_symbolPaperLayers[k].forEach(function(l){l.remove();});});_symbolPaperLayers={};
     state.symbols={};state.openSymbolTabs=[];state.activeSymbolId=null;
+    state.trackRoles={}; // feedback #151 — see state.trackRoles' own comment, app.js
     state.canvasW=cfg.w;state.canvasH=cfg.h;state.canvasBg='#ffffff';state.fps=cfg.fps;
     // v12: default timeline length is 5 SECONDS of frames at the project's
     // own fps (was a flat 24 frames — only 1s at 24fps, or under a second

@@ -229,6 +229,20 @@ var state={
   refMedia:null, // rotoscopy reference {type:'video'|'imageseq'|'image',...} — reference-bridge.js
   mediaLibrary:[], // {id,name,kind:'image'|'video',thumb,layerName} — browsable catalog of imports, media-library.js
   symbols:{},activeSymbolId:null,openSymbolTabs:[],
+  // Tracked roles (2026-08-29, feedback #151, "attacher un objet à un autre
+  // même sans identité stable entre frames" — hand-drawn Animation 2D
+  // "attach to a redrawn-every-frame object" workflow, distinct from
+  // Motion's own continuous parentLayerUid). A role is a stable NAME (e.g.
+  // "Balle") a shape can carry PER FRAME via data.trackRoleId — the tagged
+  // shape itself has a fresh strokeId every frame (redrawn, not tweened),
+  // the ROLE is what's stable, not any one stroke. Project-level registry,
+  // same category/persistence as symbols/palettes above — {roleId:{name}}.
+  // roleId IS the trimmed name itself (collision-free by construction: two
+  // roles with the same name ARE the same role, see tagSelectionAsRole/
+  // attachSelectionToRole in select-bridge.js) rather than a separately
+  // generated id — deliberately the simplest backing store that works, no
+  // dedicated management panel for v1 per the confirmed scope.
+  trackRoles:{},
   activeMontageViewId:null, // StoryBoard montage currently entered (enterMontageView) — see app.js
   // Layer folders: purely organizational metadata, not a real tree — each
   // layer optionally carries ld.folderId pointing into this map. Keeping
@@ -655,6 +669,28 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // Group membership (2026-07, group-bridge.js's Cmd+G) — a stable id
   // shared by every member, same pattern as strokeId/brushGroupId above.
   groupId:(p.data&&p.data.groupId)?p.data.groupId:undefined,
+  // Tracked-role attach (2026-08-29, feedback #151 — see state.trackRoles'
+  // own comment, app.js, for the full "hand-drawn, redrawn-every-frame
+  // object" design). trackRoleId: this stroke IS the named role's occupant
+  // THIS frame (tagSelectionAsRole, select-bridge.js). attachedToRoleId +
+  // attachOffset: this stroke rides along with that role — offset frozen
+  // at attach-time (attachSelectionToRole), re-applied ONCE every time the
+  // role gets re-tagged in a frame (tagSelectionAsRole's reposition pass),
+  // never a live/continuous link. Plain data, round-trips through JSON as-
+  // is like paramShape/fillGradient above.
+  // §1 consumer check: buildSceneJson/onionLayerItems/export.js/selectedPaths
+  // treat a tagged/attached stroke as an ordinary Path (no exclusion —
+  // this is meant to select/tween/undo exactly like any other shape, the
+  // reposition is a one-time geometry bake at tag-time, not a render-time
+  // concern). Tween matching (tweens.js splitTweenables/autoMatch): NOT
+  // excluded, same reasoning. Duplication (_materializeClones, tools.js):
+  // trackRoleId is explicitly stripped on clone (a copy must not silently
+  // claim to be the role's occupant) — attachedToRoleId/attachOffset are
+  // NOT stripped (a duplicated attached object staying attached is the
+  // expected behavior).
+  trackRoleId:(p.data&&p.data.trackRoleId)?p.data.trackRoleId:undefined,
+  attachedToRoleId:(p.data&&p.data.attachedToRoleId)?p.data.attachedToRoleId:undefined,
+  attachOffset:(p.data&&p.data.attachOffset)?{x:p.data.attachOffset.x,y:p.data.attachOffset.y}:undefined,
   // Dynamic shape (2026-08-18, "shape dynamique round corner sur rect...")
   // — plain data like fillGradient just above, round-trips through JSON
   // as-is. The item's REAL segments already encode the CURRENT radii
@@ -754,6 +790,11 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // ctrl+Z"). Legacy data predating the field (undefined) keeps the old
   // fallback chain untouched.
   p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=typeof d.strokeCap==='string'?d.strokeCap:'round';p.strokeJoin=typeof d.strokeJoin==='string'?d.strokeJoin:'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.strokeProfile)p.data.strokeProfile=d.strokeProfile;if(d.profileBase)p.data.profileBase=d.profileBase;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.isFillCloseLine)p.data.isFillCloseLine=true;if(d.fillSeed)p.data.fillSeed=d.fillSeed;if(d.fillSeeds&&d.fillSeeds.length)p.data.fillSeeds=d.fillSeeds;if((d.fillSeed||(d.fillSeeds&&d.fillSeeds.length))&&d.fillGapPx!==undefined)p.data.fillGapPx=d.fillGapPx;if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isLinkedFillCompanion)p.data.isLinkedFillCompanion=true;if(d.linkedFillId)p.data.linkedFillId=d.linkedFillId;if(d.tweenOn)p.data.tweenOn=true;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.shadowSwatchId)p.data.shadowSwatchId=d.shadowSwatchId;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;if(d.preRevisionOpacity!==undefined)p.data.preRevisionOpacity=d.preRevisionOpacity;if(d.fillGradient)p.data.fillGradient=d.fillGradient;if(d.groupId)p.data.groupId=d.groupId;if(d.paramShape)p.data.paramShape=d.paramShape;if(d.effects&&d.effects.length)p.data.effects=d.effects;
+  // Tracked-role attach (2026-08-29, feedback #151) — see serP's own
+  // comment on these three fields for the full round-trip contract.
+  if(d.trackRoleId)p.data.trackRoleId=d.trackRoleId;
+  if(d.attachedToRoleId)p.data.attachedToRoleId=d.attachedToRoleId;
+  if(d.attachOffset)p.data.attachOffset={x:d.attachOffset.x,y:d.attachOffset.y};
   if(d.isVectorText)p.data.isVectorText=true;if(d.vectorChar)p.data.vectorChar=d.vectorChar;if(d.isText)p.data.isText=true;
   if(d.charIndex!=null)p.data.charIndex=d.charIndex;if(d.wordIndex!=null)p.data.wordIndex=d.wordIndex;if(d.lineIndex!=null)p.data.lineIndex=d.lineIndex;
   // Mograph duplicator copy tags (applyLayerDuplicator) — belt-and-suspenders

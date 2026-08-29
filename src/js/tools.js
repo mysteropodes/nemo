@@ -1402,6 +1402,12 @@ function _materializeClones(snaps,layer,offset){
   snaps.forEach(function(snap){
     var d=JSON.parse(JSON.stringify(snap.d));
     d.strokeId=undefined; // fresh identity below — must NOT alias the source's
+    // Tracked-role tag (2026-08-29, feedback #151) — a duplicate/copy must
+    // NOT silently claim to be the role's current occupant (see
+    // state.trackRoles' own comment, app.js). attachedToRoleId/attachOffset
+    // are deliberately NOT stripped: a duplicated ATTACHED object (the
+    // "hat") staying attached to its role is the expected behavior.
+    d.trackRoleId=undefined;
     if(d.brushGroupId)d.brushGroupId=freshGroupId(d.brushGroupId);
     var clone=desP(d,layer,d.opacity);
     if(offset)clone.translate(new Point(offset,offset));
