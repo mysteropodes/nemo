@@ -167,17 +167,40 @@
   }
 
   var ALIGN_MAP = { LEFT: 'left', CENTER: 'center', RIGHT: 'right', JUSTIFIED: 'left' };
-  // Best-effort match against the bundled/live-fetchable vector fonts —
-  // NOT a live Google Fonts lookup (that needs a Tauri command on desktop,
-  // untestable here — see file header). An unmatched family falls back to
-  // Roboto rather than failing the whole node.
-  function resolveFontKey(figmaFamily) {
-    var fam = (figmaFamily || '').toLowerCase();
+  // Font matching, in order (2026-08-29, v2 follow-up — Cyril's stated top
+  // priority once the token/import loop itself was working): an exact match
+  // against a bundled family needs no network; otherwise fetch the family
+  // live from Google Fonts via SMVectorText.addGoogleFont (vector-text-
+  // bridge.js) — the SAME catalog lookup the Typography panel's "+" field
+  // already uses, so a Figma text node keeps its actual family (Poppins,
+  // Manrope, Space Grotesk, ...) instead of silently landing on Roboto just
+  // because it wasn't one of the 4 bundled TTFs. Works on both desktop
+  // (Tauri's fetch_google_font) and the web build (worker/index.js's
+  // /api/google-font proxy) — addGoogleFont itself picks the right path.
+  // A family Google Fonts doesn't have (typo, or a paid/self-hosted font
+  // Figma reports by its real name) degrades to the old loose bundled-name
+  // match, then Roboto — reported in `report.skipped`, never a hard failure
+  // for the whole import.
+  async function resolveFontKey(figmaFamily, report) {
+    var fam = (figmaFamily || '').trim();
+    if (!fam) return 'Roboto-Regular';
+    var famLc = fam.toLowerCase();
     var VF = window.SMVectorText ? window.SMVectorText.VECTOR_FONTS : {};
     var keys = Object.keys(VF);
     for (var i = 0; i < keys.length; i++) {
-      var label = (VF[keys[i]].label || '').toLowerCase();
-      if (label.indexOf(fam) === 0 || fam.indexOf(label) === 0) return keys[i].replace(/-Bold$/, '-Regular');
+      var label = (VF[keys[i]].label || '').toLowerCase().replace(/ bold$/, '');
+      if (label === famLc) return keys[i].replace(/-Bold$/, '-Regular');
+    }
+    if (window.SMVectorText && window.SMVectorText.addGoogleFont) {
+      try {
+        return await window.SMVectorText.addGoogleFont(fam);
+      } catch (e) {
+        if (report) report.skipped.push('Police "' + fam + '" introuvable sur Google Fonts — police de repli utilisée');
+      }
+    }
+    for (var j = 0; j < keys.length; j++) {
+      var label2 = (VF[keys[j]].label || '').toLowerCase();
+      if (label2.indexOf(famLc) === 0 || famLc.indexOf(label2) === 0) return keys[j].replace(/-Bold$/, '-Regular');
     }
     return 'Roboto-Regular';
   }
@@ -301,7 +324,7 @@
       for (var ti = 0; ti < out.texts.length; ti++) {
         var t = out.texts[ti];
         if (!t.text) continue;
-        var fontKey = resolveFontKey(t.style.fontFamily);
+        var fontKey = await resolveFontKey(t.style.fontFamily, report);
         var size = t.style.fontSize || 24;
         var align = ALIGN_MAP[t.style.textAlignHorizontal] || 'left';
         try {
