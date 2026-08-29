@@ -6549,7 +6549,28 @@ function openInPlaceTextEditor(root,isNew){
   handle.addEventListener('pointerup',endResize);
   handle.addEventListener('pointercancel',endResize);
   function reposition(){
-    var topLeftView=view.projectToView(bounds.topLeft);
+    // Motion transform (2026-08-29, feedback #131: "petit pblm de box de
+    // selection de text entre animation2D et motion") — this editor used to
+    // project `bounds.topLeft` straight through view.projectToView with no
+    // regard for the layer's own Motion position/anchor/rotation/scale.
+    // Motion transforms apply to rendering in EITHER app mode (CLAUDE.md
+    // §8: "buildSceneJson applique déjà motionMat à N'IMPORTE QUEL calque"),
+    // so the instant this layer had any Motion key, the textarea/orange box/
+    // resize handle stayed pinned to the RAW un-transformed geometry while
+    // the actual glyphs (and the Select tool's own transform box, which
+    // already goes through this same map — see select-bridge.js's
+    // computeHandles) rendered somewhere else entirely — confirmed live via
+    // a simple Position key: the editor opened ~360px away from the visible
+    // text. Same fix pattern this codebase already applies everywhere else
+    // a screen position is derived from raw geometry (select-bridge.js,
+    // subselect-bridge.js, rig-bridge.js): map the point forward through
+    // layerMotionPointMap before projecting to screen. Rotation of the box
+    // itself is a known residual (this stays axis-aligned; only the ANCHOR
+    // point is corrected) — acceptable for a text-edit overlay, and a much
+    // smaller gap than being positioned hundreds of px off entirely.
+    var motionMap=(window.SMMotion&&SMMotion.layerMotionPointMap)?SMMotion.layerMotionPointMap(state.activeLayerIdx):null;
+    var anchorWorld=motionMap?motionMap.fwd(bounds.topLeft.x,bounds.topLeft.y):[bounds.topLeft.x,bounds.topLeft.y];
+    var topLeftView=view.projectToView(new Point(anchorWorld[0],anchorWorld[1]));
     var canvasEl=document.getElementById('drawing-canvas');
     var cr=canvasEl.getBoundingClientRect();
     var fontPx=(d.size||48)*view.zoom;
@@ -6570,11 +6591,16 @@ function openInPlaceTextEditor(root,isNew){
     // de texte") — screen px back to world units (÷view.zoom, mirroring
     // fontPx's own ×view.zoom a few lines up) so buildTextDragBoxItems
     // (engine-bridge.js) can draw it through the Rust-rendered scene, same
-    // as every other canvas overlay in this app.
+    // as every other canvas overlay in this app. buildTextDragBoxItems draws
+    // this rect directly in world space with no Motion mapping of its own
+    // (unlike buildTransformBoxItems), so the anchor here must already be
+    // the MOTION-MAPPED point (anchorWorld, same fix as topLeftView above)
+    // — otherwise this orange box would still land on the raw geometry even
+    // after the textarea itself was corrected.
     window._inplaceTextBoxBounds={
-      left:bounds.left,top:bounds.top,
-      right:bounds.left+parseFloat(ta.style.width)/view.zoom,
-      bottom:bounds.top+parseFloat(ta.style.height)/view.zoom,
+      left:anchorWorld[0],top:anchorWorld[1],
+      right:anchorWorld[0]+parseFloat(ta.style.width)/view.zoom,
+      bottom:anchorWorld[1]+parseFloat(ta.style.height)/view.zoom,
     };
     handle.style.left=(cr.left+topLeftView.x+parseFloat(ta.style.width))+'px';
     handle.style.top=(cr.top+topLeftView.y+parseFloat(ta.style.height))+'px';
