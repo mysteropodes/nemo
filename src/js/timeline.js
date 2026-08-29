@@ -5653,7 +5653,24 @@ function renderLayerList(frameOnly){
         _layerSel=[];
         for(var l=Math.min(anchor,idx);l<=Math.max(anchor,idx);l++)_layerSel.push(l);
       }else{_layerSel=[idx];_layerSelAnchor=idx;}
-      window.SM.setActiveLayer(idx);
+      // preserveLayerSel (2026-08-29 fix, feedback #147: "impossible de
+      // faire du multi select de calque dans animation 2D"). The three
+      // branches above already build a correct multi-item _layerSel — but
+      // setActiveLayer's OWN default behavior (added by 16f606b, "Fix
+      // Motion row highlight not syncing for non-row-click selections",
+      // for Motion's identical Cmd/Shift row handler in motion.js) is to
+      // immediately collapse _layerSel back down to [idx] unless told not
+      // to, since every OTHER caller (canvas hit, camera/media-library/
+      // nemo-script/shapes-panel) wants exactly that single-row reset.
+      // 16f606b updated motion.js's own Cmd/Shift branches to pass `true`
+      // (see setLayerParent... setActiveLayer(li,true) there) but never
+      // touched this Animation 2D handler — so a Cmd- or Shift-click here
+      // built the right _layerSel for one tick and then immediately wiped
+      // it via this same trailing call, silently down to a single row.
+      // Confirmed live: a Cmd-click on a second row ended with
+      // _layerSel===[thatRow] instead of both. Only the plain-click branch
+      // (no modifier) actually WANTS the collapse-to-one-row default.
+      window.SM.setActiveLayer(idx,e.metaKey||e.ctrlKey||e.shiftKey);
     });
     row.addEventListener('dblclick',function(){var idx3=parseInt(this.dataset.layer);var l2=state.layers[idx3];if(l2.symbolId){window.SM.enterSymbol(l2.symbolId);return;}if(l2.lfsGroup){window.SM.enterSymbol(l2.lfsIds.full);return;}startLayerRename(idx3);});
     function beginLayerReorder(e){
