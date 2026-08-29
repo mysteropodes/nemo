@@ -57,18 +57,46 @@
   // marquee's containment test, drag delta math) consistently in the SAME
   // space path.segments/nodeEditSegmentsData already use — no other line
   // needs to change.
+  //
+  // 2026-08-29 fix (feedback #125, "pourquoi les points de tracé ne
+  // correspondent pas à la forme dessinée ?"): the Motion mapping above
+  // covers Motion Position/Rotation/Scale, but a Component's OWN instance
+  // placement (`ld.symMatrix` — set by dragging/resizing the instance on
+  // stage with the Select tool, symGestureAccumulate in app.js) is a
+  // SEPARATE render-time-only transform, applied in getEffectiveStrokes
+  // (app.js) BEFORE Motion, and was never accounted for here at all. Same
+  // failure mode as the Motion bug above: click straight through to
+  // layer.hitTest/nodeHandles[].pos in raw document space while the shape
+  // actually renders wherever symMatrix placed it — confirmed live
+  // (reproduced the reported screenshot exactly: node handles clustered at
+  // the shape's raw position, the visible ribbon rendered elsewhere via
+  // symMatrix). symMatrix is a plain Paper Matrix (no pivot decomposition
+  // needed, unlike Motion), applied to the ALREADY Motion-inverted point —
+  // mirrors the forward order in app.js (raw -> symMatrix -> Motion ->
+  // world), so undoing it here means peeling Motion off first, then
+  // symMatrix. buildNodeHandleItems (engine-bridge.js) needs the same fix
+  // for the overlay's forward direction — see its own comment.
   function toLocalPoint(pt, layerIdx) {
-    if (!window.SMMotion) return pt;
-    var map = SMMotion.layerMotionPointMap ? SMMotion.layerMotionPointMap(layerIdx) : null;
-    // 3D layers (2026-07-29 fix) — layerMotionPointMap returns null for a
-    // 3D-toggled layer even with real rotationX/rotationY set (it only
-    // recognizes the base 2D properties); layerMotion3DPointMap is the
-    // dedicated perspective-correct counterpart — see its own header
-    // comment in motion.js for the ray-plane-intersection math.
-    if (!map && SMMotion.layerMotion3DPointMap) map = SMMotion.layerMotion3DPointMap(layerIdx);
-    if (!map) return pt;
-    var lp = map.inv(pt.x, pt.y);
-    return new Point(lp[0], lp[1]);
+    var p = pt;
+    if (window.SMMotion) {
+      var map = SMMotion.layerMotionPointMap ? SMMotion.layerMotionPointMap(layerIdx) : null;
+      // 3D layers (2026-07-29 fix) — layerMotionPointMap returns null for a
+      // 3D-toggled layer even with real rotationX/rotationY set (it only
+      // recognizes the base 2D properties); layerMotion3DPointMap is the
+      // dedicated perspective-correct counterpart — see its own header
+      // comment in motion.js for the ray-plane-intersection math.
+      if (!map && SMMotion.layerMotion3DPointMap) map = SMMotion.layerMotion3DPointMap(layerIdx);
+      if (map) {
+        var lp = map.inv(p.x, p.y);
+        p = new Point(lp[0], lp[1]);
+      }
+    }
+    var ld = state.layers[layerIdx];
+    if (ld && ld.symMatrix && typeof symMatrixOf === 'function') {
+      var inv = symMatrixOf(ld).inverted();
+      if (inv) p = inv.transform(p);
+    }
+    return p;
   }
 
   // Illustrator/Figma "Convert Anchor Point" convention, ported to a plain
