@@ -7416,6 +7416,7 @@ function clickEl(id){var el=document.getElementById(id);if(el)el.click();}
         ?{label:tt('menuImport3D')+' '+tt('inDevSuffix'),id:'ctx-import-3d',disabled:true}
         :{label:tt('menuImport3D'),id:'ctx-import-3d',action:openObjReference},
       {label:tt('menuExport'),id:'ctx-export',action:function(){clickEl('btn-export');}},
+      {label:tt('menuRenderManager'),id:'ctx-render-manager',action:function(){if(window.SMRenderManager)SMRenderManager.open();}},
       {sep:true},
       {label:tt('menuSettings'),action:function(){clickEl('btn-settings');}},
       {label:tt('menuKeyboardShortcuts'),action:function(){

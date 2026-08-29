@@ -1423,6 +1423,38 @@
   </div>
 </div>
 
+<!-- Render Manager (feedback #141, 2026-08-29): batch render queue built on
+     TOP of the single-shot Export modal's own machinery (export.js) — this
+     modal never encodes a frame itself, it only orchestrates N calls into
+     SMExport.* in sequence, one per queue item, with that item's own
+     settings. See render-manager.js. Flattened the reference screenshot's
+     6 sub-tabs (Output/Format/Dynamic/Compositions/Scripts/Upload) into one
+     field list per item instead — matches this app's own idiom (a flat .pr
+     row list per expandable entry, same as the Effects stack panel's own
+     expandable rows), not the reference tool's own tabbed sub-UI, per
+     Cyril's own "conforme l'ui design dans notre style de l'app". -->
+<div id="render-manager-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-hdr"><span data-i18n="rmTitle">Render Manager</span> <button id="rm-close" class="modal-x">&times;</button></div>
+    <div class="modal-bdy">
+      <div class="rm-toolbar">
+        <button class="pbtn" id="rm-add-current" data-i18n="rmAddCurrentBtn">+ Current Composition</button>
+        <button class="pbtn" id="rm-delete-all" data-i18n="rmDeleteAllBtn">Delete All</button>
+        <div class="rm-progress-track"><div class="rm-progress-fill" id="rm-progress-fill"></div><span class="rm-progress-label" id="rm-progress-label">0%</span></div>
+        <button class="pbtn ac" id="rm-render-all" data-i18n="rmRenderAllBtn">Render All</button>
+      </div>
+      <div class="pr"><span class="pl" data-i18n="rmDynamicIndexLabel">Dynamic Index</span>
+        <input type="number" class="pi scrub" id="rm-dyn-index" value="0" data-step="1">
+      </div>
+      <div class="pr" data-i18n-title="rmDynamicIndexOffsetTitle" title="Added to the Dynamic Index counter before the first render this run"><span class="pl" data-i18n="rmDynamicIndexOffsetLabel">Dynamic Index Offset</span>
+        <input type="number" class="pi scrub" id="rm-dyn-offset" value="0" data-step="1">
+      </div>
+      <div id="rm-queue-list" class="rm-queue-list"></div>
+      <div id="rm-empty-hint" class="rm-empty-hint" data-i18n="rmEmptyQueueHint">Queue is empty — click "+ Current Composition" to add a render job.</div>
+    </div>
+  </div>
+</div>
+
 <div id="lottie-preview-modal" class="modal-overlay" style="display:none">
   <div class="modal-box">
     <div class="modal-hdr"><span data-i18n="lottiePreviewTitle">Prévisualisation Lottie</span> <button id="lottie-preview-close" class="modal-x">&times;</button></div>
@@ -1986,6 +2018,7 @@
 <script src="js/brush-tool-presets.js"></script>
 <script src="js/brush-editor.js"></script>
 <script src="js/export.js"></script>
+<script src="js/render-manager.js"></script>
 <script src="js/rive-export.js"></script>
 <script src="js/ae-camera-export.js"></script>
 <!-- Labs prototypes (docs/feature-scouting.md) — off by default, no core

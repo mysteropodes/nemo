@@ -398,7 +398,8 @@ async function exportMP4ToPath(outPath,opts){
   // VideoToolbox's quality control (no -crf equivalent exists there);
   // 65 is a high-quality default, roughly matching the visual target the
   // old -crf 18 aimed for.
-  await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',workDir+'/frame_%04d.png','-c:v','h264_videotoolbox','-pix_fmt','yuv420p','-q:v','65','-profile:v','high',outPath],opts&&opts.onFfmpeg);
+  var qv=MP4_QUALITY_QV[(opts&&opts.quality)||'high']||'65';
+  await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',workDir+'/frame_%04d.png','-c:v','h264_videotoolbox','-pix_fmt','yuv420p','-q:v',qv,'-profile:v','high',outPath],opts&&opts.onFfmpeg);
   await exportRemoveDir(workDir);
   return{ok:true,path:outPath};
 }
@@ -1080,10 +1081,110 @@ function lottieBuild(start,end){
   };
 }
 
+// ---- Render Manager (batch queue) support — path-based "silent" exporters ----
+// render-manager.js (2026-08-29, feedback #141: "un render manager un peu
+// plus poussé... la possibilité d'envoyer différentes compositions, choisir
+// différents format de sortie") calls one of these per QUEUED ITEM, in a
+// loop — a native save/open dialog per item would be unusable in a batch
+// (the queue's own "Path" field, set once when the item is configured, IS
+// the destination). Same reasoning exportMP4Silent already established for
+// Kitsu publish (2026-08, above). Each function here is a thin dialog-free
+// sibling of an existing SMExport.* entry point below, built from the SAME
+// internal helpers that entry point already uses (exportRenderPNGsToDir/
+// exportRunFfmpeg/lottieBuild/exportWriteText/pad4…) — no export algorithm
+// is duplicated, only the "ask the user where to save" step is replaced by
+// a caller-supplied path/dir.
+async function exportPNGSequenceToDir(dir,opts){
+  if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
+  var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;
+  await exportMkdir(dir);
+  await exportRenderPNGsToDir(dir,r.start,r.end,scale,opts&&opts.onProgress,opts&&opts.alpha);
+  return{ok:true,dir:dir};
+}
+async function exportTIFFSequenceToDir(outDir,opts){
+  if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
+  var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;
+  await exportMkdir(outDir);
+  var tmp=exportTempDirPath?await exportTempDirPath():null;
+  var workDir=(tmp||outDir)+'/sm-export-'+Date.now();
+  await exportMkdir(workDir);
+  await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);
+  await exportRunFfmpeg(['-y','-start_number','1','-i',workDir+'/frame_%04d.png','-start_number','1',outDir+'/frame_%04d.tif'],opts&&opts.onFfmpeg);
+  await exportRemoveDir(workDir);
+  return{ok:true,dir:outDir};
+}
+async function exportSVGSequenceToDir(dir,opts){
+  if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
+  var r=exportFrameRange(opts);
+  await exportMkdir(dir);
+  for(var f=r.start,i=1;f<=r.end;f++,i++){
+    await exportWriteText(dir+'/frame_'+pad4(i)+'.svg',exportFrameSVGString(f));
+    if(opts&&opts.onProgress)opts.onProgress(i,r.end-r.start+1);
+  }
+  return{ok:true,dir:dir};
+}
+async function exportGIFToPath(outPath,opts){
+  if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur) — voir exportGifBrowser.'};
+  var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var fps=(opts&&opts.fps)||state.fps;
+  var tmp=exportTempDirPath?await exportTempDirPath():null;
+  var workDir=(tmp||outPath.replace(/[^/\\]+$/,''))+'sm-export-'+Date.now();
+  await exportMkdir(workDir);
+  await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);
+  var palette=workDir+'/palette.png';
+  await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',workDir+'/frame_%04d.png','-vf','palettegen=stats_mode=diff',palette],opts&&opts.onFfmpeg);
+  await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',workDir+'/frame_%04d.png','-i',palette,'-lavfi','paletteuse=dither=bayer','-loop','0',outPath],opts&&opts.onFfmpeg);
+  await exportRemoveDir(workDir);
+  return{ok:true,path:outPath};
+}
+async function exportProResToPath(outPath,opts){
+  if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
+  var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var fps=(opts&&opts.fps)||state.fps;
+  var alpha=!!(opts&&opts.alpha);
+  var tmp=exportTempDirPath?await exportTempDirPath():null;
+  var workDir=(tmp||outPath.replace(/[^/\\]+$/,''))+'sm-export-'+Date.now();
+  await exportMkdir(workDir);
+  await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress,alpha);
+  var vArgs=alpha
+    ?['-c:v','prores_ks','-profile:v','4','-pix_fmt','yuva444p10le']
+    :['-c:v','prores_ks','-profile:v','3','-pix_fmt','yuv422p10le'];
+  await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',workDir+'/frame_%04d.png'].concat(vArgs).concat([outPath]),opts&&opts.onFfmpeg);
+  await exportRemoveDir(workDir);
+  return{ok:true,path:outPath};
+}
+async function exportLottieToPath(outPath,opts){
+  if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur) — voir exportLottie (repli navigateur).'};
+  var r=exportFrameRange(opts);
+  var json=lottieBuild(r.start,r.end);
+  var text=JSON.stringify(json);
+  await exportWriteText(outPath,text);
+  return{ok:true,path:outPath,json:json};
+}
+// Render Quality (2026-08-29, feedback #141): VideoToolbox's -q:v knob (see
+// CLAUDE.md §7 on why it replaced libx264's -crf) had exactly one hardcoded
+// value (65) everywhere MP4 export happened. The render queue's own per-item
+// "Render Quality" dropdown needs something real behind it — exposed as an
+// optional opts.quality string here, defaulting to the SAME '65' every
+// existing caller (single-shot Export modal, Kitsu publish) already got, so
+// neither changes behavior by simply not passing it. No equivalent knob
+// exists for GIF/ProRes/PNG/SVG/TIFF in this file (ProRes' quality is fixed
+// by its profile, not a scalar; the others have no lossy encode step at
+// all) — opts.quality is silently unused by those, not faked.
+var MP4_QUALITY_QV={draft:'35',medium:'50',high:'65',best:'80'};
+
 // ---- public exporters ----
 window.SMExport={
   isAvailable:exportTauriAvailable,
   previewFrame:exportFrameDataURL,
+  // Path-based batch variants (render-manager.js) — see the block above.
+  exportPNGSequenceToDir:exportPNGSequenceToDir,
+  exportTIFFSequenceToDir:exportTIFFSequenceToDir,
+  exportSVGSequenceToDir:exportSVGSequenceToDir,
+  exportGIFToPath:exportGIFToPath,
+  exportProResToPath:exportProResToPath,
+  exportLottieToPath:exportLottieToPath,
+  pickDir:exportPickDir,
+  pickSaveFile:exportPickSaveFile,
+  pickVideoMimeType:function(){return typeof exportPickVideoMimeType==='function'?exportPickVideoMimeType():'';},
 
   exportSVGSequence:async function(opts){
     var r=exportFrameRange(opts);
@@ -1200,9 +1301,10 @@ window.SMExport={
       return{ok:true,path:outPath,json:json};
     }else{
       var blob=new Blob([text],{type:'application/json'});
+      var filename=(opts&&opts.filename)||'animation.json';
       var u=URL.createObjectURL(blob);var a=document.createElement('a');
-      a.href=u;a.download='animation.json';a.click();URL.revokeObjectURL(u);
-      return{ok:true,browserFallback:true,json:json};
+      a.href=u;a.download=filename;a.click();URL.revokeObjectURL(u);
+      return{ok:true,browserFallback:true,json:json,filename:filename};
     }
   },
 };
