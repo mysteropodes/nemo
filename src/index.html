@@ -1007,6 +1007,23 @@
     <div class="psec" id="tool-opts-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrToolOptions">Tool Options</span></div>
       <div class="pbdy">
+        <!-- Brush tool-option presets (feedback #101, "il serait bien de
+             pouvoir s'en enregistrer quelques uns, de paramètres
+             predefinis, avec taille, pression etc") — save/recall a NAMED
+             bundle of this panel's numeric/boolean fields (size, stabilizer,
+             smoothing, pressure min/max/curve/invert/custom-curve, nib
+             angle/force, taper, trim overshoots, shadow/mask mode, eraser
+             size, draw mode). Global localStorage library
+             (brush-tool-presets.js), same convention as
+             motion-preset-picker.js — NOT project-embedded, and NOT the
+             brush TEXTURE picker just above (state.brushPreset /
+             brush-preset-picker.js), which is a single string key into a
+             texture recipe, not a bundle of numeric settings. -->
+        <div class="pr" id="p-toolpreset-row" data-i18n-title="toolPresetRowTitle" title="Enregistre les réglages actuels du pinceau (taille, pression, taper…) comme preset réutilisable">
+          <span class="pl" data-i18n="fieldToolPreset">Presets</span>
+          <button class="pbtn icon-only-btn" id="btn-toolpreset-save" data-i18n-title="toolPresetSaveTitle" title="Enregistrer les réglages actuels comme preset"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg></button>
+        </div>
+        <div class="bp-grid asset-tree" id="toolpreset-grid" style="display:none"></div>
         <!-- Ordre volontairement calé sur le pipeline réel (Stabilizer agit
              EN DIRECT pendant le tracé, Smooth simplifie la courbe APRÈS
              coup) — étaient dans l'ordre inverse, ce qui + les deux mots
@@ -1932,6 +1949,7 @@
 <script src="js/opentype.min.js"></script>
 <script src="js/vector-text-bridge.js"></script>
 <script src="js/brush-preset-picker.js"></script>
+<script src="js/brush-tool-presets.js"></script>
 <script src="js/brush-editor.js"></script>
 <script src="js/export.js"></script>
 <script src="js/rive-export.js"></script>
