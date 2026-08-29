@@ -349,10 +349,10 @@ export interface InitOutput {
     readonly strokemodeler_new: (a: number, b: number) => number;
     readonly strokemodeler_up: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly strokemodeler_up_packed: (a: number, b: number, c: number, d: number, e: number) => [number, number];
-    readonly erase_at_point: (a: number, b: number) => [number, number, number, number];
     readonly effective_frame_index: (a: number, b: number, c: number) => [number, number, number];
     readonly hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly resolve_symbol_frame: (a: number, b: number, c: number) => [number, number, number];
+    readonly erase_at_point: (a: number, b: number) => [number, number, number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h4177160f1dac6248: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h49909fab4bc066b4: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen__convert__closures_____invoke__h29bfc5eda1199406: (a: number, b: number, c: any) => void;

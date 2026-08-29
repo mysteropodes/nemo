@@ -2369,8 +2369,19 @@ function fillTraceLoop(graph,opens,startNode,firstEdge,turnSign,maxSteps){
   var steps=0;
   while(toNode!==startNode){
     steps++;if(steps>maxSteps)return null;
-    var arrivalDir=fillEdgeDir(graph,opens,curEdge,curNode).multiply(-1);
-    var backAngle=Math.atan2(arrivalDir.y,arrivalDir.x);
+    // Reference direction for the sharpest-turn comparison: the tangent AT
+    // toNode pointing back into the edge we just arrived on — which is
+    // exactly what fillEdgeDir(edge, toNode) returns.
+    //
+    // This used to be -fillEdgeDir(edge, curNode): the departure tangent at
+    // the FAR end, negated. Equivalent only for a STRAIGHT edge — on a
+    // curved one (any arc, any hand-drawn stroke) the two differ by the
+    // arc's total turning, so every turn angle here was measured against a
+    // wrong reference and the "sharpest turn" pick could be flatly wrong.
+    // Root cause of feedback #116, kept in sync with trace_loop/fill.rs
+    // (CLAUDE.md §3) — see that function's fuller comment.
+    var backDir=fillEdgeDir(graph,opens,curEdge,toNode);
+    var backAngle=Math.atan2(backDir.y,backDir.x);
     var node=graph.nodes[toNode];
     var bestEdge=null,bestRel=Infinity;
     for(var i=0;i<node.edges.length;i++){

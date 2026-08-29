@@ -190,7 +190,7 @@ struct Node {
     pt: Vec2,
     edges: Vec<usize>,
 }
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 enum EdgeType {
     Stroke,
     Gap,
@@ -637,9 +637,26 @@ fn trace_loop(
         if steps > max_steps {
             return None;
         }
-        let arrival = edge_dir(nodes, &edges[cur_edge], cur_node);
-        let arrival_dir = Vec2 { x: -arrival.x, y: -arrival.y };
-        let back_angle = arrival_dir.y.atan2(arrival_dir.x);
+        // Reference direction for the sharpest-turn comparison: the tangent
+        // AT to_node pointing back into the edge we just arrived on.
+        // edge_dir(edge, to_node) already returns exactly that.
+        //
+        // This used to be computed as -edge_dir(edge, cur_node) — the
+        // departure tangent at the FAR end, negated. That is only equivalent
+        // for a straight edge. On a curved one (every arc of a circle, every
+        // hand-drawn stroke) the two differ by the arc's total turning, so
+        // every turn angle at this node was measured against a wrong
+        // reference and the "sharpest turn" pick could be flatly wrong.
+        // Root cause of feedback #116 ("beaucoup de triangle alors que les
+        // zones vecteurs sont clair"), reproduced on the lens between two
+        // crossing circles: arriving at a crossing along one circle's arc,
+        // the correct next edge scored a relative angle of exactly 0 against
+        // the bogus reference and got bumped to 2π by the "ignore
+        // zero-turn" guard below — i.e. the true lens boundary was ranked
+        // LAST precisely when it should have ranked first, so that face was
+        // never traced and the fill fell through to the raster fallback.
+        let back = edge_dir(nodes, &edges[cur_edge], to_node);
+        let back_angle = back.y.atan2(back.x);
         let node = &nodes[to_node];
         let mut best_edge: Option<usize> = None;
         let mut best_rel = f64::INFINITY;
@@ -856,6 +873,25 @@ pub fn fill_find(input_json: &str) -> Result<String, JsValue> {
     if !open_pts.is_empty() {
         let (nodes, edges) = build_graph(&open_pts, input.gap_thr, input.crossings.as_deref());
         let max_steps = edges.len() * 2 + 8;
+        if std::env::var("FILL_DEBUG").is_ok() {
+            eprintln!("[fill_debug] nodes={}", nodes.len());
+            for (i, n) in nodes.iter().enumerate() {
+                eprintln!("  node[{}] = ({:.1},{:.1}) edges={:?}", i, n.pt.x, n.pt.y, n.edges);
+            }
+            eprintln!("[fill_debug] edges={}", edges.len());
+            for (i, e) in edges.iter().enumerate() {
+                let mid = e.pts.get(e.pts.len() / 2).copied().unwrap_or(Vec2 { x: 0.0, y: 0.0 });
+                eprintln!("  edge[{}] a={} b={} kind={:?} wall={} frac=[{:.3},{:.3}] mid=({:.1},{:.1}) npts={}", i, e.a, e.b, e.kind, e.stroke_idx, e.frac_a, e.frac_b, mid.x, mid.y, e.pts.len());
+            }
+            for (ni, n) in nodes.iter().enumerate() {
+                eprintln!("  node[{}] outgoing dirs:", ni);
+                for &ei in &n.edges {
+                    let d = edge_dir(&nodes, &edges[ei], ni);
+                    let ang = d.y.atan2(d.x).to_degrees();
+                    eprintln!("    edge[{}] dir=({:.3},{:.3}) angle={:.2}deg", ei, d.x, d.y, ang);
+                }
+            }
+        }
         // Exhaustive planar-face enumeration, not a capped sample of
         // stroke-only seeds. trace_loop's "always take the sharpest turn"
         // rule is the textbook-correct method for walking the boundary of
@@ -885,8 +921,10 @@ pub fn fill_find(input_json: &str) -> Result<String, JsValue> {
                         continue;
                     }
                     visited.insert(key);
+                    let debug = std::env::var("FILL_DEBUG").is_ok();
                     if let Some(seq) = trace_loop(&nodes, &edges, start_node, seed_idx, turn_sign, max_steps) {
                         if seq.len() < 2 {
+                            if debug { eprintln!("[fill_debug] seed={} start={} turn={} -> seq too short ({})", seed_idx, start_node, turn_sign, seq.len()); }
                             continue;
                         }
                         for hop in &seq {
@@ -894,7 +932,13 @@ pub fn fill_find(input_json: &str) -> Result<String, JsValue> {
                         }
                         let pts = loop_points(&nodes, &edges, &seq);
                         let area = poly_area(&pts);
-                        if area < 1.0 || !point_in_poly(click, &pts) || poly_self_intersects(&pts) {
+                        let contains = point_in_poly(click, &pts);
+                        let selfx = poly_self_intersects(&pts);
+                        if debug {
+                            let hops: Vec<(usize,usize,usize)> = seq.iter().map(|h| (h.edge_idx, h.from, h.to)).collect();
+                            eprintln!("[fill_debug] seed={} start={} turn={} -> hops={:?} area={:.1} contains={} selfx={}", seed_idx, start_node, turn_sign, hops, area, contains, selfx);
+                        }
+                        if area < 1.0 || !contains || selfx {
                             continue;
                         }
                         if best.as_ref().map_or(true, |(a, _)| area < *a) {
@@ -952,4 +996,42 @@ pub fn fill_find(input_json: &str) -> Result<String, JsValue> {
         None => FillResult::NotFound,
     };
     serde_json::to_string(&result).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+#[cfg(test)]
+mod circle_lens_tests {
+    // Feedback #116 ("beaucoup de triangle alors que les zones vecteurs
+    // sont clair") — clicking the overlap lens between two crossing closed
+    // circles, using exactly the JSON fillVectorFindWasm (tools.js) sends,
+    // captured live from a real two-circle scene. Before the arrival-
+    // direction fix in trace_loop this returned notFound and the caller
+    // fell through to the raster fallback's truncated wedge.
+    // `FILL_DEBUG=1 cargo test --lib circle_lens -- --nocapture` prints the
+    // built graph (nodes/edges/per-node angles) and every trace_loop attempt.
+    #[test]
+    fn two_crossing_circles_lens_is_traced() {
+        let input = r#"{"openWalls":[{"segments":[{"point":[130,380],"handleIn":[0,0],"handleOut":[0,-49.70562748477142]},{"point":[220,290],"handleIn":[-49.70562748477142,0],"handleOut":[49.70562748477142,0]},{"point":[310,380],"handleIn":[0,-49.70562748477142],"handleOut":[0,49.70562748477142]},{"point":[220,470],"handleIn":[49.70562748477142,0],"handleOut":[-49.70562748477142,0]},{"point":[130,380],"handleIn":[0,49.70562748477142],"handleOut":[0,0]}]},{"segments":[{"point":[250,380],"handleIn":[0,0],"handleOut":[0,-49.70562748477142]},{"point":[340,290],"handleIn":[-49.70562748477142,0],"handleOut":[49.70562748477142,0]},{"point":[430,380],"handleIn":[0,-49.70562748477142],"handleOut":[0,49.70562748477142]},{"point":[340,470],"handleIn":[49.70562748477142,0],"handleOut":[-49.70562748477142,0]},{"point":[250,380],"handleIn":[0,49.70562748477142],"handleOut":[0,0]}]}],"closedWalls":[{"segments":[{"point":[130,380],"handleIn":[0,49.70562748477142],"handleOut":[0,-49.70562748477142]},{"point":[220,290],"handleIn":[-49.70562748477142,0],"handleOut":[49.70562748477142,0]},{"point":[310,380],"handleIn":[0,-49.70562748477142],"handleOut":[0,49.70562748477142]},{"point":[220,470],"handleIn":[49.70562748477142,0],"handleOut":[-49.70562748477142,0]}]},{"segments":[{"point":[250,380],"handleIn":[0,49.70562748477142],"handleOut":[0,-49.70562748477142]},{"point":[340,290],"handleIn":[-49.70562748477142,0],"handleOut":[49.70562748477142,0]},{"point":[430,380],"handleIn":[0,-49.70562748477142],"handleOut":[0,49.70562748477142]},{"point":[340,470],"handleIn":[49.70562748477142,0],"handleOut":[-49.70562748477142,0]}]}],"gapThr":0,"click":[280,380],"crossings":[{"wall":0,"frac":0,"pt":[130,380]},{"wall":0,"frac":0.36613961537282147,"pt":[280.00000000000006,312.91680477982567]},{"wall":0,"frac":0.6338603846271786,"pt":[280,447.0831952201744]},{"wall":0,"frac":0.9999999956395531,"pt":[130,380]},{"wall":1,"frac":0,"pt":[250,380]},{"wall":1,"frac":0.13386038467884073,"pt":[280.00000000000006,312.91680477982567]},{"wall":1,"frac":0.8661396153211592,"pt":[280,447.0831952201744]},{"wall":1,"frac":1,"pt":[250,380]}]}"#;
+        let result = super::fill_find(input).unwrap();
+        eprintln!("[fill_debug] result = {}", result);
+        assert!(result.contains("\"traced\""), "expected a traced lens, got: {}", result);
+        // The lens between circle 1 (center 220,380 r90) and circle 2
+        // (center 340,380 r90) spans exactly x∈[250,310], y∈[312.9,447.1].
+        // Before the fix this returned notFound and the caller fell through
+        // to the raster fallback, which produced a truncated wedge cut at
+        // the click's own x — so asserting the real span is what actually
+        // catches a regression here, not merely "something was returned".
+        let v: serde_json::Value = serde_json::from_str(&result).unwrap();
+        let pts: Vec<(f64, f64)> = v["segments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| (s["point"][0].as_f64().unwrap(), s["point"][1].as_f64().unwrap()))
+            .collect();
+        let (min_x, max_x) = pts.iter().fold((f64::MAX, f64::MIN), |(lo, hi), p| (lo.min(p.0), hi.max(p.0)));
+        let (min_y, max_y) = pts.iter().fold((f64::MAX, f64::MIN), |(lo, hi), p| (lo.min(p.1), hi.max(p.1)));
+        assert!((min_x - 250.0).abs() < 1.0, "lens min x {} != 250", min_x);
+        assert!((max_x - 310.0).abs() < 1.0, "lens max x {} != 310", max_x);
+        assert!((min_y - 312.9).abs() < 1.0, "lens min y {} != 312.9", min_y);
+        assert!((max_y - 447.1).abs() < 1.0, "lens max y {} != 447.1", max_y);
+    }
 }
