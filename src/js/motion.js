@@ -8535,7 +8535,28 @@
       // dispatchEvent trace: stopPropagation/preventDefault both firing from
       // THIS function on every attempt, zero trace of the rect's own
       // listener ever running.
-      if (e.target.closest('.fc.motion-fc, .layer-inout-handle, .layer-inout-key, .layer-inout-bar, .motion-key-connect, #frame-hdr, #playhead-flag, #bars-row, #motion-graph-resize')) return;
+      //
+      // .layer-reorder-grip (feedback #137, found live while investigating
+      // "difficile d'attraper le in point... interfère avec le déplacement
+      // de layer en index"): the grip (timeline.js, installLayerReorderGrip)
+      // was added 2026-08-24 with its OWN mousedown/pointerdown listener but
+      // was never added to THIS exemption list — same missing-exemption bug
+      // as every entry above, just in a different file, so it was easy to
+      // miss. The practical effect was worse than "hard to grab": since this
+      // CAPTURE-phase listener always runs first and this class wasn't
+      // exempted, EVERY mousedown on the grip was swallowed into a marquee-
+      // select before the grip's own handler ever ran — verified live via
+      // dispatchEvent trace (grip's own listener never fired, not even
+      // once) and by dragging the grip a full 65px vertically, which is
+      // normally more than enough to reorder, and nothing moved. So
+      // dragging the grip to reorder a layer directly in the frame-grid
+      // didn't actually work AT ALL, frame 0 or not — only the layer-list
+      // panel's own row-drag (a separate, unaffected code path) did. The
+      // SAME-DAY fix for the frame-0 handle-vs-grip overlap (dd7a202) was
+      // therefore built and shipped on top of a handler that could never
+      // run in the first place. Exempting the grip here is what actually
+      // makes both that fix and normal grid-side reordering reachable.
+      if (e.target.closest('.fc.motion-fc, .layer-inout-handle, .layer-inout-key, .layer-inout-bar, .motion-key-connect, .layer-reorder-grip, #frame-hdr, #playhead-flag, #bars-row, #motion-graph-resize')) return;
       // Scrollbar clicks land on the wrap itself but outside its client
       // area — intercepting them would break scrollbar dragging.
       var r = wrap.getBoundingClientRect();
