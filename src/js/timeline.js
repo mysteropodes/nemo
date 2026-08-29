@@ -1186,7 +1186,14 @@ window.SM={
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
     showToast(SM.t('toastLayerCutAtFrame')+(f+1));
   },
-  duplicateLayer:function(){saveAllLayerFrames();pushUndoLayers(true);var src=state.layers[state.activeLayerIdx];var ni=createUserLayer(src.name+' copy');state.layers[ni].frames=JSON.parse(JSON.stringify(src.frames));if(src.blendMode)state.layers[ni].blendMode=src.blendMode;state.layers[ni].color=src.color;if(src.motion)state.layers[ni].motion=JSON.parse(JSON.stringify(src.motion));if(src.motionStatic)state.layers[ni].motionStatic=JSON.parse(JSON.stringify(src.motionStatic));
+  duplicateLayer:function(){saveAllLayerFrames();pushUndoLayers(true);
+    // dupOne: the whole per-layer field-copy, extracted (2026-08-29,
+    // Cyril: "Duplique ce qu'il y a l'intérieur") so duplicating a FOLDER
+    // can reuse it verbatim for each of the folder's children below —
+    // one shared copy list, not a second one that drifts (the exact
+    // field-drop bug family this function's own history documents a
+    // dozen times over).
+    function dupOne(srcIdx){var src=state.layers[srcIdx];var ni=createUserLayer(src.name+' copy');state.layers[ni].frames=JSON.parse(JSON.stringify(src.frames));if(src.blendMode)state.layers[ni].blendMode=src.blendMode;state.layers[ni].color=src.color;if(src.motion)state.layers[ni].motion=JSON.parse(JSON.stringify(src.motion));if(src.motionStatic)state.layers[ni].motionStatic=JSON.parse(JSON.stringify(src.motionStatic));
     // matteMode was dropped here entirely (pre-existing, found by the
     // 2026-07-31 uid-matte scoping) — a duplicated matted layer silently
     // lost its matte. The uid travels with it (the duplicate masks against
@@ -1289,10 +1296,10 @@ window.SM={
     // un dossier, plus un null, plus parentable comme tel. Même perte pour
     // un Null (pivot nullPos/nullShape), un calque Guide (position/
     // orientation) et un calque Texte (isTextLayer gate l'édition texte).
-    // Un dossier dupliqué arrive VIDE — ses enfants pointent toujours
-    // l'uid du dossier source (créer aussi des copies des enfants est une
-    // décision de design à trancher avec Cyril, pas un sous-produit de ce
-    // fix — même convention que convertLayersToComponent §8).
+    // Les enfants d'un dossier sont dupliqués AUSSI (tranché par Cyril
+    // 2026-08-29, « Duplique ce qu'il y a l'intérieur ») — voir le bloc
+    // folder-children après dupOne, qui re-pointe chaque copie d'enfant
+    // vers l'uid du NOUVEAU dossier.
     if(src.isNullLayer)state.layers[ni].isNullLayer=true;
     if(src.nullPos)state.layers[ni].nullPos=JSON.parse(JSON.stringify(src.nullPos));
     if(src.nullShape)state.layers[ni].nullShape=src.nullShape;
@@ -1301,6 +1308,29 @@ window.SM={
     if(src.guidePos)state.layers[ni].guidePos=JSON.parse(JSON.stringify(src.guidePos));
     if(src.guideOrientation)state.layers[ni].guideOrientation=src.guideOrientation;
     if(src.isTextLayer)state.layers[ni].isTextLayer=true;
+    return ni;}
+    var srcIdx=state.activeLayerIdx;var srcLd=state.layers[srcIdx];
+    // Folder children (2026-08-29, Cyril: "Duplique ce qu'il y a
+    // l'intérieur"): collect the source folder's children BEFORE any
+    // createUserLayer push mutates state.layers, then duplicate each via
+    // the same dupOne above and re-point its parentLayerUid at the NEW
+    // folder's uid — a fresh, self-contained folder+contents copy, never
+    // two folders sharing children. parentLayerUidB (multi-parent blend)
+    // gets the same re-point when it targeted the source folder. Nested
+    // folders don't exist in v1 (engine.rs is_folder_layer), so one level
+    // is the whole tree.
+    var childIdxs=[];
+    if(srcLd.isFolderLayer&&srcLd.layerUid){
+      for(var _fc=0;_fc<state.layers.length;_fc++){
+        if(_fc!==srcIdx&&(state.layers[_fc].parentLayerUid===srcLd.layerUid||state.layers[_fc].parentLayerUidB===srcLd.layerUid))childIdxs.push(_fc);
+      }
+    }
+    var ni=dupOne(srcIdx);
+    childIdxs.forEach(function(ci){
+      var nci=dupOne(ci);
+      if(state.layers[nci].parentLayerUid===srcLd.layerUid)state.layers[nci].parentLayerUid=state.layers[ni].layerUid;
+      if(state.layers[nci].parentLayerUidB===srcLd.layerUid)state.layers[nci].parentLayerUidB=state.layers[ni].layerUid;
+    });
     activateUL(ni);_layerSel=[ni];_layerSelAnchor=ni;loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx,preserveLayerSel){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
