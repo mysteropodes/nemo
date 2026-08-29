@@ -123,7 +123,14 @@
     return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
   }
   function updateBar(row, li) {
-    var ld = state.layers[li]; if (!ld) return;
+    // row peut être null pour un membre de group-drag dont la ligne n'est
+    // pas rendue (enfant d'un dossier REPLIÉ — computeLayerRenderOrder le
+    // marque hidden et renderTimelineMotion ne construit alors aucune
+    // ligne, donc _liToRow n'a jamais d'entrée pour lui après un
+    // chargement dossier-déjà-replié). L'état (inPoint/outPoint) est mis à
+    // jour par l'appelant quoi qu'il arrive ; seule la barre visuelle n'a
+    // rien à rafraîchir.
+    var ld = state.layers[li]; if (!row || !ld) return;
     var bar = row.querySelector('.layer-inout-bar'); if (!bar) return;
     var inF = inPointOf(ld), outF = outPointOf(ld);
     bar.style.left = (inF * FC) + 'px';
@@ -559,6 +566,32 @@
         var mOrigIn = inPointOf(mld), mOrigOut = outPointOf(mld);
         return { li: s.li, row: mrow, origIn: mOrigIn, origOut: mOrigOut, part: s.part || 'both', lastIn: mOrigIn, lastOut: mOrigOut };
       }).filter(Boolean);
+      // Un dossier dans la sélection multi-barres emmène ses enfants
+      // (audit 2026-08-29) — même contrat que le body-drag d'un dossier
+      // seul juste en dessous (#327/feedback #146) : déplacer la fenêtre
+      // d'un dossier sans déplacer ses enfants les fait sortir de sa
+      // fenêtre. Uniquement pour un membre-dossier taggé 'both' (un trim
+      // de bord garde le comportement clamp-seul de #319, enfants
+      // intouchés), et seulement les enfants pas déjà membres eux-mêmes
+      // (pas de double décalage). row peut être null — voir le
+      // commentaire du bloc dossier ci-dessous.
+      if (typeof folderLayerChildMap === 'function') {
+        var haveM = {};
+        members.forEach(function (m) { haveM[m.li] = true; });
+        members.slice().forEach(function (m) {
+          if ((m.part || 'both') !== 'both') return;
+          var mfld = state.layers[m.li];
+          if (!mfld || !mfld.isFolderLayer) return;
+          (folderLayerChildMap().childrenOf[m.li] || []).forEach(function (ci) {
+            if (haveM[ci]) return;
+            var cld2 = state.layers[ci];
+            if (!cld2) return;
+            var cIn2 = inPointOf(cld2), cOut2 = outPointOf(cld2);
+            members.push({ li: ci, row: _liToRow[ci] || null, origIn: cIn2, origOut: cOut2, part: 'both', lastIn: cIn2, lastOut: cOut2 });
+            haveM[ci] = true;
+          });
+        });
+      }
       // pressLi: which bar was actually clicked, kept alongside the group so
       // a plain (no-modifier, no-move) click can narrow the selection down
       // to just this one layer at mouseup — see that check's own comment.
@@ -597,10 +630,19 @@
         var fldIn = inPointOf(ld), fldOut = outPointOf(ld);
         var fMembers = [{ li: li, row: row, origIn: fldIn, origOut: fldOut, part: 'both', lastIn: fldIn, lastOut: fldOut }];
         flChildrenOf.forEach(function (ci) {
+          // row: null accepté (audit 2026-08-29) — un enfant de dossier
+          // REPLIÉ n'a pas de ligne rendue (computeLayerRenderOrder le
+          // marque hidden), donc _liToRow[ci] est absent après un
+          // chargement dossier-déjà-replié (ou pointe une ligne détachée
+          // périmée sinon). L'exiger ici refaisait exactement le bug #146
+          // dès que le dossier était replié : seule la fenêtre du dossier
+          // bougeait, les enfants restaient à leur ancienne position.
+          // updateBar est null-safe et les chemins mousemove/mouseup ne
+          // lisent m.row nulle part ailleurs — vérifié en direct.
           var cld = state.layers[ci], crow = _liToRow[ci];
-          if (!cld || !crow) return;
+          if (!cld) return;
           var cIn = inPointOf(cld), cOut = outPointOf(cld);
-          fMembers.push({ li: ci, row: crow, origIn: cIn, origOut: cOut, part: 'both', lastIn: cIn, lastOut: cOut });
+          fMembers.push({ li: ci, row: crow || null, origIn: cIn, origOut: cOut, part: 'both', lastIn: cIn, lastOut: cOut });
         });
         _drag = { group: true, type: 'both', startX: e.clientX, members: fMembers, alt: !!e.altKey, keySel: keySelNow(), pressLi: li, hotEl: handleEl };
         return;
