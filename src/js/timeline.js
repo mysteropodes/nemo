@@ -1899,6 +1899,12 @@ window.SM={
       // Comp markers (markers.js) — pure annotation, but losing them on save
       // would make the feature pointless.
       markers:state.markers||[],shyEnabled:!!state.shyEnabled,
+      // Tracked roles (2026-08-29, feedback #151) — project-level registry,
+      // see state.trackRoles' own comment (app.js). Per-stroke trackRoleId/
+      // attachedToRoleId/attachOffset already round-trip via serP/desP as
+      // part of each frame's own strokes — this is only the {roleId:{name}}
+      // name registry itself.
+      trackRoles:state.trackRoles||{},
       bpm:state.bpm,bpmOffset:state.bpmOffset,bpmShow:!!state.bpmShow,
       motionBlurOn:!!state.motionBlurOn,motionBlurSamples:state.motionBlurSamples,motionBlurShutter:state.motionBlurShutter,
       // Rulers/guides (2026-08-27, "mettre en place les repères et rulers
@@ -2180,6 +2186,7 @@ window.SM={
     }
     state.comments=d.comments||[];
     state.markers=d.markers||[];
+    state.trackRoles=d.trackRoles||{}; // feedback #151 — see state.trackRoles' own comment, app.js
     state.shyEnabled=!!d.shyEnabled;
     state.bpm=d.bpm!=null?d.bpm:120;state.bpmOffset=d.bpmOffset||0;state.bpmShow=!!d.bpmShow;
     state.exprGlobals=d.exprGlobals||'';
