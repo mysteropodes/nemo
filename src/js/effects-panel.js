@@ -596,7 +596,7 @@
     if (!cfg.length) {
       var none = document.createElement('div');
       none.style.cssText = 'font-size:9px;color:var(--text-dim)';
-      none.textContent = 'Aucun paramètre.';
+      none.textContent = window.SM.t('effectsNoParams');
       wrap.appendChild(none);
     }
     cfg.forEach(function (p) {
