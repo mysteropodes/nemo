@@ -2384,11 +2384,32 @@
       // copier/couper/coller existe pour tous les éléments") — only shown
       // when there's actually something in the canvas clipboard, otherwise
       // fall through to the native menu exactly as before.
-      if (!(_canvasClip && _canvasClip.snaps && _canvasClip.snaps.length)) return;
+      var emptyItems = [];
+      if (_canvasClip && _canvasClip.snaps && _canvasClip.snaps.length) {
+        emptyItems.push({ label: 'Coller', shortcut: '⌘V', action: function () { pasteSelection(); } });
+      }
+      // Tracked-role proximity suggestion (2026-08-29, feedback #151, design
+      // point 4 — the secondary assist on top of the core tag/attach
+      // mechanic above). Offered from the empty-canvas menu specifically
+      // BECAUSE nothing needs to be pre-selected here: it exists to help
+      // the user FIND which shape on this frame is the role's occupant
+      // when it isn't obvious, not to act on an already-chosen shape.
+      // Advisory only — selects the candidate (visible via the normal
+      // selection highlight) and asks for a confirming action; never tags
+      // anything on its own.
+      var roleSuggestions = collectRoleSuggestions();
+      if (roleSuggestions.length) {
+        if (emptyItems.length) emptyItems.push({ sep: true });
+        roleSuggestions.forEach(function (s) {
+          emptyItems.push({
+            label: 'Suggérer la forme pour « ' + s.name + ' »…',
+            action: function () { applyRoleSuggestion(s); }
+          });
+        });
+      }
+      if (!emptyItems.length) return;
       e.preventDefault(); e.stopImmediatePropagation();
-      window.showContextMenu(e.clientX, e.clientY, [
-        { label: 'Coller', shortcut: '⌘V', action: function () { pasteSelection(); } },
-      ]);
+      window.showContextMenu(e.clientX, e.clientY, emptyItems);
       return;
     }
     e.preventDefault(); e.stopImmediatePropagation();
@@ -2495,6 +2516,26 @@
         action: function () { toggleTweenOnForSelection(); }
       },
     ]);
+    // Tracked-role attach (2026-08-29, feedback #151) — hand-drawn
+    // Animation 2D "attach an object to another that has no stable identity
+    // across frames" workflow (a ball redrawn fresh every frame, a hat
+    // riding along) — see state.trackRoles' own comment (app.js) for the
+    // full confirmed design. Single-shape only: tagging/attaching targets
+    // exactly one stroke, offered here the same way per-element tween
+    // opt-in is just above. Path only for v1 (not Raster/CompoundPath) —
+    // matches the confirmed scenario (a hand-drawn vector stroke), a
+    // deliberate scope cut, not an oversight.
+    if (!multi && p0 instanceof Path) {
+      items.push({ sep: true });
+      items.push({
+        label: (p0.data && p0.data.trackRoleId) ? ('Rôle suivi : « ' + p0.data.trackRoleId + ' » (renommer…)') : 'Marquer comme rôle suivi…',
+        action: function () { tagSelectionAsRole(p0); }
+      });
+      items.push({
+        label: (p0.data && p0.data.attachedToRoleId) ? ('Attaché à « ' + p0.data.attachedToRoleId + ' » (changer…)') : 'Attacher à un rôle…',
+        action: function () { openAttachRolePicker(p0, e.clientX, e.clientY); }
+      });
+    }
     if (isActiveRevision || isDeleteGhost) {
       // Same actions as the Properties-panel Accept/Reject buttons
       // (timeline.js updateRevisionPanel) — surfacing them here too so a
@@ -2644,6 +2685,224 @@
     propagate(-1); propagate(1);
     if (window.SM && window.SM.generateTweens) window.SM.generateTweens();
     updateUI(); window.SMEngineBridge.renderNow();
+  }
+
+  // ---- TRACKED-ROLE ATTACH (2026-08-29, feedback #151) ----
+  // Hand-drawn Animation 2D "attach an object to another that has no stable
+  // identity across frames" — see state.trackRoles' own comment (app.js)
+  // for the full confirmed design (points 1-4 of the feature brief). Three
+  // pieces: tagSelectionAsRole (point 1+3 — mark a shape as this frame's
+  // role occupant, which ALSO triggers the one-time reposition of every
+  // attached shape), attachSelectionToRole (point 2 — freeze an offset to
+  // an existing role's CURRENT occupant), and the suggestion pair
+  // (collectRoleSuggestions/applyRoleSuggestion, point 4 — advisory only).
+
+  // Tags `p0` as the current-frame occupant of a named role. Un-tags
+  // whatever OTHER stroke (any layer, this frame) currently carries that
+  // role — "a role has one occupant per frame" is enforced this way rather
+  // than blocked outright (confirmed design: "tagging a new stroke with a
+  // role that's already occupied un-tags the previous occupant"). Then
+  // repositions every stroke (any layer) whose data.attachedToRoleId
+  // matches, by its own frozen data.attachOffset relative to p0's NEW
+  // bounds center — a ONE-TIME bake into this frame's geometry, not a
+  // live link (confirmed design point 3): once done, the attached shape is
+  // plain geometry the artist can hand-adjust with nothing re-triggering.
+  // A "held" (non-keyframe, non-tween) frame reads the nearest PRIOR
+  // keyframe's stroke array BY REFERENCE (getEffectiveStrokes, app.js) — a
+  // live edit made while sitting on one has nowhere of its own to persist
+  // into, and saveActiveLayerFrame/saveAllLayerFrames both skip a frame
+  // that's neither isKeyframe nor isInterpolated outright. Promoting it
+  // first (same idea as _maybePromoteInterpolated's tween-in-between
+  // promotion, tweens.js, just applied to a plain hold too) is what makes
+  // the reposition/tag actually stick past the next frame navigation
+  // instead of visually moving for one frame and silently reverting.
+  function _ensureLiveFrameIsKeyframe(li) {
+    var fr = state.layers[li] && state.layers[li].frames && state.layers[li].frames[state.currentFrame];
+    if (fr && !fr.isKeyframe) { fr.isKeyframe = true; fr.isInterpolated = false; }
+  }
+  function tagSelectionAsRole(p0) {
+    if (!(p0 instanceof Path)) return;
+    var current = (p0.data && p0.data.trackRoleId) || '';
+    var name = prompt('Nom du rôle suivi (ex. « Balle ») — réutilise un nom existant pour continuer ce rôle :', current);
+    if (name == null) return; // cancelled
+    name = name.trim();
+    if (!name) return;
+    var roleId = name; // name IS the id — see state.trackRoles' own comment
+    pushUndo(); // flushes every layer's live geometry to stored frame data + snapshots pre-state
+    if (!state.trackRoles) state.trackRoles = {};
+    if (!state.trackRoles[roleId]) state.trackRoles[roleId] = { name: name };
+    var newCenter = p0.bounds.center;
+    var attachedCount = 0;
+    for (var i = 0; i < state.layers.length; i++) {
+      if (!layerIsEffectivelyVisible(i)) continue;
+      var lyr = userLayers[i];
+      if (!lyr) continue;
+      (function (li) {
+        lyr.children.slice().forEach(function (c) {
+          if (c === p0) return;
+          if (c.data && c.data.trackRoleId === roleId) delete c.data.trackRoleId;
+          if (c instanceof Path && c.data && c.data.attachedToRoleId === roleId && c.data.attachOffset) {
+            var target = newCenter.add(new Point(c.data.attachOffset.x, c.data.attachOffset.y));
+            var delta = target.subtract(c.bounds.center);
+            if (Math.abs(delta.x) > 0.01 || Math.abs(delta.y) > 0.01) {
+              _ensureLiveFrameIsKeyframe(li);
+              c.translate(delta);
+            }
+            attachedCount++;
+          }
+        });
+      })(i);
+    }
+    // Safety net for the edge case of tagging a shape that's currently
+    // sitting on a HELD (non-keyframe) frame of its own layer — see
+    // _ensureLiveFrameIsKeyframe's own comment. The confirmed core scenario
+    // (redrawn fresh every frame) already makes p0's frame a real keyframe
+    // by the time it's drawn, so this is a robustness net, not the common
+    // path.
+    _ensureLiveFrameIsKeyframe(userLayers.indexOf(p0.layer));
+    if (!p0.data) p0.data = {};
+    p0.data.trackRoleId = roleId;
+    saveAllLayerFrames();
+    updateUI(); renderArcs();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    showToast('Rôle « ' + name + ' » marqué sur cette frame' + (attachedCount ? (' — ' + attachedCount + ' objet(s) repositionné(s)') : '') + '.');
+  }
+
+  // Opens a flat picker (reusing showContextMenu the same way a submenu
+  // would) listing every defined role — clicking one attaches p0 to it.
+  function openAttachRolePicker(p0, x, y) {
+    var roles = state.trackRoles || {};
+    var roleIds = Object.keys(roles);
+    if (!roleIds.length) { showToast('Aucun rôle suivi défini — utilise d\'abord « Marquer comme rôle suivi… ».'); return; }
+    roleIds.sort(function (a, b) { return (roles[a].name || a).localeCompare(roles[b].name || b); });
+    var pickItems = roleIds.map(function (rid) {
+      var isCurrent = !!(p0.data && p0.data.attachedToRoleId === rid);
+      return { label: (isCurrent ? '✓ ' : '') + (roles[rid].name || rid), action: function () { attachSelectionToRole(p0, rid); } };
+    });
+    window.showContextMenu(x, y, pickItems);
+  }
+
+  // Freezes offset = p0.bounds.center - roleShape.bounds.center at THIS
+  // instant (confirmed design point 2). Errors clearly if the role has no
+  // occupant in the CURRENT frame — "you can't attach to a role that isn't
+  // present right now". Cross-layer by design: the role's shape and the
+  // attached shape can be on the same layer or different ones (both
+  // confirmed cases), so this scans every effectively-visible layer's
+  // live children, not just the active layer.
+  function attachSelectionToRole(p0, roleId) {
+    if (!(p0 instanceof Path)) return;
+    var roleShape = null;
+    for (var i = 0; i < state.layers.length && !roleShape; i++) {
+      if (!layerIsEffectivelyVisible(i)) continue;
+      var lyr = userLayers[i];
+      if (!lyr) continue;
+      for (var j = 0; j < lyr.children.length; j++) {
+        var c = lyr.children[j];
+        if (c !== p0 && c.data && c.data.trackRoleId === roleId) { roleShape = c; break; }
+      }
+    }
+    var roleName = (state.trackRoles && state.trackRoles[roleId] && state.trackRoles[roleId].name) || roleId;
+    if (!roleShape) {
+      showToast('Le rôle « ' + roleName + ' » n\'a pas d\'occupant sur cette frame — impossible d\'attacher ici.');
+      return;
+    }
+    pushUndo();
+    // Safety net (see _ensureLiveFrameIsKeyframe's own comment) for
+    // attaching while sitting on a HELD frame of p0's own layer.
+    _ensureLiveFrameIsKeyframe(userLayers.indexOf(p0.layer));
+    var off = p0.bounds.center.subtract(roleShape.bounds.center);
+    if (!p0.data) p0.data = {};
+    p0.data.attachedToRoleId = roleId;
+    p0.data.attachOffset = { x: off.x, y: off.y };
+    saveAllLayerFrames();
+    updateUI(); renderArcs();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    showToast('Attaché au rôle « ' + roleName + ' ».');
+  }
+
+  // ---- Proximity-suggestion assist (design point 4, secondary) ----
+  // Approximate center from a STORED stroke dict's on-curve points (no live
+  // Path needed — this only ever looks at PAST frames, which aren't
+  // materialized). Good enough for a "closest candidate" heuristic; the
+  // actual reposition math above always uses real .bounds.center on live
+  // geometry, never this approximation.
+  function _strokeDictCenter(sd) {
+    if (!sd || !sd.segments || !sd.segments.length) return null;
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    sd.segments.forEach(function (s) {
+      var x = s.point[0], y = s.point[1];
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    });
+    if (minX > maxX) return null;
+    return new Point((minX + maxX) / 2, (minY + maxY) / 2);
+  }
+  // Nearest PRIOR frame (any layer) that had an occupant for this role,
+  // searching backwards from the frame just before the current one.
+  function _findPriorRoleCenter(roleId) {
+    for (var fi = state.currentFrame - 1; fi >= 0; fi--) {
+      for (var li = 0; li < state.layers.length; li++) {
+        var ld = state.layers[li];
+        var fr = ld && ld.frames && ld.frames[fi];
+        if (!fr || !fr.strokes) continue;
+        for (var k = 0; k < fr.strokes.length; k++) {
+          if (fr.strokes[k].trackRoleId === roleId) {
+            var c = _strokeDictCenter(fr.strokes[k]);
+            if (c) return c;
+          }
+        }
+      }
+    }
+    return null;
+  }
+  // Every defined role that has NO occupant on the CURRENT frame yet, but
+  // DOES have one on some earlier frame — i.e. every role worth suggesting
+  // for right now.
+  function collectRoleSuggestions() {
+    var out = [];
+    var roles = state.trackRoles || {};
+    Object.keys(roles).forEach(function (rid) {
+      var hasNow = false;
+      for (var i = 0; i < state.layers.length && !hasNow; i++) {
+        if (!layerIsEffectivelyVisible(i)) continue;
+        var lyr = userLayers[i];
+        if (!lyr) continue;
+        hasNow = lyr.children.some(function (c) { return c.data && c.data.trackRoleId === rid; });
+      }
+      if (hasNow) return;
+      var priorCenter = _findPriorRoleCenter(rid);
+      if (!priorCenter) return;
+      out.push({ roleId: rid, name: roles[rid].name || rid, center: priorCenter });
+    });
+    return out;
+  }
+  // Closest LIVE Path (any effectively-visible layer, current frame) to a
+  // world-space point.
+  function _findClosestPathToPoint(pt) {
+    var best = null, bestD = Infinity;
+    for (var i = 0; i < state.layers.length; i++) {
+      if (!layerIsEffectivelyVisible(i)) continue;
+      var lyr = userLayers[i];
+      if (!lyr) continue;
+      lyr.children.forEach(function (c) {
+        if (!(c instanceof Path) || !c.segments.length) return;
+        var d = c.bounds.center.getDistance(pt);
+        if (d < bestD) { bestD = d; best = c; }
+      });
+    }
+    return best;
+  }
+  // Advisory only — selects the closest candidate (visible via the normal
+  // selection highlight) and prompts the user to confirm via the usual
+  // "Marquer comme rôle suivi…" action. NEVER tags anything by itself.
+  function applyRoleSuggestion(s) {
+    var cand = _findClosestPathToPoint(s.center);
+    if (!cand) { showToast('Aucune forme trouvée sur cette frame.'); return; }
+    clearSel();
+    selectedPaths = [cand];
+    state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
+    renderArcs(); updateUI(); window.SMEngineBridge.renderNow();
+    showToast('Forme suggérée pour « ' + s.name + ' » sélectionnée — confirme avec « Marquer comme rôle suivi… ».');
   }
 
   // Read-only peek for engine-bridge.js's buildTransformBoxItems (2026-07

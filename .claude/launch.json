@@ -66,6 +66,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "61437", "-d", "src"],
       "port": 61437
+    },
+    {
+      "name": "nemo-fb151-role-attach-qa",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "65193", "-d", "src"],
+      "port": 65193
     }
   ]
 }
