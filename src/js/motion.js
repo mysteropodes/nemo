@@ -1354,8 +1354,24 @@
   // itself (layer target) or `ld.elementMotion[strokeId]` (element target).
   // Null when there's no motion at all this frame (the overwhelmingly common
   // case) — callers skip the per-item transform pass entirely then.
+  //
+  // 2026-08-29 fix (feedback #150, "les expressions ont l'air d'agir juste
+  // sur la bounding box pas les objets"): the early-return only checked
+  // holder.motion/motionStatic — a layer that's NEVER been keyframed or
+  // given a static override (both genuinely undefined, the common state for
+  // a just-drawn layer) bailed out here even with an expression enabled on
+  // one of its properties, so the actual render never picked it up. The
+  // selection-box overlay (motionBoxGeom, above) has no such guard — it
+  // calls valueAtFrame unconditionally, which DOES evaluate expressions
+  // regardless of motion/motionStatic — so the box moved with the
+  // expression while the object itself stayed put. Now also proceeds when
+  // any of the 5 properties this function actually reads has an enabled
+  // expression (hasExpr), matching what the box already does.
   function computeMotionMat(holder, frameIdx) {
-    if (!holder || (!holder.motion && !holder.motionStatic)) return null;
+    var hasAnyExpr = holder && holder.expressions &&
+      (hasExpr(holder, 'position') || hasExpr(holder, 'anchor') || hasExpr(holder, 'rotation') ||
+       hasExpr(holder, 'scale') || hasExpr(holder, 'opacity'));
+    if (!holder || (!holder.motion && !holder.motionStatic && !hasAnyExpr)) return null;
     var pos = valueAtFrame(holder, 'position', frameIdx);
     var anc = valueAtFrame(holder, 'anchor', frameIdx);
     var rot = valueAtFrame(holder, 'rotation', frameIdx)[0];
