@@ -4135,7 +4135,29 @@ function loadFrame(idx,dupOnly){
 // behaves. A transient view-only concept, not part of the saved project
 // (state.layers[i].solo is simply never read by serialize/save-project).
 function anyLayerSoloed(){for(var i=0;i<state.layers.length;i++)if(state.layers[i].solo)return true;return false;}
-function layerIsEffectivelyVisible(i){var ld=state.layers[i];if(!ld)return false;return anyLayerSoloed()?!!ld.solo:!!ld.visible;}
+// Un calque Dossier propage œil et solo à son sous-arbre (audit
+// 2026-08-29, confirmé en pilotant : masquer le dossier laissait ses
+// enfants rendus tels quels — pixels identiques avant/après — et soloer
+// le dossier rendait un canvas VIDE, les enfants non-solo émettant des
+// entrées vides dans la scène alors que le dossier n'avait aucun item à
+// lui). Convention DCC standard (AE/Animate/Photoshop) : l'œil d'un
+// groupe cache tout le sous-arbre, son solo isole le sous-arbre.
+// _layerFolderParent (plus haut) résout déjà « mon parent est-il un
+// dossier » par uid, pas de dossiers imbriqués en v1 (voir engine.rs
+// is_folder_layer) donc UN niveau suffit — pas de récursion. L'œil
+// PROPRE d'un enfant reste indépendant (enfant caché dans un dossier
+// visible = caché, comme avant). Solo garde sa sémantique existante
+// « ignore l'œil » (commentaire d'anyLayerSoloed ci-dessus), étendue au
+// sous-arbre : solo sur le dossier = les enfants comptent comme solo.
+// Côté rendu, le dossier caché émet une entrée vide SANS isFolderLayer
+// (buildSceneJson, garde de visibilité avant la branche dossier), donc
+// ses enfants ne sont jamais marqués is_folder_child côté Rust — sans ce
+// filtre ici ils repartaient au rendu comme calques indépendants.
+function layerIsEffectivelyVisible(i){var ld=state.layers[i];if(!ld)return false;
+  var fp=_layerFolderParent(ld);
+  if(anyLayerSoloed())return !!(ld.solo||(fp&&fp.solo));
+  if(fp&&!fp.visible)return false;
+  return !!ld.visible;}
 // Propagates a keyframe TIMING change (add/remove — not content) from one
 // layer to its siblings in the same Stroke/Fill/Shadow link group
 // (state.layerLinkGroups[id].linkedKeyframes) — NOT layerFolders, deliberately:
