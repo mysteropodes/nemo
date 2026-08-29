@@ -4447,18 +4447,18 @@ document.getElementById('frame-grid').addEventListener('contextmenu',function(e)
   // tween-curve-strip's own click-to-edit, reachable even with
   // state.showTweenCurves off.
   var twPair=tweenPairForCell(li,fi);
-  var twMenuItems=twPair?[{label:'Éditer la courbe de ce tween…',action:function(){openTweenCurveInset(li,twPair.a,twPair.b);}},{label:'Supprimer le tween',action:function(){window.SM.removeTweenSpan(li,twPair.a,twPair.b);}},{sep:true}]:[];
+  var twMenuItems=twPair?[{label:SM.t('ctxEditTweenCurve'),action:function(){openTweenCurveInset(li,twPair.a,twPair.b);}},{label:'Supprimer le tween',action:function(){window.SM.removeTweenSpan(li,twPair.a,twPair.b);}},{sep:true}]:[];
   window.showContextMenu(e.clientX,e.clientY,twMenuItems.concat([
-    {label:'Copier',shortcut:'⌘C',action:function(){window.SM.copyFrames();}},
-    {label:'Couper',shortcut:'⌘X',action:function(){window.SM.cutFrames();}},
-    {label:'Coller',shortcut:'⌘V',disabled:!hasClip,action:function(){window.SM.pasteFrames();}},
-    {label:'Dupliquer la sélection',action:function(){window.SM.duplicateSelectedFrames();}},
+    {label:SM.t('btnCopy'),shortcut:'⌘C',action:function(){window.SM.copyFrames();}},
+    {label:SM.t('ctxCut'),shortcut:'⌘X',action:function(){window.SM.cutFrames();}},
+    {label:SM.t('ctxPaste'),shortcut:'⌘V',disabled:!hasClip,action:function(){window.SM.pasteFrames();}},
+    {label:SM.t('ctxDuplicateSelection'),action:function(){window.SM.duplicateSelectedFrames();}},
     {sep:true},
-    {label:'Insérer une image',shortcut:'F5',action:function(){insertFrame();}},
-    {label:'Insérer une image clé',shortcut:'F6',action:function(){insertKeyframe();}},
-    {label:'Insérer une image clé vide',shortcut:'F7',action:function(){insertBlankKeyframe();}},
-    {label:'Convertir en images clés',action:function(){window.SM.convertToKeyframes();}},
-    {label:'Effacer l\'image clé',action:function(){window.SM.clearKeyframe();}},
+    {label:SM.t('ctxInsertFrame'),shortcut:'F5',action:function(){insertFrame();}},
+    {label:SM.t('ctxInsertKeyframe'),shortcut:'F6',action:function(){insertKeyframe();}},
+    {label:SM.t('ctxInsertBlankKeyframe'),shortcut:'F7',action:function(){insertBlankKeyframe();}},
+    {label:SM.t('ctxConvertToKeyframes'),action:function(){window.SM.convertToKeyframes();}},
+    {label:SM.t('ctxClearKeyframe'),action:function(){window.SM.clearKeyframe();}},
     {sep:true},
     // generateTweens() already scopes itself to the current frame selection
     // (re-tweens just that span) or the whole layer if nothing's selected —
@@ -4466,7 +4466,7 @@ document.getElementById('frame-grid').addEventListener('contextmenu',function(e)
     // reachable without opening that panel first (feedback #5qmww). Works
     // equally to CREATE a tween between two keys or to REGENERATE one that
     // already exists (e.g. after editing an endpoint's content).
-    {label:'Générer / refaire le tween',shortcut:'T',action:function(){window.SM.generateTweens();}},
+    {label:SM.t('ctxRegenerateTween'),shortcut:'T',action:function(){window.SM.generateTweens();}},
     {sep:true},
     // Feedback #117 ("où est la propagation de la couleur aux autres
     // frames, il la faudrait au clic droit sur la frame") — the command
@@ -4495,7 +4495,7 @@ document.getElementById('frame-grid').addEventListener('contextmenu',function(e)
       }
     },
     {sep:true},
-    {label:'Supprimer les images',action:function(){window.SM.removeFrameSpan();}},
+    {label:SM.t('ctxRemoveFrames'),action:function(){window.SM.removeFrameSpan();}},
   ]));
 });
 
@@ -4694,9 +4694,9 @@ function renderShapeTreeRowsInto(list,li,ld){
         e.preventDefault();e.stopPropagation();
         if(!window.showContextMenu)return;
         window.showContextMenu(e.clientX,e.clientY,[
-          {label:'Renommer',action:function(){SMMotion.startShapeTreeRename(grow,node.name,commitGroupRename);}},
-          {label:'Sélectionner les membres',action:function(){SMMotion.selectShapesByStrokeIds(li,memberIds);}},
-          {label:'Dissocier le groupe',action:function(){
+          {label:SM.t('elementsRename'),action:function(){SMMotion.startShapeTreeRename(grow,node.name,commitGroupRename);}},
+          {label:SM.t('elementsSelectMembers'),action:function(){SMMotion.selectShapesByStrokeIds(li,memberIds);}},
+          {label:SM.t('elementsUngroup'),action:function(){
             pushUndo();
             memberIds.forEach(function(sid){var it=SMMotion.liveItemByStrokeId(li,sid);if(it&&it.data)delete it.data.groupId;});
             if(ld.groups)delete ld.groups[node.gid];
@@ -4724,9 +4724,9 @@ function renderShapeTreeRowsInto(list,li,ld){
       e.preventDefault();e.stopPropagation();
       if(!window.showContextMenu)return;
       window.showContextMenu(e.clientX,e.clientY,[
-        {label:'Renommer',action:function(){SMMotion.startShapeTreeRename(srow,SMMotion.elementLabel(node,idx,ld),function(v){pushUndo();if(!ld.shapeNames)ld.shapeNames={};ld.shapeNames[node.strokeId]=v;saveActiveLayerFrame();renderLayerList();renderTimeline();});}},
-        {label:'Sélectionner',action:function(){SMMotion.selectShapesByStrokeIds(li,[node.strokeId]);}},
-        {label:'Supprimer',action:function(){
+        {label:SM.t('elementsRename'),action:function(){SMMotion.startShapeTreeRename(srow,SMMotion.elementLabel(node,idx,ld),function(v){pushUndo();if(!ld.shapeNames)ld.shapeNames={};ld.shapeNames[node.strokeId]=v;saveActiveLayerFrame();renderLayerList();renderTimeline();});}},
+        {label:SM.t('elementsSelect'),action:function(){SMMotion.selectShapesByStrokeIds(li,[node.strokeId]);}},
+        {label:SM.t('fxDelete'),action:function(){
           var item=SMMotion.liveItemByStrokeId(li,node.strokeId);
           if(!item)return;
           pushUndo();
@@ -4970,7 +4970,7 @@ function openLayerColorSwatches(anchorEl,currentHex,onPick){
     sw.addEventListener('click',function(e){e.stopPropagation();onPick(hex);pop.remove();});
     pop.appendChild(sw);
   });
-  var custom=document.createElement('button');custom.className='lcs-swatch lcs-custom';custom.title='Couleur personnalisée…';custom.textContent='+';
+  var custom=document.createElement('button');custom.className='lcs-swatch lcs-custom';custom.title=SM.t('titleCustomColor');custom.textContent='+';
   custom.addEventListener('click',function(e){e.stopPropagation();pop.remove();window.ColorPicker.open(anchorEl,currentHex,onPick);});
   pop.appendChild(custom);
   document.body.appendChild(pop);
@@ -5184,8 +5184,8 @@ window.buildFollowPathMenuItems=buildFollowPathMenuItems;
 // and the on-bar anchor dots.
 function buildTimeLinkMenuItems(li,ld,onChanged){
   var M=window.SMMotion;
-  if(!M||!M.setLayerTimeLink)return [{label:'Parent in Time indisponible',disabled:true}];
-  var items=[{label:'Temps : Aucun (délier, position conservée)',disabled:!ld.timeLink,action:function(){
+  if(!M||!M.setLayerTimeLink)return [{label:SM.t('ctxParentInTimeUnavailable'),disabled:true}];
+  var items=[{label:SM.t('ctxTimeNoneUnlink'),disabled:!ld.timeLink,action:function(){
     pushUndo();unlinkTimeLinkPreserveRange(ld);onChanged();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
   }}];
@@ -5194,7 +5194,7 @@ function buildTimeLinkMenuItems(li,ld,onChanged){
     var isCur=!!(ld.timeLink&&ld.timeLink.uid&&other.layerUid===ld.timeLink.uid);
     var cyc=M.timeLinkWouldCycle?M.timeLinkWouldCycle(li,oi):false;
     items.push({
-      label:'Lier le temps à : '+(other.name||('Layer '+(oi+1)))+(isCur?'  ✓':'')+(cyc?'  (cycle)':''),
+      label:SM.t('ctxLinkTimeToPrefix')+(other.name||('Layer '+(oi+1)))+(isCur?'  ✓':'')+(cyc?'  (cycle)':''),
       disabled:isCur||cyc,
       action:function(){M.setLayerTimeLink(li,oi,'both');onChanged();}
     });
@@ -5274,7 +5274,7 @@ function buildParentCell(row,ld,li){
   var pbName=(pbIdx>=0&&state.layers[pbIdx])?(state.layers[pbIdx].name||('Layer '+(pbIdx+1))):null;
   var pick=document.createElement('span');
   pick.className='lpick';
-  pick.title='Glisser sur un calque pour le définir comme parent (A)';
+  pick.title=(window.SM&&SM.t)?SM.t('titleDragLayerSetParentA'):'Drag onto a layer to set it as the parent (A)';
   pick.addEventListener('mousedown',function(e){startParentPickwhip(li,pick,e);});
   cell.appendChild(pick);
   var lbl=document.createElement('span');
@@ -5482,7 +5482,7 @@ function renderLayerList(frameOnly){
     var d3=document.createElement('div');d3.className='lico'+(ld.threeD?'':' off');d3.title='3D Layer';d3.innerHTML=ICO_3D;d3.dataset.layer=i;d3.addEventListener('click',function(e){e.stopPropagation();if(window.SMMotion)SMMotion.toggleLayer3D(parseInt(this.dataset.layer));});
     // Mograph duplicator toggle — same .lico convention, delegates to
     // motion.js's toggleLayerDuplicator (lock + config init live there).
-    var ddup=document.createElement('div');ddup.className='lico'+(ld.duplicator?'':' off');ddup.title='Duplicator — répète cette forme en grille, en cercle (radial) ou le long d’un chemin, avec un décalage animable entre copies (comme le Cloner de Cinema 4D / MoGraph)';ddup.innerHTML=ICO_DUP;ddup.dataset.layer=i;ddup.addEventListener('click',function(e){e.stopPropagation();if(window.SMMotion)SMMotion.toggleLayerDuplicator(parseInt(this.dataset.layer));});
+    var ddup=document.createElement('div');ddup.className='lico'+(ld.duplicator?'':' off');ddup.title=(window.SM&&SM.t)?SM.t('titleDuplicatorHint'):'Duplicator — repeats this shape in a grid, a circle (radial) or along a path, with an animatable offset between copies (like Cinema 4D / MoGraph\'s Cloner)';ddup.innerHTML=ICO_DUP;ddup.dataset.layer=i;ddup.addEventListener('click',function(e){e.stopPropagation();if(window.SMMotion)SMMotion.toggleLayerDuplicator(parseInt(this.dataset.layer));});
     // Type badge — a video, an imported sequence and a hand-drawn layer were
     // three identical rows before this (layer-kind.js decides which). Sits
     // just before the name so the eye reads "what" then "which", and carries
@@ -5510,7 +5510,7 @@ function renderLayerList(frameOnly){
     // matches the channel initial (S/F/O for Ombre, avoiding a clash with
     // the Solo 'S' badge's own single-letter convention would need 2
     // letters here anyway since Fill/Shadow both start differently in FR).
-    if(ld.montageId){var mtb=document.createElement('div');mtb.className='lico comp-badge';mtb.title='Calque montage (StoryBoard) — contenu piloté par le montage \u00ab '+ld.name+' \u00bb, s\u2019édite dans l\u2019onglet StoryBoard';mtb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">MT</span>';row.appendChild(mtb);}
+    if(ld.montageId){var mtb=document.createElement('div');mtb.className='lico comp-badge';mtb.title=SM.t('titleMontageLayerPrefix')+ld.name+SM.t('titleMontageLayerSuffix');mtb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">MT</span>';row.appendChild(mtb);}
     // Text layer badge (2026-07) -- ld.isTextLayer, same "layer-level flag,
     // not a new item type" precedent as symbolId/lfsGroup/montageId above:
     // it distinguishes the layer visually/structurally without touching
@@ -5531,7 +5531,7 @@ function renderLayerList(frameOnly){
       var NULL_SHAPE_ORDER=['cross','square','circle','diamond'];
       var curNullShape=ld.nullShape||'cross';
       var nlb=document.createElement('div');nlb.className='lico comp-badge';nlb.style.cursor='pointer';
-      nlb.title='Calque Null — jamais rendu, sert de pivot/parent pour d’autres calques. Clic : changer la forme du repère';
+      nlb.title=SM.t('titleNullLayerHint');
       nlb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">'+(NULL_SHAPE_GLYPHS[curNullShape]||'✛')+'</span>';
       nlb.addEventListener('click',function(e){
         e.stopPropagation();
@@ -5543,7 +5543,7 @@ function renderLayerList(frameOnly){
       });
       row.appendChild(nlb);
     }
-    if(ld.isGuideLayer){var glb=document.createElement('div');glb.className='lico comp-badge';glb.title='Calque Guide — ligne repère visible en édition seulement, jamais exportée. Position/Rotation pilotent la ligne, comme n’importe quel calque';glb.style.color=ld.color||'#00baff';glb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">┆</span>';row.appendChild(glb);}
+    if(ld.isGuideLayer){var glb=document.createElement('div');glb.className='lico comp-badge';glb.title=SM.t('titleGuideLayerHint');glb.style.color=ld.color||'#00baff';glb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">┆</span>';row.appendChild(glb);}
     if(ld.isEffectLayer){
       var fxLabels=window.EFFECT_LABELS||{};
       var enabledFx=(ld.effects||[]).filter(function(e){return e.enabled;});
@@ -5589,7 +5589,7 @@ function renderLayerList(frameOnly){
       var tlIdx=_layerIndexByUid(ld.timeLink.uid);
       var tlName=(tlIdx>=0&&state.layers[tlIdx])?(state.layers[tlIdx].name||('Layer '+(tlIdx+1))):'source introuvable';
       var tlb=document.createElement('div');tlb.className='lico comp-badge';
-      tlb.title='Temps lié à « '+tlName+' » — clic droit pour délier';
+      tlb.title=SM.t('titleTimeLinkedToPrefix')+tlName+SM.t('titleTimeLinkedToSuffix');
       tlb.innerHTML='<span style="font-size:9px;line-height:1;font-weight:700">Tp</span>';
       tlb.addEventListener('click',function(e){e.stopPropagation();});
       tlb.addEventListener('contextmenu',function(e){
@@ -5671,39 +5671,39 @@ function renderLayerList(frameOnly){
       var idx4=parseInt(this.dataset.layer);window.SM.setActiveLayer(idx4);
       var l4=state.layers[idx4];
       window.showContextMenu(e.clientX,e.clientY,[
-        {label:'Insérer un calque',action:function(){window.SM.addLayer();}},
-        {label:'Insérer un calque Null',action:function(){window.SM.addNullLayer();}},
+        {label:SM.t('ctxInsertLayer'),action:function(){window.SM.addLayer();}},
+        {label:SM.t('ctxInsertLayerNull'),action:function(){window.SM.addNullLayer();}},
         {label:'Insérer un dossier',action:function(){window.SM.addFolderLayer();}},
-        {label:'Insérer un calque d’effet',action:function(){window.SM.addEffectLayer();}},
-        {label:'Insérer un calque Guide',action:function(){window.SM.addGuideLayer();}},
-        {label:'Dupliquer le calque',action:function(){window.SM.duplicateLayer();}},
-        {label:'Supprimer le calque',action:function(){window.SM.deleteLayer();}},
+        {label:SM.t('ctxInsertLayerEffect'),action:function(){window.SM.addEffectLayer();}},
+        {label:SM.t('ctxInsertLayerGuide'),action:function(){window.SM.addGuideLayer();}},
+        {label:SM.t('ctxDuplicateLayer'),action:function(){window.SM.duplicateLayer();}},
+        {label:SM.t('ctxDeleteLayer'),action:function(){window.SM.deleteLayer();}},
         {sep:true},
-        {label:'Renommer',action:function(){startLayerRename(idx4);}},
-        {label:l4.isTextLayer?'Retirer le marquage « calque de texte »':'Marquer comme calque de texte',action:function(){l4.isTextLayer=!l4.isTextLayer;renderLayerList();}},
-        {label:'Grouper en dossier',disabled:_layerSel.length<2,action:function(){groupSelectionIntoFolder();}},
+        {label:SM.t('elementsRename'),action:function(){startLayerRename(idx4);}},
+        {label:l4.isTextLayer?SM.t('ctxRemoveTextLayerMark'):SM.t('ctxMarkAsTextLayer'),action:function(){l4.isTextLayer=!l4.isTextLayer;renderLayerList();}},
+        {label:SM.t('ctxGroupIntoFolder'),disabled:_layerSel.length<2,action:function(){groupSelectionIntoFolder();}},
         // Split / merge as a reversible PAIR (2026-07-25). "Éclater" existed
         // only as a Motion double-click with no visible entry point and no
         // inverse; both directions now sit next to each other, in both
         // timelines, so the round-trip is discoverable from either end.
-        {label:'Éclater en calques (une forme par calque)',disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.splitLayerIntoElements(idx4);}},
-        {label:'Couper au niveau de la tête de lecture  (⌘⇧D)',action:function(){window.SM.splitLayerAtPlayhead(idx4);}},
-        {label:l4.shy?'Retirer le marquage « shy »':'Marquer comme « shy »',action:function(){window.SM.toggleLayerShy(idx4);}},
-        {label:'Fusionner les calques sélectionnés',disabled:_layerSel.length<2,action:function(){window.SM.mergeLayersIntoOne(_layerSel.slice());}},
-        {label:'Retirer du dossier',disabled:!l4.folderId,action:function(){delete l4.folderId;renderLayerList();renderTimeline();}},
+        {label:SM.t('ctxSplitIntoLayers'),disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.splitLayerIntoElements(idx4);}},
+        {label:SM.t('ctxCutAtPlayhead'),action:function(){window.SM.splitLayerAtPlayhead(idx4);}},
+        {label:l4.shy?SM.t('ctxRemoveShyMark'):SM.t('ctxMarkAsShy'),action:function(){window.SM.toggleLayerShy(idx4);}},
+        {label:SM.t('ctxMergeSelectedLayers'),disabled:_layerSel.length<2,action:function(){window.SM.mergeLayersIntoOne(_layerSel.slice());}},
+        {label:SM.t('ctxRemoveFromFolder'),disabled:!l4.folderId,action:function(){delete l4.folderId;renderLayerList();renderTimeline();}},
         {label:'Retirer du dossier (parent)',disabled:folderLayerParentIdx(idx4)<0,action:function(){window.SM.removeLayerFromFolder(idx4);}},
-        {label:'Convertir en composant',disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToComponent();}},
-        {label:'Décomposer le composant',disabled:!l4.symbolId,action:function(){window.SM.convertComponentToLayer();}},
+        {label:SM.t('ctxConvertToComponent'),disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToComponent();}},
+        {label:SM.t('ctxBreakApartComponent'),disabled:!l4.symbolId,action:function(){window.SM.convertComponentToLayer();}},
         {sep:true},
-        {label:'Séparer Stroke/Fill/Shadow (3 calques liés, keyframes partagées)',disabled:!!l4.symbolId||!!l4.lfsGroup||!!l4.linkGroupId,action:function(){window.SM.convertActiveLayerToStrokeFillShadow();}},
-        {label:'Dissocier ce calque du groupe Stroke/Fill/Shadow',disabled:!l4.linkGroupId,action:function(){delete l4.channel;delete l4.linkGroupId;renderLayerList();renderTimeline();showToast(SM.t('toastLayerUnlinkedNormal'));}},
-        {label:'Grouper (Ligne/Plein/Ombre)',disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToLFSGroup();}},
-        {label:'Éditer Ligne',disabled:!l4.lfsGroup,action:function(){window.SM.enterSymbol(l4.lfsIds.line);}},
-        {label:'Éditer Plein',disabled:!l4.lfsGroup,action:function(){window.SM.enterSymbol(l4.lfsIds.full);}},
-        {label:'Éditer Ombre',disabled:!l4.lfsGroup,action:function(){window.SM.enterSymbol(l4.lfsIds.shadow);}},
-        {label:'Propager Plein sur les autres images',disabled:!l4.lfsGroup,action:function(){window.SM.propagateLFSFill('full');}},
-        {label:'Propager Ombre sur les autres images',disabled:!l4.lfsGroup,action:function(){window.SM.propagateLFSFill('shadow');}},
-        {label:'Décomposer le groupe',disabled:!l4.lfsGroup,action:function(){window.SM.convertLFSGroupToLayer();}},
+        {label:SM.t('ctxSplitStrokeFillShadow'),disabled:!!l4.symbolId||!!l4.lfsGroup||!!l4.linkGroupId,action:function(){window.SM.convertActiveLayerToStrokeFillShadow();}},
+        {label:SM.t('ctxUnlinkFromLFSGroup'),disabled:!l4.linkGroupId,action:function(){delete l4.channel;delete l4.linkGroupId;renderLayerList();renderTimeline();showToast(SM.t('toastLayerUnlinkedNormal'));}},
+        {label:SM.t('ctxGroupLFS'),disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToLFSGroup();}},
+        {label:SM.t('ctxEditLine'),disabled:!l4.lfsGroup,action:function(){window.SM.enterSymbol(l4.lfsIds.line);}},
+        {label:SM.t('ctxEditFill'),disabled:!l4.lfsGroup,action:function(){window.SM.enterSymbol(l4.lfsIds.full);}},
+        {label:SM.t('ctxEditShadow'),disabled:!l4.lfsGroup,action:function(){window.SM.enterSymbol(l4.lfsIds.shadow);}},
+        {label:SM.t('ctxPropagateFillOtherFrames'),disabled:!l4.lfsGroup,action:function(){window.SM.propagateLFSFill('full');}},
+        {label:SM.t('ctxPropagateShadowOtherFrames'),disabled:!l4.lfsGroup,action:function(){window.SM.propagateLFSFill('shadow');}},
+        {label:SM.t('ctxBreakApartGroup'),disabled:!l4.lfsGroup,action:function(){window.SM.convertLFSGroupToLayer();}},
         {sep:true},
         // Track matte (2026-07) — the discoverable entry point: works
         // whether or not this layer already has a matte, unlike the badge
@@ -5713,10 +5713,10 @@ function renderLayerList(frameOnly){
         // uid-based mattes (2026-07-31): the source no longer needs to be
         // the layer directly above — any other layer works, so the only
         // impossible case is "no other layer exists at all".
-        {label:'Source de la matte…',disabled:state.layers.length<2,action:function(){
+        {label:SM.t('ctxMatteSource'),disabled:state.layers.length<2,action:function(){
           window.showContextMenu(e.clientX+8,e.clientY+8,buildMatteMenuItems(idx4,l4,function(){renderLayerList();renderTimeline();}));
         }},
-        {label:state.layers.length<2?'Matte (aucun autre calque)':(l4.matteMode?'Changer la matte…':'Appliquer une matte…'),disabled:state.layers.length<2,action:function(){
+        {label:state.layers.length<2?SM.t('ctxMatteNoOtherLayer'):(l4.matteMode?SM.t('ctxMatteChange'):SM.t('ctxMatteApply')),disabled:state.layers.length<2,action:function(){
           window.SM.setActiveLayer(idx4);updatePropsContext();
           // The right-panel dropdown only exists in the Document-fallback
           // context (see updatePropsContext) — if a draw tool is active it
@@ -5760,7 +5760,7 @@ function installLayerReorderGrip(row,li){
   if(!row||row.querySelector('.layer-reorder-grip'))return;
   var grip=document.createElement('div');
   grip.className='layer-reorder-grip';
-  grip.title='Glisser verticalement pour réordonner le calque';
+  grip.title=(window.SM&&SM.t)?SM.t('titleDragReorderLayer'):'Drag vertically to reorder the layer';
   function begin(e){
     if(e.button!==0)return;
     // Grip sits at z-index:9 (sticky, always reachable even while a long
@@ -6148,7 +6148,7 @@ function renderDuplicatorEffectors(dup){
     // Header: falloff mode, radius, strength, delete.
     var hdr=line();
     var modeSel=document.createElement('select');modeSel.className='psel';
-    modeSel.title='Radial : influence en cercle autour du point de l’effector, dégradée jusqu’au rayon R. Linear : influence en bande le long d’une direction (angle °), dégradée jusqu’à la distance R.';
+    modeSel.title=SM.t('titleEffectorRadialLinear');
     ['radial','linear'].forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v==='radial'?'Radial':'Linear';if(eff.falloff===v||(!eff.falloff&&v==='radial'))o.selected=true;modeSel.appendChild(o);});
     modeSel.addEventListener('change',function(){pushUndo();eff.falloff=modeSel.value;renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
     hdr.appendChild(modeSel);
@@ -6197,9 +6197,9 @@ function renderDuplicatorEffectors(dup){
       // strength); clones further out get a fraction of it, down to 0 at
       // the radius. Spelled out on hover since the row's own name (just
       // "Position", "Scale"...) can't say all that.
-      nameLbl.title='Valeur appliquée aux copies les plus proches de cet effector (plein effet au centre, s’estompe jusqu’au rayon R) — pas la position de l’effector lui-même.';
+      nameLbl.title=SM.t('titleEffectorValueHint');
       nameRow.appendChild(nameLbl);
-      var rmCh=document.createElement('button');rmCh.className='pbtn';rmCh.textContent='✕';rmCh.style.marginLeft='auto';rmCh.title='Retirer cette propriété de l’effector';
+      var rmCh=document.createElement('button');rmCh.className='pbtn';rmCh.textContent='✕';rmCh.style.marginLeft='auto';rmCh.title=SM.t('titleRemoveEffectorProp');
       rmCh.addEventListener('click',function(){pushUndo();channels.splice(ci,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
       nameRow.appendChild(rmCh);
       var valRow=line();valRow.classList.add('dims-row');
@@ -6213,8 +6213,8 @@ function renderDuplicatorEffectors(dup){
     });
     var addRow=line();
     var addSel=document.createElement('select');addSel.className='psel';
-    addSel.title='Ajoute une propriété que cet effector va faire varier sur les copies proches (Position, Rotation, Échelle, Opacité…).';
-    var placeholder=document.createElement('option');placeholder.textContent='+ Propriété…';placeholder.value='';addSel.appendChild(placeholder);
+    addSel.title=SM.t('titleAddEffectorProp');
+    var placeholder=document.createElement('option');placeholder.textContent=SM.t('btnAddPropertyEllipsis');placeholder.value='';addSel.appendChild(placeholder);
     var already={};channels.forEach(function(ch){already[ch.prop]=true;});
     targetProps.forEach(function(p){
       if(already[p])return; // one entry per property — edit the existing row instead of stacking duplicates
@@ -6419,7 +6419,7 @@ function updateRecordUI(){
   if(_recording){
     btn.textContent=SM.t('commentStopRecordBtn');
     btn.classList.add('ac');
-    if(status){status.style.display='block';status.textContent='🔴 Enregistrement en cours — change d\'outil et reproduis le problème, puis reviens ici cliquer Stop.';}
+    if(status){status.style.display='block';status.textContent=SM.t('commentRecordingInProgressHint');}
   }else{
     btn.textContent=SM.t('commentRecordBtn');
     btn.classList.remove('ac');
@@ -7702,10 +7702,10 @@ function renderSyncUpdates(entries){
     label.appendChild(dot);
     label.appendChild(document.createTextNode(entry.profileName+' — '+syncRelTime(entry.ts)));
     var btn=document.createElement('button');
-    btn.className='pbtn';btn.textContent='Fusionner';btn.style.cssText='font-size:10px;padding:3px 8px';
+    btn.className='pbtn';btn.textContent=SM.t('syncMergeBtn');btn.style.cssText='font-size:10px;padding:3px 8px';
     btn.addEventListener('click',function(){
       window.SMProject.pullAndMerge(entry).then(function(){
-        btn.disabled=true;btn.textContent='Fusionné';
+        btn.disabled=true;btn.textContent=SM.t('syncMergedBtn');
       });
     });
     row.appendChild(label);row.appendChild(btn);
@@ -7758,7 +7758,7 @@ function renderFeedbackList(entries){
     row.appendChild(note);
     if(entry.status==='pending'){
       var actions=document.createElement('div');actions.style.cssText='display:flex;gap:5px;margin-top:2px';
-      var appBtn=document.createElement('button');appBtn.className='pbtn';appBtn.textContent='Approuver';appBtn.style.cssText='font-size:9px;padding:3px 7px';
+      var appBtn=document.createElement('button');appBtn.className='pbtn';appBtn.textContent=SM.t('fbApproveBtn');appBtn.style.cssText='font-size:9px;padding:3px 7px';
       appBtn.addEventListener('click',function(){
         window.SMFeedback.approveFeedback(entry.id).then(refreshFeedbackList);
       });
@@ -7943,7 +7943,7 @@ function fbDashCardEl(issue){
     var chip=document.createElement('span');chip.className='fb-chip label-'+l;chip.textContent=ghFbLabelEmoji(l)+' '+l;
     head.appendChild(chip);
   });
-  if(issue.state==='closed'){var c=document.createElement('span');c.className='fb-chip';c.textContent='fermé';head.appendChild(c);}
+  if(issue.state==='closed'){var c=document.createElement('span');c.className='fb-chip';c.textContent=SM.t('fbClosedChip');head.appendChild(c);}
   head.appendChild(document.createTextNode(new Date(issue.createdAt).toLocaleDateString()));
   card.appendChild(head);
   var title=document.createElement('div');title.className='fb-card-title';title.textContent=issue.title;
@@ -7955,29 +7955,29 @@ function fbDashCardEl(issue){
   }
   var actions=document.createElement('div');actions.className='fb-card-actions';
   if(issue.labels.indexOf('pending')>=0){
-    var appBtn=document.createElement('button');appBtn.className='pbtn';appBtn.textContent='Approuver';appBtn.style.cssText='font-size:9px;padding:3px 7px';
+    var appBtn=document.createElement('button');appBtn.className='pbtn';appBtn.textContent=SM.t('fbApproveBtn');appBtn.style.cssText='font-size:9px;padding:3px 7px';
     appBtn.addEventListener('click',function(){
       window.SMFeedback.approveGithubIssue(issue.number,issue.labels).then(refreshFbDashboard).catch(function(e){showToast(e.message);});
     });
     actions.appendChild(appBtn);
   }
   if(issue.state!=='closed'){
-    var resBtn=document.createElement('button');resBtn.className='pbtn';resBtn.textContent='Résoudre…';resBtn.style.cssText='font-size:9px;padding:3px 7px';
+    var resBtn=document.createElement('button');resBtn.className='pbtn';resBtn.textContent=SM.t('fbResolveBtn');resBtn.style.cssText='font-size:9px;padding:3px 7px';
     resBtn.addEventListener('click',function(){
       _fbDashOpenForms[issue.number]=_fbDashOpenForms[issue.number]==='resolve'?null:'resolve';
       renderFbDashList();
     });
     actions.appendChild(resBtn);
   }
-  var editBtn=document.createElement('button');editBtn.className='pbtn';editBtn.textContent='Éditer';editBtn.style.cssText='font-size:9px;padding:3px 7px';
+  var editBtn=document.createElement('button');editBtn.className='pbtn';editBtn.textContent=SM.t('fbEditBtn');editBtn.style.cssText='font-size:9px;padding:3px 7px';
   editBtn.addEventListener('click',function(){
     _fbDashOpenForms[issue.number]=_fbDashOpenForms[issue.number]==='edit'?null:'edit';
     renderFbDashList();
   });
   actions.appendChild(editBtn);
-  var delBtn=document.createElement('button');delBtn.className='pbtn';delBtn.textContent='Supprimer';delBtn.style.cssText='font-size:9px;padding:3px 7px;color:#ff8a8a';
+  var delBtn=document.createElement('button');delBtn.className='pbtn';delBtn.textContent=SM.t('fxDelete');delBtn.style.cssText='font-size:9px;padding:3px 7px;color:#ff8a8a';
   delBtn.addEventListener('click',function(){
-    smConfirm('Supprimer définitivement l\'issue #'+issue.number+' ("'+issue.title+'") ? Action irréversible.','Supprimer le feedback').then(function(ok){
+    smConfirm(SM.t('fbDeleteConfirmPrefix')+issue.number+SM.t('fbDeleteConfirmMiddle')+issue.title+SM.t('fbDeleteConfirmSuffix'),SM.t('fbDeleteConfirmTitle')).then(function(ok){
       if(!ok)return;
       window.SMFeedback.deleteGithubIssue(issue.nodeId).then(refreshFbDashboard).catch(function(e){showToast(e.message);});
     });
@@ -7987,8 +7987,8 @@ function fbDashCardEl(issue){
   var openForm=_fbDashOpenForms[issue.number];
   if(openForm==='resolve'){
     var rform=document.createElement('div');rform.className='fb-card-inline-form';
-    var rta=document.createElement('textarea');rta.placeholder='Résolution (postée en commentaire sur l\'issue, puis ferme et tague resolved)…';
-    var rbtn=document.createElement('button');rbtn.className='pbtn';rbtn.style.cssText='font-size:9px;padding:4px 8px;align-self:flex-start';rbtn.textContent='Confirmer la résolution';
+    var rta=document.createElement('textarea');rta.placeholder=SM.t('fbResolutionPlaceholder');
+    var rbtn=document.createElement('button');rbtn.className='pbtn';rbtn.style.cssText='font-size:9px;padding:4px 8px;align-self:flex-start';rbtn.textContent=SM.t('fbConfirmResolutionBtn');
     rbtn.addEventListener('click',function(){
       window.SMFeedback.resolveGithubIssue(issue.number,issue.labels,rta.value).then(function(){
         _fbDashOpenForms[issue.number]=null;refreshFbDashboard();
