@@ -42,6 +42,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "48213", "-d", "src"],
       "port": 48213
+    },
+    {
+      "name": "nemo-fb122-harmonize-qa",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "51907", "-d", "src"],
+      "port": 51907
     }
   ]
 }

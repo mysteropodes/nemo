@@ -31,6 +31,10 @@
   // the only way to tell "user clicked to toggle" from "user dragged the
   // anchor a tiny bit" is comparing screen-space start/end position in onUp.
   var _downClientX = 0, _downClientY = 0, _downAlt = false;
+  // #122: mirrors vector-sculpt.js's own wasInterpolated capture — see
+  // harmonizeAfterEdit's comment (tweens.js) for why this has to be read
+  // BEFORE ensureKeyframe()/saveActiveLayerFrame() touch the frame's state.
+  var _wasInterpolated = false;
 
   function shouldIntercept() {
     return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && state.tool === 'subselect' && !state.playing;
@@ -147,6 +151,10 @@
       var _wasKey = (function () {
         var f = state.layers[state.activeLayerIdx].frames[state.currentFrame];
         return !!(f && (f.isKeyframe || f.isInterpolated));
+      })();
+      _wasInterpolated = (function () {
+        var f = state.layers[state.activeLayerIdx].frames[state.currentFrame];
+        return !!(f && f.isInterpolated);
       })();
       ensureKeyframe();
       if (!_wasKey) {
@@ -386,6 +394,7 @@
       fillRegenerateLinked(userLayers[state.activeLayerIdx], editedPath);
       regenerateBrushTexture(editedPath, userLayers[state.activeLayerIdx]);
       saveActiveLayerFrame();
+      if (_wasInterpolated && typeof harmonizeAfterEdit === 'function') harmonizeAfterEdit(state.currentFrame);
       // Same stale-onion-ghost fix as select-bridge.js's xform/move commits
       // — onionPrevLayer/onionNextLayer are a snapshot cache never rebuilt
       // by a node-edit commit, so a held neighbor frame kept ghosting this

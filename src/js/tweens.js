@@ -3471,7 +3471,7 @@ function _dedupeFrameStrokeIds(strokes,frameIdx){
     else seen[sd.strokeId]=1;
   }
 }
-function generateTweens(){
+function generateTweens(explicitRestrictTo){
   saveAllLayerFrames();var li=state.activeLayerIdx;var ld=state.layers[li];
   var keys=[];for(var i=0;i<state.totalFrames;i++){if(ld.frames[i].isKeyframe&&ld.frames[i].strokes.length>0)keys.push(i);}
   if(keys.length<2){showToast(SM.t('toastNeedAtLeast2DrawnKeyframes'));return;}
@@ -3481,9 +3481,13 @@ function generateTweens(){
   // and nothing outside that span is touched. Selecting any held/tween
   // frame within a span counts as selecting its origin keyframe, matching
   // the double-click-selects-span behavior.
+  // explicitRestrictTo (#122): harmonizeAfterEdit passes its own {key:true}
+  // map (start-keyframe indices) to re-tween just the two spans a fresh
+  // sculpt/subselect promotion split — same restriction mechanism, but
+  // driven by the edit itself rather than the timeline's frame selection.
   var selOnLayer=_sel.frames.filter(function(s){return s.layer===li;}).map(function(s){return s.frame;});
-  var restrictTo=null;
-  if(selOnLayer.length){
+  var restrictTo=explicitRestrictTo||null;
+  if(!restrictTo&&selOnLayer.length){
     restrictTo={};
     selOnLayer.forEach(function(fi0){for(var pi=fi0;pi>=0;pi--){if(ld.frames[pi].isKeyframe){restrictTo[pi]=true;break;}}});
   }
@@ -4042,6 +4046,37 @@ function generateTweens(){
     }
   }
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(total+SM.t('toastInbetweensGeneratedSuffix'));
+}
+
+// #122 ("harmoniser les frames de tween après une correction ponctuelle") —
+// sculpting (vector-sculpt.js) or node-dragging (subselect-bridge.js) a
+// generated tween frame already promotes it to a real keyframe the moment
+// the edit is saved (_maybePromoteInterpolated, app.js) — that part was
+// already shipped and needed no change. Left there, every OTHER frame in
+// the span the promotion just split stays exactly as it was computed
+// BEFORE the correction: a visible pop right at the frame the user fixed.
+// Caller passes the frame index right after confirming (via its own
+// before-edit snapshot) that THIS gesture is what performed the promotion
+// — never fires on a plain edit to an already-existing keyframe, which
+// would silently re-tween both of its neighboring spans on every ordinary
+// keyframe correction. Reuses the exact same engine a manual "Tween" click
+// runs (Hungarian match + resample) rather than a hand-rolled displacement
+// blend, restricted with generateTweens' own explicitRestrictTo to just
+// the two new sub-spans — so the correction fades out naturally toward
+// both flanking (untouched) real keyframes instead of applying uniformly.
+// Opt-in (state.tweenHarmonizeEdits, "en option" per the feedback) since
+// it silently re-tweens a whole span from a plain sculpt/subselect drag.
+function harmonizeAfterEdit(fi){
+  if(!state.tweenHarmonizeEdits)return;
+  var ld=state.layers[state.activeLayerIdx];if(!ld)return;
+  var f=ld.frames[fi];if(!f||!f.isKeyframe)return;
+  var prevKey=-1;for(var i=fi-1;i>=0;i--){if(ld.frames[i].isKeyframe){prevKey=i;break;}}
+  var nextKey=-1;for(var j=fi+1;j<state.totalFrames;j++){if(ld.frames[j].isKeyframe){nextKey=j;break;}}
+  if(prevKey<0&&nextKey<0)return;
+  var restrictTo={};
+  if(prevKey>=0)restrictTo[prevKey]=true;
+  if(nextKey>=0)restrictTo[fi]=true;
+  generateTweens(restrictTo);
 }
 
 // ---- ARCS ----

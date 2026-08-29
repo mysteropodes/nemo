@@ -109,7 +109,7 @@ var state={
   // indistinguishable from full deletion. Lowered so partial erasing is
   // actually visible at default settings; still user-adjustable via the
   // Eraser field in Tool Options exactly as before.
-  eraserSize:14,selRotAccum:0,tweenSkipManual:true,
+  eraserSize:14,selRotAccum:0,tweenSkipManual:true,tweenHarmonizeEdits:false,
   resamplePts:50,tweenStep:1,
   canvasW:1920,canvasH:1080,canvasBg:'#ffffff',canvasClip:false,safetyZones:false,ghostAllFrames:false,currentFrameOutline:false,
   rulersOn:true,guidesLocked:false,guidesSnap:true,guides:{h:[],v:[]},
