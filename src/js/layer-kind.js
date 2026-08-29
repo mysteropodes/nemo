@@ -36,6 +36,10 @@
     effect: SVG('<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="3"/>'),
     text: SVG('<path d="M5 6h14M12 6v13M9 19h6"/>'),
     'null': SVG('<path d="M12 4v16M4 12h16"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/>'),
+    // Folder (2026-08) — a Null-shaped layer (isNullLayer:true too, see
+    // addFolderLayer/timeline.js) that also groups+scopes-effects for its
+    // children, so it gets its own badge rather than showing as 'null'.
+    folder: SVG('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>'),
     // Two overlapping squares ("an instance stamped from a shared
     // definition"), not the isometric-cube glyph this used to be
     // (2026-07-29 fix, "l'icon component du calque est le même que celui
@@ -50,7 +54,7 @@
   // strings live in i18n.js under layerKind<Key>.
   var FALLBACK = {
     draw: 'Dessin', image: 'Image', sequence: 'Séquence', video: 'Vidéo', camera: 'Caméra',
-    effect: 'Effet', text: 'Texte', 'null': 'Null', component: 'Composant', montage: 'Montage',
+    effect: 'Effet', text: 'Texte', 'null': 'Null', component: 'Composant', montage: 'Montage', folder: 'Dossier',
   };
 
   function everyStrokeIsRaster(ld) {
@@ -87,6 +91,7 @@
     if (ld.symbolId) return 'component';
     if (ld.nativeVideo) return 'video';
     if (ld.isEffectLayer) return 'effect';
+    if (ld.isFolderLayer) return 'folder';
     if (ld.isNullLayer) return 'null';
     if (ld.isGuideLayer) return 'guide';
     if (ld.isTextLayer) return 'text';

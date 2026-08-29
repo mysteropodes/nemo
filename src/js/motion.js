@@ -4378,9 +4378,41 @@
       // floor of one under every deselect. AE shows nothing selected when
       // nothing is; Animation 2D keeps its own .act cue, where it means
       // "this is where the brush draws" and is genuinely useful.
-      row.className = 'lrow' + (_layerSel.indexOf(li) >= 0 ? ' act motion-selected' : '');
+      // Folder layer (2026-08) — .in-folder is the SAME indent class
+      // Animation 2D's own ld.folderId rows already use (style.css), so a
+      // nested layer looks identically indented in both panels without a
+      // second CSS rule. folderLayerParent comes straight from
+      // computeLayerRenderOrder's splice, not re-derived here.
+      row.className = 'lrow' + (_layerSel.indexOf(li) >= 0 ? ' act motion-selected' : '') + (entry.folderLayerParent != null ? ' in-folder' : '');
       row.dataset.layer = li;
       if (isComponent) row.title = 'Composant — Position/Anchor/Rotation/Scale/Opacity animent l\'instance entière (le contenu interne s\'édite via "Éditer le composant…")';
+      // Every row reserves this slot (real chevron OR invisible spacer),
+      // never just folder-related ones — same "spacer" idiom the plain
+      // twirl `arrow` right below and Animation 2D's own folder rows
+      // already use (timeline.js comment: "every row reserves a
+      // .larrow/.larrow-spacer slot so icons stay aligned whether or not
+      // the row above was a folder"). Skipping the spacer on ordinary rows
+      // would shift every OTHER icon (color dot, eye, lock, solo…) one
+      // slot left relative to folder rows, breaking column alignment
+      // across the whole panel — not just within a folder's own rows.
+      if (ld.isFolderLayer) {
+        // Disclosure triangle for the folder's OWN children — deliberately
+        // a SEPARATE control from `arrow` below (that one twirls THIS
+        // layer's own Transform properties open/closed, unrelated concept:
+        // AE lets you have a folder's properties open while its children
+        // are hidden, and vice versa).
+        var farrow = document.createElement('div'); farrow.className = 'lico larrow folder-arrow';
+        farrow.textContent = ld.folderCollapsed ? '▸' : '▾';
+        farrow.title = ld.folderCollapsed ? 'Déplier le dossier' : 'Replier le dossier';
+        farrow.addEventListener('click', function (e) {
+          e.stopPropagation();
+          window.SM.toggleFolderLayerCollapsed(li);
+        });
+        row.appendChild(farrow);
+      } else {
+        var fspacer = document.createElement('div'); fspacer.className = 'lico larrow-spacer folder-arrow-spacer';
+        row.appendChild(fspacer);
+      }
       var arrow = document.createElement('div'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
       // The twirl-down is now the ONLY way to open a layer's properties, so
       // it needs its own handler — it used to be decoration on a row whose
@@ -4611,6 +4643,11 @@
           // (timeline.js) works unmodified against Motion rows (same
           // .lrow[data-layer]/.lnm DOM shape). F2 is the keyboard path.
           { label: 'Renommer  (F2)', action: function () { startLayerRename(li); } },
+          // Folder layer (2026-08) — disabled unless this row's parent
+          // resolves to a Folder specifically (an ordinary Null parent
+          // leaves this disabled, same guard the drag-out gesture uses —
+          // see folderLayerParentIdx, timeline.js).
+          { label: 'Retirer du dossier', disabled: (typeof folderLayerParentIdx !== 'function' || folderLayerParentIdx(li) < 0), action: function () { window.SM.removeLayerFromFolder(li); } },
           { label: 'Éclater en calques (une forme par calque)', disabled: !!ld.symbolId || !!ld.lfsGroup, action: function () { window.SM.splitLayerIntoElements(li); } },
           { label: 'Couper au niveau de la tête de lecture  (⌘⇧D)', action: function () { window.SM.splitLayerAtPlayhead(li); } },
           { label: ld.shy ? 'Retirer le marquage « shy »' : 'Marquer comme « shy »', action: function () { window.SM.toggleLayerShy(li); } },
@@ -4720,7 +4757,7 @@
     nameRow.textContent = (ld.name || ('Layer ' + (state.activeLayerIdx + 1))) + (ld.symbolId ? ' (composant)' : '');
     body.appendChild(nameRow);
     renderParentRow(body, ld, state.activeLayerIdx);
-    if (ld.isNullLayer) renderNullShapeRow(body, ld);
+    if (ld.isNullLayer && !ld.isFolderLayer) renderNullShapeRow(body, ld);
     renderFollowPathRow(body, ld, state.activeLayerIdx);
     renderTimeLinkRow(body, ld, state.activeLayerIdx);
     renderTransformGroup(body, ld, 'Transform');

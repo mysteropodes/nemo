@@ -222,6 +222,31 @@ pub(crate) struct LayerIn {
     // toggle hiding the layer's own shape while its effects still apply.
     #[serde(default)]
     pub(crate) is_effect_layer: Option<bool>,
+    // Folder layer (2026-08, Motion "grouper les layer dans des dossiers qui
+    // agiront comme un null de control parentage") — an AE-precomp-flavored
+    // group, but explicitly NOT a precomp: its children stay flat, ordinary
+    // wire layers (engine-bridge.js's buildSceneJson builds them exactly
+    // like any other layer, parenting already fully resolved into their own
+    // path_transform via SMMotion's existing parentLayerUid chain — the
+    // engine never needs to know parenting happened). What the engine DOES
+    // need to know: which layers are this folder's children, so it can
+    // render JUST that subtree in isolation, run the folder's OWN `effects`
+    // stack (below) on the flattened result, and composite that as ONE unit
+    // — the "reflect a data-subtree, not a z-order tail" contrast with
+    // is_effect_layer above. `items` is ignored (no content of its own),
+    // same convention as is_effect_layer/isNullLayer.
+    #[serde(default)]
+    pub(crate) is_folder_layer: Option<bool>,
+    // Indices into SceneIn::layers (this same flat array) that belong to
+    // this folder — resolved JS-side from ld.parentLayerUid pointing at this
+    // folder's layerUid (engine-bridge.js). Order matters: painted bottom-up
+    // in the order given, exactly like the top-level layer stack. A child
+    // index is skipped by composite_scene's own top-level loop (see
+    // is_folder_child) so it never double-paints once directly AND once
+    // inside its folder's isolated render. Not required to be contiguous —
+    // no assumption anywhere in engine.rs depends on adjacency.
+    #[serde(default)]
+    pub(crate) folder_child_indices: Option<Vec<usize>>,
     // Effects stack (2026-07 rewrite — was a handful of fixed fields:
     // blur_radius/gshadow_*/effect_type/effect_p1/effect_p2, one value each,
     // one effect per layer max). Now a proper AE-style stack: any number of
@@ -801,6 +826,20 @@ pub struct VelloEngine {
     blend_accum_a_view: wgpu::TextureView,
     blend_accum_b: wgpu::Texture,
     blend_accum_b_view: wgpu::TextureView,
+    // ---- Folder layers (2026-08, see LayerIn::is_folder_layer) ----
+    // A dedicated ping-pong pair for accumulating a folder's OWN children,
+    // entirely separate from blend_accum_a/b above: composite_scene pauses
+    // mid-iteration on the folder's own turn in the OUTER loop (whose
+    // current accum_is_a half must survive untouched) while
+    // paint_folder_children runs a nested bottom-up composite over just the
+    // child subset — reusing blend_accum_a/b for that would corrupt the
+    // outer loop's in-flight state the moment it resumes. Same shape/format
+    // as blend_accum_a/b (create_blend_accum_texture), same reasoning as
+    // element_build_a/b below (a second, unrelated nested-composite need).
+    folder_accum_a: wgpu::Texture,
+    folder_accum_a_view: wgpu::TextureView,
+    folder_accum_b: wgpu::Texture,
+    folder_accum_b_view: wgpu::TextureView,
     // ---- Track matte compositor (matte.wgsl, scouted from Caddis's
     // Layer.matteMode field — see composite_scene's matte handling) ----
     // Same fullscreen-triangle shape as the blend pipeline, kept fully
@@ -2281,6 +2320,8 @@ pub async fn create_engine(
     let (blend_layer_tex, blend_layer_view) = create_blend_layer_texture(&device, width, height);
     let (blend_accum_a, blend_accum_a_view) = create_blend_accum_texture(&device, width, height, "blend-accum-a");
     let (blend_accum_b, blend_accum_b_view) = create_blend_accum_texture(&device, width, height, "blend-accum-b");
+    let (folder_accum_a, folder_accum_a_view) = create_blend_accum_texture(&device, width, height, "folder-accum-a");
+    let (folder_accum_b, folder_accum_b_view) = create_blend_accum_texture(&device, width, height, "folder-accum-b");
     let (matte_pipeline, matte_bind_group_layout, matte_sampler, matte_uniform_buf) = create_matte_pipeline(&device);
     let (matte_source_tex, matte_source_view) = create_blend_layer_texture(&device, width, height);
     let (matte_result_tex, matte_result_view) = create_matte_result_texture(&device, width, height);
@@ -2333,6 +2374,10 @@ pub async fn create_engine(
         blend_accum_a_view,
         blend_accum_b,
         blend_accum_b_view,
+        folder_accum_a,
+        folder_accum_a_view,
+        folder_accum_b,
+        folder_accum_b_view,
         matte_pipeline,
         matte_bind_group_layout,
         matte_sampler,
@@ -2803,6 +2848,87 @@ impl VelloEngine {
         Ok(())
     }
 
+    /// Folder layer (2026-08, see LayerIn::is_folder_layer's doc comment) —
+    /// renders JUST the given child indices, bottom-up, into a fresh
+    /// transparent accumulator (folder_accum_a/b, NOT blend_accum_a/b —
+    /// see that field's own comment for why a separate pair is required),
+    /// then leaves the flattened result in self.blend_layer_view so
+    /// composite_scene's caller can treat it exactly like an ordinary
+    /// layer's own paint — masks/matte/the folder's OWN `effects` stack/
+    /// blend-mode composite into the outer accumulator all stay completely
+    /// unmodified downstream of this call. Deliberate v1 simplifications
+    /// (see PR description): each child's OWN masks/matte/nested-folder/
+    /// nested-effect-layer-tail are ignored here (matte/matte-source
+    /// resolution in particular is meaningless against a subset slice) —
+    /// only a child's own `items`, per-item effects (paint_layer_with_
+    /// element_effects, reused verbatim), own `effects` stack, and own
+    /// blend mode are honored. Mirrors paint_layer_with_element_effects's
+    /// own run-accumulation shape one level up (per-CHILD-LAYER instead of
+    /// per-item-run).
+    fn paint_folder_children(&mut self, scene_in: &SceneIn, child_indices: &[usize], view_tf: Affine) -> Result<(), JsValue> {
+        let layer_params = RenderParams { base_color: Color::TRANSPARENT, width: self.width, height: self.height, antialiasing_method: AaConfig::Area };
+        clear_texture(&self.device, &self.queue, &self.folder_accum_a_view, wgpu::Color::TRANSPARENT);
+        let mut accum_is_a = true;
+        let mut first_child = true;
+        for &ci in child_indices {
+            let child = match scene_in.layers.get(ci) {
+                Some(c) => c,
+                None => continue, // stale/out-of-range index — skip rather than panic
+            };
+            if child.items.iter().any(|it| it.effects.iter().any(|e| e.enabled)) {
+                self.paint_layer_with_element_effects(child, view_tf)?;
+            } else {
+                let mut scene = Scene::new();
+                self.push_atlas_keepalive(&mut scene);
+                paint_layer_items(&mut scene, &child.items, view_tf, &self.images, &self.paths);
+                self.renderer
+                    .render_to_texture(&self.device, &self.queue, &scene, &self.blend_layer_view, &layer_params)
+                    .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+            }
+            let (child_source, child_source_tex): (&wgpu::TextureView, &wgpu::Texture) = if child.effects.iter().any(|e| e.enabled) {
+                let bbox = self.items_bbox_px(&child.items, view_tf);
+                let in_a = self.apply_effect_stack(&self.blend_layer_view, &child.effects, bbox);
+                if in_a { (&self.effect_stack_a_view, &self.effect_stack_a_tex) } else { (&self.effect_stack_b_view, &self.effect_stack_b_tex) }
+            } else {
+                (&self.blend_layer_view, &self.blend_layer_tex)
+            };
+            let mode = mix_mode_index(child.blend_mode.as_deref());
+            if first_child {
+                // First child: nothing to composite ONTO yet — folder_accum_a
+                // is already cleared to transparent above, so a plain copy
+                // seeds the accumulator (mirrors paint_layer_with_element_
+                // effects' own first-run handling; blend mode is moot with
+                // nothing underneath yet).
+                let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("folder-first-child-copy") });
+                let dst_tex = if accum_is_a { &self.folder_accum_a } else { &self.folder_accum_b };
+                encoder.copy_texture_to_texture(
+                    child_source_tex.as_image_copy(),
+                    dst_tex.as_image_copy(),
+                    wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
+                );
+                self.queue.submit(Some(encoder.finish()));
+                first_child = false;
+            } else {
+                let (backdrop_view, target_view) =
+                    if accum_is_a { (&self.folder_accum_a_view, &self.folder_accum_b_view) } else { (&self.folder_accum_b_view, &self.folder_accum_a_view) };
+                composite_pass(
+                    &self.device, &self.queue, &self.blend_pipeline, &self.blend_bind_group_layout, &self.blend_sampler, &self.blend_uniform_buf,
+                    backdrop_view, child_source, mode, target_view,
+                );
+                accum_is_a = !accum_is_a;
+            }
+        }
+        let final_tex = if accum_is_a { &self.folder_accum_a } else { &self.folder_accum_b };
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("folder-final-copy") });
+        encoder.copy_texture_to_texture(
+            final_tex.as_image_copy(),
+            self.blend_layer_tex.as_image_copy(),
+            wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
+        );
+        self.queue.submit(Some(encoder.finish()));
+        Ok(())
+    }
+
     fn composite_scene(&mut self, scene_in: &SceneIn, view_tf: Affine, base_color: Color) -> Result<(), JsValue> {
         let n = scene_in.layers.len();
         let mut is_matte_source = vec![false; n];
@@ -2821,7 +2947,37 @@ impl VelloEngine {
         });
         let has_effect = scene_in.layers.iter().any(|l| l.is_effect_layer.unwrap_or(false));
         let has_mask = scene_in.layers.iter().any(|l| !l.masks.is_empty());
-        if !has_blend && !has_matte && !has_effects_stack && !has_effect && !has_mask {
+        // Folder layer (2026-08) — forces the slow path even with zero
+        // effects on the folder itself: the fast path below paints every
+        // layer's `items` directly and nothing else, which for a folder
+        // (empty items, real content living in its children) would render
+        // as a silent gap where the whole group used to be.
+        let has_folder = scene_in.layers.iter().any(|l| l.is_folder_layer.unwrap_or(false));
+        // Layers consumed by some folder's child list — skipped in the main
+        // loop below exactly like is_matte_source, so a child never paints
+        // BOTH on its own AND again inside its folder's isolated render.
+        let mut is_folder_child = vec![false; n];
+        for l in &scene_in.layers {
+            if l.is_folder_layer.unwrap_or(false) {
+                if let Some(kids) = &l.folder_child_indices {
+                    for &ci in kids {
+                        // Nested folders are v1-unsupported (paint_folder_
+                        // children doesn't recurse into a folder child) —
+                        // rather than silently dropping a whole grandchild
+                        // subtree, a folder-shaped child is left OUT of
+                        // is_folder_child so the outer top-level loop still
+                        // renders it (and its own children) independently,
+                        // at its own z-position, just not scoped inside the
+                        // outer folder's isolated effect pass. Degraded,
+                        // never data-losing.
+                        if ci < n && !scene_in.layers[ci].is_folder_layer.unwrap_or(false) {
+                            is_folder_child[ci] = true;
+                        }
+                    }
+                }
+            }
+        }
+        if !has_blend && !has_matte && !has_effects_stack && !has_effect && !has_mask && !has_folder {
             let mut scene = Scene::new();
             self.push_atlas_keepalive(&mut scene);
             for layer in &scene_in.layers {
@@ -2841,6 +2997,12 @@ impl VelloEngine {
             // Consumed as a matte source by the layer below it — doesn't
             // paint as its own visible layer (AE convention).
             if is_matte_source[i] {
+                continue;
+            }
+            // Consumed as some folder's child — painted inside that
+            // folder's own isolated pass (see the is_folder_layer branch
+            // below), never as an independent top-level layer.
+            if is_folder_child[i] {
                 continue;
             }
             // Effect (adjustment) layer — unlike every other branch here,
@@ -2882,7 +3044,22 @@ impl VelloEngine {
                 accum_is_a = !accum_is_a;
                 continue;
             }
-            if layer.items.iter().any(|it| it.effects.iter().any(|e| e.enabled)) {
+            // Folder layer (2026-08) — instead of painting this layer's own
+            // (empty) items, recursively flatten just its children into
+            // self.blend_layer_view. Everything below this branch (masks,
+            // matte, this layer's OWN `effects` stack, blend-mode composite
+            // into the outer accumulator) is completely unmodified — it was
+            // already written generically against "whatever's sitting in
+            // blend_layer_view", so the folder's flattened children are
+            // indistinguishable from any ordinary layer's own paint from
+            // here on. This is what makes a folder's effects stack apply to
+            // ONLY its own subtree instead of the z-order tail
+            // is_effect_layer reads (contrast that branch's doc comment).
+            if layer.is_folder_layer.unwrap_or(false) {
+                let empty: Vec<usize> = Vec::new();
+                let kids = layer.folder_child_indices.as_ref().unwrap_or(&empty);
+                self.paint_folder_children(scene_in, kids, view_tf)?;
+            } else if layer.items.iter().any(|it| it.effects.iter().any(|e| e.enabled)) {
                 self.paint_layer_with_element_effects(layer, view_tf)?;
             } else {
                 let mut scene = Scene::new();
@@ -3341,6 +3518,12 @@ impl VelloEngine {
         let (blend_accum_b, blend_accum_b_view) = create_blend_accum_texture(&self.device, width, height, "blend-accum-b");
         self.blend_accum_b = blend_accum_b;
         self.blend_accum_b_view = blend_accum_b_view;
+        let (folder_accum_a, folder_accum_a_view) = create_blend_accum_texture(&self.device, width, height, "folder-accum-a");
+        self.folder_accum_a = folder_accum_a;
+        self.folder_accum_a_view = folder_accum_a_view;
+        let (folder_accum_b, folder_accum_b_view) = create_blend_accum_texture(&self.device, width, height, "folder-accum-b");
+        self.folder_accum_b = folder_accum_b;
+        self.folder_accum_b_view = folder_accum_b_view;
         let (matte_source_tex, matte_source_view) = create_blend_layer_texture(&self.device, width, height);
         self.matte_source_tex = matte_source_tex;
         self.matte_source_view = matte_source_view;

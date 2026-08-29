@@ -1813,6 +1813,11 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 .frow.ffolder{background:var(--panel2);}
 .frow.ffolder-collapsed{opacity:.85;}
 .frow.ffolder-collapsed .fc::before{content:'';position:absolute;inset:0;background:var(--accent);opacity:.06;pointer-events:none;}
+/* Folder LAYER (2026-08) — a real ld.isFolderLayer row, distinct from the
+   plain ld.folderId/.lfolder grouping above (which has no transform/effects
+   of its own). Drop-target highlight while dragging a layer onto its
+   middle band (moveLayerReorder, timeline.js) to reparent it. */
+.lrow.folder-drop-target,#frame-grid .frow.folder-drop-target{outline:2px solid var(--accent);outline-offset:-2px;background:color-mix(in srgb,var(--accent) 14%,transparent);}
 
 /* TOOLTIP */
 #ui-tip{position:fixed;z-index:400;background:var(--panel3);border:1px solid var(--border2);color:var(--text);
