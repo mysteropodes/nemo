@@ -2128,6 +2128,12 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
    persists a filesystem path; this badge is what "can go offline" looks
    like before the user ever hits a broken relink. */
 .media-row-badge.kind-linked{background:rgba(230,170,80,.18);color:#e8b869;}
+/* Linked-media broken state (2026-08-29, linked-media.js) — file moved/
+   deleted (desktop) or IndexedDB handle missing/permission not granted
+   (web). Distinct red from kind-linked's amber so "can go offline" (a
+   neutral fact) and "IS offline right now" (needs action) read differently
+   at a glance. */
+.media-row-badge.kind-missing{background:rgba(255,85,85,.18);color:#ff8a8a;}
 .media-row-size{font-size:8px;color:var(--text-dim);opacity:.75;}
 .media-row-thumb-icon{display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--text-dim);}
 .media-row-owner{display:flex;align-items:center;gap:4px;font-size:8.5px;color:var(--text-dim);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -2511,4 +2517,20 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 .rm-path-browse:hover{color:var(--text);}
 .rm-scale-computed{font-size:9px;color:var(--text-dim);white-space:nowrap;flex:none;}
 .rm-output-preview{font-size:9.5px;color:var(--text-dim);background:var(--panel2);border-radius:6px;padding:6px 8px;word-break:break-all;margin-top:2px;}
+
+/* Linked-media permission banner (2026-08-29, linked-media.js) — a web
+   project reopened with "Médias liés" media may hold FileSystemFileHandles
+   whose read permission needs re-granting THIS session (a browser platform
+   rule, not a bug: requestPermission() only works from inside a real click,
+   so this can't happen silently on load). Sits above the canvas, same
+   full-width-bar idiom as a persistent status strip rather than a toast
+   (a toast would disappear before the user acts on it). Hidden by default;
+   linked-media.js toggles display via its own pending-permission count. */
+.linked-media-banner{display:none;align-items:center;gap:10px;padding:6px 12px;background:rgba(230,170,80,.15);border-bottom:1px solid rgba(230,170,80,.35);color:#e8b869;font-size:11.5px;flex:none;}
+.linked-media-banner.show{display:flex;}
+.linked-media-banner-msg{flex:1;min-width:0;}
+.linked-media-banner-btn{flex:none;background:var(--accent);border:none;color:#fff;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;}
+.linked-media-banner-btn:hover{background:#5254d9;}
+.linked-media-banner-dismiss{flex:none;width:20px;height:20px;border-radius:5px;background:transparent;border:none;color:rgba(236,234,231,.55);cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;}
+.linked-media-banner-dismiss:hover{background:rgba(255,255,255,.1);color:var(--text);}
 .rm-item-error{font-size:9.5px;color:var(--red);padding:0 10px 8px 30px;}

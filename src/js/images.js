@@ -64,6 +64,32 @@
     var s=Math.min(1,maxW/w,maxH/h);
     return{w:w*s,h:h*s};
   }
+  // Small JPEG preview for a LINKED image's media-library entry (2026-08-29,
+  // linked-media.js) — same 96px-wide idea as native-video-bridge.js's own
+  // video thumbnail. Re-embedding the FULL dataUrl as `thumb` (the embedded-
+  // mode convention, media-library.js's own header comment) would silently
+  // put the exact weight linking is meant to avoid right back into the
+  // project JSON via mediaLibrary's own persisted `thumb` field.
+  function makeSmallThumb(dataUrl,natW,natH){
+    return new Promise(function(resolve){
+      var img=new Image();
+      img.onload=function(){
+        try{
+          var tw=96,th=Math.max(1,Math.round(96*(natH||img.naturalHeight||1)/(natW||img.naturalWidth||1)));
+          var c=document.createElement('canvas');c.width=tw;c.height=th;
+          c.getContext('2d').drawImage(img,0,0,tw,th);
+          resolve(c.toDataURL('image/jpeg',0.7));
+        }catch(e){resolve(null);}
+      };
+      img.onerror=function(){resolve(null);};
+      img.src=dataUrl;
+    });
+  }
+  // Linked-mode gate (2026-08-29) — desktop only checks the project setting
+  // (Tauri always has a real filesystem path); the web dispatch lives in
+  // importImages()/importImageFiles() below since it needs a completely
+  // different picker (showOpenFilePicker, not <input type=file>).
+  function isLinkedMode(){return state.mediaMode==='linked';}
 
   // Detects a numeric image sequence: same prefix/extension, digits differ.
   // Returns {isSeq, items:[{path,num}] sorted, prefix} — a "sequence" needs
@@ -117,12 +143,23 @@
   async function importSequence(items,prefix,seqFps){
     showToast(SM.t('toastImportingSequence'));
     var rep=seqRepeatCount(seqFps);
+    var linked=isLinkedMode();
     var frames=[];
+    var firstDataUrl=null,firstNat=null;
     for(var i=0;i<items.length;i++){
       var dataUrl=await readAsDataUrl(items[i].path);
       var nat=await naturalSize(dataUrl);
       var fit=fitSize(nat.w,nat.h);
-      for(var r=0;r<rep;r++)frames.push({strokes:[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}],isKeyframe:r===0,isInterpolated:r!==0});
+      if(i===0){firstDataUrl=dataUrl;firstNat=nat;}
+      // Linked mode: each numbered file gets its OWN linkedPath (unlike
+      // importStandalone's single still, a sequence is genuinely a
+      // different image per frame-group) — see importStandalone's own
+      // comment for why `src` is never written here.
+      var stroke=linked
+        ?{isRaster:true,linked:true,linkedPath:items[i].path,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}
+        :{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1};
+      if(linked&&window.SMLinkedMedia)SMLinkedMedia.primeCache({linkedPath:items[i].path},dataUrl);
+      for(var r=0;r<rep;r++)frames.push({strokes:[stroke],isKeyframe:r===0,isInterpolated:r!==0});
     }
     saveAllLayerFrames();pushUndoLayers(true);
     if(frames.length>state.totalFrames)window.SM.setTotalFrames(frames.length);
@@ -135,7 +172,10 @@
     // the timeline label a sequence as a sequence instead of guessing.
     state.layers[idx].footage={kind:'sequence',count:frames.length};
     activateUL(idx);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
-    if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name,{layerUid:state.layers[idx].layerUid});
+    if(linked){
+      var seqThumb=await makeSmallThumb(firstDataUrl,firstNat.w,firstNat.h);
+      if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',seqThumb,state.layers[idx].name,{layerUid:state.layers[idx].layerUid,linked:true,path:items[0].path,naturalW:firstNat.w,naturalH:firstNat.h});
+    }else if(window.SMMediaLibrary)SMMediaLibrary.addEntry(state.layers[idx].name,'image',frames[0].strokes[0].src,state.layers[idx].name,{layerUid:state.layers[idx].layerUid});
     showToast(SM.t('toastSequenceImportedSuffix')+items.length+' images sur le calque "'+prefix+'"');
   }
 
@@ -147,6 +187,7 @@
   // layer is the thing you then move, key and swap.
   async function importStandalone(paths){
     saveAllLayerFrames();pushUndoLayers(true);
+    var linked=isLinkedMode();
     for(var i=0;i<paths.length;i++){
       var dataUrl=await readAsDataUrl(paths[i]);
       var nat=await naturalSize(dataUrl);
@@ -157,21 +198,49 @@
       // Present on EVERY frame, not just the current one: a still is a
       // still for the layer's whole length, and a one-frame raster would
       // vanish the moment the playhead moved.
+      //
+      // Linked mode (2026-08-29, linked-media.js): the stroke NEVER carries
+      // `src` here — only linked:true + linkedPath. Writing the full
+      // dataUrl into every frame's literal (like the embedded branch below)
+      // would defeat linking entirely: saveAllLayerFrames() only ever
+      // re-serializes the CURRENT frame through serR (app.js) — every OTHER
+      // frame's dict is whatever THIS loop wrote, verbatim, forever. desR
+      // resolves the actual pixels back from disk at render time (cached).
       for(var f=0;f<ldN.frames.length;f++){
-        ldN.frames[f].strokes=[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}];
+        ldN.frames[f].strokes=linked
+          ?[{isRaster:true,linked:true,linkedPath:paths[i],x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}]
+          :[{isRaster:true,src:dataUrl,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}];
         ldN.frames[f].isKeyframe=(f===0);
         ldN.frames[f].isInterpolated=(f!==0);
       }
       ldN.footage={kind:'image',name:nm,w:nat.w,h:nat.h};
       activateUL(idx);
-      if(window.SMMediaLibrary)SMMediaLibrary.addEntry(nm,'image',dataUrl,ldN.name,{layerUid:ldN.layerUid});
+      if(linked){
+        if(window.SMLinkedMedia)SMLinkedMedia.primeCache({linkedPath:paths[i]},dataUrl); // instant first render, no resolve round-trip
+        var smallThumb=await makeSmallThumb(dataUrl,nat.w,nat.h);
+        if(window.SMMediaLibrary)SMMediaLibrary.addEntry(nm,'image',smallThumb,ldN.name,{layerUid:ldN.layerUid,linked:true,path:paths[i],naturalW:nat.w,naturalH:nat.h});
+      }else if(window.SMMediaLibrary)SMMediaLibrary.addEntry(nm,'image',dataUrl,ldN.name,{layerUid:ldN.layerUid});
     }
     loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
     showToast(paths.length>1?paths.length+SM.t('toastImagesImportedOwnLayersSuffix'):SM.t('toastImageImportedOwnLayer'));
   }
 
   async function importImages(){
-    if(!tauriOk()){document.getElementById('image-input').click();return;}
+    if(!tauriOk()){
+      // Web + linked mode (2026-08-29, linked-media.js): the classic
+      // <input type=file> below gives back plain File objects with no
+      // durable handle — nothing a reload could re-open. showOpenFilePicker
+      // is the ONLY web API that returns a FileSystemFileHandle worth
+      // stashing for later, so linked mode routes through it instead, when
+      // the browser supports it (Chromium only — Safari/Firefox fall
+      // through to the same <input> flow as embedded mode, degrading
+      // gracefully rather than silently doing nothing).
+      if(state.mediaMode==='linked'&&window.SMLinkedMedia&&SMLinkedMedia.isWebLinkingSupported()){
+        await importStandaloneWebLinked();
+        return;
+      }
+      document.getElementById('image-input').click();return;
+    }
     var paths=await window.__TAURI__.dialog.open({title:'Import Image(s)',multiple:true,filters:[
       {name:'Images',extensions:['png','jpg','jpeg','gif','webp','bmp','svg','avif']},
       {name:'Images pro (via ffmpeg)',extensions:Object.keys(PRO_IMAGE_EXTS)},
@@ -182,6 +251,39 @@
     var seq=paths.length>=2?detectSequence(paths):{isSeq:false};
     if(seq.isSeq)await importSequence(seq.items.map(function(it){return{path:it.path};}),seq.prefix,promptSequenceFps());
     else await importStandalone(paths);
+  }
+
+  // Web-linked standalone import (2026-08-29, linked-media.js) — the
+  // File System Access counterpart to importStandalone's desktop dialog
+  // path above. One layer per picked file, same "present on every frame"
+  // shape, just keyed by webHandleId instead of a filesystem path. No
+  // sequence-detection equivalent here (scoped out — a multi-file pick
+  // lands as N standalone linked layers instead of one sequence layer;
+  // documented limitation, not a crash, see the PR description).
+  async function importStandaloneWebLinked(){
+    var picked;
+    try{picked=await SMLinkedMedia.pickWebImages(true);}
+    catch(e){if(window.showToast)showToast(String((e&&e.message)||e),'warn');return;}
+    if(!picked||!picked.length)return;
+    saveAllLayerFrames();pushUndoLayers(true);
+    for(var i=0;i<picked.length;i++){
+      var p=picked[i];
+      var nm=p.name.replace(/\.[^.]+$/,'');
+      var fit=fitSize(p.naturalW,p.naturalH);
+      var idx=createUserLayer(nm);
+      var ldN=state.layers[idx];
+      for(var f=0;f<ldN.frames.length;f++){
+        ldN.frames[f].strokes=[{isRaster:true,linked:true,linkedHandleId:p.webHandleId,x:state.canvasW/2,y:state.canvasH/2,width:fit.w,height:fit.h,opacity:1}];
+        ldN.frames[f].isKeyframe=(f===0);
+        ldN.frames[f].isInterpolated=(f!==0);
+      }
+      ldN.footage={kind:'image',name:nm,w:p.naturalW,h:p.naturalH};
+      activateUL(idx);
+      var smallThumb=await makeSmallThumb(p.dataUrl,p.naturalW,p.naturalH);
+      if(window.SMMediaLibrary)SMMediaLibrary.addEntry(nm,'image',smallThumb,ldN.name,{layerUid:ldN.layerUid,linked:true,webHandleId:p.webHandleId,naturalW:p.naturalW,naturalH:p.naturalH});
+    }
+    loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();
+    showToast(picked.length>1?picked.length+SM.t('toastImagesImportedOwnLayersSuffix'):SM.t('toastImageImportedOwnLayer'));
   }
 
   // Legacy fallback for plain-browser testing (no Tauri fs/dialog): the
@@ -489,4 +591,14 @@
   window.SM=window.SM||{};window.SM.importImages=importImages;window.SM.importVideo=importVideo;
   window.SM.replaceFootageSource=replaceFootageSource;
   window.SM.importImageFiles=importImageFiles;window.SM.importVideoFile=importVideoFile;
+  // Exposed for linked-media.js's desktop resolve path (2026-08-29) — reuses
+  // the SAME decode (incl. the PRO_IMAGE_EXTS ffmpeg conversion above)
+  // instead of a second, narrower reimplementation that would silently
+  // mis-decode a linked .psd/.tiff/.exr/.dpx on every resolve after the
+  // in-memory cache is cold (a fresh session, or after eviction) — the
+  // ONE-TIME import-time read already went through this same function, so
+  // reusing it keeps both reads in phase (CLAUDE.md §3's "duplicated pair
+  // must stay identical" applies just as much to two calls to ONE function
+  // as to two hand-written copies).
+  window.SM._readImageAsDataUrl=readAsDataUrl;
 })();

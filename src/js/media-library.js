@@ -46,6 +46,15 @@
     var entry = {
       id: uid(), name: name, kind: kind, thumb: thumb, layerName: layerName || null,
       layerUid: opts.layerUid || null, linked: !!opts.linked, path: opts.path || null,
+      // webHandleId/naturalW/naturalH (2026-08-29, linked-media.js): a
+      // web-linked image's IndexedDB reference (no filesystem path exists
+      // to store instead — see linked-media.js's own header comment) plus
+      // its ORIGINAL pixel size, needed since `thumb` for a linked entry is
+      // a small preview, not the full image (see the header comment above:
+      // re-embedding the full image as a "thumbnail" would defeat the
+      // entire point of linking).
+      webHandleId: opts.webHandleId || null,
+      naturalW: opts.naturalW || null, naturalH: opts.naturalH || null,
       // audioId: audio tracks have no owning layer at all (state.audioTracks
       // is a separate array) — this is their own identity, used only by the
       // 'Supprimer la piste' menu action below to find the right track.
@@ -53,6 +62,11 @@
       sizeBytes: opts.linked ? null : dataUrlBytes(thumb),
       importedAt: Date.now(),
       status: opts.status || 'ready',
+      // linkedBroken/linkedBrokenReason (2026-08-29): session-only, set by
+      // linked-media.js's resolveAsync when the file/handle can't be read
+      // right now — deliberately not part of exportJSON (see that file's
+      // own comment on why this must never round-trip stale).
+      linkedBroken: false, linkedBrokenReason: null,
     };
     state.mediaLibrary.push(entry);
     render();
@@ -112,6 +126,24 @@
     if (!ld.frames[state.currentFrame].isKeyframe && !ld.frames[state.currentFrame].isInterpolated) {
       ld.frames[state.currentFrame].strokes = JSON.parse(JSON.stringify(getEffectiveStrokes(state.activeLayerIdx, state.currentFrame)));
       ld.frames[state.currentFrame].isKeyframe = true;
+    }
+    // Linked entry (2026-08-29, linked-media.js): m.thumb is only a small
+    // preview (see this file's own header comment — re-embedding the FULL
+    // image here would defeat the entire point of linking), so this pushes
+    // the SAME linked marker instead of a `src`, resolved lazily by desR
+    // exactly like the original import's strokes. naturalW/naturalH (stored
+    // at import time) stand in for the onload probe below, which only
+    // makes sense against a real full-res `src`.
+    if (m.linked) {
+      var nw = m.naturalW || 1, nh = m.naturalH || 1;
+      var sc = Math.min(1, state.canvasW / nw, state.canvasH / nh);
+      var stroke = { isRaster: true, linked: true, x: worldPt ? worldPt.x : state.canvasW / 2, y: worldPt ? worldPt.y : state.canvasH / 2, width: nw * sc, height: nh * sc, opacity: 1 };
+      if (m.path != null) stroke.linkedPath = m.path; else if (m.webHandleId) stroke.linkedHandleId = m.webHandleId;
+      ld.frames[state.currentFrame].strokes.push(stroke);
+      if (window.loadFrame) loadFrame(state.currentFrame);
+      if (window.updateUI) updateUI();
+      if (window.showToast) showToast(SM.t('toastImageInsertedFromLibrary'));
+      return;
     }
     var img = new Image();
     img.onload = function () {
@@ -183,7 +215,15 @@
   // anyway, so "the catalog entry can no longer be resolved at all" is the
   // realistic definition of broken for this app today, not a smaller
   // stand-in for the real thing.
-  function isMissing(m) { return !!(m.layerName || m.layerUid) && !resolveSrcLayer(m); }
+  // linkedBroken (2026-08-29, linked-media.js): the source LAYER still
+  // resolves fine here — it's the underlying FILE/handle that's gone (moved,
+  // deleted, or a web handle from a different browser/machine/session). A
+  // genuinely different flavor of "missing" than the orphan-layer case
+  // below, but the same filter/badge surface makes sense for both — this is
+  // exactly the "broken link" state a real filesystem-level Missing filter
+  // would show, which the pre-existing comment on this function noted Nemo
+  // didn't have a way to build until linked media existed.
+  function isMissing(m) { return (!!(m.layerName || m.layerUid) && !resolveSrcLayer(m)) || !!m.linkedBroken; }
   // Matches the SAME fields a user would recognize the entry by: its name,
   // and its source layer's name (so searching "background" finds every clip
   // that layer owns, not just files literally named that).
@@ -320,8 +360,18 @@
       // a filesystem path persists) — a real asset panel needs this
       // distinction since it determines what "broken" even means (2026-07-31).
       if (m.linked) {
-        var linkBadge = document.createElement('span'); linkBadge.className = 'media-row-badge kind-linked'; linkBadge.textContent = SM.t('mediaLinkedFileBadge'); linkBadge.title = m.path || '';
+        var linkBadge = document.createElement('span'); linkBadge.className = 'media-row-badge kind-linked'; linkBadge.textContent = SM.t('mediaLinkedFileBadge'); linkBadge.title = m.path || m.webHandleId || '';
         meta.appendChild(linkBadge);
+        // Broken-link badge (2026-08-29, linked-media.js) — file moved/
+        // deleted (desktop) or handle missing/permission not granted (web).
+        // Separate badge from kind-linked above so "can go offline" (always
+        // true for a linked entry) and "IS offline right now" stay visually
+        // distinct — see this file's own isMissing() comment.
+        if (m.linkedBroken) {
+          var brokenBadge = document.createElement('span'); brokenBadge.className = 'media-row-badge kind-missing';
+          brokenBadge.textContent = m.linkedBrokenReason === 'permission' ? t('mediaNeedsPermissionBadge', 'Permission requise') : t('mediaMissingFileBadge', 'Introuvable');
+          meta.appendChild(brokenBadge);
+        }
       } else if (m.sizeBytes) {
         var sizeEl = document.createElement('span'); sizeEl.className = 'media-row-size'; sizeEl.textContent = formatBytes(m.sizeBytes);
         meta.appendChild(sizeEl);
@@ -358,11 +408,18 @@
         // live IN the project). replaceNativeVideoSource is native-video-
         // bridge.js's own relink flow, same dialog/session-swap shape as
         // images.js's replaceFootageSource for the embedded raster kinds.
-        if (m.linked && srcLayer && window.SMNativeVideo && window.SMNativeVideo.replaceNativeVideoSource) {
+        if (m.linked && srcLayer && m.kind === 'video' && window.SMNativeVideo && window.SMNativeVideo.replaceNativeVideoSource) {
           items.push({ label: SM.t('ctxRelinkReplaceFile'), action: function () {
             var li = state.layers.indexOf(srcLayer);
             window.SMNativeVideo.replaceNativeVideoSource(li);
           } });
+        }
+        // Same relink action for a linked IMAGE (2026-08-29, linked-media.js)
+        // — the desktop/web dispatch and the actual dialog/picker live there,
+        // mirroring replaceNativeVideoSource's own shape for the per-frame
+        // raster-stroke storage images use instead of a layer-level session.
+        if (m.linked && srcLayer && m.kind === 'image' && window.SMLinkedMedia && window.SMLinkedMedia.relinkImageEntry) {
+          items.push({ label: SM.t('ctxRelinkReplaceFile'), action: function () { window.SMLinkedMedia.relinkImageEntry(m); } });
         }
         // Audio has real controls (mute/volume/offset-drag) on its own
         // timeline row already (audio-bridge.js) — deliberately NOT

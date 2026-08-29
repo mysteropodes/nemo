@@ -270,6 +270,16 @@
       <div id="project-tabs-list"></div>
       <button id="project-tab-add" data-i18n-title="newProjectTabTitle" title="Nouveau projet (nouvel onglet)">+</button>
     </div>
+    <!-- Linked-media permission banner (2026-08-29, linked-media.js) — hidden
+         by default, shown only when a "Médias liés" web project has one or
+         more FileSystemFileHandles whose read permission needs re-granting
+         THIS session (requestPermission() must run from inside a real
+         click — see linked-media.js's own comment). -->
+    <div id="linked-media-banner" class="linked-media-banner">
+      <span class="linked-media-banner-msg" id="linked-media-banner-msg" data-i18n="linkedMediaBannerMsg">Certains médias liés nécessitent une autorisation d'accès dans ce navigateur.</span>
+      <button type="button" class="linked-media-banner-btn" id="linked-media-banner-btn" data-i18n="linkedMediaBannerBtn">Autoriser l'accès</button>
+      <button type="button" class="linked-media-banner-dismiss" id="linked-media-banner-dismiss" title="Fermer">×</button>
+    </div>
     <div id="canvas-area">
       <canvas id="drawing-canvas" resize></canvas>
       <!-- Rulers + guides (rulers-bridge.js, 2026-08-27 — "mettre en place
@@ -745,6 +755,18 @@
         <div class="pr dims-row pair-grid">
           <span class="pl">FPS</span><input type="number" class="pi scrub" id="proj-fps" value="12" min="1" max="60" data-step="1">
           <span class="pl">Frames</span><input type="number" class="pi scrub" id="proj-frames" value="24" min="1" max="999" data-step="1">
+        </div>
+        <!-- Media mode (2026-08-29, linked-media.js) — ONE project-wide
+             setting (Cyril: "un seul réglage", not per-image), default
+             "Intégrés" (unchanged base64-in-JSON behavior). Governs NEW
+             imports only; flipping it never retroactively touches already-
+             embedded media. The tooltip carries the honest tradeoff (a
+             linked project is not portable, and on web the browser may
+             re-ask for permission each session) rather than hiding it. -->
+        <div class="pr dims-row" style="gap:4px" id="media-mode-row">
+          <span class="pl" data-i18n="hdrMedia" data-i18n-title="mediaModeTip" title="Intégrés : les images sont copiées dans le fichier projet (portable, plus lourd). Liés : le projet référence les fichiers d'origine (plus léger, mais casse si vous déplacez/partagez le projet sans les fichiers — et sur le web, le navigateur peut redemander l'autorisation à chaque session).">Médias</span>
+          <button class="pbtn ac" id="btn-media-mode-embedded" type="button" data-mode="embedded" data-i18n="mediaModeEmbedded" style="flex:1">Intégrés</button>
+          <button class="pbtn" id="btn-media-mode-linked" type="button" data-mode="linked" data-i18n="mediaModeLinked" style="flex:1">Liés</button>
         </div>
         <!-- dims-row (2026-07 feedback: "aligner les icônes avec bg") — BG's
              label used the default .pl (min-width:50px), pushing its swatch
@@ -2059,6 +2081,7 @@
 <script src="js/tools-panel-dock.js"></script>
 <script src="js/lottie-preview.js"></script>
 <script src="js/idb-store.js"></script>
+<script src="js/linked-media.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/layer-kind.js"></script>

@@ -66,6 +66,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "61437", "-d", "src"],
       "port": 61437
+    },
+    {
+      "name": "nemo-linked-media-qa",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "42871", "-d", "src"],
+      "port": 42871
     }
   ]
 }
