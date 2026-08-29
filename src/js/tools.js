@@ -6681,7 +6681,9 @@ function onMouseDown(event){
     // pushUndo() BEFORE ensureKeyframe(), and unconditionally — see
     // draw-bridge.js's commitStroke comment: one undo must revert both the
     // frame's auto-promotion to keyframe and whatever this click does.
-    pushUndo();ensureKeyframe();
+    // pushUndoActiveFrame() (tweens.js) — mirrors fill-bridge.js's own
+    // click handler (CLAUDE.md §3): this only ever mutates the current frame.
+    pushUndoActiveFrame();ensureKeyframe();
     if(event.modifiers.shift){
       var hitRm=layer.hitTest(event.point,{fill:true,tolerance:12/view.zoom});
       if(hitRm&&hitRm.item instanceof Path&&hitRm.item.fillColor){hitRm.item.fillColor=null;saveActiveLayerFrame();updateUI();showToast(SM.t('toastFillRemoved'));}

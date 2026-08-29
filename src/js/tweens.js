@@ -4363,6 +4363,61 @@ function _walkStrokes(layers,fn){
 // The live tree is briefly mutated (heavy fields nulled) — synchronous, with
 // no call-out in between, and restored in a `finally` so a throw inside
 // JSON.stringify cannot leave it stripped.
+// Same detach-heavy-fields-then-native-stringify technique as
+// _cloneLayersForUndo just below, scoped to ONE frame's own strokes array
+// instead of walking every layer's every frame. Exists because pushUndoLayers
+// (the only thing that ever pushed onto state.undoStack until now) always
+// snapshots the WHOLE animation — measured on a real 120-keyframe, one-layer,
+// 67052-item project: 298ms per undo-able click, ~80% of the paint bucket's
+// whole per-click cost, and NOT specific to the Fill tool — any undoable
+// action on a project this size pays it. undo()/redo() (below) already had a
+// matching lightweight RESTORE path for a non-'layers'-typed snapshot
+// ({frame, layers:[{strokes,isKeyframe,isInterpolated}]}) — nothing ever
+// PUSHED one, so that branch was dead code until this function.
+function _cloneStrokesForUndo(strokes){
+  if(!strokes)return strokes;
+  var HEAVY=(window._HEAVY_STROKE_FIELDS)||['src','bitmapPressureProfile'];
+  var saved=[];
+  strokes.forEach(function(s){
+    var e=null;
+    for(var i=0;i<HEAVY.length;i++){var k=HEAVY[i];
+      if(typeof s[k]==='string'){(e||(e={}))[k]=s[k];s[k]=null;}}
+    saved.push(e);
+  });
+  var c;
+  try{ c=JSON.parse(JSON.stringify(strokes)); }
+  finally{ strokes.forEach(function(s,j){var e=saved[j];if(e)for(var k in e)s[k]=e[k];}); }
+  c.forEach(function(s,j){var e=saved[j];if(e)for(var k in e)s[k]=e[k];});
+  return c;
+}
+// Frame-scoped undo entry — deliberately NOT type:'layers', so it lands in
+// undo()/redo()'s existing lightweight branch. Captures every layer's copy of
+// ONE frame (not layersSnapshotNow's whole animation), which is exactly what
+// that branch already restores. Correct as long as the guarded mutation never
+// touches a DIFFERENT frame index than state.currentFrame — true for the
+// Fill tool: ensureKeyframe() only ever promotes curF (the current frame),
+// and its cross-layer fan-out (syncLinkedKeyframeFolder, for linked-layer
+// groups) only ever writes the SAME frame index on sibling layers — both
+// captured here since this snapshots ALL layers, just the one frame.
+// Anything whose mutation could reach beyond the current frame (or that
+// calls saveAllLayerFrames() rather than saveActiveLayerFrame()) must keep
+// using the full pushUndo() instead.
+function pushUndoActiveFrame(){
+  if(window._scrubLiveActive)return;
+  if(typeof saveActiveLayerFrame==='function')saveActiveLayerFrame();
+  var frame=state.currentFrame;
+  var snap={frame:frame,layers:state.layers.map(function(ld){
+    var f=ld.frames[frame]||{};
+    return{strokes:_cloneStrokesForUndo(f.strokes),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated};
+  })};
+  state.undoStack.push(snap);state.undoLabels.push(_actionLabelNow());
+  if(state.undoStack.length>state.maxUndo){state.undoStack.shift();state.undoLabels.shift();}
+  state.redoStack=[];state.redoLabels=[];
+  if(window.SMFeedback)SMFeedback.logAction();
+  if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();
+  if(window.SMPlaybackCache)SMPlaybackCache.invalidateAll();
+  window._tweenFrameDirty=true;
+}
 function _cloneLayersForUndo(layers){
   var HEAVY=(window._HEAVY_STROKE_FIELDS)||['src','bitmapPressureProfile'];
   var saved=[],c;
