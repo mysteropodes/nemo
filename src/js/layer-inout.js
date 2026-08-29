@@ -565,6 +565,47 @@
       _drag = { group: true, type: type, startX: e.clientX, members: members, alt: !!e.altKey, keySel: keySelNow(), pressLi: li, hotEl: handleEl };
       return;
     }
+    // Folder body-drag carries its children along (2026-08-29, feedback
+    // #146: "le dossier parent ne deplace pas les layers avec lui... in
+    // time"). #319's own resize handling is deliberately non-destructive —
+    // dragging an EDGE of a folder's bar only clamps children's EFFECTIVE
+    // visibility against the folder's range, never touching their stored
+    // inPoint/outPoint (see engine.rs's is_folder_layer doc comment). But a
+    // BODY drag (type 'both') is a different gesture: for an ordinary layer
+    // it already means "move this layer's whole window AND its keyframes"
+    // (see this bar's own tooltip a few hundred lines down), and a folder
+    // has no content of its own to move — only its children do. Without
+    // this, body-dragging the folder shifted only the folder's own
+    // ld.inPoint/outPoint while every child sat at its old absolute frame
+    // position, silently falling (partially or fully) outside the folder's
+    // new window.
+    //
+    // Reuses the EXISTING multi-bar group-drag machinery above (normally
+    // reached via a _barSel marquee) instead of duplicating its retime +
+    // live-preview + keyframe-shift logic: the folder plus every layer
+    // whose parentLayerUid resolves to it (folderLayerChildMap, timeline.js
+    // — same lookup computeLayerRenderOrder uses to nest their rows) become
+    // "members" of a synthetic group, exactly as if the user had marquee-
+    // selected all of them with part:'both' before dragging. Gated on
+    // type==='both' specifically so an edge (type 'in'/'out') drag is
+    // completely untouched — invariant (1) above. A folder with zero
+    // children (or no folderLayerChildMap available) falls through to the
+    // plain single-bar drag below, unchanged — a safe no-op.
+    if (type === 'both' && ld.isFolderLayer && typeof folderLayerChildMap === 'function') {
+      var flChildrenOf = folderLayerChildMap().childrenOf[li] || [];
+      if (flChildrenOf.length) {
+        var fldIn = inPointOf(ld), fldOut = outPointOf(ld);
+        var fMembers = [{ li: li, row: row, origIn: fldIn, origOut: fldOut, part: 'both', lastIn: fldIn, lastOut: fldOut }];
+        flChildrenOf.forEach(function (ci) {
+          var cld = state.layers[ci], crow = _liToRow[ci];
+          if (!cld || !crow) return;
+          var cIn = inPointOf(cld), cOut = outPointOf(cld);
+          fMembers.push({ li: ci, row: crow, origIn: cIn, origOut: cOut, part: 'both', lastIn: cIn, lastOut: cOut });
+        });
+        _drag = { group: true, type: 'both', startX: e.clientX, members: fMembers, alt: !!e.altKey, keySel: keySelNow(), pressLi: li, hotEl: handleEl };
+        return;
+      }
+    }
     _drag = { li: li, row: row, type: type, startX: e.clientX, origIn: inPointOf(ld), origOut: outPointOf(ld), alt: !!e.altKey, keySel: keySelNow(), hotEl: handleEl };
   }
   // Parent in Time (2026-07-30 on-timeline connector) — a dragged bar's OWN

@@ -60,6 +60,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "58223", "-d", "src"],
       "port": 58223
+    },
+    {
+      "name": "nemo-fb146-folder-drag-qa",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "61437", "-d", "src"],
+      "port": 61437
     }
   ]
 }
