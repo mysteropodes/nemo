@@ -451,6 +451,25 @@
       var ld = state.layers[li];
       return ld && layerHasAnimatedElements(ld);
     });
+    // Un-collapse any folder hiding an ANIMATED target (2026-08-29 audit
+    // finding, confirmed live: with the only animated layer inside a
+    // collapsed folder, U appeared to do nothing — its row simply isn't
+    // rendered while ld.folderCollapsed hides the subtree, so the reveal
+    // set pointed at rows that don't exist). Same narrowing discipline as
+    // _motionRevealedElementLayers just above: only folders whose subtree
+    // actually CARRIES animated content get opened — expanding every
+    // folder on every U press would be feedback #42's clutter all over
+    // again. One level is the whole tree (no nested folders in v1).
+    targets.forEach(function (li) {
+      var ld = state.layers[li];
+      if (!ld || !ld.parentLayerUid) return;
+      var animated = PROPS.some(function (p) { return propHasContent(ld, p); }) || layerHasAnimatedElements(ld);
+      if (!animated) return;
+      for (var fi = 0; fi < state.layers.length; fi++) {
+        var fld = state.layers[fi];
+        if (fld && fld.isFolderLayer && fld.folderCollapsed && fld.layerUid === ld.parentLayerUid) fld.folderCollapsed = false;
+      }
+    });
     _hideUnanimated = true;
     renderLayerList(); renderTimeline();
     return true;
