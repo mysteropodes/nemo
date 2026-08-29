@@ -5412,6 +5412,39 @@
       window.SMMotion.setExprGlobals(v);
     });
     row.appendChild(glob);
+    // Examples menu (feedback #113, "les expressions ne sont pas encore
+    // très clair à utilisé il faudrait un menu... qui permettent d'avoir
+    // des exemples d'expression commune et basique à utiliser"). Every
+    // snippet below uses ONLY names actually present in compiledFnFor's
+    // sandbox arg list above (time/frame/value/layer/wiggle/loopOut/key/
+    // nearestKey/numKeys) — copy-pasteable by construction, nothing here
+    // can ever reference a variable that doesn't really exist. Reuses
+    // window.showContextMenu (ui.js), the same generic dropdown already
+    // used elsewhere off a plain button click, not just right-click.
+    var examplesBtn = document.createElement('button');
+    examplesBtn.className = 'motion-expr-glob';
+    examplesBtn.textContent = 'Exemples ▾';
+    examplesBtn.title = 'Insérer un exemple d’expression courante';
+    examplesBtn.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (!window.showContextMenu) return;
+      var followProp = (prop === 'rotation' || prop === 'opacity' || prop === 'scale' || prop === 'anchor') ? prop : 'position';
+      function insert(code) {
+        ta.value = code;
+        paintGutter();
+        commit();
+        ta.focus();
+      }
+      window.showContextMenu(e.clientX, e.clientY, [
+        { label: 'value — pas de changement', action: function () { insert('value'); } },
+        { label: 'value + wiggle(2, 10) — tremblement aléatoire', action: function () { insert('value + wiggle(2, 10)'); } },
+        { label: 'value + Math.sin(time * 3) * 10 — oscillation régulière', action: function () { insert('value + Math.sin(time * 3) * 10'); } },
+        { label: 'loopOut() — boucle en continu après la dernière clé', action: function () { insert('loopOut()'); } },
+        { label: 'key(1).value — reste sur la valeur de la 1ère clé', action: function () { insert('key(1).value'); } },
+        { label: 'layer(\'Nom du calque\').' + followProp + ' — suivre un autre calque', action: function () { insert('layer(\'Nom du calque\').' + followProp); } },
+      ]);
+    });
+    row.appendChild(examplesBtn);
     // ---- code pane (Van Dijk 7.5) ------------------------------------
     // A 3-row bare textarea was fine when an expression was one line; it
     // stops being fine the moment people actually write in it, which is his
