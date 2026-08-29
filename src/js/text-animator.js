@@ -246,12 +246,15 @@
     return units.length;
   }
 
-  // Small floating panel (2026-08-17) — deliberately NOT the RiveBar-style
-  // "_ui" declarative form (that's a different app/system entirely); built
-  // the same way this codebase's own in-place text editor and popovers
-  // already are: a plain DOM node appended to <body>, styled inline off
-  // the app's existing CSS custom properties (--panel2/--border/--text-dim)
-  // so it matches the surrounding chrome without a new stylesheet entry.
+  // Docked inline in the right panel's "Texte" section (2026-08-29,
+  // feedback #142: "ce panel devrait apparaître directement dans le panel
+  // droit text" — was a floating popup before this, see git history for
+  // that version if it's ever needed again). Lives in normal document flow
+  // right after #text-animate-row (the button that opens it), inside
+  // #text-actions-sec's own .pbdy — so it inherits that section's existing
+  // show/hide (updateTextActionsPanel, timeline.js) for free: when the
+  // section hides because nothing eligible is selected, this block hides
+  // right along with it, no separate close-on-deselect logic needed.
   // Live preview (2026-08-17, Cyril: "continue" after being asked for a
   // preview scrub) — the panel writes REAL elementMotion keys on every
   // control tweak (not a separate scratch copy: this codebase has no
@@ -269,66 +272,15 @@
   // tool here anyway — these are per-EDIT preferences, not app settings.
   var _lastSettings={mode:'char',preset:'fadeIn',easing:'default',unitFrames:12,staggerFrames:3,randomize:false};
   function closePanel(){ if(_panel){_panel.remove();_panel=null;} _panelUndoTaken=false; }
-  var PANEL_W=260;
-  // Anchor rect for the panel (2026-08-29, feedback #130: a hardcoded
-  // `top:80px;right:280px` landed INSIDE the right-side properties panel
-  // whenever that panel was wider than 280+260px — the two opaque panels
-  // then overlapped, and the properties panel's own rows showed through
-  // around the floating panel's edges (confirmed against the reporter's
-  // screenshot: "23 ELEMENTS SELEC…" and other prop rows visible around
-  // it). Anchoring off the SELECTED text's own on-canvas position instead
-  // — same world→screen projection openInPlaceTextEditor's reposition()
-  // already uses (view.projectToView + the canvas element's own rect) —
-  // keeps the panel inside the canvas area by construction, so it can
-  // never land on top of the (independently resizable) properties panel.
-  function computeAnchorRect(){
-    var canvasEl=document.getElementById('drawing-canvas');
-    if(!canvasEl||typeof view==='undefined'||!view.projectToView)return null;
-    var cr=canvasEl.getBoundingClientRect();
-    var b=null;
-    (window.selectedPaths||[]).forEach(function(p){
-      if(!p||!p.bounds)return;
-      b=b?b.unite(p.bounds):p.bounds.clone();
-    });
-    if(!b)return {left:cr.left,top:cr.top,right:cr.right,bottom:cr.top,canvasRect:cr};
-    var tl=view.projectToView(b.topLeft), br=view.projectToView(b.bottomRight);
-    return {
-      left:cr.left+Math.min(tl.x,br.x), top:cr.top+Math.min(tl.y,br.y),
-      right:cr.left+Math.max(tl.x,br.x), bottom:cr.top+Math.max(tl.y,br.y),
-      canvasRect:cr,
-    };
-  }
-  // Places `p` (already filled with its rows, not yet in the document) near
-  // `anchor`, clamped so it always stays fully inside the canvas area — both
-  // axes, unlike openLayerColorSwatches/openTweenCurveInset's own
-  // horizontal-only clamp, since this panel is tall enough to run off the
-  // bottom of a short window too. Prefers opening to the right of the
-  // selection (out of the text's own way); flips to the left if there's no
-  // room, same "flip rather than clip" rule those two popovers use for X.
-  function positionPanel(p, anchor){
-    var margin=12;
-    document.body.appendChild(p);
-    _panel=p;
-    var cr=(anchor&&anchor.canvasRect)||{left:margin,right:window.innerWidth-margin,top:margin,bottom:window.innerHeight-margin};
-    var w=p.offsetWidth||PANEL_W, h=p.offsetHeight||360;
-    var a=anchor||{left:cr.left,top:cr.top,right:cr.left,bottom:cr.top};
-    var left=a.right+margin;
-    if(left+w>cr.right-margin)left=a.left-w-margin;
-    if(left<cr.left+margin)left=Math.max(cr.left+margin,Math.min(a.left,cr.right-w-margin));
-    var top=Math.max(cr.top+margin,Math.min(a.top,window.innerHeight-h-margin));
-    p.style.left=Math.round(left)+'px';
-    p.style.top=Math.round(top)+'px';
-  }
   function openPanel(li, groupId){
     closePanel();
     var ld=state.layers[li]; if(!ld)return;
+    var host=document.getElementById('text-animate-row');
+    if(!host||!host.parentElement)return; // section not in the DOM (shouldn't happen — the button that triggers this lives right here)
     if(window.pushUndo){pushUndo();_panelUndoTaken=true;}
-    var anchor=computeAnchorRect();
     var p=document.createElement('div');
     p.id='text-animator-panel';
-    p.style.cssText='position:fixed;visibility:hidden;z-index:300;width:'+PANEL_W+'px;'+
-      'background:var(--panel2);border:1px solid var(--border);border-radius:10px;'+
-      'box-shadow:0 8px 24px rgba(0,0,0,.4);padding:12px;font-size:12px;color:var(--text)';
+    p.style.cssText='margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px;color:var(--text)';
     function row(labelTxt){
       var r=document.createElement('div');
       r.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px';
@@ -465,8 +417,8 @@
     btnRow.appendChild(cancelBtn); btnRow.appendChild(applyBtn);
     p.appendChild(btnRow);
 
-    positionPanel(p, anchor); // appends p, sets _panel, clamps to the canvas area
-    p.style.visibility='';
+    host.parentElement.insertBefore(p,host.nextSibling); // right after the button that opened it, same .pbdy
+    _panel=p;
     preview(); // show the default preset live the moment the panel opens
   }
 
