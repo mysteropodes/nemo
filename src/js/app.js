@@ -495,6 +495,20 @@ function applyBrushKeyline(p){
   if(!p.data||!p.data.isVectorBrush||p.data.isBrushTextureCopy||p.data.isFillShape)return;
   p.strokeColor=null;
 }
+// Persisted-coordinate rounding (feedback #114, "pourquoi les fichiers json
+// d'enregistrement sont si lourds ?"). serP() below writes raw Paper.js
+// doubles with no rounding at all — CLAUDE.md §5's 2-decimal rounding is
+// RENDER-path only (buildSceneJson), deliberately never applied here.
+// 3 decimals (vs. render's 2) is still >1000x finer than a single screen
+// pixel at any realistic zoom, so this only trims digits no edit or export
+// could ever show — measured ~40% smaller per coordinate on typical
+// stroke data. Scoped to ONLY the segments array below: it's a value being
+// READ off a live Paper.js Point into a brand-new plain array, never a
+// write back onto the live object, so this can never accumulate drift or
+// affect in-session editing (unlike centerSegments/widthProfile, which stay
+// untouched here on purpose — those are live structures later editing
+// functions read back at full precision, e.g. rebuildVectorBrushOutline).
+function _r3(v){return isFinite(v)?Math.round(v*1000)/1000:0;}
 function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.data.centerSegments?p.data.centerSegments:undefined;
   var widthProfile=isVB&&p.data.widthProfile?p.data.widthProfile:undefined;
   var fillSeed=(p.data&&p.data.fillSeed)?p.data.fillSeed:undefined,fillGapPx=(p.data&&p.data.fillGapPx!==undefined)?p.data.fillGapPx:undefined;
@@ -610,7 +624,7 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // stroke channel. isVB therefore forces hasRealStroke false regardless of
   // any legacy live strokeColor left by an older session.
   var hasRealStroke=isVB?false:!!p.strokeColor;
-  return{segments:p.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};}),closed:!!p.closed,strokeColor:(isVB||isNoStrokeChannel||isShadowNoStroke||isTexAnchor&&!p.strokeColor)?null:(p.strokeColor?colorHex8(p.strokeColor):'#ffffff'),hasRealStroke:hasRealStroke,strokeWidth:p.strokeWidth,strokeCap:p.strokeCap||'round',strokeJoin:p.strokeJoin||'round',miterLimit:p.miterLimit,fillColor:p.fillColor?colorHex8(p.fillColor):null,opacity:p.opacity!==undefined?p.opacity:1,dashArray:(p.dashArray&&p.dashArray.length)?p.dashArray.slice():undefined,dashOffset:p.dashOffset,paintOrder:(p.data&&p.data.paintOrder)?p.data.paintOrder:undefined,isVectorBrush:isVB||undefined,isFillShape:(p.data&&p.data.isFillShape)?true:undefined,isFillCloseLine:(p.data&&p.data.isFillCloseLine)?true:undefined,centerSegments:center,widthProfile:widthProfile,strokeProfile:(p.data&&p.data.strokeProfile)||undefined,profileBase:(p.data&&p.data.profileBase)||undefined,fillSeed:fillSeed,fillSeeds:fillSeeds,fillGapPx:fillGapPx,fillWalls:fillWalls,strokeId:strokeId,brushGroupId:brushGroupId,isLinkedFillCompanion:isLinkedFillCompanion,linkedFillId:linkedFillId,tweenOn:(p.data&&p.data.tweenOn)?true:undefined,boxAngle:(p.data&&p.data.boxAngle)?p.data.boxAngle:undefined,
+  return{segments:p.segments.map(function(s){return{point:[_r3(s.point.x),_r3(s.point.y)],handleIn:[_r3(s.handleIn.x),_r3(s.handleIn.y)],handleOut:[_r3(s.handleOut.x),_r3(s.handleOut.y)]};}),closed:!!p.closed,strokeColor:(isVB||isNoStrokeChannel||isShadowNoStroke||isTexAnchor&&!p.strokeColor)?null:(p.strokeColor?colorHex8(p.strokeColor):'#ffffff'),hasRealStroke:hasRealStroke,strokeWidth:p.strokeWidth,strokeCap:p.strokeCap||'round',strokeJoin:p.strokeJoin||'round',miterLimit:p.miterLimit,fillColor:p.fillColor?colorHex8(p.fillColor):null,opacity:p.opacity!==undefined?p.opacity:1,dashArray:(p.dashArray&&p.dashArray.length)?p.dashArray.slice():undefined,dashOffset:p.dashOffset,paintOrder:(p.data&&p.data.paintOrder)?p.data.paintOrder:undefined,isVectorBrush:isVB||undefined,isFillShape:(p.data&&p.data.isFillShape)?true:undefined,isFillCloseLine:(p.data&&p.data.isFillCloseLine)?true:undefined,centerSegments:center,widthProfile:widthProfile,strokeProfile:(p.data&&p.data.strokeProfile)||undefined,profileBase:(p.data&&p.data.profileBase)||undefined,fillSeed:fillSeed,fillSeeds:fillSeeds,fillGapPx:fillGapPx,fillWalls:fillWalls,strokeId:strokeId,brushGroupId:brushGroupId,isLinkedFillCompanion:isLinkedFillCompanion,linkedFillId:linkedFillId,tweenOn:(p.data&&p.data.tweenOn)?true:undefined,boxAngle:(p.data&&p.data.boxAngle)?p.data.boxAngle:undefined,
   // Rotate/scale anchor choice (2026-07, "la position du point d'ancrage
   // n'est pas mise en mémoire si je désélectionne et resélectionne
   // l'élément") — same persistence pattern as boxAngle right above: was
