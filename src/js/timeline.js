@@ -3114,6 +3114,14 @@ function updatePropsContext(){
     });
   }
   updateStatusBarHelp();
+  // Last, so it has the final word on the stroke controls' enabled state
+  // for the current SELECTION (feedback #169). Hooked here rather than in
+  // _restoreDrawingDefaults — that one syncs the panel from the TOOL's
+  // defaults and doesn't run on a selection change, which is exactly the
+  // mistake this call started out making. updatePropsContext is the single
+  // per-selection decider, and it re-enables as readily as it disables, so
+  // one call covers both directions.
+  if(window.syncStrokePropsForVectorBrush)syncStrokePropsForVectorBrush();
 }
 // "Drawing" tools are the ones for which strokeColor/fillColor/brushSize/
 // etc. mean "next stroke's defaults" — see _snapshotDrawingDefaults below.
@@ -9292,6 +9300,50 @@ function syncJoinEnabledForGradient(){
 }
 document.getElementById('p-strokegrad-along').addEventListener('change',syncJoinEnabledForGradient);
 syncJoinEnabledForGradient();
+// Vector-brush strokes (2026-08-30, feedback #169 "sur un objet selectionné
+// fait avec brush, le properties du panel stroke n'agissent pas").
+//
+// Measured on a real drawn brush stroke, one control at a time:
+//   Width  -> works (profile peak 3 -> 40)
+//   Color  -> works (fill #000000 -> #00cc44)
+//   Style / Cap / Join -> NOTHING changes
+//
+// The last three aren't broken so much as inapplicable: a vector brush is a
+// FILLED RIBBON, not a stroked path (its strokeColor is null and its colour
+// lives in fillColor — that's why setStrokeColor has its own isVectorBrush
+// branch). Its ends and corners are baked into the ribbon outline at draw
+// time, and a dash pattern on a filled shape means nothing.
+//
+// So they stay offered-but-silent, which is the worst of both worlds — the
+// exact state the 2026-07-30 UI audit called out elsewhere ("used to grey
+// this out via `disabled`... that state explained nothing"). Same remedy as
+// syncJoinEnabledForGradient right above: disable AND say why on hover.
+// Width/Color deliberately stay live, because they do work.
+function syncStrokePropsForVectorBrush(){
+  var anyBrush=false,anyOther=false;
+  (typeof selectedPaths!=='undefined'?selectedPaths:[]).forEach(function(p){
+    if(!p||!p.data)return;
+    if(p.data.isVectorBrush)anyBrush=true;else anyOther=true;
+  });
+  // Only when the selection is ENTIRELY brush strokes: a mixed selection
+  // still has ordinary paths these controls act on, so disabling would
+  // block a legitimate edit.
+  var off=anyBrush&&!anyOther;
+  var why=off?((window.SM&&SM.t)?SM.t('strokePropsBrushDisabledTitle'):'Sans effet sur un trait de brush : c’est une forme remplie, pas un contour — ses extrémités et ses coins font partie du tracé. Width et la couleur, eux, fonctionnent.'):'';
+  ['p-cap-grp','p-join-grp'].forEach(function(id){
+    var g=document.getElementById(id);
+    if(!g)return;
+    // Never fight syncJoinEnabledForGradient over the join group: if the
+    // gradient already disabled it, leave its own reason in place.
+    if(id==='p-join-grp'&&!off&&g.dataset.brushOff!=='1')return;
+    if(off){g.classList.add('grp-disabled');g.title=why;g.dataset.brushOff='1';}
+    else if(g.dataset.brushOff==='1'){g.classList.remove('grp-disabled');g.title='';delete g.dataset.brushOff;
+      if(id==='p-join-grp')syncJoinEnabledForGradient();}
+  });
+  var st=document.getElementById('p-strokestyle');
+  if(st){st.disabled=off;st.title=why;}
+}
+window.syncStrokePropsForVectorBrush=syncStrokePropsForVectorBrush;
 document.getElementById('p-vecbrush').addEventListener('change',function(){window.SM.setVectorBrush(this.checked);});
 // Transform panel fields (position/size/rotation) used to only apply on
 // 'change' — the native event that fires once, at the END of a drag-scrub
