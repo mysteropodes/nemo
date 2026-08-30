@@ -2710,3 +2710,26 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 #start-github{display:inline-flex;align-items:center;gap:7px;margin:2px 0 20px;
   font-size:11px;color:var(--text-dim);text-decoration:none;transition:color .15s;}
 #start-github:hover{color:var(--text);}
+
+/* Document's BG + view-toggle row wraps instead of overflowing (2026-08-31,
+   feedback #187: "les bouton de document devrait wrapper si je resize plus
+   petit le panel droit et bg avoir un carré constant"). The row is a flex
+   line of seven 30px icon buttons plus the colour swatch: at the panel's
+   narrowest it needs ~250px, so below that the last buttons were pushed
+   outside the panel and became unreachable rather than moving to a second
+   line. `.pr` sets no flex-wrap, so this is opt-in for THIS row only —
+   the paired W/H and FPS/Frames rows above deliberately stay on one line.
+   row-gap matches the 4px inline gap so a wrapped second line doesn't sit
+   flush against the first. */
+#canvas-sec .doc-bg-row{flex-wrap:wrap;row-gap:4px;}
+/* A constant SQUARE, whatever the panel width — it was 28x22, i.e. a
+   rectangle that also shrank as the row tightened (flex items shrink by
+   default), which is the other half of the same report. flex:none keeps it
+   at its size while the buttons around it wrap. */
+#canvas-sec .doc-bg-row #p-cbg{width:22px;height:22px;flex:none;}
+/* The buttons keep the app-wide 30px. Shrinking them to squeeze all seven
+   onto one line at the default panel width was tried and dropped: it bought
+   one line back at exactly one width while giving this row an icon size
+   nothing else in the app uses. Two lines at the default is the honest
+   result of wrapping, and every button stays reachable — which is the point
+   of the report. */
