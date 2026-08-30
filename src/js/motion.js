@@ -7030,6 +7030,26 @@
   // _motionExpandedLayer/_motionExpandedElement/_motionExpandedPathHolder
   // elsewhere in this file (only one open at a time, tracked on window so a
   // full re-render can restore which one).
+  // Breadcrumb for the split editor's header — "Layer 1 › Shape 2 › Position".
+  // The panel sits beside the canvas with nothing else naming its target, so
+  // it has to say what it is editing; the inline row never needed this
+  // because it is physically attached to the property it belongs to.
+  function exprPanelLabelFor(holder, prop) {
+    var r = resolveHolderLayer(holder);
+    var parts = [];
+    if (r && r.ld) parts.push(r.ld.name || 'Layer');
+    // An element holder names its shape by position in the layer's element
+    // list rather than by strokeId — the id is an internal token ("c17881…")
+    // and would be noise in a header meant to orient you.
+    if (r && r.strokeId && typeof layerElements === 'function') {
+      var els = layerElements(r.ld) || [];
+      for (var i = 0; i < els.length; i++) {
+        if (els[i] && els[i].strokeId === r.strokeId) { parts.push('Shape ' + (i + 1)); break; }
+      }
+    }
+    parts.push(PROP_LABEL[prop] || prop);
+    return parts.join('  ›  ');
+  }
   function buildExprEditorRow(holder, prop) {
     var expr = ensureExpr(holder, prop);
     var row = document.createElement('div'); row.className = 'lrow motion-expr-editor';
@@ -7217,6 +7237,29 @@
       ].filter(Boolean));
     });
     row.appendChild(examplesBtn);
+    // Open the same expression in the split code editor beside the canvas
+    // (2026-08-30, "un code editor window qui split la zone du canvas...
+    // pouvoir le fermer où l'ouvrir depuis un bouton dans la zone
+    // d'expression existante"). The inline box stays exactly as it is —
+    // this is a second VIEW of one expression, never a second copy: both
+    // go through SMMotion.applyExprCode. Toggles, so the same button also
+    // closes a panel already showing this property.
+    if (window.SMExprPanel) {
+      var popBtn = document.createElement('button');
+      popBtn.className = 'motion-expr-glob motion-expr-pop';
+      var ref = holderRefOf(holder);
+      var showing = SMExprPanel.isShowing(ref, prop);
+      popBtn.textContent = showing ? SM.t('btnCloseCodeEditor') : SM.t('btnOpenCodeEditor');
+      popBtn.title = SM.t('titleCodeEditorHint');
+      popBtn.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        commit(); // don't lose an uncommitted edit when the panel takes over
+        if (SMExprPanel.isShowing(ref, prop)) SMExprPanel.close();
+        else SMExprPanel.open(ref, prop, exprPanelLabelFor(holder, prop));
+        renderLayerList();
+      });
+      row.appendChild(popBtn);
+    }
     // ---- code pane (Van Dijk 7.5) ------------------------------------
     // A 3-row bare textarea was fine when an expression was one line; it
     // stops being fine the moment people actually write in it, which is his
@@ -10664,6 +10707,50 @@
     elementFillColorAt: elementFillColorAt,
     elementStrokeColorAt: elementStrokeColorAt,
     elementStrokeWidthAt: elementStrokeWidthAt,
+    // ---- Expression code, addressed from outside this closure -----------
+    // For the split code editor (expr-code-panel.js, 2026-08-30: "un code
+    // editor window qui split la zone du canvas"). The panel is a SECOND
+    // view of an expression the inline ƒx row already edits, so it must not
+    // own any state: it addresses one by the same {uid, elem} holder ref
+    // copySelectedKeys uses, reads through exprSnapshotFor and writes
+    // through applyExprCode — which is the inline editor's own commit(),
+    // moved here so there is exactly one writer for both surfaces
+    // (the two-writers-disagreeing bug this session already produced once,
+    // in the color picker).
+    holderRefOf: holderRefOf,
+    exprSnapshotFor: function (ref, prop) {
+      var holder = holderFromRef(ref);
+      if (!holder) return null;
+      var e = ensureExpr(holder, prop);
+      return { code: e.code || '', enabled: !!e.enabled, lastError: e.lastError || null, errorLine: e.errorLine };
+    },
+    applyExprCode: function (ref, prop, code) {
+      var holder = holderFromRef(ref);
+      if (!holder) return false;
+      var e = ensureExpr(holder, prop);
+      if (e.code === code) return false;
+      pushUndo();
+      e.code = code;
+      e.lastError = null;
+      e.errorLine = -1;
+      if (holder._exprCompiled) delete holder._exprCompiled[prop];
+      if (typeof saveActiveLayerFrame === 'function') saveActiveLayerFrame();
+      reloadIfTimeLinkOffset(prop);
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      renderLayerList(); renderTimeline();
+      return true;
+    },
+    setExprEnabled: function (ref, prop, on) {
+      var holder = holderFromRef(ref);
+      if (!holder) return false;
+      pushUndo();
+      ensureExpr(holder, prop).enabled = !!on;
+      if (typeof saveActiveLayerFrame === 'function') saveActiveLayerFrame();
+      reloadIfTimeLinkOffset(prop);
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      renderLayerList(); renderTimeline();
+      return true;
+    },
     // Lets the ORDINARY fill/stroke color picker (SM.setFillColor /
     // setStrokeColor, timeline.js) reach an element's Motion color track.
     // Without this the two writers disagree in the one way that loses the

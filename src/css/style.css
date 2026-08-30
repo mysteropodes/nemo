@@ -2637,3 +2637,39 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 .linked-media-banner-dismiss{flex:none;width:20px;height:20px;border-radius:5px;background:transparent;border:none;color:rgba(236,234,231,.55);cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;}
 .linked-media-banner-dismiss:hover{background:rgba(255,255,255,.1);color:var(--text);}
 .rm-item-error{font-size:9.5px;color:var(--red);padding:0 10px 8px 30px;}
+
+/* ===== Split code editor for expressions (expr-code-panel.js) ============
+   #expr-split-row wraps #canvas-area in a flex ROW so the panel can take a
+   real slice of the stage instead of floating over the artwork. The wrapper
+   inherits the flex:1/min-height:0 that #canvas-area itself had inside the
+   flex-column #canvas-col — without min-height:0 a flex child refuses to
+   shrink below its content and the timeline gets pushed off-screen. */
+#expr-split-row{display:flex;flex:1;min-height:0;min-width:0;}
+#expr-split-row>#canvas-area{flex:1;min-width:0;}
+#expr-code-panel{position:relative;flex:0 0 auto;display:flex;flex-direction:column;
+  min-width:220px;background:var(--panel2);border-right:1px solid var(--border);}
+.ecp-head{display:flex;align-items:center;gap:8px;padding:7px 8px 6px 10px;
+  border-bottom:1px solid var(--border);}
+.ecp-title{flex:1;min-width:0;font-size:11.5px;font-weight:600;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ecp-close{background:none;border:none;color:var(--text-recessed);cursor:pointer;
+  font-size:16px;line-height:1;padding:0 4px;}
+.ecp-close:hover{color:var(--text);}
+.ecp-enable{display:flex;align-items:center;gap:2px;padding:7px 10px 5px;
+  font-size:11px;color:var(--text-value);cursor:pointer;}
+/* min-height:0 again: this is the flex child that must actually scroll. */
+.ecp-pane{flex:1;min-height:0;display:flex;overflow:hidden;background:#16161a;}
+.ecp-gutter{flex:0 0 auto;padding:8px 6px 8px 10px;text-align:right;
+  font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+  color:rgba(236,234,231,.28);white-space:pre;overflow:hidden;user-select:none;}
+.ecp-code{flex:1;min-width:0;resize:none;border:none;outline:none;background:none;
+  padding:8px 10px 8px 4px;color:var(--text);
+  font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;}
+.ecp-err{padding:6px 10px;font-size:10.5px;color:#ff8b8b;
+  border-top:1px solid var(--border);white-space:pre-wrap;}
+/* Drag edge. Sits ON the border rather than taking layout width, so the
+   code area keeps every pixel the user gave it. */
+.ecp-grip{position:absolute;top:0;right:-3px;width:6px;height:100%;
+  cursor:ew-resize;z-index:5;}
+.ecp-grip:hover{background:var(--accent);opacity:.5;}
+.motion-expr-pop{margin-left:4px;}
