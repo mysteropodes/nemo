@@ -188,6 +188,25 @@
     // shows nothing extra here, same "hidden until its prerequisite is
     // set" precedent Time Remap already establishes for symbolId.
     if (holder && holder.parentLayerUidB) list = list.concat(['parentBlend']);
+    // One weight row per parent beyond A/B (2026-08-30). Self-registered
+    // here for the same reason the exposed-property keys below are: a
+    // project reload never re-runs whatever code created the parent, and
+    // propsFor is the one function BOTH sides call before rendering a row,
+    // so registering here is what survives first-use and reload alike.
+    // Default 0 so adding a parent never moves the layer until you give it
+    // weight — see weightedParentsOf for why that falls out of the model.
+    if (holder && holder.parentLayerUidB && holder.parentsMore) {
+      for (var pw = 0; pw < holder.parentsMore.length; pw++) {
+        var pwe = holder.parentsMore[pw];
+        if (!pwe || !pwe.uid) continue;
+        var pwIdx = findLayerIndexByUid(pwe.uid);
+        var pwName = pwIdx >= 0 ? (state.layers[pwIdx].name || ('Layer ' + (pwIdx + 1))) : '?';
+        var pwKey = parentWeightKeyFor(pw);
+        registerExposedPropMeta(pwKey, SM.t('propParentWeightPrefix') + ' ' + pwName, 0);
+        PROP_UNIT[pwKey] = '%';
+        list = list.concat([pwKey]);
+      }
+    }
     // Matte On (2026-08-30) — same "only once it means something" gate as
     // parentBlend right above: a layer with no matte has nothing to switch
     // on and off, so the row would be a dead control. Threshold semantics
@@ -3502,9 +3521,69 @@
   // one, so no separate pivot offset is needed) that every existing
   // parentChain consumer already knows how to apply, via parentChainMats'
   // own dispatch below.
+  // ---- Weighted parents, 3 and up (2026-08-30) -------------------------
+  // "OK pour poids" — beyond A/B, a layer can carry ld.parentsMore, each
+  // entry with its own keyframable weight (parentWeight0, 1, …). Weights are
+  // ABSOLUTE percentages that get normalized by their sum, and A/B keep
+  // deriving theirs from parentBlend: wA = 100 - blend, wB = blend.
+  //
+  // Two properties fall straight out of that choice and are the reason for
+  // it. With no extras the weights are (1-t, t), they already sum to 1, so
+  // normalization is the identity and the two-parent case runs the code it
+  // always ran — unchanged, not "equivalent". And a freshly added parent
+  // defaults to weight 0, so pressing "+" never makes the layer jump.
+  //
+  // The blend is a weighted average of DECOMPOSED components, never of raw
+  // matrices: averaging matrices shears and collapses them. That is also
+  // what the existing two-parent lerp above already does, so this is the
+  // same idea with n terms rather than a different technique. Rotation uses
+  // a circular mean (average the unit vectors, then atan2) because degrees
+  // wrap — a plain numeric average of 350° and 10° gives 180°, pointing
+  // exactly backwards.
+  function parentWeightKeyFor(i) { return 'parentWeight' + i; }
+  function weightedParentsOf(ld, frameIdx) {
+    var extras = ld.parentsMore || [];
+    if (!extras.length) return null;
+    var out = [];
+    var t = (valueAtFrame(ld, 'parentBlend', frameIdx)[0] || 0) / 100;
+    out.push({ uid: ld.parentLayerUid, w: 1 - t });
+    out.push({ uid: ld.parentLayerUidB, w: t });
+    for (var i = 0; i < extras.length; i++) {
+      if (!extras[i] || !extras[i].uid) continue;
+      var wv = valueAtFrame(ld, parentWeightKeyFor(i), frameIdx);
+      out.push({ uid: extras[i].uid, w: ((wv && wv[0]) || 0) / 100 });
+    }
+    return out;
+  }
+  function blendWeighted(parts, frameIdx) {
+    var sum = 0, i;
+    for (i = 0; i < parts.length; i++) sum += parts[i].w;
+    // Every weight at zero has no meaningful answer — fall back to the
+    // first parent rather than dividing by zero and rendering NaN, which
+    // would blank the layer with no clue why.
+    if (!(sum > 1e-9)) { parts = [{ uid: parts[0].uid, w: 1 }]; sum = 1; }
+    var dx = 0, dy = 0, sx = 0, sy = 0, cx = 0, cy = 0, any = false;
+    for (i = 0; i < parts.length; i++) {
+      var w = parts[i].w / sum;
+      if (!w) continue;
+      var m = composeChainTransform(parts[i].uid, frameIdx);
+      if (!m) { m = { dx: 0, dy: 0, rot: 0, sx: 1, sy: 1 }; } else { any = true; }
+      dx += m.dx * w; dy += m.dy * w; sx += m.sx * w; sy += m.sy * w;
+      var r = m.rot * Math.PI / 180;
+      cx += Math.cos(r) * w; cy += Math.sin(r) * w;
+    }
+    if (!any) return null;
+    return {
+      dx: dx, dy: dy, sx: sx, sy: sy,
+      rot: (cx === 0 && cy === 0) ? 0 : Math.atan2(cy, cx) * 180 / Math.PI,
+      op: 1, ax: 0, ay: 0,
+    };
+  }
   function blendedAncestorMat(li, frameIdx) {
     var ld = state.layers[li];
     if (!ld || !ld.parentLayerUidB || !ld.parentLayerUid) return null;
+    var many = weightedParentsOf(ld, frameIdx);
+    if (many) return blendWeighted(many, frameIdx);
     var t = (valueAtFrame(ld, 'parentBlend', frameIdx)[0] || 0) / 100;
     var A = composeChainTransform(ld.parentLayerUid, frameIdx);
     var B = composeChainTransform(ld.parentLayerUidB, frameIdx);
@@ -3531,6 +3610,36 @@
   function blendedParent3D(li, frameIdx) {
     var ld = state.layers[li];
     if (!ld || !ld.parentLayerUidB || !ld.parentLayerUid) return null;
+    // Weighted N-parent 3D (2026-08-30) — same single-level rule as the
+    // two-parent path below, just averaged over n terms with the same
+    // weights blendedAncestorMat uses, so the 2D and 3D halves of one
+    // layer can never disagree about how much each parent counts.
+    var many3 = weightedParentsOf(ld, frameIdx);
+    if (many3) {
+      var s3 = 0, k;
+      for (k = 0; k < many3.length; k++) s3 += many3[k].w;
+      if (!(s3 > 1e-9)) return null;
+      var dz = 0, rcx = 0, rcy = 0, ycx = 0, ycy = 0, got = false;
+      for (k = 0; k < many3.length; k++) {
+        var w3 = many3[k].w / s3;
+        if (!w3) continue;
+        var pi = findLayerIndexByUid(many3[k].uid);
+        var pl = pi >= 0 ? state.layers[pi] : null;
+        if (!pl || !pl.threeD) continue;
+        got = true;
+        dz += valueAtFrame(pl, 'positionZ', frameIdx)[0] * w3;
+        var rx = valueAtFrame(pl, 'rotationX', frameIdx)[0] * Math.PI / 180;
+        var ry = valueAtFrame(pl, 'rotationY', frameIdx)[0] * Math.PI / 180;
+        rcx += Math.cos(rx) * w3; rcy += Math.sin(rx) * w3;
+        ycx += Math.cos(ry) * w3; ycy += Math.sin(ry) * w3;
+      }
+      if (!got) return null;
+      return {
+        dz: dz,
+        drx: (rcx === 0 && rcy === 0) ? 0 : Math.atan2(rcy, rcx) * 180 / Math.PI,
+        dry: (ycx === 0 && ycy === 0) ? 0 : Math.atan2(ycy, ycx) * 180 / Math.PI,
+      };
+    }
     var t = (valueAtFrame(ld, 'parentBlend', frameIdx)[0] || 0) / 100;
     var aIdx = findLayerIndexByUid(ld.parentLayerUid), bIdx = findLayerIndexByUid(ld.parentLayerUidB);
     var aLd = aIdx >= 0 ? state.layers[aIdx] : null, bLd = bIdx >= 0 ? state.layers[bIdx] : null;
@@ -6666,7 +6775,113 @@
     });
 
     row.appendChild(pill);
+    // "+" — a third parent and beyond (2026-08-30, "la possibilité
+    // d'ajouter d'autres parent pareil que matte et animable"). Only once
+    // BOTH A and B are set: the extras are weighted against the A/B pair,
+    // so there is nothing to weight them against until that pair exists.
+    if (pName && pbName) {
+      var addP = document.createElement('button');
+      addP.className = 'motion-expr-glob motion-parent-add';
+      addP.textContent = '+';
+      addP.title = SM.t('titleParentAddHint');
+      addP.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var pick = firstFreeParentLayer(li, ld);
+        if (pick == null) { if (window.showToast) showToast(SM.t('toastNoLayerLeftForParent')); return; }
+        pushUndoLayers(true);
+        ld.parentsMore = ld.parentsMore || [];
+        ld.parentsMore.push({ uid: ensureLayerUid(state.layers[pick]) });
+        renderLayerList(); renderTimeline();
+        if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      });
+      row.appendChild(addP);
+    }
     body.appendChild(row);
+    // One pill per extra parent. The WEIGHT is not here: it is an ordinary
+    // keyframable property row in the Transform group below (propsFor),
+    // so it gets the stopwatch, ease curves and expressions like anything
+    // else — this row only says WHICH layer, matching how the Matte stack
+    // splits "which layer" from its own animatable amount.
+    if (pName && pbName && ld.parentsMore && ld.parentsMore.length) {
+      ld.parentsMore.forEach(function (pe, pi) {
+        var r2 = document.createElement('div'); r2.className = 'lrow motion-prop-row';
+        var sp = document.createElement('span');
+        sp.textContent = '+ Parent'; sp.style.minWidth = '70px'; sp.style.opacity = '.7';
+        r2.appendChild(sp);
+        var xi = _layerIndexByUid(pe.uid);
+        var p2 = document.createElement('div');
+        p2.className = 'lparent motion-parent-pill';
+        var l2 = document.createElement('span'); l2.className = 'mp-label';
+        l2.textContent = xi >= 0 ? (state.layers[xi].name || ('Layer ' + (xi + 1))) : '?';
+        p2.appendChild(l2);
+        p2.title = SM.t('titleExtraParentHint');
+        p2.addEventListener('click', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          openExtraParentMenu(e.clientX, e.clientY, li, ld, pi);
+        });
+        r2.appendChild(p2);
+        body.appendChild(r2);
+      });
+    }
+  }
+  function firstFreeParentLayer(li, ld) {
+    var used = {};
+    if (ld.parentLayerUid) used[ld.parentLayerUid] = 1;
+    if (ld.parentLayerUidB) used[ld.parentLayerUidB] = 1;
+    (ld.parentsMore || []).forEach(function (p) { if (p && p.uid) used[p.uid] = 1; });
+    for (var i = 0; i < state.layers.length; i++) {
+      if (i === li) continue;
+      var u = state.layers[i].layerUid;
+      if (u && used[u]) continue;
+      // Refuse anything that would close a loop, the same guard
+      // setLayerParent applies to A — an extra parent is a real parent.
+      if (u && wouldCreateParentCycle(ensureLayerUid(ld), u)) continue;
+      return i;
+    }
+    return null;
+  }
+  function openExtraParentMenu(x, y, li, ld, pi) {
+    if (!window.showContextMenu) return;
+    var entry = (ld.parentsMore || [])[pi];
+    if (!entry) return;
+    var items = [];
+    state.layers.forEach(function (o, oi) {
+      if (oi === li) return;
+      var u = ensureLayerUid(o);
+      var bad = wouldCreateParentCycle(ensureLayerUid(ld), u);
+      items.push({
+        label: (o.name || ('Layer ' + (oi + 1))) + (entry.uid === u ? '  ✓' : ''),
+        disabled: bad,
+        action: function () {
+          if (bad) return;
+          pushUndoLayers(true);
+          entry.uid = u;
+          renderLayerList(); renderTimeline();
+          if (window.SMEngineBridge) SMEngineBridge.renderNow();
+        }
+      });
+    });
+    items.push({ sep: true });
+    items.push({ label: SM.t('menuRemoveThisParent'), action: function () {
+      pushUndoLayers(true);
+      ld.parentsMore.splice(pi, 1);
+      // The weight tracks are indexed BY POSITION, so removing an entry
+      // has to shift every later one down or they'd re-point at the wrong
+      // parent — the same index-drift trap per-vertex vtxN keys have.
+      var keys = ['motion', 'motionStatic'];
+      keys.forEach(function (bag) {
+        if (!ld[bag]) return;
+        for (var i = pi; i < ld.parentsMore.length + 1; i++) {
+          var here = parentWeightKeyFor(i), next = parentWeightKeyFor(i + 1);
+          if (ld[bag][next] !== undefined) ld[bag][here] = ld[bag][next];
+          else delete ld[bag][here];
+        }
+      });
+      if (!ld.parentsMore.length) delete ld.parentsMore;
+      renderLayerList(); renderTimeline();
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    } });
+    window.showContextMenu(x, y, items);
   }
   // ---- PARENT IN TIME (Van Dijk 2.1) ---------------------------------
   // The spatial Parent row's counterpart: instead of "whose transform do I

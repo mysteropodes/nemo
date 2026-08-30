@@ -287,6 +287,14 @@
       // whatever happens to answer to it here, or nothing at all. Entries
       // whose source didn't come along are dropped rather than nulled: the
       // array holds only real mattes.
+      // Extra weighted parents carry uids too — same remap requirement as
+      // parentLayerUid/B just above.
+      if (clone.parentsMore && clone.parentsMore.length) {
+        var pm = clone.parentsMore
+          .filter(function (p) { return p && p.uid && uidMap[p.uid]; })
+          .map(function (p) { return { uid: uidMap[p.uid] }; });
+        if (pm.length) nl.parentsMore = pm; else delete nl.parentsMore;
+      }
       if (clone.mattesMore && clone.mattesMore.length) {
         var mm = clone.mattesMore
           .filter(function (m) { return m && m.uid && uidMap[m.uid]; })
