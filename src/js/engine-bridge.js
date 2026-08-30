@@ -1550,6 +1550,17 @@
             // applyTextBoundsFollowFor) never ran because `sd` stayed null.
             && !(window.SMMotion && cPathOpsStrokeId && SMMotion.hasPathVertexFollowMotionFor && SMMotion.hasPathVertexFollowMotionFor(i, cPathOpsStrokeId))
             && !(window.SMMotion && cPathOpsStrokeId && SMMotion.hasTextBoundsFollowMotionFor && SMMotion.hasTextBoundsFollowMotionFor(i, cPathOpsStrokeId))
+            // Brush Size (2026-08-31, feedback #178 "le brush size properties
+            // dans motion n'agit pas"): the exact same omission as the two
+            // lines above, one release later. It rebuilds the ribbon's
+            // outline from centerline+width profile in the cold path below,
+            // which a cached pathRef + one affine cannot express — and the
+            // hook is guarded by `sd &&`, so taking the fast path made it
+            // silently do nothing rather than fail. Proved by A/B on rendered
+            // PIXELS: with the retained store ON, 100% and 300% gave the
+            // identical ink count (19714 both); with it OFF the count moved
+            // (19715 -> 20518). Every entry in this list is one of these.
+            && !(window.SMMotion && cPathOpsStrokeId && SMMotion.hasBrushSizeMotionFor && SMMotion.hasBrushSizeMotionFor(i, cPathOpsStrokeId))
             && !(c.data && c.data.fillGradient)
             && !(c.data && c.data.strokeGradientAlongPath)
             && !(includeEditorOverlays && state.currentFrameOutline)
