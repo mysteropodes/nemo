@@ -2507,6 +2507,17 @@
       // exactly one imported image is selected — canMesh() is the panel's own
       // singleRaster() guard, so the menu offers this in precisely the cases
       // the panel appears in, and never on a shape or a multi-selection.
+      // Mask an image with a shape you drew (2026-08-30) — a DIFFERENT
+      // selection shape from the block below (one image + one path, vs
+      // exactly one image), so it is its own guard rather than another entry
+      // inside that one.
+      ...(window.SMImageMeshUI && SMImageMeshUI.canMaskWithShape() ? [
+        { sep: true },
+        {
+          label: SM.t('ctxMaskImageWithShape'),
+          action: function () { SMImageMeshUI.maskImageWithShape(); },
+        },
+      ] : []),
       ...(window.SMImageMeshUI && SMImageMeshUI.canMesh() ? [
         { sep: true },
         {
