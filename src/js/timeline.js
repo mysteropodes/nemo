@@ -2855,6 +2855,15 @@ function updateStatusBarHelp(){
     root.addEventListener('mouseout',clearTitle);
   });
 })();
+// Where #combine-opts-sec normally sits — same "remember the slot once,
+// before the first move" contract as _canvasSecHome just below (2026-08-31,
+// feedback #192: "le combined shape est un peu en doublon j'ai l'impression y
+// a un onglet et y a dans element selected peut gardé ça dans elements
+// selected ?"). The whole node is moved INTO the selection block rather than
+// its controls being rebuilt there: every id, every listener and
+// updateCombinePanel() keep working untouched, which is exactly why the same
+// idiom was used for the Document panel.
+var _combineSecHome=null;
 // Where #canvas-sec normally sits, captured once before it is ever moved
 // to the top for the Document context (see updatePropsContext).
 var _canvasSecHome=null;
@@ -3049,6 +3058,44 @@ function updatePropsContext(){
       if(moved)_canvasSecHome.parent.insertBefore(canvasSec,_canvasSecHome.next);
       canvasSec.classList.remove('psec-identity');
       if(canvasHdr)canvasHdr.style.display='';
+    }
+  }
+  // Combined Shape lives INSIDE the selection block (#192). It was its own
+  // collapsible section right under Elements while the selection block sat
+  // above it — two places describing the same selection, which is the
+  // "doublon" reported. Moved, not rebuilt: same node, same ids, same
+  // listeners, same updateCombinePanel().
+  var combineSec=document.getElementById('combine-opts-sec');
+  if(combineSec){
+    if(!_combineSecHome)_combineSecHome={parent:combineSec.parentNode,next:combineSec.nextSibling};
+    var combineHdr=combineSec.querySelector('.phdr');
+    var combineBody=combineSec.querySelector('.pbdy');
+    var selBody=document.getElementById('sel-props-sec')&&document.getElementById('sel-props-sec').querySelector('.pbdy');
+    if(ctx==='selection'&&show['combine-opts-sec']&&selBody){
+      if(combineSec.parentNode!==selBody)selBody.appendChild(combineSec);
+      combineSec.classList.add('psec-inline');
+      // The identity header above already announces the selection, so the
+      // section's own title would just repeat it — and a hidden header can't
+      // be clicked to re-open a collapsed body, so force the body open too
+      // (same reasoning as the Document move).
+      if(combineHdr)combineHdr.style.display='none';
+      if(combineBody)combineBody.classList.remove('hid');
+      if(combineHdr)combineHdr.classList.remove('closed');
+      // The four mode icons are the duplicate: #sp-boolean-row a few rows up
+      // carries the same four glyphs and already reaches combine through
+      // Alt+click (wireBoolBtn). Hidden rather than deleted — the standalone
+      // section still uses them if it is ever shown outside a selection, and
+      // updateCombinePanel keeps driving them, which is what lets the active
+      // mode be mirrored onto the row that stays visible.
+      var modeRow=document.getElementById('combine-mode-row');
+      if(modeRow)modeRow.style.display='none';
+    }else{
+      var cmoved=(combineSec.parentNode!==_combineSecHome.parent)||(combineSec.nextSibling!==_combineSecHome.next);
+      if(cmoved)_combineSecHome.parent.insertBefore(combineSec,_combineSecHome.next);
+      combineSec.classList.remove('psec-inline');
+      if(combineHdr)combineHdr.style.display='';
+      var modeRowBack=document.getElementById('combine-mode-row');
+      if(modeRowBack)modeRowBack.style.display='';
     }
   }
   // Motion mode: none of these 2D-drawing-tool sections apply (no active
@@ -10341,6 +10388,18 @@ function updateCombinePanel(){
   }
   var activeMode=gid?ld.groups[gid].combineMode:'unite';
   Object.keys(COMBINE_MODE_BTN_IDS).forEach(function(m){document.getElementById(COMBINE_MODE_BTN_IDS[m]).classList.toggle('ac',m===activeMode);});
+  // Mirror the active mode onto #sp-boolean-row (2026-08-31, #192). Folding
+  // Combined Shape into the selection block put its four mode icons directly
+  // under the four boolean icons that were already there — the same glyphs
+  // with the same tooltips, which is the "doublon" reported. The mode row is
+  // hidden inline (see updatePropsContext) because those buttons already
+  // reach it: Alt+click on one of them combines, or switches an existing
+  // group's mode. Hiding it would have lost the only "which mode is this
+  // group in?" indicator, so the state moves onto the row that stays.
+  Object.keys(COMBINE_MODE_BTN_IDS).forEach(function(m){
+    var mirror=document.getElementById('btn-bool-'+m);
+    if(mirror)mirror.classList.toggle('ac',!!gid&&m===activeMode);
+  });
   existingRow.style.display=gid?'flex':'none';
   // Disabled (not hidden) when there's nothing to combine yet — 2+ shapes
   // needed to CREATE a group, but changing an EXISTING group's mode only

@@ -2733,3 +2733,10 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
    nothing else in the app uses. Two lines at the default is the honest
    result of wrapping, and every button stays reachable — which is the point
    of the report. */
+
+/* Combined Shape, once folded into the selection block (2026-08-31, #192):
+   it is no longer a standalone card, so it drops the section chrome and the
+   body's own outer padding — it has to read as one more row of the block it
+   now lives in, not as a panel nested inside a panel. */
+.psec-inline{border:0;background:transparent;}
+.psec-inline>.pbdy{padding:6px 0 0;background:transparent;}
