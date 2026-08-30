@@ -1143,6 +1143,17 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
 .motion-key-connect{fill:#2E6B60;pointer-events:auto;cursor:ew-resize;transition:fill .1s linear;}
 .motion-key-connect:hover{fill:#3E8C7E;}
 .motion-key-connect.sel{fill:#6FD9C4;}
+/* Key colour carried onto the span between two same-coloured keys, so a
+   coloured group (a walk cycle, say) reads as one block rather than a few
+   tinted diamonds. Declared AFTER the plain rules on purpose: .tinted and
+   :hover have equal specificity, so source order is what lets a user colour
+   win over the default teal. The two states below outrank both by adding a
+   second class/pseudo, and keep hover/selection legible on ANY user colour
+   by brightening it rather than replacing it — replacing would throw away
+   the very information the colour was set to carry. */
+.motion-key-connect.tinted{fill:var(--key-color,#2E6B60);}
+.motion-key-connect.tinted:hover{fill:var(--key-color,#3E8C7E);filter:brightness(1.25);}
+.motion-key-connect.tinted.sel{fill:var(--key-color,#6FD9C4);filter:brightness(1.45);}
 /* Alt = retime (first key planted, second one slides). Driven by the SAME
    #frame-grid.timelink-alt class layer-inout.js already toggles for the
    Parent-in-Time dot reveal, mirroring the spec's own .kstage.alt container
