@@ -606,13 +606,15 @@ window.SM={
   // A shape with no track at all — every shape in plain Animation 2D — takes
   // the early `false` and behaves exactly as before.
   setStrokeColor:function(v){state.strokeColor=v;paintStrokeSwatches(v);
-    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush){p.fillColor=v;applyBrushKeyline(p);}else if(p.strokeColor){routeColorToMotion(p,'strokeColor',v);p.strokeColor=v;}});saveActiveLayerFrame();updateUI();}
+    if(routeColorToSelectedMotionRow('strokeColor',v)){}
+    else if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush){p.fillColor=v;applyBrushKeyline(p);}else if(p.strokeColor){routeColorToMotion(p,'strokeColor',v);p.strokeColor=v;}});saveActiveLayerFrame();updateUI();}
     // Fill/Stroke Select tool: recolor ONLY the clicked aspect — a 'stroke'
     // selection here means strokeColor, never touches fillColor even on a
     // combined shape (that's the whole point of this tool vs plain Select).
     else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='stroke';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='stroke')return sel;var arc=fsRealizeStrokeSegment(sel,userLayers[state.activeLayerIdx]);arc.strokeColor=v;return{path:arc,kind:'stroke',segStart:0,segEnd:arc.length,closed:arc.closed};});saveActiveLayerFrame();updateUI();}},
   setFillColor:function(v){state.fillColor=v;paintFillSwatches(v);
-    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.fillColor){routeColorToMotion(p,'fillColor',v);p.fillColor=v;}});saveActiveLayerFrame();updateUI();}
+    if(routeColorToSelectedMotionRow('fillColor',v)){}
+    else if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.fillColor){routeColorToMotion(p,'fillColor',v);p.fillColor=v;}});saveActiveLayerFrame();updateUI();}
     else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='fill'&&sel.kind!=='fillregion')return sel;if(sel.kind==='fillregion')sel=fsRealizeFillRegion(sel,userLayers[state.activeLayerIdx]);sel.path.fillColor=v;return sel;});saveActiveLayerFrame();updateUI();}},
   // Fill/Stroke on-off is mirrored by TWO eye icons — the right-panel one
   // (#fill-enable-toggle / #stroke-enable-toggle) and the left tool-panel one
@@ -5665,6 +5667,32 @@ function buildParentCell(row,ld,li){
 // image-mesh-bridge's singleRaster() is (CLAUDE.md §12bis): a selectedPaths
 // entry outlives the object it names across loadFrame/undo/importJSON, and a
 // detached item still has its data.strokeId.
+// A colour ROW selected in the Motion timeline is a selection too (2026-08-31,
+// feedback #180's second half: "select couleurs ne prend pas en compte la
+// selection de la propriété impossible de changer la couleurs et de keyframé
+// par là"). The colour panel below only ever consulted `selectedPaths` — the
+// CANVAS selection — so with a Fill row picked and nothing selected on canvas
+// it wrote to nothing at all.
+//
+// Checked BEFORE the canvas-selection branches and returning true when it
+// acted, so the two selections can't both fire on one pick: in Motion the row
+// is the more specific intent, and it is the only one that can key.
+// setValue (motion.js) keys at the playhead when the stopwatch is on and
+// writes the static value otherwise — the "et keyframé par là" half — with no
+// keyframing logic duplicated here.
+function routeColorToSelectedMotionRow(prop,hex){
+  if(!window.SMMotion||!SMMotion.selectedColorProps||!SMMotion.writeColorToHolder)return false;
+  var rows=SMMotion.selectedColorProps(prop);
+  if(!rows.length)return false;
+  pushUndo();
+  var wrote=false;
+  rows.forEach(function(r){ if(SMMotion.writeColorToHolder(r.holder,prop,hex))wrote=true; });
+  if(!wrote)return false;
+  saveActiveLayerFrame();
+  updateUI();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  return true;
+}
 function routeColorToMotion(p,prop,hex){
   if(!p||!p.data||!p.data.strokeId)return false;
   if(!window.SMMotion||!SMMotion.writeElementColorFromPicker)return false;
