@@ -718,6 +718,7 @@
       titleControlColorSwatch:'Colour of this control — click to pick one',titleControlRowContextHint:' · Right-click: manage this control',
       exprErrorUnknownControlPrefix:'No control named “',exprErrorUnknownControlSuffix:'” on this layer',exprErrorControlNoLayer:'This property does not belong to a layer, so it has no controls',
       exprExControl:'Read a control on this layer',
+      mgraphModeValue:'value',mgraphModeSpeed:'speed',mgraphFrozen:'frozen',mgraphExprLegend:'solid = expression, dashed = keyframes',
     },
     fr:{
       settingsTitle:'Réglages',
@@ -1423,6 +1424,7 @@
       titleControlColorSwatch:'Couleur de ce contrôle — cliquer pour la choisir',titleControlRowContextHint:' · Clic droit : gérer ce contrôle',
       exprErrorUnknownControlPrefix:'Aucun contrôle nommé « ',exprErrorUnknownControlSuffix:' » sur ce calque',exprErrorControlNoLayer:'Cette propriété n’appartient à aucun calque, elle n’a donc pas de contrôles',
       exprExControl:'Lire un contrôle de ce calque',
+      mgraphModeValue:'valeur',mgraphModeSpeed:'vitesse',mgraphFrozen:'figé',mgraphExprLegend:'plein = expression, pointillés = clés',
     },
     ja:{
       settingsTitle:'設定',
@@ -2095,6 +2097,7 @@
       titleControlColorSwatch:'このコントロールの色 — クリックして選択',titleControlRowContextHint:' · 右クリック: このコントロールを管理',
       exprErrorUnknownControlPrefix:'「',exprErrorUnknownControlSuffix:'」という名前のコントロールはこのレイヤーにありません',exprErrorControlNoLayer:'このプロパティはレイヤーに属していないため、コントロールがありません',
       exprExControl:'このレイヤーのコントロールを読み取る',
+      mgraphModeValue:'値',mgraphModeSpeed:'速度',mgraphFrozen:'固定',mgraphExprLegend:'実線 = 式、破線 = キーフレーム',
     },
     es:{
       settingsTitle:'Ajustes',
@@ -2767,6 +2770,7 @@
       titleControlColorSwatch:'Color de este control — haz clic para elegirlo',titleControlRowContextHint:' · Clic derecho: gestionar este control',
       exprErrorUnknownControlPrefix:'No hay ningún control llamado «',exprErrorUnknownControlSuffix:'» en esta capa',exprErrorControlNoLayer:'Esta propiedad no pertenece a ninguna capa, así que no tiene controles',
       exprExControl:'Leer un control de esta capa',
+      mgraphModeValue:'valor',mgraphModeSpeed:'velocidad',mgraphFrozen:'fijado',mgraphExprLegend:'sólido = expresión, discontinuo = fotogramas clave',
     },
   };
   var LANGS=['en','fr','ja','es'];

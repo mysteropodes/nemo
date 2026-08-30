@@ -10073,6 +10073,12 @@
 
   window.SMMotion = {
     valueAtFrame: valueAtFrame,
+    // The PRE-expression value of a property — the keyframed/static curve
+    // an expression is overriding. The graph editor plots both (see
+    // motion-graph.js): without this it could only ever draw the result,
+    // with no way to see what the expression is standing on top of.
+    rawValueAtFrame: rawValueAtFrame,
+    hasExpression: hasExpr,
     // Expression controls (2026-08-30) — see propsFor's own comment.
     exprControls: controlsOf,
     controlTypeOf: controlTypeOf,
