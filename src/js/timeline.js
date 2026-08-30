@@ -2900,15 +2900,22 @@ function updatePropsContext(){
   }else if(hasSel){
     ctx='selection';
     show['sel-props-sec']=show['fill-sec']=show['stroke-sec']=true;
-    // Mockup 2026-07-17 (réordonnancement du panel) : Layer (Blend) et
-    // Document restent visibles pendant une sélection, juste sous le bloc
-    // transform — avant, sélectionner un trait les faisait disparaître.
-    // EXCEPT the Subselect tool (2026-07, "avec subselection le panneau
-    // document n'a pas besoin d'être ouvert") — editing individual vertices
-    // has no use for canvas W/H/FPS/BG, and the panel real estate is more
-    // useful given over to the Position/Size/Rotation-of-selected-vertices
-    // fields (updateSelPropsPanel) that section sits right above.
-    show['canvas-sec']=state.tool!=='subselect';
+    // Document is HIDDEN during a selection (2026-08-31, feedback #191: "si
+    // je clic sur un élement dans animation 2D je vois apparaitre le panel
+    // document comme un onglet qui devrait normalement avoir disparu").
+    //
+    // This reverses the 2026-07-17 panel mockup, which deliberately kept
+    // Layer (Blend) and Document visible under the transform block. The
+    // reversal comes from the same person who asked for that, and the
+    // Subselect tool had already been carved out of it for exactly this
+    // reason ("avec subselection le panneau document n'a pas besoin d'être
+    // ouvert") — canvas W/H/FPS/BG have nothing to do with the shape you
+    // just picked, and the panel real estate belongs to its properties.
+    // Generalising that carve-out to every selection is what #191 asks for.
+    // With nothing selected the panel falls back to Document as before
+    // (ctx==='document' branch below), where it also sits at the top on the
+    // dark ground (#171's follow-up).
+    show['canvas-sec']=false;
     show['layer-sec']=false; // folded into the layer row's context menu (#172)
     // Rig bind (2026-07-29 fix, "on ne sait pas comment select l'élément qui
     // doit y être associé"): #rig-opts-sec (with the "Lier la sélection"
