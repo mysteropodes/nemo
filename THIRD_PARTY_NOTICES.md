@@ -2,14 +2,15 @@
 
 Audit performed 2026-08-17 (Cyril: "faire en sorte que les 2 versions n'ait pas de
 problème de droits quand ça sortira en open source" — the browser preview and the
-Tauri desktop build). This catalogs everything bundled or vendored in this
-repository that isn't original code written for this project, its license, and
-what (if anything) needs to happen before public/open-source distribution.
+Tauri desktop build), Rust dependencies added 2026-08-30. This catalogs everything
+bundled or vendored in this repository that isn't original code written for this
+project, its license, and what (if anything) needs to happen for distribution.
 
-No LICENSE file exists for Nemo's own code yet — that's a choice only Cyril can
-make (MIT/Apache/GPL/source-available/etc. all have different implications for a
-commercial product going open source), so this document doesn't presume one. It
-only covers what's *bundled inside* the app.
+**Nemo's own code is [GPL-3.0-or-later](LICENSE)**, and the repository is public
+under that license. This document covers only what is *bundled inside* the app, so
+the question it answers is whether each of those components may be redistributed
+inside a GPL-3.0-or-later work. (An earlier revision of this file said no license
+had been chosen yet — that was true when it was written and is not any more.)
 
 ## Clean — no action needed
 
@@ -19,6 +20,32 @@ only covers what's *bundled inside* the app.
 | opentype.js | `src/js/opentype.min.js` | MIT | Vendored minified build. Unlike Paper.js, this one already carries its full MIT header inline (verified) — no action needed beyond keeping this table's reference current. |
 | Roboto (Regular + Bold) | `src/fonts/Roboto-*.ttf` | Apache License 2.0 (Google) | Used for vector text rendering (`vector-text-bridge.js`). Apache 2.0 is permissive and font-distribution-friendly — no action needed. |
 | Delaunator | `src/js/delaunator.vendor.js` | ISC (Mapbox) | v5.0.1, upstream UMD build, unmodified apart from a prepended license header. Delaunay triangulation for the image mesh (`image-mesh.js`). ISC is permissive and GPL-3.0-compatible. Upstream's own rollup build inlines **robust-predicates** 3.0.2 (Unlicense / public domain, Mourner) — that is the `epsilon`/`splitter`/`orient2d` code at the top of the bundle; public domain imposes no conditions, and it is called out here rather than left implicit because it isn't visible as a separate file. |
+
+## Rust dependencies (2026-08-30)
+
+`cargo license --avoid-dev-deps` run against both Rust crates. Full raw output is
+committed beside this file so the claim can be checked without re-running anything:
+[THIRD_PARTY_LICENSES_RUST_TAURI.txt](THIRD_PARTY_LICENSES_RUST_TAURI.txt) (511 crate
+instances) and [THIRD_PARTY_LICENSES_RUST_WASM.txt](THIRD_PARTY_LICENSES_RUST_WASM.txt)
+(159). A name can appear more than once at different pinned versions, hence
+"instances" rather than "crates".
+
+**Result: clean for GPL-3.0-or-later.** The two findings worth stating explicitly,
+because they are the only ones that aren't plainly permissive:
+
+| Finding | Crates | Why it's fine |
+|---|---|---|
+| `MPL-2.0` | cssparser, cssparser-macros, dtoa-short, option-ext, selectors | Weak copyleft, and explicitly GPL-compatible: MPL 2.0 §3.3 permits distributing the covered files as part of a Larger Work under a Secondary License, which it defines as the GPL family. File-level copyleft, so it does not reach Nemo's own sources. |
+| `Apache-2.0 OR LGPL-2.1-or-later OR MIT` | r-efi (×2) | A triple license — take the MIT or Apache-2.0 arm and the LGPL question never arises. Even the LGPL arm is "or later", so it is compatible anyway. |
+
+**No GPL-2.0-only anywhere**, which is the one incompatibility that would actually
+bite: GPL-2.0-*only* cannot be combined with GPL-3.0 code, while GPL-2.0-*or-later*
+can (you take the v3 option). Everything else resolves to MIT, Apache-2.0, BSD, ISC,
+Zlib, Unlicense, CC0, 0BSD, BSL-1.0, Unicode-3.0 or CDLA-Permissive-2.0 — all
+permissive and all redistributable inside a GPL-3.0-or-later work.
+
+Both `Cargo.toml` files declare `license = "GPL-3.0-or-later"` so tooling reports
+Nemo's own crates correctly instead of `N/A`.
 
 ## Removed during this audit
 

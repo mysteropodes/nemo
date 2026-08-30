@@ -60,13 +60,17 @@ views of the same document.
   with feature-aware stroke matching rather than naive point interpolation
 - Onion skinning, light table, X-sheet, flip/roll playback
 - Bitmap brush layer with seeded dab stamping (texture stays put across generated frames)
-- Layers with blend modes, mattes, groups, and components
+- Layers with blend modes, groups, and components
+- Track mattes — alpha or luma, stackable, with a keyframable on/off period
 
 ### Motion — keyframe animation
 
 - Position / Anchor / Rotation / Scale / Opacity keyframes on any layer
 - Editable easing curves per key pair, motion paths, and a graph editor
-- Parenting, including crossfade blending between two parents
+- Deform an imported image with an editable mesh, animatable per vertex
+- On-canvas joystick and slider widgets to drive a rig (never rendered)
+- Parenting, including weighted blending across several parents at once
+- Expressions on any property, with a code editor that splits the canvas
 - 3D layers with per-vertex projection, camera, and a transform gizmo
 - Mograph duplicator (grid / radial / along-path, with stagger and per-property effectors)
 - Rig tool — bones drawn with the pen, tangent-driven rotation, IK
