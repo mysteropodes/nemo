@@ -7577,9 +7577,25 @@ function onViewDoubleClick(event){
   }
   if(state.tool!=='select')return;
   var layer=userLayers[state.activeLayerIdx];
-  var hit=layer.hitTest(event.point,{fill:true,tolerance:4/view.zoom});
-  if(!hit||!(hit.item instanceof Path)||!hit.item.fillColor)return;
+  // fill AND stroke (2026-08-30, feedback #166 "au double clic toujours box
+  // globale et pas individuelle"): the old {fill:true}-only test made a
+  // double-click on any stroke-only path — every plain drawn line — return
+  // silently, leaving whatever box was already up. Reproduced exactly: with
+  // several shapes selected, dblclick on a fill-less stroke did nothing and
+  // the union box just stayed. A drawn stroke is as much "an object" as a
+  // filled shape, so it gets the same doorway.
+  var hit=layer.hitTest(event.point,{fill:true,stroke:true,tolerance:4/view.zoom});
+  if(!hit||!hit.item)return;
   var fillPath=hit.item;
+  // A hit inside a CompoundPath (boolean/fill results with holes) lands on
+  // a CHILD Path — climb to the layer-level item, which is the one carrying
+  // data.strokeId and the one every consumer (§1) expects in selectedPaths.
+  while(fillPath.parent&&fillPath.parent!==layer)fillPath=fillPath.parent;
+  if(!(fillPath instanceof Path)&&!(fillPath instanceof CompoundPath))return;
+  if(!fillPath.fillColor&&!fillPath.strokeColor)return;
+  // Synthetic companions are not objects to isolate (§1) — a dab or a
+  // duplicator copy under the cursor must not swallow the gesture.
+  if(fillPath.data&&(fillPath.data.isBrushTextureCopy||fillPath.data.isLinkedFillCompanion||fillPath.data.isDuplicatorCopy))return;
   // Group double-click (2026-07-29 fix, Cyril: "si c'est un group et que l'on
   // double clic on doit entrer dans le group avec l'outil select pas
   // subselect, l'outil subselect n'apparait qu'après si on double clic sur
