@@ -1399,6 +1399,7 @@ window.SM={
     // src.motion/motionStatic). Regenerating them would have to rewrite the
     // declarations and both tracks in lockstep to buy nothing.
     if(src.isWidgetLayer)state.layers[ni].isWidgetLayer=true;
+    if(src.isEffectorLayer&&src.effector){state.layers[ni].isEffectorLayer=true;state.layers[ni].effector=JSON.parse(JSON.stringify(src.effector));}
     if(src.widget)state.layers[ni].widget=JSON.parse(JSON.stringify(src.widget));
     if(src.isTextLayer)state.layers[ni].isTextLayer=true;
     return ni;}
@@ -1964,7 +1965,7 @@ window.SM={
       // level setting like canvasW/fps above (not per-layer, not per-
       // symbol/montage snapshot — a linked-vs-embedded choice is global).
       mediaMode:state.mediaMode||'embedded',
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,mattesMore:l.mattesMore,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,isWidgetLayer:l.isWidgetLayer,widget:l.widget,effects:l.effects,footage:l.footage,
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,mattesMore:l.mattesMore,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,isWidgetLayer:l.isWidgetLayer,widget:l.widget,isEffectorLayer:l.isEffectorLayer,effector:l.effector,effects:l.effects,footage:l.footage,
         // Layer parenting (2026-07-25). BOTH of these were missing from this
         // list, so every parent link was silently dropped on save — a rig
         // survived the session and nothing more. `uid` is the stable identity
@@ -2277,6 +2278,14 @@ window.SM={
       if(ld.isWidgetLayer&&ld.widget&&typeof ld.widget==='object'&&ld.widget.x&&typeof ld.widget.x.key==='string'){
         state.layers[idx].isWidgetLayer=true;
         state.layers[idx].widget=JSON.parse(JSON.stringify(ld.widget));
+      }
+      // Effector layer (2026-08-30) — guarded on the SHAPE of ld.effector,
+      // same reasoning as the widget block right above: a corrupted
+      // nemo-auto carrying junk here would otherwise reach the duplicator
+      // math and the overlay on the very first render.
+      if(ld.isEffectorLayer&&ld.effector&&typeof ld.effector==='object'&&typeof ld.effector.targetLayerUid==='string'){
+        state.layers[idx].isEffectorLayer=true;
+        state.layers[idx].effector=JSON.parse(JSON.stringify(ld.effector));
       }
       state.layers[idx].effects=ld.effects||[];
       if(ld.symbolId){state.layers[idx].symbolId=ld.symbolId;state.layers[idx].symPlayMode=ld.symPlayMode||'loop';state.layers[idx].symSpeed=ld.symSpeed||1;state.layers[idx].symPlacedAt=ld.symPlacedAt||0;state.layers[idx].symSingleFrame=ld.symSingleFrame||0;if(ld.symMatrix)state.layers[idx].symMatrix=ld.symMatrix;}

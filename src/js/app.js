@@ -1414,7 +1414,12 @@ function _resolveDuplicatorPath(dup,frameIdx){
 // RNG draw order (7919-decorrelated per index, exactly 9 draws every time
 // regardless of which properties are actually random) and the effector
 // summation must be changed in both, or the two paths silently diverge.
-function _duplicatorClonePlacement(dup,k,pivotK,baseDx,baseDy,baseRot,dPos,dRot,dScale,dOpacity,dPosZ,dRotX,dRotY,randMode,is3DLayer){
+// `ownerLd` (optional, last) is the duplicator's own layer descriptor. It
+// exists only so effector LAYERS pointing at it can be resolved and summed
+// alongside dup.effectors — see effector-layer.js. Optional on purpose: the
+// nativeVideo call sites in engine-bridge.js don't have a layer descriptor
+// handy, and simply get the inline effectors they always got.
+function _duplicatorClonePlacement(dup,k,pivotK,baseDx,baseDy,baseRot,dPos,dRot,dScale,dOpacity,dPosZ,dRotX,dRotY,randMode,is3DLayer,ownerLd,frameIdx){
   var rngK=seededRng(((dup.seed||0)+k*7919)>>>0);
   var rx=rngK(),ry=rngK(),rrr=rngK(),rsx=rngK(),rsy=rngK(),rop=rngK();
   var posK=randMode.position?[(2*rx-1)*dPos[0],(2*ry-1)*dPos[1]]:[k*dPos[0],k*dPos[1]];
@@ -1426,7 +1431,16 @@ function _duplicatorClonePlacement(dup,k,pivotK,baseDx,baseDy,baseRot,dPos,dRot,
   var drxK=randMode.rotation?(2*rrx-1)*dRotX:k*dRotX;
   var dryK=randMode.rotation?(2*rry-1)*dRotY:k*dRotY;
   var instX=pivotK.x+baseDx,instY=pivotK.y+baseDy;
-  (dup.effectors||[]).forEach(function(eff){
+  // Inline effectors and effector LAYERS summed through the SAME loop —
+  // resolveEffector hands back the identical shape, so there is one piece
+  // of falloff/channel math rather than a second copy to keep in step
+  // (CLAUDE.md §3's trap, avoided by never creating the pair).
+  var _effList=dup.effectors||[];
+  if(ownerLd&&window.SMEffectorLayer){
+    var _fromLayers=SMEffectorLayer.resolvedEffectorsFor(ownerLd,frameIdx!=null?frameIdx:state.currentFrame);
+    if(_fromLayers.length)_effList=_effList.concat(_fromLayers);
+  }
+  _effList.forEach(function(eff){
     var ddx=instX-(eff.pos?eff.pos.x:0),ddy=instY-(eff.pos?eff.pos.y:0);
     var w;
     if(eff.falloff==='linear'){
@@ -1578,7 +1592,7 @@ function applyLayerDuplicator(ld,base,frameIdx,layerIdx,opts){
     // descriptor all live in _duplicatorClonePlacement (shared with the
     // nativeVideo render path, engine-bridge.js) — see its own comment for
     // why pivotK is passed in rather than always using `pivot`.
-    var place=_duplicatorClonePlacement(dup,k,pivotK,baseDx,baseDy,baseRot,dPos,dRot,dScale,dOpacity,dPosZ,dRotX,dRotY,randMode,is3DLayer);
+    var place=_duplicatorClonePlacement(dup,k,pivotK,baseDx,baseDy,baseRot,dPos,dRot,dScale,dOpacity,dPosZ,dRotX,dRotY,randMode,is3DLayer,ld,frameIdx);
     // Stagger folded into ONE matrix with the mode's own placement:
     // rotate/scale in place around the seed's own bounds-center first, the
     // placement translate last — same inner-transform-then-outer-placement
@@ -2579,7 +2593,7 @@ function getEffectiveStrokes(layerIdx,frameIdx,countOnly){
   // (buildRigWidgetOverlayItems), never content. This ONE line is what
   // keeps it out of every export at once: export.js, rive-export.js and the
   // Lottie path all read the scene through getEffectiveStrokes.
-  if(ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer)return[];
+  if(ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer||ld.isEffectorLayer)return[];
   // StoryBoard montage layer (storyboard.js, 2026-07): the layer's content
   // at frame f IS the montage's resolved frame (looping) — the montage
   // stays the single source of truth, edits in the node space show up

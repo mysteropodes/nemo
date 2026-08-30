@@ -2306,6 +2306,11 @@
       // reach a rendered frame.
       var widgetOverlayItems = window.buildRigWidgetOverlayItems ? window.buildRigWidgetOverlayItems() : [];
       if (widgetOverlayItems.length) layers.push({ items: widgetOverlayItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+      // Effector rings/crosshairs — INSIDE includeEditorOverlays, which is
+      // the whole never-rendered gate (§13): renderFrameRawPixels sets it
+      // false, so this cannot reach a PNG, a video or the playback cache.
+      var effOverlayItems = window.SMEffectorLayer ? SMEffectorLayer.buildOverlayItems() : [];
+      if (effOverlayItems.length) layers.push({ items: effOverlayItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
     }
     // Track matte source resolution (uid-based, 2026-07-31) — runs LAST,
     // after every unshift/splice above, so layers.indexOf gives the final
