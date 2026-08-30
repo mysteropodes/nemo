@@ -2,6 +2,9 @@
 name = "geometry-wasm"
 version = "0.1.0"
 edition = "2021"
+# Machine-readable declaration of THIS crate\'s own license, so `cargo license`
+# and any downstream tooling report Nemo correctly instead of "N/A".
+license = "GPL-3.0-or-later"
 
 [lib]
 crate-type = ["cdylib"]
