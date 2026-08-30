@@ -8503,8 +8503,15 @@
     swatch.title = swatchTitle;
     swatch.addEventListener('click', function (e) {
       e.stopPropagation();
-      if (!window.openLayerColorSwatches) return;
-      openLayerColorSwatches(swatch, rgba255ToHex(currentRgba()), function (hex) {
+      // The REAL colour picker, not the layer-label palette (2026-08-31,
+      // feedback #180: "je n'ai pas le bon panneau de couleurs (celui des
+      // labels de couleurs)"). openLayerColorSwatches offers 8 fixed label
+      // colours with the full picker hidden behind a "+" — right for
+      // tagging a layer, wrong for a shape's fill, where you want the whole
+      // spectrum and an alpha slider straight away. ColorPicker.open takes
+      // the same (anchor, hex, callback) shape, so only the call changes.
+      if (!window.ColorPicker || !ColorPicker.open) return;
+      ColorPicker.open(swatch, rgba255ToHex(currentRgba()), function (hex) {
         pushUndo();
         var v = hexToRgba255(hex);
         if (!setSelectedKeyVector(holder, prop, v)) setValue(holder, prop, v);
