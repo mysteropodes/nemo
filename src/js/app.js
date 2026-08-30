@@ -4314,11 +4314,46 @@ function goToFrame(idx){
   // real, on-screen frame. clearSel(true) drops the shape selection (not the
   // layer selection — the `true` preserves _layerActiveExplicit, unlike a
   // canvas deselect, so layer-sec doesn't flicker shut on every scrub).
+  // ...but DROPPING the selection is not the same as needing to rebuild it
+  // (2026-08-30, feedback #155: "drag le curseur de temps dans motion
+  // deselect le calque et donc les objets sur le canvas, il faudrait que la
+  // selection persiste"). The ghost-pointer hazard above is real, yet the
+  // strokes themselves have stable identities (data.strokeId, the same id
+  // relinkBrushCompanions/rig binds already rely on across a rebuild) — so
+  // remember WHICH strokes were selected and re-point the selection at
+  // their freshly-rebuilt counterparts after loadFrame, instead of leaving
+  // the user to re-select on every scrub tick. A stroke that genuinely
+  // isn't on the new frame (a different drawing) simply isn't restored,
+  // which is the correct outcome rather than a special case.
+  // Skipped during playback: goToFrame runs per displayed frame there, and
+  // nothing can act on a selection mid-play anyway.
+  var _selIdsToRestore=null;
+  if(selectedPaths.length&&!state.playing){
+    _selIdsToRestore=selectedPaths.map(function(p){return p&&p.data&&p.data.strokeId;}).filter(Boolean);
+    if(!_selIdsToRestore.length)_selIdsToRestore=null;
+  }
   if(selectedPaths.length||_nodeSel.length)clearSel(true);
   saveAllLayerFrames();state.currentFrame=idx;window._curFrame=idx;
   if(window.SMAudio&&!state.playing)SMAudio.scrubAt(idx); // scrub audio au deplacement du playhead (v19)
   // frameOnly: goToFrame changes the frame and nothing else — see updateUI.
-  loadFrame(idx);if(!state.playing){renderOS();renderArcs();updateUI(true);}else{updatePlayhead();}
+  loadFrame(idx);
+  // Re-point the selection at the rebuilt objects (feedback #155 — see the
+  // capture above). Scoped to the ACTIVE layer, matching getSI's own
+  // assumption that a selection lives in one layer; done BEFORE the render
+  // calls below so the transform box is drawn in the same pass rather than
+  // popping in a frame later.
+  if(_selIdsToRestore&&userLayers[state.activeLayerIdx]){
+    var _kids=userLayers[state.activeLayerIdx].children,_restored=[];
+    for(var _si=0;_si<_kids.length;_si++){
+      var _k=_kids[_si];
+      if(_k&&_k.data&&_k.data.strokeId&&_selIdsToRestore.indexOf(_k.data.strokeId)>=0)_restored.push(_k);
+    }
+    if(_restored.length){
+      selectedPaths=_restored;
+      state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i){return i>=0;});
+    }
+  }
+  if(!state.playing){renderOS();renderArcs();updateUI(true);}else{updatePlayhead();}
 }
 
 // F5/insertFrame — Animate's actual convention (corrected: an earlier pass
