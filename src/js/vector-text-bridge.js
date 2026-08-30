@@ -240,6 +240,21 @@ function buildVectorTextGroup(text, fontKey, size, color, align, fixedWidthWorld
       return Math.max(0, w - letterSpacing); // no trailing tracking after the last glyph
     }
     var wrapped = wrapVectorLines(displayText, fixedWidthWorld, runWidth);
+    // Area text (2026-08-30, feedback #175: "à la indesign"). With a fixed
+    // HEIGHT declared, only the lines that fit inside the box are drawn and
+    // the rest is held back — InDesign's behaviour, and the reason its
+    // overflow marker exists at all: the text isn't lost, it just has
+    // nowhere to go, and the box tells you so.
+    // Chosen over shrinking the type or letting it spill: both silently
+    // change what you laid out, whereas a visible marker asks you to decide.
+    // Line spacing is uniform (baselineY below steps by lineHeight), so
+    // "does line li fit" is exact arithmetic, not a measurement.
+    var fixedHeightWorld = opts.fixedHeight || null;
+    var overflowed = false;
+    if (fixedHeightWorld && wrapped.length) {
+      var fits = Math.max(1, Math.floor(fixedHeightWorld / lineHeight));
+      if (wrapped.length > fits) { overflowed = true; wrapped = wrapped.slice(0, fits); }
+    }
     var maxW = 0;
     wrapped.forEach(function (l) { maxW = Math.max(maxW, runWidth(l)); });
     var groupId = 'vtxt' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6);
@@ -304,6 +319,10 @@ function buildVectorTextGroup(text, fontKey, size, color, align, fixedWidthWorld
       root.data.isText = true; root.data.isTextRoot = true;
       root.data.text = text; root.data.vectorFont = resolvedFontKey; root.data.size = size;
       root.data.color = color; root.data.align = align; root.data.fixedWidth = fixedWidthWorld || null;
+      // Both persisted on the root beside fixedWidth, so a reload rebuilds
+      // the same box AND knows it still overflows without re-measuring.
+      root.data.fixedHeight = fixedHeightWorld || null;
+      root.data.textOverflow = overflowed || false;
       root.data.bold = !!opts.bold; root.data.italic = !!opts.italic;
       root.data.underline = !!opts.underline; root.data.strike = !!opts.strike;
       root.data.letterSpacing = letterSpacing; root.data.wordSpacing = wordSpacing;

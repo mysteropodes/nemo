@@ -7157,14 +7157,15 @@ function openInPlaceTextEditor(root,isNew){
   handle.id='tp-inplace-resize-handle';
   document.body.appendChild(handle);
   _inplaceHandle=handle;
-  var resizing=false,resizeStartX=0,resizeStartWidth=0;
+  var resizing=false,resizeStartX=0,resizeStartWidth=0,resizeStartY=0,resizeStartHeight=0;
   handle.addEventListener('pointerdown',function(e){
     e.preventDefault();e.stopPropagation();
-    resizing=true;resizeStartX=e.clientX;
-    // First drag on a not-yet-fixed-width (auto-grow) box starts from its
-    // CURRENT rendered width, not an arbitrary default — so the box doesn't
-    // visibly jump the instant you grab the handle.
+    resizing=true;resizeStartX=e.clientX;resizeStartY=e.clientY;
+    // First drag on a not-yet-fixed box starts from its CURRENT rendered
+    // size, not an arbitrary default — so the box doesn't visibly jump the
+    // instant you grab the handle. Same reasoning for height as width.
     resizeStartWidth=d.fixedWidth||(parseFloat(ta.style.width)/view.zoom);
+    resizeStartHeight=d.fixedHeight||(parseFloat(ta.style.height)/view.zoom);
     handle.setPointerCapture(e.pointerId);
   });
   handle.addEventListener('pointermove',function(e){
@@ -7172,6 +7173,15 @@ function openInPlaceTextEditor(root,isNew){
     e.preventDefault();e.stopPropagation();
     var deltaWorld=(e.clientX-resizeStartX)/view.zoom;
     d.fixedWidth=Math.max(20,resizeStartWidth+deltaWorld);
+    // Height too (2026-08-30, feedback #175: "ne marche que en width", and
+    // "à la indesign" for what should happen once it can). Before this
+    // there was no d.fixedHeight to write at all — the box height was
+    // always derived from content, which is exactly why the grip only ever
+    // moved one axis. Now it's a real area-text box: text that no longer
+    // fits is held back rather than shrunk or spilled, and the overflow
+    // marker (drawn in reposition) says so.
+    var deltaYWorld=(e.clientY-resizeStartY)/view.zoom;
+    d.fixedHeight=Math.max(size||20,resizeStartHeight+deltaYWorld);
     reposition();
   });
   function endResize(e){if(!resizing)return;resizing=false;try{handle.releasePointerCapture(e.pointerId);}catch(err){}}
@@ -7215,7 +7225,12 @@ function openInPlaceTextEditor(root,isNew){
     ta.style.textAlign=d.align||'left';
     if(d.fixedWidth){ta.style.whiteSpace='pre-wrap';ta.style.width=(d.fixedWidth*view.zoom)+'px';}
     else{ta.style.whiteSpace='pre';ta.style.width=Math.max(20,ta.scrollWidth)+'px';}
-    ta.style.height=ta.scrollHeight+'px';
+    // A fixed height wins over content height — that's what makes the box an
+    // AREA rather than an auto-grow label. Without it the editor would keep
+    // growing while the rendered text is being clipped, so the two would
+    // disagree about where the box ends.
+    if(d.fixedHeight)ta.style.height=(d.fixedHeight*view.zoom)+'px';
+    else ta.style.height=ta.scrollHeight+'px';
     // Live bounding box (2026-08, "un bounding box comme dans tout éditeur
     // de texte") — screen px back to world units (÷view.zoom, mirroring
     // fontPx's own ×view.zoom a few lines up) so buildTextDragBoxItems
@@ -7269,6 +7284,7 @@ function closeInPlaceTextEditor(cancel){
   var topLeft=groupBounds.topLeft.clone();
   pushUndo();
   window.SMVectorText.vectorTextGroupMembers(root).forEach(function(p){p.remove();});
+  opts.fixedHeight=d.fixedHeight||null;
   window.SMVectorText.buildVectorTextGroup(newText,d.vectorFont,d.size,d.color,d.align,d.fixedWidth,topLeft,layer,opts).then(function(res){
     if(res.paths.length)selectedPaths=res.paths.slice();
     saveActiveLayerFrame();updateUI();
