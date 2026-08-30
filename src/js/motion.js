@@ -866,12 +866,38 @@
   // the playhead reproduces the selection's own rhythm wherever it lands —
   // AE's behaviour, and the reason this stores offsets rather than frames.
   var _keyClip = null;
+  // Each copied key remembers WHERE it came from (2026-08-30). Without this,
+  // a selection spanning several layers was flattened onto whatever layer
+  // happened to be active at paste time, so keys from different layers that
+  // share a property name — position, the common case — silently overwrote one
+  // another and the rest of the layers got nothing. Reported as: "when you
+  // select keyframes from multiple layers and you want to paste them somewhere
+  // else in time... it'd be great if we could copy and paste keyframes from
+  // different layers."
+  //
+  // The reference is by layerUid, not index, because layers get reordered; and
+  // by the element-holder KEY (a strokeId, or a meshId for an image mesh)
+  // rather than the holder object, because loadFrame rebuilds those objects —
+  // the same reason rig binds and elementMotion are keyed that way.
+  function holderRefOf(holder) {
+    var r = resolveHolderLayer(holder);
+    if (!r) return null;
+    return { uid: r.ld.layerUid || null, elem: r.strokeId || null };
+  }
+  function holderFromRef(ref) {
+    if (!ref) return null;
+    var li = ref.uid ? findLayerIndexByUid(ref.uid) : -1;
+    var ld = li >= 0 ? state.layers[li] : null;
+    if (!ld) return null;
+    if (!ref.elem) return ld;
+    return (ld.elementMotion && ld.elementMotion[ref.elem]) || ensureElementHolder(ld, ref.elem);
+  }
   function copySelectedKeys() {
     var sel = _motionKeySel;
     if (!sel || !sel.length) return 0;
     var base = Math.min.apply(null, sel.map(function (s) { return s.key.frame; }));
     _keyClip = sel.map(function (s) {
-      return { prop: s.prop, dt: s.key.frame - base, v: s.key.v.slice(), hold: !!s.key.hold, curvePoints: cloneCurvePts(s.key.curvePoints || DEFAULT_CURVE) };
+      return { prop: s.prop, dt: s.key.frame - base, v: s.key.v.slice(), hold: !!s.key.hold, curvePoints: cloneCurvePts(s.key.curvePoints || DEFAULT_CURVE), src: holderRefOf(s.holder) };
     });
     return _keyClip.length;
   }
@@ -881,10 +907,17 @@
     if (!ld) return 0;
     pushUndo();
     var n = 0;
+    var touched = [];
     _keyClip.forEach(function (c) {
       var f = state.currentFrame + c.dt;
       if (f < 0 || f > state.totalFrames - 1) return;
-      var track = ensureTrack(ld, c.prop);
+      // Back to the layer it came from. Falling back to the active layer keeps
+      // the old behaviour for the cases that relied on it: a single-layer copy
+      // deliberately re-pasted somewhere else, and a clipboard whose source
+      // layer has since been deleted.
+      var target = holderFromRef(c.src) || ld;
+      if (touched.indexOf(target) < 0) touched.push(target);
+      var track = ensureTrack(target, c.prop);
       var ex = keyAt(track, f);
       if (ex) { ex.v = c.v.slice(); ex.hold = c.hold; ex.curvePoints = cloneCurvePts(c.curvePoints); }
       else track.keys.push({ frame: f, v: c.v.slice(), hold: c.hold, curvePoints: cloneCurvePts(c.curvePoints), hOut: [0, 0], hIn: [0, 0] });
