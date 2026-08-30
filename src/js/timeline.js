@@ -939,6 +939,16 @@ window.SM={
   // offsets from; Rotation sets the angle) — zero new keyframe machinery.
   // Defaults to horizontal through canvas center.
   addGuideLayer:function(){saveAllLayerFrames();pushUndoLayers(true);var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Guide'));state.layers[idx].isGuideLayer=true;state.layers[idx].guidePos=[state.canvasW/2,state.canvasH/2];state.layers[idx].guideOrientation='horizontal';state.layers[idx].color='#00baff';activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
+  // Rig control widgets (2026-08-30, rig-widget.js) — an on-canvas
+  // joystick or slider whose axes ARE ordinary expression controls on the
+  // same layer, so the value is keyable/graphable/readable from any other
+  // layer's expression with no new machinery. The layer itself is created
+  // inside rig-widget.js (it has to create the controls in the same breath
+  // — the widget points AT them and is meaningless without them); these two
+  // are just the menu entry points, thin on purpose so there is exactly one
+  // creation path.
+  addJoystickLayer:function(){if(window.SMRigWidget)SMRigWidget.addWidgetLayer('joystick');},
+  addSliderLayer:function(){if(window.SMRigWidget)SMRigWidget.addWidgetLayer('slider');},
   // Folder layer (2026-08, "grouper les layer dans des dossiers qui
   // agiront comme un null de control parentage") — structurally a Null
   // (isNullLayer:true too, same pivot/no-content/parenting-target
@@ -1343,6 +1353,19 @@ window.SM={
     if(src.isGuideLayer)state.layers[ni].isGuideLayer=true;
     if(src.guidePos)state.layers[ni].guidePos=JSON.parse(JSON.stringify(src.guidePos));
     if(src.guideOrientation)state.layers[ni].guideOrientation=src.guideOrientation;
+    // Widget (rig control) layer (2026-08-30) — same identity-flag family
+    // as everything above. `widget` is deep-copied because its axis entries
+    // are mutable objects (min/max/rest are edited in place), so a shallow
+    // copy would leave the duplicate silently sharing the original's range.
+    // The xc_… KEYS inside it are copied AS IS, deliberately, and this is
+    // only correct because it matches what duplicateLayer already does with
+    // exprControls a few lines up: control keys are scoped to their own
+    // layer, so the duplicate's widget points at the duplicate's OWN copies
+    // of the declarations and its OWN tracks (already copied inside
+    // src.motion/motionStatic). Regenerating them would have to rewrite the
+    // declarations and both tracks in lockstep to buy nothing.
+    if(src.isWidgetLayer)state.layers[ni].isWidgetLayer=true;
+    if(src.widget)state.layers[ni].widget=JSON.parse(JSON.stringify(src.widget));
     if(src.isTextLayer)state.layers[ni].isTextLayer=true;
     return ni;}
     var srcIdx=state.activeLayerIdx;var srcLd=state.layers[srcIdx];
@@ -1907,7 +1930,7 @@ window.SM={
       // level setting like canvasW/fps above (not per-layer, not per-
       // symbol/montage snapshot — a linked-vs-embedded choice is global).
       mediaMode:state.mediaMode||'embedded',
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,effects:l.effects,footage:l.footage,
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,isWidgetLayer:l.isWidgetLayer,widget:l.widget,effects:l.effects,footage:l.footage,
         // Layer parenting (2026-07-25). BOTH of these were missing from this
         // list, so every parent link was silently dropped on save — a rig
         // survived the session and nothing more. `uid` is the stable identity
@@ -2202,6 +2225,17 @@ window.SM={
       if(ld.isEffectLayer){state.layers[idx].isEffectLayer=true;}
       if(ld.isFolderLayer){state.layers[idx].isFolderLayer=true;state.layers[idx].folderCollapsed=!!ld.folderCollapsed;}
       if(ld.isGuideLayer){state.layers[idx].isGuideLayer=true;state.layers[idx].guidePos=(ld.guidePos||[state.canvasW/2,state.canvasH/2]).slice();state.layers[idx].guideOrientation=ld.guideOrientation||'horizontal';}
+      // Widget (rig control) layer (2026-08-30, rig-widget.js). Guarded on
+      // BOTH the flag and the shape of `widget`, the way blendMode/matteMode
+      // just above are typeof-guarded: a corrupted file (or the stale
+      // 'nemo-auto' localStorage autosave restored at boot) carrying a
+      // non-object here would otherwise reach buildRigWidgetOverlayItems on
+      // the very first render. A widget without a usable descriptor is
+      // dropped back to an ordinary empty layer rather than half-restored.
+      if(ld.isWidgetLayer&&ld.widget&&typeof ld.widget==='object'&&ld.widget.x&&typeof ld.widget.x.key==='string'){
+        state.layers[idx].isWidgetLayer=true;
+        state.layers[idx].widget=JSON.parse(JSON.stringify(ld.widget));
+      }
       state.layers[idx].effects=ld.effects||[];
       if(ld.symbolId){state.layers[idx].symbolId=ld.symbolId;state.layers[idx].symPlayMode=ld.symPlayMode||'loop';state.layers[idx].symSpeed=ld.symSpeed||1;state.layers[idx].symPlacedAt=ld.symPlacedAt||0;state.layers[idx].symSingleFrame=ld.symSingleFrame||0;if(ld.symMatrix)state.layers[idx].symMatrix=ld.symMatrix;}
       if(ld.lfsGroup){state.layers[idx].lfsGroup=true;state.layers[idx].lfsIds=ld.lfsIds;state.layers[idx].lfsSettings=ld.lfsSettings;}
@@ -5851,6 +5885,13 @@ function renderLayerList(frameOnly){
         {label:SM.t('ctxInsertLayerFolder'),action:function(){window.SM.addFolderLayer();}},
         {label:SM.t('ctxInsertLayerEffect'),action:function(){window.SM.addEffectLayer();}},
         {label:SM.t('ctxInsertLayerGuide'),action:function(){window.SM.addGuideLayer();}},
+        {label:SM.t('ctxInsertLayerJoystick'),action:function(){window.SM.addJoystickLayer();}},
+        {label:SM.t('ctxInsertLayerSlider'),action:function(){window.SM.addSliderLayer();}},
+        // Widget range/size (2026-08-30) — only on a widget layer, same
+        // "shown when its prerequisite is set" convention as Time Remap's
+        // own entries below. rig-widget.js owns the submenu so the numbers
+        // are edited in exactly one place.
+        ...(l4.isWidgetLayer&&window.SMRigWidget?[{label:SM.t('ctxWidgetSettingsEllipsis'),action:function(){SMRigWidget.openWidgetMenu(e.clientX+8,e.clientY+8,idx4);}}]:[]),
         {label:SM.t('ctxDuplicateLayer'),action:function(){window.SM.duplicateLayer();}},
         {label:SM.t('ctxDeleteLayer'),action:function(){window.SM.deleteLayer();}},
         {sep:true},
@@ -9790,6 +9831,8 @@ document.getElementById('btn-al').addEventListener('click',function(e){
     {label:'Dossier',action:function(){window.SM.addFolderLayer();}},
     {label:'Calque d’effet',action:function(){window.SM.addEffectLayer();}},
     {label:'Calque Guide',action:function(){window.SM.addGuideLayer();}},
+    {label:SM.t('ctxInsertLayerJoystick'),action:function(){window.SM.addJoystickLayer();}},
+    {label:SM.t('ctxInsertLayerSlider'),action:function(){window.SM.addSliderLayer();}},
   ]);
 });
 document.getElementById('btn-dl').addEventListener('click',function(){window.SM.deleteLayer();});

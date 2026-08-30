@@ -917,6 +917,15 @@
       // (buildGuideLayerItems, below) — never part of the real/exported
       // scene, same convention as safety zones/perspective guides.
       if (state.layers[i].isGuideLayer) { layers.push(userLayerEntries[i] = { items: [] }); continue; }
+      // Widget (rig control) layer (2026-08-30, rig-widget.js) — an on-canvas
+      // joystick/slider. Same "no content, no paint" shape as Guide right
+      // above, and for the same reason it still gets its OWN stack slot: an
+      // empty entry keeps every later layer's wire index correct, which is
+      // what track mattes (matteSourceIndex, resolved at the bottom of this
+      // function) and folder child indices depend on. The pad and puck are
+      // drawn separately as an editor-only overlay (buildRigWidgetOverlayItems,
+      // inside the includeEditorOverlays block), so no export ever sees them.
+      if (state.layers[i].isWidgetLayer) { layers.push(userLayerEntries[i] = { items: [] }); continue; }
       // Effect (adjustment) layer (2026-07, Motion; effects stack rewrite
       // 2026-07) — never paints its own content either (ld.frames/strokes
       // are ignored on purpose, matching AE's "Adjustment Layer" toggle),
@@ -2278,6 +2287,13 @@
       // contains mesh handles.
       var meshOverlayItems = window.buildImageMeshOverlayItems ? window.buildImageMeshOverlayItems() : [];
       if (meshOverlayItems.length) layers.push({ items: meshOverlayItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
+      // Rig control widgets (2026-08-30, rig-widget.js) — the joystick/
+      // slider pads. Inside this same `includeEditorOverlays` guard, which
+      // renderFrameRawPixels sets to false: that is the single GPU-readback
+      // path behind PNG export AND the playback bake, so a widget can never
+      // reach a rendered frame.
+      var widgetOverlayItems = window.buildRigWidgetOverlayItems ? window.buildRigWidgetOverlayItems() : [];
+      if (widgetOverlayItems.length) layers.push({ items: widgetOverlayItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
     }
     // Track matte source resolution (uid-based, 2026-07-31) — runs LAST,
     // after every unshift/splice above, so layers.indexOf gives the final
