@@ -8691,11 +8691,93 @@
   // own header comment already warns about this class of bug for the base
   // Transform rows).
   function isPathGroupExpanded(holder) { return window._motionExpandedPathHolder === holder; }
+  // ---- Path as ONE keyframable property (2026-08-31, feedback #179) ----
+  // "avant d'ouvrir la section path d'une shape on devrait a[voir] path
+  // keyframable ça veut dire que si on keyframe path tous les vertex sont
+  // keyframer et quand on bouge les keyframe de path alors ça bougent les
+  // keyframes de path en groupe."
+  //
+  // The group header is a VIEW over the vtxN tracks, never a track of its
+  // own: a "path key" is exactly "a key on every vertex at that frame", so
+  // there is no second source of truth that could disagree with the rows
+  // underneath it — no migration, no persistence change, and a shape keyed
+  // vertex-by-vertex before this existed already shows its keys here.
+  // Same reasoning as the widget layer owning no values of its own (§13).
+  function pathGroupFrames(holder, vertexCount) {
+    var frames = [];
+    if (!holder || !holder.motion) return frames;
+    var seen = {};
+    for (var vi = 0; vi < vertexCount; vi++) {
+      var tr = holder.motion['vtx' + vi];
+      if (!tr || !tr.keys) continue;
+      tr.keys.forEach(function (k) { if (!seen[k.frame]) { seen[k.frame] = 1; frames.push(k.frame); } });
+    }
+    return frames.sort(function (a, b) { return a - b; });
+  }
+  // Every vertex key sitting on `frame`, in the {holder, prop, key} shape the
+  // existing group-drag engine already consumes (onDragMove's `d.group`
+  // branch) — so dragging a path key reuses that whole path, collision
+  // checks and snapping included, instead of a parallel mover.
+  function pathGroupKeysAt(holder, vertexCount, frame) {
+    var out = [];
+    for (var vi = 0; vi < vertexCount; vi++) {
+      var prop = 'vtx' + vi;
+      var tr = holder.motion && holder.motion[prop];
+      if (!tr) continue;
+      var k = keyAt(tr, frame);
+      if (k) out.push({ holder: holder, prop: prop, key: k });
+    }
+    return out;
+  }
+  // "si on keyframe path tous les vertex sont keyframer" — one click arms and
+  // keys EVERY vertex at the playhead. Deliberately unconditional per vertex
+  // (arm the un-armed, key the already-armed) so the result is always the
+  // same well-defined state: a key on every vertex at this frame.
+  function keyWholePath(holder, vertexCount) {
+    for (var vi = 0; vi < vertexCount; vi++) {
+      var prop = 'vtx' + vi;
+      if (!isAnimated(holder, prop)) toggleAnimated(holder, prop);
+      else if (!keyAt(holder.motion[prop], state.currentFrame)) setKeyAtCurrentFrame(holder, prop, valueAtFrame(holder, prop, state.currentFrame));
+    }
+  }
+  function unkeyWholePath(holder, vertexCount) {
+    for (var vi = 0; vi < vertexCount; vi++) {
+      var prop = 'vtx' + vi;
+      if (!isAnimated(holder, prop)) continue;
+      if (!keyAt(holder.motion[prop], state.currentFrame)) continue;
+      // Removing the LAST key has to fall back to a static value or the
+      // vertex would silently snap back to its undeformed position — the
+      // same branch renderVertexRow's own stopwatch takes.
+      if (holder.motion[prop].keys.length === 1) {
+        var fv = valueAtFrame(holder, prop, state.currentFrame);
+        holder.motion[prop] = { keys: [] };
+        if (!holder.motionStatic) holder.motionStatic = {};
+        holder.motionStatic[prop] = fv;
+      } else removeKeyAtCurrentFrame(holder, prop);
+    }
+  }
   function renderPathVertexGroup(list, holder, vertexCount) {
     var grp = document.createElement('div'); grp.className = 'lrow motion-group-row';
     var arrow = document.createElement('span'); arrow.className = 'lico larrow'; arrow.textContent = isPathGroupExpanded(holder) ? '▾' : '▸';
+    // Stopwatch on the GROUP row itself (#179). Placed before the label like
+    // every other keyframable row, and it stops propagation so it never
+    // doubles as the expand/collapse toggle the rest of the row is.
+    var frames = pathGroupFrames(holder, vertexCount);
+    var anyKeys = frames.length > 0;
+    var keyHere = frames.indexOf(state.currentFrame) >= 0;
+    var sw = document.createElement('div');
+    sw.className = 'lico motion-stopwatch' + (anyKeys ? ' on' : '');
+    sw.title = stopwatchTitle('motionAnimatePath', anyKeys, keyHere);
+    sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (keyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
+    sw.addEventListener('click', function (e) {
+      e.stopPropagation(); pushUndo();
+      if (keyHere) unkeyWholePath(holder, vertexCount);
+      else keyWholePath(holder, vertexCount);
+      renderLayerList(); renderTimeline();
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    });
     var label = document.createElement('span'); label.textContent = 'Path';
-    grp.appendChild(arrow); grp.appendChild(label);
+    grp.appendChild(sw); grp.appendChild(arrow); grp.appendChild(label);
     grp.addEventListener('click', function (e) {
       e.stopPropagation();
       window._motionExpandedPathHolder = isPathGroupExpanded(holder) ? null : holder;
@@ -8704,6 +8786,54 @@
     list.appendChild(grp);
     if (!isPathGroupExpanded(holder)) return;
     for (var vi = 0; vi < vertexCount; vi++) renderVertexRow(list, holder, vi);
+  }
+  // Grid mirror of the header row above. Same class (and therefore the same
+  // height) as the plain spacer it replaces, so the §11 panel/grid alignment
+  // is untouched — it just has diamonds in it now.
+  function renderPathGroupTrackRow(grid, holder, vertexCount) {
+    var row = document.createElement('div'); row.className = 'frow motion-group-row';
+    var frames = pathGroupFrames(holder, vertexCount);
+    var mark = {};
+    frames.forEach(function (f) { mark[f] = 1; });
+    for (var fi = 0; fi < state.totalFrames; fi++) {
+      var c = document.createElement('div');
+      c.className = 'fc motion-fc' + (fi === state.currentFrame ? ' cur' : '');
+      c.dataset.frame = fi;
+      if (mark[fi]) {
+        var dia = document.createElement('div');
+        dia.className = 'motion-key' + (fi === state.currentFrame ? ' cur' : '');
+        dia.title = 'Path · image ' + (fi + 1);
+        if (typeof FC === 'number' && FC > 0 && FC < 7) {
+          var dsz = Math.max(3, FC);
+          dia.style.width = dsz + 'px'; dia.style.height = dsz + 'px';
+        }
+        (function (frame) {
+          dia.addEventListener('mousedown', function (e) {
+            e.stopPropagation(); e.preventDefault();
+            var picked = pathGroupKeysAt(holder, vertexCount, frame);
+            if (!picked.length) return;
+            pushUndo();
+            if (frame !== state.currentFrame) {
+              goToFrame(frame);
+              picked = pathGroupKeysAt(holder, vertexCount, frame);
+            }
+            // Select the whole set, then hand it to the SAME group-drag the
+            // multi-selection uses — "ça bougent les keyframes de path en
+            // groupe" is exactly what that engine already does, including
+            // refusing a move that would collide with an unselected key.
+            setKeySel(picked);
+            window._motionKeyDrag = {
+              group: true, startX: e.clientX, startScrollLeft: motionDragScrollLeft(),
+              keys: picked.map(function (s) { return { holder: s.holder, prop: s.prop, key: s.key, origFrame: s.key.frame }; }),
+            };
+            renderTimeline();
+          });
+        })(fi);
+        c.appendChild(dia);
+      }
+      row.appendChild(c);
+    }
+    grid.appendChild(row);
   }
   // Image mesh accordion (2026-08-30) — identical to renderPathVertexGroup
   // above apart from its label, and sharing its expand state
@@ -9327,11 +9457,14 @@
           // Path group (mirrors renderElementsList's renderPathVertexGroup
           // exactly — same expand condition, same vertex count, same
           // spacer-then-rows shape as the Transform group just above).
-          if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
-            var pathHdrSpacer = document.createElement('div'); pathHdrSpacer.className = 'frow motion-group-row';
-            grid.appendChild(pathHdrSpacer);
+          if (!entry.sd.isRaster && pathVertexRowCount(entry.sd)) {
+            // Same gate as the panel half (pathVertexRowCount, not
+            // sd.segments.length) — one helper decides for both sides.
+            var vtxRows = pathVertexRowCount(entry.sd);
+            // The header row carries the group's aggregate keys now (#179)
+            // instead of being a blank spacer. Same class, same height.
+            renderPathGroupTrackRow(grid, elHolder, vtxRows);
             if (isPathGroupExpanded(elHolder)) {
-              var vtxRows = pathVertexRowCount(entry.sd);
               for (var vi = 0; vi < vtxRows; vi++) renderTracksFor(grid, elHolder, 'vtx' + vi);
             }
           }
