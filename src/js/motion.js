@@ -3703,6 +3703,80 @@
     if (!ld || !ld.elementMotion || !strokeId) return segments;
     return applyPathVertexOffsets(segments, ld.elementMotion[strokeId], frameIdx);
   }
+
+  // ---- Image mesh vertices (2026-08-30, image-mesh.js) ----
+  //
+  // An image mesh's vertices key through the SAME vtxN machinery a Path's
+  // vertices already use — same holder shape, same tracks, so mesh
+  // animation inherits keyframes, ease curves, the graph editor,
+  // expressions and the expression controls for free. Two deliberate
+  // differences, both forced by what an image is:
+  //
+  // 1. The holder is keyed by **meshId**, not strokeId. A raster has no
+  //    stable strokeId across frames: layerElements stamps one lazily onto
+  //    the frame's own dict, and a still image's dict is a SEPARATE object
+  //    literal per frame (images.js's import loop), so frame 5 would get a
+  //    different id from frame 0 and the animation would vanish on scrub.
+  //    meshId is written to every frame by SMImageMesh.propagate, which
+  //    makes it the only id an imported still actually carries throughout.
+  //
+  // 2. The value is in PERCENT of the image's own size, not pixels. The
+  //    mesh itself is stored normalized over the raster's display rect
+  //    (image-mesh.js's header) so it survives moving/scaling the image;
+  //    percent is that same unit made readable in the graph editor, where
+  //    "20" beats "0.2". meshVertexOffsetAt does the /100 once, here, so
+  //    no caller has to remember it.
+  //
+  // This offset is ADDED to the mesh's own static pose (mesh.offsets),
+  // which stays the rest sculpt — the stopwatch is what decides which of
+  // the two an on-canvas drag writes to, exactly like every other Motion
+  // property.
+  function meshHolder(li, meshId) {
+    var ld = state.layers[li];
+    if (!ld || !ld.elementMotion || !meshId) return null;
+    return ld.elementMotion[meshId] || null;
+  }
+  function hasMeshVertexMotionFor(li, meshId) {
+    return hasPathVertexMotion(meshHolder(li, meshId));
+  }
+  // [du, dv] in NORMALIZED units for one vertex at one frame, or null when
+  // this mesh has no vertex tracks at all (the common case — one cheap
+  // lookup and out, so an un-animated mesh costs nothing per frame).
+  function meshVertexOffsetAt(li, meshId, vi, frameIdx) {
+    var h = meshHolder(li, meshId);
+    if (!h || !hasPathVertexMotion(h)) return null;
+    var v = valueAtFrame(h, 'vtx' + vi, frameIdx);
+    if (!v || (!v[0] && !v[1])) return null;
+    return [v[0] / 100, v[1] / 100];
+  }
+  // Writes a vertex's ANIMATED offset (normalized in, percent out) through
+  // the ordinary setValue path: a key at the playhead when the stopwatch is
+  // on, a static override when it isn't.
+  function setMeshVertexOffset(li, meshId, vi, du, dv) {
+    var ld = state.layers[li];
+    if (!ld || !meshId) return false;
+    setValue(ensureElementHolder(ld, meshId), 'vtx' + vi, [du * 100, dv * 100]);
+    return true;
+  }
+  function isMeshVertexAnimated(li, meshId, vi) {
+    var h = meshHolder(li, meshId);
+    return !!h && isAnimated(h, 'vtx' + vi);
+  }
+  // How many vertex rows the timeline will list for a mesh. Shared by the
+  // panel and the grid so the two can NEVER disagree about the row count —
+  // CLAUDE.md §11's alignment invariant is the constraint that matters most
+  // in this file, and a dense mesh (32x32 = 1089 vertices) is exactly the
+  // case where an ad-hoc cap on one side only would drift. Capped because
+  // rendering four figures' worth of rows on both sides would lock the UI;
+  // the vertices past the cap are still animatable by dragging them on
+  // canvas, they just have no row.
+  var MESH_ROW_CAP = 200;
+  function meshVertexRowCount(meshId) {
+    if (!window.SMImageMesh) return 0;
+    var m = SMImageMesh.get(meshId);
+    if (!m || !m.verts) return 0;
+    return Math.min(m.verts.length, MESH_ROW_CAP);
+  }
   // ---- Trim Paths (2026-08, "animer les stroke en in et out") ----
   // AE's own feature: Start/End (0-100%, position along the path's arc
   // length) plus Offset (shifts the whole window). Opt-in — untouched
@@ -7498,6 +7572,15 @@
       if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
         renderPathVertexGroup(list, ensureElementHolder(ld, entry.strokeId), entry.sd.segments.length);
       }
+      // Image mesh (2026-08-30) — the raster counterpart of the Path group
+      // just above: same accordion, same vertex rows, same stopwatches,
+      // just fed by the mesh's vertices instead of a path's segments. Its
+      // holder is keyed by meshId rather than strokeId (see meshHolder's
+      // own comment). MUST stay mirrored by renderTimelineMotion's grid
+      // half — CLAUDE.md §11.
+      if (entry.sd.isRaster && entry.sd.meshId && meshVertexRowCount(entry.sd.meshId)) {
+        renderMeshVertexGroup(list, ensureElementHolder(ld, entry.sd.meshId), meshVertexRowCount(entry.sd.meshId));
+      }
       // Fill color (2026-07): opt-in extended property, hidden unless the
       // element actually has a fill — same convention as Path above.
       if (entry.sd.fillColor) {
@@ -7715,6 +7798,27 @@
     var grp = document.createElement('div'); grp.className = 'lrow motion-group-row';
     var arrow = document.createElement('span'); arrow.className = 'lico larrow'; arrow.textContent = isPathGroupExpanded(holder) ? '▾' : '▸';
     var label = document.createElement('span'); label.textContent = 'Path';
+    grp.appendChild(arrow); grp.appendChild(label);
+    grp.addEventListener('click', function (e) {
+      e.stopPropagation();
+      window._motionExpandedPathHolder = isPathGroupExpanded(holder) ? null : holder;
+      renderLayerList(); renderTimeline();
+    });
+    list.appendChild(grp);
+    if (!isPathGroupExpanded(holder)) return;
+    for (var vi = 0; vi < vertexCount; vi++) renderVertexRow(list, holder, vi);
+  }
+  // Image mesh accordion (2026-08-30) — identical to renderPathVertexGroup
+  // above apart from its label, and sharing its expand state
+  // (_motionExpandedPathHolder is keyed by HOLDER, and a mesh holder is a
+  // different object from any path holder, so "one group open at a time"
+  // keeps working across both without a second flag). Written as its own
+  // function rather than a `label` parameter on renderPathVertexGroup so
+  // the grid-half mirror has an obviously-paired call to point at.
+  function renderMeshVertexGroup(list, holder, vertexCount) {
+    var grp = document.createElement('div'); grp.className = 'lrow motion-group-row';
+    var arrow = document.createElement('span'); arrow.className = 'lico larrow'; arrow.textContent = isPathGroupExpanded(holder) ? '▾' : '▸';
+    var label = document.createElement('span'); label.textContent = SM.t('hdrImageMesh');
     grp.appendChild(arrow); grp.appendChild(label);
     grp.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -8308,6 +8412,22 @@
             grid.appendChild(pathHdrSpacer);
             if (isPathGroupExpanded(elHolder)) {
               for (var vi = 0; vi < entry.sd.segments.length; vi++) renderTracksFor(grid, elHolder, 'vtx' + vi);
+            }
+          }
+          // Image mesh group — the exact mirror of renderElementsList's own
+          // renderMeshVertexGroup call: same condition, same row count from
+          // the SAME shared helper (meshVertexRowCount), same
+          // spacer-then-rows shape. Note the holder is the MESH holder
+          // (keyed by meshId), not elHolder — the expand state and the
+          // tracks both live on it, so reusing elHolder here would silently
+          // render the wrong side of the accordion.
+          if (entry.sd.isRaster && entry.sd.meshId && meshVertexRowCount(entry.sd.meshId)) {
+            var meshHolderEl = ensureElementHolder(ld, entry.sd.meshId);
+            var meshHdrSpacer = document.createElement('div'); meshHdrSpacer.className = 'frow motion-group-row';
+            grid.appendChild(meshHdrSpacer);
+            if (isPathGroupExpanded(meshHolderEl)) {
+              var mCount = meshVertexRowCount(entry.sd.meshId);
+              for (var mvi = 0; mvi < mCount; mvi++) renderTracksFor(grid, meshHolderEl, 'vtx' + mvi);
             }
           }
           // Fill color (mirrors renderElementsList's renderFillColorRow call
@@ -10306,6 +10426,13 @@
     applyParentChainToSegments: applyParentChainToSegments,
     applyParentChainToImageRect: applyParentChainToImageRect,
     applyPathVertexOffsetsFor: applyPathVertexOffsetsFor,
+    // Image mesh vertex tracks (2026-08-30) — see meshHolder's own comment
+    // for why these are keyed by meshId and expressed in percent.
+    hasMeshVertexMotionFor: hasMeshVertexMotionFor,
+    meshVertexOffsetAt: meshVertexOffsetAt,
+    setMeshVertexOffset: setMeshVertexOffset,
+    isMeshVertexAnimated: isMeshVertexAnimated,
+    meshVertexRowCount: meshVertexRowCount,
     applyTrimFor: applyTrimFor,
     hasParamShapeMotionFor: hasParamShapeMotionFor,
     applyParamShapeFor: applyParamShapeFor,
