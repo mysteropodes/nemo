@@ -1044,6 +1044,13 @@ body:not(.mode-motion) #motion-props-sec{display:none;}
    property (2026-07-29, LottieFiles-inspired) — purely visual, no click
    handler needed (the field itself is the interactive part). */
 .motion-dim-label{color:var(--text-dark);font-size:9px;flex-shrink:0;width:7px;text-align:center;}
+/* Expression controls (2026-08-30) — the two control types whose value
+   isn't a number box. Sized to sit in the SAME 22px Motion row as a
+   .pi.motion-val without changing its height: the panel/grid row-alignment
+   invariant (CLAUDE.md §11) holds because both sides emit one row here, and
+   a taller widget on the panel side alone would break it. */
+.motion-ctrl-check{width:13px;height:13px;margin:0;flex-shrink:0;accent-color:var(--accent);cursor:pointer;}
+.motion-ctrl-swatch{width:34px;height:14px;border-radius:4px;border:1px solid var(--border2);flex-shrink:0;cursor:pointer;}
 /* Stopwatch moved to the row's right edge (2026-07-29, "keyframe button à
    droite... plus rapide à aller chercher") — margin only, so the icon's own
    fixed width/height (.lico) stays untouched and centered. */
