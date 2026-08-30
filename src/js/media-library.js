@@ -145,6 +145,13 @@
       if (window.showToast) showToast(SM.t('toastImageInsertedFromLibrary'));
       return;
     }
+    // No preview bytes to insert (2026-08-29): an embedded entry's `thumb` IS
+    // the image here, so a null one means there is genuinely nothing to place —
+    // bail with a message instead of feeding `new Image()` a null (which the
+    // browser coerces to the string "null", firing a spurious GET /null) and
+    // then pushing a stroke carrying `src: null` into the frame, which is real
+    // data corruption rather than just a bad request.
+    if (!m.thumb) { if (window.showToast) showToast(t('toastMediaNoPreview', 'Aperçu indisponible pour ce média.')); return; }
     var img = new Image();
     img.onload = function () {
       var w = img.naturalWidth || 1, h = img.naturalHeight || 1;
@@ -224,6 +231,23 @@
   // would show, which the pre-existing comment on this function noted Nemo
   // didn't have a way to build until linked media existed.
   function isMissing(m) { return (!!(m.layerName || m.layerUid) && !resolveSrcLayer(m)) || !!m.linkedBroken; }
+  // Thumbnail element for one entry — an <img> when there are real preview
+  // bytes, otherwise the SAME icon-placeholder treatment audio entries already
+  // use ('♪'), so a missing preview reads as a deliberate state rather than a
+  // broken image (2026-08-29). `m.thumb` is genuinely nullable: a linked entry
+  // whose small-preview generation failed stores null (linked-media.js), and a
+  // linked entry pointing at a moved/unreadable file has no bytes to preview at
+  // all. Assigning null to img.src makes the browser coerce it to the STRING
+  // "null" and issue a real GET /null — a 404 in the network log on every
+  // render of that row, for a request nothing wanted.
+  function appendThumbVisual(container, m, iconClass) {
+    if (!m.thumb) { container.classList.add(iconClass); container.textContent = '▦'; return null; }
+    var img = document.createElement('img');
+    img.src = m.thumb;
+    img.draggable = m.kind === 'image';
+    container.appendChild(img);
+    return img;
+  }
   // Matches the SAME fields a user would recognize the entry by: its name,
   // and its source layer's name (so searching "background" finds every clip
   // that layer owns, not just files literally named that).
@@ -274,11 +298,16 @@
     } else if (m.kind === 'audio') {
       thumb.classList.add('media-tile-thumb-icon'); thumb.textContent = '♪';
     } else {
-      var img = document.createElement('img'); img.src = m.thumb; img.draggable = m.kind === 'image';
-      thumb.appendChild(img);
+      var img = appendThumbVisual(thumb, m, 'media-tile-thumb-icon');
       if (m.kind === 'video') { var pb = document.createElement('div'); pb.className = 'media-row-playicon'; pb.textContent = '▶'; thumb.appendChild(pb); }
       if (m.kind === 'image') {
-        img.addEventListener('dragstart', function (e) {
+        // Drag source is the img when there IS one, the tile's thumb box
+        // otherwise — a linked entry whose preview failed is still perfectly
+        // insertable (the linked branch of insertImageOnCanvas never reads
+        // m.thumb), so losing drag there would be a real regression.
+        var dragEl = img || thumb;
+        dragEl.draggable = true;
+        dragEl.addEventListener('dragstart', function (e) {
           e.dataTransfer.setData('application/x-nemo-media-id', m.id);
           e.dataTransfer.effectAllowed = 'copy';
         });
@@ -317,8 +346,7 @@
       } else if (m.kind === 'audio') {
         thumb.classList.add('media-row-thumb-icon'); thumb.textContent = '♪';
       } else {
-        var img = document.createElement('img'); img.src = m.thumb; img.draggable = m.kind === 'image';
-        thumb.appendChild(img);
+        var img = appendThumbVisual(thumb, m, 'media-row-thumb-icon');
         if (m.kind === 'video') { var pb = document.createElement('div'); pb.className = 'media-row-playicon'; pb.textContent = '▶'; thumb.appendChild(pb); }
         // Feedback #106: the row already flipped out of status:'loading' (one
         // frame decoded, thumbnail built — genuinely instant), but the video
@@ -435,7 +463,11 @@
         window.showContextMenu(e.clientX, e.clientY, items);
       });
       if (m.kind === 'image') {
-        img.addEventListener('dragstart', function (e) {
+        // Same fallback as the tile view: drag from the thumb box when there's
+        // no preview img to hang the listener on.
+        var dragEl = img || thumb;
+        dragEl.draggable = true;
+        dragEl.addEventListener('dragstart', function (e) {
           e.dataTransfer.setData('application/x-nemo-media-id', m.id);
           e.dataTransfer.effectAllowed = 'copy';
         });
