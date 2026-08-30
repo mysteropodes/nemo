@@ -274,9 +274,29 @@
     renderGuides();
   }
 
+  // Rulers are OFF for a fresh install and remembered once you turn them on
+  // (2026-08-31, feedback #189: "rulers par default désactiver pour nouvelle
+  // session. laisser activé lors de l'enregistrement layout si active").
+  // Same mechanism, same storage and same lifetime as the panel widths
+  // (ui.js's restorePanelWidth/savePanelWidth) — this is a workspace
+  // preference, not project data, so it must NOT ride along in the project
+  // file where it would follow the artwork onto someone else's machine.
+  var RULERS_KEY = 'nemo-rulers-on';
+  function saveRulersPref() {
+    try { localStorage.setItem(RULERS_KEY, state.rulersOn ? '1' : '0'); } catch (e) {}
+  }
+  function restoreRulersPref() {
+    var v = null;
+    try { v = localStorage.getItem(RULERS_KEY); } catch (e) {}
+    // Nothing stored = never chosen = the new default (off). An explicit '0'
+    // is honoured too, so turning them back off also sticks.
+    state.rulersOn = v === '1';
+  }
+
   function toggleOn(on) {
     state.rulersOn = on != null ? !!on : !state.rulersOn;
     document.body.classList.toggle('rulers-off', !state.rulersOn);
+    saveRulersPref();
     if (state.rulersOn) { lastZoom = null; } // force a redraw on the next loop tick
     else { renderGuides(); } // collapses the DOM guide elements
   }
@@ -286,6 +306,7 @@
     hCanvas = document.getElementById('ruler-h');
     vCanvas = document.getElementById('ruler-v');
     if (!area || !hCanvas || !vCanvas) return;
+    restoreRulersPref();
     document.body.classList.toggle('rulers-off', !state.rulersOn);
     wireRulerDrag(hCanvas, 'h');
     wireRulerDrag(vCanvas, 'v');
