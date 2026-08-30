@@ -243,7 +243,14 @@ function exportBuildFrame(frameIdx,alpha){
       // 2026-07): innermost transform — applied directly to `p`'s own
       // segments before elMat's pivot is even read from p.bounds, same
       // ordering as buildSceneJson's engine-bridge.js branch.
-      if(!sd.isRaster&&window.SMMotion&&sd.strokeId){
+      // Vector-brush ribbons excluded (2026-08-31, #181): their vtxN indices
+      // address the CENTERLINE, and rebuilding the ribbon from an offset
+      // centerline changes the outline's POINT COUNT — something this
+      // point-by-point write cannot express at all. exportHasCenterlineMotion
+      // below routes any project using it through the engine instead, where
+      // the rebuild actually lives; writing a partial result here would be
+      // the silent-wrong-export failure §12 warns about.
+      if(!sd.isRaster&&window.SMMotion&&sd.strokeId&&!(SMMotion.isVectorBrushSd&&SMMotion.isVectorBrushSd(sd))){
         var vtxSegs=SMMotion.applyPathVertexOffsetsFor(li,sd.strokeId,sd.segments,frameIdx);
         for(var vsi=0;vsi<p.segments.length&&vsi<vtxSegs.length;vsi++){
           p.segments[vsi].point.x=vtxSegs[vsi].point[0];
@@ -519,7 +526,33 @@ function exportHasImageMesh(){
   for(var k in m){if(Object.prototype.hasOwnProperty.call(m,k))return true;}
   return false;
 }
-function exportNeedsEngine(){return exportHasActiveEffects()||exportHasLayerCompositing()||exportHasEngineOnlyMotion()||exportHasImageMesh();}
+// Centerline-authored shape motion (2026-08-31) — Brush Size (#178) and
+// per-vertex offsets on a vector-brush ribbon (#181). Both rebuild the
+// ribbon's outline from its centerline, which changes the point count; the
+// plain-Paper.js loop above can only rewrite existing points in place, so it
+// would export the stroke at its recorded width and undeformed while the
+// screen shows it scaled/morphed. Same "engine-only feature" shape as
+// 3D / Motion Blur / Order / Image mesh, and the same silent failure if
+// missed.
+//
+// Deliberately over-inclusive in the SAFE direction, like exportHasImageMesh:
+// it checks the element holders for a brushSize or vtxN entry without also
+// proving the target stroke is a vector brush (which would mean walking every
+// frame of every layer). A plain path's vtxN offsets render identically
+// through the engine, so the worst case is a slower export of the same
+// picture — where the opposite error is a wrong file nobody notices.
+function exportHasCenterlineMotion(){
+  return state.layers.some(function(ld){
+    if(!ld.elementMotion)return false;
+    return Object.keys(ld.elementMotion).some(function(k){
+      var h=ld.elementMotion[k];if(!h)return false;
+      return ['motion','motionStatic','expressions'].some(function(bag){
+        return h[bag]&&Object.keys(h[bag]).some(function(prop){return prop==='brushSize'||prop.indexOf('vtx')===0;});
+      });
+    });
+  });
+}
+function exportNeedsEngine(){return exportHasActiveEffects()||exportHasLayerCompositing()||exportHasEngineOnlyMotion()||exportHasImageMesh()||exportHasCenterlineMotion();}
 // ---- PNG sequence rendering to a working directory (shared by raster exports) ----
 async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
   // Effects (blur/vignette/glow/ground shadow/...) only ever rendered in

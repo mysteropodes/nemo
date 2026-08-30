@@ -1577,7 +1577,12 @@
           // shape's OWN local space, same as elMat's own pivot is computed
           // from `c.bounds` (the pre-offset bounds), matching AE's model
           // where a path's own points are edited before any transform.
-          if (sd && window.SMMotion && cPathOpsStrokeId) sd.segments = SMMotion.applyPathVertexOffsetsFor(i, cPathOpsStrokeId, sd.segments, renderFrame);
+          // Skipped for a vector-brush ribbon (2026-08-31, #181): there the
+          // vtxN indices address the CENTERLINE, not this baked outline, so
+          // applying them here moved outline point N — an arbitrary point on
+          // the ribbon's edge — instead of the stroke's Nth node. The ribbon
+          // is rebuilt from its offset centerline in the branch below.
+          if (sd && window.SMMotion && cPathOpsStrokeId && !(SMMotion.isVectorBrushSd && SMMotion.isVectorBrushSd(sd))) sd.segments = SMMotion.applyPathVertexOffsetsFor(i, cPathOpsStrokeId, sd.segments, renderFrame);
           // Trim Paths (2026-08) — same innermost-layer placement as vertex
           // offsets right above (authored in the shape's own local space,
           // before elMat/motionMat), applied right after so a trimmed
@@ -1620,8 +1625,14 @@
           // the trim's OWN pts/widths as Brush Size's input, not the
           // shape's un-trimmed static data — a real future case, not
           // attempted here. Trim wins when both are set.
-          else if (sd && window.SMMotion && cPathOpsStrokeId && SMMotion.hasBrushSizeMotionFor && SMMotion.hasBrushSizeMotionFor(i, cPathOpsStrokeId)) {
-            var bsSegs = SMMotion.applyBrushSizeFor(i, cPathOpsStrokeId, sd, renderFrame);
+          else if (sd && window.SMMotion && cPathOpsStrokeId && SMMotion.hasVectorBrushOutlineMotionFor && SMMotion.hasVectorBrushOutlineMotionFor(i, cPathOpsStrokeId)) {
+            // ONE rebuild carrying both centerline-authored edits — Brush
+            // Size and per-vertex offsets (#181) — instead of two chained
+            // ones, which would have to re-derive a centerline from an
+            // outline. Returns null for anything that isn't a vector-brush
+            // ribbon with real centerline data, so a plain shape falls
+            // through untouched.
+            var bsSegs = SMMotion.applyVectorBrushOutlineFor(i, cPathOpsStrokeId, sd, renderFrame);
             if (bsSegs) { sd.segments = bsSegs; sd.closed = true; }
           }
           // Dynamic shapes phase 2 (2026-08-18) — animated corner radii,
