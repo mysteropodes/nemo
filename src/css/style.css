@@ -2702,3 +2702,11 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
      drift from the panel the first time --panel2 changes. */
   background:transparent;}
 .psec-identity>.pbdy{padding:13px 16px 12px;background:transparent;}
+
+/* Project repo link on the start screen (index.html #start-github). Sits
+   under the action rows as a quiet footnote, not a fourth card: it's an
+   outbound link, not something you start work with — the visual weight has
+   to say so. */
+#start-github{display:inline-flex;align-items:center;gap:7px;margin:2px 0 20px;
+  font-size:11px;color:var(--text-dim);text-decoration:none;transition:color .15s;}
+#start-github:hover{color:var(--text);}
