@@ -1265,10 +1265,14 @@ body.mode-motion .lrow.act.motion-selected{background:rgba(63,107,245,.16);box-s
    row is introduced, preserving the panel/grid row invariant. */
 #motion-header-tools{display:none;align-items:center;gap:5px;min-width:0;margin-left:auto;}
 body.mode-motion #motion-header-tools{display:flex;}
-body.mode-motion #layer-ctrls{gap:3px;}
-body.mode-motion #layer-ctrls #btn-camera,
-body.mode-motion #layer-ctrls #btn-audio,
-body.mode-motion #layer-ctrls #btn-comp{display:none;}
+/* Camera, audio and convert-to-component used to be hidden here, purely to
+   buy horizontal room for #motion-header-tools. But Motion is where you
+   actually reach for them — it is the mode you animate in — and hiding them
+   meant a component, a sound track or a camera simply could not be created
+   without leaving Motion first. They are back; the tighter gap below, plus
+   #motion-context-label's max-width, is what pays for the space instead. */
+body.mode-motion #layer-ctrls{gap:2px;}
+body.mode-motion #layer-ctrls button{width:22px;height:22px;}
 #motion-context-label{min-width:0;max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:var(--text-dim);}
 #motion-filter-trigger{width:24px;height:24px;flex:none;border:0;border-radius:6px;background:var(--panel3);color:var(--text-dim);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 #motion-filter-trigger:hover{color:var(--text);background:#2c2a31;}
