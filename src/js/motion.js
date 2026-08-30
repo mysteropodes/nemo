@@ -5508,12 +5508,60 @@
       // is rare, but those established grabs should still win if it happens.
       var effHit = hitEffectorHandle(event.point, t);
       if (effHit) { pushUndo(); _motionDrag = { mode: 'effector', t: t, eff: effHit }; return true; }
+      // Dragging the BODY of a per-element box moves that element
+      // (2026-08-30, feedback #170 follow-up: "si je bouge la box de
+      // l'ellement aprés double clic ça bouge l'ensemble et pas les
+      // propriété de la shape en question").
+      //
+      // onDown had no body-move mode at all — only ring/corners/anchor/
+      // handles/vertices/effectors. For a whole-LAYER target that is
+      // correct and deliberate: returning false lets select-bridge.js take
+      // the gesture and move the layer, which is what its box means. But a
+      // box that now hugs ONE element still fell through to that same
+      // layer move, so the visible box and the thing that moved were
+      // different objects. Measured before the fix: drag the element box by
+      // (200,80) and ld.motionStatic.position became [200,80] while the
+      // element holder stayed null.
+      //
+      // Gated on t.strokeId so the whole-layer path is untouched, and
+      // placed LAST so every more specific grab above still wins.
+      if (t.strokeId) {
+        var gBody = motionBoxGeom(t);
+        if (gBody && gBody.bounds && gBody.inv) {
+          // Test in the box's OWN local space, not as a world-space AABB:
+          // gBody.bounds is un-transformed geometry and the drawn box can be
+          // rotated/scaled, so comparing a world point against it directly
+          // would hit-test a rectangle that isn't the one on screen. inv()
+          // exists for exactly this (it was added for vertex dragging).
+          var lp = gBody.inv(event.point.x, event.point.y);
+          var bb = gBody.bounds;
+          var insideEl = lp && lp.x >= bb.left && lp.x <= bb.right && lp.y >= bb.top && lp.y <= bb.bottom;
+          if (insideEl) {
+            pushUndo();
+            _motionDrag = {
+              mode: 'elementMove', t: t,
+              start: { x: event.point.x, y: event.point.y },
+              basePos: valueAtFrame(t.holder, 'position', state.currentFrame).slice()
+            };
+            return true;
+          }
+        }
+      }
     }
     return false;
   }
   function onDrag(event) {
     if (!_motionDrag) return false;
-    if (_motionDrag.mode === 'multiLayerMove') {
+    if (_motionDrag.mode === 'elementMove') {
+      // Writes to the ELEMENT's own holder, which is what its box stands
+      // for — same setValue every other Motion drag uses, so it keys at the
+      // playhead when the stopwatch is on and writes motionStatic when it
+      // isn't, with no second writer.
+      setValue(_motionDrag.t.holder, 'position', [
+        _motionDrag.basePos[0] + (event.point.x - _motionDrag.start.x),
+        _motionDrag.basePos[1] + (event.point.y - _motionDrag.start.y)
+      ]);
+    } else if (_motionDrag.mode === 'multiLayerMove') {
       var mdx=event.point.x-_motionDrag.start.x,mdy=event.point.y-_motionDrag.start.y;
       _motionDrag.records.forEach(function(r){setValue(r.t.holder,'position',[r.pos[0]+mdx,r.pos[1]+mdy]);});
     } else if (_motionDrag.mode === 'multiLayerScale') {
