@@ -7536,6 +7536,13 @@ function onMouseMoveTool(event){
 // this way counts as "the second one" — naturally invalidated the moment
 // the user selects anything else (dblWholeGroupSelected below goes false).
 var _groupEnteredGid=null;
+// Same signal, for an UNGROUPED shape (2026-08-30, feedback #165). The layer
+// plays the role the group plays above: first double-click isolates the one
+// shape you clicked and STAYS on Select, so it can be transformed with its own
+// box; a second double-click on that same shape enters Subselect. Cleared by
+// select-bridge.js alongside _groupEnteredGid the moment the selection moves
+// somewhere else, which is what makes "click elsewhere, come back out" work.
+var _shapeEnteredId=null;
 // Double-click a filled shape to also select the stroke(s) that bound it —
 // matches Animate's "double-click a fill selects its surrounding stroke"
 // convention. There's no stored link between a fill (built by the Fill
@@ -7603,6 +7610,38 @@ function onViewDoubleClick(event){
       if(window.SMEngineBridge)SMEngineBridge.renderNow();
       return;
     }
+  }
+  // Ungrouped shape, FIRST double-click (2026-08-30, feedback #165: "quand
+  // j'ai deux éléments sur un même calque et que je double clic avec select
+  // j'aimerais plutôt avoir accès à la bounding box de transformation de
+  // l'élément... et pouvoir le transformer, le subselect apparaîtrait plutôt
+  // avec un autre double clic"). This is the SAME rule the group branch above
+  // already implements, with the layer standing in for the group: isolate the
+  // one shape, keep Select, so it can be moved/scaled/rotated with its own
+  // box. Only a second double-click on that same shape goes on to Subselect.
+  //
+  // The guard mirrors _groupEnteredGid's exactly, and for the same reason:
+  // "this shape is the current selection" is true after any ordinary single
+  // click too, so it cannot distinguish a first double-click from a second.
+  // Only a shape this mechanism itself most recently entered counts.
+  // Restricted to UNGROUPED shapes on purpose. A grouped one already spends
+  // its first double-click entering the group (branch above), and the July
+  // 2026 spec for that case is explicit that the SECOND one reaches Subselect
+  // — "l'outil subselect n'apparait qu'après si on double clic sur un des
+  // éléments du group". Applying this step to members too would silently make
+  // groups need three double-clicks instead of two. Caught by re-testing the
+  // group path after writing this: it did exactly that.
+  var dblSid=fillPath.data&&fillPath.data.strokeId;
+  var alreadyIsolated=!dblSid||_shapeEnteredId===dblSid;
+  if(!dblGid&&!alreadyIsolated){
+    clearSel();fsClearSel();
+    _fsIsolation={groupId:fillPath.data&&fillPath.data.groupId,path:fillPath};
+    selectedPaths=[fillPath];
+    state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
+    _shapeEnteredId=dblSid||null;
+    renderArcs();updateUI();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    return;
   }
   clearSel();
   fsClearSel();
