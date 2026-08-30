@@ -7568,6 +7568,28 @@ var _shapeEnteredId=null;
 // tool) and the strokes that formed it, so this uses a bounds-overlap
 // heuristic: any stroke-only path whose bounds intersect the fill's bounds
 // is assumed to be part of its outline.
+// Ungrouped, non-synthetic shapes on a layer — the set the per-object
+// "enter the group" mode operates on (2026-08-31, feedback #176). Shared by
+// the Motion and Animation 2D double-click paths so both agree on what
+// counts as an element.
+function perObjectShapesOf(layer){
+  if(!layer)return[];
+  return layer.children.filter(function(c){
+    if(!c.data||!c.data.strokeId||c.data.groupId)return false;
+    if(c.data.isBrushTextureCopy||c.data.isLinkedFillCompanion||c.data.isDuplicatorCopy)return false;
+    return !!(c.strokeBounds&&c.strokeBounds.width&&c.strokeBounds.height);
+  });
+}
+// Union of those shapes — the "group box" a double-click enters from
+// ANYWHERE inside, not only by hitting a shape ("peu importe où je double
+// clic dans la bounding box").
+function perObjectUnionBounds(layer){
+  var sh=perObjectShapesOf(layer),b=null;
+  sh.forEach(function(c){b=b?b.unite(c.strokeBounds):c.strokeBounds.clone();});
+  return sh.length>=2?b:null;
+}
+window.perObjectShapesOf=perObjectShapesOf;
+window.perObjectUnionBounds=perObjectUnionBounds;
 function onViewDoubleClick(event){
   // Re-edit a placed text block in place (2026-07 rework) — checked before
   // the select-only guard below since double-clicking with the Text tool
@@ -7616,7 +7638,27 @@ function onViewDoubleClick(event){
     // this file uses, and it stays constant as you zoom.
     var mTol=8/Math.max(0.0001,view.zoom);
     var mHit=mLayer.hitTest(event.point,{fill:true,stroke:true,tolerance:mTol});
-    if(!mHit||!mHit.item)return;
+    // Enter the group from anywhere INSIDE its box, not only by landing on
+    // a shape (2026-08-31, feedback #176, clarified with the Illustrator
+    // analogy: "peu importe où je double clic dans la bounding box de ces
+    // éléments... ça m'affichera les bounding box séparées des 3 éléments").
+    // Requiring a direct hit is what made it "difficile de rentrer": on a
+    // layer of thin or scattered shapes most of the group box is empty.
+    if(!mHit||!mHit.item){
+      var mUnion=window.perObjectUnionBounds&&perObjectUnionBounds(mLayer);
+      if(mUnion&&mUnion.contains(event.point)){
+        // Inside the group but on no shape: reveal every element's box and
+        // target none of them. The next single click picks one.
+        window._motionExpandedLayer=state.activeLayerIdx;
+        window._motionExpandedElement=null;
+        window._perObjBoxes=state.activeLayerIdx;
+        window._sceneVersion=(window._sceneVersion||0)+1;
+        if(window.renderLayerList)renderLayerList();
+        if(window.renderTimeline)renderTimeline();
+        if(window.SMEngineBridge)SMEngineBridge.renderNow();
+      }
+      return;
+    }
     var mItem=mHit.item;
     while(mItem.parent&&mItem.parent!==mLayer)mItem=mItem.parent;
     var mSid=mItem.data&&mItem.data.strokeId;
@@ -7642,8 +7684,24 @@ function onViewDoubleClick(event){
   // several shapes selected, dblclick on a fill-less stroke did nothing and
   // the union box just stayed. A drawn stroke is as much "an object" as a
   // filled shape, so it gets the same doorway.
-  var hit=layer.hitTest(event.point,{fill:true,stroke:true,tolerance:4/view.zoom});
-  if(!hit||!hit.item)return;
+  // Same screen-space tolerance as the Motion path above — 4/view.zoom is
+  // sub-pixel once you zoom out, which is half of why entering was hard.
+  var hit=layer.hitTest(event.point,{fill:true,stroke:true,tolerance:8/Math.max(0.0001,view.zoom)});
+  if(!hit||!hit.item){
+    // Enter the group from anywhere inside its box (feedback #176) — see the
+    // Motion branch's comment. Reveals every element's box and targets none;
+    // the next single click picks one, and a click outside the union drops
+    // back out (select-bridge's own reset).
+    var uni=window.perObjectUnionBounds&&perObjectUnionBounds(layer);
+    if(uni&&uni.contains(event.point)){
+      clearSel();fsClearSel();
+      _shapeEnteredId=null;
+      window._perObjBoxes=state.activeLayerIdx;
+      renderArcs();updateUI();
+      if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    }
+    return;
+  }
   var fillPath=hit.item;
   // A hit inside a CompoundPath (boolean/fill results with holes) lands on
   // a CHILD Path — climb to the layer-level item, which is the one carrying

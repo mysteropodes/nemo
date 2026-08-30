@@ -2838,6 +2838,26 @@
         return nvItems;
       }
     }
+    // Group entered with nothing picked yet (2026-08-31, feedback #176):
+    // every element shows its own box and none is active, so there is no
+    // selection to build a gizmo from — but the boxes must still draw. The
+    // per-object block at the end of this function handles them; returning
+    // early here would take them with it.
+    if (!selectedPaths.length && window._perObjBoxes === state.activeLayerIdx) {
+      var poItems = [];
+      var poZs = 1 / view.zoom;
+      var poMap = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
+      (window.perObjectShapesOf ? perObjectShapesOf(userLayers[state.activeLayerIdx]) : []).forEach(function (ch) {
+        var sb = ch.strokeBounds;
+        function PW(x, y) { if (!poMap) return [x, y]; return poMap.fwd(x, y); }
+        var a1 = PW(sb.left, sb.top), a2 = PW(sb.right, sb.top), a3 = PW(sb.right, sb.bottom), a4 = PW(sb.left, sb.bottom);
+        poItems.push(lineItem(a1, a2, [74, 158, 255, 190], 1 * poZs));
+        poItems.push(lineItem(a2, a3, [74, 158, 255, 190], 1 * poZs));
+        poItems.push(lineItem(a3, a4, [74, 158, 255, 190], 1 * poZs));
+        poItems.push(lineItem(a4, a1, [74, 158, 255, 190], 1 * poZs));
+      });
+      return poItems;
+    }
     if (!selectedPaths.length || typeof orientedSelBox !== 'function') return [];
     // Oriented box (tools.js orientedSelBox — "les boîtes de transformation
     // ne tournent pas avec l'objet quand on rotate"): everything below is

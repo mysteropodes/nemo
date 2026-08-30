@@ -4615,7 +4615,10 @@
     lyr.children.forEach(function (ch) {
       if (!ch.data || !ch.data.strokeId || ch.data.groupId) return;
       if (ch.data.isBrushTextureCopy || ch.data.isLinkedFillCompanion || ch.data.isDuplicatorCopy) return;
-      if (ch.data.strokeId === window._motionExpandedElement) return; // has the real gizmo
+      // Skipped only when it IS the active one. With nothing targeted
+      // (_motionExpandedElement null, the "entered the group but picked
+      // nothing yet" state of #176) every shape draws its own box.
+      if (window._motionExpandedElement && ch.data.strokeId === window._motionExpandedElement) return;
       var b = ch.strokeBounds;
       if (!b || !b.width || !b.height) return;
       function P(x, y) { if (!map) return [x, y]; return map.fwd(x, y); }

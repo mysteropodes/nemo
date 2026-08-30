@@ -746,34 +746,63 @@
       // work INSIDE the isolation and must not cancel it. What's left here is
       // a click that hit none of that — empty canvas or another shape — which
       // is exactly the "clic ailleurs" that should drop back out.
-      if (window._motionExpandedElement != null) {
+      // The `_perObjBoxes` half of the condition is what covers entering the
+      // group WITHOUT targeting a shape (2026-08-31, feedback #176): that
+      // state leaves _motionExpandedElement null, and Motion cannot fall
+      // through to the Animation 2D reset further down because
+      // shouldIntercept() is false here — Motion's active tool is 'draw', not
+      // 'select'. So without this the Motion side could be entered and never
+      // left. Found by driving; reading the two branches side by side does
+      // not show it, since each looks complete on its own.
+      if (window._motionExpandedElement != null || window._perObjBoxes === state.activeLayerIdx) {
         var lyrEx = userLayers[state.activeLayerIdx];
-        var hitEx = lyrEx ? lyrEx.hitTest(new Point(w0[0], w0[1]), { fill: true, stroke: true, tolerance: 6 / view.zoom }) : null;
+        var ptEx = new Point(w0[0], w0[1]);
+        var hitEx = lyrEx ? lyrEx.hitTest(ptEx, { fill: true, stroke: true, tolerance: 6 / view.zoom }) : null;
         var itEx = hitEx && hitEx.item;
         while (itEx && itEx.parent && itEx.parent !== lyrEx) itEx = itEx.parent;
         var sidEx = itEx && itEx.data && itEx.data.strokeId;
         // Clicking a SIBLING hands the isolation over to it rather than
         // ending it — same continuity Animation 2D's per-object mode has, and
-        // the thing that makes a multi-shape layer workable. Clicking nothing
-        // exits to the whole-layer box.
+        // the thing that makes a multi-shape layer workable. Clicking empty
+        // space still INSIDE the group box drops back to "all boxes, none
+        // targeted" (you are still in the group, Illustrator-style); only a
+        // click outside the box leaves it.
         if (sidEx && sidEx !== window._motionExpandedElement) {
           window._motionExpandedElement = sidEx;
+          window._perObjBoxes = state.activeLayerIdx;
           if (SMMotion.selectShapesByStrokeIds) SMMotion.selectShapesByStrokeIds(state.activeLayerIdx, [sidEx]);
         } else if (!sidEx) {
+          var uEx = (lyrEx && window.perObjectUnionBounds) ? perObjectUnionBounds(lyrEx) : null;
           window._motionExpandedElement = null;
-          window._perObjBoxes = null;
+          if (!uEx || !uEx.contains(ptEx)) window._perObjBoxes = null;
         }
-        if (sidEx || window._motionExpandedElement == null) {
-          window._sceneVersion = (window._sceneVersion || 0) + 1;
-          if (window.renderLayerList) renderLayerList();
-          if (window.renderTimeline) renderTimeline();
-          window.SMEngineBridge.renderNow();
-          e.stopImmediatePropagation(); e.preventDefault();
-          return;
-        }
+        window._sceneVersion = (window._sceneVersion || 0) + 1;
+        if (window.renderLayerList) renderLayerList();
+        if (window.renderTimeline) renderTimeline();
+        window.SMEngineBridge.renderNow();
+        e.stopImmediatePropagation(); e.preventDefault();
+        return;
       }
     }
     if (!shouldIntercept()) return;
+    // Leave the entered group when the click lands OUTSIDE its box
+    // (2026-08-31, feedback #176: "si je clic en dehors alors on revient sur
+    // la premiere bounding box de groupe"). Keyed on _perObjBoxes, not on
+    // _shapeEnteredId: since the double-click can now enter the group
+    // WITHOUT targeting a shape, _shapeEnteredId is null in that state and
+    // the older reset — which required it — could never fire, so the mode
+    // had no way out at all. Found by driving, not by reading.
+    // A click still INSIDE the union keeps the mode: that is how you pick
+    // one element after another without re-entering each time.
+    if (window._perObjBoxes === state.activeLayerIdx && window.perObjectUnionBounds) {
+      var _pw = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+      var _pu = perObjectUnionBounds(userLayers[state.activeLayerIdx]);
+      if (!_pu || !_pu.contains(new Point(_pw[0], _pw[1]))) {
+        window._perObjBoxes = null;
+        window._shapeEnteredId = null;
+        window._sceneVersion = (window._sceneVersion || 0) + 1;
+      }
+    }
     // Every gesture starts from a clean slate (2026-07-26). onDown has a
     // dozen branches and several of them `return` without ever assigning
     // `mode`, so the PREVIOUS gesture's mode could survive into the new one
