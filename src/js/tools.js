@@ -6755,8 +6755,27 @@ function onMouseDown(event){
       var xd=event.point.getDistance(xh.pos);if(xd<bestXd){bestXd=xd;bestXh=xh;}
     }
     if(bestXh){
-      pushUndo();
       var xb=xformSelBounds();
+      // Stale gizmo guard (2026-08-30, feedback #167 "impossible de le
+      // reselect dans le canvas"). xformSelBounds() returns null the moment
+      // every selectedPaths entry is dead — and after loadFrame rebuilds the
+      // layer's items (any frame change; a duplicator layer re-materializes
+      // ALL of its children on every scrub) those entries name objects that
+      // no longer exist, while xformHandles still holds the handle positions
+      // computed before. A click near an old handle then entered this branch
+      // and threw on xb.center, which killed the REST of onMouseDown — the
+      // ordinary hit-test-and-select code below never ran, so nothing could
+      // be selected again until something else happened to refresh the
+      // handles. Reproduced exactly: select a copy, scrub, deselect, click —
+      // "Cannot read properties of null (reading 'center')" at this line,
+      // then zero selection on every subsequent click.
+      // Falling through (rather than returning) is what makes the click do
+      // the useful thing: the stale gizmo is dropped and the click is
+      // treated as the plain selection click the user meant.
+      if(!xb){ xformHandles=[]; bestXh=null; }
+    }
+    if(bestXh){
+      pushUndo();
       if(bestXh.type==='rotate'){
         _xform.active=true;_xform.type='rotate';_xform.center=xb.center.clone();
         _xform.startAngle=Math.atan2(event.point.y-_xform.center.y,event.point.x-_xform.center.x)*180/Math.PI;_xform.lastAngle=0;
