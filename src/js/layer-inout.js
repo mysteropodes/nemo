@@ -596,6 +596,7 @@
       // a plain (no-modifier, no-move) click can narrow the selection down
       // to just this one layer at mouseup — see that check's own comment.
       _drag = { group: true, type: type, startX: e.clientX, members: members, alt: !!e.altKey, keySel: keySelNow(), pressLi: li, hotEl: handleEl };
+      _drag.linkedOrig = captureLinkedOrig(members.map(function (m) { return m.li; }));
       return;
     }
     // Folder body-drag carries its children along (2026-08-29, feedback
@@ -645,10 +646,12 @@
           fMembers.push({ li: ci, row: crow || null, origIn: cIn, origOut: cOut, part: 'both', lastIn: cIn, lastOut: cOut });
         });
         _drag = { group: true, type: 'both', startX: e.clientX, members: fMembers, alt: !!e.altKey, keySel: keySelNow(), pressLi: li, hotEl: handleEl };
+        _drag.linkedOrig = captureLinkedOrig(fMembers.map(function (m) { return m.li; }));
         return;
       }
     }
     _drag = { li: li, row: row, type: type, startX: e.clientX, origIn: inPointOf(ld), origOut: outPointOf(ld), alt: !!e.altKey, keySel: keySelNow(), hotEl: handleEl };
+    _drag.linkedOrig = captureLinkedOrig([li]);
   }
   // Parent in Time (2026-07-30 on-timeline connector) — a dragged bar's OWN
   // position is kept live via updateBar (cheap, see its neighboring comment
@@ -661,20 +664,54 @@
   // children, same small guard bound resolveLinkedTime itself uses for
   // cycle-safety — still just a handful of cheap updateBar calls, not a
   // full rebuild.
+  // Walks the time-link chain up from l2 looking for srcUid. Factored out of
+  // updateLinkedChildrenBars (it was the only caller) because the keyframe
+  // lock pass in mouseup needs the exact same "is this layer downstream of
+  // what I'm dragging" test — two copies of a transitive walk with its own
+  // cycle guard is precisely the duplicated-pair trap of CLAUDE.md §3.
+  function isTimeLinkDescendant(l2, srcUid) {
+    if (!l2 || !l2.timeLink || !l2.timeLink.uid || !srcUid) return false;
+    var cur = l2, guard = 0;
+    while (cur && cur.timeLink && cur.timeLink.uid && guard++ < 16) {
+      if (cur.timeLink.uid === srcUid) return true;
+      var next = null;
+      state.layers.forEach(function (o) { if (o.layerUid === cur.timeLink.uid) next = o; });
+      cur = next;
+    }
+    return false;
+  }
+  function timeLinkUidOf(li) {
+    var ld = state.layers[li];
+    return (ld && window.SMMotion && window.SMMotion.ensureLayerUid) ? SMMotion.ensureLayerUid(ld) : null;
+  }
+  // Snapshot of every layer downstream of the bars about to be dragged, with
+  // its RESOLVED in/out — deliberately layerInPoint/layerOutPoint and not
+  // inPointOf/outPointOf (see their comment above): a linked edge's raw
+  // ld.inPoint is inert, the value that actually moves is the resolved one.
+  // Taken at drag START because the lock pass in mouseup needs a "before" to
+  // measure against, and a linked child is never in _drag.members.
+  function captureLinkedOrig(liList) {
+    var out = [], seenLi = {};
+    var uids = liList.map(timeLinkUidOf).filter(Boolean);
+    if (!uids.length) return out;
+    liList.forEach(function (li) { seenLi[li] = true; });
+    state.layers.forEach(function (l2, li2) {
+      if (seenLi[li2]) return; // dragged directly — already a member
+      var hit = uids.some(function (u) { return isTimeLinkDescendant(l2, u); });
+      if (!hit) return;
+      out.push({
+        li: li2,
+        origIn: window.layerInPoint ? layerInPoint(l2) : 0,
+        origOut: window.layerOutPoint ? layerOutPoint(l2) : state.totalFrames - 1
+      });
+    });
+    return out;
+  }
   function updateLinkedChildrenBars(sourceLi) {
-    var srcLd = state.layers[sourceLi];
-    var srcUid = (srcLd && window.SMMotion && window.SMMotion.ensureLayerUid) ? SMMotion.ensureLayerUid(srcLd) : null;
+    var srcUid = timeLinkUidOf(sourceLi);
     if (!srcUid) return;
     state.layers.forEach(function (l2, li2) {
-      if (!l2.timeLink || !l2.timeLink.uid) return;
-      var cur = l2, guard = 0, found = false;
-      while (cur && cur.timeLink && cur.timeLink.uid && guard++ < 16) {
-        if (cur.timeLink.uid === srcUid) { found = true; break; }
-        var next = null;
-        state.layers.forEach(function (o) { if (o.layerUid === cur.timeLink.uid) next = o; });
-        cur = next;
-      }
-      if (!found) return;
+      if (!isTimeLinkDescendant(l2, srcUid)) return;
       var row = _liToRow[li2];
       if (row) updateBar(row, li2);
     });
@@ -1044,6 +1081,26 @@
       };
       if (d.group) d.members.forEach(function (m) { lockOne(m.li, m.origIn, m.origOut); });
       else lockOne(d.li, d.origIn, d.origOut);
+      // Parent in Time (2026-08-30, "j'aimerais ça pour le parent in time"):
+      // a layer whose in/out is DRIVEN by the dragged one moves too, but it
+      // is never in d.members, so its standing keyLock never fired — its bar
+      // slid out from under its own keyframes. Measured before the fix:
+      // source in 0 -> 20, linked child's in 0 -> 20 (the link itself works),
+      // keys [10,20] unchanged where an unlinked layer with the same lock
+      // correctly gave [30,40].
+      // Reads RESOLVED points on both sides (captureLinkedOrig's comment says
+      // why raw is wrong here) via a lockOne variant rather than reusing the
+      // one above, which is hard-wired to inPointOf/outPointOf.
+      (d.linkedOrig || []).forEach(function (m) {
+        var l2 = state.layers[m.li]; if (!l2 || !l2.keyLock) return;
+        if (l2.keyLock === 'layer' && d.type !== 'both') return;
+        var nowIn = window.layerInPoint ? layerInPoint(l2) : m.origIn;
+        var nowOut = window.layerOutPoint ? layerOutPoint(l2) : m.origOut;
+        var moved = l2.keyLock === 'out' ? nowOut - m.origOut : nowIn - m.origIn;
+        if (!moved) return;
+        SMMotion.shiftLayerMotionKeys(m.li, moved);
+        lockDx = moved;
+      });
     }
     var selDx = 0;
     if (hasKeySel && !altHeld) {

@@ -6162,10 +6162,7 @@
           { sep: true },
           // showContextMenu has no submenus — a disabled row is the honest
           // way to title a group rather than a button that does nothing.
-          { label: SM.t('ctxLockKeyframesOnColon'), disabled: true, action: function () {} },
-          { label: SM.t('ctxKeyLockInPoint') + (ld.keyLock === 'in' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'in' ? null : 'in'); } },
-          { label: SM.t('ctxKeyLockOutPoint') + (ld.keyLock === 'out' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'out' ? null : 'out'); } },
-          { label: SM.t('ctxKeyLockWholeLayer') + (ld.keyLock === 'layer' ? '  ✓' : ''), action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === 'layer' ? null : 'layer'); } },
+          ...buildKeyLockMenuItems(li, ld),
           { label: SM.t('ctxAddMarkerOnLayer'), action: function () { if (window.SMMarkers) SMMarkers.addLayerMarker(li, state.currentFrame, ''); } },
           // UI/UX audit (2026-07-30): used to grey this out via `disabled`
           // when the layer isn't a Component — showContextMenu has no
@@ -6585,6 +6582,31 @@
   // EXISTING call site (the side-panel Temps row, the menu-based creation
   // from buildTimeLinkMenuItems, a pickwhip drop that didn't land on a
   // specific target anchor) is 100% unaffected.
+  // The standing keyframe lock (ld.keyLock, van Dijk's "Lock Keyframes to In
+  // and Out Points"), as menu rows. Shared verbatim by the Motion layer row
+  // and the keyframe cell (2026-08-30, "sur le clic droit des keyframes dans
+  // motion j'aimerais ça pour le parent in time") so the two surfaces can
+  // never drift in labels, order or check state — the same reason
+  // buildTimeLinkMenuItems is one function feeding three menus.
+  // Order stays In / Out / Layer, matching the surface that already shipped.
+  // Every row toggles: picking the active mode again clears the lock, so the
+  // group behaves like radio buttons that can also be switched fully off.
+  function buildKeyLockMenuItems(li, ld) {
+    function row(mode, key) {
+      return {
+        label: SM.t(key) + (ld.keyLock === mode ? '  ✓' : ''),
+        action: function () { window.SM.setLayerKeyLock(li, ld.keyLock === mode ? null : mode); }
+      };
+    }
+    return [
+      // showContextMenu has no submenus — a disabled row is the honest way
+      // to title a group rather than a button that does nothing.
+      { label: SM.t('ctxLockKeyframesOnColon'), disabled: true, action: function () {} },
+      row('in', 'ctxKeyLockInPoint'),
+      row('out', 'ctxKeyLockOutPoint'),
+      row('layer', 'ctxKeyLockWholeLayer')
+    ];
+  }
   function setLayerTimeLink(li, targetIdx, mode, srcAnchor) {
     var ld = state.layers[li], src = state.layers[targetIdx];
     if (!ld || !src || targetIdx === li) return false;
@@ -8397,6 +8419,12 @@
             menu.push({ label: SM.t('ctxParentInTimeLinkTimeEllipsis'), action: function () {
               window.showContextMenu(e.clientX + 8, e.clientY + 8, window.buildTimeLinkMenuItems(state.activeLayerIdx, state.layers[state.activeLayerIdx], function () { renderLayerList(); renderTimeline(); }));
             } });
+            // The standing keyframe lock belongs next to it, on the same
+            // target and by the same rule (the active layer — a keyframe row
+            // always belongs to the expanded active layer's tracks). Asked
+            // for directly: this is the surface you're on when you care
+            // whether your keys follow a retimed in/out point.
+            buildKeyLockMenuItems(state.activeLayerIdx, state.layers[state.activeLayerIdx]).forEach(function (it) { menu.push(it); });
           }
           window.showContextMenu(e.clientX, e.clientY, menu);
         });
