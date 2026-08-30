@@ -3806,13 +3806,36 @@
   // channels). Returns null (never overriding the item's own painted
   // color) unless the user has actually keyed or set a static override —
   // same "opt-in, never automatic" contract as vtxN.
+  // A colour CHANNEL is a u8 on the Rust side ([u8; 4] in engine.rs), and an
+  // interpolated track value is a plain float: halfway between two keys the
+  // red channel is 248.3356765206181, and serde refuses it outright —
+  // "invalid type: floating point ..., expected u8". That throw is a WASM
+  // trap, so it does not just drop one frame: it poisons the whole module
+  // and disables the engine for the rest of the session (see the render
+  // catch in engine-bridge.js). Hence feedback #194's symptom, "la couleur
+  // fill de la shape ne s'anime pas dans le canvas": the key frames
+  // themselves are integers and render fine, and the FIRST frame between
+  // two keys kills the renderer, which then silently falls back to Paper.js
+  // — which knows nothing about colour tracks and paints the shape's
+  // original colour.
+  //
+  // Rounded here, at the single place both colour readers return from,
+  // rather than at each engine call site: a fractional colour channel is
+  // meaningless to every consumer, not just this one.
+  function rgba255(v) {
+    if (!v) return v;
+    return v.map(function (c) {
+      var n = Math.round(c);
+      return n < 0 ? 0 : (n > 255 ? 255 : n);
+    });
+  }
   function elementFillColorAt(li, strokeId, frameIdx) {
     var ld = state.layers[li];
     if (!ld || !ld.elementMotion) return null;
     var holder = ld.elementMotion[strokeId];
     if (!holder) return null;
     if (!hasKeys(holder, 'fillColor') && !(holder.motionStatic && holder.motionStatic.fillColor)) return null;
-    return valueAtFrame(holder, 'fillColor', frameIdx);
+    return rgba255(valueAtFrame(holder, 'fillColor', frameIdx));
   }
   // Extended per-shape properties: Stroke color / Stroke width (2026-08 —
   // second slice of the "propriétés étendues par forme" chantier, same
@@ -3827,7 +3850,7 @@
     var holder = ld.elementMotion[strokeId];
     if (!holder) return null;
     if (!hasKeys(holder, 'strokeColor') && !(holder.motionStatic && holder.motionStatic.strokeColor)) return null;
-    return valueAtFrame(holder, 'strokeColor', frameIdx);
+    return rgba255(valueAtFrame(holder, 'strokeColor', frameIdx));
   }
   function elementStrokeWidthAt(li, strokeId, frameIdx) {
     var ld = state.layers[li];
