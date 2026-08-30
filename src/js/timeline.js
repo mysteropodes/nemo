@@ -6433,7 +6433,16 @@ function renderDuplicatorEffectors(dup){
       return[s,inp];
     }
     // Header: falloff mode, radius, strength, delete.
-    var hdr=line();
+    // dims-row (2026-08-30, feedback #168 "des probleme d'ui dans le panel
+    // droit pour effectors"): this line packs a select, TWO label+field
+    // pairs and a button into ~226px, but its "R" and "%" labels were plain
+    // .pl — which is 68px FIXED, sized for full words like "Position".
+    // Measured live: 68px per one-character label against 14px per number
+    // field, so both values were physically unreadable, which is exactly
+    // what the screenshot shows. .dims-row is the existing remedy for
+    // paired label+field lines (style.css: it makes .pl hug its text) —
+    // the channel rows below already opt into it; this header never did.
+    var hdr=line();hdr.classList.add('dims-row');
     var modeSel=document.createElement('select');modeSel.className='psel';
     modeSel.title=SM.t('titleEffectorRadialLinear');
     ['radial','linear'].forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v==='radial'?'Radial':'Linear';if(eff.falloff===v||(!eff.falloff&&v==='radial'))o.selected=true;modeSel.appendChild(o);});
@@ -6445,7 +6454,7 @@ function renderDuplicatorEffectors(dup){
     delBtn.addEventListener('click',function(){pushUndo();dup.effectors.splice(i,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
     hdr.appendChild(delBtn);
     if((eff.falloff||'radial')==='linear'){
-      var angRow=line();
+      var angRow=line();angRow.classList.add('dims-row'); // same one-char-label squeeze as the header
       var ang=num('°',function(v){eff.angle=v;},eff.angle||0,1,'Direction de la bande d’influence (degrés) — 0° = vers la droite, 90° = vers le bas.');angRow.appendChild(ang[0]);angRow.appendChild(ang[1]);
     }
     // Offsets: "n'importe quel property" (2026-07-30) — was 4 hardcoded
