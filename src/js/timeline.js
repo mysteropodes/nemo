@@ -2844,6 +2844,9 @@ function updateStatusBarHelp(){
     root.addEventListener('mouseout',clearTitle);
   });
 })();
+// Where #canvas-sec normally sits, captured once before it is ever moved
+// to the top for the Document context (see updatePropsContext).
+var _canvasSecHome=null;
 function updatePropsContext(){
   var hasSel=(state.tool==='select'||state.tool==='subselect')&&selectedPaths.length>0;
   var ctx,hdrText;
@@ -2997,15 +3000,37 @@ function updatePropsContext(){
   var canvasSec=document.getElementById('canvas-sec');
   if(canvasSec){
     var canvasHdr=canvasSec.querySelector('.phdr');
-    if(canvasHdr)canvasHdr.style.display=(ctx==='document')?'none':'';
-    // A hidden header can't be clicked to re-open its body, so make sure
-    // the body is open whenever we take the header away — otherwise a
-    // previously-collapsed Document section would look like an empty panel
-    // with no way back.
+    var canvasBody=canvasSec.querySelector('.pbdy');
+    // Remember where canvas-sec normally lives, ONCE, before the first move
+    // — restoring by "put it back after shapes-sec" would break the moment
+    // anything else is inserted there, whereas the original next sibling is
+    // exactly the contract "this is my slot".
+    if(!_canvasSecHome)_canvasSecHome={parent:canvasSec.parentNode,next:canvasSec.nextSibling};
     if(ctx==='document'){
-      var canvasBody=canvasSec.querySelector('.pbdy');
+      // Document fields sit at the TOP, on the dark ground, exactly where a
+      // selection puts Position/Size/Rotate (2026-08-30, feedback #171
+      // follow-up: "le panel de document avec width height est mal placé il
+      // doit toujours être en haut fond foncé comme pour element selected").
+      // Hiding the duplicate header (previous PR) was only half of it — the
+      // fields were still buried BELOW Effects and Elements, so with the
+      // header gone they read as loose controls belonging to whatever was
+      // above them. #props-panel is a plain block, not flex, so CSS `order`
+      // can't do this; the node is moved instead, and put back below.
+      var rail=document.getElementById('props-panel-rail');
+      if(rail&&canvasSec.previousSibling!==rail)rail.parentNode.insertBefore(canvasSec,rail.nextSibling);
+      canvasSec.classList.add('psec-identity');
+      if(canvasHdr)canvasHdr.style.display='none';
+      // A hidden header can't be clicked to re-open its body, so make sure
+      // the body is open whenever we take the header away — otherwise a
+      // previously-collapsed Document section would look like an empty panel
+      // with no way back.
       if(canvasBody)canvasBody.classList.remove('hid');
       if(canvasHdr)canvasHdr.classList.remove('closed');
+    }else{
+      var moved=(canvasSec.parentNode!==_canvasSecHome.parent)||(canvasSec.nextSibling!==_canvasSecHome.next);
+      if(moved)_canvasSecHome.parent.insertBefore(canvasSec,_canvasSecHome.next);
+      canvasSec.classList.remove('psec-identity');
+      if(canvasHdr)canvasHdr.style.display='';
     }
   }
   // Motion mode: none of these 2D-drawing-tool sections apply (no active
