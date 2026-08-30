@@ -347,6 +347,27 @@ function retimeTweenSpans(li,pairs,captured){
 // ---- API ----
 var PRODUCER_ALLOWED_TOOLS=['hand','zoom','rotate','comment'];
 window.SM={
+  // Placeholder translator (2026-08-30). i18n.js overwrites this with the
+  // real one (`window.SM.t=t`, i18n.js) — but it loads AFTER this file, and
+  // this file runs boot code at the bottom (SM.setTool(); updateUI();
+  // renderSymbolTabs()) that reaches SM.t long before that. The result was an
+  // uncaught "SM.t is not a function" on EVERY boot, with no interaction at
+  // all, which also meant whatever followed on that line never ran that first
+  // time — renderSymbolTabs() was simply skipped, and only looked fine
+  // because later paths call it again.
+  //
+  // Instrumented rather than guessed: trapping reads of SM.t before i18n
+  // attaches it counted 45 premature reads across TEN distinct call sites, in
+  // timeline.js and labs-core.js alike (matteModeLabel, updateStatusBarHelp,
+  // getToolHelp, addBtn, buildParentCell, installLayerReorderGrip…). Guarding
+  // each caller would be ten patches that leave the next one to rediscover it;
+  // one placeholder closes the whole class.
+  //
+  // Returning the key is exactly what the real SM.t does for an unknown key,
+  // and it is only ever visible for the instant before i18n.js's own
+  // initLanguage() runs applyI18n() on DOMContentLoaded and repaints every
+  // data-i18n element — plus the afterI18n hooks for dynamic labels.
+  t:function(k){return k;},
   exposeSymbolProperty:exposeSymbolProperty,
   goToFrame:function(idx){goToFrame(idx);},togglePlay:togglePlay,stopPlay:stopPlay,undo:undo,redo:redo,
   setTool:function(t){
@@ -10266,6 +10287,19 @@ function syncPropsPanelCollapseTitle(){
   if(btn)btn.addEventListener('click',function(){togglePropsPanelCollapse();});
   window.SM=window.SM||{};
   (window.SM.afterI18n=window.SM.afterI18n||[]).push(syncPropsPanelCollapseTitle);
+  // The status bar and the props-context labels are built with innerHTML from
+  // SM.t values, not from data-i18n attributes, so applyI18n cannot repaint
+  // them (2026-08-30). At boot they are written BEFORE i18n.js has loaded —
+  // see the placeholder `t` on the SM literal at the top of this file — which
+  // used to throw and now, with the placeholder, would leave raw keys on
+  // screen ("thDrawDesc BthTool scAltDrag…") until the next tool change.
+  // Measured: exactly that string sat in the status bar after boot.
+  // One repaint through the same documented escape hatch fixes it, and costs
+  // one extra call of something the app already runs on every tool and
+  // selection change.
+  (window.SM.afterI18n=window.SM.afterI18n||[]).push(function(){
+    if(typeof updatePropsContext==='function')updatePropsContext();
+  });
   var wasCollapsed=false;
   try{wasCollapsed=localStorage.getItem('nemo-props-panel-collapsed')==='1';}catch(e){}
   if(wasCollapsed)togglePropsPanelCollapse(true);
