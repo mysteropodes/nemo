@@ -8142,7 +8142,24 @@
         // .sel mirrors the diamonds' own convention: on when BOTH endpoint
         // keys are selected, which is exactly the state a connector click
         // (below) produces — never toggled independently of them.
-        rect.setAttribute('class', 'motion-key-connect' + (isKeySelected(ld, prop, a) && isKeySelected(ld, prop, b) ? ' sel' : ''));
+        // Key colours carry onto the connector (2026-08-30, "quand je parle
+        // de group c'est le trait qui joint les keyframes"): colouring a
+        // walk cycle's keys should paint the whole SPAN, so the group reads
+        // as one coloured block at a glance instead of a few tinted diamonds
+        // lost in a row of identical ones.
+        // Only when both endpoints carry the SAME colour — that is what
+        // "inside the group" means. A span between two differently coloured
+        // keys is a BOUNDARY between groups, and one between a coloured and
+        // an uncoloured key is half outside, so both keep the default fill
+        // rather than guessing which side owns them.
+        // Same .tinted + --key-color mechanism the diamonds already use
+        // (see the dia.classList.add('tinted') line above), so a colour is
+        // set in exactly one place and CSS owns every state.
+        var tint = (a.color && b.color && a.color === b.color) ? a.color : null;
+        rect.setAttribute('class', 'motion-key-connect'
+          + (isKeySelected(ld, prop, a) && isKeySelected(ld, prop, b) ? ' sel' : '')
+          + (tint ? ' tinted' : ''));
+        if (tint) rect.style.setProperty('--key-color', tint);
         rect.setAttribute('data-i', i);
         // The connector is a draggable TARGET, not decoration
         // (nemo-timeline-inout-spec.html, 2026-08-16): "le trait est une
