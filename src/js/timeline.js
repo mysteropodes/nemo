@@ -1919,7 +1919,12 @@ window.SM={
         // rotate are ever meant to persist; _live is rebuilt fresh from
         // strokeId by relinkRigBinds on the next loadFrame regardless.
         rig:l.rig?{bones:l.rig.bones,ikChains:l.rig.ikChains,nextId:l.rig.nextId,
-          binds:(l.rig.binds||[]).map(function(b){return{strokeId:b.strokeId,rest:b.rest,weights:b.weights,rotate:b.rotate};})}:undefined,
+          // meshId (2026-08-30): a bind can target an image's mesh instead of a
+          // path. It is a SECOND whitelist from cloneRigForSymbol's — missing it
+          // here exported every mesh bind with meshId undefined, so a rigged
+          // image came back unrigged after a save/reload while the symbol path
+          // kept working. Caught by round-tripping a real export.
+          binds:(l.rig.binds||[]).map(function(b){return{strokeId:b.strokeId,meshId:b.meshId,rest:b.rest,weights:b.weights,rotate:b.rotate};})}:undefined,
         // Non-destructive combine groups (2026-07-29) — copied wholesale
         // like duplicator/rig above. Membership itself is the plain
         // data.groupId tag on each stroke (already round-trips via serP/
@@ -9855,7 +9860,13 @@ window.renderRigModeUI=renderRigModeUI;
     var rotate=document.getElementById('rig-rotate-mode').checked;
     var softness=(parseFloat(document.getElementById('rig-falloff-softness').value)||0)/100;
     pushUndo();
-    var res=rigAutoAssignLayer(ld,userLayers[state.activeLayerIdx],radius,rotate,softness);
+    // What to bind is the artist's call (2026-08-30) — see the two checkboxes
+    // in the Rig panel. Defaults to both, so the button behaves exactly as
+    // before for a layer that has no meshed image on it.
+    var driveShapes=document.getElementById('rig-drive-shapes');
+    var driveMeshes=document.getElementById('rig-drive-meshes');
+    var res=rigAutoAssignLayer(ld,userLayers[state.activeLayerIdx],radius,rotate,softness,
+      {paths:!driveShapes||driveShapes.checked,meshes:!driveMeshes||driveMeshes.checked});
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
     // 0 assigned but candidates existed (2026-07-29 fix, QA-confirmed live:
     // "l'autoassign marche pas" on a shape drawn with the default Brush

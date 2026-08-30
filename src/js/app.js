@@ -1671,7 +1671,23 @@ function relinkRigBinds(ld,layer){
   if(!ld.rig||!ld.rig.binds||!ld.rig.binds.length)return;
   var byId={};
   layer.children.forEach(function(c){if(c.data&&c.data.strokeId)byId[c.data.strokeId]=c;});
+  // A MESH bind (2026-08-30) has no strokeId — it is keyed by meshId and its
+  // live target is the Raster carrying that mesh, not a Path. Without this
+  // branch the filter below dropped every mesh bind on the first loadFrame,
+  // i.e. the rig forgot the image the moment you scrubbed.
+  var byMesh={};
+  layer.children.forEach(function(c){if(c.data&&c.data.meshId)byMesh[c.data.meshId]=c;});
   ld.rig.binds=ld.rig.binds.filter(function(b){
+    if(b.meshId){
+      var ras=byMesh[b.meshId];
+      var mesh=window.SMImageMesh&&SMImageMesh.get(b.meshId);
+      // Vertex count is the identity check here, the same role
+      // segments.length plays for a path: a mesh rebuilt at a different
+      // density no longer matches the rest positions this bind recorded.
+      if(!ras||!mesh||mesh.verts.length!==b.rest.length)return false;
+      b._liveRaster=ras;
+      return true;
+    }
     var item=byId[b.strokeId];
     if(!item||!item.segments||item.segments.length!==b.rest.length)return false;
     b._live=item;
@@ -1806,7 +1822,39 @@ function rigBindStroke(ld,path,boneIds,radius,rotate,softness){
 // existed (rigBindStroke's own re-bind-replaces-not-stacks fix above), so
 // running this again after adjusting an influence circle is the expected
 // "try again" gesture, not something that piles up stale binds.
-function rigAutoAssignLayer(ld,layer,defaultRadius,rotate,softness){
+// Binds an IMAGE's mesh vertices to the bones (2026-08-30, Cyril: "la
+// création de bones serait évidente afin de les lier aux points de mesh
+// aussi"). Deliberately the same shape as rigBindStroke above — same
+// rigWeighOnePoint per vertex, same replace-not-stack rule — because the
+// skeleton has no business knowing what it drives: bones, poses and IK are
+// identical whether the vertices come from a Path or from a mesh. Only the
+// rest positions are read differently (mesh verts are normalized, so they
+// are mapped into world space through the raster's rect) and only the
+// destination differs (applyRigDeform writes offsets back, not points).
+function rigBindMesh(ld,raster,boneIds,radius,rotate,softness){
+  if(!raster||!raster.data||!raster.data.meshId)return false;
+  var mesh=window.SMImageMesh&&SMImageMesh.get(raster.data.meshId);
+  if(!mesh||!window.SMEngineBridge||!SMEngineBridge.rasterImageRect)return false;
+  var rig=ensureLayerRig(ld);
+  softness=Math.max(0,Math.min(1,softness||0));
+  var rect=SMEngineBridge.rasterImageRect(raster);
+  // REST positions, i.e. the mesh with its offsets ignored: a bind records
+  // where the vertices sit before any posing, exactly as rigBindStroke
+  // records a path's un-posed segments. Passing the CURRENT (already
+  // deformed) positions would bake the existing sculpt into the rest pose
+  // and make it impossible to return to it.
+  var restMesh={verts:mesh.verts,offsets:mesh.verts.map(function(){return[0,0];})};
+  var world=SMImageMesh.worldVerts(restMesh,rect,null);
+  var rest=world.map(function(p){return[p[0],p[1]];});
+  var weights=rest.map(function(pt){
+    return rigWeighOnePoint(rig,boneIds,new Point(pt[0],pt[1]),radius,softness);
+  });
+  // Re-binding replaces rather than stacks, same rule as a path's.
+  rig.binds=rig.binds.filter(function(b){return b.meshId!==raster.data.meshId;});
+  rig.binds.push({meshId:raster.data.meshId,rest:rest,weights:weights,rotate:!!rotate,_liveRaster:raster});
+  return true;
+}
+function rigAutoAssignLayer(ld,layer,defaultRadius,rotate,softness,opts){
   var rig=ensureLayerRig(ld);
   var boneIds=Object.keys(rig.bones);
   if(!boneIds.length)return 0;
@@ -1840,6 +1888,32 @@ function rigAutoAssignLayer(ld,layer,defaultRadius,rotate,softness){
       });
     });
   });
+  // Mesh vertices count toward the same measurement (2026-08-30). Skipping
+  // them would reproduce, for images, the exact bug this auto-sizing exists
+  // to fix for paths: an image wider than the fixed radius would be "bound"
+  // with every outer vertex at weight 0, so posing a bone did nothing
+  // visible — indistinguishable from "doesn't work".
+  if(typeof Raster!=='undefined'&&window.SMImageMesh&&window.SMEngineBridge&&SMEngineBridge.rasterImageRect){
+    layer.children.forEach(function(c){
+      if(!(c instanceof Raster)||!c.data||!c.data.meshId)return;
+      var mesh=SMImageMesh.get(c.data.meshId);if(!mesh)return;
+      var rect=SMEngineBridge.rasterImageRect(c);
+      var rest={verts:mesh.verts,offsets:mesh.verts.map(function(){return[0,0];})};
+      SMImageMesh.worldVerts(rest,rect,null).forEach(function(wp){
+        var pt=new Point(wp[0],wp[1]);
+        boneIds.forEach(function(bid){
+          var bone=rig.bones[bid];
+          if(!bone||bone.radius)return;
+          var bp=_boneSegsToPath(bone.restSegments,bone.closed);
+          var loc=bp.getNearestLocation(pt);
+          bp.remove();
+          if(!loc)return;
+          var dist=loc.point.getDistance(pt);
+          if(dist>neededRadius)neededRadius=dist;
+        });
+      });
+    });
+  }
   // Small margin so the single farthest vertex gets a sliver of pull
   // instead of landing exactly on the falloff's zero boundary.
   neededRadius=Math.ceil(neededRadius*1.05);
@@ -1850,7 +1924,20 @@ function rigAutoAssignLayer(ld,layer,defaultRadius,rotate,softness){
   // vector-brush strokes used to hit this same silent gap too — now bound
   // like any other Path, see rigBindStroke's own comment).
   var n=0,skippedUnsupported=0;
+  // What the bones drive is a CHOICE, not a fixed set (2026-08-30, Cyril:
+  // "oui mais faut avoir le choix"). Both default to on, since a layer that
+  // has both usually wants both posed together; either can be turned off to
+  // rig only the drawing, or only the image, on the same layer.
+  var wantPaths=!opts||opts.paths!==false;
+  var wantMeshes=!opts||opts.meshes!==false;
+  if(wantMeshes&&typeof Raster!=='undefined'){
+    layer.children.forEach(function(c){
+      if(!(c instanceof Raster)||!c.data||!c.data.meshId)return;
+      if(rigBindMesh(ld,c,boneIds,neededRadius,rotate,softness))n++;
+    });
+  }
   layer.children.forEach(function(c){
+    if(!wantPaths)return;
     if(c instanceof CompoundPath){skippedUnsupported++;return;}
     if(!(c instanceof Path)||!isSelectablePathChild(c))return;
     if(rigBindStroke(ld,c,boneIds,neededRadius,rotate,softness))n++;
@@ -1882,7 +1969,51 @@ function applyRigDeform(ld){
     boneCache[bid]=entry;
     return entry;
   }
+  // Per-vertex displacement, factored out (2026-08-30) so a MESH bind uses
+  // the identical formula instead of a second copy that would drift from it
+  // (CLAUDE.md §3's reasoning, applied within one file). Takes a rest point
+  // and its weight entries, returns [dx, dy] already normalized.
+  function displaceOne(b,restPt,wlist){
+    var dx=0,dy=0,sumW=0;
+    (wlist||[]).forEach(function(wentry){
+      var bp=bonePaths(wentry.boneId);
+      var curLoc=bp.cur.getLocationAt(wentry.offset),restLoc=bp.rest.getLocationAt(wentry.offset);
+      if(!curLoc||!restLoc)return;
+      sumW+=wentry.w;
+      if(b.rotate){
+        var restAng=Math.atan2(restLoc.tangent.y,restLoc.tangent.x);
+        var curAng=Math.atan2(curLoc.tangent.y,curLoc.tangent.x);
+        var da=curAng-restAng,cosA=Math.cos(da),sinA=Math.sin(da);
+        var offX=restPt[0]-restLoc.point.x,offY=restPt[1]-restLoc.point.y;
+        var rOffX=offX*cosA-offY*sinA,rOffY=offX*sinA+offY*cosA;
+        dx+=wentry.w*((curLoc.point.x+rOffX)-restPt[0]);
+        dy+=wentry.w*((curLoc.point.y+rOffY)-restPt[1]);
+      }else{
+        dx+=wentry.w*(curLoc.point.x-restLoc.point.x);
+        dy+=wentry.w*(curLoc.point.y-restLoc.point.y);
+      }
+    });
+    var norm=sumW>1?sumW:1;
+    return [dx/norm,dy/norm];
+  }
   rig.binds.forEach(function(b){
+    // Mesh bind: same displacement, different destination. The result is
+    // written back as a NORMALIZED offset (what a mesh stores) rather than a
+    // world point, so a rigged image keeps working when it is moved, scaled
+    // or rotated afterwards — the rig poses the picture, the transform still
+    // owns where the picture is.
+    if(b.meshId){
+      var ras=b._liveRaster,mesh=window.SMImageMesh&&SMImageMesh.get(b.meshId);
+      if(!ras||!mesh||!window.SMEngineBridge||!SMEngineBridge.rasterImageRect)return;
+      var rect=SMEngineBridge.rasterImageRect(ras);
+      for(var mi=0;mi<mesh.verts.length&&mi<b.rest.length;mi++){
+        var rp=b.rest[mi],d=displaceOne(b,rp,b.weights[mi]);
+        if(!d[0]&&!d[1]){mesh.offsets[mi]=[0,0];continue;}
+        var nd=SMImageMesh.normalizedOf(rect,rp[0]+d[0],rp[1]+d[1]);
+        mesh.offsets[mi]=[nd[0]-mesh.verts[mi][0],nd[1]-mesh.verts[mi][1]];
+      }
+      return;
+    }
     if(!b._live||!b._live.segments)return;
     var segs=b._live.segments;
     for(var i=0;i<segs.length&&i<b.rest.length;i++){
@@ -2698,7 +2829,7 @@ function badComponentSourceReason(l){
 function cloneRigForSymbol(rig){
   if(!rig)return undefined;
   return{bones:rig.bones,ikChains:rig.ikChains,nextId:rig.nextId,
-    binds:(rig.binds||[]).map(function(b){return{strokeId:b.strokeId,rest:b.rest,weights:b.weights,rotate:b.rotate};})};
+    binds:(rig.binds||[]).map(function(b){return{strokeId:b.strokeId,meshId:b.meshId,rest:b.rest,weights:b.weights,rotate:b.rotate};})};
 }
 // Component exposed properties (2026-08-18) — declares a property on the
 // SYMBOL (state.symbols[symId].exposedProps), bound to one stroke inside it
