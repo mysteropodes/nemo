@@ -176,7 +176,7 @@
       params.customStamp = res.stamp;
       refreshCaptureStatus();
       renderPreview();
-      showToast(SM.t('toastShapeCapturedSuffix') + res.stamp.pointCount + ' points)');
+      showToast(SM.t('toastShapeCapturedSuffix') + res.stamp.pointCount + SM.t('brushCapturePointsSuffix'));
     });
     syncCaptureRowVisibility();
     syncMarkerTipVisibility();
