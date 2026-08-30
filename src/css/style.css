@@ -2461,6 +2461,10 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 
 /* Expression row extras (Van Dijk 7.2 / 7.4) */
 .motion-expr-raw{margin-left:10px;font-size:9.5px;color:var(--text-dim);}
+/* The live evaluated result, beside the raw value it overrides. Brighter
+   than the raw readout because it is what the property actually shows. */
+.motion-expr-out{color:var(--text);}
+.motion-expr-out.err{color:var(--red);}
 .motion-expr-glob{margin-left:auto;font-size:9.5px;padding:2px 7px;border-radius:4px;
   border:1px solid var(--border);background:var(--panel2);color:var(--text-dim);cursor:pointer;}
 .motion-expr-glob:hover{color:var(--text);border-color:var(--border2);}
