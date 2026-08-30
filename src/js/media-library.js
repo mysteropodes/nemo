@@ -394,10 +394,16 @@
       // otherwise — a linked entry whose preview failed is still perfectly
       // insertable (the linked branch of insertImageOnCanvas never reads
       // m.thumb), so losing drag there would be a real regression.
+      // The drag handle is the WHOLE tile/row, not just the preview image
+      // (2026-08-30). It used to be the <img>, which on a list row is a 30x30
+      // thumbnail — 9% of the row's area, measured on the deployed build — so
+      // grabbing the name, the badges, or anywhere else did nothing at all,
+      // and "drag an item from the media panel onto the canvas" read as simply
+      // broken. Dragging does not conflict with clicking: a click still jumps
+      // to the source layer, and the context menu is untouched.
       if (reinsertKind(m)) {
-        var dragEl = img || thumb;
-        dragEl.draggable = true;
-        dragEl.addEventListener('dragstart', function (e) {
+        tile.draggable = true;
+        tile.addEventListener('dragstart', function (e) {
           e.dataTransfer.setData('application/x-nemo-media-id', m.id);
           e.dataTransfer.effectAllowed = 'copy';
         });
@@ -561,10 +567,10 @@
       });
       // Same fallback as the tile view: drag from the thumb box when there's
       // no preview img to hang the listener on.
+      // Whole row is the handle — see buildTile's own note.
       if (reinsertKind(m)) {
-        var dragEl = img || thumb;
-        dragEl.draggable = true;
-        dragEl.addEventListener('dragstart', function (e) {
+        row.draggable = true;
+        row.addEventListener('dragstart', function (e) {
           e.dataTransfer.setData('application/x-nemo-media-id', m.id);
           e.dataTransfer.effectAllowed = 'copy';
         });
