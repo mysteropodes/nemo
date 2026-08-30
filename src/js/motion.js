@@ -6492,6 +6492,23 @@
     renderFollowPathRow(body, ld, state.activeLayerIdx);
     renderTimeLinkRow(body, ld, state.activeLayerIdx);
     renderMatteRow(body, ld, state.activeLayerIdx);
+    // A targeted SHAPE shows its own Transform, not the layer's (2026-08-30,
+    // feedback #173: "si on select une shape dans elements alors dans layer
+    // properties on voit les propriétés de la shape, pareil si on select une
+    // box de shape via double clic"). Both routes already converge on the
+    // same state — the Elements row click and the canvas double-click both
+    // set _motionExpandedElement — so one branch here serves both, which is
+    // exactly why the feedback names them together.
+    // The layer's own Parent/Path/Time/Matte rows stay above: they belong to
+    // the layer whatever is targeted inside it, and dropping them would make
+    // the panel lose the parent pill the moment you inspect a shape.
+    var elSel = (window._motionExpandedElement != null && window._motionExpandedLayer === state.activeLayerIdx)
+      ? window._motionExpandedElement : null;
+    if (elSel) {
+      var elHolder = ensureElementHolder(ld, elSel);
+      renderTransformGroup(body, elHolder, SM.t('hdrTransformElement'));
+      return;
+    }
     renderTransformGroup(body, ld, 'Transform');
   }
   // Track matte, IN Layer Properties (2026-08-30, "un bouton matte qui
