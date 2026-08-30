@@ -1,0 +1,296 @@
+// ---- IMAGE MESH EDITOR (2026-08-30) ----
+//
+// The on-canvas half of the image mesh (data model + rendering: image-mesh.js
+// and engine.rs's draw_image_mesh). Select an imported image with the
+// Selection tool, turn "Mesh" on in the right panel, drag the dots.
+//
+// Deliberately NOT a 24th toolbar button. The mesh belongs to the image, not
+// to a global mode — so it follows the gradient gizmo's pattern
+// (gradient-bridge.js): a panel section that appears for the one selected
+// item that can have one, plus a capture-phase pointer intercept that only
+// arms while that item is selected and the mode is on. Same reason the
+// gradient's angle is dragged on canvas rather than typed: position is a
+// gesture, not a number.
+//
+// ---- THE OUTLINE IS THE MASK ----
+//
+// verts[0 .. outline.length-1] ARE the outline, in order (image-mesh.js's
+// index invariant). So dragging one of those vertices reshapes the MASK and
+// the deformation at once — there is no separate "edit the mask" mode to
+// switch into, which is the whole point of Cyril's "the mask outline is also
+// the mesh boundary" rule. The editor says this out loud rather than leaving
+// it to be discovered: outline vertices are drawn as squares in the accent
+// orange, interior vertices as blue circles, and the outline edge is drawn
+// heavier than the interior wireframe.
+//
+// ---- HANDLE CONVENTIONS ----
+//
+// Copied from buildNodeHandleItems (engine-bridge.js), not invented here:
+// sizes in 1/view.zoom so they stay screen-constant, blue [74,158,255] for
+// an idle handle, accent orange [255,184,108] for a selected/special one,
+// white 1px stroke, and thin [120,170,255] guide lines. A parallel visual
+// language for one feature is how an app starts feeling like several apps.
+(function () {
+  'use strict';
+
+  var IDLE = [74, 158, 255, 255];
+  var ACCENT = [255, 184, 108, 255];
+  var WHITE = [255, 255, 255, 255];
+  var WIRE = [120, 170, 255, 130];
+  var OUTLINE = [255, 184, 108, 220];
+
+  var editing = false;      // the panel's "Mesh" mode toggle
+  var dragIdx = -1;         // vertex being dragged, -1 = none
+  var dragMoved = false;
+
+  function engineOn() { return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && !state.playing; }
+
+  // The one selected item that can carry a mesh. Same shape as
+  // gradient-bridge's singleTarget, restricted to Rasters.
+  function singleRaster() {
+    if ((state.tool !== 'select' && state.tool !== 'subselect') || !window.selectedPaths || selectedPaths.length !== 1) return null;
+    var p = selectedPaths[0];
+    if (typeof Raster === 'undefined' || !(p instanceof Raster)) return null;
+    // A selection entry can outlive the object it points at: loadFrame,
+    // undo/redo and importJSON all rebuild every Paper item, and
+    // selectedPaths isn't always rebound in the same tick. A detached
+    // Raster still passes `instanceof` and still carries data.meshId, so
+    // without this check the panel would offer to edit a ghost — and
+    // detach() would delete the live tag while SMImageMesh.propagate
+    // silently no-oped (no parent = no layer = no frames to untag),
+    // leaving the mesh half-removed: gone on screen, back on the next
+    // loadFrame. Found live, driving the real checkbox after an import.
+    if (typeof userLayers === 'undefined' || !p.parent || userLayers.indexOf(p.parent) < 0) return null;
+    return p;
+  }
+  function targetMesh() {
+    var r = singleRaster();
+    if (!r || !r.data || !r.data.meshId || !window.SMImageMesh) return null;
+    var mesh = SMImageMesh.get(r.data.meshId);
+    return mesh ? { raster: r, mesh: mesh, meshId: r.data.meshId } : null;
+  }
+
+  // Vertex positions in RENDERED space. Two mappings are involved and both
+  // already exist elsewhere — the raster's own display rect (engine-bridge's
+  // rasterImageRect, shared rather than re-derived) and the layer's
+  // render-time-only Motion transform (SMMotion.layerMotionPointMap, exactly
+  // what buildNodeHandleItems does for path handles, and for the same
+  // reason: without it the handles sit at the shape's pre-transform position
+  // while the picture is somewhere else).
+  function motionMap() {
+    if (!window.SMMotion) return null;
+    var m = SMMotion.layerMotionPointMap ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
+    if (!m && SMMotion.layerMotion3DPointMap) m = SMMotion.layerMotion3DPointMap(state.activeLayerIdx);
+    return m;
+  }
+  function renderedVerts(t) {
+    if (!window.SMEngineBridge || !SMEngineBridge.rasterImageRect) return null;
+    var rect = SMEngineBridge.rasterImageRect(t.raster);
+    var pts = SMImageMesh.worldVerts(t.mesh, rect);
+    if (!pts) return null;
+    var mm = motionMap();
+    if (mm) pts = pts.map(function (p) { return mm.fwd(p[0], p[1]); });
+    return { pts: pts, rect: rect, mm: mm };
+  }
+
+  // ---- overlay ---------------------------------------------------------
+  function lineItem(a, b, color, w) {
+    return { segments: [{ point: [a[0], a[1]] }, { point: [b[0], b[1]] }], closed: false, fillColor: null, strokeColor: color, strokeWidth: w, strokeCap: 'butt' };
+  }
+  function dotItem(p, r, fill) {
+    // 12-gon, same approximation gradient-bridge uses for its own round
+    // handle — a circle here would need bezier handles for no visible gain
+    // at handle size.
+    var segs = [];
+    for (var i = 0; i < 12; i++) { var a = (i / 12) * Math.PI * 2; segs.push({ point: [p[0] + Math.cos(a) * r, p[1] + Math.sin(a) * r] }); }
+    return { segments: segs, closed: true, fillColor: fill, strokeColor: WHITE, strokeWidth: r * 0.25 };
+  }
+  function squareItem(p, r, fill) {
+    return {
+      segments: [{ point: [p[0] - r, p[1] - r] }, { point: [p[0] + r, p[1] - r] }, { point: [p[0] + r, p[1] + r] }, { point: [p[0] - r, p[1] + r] }],
+      closed: true, fillColor: fill, strokeColor: WHITE, strokeWidth: r * 0.25,
+    };
+  }
+
+  function buildImageMeshOverlayItems() {
+    if (!editing || !engineOn()) return [];
+    var t = targetMesh();
+    if (!t) return [];
+    var rv = renderedVerts(t);
+    if (!rv) return [];
+    var pts = rv.pts, mesh = t.mesh;
+    var zs = 1 / view.zoom;
+    var items = [];
+    // Interior wireframe first, so vertices sit on top of it. Every triangle
+    // edge is drawn once per triangle (so shared edges are drawn twice) —
+    // deliberate: de-duplicating would need an edge set built per frame for
+    // a purely cosmetic gain on a translucent stroke.
+    for (var k = 0; k + 2 < mesh.tris.length; k += 3) {
+      var a = pts[mesh.tris[k]], b = pts[mesh.tris[k + 1]], c = pts[mesh.tris[k + 2]];
+      if (!a || !b || !c) continue;
+      items.push(lineItem(a, b, WIRE, 1 * zs));
+      items.push(lineItem(b, c, WIRE, 1 * zs));
+      items.push(lineItem(c, a, WIRE, 1 * zs));
+    }
+    // The mask boundary, heavier and in the accent colour — this is the line
+    // that decides what is visible, so it should not read as one more
+    // wireframe edge.
+    for (var o = 0; o < mesh.outline.length; o++) {
+      var p0 = pts[o], p1 = pts[(o + 1) % mesh.outline.length];
+      if (p0 && p1) items.push(lineItem(p0, p1, OUTLINE, 1.6 * zs));
+    }
+    for (var i = 0; i < pts.length; i++) {
+      var isOutline = SMImageMesh.isOutlineVertex(mesh, i);
+      var isDrag = (i === dragIdx);
+      var r = (isDrag ? 5 : 3.5) * zs;
+      items.push(isOutline ? squareItem(pts[i], r, isDrag ? WHITE : ACCENT)
+                           : dotItem(pts[i], r, isDrag ? WHITE : IDLE));
+    }
+    return items;
+  }
+  window.buildImageMeshOverlayItems = buildImageMeshOverlayItems;
+
+  // ---- drag interaction ------------------------------------------------
+  function onDown(e) {
+    if (!editing || !engineOn()) return;
+    var t = targetMesh();
+    if (!t) return;
+    var rv = renderedVerts(t);
+    if (!rv) return;
+    var w = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    // Screen-space tolerance, like every other handle hit-test in the app —
+    // a world-space one would be unusable when zoomed out.
+    var tol = 10 / view.zoom;
+    var best = -1, bestD = tol;
+    for (var i = 0; i < rv.pts.length; i++) {
+      var d = Math.hypot(rv.pts[i][0] - w[0], rv.pts[i][1] - w[1]);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    if (best < 0) return;
+    dragIdx = best; dragMoved = false;
+    e.stopImmediatePropagation(); e.preventDefault();
+    pushUndo();
+    SMEngineBridge.suspend();
+  }
+  function onMove(e) {
+    if (dragIdx < 0) return;
+    var t = targetMesh();
+    if (!t) { dragIdx = -1; return; }
+    e.stopImmediatePropagation(); e.preventDefault();
+    var rect = SMEngineBridge.rasterImageRect(t.raster);
+    var w = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    // Back through the layer's Motion transform first, into the raw space
+    // the rect itself lives in, then into the rect's normalized space —
+    // the exact reverse of renderedVerts' forward chain.
+    var mm = motionMap();
+    if (mm && mm.inv) { var iv = mm.inv(w[0], w[1]); w = [iv[0], iv[1]]; }
+    var uv = SMImageMesh.normalizedOf(rect, w[0], w[1]);
+    var rest = t.mesh.verts[dragIdx];
+    SMImageMesh.setOffset(t.meshId, dragIdx, uv[0] - rest[0], uv[1] - rest[1]);
+    dragMoved = true;
+    SMEngineBridge.renderNow();
+  }
+  function onUp(e) {
+    if (dragIdx < 0) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    dragIdx = -1;
+    SMEngineBridge.resume();
+    // The mesh lives in state.imageMeshes, not in the frame's strokes, so
+    // there is nothing for saveActiveLayerFrame to write here — the undo
+    // snapshot taken in onDown is what makes the edit revertible (see
+    // layersSnapshotNow, tweens.js, which now carries imageMeshes), and
+    // SMProject.isDirty() picks the change up on its own since it diffs a
+    // fresh exportJSON() against the last saved one.
+    dragMoved = false;
+    SMEngineBridge.renderNow();
+  }
+
+  // ---- panel -----------------------------------------------------------
+  function el(id) { return document.getElementById(id); }
+  function renderImageMeshPanel() {
+    var sec = el('p-imagemesh-sec');
+    if (!sec) return;
+    var r = singleRaster();
+    if (!r) { sec.style.display = 'none'; editing = false; return; }
+    sec.style.display = '';
+    var has = !!(r.data && r.data.meshId && SMImageMesh.get(r.data.meshId));
+    if (!has) editing = false;
+    var onCb = el('p-imagemesh-on');
+    if (onCb) onCb.checked = has;
+    var editCb = el('p-imagemesh-edit');
+    if (editCb) { editCb.checked = editing; editCb.disabled = !has; }
+    var body = el('p-imagemesh-body');
+    if (body) body.style.display = has ? '' : 'none';
+    if (has) {
+      var mesh = SMImageMesh.get(r.data.meshId);
+      var cols = el('p-imagemesh-cols'), rows = el('p-imagemesh-rows');
+      if (cols) cols.value = mesh.cols;
+      if (rows) rows.value = mesh.rows;
+      var info = el('p-imagemesh-info');
+      if (info) info.textContent = mesh.verts.length + ' / ' + (mesh.tris.length / 3);
+    }
+  }
+  window.renderImageMeshPanel = renderImageMeshPanel;
+
+  function toggleMesh(on) {
+    var r = singleRaster();
+    if (!r) return;
+    pushUndo();
+    // attach/detach write BOTH the live Raster's data.meshId and every
+    // frame's stored dict (SMImageMesh.propagate), so there is nothing left
+    // for loadFrame to bring in — and calling it here was actively harmful:
+    // it rebuilds every Paper item, which leaves selectedPaths pointing at
+    // the removed Raster, so the very next click on this panel found no
+    // valid target and silently did nothing while the checkbox had already
+    // flipped. Found live, toggling the real checkbox twice in a row.
+    if (on) SMImageMesh.attach(r, { cols: 4, rows: 4 });
+    else { SMImageMesh.detach(r); editing = false; }
+    renderImageMeshPanel();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  function setDensity() {
+    var t = targetMesh();
+    if (!t) return;
+    var cols = Math.max(1, Math.min(32, parseInt(el('p-imagemesh-cols').value, 10) || 4));
+    var rows = Math.max(1, Math.min(32, parseInt(el('p-imagemesh-rows').value, 10) || 4));
+    pushUndo();
+    t.mesh.cols = cols; t.mesh.rows = rows;
+    // Retopology resets the pose — vertex indices are not stable across a
+    // rebuild, so carrying the old offsets onto new vertices would scramble
+    // the deformation (image-mesh.js's rebuild says the same thing).
+    // Rebuilding from the CURRENT outline keeps the mask the user drew.
+    SMImageMesh.setOutline(t.meshId, t.mesh.outline, { cols: cols, rows: rows });
+    renderImageMeshPanel();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  function resetPose() {
+    var t = targetMesh();
+    if (!t) return;
+    pushUndo();
+    SMImageMesh.resetOffsets(t.meshId);
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+
+  function init() {
+    var onCb = el('p-imagemesh-on');
+    if (onCb) onCb.addEventListener('change', function () { toggleMesh(this.checked); });
+    var editCb = el('p-imagemesh-edit');
+    if (editCb) editCb.addEventListener('change', function () { editing = this.checked; if (window.SMEngineBridge) SMEngineBridge.renderNow(); });
+    var cols = el('p-imagemesh-cols'), rows = el('p-imagemesh-rows');
+    if (cols) cols.addEventListener('change', setDensity);
+    if (rows) rows.addEventListener('change', setDensity);
+    var rst = el('btn-imagemesh-reset');
+    if (rst) rst.addEventListener('click', resetPose);
+    // Capture phase on #canvas-area, before the Select tool's own drag —
+    // identical wiring to gradient-bridge/perspective-bridge/symmetry-bridge.
+    var tgt = document.getElementById('canvas-area') || document.getElementById('drawing-canvas');
+    if (tgt) {
+      tgt.addEventListener('pointerdown', onDown, { capture: true });
+      tgt.addEventListener('pointermove', onMove, { capture: true });
+      tgt.addEventListener('pointerup', onUp, { capture: true });
+      tgt.addEventListener('pointercancel', onUp, { capture: true });
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();

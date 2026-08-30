@@ -4496,6 +4496,14 @@ function _cloneLayersForUndo(layers){
 // whole time — no toast, no visual hint beyond content that's suddenly
 // wrong. Tagging here is what undo()/redo() below check before restoring.
 function layersSnapshotNow(){return{type:'layers',layers:_cloneLayersForUndo(state.layers),active:state.activeLayerIdx,totalFrames:state.totalFrames,cameraKeys:JSON.parse(JSON.stringify(state.cameraKeys||[])),
+  // Image meshes (2026-08-30, image-mesh.js) — a mesh's topology and pose
+  // live in state.imageMeshes, NOT in any frame's strokes, so
+  // _cloneLayersForUndo above cannot see them: without this line, dragging a
+  // mesh vertex (or changing its density, which retriangulates) would be
+  // silently un-undoable, exactly like cameraKeys was before v19. Serialized
+  // through the module so `tris` comes back as a real Array rather than the
+  // typed array Delaunator hands out — see SMImageMesh.serialize's comment.
+  imageMeshes:(window.SMImageMesh?SMImageMesh.serialize():JSON.parse(JSON.stringify(state.imageMeshes||{}))),
   symbolId:state.activeSymbolId||null,montageViewId:state.activeMontageViewId||null};}
 // Human-readable "where this undo entry belongs", for the cross-context
 // guard in undo()/redo() below. Falls back to '?' for a symbol/montage
@@ -4564,6 +4572,13 @@ function restoreLayersSnapshot(s){
   // seulement les traits. Les snapshots antérieurs à v19 n'ont pas le
   // champ : on laisse alors les clés actuelles intactes (undefined check).
   if(s.cameraKeys!==undefined)state.cameraKeys=JSON.parse(JSON.stringify(s.cameraKeys));
+  // Image meshes — mirrors the cameraKeys line above, including its
+  // undefined check: a snapshot taken before this field existed leaves the
+  // current meshes alone rather than wiping them.
+  if(s.imageMeshes!==undefined){
+    if(window.SMImageMesh)SMImageMesh.load(JSON.parse(JSON.stringify(s.imageMeshes)));
+    else state.imageMeshes=JSON.parse(JSON.stringify(s.imageMeshes));
+  }
   activateUL(state.activeLayerIdx);
   loadFrame(state.currentFrame);
   // Paper objects are recreated by loadFrame(). Rebind the ordinary

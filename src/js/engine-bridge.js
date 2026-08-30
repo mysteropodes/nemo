@@ -2261,6 +2261,13 @@
       if (symmetryItems.length) layers.push({ items: symmetryItems });
       var gradientGizmoItems = window.buildGradientGizmoItems ? window.buildGradientGizmoItems() : [];
       if (gradientGizmoItems.length) layers.push({ items: gradientGizmoItems });
+      // Image mesh editor overlay (2026-08-30, image-mesh-bridge.js) — same
+      // "an editing gizmo is just another overlay layer" pattern as the
+      // gradient gizmo above, and like every entry in this block it is
+      // inside the `includeEditorOverlays` guard, so an export never
+      // contains mesh handles.
+      var meshOverlayItems = window.buildImageMeshOverlayItems ? window.buildImageMeshOverlayItems() : [];
+      if (meshOverlayItems.length) layers.push({ items: meshOverlayItems.map(function (it) { it.segments = roundSegs(it.segments); return it; }) });
     }
     // Track matte source resolution (uid-based, 2026-07-31) — runs LAST,
     // after every unshift/splice above, so layers.indexOf gives the final
@@ -4115,6 +4122,12 @@
     // render_to_pixels call sites.
     resizeEngineOffscreen: function (w, h) { if (!engine) return false; resizeEngineOffscreen(w, h); return true; },
     renderFrameRawPixels: function (frameIdx) { if (!engine) return Promise.resolve(null); return renderFrameRawPixels(frameIdx); },
+    // Exposed for image-mesh-bridge.js (2026-08-30): the mesh editor's
+    // overlay and hit-testing have to agree, to the pixel, with the rect
+    // this file feeds the renderer — including the rotation-aware
+    // un-rotated-size decomposition (see rasterImageRect's own comment). A
+    // second copy over there would be a §3 duplicate waiting to drift.
+    rasterImageRect: rasterImageRect,
   };
 
   // Rust/vello is now the default renderer (no more opt-in checkbox) — per

@@ -2860,6 +2860,10 @@ function updatePropsContext(){
   // Flou/Ombre au sol sync moved into effects-panel.js's unified Effects
   // stack (2026-07 rewrite) — see updateEffectsPanel, hooked via updateUI.
   if(window.renderGradientPanel)window.renderGradientPanel();
+  // Image mesh (2026-08-30) — same hook point as the gradient panel right
+  // above: both are sections that only exist for ONE kind of single
+  // selection, so they re-evaluate wherever the selection is refreshed.
+  if(window.renderImageMeshPanel)window.renderImageMeshPanel();
   var hdrEl=document.getElementById('props-context-hdr');if(hdrEl)hdrEl.textContent=hdrText;
   // Motion mode: none of these 2D-drawing-tool sections apply (no active
   // Fill/Stroke/Draw tool, no canvas marquee selection in the Animation 2D

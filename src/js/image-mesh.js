@@ -283,10 +283,60 @@
     propagate(raster, id);
     return id;
   }
+  // Every layer whose frames could reference a mesh: the scene's own, plus
+  // each Component's (state.symbols[id].layers is the same shape — see
+  // app.js's enterSymbol, which swaps one for the other).
+  function allLayerSets() {
+    var sets = [state.layers || []];
+    var syms = state.symbols || {};
+    for (var k in syms) {
+      if (Object.prototype.hasOwnProperty.call(syms, k) && syms[k] && syms[k].layers) sets.push(syms[k].layers);
+    }
+    return sets;
+  }
+  // Is this mesh still referenced by any stored stroke anywhere?
+  function isReferenced(meshId) {
+    var sets = allLayerSets();
+    for (var s = 0; s < sets.length; s++) {
+      var layers = sets[s];
+      for (var l = 0; l < layers.length; l++) {
+        var frames = layers[l] && layers[l].frames;
+        if (!frames) continue;
+        for (var f = 0; f < frames.length; f++) {
+          var strokes = frames[f] && frames[f].strokes;
+          if (!strokes) continue;
+          for (var i = 0; i < strokes.length; i++) {
+            if (strokes[i] && strokes[i].meshId === meshId) return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+  // Drops a mesh from the store once nothing points at it any more.
+  //
+  // Without this, turning Mesh off in the panel left the whole topology
+  // behind: invisible, but persisted in every save from then on AND enough
+  // to keep exportHasImageMesh (export.js) true, quietly forcing every
+  // export down the engine path. Found by watching the store grow to
+  // ['im_1','im_2'] across one on/off/on cycle.
+  //
+  // Reference-counted rather than an unconditional delete: the store is
+  // keyed by id, so if a future feature ever lets two images share one mesh
+  // (a duplicate that keeps its source's), deleting on the first detach
+  // would silently blank the other one.
+  function releaseIfUnused(meshId) {
+    if (!meshId) return false;
+    if (isReferenced(meshId)) return false;
+    delete store()[meshId];
+    return true;
+  }
   function detach(raster) {
     if (!raster || !raster.data) return;
+    var id = raster.data.meshId;
     propagate(raster, null);
     delete raster.data.meshId;
+    releaseIfUnused(id);
   }
 
   // ---- scene payload ---------------------------------------------------
@@ -299,6 +349,42 @@
   function worldOf(rect, u, v, cos, sin, cx, cy) {
     var lx = (u - 0.5) * rect.width, ly = (v - 0.5) * rect.height;
     return [cx + lx * cos - ly * sin, cy + lx * sin + ly * cos];
+  }
+
+  // Inverse of worldOf — a world point back into the rect's normalized
+  // space. Used by the editor to turn a pointer position into a vertex
+  // offset. Kept next to its forward twin on purpose: these two are the
+  // only place the rect mapping is written, and a drift between them would
+  // show up as handles that don't follow the cursor (CLAUDE.md §3).
+  function normalizedOf(rect, wx, wy) {
+    var rad = (rect.rotation || 0) * Math.PI / 180;
+    var cos = Math.cos(rad), sin = Math.sin(rad);
+    var cx = rect.x + rect.width / 2, cy = rect.y + rect.height / 2;
+    var dx = wx - cx, dy = wy - cy;
+    var lx = dx * cos + dy * sin;
+    var ly = -dx * sin + dy * cos;
+    return [lx / (rect.width || 1) + 0.5, ly / (rect.height || 1) + 0.5];
+  }
+
+  // Deformed vertex positions in WORLD space for a raster's own rect — the
+  // editor's overlay and hit-testing both read this, so the handles sit
+  // exactly on the geometry the engine draws. `rect` comes from the caller
+  // (engine-bridge's rasterImageRect) rather than being recomputed here, so
+  // there is one definition of "an image's display rect" in the app.
+  function worldVerts(mesh, rect, poseAt) {
+    if (!mesh) return null;
+    var rad = (rect.rotation || 0) * Math.PI / 180;
+    var cos = Math.cos(rad), sin = Math.sin(rad);
+    var cx = rect.x + rect.width / 2, cy = rect.y + rect.height / 2;
+    var out = new Array(mesh.verts.length);
+    for (var i = 0; i < mesh.verts.length; i++) {
+      var rest = mesh.verts[i];
+      var off = (mesh.offsets && mesh.offsets[i]) || [0, 0];
+      var du = off[0], dv = off[1];
+      if (poseAt) { var a = poseAt(i); if (a) { du += a[0]; dv += a[1]; } }
+      out[i] = worldOf(rect, rest[0] + du, rest[1] + dv, cos, sin, cx, cy);
+    }
+    return out;
   }
 
   var R2 = function (n) { return Math.round(n * 100) / 100; };   // scene JSON rounds to 2dp (CLAUDE.md §5.4)
@@ -392,13 +478,22 @@
   NS.attach = attach;
   NS.detach = detach;
   NS.propagate = propagate;
+  NS.isReferenced = isReferenced;
+  NS.releaseIfUnused = releaseIfUnused;
   NS.createMesh = createMesh;
   NS.setOutline = setOutline;
   NS.rebuild = function (meshId) { var m = get(meshId); return m ? rebuild(m) : null; };
   NS.scenePayload = scenePayload;
+  NS.worldVerts = worldVerts;
+  NS.normalizedOf = normalizedOf;
   NS.serialize = serialize;
   NS.load = load;
   NS.pointInPoly = pointInPoly;
+  // True when a vertex is part of the mask outline (verts[0..outline-1] —
+  // see the index invariant in this file's header). Dragging one of these
+  // reshapes the MASK as well as the deformation, which the editor says out
+  // loud by drawing them differently.
+  NS.isOutlineVertex = function (mesh, i) { return !!mesh && i < mesh.outline.length; };
   // Static pose editing (PR2's on-canvas drag writes through this).
   NS.setOffset = function (meshId, i, du, dv) {
     var m = get(meshId);

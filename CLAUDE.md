@@ -702,7 +702,7 @@ post-traitement dans `buildSceneJson` : il réutilise les items déjà construit
 et leur applique la matrice DELTA — ne jamais dupliquer la boucle de
 construction (CLAUDE.md §3).
 
-## 12. Image mesh — déformer une image importée (2026-08-30, PR1)
+## 12. Image mesh — déformer une image importée (2026-08-30, PR1+PR2)
 
 `image-mesh.js` (+ `draw_image_mesh` dans engine.rs). Demande de Cyril :
 déformer/animer une image importée via un maillage éditable, AVEC un système de
@@ -763,7 +763,52 @@ ISC, vendorisé) + filtre par centroïde-dans-le-contour. Exact pour un contour
 convexe ; un contour très concave peut perdre un éclat de couverture près de la
 concavité. Les arêtes longues du contour sont densifiées pour limiter ça.
 
-**Pas encore fait** : l'éditeur on-canvas (PR2) et les clés Motion par sommet
-(PR3, via le patron `vtx*`/`applyPathVertexOffsets` de motion.js). Une entrée
-de maillage orpheline (image supprimée) n'est pas ramassée — sans conséquence
-visible, mais elle force l'export par le moteur via `exportHasImageMesh`.
+### 12bis. L'éditeur on-canvas (PR2)
+
+`image-mesh-bridge.js`. **Pas un 24e bouton d'outil** : le maillage appartient
+à l'image, donc c'est le patron du gizmo de dégradé (gradient-bridge.js) —
+une section du panneau de droite qui n'apparaît que pour LA sélection unique
+concernée, plus une interception pointer en phase de CAPTURE sur `#canvas-area`
+armée seulement pendant ce mode. Poignées reprises de `buildNodeHandleItems`
+(tailles en `1/view.zoom`, bleu `[74,158,255]` au repos, orange accent
+`[255,184,108]`, contour blanc) — ne pas inventer un langage visuel parallèle.
+
+**Le contour EST le masque, et l'éditeur le dit** : les sommets `0..outline-1`
+sont dessinés en CARRÉS orange et l'arête de contour est plus épaisse ; glisser
+un de ces sommets redessine le masque ET la déformation d'un seul geste. Pas de
+second mode « éditer le masque » — c'est tout l'intérêt de la règle de Cyril.
+
+⚠️ Trois pièges trouvés EN PILOTANT, pas en relisant :
+1. **Une entrée de `selectedPaths` survit à l'objet qu'elle désigne.**
+   `loadFrame`/undo/`importJSON` reconstruisent tous les items Paper ;
+   un Raster détaché passe encore `instanceof` et porte encore `data.meshId`.
+   `singleRaster()` exige donc `userLayers.indexOf(p.parent) >= 0`.
+2. **Ne PAS appeler `loadFrame` depuis `toggleMesh`.** attach/detach écrivent
+   déjà le live ET toutes les frames ; `loadFrame` ne servait à rien et
+   invalidait la sélection qu'on venait d'utiliser, donc le clic SUIVANT sur le
+   panneau ne trouvait plus de cible et ne faisait rien pendant que la case
+   avait déjà changé d'état.
+3. **`detach` doit libérer l'entrée du store** (`releaseIfUnused`, compté par
+   références sur toutes les frames de la scène ET des composants) — sinon
+   couper le maillage laissait la topologie derrière, invisible mais persistée
+   et suffisante pour forcer l'export par le moteur (`exportHasImageMesh`).
+
+**`state.imageMeshes` fait partie du snapshot d'undo** (`layersSnapshotNow`/
+`restoreLayersSnapshot`, tweens.js) — la pose ne vit dans aucune frame, donc
+`_cloneLayersForUndo` ne la voit pas ; sans ça un glissé de sommet était
+silencieusement non annulable, exactement comme `cameraKeys` avant la v19.
+
+**Vérifié en pilotant** : glissé de sommet intérieur → offset exact
+(120 px / 600 = 0,2), un seul sommet touché, l'image ne bouge pas (l'outil
+Sélection est bien court-circuité) ; glissé de sommet de contour → pixels
+monde (960,270) et (960,350) passent au fond ; cycle marche/arrêt/marche →
+24/0/24 frames taguées et store `[im_1]`/`[]`/`[im_2]` ; undo/redo repasse
+chaque glissé dans l'ordre ; l'export (`render_to_pixels`) ne contient AUCUNE
+poignée alors que l'écran en montre 137.
+
+**Pas encore fait** : les clés Motion par sommet (PR3, via le patron
+`vtx*`/`applyPathVertexOffsets` de motion.js), l'ajout/suppression de sommets,
+et le tracé d'un contour à main levée (aujourd'hui on part du rectangle et on
+déplace ses sommets, ou on appelle `SMImageMesh.setOutline` par script). Une
+entrée orpheline reste possible si l'IMAGE est supprimée sans passer par le
+bouton Mesh — `releaseIfUnused` ne couvre que le chemin de détachement.
