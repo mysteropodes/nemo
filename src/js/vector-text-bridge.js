@@ -252,9 +252,18 @@ function buildVectorTextGroup(text, fontKey, size, color, align, fixedWidthWorld
     var wordCursor = 0, charCursor = 0;
     wrapped.forEach(function (line, li) {
       var lineWidth = runWidth(line);
+      // Align within the BOX when one was given, not merely within the widest
+      // line (2026-08-30, feedback #144's "calage de texte exact par rapport
+      // au layout"). With no fixed width the two are identical, so behaviour
+      // for ordinary text is unchanged — but for a text block that declares a
+      // width, centring inside maxW is wrong: a single centred line has
+      // maxW === lineWidth, so the offset was always 0 and the line sat flush
+      // left inside its box. That is the mismatch against a Figma layout,
+      // where a centred line sits in the middle of the frame it belongs to.
+      var boxW = Math.max(maxW, fixedWidthWorld || 0);
       var startX = topLeftWorld.x;
-      if (align === 'center') startX = topLeftWorld.x + (maxW - lineWidth) / 2;
-      else if (align === 'right') startX = topLeftWorld.x + (maxW - lineWidth);
+      if (align === 'center') startX = topLeftWorld.x + (boxW - lineWidth) / 2;
+      else if (align === 'right') startX = topLeftWorld.x + (boxW - lineWidth);
       var cursorX = startX;
       // Ascent ≈ size, matching the raster bake's textBaseline='top' anchor
       // closely enough for the two modes to feel consistent when switching.

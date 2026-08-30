@@ -233,10 +233,31 @@
   function walkNode(node, frameInv, out) {
     if (!node || node.visible === false) return;
     var mat = matMultiply(frameInv, nodeAbsMatrix(node));
+    // An image fill wins over fillGeometry (2026-08-30, feedback #144:
+    // "l'import d'image échoue, pas d'image"). This used to require the
+    // ABSENCE of fillGeometry — but every fetch in this file asks for
+    // `geometry=paths`, and Figma then returns fillGeometry for every node
+    // that has a fill AT ALL, image fills included. So the condition was
+    // never true in practice and no image was ever imported.
+    //
+    // Worse, the node did not even land in `skipped`: it fell through to the
+    // geometry branch below, where firstSolidPaint() returns null for an
+    // image paint, so it emitted nothing and reported nothing. Measured on a
+    // synthetic file shaped exactly as geometry=paths returns: 0 images,
+    // 0 shapes, and an EMPTY skipped list — the node vanished in silence.
+    // Without fillGeometry the same file imported the image correctly, which
+    // is what isolates fillGeometry as the cause.
+    //
+    // A stroke on an image-filled node is still emitted, since the image
+    // replaces only the FILL.
     var imagePaint = firstImagePaint(node.fills);
-    if (imagePaint && !(node.fillGeometry && node.fillGeometry.length)) {
+    if (imagePaint) {
       var bb = node.absoluteBoundingBox;
       out.images.push({ imageRef: imagePaint.imageRef, mat: mat, w: bb ? bb.width : 0, h: bb ? bb.height : 0, opacity: node.opacity != null ? node.opacity : 1, name: node.name });
+      if (node.strokeGeometry && node.strokeGeometry.length) {
+        var imgStrokeCss = paintToCss(firstSolidPaint(node.strokes), node.opacity);
+        if (imgStrokeCss) out.svgTags = out.svgTags.concat(geometryToPathTags(node.strokeGeometry, imgStrokeCss, mat));
+      }
       return;
     }
     var hasFillGeo = node.fillGeometry && node.fillGeometry.length;
@@ -382,10 +403,34 @@
         var size = t.style.fontSize || 24;
         var align = ALIGN_MAP[t.style.textAlignHorizontal] || 'left';
         try {
+          // The text box's WIDTH, its line height and its letter spacing all
+          // reached this point and were then dropped (2026-08-30, feedback
+          // #144: "mise en page, calage de texte exact par rapport au
+          // layout"). t.w was captured by walkNode and never passed; the
+          // style's lineHeightPx and letterSpacing were never read at all, so
+          // every imported block fell back to the 1.25 default line height and
+          // zero tracking regardless of what the Figma file said.
+          //
+          // Passing the width also makes alignment mean what it means in
+          // Figma — see buildVectorTextGroup's own note: without it, centring
+          // happened inside the widest LINE, which for a single line is a
+          // no-op, so a centred Figma label came in flush left.
+          //
+          // lineHeightPx is Figma's resolved value in px whatever unit the
+          // designer picked (AUTO/PIXELS/PERCENT), so dividing by fontSize is
+          // the multiplier this builder wants. Guarded because AUTO can report
+          // 0 on some nodes, and a 0 multiplier would stack every line on one.
+          var lhPx = t.style.lineHeightPx;
+          var lhMult = (lhPx && size) ? (lhPx / size) : undefined;
           await window.SMVectorText.buildVectorTextGroup(
-            t.text, fontKey, size, t.color, align, null,
+            t.text, fontKey, size, t.color, align, t.w || null,
             { x: t.x, y: t.y }, layer,
-            { bold: (t.style.fontWeight || 400) >= 700, italic: !!t.style.italic }
+            {
+              bold: (t.style.fontWeight || 400) >= 700,
+              italic: !!t.style.italic,
+              lineHeightMult: lhMult,
+              letterSpacing: t.style.letterSpacing || 0,
+            }
           );
           report.textsImported++;
         } catch (e) {
