@@ -11575,6 +11575,30 @@
     // setValue is the single writer (CLAUDE.md §13): it keys at the playhead
     // when the stopwatch is on and writes motionStatic when it isn't, so the
     // picker inherits both behaviors for free.
+    // Colour rows the user has SELECTED in the Motion timeline (clicking the
+    // row's label, the same selection the value-edit/ease machinery uses).
+    // The main colour panel writes through the CANVAS selection, which is a
+    // different thing entirely — feedback #180's second half: "select
+    // couleurs ne prend pas en compte la selection de la propriété
+    // impossible de changer la couleurs et de keyframé par là". Returns
+    // [{holder, prop}] for fillColor/strokeColor rows only; every other
+    // selected property is none of the colour panel's business.
+    selectedColorProps: function (which) {
+      if (state.appMode !== 'motion') return [];
+      return _motionPropSel.filter(function (s) {
+        return s.prop === which && s.holder;
+      }).map(function (s) { return { holder: s.holder, prop: s.prop }; });
+    },
+    // Companion writer for the rows above. Same body as
+    // writeElementColorFromPicker minus the (li, strokeId) lookup, since a
+    // selected row already IS a holder — going back through indices would
+    // just be a chance to resolve the wrong one.
+    writeColorToHolder: function (holder, prop, hex) {
+      if (!holder) return false;
+      if (!hasKeys(holder, prop) && !(holder.motionStatic && holder.motionStatic[prop])) return false;
+      setValue(holder, prop, hexToRgba255(hex));
+      return true;
+    },
     writeElementColorFromPicker: function (li, strokeId, prop, hex) {
       var ld = state.layers[li];
       if (!ld || !ld.elementMotion || !strokeId) return false;
