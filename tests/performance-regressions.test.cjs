@@ -6,6 +6,37 @@ const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '..');
 
+// Extracts one whole `function name(...) { ... }` by matching braces, so a
+// test can lift a function out of a source file without also pinning itself
+// to whatever happens to be declared AFTER it.
+//
+// Added 2026-08-30 after the nearestKeyIndex test broke for no reason of its
+// own: it sliced from `function nearestKeyIndex(` up to `function
+// exprNearestKey(`, and PR #345 renamed that second function to
+// exprNearestKeyAtFrame while rebuilding the expression engine. The end
+// marker stopped matching, the slice came back empty, and a test guarding a
+// perfectly intact binary search started failing — a false alarm that costs
+// exactly as much attention as a real one.
+function extractFunction(source, name) {
+  const start = source.indexOf(`function ${name}(`);
+  assert.notEqual(start, -1, `expected to find function ${name} in the source`);
+  const open = source.indexOf('{', start);
+  assert.notEqual(open, -1, `expected a body for function ${name}`);
+  let depth = 0;
+  for (let i = open; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) return source.slice(start, i + 1);
+    }
+  }
+  assert.fail(`unbalanced braces while extracting ${name}`);
+}
+// Deliberately naive about braces inside strings, comments and regexes —
+// it is used only on small arithmetic/scheduling helpers that contain none
+// of those. Anything richer should get a real parser, not a smarter regex.
+
 function timelineCellRenderer(state) {
   const source = fs.readFileSync(path.join(root, 'src/js/timeline.js'), 'utf8');
   const start = source.indexOf('function renderKeyframeCellsInto(');
@@ -340,12 +371,8 @@ test('exact motion key lookup is logarithmic and preserves missing-key behavior'
 
 test('expression nearestKey lookup is logarithmic and keeps earlier-key ties', () => {
   const source = fs.readFileSync(path.join(root, 'src/js/motion.js'), 'utf8');
-  const start = source.indexOf('function nearestKeyIndex(');
-  const end = source.indexOf('function exprNearestKey(', start);
-  assert.notEqual(start, -1);
-  assert.notEqual(end, -1);
   const sandbox = {};
-  vm.runInNewContext(`${source.slice(start, end)}\nthis.nearestKeyIndexTest = nearestKeyIndex;`, sandbox);
+  vm.runInNewContext(`${extractFunction(source, 'nearestKeyIndex')}\nthis.nearestKeyIndexTest = nearestKeyIndex;`, sandbox);
   const find = sandbox.nearestKeyIndexTest;
   const keys = [{ frame: 0 }, { frame: 3 }, { frame: 10 }, { frame: 20 }, { frame: 40 }];
   assert.equal(find(keys, -10), 0);
@@ -367,10 +394,10 @@ test('expression nearestKey lookup is logarithmic and keeps earlier-key ties', (
 
 test('motion drag timeline rebuilds are coalesced and flushed on release', () => {
   const source = fs.readFileSync(path.join(root, 'src/js/motion.js'), 'utf8');
-  const start = source.indexOf('var _motionDragTimelineRaf = 0;');
-  const end = source.indexOf('// Drag-to-retime a keyframe', start);
-  assert.notEqual(start, -1);
-  assert.notEqual(end, -1);
+  assert.notEqual(source.indexOf('var _motionDragTimelineRaf = 0;'), -1);
+  const sliced = 'var _motionDragTimelineRaf = 0;\n'
+    + extractFunction(source, 'requestMotionDragTimelineRender') + '\n'
+    + extractFunction(source, 'flushMotionDragTimelineRender');
   let nextId = 1;
   let renders = 0;
   const callbacks = new Map();
@@ -380,7 +407,7 @@ test('motion drag timeline rebuilds are coalesced and flushed on release', () =>
     renderTimeline() { renders++; },
   };
   vm.runInNewContext(
-    `${source.slice(start, end)}\nthis.requestTest = requestMotionDragTimelineRender; this.flushTest = flushMotionDragTimelineRender;`,
+    `${sliced}\nthis.requestTest = requestMotionDragTimelineRender; this.flushTest = flushMotionDragTimelineRender;`,
     sandbox,
   );
 
@@ -397,8 +424,22 @@ test('motion drag timeline rebuilds are coalesced and flushed on release', () =>
   sandbox.flushTest();
   assert.equal(callbacks.size, 0);
   assert.equal(renders, 2);
+  // A second flush renders AGAIN, and that is the intended contract, not a
+  // leak. This assertion used to expect a no-op, encoding the behaviour of
+  // an early-return that was deliberately removed in 2026-08 (feedback:
+  // "aprés je bouge la keyframe je n'arrive pas à revoir la box de
+  // lissage"). Any real drag lasts more than one frame, so its last mid-drag
+  // rAF has already fired and cleared the handle by the time onDragUp calls
+  // flush — meaning under the old early-return there was never anything to
+  // flush and the grid stayed stuck on a frame rendered while the drag flags
+  // were still set, with the ease boxes suppressed.
+  // Making the code satisfy the old assertion again would reintroduce
+  // exactly that bug, so the test is what moves. What this file actually
+  // guards is the COALESCING above (40 requests, one callback, one render),
+  // and that is unchanged.
   sandbox.flushTest();
-  assert.equal(renders, 2);
+  assert.equal(renders, 3, 'flush renders unconditionally by design — see the comment above');
+  assert.equal(callbacks.size, 0, 'flush must never leave a pending rAF behind');
 
   const dragSection = source.slice(source.indexOf('function onDragMove('), source.indexOf('document.addEventListener(\'mousemove\', onDragMove)'));
   assert.equal((dragSection.match(/requestMotionDragTimelineRender\(\)/g) || []).length, 4);
