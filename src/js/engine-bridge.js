@@ -2746,6 +2746,17 @@
   }
   function buildTransformBoxItems() {
     if (state.tool !== 'select') return [];
+    // Stand down while text is being typed in place (2026-08-30, feedback
+    // #175: "la bounding box perturbe quand j'utilise l'outil de texte avant
+    // de select le text comme un élément comme un autre"). The in-place
+    // editor already draws its OWN orange box and resize grip; the select
+    // gizmo drawn on top of it is a second, competing frame for the same
+    // object — and on a brand-new EMPTY text its near-zero bounds collapse
+    // all 8 handles into a knot right where the caret sits, which is what
+    // the screenshot shows. The text becomes an ordinary selectable element
+    // the moment the editor closes, which is exactly what he asked for
+    // ("avant de select le text comme un élément comme un autre").
+    if (window.isInPlaceTextEditing && window.isInPlaceTextEditing()) return [];
     // Motion mode (2026-08-21 fix, "2 points d'ancrage et 2 rotation qui
     // s'affiche" on a Component with several elements): this function is
     // the Animation 2D transform box — corners/ring/anchor computed from
