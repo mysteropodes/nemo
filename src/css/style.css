@@ -2187,6 +2187,30 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 .media-filter-chip{background:var(--panel3);border:1px solid transparent;border-radius:10px;color:var(--text-dim);font-size:9px;font-weight:600;padding:3px 9px;cursor:pointer;white-space:nowrap;}
 .media-filter-chip:hover{color:var(--text);}
 .media-filter-chip.active{color:var(--accent-hover);background:var(--accent-dim);border-color:var(--accent);}
+/* Import icon buttons (feedback #158) — same visual weight as .pbtn but
+   square, since the drop zone right below already carries the words. */
+.media-import-row{gap:4px;}
+.media-icon-btn{flex:none;width:26px;height:22px;display:flex;align-items:center;justify-content:center;padding:0;border:1px solid var(--border);border-radius:5px;background:var(--panel3);color:var(--text-dim);cursor:pointer;}
+.media-icon-btn:hover{color:var(--text);border-color:var(--accent);}
+.media-icon-btn:active{background:var(--panel2);}
+.media-icon-btn svg{display:block;}
+.media-icon-btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+/* Compact density (feedback #158, "une liste plus petite"): same .media-row
+   DOM as the normal list — only tighter. Name and badges share one line, and
+   the kind badge is dropped because the folder group header above already
+   says the kind; linked/missing badges stay, since those are STATUS and are
+   the whole reason to glance at this list. */
+.media-compact-view .media-row{padding:1px 5px;gap:6px;border-radius:4px;}
+.media-compact-view .media-row-thumb{width:16px;height:16px;border-radius:3px;}
+.media-compact-view .media-row-playicon{font-size:6px;}
+.media-compact-view .media-row-main{flex-direction:row;align-items:center;gap:6px;}
+.media-compact-view .media-row-name{flex:1;min-width:0;font-size:9.5px;}
+.media-compact-view .media-row-meta{flex:none;flex-wrap:nowrap;gap:4px;}
+.media-compact-view .media-row-badge.kind-image,
+.media-compact-view .media-row-badge.kind-video,
+.media-compact-view .media-row-badge.kind-audio,
+.media-compact-view .media-row-size,
+.media-compact-view .media-row-owner{display:none;}
 .media-view-toggle{flex:none;width:16px;height:16px;display:flex;align-items:center;justify-content:center;color:rgba(236,234,231,.4);cursor:pointer;}
 .media-view-toggle:hover{color:var(--text);}
 .media-view-toggle.active{color:var(--accent);}

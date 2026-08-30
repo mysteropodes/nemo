@@ -15,7 +15,7 @@
 (function(){
   var I18N={
     en:{
-      scAltClick:'Alt+click',scAltClickTip:'Alt+click near a tip',scAltDrag:'Alt+drag',scAltDragPivot:'Alt+drag (pivot)',scAltDragEmpty:'Alt+drag (empty area)',scAltDragChain:'Alt+drag the end of a 2-bone chain',scAltDragHandle:'Alt+drag a handle',scClick:'Click',scClickTip:'Click near a tip',scRightClick:'Right-click',scCtrlDragCorner:'Ctrl+drag a corner',scDoubleClick:'Double-click',scSpace:'Space',scDragExisting:'Drag an existing anchor or handle',scShiftClick:'Shift+click',scDelete:'Del',scEscape:'Esc',settingsTitle:'Settings',
+      scAltClick:'Alt+click',scAltClickTip:'Alt+click near a tip',scAltDrag:'Alt+drag',scAltDragPivot:'Alt+drag (pivot)',scAltDragEmpty:'Alt+drag (empty area)',scAltDragChain:'Alt+drag the end of a 2-bone chain',scAltDragHandle:'Alt+drag a handle',scClick:'Click',scClickTip:'Click near a tip',scRightClick:'Right-click',scCtrlDragCorner:'Ctrl+drag a corner',scDoubleClick:'Double-click',scSpace:'Space',scDragExisting:'Drag an existing anchor or handle',scShiftClick:'Shift+click',scDelete:'Del',scEscape:'Esc',mediaEmptyLibrary:'No media imported yet.',mediaViewNext:'View',mediaView_list:'list',mediaView_compact:'compact list',mediaView_grid:'grid',mediaKindVideo:'Video',mediaKindImage:'Image',mediaKindAudio:'Audio',settingsTitle:'Settings',
       settingsTabGeneral:'General',settingsTabUpdates:'Updates',settingsTabCollab:'Collaboration',settingsTabFeedback:'Feedback',settingsTabFigma:'Figma',settingsTabShortcuts:'Shortcuts',
       settingsLanguage:'Language',
       roleAnimator:'Animator',roleSupervisor:'Supervisor',roleProducer:'Producer',
@@ -729,7 +729,7 @@
       mgraphModeValue:'value',mgraphModeSpeed:'speed',mgraphFrozen:'frozen',mgraphExprLegend:'solid = expression, dashed = keyframes',
     },
     fr:{
-      scAltClick:'Alt+clic',scAltClickTip:'Alt+clic près d’une pointe',scAltDrag:'Alt+glisser',scAltDragPivot:'Alt+glisser (pivot)',scAltDragEmpty:'Alt+glisser (zone vide)',scAltDragChain:'Alt+glisser le bout d’une chaîne de 2 os',scAltDragHandle:'Alt+glisser une poignée',scClick:'Clic',scClickTip:'Clic près d’une pointe',scRightClick:'Clic-droit',scCtrlDragCorner:'Ctrl+glisser un coin',scDoubleClick:'Double-clic',scSpace:'Espace',scDragExisting:'Glisser une ancre ou une poignée existante',scShiftClick:'Shift+clic',scDelete:'Suppr',scEscape:'Échap',settingsTitle:'Réglages',
+      scAltClick:'Alt+clic',scAltClickTip:'Alt+clic près d’une pointe',scAltDrag:'Alt+glisser',scAltDragPivot:'Alt+glisser (pivot)',scAltDragEmpty:'Alt+glisser (zone vide)',scAltDragChain:'Alt+glisser le bout d’une chaîne de 2 os',scAltDragHandle:'Alt+glisser une poignée',scClick:'Clic',scClickTip:'Clic près d’une pointe',scRightClick:'Clic-droit',scCtrlDragCorner:'Ctrl+glisser un coin',scDoubleClick:'Double-clic',scSpace:'Espace',scDragExisting:'Glisser une ancre ou une poignée existante',scShiftClick:'Shift+clic',scDelete:'Suppr',scEscape:'Échap',mediaEmptyLibrary:'Aucun média importé.',mediaViewNext:'Affichage',mediaView_list:'liste',mediaView_compact:'liste compacte',mediaView_grid:'grille',mediaKindVideo:'Vidéo',mediaKindImage:'Image',mediaKindAudio:'Audio',settingsTitle:'Réglages',
       settingsTabGeneral:'Général',settingsTabUpdates:'Mises à jour',settingsTabCollab:'Collaboration',settingsTabFeedback:'Feedback',settingsTabFigma:'Figma',settingsTabShortcuts:'Raccourcis',
       settingsLanguage:'Langue',
       roleAnimator:'Animateur',roleSupervisor:'Superviseur',roleProducer:'Producteur',
@@ -1443,7 +1443,7 @@
       mgraphModeValue:'valeur',mgraphModeSpeed:'vitesse',mgraphFrozen:'figé',mgraphExprLegend:'plein = expression, pointillés = clés',
     },
     ja:{
-      scAltClick:'Alt+クリック',scAltClickTip:'先端付近をAlt+クリック',scAltDrag:'Alt+ドラッグ',scAltDragPivot:'Alt+ドラッグ（基準点）',scAltDragEmpty:'Alt+ドラッグ（空白部分）',scAltDragChain:'2ボーン チェーンの端をAlt+ドラッグ',scAltDragHandle:'ハンドルをAlt+ドラッグ',scClick:'クリック',scClickTip:'先端付近をクリック',scRightClick:'右クリック',scCtrlDragCorner:'角をCtrl+ドラッグ',scDoubleClick:'ダブルクリック',scSpace:'スペース',scDragExisting:'既存のアンカーまたはハンドルをドラッグ',scShiftClick:'Shift+クリック',scDelete:'Delete',scEscape:'Esc',settingsTitle:'設定',
+      scAltClick:'Alt+クリック',scAltClickTip:'先端付近をAlt+クリック',scAltDrag:'Alt+ドラッグ',scAltDragPivot:'Alt+ドラッグ（基準点）',scAltDragEmpty:'Alt+ドラッグ（空白部分）',scAltDragChain:'2ボーン チェーンの端をAlt+ドラッグ',scAltDragHandle:'ハンドルをAlt+ドラッグ',scClick:'クリック',scClickTip:'先端付近をクリック',scRightClick:'右クリック',scCtrlDragCorner:'角をCtrl+ドラッグ',scDoubleClick:'ダブルクリック',scSpace:'スペース',scDragExisting:'既存のアンカーまたはハンドルをドラッグ',scShiftClick:'Shift+クリック',scDelete:'Delete',scEscape:'Esc',mediaEmptyLibrary:'インポートされたメディアはありません。',mediaViewNext:'表示',mediaView_list:'リスト',mediaView_compact:'コンパクトリスト',mediaView_grid:'グリッド',mediaKindVideo:'動画',mediaKindImage:'画像',mediaKindAudio:'音声',settingsTitle:'設定',
       settingsTabGeneral:'一般',settingsTabUpdates:'アップデート',settingsTabCollab:'コラボレーション',settingsTabFeedback:'フィードバック',settingsTabFigma:'Figma',settingsTabShortcuts:'ショートカット',
       settingsLanguage:'言語',
       roleAnimator:'アニメーター',roleSupervisor:'スーパーバイザー',roleProducer:'プロデューサー',
@@ -2124,7 +2124,7 @@
       mgraphModeValue:'値',mgraphModeSpeed:'速度',mgraphFrozen:'固定',mgraphExprLegend:'実線 = 式、破線 = キーフレーム',
     },
     es:{
-      scAltClick:'Alt+clic',scAltClickTip:'Alt+clic cerca de una punta',scAltDrag:'Alt+arrastrar',scAltDragPivot:'Alt+arrastrar (pivote)',scAltDragEmpty:'Alt+arrastrar (zona vacía)',scAltDragChain:'Alt+arrastrar el extremo de una cadena de 2 huesos',scAltDragHandle:'Alt+arrastrar un manejador',scClick:'Clic',scClickTip:'Clic cerca de una punta',scRightClick:'Clic derecho',scCtrlDragCorner:'Ctrl+arrastrar una esquina',scDoubleClick:'Doble clic',scSpace:'Espacio',scDragExisting:'Arrastrar un ancla o manejador existente',scShiftClick:'Shift+clic',scDelete:'Supr',scEscape:'Esc',settingsTitle:'Ajustes',
+      scAltClick:'Alt+clic',scAltClickTip:'Alt+clic cerca de una punta',scAltDrag:'Alt+arrastrar',scAltDragPivot:'Alt+arrastrar (pivote)',scAltDragEmpty:'Alt+arrastrar (zona vacía)',scAltDragChain:'Alt+arrastrar el extremo de una cadena de 2 huesos',scAltDragHandle:'Alt+arrastrar un manejador',scClick:'Clic',scClickTip:'Clic cerca de una punta',scRightClick:'Clic derecho',scCtrlDragCorner:'Ctrl+arrastrar una esquina',scDoubleClick:'Doble clic',scSpace:'Espacio',scDragExisting:'Arrastrar un ancla o manejador existente',scShiftClick:'Shift+clic',scDelete:'Supr',scEscape:'Esc',mediaEmptyLibrary:'Ningún medio importado.',mediaViewNext:'Vista',mediaView_list:'lista',mediaView_compact:'lista compacta',mediaView_grid:'cuadrícula',mediaKindVideo:'Video',mediaKindImage:'Imagen',mediaKindAudio:'Audio',settingsTitle:'Ajustes',
       settingsTabGeneral:'General',settingsTabUpdates:'Actualizaciones',settingsTabCollab:'Colaboración',settingsTabFeedback:'Feedback',settingsTabFigma:'Figma',settingsTabShortcuts:'Atajos',
       settingsLanguage:'Idioma',
       roleAnimator:'Animador',roleSupervisor:'Supervisor',roleProducer:'Productor',

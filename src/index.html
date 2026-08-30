@@ -1186,9 +1186,19 @@
           <div class="pr" id="media-convert-row" style="margin-top:2px;margin-bottom:4px">
             <button class="pbtn" id="btn-convert-media" type="button" style="width:100%">Convertir les médias…</button>
           </div>
-          <div class="pr" style="gap:4px">
-            <button class="pbtn" id="btn-media-import-img" style="flex:1" data-i18n="mediaImportImg">Image(s)…</button>
-            <button class="pbtn" id="btn-media-import-video" style="flex:1" data-i18n="mediaImportVideo">Vidéo…</button>
+          <!-- Import: icon buttons, not text (feedback #158). The drop zone
+               directly below already spells out "…or click Import", so a full
+               row of two wide text buttons was saying the same thing twice in
+               a panel that is short on vertical space. NOTE: these carry
+               data-i18n-TITLE, never data-i18n — the latter writes textContent
+               and would wipe the inline SVG on the first applyI18n pass. -->
+          <div class="pr media-import-row" style="gap:4px">
+            <button class="media-icon-btn" id="btn-media-import-img" type="button" data-i18n-title="mediaImportImg" title="Image(s)…" aria-label="Image(s)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            </button>
+            <button class="media-icon-btn" id="btn-media-import-video" type="button" data-i18n-title="mediaImportVideo" title="Vidéo…" aria-label="Video">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="14" height="16" rx="2"/><path d="M22 7l-6 4 6 4z"/></svg>
+            </button>
           </div>
           <div id="media-drop" class="media-drop" data-i18n="mediaDropHint">Glisser des images/vidéos ici, ou cliquer Importer…</div>
           <div class="media-search-row">
@@ -1199,7 +1209,12 @@
           <div id="media-filter-chips" class="media-filter-chips"></div>
           <div class="pr media-panel-hdr" style="gap:4px">
             <button class="pbtn" id="btn-media-cleanup" style="flex:1;display:none;font-size:9px">Nettoyer (0)</button>
-            <div class="media-view-toggle" id="media-view-toggle" data-i18n-title="mediaViewToggleTitle" title="Vue liste / grille">
+            <!-- Three densities, not two (feedback #158: "il pourrait y avoir
+                 la possibilité d'avoir une liste plus petite"). Cycles
+                 list -> compact -> grid; the icon and title are rewritten by
+                 media-library.js to show which one is active, so this markup
+                 is only the initial ("list") state. -->
+            <div class="media-view-toggle" id="media-view-toggle" title="Vue liste / grille">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             </div>
             <div class="media-expand-toggle" id="media-expand-toggle" title="Agrandir / réduire la liste">
