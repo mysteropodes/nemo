@@ -194,7 +194,15 @@
   // layer's own color as a stand-in for the reference's owner avatar, since
   // there's no per-user concept here — the layer IS the "owner" of an
   // imported asset), and import date.
-  var KIND_LABEL = { video: 'Vidéo', image: 'Image', audio: 'Audio' };
+  // Lazy getters, not a literal — this was a baked-in French object, so the
+  // kind badge read "Vidéo" inside an otherwise English panel (spotted while
+  // fixing feedback #158, same family as #157). Mirrors asset-tree.js's
+  // KIND_GROUP_LABEL, which already resolves through SM.t for this reason.
+  var KIND_LABEL = {
+    get video() { return t('mediaKindVideo', 'Vidéo'); },
+    get image() { return t('mediaKindImage', 'Image'); },
+    get audio() { return t('mediaKindAudio', 'Audio'); },
+  };
   var _orphanCount = 0; // set fresh by buildRow() on every render() pass, read back after
   // ---- Search / type filter / view mode (2026-08-29, gap-analysis pass
   // against the "Stash" AE panel Cyril pointed at as a reference) — plain
@@ -204,7 +212,19 @@
   // preference, not a transient browsing filter).
   var _searchQuery = '';
   var _activeFilter = 'all'; // 'all' | 'image' | 'video' | 'audio' | 'missing'
-  var _viewMode = 'list'; // 'list' | 'grid'
+  // 'list' | 'compact' | 'grid' — three densities since feedback #158 asked for
+  // "une liste plus petite". compact reuses buildRow (same DOM, same context
+  // menu, same drag wiring) and only changes CSS: a smaller thumb and a single
+  // line, so nothing downstream has to know a third mode exists.
+  var VIEW_MODES = ['list', 'compact', 'grid'];
+  var _viewMode = 'list';
+  try { var _vmSaved = localStorage.getItem('nemo-media-view'); if (VIEW_MODES.indexOf(_vmSaved) >= 0) _viewMode = _vmSaved; } catch (e) {}
+  // Applied to #media-grid AND to every per-kind folder body (rows live in the
+  // folder bodies, not in the grid itself — see render()).
+  function applyViewClasses(el) {
+    el.classList.toggle('media-grid-view', _viewMode === 'grid');
+    el.classList.toggle('media-compact-view', _viewMode === 'compact');
+  }
   var FILTER_CHIPS = [
     { id: 'all', get label() { return t('mediaFilterAll', 'Tout'); } },
     { id: 'image', get label() { return t('assetGroupImages', 'Images'); } },
@@ -486,7 +506,7 @@
   function render() {
     var grid = document.getElementById('media-grid'); if (!grid) return;
     grid.innerHTML = '';
-    grid.classList.toggle('media-grid-view', _viewMode === 'grid');
+    applyViewClasses(grid);
     _orphanCount = 0;
     renderFilterChips();
     if (!window.SMAssetTree) return; // asset-tree.js not loaded — nothing to group into
@@ -556,7 +576,7 @@
       if (!entries.length) return;
       anyShown = true;
       var body = SMAssetTree.folderGroup(grid, { label: SMAssetTree.KIND_GROUP_LABEL[kind], color: SMAssetTree.FOLDER_COLORS[kind], count: entries.length });
-      body.classList.toggle('media-grid-view', _viewMode === 'grid');
+      applyViewClasses(body);
       entries.forEach(function (m) { body.appendChild(_viewMode === 'grid' ? buildTile(m) : buildRow(m)); });
     });
     if (!anyShown) {
@@ -565,7 +585,7 @@
         || (window.SMProject && SMProject.getOpenTabs && SMProject.getOpenTabs().length));
       empty.textContent = hasAnyContent
         ? t('mediaNoMatch', 'Aucun média ne correspond à ce filtre.')
-        : (SM && SM.t ? SM.t('mediaDropHint') : 'Aucun média importé.');
+        : t('mediaEmptyLibrary', 'Aucun média importé.');
       grid.appendChild(empty);
     }
     // Bulk cleanup (2026-07-31) — catalog-only (never touches the
@@ -687,6 +707,21 @@
     });
   }
 
+  // The button shows the mode you are IN, not the one you would switch to —
+  // it is a 3-state cycle now, and "click me to get X" only reads
+  // unambiguously on a 2-state toggle. The title names the next mode instead,
+  // which is where that information belongs.
+  var VIEW_ICON = {
+    list:    '<rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="12" width="18" height="4" rx="1"/>',
+    compact: '<line x1="3" y1="5" x2="21" y2="5"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="3" y1="20" x2="21" y2="20"/>',
+    grid:    '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  };
+  function syncViewToggle(btn) {
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' + VIEW_ICON[_viewMode] + '</svg>';
+    btn.classList.toggle('active', _viewMode !== 'list');
+    var next = VIEW_MODES[(VIEW_MODES.indexOf(_viewMode) + 1) % VIEW_MODES.length];
+    btn.title = t('mediaViewNext', 'Affichage') + ' \u2192 ' + t('mediaView_' + next, next);
+  }
   function initSearchAndViewToggle() {
     var input = document.getElementById('media-search');
     var clearBtn = document.getElementById('media-search-clear');
@@ -707,15 +742,27 @@
     }
     var viewBtn = document.getElementById('media-view-toggle');
     if (viewBtn) {
+      syncViewToggle(viewBtn);
       viewBtn.addEventListener('click', function () {
-        _viewMode = _viewMode === 'grid' ? 'list' : 'grid';
-        viewBtn.classList.toggle('active', _viewMode === 'grid');
+        _viewMode = VIEW_MODES[(VIEW_MODES.indexOf(_viewMode) + 1) % VIEW_MODES.length];
+        try { localStorage.setItem('nemo-media-view', _viewMode); } catch (x) {}
+        syncViewToggle(viewBtn);
         render();
       });
     }
   }
 
   function init() {
+    // Rows are built once and cached in the DOM, so a language switch left
+    // every badge/label in the previous locale until the next import forced a
+    // render (confirmed live: SM.t already returned the new string while the
+    // panel did not change). Same escape hatch, and same reason, as
+    // linked-media.js's own afterI18n push — see its comment there. Pushed
+    // from init(), i.e. on DOMContentLoaded, so it lands on the final
+    // window.SM rather than one a later script replaces.
+    window.SM = window.SM || {};
+    window.SM.afterI18n = window.SM.afterI18n || [];
+    if (window.SM.afterI18n.indexOf(render) < 0) window.SM.afterI18n.push(render);
     render();
     initDropZone();
     initCanvasDropTarget();
