@@ -6299,7 +6299,53 @@
       openMatteConfigMenu(e.clientX, e.clientY, li, ld);
     });
     row.appendChild(pill);
+    // "+" — stack another matte on top of this one (2026-08-30). Only once
+    // a first matte exists: an extra is a row UNDER the first, never a
+    // matte on its own, which is the same rule resolve_all_mattes enforces
+    // engine-side. Offered as a disabled-looking no-op rather than hidden
+    // would just raise the question of where it went, so it simply isn't
+    // built until there is something to add to.
+    if (on) {
+      var addBtn = document.createElement('button');
+      addBtn.className = 'motion-expr-glob motion-matte-add';
+      addBtn.textContent = '+';
+      addBtn.title = SM.t('titleMatteAddHint');
+      addBtn.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var pick = firstFreeMatteLayer(li, ld);
+        if (pick == null) { if (window.showToast) showToast(SM.t('toastNoLayerLeftForMatte')); return; }
+        pushUndoLayers(true);
+        ld.mattesMore = ld.mattesMore || [];
+        ld.mattesMore.push({ uid: ensureLayerUid(state.layers[pick]), mode: 'alpha' });
+        matteChanged();
+      });
+      row.appendChild(addBtn);
+    }
     body.appendChild(row);
+    // The 2nd..Nth mattes, one row each, same pill idiom as the first so
+    // the stack reads as one list rather than a primary plus exceptions.
+    if (on && ld.mattesMore && ld.mattesMore.length) {
+      ld.mattesMore.forEach(function (m, mi) {
+        var r2 = document.createElement('div'); r2.className = 'lrow motion-prop-row';
+        var sp = document.createElement('span');
+        sp.textContent = '+ ' + SM.t('fieldMatte'); sp.style.minWidth = '70px';
+        sp.style.opacity = '.7';
+        r2.appendChild(sp);
+        var srcI = findLayerIndexByUid(m.uid);
+        var p2 = document.createElement('div');
+        p2.className = 'lparent motion-parent-pill';
+        var l2 = document.createElement('span'); l2.className = 'mp-label';
+        l2.textContent = (srcI >= 0 ? state.layers[srcI].name : '?') + '  ·  ' + matteModeLabelSafe(m.mode);
+        p2.appendChild(l2);
+        p2.title = SM.t('titleMattePickHint');
+        p2.addEventListener('click', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          openExtraMatteMenu(e.clientX, e.clientY, li, ld, mi);
+        });
+        r2.appendChild(p2);
+        body.appendChild(r2);
+      });
+    }
     // NO matteOn row is drawn here on purpose. propsFor already lists it
     // once a matte exists, so it arrives in the Transform group below with
     // its stopwatch, ease curves, graph editor and expressions — on BOTH
@@ -6349,9 +6395,64 @@
       items.push({ label: SM.t('matteMenuRemove'), action: function () {
         pushUndoLayers(true);
         delete ld.matteMode; delete ld.matteSourceLayerUid;
+        // The extras go with it: they are rows UNDER the first matte, and
+        // resolve_all_mattes already returns nothing for them once the
+        // first is gone. Leaving them behind would keep invisible state
+        // that silently reappears the next time a matte is set.
+        delete ld.mattesMore;
         matteChanged();
       } });
     }
+    window.showContextMenu(x, y, items);
+  }
+  // First layer not already used by this layer's matte stack (and not the
+  // layer itself), so "+" lands on something meaningful instead of adding a
+  // duplicate of the matte already there.
+  function firstFreeMatteLayer(li, ld) {
+    var used = {};
+    if (ld.matteSourceLayerUid) used[ld.matteSourceLayerUid] = 1;
+    (ld.mattesMore || []).forEach(function (m) { if (m && m.uid) used[m.uid] = 1; });
+    for (var i = 0; i < state.layers.length; i++) {
+      if (i === li) continue;
+      var u = state.layers[i].layerUid;
+      if (u && used[u]) continue;
+      return i;
+    }
+    return null;
+  }
+  // Same two lists as the first matte's menu, plus Remove — kept a separate
+  // function rather than parameterising openMatteConfigMenu because the two
+  // write different places (the legacy pair vs an array entry) and folding
+  // them would mean a branch on every line of both.
+  function openExtraMatteMenu(x, y, li, ld, mi) {
+    if (!window.showContextMenu) return;
+    var entry = (ld.mattesMore || [])[mi];
+    if (!entry) return;
+    var items = [];
+    items.push({ label: SM.t('matteMenuSourceHdr'), disabled: true, action: function () {} });
+    state.layers.forEach(function (o, oi) {
+      if (oi === li) return;
+      items.push({
+        label: '  ' + (o.name || ('Layer ' + (oi + 1))) + (entry.uid === o.layerUid ? '  ✓' : ''),
+        action: function () { pushUndoLayers(true); entry.uid = ensureLayerUid(o); matteChanged(); }
+      });
+    });
+    items.push({ sep: true });
+    items.push({ label: SM.t('matteMenuModeHdr'), disabled: true, action: function () {} });
+    [['alpha', 'matteAlpha'], ['alphaInverted', 'matteAlphaInverted'],
+     ['luma', 'matteLuma'], ['lumaInverted', 'matteLumaInverted']].forEach(function (m) {
+      items.push({
+        label: '  ' + SM.t(m[1]) + (entry.mode === m[0] ? '  ✓' : ''),
+        action: function () { pushUndoLayers(true); entry.mode = m[0]; matteChanged(); }
+      });
+    });
+    items.push({ sep: true });
+    items.push({ label: SM.t('matteMenuRemove'), action: function () {
+      pushUndoLayers(true);
+      ld.mattesMore.splice(mi, 1);
+      if (!ld.mattesMore.length) delete ld.mattesMore;
+      matteChanged();
+    } });
     window.showContextMenu(x, y, items);
   }
   function matteChanged() {

@@ -2982,7 +2982,8 @@ function convertLayersToComponent(indices){
       // bridge.js) is preserved for free since `indices` stays sorted and
       // symLayers keeps that same relative order, so this is purely a
       // missing-field copy, not a re-derivation.
-      matteMode:src.matteMode,blendMode:src.blendMode};
+      matteMode:src.matteMode,blendMode:src.blendMode,
+      mattesMore:src.mattesMore?src.mattesMore.map(function(m){return{uid:m.uid,mode:m.mode};}):undefined};
   });
   state.symbols[symId]={name:'Composant',totalFrames:state.totalFrames,fps:state.fps,layers:symLayers};
   if(window.SMStoryboard)SMStoryboard.addInstanceAuto(symId);
@@ -3232,6 +3233,12 @@ function splitLayerIntoElementsCore(li,opts){
     if(ld.matteSourceLayerUid){
       nl.matteMode=ld.matteMode;
       nl.matteSourceLayerUid=ld.matteSourceLayerUid;
+      // Additional mattes (2026-08-30) travel with the first for the same
+      // reason its uid does: they are uid-referenced too, so every split-off
+      // piece can keep the whole stack and still mask against the same
+      // external sources. Deep-copied — sharing the array would make an
+      // edit on one piece silently change all N.
+      if(ld.mattesMore&&ld.mattesMore.length)nl.mattesMore=ld.mattesMore.map(function(m){return{uid:m.uid,mode:m.mode};});
     }
     if(e===n-1){
       // Legacy positional matte (no uid) — see the block above; adjacency
@@ -3443,6 +3450,8 @@ function mergeLayersIntoOne(indices,opts){
     // uid alone would silently downgrade the merged layer back to the
     // legacy adjacency behavior.
     matteSourceLayerUid:srcs[0].matteSourceLayerUid,
+    // Same "travels with matteMode" rule as the uid right above (2026-08-30).
+    mattesMore:srcs[0].mattesMore?srcs[0].mattesMore.map(function(m){return{uid:m.uid,mode:m.mode};}):undefined,
   };
   // A duplicator layer is always force-locked elsewhere (duplicateLayer,
   // applyLayerDuplicator) — inheriting the descriptor above without this

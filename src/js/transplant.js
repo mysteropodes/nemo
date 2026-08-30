@@ -281,6 +281,18 @@
       ['parentLayerUid', 'parentLayerUidB', 'matteSourceLayerUid'].forEach(function (f) {
         nl[f] = clone[f] && uidMap[clone[f]] ? uidMap[clone[f]] : null;
       });
+      // Additional mattes (2026-08-30) carry uids too, so they need the
+      // same remap as matteSourceLayerUid right above — a transplanted
+      // layer keeping a uid from the SOURCE project would mask against
+      // whatever happens to answer to it here, or nothing at all. Entries
+      // whose source didn't come along are dropped rather than nulled: the
+      // array holds only real mattes.
+      if (clone.mattesMore && clone.mattesMore.length) {
+        var mm = clone.mattesMore
+          .filter(function (m) { return m && m.uid && uidMap[m.uid]; })
+          .map(function (m) { return { uid: uidMap[m.uid], mode: m.mode }; });
+        if (mm.length) nl.mattesMore = mm; else delete nl.mattesMore;
+      }
       if (clone.timeLink && clone.timeLink.uid) {
         nl.timeLink = uidMap[clone.timeLink.uid] ? Object.assign({}, clone.timeLink, { uid: uidMap[clone.timeLink.uid] }) : null;
       }

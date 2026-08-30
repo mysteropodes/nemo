@@ -1243,6 +1243,7 @@ window.SM={
     // consumers at once by design).
     if(src.matteMode)state.layers[ni].matteMode=src.matteMode;
     if(src.matteSourceLayerUid)state.layers[ni].matteSourceLayerUid=src.matteSourceLayerUid;
+    if(src.mattesMore&&src.mattesMore.length)state.layers[ni].mattesMore=src.mattesMore.map(function(m){return{uid:m.uid,mode:m.mode};});
     // elementMotion is keyed by strokeId, and duplicateLayer's frames clone
     // above (JSON.stringify) preserves each stroke's strokeId unchanged —
     // so the duplicate's strokes carry the SAME ids the original's element
@@ -1962,7 +1963,7 @@ window.SM={
       // level setting like canvasW/fps above (not per-layer, not per-
       // symbol/montage snapshot — a linked-vs-embedded choice is global).
       mediaMode:state.mediaMode||'embedded',
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,isWidgetLayer:l.isWidgetLayer,widget:l.widget,effects:l.effects,footage:l.footage,
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,mattesMore:l.mattesMore,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,isWidgetLayer:l.isWidgetLayer,widget:l.widget,effects:l.effects,footage:l.footage,
         // Layer parenting (2026-07-25). BOTH of these were missing from this
         // list, so every parent link was silently dropped on save — a rig
         // survived the session and nothing more. `uid` is the stable identity
@@ -2240,6 +2241,14 @@ window.SM={
       if(typeof ld.blendMode==='string')state.layers[idx].blendMode=ld.blendMode;
       if(typeof ld.matteMode==='string')state.layers[idx].matteMode=ld.matteMode;
       if(typeof ld.matteSourceLayerUid==='string')state.layers[idx].matteSourceLayerUid=ld.matteSourceLayerUid;
+      // Additional mattes (2026-08-30). Guarded on SHAPE, not just presence,
+      // the same way widget/blendMode/matteMode are: a corrupted nemo-auto
+      // carrying junk here would otherwise reach engine-bridge's resolver.
+      if(Array.isArray(ld.mattesMore)){
+        var _mm=ld.mattesMore.filter(function(m){return m&&typeof m.uid==='string'&&typeof m.mode==='string';})
+                             .map(function(m){return{uid:m.uid,mode:m.mode};});
+        if(_mm.length)state.layers[idx].mattesMore=_mm;
+      }
       if(ld.expressions)state.layers[idx].expressions=ld.expressions;
       // Expression controls (2026-08-30) — restored BEFORE anything can
       // render a row, and re-registered here rather than left to propsFor
@@ -5459,7 +5468,7 @@ window.matteSourceIndicesInUse=matteSourceIndicesInUse;
 function buildMatteMenuItems(li,ld,onChanged){
   var items=[{label:'Matte : Aucune (retirer)',disabled:!ld.matteMode,action:function(){
     pushUndo();
-    delete ld.matteMode;delete ld.matteSourceLayerUid;
+    delete ld.matteMode;delete ld.matteSourceLayerUid;delete ld.mattesMore;
     onChanged();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
   }}];

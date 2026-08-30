@@ -243,6 +243,15 @@ pub(crate) struct LayerIn {
     // see resolve_matte_source, the single reader of both conventions.
     #[serde(default)]
     pub(crate) matte_source_index: Option<usize>,
+    // Additional mattes beyond the first (2026-08-30, "la possibilité
+    // d'ajouter d'autre calque avec un bouton plus"). The FIRST matte stays
+    // in matte_mode/matte_source_index above, untouched — every existing
+    // scene, save file and JS reader keeps working with no migration, and a
+    // one-matte layer serializes byte-identically to before. These are the
+    // 2nd..Nth, applied in order, each one narrowing what the previous left.
+    // Absent for every scene that doesn't use the feature.
+    #[serde(default)]
+    pub(crate) mattes_more: Option<Vec<MatteIn>>,
     // Adjustment/effect layer (2026-07, Motion) — an AE-style layer with no
     // painted content of its own whose EFFECTS STACK (below) applies to
     // EVERYTHING BELOW it in the layer stack instead of just itself.
@@ -888,6 +897,13 @@ pub struct VelloEngine {
     matte_source_view: wgpu::TextureView,
     matte_result_tex: wgpu::Texture,
     matte_result_view: wgpu::TextureView,
+    // Second matte target, for chaining more than one matte on a layer
+    // (2026-08-30). A pass cannot read and write the same texture, so N
+    // mattes ping-pong between these two exactly like blend_accum_a/b.
+    // Allocated with the SAME create_matte_result_texture constructor as
+    // every other full-frame scratch target in this struct.
+    matte_result_b_tex: wgpu::Texture,
+    matte_result_b_view: wgpu::TextureView,
     // ---- Vector masks (2026-08, AE-style "Mask" — see composite_scene's
     // mask handling) — NOT a new pipeline: masks reuse matte_pipeline
     // itself (the "multiply alpha" math a Subtract/Intersect combine needs
@@ -1356,6 +1372,57 @@ fn matte_mode_of(s: Option<&str>) -> Option<(u32, bool)> {
 /// rendering unchanged. Out-of-range or self-referencing indices return None
 /// — the matte degrades to a no-op for the frame instead of panicking or
 /// silently masking against the wrong layer.
+// One extra matte on top of the layer's first. Same two fields the first
+// matte occupies on LayerIn, so the JS wire shape stays obvious: a mode
+// string and an already-resolved layer index.
+#[derive(serde::Deserialize, serde::Serialize, Clone, Default, Debug)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct MatteIn {
+    #[serde(default)]
+    pub(crate) mode: Option<String>,
+    // Always uid-resolved JS-side, like matte_source_index. Unlike the
+    // first matte there is NO legacy "layer directly above" fallback here:
+    // this field only exists in scenes new enough to have been written by
+    // the multi-matte UI, which always resolves an explicit source.
+    #[serde(default)]
+    pub(crate) source_index: Option<usize>,
+}
+
+// Every matte on layer `i`, first one included, in application order.
+// The SINGLE place that answers "what masks this layer and with what" —
+// both the consumed-source precompute and the paint-time loop go through
+// it, so they cannot disagree about which layers get eaten (they used to
+// share resolve_matte_source for exactly that reason, and this keeps that
+// property while there is now more than one answer).
+// A matte whose source doesn't resolve is DROPPED rather than defaulted:
+// masking against the wrong layer is worse than not masking.
+fn resolve_all_mattes(layers: &[LayerIn], i: usize) -> Vec<(usize, u32, bool)> {
+    let mut out = Vec::new();
+    if let (Some((mode, invert)), Some(s)) =
+        (matte_mode_of(layers[i].matte_mode.as_deref()), resolve_matte_source(layers, i))
+    {
+        out.push((s, mode, invert));
+    }
+    // The extras only mean anything once the first matte is real: they are
+    // the "+" rows under it in the UI, never a matte on their own.
+    if out.is_empty() {
+        return out;
+    }
+    let n = layers.len();
+    if let Some(extra) = layers[i].mattes_more.as_ref() {
+        for m in extra {
+            let s = match m.source_index {
+                Some(s) if s < n && s != i => s,
+                _ => continue,
+            };
+            if let Some((mode, invert)) = matte_mode_of(m.mode.as_deref()) {
+                out.push((s, mode, invert));
+            }
+        }
+    }
+    out
+}
+
 fn resolve_matte_source(layers: &[LayerIn], i: usize) -> Option<usize> {
     if matte_mode_of(layers[i].matte_mode.as_deref()).is_none() {
         return None;
@@ -2525,6 +2592,7 @@ pub async fn create_engine(
     let (matte_pipeline, matte_bind_group_layout, matte_sampler, matte_uniform_buf) = create_matte_pipeline(&device);
     let (matte_source_tex, matte_source_view) = create_blend_layer_texture(&device, width, height);
     let (matte_result_tex, matte_result_view) = create_matte_result_texture(&device, width, height);
+    let (matte_result_b_tex, matte_result_b_view) = create_matte_result_texture(&device, width, height);
     let (mask_scratch_tex, mask_scratch_view) = create_blend_layer_texture(&device, width, height);
     let (mask_accum_a_tex, mask_accum_a_view) = create_matte_result_texture(&device, width, height);
     let (mask_accum_b_tex, mask_accum_b_view) = create_matte_result_texture(&device, width, height);
@@ -2586,6 +2654,8 @@ pub async fn create_engine(
         matte_source_view,
         matte_result_tex,
         matte_result_view,
+        matte_result_b_tex,
+        matte_result_b_view,
         mask_scratch_tex,
         mask_scratch_view,
         mask_accum_a_tex,
@@ -3136,7 +3206,7 @@ impl VelloEngine {
             // resolve_matte_source is the single source of truth for which
             // layer gets consumed — uid-resolved index or legacy i+1, same
             // answer the paint-time lookup below will compute.
-            if let Some(s) = resolve_matte_source(&scene_in.layers, i) {
+            for (s, _, _) in resolve_all_mattes(&scene_in.layers, i) {
                 is_matte_source[s] = true;
             }
         }
@@ -3394,14 +3464,27 @@ impl VelloEngine {
             // — a matte whose source doesn't resolve (dangling uid, index
             // out of range) degrades to "no matte" instead of masking
             // against the wrong layer.
-            let matte_src = resolve_matte_source(&scene_in.layers, i);
-            let mut source_view: &wgpu::TextureView = if let (Some((mode, invert)), Some(ms)) = (matte_mode_of(layer.matte_mode.as_deref()), matte_src) {
+            // Every matte on this layer, in order, each narrowing what the
+            // previous one left (2026-08-30 multi-matte). Resolved through
+            // the SAME helper as the consumed-source precompute above, so
+            // the two can never disagree about which layers get eaten.
+            //
+            // Ping-pong: a pass cannot read and write one texture, so the
+            // Nth matte reads whatever the (N-1)th wrote and writes to the
+            // other target. With exactly ONE matte this runs the identical
+            // single pass it always did, into matte_result_view — the
+            // common case is unchanged down to the texture it lands in.
+            let mattes = resolve_all_mattes(&scene_in.layers, i);
+            let mut source_view: &wgpu::TextureView = masked_view;
+            let mut into_b = false;
+            for (ms, mode, invert) in mattes {
                 let mut matte_scene = Scene::new();
                 self.push_atlas_keepalive(&mut matte_scene);
                 paint_layer_items(&mut matte_scene, &scene_in.layers[ms].items, view_tf, &self.images, &self.paths);
                 self.renderer
                     .render_to_texture(&self.device, &self.queue, &matte_scene, &self.matte_source_view, &layer_params)
                     .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+                let dst: &wgpu::TextureView = if into_b { &self.matte_result_b_view } else { &self.matte_result_view };
                 matte_pass(
                     &self.device,
                     &self.queue,
@@ -3409,16 +3492,15 @@ impl VelloEngine {
                     &self.matte_bind_group_layout,
                     &self.matte_sampler,
                     &self.matte_uniform_buf,
-                    masked_view,
+                    source_view,
                     &self.matte_source_view,
                     mode,
                     invert,
-                    &self.matte_result_view,
+                    dst,
                 );
-                &self.matte_result_view
-            } else {
-                masked_view
-            };
+                source_view = dst;
+                into_b = !into_b;
+            }
             // Effects stack (2026-07 rewrite) — runs on THIS layer's own
             // isolated alpha (real transparency), AFTER matte (so a matted
             // layer's edge softens/shadows too, not just its raw content)
@@ -3730,6 +3812,9 @@ impl VelloEngine {
         let (matte_result_tex, matte_result_view) = create_matte_result_texture(&self.device, width, height);
         self.matte_result_tex = matte_result_tex;
         self.matte_result_view = matte_result_view;
+        let (matte_result_b_tex, matte_result_b_view) = create_matte_result_texture(&self.device, width, height);
+        self.matte_result_b_tex = matte_result_b_tex;
+        self.matte_result_b_view = matte_result_b_view;
         let (mask_scratch_tex, mask_scratch_view) = create_blend_layer_texture(&self.device, width, height);
         self.mask_scratch_tex = mask_scratch_tex;
         self.mask_scratch_view = mask_scratch_view;
