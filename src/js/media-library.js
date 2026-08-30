@@ -503,7 +503,12 @@
       // this makes it visible without having to click first).
       var srcLayer = resolveSrcLayer(m);
       if (m.layerName || m.layerUid) {
-        if (!srcLayer) _orphanCount++;
+        // No _orphanCount++ here. render()'s own pass over the UNFILTERED
+        // catalog is the one counting site; this one used to increment too,
+        // so every orphan was counted twice (and only while it was visible,
+        // in list mode — buildTile has no equivalent line, so switching to
+        // grid changed the number). Found by driving it: one orphaned entry
+        // reported "2".
         var owner = document.createElement('span'); owner.className = 'media-row-owner' + (srcLayer ? '' : ' orphan');
         if (srcLayer) { var dot = document.createElement('span'); dot.className = 'media-row-owner-dot'; dot.style.background = srcLayer.color || 'var(--text-dim)'; owner.appendChild(dot); }
         var ownerLbl = document.createElement('span'); ownerLbl.textContent = srcLayer ? srcLayer.name : SM.t('mediaOrphanBadge');
@@ -666,10 +671,21 @@
     // underlying layer, which has its own trash button already): shows/
     // hides based on whether there's anything TO clean, and labels the
     // count so it isn't a mystery button.
+    // Now a badge in the status bar (feedback #160): it states the PROBLEM
+    // ("2 manquants") instead of the remedy, appears only when there is one,
+    // and clicking it still runs the same cleanup. Hardcoded French label
+    // fixed on the way through — it read "Nettoyer (0)" in every locale.
     var cleanupBtn = document.getElementById('btn-media-cleanup');
     if (cleanupBtn) {
       cleanupBtn.style.display = _orphanCount ? '' : 'none';
-      cleanupBtn.textContent = 'Nettoyer (' + _orphanCount + ')';
+      cleanupBtn.textContent = _orphanCount + ' ' + t(_orphanCount > 1 ? 'mediaMissingCountOther' : 'mediaMissingCountOne', 'manquant');
+      cleanupBtn.title = t('mediaMissingBadgeTitle', 'Entrées dont la source a disparu — cliquer pour les retirer de la bibliothèque');
+    }
+    // Left side of the status bar: what the panel holds.
+    var countEl = document.getElementById('media-count');
+    if (countEl) {
+      var n = (state.mediaLibrary || []).length;
+      countEl.textContent = n ? n + ' ' + t(n > 1 ? 'mediaItemsOther' : 'mediaItemsOne', 'élément') : '';
     }
   }
   // Catalog-only cleanup: removes entries whose source layer no longer
@@ -796,6 +812,25 @@
     var next = VIEW_MODES[(VIEW_MODES.indexOf(_viewMode) + 1) % VIEW_MODES.length];
     btn.title = t('mediaViewNext', 'Affichage') + ' \u2192 ' + t('mediaView_' + next, next);
   }
+  // Settings gear (feedback #160) — closes on outside click and on Escape,
+  // the two ways anyone expects a popover to go away. Bound once at init;
+  // the popover's own contents are wired by linked-media.js, by id, and are
+  // untouched by being moved in here.
+  function initSettingsPopover() {
+    var btn = document.getElementById('media-settings-btn');
+    var pop = document.getElementById('media-settings-pop');
+    if (!btn || !pop) return;
+    function close() { pop.style.display = 'none'; btn.classList.remove('open'); }
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var opening = pop.style.display === 'none';
+      pop.style.display = opening ? 'block' : 'none';
+      btn.classList.toggle('open', opening);
+    });
+    pop.addEventListener('click', function (e) { e.stopPropagation(); });
+    document.addEventListener('click', function () { if (pop.style.display !== 'none') close(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && pop.style.display !== 'none') close(); });
+  }
   function initSearchAndViewToggle() {
     var input = document.getElementById('media-search');
     var clearBtn = document.getElementById('media-search-clear');
@@ -843,6 +878,7 @@
     initCompositionDropTargets();
     initExpandToggle();
     initSearchAndViewToggle();
+    initSettingsPopover();
     var bImg = document.getElementById('btn-media-import-img'); if (bImg) bImg.addEventListener('click', function () { if (window.SM) SM.importImages(); });
     var bVid = document.getElementById('btn-media-import-video'); if (bVid) bVid.addEventListener('click', function () { if (window.SM) SM.importVideo(); });
     var bClean = document.getElementById('btn-media-cleanup'); if (bClean) bClean.addEventListener('click', cleanupOrphans);

@@ -1155,60 +1155,43 @@
           <button class="settings-tab" id="assets-tab-presets" data-i18n="assetsTabPresets">Presets</button>
         </div>
         <div id="assets-view-media" class="asset-view">
-          <!-- Media mode (2026-08-29, linked-media.js; MOVED here from the
-               Document panel 2026-08-30, feedback #156) — ONE project-wide
-               setting (Cyril: "un seul réglage", not per-image), default
-               "Intégrés" (unchanged base64-in-JSON behavior). Governs NEW
-               imports only; flipping it never retroactively touches already-
-               embedded media. The tooltip carries the honest tradeoff (a
-               linked project is not portable, and on web the browser may
-               re-ask for permission each session) rather than hiding it.
-               Placed at the TOP of the Média tab, directly above the two
-               import buttons it governs, rather than above the Média/Presets
-               tab bar: it decides what those buttons do, and hoisting it
-               above the tabs would also show it while browsing brush
-               Presets, which it has nothing to do with. Ids unchanged — the
-               wiring in linked-media.js is entirely by id. -->
-          <div class="pr dims-row" style="gap:4px" id="media-mode-row">
-            <span class="pl" data-i18n="hdrMedia" data-i18n-title="mediaModeTip" title="Intégrés : les images sont copiées dans le fichier projet (portable, plus lourd). Liés : le projet référence les fichiers d'origine (plus léger, mais casse si vous déplacez/partagez le projet sans les fichiers — et sur le web, le navigateur peut redemander l'autorisation à chaque session).">Médias</span>
-            <button class="pbtn ac" id="btn-media-mode-embedded" type="button" data-mode="embedded" data-i18n="mediaModeEmbedded" style="flex:1">Intégrés</button>
-            <button class="pbtn" id="btn-media-mode-linked" type="button" data-mode="linked" data-i18n="mediaModeLinked" style="flex:1">Liés</button>
-          </div>
-          <!-- Bulk convert (2026-08-29, linked-media.js follow-up) — closes the
-               gap the toggle above deliberately left open: flipping "Médias"
-               only ever governs NEW imports. This is an EXPLICIT action the
-               user runs on purpose (never fired automatically by the toggle
-               click above — a bulk filesystem write firing invisibly off a
-               checkbox would be a bad surprise), converting every image
-               ALREADY in the project to match whichever mode is selected
-               above. Label/enabled-state are dynamic (see updateConvertButtonUI
-               in linked-media.js — mirrors syncUI's own afterI18n repaint). -->
-          <div class="pr" id="media-convert-row" style="margin-top:2px;margin-bottom:4px">
-            <button class="pbtn" id="btn-convert-media" type="button" style="width:100%">Convertir les médias…</button>
-          </div>
-          <!-- Import: icon buttons, not text (feedback #158). The drop zone
-               directly below already spells out "…or click Import", so a full
-               row of two wide text buttons was saying the same thing twice in
-               a panel that is short on vertical space. NOTE: these carry
-               data-i18n-TITLE, never data-i18n — the latter writes textContent
-               and would wipe the inline SVG on the first applyI18n pass. -->
-          <div class="pr media-import-row" style="gap:4px">
-            <button class="media-icon-btn" id="btn-media-import-img" type="button" data-i18n-title="mediaImportImg" title="Image(s)…" aria-label="Image(s)">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-            </button>
-            <button class="media-icon-btn" id="btn-media-import-video" type="button" data-i18n-title="mediaImportVideo" title="Vidéo…" aria-label="Video">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="14" height="16" rx="2"/><path d="M22 7l-6 4 6 4z"/></svg>
-            </button>
-          </div>
+          <!-- Panel simplified (2026-08-30, feedback #160: "tout ceci pourrait
+               être des icons... il faut un peu réduire le nombre d'info").
+               What used to be three stacked full-width rows at the top — the
+               Embedded/Linked mode, the bulk Convert action, and the two
+               import buttons — is gone from the body. Mode and Convert are
+               settings, so they moved behind the gear next to the search
+               (#media-settings-pop below); import moved into the status bar
+               at the bottom with the other actions. Every id is unchanged:
+               linked-media.js and media-library.js wire entirely by id, and
+               #156 (these controls belong in the Média tab, not the Document
+               panel) still holds — they are in this tab, just folded away. -->
           <div id="media-drop" class="media-drop" data-i18n="mediaDropHint">Glisser des images/vidéos ici, ou cliquer Importer…</div>
-          <div class="media-search-row">
-            <svg class="media-search-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="media-search" class="media-search-input" data-i18n-placeholder="mediaSearchPlaceholder" placeholder="Rechercher un média…" spellcheck="false">
-            <span class="media-search-clear" id="media-search-clear" title="Effacer">×</span>
+          <div class="media-search-line">
+            <div class="media-search-row">
+              <svg class="media-search-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="media-search" class="media-search-input" data-i18n-placeholder="mediaSearchPlaceholder" placeholder="Rechercher un média…" spellcheck="false">
+              <span class="media-search-clear" id="media-search-clear" title="Effacer">×</span>
+            </div>
+            <!-- Settings gear: everything that configures the panel rather than
+                 acting on it. Opened/closed by media-library.js. -->
+            <button type="button" class="media-gear" id="media-settings-btn" data-i18n-title="mediaSettingsTitle" title="Réglages des médias">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.36.4.66.74.86.3.18.65.28 1 .28H21a2 2 0 1 1 0 4h-.09c-.7 0-1.32.42-1.6 1.06Z"/></svg>
+            </button>
+            <div id="media-settings-pop" class="media-settings-pop" style="display:none">
+              <div class="pr dims-row" style="gap:4px" id="media-mode-row">
+                <span class="pl" data-i18n="hdrMedia" data-i18n-title="mediaModeTip" title="Intégrés : les images sont copiées dans le fichier projet (portable, plus lourd). Liés : le projet référence les fichiers d'origine (plus léger, mais casse si vous déplacez/partagez le projet sans les fichiers — et sur le web, le navigateur peut redemander l'autorisation à chaque session).">Médias</span>
+                <button class="pbtn ac" id="btn-media-mode-embedded" type="button" data-mode="embedded" data-i18n="mediaModeEmbedded" style="flex:1">Intégrés</button>
+                <button class="pbtn" id="btn-media-mode-linked" type="button" data-mode="linked" data-i18n="mediaModeLinked" style="flex:1">Liés</button>
+              </div>
+              <div class="pr" id="media-convert-row" style="margin-top:4px">
+                <button class="pbtn" id="btn-convert-media" type="button" style="width:100%">Convertir les médias…</button>
+              </div>
+            </div>
           </div>
           <div id="media-filter-chips" class="media-filter-chips"></div>
           <div class="pr media-panel-hdr" style="gap:4px">
-            <button class="pbtn" id="btn-media-cleanup" style="flex:1;display:none;font-size:9px">Nettoyer (0)</button>
+            <span class="media-count" id="media-count"></span>
             <!-- Three densities, not two (feedback #158: "il pourrait y avoir
                  la possibilité d'avoir une liste plus petite"). Cycles
                  list -> compact -> grid; the icon and title are rewritten by
@@ -1222,8 +1205,23 @@
             </div>
           </div>
           <div id="media-grid" class="media-grid asset-tree"></div>
-          <div class="pr" style="gap:4px;border-top:1px solid var(--border);padding-top:6px;margin-top:2px">
-            <button class="pbtn" id="btn-transplant-open" style="flex:1" data-i18n-title="transplantBtnTitle" title="Importer des calques et médias depuis un autre fichier projet Nemo, sans l'ouvrir en entier" data-i18n="transplantBtn">Transplanter depuis un projet…</button>
+          <!-- Status bar: what the panel HOLDS on the left, what you can DO
+               to it on the right — the shape a file browser's footer has.
+               Replaces the old "Nettoyer (N)" button (now the missing badge,
+               which both reports and cleans) and the full-width Transplant
+               row (now an icon beside the two imports). -->
+          <div class="media-statusbar" id="media-statusbar">
+            <button class="media-missing-badge" id="btn-media-cleanup" type="button" style="display:none"></button>
+            <span class="media-statusbar-spacer"></span>
+            <button class="media-icon-btn" id="btn-media-import-img" type="button" data-i18n-title="mediaImportImg" title="Image(s)…" aria-label="Image(s)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            </button>
+            <button class="media-icon-btn" id="btn-media-import-video" type="button" data-i18n-title="mediaImportVideo" title="Vidéo…" aria-label="Video">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="14" height="16" rx="2"/><path d="M22 7l-6 4 6 4z"/></svg>
+            </button>
+            <button class="media-icon-btn" id="btn-transplant-open" type="button" data-i18n-title="transplantBtnTitle" title="Importer des calques et médias depuis un autre fichier projet Nemo, sans l'ouvrir en entier" aria-label="Transplant">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 20h16"/></svg>
+            </button>
           </div>
         </div>
         <div id="assets-view-presets" class="asset-view" style="display:none">
