@@ -2617,35 +2617,35 @@ function getToolHelp(tool){
     // Ctrl was already held. Alt+glisser also had two DIFFERENT meanings
     // depending on where the drag starts (pivot vs empty canvas) collapsed
     // into one label that only documented the first — split into two rows.
-    select:{desc:tt('thSelectDesc'),sc:[['V',tt('thTool')],['Shift+clic',tt('thAdd')],['Alt+glisser (pivot)',tt('thMoveAnchor')],['Alt+glisser (zone vide)',tt('thLassoEmpty')],['Ctrl+glisser un coin',tt('thDistort')],['Suppr',tt('thErase')],['Shift+X',tt('thFlipH')],['Shift+Alt+X',tt('thFlipV')]]},
-    subselect:{desc:tt('thSubselectDesc'),sc:[['A',tt('thTool')],['Alt+clic',tt('thBreakTangent')]]},
-    fsselect:{desc:tt('thFsselectDesc'),sc:[['Shift+clic',tt('thAdd')]]},
-    draw:{desc:tt('thDrawDesc'),sc:[['B',tt('thTool')],['Alt+glisser',tt('thSize')],['[ ]',tt('thSizePlusMinus')]]},
+    select:{desc:tt('thSelectDesc'),sc:[['V',tt('thTool')],[tt('scShiftClick'),tt('thAdd')],[tt('scAltDragPivot'),tt('thMoveAnchor')],[tt('scAltDragEmpty'),tt('thLassoEmpty')],[tt('scCtrlDragCorner'),tt('thDistort')],[tt('scDelete'),tt('thErase')],['Shift+X',tt('thFlipH')],['Shift+Alt+X',tt('thFlipV')]]},
+    subselect:{desc:tt('thSubselectDesc'),sc:[['A',tt('thTool')],[tt('scAltClick'),tt('thBreakTangent')]]},
+    fsselect:{desc:tt('thFsselectDesc'),sc:[[tt('scShiftClick'),tt('thAdd')]]},
+    draw:{desc:tt('thDrawDesc'),sc:[['B',tt('thTool')],[tt('scAltDrag'),tt('thSize')],['[ ]',tt('thSizePlusMinus')]]},
     // Shift (angle 45°) and Alt (break the handle being dragged into a
     // corner) were undocumented for Pen — the ONLY place a user would
     // learn them was Subselect's own Alt+clic row above, a different tool.
-    pen:{desc:tt('thPenDesc'),sc:[['P',tt('thTool')],['Clic',tt('thAnchor')],['Shift',tt('thAngle45')],['Alt+glisser une poignée',tt('thBreakTangent')],['Échap',tt('thFinish')]]},
+    pen:{desc:tt('thPenDesc'),sc:[['P',tt('thTool')],[tt('scClick'),tt('thAnchor')],['Shift',tt('thAngle45')],[tt('scAltDragHandle'),tt('thBreakTangent')],[tt('scEscape'),tt('thFinish')]]},
     line:{desc:tt('thLineDesc'),sc:[['Shift',tt('thAngle45')]]},
     rect:{desc:tt('thRectDesc'),sc:[['Shift',tt('thSquare')]]},
     ellipse:{desc:tt('thEllipseDesc'),sc:[['Shift',tt('thCircle')]]},
-    fill:{desc:tt('thFillDesc'),sc:[['Alt+glisser',tt('thClosingStroke')],['Shift+clic',tt('thRemoveFill')],['Échap',tt('thCancelStroke')]]},
+    fill:{desc:tt('thFillDesc'),sc:[[tt('scAltDrag'),tt('thClosingStroke')],[tt('scShiftClick'),tt('thRemoveFill')],[tt('scEscape'),tt('thCancelStroke')]]},
     fillbrush:{desc:tt('thFillbrushDesc'),sc:[]},
     // Alt+glisser live-resizes the brush here exactly like it does on Draw
     // (above) — was undocumented on this sibling tool specifically, even
     // though the gesture and the code path are the same.
-    eraser:{desc:tt('thEraserDesc'),sc:[['E',tt('thTool')],['Alt+glisser',tt('thSize')],['[ ]',tt('thSizePlusMinus')]]},
+    eraser:{desc:tt('thEraserDesc'),sc:[['E',tt('thTool')],[tt('scAltDrag'),tt('thSize')],['[ ]',tt('thSizePlusMinus')]]},
     eyedropper:{desc:tt('thEyedropperDesc'),sc:[['I',tt('thTool')]]},
-    hand:{desc:tt('thHandDesc'),sc:[['Espace',tt('thHoldTemp')],['Espace',tt('thTapPlay')]]},
+    hand:{desc:tt('thHandDesc'),sc:[[tt('scSpace'),tt('thHoldTemp')],[tt('scSpace'),tt('thTapPlay')]]},
     zoom:{desc:tt('thZoomDesc'),sc:[['Z',tt('thTool')]]},
-    rotate:{desc:tt('thRotateDesc'),sc:[['Alt+glisser',tt('thOnOtherTool')]]},
-    camera:{desc:tt('thCameraDesc'),sc:[['Clic-droit',tt('thEasingCurve')]]},
+    rotate:{desc:tt('thRotateDesc'),sc:[[tt('scAltDrag'),tt('thOnOtherTool')]]},
+    camera:{desc:tt('thCameraDesc'),sc:[[tt('scRightClick'),tt('thEasingCurve')]]},
     comment:{desc:tt('thCommentDesc'),sc:[]},
     text:{desc:tt('thTextDesc'),sc:[]},
     perspective:{desc:tt('thPerspectiveDesc'),sc:[]},
     // Rig's Tracer step is Pen-style bone drawing (rig-bridge.js) — same
     // Shift/Alt semantics as Pen, undocumented here (only Pen's own row
     // had them, a different tool).
-    rig:{desc:tt('thRigDesc'),sc:[['S',tt('thTool')],['Clic',tt('thAnchor')],['Shift',tt('thAngle45')],['Clic près d’une pointe',tt('thRigBranch')],['Alt+clic près d’une pointe',tt('thRigExtend')],['Alt+glisser une poignée',tt('thBreakTangent')],['Glisser une ancre ou une poignée existante',tt('thRigPose')],['Alt+glisser le bout d’une chaîne de 2 os',tt('thRigIK')],['Double-clic',tt('thFinish')]]},
+    rig:{desc:tt('thRigDesc'),sc:[['S',tt('thTool')],[tt('scClick'),tt('thAnchor')],['Shift',tt('thAngle45')],[tt('scClickTip'),tt('thRigBranch')],[tt('scAltClickTip'),tt('thRigExtend')],[tt('scAltDragHandle'),tt('thBreakTangent')],[tt('scDragExisting'),tt('thRigPose')],[tt('scAltDragChain'),tt('thRigIK')],[tt('scDoubleClick'),tt('thFinish')]]},
   };
   return TOOL_HELP[tool];
 }
@@ -2665,20 +2665,20 @@ function updateStatusBarHelp(){
   // 1. A canvas element is selected (select/subselect) — most specific.
   if((state.tool==='select'||state.tool==='subselect')&&typeof selectedPaths!=='undefined'&&selectedPaths.length>0){
     var n=selectedPaths.length;
-    statusbarHelpRender(n+' '+tt(n>1?'thElementsSelected':'thElementSelected')+' —',[['Suppr',tt('thErase')],['⌘/Ctrl+D',tt('thDuplicate')],['↑↓←→',tt('thMove')],['Échap',tt('thDeselect')]]);
+    statusbarHelpRender(n+' '+tt(n>1?'thElementsSelected':'thElementSelected')+' —',[[tt('scDelete'),tt('thErase')],['⌘/Ctrl+D',tt('thDuplicate')],['↑↓←→',tt('thMove')],[tt('scEscape'),tt('thDeselect')]]);
     return;
   }
   // 2. fsselect has an active fill/stroke pick.
   if(state.tool==='fsselect'&&typeof _fsSel!=='undefined'&&_fsSel.length){
     var fsPrimSB=fsPrimarySel();
     var fsCountSB=_fsSel.length>1?' ('+_fsSel.length+')':'';
-    statusbarHelpRender(tt(fsPrimSB.kind==='stroke'?'hdrStroke':'hdrFill')+fsCountSB+' '+tt('thSelected')+' —',[['Suppr',tt('thErase')],['Échap',tt('thDeselect')]]);
+    statusbarHelpRender(tt(fsPrimSB.kind==='stroke'?'hdrStroke':'hdrFill')+fsCountSB+' '+tt('thSelected')+' —',[[tt('scDelete'),tt('thErase')],[tt('scEscape'),tt('thDeselect')]]);
     return;
   }
   // 3. A timeline keyframe cell (or span) is selected.
   if(typeof _sel!=='undefined'&&_sel.frames&&_sel.frames.length>0){
     var kn=_sel.frames.length;
-    statusbarHelpRender(kn+' '+tt(kn>1?'thKeyframesSelected':'thKeyframeSelected')+' —',[['F6',tt('scKey')],['F7',tt('scBlank')],['T',tt('scTween')],['D',tt('scDupli')],['F',tt('scFlip')],['X',tt('scMirror')],['Suppr',tt('thErase')]]);
+    statusbarHelpRender(kn+' '+tt(kn>1?'thKeyframesSelected':'thKeyframeSelected')+' —',[['F6',tt('scKey')],['F7',tt('scBlank')],['T',tt('scTween')],['D',tt('scDupli')],['F',tt('scFlip')],['X',tt('scMirror')],[tt('scDelete'),tt('thErase')]]);
     return;
   }
   // 4. The active tool's own help.
