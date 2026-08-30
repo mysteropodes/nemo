@@ -2326,6 +2326,35 @@
       var mFinal = layers.indexOf(userLayerEntries[mSrcIdx]);
       if (mFinal >= 0) mEntry.matteSourceIndex = mFinal;
     }
+    // Additional mattes (2026-08-30) — resolved in the SAME final pass and
+    // by the same rule as the first one above, because they have the same
+    // requirement: an index into the FINAL wire array. Kept as a separate
+    // loop rather than folded into that one so the single-matte path stays
+    // exactly the code it was; a layer with no extras never enters here.
+    // An entry whose uid is dangling or self-referencing is DROPPED, not
+    // emitted with a missing index — engine.rs's resolve_all_mattes gives
+    // the first matte a legacy i+1 fallback but deliberately gives the
+    // extras none, so a half-resolved entry there would mask against
+    // whatever layer happened to sit at index 0.
+    for (var xi = 0; xi < state.layers.length; xi++) {
+      var xEntry = userLayerEntries[xi];
+      if (!xEntry || !xEntry.matteMode) continue;
+      var more = state.layers[xi].mattesMore;
+      if (!more || !more.length) continue;
+      var wire = [];
+      for (var xk = 0; xk < more.length; xk++) {
+        var m = more[xk];
+        if (!m || !m.uid || !m.mode || m.mode === 'none') continue;
+        var xSrc = -1;
+        for (var xj = 0; xj < state.layers.length; xj++) {
+          if (xj !== xi && state.layers[xj].layerUid === m.uid) { xSrc = xj; break; }
+        }
+        if (xSrc < 0 || !userLayerEntries[xSrc]) continue;
+        var xFinal = layers.indexOf(userLayerEntries[xSrc]);
+        if (xFinal >= 0) wire.push({ mode: m.mode, sourceIndex: xFinal });
+      }
+      if (wire.length) xEntry.mattesMore = wire;
+    }
     // Folder layer child resolution (2026-08) — same "runs LAST, resolves
     // via object identity" contract as the matte pass right above, and for
     // the identical reason: folderChildIndices must be positions in the
