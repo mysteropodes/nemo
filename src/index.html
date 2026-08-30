@@ -35,6 +35,16 @@
       </span>
       Nemo
     </div>
+    <!-- Alpha warning (2026-08-30). Sits ABOVE the cards on purpose: it has
+         to be read before the choice it qualifies, not after. Deliberately
+         NOT dismissible and NOT a modal — it lives only on the start screen,
+         so it is seen at launch and never gets in the way while working,
+         which is what makes "always shown" acceptable here. Wording tracks
+         README's own Status section; keep the two in step. -->
+    <div id="start-alpha-note">
+      <span class="start-alpha-badge" data-i18n="startAlphaBadge">Alpha</span>
+      <span class="start-alpha-text" data-i18n="startAlphaBody">Nemo is under daily development and not stable yet. Expect bugs and occasional breaking changes to the project format — please keep backups of anything important.</span>
+    </div>
     <div id="start-cards">
       <div class="start-card" id="start-new">
         <span class="start-card-ico start-card-ico-accent"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
