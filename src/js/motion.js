@@ -2262,14 +2262,33 @@
     var dim = PROP_DIM[prop];
     if (dim === undefined && prop.indexOf('vtx') === 0) dim = 2;
     function fill(n) { var o = []; for (var i = 0; i < dim; i++) o.push(n); return o; }
+    // Every component must be FINITE (2026-08-30). The bare-number branch
+    // below already rejected NaN; the array branch did not, and that gap was
+    // load-bearing: `[0/0, 100]` is valid JavaScript with no syntax error and
+    // no reported expression error, so a NaN went straight through, reached
+    // the scene JSON — where JSON.stringify turns NaN and Infinity into
+    // `null` — and the Rust engine rejected the payload with "invalid type:
+    // null, expected f64". Measured: a position expression of exactly that
+    // form threw on every render.
+    //
+    // Returning null here routes it into the path that already exists for a
+    // bad result: the located "must return a number" error on that one
+    // property row, that property falling back to its raw value, and the rest
+    // of the scene still rendering. This is the same family as the
+    // Option<String> incident in CLAUDE.md — one malformed value must not be
+    // able to take the whole engine down for the session.
+    function allFinite(a) {
+      for (var i = 0; i < a.length; i++) if (typeof a[i] !== 'number' || !isFinite(a[i])) return false;
+      return true;
+    }
     if (Array.isArray(result)) {
-      if (result.length >= dim) return result.slice(0, dim);
+      if (result.length >= dim) { var cut = result.slice(0, dim); return allFinite(cut) ? cut : null; }
       // A single number in an array applies to every dimension, same
       // forgiving reading as a bare number below.
-      if (result.length === 1 && dim >= 2) return fill(result[0]);
+      if (result.length === 1 && dim >= 2 && typeof result[0] === 'number' && isFinite(result[0])) return fill(result[0]);
       return null;
     }
-    if (typeof result === 'number' && !isNaN(result)) return fill(result);
+    if (typeof result === 'number' && isFinite(result)) return fill(result);
     return null;
   }
   function evalExpressionFor(holder, prop, frame, rawValue) {
