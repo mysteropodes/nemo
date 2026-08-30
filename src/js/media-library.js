@@ -662,9 +662,16 @@
       var empty = document.createElement('div'); empty.className = 'asset-folder-empty-hint';
       var hasAnyContent = !!((state.mediaLibrary || []).length || Object.keys(state.symbols || {}).length
         || (window.SMProject && SMProject.getOpenTabs && SMProject.getOpenTabs().length));
-      empty.textContent = hasAnyContent
-        ? t('mediaNoMatch', 'Aucun média ne correspond à ce filtre.')
-        : t('mediaEmptyLibrary', 'Aucun média importé.');
+      // Genuinely empty -> this IS the drop zone (its dashed styling and the
+      // gesture it names). Empty only because a filter/search excludes
+      // everything -> a plain message: media exists, the dashed "drop here"
+      // box would be telling you the wrong thing.
+      if (hasAnyContent) {
+        empty.textContent = t('mediaNoMatch', 'Aucun média ne correspond à ce filtre.');
+      } else {
+        empty.className += ' media-drop';
+        empty.textContent = t('mediaDropHint', 'Glisser des images/vidéos ici, ou cliquer Importer…');
+      }
       grid.appendChild(empty);
     }
     // Bulk cleanup (2026-07-31) — catalog-only (never touches the
@@ -701,15 +708,20 @@
     if (window.showToast) showToast(removed + SM.t('toastOrphanEntriesRemovedSuffix'));
   }
 
-  // OS drag-and-drop onto the panel's own drop zone (#media-drop) — routes
+  // OS drag-and-drop onto the panel's own list (#media-grid) — routes
   // through images.js's real import pipeline (images.js:importImageFiles/
   // importVideoFile), same as the toolbar buttons, so entries land as
   // normal layers AND register a library entry. drop-import.js's canvas/
   // timeline drop target now routes image/video files through this exact
   // same pipeline too (2026-08 fix) — only genuinely unrecognized file
   // types still fall back to the rotoscopy reference importer there.
+  // Bound to #media-grid, not to the dashed hint: the hint is rebuilt by
+  // every render() (it IS the empty state now), so listeners on it would die
+  // the first time the list changed. Listening on the stable container also
+  // means dropping files onto a list that already has media works — which is
+  // what anyone would try once the hint is gone.
   function initDropZone() {
-    var zone = document.getElementById('media-drop'); if (!zone) return;
+    var zone = document.getElementById('media-grid'); if (!zone) return;
     zone.addEventListener('dragover', function (e) { if (e.dataTransfer && e.dataTransfer.types.indexOf('Files') >= 0) { e.preventDefault(); zone.classList.add('drop-hover'); } });
     zone.addEventListener('dragleave', function () { zone.classList.remove('drop-hover'); });
     zone.addEventListener('drop', function (e) {
