@@ -5959,6 +5959,19 @@
           // leaves this disabled, same guard the drag-out gesture uses —
           // see folderLayerParentIdx, timeline.js).
           { label: 'Retirer du dossier', disabled: (typeof folderLayerParentIdx !== 'function' || folderLayerParentIdx(li) < 0), action: function () { window.SM.removeLayerFromFolder(li); } },
+          // Component / camera / audio (2026-08-30, Cyril: "la possibilité de
+          // créer un composant dans motion... et pareil pour layer sound et
+          // camera"). The three header buttons are visible in Motion again
+          // (style.css), and these mirror them in the menu, the way
+          // Animation 2D's own row menu already carries convert/break-apart
+          // next to the split/merge pair. Camera and audio delegate to their
+          // existing buttons rather than reimplementing them — one wiring,
+          // one behaviour, and camera's default-keyframe/undo handling stays
+          // in camera.js where it belongs.
+          { label: SM.t('ctxConvertToComponent'), disabled: !!ld.symbolId || !!ld.lfsGroup, action: function () { window.SM.setActiveLayer(li); window.SM.convertActiveLayerToComponent(); } },
+          { label: SM.t('ctxBreakApartComponent'), disabled: !ld.symbolId, action: function () { window.SM.setActiveLayer(li); window.SM.convertComponentToLayer(); } },
+          { label: SM.t('ctxInsertCameraLayer'), action: function () { var b = document.getElementById('btn-camera'); if (b) b.click(); } },
+          { label: SM.t('ctxInsertAudioTrack'), action: function () { var b = document.getElementById('btn-audio'); if (b) b.click(); } },
           { label: SM.t('ctxSplitIntoLayers'), disabled: !!ld.symbolId || !!ld.lfsGroup, action: function () { window.SM.splitLayerIntoElements(li); } },
           { label: SM.t('ctxCutAtPlayhead'), action: function () { window.SM.splitLayerAtPlayhead(li); } },
           { label: ld.shy ? SM.t('ctxRemoveShyMark') : SM.t('ctxMarkAsShy'), action: function () { window.SM.toggleLayerShy(li); } },
