@@ -112,7 +112,9 @@ var state={
   eraserSize:14,selRotAccum:0,tweenSkipManual:true,tweenHarmonizeEdits:false,
   resamplePts:50,tweenStep:1,
   canvasW:1920,canvasH:1080,canvasBg:'#ffffff',canvasClip:false,safetyZones:false,ghostAllFrames:false,currentFrameOutline:false,
-  rulersOn:true,guidesLocked:false,guidesSnap:true,guides:{h:[],v:[]},
+  // OFF by default (2026-08-31, feedback #189) — rulers-bridge.js restores
+  // the user's own choice from localStorage at init when they made one.
+  rulersOn:false,guidesLocked:false,guidesSnap:true,guides:{h:[],v:[]},
   // Live "show transparency" preview (2026-08-27, "il manque un bouton
   // pour afficher ou pas le fond en alpha") — the Export panel already
   // has its own "Fond transparent (alpha)" checkbox (engine-bridge.js's

@@ -9356,19 +9356,28 @@ document.getElementById('btn-dims-lock').addEventListener('click',function(){
   this.classList.toggle('on',on);
   _dimsLockRatio=on?(state.canvasW/state.canvasH):null;
 });
+// Live while the value is being dragged (2026-08-31, feedback #188: "le
+// resize de document n'est pas en temps réel pendant drag de value"). These
+// two handlers already existed but acted ONLY when the aspect-ratio link was
+// on — with the link off, nothing happened until the scrub's final 'change',
+// so the stage jumped to its new size at the END of the gesture instead of
+// following it. The ratio branch is now just the extra work of updating the
+// sibling field; applying the size itself is unconditional.
 document.getElementById('p-cw').addEventListener('input',function(){
+  var w=parseInt(this.value)||1,h=state.canvasH;
   if(_dimsLockRatio){
-    var h=Math.max(1,Math.round(parseFloat(this.value)/_dimsLockRatio));
+    h=Math.max(1,Math.round(parseFloat(this.value)/_dimsLockRatio));
     document.getElementById('p-ch').value=h;
-    window.SM.setCanvasSize(parseInt(this.value)||1,h);
   }
+  window.SM.setCanvasSize(w,h);
 });
 document.getElementById('p-ch').addEventListener('input',function(){
+  var h=parseInt(this.value)||1,w=state.canvasW;
   if(_dimsLockRatio){
-    var w=Math.max(1,Math.round(parseFloat(this.value)*_dimsLockRatio));
+    w=Math.max(1,Math.round(parseFloat(this.value)*_dimsLockRatio));
     document.getElementById('p-cw').value=w;
-    window.SM.setCanvasSize(w,parseInt(this.value)||1);
   }
+  window.SM.setCanvasSize(w,h);
 });
 // Paint the panel's fill swatch from the actual starting state.fillColor/
 // fillEnabled on load — without this it sits at whatever background the
