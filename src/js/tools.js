@@ -7639,6 +7639,16 @@ function onViewDoubleClick(event){
     selectedPaths=[fillPath];
     state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
     _shapeEnteredId=dblSid||null;
+    // Per-object boxes (2026-08-30, the full #165 spec re-read after "le
+    // double clic n'affiche pas les box de chaque objet"): the request was
+    // never just isolating the CLICKED shape — it was "2 shapes > double
+    // clic > 2 bounding box de shape", every object on the layer showing
+    // its own box at once, each grabbable. This flag makes
+    // buildTransformBoxItems (engine-bridge) draw a dim outline box around
+    // every OTHER shape on this layer while the clicked one keeps the full
+    // gizmo; clicking a sibling migrates the isolation to it
+    // (select-bridge's _shapeEnteredId handoff) instead of ending it.
+    window._perObjBoxes=state.activeLayerIdx;
     renderArcs();updateUI();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
     return;

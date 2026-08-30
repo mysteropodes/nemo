@@ -2949,6 +2949,32 @@
         });
       }
     }
+    // Per-object boxes (2026-08-30, the full #165 spec: "2 shape > double
+    // clic > 2 bounding box de shape"): while the double-click isolation
+    // mode is on for THIS layer, every sibling shape also shows its own
+    // dim outline box, so each object on the layer reads as individually
+    // grabbable — the isolated one keeps the full gizmo drawn above, the
+    // others get outline-only (their box becomes the active one the moment
+    // they're clicked, via select-bridge's _shapeEnteredId handoff).
+    // Skips synthetic/companion children (§1: dabs, brush copies, duplicator
+    // copies carry no strokeId or carry their own tags) by requiring a
+    // strokeId and no groupId — the mode is defined for ungrouped shapes.
+    if (window._perObjBoxes === state.activeLayerIdx && userLayers[state.activeLayerIdx]) {
+      var poMap = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
+      userLayers[state.activeLayerIdx].children.forEach(function (ch) {
+        if (!ch.data || !ch.data.strokeId || ch.data.groupId) return;
+        if (ch.data.isBrushTextureCopy || ch.data.isLinkedFillCompanion || ch.data.isDuplicatorCopy) return;
+        if (selectedPaths.indexOf(ch) >= 0) return; // the active one has the real gizmo
+        var sb = ch.strokeBounds;
+        if (!sb || !sb.width || !sb.height) return;
+        function PW(x, y) { if (!poMap) return [x, y]; return poMap.fwd(x, y); }
+        var q1 = PW(sb.left, sb.top), q2 = PW(sb.right, sb.top), q3 = PW(sb.right, sb.bottom), q4 = PW(sb.left, sb.bottom);
+        items.push(lineItem(q1, q2, [74, 158, 255, 130], 1 * zs));
+        items.push(lineItem(q2, q3, [74, 158, 255, 130], 1 * zs));
+        items.push(lineItem(q3, q4, [74, 158, 255, 130], 1 * zs));
+        items.push(lineItem(q4, q1, [74, 158, 255, 130], 1 * zs));
+      });
+    }
     return items;
   }
   function buildMarqueeItems() {
