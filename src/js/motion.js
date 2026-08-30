@@ -5561,6 +5561,16 @@
         _motionDrag.basePos[0] + (event.point.x - _motionDrag.start.x),
         _motionDrag.basePos[1] + (event.point.y - _motionDrag.start.y)
       ]);
+      // The DOCUMENT changed, so say so (2026-08-30, "n'est pas en temps
+      // reel, il bouge pas sur le canvas pendant le drag que au
+      // relachement"). engine-bridge caches the serialized scene base
+      // during a drag keyed on _sceneVersion (CLAUDE.md §5.3) — the whole
+      // point being that an intercepted drag leaves the document untouched.
+      // This one does NOT: it moves an element. Without the bump the cached
+      // base was replayed every tick and the shape only jumped when the
+      // drop invalidated it. Same hazard §5.3 already flags for the eraser
+      // ("la gomme mutte SANS bump de version").
+      window._sceneVersion = (window._sceneVersion || 0) + 1;
     } else if (_motionDrag.mode === 'multiLayerMove') {
       var mdx=event.point.x-_motionDrag.start.x,mdy=event.point.y-_motionDrag.start.y;
       _motionDrag.records.forEach(function(r){setValue(r.t.holder,'position',[r.pos[0]+mdx,r.pos[1]+mdy]);});

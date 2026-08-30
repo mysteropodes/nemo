@@ -7608,7 +7608,14 @@ function onViewDoubleClick(event){
   if(state.appMode==='motion'){
     var mLayer=userLayers[state.activeLayerIdx];
     if(!mLayer)return;
-    var mHit=mLayer.hitTest(event.point,{fill:true,stroke:true,tolerance:4/view.zoom});
+    // Tolerance in SCREEN pixels, not world (2026-08-30: "j'ai du mal à y
+    // accéder"). 4/view.zoom looks generous but is the wrong way round —
+    // at 19% zoom, a typical fit-to-canvas view, it collapses to well under
+    // a screen pixel of slack, so the double-click had to land dead on the
+    // shape. 8 screen px is the same order of slack every other hit-test in
+    // this file uses, and it stays constant as you zoom.
+    var mTol=8/Math.max(0.0001,view.zoom);
+    var mHit=mLayer.hitTest(event.point,{fill:true,stroke:true,tolerance:mTol});
     if(!mHit||!mHit.item)return;
     var mItem=mHit.item;
     while(mItem.parent&&mItem.parent!==mLayer)mItem=mItem.parent;

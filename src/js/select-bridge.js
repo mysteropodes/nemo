@@ -734,6 +734,44 @@
         e.stopImmediatePropagation(); e.preventDefault();
         return;
       }
+      // Leaving per-element isolation (2026-08-30: "si je clic ailleurs ça ne
+      // sors pas et reviens pas en box normal"). Animation 2D has always had
+      // this — its own _shapeEnteredId reset a few hundred lines down — but
+      // the Motion equivalent was never written, so once a double-click had
+      // isolated a shape there was NO way back to the layer box short of
+      // switching modes.
+      //
+      // Placed right after SMMotion.onDown declined the gesture: anything it
+      // took (a handle, the ring, the anchor, or the element body itself) is
+      // work INSIDE the isolation and must not cancel it. What's left here is
+      // a click that hit none of that — empty canvas or another shape — which
+      // is exactly the "clic ailleurs" that should drop back out.
+      if (window._motionExpandedElement != null) {
+        var lyrEx = userLayers[state.activeLayerIdx];
+        var hitEx = lyrEx ? lyrEx.hitTest(new Point(w0[0], w0[1]), { fill: true, stroke: true, tolerance: 6 / view.zoom }) : null;
+        var itEx = hitEx && hitEx.item;
+        while (itEx && itEx.parent && itEx.parent !== lyrEx) itEx = itEx.parent;
+        var sidEx = itEx && itEx.data && itEx.data.strokeId;
+        // Clicking a SIBLING hands the isolation over to it rather than
+        // ending it — same continuity Animation 2D's per-object mode has, and
+        // the thing that makes a multi-shape layer workable. Clicking nothing
+        // exits to the whole-layer box.
+        if (sidEx && sidEx !== window._motionExpandedElement) {
+          window._motionExpandedElement = sidEx;
+          if (SMMotion.selectShapesByStrokeIds) SMMotion.selectShapesByStrokeIds(state.activeLayerIdx, [sidEx]);
+        } else if (!sidEx) {
+          window._motionExpandedElement = null;
+          window._perObjBoxes = null;
+        }
+        if (sidEx || window._motionExpandedElement == null) {
+          window._sceneVersion = (window._sceneVersion || 0) + 1;
+          if (window.renderLayerList) renderLayerList();
+          if (window.renderTimeline) renderTimeline();
+          window.SMEngineBridge.renderNow();
+          e.stopImmediatePropagation(); e.preventDefault();
+          return;
+        }
+      }
     }
     if (!shouldIntercept()) return;
     // Every gesture starts from a clean slate (2026-07-26). onDown has a
