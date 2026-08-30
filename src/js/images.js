@@ -395,7 +395,12 @@
     }
     return frames;
   }
-  async function importVideoFrames(frames,prefix){
+  // adoptMediaId (2026-08-30, feedback #153): when the instant WebCodecs
+  // importer bailed, it hands its "decoding…" media-library row over rather
+  // than deleting it — fill THAT row in at the end instead of adding a
+  // second one, so the panel shows one continuous entry across the whole
+  // (slow) bake instead of a row that vanishes and comes back.
+  async function importVideoFrames(frames,prefix,adoptMediaId){
     saveAllLayerFrames();pushUndoLayers(true);
     if(frames.length>state.totalFrames)window.SM.setTotalFrames(frames.length);
     var idx=createUserLayer(prefix);
@@ -443,7 +448,11 @@
     var firstFrameThumb=(frames.filter(function(f){return f.strokes.length;})[0]||{}).strokes;
     firstFrameThumb=firstFrameThumb&&firstFrameThumb[0]&&firstFrameThumb[0].src;
     convertLayerToComponent(idx);
-    if(window.SMMediaLibrary&&firstFrameThumb)SMMediaLibrary.addEntry(state.layers[idx].name,'video',firstFrameThumb,state.layers[idx].name,{layerUid:state.layers[idx].layerUid});
+    if(window.SMMediaLibrary&&firstFrameThumb){
+      var patch={layerUid:state.layers[idx].layerUid,status:'ready',thumb:firstFrameThumb,name:state.layers[idx].name,layerName:state.layers[idx].name};
+      if(adoptMediaId)SMMediaLibrary.updateEntry(adoptMediaId,patch);
+      else SMMediaLibrary.addEntry(state.layers[idx].name,'video',firstFrameThumb,state.layers[idx].name,{layerUid:state.layers[idx].layerUid});
+    }
     showToast(SM.t('toastVideoImportedSuffix')+frames.filter(function(f){return f.strokes.length;}).length+' images sur le calque "'+prefix+'"');
   }
   async function importVideoFile(file){
@@ -454,15 +463,24 @@
     // ffmpeg subprocess. Falls through to the old bake-every-frame-as-JPEG
     // importer below for anything it can't handle (unsupported container/
     // codec, or a browser without WebCodecs — e.g. older Firefox).
+    var adoptId=null;
     if(window.SMNativeVideo){
       try{await SMNativeVideo.importAsLayer(file);return;}
-      catch(e){showToast(SM.t('toastWebCodecsUnavailable')+(e&&e.message||e)+') — import classique…');}
+      catch(e){
+        adoptId=e&&e.pendingMediaId||null; // see importVideoFrames' own comment (feedback #153)
+        showToast(SM.t('toastWebCodecsUnavailable')+(e&&e.message||e)+') — import classique…');
+      }
     }
     showToast(SM.t('toastDecodingVideo'));
     var blobUrl=URL.createObjectURL(file);
     try{
       var frames=await decodeVideoFrames(blobUrl);
-      await importVideoFrames(frames,file.name.replace(/\.[^.]+$/,''));
+      await importVideoFrames(frames,file.name.replace(/\.[^.]+$/,''),adoptId);
+    }catch(e2){
+      // The fallback failed too — now the placeholder really is dead, so
+      // clear it rather than leaving a permanent "decoding…" row behind.
+      if(adoptId&&window.SMMediaLibrary)SMMediaLibrary.removeEntry(adoptId);
+      throw e2;
     }finally{URL.revokeObjectURL(blobUrl);}
   }
   async function importVideo(){

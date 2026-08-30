@@ -920,8 +920,18 @@
     try {
       info = await open(source);
     } catch (e) {
-      if (pendingMediaId && window.SMMediaLibrary) SMMediaLibrary.removeEntry(pendingMediaId);
-      throw e; // unchanged: images.js's own caller catches this and falls through to the slower bake-every-frame path
+      // Hand the placeholder OVER to the fallback importer instead of
+      // deleting it (2026-08-30, feedback #153: "l'icon apparait avec
+      // decoding mais au bout d'un moment celle ci disparait pendant
+      // l'encoding et réapparait par la suite, du coup on a l'impression
+      // d'un bug"). images.js catches this and falls through to the slow
+      // bake-every-frame path, which only added its own entry at the very
+      // END of decoding — so the row vanished for the entire decode and
+      // came back as a different entry, reading exactly like a crash.
+      // The id rides on the error so the caller can adopt the SAME row and
+      // just fill it in; it removes the row itself if the fallback fails too.
+      e.pendingMediaId = pendingMediaId;
+      throw e;
     }
     if (window.saveAllLayerFrames) saveAllLayerFrames();
     if (window.pushUndoLayers) pushUndoLayers();
