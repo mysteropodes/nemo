@@ -4258,9 +4258,30 @@
   // and `closed`, which that in-place-mutation shape can't accommodate
   // without a larger rework of that function. A trimmed shape currently
   // exports un-trimmed (full path) until that's addressed.
+  // "Trim Paths is on, but its window covers the whole path" — i.e. nothing
+  // is actually trimmed (2026-08-31, feedback #182: "pourquoi un trim path
+  // peut supprimé le fill d'une shape ?"). Merely ENABLING the property used
+  // to rebuild the shape as an open polyline approximation and drop its
+  // fill, before the artist had trimmed anything: measured on a plain filled
+  // rectangle, 4 closed segments with a fill became 81 open ones with none.
+  // Dropping the fill on a genuinely trimmed shape is deliberate and stays
+  // (see engine-bridge's own comment — AE's convention, and the fix for the
+  // "pac-man wedge" Cyril reported in August); doing it for a window that
+  // trims nothing is just a property that breaks the drawing when switched
+  // on.
+  //
+  // Offset is deliberately ignored: rotating a full window around a path
+  // still keeps the whole path, so it changes nothing either.
+  var TRIM_EPS = 0.001;
+  function trimIsFullWindow(li, strokeId, frameIdx) {
+    var win = trimWindowAt(li, strokeId, frameIdx);
+    if (!win) return true;
+    return (win.start || 0) <= TRIM_EPS && (win.end == null ? 100 : win.end) >= 100 - TRIM_EPS;
+  }
   function applyTrimFor(li, strokeId, segments, closed, frameIdx) {
     var win = trimWindowAt(li, strokeId, frameIdx);
     if (!win) return { segments: segments, closed: closed };
+    if (trimIsFullWindow(li, strokeId, frameIdx)) return { segments: segments, closed: closed };
     return applyTrimSegments(segments, closed, win);
   }
   // Vector-brush ribbon trim (2026-08-20) — "il faudrait mettre en place le
@@ -11735,6 +11756,7 @@
       if (!ld || !ld.elementMotion || !strokeId) return false;
       return hasTrimMotion(ld.elementMotion[strokeId]);
     },
+    trimIsFullWindow: trimIsFullWindow,
     applyTrimToVectorBrush: applyTrimToVectorBrush,
     // Called by the two frame-content writers in app.js — the union is
     // derived from that content, so it must not outlive an edit.

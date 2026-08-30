@@ -218,7 +218,12 @@ function exportBuildFrame(frameIdx,alpha){
         }else{
           var trimmed=SMMotion.applyTrimFor(li,sd.strokeId,sd.segments,sd.closed,frameIdx);
           sd.segments=trimmed.segments;sd.closed=trimmed.closed;
-          if(!sd.isVectorBrush){sd.fillColor=null;delete sd.fillGradient;}
+          // Same "a full window trims nothing" carve-out as the live render
+          // (#182) — this path is the export's own copy of that rule, and the
+          // two must agree or a trim-enabled-but-untrimmed shape would export
+          // without the fill it has on screen.
+          var trimNul=SMMotion.trimIsFullWindow&&SMMotion.trimIsFullWindow(li,sd.strokeId,frameIdx);
+          if(!sd.isVectorBrush&&!trimNul){sd.fillColor=null;delete sd.fillGradient;}
         }
       }
       var p=sd.isRaster?desR(sd,L,sd.opacity!==undefined?sd.opacity:1):desP(sd,L,sd.opacity!==undefined?sd.opacity:1);

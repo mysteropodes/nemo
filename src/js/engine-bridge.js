@@ -1829,7 +1829,13 @@
           // reach this branch at all: see its own comment above. The
           // isVectorBrush guard stays for the real anchor item, which IS
           // reached through cPathOpsStrokeId.
+          // ...but NOT when the trim window covers the whole path (#182):
+          // turning the property on without trimming anything must leave the
+          // drawing exactly as it was. trimIsFullWindow is the single place
+          // that decides "nothing is actually trimmed" — applyTrimFor reads
+          // the same helper, so the geometry and the paint can't disagree.
           if (window.SMMotion && cPathOpsStrokeId && SMMotion.hasTrimMotionFor(i, cPathOpsStrokeId)
+              && !(SMMotion.trimIsFullWindow && SMMotion.trimIsFullWindow(i, cPathOpsStrokeId, renderFrame))
               && !(c.data && c.data.isVectorBrush)) {
             item.fillColor = null;
             delete item.fillGradient;
