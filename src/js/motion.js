@@ -1937,10 +1937,55 @@
     keys: SELF_KEYS,
     control: exprSelfControl,
   };
+  // ---- Mesh-aware `self` (2026-08-30) -------------------------------
+  // Image meshes became animatable per vertex, but an expression had no way
+  // to know WHICH vertex it was running on — so the only way to animate a
+  // mesh was to key every vertex by hand, which for a 10-column mesh is 75
+  // tracks. With the index and the vertex's own rest position in hand, ONE
+  // expression describes the whole surface:
+  //
+  //   var uv = self.vertexUV;
+  //   [0, Math.sin(uv[0] * 6 + time * 3) * 8]     // a wave travelling across
+  //
+  // vertexUV is the REST position (normalized, 0..1 over the image), not the
+  // posed one: an expression that read its own output would feed back on
+  // itself frame after frame.
+  function _selfMesh() {
+    var r = _selfResolved();
+    if (!r || r.strokeId == null || !window.SMImageMesh) return null;
+    return SMImageMesh.get(r.strokeId) || null;
+  }
+  function _selfVertexIndex() {
+    var p = _ectx && _ectx.prop;
+    if (!p) return -1;
+    var m = /^vtx(\d+)$/.exec(p);
+    return m ? parseInt(m[1], 10) : -1;
+  }
+  Object.defineProperty(SELF_VIEW, 'isMesh', { get: function () { return !!_selfMesh(); } });
+  Object.defineProperty(SELF_VIEW, 'vertexIndex', { get: _selfVertexIndex });
+  Object.defineProperty(SELF_VIEW, 'vertexCount', {
+    get: function () { var m = _selfMesh(); return m ? m.verts.length : 0; },
+  });
+  Object.defineProperty(SELF_VIEW, 'vertexUV', {
+    get: function () {
+      var m = _selfMesh(), i = _selfVertexIndex();
+      if (!m || i < 0 || !m.verts[i]) return [0, 0];
+      return [m.verts[i][0], m.verts[i][1]];
+    },
+  });
+  Object.defineProperty(SELF_VIEW, 'isOutlineVertex', {
+    get: function () {
+      var m = _selfMesh(), i = _selfVertexIndex();
+      return !!(m && i >= 0 && i < m.outline.length);
+    },
+  });
   Object.defineProperty(SELF_VIEW, 'property', { get: function () { return _ectx ? _ectx.prop : null; } });
   Object.defineProperty(SELF_VIEW, 'name', { get: function () { var ld = _selfLd(); return ld ? ld.name : null; } });
   Object.defineProperty(SELF_VIEW, 'index', { get: function () { var r = _selfResolved(); return r ? r.index : -1; } });
-  Object.defineProperty(SELF_VIEW, 'isShape', { get: function () { var r = _selfResolved(); return !!(r && r.strokeId != null); } });
+  // A mesh holder is keyed like an element holder but is NOT a shape — it
+  // used to answer true here, which made `self.isShape` useless for telling
+  // the two apart now that both exist.
+  Object.defineProperty(SELF_VIEW, 'isShape', { get: function () { var r = _selfResolved(); return !!(r && r.strokeId != null) && !_selfMesh(); } });
   Object.defineProperty(SELF_VIEW, 'inPoint', {
     get: function () { var ld = _selfLd(); return (ld && window.layerInPoint) ? layerInPoint(ld) : 0; },
   });
@@ -2205,7 +2250,17 @@
   // the old `dim === 2` branches silently produced a 2-element array for a
   // 4-dimension property. Behaviour for 1D/2D properties is unchanged.
   function normalizeExprResult(result, prop) {
+    // Per-vertex properties (prop = 'vtx0','vtx1', ...) are created on demand
+    // and are deliberately absent from the fixed PROP_DIM table, exactly as
+    // they are absent from PROP_DEFAULT — staticValue already answers [0,0]
+    // for the same family, for the same reason. Without the same fallback
+    // here `dim` was undefined, `result.length >= undefined` is false, and
+    // EVERY expression on a vertex returned null: the value was computed
+    // correctly and then discarded on the way out. Vertex expressions have
+    // never worked, on meshes or on path vertices. A vertex offset is always
+    // [du, dv].
     var dim = PROP_DIM[prop];
+    if (dim === undefined && prop.indexOf('vtx') === 0) dim = 2;
     function fill(n) { var o = []; for (var i = 0; i < dim; i++) o.push(n); return o; }
     if (Array.isArray(result)) {
       if (result.length >= dim) return result.slice(0, dim);
@@ -3678,6 +3733,15 @@
     var k;
     if (holder.motion) for (k in holder.motion) if (k.indexOf('vtx') === 0 && holder.motion[k].keys.length) return true;
     if (holder.motionStatic) for (k in holder.motionStatic) if (k.indexOf('vtx') === 0) return true;
+    // Expressions count as motion (2026-08-30). This checked keys and static
+    // values only, so a vertex driven PURELY by an expression — no keyframe,
+    // no static override — was invisible here, and every reader gated on this
+    // function (meshVertexOffsetAt, applyPathVertexOffsets) skipped it
+    // entirely: the expression evaluated to the right number and nothing ever
+    // asked for it. Harmless while vertices were only ever keyed by hand;
+    // load-bearing now that one expression over self.vertexIndex/vertexUV is
+    // the sane way to animate a 69-vertex mesh.
+    if (holder.expressions) for (k in holder.expressions) if (k.indexOf('vtx') === 0 && hasExpr(holder, k)) return true;
     return false;
   }
   // Applied to an item's already-serialized segments (engine-bridge.js's
