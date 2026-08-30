@@ -2879,7 +2879,7 @@ function updatePropsContext(){
   if(state.tool==='rig'){
     ctx='rig';
     show['rig-opts-sec']=true;
-    show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
+    show['layer-sec']=false; // folded into the layer row's context menu (#172)
     if(window.renderRigModeUI)renderRigModeUI();
     hdrText=(window.SM&&SM.t?SM.t('toolRig'):'Rig')+' — Options';
   }else if(state.tool==='fsselect'&&_fsSel.length){
@@ -2907,7 +2907,7 @@ function updatePropsContext(){
     // useful given over to the Position/Size/Rotation-of-selected-vertices
     // fields (updateSelPropsPanel) that section sits right above.
     show['canvas-sec']=state.tool!=='subselect';
-    show['layer-sec']=!!(state.layers[state.activeLayerIdx]);
+    show['layer-sec']=false; // folded into the layer row's context menu (#172)
     // Rig bind (2026-07-29 fix, "on ne sait pas comment select l'élément qui
     // doit y être associé"): #rig-opts-sec (with the "Lier la sélection"
     // button) used to be shown ONLY while state.tool==='rig' — but binding a
@@ -2957,7 +2957,7 @@ function updatePropsContext(){
     // this flag, activeLayerIdx being ALWAYS a valid index (never "none")
     // meant this branch showed the last-active layer's properties even
     // right after deselecting everything on canvas.
-    show['layer-sec']=!!window._layerActiveExplicit&&!!(state.layers[state.activeLayerIdx]);
+    show['layer-sec']=false; // folded into the layer row's context menu (#172)
     // i18n (2026-08-30): this was the one hdrText branch still hardcoded,
     // so the context header read "Document" in every locale while its
     // neighbours translated — the key already existed and was simply never
@@ -6021,14 +6021,28 @@ function renderLayerList(frameOnly){
       e.preventDefault();
       var idx4=parseInt(this.dataset.layer);window.SM.setActiveLayer(idx4);
       var l4=state.layers[idx4];
+      // Grouped into nested menus (2026-08-30, "un peu lourd comme clic
+      // droit y a pas moyen de classer mieux dans des sous menu ?").
+      // Measured before: 35 entries, 901px tall — taller than most windows,
+      // so the bottom of the menu was effectively unreachable.
+      // showContextMenu has no hover-submenus, but opening a SECOND menu
+      // from an entry is a pattern this file already uses (Parent in Time,
+      // "Color the keys…"), so this reuses it rather than inventing one.
+      // What stays at top level is what you reach for constantly (duplicate,
+      // delete, rename, the two marks) plus whatever is contextual to THIS
+      // layer; the rest is one click deeper. Entries themselves are
+      // untouched — only their nesting changed.
+      var _sub=function(items){return function(){window.showContextMenu(e.clientX+8,e.clientY+8,items);};};
       window.showContextMenu(e.clientX,e.clientY,[
-        {label:SM.t('ctxInsertLayer'),action:function(){window.SM.addLayer();}},
+        {label:SM.t('ctxMenuInsert'),action:_sub([
+{label:SM.t('ctxInsertLayer'),action:function(){window.SM.addLayer();}},
         {label:SM.t('ctxInsertLayerNull'),action:function(){window.SM.addNullLayer();}},
         {label:SM.t('ctxInsertLayerFolder'),action:function(){window.SM.addFolderLayer();}},
         {label:SM.t('ctxInsertLayerEffect'),action:function(){window.SM.addEffectLayer();}},
         {label:SM.t('ctxInsertLayerGuide'),action:function(){window.SM.addGuideLayer();}},
         {label:SM.t('ctxInsertLayerJoystick'),action:function(){window.SM.addJoystickLayer();}},
         {label:SM.t('ctxInsertLayerSlider'),action:function(){window.SM.addSliderLayer();}},
+        ])},
         // Widget range/size (2026-08-30) — only on a widget layer, same
         // "shown when its prerequisite is set" convention as Time Remap's
         // own entries below. rig-widget.js owns the submenu so the numbers
@@ -6047,13 +6061,16 @@ function renderLayerList(frameOnly){
         {label:SM.t('ctxSplitIntoLayers'),disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.splitLayerIntoElements(idx4);}},
         {label:SM.t('ctxCutAtPlayhead'),action:function(){window.SM.splitLayerAtPlayhead(idx4);}},
         {label:l4.shy?SM.t('ctxRemoveShyMark'):SM.t('ctxMarkAsShy'),action:function(){window.SM.toggleLayerShy(idx4);}},
-        {label:SM.t('ctxMergeSelectedLayers'),disabled:_layerSel.length<2,action:function(){window.SM.mergeLayersIntoOne(_layerSel.slice());}},
+        {label:SM.t('ctxMenuOrganise'),action:_sub([
+{label:SM.t('ctxMergeSelectedLayers'),disabled:_layerSel.length<2,action:function(){window.SM.mergeLayersIntoOne(_layerSel.slice());}},
         {label:SM.t('ctxRemoveFromFolder'),disabled:!l4.folderId,action:function(){delete l4.folderId;renderLayerList();renderTimeline();}},
         {label:SM.t('ctxRemoveFromFolderParent'),disabled:folderLayerParentIdx(idx4)<0,action:function(){window.SM.removeLayerFromFolder(idx4);}},
         {label:SM.t('ctxConvertToComponent'),disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToComponent();}},
         {label:SM.t('ctxBreakApartComponent'),disabled:!l4.symbolId,action:function(){window.SM.convertComponentToLayer();}},
+        ])},
         {sep:true},
-        {label:SM.t('ctxSplitStrokeFillShadow'),disabled:!!l4.symbolId||!!l4.lfsGroup||!!l4.linkGroupId,action:function(){window.SM.convertActiveLayerToStrokeFillShadow();}},
+        {label:SM.t('ctxMenuLFS'),action:_sub([
+{label:SM.t('ctxSplitStrokeFillShadow'),disabled:!!l4.symbolId||!!l4.lfsGroup||!!l4.linkGroupId,action:function(){window.SM.convertActiveLayerToStrokeFillShadow();}},
         {label:SM.t('ctxUnlinkFromLFSGroup'),disabled:!l4.linkGroupId,action:function(){delete l4.channel;delete l4.linkGroupId;renderLayerList();renderTimeline();showToast(SM.t('toastLayerUnlinkedNormal'));}},
         {label:SM.t('ctxGroupLFS'),disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToLFSGroup();}},
         {label:SM.t('ctxEditLine'),disabled:!l4.lfsGroup,action:function(){window.SM.enterSymbol(l4.lfsIds.line);}},
@@ -6062,7 +6079,21 @@ function renderLayerList(frameOnly){
         {label:SM.t('ctxPropagateFillOtherFrames'),disabled:!l4.lfsGroup,action:function(){window.SM.propagateLFSFill('full');}},
         {label:SM.t('ctxPropagateShadowOtherFrames'),disabled:!l4.lfsGroup,action:function(){window.SM.propagateLFSFill('shadow');}},
         {label:SM.t('ctxBreakApartGroup'),disabled:!l4.lfsGroup,action:function(){window.SM.convertLFSGroupToLayer();}},
+        ])},
         {sep:true},
+{label:SM.t('ctxMenuAppearance'),action:_sub([
+          // Blend, from the layer row (2026-08-30, feedback #172: "en
+          // animation 2D ça peut être un menu qui s'affiche sur le calque en
+          // option clic droit"). The Layer tab that held it is gone; this is
+          // where it lives now. Anchored on the CLICK, not on a captured row
+          // node — setActiveLayer re-renders the list, so by the time this
+          // fires that node is detached and its rect is all zeros, which
+          // pinned the popup to the corner at (8,4). Found by driving.
+          {label:SM.t('ctxLayerBlend')+' : '+((typeof BLEND_MODE_LABELS!=='undefined'&&BLEND_MODE_LABELS[l4.blendMode||'normal'])||'Normal'),action:function(){
+            window.SM.setActiveLayer(idx4);updatePropsContext();
+            var _bx=e.clientX,_by=e.clientY;
+            if(window.openBlendDropdownAt)openBlendDropdownAt({getBoundingClientRect:function(){return {left:_bx,right:_bx,top:_by,bottom:_by,width:0,height:0};}});
+          }},
         // Track matte (2026-07) — the discoverable entry point: works
         // whether or not this layer already has a matte, unlike the badge
         // (which only shows once one exists) or the right-panel dropdown
@@ -6086,6 +6117,7 @@ function renderLayerList(frameOnly){
           var anchor=(panelAnchor&&panelAnchor.offsetParent)?panelAnchor:row;
           if(window.openMatteDropdownAt)openMatteDropdownAt(anchor);
         }},
+        ])},
       ]);
     });
     list.appendChild(row);
@@ -9633,7 +9665,12 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
     if(revert&&origMode!==null)applyPreview(origMode);
     origMode=null;
   }
-  function open(){
+  // `anchorEl` mirrors initMatteDropdown's own signature (2026-08-30): the
+  // Layer tab is gone, so this also opens from the layer row's context menu
+  // and must anchor to what was actually clicked. Accepts anything with a
+  // getBoundingClientRect, so a caller can pass a synthetic rect built from
+  // the click — a captured DOM node goes stale the moment the list re-renders.
+  function open(anchorEl){
     var ld=currentLd();if(!ld)return;
     origMode=ld.blendMode||'normal';
     pop.innerHTML='';
@@ -9655,7 +9692,7 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
       });
       pop.appendChild(it);
     });
-    var r=dd.getBoundingClientRect();
+    var r=((anchorEl&&anchorEl.getBoundingClientRect)?anchorEl:dd).getBoundingClientRect();
     pop.style.display='block';
     pop.style.left=Math.max(8,Math.min(window.innerWidth-pop.offsetWidth-8,r.left))+'px';
     var top=r.bottom+4;
@@ -9668,6 +9705,7 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
   dd.addEventListener('click',function(e){e.stopPropagation();if(pop.style.display==='block')close(true);else open();});
   document.addEventListener('pointerdown',function(e){if(pop.style.display==='block'&&!pop.contains(e.target)&&e.target!==dd)close(true);});
   window.addEventListener('keydown',function(e){if(e.key==='Escape'&&pop.style.display==='block')close(true);});
+  window.openBlendDropdownAt=open;
 })();
 
 // Track matte (2026-07, scouted from Caddis's Layer.matteMode) — dropdown
