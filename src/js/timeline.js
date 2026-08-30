@@ -5816,7 +5816,7 @@ function renderLayerList(frameOnly){
       window.showContextMenu(e.clientX,e.clientY,[
         {label:SM.t('ctxInsertLayer'),action:function(){window.SM.addLayer();}},
         {label:SM.t('ctxInsertLayerNull'),action:function(){window.SM.addNullLayer();}},
-        {label:'Insérer un dossier',action:function(){window.SM.addFolderLayer();}},
+        {label:SM.t('ctxInsertLayerFolder'),action:function(){window.SM.addFolderLayer();}},
         {label:SM.t('ctxInsertLayerEffect'),action:function(){window.SM.addEffectLayer();}},
         {label:SM.t('ctxInsertLayerGuide'),action:function(){window.SM.addGuideLayer();}},
         {label:SM.t('ctxDuplicateLayer'),action:function(){window.SM.duplicateLayer();}},
@@ -5834,7 +5834,7 @@ function renderLayerList(frameOnly){
         {label:l4.shy?SM.t('ctxRemoveShyMark'):SM.t('ctxMarkAsShy'),action:function(){window.SM.toggleLayerShy(idx4);}},
         {label:SM.t('ctxMergeSelectedLayers'),disabled:_layerSel.length<2,action:function(){window.SM.mergeLayersIntoOne(_layerSel.slice());}},
         {label:SM.t('ctxRemoveFromFolder'),disabled:!l4.folderId,action:function(){delete l4.folderId;renderLayerList();renderTimeline();}},
-        {label:'Retirer du dossier (parent)',disabled:folderLayerParentIdx(idx4)<0,action:function(){window.SM.removeLayerFromFolder(idx4);}},
+        {label:SM.t('ctxRemoveFromFolderParent'),disabled:folderLayerParentIdx(idx4)<0,action:function(){window.SM.removeLayerFromFolder(idx4);}},
         {label:SM.t('ctxConvertToComponent'),disabled:!!l4.symbolId||!!l4.lfsGroup,action:function(){window.SM.convertActiveLayerToComponent();}},
         {label:SM.t('ctxBreakApartComponent'),disabled:!l4.symbolId,action:function(){window.SM.convertComponentToLayer();}},
         {sep:true},

@@ -5958,7 +5958,7 @@
           // resolves to a Folder specifically (an ordinary Null parent
           // leaves this disabled, same guard the drag-out gesture uses —
           // see folderLayerParentIdx, timeline.js).
-          { label: 'Retirer du dossier', disabled: (typeof folderLayerParentIdx !== 'function' || folderLayerParentIdx(li) < 0), action: function () { window.SM.removeLayerFromFolder(li); } },
+          { label: SM.t('ctxRemoveFromFolder'), disabled: (typeof folderLayerParentIdx !== 'function' || folderLayerParentIdx(li) < 0), action: function () { window.SM.removeLayerFromFolder(li); } },
           // Component / camera / audio (2026-08-30, Cyril: "la possibilité de
           // créer un composant dans motion... et pareil pour layer sound et
           // camera"). The three header buttons are visible in Motion again
