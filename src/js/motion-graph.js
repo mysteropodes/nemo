@@ -63,6 +63,10 @@
   // falls back to everything animated on the layer — same rule here, because a
   // graph showing all five properties at once is exactly as unreadable in this
   // app as it is there.
+  function hasExpr(ld, prop) {
+    var m = M();
+    return !!(m && m.hasExpression && m.hasExpression(ld, prop));
+  }
   function tracks() {
     var out = [];
     var sel = M() && M().getKeySelection ? M().getKeySelection() : [];
@@ -72,45 +76,102 @@
       sel.forEach(function (s) { wanted[(state.layers.indexOf(s.holder)) + '|' + s.prop] = true; });
     }
     state.layers.forEach(function (ld, li) {
-      if (!ld || !ld.motion) return;
+      if (!ld) return;
       var expanded = (window._motionExpandedLayer === li) ||
         (window._motionRevealedLayers && window._motionRevealedLayers.indexOf(li) >= 0);
-      Object.keys(ld.motion).forEach(function (prop) {
-        var trk = ld.motion[prop];
-        if (!trk || !trk.keys || trk.keys.length < 1) return;
+      // A property qualifies if it has KEYS or an enabled EXPRESSION.
+      // Expression-only is not an edge case, it's the common one: `value +
+      // wiggle(2, 10)` on an un-keyed property is the first thing most
+      // people write, and before this it was the one kind of animation this
+      // editor could never show — there was no ld.motion entry to find.
+      var props = Object.keys(ld.motion || {});
+      Object.keys(ld.expressions || {}).forEach(function (p) {
+        if (props.indexOf(p) < 0 && hasExpr(ld, p)) props.push(p);
+      });
+      props.forEach(function (prop) {
+        var trk = (ld.motion && ld.motion[prop]) || null;
+        var keyed = !!(trk && trk.keys && trk.keys.length);
+        var ex = hasExpr(ld, prop);
+        if (!keyed && !ex) return;
         if (wanted) { if (!wanted[li + '|' + prop]) return; }
         else if (!expanded) return;
-        var dims = (trk.keys[0].v || []).length || 1;
-        for (var d = 0; d < dims; d++) out.push({ ld: ld, li: li, prop: prop, dim: d, track: trk });
+        var dims = keyed ? ((trk.keys[0].v || []).length || 1)
+          : ((M() && M().propDim) ? M().propDim(prop) : 1);
+        for (var d = 0; d < dims; d++) out.push({ ld: ld, li: li, prop: prop, dim: d, track: trk, expr: ex });
       });
     });
     return out;
   }
 
-  function sampleCurve(t) {
-    var pts = [];
-    var f0 = t.track.keys[0].frame, f1 = t.track.keys[t.track.keys.length - 1].frame;
-    if (f1 <= f0) f1 = f0 + 1;
+  // Speed = |dv/dframe|, the derivative animators actually read: a flat
+  // stretch is constant velocity, a dip to zero is a hold. Plotted at the
+  // midpoint of each frame pair so it lines up with the motion it describes
+  // rather than leading it by half a frame. Applied to whichever curve it's
+  // handed, so the expression's speed and the keyframed speed stay
+  // comparable in the same units.
+  function speedOf(pts) {
+    var sp = [];
+    for (var i = 1; i < pts.length; i++) sp.push([(pts[i][0] + pts[i - 1][0]) / 2, Math.abs(pts[i][1] - pts[i - 1][1])]);
+    return sp;
+  }
+  // The horizontally visible frame window, one sample per DISPLAYED frame.
+  // A keyframed curve is only interesting between its own first and last key
+  // (outside that it's a flat clamp), but an expression has no such
+  // boundary — loopAfter(), wiggle() and anything reading `frame` keep
+  // producing values right across the timeline, and those values are what
+  // actually renders. Bounding to the viewport rather than to totalFrames
+  // keeps that honest without the cost growing with the project's length.
+  function visibleFrameRange() {
+    var w = host(), col = fc();
+    var last = Math.max(0, state.totalFrames - 1);
+    if (!w || !w.clientWidth) return { f0: 0, f1: last };
+    var f0 = Math.floor(w.scrollLeft / col) - 1;
+    var f1 = Math.ceil((w.scrollLeft + w.clientWidth) / col) + 1;
+    return { f0: Math.max(0, Math.min(last, f0)), f1: Math.max(0, Math.min(last, f1)) };
+  }
+  function sampleRange(t, f0, f1, evaluated) {
+    var m = M(), pts = [];
     for (var f = f0; f <= f1; f++) {
-      var v = M().valueAtFrame(t.ld, t.prop, f);
+      var v = evaluated ? m.valueAtFrame(t.ld, t.prop, f) : m.rawValueAtFrame(t.ld, t.prop, f);
       pts.push([f, Array.isArray(v) ? v[t.dim] : v]);
     }
-    if (_mode === 'speed') {
-      // Speed = |dv/dframe|, the derivative animators actually read: a flat
-      // stretch is constant velocity, a dip to zero is a hold. Plotted at the
-      // midpoint of each frame pair so it lines up with the motion it
-      // describes rather than leading it by half a frame.
-      var sp = [];
-      for (var i = 1; i < pts.length; i++) sp.push([(pts[i][0] + pts[i - 1][0]) / 2, Math.abs(pts[i][1] - pts[i - 1][1])]);
-      return sp;
+    return _mode === 'speed' ? speedOf(pts) : pts;
+  }
+  // Fills t.raw (the keyframed/static curve — what the diamonds and the ease
+  // waypoints sit on) and, when an expression is driving this property,
+  // t.eval (what the property ACTUALLY renders). The two are drawn
+  // differently and both are shown, because the whole point is being able to
+  // see at a glance what your expression is doing versus what it's
+  // overriding.
+  function sampleCurve(t) {
+    if (t.track && t.track.keys && t.track.keys.length) {
+      var f0 = t.track.keys[0].frame, f1 = t.track.keys[t.track.keys.length - 1].frame;
+      if (f1 <= f0) f1 = f0 + 1;
+      t.raw = sampleRange(t, f0, f1, false);
+    } else {
+      // No keys at all: the raw value is a flat static/default line, which
+      // says nothing useful — only the expression's own curve is drawn.
+      t.raw = null;
     }
-    return pts;
+    if (t.expr) {
+      var vr = visibleFrameRange();
+      t.eval = vr.f1 > vr.f0 ? sampleRange(t, vr.f0, vr.f1, true) : null;
+    } else {
+      t.eval = null;
+    }
+    return t.raw;
   }
 
   function rangeOf(all) {
     if (_fit) return _fit;
     var min = Infinity, max = -Infinity;
-    all.forEach(function (c) { c.pts.forEach(function (p) { if (p[1] < min) min = p[1]; if (p[1] > max) max = p[1]; }); });
+    function scan(pts) {
+      if (!pts) return;
+      pts.forEach(function (p) { if (p[1] < min) min = p[1]; if (p[1] > max) max = p[1]; });
+    }
+    // Both curves, or an expression that swings wider than its keyframes
+    // would be drawn clipped off the top of its own graph.
+    all.forEach(function (c) { scan(c.raw); scan(c.eval); });
     if (!isFinite(min) || !isFinite(max)) { min = 0; max = 1; }
     if (Math.abs(max - min) < 1e-6) { min -= 1; max += 1; }
     var pad = (max - min) * 0.12;
@@ -192,7 +253,7 @@
       _rh.style.width = W + 'px';
     }
 
-    var all = tracks().map(function (t) { t.pts = sampleCurve(t); return t; });
+    var all = tracks().map(function (t) { sampleCurve(t); return t; });
     var rg = rangeOf(all);
     var innerH = H - PAD_T - PAD_B;
     function yFor(v) { return PAD_T + innerH - ((v - rg.min) / (rg.max - rg.min)) * innerH; }
@@ -213,9 +274,24 @@
 
     all.forEach(function (t, ti) {
       var col = COLORS[t.prop + '.' + t.dim] || '#8ab4f8';
-      var d = t.pts.map(function (p, i) { return (i ? 'L' : 'M') + xForFrame(p[0]).toFixed(1) + ' ' + yFor(p[1]).toFixed(1); }).join(' ');
-      svg += '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="1.8" stroke-linejoin="round"/>';
-      if (_mode === 'value') {
+      function pathD(pts) {
+        return pts.map(function (p, i) { return (i ? 'L' : 'M') + xForFrame(p[0]).toFixed(1) + ' ' + yFor(p[1]).toFixed(1); }).join(' ');
+      }
+      // With an expression driving this property the keyframed curve is NOT
+      // what you see on screen — it's what's being overridden. Drawn thin,
+      // dashed and faded so it reads as the underlay it is, with the
+      // expression's real output solid on top of it. Without an expression
+      // this is the single 1.8px line the editor has always drawn, at the
+      // same weight, from the same values.
+      if (t.raw && t.raw.length) {
+        svg += t.expr
+          ? '<path class="mg-raw" d="' + pathD(t.raw) + '" fill="none" stroke="' + col + '" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.45" stroke-linejoin="round"/>'
+          : '<path d="' + pathD(t.raw) + '" fill="none" stroke="' + col + '" stroke-width="1.8" stroke-linejoin="round"/>';
+      }
+      if (t.eval && t.eval.length) {
+        svg += '<path class="mg-expr" d="' + pathD(t.eval) + '" fill="none" stroke="' + col + '" stroke-width="2.2" stroke-linejoin="round"/>';
+      }
+      if (_mode === 'value' && t.track && t.track.keys) {
         t.track.keys.forEach(function (k, ki) {
           var v = Array.isArray(k.v) ? k.v[t.dim] : k.v;
           var selNow = M().getKeySelection().some(function (s) { return s.key === k && s.prop === t.prop; });
@@ -243,16 +319,28 @@
 
     // legend + mode readout, pinned to the left of the visible scroll window so
     // it stays readable however far along the timeline you are
+    var anyExpr = false;
     var legend = all.map(function (t) {
       var col = COLORS[t.prop + '.' + t.dim] || '#8ab4f8';
       var suf = (DIM_SUFFIX[t.prop] || [''])[t.dim] || '';
-      return '<span style="color:' + col + ';margin-right:12px">&#9632;&nbsp;' + t.prop + (suf ? '&nbsp;' + suf : '') + '</span>';
+      // Property NAME, not the internal key — an expression control's row is
+      // labelled with what the user called it, and its curve should be too.
+      var nm = (M() && M().propLabel) ? M().propLabel(t.prop) : t.prop;
+      if (t.expr) anyExpr = true;
+      return '<span style="color:' + col + ';margin-right:12px">&#9632;&nbsp;' + nm + (suf ? '&nbsp;' + suf : '') + (t.expr ? '&nbsp;ƒx' : '') + '</span>';
     }).join('');
     el.innerHTML = svg +
       '<div class="mg-legend" style="left:' + (host().scrollLeft + 8) + 'px">' + legend +
-      '<span style="color:var(--text-dim);margin-left:6px">' + (_mode === 'speed' ? 'vitesse' : 'valeur') + (_fit ? ' · figé' : '') + '</span></div>';
+      '<span style="color:var(--text-dim);margin-left:6px">' + (_mode === 'speed' ? SM.t('mgraphModeSpeed') : SM.t('mgraphModeValue')) + (_fit ? ' · ' + SM.t('mgraphFrozen') : '') +
+      (anyExpr ? ' · ' + SM.t('mgraphExprLegend') : '') + '</span></div>';
     _svg = el.querySelector('svg');
     el._tracks = all;
+    // Whether any plotted curve is sampled against the VISIBLE window
+    // (visibleFrameRange) rather than against its own keyframe span — if so,
+    // scrolling horizontally has to re-sample, or the expression curve stays
+    // drawn over the window you just scrolled away from. Read by the scroll
+    // handler at the bottom of this file.
+    el._hasExpr = anyExpr;
   }
 
   // ---- interaction ----
@@ -401,10 +489,23 @@
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onUp);
   window.addEventListener('resize', function () { if (_on) render(); });
+  // Re-sample on horizontal scroll ONLY when something on screen is sampled
+  // against the visible window (an expression curve). Coalesced to one rAF
+  // tick, and deliberately NOT scheduleRender() — that one also drives
+  // renderLayerList + a full engine repaint, which scrolling has no reason
+  // to trigger (CLAUDE.md §5bis: a raw drag/scroll path needs a guard, and
+  // it should do the least work that is actually correct).
+  var _scrollRenderQueued = false;
+  function scheduleScrollRender() {
+    if (_scrollRenderQueued) return;
+    _scrollRenderQueued = true;
+    requestAnimationFrame(function () { _scrollRenderQueued = false; if (_on) render(); });
+  }
   document.addEventListener('scroll', function (e) {
     if (_on && e.target && e.target.id === 'fg-wrap') {
       var lg = _el && _el.querySelector('.mg-legend');
       if (lg) lg.style.left = (e.target.scrollLeft + 8) + 'px';
+      if (_el && _el._hasExpr) scheduleScrollRender();
     }
   }, true);
 
