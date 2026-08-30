@@ -1212,6 +1212,33 @@ window.SM={
     // as elementMotion just above), so relinkRigBinds matches correctly
     // on the duplicate without any extra remapping.
     if(src.rig)state.layers[ni].rig=JSON.parse(JSON.stringify(src.rig));
+    // Image meshes are the ONE id here that must NOT be preserved (2026-08-30).
+    // Every other id above is per-layer data that the frame clone copied too,
+    // so keeping it keeps the copy matched. A meshId instead points into
+    // state.imageMeshes, a PROJECT-level store — preserving it left both
+    // layers driving one shared mesh, and deforming either moved both.
+    // Confirmed live: pushing a vertex on the original moved the same vertex
+    // on the copy. The mesh is deep-copied under a fresh id, and that id is
+    // rewritten in all three places that reference it: the frame dicts, the
+    // per-vertex elementMotion holder (keyed by meshId, not strokeId — see
+    // motion.js's own note on why), and any rig bind targeting it.
+    (function remapMeshes(){
+      if(!window.SMImageMesh||!SMImageMesh.duplicate)return;
+      var map={};
+      (state.layers[ni].frames||[]).forEach(function(fr){
+        (fr.strokes||[]).forEach(function(st){
+          if(!st||!st.meshId)return;
+          if(!map[st.meshId]){var nid=SMImageMesh.duplicate(st.meshId);if(!nid)return;map[st.meshId]=nid;}
+          st.meshId=map[st.meshId];
+        });
+      });
+      var em=state.layers[ni].elementMotion;
+      if(em)Object.keys(map).forEach(function(oldId){
+        if(em[oldId]){em[map[oldId]]=em[oldId];delete em[oldId];}
+      });
+      var rg=state.layers[ni].rig;
+      if(rg&&rg.binds)rg.binds.forEach(function(b){if(b.meshId&&map[b.meshId])b.meshId=map[b.meshId];});
+    })();
     // Combine groups (2026-07-29): the frame clone above already preserves
     // each stroke's data.groupId unchanged, so the duplicate's strokes carry
     // the SAME groupId strings as the original — harmless for duplicateLayer

@@ -517,6 +517,19 @@
     state.imageMeshes = s;
   }
 
+  // Deep-copies a mesh under a FRESH id (2026-08-30). The store is
+  // project-level and keyed by meshId, so anything that copies a raster while
+  // preserving its meshId — duplicateLayer does exactly that, deliberately,
+  // because every OTHER id it preserves is per-layer data — ends up with two
+  // rasters pointing at one shared mesh: deforming either moved both.
+  // Returns the new id, or null if the source is gone.
+  NS.duplicate = function (meshId) {
+    var src = get(meshId);
+    if (!src) return null;
+    var id = newId();
+    store()[id] = JSON.parse(JSON.stringify(src));
+    return id;
+  };
   NS.get = get;
   NS.attach = attach;
   NS.detach = detach;
