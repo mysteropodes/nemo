@@ -1421,6 +1421,15 @@
         <div class="pr"><span class="pl" data-i18n="fieldRigWeightRadius">Rayon de poids</span><input type="number" class="pi scrub" id="rig-weight-radius" value="200" min="1" max="4000" data-step="1" data-i18n-title="rigWeightRadiusTitle" title="Distance au-delà de laquelle un os n'influence plus un vertex lié — glisser le bord du cercle d'un os (mode Assigner) règle le SIEN spécifiquement"></div>
         <div class="pr"><span class="pl" data-i18n="fieldRigFalloffSoftness">Adoucissement</span><input type="number" class="pi scrub" id="rig-falloff-softness" value="0" min="0" max="100" data-step="5" data-i18n-title="rigFalloffSoftnessTitle" title="0% = chute linéaire (transition franche au bord du rayon), 100% = chute adoucie (S-curve, comme un dégradé) — s'applique à tous les os du calque, se règle sans toucher au rayon"></div>
         <div class="pr"><label style="display:flex;gap:5px;align-items:center;font-size:10px;cursor:pointer" data-i18n-title="rigRotateModeTitle" title="Fait tourner localement chaque vertex selon la tangente de l'os (au-delà de Shapper) — désactive si une forme se déchire sur une courbure"><input type="checkbox" id="rig-rotate-mode" checked> <span data-i18n="rigRotateModeLabel">Rotation selon tangente</span></label></div>
+        <!-- What the bones drive (2026-08-30, Cyril: "oui mais faut avoir le
+             choix"). Both on by default — a layer holding a drawing AND a
+             meshed image usually wants both posed by the same skeleton — but
+             either can be turned off to rig only one of them. Read by the
+             Assign button (timeline.js) and passed to rigAutoAssignLayer. -->
+        <div class="pr" style="gap:10px">
+          <label style="display:flex;gap:4px;align-items:center;font-size:10px;cursor:pointer" data-i18n-title="rigDriveShapesTitle" title="Lier les tracés du calque au squelette"><input type="checkbox" id="rig-drive-shapes" checked> <span data-i18n="rigDriveShapes">Tracés</span></label>
+          <label style="display:flex;gap:4px;align-items:center;font-size:10px;cursor:pointer" data-i18n-title="rigDriveMeshesTitle" title="Lier les points de mesh des images du calque au squelette"><input type="checkbox" id="rig-drive-meshes" checked> <span data-i18n="rigDriveMeshes">Images (mesh)</span></label>
+        </div>
         <div class="pr" style="gap:6px">
           <button class="pbtn ac" id="btn-rig-commit" style="flex:1" data-i18n="rigCommitBtn">Figer la pose</button>
           <button class="pbtn" id="btn-rig-reset" style="flex:1" data-i18n="rigResetBtn">Réinitialiser</button>
