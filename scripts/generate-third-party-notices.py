@@ -50,6 +50,21 @@ VENDORED_FILES = [
         "source": "https://github.com/gpac/mp4box.js",
         "note": "v0.5.2, minified, unmodified. MP4/MOV demuxing (native-video-bridge.js).",
     },
+    {
+        "name": "Delaunator",
+        "path": "src/js/delaunator.vendor.js",
+        "license": "ISC",
+        "copyright": "Copyright (c) 2021, Mapbox",
+        "source": "https://github.com/mapbox/delaunator",
+        "note": (
+            "v5.0.1, upstream UMD build, unmodified apart from a prepended license "
+            "header. Delaunay triangulation for the image mesh (image-mesh.js). "
+            "Upstream's rollup build INLINES robust-predicates 3.0.2 "
+            "(Unlicense / public domain, https://github.com/mourner/robust-predicates) "
+            "— no separate file, so it can't be discovered by a scanner and is "
+            "recorded here."
+        ),
+    },
 ]
 
 # Bundled external binary — not a library dependency, but its license terms

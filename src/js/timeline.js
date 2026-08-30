@@ -1972,6 +1972,15 @@ window.SM={
       // part of each frame's own strokes — this is only the {roleId:{name}}
       // name registry itself.
       trackRoles:state.trackRoles||{},
+      // Image meshes (2026-08-30, image-mesh.js) — project-level registry,
+      // same slot/category as trackRoles above. The per-raster `meshId` tag
+      // already round-trips via serR/desR as part of each frame's own
+      // strokes; this is the topology those ids point AT (mask outline +
+      // rest vertices + triangle indices + static pose). Serialized through
+      // the module rather than copied wholesale because Delaunator returns
+      // `tris` as a typed array, which JSON.stringify would turn into an
+      // object ({"0":1,…}) — reloadable-looking and silently unusable.
+      imageMeshes:(window.SMImageMesh?SMImageMesh.serialize():(state.imageMeshes||{})),
       bpm:state.bpm,bpmOffset:state.bpmOffset,bpmShow:!!state.bpmShow,
       motionBlurOn:!!state.motionBlurOn,motionBlurSamples:state.motionBlurSamples,motionBlurShutter:state.motionBlurShutter,
       // Rulers/guides (2026-08-27, "mettre en place les repères et rulers
@@ -2265,6 +2274,13 @@ window.SM={
     state.comments=d.comments||[];
     state.markers=d.markers||[];
     state.trackRoles=d.trackRoles||{}; // feedback #151 — see state.trackRoles' own comment, app.js
+    // Image meshes (2026-08-30) — mirrors the exportJSON line above. Goes
+    // through the module so the id counter is re-seeded past whatever ids
+    // this project already uses (otherwise the next mesh created in this
+    // session would collide with an imported one and silently share its
+    // topology).
+    if(window.SMImageMesh)SMImageMesh.load(d.imageMeshes);
+    else state.imageMeshes=d.imageMeshes||{};
     state.shyEnabled=!!d.shyEnabled;
     state.bpm=d.bpm!=null?d.bpm:120;state.bpmOffset=d.bpmOffset||0;state.bpmShow=!!d.bpmShow;
     state.exprGlobals=d.exprGlobals||'';

@@ -2146,6 +2146,11 @@
 <script src="js/updater-bridge.js"></script>
 <script src="js/kitsu.js"></script>
 <script src="js/images.js"></script>
+<!-- Delaunator (Mapbox, ISC) 5.0.1, vendored — Delaunay triangulation for the
+     image mesh (image-mesh.js). Loaded BEFORE that file so window.Delaunator
+     already exists when a mesh is built. -->
+<script src="js/delaunator.vendor.js"></script>
+<script src="js/image-mesh.js"></script>
 <script src="js/psd-import-bridge.js"></script>
 <script src="js/figma-import.js"></script>
 <script src="js/asset-tree.js"></script>

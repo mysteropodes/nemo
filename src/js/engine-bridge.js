@@ -1449,9 +1449,21 @@
             }
             rb = SMMotion.project3DImageRect(rb, rbProjector);
           }
-          items.push({
-            image: { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: imgOp, rotation: rb.rotation || 0 },
-          });
+          var imgItem = { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: imgOp, rotation: rb.rotation || 0 };
+          // Image mesh (2026-08-30, image-mesh.js) — a raster carrying
+          // data.meshId is drawn by the engine as a deformable mesh clipped
+          // to its own outline (which IS its mask) instead of one rect blit.
+          // Built from `rb`, the FINAL rect: every Motion/parent/3D
+          // transform above has already been folded into it, and the mesh
+          // lives in normalized rect space, so it rides that whole chain
+          // for free instead of needing its own copy of the transform math
+          // (CLAUDE.md §3). Returns null — costing one property read — for
+          // every ordinary image.
+          if (window.SMImageMesh) {
+            var meshPayload = SMImageMesh.scenePayload(c, rb);
+            if (meshPayload) imgItem.mesh = meshPayload;
+          }
+          items.push({ image: imgItem });
           continue;
         }
         // The eraser (tools.js eraseAtPoint) produces a CompoundPath the
@@ -2339,7 +2351,16 @@
         if (imageId) {
           var rb = rasterImageRect(c); // same rotation-aware rect as buildSceneJson's own Raster branch
           if (onionProjector3D) rb = SMMotion.project3DImageRect(rb, onionProjector3D);
-          items.push({ image: { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: c.opacity !== undefined ? c.opacity : 1, rotation: rb.rotation || 0 } });
+          var oItem = { imageId: imageId, x: rb.x, y: rb.y, width: rb.width, height: rb.height, opacity: c.opacity !== undefined ? c.opacity : 1, rotation: rb.rotation || 0 };
+          // Same image-mesh handling as buildSceneJson's own Raster branch —
+          // an onion-skin/Ghost-All ghost of a DEFORMED image has to show the
+          // deformed silhouette, otherwise the ghost and the live drawing
+          // disagree about where the artwork is, which is worse than no ghost.
+          if (window.SMImageMesh) {
+            var oMesh = SMImageMesh.scenePayload(c, rb);
+            if (oMesh) oItem.mesh = oMesh;
+          }
+          items.push({ image: oItem });
         }
         return;
       }

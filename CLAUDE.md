@@ -701,3 +701,69 @@ unique de tous les lecteurs d'un composant. **Motion blur** est un
 post-traitement dans `buildSceneJson` : il réutilise les items déjà construits
 et leur applique la matrice DELTA — ne jamais dupliquer la boucle de
 construction (CLAUDE.md §3).
+
+## 12. Image mesh — déformer une image importée (2026-08-30, PR1)
+
+`image-mesh.js` (+ `draw_image_mesh` dans engine.rs). Demande de Cyril :
+déformer/animer une image importée via un maillage éditable, AVEC un système de
+masque, les deux **intégrés au calque image** et pas en calques séparés. Règle
+confirmée explicitement : **le contour du masque EST la frontière du maillage**
+— on triangule À L'INTÉRIEUR du contour. C'est ce qui fait UNE fonctionnalité et
+pas deux : il n'existe aucun chemin de code « masque d'image » séparé, le
+contour est directement la silhouette que le moteur découpe.
+
+**Le maillage vit dans `state.imageMeshes`, PAS sur le stroke.** Le dict d'un
+raster est réécrit tel quel dans CHAQUE frame du calque (boucle d'import de
+images.js) — poser la topologie dessus la dupliquerait une fois par frame.
+Mesuré sur 24 frames avec un maillage 8×8 : projet 133 855 octets (store) contre
+311 268 (par frame), soit **+177 413 octets, ×2,33**, pour une entrée de
+maillage de 7 723 octets. Le stroke ne porte que `meshId` (17 octets/frame).
+Même catégorie et même emplacement de persistance que `symbols`/`trackRoles`.
+
+⚠️ **`meshId` doit être écrit sur TOUTES les frames, pas seulement la
+courante** (`SMImageMesh.propagate`). Trouvé en mesurant, pas en relisant :
+`saveActiveLayerFrame` ne re-sérialise que la frame courante, donc taguer le
+Raster live ne taguait qu'UNE frame — un scrub d'une frame et l'image
+redevenait plate et non masquée, sans la moindre erreur. Famille de bug n°1 du
+§1 exactement.
+
+**Espace normalisé.** Tout un maillage (contour, sommets de repos, offsets) est
+en coordonnées 0..1 sur le rect d'affichage du raster, JAMAIS en monde :
+`buildSceneJson` résout déjà toute la chaîne Motion/parent/3D en UN rect final
+par item, et `scenePayload` mappe le maillage à travers CE rect — donc le
+maillage suit déplacement/rotation/échelle/Motion sans deuxième copie des maths
+de transformation (§3). `verts` = repos, `offsets` = pose statique ; la version
+animée (clés par sommet, PR3) se superpose via l'argument `poseAt`.
+
+**Rendu : une affine par triangle, pas de nouveau pipeline GPU.** vello ne sait
+placer une image que sous une affine — mais une affine est déterminée
+EXACTEMENT par trois paires de points, donc un mapping triangle→triangle n'est
+pas une approximation. Chaque triangle est un `scene.fill` avec l'image comme
+BRUSH (c'est littéralement ce que fait `draw_image` en interne, avec un rect au
+lieu d'un triangle). Un seul `push_layer` externe sur le contour déformé porte
+le masque ET l'opacité — l'opacité là plutôt que par triangle, sinon chaque
+couture se composite deux fois. Coutures : chaque triangle de destination est
+dilaté d'un demi-pixel ÉCRAN autour de son centroïde (le clip seulement, jamais
+l'affine de l'image), sinon l'antialiasing laisse une grille visible à ~25 % de
+fond entre triangles voisins.
+
+**Chiffré** : maillage au repos contre image simple = **52 px différents sur
+2 073 600 (0,0025 %), écart de canal max 1/255** — même ordre que le
+`pathTransform` du §5ter, donc la reconstruction par morceaux est exacte.
+`render()` et `render_to_pixels()` d'accord sur 11 échantillons monde sur 12
+(le 12e tombe sur une frontière de damier, artefact de ma calibration écran).
+
+⚠️ **`exportNeedsEngine` (export.js) doit inclure `exportHasImageMesh`** —
+même piège que 3D/Motion Blur/Order : le repli Paper.js dessine un Raster comme
+son rect, sans notion de maillage ni de masque, donc l'export sortirait l'image
+parfaitement plate et non masquée en ayant l'air correct à l'écran.
+
+**Limite v1 assumée** : triangulation Delaunay NON contrainte (Delaunator,
+ISC, vendorisé) + filtre par centroïde-dans-le-contour. Exact pour un contour
+convexe ; un contour très concave peut perdre un éclat de couverture près de la
+concavité. Les arêtes longues du contour sont densifiées pour limiter ça.
+
+**Pas encore fait** : l'éditeur on-canvas (PR2) et les clés Motion par sommet
+(PR3, via le patron `vtx*`/`applyPathVertexOffsets` de motion.js). Une entrée
+de maillage orpheline (image supprimée) n'est pas ramassée — sans conséquence
+visible, mais elle force l'export par le moteur via `exportHasImageMesh`.
