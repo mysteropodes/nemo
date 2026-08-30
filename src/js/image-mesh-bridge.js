@@ -358,11 +358,91 @@
   // and to flip it. Everything routes through the same toggleMesh/`editing`
   // the checkboxes use, so the two entry points can never disagree — and
   // renderImageMeshPanel() keeps the checkboxes in step after a menu click.
+  // ---- Mask an image with a shape you drew (2026-08-30) --------------
+  // Cyril: "comment il fonctionnerait avec un bouton select dans le menu
+  // flottant quand on a select une image ? Sur les outils de tracé ?"
+  //
+  // Answer, and why it is shaped this way: rather than teaching the mesh a
+  // drawing mode of its own (which would have to re-implement the Pen, the
+  // lasso, the primitives and freehand, one by one), you draw the mask with
+  // the tools that already exist, as an ORDINARY shape, and then hand that
+  // shape to the image. Every tracing tool works for free, including ones
+  // added later, and you can refine the shape with the normal editing tools
+  // before committing it.
+  //
+  // The result is not a second masking system: the shape becomes the mesh's
+  // OUTLINE, which already IS the clip silhouette and the triangulation
+  // boundary. So the mask stays live (no baking, unlike labs/clip-mask-bake
+  // for vectors), its points stay draggable in mesh edit mode afterwards,
+  // and because outline points are ordinary mesh vertices, the mask is
+  // keyframable in Motion like anything else — an animated mask, for free.
+  //
+  // Selection is one shape + one image, the convention every app uses for
+  // "clip this with that", and unambiguous about which masks which.
+  function maskPair() {
+    if (typeof Raster === 'undefined' || !window.selectedPaths || selectedPaths.length !== 2) return null;
+    var a = selectedPaths[0], b = selectedPaths[1];
+    var ras = (a instanceof Raster) ? a : (b instanceof Raster) ? b : null;
+    var shape = (ras === a) ? b : a;
+    if (!ras || !ras.parent || !shape || !(shape instanceof Path) || !shape.segments || shape.segments.length < 3) return null;
+    return { raster: ras, shape: shape };
+  }
+  function maskImageWithShape() {
+    var pair = maskPair();
+    if (!pair) return;
+    var rect = window.SMEngineBridge && SMEngineBridge.rasterImageRect
+      ? SMEngineBridge.rasterImageRect(pair.raster) : null;
+    if (!rect) return;
+    // flatten() on a CLONE: the outline is a polygon (SMImageMesh triangulates
+    // straight edges), so a curve has to be sampled — and the user's own shape
+    // must not be modified in the process, since it may survive as art if the
+    // caller ever chooses not to consume it.
+    var tmp = pair.shape.clone({ insert: false });
+    tmp.closed = true;
+    tmp.flatten(2);
+    var poly = tmp.segments.map(function (sg) {
+      return SMImageMesh.normalizedOf(rect, sg.point.x, sg.point.y);
+    });
+    tmp.remove();
+    if (poly.length < 3) return;
+    pushUndo();
+    var mid = pair.raster.data && pair.raster.data.meshId;
+    if (!mid) { SMImageMesh.attach(pair.raster, { cols: 4, rows: 4 }); mid = pair.raster.data && pair.raster.data.meshId; }
+    if (!mid) return;
+    SMImageMesh.setOutline(mid, poly);
+    // The shape has BECOME the mask, so leaving it on the canvas would draw
+    // it twice: once as art, once as the silhouette. Removed through the
+    // app's own delete path (companions, revision-ghosting, frame save) with
+    // the selection narrowed to it, then the image is reselected so the mesh
+    // panel stays on the thing you are now editing.
+    selectedPaths = [pair.shape];
+    if (window.SM && SM.deleteSelStrokes) SM.deleteSelStrokes();
+    // Re-RESOLVE the image instead of keeping the pre-delete reference:
+    // deleteSelStrokes saves the frame, which rebuilds the Paper items, so
+    // the old object is detached by the time we get here. Holding it left
+    // selectedPaths pointing at a parentless Raster — singleRaster() then
+    // refused it (correctly, that is exactly the ghost its own comment
+    // guards against) and the mesh panel went blank the instant the mask
+    // landed. Found live, toggling Edit points right after masking. meshId
+    // is the key because we just wrote it, and it survives the rebuild.
+    var live = null, kids = userLayers[state.activeLayerIdx] && userLayers[state.activeLayerIdx].children;
+    for (var i = 0; kids && i < kids.length; i++) {
+      if (kids[i] instanceof Raster && kids[i].data && kids[i].data.meshId === mid) { live = kids[i]; break; }
+    }
+    selectedPaths = live ? [live] : [];
+    if (window.updateUI) updateUI(true);
+    renderImageMeshPanel();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    if (window.showToast) showToast(SM.t('toastImageMaskedWithShape'));
+  }
+
   window.SMImageMeshUI = {
     canMesh: function () { return !!singleRaster(); },
     hasMesh: function () { var r = singleRaster(); return !!(r && r.data && r.data.meshId); },
     toggleMesh: function () { var r = singleRaster(); if (r) toggleMesh(!(r.data && r.data.meshId)); },
     isEditing: function () { return editing; },
+    canMaskWithShape: function () { return !!maskPair(); },
+    maskImageWithShape: maskImageWithShape,
     toggleEditing: function () {
       var r = singleRaster();
       if (!r || !(r.data && r.data.meshId)) return;
