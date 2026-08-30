@@ -11,6 +11,12 @@
   --gutter:#0b0a0d;--bg:#131215;--panel:#201f25;--panel2:#17161a;--panel3:#26242a;
   --border:rgba(255,255,255,.05);--border2:rgba(255,255,255,.12);
   --text:#ECEAE7;--text-dim:rgba(236,234,231,.45);--text-dark:rgba(236,234,231,.3);
+  /* Recessed: a control that exists but is not currently in play — a collapsed
+     section header, an unselected tool, an inactive tab. Distinct from
+     --text-dim (secondary but live, e.g. a field's label) on purpose. */
+  --text-recessed:#5d6267;
+  /* A numeric value at rest — see .pi, which returns to --text while edited. */
+  --text-value:rgba(236,234,231,.72);
   --accent:#3F6BF5;--accent-hover:#7EA0FA;--accent-dim:rgba(63,107,245,.18);
   --key-color:#c8c8d4;--tween-color:rgba(63,107,245,.16);
   --red:#ff5555;--green:#5FA875;--orange:#F0A585;--purple:#B49BE6;
@@ -260,7 +266,7 @@ body.tools-docked-away #tools-panel-resize{display:none;}
 #tools-panel-resize::after,#props-panel-resize::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:3px;height:44px;border-radius:99px;background:transparent;transition:background .15s;}
 #tools-panel-resize:hover::after,#tools-panel-resize.active::after,
 #props-panel-resize:hover::after,#props-panel-resize.active::after{background:var(--accent);}
-.tool-btn{width:34px;height:34px;border:none;background:transparent;color:rgba(236,234,231,.75);
+.tool-btn{width:34px;height:34px;border:none;background:transparent;color:var(--text-recessed);
   border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;
   position:relative;transition:background .15s,color .15s;}
 .tool-btn:hover{background:rgba(255,255,255,.06);color:var(--text);}
@@ -528,6 +534,13 @@ body.rulers-off #ruler-h,body.rulers-off #ruler-v,body.rulers-off #ruler-corner{
 .phdr:active{cursor:grabbing;}
 .phdr .ar{font-size:14px;color:rgba(236,234,231,.3);transition:none;order:2;margin-left:auto;}
 .phdr.closed .ar{transform:none;}
+/* A collapsed section is a header with nothing under it, so it should read as
+   dormant rather than as a live heading (UI pass 2026-08-30). Same recessed
+   grey as the inactive tool icons, so "not currently in play" looks the same
+   everywhere. */
+.phdr.closed{color:var(--text-recessed);}
+.phdr.closed .ar{color:var(--text-recessed);}
+.phdr.closed:hover{color:rgba(236,234,231,.85);}
 .pbdy{padding:2px 14px 12px;display:flex;flex-direction:column;gap:8px;}
 .pbdy.hid{display:none;}
 .pr{display:flex;align-items:center;gap:6px;}
@@ -549,7 +562,13 @@ body.rulers-off #ruler-h,body.rulers-off #ruler-v,body.rulers-off #ruler-corner{
    ~31px-tall box — reduced from 8px/10px vertical/horizontal padding to
    5px/8px so the whole right panel column of sections takes noticeably
    less vertical space without shrinking the text itself. */
-.pi{flex:1;background:var(--panel3);border:none;color:var(--text);border-radius:6px;padding:5px 8px;font-size:12.5px;font-weight:600;outline:none;box-shadow:inset 0 0 0 1px transparent;transition:box-shadow .15s;}
+.pi{flex:1;background:var(--panel3);border:none;color:var(--text-value);border-radius:5px;padding:4px 7px;font-size:11.5px;font-weight:600;outline:none;box-shadow:inset 0 0 0 1px transparent;transition:box-shadow .15s,color .12s;}
+/* A value at rest is reference material; a value you are touching is the thing
+   you are working on. Only the second earns full-strength text (UI pass
+   2026-08-30). :hover is included because a scrub field reacts to the pointer
+   before any click — brightening on approach makes the field feel live rather
+   than making the change look like it already happened. */
+.pi:hover,.pi:focus,.pi.scrubbing,.pi.editing{color:var(--text);}
 .pi:focus{box-shadow:inset 0 0 0 1px var(--accent);}
 .pi[type="range"]{padding:0;border:none;background:transparent;accent-color:var(--accent);}
 /* Unified checkbox design (feedback 2026-07: "tous les checkbox qui
@@ -1794,8 +1813,9 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
    44px bar above the transport controls, so it inherits height/background
    from the parent row instead of setting its own. */
 #symbol-tabs{display:flex;align-items:center;background:transparent;border-bottom:none;height:100%;flex-shrink:0;overflow-x:auto;padding:0;gap:24px;}
-.sym-tab{display:flex;align-items:center;gap:9px;padding:0;font-size:12.5px;font-weight:500;color:rgba(236,234,231,.35);cursor:pointer;border-right:none;white-space:nowrap;}
-.sym-tab::before{content:'';width:9px;height:9px;border-radius:50%;background:#4a4852;flex-shrink:0;}
+.sym-tab{display:flex;align-items:center;gap:9px;padding:0;font-size:12.5px;font-weight:500;color:var(--text-recessed);cursor:pointer;border-right:none;white-space:nowrap;transition:color .12s;}
+.sym-tab:hover{color:rgba(236,234,231,.7);}
+.sym-tab::before{content:'';width:9px;height:9px;border-radius:50%;background:#3a3942;flex-shrink:0;transition:background .12s;}
 .sym-tab.act{color:var(--text);background:transparent;border-bottom:none;font-weight:600;}
 .sym-tab.act::before{background:var(--green);}
 .sym-tab .sym-tab-x{font-size:12px;line-height:1;color:var(--text-dim);}
