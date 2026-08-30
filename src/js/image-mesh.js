@@ -166,6 +166,45 @@
   // (outline edited, density changed), so any existing per-vertex offsets
   // are reset — vertex INDICES are not stable across a retopology and
   // silently carrying old offsets onto new vertices would scramble the pose.
+  // Re-samples the OLD deformation at the NEW vertex positions, so revising a
+  // mesh does not throw away what you sculpted (2026-08-30, Cyril: "avoir la
+  // possibilité d'éditer revoir le mesh"). rebuild() used to zero every offset,
+  // which meant changing the density or redrawing the outline silently
+  // discarded the deformation — you could revise the mesh, but only by losing
+  // the work that made you want to revise it.
+  //
+  // The offsets are a piecewise-linear field over the old triangulation, so
+  // the honest resample is barycentric interpolation inside the old triangle
+  // that contains the new point. A new vertex outside the old outline (the
+  // outline grew) has no triangle to sit in and falls back to the nearest old
+  // vertex, which keeps the boundary moving with its neighbourhood instead of
+  // snapping back to rest.
+  function resampleOffsets(oldPts, oldOffs, oldTris, newPts) {
+    if (!oldPts || !oldPts.length || !oldOffs) return newPts.map(function () { return [0, 0]; });
+    return newPts.map(function (q) {
+      var qx = q[0], qy = q[1];
+      for (var t = 0; t + 2 < oldTris.length; t += 3) {
+        var a = oldPts[oldTris[t]], b = oldPts[oldTris[t + 1]], c = oldPts[oldTris[t + 2]];
+        if (!a || !b || !c) continue;
+        var d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+        if (!d) continue;
+        var w0 = ((b[1] - c[1]) * (qx - c[0]) + (c[0] - b[0]) * (qy - c[1])) / d;
+        var w1 = ((c[1] - a[1]) * (qx - c[0]) + (a[0] - c[0]) * (qy - c[1])) / d;
+        var w2 = 1 - w0 - w1;
+        if (w0 < -1e-6 || w1 < -1e-6 || w2 < -1e-6) continue;
+        var oa = oldOffs[oldTris[t]] || [0, 0], ob = oldOffs[oldTris[t + 1]] || [0, 0], oc = oldOffs[oldTris[t + 2]] || [0, 0];
+        return [oa[0] * w0 + ob[0] * w1 + oc[0] * w2, oa[1] * w0 + ob[1] * w1 + oc[1] * w2];
+      }
+      var best = -1, bestD = Infinity;
+      for (var i = 0; i < oldPts.length; i++) {
+        var dx = oldPts[i][0] - qx, dy = oldPts[i][1] - qy, dd = dx * dx + dy * dy;
+        if (dd < bestD) { bestD = dd; best = i; }
+      }
+      var o = (best >= 0 && oldOffs[best]) || [0, 0];
+      return [o[0], o[1]];
+    });
+  }
+
   function rebuild(mesh) {
     var cols = Math.max(0, Math.min(64, mesh.cols | 0));
     var rows = Math.max(0, Math.min(64, mesh.rows | 0));
@@ -181,9 +220,13 @@
         if (pointInPoly(outline, u, v)) pts.push([u, v]);
       }
     }
+    var prevPts = mesh.verts, prevOffs = mesh.offsets, prevTris = mesh.tris;
     mesh.verts = pts;
     mesh.tris = triangulate(pts, outline.length);
-    mesh.offsets = pts.map(function () { return [0, 0]; });
+    // Carry the deformation across instead of zeroing it — see resampleOffsets.
+    mesh.offsets = (prevPts && prevOffs && prevTris && prevOffs.some(function (o) { return o && (o[0] || o[1]); }))
+      ? resampleOffsets(prevPts, prevOffs, prevTris, pts)
+      : pts.map(function () { return [0, 0]; });
     return mesh;
   }
 
