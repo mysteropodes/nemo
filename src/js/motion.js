@@ -7866,10 +7866,10 @@
     list.appendChild(row);
   }
   function renderFillColorRow(list, holder, currentFillColorHex) {
-    renderColorRow(list, holder, 'fillColor', 'Fill', 'Couleur de fill de cette forme', currentFillColorHex);
+    renderColorRow(list, holder, 'fillColor', 'Fill', SM.t('shapeFillColorTitle'), currentFillColorHex);
   }
   function renderStrokeColorRow(list, holder, currentStrokeColorHex) {
-    renderColorRow(list, holder, 'strokeColor', 'Stroke', 'Couleur de stroke de cette forme', currentStrokeColorHex);
+    renderColorRow(list, holder, 'strokeColor', 'Stroke', SM.t('shapeStrokeColorTitle'), currentStrokeColorHex);
   }
   // Trim Paths (2026-08, "animer les stroke en in et out"): 3 scalar rows
   // (Start/End/Offset, %), same stopwatch/keying contract as
@@ -8756,7 +8756,7 @@
     row.classList.toggle('prop-selected', isMotionPropSelected(holder, prop));
     var target = labelEl || row;
     target.classList.add('motion-prop-select-target');
-    target.title = (target.title ? target.title + ' · ' : '') + 'Clic : sélectionner toutes les clés · Cmd : ajouter/retirer · Maj : plage de propriétés';
+    target.title = (target.title ? target.title + ' · ' : '') + SM.t('propRowSelectHint');
     target.addEventListener('click', function (e) {
       e.stopPropagation();
       selectMotionProperty(holder, prop, e);
@@ -10619,6 +10619,30 @@
     elementFillColorAt: elementFillColorAt,
     elementStrokeColorAt: elementStrokeColorAt,
     elementStrokeWidthAt: elementStrokeWidthAt,
+    // Lets the ORDINARY fill/stroke color picker (SM.setFillColor /
+    // setStrokeColor, timeline.js) reach an element's Motion color track.
+    // Without this the two writers disagree in the one way that loses the
+    // user's work: the picker wrote p.fillColor straight onto the Paper item
+    // and saved the frame, while elementFillColorAt kept returning the TRACK
+    // value — so with a fillColor track live, picking a color at frame 12
+    // showed red for one repaint and then rendered blue again, forever, with
+    // no key created and no error. Measured live before the fix: 1 key in,
+    // 1 key out, live item #ff2200, engine value still [74,158,255,255].
+    // Returns false when this element has no color track at all, which is
+    // the overwhelmingly common case — plain Animation 2D recoloring keeps
+    // its existing behavior untouched and never pays for this lookup twice.
+    // setValue is the single writer (CLAUDE.md §13): it keys at the playhead
+    // when the stopwatch is on and writes motionStatic when it isn't, so the
+    // picker inherits both behaviors for free.
+    writeElementColorFromPicker: function (li, strokeId, prop, hex) {
+      var ld = state.layers[li];
+      if (!ld || !ld.elementMotion || !strokeId) return false;
+      var holder = ld.elementMotion[strokeId];
+      if (!holder) return false;
+      if (!hasKeys(holder, prop) && !(holder.motionStatic && holder.motionStatic[prop])) return false;
+      setValue(holder, prop, hexToRgba255(hex));
+      return true;
+    },
     layerOrderAt: layerOrderAt,
     elementOrderAt: elementOrderAt,
     anyLayerHasOrder: anyLayerHasOrder,

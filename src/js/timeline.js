@@ -594,14 +594,25 @@ window.SM={
       });
       saveActiveLayerFrame();updateUI();
     }},
+  // Sends a pick from the ordinary color picker into this shape's Motion
+  // color track when it has one, so the picker and the Fill/Stroke row in
+  // the Motion panel stop being two writers that disagree (see
+  // writeElementColorFromPicker's own comment in motion.js for the exact
+  // symptom this fixes). We still write p.fillColor/strokeColor afterwards
+  // either way: at the playhead the track value setValue just wrote IS this
+  // same color, so the two agree, and the Paper.js fallback canvas (which
+  // has never known about color tracks, same as Order/3D/Motion Blur) keeps
+  // showing something correct for the frame being edited.
+  // A shape with no track at all — every shape in plain Animation 2D — takes
+  // the early `false` and behaves exactly as before.
   setStrokeColor:function(v){state.strokeColor=v;paintStrokeSwatches(v);
-    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush){p.fillColor=v;applyBrushKeyline(p);}else if(p.strokeColor)p.strokeColor=v;});saveActiveLayerFrame();updateUI();}
+    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush){p.fillColor=v;applyBrushKeyline(p);}else if(p.strokeColor){routeColorToMotion(p,'strokeColor',v);p.strokeColor=v;}});saveActiveLayerFrame();updateUI();}
     // Fill/Stroke Select tool: recolor ONLY the clicked aspect — a 'stroke'
     // selection here means strokeColor, never touches fillColor even on a
     // combined shape (that's the whole point of this tool vs plain Select).
     else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='stroke';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='stroke')return sel;var arc=fsRealizeStrokeSegment(sel,userLayers[state.activeLayerIdx]);arc.strokeColor=v;return{path:arc,kind:'stroke',segStart:0,segEnd:arc.length,closed:arc.closed};});saveActiveLayerFrame();updateUI();}},
   setFillColor:function(v){state.fillColor=v;paintFillSwatches(v);
-    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.fillColor)p.fillColor=v;});saveActiveLayerFrame();updateUI();}
+    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.fillColor){routeColorToMotion(p,'fillColor',v);p.fillColor=v;}});saveActiveLayerFrame();updateUI();}
     else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='fill'&&sel.kind!=='fillregion')return sel;if(sel.kind==='fillregion')sel=fsRealizeFillRegion(sel,userLayers[state.activeLayerIdx]);sel.path.fillColor=v;return sel;});saveActiveLayerFrame();updateUI();}},
   // Fill/Stroke on-off is mirrored by TWO eye icons — the right-panel one
   // (#fill-enable-toggle / #stroke-enable-toggle) and the left tool-panel one
@@ -5544,6 +5555,20 @@ function buildParentCell(row,ld,li){
 // Keeps the existing 8-digit-hex convention untouched: `.value` is assigned
 // the full string and the native input truncates it to 6 digits by design,
 // with `.dataset.hex8` carrying the alpha alongside (CLAUDE.md §2).
+// Resolves a Paper item back to (layer index, strokeId) and hands the pick to
+// the element's Motion color track. `userLayers[i]` and `state.layers[i]` are
+// the same index throughout the app, so the parent lookup is the layer index.
+// Guarded on the parent still being IN userLayers for the same reason
+// image-mesh-bridge's singleRaster() is (CLAUDE.md §12bis): a selectedPaths
+// entry outlives the object it names across loadFrame/undo/importJSON, and a
+// detached item still has its data.strokeId.
+function routeColorToMotion(p,prop,hex){
+  if(!p||!p.data||!p.data.strokeId)return false;
+  if(!window.SMMotion||!SMMotion.writeElementColorFromPicker)return false;
+  var li=userLayers.indexOf(p.parent);
+  if(li<0)return false;
+  return SMMotion.writeElementColorFromPicker(li,p.data.strokeId,prop,hex);
+}
 function paintStrokeSwatches(v){
   var sw=document.getElementById('stroke-well'); if(sw)sw.style.background=v;
   var pm=document.getElementById('pm-stroke');   if(pm)pm.style.background=v;
