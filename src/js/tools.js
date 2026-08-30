@@ -7594,6 +7594,38 @@ function onViewDoubleClick(event){
       return;
     }
   }
+  // Motion mode (2026-08-30, feedback #170 "dans motion le double clic dans
+  // le canvas sur plusieurs éléments ne révèle toujours pas les box
+  // individuelle"): Motion's active tool is 'draw', not 'select', so this
+  // whole function used to early-return below and the double-click did
+  // NOTHING there — the Animation 2D isolation shipped earlier today never
+  // reached it. Motion already HAS a per-element target of its own
+  // (_motionExpandedElement, which motionBoxGeom aims the gizmo at); the
+  // gesture just had no way in from the canvas, only from the timeline's
+  // element rows. So this hands the double-click to that existing machinery
+  // rather than running Animation 2D's selectedPaths isolation, which
+  // Motion's own overlay would ignore anyway.
+  if(state.appMode==='motion'){
+    var mLayer=userLayers[state.activeLayerIdx];
+    if(!mLayer)return;
+    var mHit=mLayer.hitTest(event.point,{fill:true,stroke:true,tolerance:4/view.zoom});
+    if(!mHit||!mHit.item)return;
+    var mItem=mHit.item;
+    while(mItem.parent&&mItem.parent!==mLayer)mItem=mItem.parent;
+    var mSid=mItem.data&&mItem.data.strokeId;
+    if(!mSid)return;
+    if(mItem.data.isBrushTextureCopy||mItem.data.isLinkedFillCompanion||mItem.data.isDuplicatorCopy)return;
+    var M=window.SMMotion;
+    if(!M)return;
+    window._motionExpandedLayer=state.activeLayerIdx;
+    window._motionExpandedElement=mSid;
+    window._perObjBoxes=state.activeLayerIdx;
+    if(M.selectShapesByStrokeIds)M.selectShapesByStrokeIds(state.activeLayerIdx,[mSid]);
+    if(window.renderLayerList)renderLayerList();
+    if(window.renderTimeline)renderTimeline();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    return;
+  }
   if(state.tool!=='select')return;
   var layer=userLayers[state.activeLayerIdx];
   // fill AND stroke (2026-08-30, feedback #166 "au double clic toujours box
@@ -7716,7 +7748,11 @@ function onViewDoubleClick(event){
 }
 view.onMouseDown=onMouseDown;view.onMouseDrag=onMouseDrag;view.onMouseUp=onMouseUp;view.onMouseMove=onMouseMoveTool;view.onDoubleClick=onViewDoubleClick;
 canvasEl.addEventListener('dblclick',function(e){
-  if(!(window.SMEngineBridge&&SMEngineBridge.isEnabled())||state.tool!=='select')return;
+  // state.tool is 'draw' in Motion mode, so the select-only gate kept this
+  // bridge from ever firing there (feedback #170) — onViewDoubleClick has
+  // its own Motion branch now and decides for itself.
+  if(!(window.SMEngineBridge&&SMEngineBridge.isEnabled()))return;
+  if(state.tool!=='select'&&state.appMode!=='motion')return;
   var w=SMEngineBridge.screenToWorld(e.clientX,e.clientY);
   onViewDoubleClick({point:new Point(w[0],w[1])});
   e.preventDefault();e.stopImmediatePropagation();
