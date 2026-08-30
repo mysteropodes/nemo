@@ -2213,6 +2213,23 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 .media-filter-chip.active{color:var(--accent-hover);background:var(--accent-dim);border-color:var(--accent);}
 /* Import icon buttons (feedback #158) — same visual weight as .pbtn but
    square, since the drop zone right below already carries the words. */
+/* Search row becomes a flex line so the gear sits beside the field. */
+.media-search-line{display:flex;align-items:center;gap:4px;position:relative;}
+.media-search-line .media-search-row{flex:1;min-width:0;}
+.media-gear{flex:none;width:22px;height:22px;display:flex;align-items:center;justify-content:center;padding:0;border:none;border-radius:5px;background:transparent;color:var(--text-recessed);cursor:pointer;}
+.media-gear:hover{color:var(--text);background:var(--panel3);}
+.media-gear.open{color:var(--accent);background:var(--panel3);}
+/* Settings live in a popover, not stacked in the body (feedback #160). */
+.media-settings-pop{position:absolute;right:0;top:100%;z-index:40;margin-top:4px;width:210px;padding:8px;background:var(--panel2);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.45);}
+/* Status bar: holdings on the left, actions on the right. */
+.media-statusbar{display:flex;align-items:center;gap:4px;border-top:1px solid var(--border);padding-top:6px;margin-top:4px;}
+.media-statusbar-spacer{flex:1;}
+.media-count{font-size:9px;color:var(--text-recessed);white-space:nowrap;}
+/* Both a report and the action: it only appears when something IS missing,
+   and clicking it clears those entries — the old "Nettoyer (N)" button's job,
+   now stated as the problem rather than as the remedy. */
+.media-missing-badge{flex:none;font-size:9px;font-weight:600;line-height:1;padding:4px 8px;border-radius:9px;border:1px solid rgba(255,85,85,.45);background:rgba(255,85,85,.12);color:#ff8a8a;cursor:pointer;}
+.media-missing-badge:hover{background:rgba(255,85,85,.22);border-color:var(--red);}
 .media-import-row{gap:4px;}
 .media-icon-btn{flex:none;width:26px;height:22px;display:flex;align-items:center;justify-content:center;padding:0;border:1px solid var(--border);border-radius:5px;background:var(--panel3);color:var(--text-dim);cursor:pointer;}
 .media-icon-btn:hover{color:var(--text);border-color:var(--accent);}
