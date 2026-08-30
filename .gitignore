@@ -43,3 +43,6 @@ geometry-wasm/target/
 /CODEX_HANDOFF.md
 
 .wrangler/
+
+# Worktrees created by Claude Code background tasks — local scratch, never committed.
+.claude/worktrees/

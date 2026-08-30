@@ -2673,3 +2673,16 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
   cursor:ew-resize;z-index:5;}
 .ecp-grip:hover{background:var(--accent);opacity:.5;}
 .motion-expr-pop{margin-left:4px;}
+
+/* Alpha warning on the start screen (index.html, above #start-cards).
+   Amber rather than red: this is "know what you're getting into", not an
+   error — a red alarm on every launch reads as something being broken.
+   Sized to sit quietly under the logo, but with a solid-fill badge so it
+   can't be mistaken for body copy and skipped. */
+#start-alpha-note{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;
+  padding:10px 12px;border-radius:8px;
+  background:rgba(232,182,76,.09);border:1px solid rgba(232,182,76,.28);}
+.start-alpha-badge{flex:0 0 auto;background:#e8b64c;color:#0b0a0d;
+  font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  padding:3px 7px;border-radius:4px;line-height:1;margin-top:1px;}
+.start-alpha-text{font-size:11.5px;line-height:1.5;color:rgba(236,234,231,.72);}
