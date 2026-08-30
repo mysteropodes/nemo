@@ -6299,12 +6299,30 @@ function paramShapeBoxOf(path,ps){
 window.stampParamShapeBox=stampParamShapeBox;
 window.syncParamShapeBoxOnTranslate=syncParamShapeBoxOnTranslate;
 window.syncParamShapeBoxOnScale=syncParamShapeBoxOnScale;
+// ps.box is stored AXIS-ALIGNED and un-rotated, on purpose: it is the shape's
+// declared size, and syncParamShapeBoxOnTranslate/OnScale keep it that way
+// through those two gestures. Rotation is deliberately NOT folded into it —
+// it lives on the stroke as data.boxAngle (see tools.js:1129 and serP), which
+// both rotate gestures and the Rotation field already maintain.
+//
+// So a rebuild has to put the rotation back (2026-08-30, feedback #163: "if I
+// want to change the radius of one corner now, it rotates back first"). It
+// was the ONE reader of boxAngle that ignored it: rotate a rounded rect, then
+// touch any corner radius, and the shape snapped back to axis-aligned —
+// measured, corners went from (670,512) to (740,400). Same for a star's own
+// parameters.
+function reapplyParamShapeAngle(path,b){
+  var ang=(path.data&&path.data.boxAngle)||0;
+  if(!ang)return;
+  path.rotate(ang,new Point((b.x1+b.x2)/2,(b.y1+b.y2)/2));
+}
 function applyParamShapeStar(path){
   var ps=path.data&&path.data.paramShape;if(!ps||ps.kind!=='star')return;
   var b=paramShapeBoxOf(path,ps),cx=(b.x1+b.x2)/2,cy=(b.y1+b.y2)/2,outerR=Math.min(b.x2-b.x1,b.y2-b.y1)/2;
   var built=buildStarPolygonPath(cx,cy,outerR,ps.pointCount,ps.innerRatio,ps.cornerRadius);
   path.segments=built.segments;path.closed=true;
   built.remove();
+  reapplyParamShapeAngle(path,b);
 }
 window.buildStarPolygonPath=buildStarPolygonPath;
 window.applyParamShapeStar=applyParamShapeStar;
@@ -6314,6 +6332,7 @@ function applyParamShapeRect(path){
   var built=buildRoundRectPath(b.x1,b.y1,b.x2,b.y2,ps.tl||0,ps.tr||0,ps.br||0,ps.bl||0);
   path.segments=built.segments;path.closed=true;
   built.remove();
+  reapplyParamShapeAngle(path,b);
 }
 window.applyParamShapeRect=applyParamShapeRect;
 function insertBooleanResult(layer,insertAt,result,fillColor,opacity,strokeInfo,srcData,preserveGeometry){
