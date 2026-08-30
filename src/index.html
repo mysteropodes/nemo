@@ -1021,6 +1021,31 @@
         <div class="pr" style="font-size:9px;color:var(--text-dim)" id="selected-colors-empty" data-i18n="noColorSelected">Aucune couleur</div>
       </div>
     </div>
+    <!-- Image mesh (2026-08-30, image-mesh-bridge.js). Hidden unless exactly
+         one imported image is selected — the mesh belongs to the image, so
+         it lives with the image's own properties rather than as a 24th
+         toolbar button. "Edit" turns on the on-canvas overlay; dragging an
+         outline square reshapes the MASK and the deformation at once (the
+         outline IS the mesh boundary), dragging an interior dot deforms
+         only. Density retriangulates and resets the pose — vertex indices
+         aren't stable across a rebuild. -->
+    <div class="psec" id="p-imagemesh-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrImageMesh">Image mesh</span></div>
+      <div class="pbdy">
+        <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" data-i18n-title="imageMeshOnTitle" title="Deform this image through an editable mesh — its outline also masks it"><input type="checkbox" id="p-imagemesh-on" style="accent-color:var(--accent)"> <span data-i18n="imageMeshOnLabel">Mesh</span></label></div>
+        <div id="p-imagemesh-body" style="display:none">
+          <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer" data-i18n-title="imageMeshEditTitle" title="Show the mesh on the canvas and drag its points"><input type="checkbox" id="p-imagemesh-edit" style="accent-color:var(--accent)"> <span data-i18n="imageMeshEditLabel">Edit points</span></label></div>
+          <div class="pr">
+            <span class="pl" data-i18n="imageMeshDensity">Density</span>
+            <input type="number" class="pi scrub" id="p-imagemesh-cols" value="4" min="1" max="32" data-step="1">
+            <input type="number" class="pi scrub" id="p-imagemesh-rows" value="4" min="1" max="32" data-step="1">
+          </div>
+          <div class="pr"><span class="pl" data-i18n="imageMeshCounts">Points / triangles</span><span id="p-imagemesh-info" style="font-size:9px;color:var(--text-dim)"></span></div>
+          <div class="pr"><button class="pbtn" id="btn-imagemesh-reset" style="flex:1" data-i18n="imageMeshReset">Reset shape</button></div>
+          <div class="pr" style="font-size:9px;color:var(--text-dim)" data-i18n="imageMeshHint">Drag an orange square to reshape the outline (it masks the image); drag a blue dot to deform inside it.</div>
+        </div>
+      </div>
+    </div>
     <div class="psec" id="tool-opts-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrToolOptions">Tool Options</span></div>
       <div class="pbdy">
@@ -2151,6 +2176,7 @@
      already exists when a mesh is built. -->
 <script src="js/delaunator.vendor.js"></script>
 <script src="js/image-mesh.js"></script>
+<script src="js/image-mesh-bridge.js"></script>
 <script src="js/psd-import-bridge.js"></script>
 <script src="js/figma-import.js"></script>
 <script src="js/asset-tree.js"></script>
