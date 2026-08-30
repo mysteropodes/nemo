@@ -6509,6 +6509,17 @@
         // first is gone. Leaving them behind would keep invisible state
         // that silently reappears the next time a matte is set.
         delete ld.mattesMore;
+        // The matteOn track goes too — found by driving (2026-08-30 sweep):
+        // with the track left behind, setting a NEW matte later resurrected
+        // the old on/off keys, and the fresh matte was mysteriously OFF
+        // from wherever the dead track said so, with nothing visible to
+        // explain it (the row only renders while a matte exists). Same
+        // invisible-state class as mattesMore right above; the expression
+        // slot follows for the same reason. Undo restores all of it in one
+        // step — pushUndoLayers ran first.
+        if (ld.motion) delete ld.motion.matteOn;
+        if (ld.motionStatic) delete ld.motionStatic.matteOn;
+        if (ld.expressions) delete ld.expressions.matteOn;
         matteChanged();
       } });
     }
