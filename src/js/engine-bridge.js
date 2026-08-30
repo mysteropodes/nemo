@@ -2032,6 +2032,18 @@
       // source layer as its own visible content once it's consumed.
       var mm = state.layers[i].matteMode;
       if (typeof mm !== 'string') mm = undefined;
+      // Animate the PERIOD a layer is matted (2026-08-30, "la possibilité
+      // d'animer la période où ça sera matte ou pas"). matteMode is a plain
+      // per-layer string on the wire and Rust's matte_mode is a single
+      // Option<String>, so there is nothing per-frame to animate down there
+      // — but this whole function already runs once per rendered frame, so
+      // dropping the string on the frames where the matte is switched off
+      // animates it with ZERO engine change (and therefore no §3 twin-
+      // function risk). The keyframable side is an ordinary Motion property
+      // (matteOn, motion.js), so it inherits keys, holds, ease curves and
+      // expressions for free — a hold key at 0 and another at 100 is
+      // exactly "matted from here to there".
+      if (mm && window.SMMotion && SMMotion.matteOnAt && !SMMotion.matteOnAt(i, renderFrame)) mm = undefined;
       // Effects stack (2026-07 rewrite — was separate blurRadius/gshadow_*
       // fields) — runs on THIS layer's own isolated alpha (see
       // geometry-wasm/src/engine.rs's LayerIn::effects doc comment).

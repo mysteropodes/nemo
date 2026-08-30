@@ -188,6 +188,11 @@
     // shows nothing extra here, same "hidden until its prerequisite is
     // set" precedent Time Remap already establishes for symbolId.
     if (holder && holder.parentLayerUidB) list = list.concat(['parentBlend']);
+    // Matte On (2026-08-30) — same "only once it means something" gate as
+    // parentBlend right above: a layer with no matte has nothing to switch
+    // on and off, so the row would be a dead control. Threshold semantics
+    // (>= 50 is matted) live in matteOnAt, the single reader.
+    if (holder && holder.matteMode && holder.matteMode !== 'none') list = list.concat(['matteOn']);
     // Follow Path (2026-08, motion path unifié — see FollowPathEffect
     // research note). Layer-level only for v1 (ld.followPath, not per-
     // element) — same "static config field, extra keyable rows only once
@@ -406,15 +411,15 @@
     if (prop === 'timeRemap') return holder.timeRemap || null;
     return (holder.motion && holder.motion[prop]) || null;
   }
-  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', order: 'Order', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie', cornerTL: 'Coin ↖', cornerTR: 'Coin ↗', cornerBR: 'Coin ↘', cornerBL: 'Coin ↙', arcStart: 'Début (arc)', arcSweep: 'Ouverture (arc)', arcInner: 'Rayon interne', starInner: 'Rayon interne', starCorner: 'Coins', pathPercent: 'Position sur le chemin', pathInfluence: 'Influence (rotation)' };
-  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, order: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1, cornerTL: 1, cornerTR: 1, cornerBR: 1, cornerBL: 1, arcStart: 1, arcSweep: 1, arcInner: 1, starInner: 1, starCorner: 1, pathPercent: 1, pathInfluence: 1 };
-  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', order: '', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f', cornerTL: 'px', cornerTR: 'px', cornerBR: 'px', cornerBL: 'px', arcStart: '°', arcSweep: '°', arcInner: '%', starInner: '%', starCorner: 'px', pathPercent: '%', pathInfluence: '%' };
+  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', order: 'Order', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', matteOn: 'Matte On', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie', cornerTL: 'Coin ↖', cornerTR: 'Coin ↗', cornerBR: 'Coin ↘', cornerBL: 'Coin ↙', arcStart: 'Début (arc)', arcSweep: 'Ouverture (arc)', arcInner: 'Rayon interne', starInner: 'Rayon interne', starCorner: 'Coins', pathPercent: 'Position sur le chemin', pathInfluence: 'Influence (rotation)' };
+  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, order: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, matteOn: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1, cornerTL: 1, cornerTR: 1, cornerBR: 1, cornerBL: 1, arcStart: 1, arcSweep: 1, arcInner: 1, starInner: 1, starCorner: 1, pathPercent: 1, pathInfluence: 1 };
+  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', order: '', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', matteOn: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f', cornerTL: 'px', cornerTR: 'px', cornerBR: 'px', cornerBL: 'px', arcStart: '°', arcSweep: '°', arcInner: '%', starInner: '%', starCorner: 'px', pathPercent: '%', pathInfluence: '%' };
   // parentBlend defaults to 0 — "0%" reads as "fully Parent A" (the
   // pre-existing single parent), matching the invariant that assigning a
   // second parent must never itself move anything until the user actually
   // animates the blend (same "adding a feature is a visual no-op until
   // deliberately used" precedent enableTimeRemap's own seeded keys follow).
-  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], order: [0], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0], dupOffsetPosZ: [0], dupOffsetRotX: [0], dupOffsetRotY: [0], parentBlend: [0], timeLinkInOffset: [0], timeLinkOutOffset: [0],
+  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], order: [0], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0], dupOffsetPosZ: [0], dupOffsetRotX: [0], dupOffsetRotY: [0], parentBlend: [0], matteOn: [100], timeLinkInOffset: [0], timeLinkOutOffset: [0],
     // Trim Paths (2026-08, AE parity — "animer les stroke en in et out"):
     // start/end as % of the path's own arc length, offset as a % that
     // shifts the whole [start,end] window — same 3-field shape as AE's own
@@ -6247,7 +6252,113 @@
     if (ld.isNullLayer && !ld.isFolderLayer) renderNullShapeRow(body, ld);
     renderFollowPathRow(body, ld, state.activeLayerIdx);
     renderTimeLinkRow(body, ld, state.activeLayerIdx);
+    renderMatteRow(body, ld, state.activeLayerIdx);
     renderTransformGroup(body, ld, 'Transform');
+  }
+  // Track matte, IN Layer Properties (2026-08-30, "un bouton matte qui
+  // ouvre dans le menu déroulant des properties de calques la config pour
+  // choisir le calque à matte et si en alpha luma").
+  //
+  // The pieces already existed but were scattered where they could not be
+  // found: the mode lived on #p-mattemode, which only surfaces in the right
+  // panel's Document fallback context (nothing selected, no draw tool), and
+  // the SOURCE lived in the layer row's context menu. The layer-row badge
+  // added earlier only appears once a matte is ALREADY set, so there was no
+  // entry point from a layer that has none — the original "je vois pas où
+  // appliqué les track matte" was never really closed.
+  // Both now sit on one row next to Parent / Follow Path / Time, in the same
+  // pill-and-menu idiom, writing the SAME ld.matteMode / ld.matteSourceLayerUid
+  // fields the existing dropdown, badge and context menu write, so no
+  // surface goes stale.
+  function renderMatteRow(body, ld, li) {
+    var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
+    var label = document.createElement('span');
+    label.textContent = SM.t('fieldMatte'); label.style.minWidth = '70px';
+    label.title = SM.t('titleMatteHint');
+    row.appendChild(label);
+
+    var srcIdx = -1;
+    if (ld.matteSourceLayerUid) srcIdx = findLayerIndexByUid(ld.matteSourceLayerUid);
+    // AE convention, kept: with no explicit source, the matte comes from the
+    // layer directly above. Shown as such rather than left blank, because
+    // "none picked" and "none in effect" are different things here.
+    if (srcIdx < 0 && ld.matteMode && li + 1 < state.layers.length) srcIdx = li + 1;
+    var srcLd = srcIdx >= 0 ? state.layers[srcIdx] : null;
+
+    var pill = document.createElement('div');
+    var on = !!(ld.matteMode && ld.matteMode !== 'none');
+    pill.className = 'lparent motion-parent-pill' + (on ? '' : ' none');
+    var lab = document.createElement('span'); lab.className = 'mp-label';
+    lab.textContent = on
+      ? ((srcLd ? srcLd.name : '?') + '  ·  ' + matteModeLabelSafe(ld.matteMode))
+      : '—';
+    pill.appendChild(lab);
+    pill.title = SM.t('titleMattePickHint');
+    pill.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      openMatteConfigMenu(e.clientX, e.clientY, li, ld);
+    });
+    row.appendChild(pill);
+    body.appendChild(row);
+    // NO matteOn row is drawn here on purpose. propsFor already lists it
+    // once a matte exists, so it arrives in the Transform group below with
+    // its stopwatch, ease curves, graph editor and expressions — on BOTH
+    // sides. Emitting it here as well would put an extra row on the panel
+    // that the frame grid never draws, which is exactly the panel/grid
+    // drift CLAUDE.md §11 makes propsFor the single decider to prevent.
+  }
+  function matteModeLabelSafe(m) {
+    return (typeof matteModeLabel === 'function') ? matteModeLabel(m) : m;
+  }
+  // One menu: pick the SOURCE layer, then the MODE. Two short lists in one
+  // place beat the old split between a right-panel dropdown (mode) and a
+  // row context menu (source), which is what made the feature hard to find.
+  function openMatteConfigMenu(x, y, li, ld) {
+    if (!window.showContextMenu) return;
+    var items = [];
+    items.push({ label: SM.t('matteMenuSourceHdr'), disabled: true, action: function () {} });
+    state.layers.forEach(function (o, oi) {
+      if (oi === li) return; // a layer cannot matte itself
+      var chosen = ld.matteSourceLayerUid
+        ? ld.matteSourceLayerUid === o.layerUid
+        : (ld.matteMode && oi === li + 1);
+      items.push({
+        label: '  ' + (o.name || ('Layer ' + (oi + 1))) + (chosen ? '  ✓' : ''),
+        action: function () {
+          pushUndoLayers(true);
+          ld.matteSourceLayerUid = ensureLayerUid(o);
+          // Choosing a source on a layer with no mode yet has to DO
+          // something, or the pick silently vanishes: default to Alpha,
+          // the mode you almost always want first.
+          if (!ld.matteMode || ld.matteMode === 'none') ld.matteMode = 'alpha';
+          matteChanged();
+        }
+      });
+    });
+    items.push({ sep: true });
+    items.push({ label: SM.t('matteMenuModeHdr'), disabled: true, action: function () {} });
+    [['alpha', 'matteAlpha'], ['alphaInverted', 'matteAlphaInverted'],
+     ['luma', 'matteLuma'], ['lumaInverted', 'matteLumaInverted']].forEach(function (m) {
+      items.push({
+        label: '  ' + SM.t(m[1]) + (ld.matteMode === m[0] ? '  ✓' : ''),
+        action: function () { pushUndoLayers(true); ld.matteMode = m[0]; matteChanged(); }
+      });
+    });
+    if (ld.matteMode && ld.matteMode !== 'none') {
+      items.push({ sep: true });
+      items.push({ label: SM.t('matteMenuRemove'), action: function () {
+        pushUndoLayers(true);
+        delete ld.matteMode; delete ld.matteSourceLayerUid;
+        matteChanged();
+      } });
+    }
+    window.showContextMenu(x, y, items);
+  }
+  function matteChanged() {
+    window._sceneVersion = (window._sceneVersion || 0) + 1;
+    if (typeof saveActiveLayerFrame === 'function') saveActiveLayerFrame();
+    renderLayerList(); renderTimeline();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
   // Null shape selector, IN Layer Properties (2026-08 fix, feedback: "le
   // menu pour changé la forme du null doit apparaitre dans layer
@@ -10707,6 +10818,20 @@
     elementFillColorAt: elementFillColorAt,
     elementStrokeColorAt: elementStrokeColorAt,
     elementStrokeWidthAt: elementStrokeWidthAt,
+    // Is layer `li` actually matted at `frameIdx`? The SINGLE reader of the
+    // matteOn track's threshold, so "what counts as on" is defined once —
+    // engine-bridge asks this and simply omits matteMode from the wire on
+    // frames that answer false (see its own comment for why that animates a
+    // field Rust holds as a plain Option<String>).
+    // Layers with no track at all answer true, so every existing matte
+    // keeps behaving exactly as before this property existed.
+    matteOnAt: function (li, frameIdx) {
+      var ld = state.layers[li];
+      if (!ld) return true;
+      if (!hasKeys(ld, 'matteOn') && !(ld.motionStatic && ld.motionStatic.matteOn)) return true;
+      var v = valueAtFrame(ld, 'matteOn', frameIdx);
+      return !v || v[0] == null ? true : v[0] >= 50;
+    },
     // ---- Expression code, addressed from outside this closure -----------
     // For the split code editor (expr-code-panel.js, 2026-08-30: "un code
     // editor window qui split la zone du canvas"). The panel is a SECOND
