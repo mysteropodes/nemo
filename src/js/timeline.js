@@ -7055,6 +7055,9 @@ function closeTextPopover(){var pop=document.getElementById('text-popover');if(p
 // vector-text-bridge.js parses for glyph outlines, so the overlay LOOKS
 // like the vector result it's about to become, not a generic stand-in.
 var _inplaceTa=null,_inplaceRoot=null,_inplaceHidden=null,_inplaceIsNew=false,_inplaceHandle=null;
+// Readable from the render side (engine-bridge) so overlays can stand
+// down while text is being typed in place — see buildTransformBoxItems.
+window.isInPlaceTextEditing=function(){return !!_inplaceTa;};
 // Area-text creation (2026-08-17, same ask as openInPlaceTextEditor above:
 // "comme AI ou Figma" also means the INITIAL drag-a-box placement, not just
 // re-editing) — builds a throwaway single-glyph vector-text root (needed
