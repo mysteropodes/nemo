@@ -1311,6 +1311,15 @@
         // click, then immediately double-click again" fast path into
         // Subselect is untouched — see tools.js's onViewDoubleClick.
         if (window._groupEnteredGid && (!p.data || p.data.groupId !== window._groupEnteredGid)) window._groupEnteredGid = null;
+        // Same reset for the ungrouped-shape flag (2026-08-30, feedback #165).
+        // Deliberately written the same way rather than folded in with the
+        // line above: the two track different things and a shape can carry
+        // both a strokeId and a groupId. Clicking away from the entered shape
+        // ends its continuity, so coming back to it is a fresh first
+        // double-click — which is exactly the "je clic ailleurs, je reviens
+        // sur la bounding box globale" half of the request. Without it this
+        // would reproduce the July bug quoted just above, one level down.
+        if (window._shapeEnteredId && (!p.data || p.data.strokeId !== window._shapeEnteredId)) window._shapeEnteredId = null;
       } else {
         // p is ALREADY selected (idx2>=0) — but its own group siblings might
         // not be (2026-07-29 fix, QA-confirmed): right after a Subselect
