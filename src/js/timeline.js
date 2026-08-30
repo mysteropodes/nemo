@@ -1282,6 +1282,15 @@ window.SM={
     // or cross-layer expression on any property silently lost it, reverting
     // to the raw keyframed/static value.
     if(src.expressions)state.layers[ni].expressions=JSON.parse(JSON.stringify(src.expressions));
+    // Expression controls (2026-08-30) — same reasoning as expressions just
+    // above, and they have to travel TOGETHER: src.motion (copied earlier)
+    // already carries each control's keyframe track, and src.expressions
+    // carries the code that reads it by name, so omitting only the
+    // declaration would leave the duplicate with a live track, a live
+    // expression, and nothing to connect them. The keys are copied AS IS
+    // (not regenerated) so the duplicate's own tracks still match its own
+    // declarations.
+    if(Array.isArray(src.exprControls)&&src.exprControls.length)state.layers[ni].exprControls=JSON.parse(JSON.stringify(src.exprControls));
     // threeD (2026-08-16, found testing 3D+duplicator+motionBlur
     // combinations): a plain boolean flag, missed by the same field-drop
     // shape as everything above it — a duplicated 3D layer silently came
@@ -1880,6 +1889,14 @@ window.SM={
         // and its own tooltip calls a null layer a "pivot/parent pour d'autres
         // calques" — the pivot came back, everything hung off it did not.
         layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,parentLayerUidB:l.parentLayerUidB,followPath:l.followPath,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink,
+        // Expression controls (2026-08-30) — the DECLARATIONS only
+        // ({key,name,type,default}). Their keyframes are ordinary tracks and
+        // already ride along inside `motion`/`motionStatic` above, keyed by
+        // the same xc_… key; the expressions that read them ride along in
+        // `expressions`. All three have to persist together or the round
+        // trip loses one leg of the rig — a control whose keys survived but
+        // whose declaration didn't is a dead track no row can ever show.
+        exprControls:l.exprControls||undefined,
         // 3D layer toggle (2026-07-28) — see motion.js's compute3DCorners.
         threeD:l.threeD,
         // Mograph duplicator (2026-07-29) — copied wholesale like
@@ -2128,6 +2145,17 @@ window.SM={
       if(typeof ld.matteMode==='string')state.layers[idx].matteMode=ld.matteMode;
       if(typeof ld.matteSourceLayerUid==='string')state.layers[idx].matteSourceLayerUid=ld.matteSourceLayerUid;
       if(ld.expressions)state.layers[idx].expressions=ld.expressions;
+      // Expression controls (2026-08-30) — restored BEFORE anything can
+      // render a row, and re-registered here rather than left to propsFor
+      // alone: propsFor does self-register (that's its documented reason for
+      // registering on every call), but SMMotion.propLabel/propDim are read
+      // by callers outside the row loop too, so seeding the metadata at load
+      // time keeps them right from the first frame instead of from the first
+      // Motion render.
+      if(Array.isArray(ld.exprControls)&&ld.exprControls.length){
+        state.layers[idx].exprControls=ld.exprControls;
+        if(window.SMMotion&&SMMotion.registerControlPropMeta)ld.exprControls.forEach(function(c){SMMotion.registerControlPropMeta(c);});
+      }
       if(ld.isTextLayer)state.layers[idx].isTextLayer=true;
       if(ld.isNullLayer){state.layers[idx].isNullLayer=true;state.layers[idx].nullPos=(ld.nullPos||[state.canvasW/2,state.canvasH/2]).slice();state.layers[idx].nullShape=ld.nullShape||'cross';}
       if(ld.isEffectLayer){state.layers[idx].isEffectLayer=true;}

@@ -2847,6 +2847,11 @@ function convertLayersToComponent(indices){
   if(firstSrc.parentLayerUid)newLd.parentLayerUid=firstSrc.parentLayerUid;
   if(firstSrc.parentLayerUidB)newLd.parentLayerUidB=firstSrc.parentLayerUidB;
   if(firstSrc.expressions)newLd.expressions=JSON.parse(JSON.stringify(firstSrc.expressions));
+  // exprControls (2026-08-30) travel with `expressions` everywhere, for the
+  // same reason motion/motionStatic do: an expression names a control, the
+  // control names a track. Carrying one leg without the others leaves a rig
+  // that looks intact and evaluates to nothing.
+  if(firstSrc.exprControls&&firstSrc.exprControls.length)newLd.exprControls=JSON.parse(JSON.stringify(firstSrc.exprControls));
   // threeD/motionBlur/duplicator (2026-08-16): same "topmost source wins"
   // inheritance as everything else above — these three describe how the
   // OUTER instance itself renders/multiplies, independent of whatever now
@@ -3044,6 +3049,12 @@ function splitLayerIntoElementsCore(li,opts){
       // instant the split runs.
       inPoint:ld.inPoint,outPoint:ld.outPoint,
       expressions:ld.expressions?JSON.parse(JSON.stringify(ld.expressions)):undefined,
+      // exprControls (2026-08-30) — same carry-over as `expressions` just
+      // above: every split-off piece keeps the expressions the whole layer
+      // had, so it needs the controls those expressions name too, or each
+      // piece comes out with live code pointing at a control that no longer
+      // exists on it.
+      exprControls:(ld.exprControls&&ld.exprControls.length)?JSON.parse(JSON.stringify(ld.exprControls)):undefined,
       // threeD/motionBlur (2026-08-16): same per-layer render toggles as
       // blendMode a few lines up, and the same reasoning — every split-off
       // piece keeps rendering the way the whole original layer did.
@@ -3250,6 +3261,12 @@ function mergeLayersIntoOne(indices,opts){
     parentLayerUidB:srcs[0].parentLayerUidB,
     timeLink:srcs[0].timeLink,
     expressions:srcs[0].expressions?JSON.parse(JSON.stringify(srcs[0].expressions)):undefined,
+    // exprControls (2026-08-30) — "topmost source wins", same as
+    // `expressions` directly above and for the same reason: srcs[0]'s
+    // expressions come across, so srcs[0]'s controls have to as well. The
+    // merged layer keeps srcs[0].layerUid too, so any OTHER layer whose
+    // expression reads this one's controls by name still resolves.
+    exprControls:(srcs[0].exprControls&&srcs[0].exprControls.length)?JSON.parse(JSON.stringify(srcs[0].exprControls)):undefined,
     // matteMode/blendMode: same field-drop bug already fixed once in
     // convertLayersToComponent (§1) — recurred here in the sibling merge
     // path. Inherited from the topmost (first) source, matching how

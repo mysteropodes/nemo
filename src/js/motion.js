@@ -117,6 +117,54 @@
     PROP_LABEL[key] = label; PROP_DIM[key] = 1; PROP_UNIT[key] = '';
     PROP_DEFAULT[key] = [defaultVal];
   }
+  // ---- Expression controls (2026-08-30) ---------------------------------
+  // Named, typed, KEYFRAMABLE parameters carried by a layer, whose reason to
+  // exist is to be read from expressions: one "Wave amount" number on a null
+  // layer that ten other layers' rotation reads, so a single value drives a
+  // whole rig instead of ten copies of the same magic constant.
+  //
+  // Built on the SAME mechanism Component exposed properties already use
+  // (registerExposedPropMeta + propsFor, just above): a control IS an extra
+  // ordinary Motion property, not a parallel store hanging off the side.
+  // That one decision is what makes the stopwatch, the keyframe machinery,
+  // the graph editor, ease curves, the pickwhip, expression access AND —
+  // most importantly — CLAUDE.md §11's panel/grid row-alignment invariant
+  // all come along for free, because propsFor is the single function both
+  // halves of the timeline call before they can render anything. Anything
+  // that stored controls outside the property system would have to re-fight
+  // every one of those.
+  //
+  // Storage: ld.exprControls = [{key, name, type, default}], with a stable
+  // generated key (never an array index — same id discipline as layerUid/
+  // strokeId elsewhere), so renaming or reordering a control can never
+  // orphan the keyframe track that key names inside ld.motion.
+  var CONTROL_TYPES = ['number', 'checkbox', 'angle', 'point', 'color'];
+  // Colour is genuinely available here, and it isn't a special case bolted
+  // on: PROP_DIM has never been limited to 1 and 2 — the per-element
+  // 'fillColor' property already runs a 4-channel [r,g,b,a] track through
+  // this exact generic keyframe/interpolation machinery (see
+  // elementFillColorAt). A control only needs its own FIELD widget (a
+  // swatch instead of four number boxes), which renderTransformProps
+  // branches on below; nothing under it changes.
+  var CONTROL_DIM = { number: 1, checkbox: 1, angle: 1, point: 2, color: 4 };
+  var CONTROL_UNIT = { number: '', checkbox: '', angle: '°', point: 'px', color: '' };
+  var CONTROL_DEFAULT = { number: [0], checkbox: [0], angle: [0], point: [0, 0], color: [255, 255, 255, 255] };
+  // prop key -> control type, so the row builders can ask "is this a
+  // control, and which widget does it want" without re-scanning every
+  // layer's list on every row.
+  var _controlTypeByKey = {};
+  function controlsOf(holder) { return (holder && Array.isArray(holder.exprControls)) ? holder.exprControls : []; }
+  function registerControlPropMeta(c) {
+    if (!c || !c.key) return;
+    var type = CONTROL_TYPES.indexOf(c.type) >= 0 ? c.type : 'number';
+    PROP_LABEL[c.key] = c.name || SM.t('ctrlUnnamed');
+    PROP_DIM[c.key] = CONTROL_DIM[type];
+    PROP_UNIT[c.key] = CONTROL_UNIT[type];
+    PROP_DEFAULT[c.key] = Array.isArray(c.default) ? c.default.slice() : CONTROL_DEFAULT[type].slice();
+    if (type === 'point') PROP_DIM_LABELS[c.key] = ['X', 'Y'];
+    _controlTypeByKey[c.key] = type;
+  }
+  function controlTypeOf(prop) { return _controlTypeByKey[prop] || null; }
   function propsFor(holder) {
     var list = (holder && holder.threeD) ? PROPS_WITH_3D : PROPS;
     if (holder && holder.duplicator) list = list.concat(PROPS_DUP_EXTRA);
@@ -167,8 +215,143 @@
       if (tlMode !== 'out') list = list.concat(['timeLinkInOffset']);
       if (tlMode !== 'in') list = list.concat(['timeLinkOutOffset']);
     }
+    // Expression controls (2026-08-30) — listed LAST so they read as the
+    // layer's own parameter block below its transform, and registered on
+    // EVERY call for the same reason the exposedProps branch above does it:
+    // a project reload never re-runs whatever code created the control, and
+    // propsFor is the one function every row on BOTH sides is guaranteed to
+    // call before it can render, so self-registering here is what survives
+    // first-use and reload alike.
+    var ctrls = controlsOf(holder);
+    if (ctrls.length) {
+      ctrls.forEach(registerControlPropMeta);
+      list = list.concat(ctrls.map(function (c) { return c.key; }));
+    }
     if (holder && holder.timeRemap) return list.concat(['timeRemap']);
     return list;
+  }
+  // ---- control CRUD ------------------------------------------------------
+  // Names are user-facing strings typed twice — once when creating the
+  // control, once inside an expression — so every lookup normalizes the same
+  // way (trimmed, case-insensitive) and creation refuses a name that would
+  // collide under that same rule. Two controls a user reads as "the same
+  // name" resolving to different tracks is a trap, not a feature.
+  function normalizeControlName(n) { return String(n == null ? '' : n).trim().toLowerCase(); }
+  function findControl(ld, name) {
+    var want = normalizeControlName(name);
+    if (!want) return null;
+    var list = controlsOf(ld);
+    for (var i = 0; i < list.length; i++) if (normalizeControlName(list[i].name) === want) return list[i];
+    return null;
+  }
+  function genControlKey() { return 'xc_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6); }
+  function addExprControl(ld, type, name) {
+    if (!ld) return null;
+    var t = CONTROL_TYPES.indexOf(type) >= 0 ? type : 'number';
+    var nm = String(name == null ? '' : name).trim();
+    if (!nm) return null;
+    if (findControl(ld, nm)) { if (window.showToast) showToast(SM.t('toastControlNameTaken')); return null; }
+    if (!Array.isArray(ld.exprControls)) ld.exprControls = [];
+    var c = { key: genControlKey(), name: nm, type: t, default: CONTROL_DEFAULT[t].slice() };
+    ld.exprControls.push(c);
+    registerControlPropMeta(c);
+    return c;
+  }
+  function renameExprControl(ld, key, name) {
+    var nm = String(name == null ? '' : name).trim();
+    if (!nm) return false;
+    var list = controlsOf(ld), target = null;
+    for (var i = 0; i < list.length; i++) if (list[i].key === key) target = list[i];
+    if (!target) return false;
+    var clash = findControl(ld, nm);
+    if (clash && clash !== target) { if (window.showToast) showToast(SM.t('toastControlNameTaken')); return false; }
+    target.name = nm;
+    registerControlPropMeta(target);
+    return true;
+  }
+  // Deleting a control removes its TRACK too — leaving ld.motion[key] behind
+  // would be data nothing can ever reach again (no row lists it, no
+  // expression can name it) that still rides along in every save. Any
+  // expression still referencing the deleted name degrades on its own: the
+  // lookup returns nothing, the engine's ordinary error path shows the
+  // message on that one property row and falls back to the raw value.
+  function removeExprControl(ld, key) {
+    var list = controlsOf(ld), idx = -1;
+    for (var i = 0; i < list.length; i++) if (list[i].key === key) idx = i;
+    if (idx < 0) return false;
+    list.splice(idx, 1);
+    if (ld.motion) delete ld.motion[key];
+    if (ld.motionStatic) delete ld.motionStatic[key];
+    if (ld.expressions) delete ld.expressions[key];
+    if (ld._exprCompiled) delete ld._exprCompiled[key];
+    if (window._exprEditorOpen && window._exprEditorOpen.holder === ld && window._exprEditorOpen.prop === key) window._exprEditorOpen = null;
+    setKeySel(_motionKeySel.filter(function (s) { return !(s.holder === ld && s.prop === key); }));
+    if (!list.length) delete ld.exprControls;
+    return true;
+  }
+  function moveExprControl(ld, key, dir) {
+    var list = controlsOf(ld), idx = -1;
+    for (var i = 0; i < list.length; i++) if (list[i].key === key) idx = i;
+    var to = idx + dir;
+    if (idx < 0 || to < 0 || to >= list.length) return false;
+    var tmp = list[idx]; list[idx] = list[to]; list[to] = tmp;
+    return true;
+  }
+  function afterControlEdit(ld) {
+    if (typeof saveActiveLayerFrame === 'function') saveActiveLayerFrame();
+    renderLayerList(); renderTimeline();
+    if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+  }
+  // Add / rename / delete / reorder, reached from the layer's own
+  // right-click menu (and from a right-click on a control row itself).
+  // Deliberately NOT a new settings surface: this is the same nested
+  // showContextMenu + prompt idiom the layer menu already uses for
+  // "Inherit effects from…" and "Stagger…", so there is one place to look
+  // for anything about a layer and one interaction to learn.
+  function openExprControlsMenu(x, y, ld) {
+    if (!window.showContextMenu) return;
+    var items = [{ label: SM.t('ctrlMenuAddEllipsis'), action: function () {
+      window.showContextMenu(x + 8, y + 8, CONTROL_TYPES.map(function (t) {
+        return { label: SM.t('ctrlType_' + t), action: function () {
+          var nm = prompt(SM.t('promptControlName'), SM.t('ctrlType_' + t));
+          if (nm === null) return;
+          pushUndo();
+          var c = addExprControl(ld, t, nm);
+          if (!c) return;
+          afterControlEdit(ld);
+          if (window.showToast) showToast(SM.t('toastControlAddedPrefix') + c.name + SM.t('toastControlAddedSuffix'));
+        } };
+      }));
+    } }];
+    var list = controlsOf(ld);
+    if (list.length) {
+      items.push({ sep: true });
+      // showContextMenu has no submenus and no group headings — a disabled
+      // row is how the rest of this file titles a group (see the layer
+      // menu's own "Lock keyframes on:").
+      items.push({ label: SM.t('ctrlMenuExistingColon'), disabled: true, action: function () {} });
+      list.forEach(function (c, ci) {
+        items.push({ label: c.name + '  ·  ' + SM.t('ctrlType_' + c.type), action: function () {
+          window.showContextMenu(x + 8, y + 8, [
+            { label: SM.t('ctrlMenuRenameEllipsis'), action: function () {
+              var nm = prompt(SM.t('promptControlRename'), c.name);
+              if (nm === null) return;
+              pushUndo();
+              if (renameExprControl(ld, c.key, nm)) afterControlEdit(ld);
+            } },
+            { label: SM.t('ctrlMenuMoveUp'), disabled: ci === 0, action: function () { pushUndo(); moveExprControl(ld, c.key, -1); afterControlEdit(ld); } },
+            { label: SM.t('ctrlMenuMoveDown'), disabled: ci === list.length - 1, action: function () { pushUndo(); moveExprControl(ld, c.key, 1); afterControlEdit(ld); } },
+            { label: SM.t('ctrlMenuDelete'), action: function () {
+              pushUndo();
+              if (!removeExprControl(ld, c.key)) return;
+              afterControlEdit(ld);
+              if (window.showToast) showToast(SM.t('toastControlDeletedPrefix') + c.name + SM.t('toastControlDeletedSuffix'));
+            } },
+          ]);
+        } });
+      });
+    }
+    window.showContextMenu(x, y, items);
   }
   // ---- Collapsible "Duplicator" sub-group (2026-07-30, "créer des sous
   // menu à transform pour des properties comme duplicator afin que ça soit
@@ -1576,12 +1759,54 @@
       // Uniform accessor — the only form that also works for 1D properties.
       at: function (prop, f) { return _sampleOther(ld2, prop, _num(f)); },
       marker: _markerApi(ld2.markers),
+      // That layer's own expression controls — the cross-layer half of the
+      // rig ("ten layers read one slider"). Defaults to the frame this
+      // snapshot was taken at, like every other field here; an explicit
+      // second argument samples the control at another frame.
+      control: function (name, f) { return _controlValue(ld2, name, f === undefined ? frame : _num(f)); },
     };
   }
   function exprLayer(ref) {
     _exprTick();
     var ctx = _ectx;
     return layerSnapshot(ref, ctx ? ctx.frame : state.currentFrame);
+  }
+
+  // ---- expression controls ----------------------------------------------
+  // A layer's named parameters, read as `self.control('Wave amount')` for
+  // this layer's own and `layer('Ctrl').control('Wave amount')` for another
+  // layer's (with a bare `control(...)` as the self shorthand, matching how
+  // wiggle/loopAfter are already implicitly about the property they sit on).
+  // The name is whatever the user typed in the panel, so it resolves trimmed
+  // and case-insensitively — the same rule findControl applies at creation
+  // time, so what the panel refuses as a duplicate is exactly what an
+  // expression can't ambiguously mean.
+  //
+  // An unknown name THROWS rather than quietly returning zero: the engine's
+  // own degrade contract then does the right thing with it — the message
+  // lands on that one property's row and the property falls back to its raw
+  // keyframed/static value. Deleting a referenced control therefore produces
+  // a visible, located error and a still-rendering scene, never a crash and
+  // never a silent zero that looks like a working rig gone limp.
+  // Read through valueAtFrame (not rawValueAtFrame) so a control can itself
+  // carry an expression; _exprDepth bounds any chain of those exactly as it
+  // does for cross-layer property reads.
+  function _controlValue(ld, name, frame) {
+    var c = findControl(ld, name);
+    if (!c) throw new Error(SM.t('exprErrorUnknownControlPrefix') + String(name) + SM.t('exprErrorUnknownControlSuffix'));
+    var v = valueAtFrame(ld, c.key, frame);
+    return v.length === 1 ? v[0] : v.slice();
+  }
+  // Controls live on the LAYER, so a per-shape (element) holder's expression
+  // reaches its OWNING layer's controls — which is what makes "one slider,
+  // every shape inside this layer" work without duplicating the control.
+  function exprSelfControl(name, f) {
+    _exprTick();
+    var ctx = _ectx;
+    if (!ctx) return 0;
+    var ld = _selfLd();
+    if (!ld) throw new Error(SM.t('exprErrorControlNoLayer'));
+    return _controlValue(ld, name, f === undefined ? ctx.frame : _num(f));
   }
 
   // ---- keyframe introspection ------------------------------------------
@@ -1710,6 +1935,7 @@
     velocity: exprSelfVelocity,
     speed: exprSelfSpeed,
     keys: SELF_KEYS,
+    control: exprSelfControl,
   };
   Object.defineProperty(SELF_VIEW, 'property', { get: function () { return _ectx ? _ectx.prop : null; } });
   Object.defineProperty(SELF_VIEW, 'name', { get: function () { var ld = _selfLd(); return ld ? ld.name : null; } });
@@ -1848,6 +2074,12 @@
     'clamp', 'remap', 'remapEase', 'remapEaseIn', 'remapEaseOut', 'degrees', 'radians',
     'add', 'sub', 'mul', 'div', 'length', 'normalize', 'dot', 'cross', 'angleTo',
     'stepTime', 'loopAfter', 'loopBefore', 'toFrames', 'toSeconds', 'contentBox',
+    // Expression controls (2026-08-30) — the bare form is the self
+    // shorthand; self.control(...) and layer(...).control(...) are the same
+    // function reached through those two views. Listed here (and therefore
+    // in the "did you mean" pool) because it IS part of the documented
+    // vocabulary, not a compatibility alias.
+    'control',
   ];
   var EXPR_ARG_NAMES = EXPR_PUBLIC_NAMES.concat([
     // --- compatibility aliases (undocumented, see the block above) ---
@@ -1967,14 +2199,22 @@
   // expects — a 1D property (rotation/opacity) may return a bare number,
   // a 2D one (position/anchor/scale) a bare [x,y] array or, forgivingly, a
   // bare number applied to both dimensions.
+  // Written against `dim` rather than against the literal cases 1 and 2
+  // (2026-08-30): PROP_DIM has never actually been capped at 2 — 'fillColor'
+  // is a 4-channel track, and a colour expression control is another — so
+  // the old `dim === 2` branches silently produced a 2-element array for a
+  // 4-dimension property. Behaviour for 1D/2D properties is unchanged.
   function normalizeExprResult(result, prop) {
     var dim = PROP_DIM[prop];
+    function fill(n) { var o = []; for (var i = 0; i < dim; i++) o.push(n); return o; }
     if (Array.isArray(result)) {
       if (result.length >= dim) return result.slice(0, dim);
-      if (result.length === 1 && dim === 2) return [result[0], result[0]];
+      // A single number in an array applies to every dimension, same
+      // forgiving reading as a bare number below.
+      if (result.length === 1 && dim >= 2) return fill(result[0]);
       return null;
     }
-    if (typeof result === 'number' && !isNaN(result)) return dim === 1 ? [result] : [result, result];
+    if (typeof result === 'number' && !isNaN(result)) return fill(result);
     return null;
   }
   function evalExpressionFor(holder, prop, frame, rawValue) {
@@ -2016,6 +2256,7 @@
         exprClamp, exprRemap, exprRemapEase, exprRemapEaseIn, exprRemapEaseOut, exprDegrees, exprRadians,
         exprAdd, exprSub, exprMul, exprDiv, exprLength, exprNormalize, exprDot, exprCross, exprAngleTo,
         exprStepTime, exprLoopAfter, exprLoopBefore, exprToFrames, exprToSeconds, exprContentBox,
+        exprSelfControl,
         // --- compatibility aliases ---
         exprLoopAfter, exprLoopBefore, aliasKey, aliasNearestKey, exprNumKeys(holder, prop), aliasPosterizeTime,
         exprRemap, exprRemapEase, exprRemapEaseIn, exprRemapEaseOut, exprRadians, exprDegrees,
@@ -2028,7 +2269,7 @@
       );
       var normalized = normalizeExprResult(result, prop);
       if (normalized === null) {
-        ex.lastError = SM.t(PROP_DIM[prop] === 2 ? 'exprErrorMustReturnNumberOrXY' : 'exprErrorMustReturnNumber');
+        ex.lastError = SM.t(PROP_DIM[prop] >= 2 ? 'exprErrorMustReturnNumberOrXY' : 'exprErrorMustReturnNumber');
         ex.errorLine = -1;
         return null;
       }
@@ -5670,6 +5911,12 @@
           { label: SM.t('ctxParentInTimeLinkTimeEllipsis'), action: function () {
             window.showContextMenu(e.clientX + 8, e.clientY + 8, window.buildTimeLinkMenuItems(li, ld, function () { renderLayerList(); renderTimeline(); }));
           } },
+          // Expression controls (2026-08-30) — the layer menu is where
+          // everything else that belongs to a whole LAYER already lives
+          // (parenting, time linking, key locking, markers), and a control
+          // is exactly that: a parameter of this layer, not of one of its
+          // properties.
+          { label: SM.t('ctxExprControlsEllipsis'), action: function () { openExprControlsMenu(e.clientX + 8, e.clientY + 8, ld); } },
           { sep: true },
           // showContextMenu has no submenus — a disabled row is the honest
           // way to title a group rather than a button that does nothing.
@@ -6352,7 +6599,52 @@
       var vals = isAnimated(holder, prop) ? valueAtFrame(holder, prop, state.currentFrame) : staticValue(holder, prop);
       var fieldWrap = document.createElement('div'); fieldWrap.className = 'motion-fields';
       var DIM_LABEL = PROP_DIM[prop] > 1 ? (PROP_DIM_LABELS[prop] || ['X', 'Y', 'Z']) : null;
-      for (var d = 0; d < PROP_DIM[prop]; d++) {
+      // Expression controls (2026-08-30): two of the five types want a
+      // widget that isn't a number box — a checkbox reads as on/off and a
+      // colour reads as a swatch. Everything BELOW the widget (the track,
+      // the keys, the stopwatch on this same row, the grid mirror) is the
+      // ordinary generic machinery, unchanged: only the input differs.
+      // number/angle/point fall through to the scrub-field loop that every
+      // other property already uses, so they inherit CLAUDE.md §10's
+      // drag-to-scrub for free.
+      var ctrlType = controlTypeOf(prop);
+      // Shared commit for the two custom widgets — same
+      // "write into the selected keys if there are any, otherwise through
+      // setValue" contract the scrub fields below follow, so editing a
+      // control behaves identically however it's rendered.
+      function commitControlValue(nvals) {
+        pushUndo();
+        if (!setSelectedKeyVector(holder, prop, nvals)) setValue(holder, prop, nvals);
+        renderLayerList(); renderTimeline();
+        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      }
+      if (ctrlType === 'checkbox') {
+        var cbx = document.createElement('input');
+        cbx.type = 'checkbox';
+        cbx.className = 'motion-ctrl-check';
+        // >= 0.5, not === 1: a checkbox control is a real keyframable track
+        // like any other, so two keys 0 and 1 interpolate through the middle
+        // — the display has to pick a side rather than pretend it can't
+        // happen. (Hold keys, already available on every track, are how you
+        // get a hard on/off switch.)
+        cbx.checked = (Number(vals[0]) || 0) >= 0.5;
+        cbx.addEventListener('click', function (e) { e.stopPropagation(); });
+        cbx.addEventListener('change', function () { commitControlValue([cbx.checked ? 1 : 0]); });
+        fieldWrap.appendChild(cbx);
+      } else if (ctrlType === 'color') {
+        var csw = document.createElement('div');
+        csw.className = 'motion-ctrl-swatch';
+        var crgba = vals;
+        csw.style.background = 'rgba(' + Math.round(crgba[0] || 0) + ',' + Math.round(crgba[1] || 0) + ',' + Math.round(crgba[2] || 0) + ',' + ((crgba[3] !== undefined ? crgba[3] : 255) / 255) + ')';
+        csw.title = SM.t('titleControlColorSwatch');
+        csw.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (!window.openLayerColorSwatches) return;
+          // Same picker popover every other colour row in this file opens.
+          openLayerColorSwatches(csw, rgba255ToHex(crgba), function (hex) { commitControlValue(hexToRgba255(hex)); });
+        });
+        fieldWrap.appendChild(csw);
+      } else for (var d = 0; d < PROP_DIM[prop]; d++) {
         (function (dim) {
           if (DIM_LABEL) {
             var dl = document.createElement('span'); dl.className = 'motion-dim-label'; dl.textContent = DIM_LABEL[dim];
@@ -6635,6 +6927,29 @@
         } }),
         { label: SM.t('exprExFollowLayer') + ' · ' + followProp, action: function () { insert('layer(\'' + otherA + '\').' + followProp); } },
         { label: SM.t('exprExFirstKey'), action: function () { insert('self.keys.count ? self.keys.at(1).value : value'); } },
+        // Expression controls (2026-08-30) — offered only when this layer
+        // actually has one, and naming the FIRST real control rather than a
+        // placeholder, for the same reason the cross-layer examples above
+        // name real other layers: an example that errors the moment you use
+        // it is not an example. The owning layer is resolved through
+        // resolveHolderLayer so this works from a per-shape row too, where
+        // `holder` is an element holder and the controls live one level up.
+        (function () {
+          var ownerRes = resolveHolderLayer(holder);
+          var ownerLd = ownerRes ? ownerRes.ld : null;
+          var first = controlsOf(ownerLd)[0];
+          if (!first) return null;
+          return { label: SM.t('exprExControl') + ' · ' + first.name, action: function () {
+            var read = 'self.control(' + JSON.stringify(first.name) + ')';
+            // A point/colour control hands back an array; adding it to a
+            // scalar property (or to a bare `value`) would string-concat
+            // rather than add, the exact trap feedback #134 was about — so
+            // multi-dimension controls are inserted on their own line.
+            var multi = CONTROL_DIM[first.type] > 1;
+            if (multi) { insert(read); return; }
+            insert(pair('value + ' + read, 'const c = ' + read + ';\nreturn [value[0] + c, value[1] + c];'));
+          } };
+        })(),
       ].filter(Boolean));
     });
     row.appendChild(examplesBtn);
@@ -6824,7 +7139,20 @@
           if (ld2.elementMotion) Object.keys(ld2.elementMotion).forEach(function (k) { if (ld2.elementMotion[k] === t.holder) li = i2; });
         });
         if (li < 0) { if (window.showToast) showToast(SM.t('toastPropertyNotReferenceable')); return; }
-        text = 'layer("' + ensureLayerUid(state.layers[li]) + '").' + t.prop;
+        // An expression control's PROPERTY key (xc_…) is an internal id the
+        // sandbox has no name for — the vocabulary reaches a control by the
+        // name shown on the row. Wiring a rig by dragging onto a control row
+        // is how these are meant to be used at all, so the whip has to emit
+        // the form that actually resolves, not the raw key. JSON.stringify
+        // for the name so a quote or backslash in it can't break the code it
+        // is being pasted into.
+        var ctrlDef = null;
+        if (controlTypeOf(t.prop)) {
+          controlsOf(t.holder).forEach(function (c) { if (c.key === t.prop) ctrlDef = c; });
+        }
+        text = ctrlDef
+          ? 'layer("' + ensureLayerUid(state.layers[li]) + '").control(' + JSON.stringify(ctrlDef.name) + ')'
+          : 'layer("' + ensureLayerUid(state.layers[li]) + '").' + t.prop;
       }
       // Insert at the caret rather than replacing: a pickwhip is usually
       // used mid-expression (`value + <here>`), not on an empty box.
@@ -8141,6 +8469,17 @@
       e.stopPropagation();
       selectMotionProperty(holder, prop, e);
     });
+    // Expression control rows get the manage menu right where they are —
+    // the layer menu is the discoverable entry point, but once a control
+    // exists, its own row is where you look to rename or remove it. Same
+    // menu either way (openExprControlsMenu), never a second implementation.
+    if (controlTypeOf(prop) && controlsOf(holder).length) {
+      target.title += SM.t('titleControlRowContextHint');
+      target.addEventListener('contextmenu', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        openExprControlsMenu(e.clientX, e.clientY, holder);
+      });
+    }
   }
   // ---- batch operations on the current keyframe selection (Distribute/
   // Flip/Select Every/Invert Selection — no Align here, unlike layer bars:
@@ -9734,6 +10073,17 @@
 
   window.SMMotion = {
     valueAtFrame: valueAtFrame,
+    // Expression controls (2026-08-30) — see propsFor's own comment.
+    exprControls: controlsOf,
+    controlTypeOf: controlTypeOf,
+    addExprControl: addExprControl,
+    renameExprControl: renameExprControl,
+    removeExprControl: removeExprControl,
+    moveExprControl: moveExprControl,
+    openExprControlsMenu: openExprControlsMenu,
+    // Called on load/import so a project's controls have their PROP_LABEL/
+    // DIM/UNIT/DEFAULT registered even before anything renders a row.
+    registerControlPropMeta: registerControlPropMeta,
     // motion-preset-picker.js: refresh the Transform group's displayed
     // values right after overwriting ld.motion/motionStatic wholesale
     // (applying a preset), same as any other bulk Motion mutation.
