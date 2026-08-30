@@ -4571,7 +4571,45 @@
     });
   }
   function buildOverlayItems() {
-    return buildOverlayItemsInner().concat(hoverOverlayItems());
+    return buildOverlayItemsInner().concat(hoverOverlayItems()).concat(perObjectBoxItems());
+  }
+  // Sibling element boxes in MOTION (2026-08-30, feedback #170 "dans motion
+  // le double clic dans le canvas... ne révèle toujours pas les box
+  // individuelle"). Animation 2D draws these from buildTransformBoxItems
+  // (engine-bridge), which returns [] outright in Motion — Motion has its
+  // own complete overlay, and the two were deliberately kept from firing
+  // together. So the same idea needs its own small builder here.
+  // The DOUBLE-CLICKED element keeps Motion's real gizmo (drawn above via
+  // activeMotionTarget/_motionExpandedElement); every other shape on the
+  // layer gets a dim outline, so each one reads as individually targetable
+  // — clicking its row, or double-clicking it on canvas, makes it active.
+  function perObjectBoxItems() {
+    if (window._perObjBoxes !== state.activeLayerIdx) return [];
+    var lyr = userLayers[state.activeLayerIdx];
+    if (!lyr) return [];
+    var items = [];
+    var zs = 1 / Math.max(0.0001, view.zoom);
+    // Same layer-level Motion map the gizmo itself uses, so a moved/rotated
+    // layer carries its sibling boxes with it instead of leaving them at the
+    // untransformed geometry.
+    // Reached through the export rather than a bare call: layerMotionPointMap
+    // is defined on the SMMotion object literal at the bottom of this file,
+    // not as a local function in this closure.
+    var map = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
+    lyr.children.forEach(function (ch) {
+      if (!ch.data || !ch.data.strokeId || ch.data.groupId) return;
+      if (ch.data.isBrushTextureCopy || ch.data.isLinkedFillCompanion || ch.data.isDuplicatorCopy) return;
+      if (ch.data.strokeId === window._motionExpandedElement) return; // has the real gizmo
+      var b = ch.strokeBounds;
+      if (!b || !b.width || !b.height) return;
+      function P(x, y) { if (!map) return [x, y]; return map.fwd(x, y); }
+      var c1 = P(b.left, b.top), c2 = P(b.right, b.top), c3 = P(b.right, b.bottom), c4 = P(b.left, b.bottom);
+      items.push({ segments: [{ point: c1 }, { point: c2 }], closed: false, fillColor: null, strokeColor: [63, 107, 245, 120], strokeWidth: 1 * zs });
+      items.push({ segments: [{ point: c2 }, { point: c3 }], closed: false, fillColor: null, strokeColor: [63, 107, 245, 120], strokeWidth: 1 * zs });
+      items.push({ segments: [{ point: c3 }, { point: c4 }], closed: false, fillColor: null, strokeColor: [63, 107, 245, 120], strokeWidth: 1 * zs });
+      items.push({ segments: [{ point: c4 }, { point: c1 }], closed: false, fillColor: null, strokeColor: [63, 107, 245, 120], strokeWidth: 1 * zs });
+    });
+    return items;
   }
   function buildOverlayItemsInner() {
     var ml = multiLayerBox();
