@@ -2184,6 +2184,9 @@
      runs, since buildExprEditorRow only draws its open/close button when
      window.SMExprPanel already exists. -->
 <script src="js/expr-code-panel.js"></script>
+<!-- Duplicator effectors as their own layer kind. After motion.js: propsFor
+     calls into it, and it calls back into SMMotion for value resolution. -->
+<script src="js/effector-layer.js"></script>
 <script src="js/shapes-panel.js"></script>
 <script src="js/text-animator.js"></script>
 <script src="js/motion-graph.js"></script>

@@ -113,6 +113,15 @@
   // function EVERY row (panel AND grid, the ROW_H alignment invariant) is
   // guaranteed to call before it can render anything, so self-registering
   // here is the only way that survives both first-use and reload alike.
+  // Like registerExposedPropMeta but honours dimension and unit — effector
+  // layers need 2D offsets (position/scale) and real units, which the
+  // exposed-property registrar deliberately flattens to 1D/no-unit.
+  function registerEffectorPropMeta(key, label, defaultVal, dim, unit) {
+    PROP_LABEL[key] = label;
+    PROP_DIM[key] = dim || 1;
+    PROP_UNIT[key] = unit || '';
+    PROP_DEFAULT[key] = (dim === 2) ? [defaultVal, defaultVal] : [defaultVal];
+  }
   function registerExposedPropMeta(key, label, defaultVal) {
     PROP_LABEL[key] = label; PROP_DIM[key] = 1; PROP_UNIT[key] = '';
     PROP_DEFAULT[key] = [defaultVal];
@@ -187,6 +196,13 @@
     // parent exists (parentLayerUidB); an ordinary single-parent layer
     // shows nothing extra here, same "hidden until its prerequisite is
     // set" precedent Time Remap already establishes for symbolId.
+    // Effector layer rows (2026-08-30) — radius/strength/angle plus one
+    // offset per duplicator-targetable channel, all ordinary keyframable
+    // Motion properties. Listed through propsFor like everything else, so
+    // panel and grid agree by construction (§11).
+    if (holder && holder.isEffectorLayer && window.SMEffectorLayer) {
+      list = list.concat(SMEffectorLayer.propKeysFor(holder));
+    }
     if (holder && holder.parentLayerUidB) list = list.concat(['parentBlend']);
     // One weight row per parent beyond A/B (2026-08-30). Self-registered
     // here for the same reason the exposed-property keys below are: a
@@ -6382,6 +6398,11 @@
           // (timeline.js) that carries the same entry — a widget is edited
           // from whichever timeline you happen to be in.
           ...(ld.isWidgetLayer && window.SMRigWidget ? [{ label: SM.t('ctxWidgetSettingsEllipsis'), action: function () { SMRigWidget.openWidgetMenu(e.clientX + 8, e.clientY + 8, li); } }] : []),
+          // Effector layer (2026-08-30) — offered only on a layer that has a
+          // duplicator, since an effector with nothing to affect is a dead
+          // control. Same "only where it means something" gate as the rows
+          // propsFor adds for parentBlend and matteOn.
+          ...(ld.duplicator && window.SMEffectorLayer ? [{ label: SM.t('ctxAddEffectorLayer'), action: function () { SMEffectorLayer.addEffectorLayer(li); } }] : []),
           { sep: true },
           // showContextMenu has no submenus — a disabled row is the honest
           // way to title a group rather than a button that does nothing.
@@ -11261,6 +11282,7 @@
     // field Rust holds as a plain Option<String>).
     // Layers with no track at all answer true, so every existing matte
     // keeps behaving exactly as before this property existed.
+    registerEffectorPropMeta: registerEffectorPropMeta,
     matteOnAt: function (li, frameIdx) {
       var ld = state.layers[li];
       if (!ld) return true;

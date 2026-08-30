@@ -63,13 +63,16 @@
     // deliberately unlike anything already here (no circle-on-crosshair,
     // which is the Null marker's own shape on canvas).
     widget: SVG('<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 12l4-4"/><circle cx="16.5" cy="7.5" r="2"/>'),
+    // Effector: a falloff ring around a centre point — the same thing its
+    // on-canvas marker draws, so the row icon and the canvas agree.
+    effector: SVG('<circle cx="12" cy="12" r="8" stroke-dasharray="3 2.5"/><path d="M9 12h6M12 9v6"/>'),
   };
   // Fallback labels, used when i18n hasn't loaded (or has no entry). The real
   // strings live in i18n.js under layerKind<Key>.
   var FALLBACK = {
     draw: 'Dessin', image: 'Image', sequence: 'Séquence', video: 'Vidéo', camera: 'Caméra',
     effect: 'Effet', text: 'Texte', 'null': 'Null', component: 'Composant', montage: 'Montage', folder: 'Dossier',
-    widget: 'Widget',
+    widget: 'Widget', effector: 'Effector',
   };
 
   function everyStrokeIsRaster(ld) {
@@ -114,6 +117,7 @@
     // (getEffectiveStrokes returns [] for it), so none of the content-
     // sniffing branches further down could ever answer correctly for it.
     if (ld.isWidgetLayer) return 'widget';
+    if (ld.isEffectorLayer) return 'effector';
     if (ld.isTextLayer) return 'text';
     if (ld.footage && ld.footage.kind) return ld.footage.kind === 'sequence' ? 'sequence' : 'image';
     if (everyStrokeIsRaster(ld)) return distinctSources(ld) > 1 ? 'sequence' : 'image';
