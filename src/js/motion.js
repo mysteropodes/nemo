@@ -886,29 +886,33 @@
     return out;
   }
 
-  // ---- Expression engine (2026-07) — a modernized take on AE's per-
-  // property expressions. Same "opt-in extended mode on the SAME holder"
-  // principle as everything else in this file (a holder's .expressions is
-  // a THIRD mode next to keyframed/static, not a parallel system) — see
-  // this session's audit for the full AE-comparison rationale. Key
-  // differences from AE, all deliberate:
-  //   - Sandbox: `new Function` with an EXPLICIT, closed parameter list
-  //     (time/frame/value/layer/wiggle/loopOut) — no access to window/
-  //     document/state, unlike AE's unrestricted ExtendScript.
-  //   - Stable references: layer(uid) takes the SAME layerUid this
-  //     session's parenting feature already introduced — never a display
-  //     name, so renaming a layer can never silently break an expression
-  //     (AE's #1 real-world footgun).
-  //   - Deterministic wiggle: seeded per-holder-per-property (ensureExprSeed
-  //     below), never raw Math.random() — same discipline this codebase's
+  // ---- Expression engine (2026-07, rebuilt 2026-08-30) ------------------
+  // A property can be driven by code instead of (or on top of) its
+  // keyframes. Same "opt-in extended mode on the SAME holder" principle as
+  // everything else in this file: a holder's `.expressions` is a THIRD mode
+  // next to keyframed and static, not a parallel system. The properties that
+  // make this engine what it is:
+  //   - Sandbox: `new Function` with an EXPLICIT, closed parameter list —
+  //     no window, no document, no state. Everything reachable from an
+  //     expression is listed in EXPR_ARG_NAMES and nothing else is.
+  //   - Ordinary modern JavaScript: the code compiles through the browser's
+  //     own engine, so let/const, arrow functions, destructuring, template
+  //     literals, spread and the whole current Math/Array surface work with
+  //     no dialect of our own layered on top.
+  //   - Frame-native vocabulary: every function that names a moment in the
+  //     timeline speaks in FRAMES. See the runtime block below.
+  //   - Deterministic randomness: seeded per holder and per property
+  //     (ensureExprSeed), never raw Math.random() — same discipline
   //     seededRng (tools.js) already applies to brush-texture dabs, so a
-  //     given frame renders identically every time (preview AND export),
-  //     unlike AE's wiggle() which can re-seed unpredictably.
+  //     given frame renders identically every time, preview and export.
   //   - Errors never break the render: a throwing expression falls back to
   //     the underlying keyframed/static value (computed BEFORE the
   //     expression runs, passed in as `value`) and records `lastError` for
-  //     the UI to show as a small badge on just that property row — never
-  //     a whole-scene failure the way AE's red expression icon can cascade.
+  //     the UI to show on just that property row — never a whole-scene
+  //     failure.
+  //   - Runaway code can't take the application with it: loops are
+  //     instrumented against a wall-clock budget, and an expression that
+  //     trips it switches itself off.
   //   - Compiled once per (holder,prop), cached until the code string
   //     changes — not re-parsed every frame.
   function ensureExpr(holder, prop) {
@@ -917,73 +921,606 @@
     return holder.expressions[prop];
   }
   function hasExpr(holder, prop) { return !!(holder.expressions && holder.expressions[prop] && holder.expressions[prop].enabled && holder.expressions[prop].code); }
-  // Stable per-holder random seed for wiggle() — NOT persisted (deliberately
-  // absent from serP/serR's field list, see app.js), so it's only stable
-  // WITHIN a session; a reload reseeds. A fully save-stable seed would need
-  // threading through serP/desP same as strokeId, a reasonable follow-up if
-  // "wiggle looks different after reopening the project" is ever reported,
-  // but not needed for this MVP (the shape of the motion is what matters,
-  // not bit-for-bit identical noise across sessions).
+  // ==== Expression runtime (2026-08-30 rebuild) =========================
+  // Nemo's expression vocabulary is its own, and it is FRAME-NATIVE: every
+  // function that takes or returns a moment in the timeline speaks in
+  // FRAMES, the unit this whole application is built on. `time` stays
+  // available in seconds for ordinary maths (sines, physical speeds), and
+  // toFrames()/toSeconds() convert explicitly when you need to cross over.
+  // There is deliberately no place where a number silently means seconds.
+  //
+  // Everything the sandbox exposes lives BELOW as module-level singletons
+  // that read one mutable per-evaluation context (`_ectx`), instead of the
+  // per-evaluation closures the first version built. Two reasons, in order
+  // of importance:
+  //   1. CORRECTNESS. The old makeWiggle() read `state.currentFrame` rather
+  //      than the `frame` argument evalExpressionFor was handed. That was
+  //      invisible while every caller happened to evaluate the current
+  //      frame, and flatly wrong the moment anything samples a property at
+  //      another time (self.at(), cross-layer reads, rendering a frame
+  //      other than the playhead's). The context carries the evaluation
+  //      frame; nothing time-dependent may read state.currentFrame again.
+  //   2. COST. Expressions evaluate per property per frame. Rebuilding the
+  //      whole binding set on every call would be a real regression over
+  //      the three closures the old list allocated; module-level functions
+  //      and singleton views allocate none. The only per-call allocations
+  //      left are the context object and the argument array.
+  // Nesting (layer A's expression sampling layer B, whose own expression
+  // samples back) saves/restores `_ectx` and is bounded by _exprDepth.
+  var _ectx = null;
+  var _exprDepth = 0;
+  var EXPR_MAX_DEPTH = 8;
+  // Expression records the depth cap flagged during the current outermost
+  // evaluation — see the success path in evalExpressionFor for why.
+  var _depthTripped = [];
+  function _exprFps() { return state.fps || 24; }
+
+  // ---- runaway protection -----------------------------------------------
+  // An expression is user code on the UI thread, evaluated for every
+  // property on every frame. A mistyped `while (true) {}` would otherwise
+  // freeze the whole application with no way out but force-quitting it, and
+  // JavaScript gives no way to interrupt a running function from outside.
+  // So the loops are instrumented on the way in: instrumentLoops() inserts a
+  // call to __tick at the top of every loop BODY, and __tick throws once a
+  // wall-clock budget is spent. Sampling the clock (every 1024 crossings)
+  // rather than reading it each time keeps the added cost off the radar.
+  //
+  // Honest about the hole: only loops with a BRACED body are instrumented.
+  // `while (true);`, `for (;;);` and `while (x) doThing();` — a loop whose
+  // body is a single statement rather than a block — are not reached, and
+  // neither is unbounded recursion inside the expression itself. Those still
+  // hang. Everything with a `{` after the loop header, which is how loops
+  // are actually written, is covered.
+  //
+  // Tripping the budget doesn't just fail the frame: the expression turns
+  // ITSELF off (see evalExpressionFor), so the user gets the application
+  // back instead of hitting the same wall on the next frame.
+  var EXPR_BUDGET_MS = 60;
+  var _exprDeadline = 0;
+  var _tickCount = 0;
+  var EXPR_TIMEOUT_TAG = '__nemo_expr_timeout__';
+  function _exprTick() {
+    if (((++_tickCount) & 1023) !== 0) return;
+    if (Date.now() > _exprDeadline) throw new Error(EXPR_TIMEOUT_TAG);
+  }
+  // Skips ahead past a string, template literal or comment starting at i.
+  // Returns the index just after it, or -1 if i isn't the start of one.
+  function _skipLiteral(src, i) {
+    var c = src.charAt(i);
+    if (c === '/' && src.charAt(i + 1) === '/') {
+      var nl = src.indexOf('\n', i);
+      return nl < 0 ? src.length : nl;
+    }
+    if (c === '/' && src.charAt(i + 1) === '*') {
+      var end = src.indexOf('*/', i + 2);
+      return end < 0 ? src.length : end + 2;
+    }
+    if (c === '"' || c === "'" || c === '`') {
+      var j = i + 1;
+      while (j < src.length) {
+        var d = src.charAt(j);
+        if (d === '\\') { j += 2; continue; }
+        if (d === c) return j + 1;
+        j++;
+      }
+      return src.length;
+    }
+    return -1;
+  }
+  function _isIdentChar(c) { return /[A-Za-z0-9_$]/.test(c); }
+  function instrumentLoops(src) {
+    var out = '', i = 0;
+    while (i < src.length) {
+      var skipped = _skipLiteral(src, i);
+      if (skipped >= 0) { out += src.slice(i, skipped); i = skipped; continue; }
+      var rest = src.slice(i);
+      var m = /^(while|for|do)\b/.exec(rest);
+      var prevOk = (i === 0) || !_isIdentChar(src.charAt(i - 1));
+      if (!m || !prevOk) { out += src.charAt(i); i++; continue; }
+      var kw = m[1];
+      out += kw;
+      var j = i + kw.length;
+      if (kw !== 'do') {
+        // Step over the loop header, balancing parentheses (and skipping any
+        // string/comment inside it).
+        while (j < src.length && src.charAt(j) !== '(') { out += src.charAt(j); j++; }
+        if (j >= src.length) { i = j; continue; }
+        var depth = 0;
+        while (j < src.length) {
+          var sk = _skipLiteral(src, j);
+          if (sk >= 0) { out += src.slice(j, sk); j = sk; continue; }
+          var ch = src.charAt(j);
+          out += ch;
+          j++;
+          if (ch === '(') depth++;
+          else if (ch === ')') { depth--; if (depth === 0) break; }
+        }
+      }
+      // Whatever whitespace/comments separate the header from the body.
+      while (j < src.length) {
+        var sk2 = _skipLiteral(src, j);
+        if (sk2 >= 0) { out += src.slice(j, sk2); j = sk2; continue; }
+        if (!/\s/.test(src.charAt(j))) break;
+        out += src.charAt(j); j++;
+      }
+      if (src.charAt(j) === '{') { out += '{ __tick();'; j++; }
+      i = j;
+    }
+    return out;
+  }
+
+  // ---- error reporting --------------------------------------------------
+  // `new Function` reports positions against ITS OWN wrapper, not against
+  // the text the user typed, and the size of that wrapper is an engine
+  // detail. So it is measured once, at run time, from a probe whose error
+  // line is known — no hardcoded guess that silently drifts.
+  var _lineOffset = null;
+  function _fnLineOffset() {
+    if (_lineOffset !== null) return _lineOffset;
+    _lineOffset = 2;
+    try {
+      // eslint-disable-next-line no-new-func
+      Function('"use strict";\nthrow new Error("probe");')();
+    } catch (e) {
+      var mm = /<anonymous>:(\d+):/.exec(e.stack || '');
+      if (mm) _lineOffset = parseInt(mm[1], 10) - 2; // probe throws on body line 2
+    }
+    return _lineOffset;
+  }
+  // `exprMode` is the bare-expression wrapper (the one that adds a `return (`
+  // line); `userLines` is how many lines the user actually typed.
+  // Both corrections below were measured, not assumed:
+  //   - In the bare-expression wrapper an error on the user's FIRST line is
+  //     attributed to the `return (` line we added, landing on 0. Every
+  //     other position comes out exact.
+  //   - Anything that still falls outside the text the user typed is
+  //     reported as "no line" rather than as a number pointing nowhere. A
+  //     wrong line is worse than none.
+  function _lineFromStack(stack, prefixLines, userLines, exprMode) {
+    if (!stack) return -1;
+    var mm = /<anonymous>:(\d+):/.exec(stack);
+    if (!mm) return -1;
+    var line = parseInt(mm[1], 10) - _fnLineOffset() - prefixLines;
+    if (line === 0 && exprMode) line = 1;
+    if (line < 1) return -1;
+    if (userLines && line > userLines) return -1;
+    return line;
+  }
+  function _editDistance(a, b) {
+    var m = a.length, n = b.length;
+    if (Math.abs(m - n) > 2) return 99;
+    var prev = [], cur = [], i, j;
+    for (j = 0; j <= n; j++) prev[j] = j;
+    for (i = 1; i <= m; i++) {
+      cur[0] = i;
+      for (j = 1; j <= n; j++) {
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1));
+      }
+      for (j = 0; j <= n; j++) prev[j] = cur[j];
+    }
+    return prev[n];
+  }
+  // Closest documented name to something the expression referenced but that
+  // doesn't exist. Only Nemo's own vocabulary is suggested — never the
+  // compatibility aliases, which stay invisible.
+  function _closestName(name) {
+    var best = null, bestD = 3;
+    var lower = String(name).toLowerCase();
+    for (var i = 0; i < EXPR_PUBLIC_NAMES.length; i++) {
+      var cand = EXPR_PUBLIC_NAMES[i];
+      var d = _editDistance(lower, cand.toLowerCase());
+      if (d < bestD) { bestD = d; best = cand; }
+    }
+    return best;
+  }
+  function _formatRuntimeError(e, entry) {
+    var msg = SM.t('exprErrorPrefix') + (e && e.message ? e.message : String(e));
+    var line = _lineFromStack(e && e.stack, entry ? entry.prefixLines : 0,
+      entry ? entry.userLines : 0, entry ? entry.exprMode : false);
+    var undef = /(?:^|\s)([A-Za-z_$][A-Za-z0-9_$]*) is not defined/.exec((e && e.message) || '');
+    if (undef) {
+      var near = _closestName(undef[1]);
+      if (near) msg += SM.t('exprErrorDidYouMeanPrefix') + near + SM.t('exprErrorDidYouMeanSuffix');
+    }
+    if (line > 0) msg += SM.t('exprErrorLineSuffixPrefix') + line + SM.t('exprErrorLineSuffixEnd');
+    return { message: msg, line: line };
+  }
+
+  // Stable per-holder random seed for wiggle()/random() — NOT persisted
+  // (deliberately absent from serP/serR's field list, see app.js), so it's
+  // only stable WITHIN a session; a reload reseeds. A fully save-stable seed
+  // would need threading through serP/desP same as strokeId, a reasonable
+  // follow-up if "the shake looks different after reopening the project" is
+  // ever reported, but not needed here (the shape of the motion is what
+  // matters, not bit-for-bit identical noise across sessions).
   function ensureExprSeed(holder) {
     if (holder._exprSeed === undefined) holder._exprSeed = Math.floor(Math.random() * 1e9);
     return holder._exprSeed;
   }
-  // Tiny deterministic hash noise (not cryptographic, doesn't need to be) —
-  // same value for the same (seed, x) every time, smoothly interpolated so
-  // wiggle() reads as continuous motion rather than a stepped random walk.
+  // Per-property offset so two properties on the SAME holder don't draw the
+  // same random stream.
+  function _propSeedOffset(prop) {
+    var h = 0;
+    for (var i = 0; i < prop.length; i++) h = (h * 31 + prop.charCodeAt(i)) | 0;
+    return h;
+  }
+  // Tiny deterministic hash (not cryptographic, doesn't need to be) — the
+  // same value for the same (seed, n) every time. Extracted from the inner
+  // h() hashNoise1D used to define privately, so the smooth noise below and
+  // the uniform draw above share ONE definition instead of drifting
+  // (CLAUDE.md §3's duplicated-pair hazard).
+  function hashUnit(seed, n) {
+    var v = Math.sin(n * 12.9898 + seed * 78.233) * 43758.5453;
+    return v - Math.floor(v);
+  }
+  // Smoothly interpolated 1D value noise, so wiggle() reads as continuous
+  // motion rather than a stepped random walk.
   function hashNoise1D(seed, x) {
     var i = Math.floor(x), f = x - i;
-    function h(n) { var v = Math.sin(n * 12.9898 + seed * 78.233) * 43758.5453; return v - Math.floor(v); }
-    var a = h(i), b = h(i + 1);
+    var a = hashUnit(seed, i), b = hashUnit(seed, i + 1);
     var t = f * f * (3 - 2 * f); // smoothstep
     return a + (b - a) * t;
   }
+  // 2D counterpart — bilinear blend of the same lattice, used by noise([x,y]).
+  function hashNoise2D(seed, x, y) {
+    var xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+    function g(a, b) { return hashUnit(seed, a + b * 311.7); }
+    var u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    var n00 = g(xi, yi), n10 = g(xi + 1, yi), n01 = g(xi, yi + 1), n11 = g(xi + 1, yi + 1);
+    var a = n00 + (n10 - n00) * u, b = n01 + (n11 - n01) * u;
+    return a + (b - a) * v;
+  }
+
+  // ---- shared value helpers (scalar-or-array) --------------------------
+  // Every property is either 1-dimensional (a bare number to user code) or
+  // 2-dimensional (an [x, y] array). Each helper below accepts both and
+  // gives back the same shape it was handed, so `remap(t, 0, 1, [0,0],
+  // [100,50])` and `remap(t, 0, 1, 0, 100)` are both ordinary usage.
+  function _vec(v) { return Array.isArray(v) ? v : [Number(v) || 0]; }
+  function _num(v) { var n = Number(v); return isFinite(n) ? n : 0; }
+  function _vecOp(a, b, f) {
+    var A = _vec(a), B = _vec(b), n = Math.max(A.length, B.length), out = [];
+    for (var i = 0; i < n; i++) out.push(f(_num(A[i]), _num(B[i])));
+    return (!Array.isArray(a) && !Array.isArray(b)) ? out[0] : out;
+  }
+  function _mixVals(v1, v2, k) {
+    if (Array.isArray(v1) || Array.isArray(v2)) {
+      var A = _vec(v1), B = _vec(v2), n = Math.max(A.length, B.length), out = [];
+      for (var i = 0; i < n; i++) {
+        var x = _num(A[i]), y = _num(B[i]);
+        out.push(x + (y - x) * k);
+      }
+      return out;
+    }
+    return _num(v1) + (_num(v2) - _num(v1)) * k;
+  }
+  // Both call shapes of the four remap helpers in one place:
+  //   remap(v, toLo, toHi)                    — v read on a 0..1 scale
+  //   remap(v, fromLo, fromHi, toLo, toHi)    — v rescaled from its own range
+  function _remapArgs(a) {
+    if (a.length >= 4) return { t: _num(a[0]), tMin: _num(a[1]), tMax: _num(a[2]), v1: a[3], v2: a[4] };
+    return { t: _num(a[0]), tMin: 0, tMax: 1, v1: a[1], v2: a[2] };
+  }
+  function _normT(t, tMin, tMax) {
+    if (tMax === tMin) return t <= tMin ? 0 : 1;
+    var k = (t - tMin) / (tMax - tMin);
+    return k < 0 ? 0 : (k > 1 ? 1 : k);
+  }
+  // Four blend shapes over the same remap: straight, soft at both ends, soft
+  // at the start only, soft at the end only. Input outside [fromLo, fromHi]
+  // is clamped, so the result never overshoots the output range.
+  function exprRemap() { var p = _remapArgs(arguments); return _mixVals(p.v1, p.v2, _normT(p.t, p.tMin, p.tMax)); }
+  function exprRemapEase() { var p = _remapArgs(arguments); var k = _normT(p.t, p.tMin, p.tMax); return _mixVals(p.v1, p.v2, k * k * (3 - 2 * k)); }
+  function exprRemapEaseIn() { var p = _remapArgs(arguments); var k = _normT(p.t, p.tMin, p.tMax); return _mixVals(p.v1, p.v2, -k * k * k + 2 * k * k); }
+  function exprRemapEaseOut() { var p = _remapArgs(arguments); var k = _normT(p.t, p.tMin, p.tMax); return _mixVals(p.v1, p.v2, -k * k * k + k * k + k); }
+  function exprClamp(v, lo, hi) {
+    if (Array.isArray(v)) {
+      var out = [];
+      for (var i = 0; i < v.length; i++) {
+        out.push(exprClamp(v[i], Array.isArray(lo) ? lo[i] : lo, Array.isArray(hi) ? hi[i] : hi));
+      }
+      return out;
+    }
+    var lo2 = _num(lo), hi2 = _num(hi);
+    if (hi2 < lo2) { var s = lo2; lo2 = hi2; hi2 = s; }
+    return Math.min(Math.max(_num(v), lo2), hi2);
+  }
+  function exprRadians(d) { if (Array.isArray(d)) return d.map(exprRadians); return _num(d) * Math.PI / 180; }
+  function exprDegrees(r) { if (Array.isArray(r)) return r.map(exprDegrees); return _num(r) * 180 / Math.PI; }
+
+  // ---- vector maths ----------------------------------------------------
+  function exprAdd(a, b) { return _vecOp(a, b, function (x, y) { return x + y; }); }
+  function exprSub(a, b) { return _vecOp(a, b, function (x, y) { return x - y; }); }
+  function exprMul(a, s) {
+    if (Array.isArray(s)) return _vecOp(a, s, function (x, y) { return x * y; });
+    var A = _vec(a), k = _num(s), out = [];
+    for (var i = 0; i < A.length; i++) out.push(_num(A[i]) * k);
+    return Array.isArray(a) ? out : out[0];
+  }
+  function exprDiv(a, s) {
+    if (Array.isArray(s)) return _vecOp(a, s, function (x, y) { return y === 0 ? 0 : x / y; });
+    var A = _vec(a), k = _num(s), out = [];
+    for (var i = 0; i < A.length; i++) out.push(k === 0 ? 0 : _num(A[i]) / k);
+    return Array.isArray(a) ? out : out[0];
+  }
+  function exprDot(a, b) {
+    var A = _vec(a), B = _vec(b), n = Math.max(A.length, B.length), s = 0;
+    for (var i = 0; i < n; i++) s += _num(A[i]) * _num(B[i]);
+    return s;
+  }
+  // One argument: the vector's own magnitude. Two: the distance between two
+  // points — the form that actually gets typed ("how far apart are these").
+  function exprLength(a, b) {
+    if (b === undefined) {
+      var A = _vec(a), s = 0;
+      for (var i = 0; i < A.length; i++) s += _num(A[i]) * _num(A[i]);
+      return Math.sqrt(s);
+    }
+    return exprLength(exprSub(a, b));
+  }
+  function exprNormalize(a) {
+    var L = exprLength(a);
+    if (!L) { var A = _vec(a), z = []; for (var i = 0; i < A.length; i++) z.push(0); return Array.isArray(a) ? z : 0; }
+    return exprDiv(a, L);
+  }
+  // 3-component inputs give the usual 3-component cross product. Nemo's
+  // properties are 2D, and there the cross product only ever has a Z
+  // component, so a 2D pair gives back that number directly rather than an
+  // [0, 0, z] array nothing in a 2D property could consume.
+  function exprCross(a, b) {
+    var A = _vec(a), B = _vec(b);
+    if (A.length >= 3 || B.length >= 3) {
+      return [_num(A[1]) * _num(B[2]) - _num(A[2]) * _num(B[1]),
+        _num(A[2]) * _num(B[0]) - _num(A[0]) * _num(B[2]),
+        _num(A[0]) * _num(B[1]) - _num(A[1]) * _num(B[0])];
+    }
+    return _num(A[0]) * _num(B[1]) - _num(A[1]) * _num(B[0]);
+  }
+  // The angle, IN DEGREES, from one point towards another — the unit
+  // Rotation itself uses (PROP_UNIT.rotation === '°'), so the result can be
+  // returned straight from a Rotation expression with no conversion.
+  function exprAngleTo(from, to) {
+    var A = _vec(from), B = _vec(to);
+    return Math.atan2(_num(B[1]) - _num(A[1]), _num(B[0]) - _num(A[0])) * 180 / Math.PI;
+  }
+
+  // ---- time -------------------------------------------------------------
+  // stepTime(n) snaps the evaluation clock to every n FRAMES, in place.
+  // Every later call in the SAME expression that depends on the clock —
+  // wiggle, noise, random, self.at(), layer(), the loops — then sees the
+  // snapped frame, so one call at the top turns a whole expression into
+  // stepped motion. n may be fractional.
+  // Known limit, stated rather than hidden: the bare `time`/`frame`
+  // variables are ordinary function arguments, bound by value before user
+  // code runs, so they keep their un-snapped values. The snapped FRAME is
+  // returned for exactly that reason — `var f = stepTime(4);` hands you a
+  // stepped clock to do arithmetic with.
+  function exprStepTime(everyNFrames) {
+    var ctx = _ectx;
+    if (!ctx) return 0;
+    var n = Number(everyNFrames);
+    if (!isFinite(n) || n <= 0) return ctx.frame;
+    ctx.frame = Math.floor(ctx.frame / n) * n;
+    ctx.time = ctx.frame / ctx.fps;
+    return ctx.frame;
+  }
+  function exprToFrames(seconds) {
+    var ctx = _ectx;
+    var s = (seconds === undefined) ? (ctx ? ctx.time : 0) : _num(seconds);
+    return s * (ctx ? ctx.fps : _exprFps());
+  }
+  function exprToSeconds(frames) {
+    var ctx = _ectx;
+    var f = (frames === undefined) ? (ctx ? ctx.frame : 0) : _num(frames);
+    var r = ctx ? ctx.fps : _exprFps();
+    return r === 0 ? 0 : f / r;
+  }
+
+  // ---- randomness -------------------------------------------------------
+  // The stream is stable per holder AND per property (so two properties
+  // never shake in lockstep) unless seed(n) picks an explicit one. random()
+  // re-draws every frame; randomFixed() draws once and holds that value for
+  // the whole timeline, which is how you give each element of a set its own
+  // permanent offset. Same pair for the bell-curve versions.
+  function exprSeed(n) {
+    var ctx = _ectx;
+    if (!ctx) return;
+    ctx.rngSeed = _num(n) + 1;
+    ctx.rngCounter = 0;
+  }
+  function _rand01(fixed) {
+    _exprTick();
+    var ctx = _ectx;
+    if (!ctx) return 0;
+    var tPart = (fixed || ctx.rngTimeless) ? 0 : Math.round(ctx.frame * 1000) / 1000;
+    return hashUnit(ctx.rngSeed, tPart * 1013.13 + (ctx.rngCounter++) * 7919 + 0.5);
+  }
+  // Bell-shaped counterpart (Box-Muller), centred on 0.5 with a spread that
+  // keeps roughly nine draws in ten inside 0..1.
+  function _gauss01(fixed) {
+    var u1 = Math.max(1e-9, _rand01(fixed)), u2 = _rand01(fixed);
+    return 0.5 + 0.304 * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  }
+  // Shared by all four draw functions: no args = the raw 0..1 draw, one arg
+  // = 0..max, two = min..max, and either bound may be an array for a
+  // per-axis range.
+  function _randomWith(gen, a, b) {
+    if (a === undefined) return gen();
+    if (b === undefined) {
+      if (Array.isArray(a)) { var o = []; for (var i = 0; i < a.length; i++) o.push(gen() * _num(a[i])); return o; }
+      return gen() * _num(a);
+    }
+    if (Array.isArray(a) || Array.isArray(b)) {
+      var A = _vec(a), B = _vec(b), n = Math.max(A.length, B.length), out = [];
+      for (var j = 0; j < n; j++) { var lo = _num(A[j]), hi = _num(B[j]); out.push(lo + gen() * (hi - lo)); }
+      return out;
+    }
+    var l = _num(a), h = _num(b);
+    return l + gen() * (h - l);
+  }
+  function _rndVary() { return _rand01(false); }
+  function _rndFixed() { return _rand01(true); }
+  function _gaussVary() { return _gauss01(false); }
+  function _gaussFixed() { return _gauss01(true); }
+  function exprRandom(a, b) { return _randomWith(_rndVary, a, b); }
+  function exprRandomFixed(a, b) { return _randomWith(_rndFixed, a, b); }
+  function exprRandomGauss(a, b) { return _randomWith(_gaussVary, a, b); }
+  function exprRandomGaussFixed(a, b) { return _randomWith(_gaussFixed, a, b); }
+  // Smooth noise in -1..1 for a 1D or 2D input — unlike random(), nearby
+  // inputs give nearby results, which is what makes it usable as motion.
+  function exprNoise(x, y) {
+    _exprTick();
+    var ctx = _ectx;
+    if (!ctx) return 0;
+    if (Array.isArray(x)) { y = x[1]; x = x[0]; }
+    if (y === undefined) return hashNoise1D(ctx.seed + 7717, _num(x)) * 2 - 1;
+    return hashNoise2D(ctx.seed + 7717, _num(x), _num(y)) * 2 - 1;
+  }
+
+  // ---- wiggle -----------------------------------------------------------
   // dim is the PROPERTY's PROP_DIM (1 for rotation/opacity, 2 for
   // position/anchor/scale) — NOT a single axis index. A 1D property gets a
   // bare number back (axis 0's own noise stream); a 2D one gets [wx, wy]
   // IN ONE CALL, each axis its own independent noise stream (offsetting the
-  // seed by axis, same idea as the octave loop below) so X and Y don't move
-  // in lockstep along a diagonal line — this is what lets the "Exemples"
-  // menu (below) write plain `value[0] + wiggle(2,10)[0]` / `[1]` instead of
-  // calling wiggle() twice with no way to correlate/decorrelate the axes
-  // from user code (bug found via feedback #134: the single-scalar wiggle()
-  // this replaced could never produce a valid [x,y] for a 2D property in
-  // the first place — `value + wiggle(...)` string-concats an array with a
-  // number in JS, it doesn't add per-axis, so the shipped Position example
-  // could never have worked).
-  function makeWiggle(seed, dim) {
-    function axisNoise(axis, freqPerSec, amp, octaves) {
-      var t = (state.currentFrame / (state.fps || 24));
-      var n = 0, amp2 = 1, freq2 = 1, norm = 0;
-      for (var o = 0; o < octaves; o++) {
-        n += (hashNoise1D(seed + axis * 101 + o * 977, t * freqPerSec * freq2) - 0.5) * 2 * amp2;
-        norm += amp2; amp2 *= 0.5; freq2 *= 2;
-      }
-      return (n / norm) * amp;
+  // seed by axis, same idea as the octave loop) so X and Y don't move in
+  // lockstep along a diagonal line — this is what lets the examples menu
+  // write plain `value[0] + wiggle(2,10)[0]` / `[1]` instead of calling
+  // wiggle() twice with no way to correlate/decorrelate the axes from user
+  // code (bug found via feedback #134: the single-scalar wiggle() this
+  // replaced could never produce a valid [x,y] for a 2D property in the
+  // first place — `value + wiggle(...)` string-concats an array with a
+  // number in JS, it doesn't add per-axis).
+  function _wiggleAxis(ctx, axis, freqPerSec, amp, octaves) {
+    var t = ctx.time; // the EVALUATION frame's time, never state.currentFrame
+    var n = 0, amp2 = 1, freq2 = 1, norm = 0;
+    for (var o = 0; o < octaves; o++) {
+      n += (hashNoise1D(ctx.seed + axis * 101 + o * 977, t * freqPerSec * freq2) - 0.5) * 2 * amp2;
+      norm += amp2; amp2 *= 0.5; freq2 *= 2;
     }
-    return function (freqPerSec, amp, octaves) {
-      octaves = Math.max(1, octaves || 1);
-      if (dim === 2) return [axisNoise(0, freqPerSec, amp, octaves), axisNoise(1, freqPerSec, amp, octaves)];
-      return axisNoise(0, freqPerSec, amp, octaves);
-    };
+    return (n / norm) * amp;
   }
-  // loopOut() — cycles `frame` back into this SAME property's own keyed
-  // range once playback runs past its last key, AE's loopOut('cycle')
-  // equivalent. No-op (returns the un-looped raw value) if the property
-  // has fewer than 2 keys — nothing to loop.
-  function loopOutRaw(holder, prop, frame) {
+  function exprWiggle(freqPerSec, amp, octaves) {
+    _exprTick();
+    var ctx = _ectx;
+    if (!ctx) return 0;
+    octaves = Math.max(1, octaves || 1);
+    if ((PROP_DIM[ctx.prop] || 1) === 2) {
+      return [_wiggleAxis(ctx, 0, freqPerSec, amp, octaves), _wiggleAxis(ctx, 1, freqPerSec, amp, octaves)];
+    }
+    return _wiggleAxis(ctx, 0, freqPerSec, amp, octaves);
+  }
+
+  // ---- sampling this property at another frame --------------------------
+  // self.at() reads the RAW (pre-expression) track deliberately. That is
+  // both what makes "where was I a moment ago" meaningful — sampling the
+  // post-expression value would feed the expression its own output — and
+  // what makes infinite self-recursion structurally impossible rather than
+  // merely guarded against.
+  function _rawShaped(holder, prop, frame) {
+    var v = rawValueAtFrame(holder, prop, frame);
+    return v.length === 1 ? v[0] : v.slice();
+  }
+  function exprSelfAt(f) {
+    _exprTick();
+    var ctx = _ectx;
+    if (!ctx) return 0;
+    return _rawShaped(ctx.holder, ctx.prop, f === undefined ? ctx.frame : _num(f));
+  }
+  // Rate of change in units per SECOND, as a central difference across one
+  // frame. Honest about what it is: a numeric derivative of the sampled
+  // track, not an analytic one. Per second rather than per frame because
+  // that is what "speed" means once you compare two projects at different
+  // frame rates.
+  function exprSelfVelocity(f) {
+    var ctx = _ectx;
+    if (!ctx) return 0;
+    var ff = (f === undefined) ? ctx.frame : _num(f);
+    var a = rawValueAtFrame(ctx.holder, ctx.prop, ff - 0.5);
+    var b = rawValueAtFrame(ctx.holder, ctx.prop, ff + 0.5);
+    var out = [];
+    for (var i = 0; i < b.length; i++) out.push((b[i] - (a[i] || 0)) * ctx.fps);
+    return out.length === 1 ? out[0] : out;
+  }
+  function exprSelfSpeed(f) {
+    var v = exprSelfVelocity(f);
+    if (!Array.isArray(v)) return Math.abs(v);
+    var s = 0;
+    for (var i = 0; i < v.length; i++) s += v[i] * v[i];
+    return Math.sqrt(s);
+  }
+
+  // ---- looping ----------------------------------------------------------
+  // ONE implementation for both directions and all four shapes; loopAfter/
+  // loopBefore are thin wrappers over it, so a fix to the wrap maths can
+  // never apply to only half of them. "After"/"before" means after the LAST
+  // keyframe / before the FIRST one — deliberately not "in"/"out", which in
+  // Nemo already mean a layer's in and out points.
+  //   'cycle'    — replay the keyed range over and over
+  //   'pingpong' — replay it forwards, then backwards, alternating
+  //   'offset'   — replay it, each pass starting where the last one ended
+  //   'continue' — no replay: keep going in a straight line at the speed the
+  //                property had when it ran out of keyframes
+  // `keyframes` picks how much of the track repeats: 0 (the default) uses
+  // the whole thing, N uses the last (or first) N segments.
+  function loopRaw(holder, prop, frame, mode, keyframes, forward) {
+    _exprTick();
     var track = trackFor(holder, prop);
-    if (!track || track.keys.length < 2) return rawValueAtFrame(holder, prop, frame);
-    var first = track.keys[0].frame, last = track.keys[track.keys.length - 1].frame;
-    var span = last - first;
-    if (span <= 0 || frame <= last) return rawValueAtFrame(holder, prop, frame);
-    var wrapped = first + ((frame - first) % span);
-    return rawValueAtFrame(holder, prop, wrapped);
+    if (!track || !track.keys || track.keys.length < 2) return rawValueAtFrame(holder, prop, frame);
+    var keys = track.keys;
+    var firstF = keys[0].frame, lastF = keys[keys.length - 1].frame;
+    // Inside the keyed range nothing loops — the real keyframes win.
+    if (forward ? frame <= lastF : frame >= firstF) return rawValueAtFrame(holder, prop, frame);
+    var m = String(mode == null ? 'cycle' : mode).toLowerCase();
+    var n = Math.max(0, Math.floor(_num(keyframes)));
+    var segStart, segEnd;
+    if (forward) {
+      segEnd = lastF;
+      segStart = (n > 0 && n < keys.length) ? keys[keys.length - 1 - n].frame : firstF;
+    } else {
+      segStart = firstF;
+      segEnd = (n > 0 && n < keys.length) ? keys[n].frame : lastF;
+    }
+    if (m === 'continue') {
+      // Straight-line extrapolation off the outermost keyframe, at the slope
+      // the last real frame of animation had.
+      var edge = forward ? lastF : firstF;
+      var inner = forward ? (lastF - 1) : (firstF + 1);
+      var ve = rawValueAtFrame(holder, prop, edge);
+      var vi = rawValueAtFrame(holder, prop, inner);
+      var dist = forward ? (frame - lastF) : (firstF - frame);
+      var outC = [];
+      for (var c = 0; c < ve.length; c++) outC.push(ve[c] + (ve[c] - (vi[c] || 0)) * dist);
+      return outC;
+    }
+    var span = segEnd - segStart;
+    if (span <= 0) return rawValueAtFrame(holder, prop, frame);
+    var d = forward ? (frame - segStart) : (segEnd - frame);
+    var cycles = Math.floor(d / span);
+    var r = d - cycles * span;
+    if (m === 'pingpong' && (cycles % 2) === 1) r = span - r;
+    var base = rawValueAtFrame(holder, prop, forward ? (segStart + r) : (segEnd - r));
+    if (m !== 'offset') return base;
+    var from = rawValueAtFrame(holder, prop, forward ? segStart : segEnd);
+    var to = rawValueAtFrame(holder, prop, forward ? segEnd : segStart);
+    var outO = [];
+    for (var k = 0; k < base.length; k++) outO.push(base[k] + ((to[k] || 0) - (from[k] || 0)) * cycles);
+    return outO;
   }
-  // Read-only snapshot of another layer's CURRENT effective values, keyed
-  // by its stable layerUid (never a display name) — the only inter-item
-  // reference an expression can make in this MVP (element-level references
-  // are a natural follow-up once this proves out).
+  function exprLoopAfter(mode, keyframes) {
+    var ctx = _ectx;
+    if (!ctx) return 0;
+    var v = loopRaw(ctx.holder, ctx.prop, ctx.frame, mode, keyframes, true);
+    return v.length === 1 ? v[0] : v.slice();
+  }
+  function exprLoopBefore(mode, keyframes) {
+    var ctx = _ectx;
+    if (!ctx) return 0;
+    var v = loopRaw(ctx.holder, ctx.prop, ctx.frame, mode, keyframes, false);
+    return v.length === 1 ? v[0] : v.slice();
+  }
+
+  // ---- other layers -----------------------------------------------------
+  // Read-only snapshot of another layer's effective values.
   // `ref` is whatever the user typed into layer(...) inside an expression —
   // 2026-08-16, Cyril: "agrémenter la library d'expressions... ID layers
   // peut être". The ONLY thing layer() ever accepted was the internal uid
@@ -994,42 +1531,72 @@
   // layer-list row, the Motion panel header), so it's tried FIRST; the raw
   // uid is still accepted after, so nothing written before this change
   // (or generated by some future name-independent tool) breaks. First
-  // match wins on a duplicate name, same "good enough, not ambiguity-safe"
-  // tradeoff a hand-typed AE expression's own layer("name") already has.
+  // match wins on a duplicate name, the same "good enough, not
+  // ambiguity-safe" tradeoff any hand-typed layer("name") reference has.
   function findLayerIndexByRef(ref) {
     if (!ref) return -1;
     for (var i = 0; i < state.layers.length; i++) if (state.layers[i].name === ref) return i;
     return findLayerIndexByUid(ref);
+  }
+  // Attaches .at(frame) to the ARRAY a 2D property hands back. An array can
+  // carry properties without ceasing to be an array, so
+  // `layer('Ball').position` keeps working exactly as before while
+  // `layer('Ball').position.at(f)` becomes available. 1D properties are bare
+  // numbers and cannot carry methods, which is why the snapshot ALSO gets a
+  // uniform at(prop, frame) covering every property.
+  function _withSampler(arr, ld2, prop) {
+    try {
+      arr.at = function (f) { return _sampleOther(ld2, prop, _num(f)); };
+    } catch (e) { /* frozen array: the plain values still work */ }
+    return arr;
+  }
+  function _sampleOther(ld2, prop, frame) {
+    var v = valueAtFrame(ld2, prop, frame);
+    return v.length === 1 ? v[0] : v.slice();
   }
   function layerSnapshot(ref, frame) {
     var idx = findLayerIndexByRef(ref);
     if (idx < 0) return null;
     var ld2 = state.layers[idx];
     return {
-      position: valueAtFrame(ld2, 'position', frame),
-      anchor: valueAtFrame(ld2, 'anchor', frame),
+      position: _withSampler(valueAtFrame(ld2, 'position', frame), ld2, 'position'),
+      anchor: _withSampler(valueAtFrame(ld2, 'anchor', frame), ld2, 'anchor'),
       rotation: valueAtFrame(ld2, 'rotation', frame)[0],
-      scale: valueAtFrame(ld2, 'scale', frame),
+      scale: _withSampler(valueAtFrame(ld2, 'scale', frame), ld2, 'scale'),
       opacity: valueAtFrame(ld2, 'opacity', frame)[0],
       name: ld2.name,
       index: idx,
+      inPoint: window.layerInPoint ? layerInPoint(ld2) : 0,
+      outPoint: window.layerOutPoint ? layerOutPoint(ld2) : (state.totalFrames - 1),
+      hasParent: !!ld2.parentLayerUid,
+      parent: ld2.parentLayerUid ? (function () {
+        var pi = findLayerIndexByUid(ld2.parentLayerUid);
+        return pi >= 0 ? { name: state.layers[pi].name, index: pi } : null;
+      })() : null,
+      // Uniform accessor — the only form that also works for 1D properties.
+      at: function (prop, f) { return _sampleOther(ld2, prop, _num(f)); },
+      marker: _markerApi(ld2.markers),
     };
   }
-  // Keyframe introspection (AE's key()/nearestKey()/numKeys) — the other
-  // half of the same request. Scoped to the CURRENT property's own track
-  // (the one the expression lives on), matching AE's own default binding
-  // ("key(1)" inside a Position expression means Position's key 1, not some
-  // other property's). 1-indexed like AE, not 0-indexed like the internal
-  // `.keys` array, since these are the names a user copying an AE-style
-  // expression will already reach for. Returns null (not throw) for an
-  // out-of-range index/empty track, same "fall through to the safe value,
-  // never crash the whole expression" contract as layer() returning null
-  // for an unresolved reference.
+  function exprLayer(ref) {
+    _exprTick();
+    var ctx = _ectx;
+    return layerSnapshot(ref, ctx ? ctx.frame : state.currentFrame);
+  }
+
+  // ---- keyframe introspection ------------------------------------------
+  // Scoped to the CURRENT property's own track (the one the expression lives
+  // on) — self.keys.at(1) inside a Position expression means Position's
+  // first keyframe. 1-indexed, matching how keyframes are counted in the
+  // timeline UI rather than the internal 0-based array. Returns null (never
+  // throws) for an out-of-range index or an empty track, same "fall through
+  // to the safe value" contract as layer() returning null for an unresolved
+  // reference.
   function exprKeyAt(holder, prop, i) {
     var track = trackFor(holder, prop);
     if (!track || !track.keys || i < 1 || i > track.keys.length) return null;
     var k = track.keys[i - 1];
-    return { time: k.frame / (state.fps || 24), frame: k.frame, value: k.v.length === 1 ? k.v[0] : k.v.slice(), index: i };
+    return { frame: k.frame, time: k.frame / _exprFps(), value: k.v.length === 1 ? k.v[0] : k.v.slice(), index: i };
   }
   function exprNumKeys(holder, prop) {
     var track = trackFor(holder, prop);
@@ -1051,61 +1618,350 @@
     // won when the target sat exactly halfway between two keys.
     return nextDistance < prevDistance ? lo : lo - 1;
   }
-  function exprNearestKey(holder, prop, t) {
+  // Takes a FRAME (see the frame-native rule at the top of this section).
+  function exprNearestKeyAtFrame(holder, prop, frame) {
     var track = trackFor(holder, prop);
     if (!track || !track.keys || !track.keys.length) return null;
-    var targetFrame = t * (state.fps || 24);
-    return exprKeyAt(holder, prop, nearestKeyIndex(track.keys, targetFrame) + 1);
+    return exprKeyAt(holder, prop, nearestKeyIndex(track.keys, frame) + 1);
   }
-  // Project-wide expression preamble (Van Dijk 7.2, "set global variables":
-  // define something once and use it from every expression instead of
-  // retyping it). Plain statements — `var k = 12;` — evaluated in the same
-  // scope as the expression body, so anything it declares is in scope.
-  // Cached against BOTH the expression's code and the preamble, so editing
-  // the preamble recompiles every expression rather than silently leaving
-  // stale ones behind.
+
+  // ---- markers ----------------------------------------------------------
+  // Both marker scopes are stored as {frame, name, color} (markers.js).
+  // Same count/at/nearest shape as keyframes, so learning one teaches the
+  // other. at() also accepts a marker's name, which is usually how you mean
+  // to find one.
+  function _markerEntry(list, i) {
+    if (!list || i < 1 || i > list.length) return null;
+    var m = list[i - 1];
+    return { frame: m.frame, time: m.frame / _exprFps(), name: m.name || '', color: m.color || null, index: i };
+  }
+  function _markerApi(list) {
+    var arr = list || [];
+    return {
+      count: arr.length,
+      at: function (i) {
+        if (typeof i === 'string') {
+          for (var j = 0; j < arr.length; j++) if ((arr[j].name || '') === i) return _markerEntry(arr, j + 1);
+          return null;
+        }
+        return _markerEntry(arr, Math.floor(_num(i)));
+      },
+      nearest: function (frame) {
+        if (!arr.length) return null;
+        var target = _num(frame);
+        var best = 0, bestD = Infinity;
+        for (var j = 0; j < arr.length; j++) {
+          var d = Math.abs(arr[j].frame - target);
+          if (d < bestD) { bestD = d; best = j; }
+        }
+        return _markerEntry(arr, best + 1);
+      },
+    };
+  }
+
+  // ---- `comp` and `self` views ------------------------------------------
+  // Both are module-level SINGLETONS whose accessors read `_ectx`/`state` at
+  // the moment they're touched, not per-evaluation objects. That keeps the
+  // hot path allocation-free, and the expensive parts (resolving which layer
+  // a per-shape holder belongs to; building a marker list) only run if an
+  // expression actually reads them.
+  function resolveHolderLayer(holder) {
+    var li = state.layers.indexOf(holder);
+    if (li >= 0) return { ld: holder, index: li, strokeId: null };
+    for (var i = 0; i < state.layers.length; i++) {
+      var em = state.layers[i].elementMotion;
+      if (!em) continue;
+      for (var k in em) if (em[k] === holder) return { ld: state.layers[i], index: i, strokeId: k };
+    }
+    return null;
+  }
+  // Cached per evaluation: the scan above is O(layers × shapes) and several
+  // `self` fields want the same answer.
+  function _selfResolved() {
+    var ctx = _ectx;
+    if (!ctx) return null;
+    if (ctx._resolved === undefined) ctx._resolved = resolveHolderLayer(ctx.holder);
+    return ctx._resolved;
+  }
+  function _selfLd() { var r = _selfResolved(); return r ? r.ld : null; }
+  var COMP_VIEW = {};
+  Object.defineProperty(COMP_VIEW, 'width', { get: function () { return state.canvasW; } });
+  Object.defineProperty(COMP_VIEW, 'height', { get: function () { return state.canvasH; } });
+  Object.defineProperty(COMP_VIEW, 'fps', { get: function () { return _exprFps(); } });
+  Object.defineProperty(COMP_VIEW, 'frames', { get: function () { return state.totalFrames; } });
+  Object.defineProperty(COMP_VIEW, 'layers', { get: function () { return state.layers.length; } });
+  Object.defineProperty(COMP_VIEW, 'name', {
+    get: function () {
+      if (state.activeSymbolId && state.symbols && state.symbols[state.activeSymbolId]) {
+        return state.symbols[state.activeSymbolId].name || 'Component';
+      }
+      return 'Scene';
+    },
+  });
+  Object.defineProperty(COMP_VIEW, 'marker', { get: function () { return _markerApi(state.markers); } });
+  // self.keys — the current property's own keyframes.
+  var SELF_KEYS = {
+    at: function (i) { var c = _ectx; return c ? exprKeyAt(c.holder, c.prop, Math.floor(_num(i))) : null; },
+    nearest: function (f) { var c = _ectx; return c ? exprNearestKeyAtFrame(c.holder, c.prop, _num(f)) : null; },
+  };
+  Object.defineProperty(SELF_KEYS, 'count', { get: function () { var c = _ectx; return c ? exprNumKeys(c.holder, c.prop) : 0; } });
+  var SELF_VIEW = {
+    at: exprSelfAt,
+    velocity: exprSelfVelocity,
+    speed: exprSelfSpeed,
+    keys: SELF_KEYS,
+  };
+  Object.defineProperty(SELF_VIEW, 'property', { get: function () { return _ectx ? _ectx.prop : null; } });
+  Object.defineProperty(SELF_VIEW, 'name', { get: function () { var ld = _selfLd(); return ld ? ld.name : null; } });
+  Object.defineProperty(SELF_VIEW, 'index', { get: function () { var r = _selfResolved(); return r ? r.index : -1; } });
+  Object.defineProperty(SELF_VIEW, 'isShape', { get: function () { var r = _selfResolved(); return !!(r && r.strokeId != null); } });
+  Object.defineProperty(SELF_VIEW, 'inPoint', {
+    get: function () { var ld = _selfLd(); return (ld && window.layerInPoint) ? layerInPoint(ld) : 0; },
+  });
+  Object.defineProperty(SELF_VIEW, 'outPoint', {
+    get: function () { var ld = _selfLd(); return (ld && window.layerOutPoint) ? layerOutPoint(ld) : (state.totalFrames - 1); },
+  });
+  Object.defineProperty(SELF_VIEW, 'hasParent', { get: function () { var ld = _selfLd(); return !!(ld && ld.parentLayerUid); } });
+  Object.defineProperty(SELF_VIEW, 'parent', {
+    get: function () {
+      var ld = _selfLd();
+      if (!ld || !ld.parentLayerUid) return null;
+      var pi = findLayerIndexByUid(ld.parentLayerUid);
+      if (pi < 0) return null;
+      return layerSnapshot(state.layers[pi].name, _ectx ? _ectx.frame : state.currentFrame);
+    },
+  });
+  Object.defineProperty(SELF_VIEW, 'marker', { get: function () { var ld = _selfLd(); return _markerApi(ld && ld.markers); } });
+
+  // Bounding box of what this holder actually draws, as {x, y, width,
+  // height} in canvas coordinates.
+  // SCOPE, stated rather than faked: Paper.js only materializes geometry for
+  // the frame currently loaded, so this reports the CURRENT frame's box
+  // whatever frame is being evaluated. Returning plausible-looking numbers
+  // for another frame would be worse than saying so.
+  function exprContentBox() {
+    var r = _selfResolved();
+    var b = null;
+    if (r && window.userLayers) {
+      if (r.strokeId != null && typeof liveItemByStrokeId === 'function') {
+        var it = liveItemByStrokeId(r.index, r.strokeId);
+        b = it && it.bounds;
+      }
+      if (!b) b = userLayers[r.index] && userLayers[r.index].bounds;
+    }
+    if (!b) return { x: 0, y: 0, width: 0, height: 0, top: 0, left: 0 };
+    // top/left duplicate y/x so the compatibility alias below needs no
+    // separate implementation.
+    return { x: b.x, y: b.y, width: b.width, height: b.height, top: b.y, left: b.x };
+  }
+
+  // ==== Compatibility aliases ===========================================
+  // Undocumented on purpose. These exist for ONE reason: a snippet pasted
+  // from another application shouldn't strand the person who pasted it.
+  // They are absent from the help tooltip, the examples menu and every
+  // user-facing string; Nemo's own vocabulary above is the documented API.
+  // Where an alias speaks SECONDS and the Nemo primary speaks FRAMES, the
+  // alias converts here — a silent factor-of-fps error would be nasty.
+  function aliasPosterizeTime(samplesPerSecond) {
+    var ctx = _ectx;
+    if (!ctx) return 0;
+    var s = Number(samplesPerSecond);
+    if (isFinite(s) && s > 0) exprStepTime(ctx.fps / s);
+    return ctx.time; // seconds, as the original does
+  }
+  function aliasValueAtTime(t) { var c = _ectx; return exprSelfAt(_num(t) * (c ? c.fps : _exprFps())); }
+  function aliasVelocityAtTime(t) { var c = _ectx; return exprSelfVelocity(_num(t) * (c ? c.fps : _exprFps())); }
+  function aliasSpeedAtTime(t) { var c = _ectx; return exprSelfSpeed(_num(t) * (c ? c.fps : _exprFps())); }
+  function aliasNearestKey(t) {
+    var c = _ectx;
+    return c ? exprNearestKeyAtFrame(c.holder, c.prop, _num(t) * c.fps) : null;
+  }
+  function aliasKey(i) { var c = _ectx; return c ? exprKeyAt(c.holder, c.prop, Math.floor(_num(i))) : null; }
+  function aliasSeedRandom(seed, timeless) {
+    var c = _ectx;
+    exprSeed(seed);
+    if (c) c.rngTimeless = !!timeless;
+  }
+  function aliasTimeToFrames(t, fps) {
+    var c = _ectx;
+    var tt = (t === undefined) ? (c ? c.time : 0) : _num(t);
+    return tt * ((fps === undefined) ? (c ? c.fps : _exprFps()) : _num(fps));
+  }
+  function aliasFramesToTime(f, fps) {
+    var c = _ectx;
+    var ff = (f === undefined) ? (c ? c.frame : 0) : _num(f);
+    var r = (fps === undefined) ? (c ? c.fps : _exprFps()) : _num(fps);
+    return r === 0 ? 0 : ff / r;
+  }
+  // A comp/layer view shaped the way the pasted snippet expects. Built only
+  // when an expression actually names one (see compiledFnFor's usage scan),
+  // so the alias layer costs nothing on the hot path.
+  function buildAliasComp() {
+    return {
+      width: COMP_VIEW.width, height: COMP_VIEW.height,
+      frameDuration: 1 / _exprFps(),
+      duration: (state.totalFrames || 1) / _exprFps(),
+      numLayers: state.layers.length,
+      name: COMP_VIEW.name,
+      marker: _aliasMarkerApi(state.markers),
+      layer: exprLayer,
+    };
+  }
+  function buildAliasLayer() {
+    var ld = _selfLd(), r = _selfResolved(), fps = _exprFps();
+    if (!ld || !r) return null;
+    return {
+      name: ld.name, index: r.index,
+      inPoint: (window.layerInPoint ? layerInPoint(ld) : 0) / fps,
+      outPoint: (window.layerOutPoint ? layerOutPoint(ld) : (state.totalFrames - 1)) / fps,
+      hasParent: !!ld.parentLayerUid,
+      parent: SELF_VIEW.parent,
+      marker: _aliasMarkerApi(ld.markers),
+    };
+  }
+  // Same entries, under the numKeys/key/nearestKey names and with
+  // nearestKey taking seconds.
+  function _aliasMarkerApi(list) {
+    var api = _markerApi(list);
+    return {
+      numKeys: api.count,
+      key: api.at,
+      nearestKey: function (t) { return api.nearest(_num(t) * _exprFps()); },
+    };
+  }
+
+  // ---- compilation ------------------------------------------------------
+  // Project-wide expression preamble: define something once and use it from
+  // every expression instead of retyping it. Plain statements — `var k =
+  // 12;` — evaluated in the same scope as the expression body, so anything
+  // it declares is in scope. Cached against BOTH the expression's code and
+  // the preamble, so editing the preamble recompiles every expression rather
+  // than silently leaving stale ones behind.
   function exprGlobals() { return state.exprGlobals || ''; }
+  // The sandbox's complete surface. `new Function` with an EXPLICIT, closed
+  // parameter list — no window, no document, no state.
+  // Nemo's own vocabulary — the documented surface, and the only pool the
+  // "did you mean" suggestion draws from.
+  var EXPR_PUBLIC_NAMES = [
+    'time', 'frame', 'value', 'layer', 'self', 'comp', 'marker',
+    'wiggle', 'noise', 'random', 'randomFixed', 'randomGauss', 'randomGaussFixed', 'seed',
+    'clamp', 'remap', 'remapEase', 'remapEaseIn', 'remapEaseOut', 'degrees', 'radians',
+    'add', 'sub', 'mul', 'div', 'length', 'normalize', 'dot', 'cross', 'angleTo',
+    'stepTime', 'loopAfter', 'loopBefore', 'toFrames', 'toSeconds', 'contentBox',
+  ];
+  var EXPR_ARG_NAMES = EXPR_PUBLIC_NAMES.concat([
+    // --- compatibility aliases (undocumented, see the block above) ---
+    'loopOut', 'loopIn', 'key', 'nearestKey', 'numKeys', 'posterizeTime',
+    'linear', 'ease', 'easeIn', 'easeOut', 'degreesToRadians', 'radiansToDegrees',
+    'lookAt', 'seedRandom', 'gaussRandom',
+    'valueAtTime', 'valueAtFrame', 'velocityAtTime', 'speedAtTime',
+    'timeToFrames', 'framesToTime', 'sourceRectAtTime', 'thisComp', 'thisLayer',
+    // --- internal: the runaway guard instrumentLoops() injects ---
+    '__tick',
+  ]);
+  function _countLines(s) { return s ? s.split('\n').length : 0; }
   function compiledFnFor(holder, prop) {
     var ex = holder.expressions[prop];
     var pre = exprGlobals();
     if (holder._exprCompiled && holder._exprCompiled[prop] && holder._exprCompiled[prop].code === ex.code
         && holder._exprCompiled[prop].pre === pre) {
-      return holder._exprCompiled[prop].fn;
+      return holder._exprCompiled[prop];
     }
     var fn;
-    var args = ['time', 'frame', 'value', 'layer', 'wiggle', 'loopOut', 'key', 'nearestKey', 'numKeys'];
-    try {
+    var args = EXPR_ARG_NAMES;
+    // Guarded source first; if instrumentation somehow produced something
+    // the parser rejects, fall back to the user's untouched text. A working
+    // expression without the loop guard beats a broken one with it — and
+    // this is why instrumentLoops may be conservative without risk.
+    var preSrc = pre ? instrumentLoops(pre) : '';
+    var codeSrc = instrumentLoops(ex.code || '');
+    var guarded = true;
+    // Body lines that sit BEFORE the user's own line 1, so a reported error
+    // line can be translated back into a line of the textarea. Attempt A
+    // adds `"use strict";`, the preamble, and `return (`.
+    var preLines = pre ? _countLines(pre) : 0;
+    var prefixLines = 1 + preLines + 1;
+    var exprMode = true; // flipped below if the multi-statement form is used
+    var userLines = _countLines(ex.code || '');
+    function build(preText, codeText) {
       // eslint-disable-next-line no-new-func
-      fn = Function.apply(null, args.concat(
-        '"use strict";\n' + (pre ? pre + '\n' : '') + 'return (\n' + ex.code + '\n);'));
+      return Function.apply(null, args.concat(
+        '"use strict";\n' + (preText ? preText + '\n' : '') + 'return (\n' + codeText + '\n);'));
+    }
+    try {
+      try {
+        fn = build(preSrc, codeSrc);
+      } catch (eGuard) {
+        if (eGuard instanceof SyntaxError && (preSrc !== pre || codeSrc !== ex.code)) {
+          fn = build(pre, ex.code); // un-instrumented retry
+          guarded = false;
+        } else {
+          throw eGuard;
+        }
+      }
       ex.lastError = null;
     } catch (e) {
       // Multi-statement fallback (2026-08-16, Cyril: "agrémenter la library
       // d'expressions... ID keyframes et layers") — the single-expression
       // wrapper above was the ONLY form ever tried, so `var l = layer(...);
       // return l ? l.position : value;` (the natural way to use layer()'s
-      // own null-when-not-found contract, or key()'s null-when-out-of-range
-      // one) has always been a syntax error: `var`/`if`/multiple statements
-      // can't live inside a bare `return (...)` expression. Retried as a
-      // plain function BODY instead — requires the user's own explicit
-      // `return`, unlike the wrapper above, so this is deliberately a
-      // fallback tried second: every existing single-expression project
-      // (`value + wiggle(2, 10)`, no `return`) keeps compiling exactly as
-      // before through the first attempt, and only code that already
-      // failed as a bare expression gets a second interpretation.
-      try {
+      // own null-when-not-found contract) has always been a syntax error:
+      // `var`/`if`/multiple statements can't live inside a bare `return
+      // (...)` expression. Retried as a plain function BODY instead —
+      // requires the user's own explicit `return`, unlike the wrapper above,
+      // so this is deliberately a fallback tried second: every existing
+      // single-expression project (`value + wiggle(2, 10)`, no `return`)
+      // keeps compiling exactly as before through the first attempt, and
+      // only code that already failed as a bare expression gets a second
+      // interpretation.
+      function buildBody(preText, codeText) {
         // eslint-disable-next-line no-new-func
-        fn = Function.apply(null, args.concat(
-          '"use strict";\n' + (pre ? pre + '\n' : '') + ex.code + '\n'));
+        return Function.apply(null, args.concat(
+          '"use strict";\n' + (preText ? preText + '\n' : '') + codeText + '\n'));
+      }
+      prefixLines = 1 + preLines; // no `return (` line in this form
+      exprMode = false;
+      try {
+        try {
+          fn = buildBody(preSrc, codeSrc);
+        } catch (eGuard2) {
+          if (eGuard2 instanceof SyntaxError && (preSrc !== pre || codeSrc !== ex.code)) {
+            fn = buildBody(pre, ex.code);
+            guarded = false;
+          } else {
+            throw eGuard2;
+          }
+        }
         ex.lastError = null;
       } catch (e2) {
         fn = null;
-        ex.lastError = 'Erreur de syntaxe : ' + e2.message + (pre ? ' (variables globales incluses)' : '');
+        // No line number on a syntax error, on purpose: measured, `new
+        // Function` gives no usable position for one (its stack points at
+        // the Function constructor's own call site, not into the source it
+        // was handed). The engine's message usually names the offending
+        // token, which is the part that helps; inventing a line here would
+        // point at the wrong row of the editor.
+        ex.lastError = SM.t('exprErrorSyntaxPrefix') + e2.message
+          + (pre ? SM.t('exprErrorSyntaxGlobalsSuffix') : '');
+        ex.errorLine = -1;
       }
     }
+    // The two alias views are the only bindings that would allocate per
+    // evaluation. Detected once, at compile time, from the text that will
+    // actually run, so an expression that never names them pays nothing.
+    var body = (pre ? pre + '\n' : '') + (ex.code || '');
+    var entry = {
+      code: ex.code, pre: pre, fn: fn,
+      prefixLines: prefixLines,
+      userLines: userLines,
+      exprMode: exprMode,
+      guarded: guarded,
+      needsAliasComp: /\bthisComp\b/.test(body),
+      needsAliasLayer: /\bthisLayer\b/.test(body),
+    };
     if (!holder._exprCompiled) holder._exprCompiled = {};
-    holder._exprCompiled[prop] = { code: ex.code, pre: pre, fn: fn };
-    return fn;
+    holder._exprCompiled[prop] = entry;
+    return entry;
   }
   // Normalizes an expression's return value to the array shape PROP_DIM
   // expects — a 1D property (rotation/opacity) may return a bare number,
@@ -1123,30 +1979,96 @@
   }
   function evalExpressionFor(holder, prop, frame, rawValue) {
     var ex = holder.expressions[prop];
-    var fn = compiledFnFor(holder, prop);
+    var entry = compiledFnFor(holder, prop);
+    var fn = entry && entry.fn;
     if (!fn) return null;
-    var seed = ensureExprSeed(holder);
-    try {
-      var result = fn(
-        frame / (state.fps || 24),
-        frame,
-        rawValue.length === 1 ? rawValue[0] : rawValue.slice(),
-        function (ref) { return layerSnapshot(ref, frame); },
-        makeWiggle(seed, PROP_DIM[prop]),
-        function () { return loopOutRaw(holder, prop, frame); },
-        function (i) { return exprKeyAt(holder, prop, i); },
-        function (t) { return exprNearestKey(holder, prop, t); },
-        exprNumKeys(holder, prop)
-      );
-      var normalized = normalizeExprResult(result, prop);
-      if (normalized === null) { ex.lastError = SM.t(PROP_DIM[prop] === 2 ? 'exprErrorMustReturnNumberOrXY' : 'exprErrorMustReturnNumber'); return null; }
-      ex.lastError = null;
-      return normalized;
-    } catch (e) {
-      ex.lastError = 'Erreur : ' + e.message;
+    // Cross-layer references can form a cycle (A reads B, B reads A). Each
+    // hop re-enters here, so a bounded depth turns what would be a stack
+    // overflow into the ordinary "fall back to the raw value" outcome.
+    if (_exprDepth >= EXPR_MAX_DEPTH) {
+      ex.lastError = SM.t('exprErrorTooDeep');
+      ex.errorLine = -1;
+      _depthTripped.push(ex);
       return null;
     }
+    // The wall-clock budget belongs to the OUTERMOST evaluation, so a chain
+    // of cross-layer references shares one budget instead of each hop
+    // resetting it.
+    if (_exprDepth === 0) { _exprDeadline = Date.now() + EXPR_BUDGET_MS; _depthTripped.length = 0; }
+    var seed = ensureExprSeed(holder);
+    var fps = _exprFps();
+    var prev = _ectx;
+    _ectx = {
+      holder: holder, prop: prop,
+      frame: frame, time: frame / fps, fps: fps,
+      seed: seed,
+      rngSeed: seed + _propSeedOffset(prop), rngTimeless: false, rngCounter: 0,
+      _resolved: undefined,
+    };
+    _exprDepth++;
+    try {
+      var result = fn(
+        // --- Nemo's own vocabulary ---
+        _ectx.time, _ectx.frame,
+        rawValue.length === 1 ? rawValue[0] : rawValue.slice(),
+        exprLayer, SELF_VIEW, COMP_VIEW, COMP_VIEW.marker,
+        exprWiggle, exprNoise, exprRandom, exprRandomFixed, exprRandomGauss, exprRandomGaussFixed, exprSeed,
+        exprClamp, exprRemap, exprRemapEase, exprRemapEaseIn, exprRemapEaseOut, exprDegrees, exprRadians,
+        exprAdd, exprSub, exprMul, exprDiv, exprLength, exprNormalize, exprDot, exprCross, exprAngleTo,
+        exprStepTime, exprLoopAfter, exprLoopBefore, exprToFrames, exprToSeconds, exprContentBox,
+        // --- compatibility aliases ---
+        exprLoopAfter, exprLoopBefore, aliasKey, aliasNearestKey, exprNumKeys(holder, prop), aliasPosterizeTime,
+        exprRemap, exprRemapEase, exprRemapEaseIn, exprRemapEaseOut, exprRadians, exprDegrees,
+        exprAngleTo, aliasSeedRandom, exprRandomGauss,
+        aliasValueAtTime, exprSelfAt, aliasVelocityAtTime, aliasSpeedAtTime,
+        aliasTimeToFrames, aliasFramesToTime, exprContentBox,
+        entry.needsAliasComp ? buildAliasComp() : null,
+        entry.needsAliasLayer ? buildAliasLayer() : null,
+        _exprTick
+      );
+      var normalized = normalizeExprResult(result, prop);
+      if (normalized === null) {
+        ex.lastError = SM.t(PROP_DIM[prop] === 2 ? 'exprErrorMustReturnNumberOrXY' : 'exprErrorMustReturnNumber');
+        ex.errorLine = -1;
+        return null;
+      }
+      // A reference cycle resolves to SOMETHING (the innermost hop falls back
+      // to its raw value and the outer hops then succeed on top of it), so
+      // without this the warning the cap raised would be wiped out by the
+      // very evaluations it protected, and a cycle would look healthy while
+      // producing an arbitrary number. Anything the cap flagged during this
+      // outermost evaluation keeps its message.
+      if (_depthTripped.indexOf(ex) < 0) { ex.lastError = null; ex.errorLine = -1; }
+      return normalized;
+    } catch (e) {
+      if (e && e.message === EXPR_TIMEOUT_TAG) {
+        // Give the application back rather than hitting the same wall on
+        // every subsequent frame: the expression switches itself off and
+        // says why, exactly once.
+        ex.enabled = false;
+        ex.lastError = SM.t('exprErrorTimeout');
+        ex.errorLine = -1;
+        if (holder._exprCompiled) delete holder._exprCompiled[prop];
+        if (!_timeoutToastPending) {
+          _timeoutToastPending = true;
+          setTimeout(function () {
+            _timeoutToastPending = false;
+            if (window.showToast) showToast(SM.t('exprToastTimeout'));
+            try { renderLayerList(); renderTimeline(); } catch (e2) { /* not mounted */ }
+          }, 0);
+        }
+        return null;
+      }
+      var f = _formatRuntimeError(e, entry);
+      ex.lastError = f.message;
+      ex.errorLine = f.line;
+      return null;
+    } finally {
+      _ectx = prev;
+      _exprDepth--;
+    }
   }
+  var _timeoutToastPending = false;
   // Public wrapper — the ONE new branch on top of the pre-existing
   // rawValueAtFrame, checked first so an enabled-with-error expression
   // still falls through to the exact keyframed/static value it would have
@@ -5566,18 +6488,45 @@
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
     head.appendChild(cb);
-    head.appendChild(document.createTextNode(' Activer l’expression'));
+    head.appendChild(document.createTextNode(' ' + SM.t('exprEnableLabel')));
     row.appendChild(head);
     // The value the property WOULD have without the expression (Van Dijk
     // 7.4). With an expression on, the field above shows the RESULT, and
     // the underlying keyframed value becomes invisible — you end up
     // disabling the expression just to see what you are driving.
+    function fmtVals(arr) {
+      return arr.map(function (n) { return Math.round(n * 100) / 100; }).join(', ') + ' ' + (PROP_UNIT[prop] || '');
+    }
     var rawWrap = document.createElement('span');
     rawWrap.className = 'motion-expr-raw';
     var raw = rawValueAtFrame(holder, prop, state.currentFrame);
-    rawWrap.textContent = SM.t('exprRawValuePrefix') + raw.map(function (n) { return Math.round(n * 100) / 100; }).join(', ') + ' ' + (PROP_UNIT[prop] || '');
+    rawWrap.textContent = SM.t('exprRawValuePrefix') + fmtVals(raw);
     rawWrap.title = SM.t('titleRawValueHint');
     row.appendChild(rawWrap);
+    // ...and, right beside it, what the expression ACTUALLY produces at the
+    // playhead. Writing code against a value you can't see is the slowest
+    // way to work; this refreshes with the playhead like every other Motion
+    // row does. When the expression is failing, this is where that shows.
+    var outWrap = document.createElement('span');
+    outWrap.className = 'motion-expr-raw motion-expr-out';
+    outWrap.title = SM.t('titleExprResultHint');
+    // Repainted in place rather than by re-rendering the row: commit() runs
+    // while the textarea still has focus and a caret in it, and rebuilding
+    // the panel there would throw both away mid-edit.
+    function paintResult() {
+      outWrap.classList.remove('err');
+      if (!expr.enabled || !expr.code) { outWrap.textContent = SM.t('exprResultPrefix') + '—'; return; }
+      var cur = rawValueAtFrame(holder, prop, state.currentFrame);
+      var evaluated = evalExpressionFor(holder, prop, state.currentFrame, cur);
+      if (evaluated === null) {
+        outWrap.classList.add('err');
+        outWrap.textContent = SM.t('exprResultPrefix') + SM.t('exprResultError');
+        return;
+      }
+      outWrap.textContent = SM.t('exprResultPrefix') + fmtVals(evaluated);
+    }
+    paintResult();
+    row.appendChild(outWrap);
     // Project-wide preamble (7.2) — reachable from the same place you write
     // the expression that uses it, rather than a settings panel away.
     var glob = document.createElement('button');
@@ -5595,16 +6544,17 @@
     // Examples menu (feedback #113, "les expressions ne sont pas encore
     // très clair à utilisé il faudrait un menu... qui permettent d'avoir
     // des exemples d'expression commune et basique à utiliser"). Every
-    // snippet below uses ONLY names actually present in compiledFnFor's
-    // sandbox arg list above (time/frame/value/layer/wiggle/loopOut/key/
-    // nearestKey/numKeys) — copy-pasteable by construction, nothing here
-    // can ever reference a variable that doesn't really exist. Reuses
-    // window.showContextMenu (ui.js), the same generic dropdown already
-    // used elsewhere off a plain button click, not just right-click.
+    // snippet below uses ONLY names present in EXPR_PUBLIC_NAMES — Nemo's
+    // own documented vocabulary, never the compatibility aliases — so the
+    // menu is copy-pasteable by construction and also doubles as the
+    // shortest tour of what the engine can do. Several use let/const and
+    // arrow functions on purpose: this is ordinary modern JavaScript and
+    // the menu should show that. Reuses window.showContextMenu (ui.js), the
+    // same generic dropdown already used elsewhere off a plain button click.
     var examplesBtn = document.createElement('button');
     examplesBtn.className = 'motion-expr-glob';
-    examplesBtn.textContent = 'Exemples ▾';
-    examplesBtn.title = 'Insérer un exemple d’expression courante';
+    examplesBtn.textContent = SM.t('btnExamplesEllipsis');
+    examplesBtn.title = SM.t('titleExamplesHint');
     examplesBtn.addEventListener('click', function (e) {
       e.preventDefault(); e.stopPropagation();
       if (!window.showContextMenu) return;
@@ -5615,28 +6565,77 @@
         commit();
         ta.focus();
       }
-      // wiggle()/Math.sin() examples: `value` is a bare [x,y] ARRAY on a 2D
-      // property (position/anchor/scale) — JS's `+` on an array string-
-      // concatenates instead of adding per-axis, so the 1D-only
-      // `value + wiggle(2, 10)` form silently produced an invalid result
-      // (feedback #134: this exact example, inserted on Position, always
-      // hit "expression must return a number or [x,y] array"). PROP_DIM-
-      // branch the inserted code so the SAME menu item is always valid for
-      // the property it was invoked on — wiggle() itself already returns
-      // [wx, wy] for a 2D property (see makeWiggle above).
+      // `value` is a bare [x,y] ARRAY on a 2D property (position/anchor/
+      // scale) — JS's `+` on an array string-concatenates instead of adding
+      // per-axis, so a 1D-only `value + wiggle(2, 10)` form silently
+      // produces an invalid result (feedback #134: that exact example,
+      // inserted on Position, always hit "expression must return a number
+      // or [x,y] array"). Every entry is therefore PROP_DIM-branched, so
+      // the SAME menu item is always valid for the property it was invoked
+      // on — wiggle() itself already returns [wx, wy] for a 2D property.
       var is2D = PROP_DIM[prop] === 2;
+      function pair(one, two) { return is2D ? two : one; }
+      // The cross-layer examples name real OTHER layers. Found live: with a
+      // hardcoded 'Layer 1' placeholder, inserting one of them while editing
+      // Layer 1 produced a self-reference that the cycle guard (correctly)
+      // refused — an example that fails the moment you use it on the first
+      // layer of the project is not an example.
+      var otherA = 'Layer 1', otherB = 'Layer 2', picked = [];
+      for (var oi = 0; oi < state.layers.length && picked.length < 2; oi++) {
+        if (state.layers[oi] !== holder) picked.push(state.layers[oi].name);
+      }
+      if (picked.length > 0) otherA = picked[0];
+      if (picked.length > 1) otherB = picked[1];
+      // Entries that only make sense on one dimensionality are listed as
+      // null above and dropped here, rather than shown doing nothing.
       window.showContextMenu(e.clientX, e.clientY, [
-        { label: 'value — pas de changement', action: function () { insert('value'); } },
-        is2D
-          ? { label: 'value + wiggle(2, 10) — tremblement aléatoire', action: function () { insert('[value[0] + wiggle(2, 10)[0], value[1] + wiggle(2, 10)[1]]'); } }
-          : { label: 'value + wiggle(2, 10) — tremblement aléatoire', action: function () { insert('value + wiggle(2, 10)'); } },
-        is2D
-          ? { label: 'value + Math.sin(time * 3) * 10 — oscillation régulière', action: function () { insert('[value[0] + Math.sin(time * 3) * 10, value[1] + Math.sin(time * 3) * 10]'); } }
-          : { label: 'value + Math.sin(time * 3) * 10 — oscillation régulière', action: function () { insert('value + Math.sin(time * 3) * 10'); } },
-        { label: 'loopOut() — boucle en continu après la dernière clé', action: function () { insert('loopOut()'); } },
-        { label: 'key(1).value — reste sur la valeur de la 1ère clé', action: function () { insert('key(1).value'); } },
-        { label: 'layer(\'Nom du calque\').' + followProp + ' — suivre un autre calque', action: function () { insert('layer(\'Nom du calque\').' + followProp); } },
-      ]);
+        { label: SM.t('exprExValue'), action: function () { insert('value'); } },
+        { label: SM.t('exprExWiggle'), action: function () {
+          insert(pair('value + wiggle(2, 10)',
+            '[value[0] + wiggle(2, 10)[0], value[1] + wiggle(2, 10)[1]]'));
+        } },
+        { label: SM.t('exprExOscillate'), action: function () {
+          insert(pair('value + Math.sin(time * 3) * 10',
+            'const w = Math.sin(time * 3) * 10;\nreturn [value[0] + w, value[1] + w];'));
+        } },
+        { label: SM.t('exprExStepped'), action: function () {
+          insert(pair('stepTime(4);\nreturn value + wiggle(3, 15);',
+            'stepTime(4);\nconst w = wiggle(3, 15);\nreturn [value[0] + w[0], value[1] + w[1]];'));
+        } },
+        { label: SM.t('exprExLoopCycle'), action: function () { insert('loopAfter(\'cycle\')'); } },
+        { label: SM.t('exprExLoopPingpong'), action: function () { insert('loopAfter(\'pingpong\')'); } },
+        { label: SM.t('exprExLoopOffset'), action: function () { insert('loopAfter(\'offset\')'); } },
+        { label: SM.t('exprExLoopBefore'), action: function () { insert('loopBefore(\'cycle\')'); } },
+        { label: SM.t('exprExBounce'), action: function () {
+          var head = 'const n = self.keys.count;\n'
+            + 'if (!n) return value;\n'
+            + 'const t = (frame - self.keys.at(n).frame) / comp.fps;\n'
+            + 'if (t <= 0) return value;\n'
+            + 'const b = 40 * Math.exp(-4 * t) * Math.sin(3 * 2 * Math.PI * t);\n';
+          insert(head + pair('return value + b;', 'return [value[0], value[1] + b];'));
+        } },
+        { label: SM.t('exprExRemapOther'), action: function () {
+          insert(pair('remap(layer(\'' + otherA + '\').position[0], 0, comp.width, 0, 100)',
+            'const k = remap(layer(\'' + otherA + '\').position[0], 0, comp.width, 0, 1);\n'
+            + 'return [value[0], value[1] + k * 100];'));
+        } },
+        { label: SM.t('exprExStagger'), action: function () {
+          insert('seed(self.index);\n' + pair('return value + randomFixed(-20, 20);',
+            'const o = randomFixed(-20, 20);\nreturn [value[0] + o, value[1] + o];'));
+        } },
+        { label: SM.t('exprExContentBox'), action: function () {
+          insert(pair('contentBox().width + 20',
+            'const b = contentBox();\nreturn [b.width + 20, b.height + 20];'));
+        } },
+        // angleTo returns ONE angle, so it only has a meaning on a
+        // 1-dimensional property. Offered there and nowhere else, rather
+        // than padded into a two-component shape that would do nothing.
+        (is2D ? null : { label: SM.t('exprExAngleTo'), action: function () {
+          insert('angleTo(layer(\'' + otherA + '\').position, layer(\'' + otherB + '\').position)');
+        } }),
+        { label: SM.t('exprExFollowLayer') + ' · ' + followProp, action: function () { insert('layer(\'' + otherA + '\').' + followProp); } },
+        { label: SM.t('exprExFirstKey'), action: function () { insert('self.keys.count ? self.keys.at(1).value : value'); } },
+      ].filter(Boolean));
     });
     row.appendChild(examplesBtn);
     // ---- code pane (Van Dijk 7.5) ------------------------------------
@@ -5656,18 +6655,21 @@
     // (feedback #134).
     ta.placeholder = PROP_DIM[prop] === 2 ? '[value[0] + wiggle(2, 10)[0], value[1] + wiggle(2, 10)[1]]' : 'value + wiggle(2, 10)';
     // Discoverability (2026-08-16, Cyril: "agrémenter la library
-    // d'expressions... ID keyframes et layers") — layer()/key()/nearestKey()/
-    // numKeys existed (or now exist) with zero UI surface telling anyone
-    // they're callable; a hover tooltip on the one place you're already
-    // looking beats a separate docs page nobody opens.
+    // d'expressions... ID keyframes et layers") — the vocabulary exists with
+    // zero UI surface telling anyone it's callable; a hover tooltip on the
+    // one place you're already looking beats a separate docs page nobody
+    // opens. Documents Nemo's own names only, never the compatibility
+    // aliases.
     ta.title = SM.t('titleExprCodeHint');
     pane.appendChild(gutter); pane.appendChild(ta);
-    // The line number the error points at, when the message carries one.
-    // new Function() reports positions against the wrapper we build in
-    // compiledFnFor, not against the user's own text, so only a number we
-    // can actually trust is used — no guessing at an offset.
+    // The line number the error points at. The engine computes it (against
+    // the user's own text, after subtracting the wrapper and preamble lines
+    // — see _lineFromStack) and stores it on the expression, so the gutter
+    // reads a number rather than trying to parse it back out of a message
+    // that is translated into four languages.
     function errorLine() {
       if (!expr.lastError) return -1;
+      if (typeof expr.errorLine === 'number' && expr.errorLine > 0) return expr.errorLine;
       var mm = /(?:ligne|line)\s*(\d+)/i.exec(expr.lastError);
       return mm ? parseInt(mm[1], 10) : -1;
     }
@@ -5686,10 +6688,20 @@
       pushUndo();
       expr.code = ta.value;
       expr.lastError = null;
+      expr.errorLine = -1;
       if (holder._exprCompiled) delete holder._exprCompiled[prop];
       if (typeof saveActiveLayerFrame === 'function') saveActiveLayerFrame();
       reloadIfTimeLinkOffset(prop);
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      // Show what the new code produces immediately, and repaint the gutter
+      // and the message in case the error moved or went away.
+      paintResult();
+      paintError();
+      paintGutter();
+    }
+    function paintError() {
+      errEl.textContent = expr.lastError || '';
+      errEl.style.display = expr.lastError ? '' : 'none';
     }
     ta.addEventListener('blur', commit);
     ta.addEventListener('keydown', function (e) {
@@ -5731,10 +6743,13 @@
     if (expr.editorHeight) { ta.style.height = expr.editorHeight + 'px'; gutter.style.height = expr.editorHeight + 'px'; }
     row.appendChild(pane);
     paintGutter();
-    if (expr.lastError) {
-      var errEl = document.createElement('div'); errEl.className = 'motion-expr-error'; errEl.textContent = expr.lastError;
-      row.appendChild(errEl);
-    }
+    // Always built, shown only when there is something to say — so commit()
+    // can surface a fresh message without re-rendering the row out from
+    // under the caret.
+    var errEl = document.createElement('div');
+    errEl.className = 'motion-expr-error';
+    row.appendChild(errEl);
+    paintError();
     // ---- pickwhip (Van Dijk 7.3) -------------------------------------
     // Drag onto another property row to write its reference into the code;
     // Alt-drag CLONES that property's own expression instead — his exact
