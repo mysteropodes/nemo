@@ -3616,6 +3616,21 @@ function syncPlayheadToViewport(){
     var wrap=document.getElementById('fg-wrap');
     if(!wrap)return;
     wrap.addEventListener('scroll',syncPlayheadToViewport);
+    // The height above is only correct until #fg-wrap's own box changes, and
+    // SCROLLING was the only thing that re-ran it (2026-08-31, feedback #177
+    // "sa ligne bleu ne va pas jusqu'à la barre de scroll en bas de la
+    // timeline dans tous les cas de figure"). Dragging #tl-resize to make the
+    // timeline taller (ui.js) grows the wrap without moving scrollTop, so no
+    // scroll event fires and the line keeps its old, shorter height —
+    // reproduced by driving the real handle: wrap 194→394px tall, line still
+    // 194px, stopping 200px above the scrollbar. Same for a window resize or
+    // any panel collapse that reflows the row.
+    // Observing the element covers all of them at once instead of chasing
+    // each call site, which is how this was missed the first time.
+    if(window.ResizeObserver){
+      try{ new ResizeObserver(syncPlayheadToViewport).observe(wrap); }
+      catch(_){ window.addEventListener('resize',syncPlayheadToViewport); }
+    } else window.addEventListener('resize',syncPlayheadToViewport);
     syncPlayheadToViewport();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
@@ -3749,15 +3764,16 @@ function renderTimeline(){
     // last showed in Animation 2D.
     document.getElementById('playhead-flag').textContent=state.currentFrame+1;
     // Bug found 2026-07 ("le curseur de temps devrait descendre jusqu'au
-    // niveau de la scroll bar en bas"): grid.scrollHeight only covers the
-    // RENDERED content — with few tracks that's shorter than #fg-wrap's
-    // own visible box (flex:1, fills the panel), so the line stopped short
-    // of the actual bottom edge/scrollbar with dead space below it. Extend
-    // to whichever is taller: content height (so a tall/scrolled track
-    // list still gets a fully-covering line) or the wrap's own visible
-    // height (so a short list still reaches the panel's bottom).
-    var mwrap=document.getElementById('fg-wrap');
-    mph.style.height=Math.max(grid.scrollHeight,mwrap?mwrap.clientHeight:0)+'px';
+    // niveau de la scroll bar en bas"): the line has to reach the panel's
+    // real bottom whether the track list is short or long.
+    // This used to compute its own Math.max(grid.scrollHeight,
+    // wrap.clientHeight) and set height ALONE — leaving `top` at whatever
+    // the last scroll left it, and disagreeing with the Animation 2D branch
+    // below, which just calls syncPlayheadToViewport(). One authority for
+    // both modes (2026-08-31, #177): top follows scrollTop and height is the
+    // visible height, which spans exactly the viewport at every scroll
+    // position, in both modes, with no second formula to keep in sync.
+    syncPlayheadToViewport();
     return;
   }
   if(window.SMCamera)SMCamera.renderGridRow(grid);
