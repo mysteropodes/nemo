@@ -2870,7 +2870,10 @@
       var poZs = 1 / view.zoom;
       var poMap = (window.SMMotion && SMMotion.layerMotionPointMap) ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
       (window.perObjectShapesOf ? perObjectShapesOf(userLayers[state.activeLayerIdx]) : []).forEach(function (ch) {
-        var sb = ch.strokeBounds;
+        // Posed bounds (#193) — see elementPosedBounds in tools.js: a shape
+        // moved through Motion keeps its RAW geometry, so a box built from
+        // strokeBounds stays where the shape used to be.
+        var sb = window.elementPosedBounds ? elementPosedBounds(userLayers[state.activeLayerIdx], ch) : ch.strokeBounds;
         function PW(x, y) { if (!poMap) return [x, y]; return poMap.fwd(x, y); }
         var a1 = PW(sb.left, sb.top), a2 = PW(sb.right, sb.top), a3 = PW(sb.right, sb.bottom), a4 = PW(sb.left, sb.bottom);
         poItems.push(lineItem(a1, a2, [74, 158, 255, 190], 1 * poZs));
