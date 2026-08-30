@@ -1337,6 +1337,7 @@ window.SM={
     // field on this list already follows.
     if(src.parentLayerUid)state.layers[ni].parentLayerUid=src.parentLayerUid;
     if(src.parentLayerUidB)state.layers[ni].parentLayerUidB=src.parentLayerUidB;
+    if(src.parentsMore&&src.parentsMore.length)state.layers[ni].parentsMore=src.parentsMore.map(function(p){return{uid:p.uid};});
     // Same gap as parentLayerUid just above (2026-08-16 QA sweep): Parent-
     // in-Time's own link descriptor was never copied, so a duplicated linked
     // layer silently came out unlinked even though timeLinkInOffset/
@@ -1971,7 +1972,7 @@ window.SM={
         // be just as useless. Note isNullLayer above was already persisted,
         // and its own tooltip calls a null layer a "pivot/parent pour d'autres
         // calques" — the pivot came back, everything hung off it did not.
-        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,parentLayerUidB:l.parentLayerUidB,followPath:l.followPath,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink,
+        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,parentLayerUidB:l.parentLayerUidB,parentsMore:l.parentsMore,followPath:l.followPath,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink,
         // Expression controls (2026-08-30) — the DECLARATIONS only
         // ({key,name,type,default}). Their keyframes are ordinary tracks and
         // already ride along inside `motion`/`motionStatic` above, keyed by
@@ -2289,6 +2290,12 @@ window.SM={
       if(ld.layerUid)state.layers[idx].layerUid=ld.layerUid;
       if(ld.parentLayerUid)state.layers[idx].parentLayerUid=ld.parentLayerUid;
       if(ld.parentLayerUidB)state.layers[idx].parentLayerUidB=ld.parentLayerUidB;
+      // Extra weighted parents (2026-08-30) — guarded on SHAPE like widget/
+      // matteMode, so a corrupted nemo-auto can't reach the blend maths.
+      if(Array.isArray(ld.parentsMore)){
+        var _pm=ld.parentsMore.filter(function(p){return p&&typeof p.uid==='string';}).map(function(p){return{uid:p.uid};});
+        if(_pm.length)state.layers[idx].parentsMore=_pm;
+      }
       if(ld.followPath)state.layers[idx].followPath=ld.followPath;
       if(ld.motion)state.layers[idx].motion=ld.motion;
       if(ld.elementMotion)state.layers[idx].elementMotion=ld.elementMotion;
