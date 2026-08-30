@@ -216,6 +216,61 @@
     c.remove();
   }
 
+  // ---- Image meshes under the brush (2026-08-30) ----------------------
+  // Cyril: "il faudrait que l'outil sculpt déforme aussi les points de mesh
+  // quand ils sont actifs". The brush already pushes path vertices with a
+  // quadratic falloff; a mesh vertex is the same idea in a different store,
+  // so this reuses the SAME radius and the SAME falloff rather than giving
+  // meshes a second, subtly-different feel.
+  //
+  // "quand ils sont actifs" is taken literally: only a raster whose mesh is
+  // currently in EDIT mode is sculpted. Otherwise dragging near any meshed
+  // image on the layer would silently reshape it while you meant to sculpt a
+  // stroke — meshes are attached to images that mostly sit still.
+  //
+  // Offsets are normalized (0..1 of the image rect), so the world-space delta
+  // is converted through the rect rather than added raw; a rotated or scaled
+  // image therefore follows the pointer instead of drifting off-axis.
+  function meshTargets(layer) {
+    if (!window.SMImageMesh || !window.SMImageMeshUI || !SMImageMeshUI.isEditing()) return [];
+    if (typeof Raster === 'undefined' || !window.SMEngineBridge || !SMEngineBridge.rasterImageRect) return [];
+    var out = [];
+    layer.children.forEach(function (c) {
+      if (!(c instanceof Raster) || !c.data || !c.data.meshId) return;
+      var mesh = SMImageMesh.get(c.data.meshId);
+      if (!mesh) return;
+      out.push({ id: c.data.meshId, mesh: mesh, rect: SMEngineBridge.rasterImageRect(c) });
+    });
+    return out;
+  }
+  function pushMeshes(layer, center, delta, R) {
+    var moved = false;
+    meshTargets(layer).forEach(function (t) {
+      var world = SMImageMesh.worldVerts(t.mesh, t.rect, null);
+      if (!world) return;
+      // Same conversion the offsets themselves use: a normalized delta is the
+      // world delta expressed in the rect's own (possibly rotated) frame.
+      var rad = (t.rect.rotation || 0) * Math.PI / 180;
+      var cos = Math.cos(rad), sin = Math.sin(rad);
+      var lw = (delta.x * cos + delta.y * sin) / (t.rect.width || 1);
+      var lh = (-delta.x * sin + delta.y * cos) / (t.rect.height || 1);
+      for (var i = 0; i < world.length; i++) {
+        // worldVerts returns [x, y] ARRAYS, not Points — same shape the mesh
+        // editor's own hit-test reads (rv.pts[i][0]). Reading .x/.y here gave
+        // NaN distances, which never tripped the `d >= R` skip, so every
+        // vertex got an offset of NaN and the mesh looked untouched. Found by
+        // driving a real sculpt drag and counting moved vertices: 0.
+        var d = Math.hypot(world[i][0] - center.x, world[i][1] - center.y);
+        if (d >= R) continue;
+        var w = 1 - d / R; w = w * w;
+        var off = (t.mesh.offsets && t.mesh.offsets[i]) || [0, 0];
+        SMImageMesh.setOffset(t.id, i, off[0] + lw * w, off[1] + lh * w);
+        moved = true;
+      }
+    });
+    return moved;
+  }
+
   function applyPush(layer, center, delta, R) {
     var moved = false;
     sculptables(layer).forEach(function (p) {
@@ -317,7 +372,12 @@
     if (!layer || state.layers[state.activeLayerIdx].locked) return;
     var R = radiusScreen() / view.zoom;
     if (!undoPushed) { pushUndo(); ensureKeyframe(); undoPushed = true; }
-    var moved = e.shiftKey ? applySmooth(layer, cur, R) : applyPush(layer, cur, cur.subtract(lastW), R);
+    var delta = cur.subtract(lastW);
+    var moved = e.shiftKey ? applySmooth(layer, cur, R) : applyPush(layer, cur, delta, R);
+    // Meshes are pushed alongside the paths, not instead of them: one drag
+    // over an image sitting on top of a stroke moves both, which is what the
+    // brush looks like it is doing.
+    if (!e.shiftKey && pushMeshes(layer, cur, delta, R)) moved = true;
     lastW = cur;
     if (moved) {
       saveActiveLayerFrame();
