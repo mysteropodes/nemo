@@ -4697,7 +4697,10 @@
       // (_motionExpandedElement null, the "entered the group but picked
       // nothing yet" state of #176) every shape draws its own box.
       if (window._motionExpandedElement && ch.data.strokeId === window._motionExpandedElement) return;
-      var b = ch.strokeBounds;
+      // Posed bounds, not raw (#193): a sibling that has been moved through
+      // Motion must carry its box with it, exactly like the active element's
+      // own gizmo already does.
+      var b = window.elementPosedBounds ? elementPosedBounds(lyr, ch) : ch.strokeBounds;
       if (!b || !b.width || !b.height) return;
       function P(x, y) { if (!map) return [x, y]; return map.fwd(x, y); }
       var c1 = P(b.left, b.top), c2 = P(b.right, b.top), c3 = P(b.right, b.bottom), c4 = P(b.left, b.bottom);

@@ -7583,12 +7583,50 @@ function perObjectShapesOf(layer){
 // Union of those shapes — the "group box" a double-click enters from
 // ANYWHERE inside, not only by hitting a shape ("peu importe où je double
 // clic dans la bounding box").
+// An element's bounds AFTER its own element-level Motion transform
+// (2026-08-31, feedback #193: "Quand on reviens à la bounding box de groupe
+// celle ci ne s'est pas réadapter au nouveau position des éléments"). A shape
+// moved/rotated/scaled through Motion leaves its RAW geometry untouched — the
+// transform is applied at render time — so every box computed from
+// strokeBounds alone stayed where the shape used to be, both the per-element
+// boxes and the group box built from their union. That also made the
+// enter/exit hit test for the group (feedback #176) disagree with what is
+// actually on screen once anything had been animated.
+//
+// The maths are NOT re-derived here: the four corners go through the exact
+// same SMMotion.transformSegments the renderer uses, around the same pivot
+// (the item's own bounds centre offset by the anchor), so this box can never
+// drift from what is drawn. Falls back to the raw bounds whenever there is no
+// transform to apply — the overwhelmingly common case, and one object
+// allocation cheaper.
+function elementPosedBounds(layer,c){
+  var b=c.strokeBounds;
+  if(!window.SMMotion||!SMMotion.elementMotionAt||!SMMotion.transformSegments)return b;
+  var li=userLayers.indexOf(layer);
+  var sid=c.data&&c.data.strokeId;
+  if(li<0||!sid)return b;
+  var m=SMMotion.elementMotionAt(li,sid,state.currentFrame);
+  if(!m)return b;
+  if(!m.dx&&!m.dy&&!m.rot&&m.sx===1&&m.sy===1)return b;
+  var pc=c.bounds.center;
+  var pivot={x:pc.x+(m.ax||0),y:pc.y+(m.ay||0)};
+  var corners=[[b.left,b.top],[b.right,b.top],[b.right,b.bottom],[b.left,b.bottom]]
+    .map(function(pt){return {point:[pt[0],pt[1]],handleIn:[0,0],handleOut:[0,0]};});
+  var out=SMMotion.transformSegments(corners,pivot,m);
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  out.forEach(function(sg){
+    var x=sg.point[0],y=sg.point[1];
+    if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y;
+  });
+  return new Rectangle(new Point(minX,minY),new Point(maxX,maxY));
+}
 function perObjectUnionBounds(layer){
   var sh=perObjectShapesOf(layer),b=null;
-  sh.forEach(function(c){b=b?b.unite(c.strokeBounds):c.strokeBounds.clone();});
+  sh.forEach(function(c){var eb=elementPosedBounds(layer,c);b=b?b.unite(eb):eb.clone();});
   return sh.length>=2?b:null;
 }
 window.perObjectShapesOf=perObjectShapesOf;
+window.elementPosedBounds=elementPosedBounds;
 window.perObjectUnionBounds=perObjectUnionBounds;
 function onViewDoubleClick(event){
   // Re-edit a placed text block in place (2026-07 rework) — checked before
@@ -7661,6 +7699,18 @@ function onViewDoubleClick(event){
     }
     var mItem=mHit.item;
     while(mItem.parent&&mItem.parent!==mLayer)mItem=mItem.parent;
+    // Resolve a synthetic hit back to the real stroke BEFORE refusing it
+    // (2026-08-31, feedback #193: "Le double clic marche bien avec des shape
+    // paramétrique mais pas avec des shape de brush"). What you SEE of a
+    // filled brush stroke is mostly its linkedFill backdrop — a companion
+    // item — and of a textured one, its dab stamps; the refusal below then
+    // dropped the gesture entirely, so double-clicking the coloured part of
+    // a brush stroke did nothing at all while a rectangle worked. Every
+    // other click path in the app already goes through resolveBrushAnchor
+    // (select-bridge, subselect-bridge, fill/stroke select, tweens); the
+    // double-click was the one that didn't. The refusal stays for what
+    // genuinely has no anchor to reach — a duplicator copy.
+    mItem=resolveBrushAnchor(mItem,mLayer)||mItem;
     var mSid=mItem.data&&mItem.data.strokeId;
     if(!mSid)return;
     if(mItem.data.isBrushTextureCopy||mItem.data.isLinkedFillCompanion||mItem.data.isDuplicatorCopy)return;
@@ -7707,6 +7757,9 @@ function onViewDoubleClick(event){
   // a CHILD Path — climb to the layer-level item, which is the one carrying
   // data.strokeId and the one every consumer (§1) expects in selectedPaths.
   while(fillPath.parent&&fillPath.parent!==layer)fillPath=fillPath.parent;
+  // Then map a dab stamp / linkedFill backdrop onto the stroke it belongs
+  // to — see the Motion branch above for why (feedback #193).
+  fillPath=resolveBrushAnchor(fillPath,layer)||fillPath;
   if(!(fillPath instanceof Path)&&!(fillPath instanceof CompoundPath))return;
   if(!fillPath.fillColor&&!fillPath.strokeColor)return;
   // Synthetic companions are not objects to isolate (§1) — a dab or a
