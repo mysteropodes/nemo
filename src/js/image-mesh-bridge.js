@@ -350,4 +350,25 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
+
+  // Exposed so the canvas right-click menu can offer the same two toggles the
+  // panel does (2026-08-30, Cyril: "est-ce que ça serait dans élément et au
+  // clic droit dans le canvas ?"). Deliberately NOT the whole module: these
+  // four are what an outside caller needs to ask "is this offerable, is it on"
+  // and to flip it. Everything routes through the same toggleMesh/`editing`
+  // the checkboxes use, so the two entry points can never disagree — and
+  // renderImageMeshPanel() keeps the checkboxes in step after a menu click.
+  window.SMImageMeshUI = {
+    canMesh: function () { return !!singleRaster(); },
+    hasMesh: function () { var r = singleRaster(); return !!(r && r.data && r.data.meshId); },
+    toggleMesh: function () { var r = singleRaster(); if (r) toggleMesh(!(r.data && r.data.meshId)); },
+    isEditing: function () { return editing; },
+    toggleEditing: function () {
+      var r = singleRaster();
+      if (!r || !(r.data && r.data.meshId)) return;
+      editing = !editing;
+      renderImageMeshPanel();
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    },
+  };
 })();

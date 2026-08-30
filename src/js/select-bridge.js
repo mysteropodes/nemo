@@ -2499,6 +2499,26 @@
           updateUI(); window.SMEngineBridge.renderNow();
         }
       },
+      // Image mesh (2026-08-30) — the same two toggles the Image mesh panel
+      // section carries, offered where you are already looking when you want
+      // them: on the image itself. Both route through SMImageMeshUI, which
+      // drives the panel's own toggleMesh/`editing`, so the menu and the
+      // checkboxes can never drift apart. The whole block is skipped unless
+      // exactly one imported image is selected — canMesh() is the panel's own
+      // singleRaster() guard, so the menu offers this in precisely the cases
+      // the panel appears in, and never on a shape or a multi-selection.
+      ...(window.SMImageMeshUI && SMImageMeshUI.canMesh() ? [
+        { sep: true },
+        {
+          label: (SMImageMeshUI.hasMesh() ? '✓ ' : '') + SM.t('ctxImageMesh'),
+          action: function () { SMImageMeshUI.toggleMesh(); },
+        },
+        {
+          label: (SMImageMeshUI.isEditing() ? '✓ ' : '') + SM.t('ctxImageMeshEditPoints'),
+          disabled: !SMImageMeshUI.hasMesh(),
+          action: function () { SMImageMeshUI.toggleEditing(); },
+        },
+      ] : []),
       { sep: true },
       {
         // 2026-07 feedback ("tween seulement des éléments select... avec le
