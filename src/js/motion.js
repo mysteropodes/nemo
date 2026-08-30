@@ -5007,7 +5007,20 @@
       var nb = t.boundsCenter;
       lb = { left: nb.x - hs, top: nb.y - hs, right: nb.x + hs, bottom: nb.y + hs, width: hs * 2, height: hs * 2, center: { x: nb.x, y: nb.y } };
     } else {
-      lb = (ld && ld.symbolId) ? symbolUnionBounds(t.li) : (userLayers[t.li] && userLayers[t.li].bounds);
+      // Per-ELEMENT target hugs its own shape (2026-08-30, feedback #170
+      // re-opened: "ça m'ouvre pas ça comme un groupe avec les 2 bounding
+      // box différencié"). activeMotionTarget has computed t.bounds for the
+      // expanded element since the per-element branch was added — this
+      // function simply never read it and always took the whole LAYER's
+      // union, so on a layer with two shapes the gizmo drew ONE box around
+      // both while its anchor correctly sat on the element. Seen on screen,
+      // not deduced: the box spanned a square at (700,420) and a circle at
+      // (1030,780) together.
+      // Only when a strokeId is actually targeted; the whole-layer case
+      // (t.strokeId null) keeps the union it always used, and a Component
+      // keeps symbolUnionBounds' duration-stable box.
+      lb = (t.strokeId && t.bounds) ? t.bounds
+        : ((ld && ld.symbolId) ? symbolUnionBounds(t.li) : (userLayers[t.li] && userLayers[t.li].bounds));
     }
     if (!lb) return null;
     var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);
