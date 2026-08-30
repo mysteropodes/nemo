@@ -141,6 +141,39 @@ pub(crate) struct ImageRef {
     // pipeline (Paper.js and motion.js are degree-based throughout).
     #[serde(default)]
     pub(crate) rotation: f64,
+    // Image mesh (2026-08-30) — when present, this image is drawn as a
+    // triangulated, deformable mesh clipped to an outline instead of as one
+    // axis-rect blit. Absent for every ordinary image (the overwhelmingly
+    // common case), which keeps the plain `draw_image` fast path — and its
+    // output — completely untouched.
+    #[serde(default)]
+    pub(crate) mesh: Option<MeshIn>,
+}
+// A deformed image mesh. See draw_image_mesh for how it is painted, and
+// src/js/image-mesh.js for where the numbers come from.
+//
+// `verts` are WORLD-space destinations, already carrying the item's whole
+// Motion/parent/3D chain: engine-bridge.js resolves that chain down to one
+// final rect per image item and maps the mesh's own normalized coordinates
+// through it, rather than this side re-deriving the same transform a second
+// time (CLAUDE.md §3 — two copies of one piece of math drift silently).
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct MeshIn {
+    pub(crate) verts: Vec<[f64; 2]>,
+    // Source position of each vertex, normalized 0..1 over the image's own
+    // pixels. This is the vertex's REST position — the deformation moves
+    // where a vertex LANDS (`verts`), never where it is sampled from.
+    pub(crate) uvs: Vec<[f64; 2]>,
+    // Flat triples of indices into `verts`/`uvs`.
+    pub(crate) tris: Vec<u32>,
+    // Indices into `verts` forming the closed boundary polygon, in order.
+    // This is the MASK: the whole mesh is drawn inside one clip layer on
+    // this polygon, so the outline is simultaneously the mask silhouette and
+    // the boundary the triangulation was built inside — the single rule that
+    // makes image masking and image meshing one feature rather than two.
+    #[serde(default)]
+    pub(crate) outline: Vec<u32>,
 }
 fn default_opacity() -> f32 {
     1.0
@@ -2114,6 +2147,165 @@ fn composite_pass(
 /// slice rather than `&LayerIn` so paint_layer_with_element_effects can
 /// paint just a RUN of one layer's items (the items between/around a
 /// per-element-effect item) without needing a fake LayerIn wrapper.
+/// Draws a deformed image mesh (see MeshIn).
+///
+/// ---- WHY THIS SHAPE ----
+///
+/// vello can only place an image under an AFFINE transform; there is no
+/// textured-triangle primitive, and adding a dedicated vertex-buffer wgpu
+/// pipeline would be a whole new rendering path alongside the existing
+/// fullscreen blend/matte/blur passes. It is not needed: an affine map is
+/// UNIQUELY and EXACTLY determined by three point pairs, so a
+/// triangle-to-triangle map is not an approximation. Per triangle: FILL the
+/// destination triangle with the image as a BRUSH, under the affine that
+/// carries its source triangle onto that destination triangle. The result is
+/// the exact piecewise-affine warp a textured-triangle renderer would
+/// produce, with zero new GPU plumbing.
+///
+/// `scene.fill(.., brush, Some(place), &tri)` rather than a clip layer per
+/// triangle: vello composes the brush transform as `transform *
+/// brush_transform`, which is precisely what `draw_image` does internally
+/// (it is a `fill` of the image's own rect), so this is the same primitive
+/// with a triangle instead of a rect — one encoded path per triangle rather
+/// than a clip push/pop pair, and the triangle edge is antialiased directly.
+///
+/// A real vertex-buffer pipeline stays available as a later optimization if
+/// triangle counts ever make the per-triangle clip cost matter — nothing
+/// here forecloses it, since the JS payload is already vertices + uvs +
+/// indices, which is exactly what such a pipeline would want.
+///
+/// ---- SEAMS ----
+///
+/// Adjacent clips are antialiased, so two triangles sharing an edge each
+/// cover ~50% of the boundary pixels; composited src-over that leaves ~25%
+/// of the background showing through as a visible seam grid. Each
+/// destination triangle is therefore dilated about its centroid by half a
+/// device pixel so neighbours overlap and coverage saturates. The IMAGE
+/// affine is left undilated — only the clip grows — so the sampled pixels
+/// stay exactly where they belong; the cost is that the mesh's outer
+/// boundary would bleed half a pixel, which the outer outline clip below
+/// trims back off.
+fn draw_image_mesh(
+    scene: &mut Scene,
+    mesh: &MeshIn,
+    image_data: &vello::peniko::ImageData,
+    opacity: f32,
+    view_tf: Affine,
+) {
+    let n = mesh.verts.len();
+    if n < 3 || mesh.tris.len() < 3 || mesh.uvs.len() < n {
+        return;
+    }
+    let iw = image_data.width as f64;
+    let ih = image_data.height as f64;
+    if iw <= 0.0 || ih <= 0.0 {
+        return;
+    }
+    // Half a DEVICE pixel expressed in the world units the triangles live
+    // in — view_tf carries the zoom, so this stays half a screen pixel at
+    // any zoom level instead of growing/shrinking with the document.
+    let c = view_tf.as_coeffs();
+    let view_scale = ((c[0] * c[3] - c[1] * c[2]).abs()).sqrt().max(1e-9);
+    let dilate = 0.5 / view_scale;
+
+    // Outer layer: clips the WHOLE mesh to its outline (the mask) and
+    // applies the item's opacity ONCE. Doing opacity here rather than on
+    // each triangle's brush is what keeps a semi-transparent mesh from
+    // double-compositing along every dilated seam.
+    let mut outline_path = BezPath::new();
+    if mesh.outline.len() >= 3 {
+        for (k, &vi) in mesh.outline.iter().enumerate() {
+            let Some(p) = mesh.verts.get(vi as usize) else { return };
+            if k == 0 {
+                outline_path.move_to((p[0], p[1]));
+            } else {
+                outline_path.line_to((p[0], p[1]));
+            }
+        }
+        outline_path.close_path();
+    } else {
+        // No outline sent (older/degenerate payload): fall back to a bbox so
+        // the mesh still draws rather than vanishing — a silent skip here is
+        // exactly the "the shape disappeared" failure mode CLAUDE.md §1 is
+        // about.
+        let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+        for p in &mesh.verts {
+            x0 = x0.min(p[0]);
+            y0 = y0.min(p[1]);
+            x1 = x1.max(p[0]);
+            y1 = y1.max(p[1]);
+        }
+        outline_path = Rect::new(x0, y0, x1, y1).to_path(0.1);
+    }
+    scene.push_layer(vello::peniko::Fill::NonZero, vello::peniko::Mix::Normal, opacity, view_tf, &outline_path);
+
+    let brush = vello::peniko::ImageBrush::new(image_data.clone());
+    let mut t = 0;
+    while t + 2 < mesh.tris.len() {
+        let (ia, ib, ic) = (mesh.tris[t] as usize, mesh.tris[t + 1] as usize, mesh.tris[t + 2] as usize);
+        t += 3;
+        if ia >= n || ib >= n || ic >= n {
+            continue;
+        }
+        // Source triangle in IMAGE PIXEL space (draw_image's own units).
+        let s0 = (mesh.uvs[ia][0] * iw, mesh.uvs[ia][1] * ih);
+        let s1 = (mesh.uvs[ib][0] * iw, mesh.uvs[ib][1] * ih);
+        let s2 = (mesh.uvs[ic][0] * iw, mesh.uvs[ic][1] * ih);
+        let d0 = (mesh.verts[ia][0], mesh.verts[ia][1]);
+        let d1 = (mesh.verts[ib][0], mesh.verts[ib][1]);
+        let d2 = (mesh.verts[ic][0], mesh.verts[ic][1]);
+        // The unique affine with A(s_i) = d_i: solve the 2x2 linear part
+        // against the source edge basis, then recover the translation.
+        let (e1x, e1y) = (s1.0 - s0.0, s1.1 - s0.1);
+        let (e2x, e2y) = (s2.0 - s0.0, s2.1 - s0.1);
+        let det = e1x * e2y - e2x * e1y;
+        if det.abs() < 1e-12 {
+            continue; // degenerate source triangle — no invertible map exists
+        }
+        let (f1x, f1y) = (d1.0 - d0.0, d1.1 - d0.1);
+        let (f2x, f2y) = (d2.0 - d0.0, d2.1 - d0.1);
+        let a = (f1x * e2y - f2x * e1y) / det;
+        let b = (f1y * e2y - f2y * e1y) / det;
+        let cc = (f2x * e1x - f1x * e2x) / det;
+        let d = (f2y * e1x - f1y * e2x) / det;
+        let tx = d0.0 - (a * s0.0 + cc * s0.1);
+        let ty = d0.1 - (b * s0.0 + d * s0.1);
+        let place = Affine::new([a, b, cc, d, tx, ty]);
+
+        // Destination triangle, dilated about its centroid (see the seam
+        // note above). Scaling about the centroid by k moves edge i outward
+        // by (k-1) * dist(centroid, edge_i); the smallest of those distances
+        // belongs to the LONGEST edge, so sizing k off that edge guarantees
+        // every edge grows by at least `dilate`.
+        let (gx, gy) = ((d0.0 + d1.0 + d2.0) / 3.0, (d0.1 + d1.1 + d2.1) / 3.0);
+        let area2 = ((d1.0 - d0.0) * (d2.1 - d0.1) - (d2.0 - d0.0) * (d1.1 - d0.1)).abs();
+        let mut k = 1.0;
+        if area2 > 1e-12 {
+            let l0 = ((d1.0 - d0.0).powi(2) + (d1.1 - d0.1).powi(2)).sqrt();
+            let l1 = ((d2.0 - d1.0).powi(2) + (d2.1 - d1.1).powi(2)).sqrt();
+            let l2 = ((d0.0 - d2.0).powi(2) + (d0.1 - d2.1).powi(2)).sqrt();
+            let lmax = l0.max(l1).max(l2);
+            // dist(centroid, edge) = area2 / (3 * len(edge))
+            k = 1.0 + dilate * 3.0 * lmax / area2;
+            // A triangle already smaller than the dilation would blow up
+            // without this; clamp rather than let one sliver smear.
+            if !k.is_finite() || k > 4.0 {
+                k = 4.0;
+            }
+        }
+        let ex = |p: (f64, f64)| (gx + (p.0 - gx) * k, gy + (p.1 - gy) * k);
+        let (t0, t1, t2) = (ex(d0), ex(d1), ex(d2));
+        let mut tri = BezPath::new();
+        tri.move_to(t0);
+        tri.line_to(t1);
+        tri.line_to(t2);
+        tri.close_path();
+
+        scene.fill(vello::peniko::Fill::NonZero, view_tf, &brush, Some(place), &tri);
+    }
+    scene.pop_layer();
+}
+
 fn paint_layer_items(
     scene: &mut Scene,
     items: &[ItemIn],
@@ -2124,6 +2316,14 @@ fn paint_layer_items(
     for item in items {
         if let Some(img_ref) = &item.image {
             if let Some(image_data) = images.get(&img_ref.image_id) {
+                // Image mesh (2026-08-30) — an image carrying a mesh is drawn
+                // as a clipped, piecewise-affine warp instead of one rect
+                // blit. Opt-in per item, so nothing about an ordinary
+                // image's rendering changes.
+                if let Some(mesh) = &img_ref.mesh {
+                    draw_image_mesh(scene, mesh, image_data, img_ref.opacity, view_tf);
+                    continue;
+                }
                 let sx = img_ref.width / image_data.width as f64;
                 let sy = img_ref.height / image_data.height as f64;
                 let mut place = Affine::translate((img_ref.x, img_ref.y)) * Affine::scale_non_uniform(sx, sy);

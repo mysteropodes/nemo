@@ -499,7 +499,27 @@ function exportHasEngineOnlyMotion(){
     return ld.threeD||(ld.motionBlur&&state.motionBlurOn);
   });
 }
-function exportNeedsEngine(){return exportHasActiveEffects()||exportHasLayerCompositing()||exportHasEngineOnlyMotion();}
+// Image mesh (2026-08-30, image-mesh.js) — the same "engine-only feature"
+// shape as 3D / Motion Blur / Order above, and the same silent failure if
+// missed: exportBuildFrame's plain-Paper.js loop draws a Raster as its own
+// axis-aligned rect with no notion of a mesh or of the outline that masks
+// it, so a deformed, masked image would export perfectly undeformed and
+// unmasked while looking right on screen. Route through the engine, which
+// is where draw_image_mesh lives.
+//
+// Deliberately checks the STORE rather than walking every layer's every
+// frame looking for a meshId: an orphaned mesh (image deleted, mesh entry
+// still in the store) would then force the engine path unnecessarily, which
+// costs a little time and produces the identical picture — whereas the
+// opposite error, missing a mesh that IS in use, is a wrong export nobody
+// notices. Over-inclusive on purpose, in the safe direction.
+function exportHasImageMesh(){
+  var m=state.imageMeshes;
+  if(!m)return false;
+  for(var k in m){if(Object.prototype.hasOwnProperty.call(m,k))return true;}
+  return false;
+}
+function exportNeedsEngine(){return exportHasActiveEffects()||exportHasLayerCompositing()||exportHasEngineOnlyMotion()||exportHasImageMesh();}
 // ---- PNG sequence rendering to a working directory (shared by raster exports) ----
 async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
   // Effects (blur/vignette/glow/ground shadow/...) only ever rendered in

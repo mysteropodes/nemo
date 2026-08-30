@@ -251,6 +251,16 @@ var state={
   // generated id — deliberately the simplest backing store that works, no
   // dedicated management panel for v1 per the confirmed scope.
   trackRoles:{},
+  // Image meshes (2026-08-30, image-mesh.js) — project-level registry keyed
+  // by a stable id, same category and same persistence slot as symbols/
+  // trackRoles above. A meshed image's stroke dict carries only `meshId`;
+  // the topology (mask outline + rest vertices + triangle indices + the
+  // static pose) lives HERE, exactly once. That split is not cosmetic: a
+  // still image's stroke dict is written verbatim into EVERY frame of its
+  // layer (images.js's import loop — see its own comment), so a mesh stored
+  // on the dict would be duplicated once per frame. See image-mesh.js's
+  // header for the measured numbers.
+  imageMeshes:{},
   activeMontageViewId:null, // StoryBoard montage currently entered (enterMontageView) — see app.js
   // Layer folders: purely organizational metadata, not a real tree — each
   // layer optionally carries ld.folderId pointing into this map. Keeping
@@ -1030,6 +1040,15 @@ function serR(r){
   // from its anchor (independent selection, no group move, no regen).
   if(r.data&&r.data.brushGroupId)d.brushGroupId=r.data.brushGroupId;
   if(r.data&&r.data.isBrushTextureCopy)d.isBrushTextureCopy=true;
+  // Image mesh (2026-08-30, image-mesh.js): ONLY the id travels on the
+  // stroke dict — the mesh itself lives in state.imageMeshes (see its own
+  // comment above for why: this dict is duplicated into every frame of a
+  // still's layer, the mesh must not be). Without persisting this one
+  // string a saved-then-reloaded meshed image renders as a plain
+  // undeformed rect while its mesh sits orphaned in the store — the exact
+  // "new tag handled at the write site, forgotten at the read site" bug
+  // class CLAUDE.md §1 documents for this file.
+  if(r.data&&r.data.meshId)d.meshId=r.data.meshId;
   // Group membership (2026-07, group-bridge.js's Cmd+G) — same stable id
   // as serP's own groupId, so a group can freely mix Path and Raster members.
   if(r.data&&r.data.groupId)d.groupId=r.data.groupId;
@@ -1155,6 +1174,7 @@ function desR(d,layer,op){var prev=project.activeLayer;layer.activate();
   r.data.src=srcForRaster||null;
   if(d.linked){r.data.linked=true;if(d.linkedPath)r.data.linkedPath=d.linkedPath;if(d.linkedHandleId)r.data.linkedHandleId=d.linkedHandleId;if(!srcForRaster)r.data.linkedMissing=true;}
   if(d.isBitmapBrush)r.data.isBitmapBrush=true;if(d.brushGroupId)r.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)r.data.isBrushTextureCopy=true;if(d.groupId)r.data.groupId=d.groupId;
+  if(d.meshId)r.data.meshId=d.meshId; // image mesh — see serR's own comment
   if(d.isText){r.data.isText=true;r.data.text=d.text||'';r.data.font=d.font||'sans-serif';r.data.size=d.size||48;r.data.color=d.color||'#000000';r.data.align=d.align||'left';if(d.fixedWidth)r.data.fixedWidth=d.fixedWidth;if(d.isTextChar)r.data.isTextChar=true;if(d.textGroupId)r.data.textGroupId=d.textGroupId;if(d.charIndex!=null)r.data.charIndex=d.charIndex;if(d.wordIndex!=null)r.data.wordIndex=d.wordIndex;if(d.lineIndex!=null)r.data.lineIndex=d.lineIndex;}
   r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;
   // serR()'s mid-decode fallback reads this — see its own comment. Cleared

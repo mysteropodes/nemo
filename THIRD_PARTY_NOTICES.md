@@ -18,6 +18,7 @@ only covers what's *bundled inside* the app.
 | Paper.js | `src/paper-full.min.js` | MIT | Vendored minified build. The local copy carries no embedded license header (minification stripped it) — MIT requires the notice travel with copies of the software, so this repo's own README/NOTICES (this file) is what satisfies that now. |
 | opentype.js | `src/js/opentype.min.js` | MIT | Vendored minified build. Unlike Paper.js, this one already carries its full MIT header inline (verified) — no action needed beyond keeping this table's reference current. |
 | Roboto (Regular + Bold) | `src/fonts/Roboto-*.ttf` | Apache License 2.0 (Google) | Used for vector text rendering (`vector-text-bridge.js`). Apache 2.0 is permissive and font-distribution-friendly — no action needed. |
+| Delaunator | `src/js/delaunator.vendor.js` | ISC (Mapbox) | v5.0.1, upstream UMD build, unmodified apart from a prepended license header. Delaunay triangulation for the image mesh (`image-mesh.js`). ISC is permissive and GPL-3.0-compatible. Upstream's own rollup build inlines **robust-predicates** 3.0.2 (Unlicense / public domain, Mourner) — that is the `epsilon`/`splitter`/`orient2d` code at the top of the bundle; public domain imposes no conditions, and it is called out here rather than left implicit because it isn't visible as a separate file. |
 
 ## Removed during this audit
 
