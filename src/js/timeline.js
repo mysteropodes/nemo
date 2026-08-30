@@ -5616,6 +5616,15 @@ function paintFillSwatches(v){
 // caller.
 function renderLayerList(frameOnly){
   if(frameOnly&&state.appMode!=='motion')return;
+  // Split code editor sync (2026-08-30, found by driving: deleting the
+  // layer whose expression the panel was showing left the panel open on a
+  // dead expression — a zombie that silently swallowed edits). refresh()
+  // re-reads its expression from the model and CLOSES ITSELF when the
+  // holder no longer resolves; hooked here because every path that changes
+  // what the panel could be stale against (layer deletion, undo/redo,
+  // project load) already funnels through renderLayerList, and the call is
+  // one snapshot read when open, nothing when closed.
+  if(window.SMExprPanel&&SMExprPanel.isOpen())SMExprPanel.refresh();
   var _scroll=_tlScrollSnapshot(); // see _tlScrollSnapshot — same wipe, same jump
   var list=document.getElementById('layer-list');list.innerHTML='';
   // Motion mode: expandable Transform property rows instead of the plain
