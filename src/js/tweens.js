@@ -4275,6 +4275,16 @@ function renderGhostAll(){
 // every one of renderOS()'s many call sites across app.js/timeline.js) so
 // every existing "state changed, recompute the ghost overlays" call site
 // keeps working unmodified and picks up Ghost All for free.
+// Stamps which (layer, frame) an onion ghost came FROM (2026-08-30, image
+// mesh). An onion item is a snapshot of a DIFFERENT frame, and an animated
+// image mesh has a different shape on every frame — without this, a ghost
+// rendered the mesh's rest sculpt instead of that frame's pose, so the
+// ghost and the live drawing disagreed about where the artwork is.
+// Transient by construction: onionPrevLayer/onionNextLayer are never in
+// userLayers, never serialized, and rebuilt wholesale by every renderOS —
+// the `__` prefix marks that, same convention as data.__engineSrcDict.
+// Read by engine-bridge.js's onionLayerItems.
+function osTagFrame(item,li,fi){if(item&&item.data){item.data.__osLayer=li;item.data.__osFrame=fi;}}
 function renderOS(){
   // toggleOnion()/setOnionMode()/setOnionRange()/toggleGhostAll() etc. all
   // just mutate state then call renderOS() — none of them ever bumped
@@ -4366,8 +4376,8 @@ function renderOS(){
   // outline modes still never touch texture-tagged items (canTint excludes
   // them) — that's the original stray-blue-line halo bug this skip was
   // added to prevent, still guarded, just no longer by omitting them outright.
-  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes=SMGroup.applyCombinesToStrokes(strokes,osLd);var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-(dist/prevRangeSpan)*.85);strokes.forEach(function(sd){var isTex=!!(sd.isBrushTextureCopy||sd.brushTexturePreset);if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;return;}var effOp=isTex?op*(sd.opacity!==undefined?sd.opacity:1):op;var p=desP(sd,onionPrevLayer,effOp);var canTint=(sd.hasRealStroke||sd.fillColor)&&!isTex;if(state.onionMode==='tinted'&&canTint)p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'&&canTint){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=effOp;});}
-  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes2=SMGroup.applyCombinesToStrokes(strokes2,osLd);var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-(dist2/nextRangeSpan)*.85);strokes2.forEach(function(sd){var isTex2=!!(sd.isBrushTextureCopy||sd.brushTexturePreset);if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;return;}var effOp2=isTex2?op2*(sd.opacity!==undefined?sd.opacity:1):op2;var p=desP(sd,onionNextLayer,effOp2);var canTint2=(sd.hasRealStroke||sd.fillColor)&&!isTex2;if(state.onionMode==='tinted'&&canTint2)p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'&&canTint2){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=effOp2;});}
+  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes=SMGroup.applyCombinesToStrokes(strokes,osLd);var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-(dist/prevRangeSpan)*.85);strokes.forEach(function(sd){var isTex=!!(sd.isBrushTextureCopy||sd.brushTexturePreset);if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;osTagFrame(pr,li,fi);return;}var effOp=isTex?op*(sd.opacity!==undefined?sd.opacity:1):op;var p=desP(sd,onionPrevLayer,effOp);var canTint=(sd.hasRealStroke||sd.fillColor)&&!isTex;if(state.onionMode==='tinted'&&canTint)p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'&&canTint){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=effOp;});}
+  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes2=SMGroup.applyCombinesToStrokes(strokes2,osLd);var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-(dist2/nextRangeSpan)*.85);strokes2.forEach(function(sd){var isTex2=!!(sd.isBrushTextureCopy||sd.brushTexturePreset);if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;osTagFrame(nr,li,fi2);return;}var effOp2=isTex2?op2*(sd.opacity!==undefined?sd.opacity:1):op2;var p=desP(sd,onionNextLayer,effOp2);var canTint2=(sd.hasRealStroke||sd.fillColor)&&!isTex2;if(state.onionMode==='tinted'&&canTint2)p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'&&canTint2){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=effOp2;});}
   userLayers[state.activeLayerIdx].activate();
 }
 

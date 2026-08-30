@@ -1460,7 +1460,17 @@
           // (CLAUDE.md §3). Returns null — costing one property read — for
           // every ordinary image.
           if (window.SMImageMesh) {
-            var meshPayload = SMImageMesh.scenePayload(c, rb);
+            // Animated pose (2026-08-30) — per-vertex Motion tracks, keyed
+            // by meshId on this layer's element holders (see motion.js's
+            // meshHolder comment). The guard is the cheap one: a mesh with
+            // no vertex tracks at all (the common case) passes no poseAt
+            // and scenePayload takes its zero-cost path.
+            var cMeshId = c.data && c.data.meshId;
+            var meshPose = null;
+            if (cMeshId && window.SMMotion && SMMotion.hasMeshVertexMotionFor && SMMotion.hasMeshVertexMotionFor(i, cMeshId)) {
+              meshPose = function (vi) { return SMMotion.meshVertexOffsetAt(i, cMeshId, vi, renderFrame); };
+            }
+            var meshPayload = SMImageMesh.scenePayload(c, rb, meshPose);
             if (meshPayload) imgItem.mesh = meshPayload;
           }
           items.push({ image: imgItem });
@@ -2364,7 +2374,17 @@
           // deformed silhouette, otherwise the ghost and the live drawing
           // disagree about where the artwork is, which is worse than no ghost.
           if (window.SMImageMesh) {
-            var oMesh = SMImageMesh.scenePayload(c, rb);
+            // An onion ghost is a snapshot of ANOTHER frame, so an animated
+            // mesh has to be posed at THAT frame, not the current one —
+            // renderOS stamps the source (layer, frame) on the ghost item
+            // for exactly this (tweens.js's osTagFrame).
+            var oMeshId = c.data && c.data.meshId;
+            var oPose = null;
+            if (oMeshId && c.data.__osFrame != null && window.SMMotion && SMMotion.hasMeshVertexMotionFor && SMMotion.hasMeshVertexMotionFor(c.data.__osLayer, oMeshId)) {
+              var oLi = c.data.__osLayer, oFr = c.data.__osFrame;
+              oPose = function (vi) { return SMMotion.meshVertexOffsetAt(oLi, oMeshId, vi, oFr); };
+            }
+            var oMesh = SMImageMesh.scenePayload(c, rb, oPose);
             if (oMesh) oItem.mesh = oMesh;
           }
           items.push({ image: oItem });

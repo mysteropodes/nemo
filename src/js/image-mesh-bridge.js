@@ -83,10 +83,21 @@
     if (!m && SMMotion.layerMotion3DPointMap) m = SMMotion.layerMotion3DPointMap(state.activeLayerIdx);
     return m;
   }
+  // The animated pose for this mesh at the current frame, or null when it
+  // has no vertex tracks at all. Identical to what buildSceneJson feeds the
+  // renderer (engine-bridge.js) — the handles have to sit on the picture,
+  // so both sides read the same thing rather than the overlay quietly
+  // showing the rest sculpt while the image renders its animated pose.
+  function poseAtFor(t) {
+    if (!window.SMMotion || !SMMotion.hasMeshVertexMotionFor) return null;
+    var li = state.activeLayerIdx;
+    if (!SMMotion.hasMeshVertexMotionFor(li, t.meshId)) return null;
+    return function (vi) { return SMMotion.meshVertexOffsetAt(li, t.meshId, vi, state.currentFrame); };
+  }
   function renderedVerts(t) {
     if (!window.SMEngineBridge || !SMEngineBridge.rasterImageRect) return null;
     var rect = SMEngineBridge.rasterImageRect(t.raster);
-    var pts = SMImageMesh.worldVerts(t.mesh, rect);
+    var pts = SMImageMesh.worldVerts(t.mesh, rect, poseAtFor(t));
     if (!pts) return null;
     var mm = motionMap();
     if (mm) pts = pts.map(function (p) { return mm.fwd(p[0], p[1]); });
@@ -186,13 +197,32 @@
     if (mm && mm.inv) { var iv = mm.inv(w[0], w[1]); w = [iv[0], iv[1]]; }
     var uv = SMImageMesh.normalizedOf(rect, w[0], w[1]);
     var rest = t.mesh.verts[dragIdx];
-    SMImageMesh.setOffset(t.meshId, dragIdx, uv[0] - rest[0], uv[1] - rest[1]);
+    // Where the drag lands depends on the stopwatch, exactly like every
+    // other Motion property: an ANIMATED vertex records a key (or a static
+    // override) on its vtxN track, an un-animated one edits the mesh's own
+    // rest sculpt. The track value is a deviation ON TOP of the sculpt, so
+    // it is measured from rest+sculpt rather than from rest.
+    var li = state.activeLayerIdx;
+    if (window.SMMotion && SMMotion.isMeshVertexAnimated && SMMotion.isMeshVertexAnimated(li, t.meshId, dragIdx)) {
+      var sculpt = (t.mesh.offsets && t.mesh.offsets[dragIdx]) || [0, 0];
+      SMMotion.setMeshVertexOffset(li, t.meshId, dragIdx, uv[0] - rest[0] - sculpt[0], uv[1] - rest[1] - sculpt[1]);
+    } else {
+      SMImageMesh.setOffset(t.meshId, dragIdx, uv[0] - rest[0], uv[1] - rest[1]);
+    }
     dragMoved = true;
     SMEngineBridge.renderNow();
   }
   function onUp(e) {
     if (dragIdx < 0) return;
     e.stopImmediatePropagation(); e.preventDefault();
+    // A drag that landed on a vtxN track may have created a keyframe, which
+    // only shows up once the timeline re-renders — the panel/grid pair is
+    // rebuilt wholesale (motion.js), never incrementally, so nothing else
+    // would repaint it until the next unrelated UI event.
+    var tUp = targetMesh();
+    if (dragMoved && tUp && window.SMMotion && SMMotion.isMeshVertexAnimated
+        && SMMotion.isMeshVertexAnimated(state.activeLayerIdx, tUp.meshId, dragIdx)
+        && typeof updateUI === 'function') updateUI();
     dragIdx = -1;
     SMEngineBridge.resume();
     // The mesh lives in state.imageMeshes, not in the frame's strokes, so
@@ -211,7 +241,16 @@
     var sec = el('p-imagemesh-sec');
     if (!sec) return;
     var r = singleRaster();
-    if (!r) { sec.style.display = 'none'; editing = false; return; }
+    // NOT `editing = false` here. This runs from updateUI, which fires on
+    // every frame change — and loadFrame rebuilds the Paper items, so
+    // singleRaster() is transiently null in the middle of an ordinary
+    // scrub. Clearing the mode there turned edit mode off the instant the
+    // playhead moved, which makes animating a mesh (key a vertex, scrub,
+    // key it again) impossible. Found live doing exactly that. `editing`
+    // is a sticky preference; with no valid target the overlay returns []
+    // and the pointer handlers bail on their own, so leaving it on costs
+    // nothing. It is cleared only when the mesh is genuinely gone (below).
+    if (!r) { sec.style.display = 'none'; return; }
     sec.style.display = '';
     var has = !!(r.data && r.data.meshId && SMImageMesh.get(r.data.meshId));
     if (!has) editing = false;
@@ -281,15 +320,33 @@
     if (rows) rows.addEventListener('change', setDensity);
     var rst = el('btn-imagemesh-reset');
     if (rst) rst.addEventListener('click', resetPose);
-    // Capture phase on #canvas-area, before the Select tool's own drag —
-    // identical wiring to gradient-bridge/perspective-bridge/symmetry-bridge.
-    var tgt = document.getElementById('canvas-area') || document.getElementById('drawing-canvas');
-    if (tgt) {
-      tgt.addEventListener('pointerdown', onDown, { capture: true });
-      tgt.addEventListener('pointermove', onMove, { capture: true });
-      tgt.addEventListener('pointerup', onUp, { capture: true });
-      tgt.addEventListener('pointercancel', onUp, { capture: true });
+    // Capture phase on DOCUMENT, not on #canvas-area.
+    //
+    // gradient-bridge/perspective-bridge/symmetry-bridge all listen on
+    // #canvas-area, and that is enough for them because nothing else
+    // competes for the same gesture. It is NOT enough here: motion.js also
+    // has a capture-phase pointerdown on #canvas-area (its own canvas drag
+    // that moves a layer), and among listeners on the SAME element capture
+    // order is registration order — motion.js loads first, so it won.
+    // Found live in Motion mode: dragging a mesh vertex silently moved the
+    // whole layer instead, leaving ld.motionStatic.position at exactly the
+    // drag delta and no key on the vertex.
+    //
+    // A capture listener on an ANCESTOR always runs before one on a
+    // descendant, whatever the registration order — the same trick tweens.js
+    // documents for its reassign-click intercept ("registered on document,
+    // to steal a click before any per-tool bridge on #canvas-area sees it").
+    // The target check keeps this scoped to the canvas exactly as before,
+    // and every handler bails without stopping propagation unless it is
+    // really taking the gesture.
+    function inCanvas(e) {
+      var area = document.getElementById('canvas-area');
+      return !!(area && e.target && area.contains(e.target));
     }
+    document.addEventListener('pointerdown', function (e) { if (inCanvas(e)) onDown(e); }, { capture: true });
+    document.addEventListener('pointermove', function (e) { if (dragIdx >= 0) onMove(e); }, { capture: true });
+    document.addEventListener('pointerup', function (e) { if (dragIdx >= 0) onUp(e); }, { capture: true });
+    document.addEventListener('pointercancel', function (e) { if (dragIdx >= 0) onUp(e); }, { capture: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

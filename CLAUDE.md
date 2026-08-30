@@ -702,7 +702,7 @@ post-traitement dans `buildSceneJson` : il réutilise les items déjà construit
 et leur applique la matrice DELTA — ne jamais dupliquer la boucle de
 construction (CLAUDE.md §3).
 
-## 12. Image mesh — déformer une image importée (2026-08-30, PR1+PR2)
+## 12. Image mesh — déformer une image importée (2026-08-30, PR1+PR2+PR3)
 
 `image-mesh.js` (+ `draw_image_mesh` dans engine.rs). Demande de Cyril :
 déformer/animer une image importée via un maillage éditable, AVEC un système de
@@ -806,9 +806,57 @@ monde (960,270) et (960,350) passent au fond ; cycle marche/arrêt/marche →
 chaque glissé dans l'ordre ; l'export (`render_to_pixels`) ne contient AUCUNE
 poignée alors que l'écran en montre 137.
 
-**Pas encore fait** : les clés Motion par sommet (PR3, via le patron
-`vtx*`/`applyPathVertexOffsets` de motion.js), l'ajout/suppression de sommets,
-et le tracé d'un contour à main levée (aujourd'hui on part du rectangle et on
-déplace ses sommets, ou on appelle `SMImageMesh.setOutline` par script). Une
-entrée orpheline reste possible si l'IMAGE est supprimée sans passer par le
-bouton Mesh — `releaseIfUnused` ne couvre que le chemin de détachement.
+**Pas encore fait** : l'ajout/suppression de sommets et le tracé d'un contour à
+main levée (aujourd'hui on part du rectangle et on déplace ses sommets, ou on
+appelle `SMImageMesh.setOutline` par script). Une entrée orpheline reste
+possible si l'IMAGE est supprimée sans passer par le bouton Mesh —
+`releaseIfUnused` ne couvre que le chemin de détachement.
+
+### 12ter. Animation des sommets (PR3)
+
+Les sommets d'un maillage passent par la **même machinerie `vtxN`** que ceux
+d'un Path (`hasPathVertexMotion`/`valueAtFrame`) — donc clés, courbes d'ease,
+éditeur de courbes, expressions et contrôles d'expression sont hérités sans une
+ligne de code de plus. Deux différences volontaires, imposées par ce qu'est une
+image :
+
+1. **Le holder est clé par `meshId`, pas par `strokeId`.** Un raster n'a PAS de
+   strokeId stable d'une frame à l'autre : `layerElements` en tamponne un
+   paresseusement sur le dict de LA frame, et le dict d'une image fixe est un
+   objet littéral SÉPARÉ par frame — la frame 5 en recevrait donc un différent
+   de la frame 0 et l'animation disparaîtrait au scrub. `meshId` est écrit sur
+   toutes les frames par `propagate`, c'est le seul id qu'une image fixe porte
+   réellement de bout en bout.
+2. **La valeur est en POURCENT de la taille de l'image**, pas en pixels — le
+   maillage est stocké normalisé (§12), et le pourcent c'est cette même unité
+   rendue lisible dans l'éditeur de courbes (« 20 » plutôt que « 0,2 »). La
+   division par 100 se fait une seule fois, dans `meshVertexOffsetAt`.
+
+L'offset animé s'AJOUTE à `mesh.offsets` (le sculpt de repos) : le chronomètre
+décide auquel des deux un glissé sur le canevas écrit, exactement comme
+n'importe quelle autre propriété Motion.
+
+⚠️ Trois pièges de plus, tous trouvés en pilotant :
+1. **Écouter sur `document` en capture, PAS sur `#canvas-area`.** motion.js a
+   lui aussi un `pointerdown` en capture sur `#canvas-area`, et entre écouteurs
+   du MÊME élément l'ordre de capture est l'ordre d'enregistrement — motion.js
+   charge en premier, donc il gagnait : glisser un sommet en mode Motion
+   déplaçait silencieusement tout le calque (`ld.motionStatic.position` = le
+   delta exact du glissé). Un écouteur en capture sur un ANCÊTRE passe toujours
+   avant, quel que soit l'ordre d'enregistrement — même astuce que
+   l'interception de clic de tweens.js.
+2. **Ne pas éteindre le mode Édition sur une sélection transitoirement nulle.**
+   `renderImageMeshPanel` tourne depuis `updateUI`, donc à chaque changement de
+   frame, et `loadFrame` reconstruit les items : le mode s'éteignait dès que la
+   tête de lecture bougeait, ce qui rend l'animation d'un maillage impossible
+   (clé, scrub, clé). `editing` est une préférence collante.
+3. **Un fantôme d'onion est un instantané d'une AUTRE frame.** `osTagFrame`
+   (tweens.js) tamponne `__osLayer`/`__osFrame` sur chaque raster fantôme pour
+   qu'`onionLayerItems` le pose à SA frame — sinon le fantôme affichait le
+   sculpt de repos et contredisait le dessin vivant. Vérifié : 12 frames
+   fantômes, 12 poses distinctes.
+
+**Le compte de lignes de la timeline passe par `meshVertexRowCount`**, partagé
+par le panneau ET la grille (§11) — un maillage 32×32 fait 1093 sommets, donc
+il y a un plafond (200) qui DOIT être le même des deux côtés. Vérifié :
+44/44 lignes à 4×4, 219/219 à 32×32.
