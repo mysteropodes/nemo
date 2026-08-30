@@ -3783,6 +3783,17 @@ function renderTimeline(){
     // visible height, which spans exactly the viewport at every scroll
     // position, in both modes, with no second formula to keep in sync.
     syncPlayheadToViewport();
+    // Audio belongs to the document, not to Animation 2D (2026-08-31,
+    // feedback #183: "si j'importe un calque son dans la timeline motion
+    // celui ci apparait à droite de la timeline trés bien mais pas à gauche
+    // comme layer son avec les options qui vont avec"). renderStrip() draws
+    // BOTH halves — the waveform strip on the right AND the synthetic
+    // name/mute/level rows in #layer-list — but it was only called from the
+    // Animation 2D tail below, past this early return. So switching to
+    // Motion left the waveform behind (nothing clears #audio-strip) while
+    // the left rows vanished with the layer list rebuild: exactly "à droite
+    // très bien mais pas à gauche". Same call, same order as the tail.
+    if(window.SMAudio)SMAudio.renderStrip();
     return;
   }
   if(window.SMCamera)SMCamera.renderGridRow(grid);
