@@ -455,6 +455,72 @@
     }
     showToast(SM.t('toastVideoImportedSuffix')+frames.filter(function(f){return f.strokes.length;}).length+' images sur le calque "'+prefix+'"');
   }
+  // ---- linked-mode video guards (2026-08-30, feedback #154) ----
+  // Reported bug, stated plainly: with the project set to "Liés", a web
+  // video import still baked every frame to a JPEG data URL into the
+  // project JSON. Two distinct ways that can still happen, each with a
+  // different consequence, so each gets its own honest warning rather than
+  // one vague catch-all:
+  //  - the file reached us with NO durable handle (drag-and-drop, or the
+  //    classic <input type=file>): WebCodecs will still import it fine and
+  //    nothing gets baked, but nothing survives a reload either. Recovery
+  //    is trivial and worth naming: use the Vidéo… button.
+  //  - WebCodecs could not decode it at all, so we are about to fall
+  //    through to importVideoFrames, which WILL write hundreds of MB of
+  //    base64 into a project explicitly set to "linked". That directly
+  //    contradicts what the user asked for.
+  // Chosen behaviour for the second case: WARN LOUDLY AND PROCEED, not
+  // decline. Declining would leave no way at all to import that clip on
+  // the web (the bake IS the only fallback decoder), which trades a
+  // documented surprise for a dead end — worse. The toast names the actual
+  // consequence ("intégrée en base64, projet volumineux") so the outcome is
+  // never silent, which is the part that was actually broken.
+  function linkedModeWeb(){return state.mediaMode==='linked'&&!tauriOk();}
+  function warnLinkedVideoNoHandle(){
+    if(!linkedModeWeb())return;
+    if(window.SMLinkedMedia&&SMLinkedMedia.isWebLinkingSupported&&SMLinkedMedia.isWebLinkingSupported()){
+      showToast(SM.t('toastLinkedVideoDropNoHandle'),'warn');
+    }
+  }
+  function warnLinkedVideoBaking(){
+    if(!linkedModeWeb())return;
+    showToast(SM.t('toastLinkedVideoBakingBase64'),'warn');
+  }
+
+  // Web + linked mode: acquire a FileSystemFileHandle FIRST (the only web
+  // API that yields something a reload can re-open), then hand both the id
+  // and the live File to the instant WebCodecs importer. Mirrors
+  // importStandaloneWebLinked above, one file at a time — a video import
+  // creates one layer per clip anyway, so there is no multi-select case to
+  // mirror here.
+  async function importVideoWebLinked(){
+    var picked;
+    try{picked=await SMLinkedMedia.pickWebVideo();}
+    catch(e){
+      if(e&&e.name==='AbortError')return; // user cancelled the picker
+      showToast(String((e&&e.message)||e),'warn');return;
+    }
+    if(!picked)return;
+    var adoptId=null;
+    try{await SMNativeVideo.importAsLayer(picked.file,{webHandleId:picked.webHandleId});return;}
+    catch(e){
+      adoptId=e&&e.pendingMediaId||null;
+      showToast(SM.t('toastWebCodecsUnavailable')+(e&&e.message||e)+') — import classique…');
+    }
+    // WebCodecs refused this container/codec — the linked route is closed
+    // for this file, and the only remaining decoder is the baking one.
+    warnLinkedVideoBaking();
+    if(window.SMLinkedMedia&&SMLinkedMedia.forgetHandle)SMLinkedMedia.forgetHandle(picked.webHandleId).catch(function(){});
+    var blobUrl=URL.createObjectURL(picked.file);
+    try{
+      var frames=await decodeVideoFrames(blobUrl);
+      await importVideoFrames(frames,picked.name.replace(/\.[^.]+$/,''),adoptId);
+    }catch(e2){
+      if(adoptId&&window.SMMediaLibrary)SMMediaLibrary.removeEntry(adoptId);
+      throw e2;
+    }finally{URL.revokeObjectURL(blobUrl);}
+  }
+
   async function importVideoFile(file){
     // WebCodecs instant-import path (2026-07, browser-only — the Tauri
     // path above this function is untouched): same "instant import + live
@@ -465,12 +531,20 @@
     // codec, or a browser without WebCodecs — e.g. older Firefox).
     var adoptId=null;
     if(window.SMNativeVideo){
-      try{await SMNativeVideo.importAsLayer(file);return;}
+      try{
+        await SMNativeVideo.importAsLayer(file);
+        // Imported fine, but this File carried no handle — say so, because
+        // in linked mode the user reasonably expects it to come back after
+        // a reload, and it will not.
+        warnLinkedVideoNoHandle();
+        return;
+      }
       catch(e){
         adoptId=e&&e.pendingMediaId||null; // see importVideoFrames' own comment (feedback #153)
         showToast(SM.t('toastWebCodecsUnavailable')+(e&&e.message||e)+') — import classique…');
       }
     }
+    warnLinkedVideoBaking();
     showToast(SM.t('toastDecodingVideo'));
     var blobUrl=URL.createObjectURL(file);
     try{
@@ -484,7 +558,20 @@
     }finally{URL.revokeObjectURL(blobUrl);}
   }
   async function importVideo(){
-    if(!tauriOk()){document.getElementById('video-input').click();return;}
+    if(!tauriOk()){
+      // Web + linked mode (2026-08-30, feedback #154) — same dispatch shape
+      // as importImages above: the classic <input type=file> below hands
+      // back a File with no durable handle, so linked mode routes through
+      // showOpenFilePicker instead when the browser supports it (Chromium
+      // only; Safari/Firefox fall through to the <input> flow and get the
+      // no-handle warning at import time rather than silently doing
+      // nothing).
+      if(state.mediaMode==='linked'&&window.SMLinkedMedia&&SMLinkedMedia.isWebLinkingSupported()&&window.SMNativeVideo){
+        await importVideoWebLinked();
+        return;
+      }
+      document.getElementById('video-input').click();return;
+    }
     // Broad container/codec list (2026-07) — under Tauri, decode goes
     // through the bundled ffmpeg sidecar (see decodeVideoFramesFfmpeg
     // below), not the webview's <video> element, so the format ceiling is
