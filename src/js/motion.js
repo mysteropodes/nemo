@@ -3913,15 +3913,70 @@
   // animated Trim window with an animated Brush Size on the SAME stroke at
   // the same time is a real future case, not attempted here (see the call
   // site's own comment for the exact boundary).
-  function applyBrushSizeFor(li, strokeId, sd, frameIdx) {
+  // A vector-brush ribbon's EDITABLE geometry is its centerline, never the
+  // baked outline. Every other tool in the app already knows this —
+  // nodeEditSegmentsData (tools.js) hands Select/Subselect the centerline —
+  // and Motion was the one place reading the outline instead. Measured on one
+  // ordinary stroke for feedback #181: 5 points under Select, 476 vertex rows
+  // in Motion ("le path dans motion à plus de path que avec l'outil select.
+  // Il faudrait le même nombre de point... même si celui ci est lissé").
+  //
+  // The counts disagreeing was the visible half. The invisible half was
+  // worse: vtx0..vtx4 were being applied to outline points 0..4, so keying
+  // "vertex 0" nudged an arbitrary point on the ribbon's edge instead of the
+  // stroke's first node.
+  function isVectorBrushSd(sd) {
+    return !!(sd && sd.isVectorBrush && sd.centerSegments && sd.centerSegments.length >= 2);
+  }
+  // Row count for the Path accordion — panel AND grid read it through here,
+  // so the §11 alignment invariant cannot drift between the two.
+  function pathVertexRowCount(sd) {
+    return isVectorBrushSd(sd) ? sd.centerSegments.length : ((sd && sd.segments) ? sd.segments.length : 0);
+  }
+  // Same list, from the LIVE Paper item, as {x,y} in the shape's local space:
+  // what the on-canvas vertex dots draw and hit-test against. Mirrors
+  // nodeEditSegmentsData's choice exactly — the two must agree or a dot sits
+  // on a point Motion cannot key.
+  function elementVertexPoints(item) {
+    if (!item) return [];
+    if (item.data && item.data.isVectorBrush && item.data.centerSegments && item.data.centerSegments.length >= 2)
+      return item.data.centerSegments.map(function (s) { return { x: s.point[0], y: s.point[1] }; });
+    return (item.segments || []).map(function (s) { return { x: s.point.x, y: s.point.y }; });
+  }
+  function hasVectorBrushOutlineMotionFor(li, strokeId) {
+    var ld = state.layers[li]; if (!ld) return false;
+    var holder = elementHolder(ld, strokeId);
+    if (!holder) return false;
+    return hasBrushSizeMotionFor(li, strokeId) || hasPathVertexMotion(holder);
+  }
+  // ONE rebuild of the ribbon from its centerline, carrying both Motion edits
+  // that live on that centerline: per-vertex offsets (#181) and Brush Size
+  // (#178). Kept as a single pass rather than two chained ones because both
+  // consume the SAME source (sd.centerSegments + sd.widthProfile) and each
+  // produces an outline — running them in sequence would mean re-deriving a
+  // centerline from an outline, which is exactly the wedge/sliver family of
+  // bug the Trim work already hit.
+  //
+  // sd.centerSegments/sd.widthProfile are the shape's own static recording
+  // (serP's output, app.js) — untouched here, so repeated calls across frames
+  // always start from the same source instead of compounding.
+  function applyVectorBrushOutlineFor(li, strokeId, sd, frameIdx) {
+    if (!isVectorBrushSd(sd)) return null;
     var ld = state.layers[li]; var holder = ld && elementHolder(ld, strokeId);
-    if (!holder || !sd.centerSegments || sd.centerSegments.length < 2) return null;
-    var pct = valueAtFrame(holder, 'brushSize', frameIdx)[0];
+    if (!holder) return null;
     if (!window.sampleVectorBrushCenterline || !window.buildVariableWidthPath) return null;
-    var sampled = window.sampleVectorBrushCenterline(sd.centerSegments, sd.widthProfile);
-    var scale = pct / 100;
-    var scaledWidths = sampled.widths.map(function (w) { return w * scale; });
-    var outline = window.buildVariableWidthPath(sampled.pts, scaledWidths);
+    var center = applyPathVertexOffsets(sd.centerSegments, holder, frameIdx);
+    var sampled = window.sampleVectorBrushCenterline(center, sd.widthProfile);
+    var widths = sampled.widths;
+    // Read brushSize only when it actually carries a value: valueAtFrame
+    // falls back to a prop's PROP_DEFAULT, and brushSize has none, so an
+    // unconditional read returns 0 — a scale of 0, i.e. the ribbon silently
+    // disappearing on every stroke that merely has a keyed vertex.
+    if (isAnimated(holder, 'brushSize') || (holder.motionStatic && holder.motionStatic.brushSize)) {
+      var scale = valueAtFrame(holder, 'brushSize', frameIdx)[0] / 100;
+      widths = widths.map(function (w) { return w * scale; });
+    }
+    var outline = window.buildVariableWidthPath(sampled.pts, widths);
     if (!outline) return null;
     var segs = outline.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
     outline.remove();
@@ -4776,11 +4831,16 @@
     // to offer vertices from.
     if (t.strokeId && window._motionExpandedPathHolder === holder) {
       var vItem = findElementItem(t.li, t.strokeId);
-      if (vItem && vItem.segments && mh) {
+      // Through elementVertexPoints, so a vector-brush ribbon shows dots on
+      // its CENTERLINE — the same nodes Select/Subselect show, and the same
+      // ones the Path rows now key (#181). Reading vItem.segments here put
+      // dots on outline points that no vtxN row corresponded to.
+      var vPts = elementVertexPoints(vItem);
+      if (vPts.length && mh) {
         var vg = mh.g, vertCol = [190, 130, 240, 255];
-        vItem.segments.forEach(function (seg, vi) {
+        vPts.forEach(function (seg, vi) {
           var voff = valueAtFrame(holder, 'vtx' + vi, state.currentFrame);
-          var localX = seg.point.x + (voff[0] || 0), localY = seg.point.y + (voff[1] || 0);
+          var localX = seg.x + (voff[0] || 0), localY = seg.y + (voff[1] || 0);
           var wp = vg.fwd(localX, localY);
           var vhs = 4.5 * zs;
           items.push({
@@ -5397,15 +5457,16 @@
     if (t && t.strokeId && window._motionExpandedPathHolder === t.holder) {
       var vItem2 = findElementItem(t.li, t.strokeId);
       var vg2 = motionBoxGeom(t);
-      if (vItem2 && vItem2.segments && vg2) {
+      var vPts2 = elementVertexPoints(vItem2);
+      if (vPts2.length && vg2) {
         var vTol = 9 / view.zoom;
-        for (var vi2 = 0; vi2 < vItem2.segments.length; vi2++) {
-          var seg2 = vItem2.segments[vi2];
+        for (var vi2 = 0; vi2 < vPts2.length; vi2++) {
+          var seg2 = vPts2[vi2];
           var voff2 = valueAtFrame(t.holder, 'vtx' + vi2, state.currentFrame);
-          var wp2 = vg2.fwd(seg2.point.x + (voff2[0] || 0), seg2.point.y + (voff2[1] || 0));
+          var wp2 = vg2.fwd(seg2.x + (voff2[0] || 0), seg2.y + (voff2[1] || 0));
           if (Math.hypot(event.point.x - wp2.x, event.point.y - wp2.y) < vTol) {
             pushUndo();
-            _motionDrag = { mode: 'vertex', t: t, vi: vi2, basePt: { x: seg2.point.x, y: seg2.point.y } };
+            _motionDrag = { mode: 'vertex', t: t, vi: vi2, basePt: { x: seg2.x, y: seg2.y } };
             return true;
           }
         }
@@ -8394,8 +8455,12 @@
       // the element actually has vertex geometry (a Raster/image entry
       // never does) — same "hidden by default, opt-in" convention CLAUDE.md
       // §8 documents for fill/stroke/brush extended properties.
-      if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
-        renderPathVertexGroup(list, ensureElementHolder(ld, entry.strokeId), entry.sd.segments.length);
+      if (!entry.sd.isRaster && pathVertexRowCount(entry.sd)) {
+        // Count through pathVertexRowCount, not entry.sd.segments.length: for
+        // a vector-brush ribbon the vertices are its centerline, not the
+        // baked outline (#181). The grid half below reads the SAME helper —
+        // CLAUDE.md §11.
+        renderPathVertexGroup(list, ensureElementHolder(ld, entry.strokeId), pathVertexRowCount(entry.sd));
       }
       // Image mesh (2026-08-30) — the raster counterpart of the Path group
       // just above: same accordion, same vertex rows, same stopwatches,
@@ -9266,7 +9331,8 @@
             var pathHdrSpacer = document.createElement('div'); pathHdrSpacer.className = 'frow motion-group-row';
             grid.appendChild(pathHdrSpacer);
             if (isPathGroupExpanded(elHolder)) {
-              for (var vi = 0; vi < entry.sd.segments.length; vi++) renderTracksFor(grid, elHolder, 'vtx' + vi);
+              var vtxRows = pathVertexRowCount(entry.sd);
+              for (var vi = 0; vi < vtxRows; vi++) renderTracksFor(grid, elHolder, 'vtx' + vi);
             }
           }
           // Image mesh group — the exact mirror of renderElementsList's own
@@ -11391,7 +11457,10 @@
     layerElementsHaveOrder: layerElementsHaveOrder,
     anyOrderUsedAnywhere: anyOrderUsedAnywhere,
     hasBrushSizeMotionFor: hasBrushSizeMotionFor,
-    applyBrushSizeFor: applyBrushSizeFor,
+    hasVectorBrushOutlineMotionFor: hasVectorBrushOutlineMotionFor,
+    applyVectorBrushOutlineFor: applyVectorBrushOutlineFor,
+    isVectorBrushSd: isVectorBrushSd,
+    pathVertexRowCount: pathVertexRowCount,
     transformSegments: transformSegments,
     transformImageRect: transformImageRect,
     transformImageRectByMatrix: transformImageRectByMatrix,
