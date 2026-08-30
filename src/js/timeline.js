@@ -2946,7 +2946,11 @@ function updatePropsContext(){
     // meant this branch showed the last-active layer's properties even
     // right after deselecting everything on canvas.
     show['layer-sec']=!!window._layerActiveExplicit&&!!(state.layers[state.activeLayerIdx]);
-    hdrText='Document';
+    // i18n (2026-08-30): this was the one hdrText branch still hardcoded,
+    // so the context header read "Document" in every locale while its
+    // neighbours translated — the key already existed and was simply never
+    // read from here.
+    hdrText=(window.SM&&SM.t)?SM.t('hdrDocument'):'Document';
   }
   // p-blendmode sync moved OUT of the 'document' branch above: it only ran
   // when the props panel happened to be showing that fallback context (no
@@ -2979,6 +2983,31 @@ function updatePropsContext(){
   // selection, so they re-evaluate wherever the selection is refreshed.
   if(window.renderImageMeshPanel)window.renderImageMeshPanel();
   var hdrEl=document.getElementById('props-context-hdr');if(hdrEl)hdrEl.textContent=hdrText;
+  // Document panel presented like a selection (2026-08-30, feedback #171
+  // "l'onglet document pourrait disparaitre et se mettre comme pour element
+  // selected"). With nothing selected the panel said DOCUMENT in the context
+  // header and then, immediately below, opened a section whose own header
+  // also said "☰ Document" — the same word twice, one of them collapsible.
+  // A selection never does that: "1 ELEMENT SELECTED" is followed straight
+  // by Position/Size/Rotate.
+  // So the inner header is hidden exactly when the context header is already
+  // announcing it, and restored otherwise — canvas-sec is also shown in
+  // OTHER contexts (Motion with nothing selected, see the branch below),
+  // where it is one section among several and does need its own title.
+  var canvasSec=document.getElementById('canvas-sec');
+  if(canvasSec){
+    var canvasHdr=canvasSec.querySelector('.phdr');
+    if(canvasHdr)canvasHdr.style.display=(ctx==='document')?'none':'';
+    // A hidden header can't be clicked to re-open its body, so make sure
+    // the body is open whenever we take the header away — otherwise a
+    // previously-collapsed Document section would look like an empty panel
+    // with no way back.
+    if(ctx==='document'){
+      var canvasBody=canvasSec.querySelector('.pbdy');
+      if(canvasBody)canvasBody.classList.remove('hid');
+      if(canvasHdr)canvasHdr.classList.remove('closed');
+    }
+  }
   // Motion mode: none of these 2D-drawing-tool sections apply (no active
   // Fill/Stroke/Draw tool, no canvas marquee selection in the Animation 2D
   // sense) — they were rendering unconditionally via this same inline
