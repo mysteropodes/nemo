@@ -2742,6 +2742,30 @@
       var tb = window._inplaceTextBoxBounds;
       items.push(boundsRectItem(tb.left, tb.top, tb.right, tb.bottom, null, col, sw));
     }
+    // Overflow marker for area text (2026-08-30, feedback #175 "à la
+    // indesign"): a red square with a + at the box's bottom-right when the
+    // text no longer fits the fixed height. InDesign's own convention, and
+    // the reason it exists — the held-back text isn't lost, it just has
+    // nowhere to go, and a silently short block gives you no way to know.
+    // Red, not the box's orange: it's a condition to resolve, not part of
+    // the frame. Drawn here so it sits under the same includeEditorOverlays
+    // gate as everything else in this function and can never reach a render.
+    var ovLayer = userLayers[state.activeLayerIdx];
+    if (ovLayer) {
+      var ovSeen = {};
+      ovLayer.children.forEach(function (c) {
+        if (!c.data || !c.data.isTextRoot || !c.data.textOverflow || !c.data.fixedHeight) return;
+        if (!c.data.anchorTopLeft || ovSeen[c.data.groupId]) return;
+        ovSeen[c.data.groupId] = true;
+        var w = c.data.fixedWidth || c.bounds.width;
+        var x = c.data.anchorTopLeft.x + w, y = c.data.anchorTopLeft.y + c.data.fixedHeight;
+        var hs = 6 / view.zoom, red = [230, 70, 70, 255];
+        items.push(boundsRectItem(x - hs, y - hs, x + hs, y + hs, red, [255, 255, 255, 255], 1 / view.zoom));
+        var p = 3.2 / view.zoom;
+        items.push(lineItem([x - p, y], [x + p, y], [255, 255, 255, 255], 1.4 / view.zoom));
+        items.push(lineItem([x, y - p], [x, y + p], [255, 255, 255, 255], 1.4 / view.zoom));
+      });
+    }
     return items;
   }
   function buildTransformBoxItems() {
