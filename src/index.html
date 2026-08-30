@@ -175,14 +175,11 @@
          click-drag=curve handle, chainable), rendered live while the tool
          is active; dragging an existing bone anchor poses it instead
          (rig-bridge.js unifies both gestures behind one onDown). -->
-    <!-- Freeze (2026-08, PR #209: "mettre en freeze (in Dev)" — see the
-         SM_FROZEN_IN_DEV registry above and SM.setTool's gate, timeline.js).
-         Points at the freeze-specific rigFrozenTitle key (not toolRig,
-         that's the real tool description for once un-frozen) so this
-         title still switches language like everything else instead of
-         staying stuck in one language — restore data-i18n-title="toolRig"
-         when un-freezing. -->
-    <button class="tool-btn in-dev-locked" data-tool="rig" disabled data-i18n-title="rigFrozenTitle" title="Rig — en développement, pas encore disponible dans cette build"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="19" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="2.2" fill="currentColor" stroke="none"/><circle cx="19" cy="5" r="2.2" fill="currentColor" stroke="none"/><path d="M6.6 17.4 10.4 11.6M13.6 8.4 17.4 6.6"/></svg></button>
+    <!-- Un-frozen 2026-08-30 (see the SM_FROZEN_IN_DEV registry below), and
+         restored to data-i18n-title="toolRig" exactly as the freeze comment
+         asked. Keeps its own dedicated button and the S shortcut; the "dev"
+         badge stays, since the tool is reachable but still young. -->
+    <button class="tool-btn in-dev" data-tool="rig" data-i18n-title="toolRig" title="Rig — bones drawn with the Pen, posed, and bound to strokes or to an image's mesh points (S)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="19" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="2.2" fill="currentColor" stroke="none"/><circle cx="19" cy="5" r="2.2" fill="currentColor" stroke="none"/><path d="M6.6 17.4 10.4 11.6M13.6 8.4 17.4 6.6"/></svg><span class="sk">S</span></button>
     <!-- Missing separator (feedback 2026-07) — freehand painting tools
          (Draw/Pen/Fill brush) and geometric shape tools (Line/Rect/
          Ellipse) read as one undifferentiated group without this; Text
@@ -2107,7 +2104,12 @@
      files: every gate (SM.setTool for Rig, timeline.js; setAppMode for
      StoryBoard, motion.js; the ctx-import-3d menu row, timeline.js) reads
      the SAME source, so un-freezing a feature later is one line here. -->
-<script>window.SM_FROZEN_IN_DEV={rig:true,storyboard:true,import3d:true};</script>
+<!-- Rig un-frozen 2026-08-30: it has moved a long way since the freeze —
+     three modes, a weight brush, IK, and bones that now drive image meshes
+     as well as strokes with a per-target choice. It keeps its "en dev"
+     badge: reachable and honest about being young, rather than hidden.
+     StoryBoard and import3d stay frozen, untouched. -->
+<script>window.SM_FROZEN_IN_DEV={rig:false,storyboard:true,import3d:true};</script>
 <script src="js/ui.js"></script>
 <script src="js/color-picker.js"></script>
 <script src="js/app.js"></script>
