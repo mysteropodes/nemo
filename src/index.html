@@ -1166,7 +1166,14 @@
                linked-media.js and media-library.js wire entirely by id, and
                #156 (these controls belong in the Média tab, not the Document
                panel) still holds — they are in this tab, just folded away. -->
-          <div id="media-drop" class="media-drop" data-i18n="mediaDropHint">Glisser des images/vidéos ici, ou cliquer Importer…</div>
+          <!-- The drop zone used to sit here as a permanent dashed box. It now
+               only exists as the EMPTY STATE inside #media-grid (built by
+               render()), so it teaches the gesture while there is nothing to
+               show and then gets out of the way — the hierarchy takes the
+               space back once you have media, and by then you know you can
+               drag onto it. The file-drop listeners moved to #media-grid
+               itself, which is stable across renders and means a drop still
+               works over a POPULATED list, not only over the hint. -->
           <div class="media-search-line">
             <div class="media-search-row">
               <svg class="media-search-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
