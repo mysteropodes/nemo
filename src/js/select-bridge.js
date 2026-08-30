@@ -1319,7 +1319,22 @@
         // double-click — which is exactly the "je clic ailleurs, je reviens
         // sur la bounding box globale" half of the request. Without it this
         // would reproduce the July bug quoted just above, one level down.
-        if (window._shapeEnteredId && (!p.data || p.data.strokeId !== window._shapeEnteredId)) window._shapeEnteredId = null;
+        if (window._shapeEnteredId && (!p.data || p.data.strokeId !== window._shapeEnteredId)) {
+          // Per-object boxes (2026-08-30): while that mode is on, clicking a
+          // SIBLING shape on the same layer hands the isolation over to it
+          // instead of ending it — that is the mode's whole point ("je peux
+          // transformer tranquillement mes shapes avec leur propre bounding
+          // box"), and it keeps the next double-click on the newly clicked
+          // shape reaching Subselect, since alreadyIsolated (tools.js) then
+          // sees ITS id. Clicking a grouped shape or one on another layer
+          // still ends the continuity exactly as before.
+          if (window._perObjBoxes === state.activeLayerIdx && p.data && p.data.strokeId && !p.data.groupId) {
+            window._shapeEnteredId = p.data.strokeId;
+          } else {
+            window._shapeEnteredId = null;
+            window._perObjBoxes = null;
+          }
+        }
       } else {
         // p is ALREADY selected (idx2>=0) — but its own group siblings might
         // not be (2026-07-29 fix, QA-confirmed): right after a Subselect
