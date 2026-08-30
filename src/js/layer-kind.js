@@ -58,12 +58,18 @@
     // at a glance in the row.
     component: SVG('<rect x="4" y="8" width="11" height="11" rx="2"/><rect x="9" y="3" width="11" height="11" rx="2"/>'),
     montage: SVG('<rect x="3" y="5" width="7" height="14" rx="1.5"/><rect x="14" y="5" width="7" height="14" rx="1.5"/>'),
+    // Rig control widget (2026-08-30, rig-widget.js) — a pad with a stick
+    // leaning out of centre, the universally-read "joystick" silhouette,
+    // deliberately unlike anything already here (no circle-on-crosshair,
+    // which is the Null marker's own shape on canvas).
+    widget: SVG('<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 12l4-4"/><circle cx="16.5" cy="7.5" r="2"/>'),
   };
   // Fallback labels, used when i18n hasn't loaded (or has no entry). The real
   // strings live in i18n.js under layerKind<Key>.
   var FALLBACK = {
     draw: 'Dessin', image: 'Image', sequence: 'Séquence', video: 'Vidéo', camera: 'Caméra',
     effect: 'Effet', text: 'Texte', 'null': 'Null', component: 'Composant', montage: 'Montage', folder: 'Dossier',
+    widget: 'Widget',
   };
 
   function everyStrokeIsRaster(ld) {
@@ -103,6 +109,11 @@
     if (ld.isFolderLayer) return 'folder';
     if (ld.isNullLayer) return 'null';
     if (ld.isGuideLayer) return 'guide';
+    // Before isTextLayer/footage below and after the structural kinds
+    // above: a widget layer never carries content of its own
+    // (getEffectiveStrokes returns [] for it), so none of the content-
+    // sniffing branches further down could ever answer correctly for it.
+    if (ld.isWidgetLayer) return 'widget';
     if (ld.isTextLayer) return 'text';
     if (ld.footage && ld.footage.kind) return ld.footage.kind === 'sequence' ? 'sequence' : 'image';
     if (everyStrokeIsRaster(ld)) return distinctSources(ld) > 1 ? 'sequence' : 'image';

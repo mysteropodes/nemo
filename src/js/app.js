@@ -2574,7 +2574,12 @@ function getEffectiveStrokes(layerIdx,frameIdx,countOnly){
   // Null/Effect layer (2026-07, Motion) — never have real content by
   // design (see SM.addNullLayer/addEffectLayer's own comments); same
   // "no strokes to speak of" early-return as nativeVideo above.
-  if(ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer)return[];
+  // Widget (rig control) layer (2026-08-30, rig-widget.js) — a joystick or
+  // slider you drag on canvas; its picture is an editor-only overlay
+  // (buildRigWidgetOverlayItems), never content. This ONE line is what
+  // keeps it out of every export at once: export.js, rive-export.js and the
+  // Lottie path all read the scene through getEffectiveStrokes.
+  if(ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer)return[];
   // StoryBoard montage layer (storyboard.js, 2026-07): the layer's content
   // at frame f IS the montage's resolved frame (looping) — the montage
   // stays the single source of truth, edits in the node space show up
@@ -2812,6 +2817,7 @@ function badComponentSourceReason(l){
   if(l.isNullLayer)return'un calque Null';
   if(l.isEffectLayer)return'un calque d\'effet';
   if(l.isGuideLayer)return'un calque Guide';
+  if(l.isWidgetLayer)return'un calque Widget';
   return null;
 }
 // Whitelist-clones a rig for a symLayer, dropping binds[i]._live (the live
@@ -3320,6 +3326,7 @@ function mergeLayersIntoOne(indices,opts){
     else if(l.isNullLayer)bad=bad||'un calque Null';
     else if(l.isEffectLayer)bad=bad||'un calque d\'effet';
     else if(l.isGuideLayer)bad=bad||'un calque Guide';
+    else if(l.isWidgetLayer)bad=bad||'un calque Widget';
     srcs.push(l);
   }
   if(bad){if(!silent)showToast(SM.t('toastCannotMergeSelectionContains')+bad);return false;}
@@ -4158,7 +4165,7 @@ function saveActiveLayerFrame(){
   // Rig tool is the one interaction in this app where "live but
   // uncommitted" is meant to survive far longer than a single gesture
   // (Commit/Reset are deliberate separate actions, not implied by mouseup).
-  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.lfsGroup||(ld.duplicator&&!ld._dupEditSource)||ld._rigPoseLive)return;
+  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer||ld.lfsGroup||(ld.duplicator&&!ld._dupEditSource)||ld._rigPoseLive)return;
   if(!layerIsEffectivelyVisible(state.activeLayerIdx))return;
   // Same class of bug as the eye/solo guard right above, found live
   // 2026-07-30 (Cyril: "avec plein d'aller retour, scrub, trim de layer
@@ -4192,7 +4199,7 @@ function saveAllLayerFrames(){
   _invalidateSymbolUnionIfEditingSymbol();
   _writeBackGhostProxies(state.activeLayerIdx);
   // duplicator skip: same reason as saveActiveLayerFrame's guard above.
-  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||state.layers[i].isGuideLayer||state.layers[i].lfsGroup||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource)||state.layers[i]._rigPoseLive)continue;
+  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||state.layers[i].isGuideLayer||state.layers[i].isWidgetLayer||state.layers[i].lfsGroup||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource)||state.layers[i]._rigPoseLive)continue;
   if(!layerIsEffectivelyVisible(i))continue;
   // Trim-range guard — see saveActiveLayerFrame's identical check for the
   // full explanation. Per-layer here (unlike the single active layer

@@ -1808,6 +1808,33 @@
     if (!ld) throw new Error(SM.t('exprErrorControlNoLayer'));
     return _controlValue(ld, name, f === undefined ? ctx.frame : _num(f));
   }
+  // layerControl(uid, name) — the LEAN cross-layer control read
+  // (2026-08-30, added with the rig widgets). `layer(uid).control(name)`
+  // returns the identical number, but gets there by building a whole
+  // layerSnapshot first: a name scan over every layer, SIX valueAtFrame
+  // calls (position/anchor/rotation/scale/opacity plus the parent lookup),
+  // a _withSampler closure per 2D property and two more closures for
+  // at()/marker(). All of it discarded, every read. A rig is MANY reads per
+  // scrub tick — every driven property on every driven layer, on the
+  // playback hot path (CLAUDE.md §5bis) — so the widget wiring emits this
+  // form instead, and so does the expression pickwhip when it lands on a
+  // control row.
+  //
+  // Uid FIRST (findLayerIndexByRef scans names first, which is the wrong
+  // order for the form we emit), name second so a hand-typed
+  // layerControl("Ctrl", "Turn") still resolves. Unknown layer THROWS, the
+  // same contract _controlValue already has for an unknown control name:
+  // the engine's degrade path puts the message on that one property row and
+  // falls back to its raw value, rather than a silent zero that looks like
+  // a working rig gone limp.
+  function exprLayerControl(ref, name, f) {
+    _exprTick();
+    var ctx = _ectx;
+    var idx = findLayerIndexByUid(ref);
+    if (idx < 0) idx = findLayerIndexByRef(ref);
+    if (idx < 0) throw new Error(SM.t('exprErrorUnknownLayerPrefix') + String(ref) + SM.t('exprErrorUnknownLayerSuffix'));
+    return _controlValue(state.layers[idx], name, f === undefined ? (ctx ? ctx.frame : state.currentFrame) : _num(f));
+  }
 
   // ---- keyframe introspection ------------------------------------------
   // Scoped to the CURRENT property's own track (the one the expression lives
@@ -2125,6 +2152,10 @@
     // in the "did you mean" pool) because it IS part of the documented
     // vocabulary, not a compatibility alias.
     'control',
+    // Lean cross-layer control read — see exprLayerControl's own comment for
+    // why this exists next to layer(...).control(...) rather than instead of
+    // it. Documented vocabulary, so it belongs in the "did you mean" pool.
+    'layerControl',
   ];
   var EXPR_ARG_NAMES = EXPR_PUBLIC_NAMES.concat([
     // --- compatibility aliases (undocumented, see the block above) ---
@@ -2311,7 +2342,7 @@
         exprClamp, exprRemap, exprRemapEase, exprRemapEaseIn, exprRemapEaseOut, exprDegrees, exprRadians,
         exprAdd, exprSub, exprMul, exprDiv, exprLength, exprNormalize, exprDot, exprCross, exprAngleTo,
         exprStepTime, exprLoopAfter, exprLoopBefore, exprToFrames, exprToSeconds, exprContentBox,
-        exprSelfControl,
+        exprSelfControl, exprLayerControl,
         // --- compatibility aliases ---
         exprLoopAfter, exprLoopBefore, aliasKey, aliasNearestKey, exprNumKeys(holder, prop), aliasPosterizeTime,
         exprRemap, exprRemapEase, exprRemapEaseIn, exprRemapEaseOut, exprRadians, exprDegrees,
@@ -6068,6 +6099,14 @@
           // is exactly that: a parameter of this layer, not of one of its
           // properties.
           { label: SM.t('ctxExprControlsEllipsis'), action: function () { openExprControlsMenu(e.clientX + 8, e.clientY + 8, ld); } },
+          // Rig widget range/size (2026-08-30) — same reasoning as the
+          // controls entry right above (it belongs to the whole layer), and
+          // shown only on a widget layer, the "hidden until its
+          // prerequisite is set" convention Time Remap already uses. Motion
+          // has its OWN layer-row menu, separate from the Animation 2D one
+          // (timeline.js) that carries the same entry — a widget is edited
+          // from whichever timeline you happen to be in.
+          ...(ld.isWidgetLayer && window.SMRigWidget ? [{ label: SM.t('ctxWidgetSettingsEllipsis'), action: function () { SMRigWidget.openWidgetMenu(e.clientX + 8, e.clientY + 8, li); } }] : []),
           { sep: true },
           // showContextMenu has no submenus — a disabled row is the honest
           // way to title a group rather than a button that does nothing.
@@ -7301,8 +7340,12 @@
         if (controlTypeOf(t.prop)) {
           controlsOf(t.holder).forEach(function (c) { if (c.key === t.prop) ctrlDef = c; });
         }
+        // A control row emits layerControl(uid, name), not
+        // layer(uid).control(name): identical value, without building a
+        // layerSnapshot per read (see exprLayerControl). Dragging onto a
+        // control row is exactly the rig case, i.e. the hot one.
         text = ctrlDef
-          ? 'layer("' + ensureLayerUid(state.layers[li]) + '").control(' + JSON.stringify(ctrlDef.name) + ')'
+          ? 'layerControl(' + JSON.stringify(ensureLayerUid(state.layers[li])) + ', ' + JSON.stringify(ctrlDef.name) + ')'
           : 'layer("' + ensureLayerUid(state.layers[li]) + '").' + t.prop;
       }
       // Insert at the caret rather than replacing: a pickwhip is usually
@@ -8670,13 +8713,80 @@
     // the layer menu is the discoverable entry point, but once a control
     // exists, its own row is where you look to rename or remove it. Same
     // menu either way (openExprControlsMenu), never a second implementation.
-    if (controlTypeOf(prop) && controlsOf(holder).length) {
-      target.title += SM.t('titleControlRowContextHint');
-      target.addEventListener('contextmenu', function (e) {
-        e.preventDefault(); e.stopPropagation();
-        openExprControlsMenu(e.clientX, e.clientY, holder);
-      });
+    // ONE contextmenu listener per row, building one menu — the widget
+    // wiring entries first (they apply to any property), then the control
+    // management entries when this row happens to BE a control. Two
+    // separate listeners on the same element would both fire and the second
+    // showContextMenu would simply replace the first one's menu.
+    if (controlTypeOf(prop) && controlsOf(holder).length) target.title += SM.t('titleControlRowContextHint');
+    target.addEventListener('contextmenu', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (!window.showContextMenu) return;
+      var items = widgetWiringMenuItems(holder, prop, e.clientX, e.clientY);
+      // showContextMenu has no real submenus, so the control-management
+      // menu is reached as one entry that opens it (the same
+      // openExprControlsMenu the layer menu opens) rather than being
+      // inlined here — one implementation, one place to look.
+      if (controlTypeOf(prop) && controlsOf(holder).length) {
+        if (items.length) items.push({ sep: true });
+        items.push({ label: SM.t('ctxExprControlsEllipsis'), action: function () { openExprControlsMenu(e.clientX, e.clientY, holder); } });
+      }
+      if (!items.length) return;
+      window.showContextMenu(e.clientX, e.clientY, items);
+    });
+  }
+  // ---- Wiring a property to a rig widget (2026-08-30) -------------------
+  // The point of the widget feature. Typing
+  // `layerControl("ly_x9","Turn")` by hand is not a workflow, so both
+  // gestures are one right-click:
+  //
+  //   "Link to a widget axis…"      -> layerControl(uid, name)
+  //       the property simply BECOMES the axis' number.
+  //
+  //   "Drive this pose from a widget axis…" -> self.at(layerControl(...))
+  //       the headline. exprSelfAt reads this property's RAW track
+  //       deliberately (no self-recursion, see its own comment), so this
+  //       one line turns the property's OWN keyframes into a POSE LIBRARY
+  //       that the widget scrubs through — functionally a Moho Smart Bone
+  //       dial or a Rive Joystick axis, written in vocabulary this app
+  //       already ships and already sandboxes.
+  //
+  // Both write through the same setExpressionCode below, i.e. the same
+  // holder.expressions[prop] the editor's own textarea commits to — there
+  // is no second expression writer.
+  function setExpressionCode(holder, prop, code) {
+    pushUndo();
+    var ex = ensureExpr(holder, prop);
+    ex.code = code;
+    ex.enabled = true;
+    ex.lastError = null;
+    ex.errorLine = -1;
+    // compiledFnFor caches against the code string, so changing it is
+    // already enough to force a recompile; clearing the entry keeps a stale
+    // prefixLines/exprMode from being read in the meantime.
+    if (holder._exprCompiled) delete holder._exprCompiled[prop];
+    reloadIfTimeLinkOffset(prop);
+    renderLayerList(); renderTimeline();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  function widgetWiringMenuItems(holder, prop, x, y) {
+    if (!window.SMRigWidget) return [];
+    var choices = SMRigWidget.axisChoices();
+    function sub(label, wrap, toastKey) {
+      return { label: label, action: function () {
+        if (!choices.length) { if (window.showToast) showToast(SM.t('ctxWidgetNoneYet')); return; }
+        window.showContextMenu(x + 8, y + 8, choices.map(function (c) {
+          return { label: c.layerName + ' · ' + c.name + '  (' + c.min + '…' + c.max + ')', action: function () {
+            setExpressionCode(holder, prop, wrap(SMRigWidget.axisRef(c)));
+            if (window.showToast) showToast(SM.t(toastKey));
+          } };
+        }));
+      } };
     }
+    return [
+      sub(SM.t('ctxLinkToWidgetAxisEllipsis'), function (ref) { return ref; }, 'toastLinkedToWidget'),
+      sub(SM.t('ctxDriveFromWidgetAxisEllipsis'), function (ref) { return 'self.at(' + ref + ')'; }, 'toastPoseDrivenByWidget'),
+    ];
   }
   // ---- batch operations on the current keyframe selection (Distribute/
   // Flip/Select Every/Invert Selection — no Align here, unlike layer bars:

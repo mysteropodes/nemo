@@ -860,3 +860,126 @@ n'importe quelle autre propriété Motion.
 par le panneau ET la grille (§11) — un maillage 32×32 fait 1093 sommets, donc
 il y a un plafond (200) qui DOIT être le même des deux côtés. Vérifié :
 44/44 lignes à 4×4, 219/219 à 32×32.
+
+## 13. Widgets de rig on-canvas — joystick / slider (2026-08-30)
+
+`rig-widget.js`. Un joystick ou un fader qu'on attrape à la souris sur le
+canevas, sous forme de **type de calque** à part entière (`ld.isWidgetLayer`),
+à côté de Null / Guide / Dossier. Les dials Smart Bone de Moho et les
+Joysticks de Rive, écrits entièrement dans le vocabulaire que Nemo a déjà.
+
+**LA décision dont tout le reste découle : un widget n'a PAS de valeur à
+lui.** Chaque axe POINTE VERS un contrôle d'expression ordinaire
+(`ld.exprControls`, clé `xc_…`, motion.js) porté par ce même calque. Créer le
+calque, c'est créer les contrôles (`addExprControl` une fois par axe) ; le
+widget est un ÉDITEUR on-canvas d'un contrôle qui existe déjà, pas un second
+système de valeurs en parallèle. Ce seul choix fait venir gratuitement : une
+vraie ligne de propriété Motion keyable (`propsFor` liste les clés de contrôle
+en dernier, donc l'invariant d'alignement panneau/grille du §11 est respecté
+sans une ligne de code), le chronomètre, les courbes d'ease, l'éditeur de
+courbes, le pickwhip, la lecture depuis n'importe quelle autre expression, et
+la persistance via la ligne `exprControls` que `exportJSON` écrit déjà.
+Vérifié : 11 lignes panneau / 11 lignes grille avec le calque déplié.
+
+`min`/`max`/`rest` sont de la **présentation** (jusqu'où va le puck et quel
+nombre ça donne), délibérément hors de la déclaration du contrôle — le même
+contrôle lu par une expression n'est qu'un nombre, et un second widget
+pourrait mapper la même valeur sur une autre plage. Édités par
+« Réglages du widget… » (menu contextuel du calque, dans les DEUX timelines).
+
+**`ld.widget.pos` est une ancre MONDE**, exactement comme `guidePos`/`nullPos` :
+la piste Position du calque la décale et `parentChainMats` compose la chaîne de
+parents, donc un widget est parentable/keyable sans nouvelle machinerie
+(troisième instance du patron `buildGuideLayerItems`/`buildNullLayerItems`, pas
+un nouveau). Aucune référence d'objet live dans `ld.widget` (règle `_live` du
+§1) — d'où l'undo gratuit via `_cloneLayersForUndo`, et **pas de store
+`state.widgets`**. Vérifié à travers un parent tourné de 30° + décalé : 4
+glissés, 4 valeurs exactes.
+
+**Jamais rendu — précédent du calque Guide, ZÉRO changement Rust**
+(`LayerIn` n'apprend jamais le concept, donc le piège des fonctions jumelles du
+§3 n'est pas déclenché). Quatre points de contact :
+1. `getEffectiveStrokes` (app.js) renvoie `[]` — **cette seule ligne** ferme
+   PNG/vidéo/Lottie/Rive d'un coup, parce que export.js (via
+   `getEffectiveStrokesRendered`) et rive-export.js lisent tous à travers elle.
+2. la boucle par calque de `buildSceneJson` pousse un slot vide et `continue`
+   (les index de pile restent justes pour les mattes/le parentage).
+3. `buildRigWidgetOverlayItems` poussé DANS le bloc `includeEditorOverlays`,
+   que `renderFrameRawPixels` met déjà à `false` (seul point de readback GPU,
+   partagé par l'export PNG ET le cache de lecture).
+4. rien d'autre.
+Chiffré : scan des **2 073 600 pixels** d'une frame exportée → exactement deux
+couleurs, fond (1 913 600) et le rectangle (160 000 = 400×400), **0 pixel bleu
+et 0 pixel orange de widget** pendant que l'écran en dessine 10 items ; PNG
+**identique octet pour octet** avec l'overlay stubbé à `[]` ; `[]` sur les
+360 couples calque-frame testés.
+
+⚠️ **Le pointeur écoute sur `document` en CAPTURE, pas sur `#canvas-area`** —
+même raison que `image-mesh-bridge.js` (motion.js a son propre pointerdown en
+capture sur `#canvas-area` et charge en premier, donc il gagnerait et un
+glissé de puck déplacerait tout le calque). Vérifié en mode Motion : le puck
+va à la valeur voulue et `motionStatic.position` reste vide des deux côtés.
+`image-mesh-bridge` a maintenant lui aussi un écouteur document-capture : les
+deux ne coupent la propagation QUE s'ils prennent vraiment le geste.
+
+**Conséquence assumée et mesurée** : un trait qui COMMENCE dans le pavé est
+pris par le widget (0 trait ajouté, l'axe bouge). L'échappatoire est le cadenas
+déjà présent sur la ligne : calque widget verrouillé → le même geste dessine
+(2 traits ajoutés, axe intact). Les deux moitiés vérifiées en pilotant.
+
+**Écrire passe par `setValue`** (`SMMotion.setLayerValue`) — qui keye déjà à la
+tête de lecture quand le chronomètre est allumé et écrit `motionStatic` sinon.
+Pas de second écrivain.
+
+**Quatre listes blanches de persistance**, toutes explicites : `exportJSON`
+(`isWidgetLayer`, `widget`), `importJSON` (gardé sur la FORME de `widget`, comme
+blendMode/matteMode, pour qu'un `nemo-auto` corrompu ne parte pas dans
+l'overlay), `duplicateLayer` (copie profonde ; les clés `xc_…` sont copiées TELLES
+QUELLES — c'est ce que `duplicateLayer` fait déjà pour `exprControls`, et c'est
+correct parce qu'une clé de contrôle est scopée à son propre calque : le
+doublon pointe vers SES propres déclarations et SES propres pistes) et
+`transplant.js` (le widget ET ses `exprControls` voyagent ensemble — l'un sans
+l'autre donne un widget câblé à rien ; le côté PILOTÉ n'est pas porté, parce que
+transplant n'a jamais copié `expressions` et remappe tous les `layerUid`).
+Rien dans serP/desP : un widget n'a pas de trait, et `getEffectiveStrokes`
+renvoyant `[]` garantit que serP n'est jamais appelé dessus.
+
+**`layerControl(uid, name)`** (motion.js) : lecture croisée MAIGRE d'un contrôle.
+`layer(uid).control(name)` rend le même nombre mais construit d'abord tout un
+`layerSnapshot` — scan de noms O(n), **six** `valueAtFrame`, une closure par
+propriété 2D, tout jeté à chaque lecture. Un rig, c'est beaucoup de lectures par
+tick de scrub (§5bis). Mesuré à 44 calques, 20 000 lectures, valeur identique
+(−50 des deux côtés) : **0,38 µs contre 0,93 µs par lecture, ×2,45**. Le
+pickwhip d'expression émet désormais cette forme quand il tombe sur une ligne
+de contrôle, et les deux entrées de menu ci-dessous aussi.
+
+**Le geste qui est le POINT de la fonctionnalité** — clic droit sur n'importe
+quelle ligne de propriété :
+- « Lier à un axe de widget… » → `layerControl("uid","Turn")`.
+- « Piloter cette pose depuis un axe de widget… » → `self.at(layerControl(...))`.
+  `exprSelfAt` lit délibérément la piste BRUTE (pas de récursion sur soi) :
+  cette seule ligne fait des keyframes de la propriété une **bibliothèque de
+  poses** que le widget parcourt. Vérifié tête de lecture FIGÉE sur la frame 0,
+  axe mappé 0…24, poses aux frames 0/12/24 : puck à 0/25/50/75/100 % →
+  (0,0) / (150,−100) / (300,−200) / (0,−25) / (−300,150), chaque valeur égale à
+  la piste brute échantillonnée à la valeur de l'axe.
+
+**Trou hérité à ne pas reproduire** : le calque **Guide** n'a que sa branche
+`keyOf` dans layer-kind.js — pas d'entrée `ICONS`, pas de `FALLBACK`, pas de
+`layerKindGuide` dans i18n.js, donc il s'affiche avec l'icône « dessin » et le
+texte brut « guide ». Le widget a bien les quatre (branche `keyOf`, icône,
+fallback, `layerKindWidget` dans les 4 blocs de locale). Le menu « + »
+(timeline.js) a aussi des libellés français codés en dur (« Calque Guide »,
+« Dossier »…) qui ne passent pas par `SM.t` — pré-existant, pas touché ici.
+
+**Non fait en v1** : `ld.widget.screenSpace` est déclaré et persisté mais
+**réservé** — rien ne branche dessus, un widget vit toujours en espace monde
+(il suit pan/zoom/parentage comme le marqueur d'un Null). Pas de mélange
+barycentrique N-poses (deux axes indépendants seulement), pas de formes de
+widget scriptables, pas de nouveau type d'item dans `strokes` (niveau calque
+uniquement).
+
+**Hors périmètre, repéré au passage** : `timeRemapValue` (motion.js) contourne
+`valueAtFrame`, donc une expression posée sur Time Remap est ignorée — c'est un
+point de passage unique de tous les lecteurs de composant, ça mérite sa propre
+PR avec un A/B pixel. Laissé intact.

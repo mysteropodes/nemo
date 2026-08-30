@@ -236,6 +236,26 @@
       if (clone.groups) nl.groups = clone.groups;
       if (clone.isTextLayer) nl.isTextLayer = clone.isTextLayer;
       if (clone.isNullLayer) { nl.isNullLayer = true; nl.nullPos = clone.nullPos; nl.nullShape = clone.nullShape; }
+      // Widget (rig control) layer (2026-08-30) — carried, together with
+      // its exprControls, because those two are one object: ld.widget's
+      // axes point at xc_… keys that only exist as declarations inside
+      // exprControls, so bringing one without the other yields a widget
+      // wired to nothing and a Motion row that cannot render.
+      //
+      // What is deliberately NOT carried is the DRIVEN side: transplant has
+      // never copied `expressions` at all (pre-existing, unrelated to this
+      // feature), and it remaps every layerUid on import anyway — so an
+      // expression naming the source project's uid could not resolve here
+      // even if it were copied. A transplanted widget therefore arrives
+      // live and re-wireable rather than silently half-connected.
+      if (clone.isWidgetLayer && clone.widget && typeof clone.widget === 'object' && clone.widget.x) {
+        nl.isWidgetLayer = true;
+        nl.widget = clone.widget;
+        if (Array.isArray(clone.exprControls) && clone.exprControls.length) {
+          nl.exprControls = clone.exprControls;
+          if (window.SMMotion && SMMotion.registerControlPropMeta) nl.exprControls.forEach(function (c) { SMMotion.registerControlPropMeta(c); });
+        }
+      }
       if (clone.threeD) nl.threeD = clone.threeD;
       if (clone.timeRemap) nl.timeRemap = clone.timeRemap;
       if (clone.motionBlur) nl.motionBlur = clone.motionBlur;
