@@ -118,6 +118,76 @@
   // frame — mirrors images.js's importStandalone insertion pattern exactly
   // (same isRaster stroke shape, same keyframe-if-needed guard), just fed a
   // dataURL already in hand instead of decoding one from a file.
+  // Can this entry be dropped back onto the canvas? (feedback #159 — "il
+  // faudrait que ça soit un élément persistent tant que l'on ne l'enlève pas
+  // de ce panel"). One decider, used both to arm the drag and to explain the
+  // refusal, so the thumbnail never offers a gesture the drop would drop.
+  //
+  // Images always can: the entry carries its own bytes (or, when linked, a
+  // file reference desR resolves lazily), and deleting the raster from the
+  // canvas never touched either. Confirmed live, including for an entry whose
+  // source layer no longer exists.
+  //
+  // Video is the half that was broken: the drag was armed for images only, so
+  // a video thumbnail was inert forever. What it can be rebuilt from depends
+  // on the media mode:
+  //  - linked: `path` (desktop) or `webHandleId` (web) still points at the
+  //    original file, so a real re-import is possible — this is the case that
+  //    makes the panel a genuine library.
+  //  - embedded: the project deliberately keeps no copy of the source bytes
+  //    (feedback #154 stopped baking base64), only a first-frame preview. The
+  //    decoded frames live in the owning layer, so a re-drop is possible for
+  //    as long as that layer exists, and genuinely impossible after it goes.
+  function reinsertKind(m) {
+    if (!m) return null;
+    if (m.kind === 'image') return 'image';
+    if (m.kind !== 'video') return null;
+    if (m.linked && (m.path || m.webHandleId)) return 'video-linked';
+    if (resolveSrcLayer(m)) return 'video-clone';
+    return null;
+  }
+  function reinsertBlockedReason(m) {
+    if (m.kind !== 'video') return null;
+    return t('mediaVideoSourceGoneTip',
+      'Source introuvable — la vidéo était intégrée et son calque a été supprimé. En mode Liés, le fichier d\'origine reste réutilisable.');
+  }
+
+  // Re-imports a video as its own NEW layer (a video is a layer, not a stroke
+  // on one — unlike insertImageOnCanvas below), delegating to the same
+  // importAsLayer the original import used rather than reimplementing decode.
+  async function insertVideoAsLayer(m) {
+    var kind = reinsertKind(m);
+    if (kind === 'video-linked') {
+      if (!window.SMNativeVideo) return;
+      var source = m.path;
+      if (!source && m.webHandleId && window.SMLinkedMedia && SMLinkedMedia.getHandleFile) {
+        try { source = await SMLinkedMedia.getHandleFile(m.webHandleId); } catch (e) { source = null; }
+      }
+      if (!source) {
+        if (window.showToast) showToast(t('mediaVideoRelinkNeeded', 'Fichier lié inaccessible — autorise l\'accès ou relie le fichier.'));
+        return;
+      }
+      await SMNativeVideo.importAsLayer(source, m.webHandleId ? { webHandleId: m.webHandleId } : {});
+      return;
+    }
+    if (kind === 'video-clone') {
+      // Embedded: the decoded rasters still live in the source layer, so this
+      // duplicates that layer rather than decoding anything a second time.
+      var src = resolveSrcLayer(m);
+      var si = state.layers.indexOf(src);
+      if (si < 0) return;
+      if (window.SM && SM.duplicateLayer) {
+        var prev = state.activeLayerIdx;
+        SM.setActiveLayer(si);
+        SM.duplicateLayer();
+        if (state.activeLayerIdx === si) SM.setActiveLayer(prev);
+      }
+      if (window.showToast) showToast(t('mediaVideoReinserted', 'Vidéo réinsérée sur un nouveau calque'));
+      return;
+    }
+    if (window.showToast) showToast(reinsertBlockedReason(m));
+  }
+
   function insertImageOnCanvas(m, worldPt) {
     if (m.kind !== 'image') return;
     if (window.pushUndo) pushUndo();
@@ -320,17 +390,19 @@
     } else {
       var img = appendThumbVisual(thumb, m, 'media-tile-thumb-icon');
       if (m.kind === 'video') { var pb = document.createElement('div'); pb.className = 'media-row-playicon'; pb.textContent = '▶'; thumb.appendChild(pb); }
-      if (m.kind === 'image') {
-        // Drag source is the img when there IS one, the tile's thumb box
-        // otherwise — a linked entry whose preview failed is still perfectly
-        // insertable (the linked branch of insertImageOnCanvas never reads
-        // m.thumb), so losing drag there would be a real regression.
+      // Drag source is the img when there IS one, the tile's thumb box
+      // otherwise — a linked entry whose preview failed is still perfectly
+      // insertable (the linked branch of insertImageOnCanvas never reads
+      // m.thumb), so losing drag there would be a real regression.
+      if (reinsertKind(m)) {
         var dragEl = img || thumb;
         dragEl.draggable = true;
         dragEl.addEventListener('dragstart', function (e) {
           e.dataTransfer.setData('application/x-nemo-media-id', m.id);
           e.dataTransfer.effectAllowed = 'copy';
         });
+      } else if (m.kind === 'video') {
+        thumb.title = reinsertBlockedReason(m);
       }
     }
     if (isMissing(m)) { var mb = document.createElement('div'); mb.className = 'media-tile-missing-badge'; mb.title = t('mediaMissingTip', 'Calque source introuvable'); mb.textContent = '!'; thumb.appendChild(mb); }
@@ -482,15 +554,17 @@
         }
         window.showContextMenu(e.clientX, e.clientY, items);
       });
-      if (m.kind === 'image') {
-        // Same fallback as the tile view: drag from the thumb box when there's
-        // no preview img to hang the listener on.
+      // Same fallback as the tile view: drag from the thumb box when there's
+      // no preview img to hang the listener on.
+      if (reinsertKind(m)) {
         var dragEl = img || thumb;
         dragEl.draggable = true;
         dragEl.addEventListener('dragstart', function (e) {
           e.dataTransfer.setData('application/x-nemo-media-id', m.id);
           e.dataTransfer.effectAllowed = 'copy';
         });
+      } else if (m.kind === 'video') {
+        thumb.title = reinsertBlockedReason(m);
       }
       return row;
   }
@@ -650,7 +724,7 @@
       var m = (state.mediaLibrary || []).find(function (x) { return x.id === id; });
       if (!m) return;
       var pt = window.SMEngineBridge && SMEngineBridge.screenToWorld ? SMEngineBridge.screenToWorld(e.clientX, e.clientY) : null;
-      insertImageOnCanvas(m, pt);
+      if (m.kind === 'video') insertVideoAsLayer(m); else insertImageOnCanvas(m, pt);
     });
   }
 
