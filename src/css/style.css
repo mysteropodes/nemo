@@ -574,6 +574,10 @@ body.rulers-off #ruler-h,body.rulers-off #ruler-v,body.rulers-off #ruler-corner{
 .pi:hover,.pi:focus,.pi.scrubbing,.pi.editing{color:var(--text);}
 .pi:focus{box-shadow:inset 0 0 0 1px var(--accent);}
 .pi[type="range"]{padding:0;border:none;background:transparent;accent-color:var(--accent);}
+/* An icon group whose setting has no effect in the current mode (feedback
+   #164 — Join under "Gradient along path"). Dimmed and inert rather than
+   removed, so the control stays where you expect it and its title says why. */
+.icon-grp.grp-disabled{opacity:.4;pointer-events:none;}
 /* Unified checkbox design (feedback 2026-07: "tous les checkbox qui
    apparraissent dans l'app devrait avoir cette apparence") — a single
    global rule on the type selector, not a class, so every existing

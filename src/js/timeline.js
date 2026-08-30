@@ -9143,6 +9143,34 @@ paintIconGroup('p-fillbrushmode-grp',state.fillBrushMode);
 function syncMiterLimitEnabled(){document.getElementById('p-miterlimit').disabled=(document.getElementById('p-join-grp').dataset.value!=='miter');}
 document.getElementById('p-join-grp').addEventListener('click',syncMiterLimitEnabled);
 syncMiterLimitEnabled();
+// Join is INOPERATIVE while "Gradient along path" is on (2026-08-30, feedback
+// #164: "with 'gradient along path' you can't pick a joint option"). Not a
+// blocked menu — the control accepted the click and the value changed; it
+// simply had no effect, which is worse than being unavailable.
+//
+// The reason is structural, and lives in engine-bridge.js's own gradient
+// block: this engine paints ONE flat colour per stroked item, so a gradient
+// along the path is drawn by splitting the stroke into N INDEPENDENT 2-point
+// straight segments, each solid-coloured at its arc-length position. A stroke
+// join only exists between consecutive segments OF ONE PATH — once every
+// corner falls between two separate items, there is no join left to render,
+// and the corner's look is governed by the CAP instead. Making it render
+// would mean real gradient support in the Rust engine rather than this
+// split-into-pieces trick.
+//
+// So the control now says what is true. Same convention as syncMiterLimitEnabled
+// right above: disable rather than silently no-op.
+function syncJoinEnabledForGradient(){
+  var grp=document.getElementById('p-join-grp');
+  var cb=document.getElementById('p-strokegrad-along');
+  if(!grp||!cb)return;
+  var off=!!cb.checked;
+  grp.classList.toggle('grp-disabled',off);
+  grp.title=off?((window.SM&&SM.t)?SM.t('joinDisabledByGradientTitle'):'Sans effet avec « Dégradé le long du tracé » : le trait est peint en segments séparés, il n’y a donc pas de jointure à dessiner — c’est le Cap qui gouverne l’aspect des coins.'):'';
+  if(off)document.getElementById('p-miterlimit').disabled=true; else syncMiterLimitEnabled();
+}
+document.getElementById('p-strokegrad-along').addEventListener('change',syncJoinEnabledForGradient);
+syncJoinEnabledForGradient();
 document.getElementById('p-vecbrush').addEventListener('change',function(){window.SM.setVectorBrush(this.checked);});
 // Transform panel fields (position/size/rotation) used to only apply on
 // 'change' — the native event that fires once, at the END of a drag-scrub
