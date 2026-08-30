@@ -207,6 +207,12 @@
       } catch (e) { /* stays pending — user can retry */ }
     }
     _updateBanner();
+    // A linked VIDEO's re-grant needs more than a re-render: its decode
+    // session was never opened (or was dropped), and the per-layer
+    // "already warned, stay quiet" latch has to be released or the retry
+    // below would be swallowed. native-video-bridge.js owns that state, so
+    // it clears its own — one call, before the render that follows.
+    if (window.SMNativeVideo && SMNativeVideo.retryWebLinkedSessions) SMNativeVideo.retryWebLinkedSessions();
     _rerender();
   }
 
@@ -240,6 +246,81 @@
     }
     return out;
   }
+
+  // ---- VIDEO (2026-08-30, feedback #154: "le save as enregistre toujours
+  // dans le json les video encoded en base 64, on avait pourtant dit
+  // d'expérimenter l'url local") ----
+  // Video was excluded from this whole mechanism in the 2026-08-29 wave (a
+  // deliberate scope boundary, not an oversight) — which left the WEB build
+  // with two bad video shapes and no good one:
+  //  - images.js's importVideoFrames bakes every decoded frame to a JPEG
+  //    data URL into ld.frames[].strokes[].src — hundreds of MB of base64
+  //    in the project file, exactly what Cyril reported;
+  //  - the fast WebCodecs path (native-video-bridge.js importAsLayer)
+  //    persists NOTHING durable: ld.nativeVideo.path is just the display
+  //    name for a web session, so the clip is simply gone after a reload.
+  // A FileSystemFileHandle fixes BOTH at once, and it is the same handle
+  // mechanism linked images already use — the functions below are the video
+  // counterparts of pickWebImages/_resolveWebHandle above, deliberately
+  // sharing this file's SMIdb handle store, _pendingPermission set and
+  // permission banner rather than growing a second parallel copy.
+  //
+  // ONE shape difference, and it is the good kind: a video resolves to a
+  // FILE (fed straight to a decode session), never to a data: URL. Baking a
+  // video into a data URL IS the reported bug, so getHandleFile below
+  // deliberately stops one step short of fileToDataUrl.
+  //
+  // Also note where the reference LIVES: a linked video keeps exactly ONE
+  // webHandleId on ld.nativeVideo, at LAYER level — getEffectiveStrokes
+  // (app.js) returns [] for a nativeVideo layer, so there are no per-frame
+  // stroke dicts at all. The "a still's stroke dict is duplicated verbatim
+  // into every frame" multiplication that images have to live with simply
+  // has no equivalent here; only the BAKING importer writes per-frame
+  // payloads, which is what this change routes around.
+  var VIDEO_PICKER_TYPES = [{ description: 'Vidéos', accept: { 'video/*': ['.mp4', '.mov', '.webm', '.m4v', '.ogv', '.mkv', '.avi'] } }];
+
+  // Opens the File System Access picker for ONE video, stashes the handle
+  // in the same SMIdb store linked images use, and hands back both the id
+  // to persist and the live File to open a decode session on right now.
+  // Called only from a real user-gesture handler (the Vidéo… button), same
+  // hard requirement as pickWebImages above.
+  async function pickWebVideo() {
+    if (!isWebLinkingSupported()) throw new Error('File System Access API indisponible dans ce navigateur (Safari/Firefox) — utilisez le mode Intégrés ou Chrome/Edge.');
+    var handles = await window.showOpenFilePicker({ multiple: false, types: VIDEO_PICKER_TYPES });
+    var handle = handles[0];
+    if (!handle) return null;
+    var file = await handle.getFile();
+    var id = uid();
+    await putHandle(id, handle);
+    return { webHandleId: id, file: file, name: file.name };
+  }
+
+  // Resolve a persisted handle id back to a live File — the video
+  // counterpart of _resolveWebHandle above, sharing its permission
+  // handling verbatim (pending set + banner) so a re-grant click fixes
+  // linked images and linked videos in the same gesture. Throws with
+  // .needsPermission set so the caller can distinguish "user must click"
+  // from "file genuinely gone" and report each differently.
+  function getHandleFile(handleId) {
+    return getHandle(handleId).then(function (handle) {
+      if (!handle) { throw new Error('handle introuvable (autre navigateur/machine, ou données locales effacées)'); }
+      return handle.queryPermission({ mode: 'read' }).then(function (perm) {
+        if (perm !== 'granted') {
+          _pendingPermission[handleId] = handle;
+          _updateBanner();
+          var e = new Error('autorisation requise'); e.needsPermission = true; throw e;
+        }
+        delete _pendingPermission[handleId];
+        return handle.getFile();
+      });
+    });
+  }
+
+  // Drop a handle the caller no longer references (a relink replacing an
+  // older one) — exposed so native-video-bridge.js's own relink flow can
+  // clean up through this file's store rather than reaching into SMIdb
+  // with a duplicated key prefix.
+  function forgetHandle(handleId) { return removeHandle(handleId); }
 
   // ---- relink (moved/deleted desktop file, or a web handle from another
   // browser/machine/session) — same shape as native-video-bridge.js's
@@ -410,6 +491,21 @@
     usedSet[full.toLowerCase()] = true;
     return full;
   }
+
+  // NOTE on the kind === 'image' filter both directions below still carry
+  // (2026-08-30, feedback #154): video now participates in linked media for
+  // NEW IMPORTS (see the VIDEO section above and images.js's own dispatch),
+  // which is what state.mediaMode has always governed — but it stays out of
+  // this BULK CONVERTER on purpose, in both directions, because neither one
+  // is a reference rewrite for a video the way it is for an image:
+  //  - linked → embedded would have to re-run the bake-every-frame-to-JPEG
+  //    importer, i.e. deliberately reproduce the exact hundreds-of-MB
+  //    base64 blowup this feedback is about;
+  //  - embedded → linked has nothing to point AT — an embedded video is a
+  //    pile of baked per-frame JPEGs with no original container left, so
+  //    "write the file out and link it" would mean re-encoding a video,
+  //    which is a whole export pipeline, not a file write.
+  // Left as an explicit, documented boundary rather than a silent filter.
 
   // ---- Linked → Embedded — the simpler, lower-risk direction: just READS
   // bytes back (via resolveOnce above, reusing the shipped resolve cache)
@@ -621,12 +717,25 @@
     _updateBanner();
     updateConvertButtonUI();
   }
-  window.SM = window.SM || {};
-  window.SM.afterI18n = window.SM.afterI18n || [];
-  window.SM.afterI18n.push(syncUI);
-
   function init() {
     initSettingUI();
+    // Registered HERE, not at IIFE-evaluation time (fixed 2026-08-30 while
+    // verifying feedback #156's panel move — a pre-existing silent break,
+    // not a consequence of that move). index.html loads this file BEFORE
+    // timeline.js, and timeline.js:349 assigns `window.SM = {...}` as a
+    // fresh object LITERAL, which wipes anything attached to window.SM
+    // earlier — the exact trap app.js already documents above
+    // convertLayerToComponent ("silently wipes out anything attached to
+    // window.SM earlier"). So the old top-level push landed on an object
+    // that no longer existed by the time applyI18n() read the list, and
+    // this repaint never ran: switching language left the convert button
+    // showing its previous locale's label (confirmed live — SM.t returned
+    // the right string while the button did not change, and a manual
+    // syncUI() fixed it). init() runs on DOMContentLoaded, after every
+    // script has evaluated, so the push lands on the final window.SM.
+    window.SM = window.SM || {};
+    window.SM.afterI18n = window.SM.afterI18n || [];
+    if (window.SM.afterI18n.indexOf(syncUI) < 0) window.SM.afterI18n.push(syncUI);
     syncUI();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
@@ -639,6 +748,11 @@
     resolveOnce: resolveOnce,
     readLinkedDesktop: readLinkedDesktop,
     pickWebImages: pickWebImages,
+    // Video (2026-08-30, feedback #154) — same handle store / permission
+    // banner as the image side above; resolves to a FILE, never a data URL.
+    pickWebVideo: pickWebVideo,
+    getHandleFile: getHandleFile,
+    forgetHandle: forgetHandle,
     relinkImageEntry: relinkImageEntry,
     requestPermissionForAll: requestPermissionForAll,
     syncUI: syncUI,

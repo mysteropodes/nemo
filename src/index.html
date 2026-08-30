@@ -756,30 +756,13 @@
           <span class="pl">FPS</span><input type="number" class="pi scrub" id="proj-fps" value="12" min="1" max="60" data-step="1">
           <span class="pl">Frames</span><input type="number" class="pi scrub" id="proj-frames" value="24" min="1" max="999" data-step="1">
         </div>
-        <!-- Media mode (2026-08-29, linked-media.js) — ONE project-wide
-             setting (Cyril: "un seul réglage", not per-image), default
-             "Intégrés" (unchanged base64-in-JSON behavior). Governs NEW
-             imports only; flipping it never retroactively touches already-
-             embedded media. The tooltip carries the honest tradeoff (a
-             linked project is not portable, and on web the browser may
-             re-ask for permission each session) rather than hiding it. -->
-        <div class="pr dims-row" style="gap:4px" id="media-mode-row">
-          <span class="pl" data-i18n="hdrMedia" data-i18n-title="mediaModeTip" title="Intégrés : les images sont copiées dans le fichier projet (portable, plus lourd). Liés : le projet référence les fichiers d'origine (plus léger, mais casse si vous déplacez/partagez le projet sans les fichiers — et sur le web, le navigateur peut redemander l'autorisation à chaque session).">Médias</span>
-          <button class="pbtn ac" id="btn-media-mode-embedded" type="button" data-mode="embedded" data-i18n="mediaModeEmbedded" style="flex:1">Intégrés</button>
-          <button class="pbtn" id="btn-media-mode-linked" type="button" data-mode="linked" data-i18n="mediaModeLinked" style="flex:1">Liés</button>
-        </div>
-        <!-- Bulk convert (2026-08-29, linked-media.js follow-up) — closes the
-             gap the toggle above deliberately left open: flipping "Médias"
-             only ever governs NEW imports. This is an EXPLICIT action the
-             user runs on purpose (never fired automatically by the toggle
-             click above — a bulk filesystem write firing invisibly off a
-             checkbox would be a bad surprise), converting every image
-             ALREADY in the project to match whichever mode is selected
-             above. Label/enabled-state are dynamic (see updateConvertButtonUI
-             in linked-media.js — mirrors syncUI's own afterI18n repaint). -->
-        <div class="pr" id="media-convert-row" style="margin-top:2px">
-          <button class="pbtn" id="btn-convert-media" type="button" style="width:100%">Convertir les médias…</button>
-        </div>
+        <!-- Media mode + bulk convert MOVED to the "Médias & Presets" panel
+             (#assets-sec, 2026-08-30, feedback #156: "les option de media
+             devrait être dans media et preset pas dans le panel document").
+             They are media concerns, not document-dimension concerns; the
+             Document panel is back to W/H, FPS/Frames, BG and the view
+             toggles. The element ids are unchanged by that move, so
+             linked-media.js's id-based wiring needed no edit. -->
         <!-- dims-row (2026-07 feedback: "aligner les icônes avec bg") — BG's
              label used the default .pl (min-width:50px), pushing its swatch
              ~40px further right than every sibling row's value column (W/H,
@@ -1147,6 +1130,37 @@
           <button class="settings-tab" id="assets-tab-presets" data-i18n="assetsTabPresets">Presets</button>
         </div>
         <div id="assets-view-media" class="asset-view">
+          <!-- Media mode (2026-08-29, linked-media.js; MOVED here from the
+               Document panel 2026-08-30, feedback #156) — ONE project-wide
+               setting (Cyril: "un seul réglage", not per-image), default
+               "Intégrés" (unchanged base64-in-JSON behavior). Governs NEW
+               imports only; flipping it never retroactively touches already-
+               embedded media. The tooltip carries the honest tradeoff (a
+               linked project is not portable, and on web the browser may
+               re-ask for permission each session) rather than hiding it.
+               Placed at the TOP of the Média tab, directly above the two
+               import buttons it governs, rather than above the Média/Presets
+               tab bar: it decides what those buttons do, and hoisting it
+               above the tabs would also show it while browsing brush
+               Presets, which it has nothing to do with. Ids unchanged — the
+               wiring in linked-media.js is entirely by id. -->
+          <div class="pr dims-row" style="gap:4px" id="media-mode-row">
+            <span class="pl" data-i18n="hdrMedia" data-i18n-title="mediaModeTip" title="Intégrés : les images sont copiées dans le fichier projet (portable, plus lourd). Liés : le projet référence les fichiers d'origine (plus léger, mais casse si vous déplacez/partagez le projet sans les fichiers — et sur le web, le navigateur peut redemander l'autorisation à chaque session).">Médias</span>
+            <button class="pbtn ac" id="btn-media-mode-embedded" type="button" data-mode="embedded" data-i18n="mediaModeEmbedded" style="flex:1">Intégrés</button>
+            <button class="pbtn" id="btn-media-mode-linked" type="button" data-mode="linked" data-i18n="mediaModeLinked" style="flex:1">Liés</button>
+          </div>
+          <!-- Bulk convert (2026-08-29, linked-media.js follow-up) — closes the
+               gap the toggle above deliberately left open: flipping "Médias"
+               only ever governs NEW imports. This is an EXPLICIT action the
+               user runs on purpose (never fired automatically by the toggle
+               click above — a bulk filesystem write firing invisibly off a
+               checkbox would be a bad surprise), converting every image
+               ALREADY in the project to match whichever mode is selected
+               above. Label/enabled-state are dynamic (see updateConvertButtonUI
+               in linked-media.js — mirrors syncUI's own afterI18n repaint). -->
+          <div class="pr" id="media-convert-row" style="margin-top:2px;margin-bottom:4px">
+            <button class="pbtn" id="btn-convert-media" type="button" style="width:100%">Convertir les médias…</button>
+          </div>
           <div class="pr" style="gap:4px">
             <button class="pbtn" id="btn-media-import-img" style="flex:1" data-i18n="mediaImportImg">Image(s)…</button>
             <button class="pbtn" id="btn-media-import-video" style="flex:1" data-i18n="mediaImportVideo">Vidéo…</button>

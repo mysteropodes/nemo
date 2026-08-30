@@ -655,6 +655,43 @@
     }
     _layerFrameSyncAsync(key, ld, frame);
   }
+  // Retry window for a linked WEB video whose handle is missing or not yet
+  // permitted (2026-08-30) — mirrors linked-media.js's RETRY_COOLDOWN_MS.
+  var WEB_REOPEN_COOLDOWN_MS = 4000;
+
+  // ---- linked-video catalog status (2026-08-30, feedback #154) ----
+  // The Médias panel already renders linkedBroken/linkedBrokenReason for
+  // linked IMAGES (media-library.js's own badge block) — a linked video
+  // reuses those exact same two fields rather than inventing a video-only
+  // status, so the panel needs no new rendering branch. Looked up by
+  // layerUid, the same key replaceNativeVideoSource already uses.
+  function _videoEntryFor(ld) {
+    if (!ld || !ld.layerUid) return null;
+    return (state.mediaLibrary || []).find(function (m) { return m.layerUid === ld.layerUid; }) || null;
+  }
+  function _markVideoEntryBroken(ld, reason) {
+    var m = _videoEntryFor(ld);
+    if (!m || (m.linkedBroken && m.linkedBrokenReason === reason)) return; // no-op reload storm guard
+    m.linkedBroken = true; m.linkedBrokenReason = reason;
+    if (window.SMMediaLibrary) SMMediaLibrary.reload();
+  }
+  function _markVideoEntryOk(ld) {
+    var m = _videoEntryFor(ld);
+    if (!m || !m.linkedBroken) return;
+    m.linkedBroken = false; m.linkedBrokenReason = null;
+    if (window.SMMediaLibrary) SMMediaLibrary.reload();
+  }
+  // Called by linked-media.js right after the user grants permission from
+  // its banner: clears every per-layer "already warned, stay quiet" latch
+  // so the loadFrame that follows genuinely retries the reopen instead of
+  // hitting the latch and doing nothing.
+  function retryWebLinkedSessions() {
+    Object.keys(_layerSync).forEach(function (k) {
+      var st = _layerSync[k];
+      if (st) { st.webReopenWarned = false; st.webRetryAt = 0; }
+    });
+  }
+
   async function _layerFrameSyncAsync(key, ld, frame) {
     var st = _syncState(key);
     if (st.busy) { st.pending = frame; return; }
@@ -668,45 +705,94 @@
       // the OS purged it from the temp cache, fall back to the original
       // and let _optimizeLayerMedia regenerate it in the background.
       if (!ld._nvSessionId) {
-        // A web (File/Blob) session can't lazily re-open: nv.path is just
-        // the display name (no durable file handle survives a reload —
-        // see importAsLayer's own comment), and falling through to open()
-        // would throw the misleading "requires the Tauri app" error on
-        // EVERY frame change. Fail once, visibly, then stay quiet.
-        if (nv.isWeb) {
-          if (!st.webReopenWarned) {
-            st.webReopenWarned = true;
-            if (window.showToast) showToast(SM.t('toastVideoQuote') + nv.path + SM.t('toastVideoUnreloadable'), 'warn');
-          }
-          return;
-        }
         var info = null;
-        // Pre-indexed-era (.mov) optimized copies must NOT be reopened —
-        // they'd silently keep the session on the old seek/respawn decode
-        // path (live-caught 2026-07: zero INDEXED decodes in the log
-        // because every layer's persisted optimizedPath predated the
-        // indexed format). Dropping it here routes through the original +
-        // background re-optimize into the indexed .mjpeg flavor.
-        if (nv.optimizedPath && !/\.mjpeg$/.test(nv.optimizedPath)) nv.optimizedPath = null;
-        if (nv.optimizedPath) {
-          try { info = await open(nv.optimizedPath); }
-          catch (e) { nv.optimizedPath = null; }
-        }
-        if (!info) {
-          info = await open(nv.path);
+        // ---- WEB session reopen (2026-08-30, feedback #154) ----
+        // With a webHandleId, a web session CAN lazily re-open: the handle
+        // stashed in IndexedDB by linked-media.js resolves back to a real
+        // File, which open() accepts directly (File is a Blob — same branch
+        // the original import took). Without one, the old behavior stands:
+        // nv.path is just a display name, so fail once, visibly, then stay
+        // quiet rather than throwing the misleading "requires the Tauri
+        // app" error on EVERY frame change.
+        if (nv.isWeb) {
+          if (!nv.webHandleId || !window.SMLinkedMedia || !SMLinkedMedia.getHandleFile) {
+            if (!st.webReopenWarned) {
+              st.webReopenWarned = true;
+              if (window.showToast) showToast(SM.t('toastVideoQuote') + nv.path + SM.t('toastVideoUnreloadable'), 'warn');
+            }
+            return;
+          }
+          // Cooldown, same reasoning (and roughly the same window) as
+          // linked-media.js's own RETRY_COOLDOWN_MS on the image side: a
+          // scrub or a looping playback over a broken link would otherwise
+          // hit IndexedDB (and queryPermission) once per frame forever. The
+          // banner's re-grant path clears this via retryWebLinkedSessions()
+          // below, so a genuine fix is never delayed by it.
+          if (st.webRetryAt && (Date.now() - st.webRetryAt) < WEB_REOPEN_COOLDOWN_MS) return;
+          var wfile;
+          try {
+            wfile = await SMLinkedMedia.getHandleFile(nv.webHandleId);
+          } catch (e) {
+            st.webRetryAt = Date.now();
+            // Two genuinely different outcomes, reported differently and
+            // ONCE each (a scrub crosses this path every frame otherwise):
+            // needsPermission is recoverable by a click — linked-media.js
+            // has already armed its own banner, and its re-grant handler
+            // calls retryWebLinkedSessions() below to clear this latch, so
+            // saying anything louder here would just be noise. A genuinely
+            // missing handle is a dead link: toast it, and mark the media
+            // entry broken so the panel shows WHY.
+            if (!(e && e.needsPermission)) {
+              _markVideoEntryBroken(ld, 'missing');
+              if (!st.webReopenWarned) {
+                st.webReopenWarned = true;
+                if (window.showToast) showToast(SM.t('toastVideoQuote') + nv.path + SM.t('toastLinkedVideoHandleLost'), 'warn');
+              }
+            } else {
+              _markVideoEntryBroken(ld, 'permission');
+            }
+            return;
+          }
+          info = await open(wfile);
           nv.codec = info.codec || nv.codec || '';
-          // Background re-optimize (no-op if already all-intra or in
-          // flight) is keyed by a top-level index re-lookup — skipped for
-          // a nested symLayer (string key), which has none. Nested video
-          // simply stays on the slower non-optimized decode path; a real
-          // fix would need _optimizeLayerMedia keyed the same way as
-          // everything else here, deferred as a known scope boundary
-          // rather than blocking correctness on it.
-          if (typeof key === 'number') _optimizeLayerMedia(key);
+          st.webReopenWarned = false; st.webRetryAt = 0;
+          _markVideoEntryOk(ld);
+          ld._nvSessionId = info.session_id;
+          nv.frameCount = Number(info.frame_count);
+          nv.width = info.width; nv.height = info.height; nv.fps = info.fps;
         }
-        ld._nvSessionId = info.session_id; // runtime-only (not in exportJSON's layer whitelist)
-        nv.frameCount = Number(info.frame_count);
-        nv.width = info.width; nv.height = info.height; nv.fps = info.fps;
+        // ---- DESKTOP (Tauri) reopen — unchanged from before, just nested
+        // under an explicit !isWeb guard now that the web branch above can
+        // also produce a session (it returns early or falls through with
+        // ld._nvSessionId already set, so this must not run for it). ----
+        if (!nv.isWeb) {
+          // Pre-indexed-era (.mov) optimized copies must NOT be reopened —
+          // they'd silently keep the session on the old seek/respawn decode
+          // path (live-caught 2026-07: zero INDEXED decodes in the log
+          // because every layer's persisted optimizedPath predated the
+          // indexed format). Dropping it here routes through the original +
+          // background re-optimize into the indexed .mjpeg flavor.
+          if (nv.optimizedPath && !/\.mjpeg$/.test(nv.optimizedPath)) nv.optimizedPath = null;
+          if (nv.optimizedPath) {
+            try { info = await open(nv.optimizedPath); }
+            catch (e) { nv.optimizedPath = null; }
+          }
+          if (!info) {
+            info = await open(nv.path);
+            nv.codec = info.codec || nv.codec || '';
+            // Background re-optimize (no-op if already all-intra or in
+            // flight) is keyed by a top-level index re-lookup — skipped for
+            // a nested symLayer (string key), which has none. Nested video
+            // simply stays on the slower non-optimized decode path; a real
+            // fix would need _optimizeLayerMedia keyed the same way as
+            // everything else here, deferred as a known scope boundary
+            // rather than blocking correctness on it.
+            if (typeof key === 'number') _optimizeLayerMedia(key);
+          }
+          ld._nvSessionId = info.session_id; // runtime-only (not in exportJSON's layer whitelist)
+          nv.frameCount = Number(info.frame_count);
+          nv.width = info.width; nv.height = info.height; nv.fps = info.fps;
+        }
       }
       var target = _targetFor(nv, frame);
       if (target === st.lastShown) return;
@@ -885,7 +971,13 @@
   // (the ONLY canvas use here in the Tauri path — the render path itself
   // never touches one; the web backend's own decode already round-trips
   // through a canvas internally, see _videoFrameToRgba).
-  async function importAsLayer(source) {
+  // opts.webHandleId (2026-08-30, feedback #154): on the web build, images.js
+  // can now hand us a FileSystemFileHandle id alongside the File itself when
+  // the project is in linked mode — the File opens the session RIGHT NOW,
+  // the id is what survives the save so a reload can re-open the same file
+  // without the user re-importing (and without a single byte of video ever
+  // entering the project JSON). See linked-media.js's VIDEO section.
+  async function importAsLayer(source, opts) {
     // Component guard REMOVED (2026-07-30): importing footage while editing
     // inside a Component used to create a nativeVideo layer that played
     // fine while still inside, then silently and permanently vanished the
@@ -939,13 +1031,21 @@
     var idx = createUserLayer(name);
     var ld = state.layers[idx];
     var isWeb = source instanceof Blob;
+    var webHandleId = (opts && opts.webHandleId) || null;
     ld.nativeVideo = {
       // A File/Blob can't survive JSON.stringify (project save) — stored
-      // only as the display name for a web session, never as something a
-      // reload could re-open (browsers have no durable file handle for
-      // this without the separate File System Access API). Re-importing
-      // after a reload is expected/required for a web session; the Tauri
-      // path's real filesystem path keeps working across reloads as before.
+      // only as the display name for a web session. That used to be the END
+      // of the story ("re-importing after a reload is expected"), which made
+      // web video either unreloadable (this path) or enormous (images.js's
+      // baking fallback) — feedback #154.
+      //
+      // webHandleId closes it: the File System Access API DOES give a
+      // durable handle, and linked-media.js already stashes those in
+      // IndexedDB for images. Present only when the project was in linked
+      // mode AND the browser supports the picker; when it is, the lazy
+      // reopen below resolves it back to a File and opens a fresh session,
+      // so a saved project reloads its video with zero embedded bytes. The
+      // Tauri path's real filesystem path keeps working as before.
       path: isWeb ? name : source,
       isWeb: isWeb,
       fps: info.fps,
@@ -955,6 +1055,10 @@
       offsetFrames: 0,
       codec: info.codec || '',
     };
+    // Set separately (not as `webHandleId: webHandleId || undefined`) so a
+    // non-linked session's nativeVideo dict keeps the exact same key set it
+    // had before this change — nothing new to skip in any consumer.
+    if (webHandleId) ld.nativeVideo.webHandleId = webHandleId;
     ld._nvSessionId = info.session_id;
     if (Number(info.frame_count) > state.totalFrames && window.SM && SM.setTotalFrames) SM.setTotalFrames(Number(info.frame_count));
     // Decode the on-screen frame ONCE, right here, before anything else
@@ -1001,7 +1105,14 @@
     // rather than a second addEntry() call, so the panel shows one row
     // throughout the import, not a loading row that gets replaced by a
     // second, separate ready row.
-    var readyPatch = { layerUid: ld.layerUid, linked: !isWeb, path: isWeb ? null : source, status: 'ready' };
+    // linked is now true for a web session too WHEN it has a handle
+    // (2026-08-30) — it genuinely is a link to an outside file that can go
+    // offline, which is exactly what the badge means; it also unlocks the
+    // relink entry in media-library.js's context menu (gated on m.linked &&
+    // kind==='video'), reusing that ONE entry point rather than adding a
+    // second web-specific one. A handle-less web session stays as before.
+    var readyPatch = { layerUid: ld.layerUid, linked: !isWeb || !!webHandleId, path: isWeb ? null : source, status: 'ready' };
+    if (webHandleId) readyPatch.webHandleId = webHandleId;
     if (pxThumb) {
       try {
         var tc = document.createElement('canvas');
@@ -1078,10 +1189,60 @@
   // swap follows _optimizeLayerMedia's own session-replace steps: open the
   // new path, point the layer at the fresh session, drop the old one, and
   // clear the per-layer sync cache (stale bytes from the OLD decode).
+  // Web half of replaceNativeVideoSource (2026-08-30, feedback #154). Same
+  // five steps as the desktop path below — open the new source, point the
+  // layer at the fresh session, drop the old one, clear the per-layer sync
+  // cache (stale bytes from the OLD decode), refresh the catalog entry —
+  // with the picker/handle bookkeeping delegated to linked-media.js. The
+  // OLD handle is forgotten only AFTER the new one opens successfully, so
+  // a cancelled or failed relink never destroys a working link.
+  async function _relinkWebVideo(li, ld) {
+    if (!window.SMLinkedMedia || !SMLinkedMedia.isWebLinkingSupported || !SMLinkedMedia.isWebLinkingSupported()) {
+      if (window.showToast) showToast(SM.t('toastLinkedVideoNeedsChromium'), 'warn');
+      return;
+    }
+    var picked;
+    try { picked = await SMLinkedMedia.pickWebVideo(); }
+    catch (e) { return; } // cancelled (AbortError) — nothing touched
+    if (!picked) return;
+    var info;
+    try { info = await open(picked.file); }
+    catch (e) { if (window.showToast) showToast('Ouverture impossible : ' + (e && e.message || e), 'warn'); return; }
+    if (window.pushUndo) pushUndo();
+    var nv = ld.nativeVideo;
+    var oldSession = ld._nvSessionId, oldHandleId = nv.webHandleId;
+    nv.webHandleId = picked.webHandleId;
+    nv.path = picked.name; nv.isWeb = true;
+    nv.fps = info.fps; nv.frameCount = Number(info.frame_count);
+    nv.width = info.width; nv.height = info.height; nv.codec = info.codec || '';
+    ld._nvSessionId = info.session_id;
+    var st = _syncState(li);
+    st.jsCache.clear(); st.jsBytes = 0; st.prefetchQueue = []; st.lastShown = -1; st.webReopenWarned = false; st.webRetryAt = 0;
+    if (oldSession) close(oldSession).catch(function () {});
+    if (oldHandleId && oldHandleId !== picked.webHandleId && SMLinkedMedia.forgetHandle) SMLinkedMedia.forgetHandle(oldHandleId).catch(function () {});
+    if (Number(info.frame_count) > state.totalFrames && window.SM && SM.setTotalFrames) SM.setTotalFrames(Number(info.frame_count));
+    var entry = _videoEntryFor(ld);
+    if (entry) {
+      entry.webHandleId = picked.webHandleId;
+      entry.name = picked.name.replace(/\.[^.]+$/, '');
+      entry.linked = true; entry.linkedBroken = false; entry.linkedBrokenReason = null;
+      if (window.SMMediaLibrary) SMMediaLibrary.reload();
+    }
+    if (window.loadFrame) loadFrame(state.currentFrame);
+    if (window.updateUI) updateUI();
+    if (window.showToast) showToast(SM.t('toastVideoRelinkedSuffix') + picked.name);
+  }
+
   async function replaceNativeVideoSource(li) {
     var ld = state.layers[li];
     if (!ld || !ld.nativeVideo) { if (window.showToast) showToast(SM.t('toastNotANativeVideoLayer')); return; }
-    if (ld.nativeVideo.isWeb) { if (window.showToast) showToast(SM.t('toastRelinkUnavailableNoTauri')); return; }
+    // Web sessions used to be refused outright ("no real filesystem path to
+    // relink to"). With a FileSystemFileHandle they have a durable
+    // reference after all, so they relink through THIS same entry point
+    // (2026-08-30, feedback #154) — the picker and the handle bookkeeping
+    // live in linked-media.js, the session swap below is shared with the
+    // desktop path verbatim.
+    if (ld.nativeVideo.isWeb) { await _relinkWebVideo(li, ld); return; }
     if (!tauriOk()) { if (window.showToast) showToast(SM.t('toastRelinkRequiresTauriApp')); return; }
     var path = await window.__TAURI__.dialog.open({ title: 'Relier / remplacer le fichier vidéo', multiple: false,
       filters: [{ name: 'Vidéos', extensions: ['mp4', 'mov', 'mkv', 'webm', 'avi'] }] });
@@ -1120,6 +1281,10 @@
     attachToPlayhead: attachToPlayhead,
     detachFromPlayhead: detachFromPlayhead,
     importAsLayer: importAsLayer,
+    // Called by linked-media.js's permission banner (2026-08-30) — see its
+    // own comment; exposed rather than wired through a DOM event so the
+    // dependency direction stays the same as every other cross-file call here.
+    retryWebLinkedSessions: retryWebLinkedSessions,
     onFrameChanged: onFrameChanged,
     displayRect: displayRect,
     transformBox: transformBox,
