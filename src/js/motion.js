@@ -3933,24 +3933,30 @@
   // the layer's own stored strokes rather than the live Paper items so the
   // export path (which never materialises them) agrees with the screen.
   //
-  // Memoised per (layer, frame, basedOn): this is called once per GLYPH while
-  // building a scene, and getEffectiveStrokes is the single most-walked
-  // function in the render path (CLAUDE.md §5bis' "an access that isn't free")
-  // — without the cache a 50-character title would walk the layer's strokes
-  // 50 times per frame for a number that cannot change between those calls.
-  var _taCountCache = { key: '', n: 0 };
+  // Memoised on the IDENTITY of the stroke array, not on a version counter:
+  // this is called once per GLYPH while building a scene, so a 50-character
+  // title would otherwise walk the layer's strokes 50 times per frame for a
+  // number that cannot change between those calls.
+  //
+  // Keyed the way §5quater keys _canReuseMaterialized, and for the same
+  // reason: every writer REPLACES f.strokes rather than mutating it, so array
+  // identity IS content identity. A first attempt keyed on _sceneVersion
+  // instead and was measurably wrong — re-typing "ANIMATION" as
+  // "ANIMATIONS!" left the count at 9 for 11 characters, which silently
+  // skews every weight (totalChars is the divisor). §5bis says it outright:
+  // invalidating a cache is choosing WHEN, and _sceneVersion is the wrong
+  // criterion here.
+  var _taCountCache = { arr: null, basedOn: '', n: 0 };
   function taUnitCount(li, frameIdx, basedOn) {
-    var key = li + '|' + frameIdx + '|' + basedOn + '|' + (state._sceneVersion || 0);
-    if (_taCountCache.key === key) return _taCountCache.n;
     var strokes = (typeof getEffectiveStrokes === 'function') ? getEffectiveStrokes(li, frameIdx) : null;
+    if (!strokes) return 0;
+    if (_taCountCache.arr === strokes && _taCountCache.basedOn === basedOn) return _taCountCache.n;
     var max = -1;
-    if (strokes) {
-      for (var i = 0; i < strokes.length; i++) {
-        var u = SMTextSelector.unitIndexOf(strokes[i], basedOn);
-        if (u != null && u > max) max = u;
-      }
+    for (var i = 0; i < strokes.length; i++) {
+      var u = SMTextSelector.unitIndexOf(strokes[i], basedOn);
+      if (u != null && u > max) max = u;
     }
-    _taCountCache.key = key; _taCountCache.n = max + 1;
+    _taCountCache.arr = strokes; _taCountCache.basedOn = basedOn; _taCountCache.n = max + 1;
     return _taCountCache.n;
   }
   function textAnimatorContribution(li, sd, frameIdx) {

@@ -3082,6 +3082,10 @@ function updatePropsContext(){
   // properties dans layer properties") — same hook point, same reason: a
   // section that only exists for ONE kind of single selection.
   if(window.renderRigWidgetPanel)window.renderRigWidgetPanel();
+  // Text animators (2026-08-31) — same hook point and same reason again: a
+  // section that only exists for ONE kind of selection (a layer carrying
+  // vector text), re-evaluated wherever the selection is refreshed.
+  if(window.renderTextAnimatorPanel)window.renderTextAnimatorPanel();
   var hdrEl=document.getElementById('props-context-hdr');if(hdrEl)hdrEl.textContent=hdrText;
   // Document panel presented like a selection (2026-08-30, feedback #171
   // "l'onglet document pourrait disparaitre et se mettre comme pour element
