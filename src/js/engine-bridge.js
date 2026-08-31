@@ -2204,52 +2204,52 @@
     // (object identity), which this comment block's own header already
     // documents as immune to exactly this kind of reordering.
     if (_anyLayerOrder) {
-      // Direction flipped (2026-08-31, feedback #205, "layer index devrait
-      // être dans le sens positif et commencer par layer tout en haut 1
-      // après 2...") — Order now counts from the FRONT: 1 is the topmost/
-      // frontmost layer, 2 sits just behind it, and so on, matching how you'd
-      // naturally number a stack of physical sheets from the one facing you.
-      // Was ascending-toward-front (higher = later in this array = painted
-      // last = on top); now descending-toward-front (higher = EARLIER in
-      // this array = painted first = further back). Ties (the default 0,
-      // an untouched layer) still keep original document order — that half
-      // is orthogonal to which direction an explicit value pushes.
-      // feedback #215: an untouched layer used to share a flat 0 with
-      // every other untouched layer -- numerically smaller than any
-      // positive explicit rank, which under this descending sort always
-      // outranked (sorted closer to the front than) a layer explicitly
-      // set to the supposedly-frontmost rank 1. Giving a layer order=1
-      // could therefore only ever send it BEHIND every untouched layer,
-      // the opposite of "1 is the topmost" (feedback #205, right above).
-      // Fixed at the source instead of worked around here: layerOrderAt
-      // (motion.js) now returns an untouched layer's own natural
-      // front-to-back rank instead of a flat 0 (feedback #215 follow-up,
-      // "la value si non keyframé... corresponde à son ordre index dans
-      // la timeline") -- every layer, touched or not, now carries a real,
-      // correctly-scaled rank. That reopened a narrower version of the
-      // exact same collision one level down: an untouched layer's natural
-      // rank can legitimately TIE with another layer's EXPLICIT rank (a
-      // 3-layer document's untouched back layer naturally reads "3", but
-      // so would a middle layer explicitly told "put me at rank 3") --
-      // broken by document index alone, the explicit pick silently did
-      // nothing whenever it happened to match a sibling's natural rank
-      // (confirmed live: explicit rank 1 on a middle layer produced ZERO
-      // visible change when the naturally-frontmost layer's own rank was
-      // also 1). layerHasExplicitOrder makes the tiebreak asymmetric: an
-      // explicit rank always wins the front position over an untouched
-      // layer merely reading the same number by coincidence; only a tie
-      // between two layers of the SAME kind (both explicit, or both
-      // untouched) falls back to original document order, as before.
-      var _orderPairs = layers.map(function (entry, idx) {
-        return { entry: entry, idx: idx, ord: SMMotion.layerOrderAt(idx, renderFrame), explicit: SMMotion.layerHasExplicitOrder(idx) };
+      // Order counts from the FRONT: 1 is the topmost/frontmost layer, 2
+      // sits just behind it, and so on (feedback #205), matching how you'd
+      // naturally number a stack of physical sheets from the one facing
+      // you.
+      //
+      // feedback #222 ("l'order n'est toujours pas totalement ok... j'ai 3
+      // layer si je change l'order du 3eme layer sur 2 il ne s'affiche pas
+      // entre les 2 autres calques") — two earlier passes at this (#215
+      // and its follow-up) both tried to model Order as a flat SORT KEY:
+      // give every layer a number, sort descending. That can't express
+      // "insert me at position 2" when another layer's natural position
+      // ALREADY reads as 2 (confirmed live: explicit rank 2 on the
+      // naturally-frontmost of 3 layers, with the natural middle layer
+      // ALSO reading rank 2, produced no visible change — both prior
+      // tiebreak strategies just picked which of the two tied layers won
+      // the SAME slot, when what was wanted was for the explicit layer to
+      // insert itself AT that slot and push everything else outward).
+      //
+      // Rank is a POSITION to insert at, not a tag to sort by (confirmed
+      // with Cyril): every EXPLICITLY-ranked layer is pulled out, the
+      // remaining UNTOUCHED layers keep their natural relative order as
+      // the base sequence, and each explicit layer is spliced into that
+      // sequence at index (rank-1) — lowest rank first, so a later splice
+      // can push an earlier one back exactly the way inserting a card
+      // into a hand does. layerOrderAt's own natural-rank fallback (an
+      // untouched layer reading its real position instead of a flat 0,
+      // feedback #215 follow-up) still matters here — it's what an
+      // untouched layer's OWN Order field displays — but the sort no
+      // longer treats that number as a competing claim on a slot.
+      var _frontToBack = []; // untouched layers only, front-to-back (natural order)
+      for (var _oi = layers.length - 1; _oi >= 0; _oi--) {
+        if (!SMMotion.layerHasExplicitOrder(_oi)) _frontToBack.push(layers[_oi]);
+      }
+      var _explicitList = [];
+      for (var _oj = 0; _oj < layers.length; _oj++) {
+        if (SMMotion.layerHasExplicitOrder(_oj)) _explicitList.push({ entry: layers[_oj], idx: _oj, rank: SMMotion.layerOrderAt(_oj, renderFrame) });
+      }
+      // Lowest rank (most-front request) inserted first; a later insert at
+      // the SAME target position pushes the earlier one back by one, which
+      // is why ascending order matters here and not just for readability.
+      _explicitList.sort(function (a, b) { return (a.rank - b.rank) || (a.idx - b.idx); });
+      _explicitList.forEach(function (e) {
+        var pos = Math.max(0, Math.min(_frontToBack.length, Math.round(e.rank) - 1));
+        _frontToBack.splice(pos, 0, e.entry);
       });
-      _orderPairs.sort(function (a, b) {
-        var byOrd = b.ord - a.ord;
-        if (byOrd) return byOrd;
-        if (a.explicit !== b.explicit) return a.explicit ? 1 : -1;
-        return a.idx - b.idx;
-      });
-      layers = _orderPairs.map(function (p) { return p.entry; });
+      layers = _frontToBack.slice().reverse(); // back-to-front, matching this array's own paint-order convention
     }
     // artboard background as the bottom item of a synthetic bottom layer,
     // mirroring drawStage()'s background rect
