@@ -2772,4 +2772,14 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
   padding:3px 4px;background:var(--panel3);border-radius:5px;overflow:hidden;}
 .ta-ramp i{display:block;flex:1 1 0;min-width:2px;background:var(--accent);border-radius:1px;opacity:.85;min-height:1px;}
 .ta-ramp-empty{font-size:10.5px;color:rgba(236,234,231,.45);align-self:center;padding-left:2px;}
-.ta-sep{height:1px;background:rgba(236,234,231,.10);margin:9px 0 7px;}
+/* #p-textanim-list holds several animators' rows as DIRECT children (no
+   wrapper per animator), so it needs the exact rhythm .pbdy gives its own
+   children — same 8px, same mechanism (flex gap, not per-row margin) — or
+   rows here read at a different cadence than every other section. Found by
+   Cyril comparing a screenshot against Stroke: rows were touching because
+   this list had no gap of its own, only .pbdy's gap between the list-as-a-
+   whole and the Add-animator button below it. */
+#p-textanim-list{display:flex;flex-direction:column;gap:8px;}
+/* No margin of its own now that the list supplies the 8px on both sides —
+   a margin here would have added to that gap instead of replacing it. */
+.ta-sep{height:1px;background:rgba(236,234,231,.10);}
