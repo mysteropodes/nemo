@@ -2,6 +2,7 @@
   "name": "geometry-wasm",
   "type": "module",
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "files": [
     "geometry_wasm_bg.wasm",
     "geometry_wasm.js",

@@ -335,10 +335,10 @@ export interface InitOutput {
     readonly auto_match: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly resample_stroke: (a: number, b: number, c: number) => [number, number, number, number];
     readonly fill_find: (a: number, b: number) => [number, number, number, number];
+    readonly hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly boolean_op: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly boolean_op_multi: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly erase_at_point: (a: number, b: number) => [number, number, number, number];
-    readonly hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly __wbg_strokemodeler_free: (a: number, b: number) => void;
     readonly effective_frame_index: (a: number, b: number, c: number) => [number, number, number];
     readonly ellipse_segments: (a: number, b: number, c: number, d: number) => [number, number];

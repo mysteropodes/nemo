@@ -264,6 +264,15 @@ pub(crate) struct LayerIn {
     // toggle hiding the layer's own shape while its effects still apply.
     #[serde(default)]
     pub(crate) is_effect_layer: Option<bool>,
+    // The document background rect (+ rotoscopy reference) — see
+    // composite_scene's own canvas_bg_view doc comment for why this needs
+    // to be its own flag rather than an assumed "always index 0" position:
+    // an Effect layer must never be able to grade/distort it, no matter
+    // where in the stack the effect layer sits. Set only by
+    // engine-bridge.js's own background-rect entry (bgItems), never by any
+    // real content layer.
+    #[serde(default)]
+    pub(crate) is_canvas_background: Option<bool>,
     // Folder layer (2026-08, Motion "grouper les layer dans des dossiers qui
     // agiront comme un null de control parentage") — an AE-precomp-flavored
     // group, but explicitly NOT a precomp: its children stay flat, ordinary
@@ -882,6 +891,31 @@ pub struct VelloEngine {
     folder_accum_a_view: wgpu::TextureView,
     folder_accum_b: wgpu::Texture,
     folder_accum_b_view: wgpu::TextureView,
+    // ---- Canvas background (2026-08-31, feedback #197: "le fond du canvas
+    // ne devrait pas être affecté par un calque d'effet") ----
+    // The document background rect (+ rotoscopy reference, if any) arrives
+    // from JS as an ordinary layer (engine-bridge.js's bgItems, tagged
+    // is_canvas_background) so it still supports the checkerboard-alpha
+    // preview and every other thing an ordinary layer already does. But an
+    // Effect/adjustment layer (is_effect_layer) reads "everything
+    // accumulated so far" as its grade source — if the background painted
+    // into that SAME accumulator like any other layer (it always sits at
+    // the very bottom, so it always would), any effect layer anywhere in
+    // the stack distorts/grades the canvas frame itself along with the
+    // artwork, which reads as broken rather than a document property.
+    // Painted into its own isolated texture ONCE before the main loop
+    // (composite_scene skips it in the loop itself, same convention as
+    // is_matte_source/is_folder_child), then composited back UNDER the
+    // fully-graded result at the very end — never part of what an effect
+    // layer can see. Single texture, no ping-pong: written once, read once,
+    // per composite_scene call. STORAGE_BINDING (create_blend_layer_texture,
+    // NOT create_blend_accum_texture) — vello's render_to_texture paints it
+    // via a compute pipeline, same requirement as blend_layer_view/
+    // matte_source_view/mask_scratch_view; it is only ever READ (never
+    // written) by composite_pass's own fragment shader, as the backdrop for
+    // the single final re-composite.
+    canvas_bg_tex: wgpu::Texture,
+    canvas_bg_view: wgpu::TextureView,
     // ---- Track matte compositor (matte.wgsl, scouted from Caddis's
     // Layer.matteMode field — see composite_scene's matte handling) ----
     // Same fullscreen-triangle shape as the blend pipeline, kept fully
@@ -2589,6 +2623,7 @@ pub async fn create_engine(
     let (blend_accum_b, blend_accum_b_view) = create_blend_accum_texture(&device, width, height, "blend-accum-b");
     let (folder_accum_a, folder_accum_a_view) = create_blend_accum_texture(&device, width, height, "folder-accum-a");
     let (folder_accum_b, folder_accum_b_view) = create_blend_accum_texture(&device, width, height, "folder-accum-b");
+    let (canvas_bg_tex, canvas_bg_view) = create_blend_layer_texture(&device, width, height);
     let (matte_pipeline, matte_bind_group_layout, matte_sampler, matte_uniform_buf) = create_matte_pipeline(&device);
     let (matte_source_tex, matte_source_view) = create_blend_layer_texture(&device, width, height);
     let (matte_result_tex, matte_result_view) = create_matte_result_texture(&device, width, height);
@@ -2646,6 +2681,8 @@ pub async fn create_engine(
         folder_accum_a_view,
         folder_accum_b,
         folder_accum_b_view,
+        canvas_bg_tex,
+        canvas_bg_view,
         matte_pipeline,
         matte_bind_group_layout,
         matte_sampler,
@@ -3201,6 +3238,11 @@ impl VelloEngine {
 
     fn composite_scene(&mut self, scene_in: &SceneIn, view_tf: Affine, base_color: Color) -> Result<(), JsValue> {
         let n = scene_in.layers.len();
+        // Canvas background (2026-08-31, feedback #197) — see canvas_bg_view's
+        // own doc comment. Resolved once here; both the pre-loop paint, the
+        // in-loop skip, and the post-loop re-composite all read this same
+        // index so they can never disagree about which layer it is.
+        let bg_index = scene_in.layers.iter().position(|l| l.is_canvas_background.unwrap_or(false));
         let mut is_matte_source = vec![false; n];
         for i in 0..n {
             // resolve_matte_source is the single source of truth for which
@@ -3263,6 +3305,33 @@ impl VelloEngine {
         clear_texture(&self.device, &self.queue, &self.blend_accum_a_view, wgpu_color_from(base_color));
         let mut accum_is_a = true;
         let layer_params = RenderParams { base_color: Color::TRANSPARENT, width: self.width, height: self.height, antialiasing_method: AaConfig::Area };
+        // Canvas background, painted into its own isolated texture BEFORE
+        // the main loop even starts — so that by construction, no Effect
+        // layer's "everything accumulated so far" backdrop read can ever
+        // include it (see canvas_bg_view's doc comment).
+        if let Some(bgi) = bg_index {
+            // No separate clear_texture call: canvas_bg_view is STORAGE_BINDING
+            // (create_blend_layer_texture), same as blend_layer_view/
+            // matte_source_view/mask_scratch_view — vello's own render_to_texture
+            // writes via a compute pipeline and clears to layer_params.base_color
+            // (TRANSPARENT) as part of that same call, exactly like every other
+            // call site of render_to_texture in this function. clear_texture's
+            // RenderPassColorAttachment requires RENDER_ATTACHMENT, which this
+            // texture deliberately does NOT have — calling it here silently
+            // failed (a wgpu validation error, not a JS exception) and left this
+            // texture perpetually empty, so the background never actually
+            // reached the final composite. Found by exporting a PNG and seeing
+            // straight-up transparency where the canvas background should have
+            // been opaque white — the live view alone never caught it, because
+            // the empty (transparent) result let the DOM canvas element's own
+            // white CSS fallback show through and look correct by coincidence.
+            let mut bg_scene = Scene::new();
+            self.push_atlas_keepalive(&mut bg_scene);
+            paint_layer_items(&mut bg_scene, &scene_in.layers[bgi].items, view_tf, &self.images, &self.paths);
+            self.renderer
+                .render_to_texture(&self.device, &self.queue, &bg_scene, &self.canvas_bg_view, &layer_params)
+                .map_err(|e| JsValue::from_str(&format!("render_to_texture failed: {e:?}")))?;
+        }
         for (i, layer) in scene_in.layers.iter().enumerate() {
             // Consumed as a matte source by the layer below it — doesn't
             // paint as its own visible layer (AE convention).
@@ -3273,6 +3342,12 @@ impl VelloEngine {
             // folder's own isolated pass (see the is_folder_layer branch
             // below), never as an independent top-level layer.
             if is_folder_child[i] {
+                continue;
+            }
+            // Canvas background — already painted separately above, and
+            // re-composited back in AFTER the loop (below); never part of
+            // the ordinary ping-pong accumulator itself.
+            if bg_index == Some(i) {
                 continue;
             }
             // Effect (adjustment) layer — unlike every other branch here,
@@ -3528,6 +3603,19 @@ impl VelloEngine {
                 source_view,
                 mode,
                 target_view,
+            );
+            accum_is_a = !accum_is_a;
+        }
+        // Canvas background re-enters HERE — the one and only place — strictly
+        // after every Effect layer in the stack has already run, so nothing
+        // above ever had a chance to grade/distort it (2026-08-31, #197).
+        if bg_index.is_some() {
+            let (source_view, target_view) =
+                if accum_is_a { (&self.blend_accum_a_view, &self.blend_accum_b_view) } else { (&self.blend_accum_b_view, &self.blend_accum_a_view) };
+            composite_pass(
+                &self.device, &self.queue, &self.blend_pipeline, &self.blend_bind_group_layout,
+                &self.blend_sampler, &self.blend_uniform_buf,
+                &self.canvas_bg_view, source_view, 0, target_view,
             );
             accum_is_a = !accum_is_a;
         }
@@ -3806,6 +3894,9 @@ impl VelloEngine {
         let (folder_accum_b, folder_accum_b_view) = create_blend_accum_texture(&self.device, width, height, "folder-accum-b");
         self.folder_accum_b = folder_accum_b;
         self.folder_accum_b_view = folder_accum_b_view;
+        let (canvas_bg_tex, canvas_bg_view) = create_blend_layer_texture(&self.device, width, height);
+        self.canvas_bg_tex = canvas_bg_tex;
+        self.canvas_bg_view = canvas_bg_view;
         let (matte_source_tex, matte_source_view) = create_blend_layer_texture(&self.device, width, height);
         self.matte_source_tex = matte_source_tex;
         self.matte_source_view = matte_source_view;
