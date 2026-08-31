@@ -2536,6 +2536,17 @@ function updateUI(frameOnly){
   window._totalF=state.totalFrames;window._waIn=state.waIn;window._waOut=state.waOut;window._curFrame=state.currentFrame;
   window.updateWaBar();window.updateOmMarkers(state.currentFrame,state.totalFrames);
   if(frameOnly)updatePlayhead();else renderTimeline();
+  // feedback #213 ("l'animation du blend mode n'est pas synchro avec les
+  // keyframe dans le layer properties") — renderMotionPropsPanel (Motion's
+  // right-side Parent/Path/Time/Blend/Matte panel) was never called from
+  // here at all, on either branch: a plain frame navigation (goToFrame's
+  // frameOnly=true path, the overwhelmingly common case) left it frozen on
+  // whatever it showed at the LAST full rebuild, same trap frameOnly's own
+  // renderLayerList(frameOnly) guard exists to avoid for the bottom-left
+  // list — that one already ignores frameOnly in Motion (CLAUDE.md §5bis:
+  // "en Motion les lignes affichent la VALEUR à la tête de lecture"), this
+  // panel needs the identical treatment for the same reason.
+  if(state.appMode==='motion'&&window.SMMotion&&SMMotion.renderMotionPropsPanel)SMMotion.renderMotionPropsPanel();
   renderLayerList(frameOnly);updateCompInstancePanel();updateDuplicatorPanel();updateFootagePanel();updateSelPropsPanel();updateFsSelPanel();updateRevisionPanel();updateMaskPanel();updateCornersPanel();updateEllipseArcPanel();updateStarPanel();updateTextActionsPanel();updateTextPropsPanel();if(window.updateEffectsPanel)window.updateEffectsPanel();updatePropsContext();
 }
 // Vector mask properties (2026-08, AE-style "Mask" — see the mask-feature
@@ -6242,7 +6253,13 @@ function renderLayerList(frameOnly){
           // node — setActiveLayer re-renders the list, so by the time this
           // fires that node is detached and its rect is all zeros, which
           // pinned the popup to the corner at (8,4). Found by driving.
-          {label:SM.t('ctxLayerBlend')+' : '+((typeof BLEND_MODE_LABELS!=='undefined'&&BLEND_MODE_LABELS[l4.blendMode||'normal'])||'Normal'),action:function(){
+          // feedback #213 ("l'animation du blend mode n'est pas synchro"):
+          // l4.blendMode is the STATIC field, ignored once ld.blendKeys
+          // exists (layerBlendModeAt, motion.js) — this label showed the
+          // wrong mode (always the pre-keying fallback) the instant a layer
+          // had blend keyframes, same story as the Motion panel's own pill
+          // before it switched to layerBlendModeAt (feedback #207).
+          {label:SM.t('ctxLayerBlend')+' : '+((typeof BLEND_MODE_LABELS!=='undefined'&&BLEND_MODE_LABELS[(window.SMMotion&&SMMotion.layerBlendModeAt?SMMotion.layerBlendModeAt(idx4,state.currentFrame):l4.blendMode)||'normal'])||'Normal'),action:function(){
             window.SM.setActiveLayer(idx4);updatePropsContext();
             var _bx=e.clientX,_by=e.clientY;
             if(window.openBlendDropdownAt)openBlendDropdownAt({getBoundingClientRect:function(){return {left:_bx,right:_bx,top:_by,bottom:_by,width:0,height:0};}});
@@ -9889,7 +9906,19 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
         close(false);
         // Refresh Motion's own panel/grid so the pill label and any new key
         // marker show up immediately, not just on the next unrelated redraw.
+        //
+        // feedback #213 ("si je change de blend mode depuis le calque de la
+        // timeline cela ne marche pas") — the write itself always landed
+        // (layerBlendModeAt read back the new mode correctly, confirmed
+        // live), but renderLayerList was missing here: the bottom-left
+        // accordion's OWN Blend pill (renderBlendRow, called from
+        // renderLayerListMotion — the THIRD of this row's three entry
+        // points, alongside the right panel and this popover itself) kept
+        // showing the mode from before the pick, forever, since nothing
+        // else rebuilds that list on a plain click. Looked exactly like
+        // the change silently failed from that one specific surface.
         if(window.SMMotion&&SMMotion.renderMotionPropsPanel)SMMotion.renderMotionPropsPanel();
+        if(window.renderLayerList)renderLayerList();
         if(window.renderTimeline)renderTimeline();
       });
       pop.appendChild(it);

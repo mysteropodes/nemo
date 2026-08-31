@@ -7113,7 +7113,12 @@
       } else {
         SMMotion.upsertBlendKeyAt(ld, state.currentFrame, layerBlendModeAt(li, state.currentFrame));
       }
-      renderLayerList(); renderTimeline();
+      // feedback #213 — same stale-row bug the dropdown's own click handler
+      // had (timeline.js's initBlendDropdown): this row is shared by the
+      // right panel AND the bottom-left list (renderMotionPropsPanel /
+      // renderLayerListMotion both call renderBlendRow), but only the
+      // list's own rebuild was ever triggered here.
+      renderLayerList(); renderTimeline(); renderMotionPropsPanel();
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
     row.appendChild(sw);
