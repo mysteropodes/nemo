@@ -1084,6 +1084,25 @@
         </div>
       </div>
     </div>
+    <!-- Text animators (2026-08-31) — the range-selector model from
+         text-selector.js given a face. Same "section that only exists for ONE
+         kind of selection" pattern as the rig-widget and image-mesh panels
+         right above: a static block here, shown/hidden and populated by
+         text-animator-panel.js, hooked into updatePropsContext.
+         The animator LIST is rebuilt in JS (there can be several), so only
+         the shell and the "add" affordance are markup. -->
+    <div class="psec" id="p-textanim-sec" style="display:none">
+      <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrTextAnimators">Text animators</span></div>
+      <div class="pbdy">
+        <div id="p-textanim-list"></div>
+        <div class="pr">
+          <button class="pbtn" id="p-textanim-add" data-i18n-title="textAnimAddTitle" title="Add an animator: a range selector plus the properties it drives"><span data-i18n="textAnimAdd">Add animator</span></button>
+        </div>
+        <div class="pr" id="p-textanim-empty">
+          <span class="pl" style="width:auto;opacity:.7" data-i18n="textAnimEmptyHint">Animates by character index, so editing the text never breaks it.</span>
+        </div>
+      </div>
+    </div>
     <div class="psec" id="tool-opts-sec">
       <div class="phdr"><span class="ar">☰</span> <span data-i18n="hdrToolOptions">Tool Options</span></div>
       <div class="pbdy">
@@ -2264,6 +2283,7 @@
 <script src="js/image-mesh.js"></script>
 <script src="js/image-mesh-bridge.js"></script>
 <script src="js/rig-widget.js"></script>
+<script src="js/text-animator-panel.js"></script>
 <script src="js/psd-import-bridge.js"></script>
 <script src="js/figma-import.js"></script>
 <script src="js/asset-tree.js"></script>
