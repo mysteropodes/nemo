@@ -4639,6 +4639,10 @@
   // unified multi-target box, or nothing selected at all) via the thin
   // wrapper below, not threaded through each of those branches.
   var _hoverLi = -1;
+  // Cheap fingerprint of the hovered layer's CURRENT bounds (2026-08-31) —
+  // see onHoverMove's own comment for why this exists alongside _hoverLi.
+  function hoverBoundsSig(b) { return b ? (b.x + ',' + b.y + ',' + b.w + ',' + b.h) : null; }
+  var _hoverBoundsSig = null;
   function hitTestLayerAt(pt, frame) {
     // Reverse (topmost-drawn-first) — same z-order convention the Null
     // marker hit-test already uses (select-bridge.js). Skips locked/hidden/
@@ -4657,11 +4661,34 @@
   }
   // Returns true when the hover target changed (caller re-renders only
   // then, avoiding a redraw on every pixel of idle mouse movement).
+  //
+  // "changed" used to mean ONLY "the hovered LAYER INDEX is different from
+  // last time" — but the box this drives (hoverOverlayItems) is drawn from
+  // that layer's CURRENT bounds, which can change out from under an
+  // unmoving mouse: drag that layer's elements apart in one gesture, exit,
+  // dive into a DIFFERENT layer's group, then come back to hover the first
+  // one — the index round-trips to the same value it already was (no drag
+  // ever runs onHoverMove at all, per the caller's own onDrag-first gate),
+  // so the box never got the redraw its now-stale geometry needed. Found
+  // live chasing Cyril's report + screenshot: a group's hover box stopped
+  // short of a rotated element sitting well outside the box's own stale
+  // extent. A second fingerprint (the bounds themselves, not just which
+  // layer they belong to) catches exactly this without paying for a
+  // redraw on every idle pixel of movement — the common case (mouse
+  // drifting inside one static layer) still short-circuits on the index
+  // check before this ever runs a comparison.
   function onHoverMove(pt) {
-    if (state.appMode !== 'motion') { var had = _hoverLi !== -1; _hoverLi = -1; return had; }
+    if (state.appMode !== 'motion') { var had = _hoverLi !== -1; _hoverLi = -1; _hoverBoundsSig = null; return had; }
     var li = hitTestLayerAt(pt, state.currentFrame);
-    if (li === _hoverLi) return false;
-    _hoverLi = li;
+    if (li !== _hoverLi) {
+      _hoverLi = li;
+      _hoverBoundsSig = li >= 0 ? hoverBoundsSig(layerWorldBoundsUnion([li], state.currentFrame)) : null;
+      return true;
+    }
+    if (li < 0) return false;
+    var sig = hoverBoundsSig(layerWorldBoundsUnion([li], state.currentFrame));
+    if (sig === _hoverBoundsSig) return false;
+    _hoverBoundsSig = sig;
     return true;
   }
   function hoverOverlayItems() {
