@@ -8846,6 +8846,17 @@
         // (see shapes-panel.js's buildPaintSubRow).
         outSd = {};
         for (var k in sd) if (Object.prototype.hasOwnProperty.call(sd, k)) outSd[k] = sd[k];
+        // feedback #219 ("stroke n'a pas sa couleur affichée dans le
+        // canvas (même couleur que fill)"): this overwrite is exactly why
+        // — for a vector-brush anchor, sd.fillColor IS the ink (see #203),
+        // so once it's replaced with the companion's fill here, the Stroke
+        // row's own default-swatch read (entry.sd.fillColor, engine-bridge.js's
+        // isBrushInk branch's ink source) silently started reading the
+        // FILL companion's color instead of the anchor's own — both rows
+        // then default-displayed and (before the user touched Stroke)
+        // rendered the same color. __inkColor preserves the anchor's real
+        // pre-merge value so the Stroke row can read THAT instead.
+        outSd.__inkColor = sd.fillColor;
         outSd.fillColor = companion.fillColor;
         outSd.__linkedFillStrokeId = companion.strokeId;
       }
@@ -9160,13 +9171,23 @@
       // forcing hasRealStroke false above is correct, there's no real
       // outline stroke to animate — but the Stroke track now DRIVES that
       // ink (engine-bridge.js's isBrushInk branch, same feedback) once this
-      // row exists to key it, so it's shown here too. Default swatch reads
-      // the shape's own current ink color (sd.fillColor), not
-      // sd.strokeColor (always null for a brush ribbon). No width row: a
+      // row exists to key it, so it's shown here too. No width row: a
       // brush's own "Brush Size" row just below already covers scale.
+      //
+      // feedback #219 ("stroke n'a pas sa couleur affichée... même couleur
+      // que fill"): when this shape ALSO has a real linked-fill companion
+      // (feedback #200), layerElements' own merge overwrites entry.sd.fillColor
+      // with the COMPANION's color for the Fill row's benefit — reading
+      // fillColor here too meant the Stroke row's default swatch silently
+      // showed the companion's color instead of the anchor's own ink the
+      // moment a companion existed (both rows then displayed and rendered
+      // identically until Stroke was manually touched). __inkColor is the
+      // anchor's real pre-merge value, preserved by that same merge
+      // specifically for this row to read.
       if (hasRealStrokeEl || entry.sd.isVectorBrush) {
         var strokeHolder = ensureElementHolder(ld, entry.strokeId);
-        renderStrokeColorRow(list, strokeHolder, entry.sd.isVectorBrush ? entry.sd.fillColor : entry.sd.strokeColor);
+        var inkDefault = entry.sd.__inkColor !== undefined ? entry.sd.__inkColor : entry.sd.fillColor;
+        renderStrokeColorRow(list, strokeHolder, entry.sd.isVectorBrush ? inkDefault : entry.sd.strokeColor);
         if (!entry.sd.isVectorBrush && entry.sd.strokeWidth !== undefined) {
           renderTrimScalarRow(list, strokeHolder, 'strokeWidth', 'Stroke Width', 'px', 0, 200, entry.sd.strokeWidth);
         }
