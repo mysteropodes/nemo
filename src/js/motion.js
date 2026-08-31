@@ -5708,7 +5708,26 @@
           // rotated/scaled, so comparing a world point against it directly
           // would hit-test a rectangle that isn't the one on screen. inv()
           // exists for exactly this (it was added for vertex dragging).
-          var lp = gBody.inv(event.point.x, event.point.y);
+          //
+          // event.point must go through outerLocalPoint FIRST (2026-08-31
+          // fix) — motionBoxGeom's own inv is explicitly LOCAL-only (see its
+          // comment: "no outer wrapping... every caller composes that
+          // separately via outerWorldPoint/outerLocalPoint"), but this is
+          // the one caller in this file that fed it the raw world point
+          // directly. Every sibling grab just above (handles, position
+          // dots, anchor, effector) already wraps through outerWorldPoint/
+          // outerLocalPoint; this one, added later for feedback #170, never
+          // got the same treatment. Invisible as long as the CONTAINING
+          // layer had no Motion of its own — the two points coincide then —
+          // which is why it went unnoticed until Cyril moved a whole group
+          // and then tried to drag one of its elements: the box still drew
+          // in the right (rotated) place, but a click dead-center on it
+          // computed `lp` as if the layer had never moved, missing the
+          // element's own local bounds entirely. Measured: layer rotated
+          // 76.8°, click at the element's true rendered center — old code
+          // path declined every time; onDown now grabs it.
+          var outerPt = outerLocalPoint(t, { x: event.point.x, y: event.point.y });
+          var lp = gBody.inv(outerPt.x, outerPt.y);
           var bb = gBody.bounds;
           var insideEl = lp && lp.x >= bb.left && lp.x <= bb.right && lp.y >= bb.top && lp.y <= bb.bottom;
           if (insideEl) {
