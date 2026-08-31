@@ -217,7 +217,72 @@
       var pl = puckLocal(g), pw = toWorld(g, pl[0], pl[1]), pr = puckRadius(g);
       if (g.widget.kind === 'joystick') items.push(lineItem([g.cx, g.cy], pw, TRACK, sw));
       items.push(discItem(pw, pr, col, pr * 0.22));
+      // Path scoped to the ACTIVE layer only, same "expanded target only"
+      // convention the Position property's own path overlay uses (motion.js)
+      // — every widget's pad/puck stays always-visible (the whole point of a
+      // rig control per this file's own header comment), but drawing every
+      // widget's path unconditionally would clutter the canvas the moment a
+      // rig has more than one.
+      if (li === state.activeLayerIdx) items = items.concat(buildWidgetPathItems(li));
     }
+    return items;
+  }
+  // ---- Puck motion path (feedback #184's 3rd point, deferred until #198
+  // landed the general Position property's path line — it now has, so this
+  // is that same visual language applied to the puck instead of a plain
+  // Position track.
+  //
+  // Each axis is an independent SCALAR expression-control track (this
+  // file's own header comment) — there is no single 2D key with its own
+  // spatial handles to run a bezier through like the Position overlay
+  // does a few hundred lines up in motion.js. Sampling puckLocal/toWorld
+  // once per frame across the combined key range of both axes and
+  // connecting the samples with a plain polyline reads exactly the same
+  // ("thin continuous line + one dot per frame, denser where the puck
+  // moves slowly") without a second bezier-fitting pass for a curve that
+  // was never cubic to begin with — each axis's own ease curve is already
+  // applied by valueAtFrame inside axisValue, so the combined 2D sample
+  // path already carries that shape.
+  function axisKeyFrames(ld, ax) {
+    var tr = ax && ax.key && ld.motion && ld.motion[ax.key];
+    return (tr && tr.keys) ? tr.keys.map(function (k) { return k.frame; }) : [];
+  }
+  function buildWidgetPathItems(li) {
+    var g0 = geomFor(li);
+    if (!g0) return [];
+    var ld = g0.ld, w = g0.widget;
+    var frames = axisKeyFrames(ld, w.x).concat((w.kind === 'joystick' && w.y) ? axisKeyFrames(ld, w.y) : []);
+    if (frames.length < 2) return [];
+    var minF = Math.min.apply(null, frames), maxF = Math.max.apply(null, frames);
+    var zs = 1 / view.zoom;
+    var pts = [];
+    for (var f = minF; f <= maxF; f++) {
+      var g = geomFor(li, f);
+      if (!g) continue;
+      var pl = puckLocal(g);
+      pts.push(toWorld(g, pl[0], pl[1]));
+    }
+    if (pts.length < 2) return [];
+    var items = [];
+    items.push({ segments: pts.map(function (p) { return { point: p }; }), closed: false, fillColor: null, strokeColor: TRACK, strokeWidth: 1 * zs });
+    // Stride caps dot count on a long-held span — same reasoning as the
+    // Position path's own maxDots.
+    var maxDots = 120;
+    var dotStride = Math.max(1, Math.ceil(pts.length / maxDots));
+    var dotR = 1.3 * zs;
+    for (var fi = 0; fi < pts.length; fi += dotStride) items.push(discItem(pts[fi], dotR, TRACK, 0));
+    // Diamond at every ACTUAL key frame on either axis (deduped) — the
+    // Position path's own key-marker convention, drawn AFTER the dots so
+    // it always sits on top of them.
+    var seen = {};
+    frames.forEach(function (fr) { seen[fr] = 1; });
+    Object.keys(seen).forEach(function (frStr) {
+      var fr = +frStr, gk = geomFor(li, fr);
+      if (!gk) return;
+      var pl = puckLocal(gk), wp = toWorld(gk, pl[0], pl[1]);
+      var r = (fr === state.currentFrame ? 5 : 4) * zs;
+      items.push(polyItem([[wp[0], wp[1] - r], [wp[0] + r, wp[1]], [wp[0], wp[1] + r], [wp[0] - r, wp[1]]], WHITE, 1 * zs, fr === state.currentFrame ? ACCENT : IDLE));
+    });
     return items;
   }
   function restLocal(g) {
