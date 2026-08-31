@@ -7762,6 +7762,65 @@
       row('layer', 'ctxKeyLockWholeLayer')
     ];
   }
+  // Per-KEYFRAME standing lock (feedback #212, "le lock in point, out point
+  // et layer affecte toute les keyframes alors que ça devrait être les
+  // keyframes select au clic droit") — reusing ld.keyLock's 3 labels above
+  // was a deliberate earlier call (buildKeyLockMenuItems' own header
+  // comment: "the keyframe selection itself is incidental context, confirmed
+  // with Cyril"), but re-asked directly this time: the keyframe cell's own
+  // menu should lock ONLY whatever's selected at the moment it's opened, not
+  // the whole layer. Stored right on each key (key.lockTo, same footprint as
+  // the existing key.hold flag) rather than on the layer, so several keys on
+  // the same layer can each follow a DIFFERENT edge. Persists for free:
+  // ld.motion/ld.elementMotion are written into exportJSON wholesale
+  // (timeline.js), not field-by-field, so a new key field needs no separate
+  // whitelist entry.
+  function buildKeySelectionLockMenuItems() {
+    if (!_motionKeySel.length) return [];
+    function allLockedTo(mode) { return _motionKeySel.every(function (s) { return s.key && s.key.lockTo === mode; }); }
+    function row(mode, key) {
+      var active = allLockedTo(mode);
+      return {
+        label: SM.t(key) + (active ? '  ✓' : ''),
+        action: function () {
+          pushUndo();
+          var next = active ? null : mode;
+          _motionKeySel.forEach(function (s) { if (s.key) s.key.lockTo = next; });
+          renderTimeline();
+        }
+      };
+    }
+    return [
+      { label: SM.t('ctxLockKeyframesOnColon'), disabled: true, action: function () {} },
+      row('in', 'ctxKeyLockInPoint'),
+      row('out', 'ctxKeyLockOutPoint'),
+      row('layer', 'ctxKeyLockWholeLayer')
+    ];
+  }
+  // Every key across a layer's own track set (+ each element holder's own
+  // tracks — CLAUDE.md §8's per-shape Motion) currently flagged to follow
+  // `mode` ('in'/'out'/'layer'). Same holder/track reach as shiftLayerMotionKeys'
+  // shiftHolder (propsFor, not the base PROPS — a 3D/duplicator/multi-parent
+  // -blend/timeLink holder has tracks beyond the base 5), minus timeRemap/
+  // effects: those aren't reachable through the same keyframe-cell menu this
+  // lock is set from, so they're out of scope for it, unlike the whole-layer
+  // lock which sweeps everything on purpose.
+  function keysLockedTo(li, mode) {
+    var ld = state.layers[li];
+    if (!ld) return [];
+    var out = [];
+    function scan(h) {
+      if (!h || !h.motion) return;
+      propsFor(h).forEach(function (prop) {
+        var t = h.motion[prop];
+        if (!t || !t.keys) return;
+        t.keys.forEach(function (k) { if (k.lockTo === mode) out.push({ holder: h, prop: prop, key: k }); });
+      });
+    }
+    scan(ld);
+    if (ld.elementMotion) Object.keys(ld.elementMotion).forEach(function (id) { scan(ld.elementMotion[id]); });
+    return out;
+  }
   function setLayerTimeLink(li, targetIdx, mode, srcAnchor) {
     var ld = state.layers[li], src = state.layers[targetIdx];
     if (!ld || !src || targetIdx === li) return false;
@@ -9857,13 +9916,17 @@
             menu.push({ label: SM.t('ctxParentInTimeLinkTimeEllipsis'), action: function () {
               window.showContextMenu(e.clientX + 8, e.clientY + 8, window.buildTimeLinkMenuItems(state.activeLayerIdx, state.layers[state.activeLayerIdx], function () { renderLayerList(); renderTimeline(); }));
             } });
-            // The standing keyframe lock belongs next to it, on the same
-            // target and by the same rule (the active layer — a keyframe row
-            // always belongs to the expanded active layer's tracks). Asked
-            // for directly: this is the surface you're on when you care
-            // whether your keys follow a retimed in/out point.
-            buildKeyLockMenuItems(state.activeLayerIdx, state.layers[state.activeLayerIdx]).forEach(function (it) { menu.push(it); });
           }
+          // feedback #212 ("le lock in point, out point et layer affecte
+          // toute les keyframes alors que ça devrait être les keyframes
+          // select au clic droit") — this used to reuse buildKeyLockMenuItems
+          // (the whole-LAYER ld.keyLock, same as the layer row's own menu).
+          // Re-asked directly: this surface now locks ONLY whatever's
+          // selected when the menu opens (key.lockTo, see its own header
+          // comment) — independent of Parent-in-Time's own availability
+          // gate above, so it's not folded into that block anymore.
+          var lockItems = buildKeySelectionLockMenuItems();
+          if (lockItems.length) { menu.push({ sep: true }); lockItems.forEach(function (it) { menu.push(it); }); }
           window.showContextMenu(e.clientX, e.clientY, menu);
         });
       })(fi, k);
@@ -12352,6 +12415,9 @@
     registerExposedPropMeta: registerExposedPropMeta,
     distributeKeys: distributeKeys, flipKeys: flipKeys, selectEveryNthKey: selectEveryNthKey, invertKeySelection: invertKeySelection,
     getKeySelection: function () { return _motionKeySel.slice(); },
+    // feedback #212 — per-keyframe standing lock (key.lockTo), used by
+    // layer-inout.js's drag-drop alongside the whole-layer ld.keyLock pass.
+    keysLockedTo: keysLockedTo,
     // Move an explicit set of keys by dx frames — used by layer-inout.js so
     // that dragging a layer's in/out point carries the SELECTED keyframes
     // with it (2026-07-25: "il faut pouvoir bouger les in/out point de
