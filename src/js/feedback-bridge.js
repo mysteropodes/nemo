@@ -288,10 +288,15 @@
       createdAt: Date.now(),
       resolvedAt: null,
       origin: 'local',
-      // Kept locally as a data URL for review even without Tauri/GitHub —
-      // the GitHub copy (publishToGitHubIssue below) is a separate,
-      // uploaded file, not this same string re-embedded.
-      screenshotDataUrl: opts.screenshotDataUrl || null,
+      // Kept locally as data URLs for review even without Tauri/GitHub —
+      // the GitHub copies (publishToGitHubIssue below) are separate,
+      // uploaded files, not these same strings re-embedded. Array, not a
+      // single field, since feedback #208 ("possibilité de... mettre
+      // plusieurs image pour un seul et même feedback") — an OLDER stored
+      // entry may still carry the old singular screenshotDataUrl instead;
+      // every reader of this field (uploadScreenshotsIfAny below,
+      // timeline.js's popover re-open) checks both shapes.
+      screenshotDataUrls: opts.screenshotDataUrls || (opts.screenshotDataUrl ? [opts.screenshotDataUrl] : []),
     };
     await writeLocal(entry);
     // Best-effort: also publish to the shared team-sync folder (if
@@ -329,35 +334,60 @@
   function fbTagLabelPlain(tag) {
     return { bug: 'bug', perf: 'perf', idee: 'idée', polish: 'polish' }[tag] || tag;
   }
-  // Commits the screenshot into strokemotion-feedback's attachments/
+  // Commits each screenshot into strokemotion-feedback's attachments/
   // folder via the GitHub Contents API (Rust command upload_feedback_
   // attachment — same reasoning as submit_feedback_issue for keeping the
-  // token out of JS/devtools) and returns a raw.githubusercontent.com URL
-  // that renders inline in the issue body via normal Markdown image syntax
-  // — GFM does NOT render data: URIs, so the file has to actually land in
-  // the repo, not just be inlined as base64 in the issue text.
-  async function uploadScreenshotIfAny(entry) {
-    if (!entry.screenshotDataUrl) return null;
-    var m = /^data:image\/(\w+);base64,(.+)$/.exec(entry.screenshotDataUrl);
-    if (!m) return null;
-    var ext = m[1] === 'jpeg' ? 'jpg' : m[1];
-    var filename = entry.id + '.' + ext;
-    if (tauriOk()) {
-      var t = window.__TAURI__;
-      return t.core.invoke('upload_feedback_attachment', { filename: filename, contentBase64: m[2] });
+  // token out of JS/devtools) and returns an array of raw.githubusercontent.com
+  // URLs that render inline in the issue body via normal Markdown image
+  // syntax — GFM does NOT render data: URIs, so each file has to actually
+  // land in the repo, not just be inlined as base64 in the issue text.
+  //
+  // feedback #208: was one screenshot per entry (uploadScreenshotIfAny,
+  // singular) — now uploads however many were attached, sequentially (not
+  // Promise.all: the Rust command and the Worker both write via the GitHub
+  // Contents API, which 409s on two concurrent commits to the same repo —
+  // a real risk once this is more than one file per submission). filename
+  // includes an index (entry.id + '-' + i) so multiple images from the
+  // SAME entry never collide on the single-screenshot naming the old code
+  // used unconditionally. Compat: an older stored entry may only have the
+  // singular screenshotDataUrl field.
+  async function uploadScreenshotsIfAny(entry) {
+    var dataUrls = entry.screenshotDataUrls && entry.screenshotDataUrls.length ? entry.screenshotDataUrls
+      : (entry.screenshotDataUrl ? [entry.screenshotDataUrl] : []);
+    var urls = [];
+    for (var i = 0; i < dataUrls.length; i++) {
+      var m = /^data:image\/(\w+);base64,(.+)$/.exec(dataUrls[i]);
+      if (!m) continue;
+      var ext = m[1] === 'jpeg' ? 'jpg' : m[1];
+      var filename = entry.id + (dataUrls.length > 1 ? '-' + (i + 1) : '') + '.' + ext;
+      var url = null;
+      if (tauriOk()) {
+        var t = window.__TAURI__;
+        url = await t.core.invoke('upload_feedback_attachment', { filename: filename, contentBase64: m[2] });
+      } else {
+        var data = await workerPost('/attachment', { filename: filename, contentBase64: m[2] });
+        url = data && data.url;
+      }
+      if (url) urls.push(url);
     }
-    var data = await workerPost('/attachment', { filename: filename, contentBase64: m[2] });
-    return data && data.url;
+    return urls;
   }
   async function publishToGitHubIssue(entry) {
     var title = (entry.blocking ? '[BLOQUANT] ' : '') + (entry.note || '(sans titre)').slice(0, 80);
     var labels = ['pending'].concat((entry.tags || []).map(fbTagLabelPlain));
     if (entry.blocking) labels.push('blocking');
-    var shotUrl = null;
-    try { shotUrl = await uploadScreenshotIfAny(entry); } catch (e) { console.warn('[feedback] screenshot upload failed', e); }
+    var shotUrls = [];
+    try { shotUrls = await uploadScreenshotsIfAny(entry); } catch (e) { console.warn('[feedback] screenshot upload failed', e); }
+    // One heading, one image per URL — GFM renders each ![]() on its own
+    // line as a separate inline image, so N screenshots just means N lines
+    // here instead of the single line the old code always produced.
+    var shotsBlock = shotUrls.length
+      ? ('**Capture' + (shotUrls.length > 1 ? 's d\'écran' : ' d\'écran') + '**\n'
+        + shotUrls.map(function (u, i) { return '![capture ' + (i + 1) + '](' + u + ')'; }).join('\n') + '\n')
+      : '';
     var body = [
       '**Note**', entry.note || '(vide)', '',
-      shotUrl ? ('**Capture d\'écran**\n![capture](' + shotUrl + ')\n') : '',
+      shotsBlock,
       '**Contexte**',
       '- Frame: ' + entry.frame,
       '- Auteur: ' + (entry.author ? entry.author.name + ' (' + entry.author.role + ')' : 'inconnu'),

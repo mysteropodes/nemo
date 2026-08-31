@@ -6949,29 +6949,59 @@ var _activeComment=null;
 // feedback below) — reset on every open, unrelated to _activeComment/
 // state.comments since a feedback submission never becomes a team comment.
 var _activeFbTags=[];
-// Feedback screenshot attachment — a data URL for the thumbnail preview
-// (comment-shot-img) held here for the life of the popover; the actual
-// GitHub upload (base64 → Contents API commit) happens in
-// feedback-bridge.js's uploadScreenshotIfAny() at submit time, not here.
-var _activeShotDataUrl=null;
-function setCommentShot(dataUrl){
-  _activeShotDataUrl=dataUrl;
-  var drop=document.getElementById('comment-shot-drop'),prev=document.getElementById('comment-shot-preview'),img=document.getElementById('comment-shot-img');
-  if(dataUrl){
+// Feedback screenshot attachment(s) (feedback #208, "possibilité de drag
+// ou mettre plusieurs image pour un seul et même feedback") — an ARRAY of
+// data URLs for the thumbnail strip (comment-shot-thumbs) held here for the
+// life of the popover; the actual GitHub upload (base64 → Contents API
+// commit, one per image) happens in feedback-bridge.js's
+// uploadScreenshotsIfAny() at submit time, not here. Was a single
+// _activeShotDataUrl/comment-shot-img slot that a new drop/paste/pick
+// silently REPLACED — now every add APPENDS, and the drop-zone stays
+// visible/usable alongside the thumbnails instead of swapping out for them.
+var _activeShotDataUrls=[];
+function renderCommentShotThumbs(){
+  var thumbs=document.getElementById('comment-shot-thumbs');
+  thumbs.innerHTML='';
+  thumbs.style.display=_activeShotDataUrls.length?'flex':'none';
+  _activeShotDataUrls.forEach(function(dataUrl,idx){
+    var cell=document.createElement('div');
+    cell.style.cssText='position:relative';
+    var img=document.createElement('img');
     img.src=dataUrl;
-    prev.style.display='block';
-    drop.style.display='none';
-  }else{
-    img.src='';
-    prev.style.display='none';
-    drop.style.display='block';
-  }
+    img.style.cssText='max-width:70px;max-height:70px;border-radius:6px;display:block;object-fit:cover';
+    var rm=document.createElement('button');
+    rm.type='button';
+    rm.title=SM.t('commentShotRemoveTitle')||'Retirer la capture';
+    rm.style.cssText='position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;border:none;cursor:pointer;font-size:10px;line-height:1';
+    rm.textContent='×';
+    rm.addEventListener('click',function(e){e.stopPropagation();_activeShotDataUrls.splice(idx,1);renderCommentShotThumbs();});
+    cell.appendChild(img); cell.appendChild(rm);
+    thumbs.appendChild(cell);
+  });
 }
-function loadCommentShotFile(file){
-  if(!file||file.type.indexOf('image/')!==0)return;
-  var reader=new FileReader();
-  reader.onload=function(){setCommentShot(reader.result);};
-  reader.readAsDataURL(file);
+// Replaces the whole set — the ONLY caller that still needs "set, not
+// append" is opening/resetting the popover (an existing entry's saved
+// shots, or a clean slate).
+function setCommentShots(dataUrls){
+  _activeShotDataUrls=(dataUrls||[]).slice();
+  renderCommentShotThumbs();
+}
+function addCommentShots(dataUrls){
+  dataUrls.forEach(function(d){ if(d)_activeShotDataUrls.push(d); });
+  renderCommentShotThumbs();
+}
+function loadCommentShotFiles(files){
+  var imgFiles=Array.prototype.filter.call(files||[],function(f){return f&&f.type.indexOf('image/')===0;});
+  if(!imgFiles.length)return;
+  var pending=imgFiles.length, results=new Array(imgFiles.length);
+  imgFiles.forEach(function(file,i){
+    var reader=new FileReader();
+    reader.onload=function(){
+      results[i]=reader.result;
+      if(--pending===0)addCommentShots(results);
+    };
+    reader.readAsDataURL(file);
+  });
 }
 // Precise start/stop action recording (comment-record button) — bracketing
 // an explicit Record/Stop around the actual repro gesture captures exactly
@@ -7060,7 +7090,10 @@ function openCommentPopover(worldPt,existing){
   var fbBlocking=document.getElementById('comment-fb-blocking');if(fbBlocking)fbBlocking.checked=false;
   _recording=false;_recordedActionTrail=null;_recordedClickTrail=null;
   updateRecordUI();
-  setCommentShot(existing&&existing.screenshotDataUrl?existing.screenshotDataUrl:null);
+  // Compat: an entry saved before #208 (multi-image) has the old singular
+  // screenshotDataUrl field, not the new array — read either shape.
+  setCommentShots(existing&&existing.screenshotDataUrls ? existing.screenshotDataUrls
+    : (existing&&existing.screenshotDataUrl ? [existing.screenshotDataUrl] : []));
   pop.style.display='block';
   document.getElementById('comment-text').focus();
 }
@@ -7069,7 +7102,7 @@ function closeCommentPopover(){
   if(pop)pop.style.display='none';
   _activeComment=null;
   _recording=false;_recordedActionTrail=null;_recordedClickTrail=null;
-  setCommentShot(null);
+  setCommentShots([]);
 }
 function initCommentPopover(){
   var saveBtn=document.getElementById('comment-save'),delBtn=document.getElementById('comment-delete'),pop=document.getElementById('comment-popover');
@@ -7086,28 +7119,34 @@ function initCommentPopover(){
   if(recordBtn)recordBtn.addEventListener('click',function(){
     if(_recording)stopRecording();else startRecording();
   });
-  // Screenshot attachment: drag&drop, click-to-browse, or Cmd+V paste.
-  var shotDrop=document.getElementById('comment-shot-drop'),shotInput=document.getElementById('comment-shot-input'),shotRemove=document.getElementById('comment-shot-remove');
+  // Screenshot attachment(s) (feedback #208): drag&drop (one or several
+  // files), click-to-browse (multi-select via the input's `multiple`
+  // attribute), or Cmd+V paste — each adds to the set instead of replacing
+  // it; per-thumbnail remove buttons are wired in renderCommentShotThumbs.
+  var shotDrop=document.getElementById('comment-shot-drop'),shotInput=document.getElementById('comment-shot-input');
   if(shotDrop){
     shotDrop.addEventListener('click',function(){shotInput.click();});
     shotDrop.addEventListener('dragover',function(e){e.preventDefault();shotDrop.style.borderColor='var(--accent)';});
     shotDrop.addEventListener('dragleave',function(){shotDrop.style.borderColor='';});
     shotDrop.addEventListener('drop',function(e){
       e.preventDefault();shotDrop.style.borderColor='';
-      if(e.dataTransfer.files&&e.dataTransfer.files[0])loadCommentShotFile(e.dataTransfer.files[0]);
+      if(e.dataTransfer.files&&e.dataTransfer.files.length)loadCommentShotFiles(e.dataTransfer.files);
     });
   }
   if(shotInput)shotInput.addEventListener('change',function(){
-    if(shotInput.files&&shotInput.files[0])loadCommentShotFile(shotInput.files[0]);
+    if(shotInput.files&&shotInput.files.length)loadCommentShotFiles(shotInput.files);
     shotInput.value='';
   });
-  if(shotRemove)shotRemove.addEventListener('click',function(e){e.stopPropagation();setCommentShot(null);});
   pop.addEventListener('paste',function(e){
     var items=e.clipboardData&&e.clipboardData.items;
     if(!items)return;
+    // A paste can carry several images at once (e.g. copying multiple
+    // files from Finder) — collect all of them, not just the first.
+    var pastedFiles=[];
     for(var i=0;i<items.length;i++){
-      if(items[i].type.indexOf('image/')===0){loadCommentShotFile(items[i].getAsFile());break;}
+      if(items[i].type.indexOf('image/')===0){var pf=items[i].getAsFile();if(pf)pastedFiles.push(pf);}
     }
+    if(pastedFiles.length)loadCommentShotFiles(pastedFiles);
   });
   var saveFbBtn=document.getElementById('comment-save-feedback');
   if(saveFbBtn)saveFbBtn.addEventListener('click',function(){
@@ -7130,8 +7169,8 @@ function initCommentPopover(){
       note:note,tags:_activeFbTags.slice(),blocking:blocking,
       pos:new Point(_activeComment.x,_activeComment.y),
       actionTrail:_recordedActionTrail,clickTrail:_recordedClickTrail,
-      screenshotDataUrl:_activeShotDataUrl,
-    }).then(function(){showToast(_activeShotDataUrl?SM.t('toastFeedbackAndCaptureSent'):SM.t('toastFeedbackSavedOutsideProject'));})
+      screenshotDataUrls:_activeShotDataUrls.slice(),
+    }).then(function(){showToast(_activeShotDataUrls.length?SM.t('toastFeedbackAndCaptureSent'):SM.t('toastFeedbackSavedOutsideProject'));})
       .catch(function(e){console.warn('[feedback] submit failed',e);showToast(SM.t('toastFeedbackSaveFailed'));});
     closeCommentPopover();
   });
