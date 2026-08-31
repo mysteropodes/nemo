@@ -1102,6 +1102,44 @@
         lockDx = moved;
       });
     }
+    // Per-KEYFRAME standing lock (feedback #212, "ça devrait être les
+    // keyframes select au clic droit"): same edge-follows-drag semantics as
+    // ld.keyLock just above, and the same "explicit selection wins" and Alt
+    // precedence — but scoped to individually-flagged keys (key.lockTo, set
+    // from the keyframe cell's own right-click menu, buildKeySelectionLock
+    // MenuItems in motion.js) rather than a whole layer's every track. Loops
+    // all three modes (unlike the scalar ld.keyLock above) since different
+    // keys on the SAME layer can each follow a different edge.
+    if (!hasKeySel && !altHeld && window.SMMotion && SMMotion.keysLockedTo && SMMotion.shiftKeySelection) {
+      var lockKeysOne = function (li2, origIn, origOut) {
+        var l2 = state.layers[li2]; if (!l2) return;
+        ['in', 'out', 'layer'].forEach(function (mode) {
+          if (mode === 'layer' && d.type !== 'both') return;
+          var moved = mode === 'out' ? outPointOf(l2) - origOut : inPointOf(l2) - origIn;
+          if (!moved) return;
+          var sel = SMMotion.keysLockedTo(li2, mode);
+          if (!sel.length) return;
+          SMMotion.shiftKeySelection(sel, moved);
+          lockDx = moved;
+        });
+      };
+      if (d.group) d.members.forEach(function (m) { lockKeysOne(m.li, m.origIn, m.origOut); });
+      else lockKeysOne(d.li, d.origIn, d.origOut);
+      (d.linkedOrig || []).forEach(function (m) {
+        var l2 = state.layers[m.li]; if (!l2) return;
+        var nowIn = window.layerInPoint ? layerInPoint(l2) : m.origIn;
+        var nowOut = window.layerOutPoint ? layerOutPoint(l2) : m.origOut;
+        ['in', 'out', 'layer'].forEach(function (mode) {
+          if (mode === 'layer' && d.type !== 'both') return;
+          var moved = mode === 'out' ? nowOut - m.origOut : nowIn - m.origIn;
+          if (!moved) return;
+          var sel = SMMotion.keysLockedTo(m.li, mode);
+          if (!sel.length) return;
+          SMMotion.shiftKeySelection(sel, moved);
+          lockDx = moved;
+        });
+      });
+    }
     var selDx = 0;
     if (hasKeySel && !altHeld) {
       if (d.group) {
@@ -1149,7 +1187,13 @@
         // deliberately don't) — sweeping the rest along would contradict both.
         if (hasKeySel) return;
         var lk = state.layers[li] && state.layers[li].keyLock;
-        if (lk && lockDx) return; // the standing lock above already moved this layer's keys
+        // feedback #212's per-key lock also already-moved SOME of this
+        // layer's keys above (SMMotion.keysLockedTo) — same reasoning as
+        // the whole-layer `lk` check, just scoped to whether THIS layer has
+        // any locked key at all rather than a single scalar field.
+        var hasKeyLocks = !!(window.SMMotion && SMMotion.keysLockedTo &&
+          (SMMotion.keysLockedTo(li, 'in').length || SMMotion.keysLockedTo(li, 'out').length || SMMotion.keysLockedTo(li, 'layer').length));
+        if ((lk || hasKeyLocks) && lockDx) return; // the standing lock(s) above already moved this layer's keys
         if (window.SMMotion && SMMotion.shiftLayerMotionKeys) SMMotion.shiftLayerMotionKeys(li, dx);
       };
       if (d.group) {
