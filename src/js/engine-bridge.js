@@ -1400,7 +1400,7 @@
         // reshapes path content — only used below, never for elMat/
         // elementFillColorAt which should keep sharing the anchor's id.
         var cPathOpsStrokeId = (c.data && c.data.isBrushTextureCopy) ? undefined : cStrokeId;
-        var elMat = (window.SMMotion && cStrokeId) ? SMMotion.elementMotionAt(i, cStrokeId, renderFrame) : null;
+        var elMat = (window.SMMotion && cStrokeId) ? SMMotion.elementMotionAt(i, cStrokeId, renderFrame, c.data) : null;
         var elPivot = elMat ? { x: c.bounds.center.x + elMat.ax, y: c.bounds.center.y + elMat.ay } : null;
         if (c instanceof Raster) {
           // Bitmap-brush Trim Paths (2026-08-21) — a trimmed bitmap stroke

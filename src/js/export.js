@@ -266,7 +266,7 @@ function exportBuildFrame(frameIdx,alpha){
       // around THIS stroke's own just-built bounds (not the whole layer's)
       // — see motion.js's elementMotionAt header comment. sd.strokeId is
       // the raw serialized field (same one serP/desP already round-trip).
-      var elMat=(window.SMMotion&&sd.strokeId)?SMMotion.elementMotionAt(li,sd.strokeId,frameIdx):null;
+      var elMat=(window.SMMotion&&sd.strokeId)?SMMotion.elementMotionAt(li,sd.strokeId,frameIdx,sd):null;
       if(elMat){
         var epc=p.bounds.center;
         var elPivot=new Point(epc.x+elMat.ax,epc.y+elMat.ay);
