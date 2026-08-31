@@ -1300,6 +1300,52 @@
         }
       }
     }
+    // Motion's own version of the fallback just above (2026-08-31 follow-up
+    // to the same feedback that built it — "peu importe où on clic dans la
+    // boîte de hover si celle-ci est affiché ça doit select le group"). The
+    // gate above assumed SMMotion.onDown() already covered every Motion
+    // click, but onDown only grabs handles/dots/anchors on the CURRENT
+    // target; a plain click elsewhere within a layer's own shown box
+    // (layerWorldBoundsUnion — the exact bounds hoverOverlayItems draws,
+    // motion.js) still fell through to the precise per-child hitTest above,
+    // which misses in the gap between two elements or near a corner the box
+    // covers but no ink reaches. Found live chasing "impossible de
+    // reselect parfois, j'arrive pas à savoir quand": once two elements
+    // inside a group have been dragged apart, their combined box has a lot
+    // of empty middle that LOOKS selectable (it's the box actually drawn)
+    // but wasn't. Null/native-video/Component layers are excluded — each
+    // already has its own dedicated, better-tailored hit-test a few lines
+    // below (nullHit/nvHit/compHit), which only runs `if (!hit)`; matching
+    // them here first would silently skip that specialized handling.
+    if (!hit && state.appMode === 'motion' && window.SMMotion && window.SMMotion.layerWorldBoundsUnion) {
+      var motionLayerBoxHit = function (li) {
+        var mld = state.layers[li];
+        if (!mld || mld.locked || !mld.visible || mld.threeD || mld.symbolId || mld.isNullLayer || mld.nativeVideo) return null;
+        var mb = SMMotion.layerWorldBoundsUnion([li], state.currentFrame);
+        if (!mb || pt.x < mb.x || pt.x > mb.x + mb.w || pt.y < mb.y || pt.y > mb.y + mb.h) return null;
+        var mul = userLayers[li];
+        if (!mul) return null;
+        for (var mci = mul.children.length - 1; mci >= 0; mci--) {
+          var mc = mul.children[mci];
+          if (!(mc instanceof Path || mc instanceof Raster)) continue;
+          if (mc.data && (mc.data.isLinkedFillCompanion || mc.data.isBrushTextureCopy || mc.data.isDuplicatorCopy)) continue;
+          return mc;
+        }
+        return null;
+      };
+      var mActiveHit = motionLayerBoxHit(state.activeLayerIdx);
+      if (mActiveHit) {
+        hit = { item: mActiveHit };
+      } else {
+        for (var mpli = project.layers.length - 1; mpli >= 0; mpli--) {
+          var mpl = project.layers[mpli];
+          var moli = userLayers.indexOf(mpl);
+          if (moli < 0 || moli === state.activeLayerIdx) continue;
+          var mItemHit = motionLayerBoxHit(moli);
+          if (mItemHit) { hit = { item: mItemHit }; hitOtherLayerIdx = moli; break; }
+        }
+      }
+    }
 
     if (!hit) {
       // Selected video's transform handles FIRST (2026-07, full gizmo —
