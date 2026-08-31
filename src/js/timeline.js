@@ -7777,13 +7777,20 @@ function splitTextIntoCharacters(raster){
   raster.remove();
 }
 window.splitTextIntoCharacters=splitTextIntoCharacters;
-// Contextual panel (mirrors updateRevisionPanel's exact shape/precedent) —
-// shown for a whole (not-yet-split) raster text block (split action) AND
-// for anything already granular enough to animate per-unit (vector text,
-// or an already-split raster character) — see text-animator.js.
+// Toggles the two rows this function owns inside the shared #p-textanim-sec
+// (merged 2026-08-31 — see that block's own comment in index.html): the
+// split action for a whole, not-yet-split raster text block, and the icon
+// opening the old preset-based animator for anything already granular
+// enough to animate per-unit (vector text, or an already-split raster
+// character) — see text-animator.js. This function no longer owns the
+// section's own display: text-animator-panel.js's render() does (it runs
+// later in the same update chain, from updatePropsContext), using its own
+// layer/stored-frame based detection to decide whether the section shows
+// at all — this one only ever touches its two rows' visibility, so the
+// order between them can't stomp either one's decision.
 function updateTextActionsPanel(){
-  var sec=document.getElementById('text-actions-sec');
-  if(!sec)return;
+  var splitRow=document.getElementById('text-split-row');
+  if(!splitRow)return;
   var p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;
   var isWholeText=!!(p&&p.data&&p.data.isText&&!p.data.isTextChar&&!p.data.isVectorText);
   // Multi-glyph selection (feedback #87, "je n'ai toujours pas d'option
@@ -7800,16 +7807,16 @@ function updateTextActionsPanel(){
   var SMTA=window.SMTextAnimator;
   var animGroupId=(SMTA&&state.tool==='select'&&selectedPaths.length)?SMTA.groupIdForItem(selectedPaths[0]):null;
   if(animGroupId&&!selectedPaths.every(function(sp){return SMTA.groupIdForItem(sp)===animGroupId;}))animGroupId=null;
-  sec.style.display=(isWholeText||animGroupId)?'':'none';
-  document.getElementById('text-split-desc').style.display=isWholeText?'':'none';
-  document.getElementById('btn-text-split-chars').parentElement.style.display=isWholeText?'':'none';
+  splitRow.style.display=isWholeText?'':'none';
   if(isWholeText)document.getElementById('btn-text-split-chars').onclick=function(){splitTextIntoCharacters(p);};
-  var animRow=document.getElementById('text-animate-row');
-  animRow.style.display=animGroupId?'':'none';
-  if(animGroupId){
-    document.getElementById('btn-text-animate').onclick=function(){
-      window.SMTextAnimator.openPanel(state.activeLayerIdx,animGroupId);
-    };
+  var animBtn=document.getElementById('btn-text-animate');
+  if(animBtn){
+    animBtn.style.display=animGroupId?'':'none';
+    if(animGroupId){
+      animBtn.onclick=function(){
+        window.SMTextAnimator.openPanel(state.activeLayerIdx,animGroupId);
+      };
+    }
   }
 }
 // Typography panel (2026-08-16, "le panneau droite pour le texte") — live,
