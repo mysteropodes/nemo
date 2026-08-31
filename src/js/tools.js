@@ -1075,6 +1075,17 @@ function renderNodeHandles(){
   nodeLayer.removeChildren();nodeHandles=[];
   var path=nodeEditTargetPath();if(!path)return;
   var segs=nodeEditSegmentsData(path);
+  // feedback #216: a shape with an armed Motion "Path" vertex track
+  // (CLAUDE.md §12ter's vtxN machinery) renders each vertex at
+  // segment-point + vtxN offset, not at the raw segment point — apply the
+  // same offset here so hit-testing (nodeHandles[].pos, compared against
+  // subselect-bridge's toLocalPoint, which does NOT undo this offset) and
+  // the Paper-native fallback overlay both agree with where the vertex
+  // actually appears. No-op (same array back) for the overwhelmingly common
+  // un-armed case. Twin of engine-bridge.js's buildNodeHandleItems — keep
+  // both in sync (CLAUDE.md §3).
+  var sid0=path.data&&path.data.strokeId;
+  if(sid0&&window.SMMotion&&SMMotion.applyPathVertexOffsetsFor)segs=SMMotion.applyPathVertexOffsetsFor(state.activeLayerIdx,sid0,segs,state.currentFrame);
   nodeLayer.activate();var zs=1/view.zoom;
   segs.forEach(function(s,i){
     var pt=new Point(s.point[0],s.point[1]);
