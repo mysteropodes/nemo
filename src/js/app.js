@@ -1812,8 +1812,29 @@ function rigBindStroke(ld,path,boneIds,radius,rotate,softness){
     });
   }
   var rest=path.segments.map(function(s){return[s.point.x,s.point.y];});
+  // Rest TANGENTS, stored alongside rest points (2026-08-31, Cyril: "le rig
+  // que je trouve pas encore au point... rapproche-toi de Shapper").
+  // applyRigDeform's boundary loop used to move points only, on the stated
+  // assumption that a boundary is "hundreds of near-straight, already-
+  // smoothed segments" — true of a vector-brush ribbon, false of the Pen-
+  // drawn shapes Shapper is actually used on, which have a handful of points
+  // and real bezier handles. Leaving those handles unrotated flattens every
+  // curve the moment a bone turns, which is exactly what Shapper's own
+  // expression does NOT do: it rotates inTangent/outTangent by the same
+  // local angle as the point and applies the delta.
+  //
+  // A SEPARATE parallel array rather than reshaping `rest`: rest is a plain
+  // [x,y] list in every project already saved, and rigs persist. Absent
+  // (old rig) means the previous behaviour exactly, so nothing that works
+  // today changes shape under an old file.
+  var restHandles=path.segments.map(function(s){
+    return {
+      i:(s.handleIn&&(s.handleIn.x||s.handleIn.y))?[s.handleIn.x,s.handleIn.y]:null,
+      o:(s.handleOut&&(s.handleOut.x||s.handleOut.y))?[s.handleOut.x,s.handleOut.y]:null,
+    };
+  });
   var weights=weighForPoints(rest);
-  var bind={strokeId:path.data.strokeId,rest:rest,weights:weights,rotate:!!rotate,_live:path};
+  var bind={strokeId:path.data.strokeId,rest:rest,restHandles:restHandles,weights:weights,rotate:!!rotate,_live:path};
   // Keep centerSegments (the source data any future brush-width edit
   // regenerates the boundary FROM, via rebuildVectorBrushOutline) in sync
   // too — 2026-07-29 fix, Cyril: attaque le chantier of a later width edit
@@ -2046,6 +2067,12 @@ function applyRigDeform(ld){
     var segs=b._live.segments;
     for(var i=0;i<segs.length&&i<b.rest.length;i++){
       var restPt=b.rest[i],dx=0,dy=0,sumW=0;
+      // Weighted-average local rotation for this vertex, accumulated in its
+      // OWN pair of accumulators (sumDaW/sumWRot) exactly as the
+      // centerSegments block below does: sumW is the position-normalisation
+      // divisor and is filled in both modes, these two only fill in rotate
+      // mode and would wrongly read 0 otherwise.
+      var sumDaW=0,sumWRot=0;
       (b.weights[i]||[]).forEach(function(wentry){
         var bp=bonePaths(wentry.boneId);
         var curLoc=bp.cur.getLocationAt(wentry.offset),restLoc=bp.rest.getLocationAt(wentry.offset);
@@ -2066,6 +2093,7 @@ function applyRigDeform(ld){
           var rOffX=offX*cosA-offY*sinA,rOffY=offX*sinA+offY*cosA;
           dx+=wentry.w*((curLoc.point.x+rOffX)-restPt[0]);
           dy+=wentry.w*((curLoc.point.y+rOffY)-restPt[1]);
+          sumDaW+=da*wentry.w;sumWRot+=wentry.w;
         }else{
           dx+=wentry.w*(curLoc.point.x-restLoc.point.x);
           dy+=wentry.w*(curLoc.point.y-restLoc.point.y);
@@ -2087,6 +2115,24 @@ function applyRigDeform(ld){
       // scaled back down.
       var norm=sumW>1?sumW:1;
       segs[i].point=new Point(restPt[0]+dx/norm,restPt[1]+dy/norm);
+      // Rotate this vertex's bezier handles by the same weighted-average
+      // local angle, ALWAYS from the immutable rest handles and never from
+      // the current live ones — the same idempotence contract the
+      // centerSegments block states: applyRigDeform runs on every pose
+      // change, and rotating an already-rotated handle would compound.
+      // Guarded on b.restHandles so a rig bound before this existed keeps
+      // its exact previous behaviour.
+      var rh=b.restHandles&&b.restHandles[i];
+      if(rh){
+        if(sumWRot>0){
+          var avgDa=sumDaW/sumWRot,hc=Math.cos(avgDa),hs=Math.sin(avgDa);
+          if(rh.i)segs[i].handleIn=new Point(rh.i[0]*hc-rh.i[1]*hs,rh.i[0]*hs+rh.i[1]*hc);
+          if(rh.o)segs[i].handleOut=new Point(rh.o[0]*hc-rh.o[1]*hs,rh.o[0]*hs+rh.o[1]*hc);
+        }else{
+          if(rh.i)segs[i].handleIn=new Point(rh.i[0],rh.i[1]);
+          if(rh.o)segs[i].handleOut=new Point(rh.o[0],rh.o[1]);
+        }
+      }
     }
     // Vector-brush companion sync (2026-07-29, "les points de vecteurs
     // suivent les bones comme dans Shapper") — copy the ribbon's OWN just-
