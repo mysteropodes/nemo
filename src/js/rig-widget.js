@@ -314,6 +314,10 @@
       var ndy = drag.startDy + (curLocal.y - drag.startLocal.y);
       SMMotion.setLayerValue(drag.li, 'position', [ndx, ndy]);
       drag.moved = true;
+      // feedback #211 — same cheap in-place field sync motion.js's own
+      // onDrag does after every tick, needed here too since this writes
+      // Position through the identical setLayerValue path.
+      if (window.SMMotion && SMMotion.liveRefreshVisiblePropertyFields) SMMotion.liveRefreshVisiblePropertyFields();
       SMEngineBridge.renderNow();
       return;
     }
@@ -323,6 +327,10 @@
     var loc = toLocal(g, wpt2[0], wpt2[1]);
     writeFromLocal(g, loc[0], loc[1]);
     drag.moved = true;
+    // feedback #211 — the axis value(s) just written live in an
+    // exprControls row (CLAUDE.md §13), same panel-field-lag bug as every
+    // other canvas drag.
+    if (window.SMMotion && SMMotion.liveRefreshVisiblePropertyFields) SMMotion.liveRefreshVisiblePropertyFields();
     SMEngineBridge.renderNow();
   }
   function onUp(e) {

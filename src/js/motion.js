@@ -6012,6 +6012,9 @@
         var dx = local.x - _motionDrag.basePt.x, dy = local.y - _motionDrag.basePt.y;
         setValue(_motionDrag.t.holder, 'vtx' + _motionDrag.vi, [dx, dy]);
       }
+      // feedback #211 — this mode returns early, bypassing the shared tail
+      // below that normally does this refresh for every other drag mode.
+      liveRefreshVisiblePropertyFields();
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
       return true;
     }
@@ -6140,8 +6143,43 @@
       if (_motionDrag.mode === 'handle') k[_motionDrag.which] = [localPointer.x - (pv.x + k.v[0]), localPointer.y - (pv.y + k.v[1])];
       else { k.v[0] = localPointer.x - pv.x; k.v[1] = localPointer.y - pv.y; }
     }
+    liveRefreshVisiblePropertyFields();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
     return true;
+  }
+  // Cheap live refresh of number fields during a drag (feedback #211, "les
+  // valeurs de propriété dans layer properties ne changent pas en temps
+  // réel pendant les modifications dans le canvas") — every onDrag branch
+  // above writes the new value via setValue/setSelectedKeyDimension, which
+  // updates the DATA and repaints the CANVAS (SMEngineBridge.renderNow),
+  // but never touched the already-built <input> elements showing that same
+  // value in the panel, so they sat stale until the drag ended and some
+  // other action forced a full rebuild. A full renderLayerList()/
+  // renderTimeline() on every pointermove tick would work but is exactly
+  // the "rebuild the whole DOM because ONE value changed" cost CLAUDE.md
+  // §5bis's own perf pass measured and fixed elsewhere in this file —
+  // this only ever touches .value on whichever fields are ALREADY on
+  // screen (bottom Transform group + right-panel mirror both tagged
+  // _smHolder/_smProp by decorateMotionPropertyRow), never rebuilds a row.
+  // Deliberately reads EVERY visible row rather than tracking exactly which
+  // holder/prop the current _motionDrag touched: several branches above
+  // (multiLayerMove/Scale/Rotate) write MANY holders in one tick, and this
+  // stays cheap regardless — typically a handful of rows are ever expanded
+  // at once. Skips a field the user has focused (mid-typing) so a live
+  // refresh can never overwrite a keystroke in progress.
+  function liveRefreshVisiblePropertyFields() {
+    document.querySelectorAll('.lrow.motion-prop-row').forEach(function (pr) {
+      var holder = pr._smHolder, prop = pr._smProp;
+      if (!holder || !prop) return;
+      var inputs = pr.querySelectorAll('.motion-val');
+      if (!inputs.length) return;
+      var vals = isAnimated(holder, prop) ? valueAtFrame(holder, prop, state.currentFrame) : staticValue(holder, prop);
+      for (var i = 0; i < inputs.length; i++) {
+        if (document.activeElement === inputs[i]) continue;
+        if (i >= vals.length) continue;
+        inputs[i].value = fmtVal(vals[i]);
+      }
+    });
   }
   function onUp() {
     if (!_motionDrag) return false;
@@ -12059,6 +12097,10 @@
     layerParentUidAt: layerParentUidAt,
     upsertParentKeyAt: upsertParentKeyAt,
     removeParentKeyAt: removeParentKeyAt,
+    // feedback #211 — select-bridge.js's own layer-body Motion drag writes
+    // Position too, straight through SMMotion.setLayerValue, same staleness
+    // this fixes for every onDrag branch in this file.
+    liveRefreshVisiblePropertyFields: liveRefreshVisiblePropertyFields,
     // rig-widget.js's "+" button (feedback #185) reads the SAME per-layer
     // property list every Motion row already goes through (§11's single-
     // decider invariant), instead of guessing a parallel list, and writes
