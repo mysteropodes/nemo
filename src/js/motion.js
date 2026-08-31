@@ -1077,6 +1077,22 @@
     var def = PROP_DEFAULT[prop];
     return def ? def.slice() : [0, 0];
   }
+  // What a property row should actually DISPLAY right now — the ordinary
+  // animated/static value for everything, except a LAYER holder's
+  // untouched 'order' row (feedback #215 follow-up), which shows the
+  // layer's own natural front-to-back rank (layerOrderAt's fallback, the
+  // exact value the render pipeline now sorts by) instead of staticValue's
+  // flat 0 placeholder. Shared by the panel's initial build and its own
+  // live-drag refresh so the two can never show two different numbers for
+  // the same untouched layer.
+  function displayValueFor(holder, prop) {
+    if (isAnimated(holder, prop)) return valueAtFrame(holder, prop, state.currentFrame);
+    if (prop === 'order') {
+      var li = state.layers.indexOf(holder);
+      if (li >= 0) return [layerOrderAt(li, state.currentFrame)];
+    }
+    return staticValue(holder, prop);
+  }
 
   // Callers clamp before the first/after the last key, so the remaining
   // query is always inside one segment. Motion evaluation runs this lookup
@@ -2626,7 +2642,12 @@
       if (!ld.motionStatic) ld.motionStatic = {};
       ld.motionStatic[prop] = v;
     } else {
-      var cur = staticValue(ld, prop);
+      // feedback #215 follow-up: seed the first key with what the field
+      // was actually SHOWING (displayValueFor — a layer's untouched
+      // 'order' reads as its natural rank, not staticValue's flat 0), so
+      // turning the stopwatch on can never snap the layer to a different
+      // rank than what was on screen the moment before.
+      var cur = displayValueFor(ld, prop);
       ensureTrack(ld, prop).keys = [{ frame: state.currentFrame, v: cur, curvePoints: cloneCurvePts(DEFAULT_CURVE), hOut: [0, 0], hIn: [0, 0] }];
     }
   }
@@ -3905,7 +3926,34 @@
   function layerOrderAt(li, frameIdx) {
     var ld = state.layers[li];
     if (!ld) return 0;
+    // feedback #215 follow-up ("la value si non keyframé... corresponde
+    // à son ordre index dans la timeline") — an untouched layer used to
+    // read as a flat neutral 0 regardless of where it actually sits in
+    // the stack, which collided with any small explicit rank set on
+    // ANOTHER layer (see engine-bridge.js's own comment on the sort that
+    // consumes this). Reading its OWN natural front-to-back position
+    // instead — same "1 = topmost" counting convention explicit values
+    // already use (feedback #205) — means every layer, touched or not,
+    // carries a real, correctly-scaled rank: no collision, and the field
+    // now shows something meaningful instead of a placeholder 0 the
+    // instant you open it.
+    if (!isAnimated(ld, 'order') && !(ld.motionStatic && ld.motionStatic.order)) {
+      return state.layers.length - li;
+    }
     return valueAtFrame(ld, 'order', frameIdx)[0];
+  }
+  // Whether THIS layer's Order was actually set by the user, vs. reading
+  // as its natural-rank fallback above. The z-stack sort needs this
+  // because a natural rank can legitimately tie with another layer's
+  // EXPLICIT rank (a 3-layer document: an untouched back layer naturally
+  // reads as "3", but so would a middle layer explicitly told "put me at
+  // rank 3") — ties broken by document index alone would then leave the
+  // explicit pick indistinguishable from a coincidence, silently doing
+  // nothing. See its one call site (engine-bridge.js) for how the tie
+  // actually resolves once this is known.
+  function layerHasExplicitOrder(li) {
+    var ld = state.layers[li];
+    return !!(ld && (isAnimated(ld, 'order') || (ld.motionStatic && ld.motionStatic.order)));
   }
   function elementOrderAt(li, strokeId, frameIdx) {
     var ld = state.layers[li];
@@ -6184,7 +6232,7 @@
       if (!holder || !prop) return;
       var inputs = pr.querySelectorAll('.motion-val');
       if (!inputs.length) return;
-      var vals = isAnimated(holder, prop) ? valueAtFrame(holder, prop, state.currentFrame) : staticValue(holder, prop);
+      var vals = displayValueFor(holder, prop);
       for (var i = 0; i < inputs.length; i++) {
         if (document.activeElement === inputs[i]) continue;
         if (i >= vals.length) continue;
@@ -8090,7 +8138,7 @@
         });
         pr.appendChild(gridBtn);
       }
-      var vals = isAnimated(holder, prop) ? valueAtFrame(holder, prop, state.currentFrame) : staticValue(holder, prop);
+      var vals = displayValueFor(holder, prop);
       var fieldWrap = document.createElement('div'); fieldWrap.className = 'motion-fields';
       var DIM_LABEL = PROP_DIM[prop] > 1 ? (PROP_DIM_LABELS[prop] || ['X', 'Y', 'Z']) : null;
       // Expression controls (2026-08-30): two of the five types want a
@@ -9938,7 +9986,9 @@
           var menu = [
             key
               ? { label: SM.t('ctxDeleteThisKey'), action: function () { pushUndo(); var tr = trackFor(ld, prop); tr.keys.splice(tr.keys.indexOf(key), 1); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } }
-              : { label: SM.t('ctxAddKeyHere'), action: function () { pushUndo(); setKeyAtCurrentFrame(ld, prop, isAnimated(ld, prop) ? valueAtFrame(ld, prop, frameIdx) : staticValue(ld, prop)); renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } },
+              // feedback #215 follow-up: displayValueFor, not staticValue —
+              // see toggleAnimated's own comment on the same seeding gap.
+              : { label: SM.t('ctxAddKeyHere'), action: function () { pushUndo(); setKeyAtCurrentFrame(ld, prop, isAnimated(ld, prop) ? valueAtFrame(ld, prop, frameIdx) : displayValueFor(ld, prop)); renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); } },
           ];
           if (track && track.keys.length) {
             // A single-key track auto-creates its missing second key on open
@@ -12386,6 +12436,7 @@
       return true;
     },
     layerOrderAt: layerOrderAt,
+    layerHasExplicitOrder: layerHasExplicitOrder,
     elementOrderAt: elementOrderAt,
     anyLayerHasOrder: anyLayerHasOrder,
     layerElementsHaveOrder: layerElementsHaveOrder,

@@ -2214,25 +2214,41 @@
       // this array = painted first = further back). Ties (the default 0,
       // an untouched layer) still keep original document order — that half
       // is orthogonal to which direction an explicit value pushes.
-      // feedback #215: 0 (untouched) is numerically smaller than any
-      // positive explicit rank, and this sort is descending -- so an
-      // untouched layer, sharing the sentinel 0, always outranked (sorted
-      // closer to the front than) a layer explicitly set to the
-      // supposedly-frontmost rank 1. Giving a layer order=1 could
-      // therefore only ever send it BEHIND every untouched layer, never
-      // in front of any of them -- the opposite of "1 is the topmost"
-      // (feedback #205, right above). Untouched layers now sort as if
-      // ranked past the back of any rank a user would realistically type
-      // for a document this size (layers.length+1, shared by all of them
-      // so ties still resolve to original document order via the idx
-      // tiebreak, same as before) -- an explicit small rank can now
-      // actually land in front of them, as documented.
-      var _totalOrderLayers = layers.length + 1;
+      // feedback #215: an untouched layer used to share a flat 0 with
+      // every other untouched layer -- numerically smaller than any
+      // positive explicit rank, which under this descending sort always
+      // outranked (sorted closer to the front than) a layer explicitly
+      // set to the supposedly-frontmost rank 1. Giving a layer order=1
+      // could therefore only ever send it BEHIND every untouched layer,
+      // the opposite of "1 is the topmost" (feedback #205, right above).
+      // Fixed at the source instead of worked around here: layerOrderAt
+      // (motion.js) now returns an untouched layer's own natural
+      // front-to-back rank instead of a flat 0 (feedback #215 follow-up,
+      // "la value si non keyframé... corresponde à son ordre index dans
+      // la timeline") -- every layer, touched or not, now carries a real,
+      // correctly-scaled rank. That reopened a narrower version of the
+      // exact same collision one level down: an untouched layer's natural
+      // rank can legitimately TIE with another layer's EXPLICIT rank (a
+      // 3-layer document's untouched back layer naturally reads "3", but
+      // so would a middle layer explicitly told "put me at rank 3") --
+      // broken by document index alone, the explicit pick silently did
+      // nothing whenever it happened to match a sibling's natural rank
+      // (confirmed live: explicit rank 1 on a middle layer produced ZERO
+      // visible change when the naturally-frontmost layer's own rank was
+      // also 1). layerHasExplicitOrder makes the tiebreak asymmetric: an
+      // explicit rank always wins the front position over an untouched
+      // layer merely reading the same number by coincidence; only a tie
+      // between two layers of the SAME kind (both explicit, or both
+      // untouched) falls back to original document order, as before.
       var _orderPairs = layers.map(function (entry, idx) {
-        var ord = SMMotion.layerOrderAt(idx, renderFrame);
-        return { entry: entry, idx: idx, ord: ord === 0 ? _totalOrderLayers : ord };
+        return { entry: entry, idx: idx, ord: SMMotion.layerOrderAt(idx, renderFrame), explicit: SMMotion.layerHasExplicitOrder(idx) };
       });
-      _orderPairs.sort(function (a, b) { return (b.ord - a.ord) || (a.idx - b.idx); });
+      _orderPairs.sort(function (a, b) {
+        var byOrd = b.ord - a.ord;
+        if (byOrd) return byOrd;
+        if (a.explicit !== b.explicit) return a.explicit ? 1 : -1;
+        return a.idx - b.idx;
+      });
       layers = _orderPairs.map(function (p) { return p.entry; });
     }
     // artboard background as the bottom item of a synthetic bottom layer,
