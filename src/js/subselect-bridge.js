@@ -186,7 +186,31 @@
       if (nd < bestNd) { bestNd = nd; bestNh = nh; }
     }
     if (bestNh) {
+      // feedback #216 ("dans motion ajouté une keyframe de path > modifié le
+      // path avec subselect ne créer pas un blend de vertex ni de keyframes
+      // de path mais une nouvelle clé d'animation 2D"): once a shape's
+      // "Path" group is armed (motion.js's renderPathVertexGroup stopwatch,
+      // CLAUDE.md §12ter's vtxN machinery), a vertex drag must write an
+      // animated per-vertex OFFSET into that track — the ensureKeyframe()/
+      // raw-segment-mutation path below is the Animation 2D system, an
+      // entirely different persistence layer vtxN exists specifically to
+      // bypass (CLAUDE.md §8 "le path est keyable au niveau du VERTEX").
+      // Scoped to 'point' handles only — vtxN has no notion of tangent
+      // handles (applyPathVertexOffsets only ever offsets s.point) — and to
+      // non-vector-brush paths, since a brush's editable geometry lives in
+      // data.centerSegments, a different space this track was never built
+      // to read.
+      var vtxTargetPath = typeof nodeEditTargetPath === 'function' ? nodeEditTargetPath() : null;
+      var vtxStrokeId = (bestNh.type === 'point' && vtxTargetPath && vtxTargetPath.data && !vtxTargetPath.data.isVectorBrush) ? vtxTargetPath.data.strokeId : null;
+      var isMotionVertexDrag = !!(vtxStrokeId && state.appMode === 'motion' && window.SMMotion && SMMotion.hasPathVertexMotionFor(state.activeLayerIdx, vtxStrokeId));
+
       pushUndo();
+      if (isMotionVertexDrag) {
+        _nodeDrag.motionStrokeId = vtxStrokeId;
+        _nodeDrag.motionLi = state.activeLayerIdx;
+        _wasInterpolated = false;
+      } else {
+      _nodeDrag.motionStrokeId = null;
       // Promote a HELD frame to a real keyframe before touching geometry.
       // Without this, editing vertices on a frame that merely inherits an
       // earlier keyframe was silently DISCARDED: saveActiveLayerFrame (app.js)
@@ -217,6 +241,7 @@
           .filter(Boolean);
         if (!selectedPaths.length) return;
         renderNodeHandles();
+      }
       }
       _nodeDrag.active = true; _nodeDrag.path = selectedPaths[0]; _nodeDrag.segIndex = bestNh.segIndex;
       _nodeDrag.dragStartPointer = pt.clone(); _nodeDrag.appliedDelta = new Point(0, 0);
@@ -327,6 +352,19 @@
         dashArray: [4 / view.zoom, 3 / view.zoom], fillColor: new Color(1, 0.72, 0.42, 0.08), insert: true,
       });
       prevA2.activate();
+    } else if (_nodeDrag.active && _nodeDrag.motionStrokeId) {
+      // feedback #216 — armed Path-vertex Motion track: write the total
+      // accumulated drag delta into vtxN (SMMotion.setPathVertexOffset)
+      // instead of mutating path.segments, mirroring image-mesh-bridge.js's
+      // setMeshVertexOffset pattern (same vtxN machinery, CLAUDE.md §12ter).
+      // `desired` is the SAME total-since-mousedown delta the raw-geometry
+      // branches below would have added to the segment point, so this is a
+      // like-for-like swap of destination, not a different gesture.
+      var vtxIndices = _nodeDrag.type === 'group' ? _nodeSel : [_nodeDrag.segIndex];
+      vtxIndices.forEach(function (vi) {
+        SMMotion.setPathVertexOffset(_nodeDrag.motionLi, _nodeDrag.motionStrokeId, vi, desired.x, desired.y);
+      });
+      if (SMMotion.liveRefreshVisiblePropertyFields) SMMotion.liveRefreshVisiblePropertyFields();
     } else if (_nodeDrag.active && _nodeDrag.type === 'group') {
       var gp = _nodeDrag.path;
       if (gp.data && gp.data.isVectorBrush && gp.data.centerSegments) {
@@ -418,6 +456,17 @@
         if (!_nodeSel.length) clearSel();
       } else { clearSel(); }
       _nmq.active = false; renderNodeHandles(); renderArcs(); updateUI();
+    } else if (_nodeDrag.active && _nodeDrag.motionStrokeId) {
+      // feedback #216 — the vtxN write already happened live in onMove
+      // (setValue there handles both the key-at-playhead and static-override
+      // cases); nothing here touches Animation 2D geometry/frames, so none
+      // of the raw-segment commit machinery below applies (fork/fill-regen/
+      // saveActiveLayerFrame/harmonizeAfterEdit are all specific to that
+      // system). updateUI() only — a fresh key may have just appeared on
+      // the Path group's row, which only a full timeline rebuild picks up
+      // (same reasoning as image-mesh-bridge.js's onUp).
+      _nodeDrag.active = false; _nodeDrag.path = null; _nodeDrag.motionStrokeId = null;
+      renderNodeHandles(); updateUI();
     } else if (_nodeDrag.active) {
       var editedPath = _nodeDrag.path; var editedType = _nodeDrag.type; var editedSegIndex = _nodeDrag.segIndex;
       _nodeDrag.active = false; _nodeDrag.path = null;

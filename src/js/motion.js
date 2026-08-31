@@ -4231,6 +4231,22 @@
     if (!ld || !ld.elementMotion || !strokeId) return segments;
     return applyPathVertexOffsets(segments, ld.elementMotion[strokeId], frameIdx);
   }
+  // Writes a Path vertex's ANIMATED offset through the ordinary setValue
+  // path (a key at the playhead when the stopwatch is on, a static override
+  // when it isn't) — the on-canvas counterpart to setMeshVertexOffset below,
+  // for a regular shape's own vtxN track (elementMotion keyed by strokeId,
+  // not meshId). Unlike a mesh vertex the value is in the SAME units as the
+  // segment point itself (applyPathVertexOffsets adds it straight to
+  // s.point) — no percent normalization needed. feedback #216: this is what
+  // subselect-bridge.js's vertex drag calls once the shape's "Path" group
+  // is armed (SMMotion.hasPathVertexMotionFor), instead of falling through
+  // to the Animation 2D keyframe-promotion path.
+  function setPathVertexOffset(li, strokeId, vi, dx, dy) {
+    var ld = state.layers[li];
+    if (!ld || !strokeId) return false;
+    setValue(ensureElementHolder(ld, strokeId), 'vtx' + vi, [dx, dy]);
+    return true;
+  }
 
   // ---- Image mesh vertices (2026-08-30, image-mesh.js) ----
   //
@@ -12566,6 +12582,7 @@
     applyParentChainToSegments: applyParentChainToSegments,
     applyParentChainToImageRect: applyParentChainToImageRect,
     applyPathVertexOffsetsFor: applyPathVertexOffsetsFor,
+    setPathVertexOffset: setPathVertexOffset,
     // Image mesh vertex tracks (2026-08-30) — see meshHolder's own comment
     // for why these are keyed by meshId and expressed in percent.
     hasMeshVertexMotionFor: hasMeshVertexMotionFor,

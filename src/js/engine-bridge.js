@@ -3626,6 +3626,14 @@
     var segs = nodeEditSegmentsData(path);
     var zs = 1 / view.zoom;
     var items = [];
+    // feedback #216 — twin of renderNodeHandles' identical fix (tools.js,
+    // see its own comment): apply an armed Path vertex track's vtxN offset
+    // BEFORE the element/layer/symMatrix transforms below, mirroring
+    // applyPathVertexOffsets' role as the innermost, pre-transform step at
+    // render time (CLAUDE.md §5ter v2) — otherwise the overlay diamond sits
+    // at the vertex's pre-drag position while the shape itself has moved.
+    var vtxSid = path.data && path.data.strokeId;
+    if (vtxSid && window.SMMotion && SMMotion.applyPathVertexOffsetsFor) segs = SMMotion.applyPathVertexOffsetsFor(state.activeLayerIdx, vtxSid, segs, state.currentFrame);
     // Per-ELEMENT Motion (feedback #199, "subselect affiche des vecteurs
     // décalés si la shape est déplacée ou animée") — a single shape keyed
     // on its OWN Position/Scale/Rotation (CLAUDE.md §8's "Motion niveau
@@ -3636,7 +3644,7 @@
     // established element -> layer -> parents order, and reusing the exact
     // same transformSegments/elementMotionAt pair that function already
     // uses for hit-testing, so overlay and hit-test agree by construction.
-    var handleSid = path.data && path.data.strokeId;
+    var handleSid = vtxSid;
     if (handleSid && window.SMMotion && SMMotion.elementMotionAt && SMMotion.transformSegments) {
       var em = SMMotion.elementMotionAt(state.activeLayerIdx, handleSid, state.currentFrame);
       if (em && (em.dx || em.dy || em.rot || em.sx !== 1 || em.sy !== 1)) {

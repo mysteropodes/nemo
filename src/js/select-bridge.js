@@ -852,6 +852,23 @@
           // single gesture both selects AND drags the sibling, like every
           // other grab in this file already does for the FIRST element.
           SMMotion.onDown({ point: ptEx, altKey: e.altKey });
+        } else if (sidEx === window._motionExpandedElement) {
+          // feedback #216 investigation (2026-08-31): re-clicking the SAME
+          // shape that is already the isolation target hit neither branch
+          // above (not a sibling to retarget to, not empty space to exit
+          // through) — sortiDuGroupe stayed false and the click below got
+          // swallowed for nothing: no retarget happened, no exit happened,
+          // the gesture just vanished. That silently blocked every OTHER
+          // canvas tool (Subselect vertex-dragging chief among them, but
+          // also a plain Select-tool re-drag) from ever reaching its own
+          // hit-test once a single element had been isolated via the
+          // Elements panel (selectShapesByStrokeIds sets
+          // _motionExpandedElement) — the exact state a user is in right
+          // after arming a shape's "Path" vertex Motion group, whose row
+          // only appears for an isolated single element. Nothing to change
+          // about the isolation itself here; just let a click this block
+          // has no work for fall through instead of eating it.
+          sortiDuGroupe = true;
         } else if (!sidEx) {
           var uEx = (lyrEx && window.perObjectUnionBounds) ? perObjectUnionBounds(lyrEx) : null;
           window._motionExpandedElement = null;
