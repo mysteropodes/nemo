@@ -1946,20 +1946,22 @@
   <div class="pr" style="margin-top:4px;gap:6px">
     <input type="email" id="comment-fb-email" class="pi" style="flex:1;font-size:10px" placeholder="Email (optionnel, pour te recontacter)" data-i18n-placeholder="commentFbEmailPh">
   </div>
-  <!-- Screenshot attachment (feedback only) — drag&drop, click-to-browse,
-       or Cmd+V paste while the popover is focused. Read client-side as a
-       data URL for a thumbnail preview; the actual upload (base64 → GitHub
-       Contents API, committed into strokemotion-feedback's attachments/
-       folder so it renders inline in the issue via raw.githubusercontent.com)
-       only happens on submit — see feedback-bridge.js's uploadScreenshotIfAny. -->
+  <!-- Screenshot attachment(s) (feedback only) — drag&drop (one or several
+       files at once), click-to-browse (multi-select), or Cmd+V paste while
+       the popover is focused. Read client-side as data URLs for thumbnail
+       previews; the actual upload (base64 → GitHub Contents API, committed
+       into strokemotion-feedback's attachments/ folder so each renders
+       inline in the issue via raw.githubusercontent.com) only happens on
+       submit — see feedback-bridge.js's uploadScreenshotsIfAny. The
+       drop-zone stays available even with images already added (feedback
+       #208, "possibilité de drag ou mettre plusieurs image pour un seul et
+       même feedback") — dropping/pasting/picking more APPENDS instead of
+       replacing; each thumbnail has its own remove button. -->
   <div id="comment-shot-drop" style="margin-top:6px;border:1.5px dashed var(--border2);border-radius:6px;padding:8px;text-align:center;font-size:9px;color:var(--text-dim);cursor:pointer">
-    📎 <span data-i18n="commentShotDropHint">Glisser une capture ici, cliquer, ou coller (Cmd+V)</span>
+    📎 <span data-i18n="commentShotDropHint">Glisser une ou plusieurs captures ici, cliquer, ou coller (Cmd+V)</span>
   </div>
-  <div id="comment-shot-preview" style="display:none;margin-top:6px;position:relative">
-    <img id="comment-shot-img" style="max-width:100%;max-height:100px;border-radius:6px;display:block" />
-    <button type="button" id="comment-shot-remove" data-i18n-title="commentShotRemoveTitle" title="Retirer la capture" style="position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;border:none;cursor:pointer;font-size:11px;line-height:1">×</button>
-  </div>
-  <input type="file" id="comment-shot-input" accept="image/*" style="display:none">
+  <div id="comment-shot-thumbs" style="display:none;margin-top:6px;flex-wrap:wrap;gap:6px"></div>
+  <input type="file" id="comment-shot-input" accept="image/*" multiple style="display:none">
   <div class="pr" style="margin-top:6px;gap:6px">
     <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim);cursor:pointer"><input type="checkbox" id="comment-resolved"> <span data-i18n="commentResolvedLabel">Résolu</span></label>
     <button class="pbtn" id="comment-delete" style="font-size:10px;padding:4px 8px" data-i18n-title="commentDeleteTitle" title="Supprimer ce commentaire"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" style="vertical-align:middle"><path d="M9 3h6l1 2h4v2H4V5h4z"/><path d="M6 9h12l-1 12H7z"/></svg></button>
