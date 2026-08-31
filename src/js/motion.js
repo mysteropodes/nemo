@@ -8774,7 +8774,21 @@
       // comes from THIS shape's own current width, same "per-shape, not
       // one shared constant" principle ensureElementHolder's corner-radii
       // seeding already establishes for paramShapeKind.
-      if (entry.sd.strokeColor) {
+      // hasRealStroke, not the mere truthiness of sd.strokeColor (feedback
+      // #203, "le fill properties... agit aussi sur le stroke, il devrait y
+      // avoir une propriété keyframable de stroke séparée") — serP (app.js)
+      // bakes a '#ffffff' FALLBACK into strokeColor for every ordinary
+      // fill-only shape (CLAUDE.md §1's own documented gotcha; the same trap
+      // color-manager.js's computeUsedColors and shapes-panel.js's own
+      // hasRealStroke check already guard against). Without this, EVERY
+      // plain filled shape got a phantom "Stroke" row seeded with that white
+      // fallback — keying it created a real (if invisible-until-then) white
+      // stroke track sitting right next to Fill's own row, which is what
+      // reads as "the fill row is also touching the stroke": both rows are
+      // always there and both look keyable, on a shape that never actually
+      // had a stroke to animate.
+      var hasRealStrokeEl = entry.sd.hasRealStroke !== undefined ? entry.sd.hasRealStroke : !!entry.sd.strokeColor;
+      if (hasRealStrokeEl) {
         var strokeHolder = ensureElementHolder(ld, entry.strokeId);
         renderStrokeColorRow(list, strokeHolder, entry.sd.strokeColor);
         if (entry.sd.strokeWidth !== undefined) {
@@ -9785,7 +9799,11 @@
           // Stroke color/width (mirrors renderElementsList's own Stroke
           // block exactly — same condition, same order: color row then,
           // only if the shape also reports a width, the width row).
-          if (entry.sd.strokeColor) {
+          // hasRealStroke, not sd.strokeColor's truthiness — mirrors
+          // renderElementsList's own Stroke block above exactly, same
+          // condition (feedback #203, see that block's own comment).
+          var hasRealStrokeElGrid = entry.sd.hasRealStroke !== undefined ? entry.sd.hasRealStroke : !!entry.sd.strokeColor;
+          if (hasRealStrokeElGrid) {
             renderTracksFor(grid, elHolder, 'strokeColor');
             if (entry.sd.strokeWidth !== undefined) renderTracksFor(grid, elHolder, 'strokeWidth');
           }
