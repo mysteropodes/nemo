@@ -9750,11 +9750,10 @@
       renderLayerList(); renderTimeline();
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
-    var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = label;
+    var nm = document.createElement('div'); nm.className = 'lnm motion-prop-name'; nm.textContent = label;
     decorateMotionPropertyRow(row, holder, prop, nm);
     var input = document.createElement('input');
-    input.type = 'number'; input.className = 'pi scrub'; input.min = min; input.max = max; input.dataset.step = '1';
-    input.style.cssText = 'width:52px;margin-left:auto';
+    input.type = 'number'; input.className = 'pi scrub motion-val'; input.min = min; input.max = max; input.dataset.step = '1';
     var trimDisplay = selectedDimensionDisplay(holder, prop, 0, currentVal());
     input.value = trimDisplay.mixed ? '' : trimDisplay.value;
     var lastTrimScrubValue = trimDisplay.mixed ? 0 : (Number(trimDisplay.value) || 0);
@@ -9773,8 +9772,18 @@
       renderLayerList(); renderTimeline();
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
-    row.appendChild(sw); row.appendChild(nm); row.appendChild(input);
-    if (unit) { var u = document.createElement('span'); u.style.cssText = 'font-size:9px;color:var(--text-dim);margin-left:2px'; u.textContent = unit; row.appendChild(u); }
+    // Fields wrapped in .motion-fields (flex-shrink:0) exactly like every
+    // other Transform row (renderWidgetSizeRow, the generic property-row
+    // builder) — .pi itself is flex:1, so without this wrapper it split the
+    // row's free space 50/50 with the flex:1 .lnm label instead of sitting
+    // at its intended 28-34px (found live: measured 90-99px vs the
+    // established 28px). Stopwatch appended LAST to match the row's own
+    // "keyframe button à droite" convention (.motion-prop-row
+    // .motion-stopwatch, 2026-07-29) — this row used to put it first.
+    var fieldWrap = document.createElement('div'); fieldWrap.className = 'motion-fields';
+    fieldWrap.appendChild(input);
+    if (unit) { var u = document.createElement('span'); u.className = 'motion-unit'; u.textContent = unit; fieldWrap.appendChild(u); }
+    row.appendChild(nm); row.appendChild(fieldWrap); row.appendChild(sw);
     list.appendChild(row);
   }
   function renderTrimPathsGroup(list, holder) {
@@ -9833,7 +9842,14 @@
       var row = document.createElement('div'); row.className = 'lrow motion-elem-row';
       var expanded = isTextAnimatorExpanded(an);
       var arrow = document.createElement('div'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
-      var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch'; swatch.style.background = 'transparent';
+      // A colorless transparent swatch (no fill/stroke to preview, unlike a
+      // shape row) reads as an empty/broken checkbox — same problem the
+      // Group row already solved with a glyph instead of a color
+      // (renderElementsList's gswatch, textContent '▤'). Reusing that exact
+      // pattern here rather than the unused .motion-elem-swatch.icon
+      // variant, which has zero live usage anywhere to confirm against.
+      var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch'; swatch.textContent = 'A';
+      swatch.style.cssText = 'background:transparent;font-size:9px;line-height:12px;text-align:center;color:var(--text-dim);';
       if (an.enabled === false) swatch.style.opacity = '0.35';
       var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = SM.t('textAnimTitle') + ' ' + (idx + 1);
       row.appendChild(arrow); row.appendChild(swatch); row.appendChild(nm);
