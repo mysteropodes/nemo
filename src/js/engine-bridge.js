@@ -3553,6 +3553,25 @@
     var segs = nodeEditSegmentsData(path);
     var zs = 1 / view.zoom;
     var items = [];
+    // Per-ELEMENT Motion (feedback #199, "subselect affiche des vecteurs
+    // décalés si la shape est déplacée ou animée") — a single shape keyed
+    // on its OWN Position/Scale/Rotation (CLAUDE.md §8's "Motion niveau
+    // SHAPE"), not the whole layer's, was never composed here at all: only
+    // symMatrix and the LAYER's own layerMotionPointMap were (the two fixes
+    // right below, 2026-07-29/2026-08-29). Applied INNERMOST — before
+    // symMatrix/layerMotion — mirroring elementPosedBounds' (tools.js)
+    // established element -> layer -> parents order, and reusing the exact
+    // same transformSegments/elementMotionAt pair that function already
+    // uses for hit-testing, so overlay and hit-test agree by construction.
+    var handleSid = path.data && path.data.strokeId;
+    if (handleSid && window.SMMotion && SMMotion.elementMotionAt && SMMotion.transformSegments) {
+      var em = SMMotion.elementMotionAt(state.activeLayerIdx, handleSid, state.currentFrame);
+      if (em && (em.dx || em.dy || em.rot || em.sx !== 1 || em.sy !== 1)) {
+        var pc = path.bounds.center;
+        var pivotEl = { x: pc.x + (em.ax || 0), y: pc.y + (em.ay || 0) };
+        segs = SMMotion.transformSegments(segs, pivotEl, em);
+      }
+    }
     // 2026-07-29 fix — see subselect-bridge.js's toLocalPoint comment for
     // the full story: path.segments/nodeEditSegmentsData live in raw
     // document space, but the shape itself renders through the active
