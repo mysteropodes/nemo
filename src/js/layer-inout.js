@@ -100,6 +100,35 @@
     if (!window.SMMotion || !SMMotion.previewKeyframeShift) return;
     SMMotion.previewKeyframeShift(null, dxFrames, 'selected');
   }
+  // Live preview for the TWO standing-lock mechanisms (feedback #217,
+  // "quand on parent in time les keyframes select et que je drag [...]
+  // l'inPoint les keyframe ne bougent pas en temps réel [...] pendant le
+  // drag"): ld.keyLock (whole layer, Sander van Dijk's "Lock Keyframes to
+  // In and Out Points") and key.lockTo (per-keyframe, feedback #212).
+  // mouseup's own lockOne/lockKeysOne (a few hundred lines down) already
+  // apply these for real at drop — this is the same "cheap transform-only
+  // preview, expensive commit at drop" split livePreviewLayerKeys uses for
+  // the default-retimes case, just never extended to the standing locks
+  // when they were added afterward. Deliberately mirrors lockOne/
+  // lockKeysOne's own gating (mode==='layer' only counts on a body drag,
+  // 'in'/'out' follow their own edge) so the preview never shows a shift
+  // drop won't actually commit.
+  function livePreviewLockedKeys(li, type, ld, origIn, origOut) {
+    if (!window.SMMotion || !SMMotion.previewKeyframeShift) return;
+    if (ld.keyLock && !(ld.keyLock === 'layer' && type !== 'both')) {
+      var movedL = ld.keyLock === 'out' ? outPointOf(ld) - origOut : inPointOf(ld) - origIn;
+      if (movedL) SMMotion.previewKeyframeShift(li, movedL, 'layer');
+    }
+    if (SMMotion.keysLockedTo) {
+      ['in', 'out', 'layer'].forEach(function (mode) {
+        if (mode === 'layer' && type !== 'both') return;
+        var moved = mode === 'out' ? outPointOf(ld) - origOut : inPointOf(ld) - origIn;
+        if (!moved) return;
+        var sel = SMMotion.keysLockedTo(li, mode);
+        if (sel.length) SMMotion.previewKeyframeShift(li, moved, 'keys', sel);
+      });
+    }
+  }
   // A manually-dragged range OR an auto-detected blank-keyframe trim both
   // count as "not full range" for styling — a naturally-shortened bar
   // (layer stops drawing partway through) should read as visually distinct
@@ -835,6 +864,7 @@
           // this specific bar actually moved a few lines up, instead of
           // whichever handle was grabbed to start the whole gesture.
           livePreviewLayerKeys(m.li, m.part || 'both', mld, m.origIn, e.altKey);
+          if (!e.altKey) livePreviewLockedKeys(m.li, m.part || 'both', mld, m.origIn, m.origOut);
         });
       }
       if (anyChanged) {
@@ -869,6 +899,7 @@
       }
     } else {
       livePreviewLayerKeys(_drag.li, _drag.type, ld, _drag.origIn, e.altKey);
+      if (!e.altKey) livePreviewLockedKeys(_drag.li, _drag.type, ld, _drag.origIn, _drag.origOut);
     }
     // Content visibility for the CURRENT frame must reflect the new range
     // live (dragging the out point below the playhead should hide the

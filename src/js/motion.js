@@ -11417,11 +11417,11 @@
   // target. Purely a transform on existing DOM nodes — the next real
   // renderTimeline() (drop, or anything else that rebuilds the grid) throws
   // these nodes away, so nothing needs undoing on the data side.
-  function previewKeyframeShift(li, dxFrames, mode) {
+  function previewKeyframeShift(li, dxFrames, mode, keyList) {
     if (!dxFrames) return;
     var px = Math.round(dxFrames * FC);
     var holders = null;
-    if (mode !== 'selected') {
+    if (mode !== 'selected' && mode !== 'keys') {
       var ld = state.layers[li];
       if (!ld) return;
       holders = [ld];
@@ -11429,7 +11429,17 @@
     }
     document.querySelectorAll('#frame-grid .motion-track-row').forEach(function (rowEl) {
       var dias;
-      if (mode === 'selected') {
+      // 'keys' mode (feedback #217, standing key.lockTo/ld.keyLock preview
+      // during an in/out drag): an explicit {holder,prop,key} list, same
+      // shape as SMMotion.keysLockedTo's return — unlike 'selected' (reads
+      // the .sel CSS class) this is the caller's own arbitrary set, scoped
+      // per-row to whichever entries belong to THIS row's holder/prop.
+      var rowKeyFrames = null;
+      if (mode === 'keys') {
+        rowKeyFrames = (keyList || []).filter(function (e) { return e.holder === rowEl._smHolder && e.prop === rowEl._smProp; }).map(function (e) { return e.key.frame; });
+        if (!rowKeyFrames.length) return;
+        dias = rowKeyFrames.map(function (fr) { return rowEl.querySelector('.fc[data-frame="' + fr + '"] .motion-key'); }).filter(Boolean);
+      } else if (mode === 'selected') {
         dias = rowEl.querySelectorAll('.motion-key.sel');
       } else {
         if (holders.indexOf(rowEl._smHolder) < 0) return;
@@ -11456,9 +11466,12 @@
       // duration block moves when its own key is selected.
       var rects = rowEl.querySelectorAll('.motion-key-connect, .motion-key-durblock');
       if (!rects.length) return;
-      if (mode === 'selected') {
+      if (mode === 'selected' || mode === 'keys') {
         var track = trackFor(rowEl._smHolder, rowEl._smProp);
         if (!track || !track.keys.length) return;
+        var keyQualifies = mode === 'keys'
+          ? function (k) { return rowKeyFrames.indexOf(k.frame) >= 0; }
+          : function (k) { return isKeySelected(rowEl._smHolder, rowEl._smProp, k); };
         rects.forEach(function (r) {
           var sel;
           // classList.contains, NOT getAttribute('class')===… (2026-08-29
@@ -11483,10 +11496,10 @@
           // live-preview-only bug, not a data bug).
           if (r.classList.contains('motion-key-durblock')) {
             var ki = +r.getAttribute('data-ki');
-            sel = track.keys[ki] && isKeySelected(rowEl._smHolder, rowEl._smProp, track.keys[ki]);
+            sel = track.keys[ki] && keyQualifies(track.keys[ki]);
           } else {
             var i = +r.getAttribute('data-i');
-            sel = track.keys[i] && track.keys[i + 1] && isKeySelected(rowEl._smHolder, rowEl._smProp, track.keys[i]) && isKeySelected(rowEl._smHolder, rowEl._smProp, track.keys[i + 1]);
+            sel = track.keys[i] && track.keys[i + 1] && keyQualifies(track.keys[i]) && keyQualifies(track.keys[i + 1]);
           }
           if (sel) r.style.transform = 'translateX(' + px + 'px)';
         });
