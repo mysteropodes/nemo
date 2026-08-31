@@ -2214,7 +2214,24 @@
       // this array = painted first = further back). Ties (the default 0,
       // an untouched layer) still keep original document order — that half
       // is orthogonal to which direction an explicit value pushes.
-      var _orderPairs = layers.map(function (entry, idx) { return { entry: entry, idx: idx, ord: SMMotion.layerOrderAt(idx, renderFrame) }; });
+      // feedback #215: 0 (untouched) is numerically smaller than any
+      // positive explicit rank, and this sort is descending -- so an
+      // untouched layer, sharing the sentinel 0, always outranked (sorted
+      // closer to the front than) a layer explicitly set to the
+      // supposedly-frontmost rank 1. Giving a layer order=1 could
+      // therefore only ever send it BEHIND every untouched layer, never
+      // in front of any of them -- the opposite of "1 is the topmost"
+      // (feedback #205, right above). Untouched layers now sort as if
+      // ranked past the back of any rank a user would realistically type
+      // for a document this size (layers.length+1, shared by all of them
+      // so ties still resolve to original document order via the idx
+      // tiebreak, same as before) -- an explicit small rank can now
+      // actually land in front of them, as documented.
+      var _totalOrderLayers = layers.length + 1;
+      var _orderPairs = layers.map(function (entry, idx) {
+        var ord = SMMotion.layerOrderAt(idx, renderFrame);
+        return { entry: entry, idx: idx, ord: ord === 0 ? _totalOrderLayers : ord };
+      });
       _orderPairs.sort(function (a, b) { return (b.ord - a.ord) || (a.idx - b.idx); });
       layers = _orderPairs.map(function (p) { return p.entry; });
     }
