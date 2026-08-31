@@ -206,6 +206,10 @@
     if (window.SMMotion && SMMotion.isMeshVertexAnimated && SMMotion.isMeshVertexAnimated(li, t.meshId, dragIdx)) {
       var sculpt = (t.mesh.offsets && t.mesh.offsets[dragIdx]) || [0, 0];
       SMMotion.setMeshVertexOffset(li, t.meshId, dragIdx, uv[0] - rest[0] - sculpt[0], uv[1] - rest[1] - sculpt[1]);
+      // feedback #211 — same cheap in-place field sync every other canvas
+      // drag now does; this mesh vertex row (CLAUDE.md §12ter) is keyed
+      // through the identical vtxN track machinery.
+      if (SMMotion.liveRefreshVisiblePropertyFields) SMMotion.liveRefreshVisiblePropertyFields();
     } else {
       SMImageMesh.setOffset(t.meshId, dragIdx, uv[0] - rest[0], uv[1] - rest[1]);
     }

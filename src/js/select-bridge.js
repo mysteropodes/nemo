@@ -1875,12 +1875,20 @@
       var nulld = pt.subtract(nullStartPt);
       SMMotion.setLayerValue(nullIdx, 'position', [nullStartPos[0] + nulld.x, nullStartPos[1] + nulld.y]);
       window._sceneVersion++;
+      // feedback #211 — same cheap in-place field sync as the layer-body
+      // drag below, needed here too since this writes Position through the
+      // identical setLayerValue path.
+      if (window.SMMotion && SMMotion.liveRefreshVisiblePropertyFields) SMMotion.liveRefreshVisiblePropertyFields();
       window.SMEngineBridge.renderNow();
     } else if (mode === 'nv-drag') {
       if (!nvMoved) { pushUndo(); nvMoved = true; }
       var nvd = pt.subtract(nvStartPt);
       SMMotion.setLayerValue(nvIdx, 'position', [nvStartPos[0] + nvd.x, nvStartPos[1] + nvd.y]);
       window._sceneVersion++;
+      // feedback #211 — same cheap in-place field sync as the layer-body
+      // drag below, needed here too since this writes Position through the
+      // identical setLayerValue path.
+      if (window.SMMotion && SMMotion.liveRefreshVisiblePropertyFields) SMMotion.liveRefreshVisiblePropertyFields();
       window.SMEngineBridge.renderNow();
     } else if (mode === 'nv-scale') {
       // Uniform corner scale around the box center — same ratio-of-
@@ -1890,11 +1898,19 @@
       var nvRatio = pt.getDistance(nvPivot) / nvOrigDist;
       SMMotion.setLayerValue(nvIdx, 'scale', [nvStartScale[0] * nvRatio, nvStartScale[1] * nvRatio]);
       window._sceneVersion++;
+      // feedback #211 — same cheap in-place field sync as the layer-body
+      // drag below, needed here too since this writes Scale through the
+      // identical setLayerValue path.
+      if (window.SMMotion && SMMotion.liveRefreshVisiblePropertyFields) SMMotion.liveRefreshVisiblePropertyFields();
       window.SMEngineBridge.renderNow();
     } else if (mode === 'nv-rotate') {
       var nvAng = Math.atan2(pt.y - nvPivot.y, pt.x - nvPivot.x) * 180 / Math.PI;
       SMMotion.setLayerValue(nvIdx, 'rotation', [nvOrigRot + (nvAng - nvStartAngle)]);
       window._sceneVersion++;
+      // feedback #211 — same cheap in-place field sync as the layer-body
+      // drag below, needed here too since this writes Rotation through the
+      // identical setLayerValue path.
+      if (window.SMMotion && SMMotion.liveRefreshVisiblePropertyFields) SMMotion.liveRefreshVisiblePropertyFields();
       window.SMEngineBridge.renderNow();
     } else if (mode === 'move') {
       // Same ensureKeyframe()+reselect as the scale/rotate grab above (see
@@ -2006,6 +2022,12 @@
         SMMotion.setLayerValue(mvLi, 'position', [mvCur[0] + mvPd[0], mvCur[1] + mvPd[1]]);
         window._sceneVersion++;
         lastPt = pt;
+        // feedback #211, "les valeurs de propriété... ne changent pas en
+        // temps réel pendant les modifications dans le canvas" — same
+        // cheap in-place field sync motion.js's own onDrag now does after
+        // every tick, needed here too since this layer-body drag writes
+        // Position through the identical setLayerValue path.
+        if (window.SMMotion && SMMotion.liveRefreshVisiblePropertyFields) SMMotion.liveRefreshVisiblePropertyFields();
         window.SMEngineBridge.renderNow();
         return;
       }
@@ -2136,6 +2158,10 @@
         SMMotion.setLayerValue(msLi, 'scale', [msCur[0] * stepSx, msCur[1] * stepSy]);
         window._sceneVersion++;
         lastPt = pt;
+        // feedback #211 — same cheap in-place field sync as the layer-body
+        // drag above, needed here too since this writes Scale through the
+        // identical setLayerValue path.
+        if (window.SMMotion && SMMotion.liveRefreshVisiblePropertyFields) SMMotion.liveRefreshVisiblePropertyFields();
         window.SMEngineBridge.renderNow();
         return;
       }
@@ -2266,6 +2292,10 @@
         SMMotion.setLayerValue(mrLi, 'rotation', [mrCur[0] + stepAngle]);
         window._sceneVersion++;
         lastPt = pt;
+        // feedback #211 — same cheap in-place field sync as the layer-body
+        // drag above, needed here too since this writes Rotation through the
+        // identical setLayerValue path.
+        if (window.SMMotion && SMMotion.liveRefreshVisiblePropertyFields) SMMotion.liveRefreshVisiblePropertyFields();
         window.SMEngineBridge.renderNow();
         return;
       }
