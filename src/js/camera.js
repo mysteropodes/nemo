@@ -364,6 +364,7 @@
       e.stopPropagation();
       state.cameraView = !state.cameraView;
       if (!state.cameraView) { state.canvasRotation = 0; if (window.SMEngineBridge) window.SMEngineBridge.renderNow(true); }
+      else resetCameraViewOverride();
       applyCameraView();
       renderLayerList();
     });
@@ -499,12 +500,44 @@
   }
 
   // ---- viewport lock ("Vue caméra") + loadFrame hook ----
+  // Manual zoom/pan appliqué PENDANT que "Vue caméra" est actif (molette,
+  // outil zoom, main, raccourcis clavier — tous mutent view.zoom/view.center
+  // directement, sans rien savoir de la caméra) se superpose au transform
+  // animé et DOIT survivre au scrub (feedback #190 : "on doit pouvoir
+  // zoomer ou dézoomer le canvas pendant le scrub et que ça conserve"), au
+  // lieu d'être effacé par le prochain changement de frame — c'était le
+  // comportement précédent, applyCameraView écrasait toujours
+  // inconditionnellement view.zoom/view.center depuis cameraAtFrame.
+  // Capturé par COMPARAISON plutôt qu'en interceptant chaque geste : chaque
+  // appel se souvient du transform de BASE (sans override) qu'il a
+  // lui-même posé (_camBaseZoom/_camBaseCenter) ; l'appel SUIVANT compare
+  // l'état réel actuel du viewport à ce souvenir — tout écart est
+  // exactement ce que l'utilisateur a fait à la main depuis, gardé comme
+  // multiplicateur/offset réappliqué par-dessus le transform de la
+  // nouvelle frame. Réinitialisé (cf. le toggle de l'œil plus haut) à
+  // chaque réactivation de "Vue caméra", pour qu'un override périmé ne
+  // fasse jamais sauter la vue au moment où on la réactive.
+  var _camBaseZoom = null, _camBaseCenter = null;
+  var _camViewZoomMult = 1, _camViewPan = { x: 0, y: 0 };
+  function resetCameraViewOverride() {
+    _camBaseZoom = null; _camBaseCenter = null;
+    _camViewZoomMult = 1; _camViewPan = { x: 0, y: 0 };
+  }
   function applyCameraView() {
     if (!state.cameraView) return;
     var cam = cameraAtFrame(state.currentFrame);
     if (!cam) return;
-    view.center = new Point(cam.x, cam.y);
-    view.zoom = view.viewSize.width / cam.w;
+    if (_camBaseZoom != null) {
+      var zr = view.zoom / _camBaseZoom;
+      if (isFinite(zr) && zr > 0) _camViewZoomMult = zr;
+      var pd = view.center.subtract(_camBaseCenter);
+      _camViewPan = { x: pd.x, y: pd.y };
+    }
+    var baseZoom = view.viewSize.width / cam.w;
+    _camBaseZoom = baseZoom;
+    _camBaseCenter = new Point(cam.x, cam.y);
+    view.zoom = baseZoom * _camViewZoomMult;
+    view.center = new Point(cam.x + _camViewPan.x, cam.y + _camViewPan.y);
     // Roll : réutilise le canal de rotation de viewport existant (radians,
     // déjà synchronisé au moteur Rust via syncViewport) — négatif car
     // tourner la caméra dans un sens fait tourner la scène dans l'autre.
@@ -622,6 +655,7 @@
     renderGridRow: renderGridRow,
     renderCameraRow: renderCameraRow,
     applyCameraView: applyCameraView,
+    resetCameraViewOverride: resetCameraViewOverride,
     applyToExportLayer: applyToExportLayer,
     updatePanel: updateCameraPanel,
   };
