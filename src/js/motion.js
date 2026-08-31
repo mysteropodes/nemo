@@ -8589,6 +8589,23 @@
     if (!items.length) return;
     window.SM.setActiveLayer(li);
     selectedPaths = items;
+    // feedback #202, "si je select une shape dans elements ça doit être les
+    // properties de cette shape qui s'affiche dans layer properties" —
+    // renderMotionPropsPanel's "targeted shape" branch (2026-08-30, #173)
+    // only ever reads window._motionExpandedElement/_motionExpandedLayer,
+    // which the LEFT-panel element row already sets itself right after this
+    // call (see its own line below) — but every OTHER caller (the RIGHT-
+    // panel shapes list in shapes-panel.js chief among them, plus the
+    // context-menu "Select" entries and the canvas resolve-to-anchor paths
+    // in select-bridge.js/tools.js) only ever called this shared selector
+    // and never touched those two globals, so Layer Properties kept showing
+    // the LAYER's own Transform no matter which single shape got picked.
+    // Scoped to an unambiguous SINGLE target — a multi-shape pick (group
+    // members) has no one shape's properties to show, so it's left alone.
+    if (strokeIds.length === 1) {
+      window._motionExpandedLayer = li;
+      window._motionExpandedElement = strokeIds[0];
+    }
     // 2026-08 fix, "je select une forme dans le groupe... si j'essaie de
     // bouger/transformer la forme dans le canvas alors ça select le groupe
     // et pas la forme": select-bridge.js's onDown widens ANY click/drag on
