@@ -1992,7 +1992,7 @@ window.SM={
         // be just as useless. Note isNullLayer above was already persisted,
         // and its own tooltip calls a null layer a "pivot/parent pour d'autres
         // calques" — the pivot came back, everything hung off it did not.
-        layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,parentLayerUidB:l.parentLayerUidB,parentsMore:l.parentsMore,followPath:l.followPath,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink,
+layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,parentKeys:l.parentKeys,parentLayerUidB:l.parentLayerUidB,parentsMore:l.parentsMore,followPath:l.followPath,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink,
         // Expression controls (2026-08-30) — the DECLARATIONS only
         // ({key,name,type,default}). Their keyframes are ordinary tracks and
         // already ride along inside `motion`/`motionStatic` above, keyed by
@@ -2324,6 +2324,13 @@ window.SM={
       // was regenerated on load would orphan every child pointing at it.
       if(ld.layerUid)state.layers[idx].layerUid=ld.layerUid;
       if(ld.parentLayerUid)state.layers[idx].parentLayerUid=ld.parentLayerUid;
+      // Parent keys (2026-08-31, feedback #207) — same shape-guarded
+      // pattern as blendKeys/mattesMore right below: a corrupted nemo-auto
+      // carrying junk here would otherwise reach legacyParentChainMats.
+      if(Array.isArray(ld.parentKeys)){
+        var _pk=ld.parentKeys.filter(function(k){return k&&typeof k.frame==='number'&&(k.uid===null||typeof k.uid==='string');});
+        if(_pk.length)state.layers[idx].parentKeys=_pk;
+      }
       if(ld.parentLayerUidB)state.layers[idx].parentLayerUidB=ld.parentLayerUidB;
       // Extra weighted parents (2026-08-30) — guarded on SHAPE like widget/
       // matteMode, so a corrupted nemo-auto can't reach the blend maths.
