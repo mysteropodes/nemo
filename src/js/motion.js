@@ -4699,6 +4699,14 @@
   // layer gets a dim outline, so each one reads as individually targetable
   // — clicking its row, or double-clicking it on canvas, makes it active.
   function perObjectBoxItems() {
+    // MOTION ONLY. Animation 2D draws its own per-object boxes from
+    // buildTransformBoxItems (engine-bridge) — this builder exists because
+    // that one returns [] in Motion. Without this gate both fired in
+    // Animation 2D and every element got TWO boxes, in two slightly
+    // different blues ([74,158,255,190] over [63,107,245,120]); found by
+    // reading the emitted overlay layers, not by looking, because at a
+    // 1px stroke the pair reads as one slightly-wrong box.
+    if (state.appMode !== 'motion') return [];
     if (window._perObjBoxes !== state.activeLayerIdx) return [];
     var lyr = userLayers[state.activeLayerIdx];
     if (!lyr) return [];
@@ -5145,8 +5153,18 @@
       // Only when a strokeId is actually targeted; the whole-layer case
       // (t.strokeId null) keeps the union it always used, and a Component
       // keeps symbolUnionBounds' duration-stable box.
+      // The whole-LAYER box is built from the elements' POSED bounds, not
+      // the layer's raw ones (2026-08-31): moving two elements apart with
+      // their own Motion left this box at its old size while they visibly
+      // spread outside it. perObjectPosedUnionLocal returns the union after
+      // each element's own transform but BEFORE the layer's, which is
+      // exactly this function's input space — it applies the layer transform
+      // itself just below. Falls back to the raw bounds when the layer has
+      // no usable shapes (an empty layer, a Null, a Guide).
+      var posedLb = (!t.strokeId && !(ld && ld.symbolId) && window.perObjectPosedUnionLocal)
+        ? perObjectPosedUnionLocal(userLayers[t.li]) : null;
       lb = (t.strokeId && t.bounds) ? t.bounds
-        : ((ld && ld.symbolId) ? symbolUnionBounds(t.li) : (userLayers[t.li] && userLayers[t.li].bounds));
+        : (posedLb || ((ld && ld.symbolId) ? symbolUnionBounds(t.li) : (userLayers[t.li] && userLayers[t.li].bounds)));
     }
     if (!lb) return null;
     var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);

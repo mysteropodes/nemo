@@ -757,7 +757,18 @@
       if (window._motionExpandedElement != null || window._perObjBoxes === state.activeLayerIdx) {
         var lyrEx = userLayers[state.activeLayerIdx];
         var ptEx = new Point(w0[0], w0[1]);
-        var hitEx = lyrEx ? lyrEx.hitTest(ptEx, { fill: true, stroke: true, tolerance: 6 / view.zoom }) : null;
+        // Hit-test in the LAYER's own space (2026-08-31): its geometry never
+        // moves, the Motion transform is applied at render, so testing the
+        // raw world point misses every shape as soon as the layer is
+        // animated. perObjectUnionBounds below is already world-space and
+        // keeps ptEx. Measured with the layer moved/rotated/scaled: clicking
+        // a shape dead-centre targeted nothing.
+        // hitTestPosed undoes the layer's transform AND each element's own,
+        // per element — a plain layer.hitTest tests one point against
+        // geometry that several independent transforms have moved, so once
+        // two elements had been dragged apart inside the group, clicking
+        // either of them at its visible position matched nothing.
+        var hitEx = (lyrEx && window.hitTestPosed) ? hitTestPosed(state.activeLayerIdx, ptEx, 6 / view.zoom) : null;
         var itEx = hitEx && hitEx.item;
         while (itEx && itEx.parent && itEx.parent !== lyrEx) itEx = itEx.parent;
         var sidEx = itEx && itEx.data && itEx.data.strokeId;
@@ -1085,7 +1096,13 @@
     // handles above (xformMap) — so testing against geometry that never
     // actually moved uses a point in the space it still lives in.
     var hitPt = pt;
-    if (state.appMode === 'motion' && window.SMMotion) {
+    // No longer gated on Motion mode (2026-08-31): buildSceneJson applies a
+    // layer's motionMat in EITHER mode (CLAUDE.md §8), so an animated layer
+    // renders moved in Animation 2D too — and there the click was still
+    // tested against the un-moved geometry, so nothing could be selected
+    // where it visibly sits. Both call sites (left click and right click)
+    // get it, or the two would disagree about what is under the cursor.
+    if (window.SMMotion) {
       var hitMap = SMMotion.layerMotionPointMap(state.activeLayerIdx);
       // 3D layers (2026-07-29 fix) — layerMotionPointMap returns null for a
       // 3D-toggled layer even with real rotationX/rotationY set (it only
@@ -1095,8 +1112,19 @@
       if (!hitMap && SMMotion.layerMotion3DPointMap) hitMap = SMMotion.layerMotion3DPointMap(state.activeLayerIdx);
       if (hitMap) { var hg = hitMap.inv(pt.x, pt.y); hitPt = new Point(hg[0], hg[1]); }
     }
-    var hit = (activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
-    if (hit && !combineHitConfirm(hit, hitPt, state.activeLayerIdx)) hit = null;
+    // Per-ELEMENT transforms on top of the layer's (2026-08-31): hitTestPosed
+    // undoes each child's own Motion for that child alone, which a single
+    // layer.hitTest cannot do — it tests one point against geometry that
+    // several independent transforms have moved. Measured in Animation 2D
+    // with the layer transformed AND the two elements dragged apart:
+    // clicking either at its visible position selected nothing. hitPt
+    // (layer-space) stays the fallback, and the posed test hands back the
+    // point in the element's own space for combineHitConfirm.
+    var posedHit = (window.hitTestPosed && !(activeLdForLock.locked && !activeLdForLock.symbolId))
+      ? hitTestPosed(state.activeLayerIdx, pt, 8 / view.zoom) : null;
+    var hit = posedHit || ((activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom }));
+    var confirmPt = (posedHit && posedHit.localPoint) ? posedHit.localPoint : hitPt;
+    if (hit && !combineHitConfirm(hit, confirmPt, state.activeLayerIdx)) hit = null;
     var hitOtherLayerIdx = -1;
     // If nothing on the active layer, check every OTHER normal (non-
     // component) layer too — clicking a stroke that lives on layer 1 while
@@ -2435,7 +2463,13 @@
     // layer whole-instance click, brush-anchor resolution) so right-click
     // selects exactly what a left-click would.
     var hitPt = pt;
-    if (state.appMode === 'motion' && window.SMMotion) {
+    // No longer gated on Motion mode (2026-08-31): buildSceneJson applies a
+    // layer's motionMat in EITHER mode (CLAUDE.md §8), so an animated layer
+    // renders moved in Animation 2D too — and there the click was still
+    // tested against the un-moved geometry, so nothing could be selected
+    // where it visibly sits. Both call sites (left click and right click)
+    // get it, or the two would disagree about what is under the cursor.
+    if (window.SMMotion) {
       var hitMap = SMMotion.layerMotionPointMap(state.activeLayerIdx);
       // 3D layers (2026-07-29 fix) — layerMotionPointMap returns null for a
       // 3D-toggled layer even with real rotationX/rotationY set (it only
@@ -2445,8 +2479,19 @@
       if (!hitMap && SMMotion.layerMotion3DPointMap) hitMap = SMMotion.layerMotion3DPointMap(state.activeLayerIdx);
       if (hitMap) { var hg = hitMap.inv(pt.x, pt.y); hitPt = new Point(hg[0], hg[1]); }
     }
-    var hit = (activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
-    if (hit && !combineHitConfirm(hit, hitPt, state.activeLayerIdx)) hit = null;
+    // Per-ELEMENT transforms on top of the layer's (2026-08-31): hitTestPosed
+    // undoes each child's own Motion for that child alone, which a single
+    // layer.hitTest cannot do — it tests one point against geometry that
+    // several independent transforms have moved. Measured in Animation 2D
+    // with the layer transformed AND the two elements dragged apart:
+    // clicking either at its visible position selected nothing. hitPt
+    // (layer-space) stays the fallback, and the posed test hands back the
+    // point in the element's own space for combineHitConfirm.
+    var posedHit = (window.hitTestPosed && !(activeLdForLock.locked && !activeLdForLock.symbolId))
+      ? hitTestPosed(state.activeLayerIdx, pt, 8 / view.zoom) : null;
+    var hit = posedHit || ((activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom }));
+    var confirmPt = (posedHit && posedHit.localPoint) ? posedHit.localPoint : hitPt;
+    if (hit && !combineHitConfirm(hit, confirmPt, state.activeLayerIdx)) hit = null;
     var clickedPath = null;
     if (hit && (hit.item instanceof Path || hit.item instanceof Raster)) {
       clickedPath = resolveBrushAnchor(hit.item, layer);
