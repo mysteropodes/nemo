@@ -855,7 +855,26 @@
         } else if (!sidEx) {
           var uEx = (lyrEx && window.perObjectUnionBounds) ? perObjectUnionBounds(lyrEx) : null;
           window._motionExpandedElement = null;
-          if (!uEx || !uEx.contains(ptEx)) { window._perObjBoxes = null; sortiDuGroupe = true; }
+          if (!uEx || !uEx.contains(ptEx)) {
+            window._perObjBoxes = null;
+            sortiDuGroupe = true;
+            // _motionExpandedLayer is a THIRD flag (tools.js's double-click
+            // group entry sets it alongside _perObjBoxes, motion.js:5409) —
+            // activeMotionTarget() prefers it over state.activeLayerIdx
+            // whenever it's non-null, so leaving it behind here meant the
+            // canvas gizmo kept drawing THIS layer's box forever after
+            // exiting, even once a different layer had genuinely become
+            // active (row highlight, Layer Properties panel, selectedPaths
+            // all correctly showed the new layer — only the canvas box and
+            // the timeline's own row highlight, which reads this same flag,
+            // stayed stuck). Found live: exit Layer 2's group, click Layer
+            // 1's shape — state.activeLayerIdx became 0 right away, but
+            // window._motionExpandedLayer stayed 1, so the gizmo kept
+            // hugging Layer 2 no matter what got selected afterward. Scoped
+            // to the layer actually being exited, matching _perObjBoxes'
+            // own scoping just above.
+            if (window._motionExpandedLayer === state.activeLayerIdx) window._motionExpandedLayer = null;
+          }
         }
         window._sceneVersion = (window._sceneVersion || 0) + 1;
         if (window.renderLayerList) renderLayerList();
