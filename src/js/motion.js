@@ -3959,11 +3959,66 @@
     _taCountCache.arr = strokes; _taCountCache.basedOn = basedOn; _taCountCache.n = max + 1;
     return _taCountCache.n;
   }
+  // Rest-pose bounding box of ONE stored stroke, from its own sd.segments —
+  // the same coordinate space c.bounds reads at render time, since per-
+  // element Motion is composed as a matrix on TOP of segments, never baked
+  // into them. Anchor-point-only accuracy (control points, not full bezier
+  // ink), which is all a PIVOT needs.
+  function _taStrokeRestBounds(sd) {
+    var segs = sd && sd.segments;
+    if (!segs || !segs.length) return null;
+    var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (var i = 0; i < segs.length; i++) {
+      var p = segs[i] && segs[i].point; if (!p) continue;
+      if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0];
+      if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1];
+    }
+    return x0 <= x1 ? [x0, y0, x1, y1] : null;
+  }
+  // A "character" (or word/line) that an animator addresses by unit index
+  // can be MORE than one Path: vector-text-bridge's buildGlyphPaths returns
+  // one Path per disjoint contour, so ':', ';', '%', '=' each split into
+  // several Paths sharing one charIndex (confirmed live, 'M:X' — the ':'
+  // yields exactly 2 strokeIds), and a hand-drawn letter split by "Découper
+  // par caractère" can equally be several separate brush strokes. Rotation/
+  // scale need ONE shared pivot for the whole unit, not each sibling's own
+  // bounds-center — otherwise a rotating ':' has its two dots spin apart
+  // instead of turning together (Cyril, from a screenshot: "rotation
+  // rotationne l'ensemble de shape d'une même [lettre] selon LEUR PROPRE
+  // point d'ancrage et pas LA LETTRE GLOBALE").
+  //
+  // Memoised the same way taUnitCount is and for the identical reason
+  // (§5bis/§5quater — array identity, not a version counter): this walks
+  // every stroke once per (layer, frame, basedOn) rather than once per
+  // GLYPH, or a 50-character title would re-walk its own layer 50 times.
+  var _taPivotCache = { arr: null, basedOn: '', map: null };
+  function taUnitPivotCenter(li, frameIdx, basedOn, idx) {
+    var strokes = (typeof getEffectiveStrokes === 'function') ? getEffectiveStrokes(li, frameIdx) : null;
+    if (!strokes) return null;
+    if (_taPivotCache.arr !== strokes || _taPivotCache.basedOn !== basedOn) {
+      var map = {};
+      for (var i = 0; i < strokes.length; i++) {
+        var u = SMTextSelector.unitIndexOf(strokes[i], basedOn);
+        if (u == null) continue;
+        var b = _taStrokeRestBounds(strokes[i]);
+        if (!b) continue;
+        var m = map[u];
+        if (!m) map[u] = b.slice();
+        else {
+          if (b[0] < m[0]) m[0] = b[0]; if (b[1] < m[1]) m[1] = b[1];
+          if (b[2] > m[2]) m[2] = b[2]; if (b[3] > m[3]) m[3] = b[3];
+        }
+      }
+      _taPivotCache.arr = strokes; _taPivotCache.basedOn = basedOn; _taPivotCache.map = map;
+    }
+    var e = _taPivotCache.map[idx];
+    return e ? { cx: (e[0] + e[2]) / 2, cy: (e[1] + e[3]) / 2 } : null;
+  }
   function textAnimatorContribution(li, sd, frameIdx) {
     var ld = state.layers[li];
     if (!ld || !ld.textAnimators || !ld.textAnimators.length || !sd) return null;
     if (typeof window === 'undefined' || !window.SMTextSelector) return null;
-    var acc = null;
+    var acc = null, pivotBasedOn = null;
     for (var a = 0; a < ld.textAnimators.length; a++) {
       var an = ld.textAnimators[a];
       if (!an || an.enabled === false || !an.props) continue;
@@ -3977,13 +4032,37 @@
       var p = an.props;
       acc = acc || { dx: 0, dy: 0, rot: 0, sx: 0, sy: 0, op: 0 };
       if (p.position) { acc.dx += (p.position[0] || 0) * w; acc.dy += (p.position[1] || 0) * w; }
-      if (p.rotation != null) acc.rot += p.rotation * w;
+      if (p.rotation) { acc.rot += p.rotation * w; pivotBasedOn = pivotBasedOn || basedOn; }
       // Scale and opacity are authored as a DELTA from 100% (AE's own
       // convention: an animator's Scale 0% means "shrink to nothing at full
       // weight"), so they accumulate around 0 here and are folded into the
       // multiplicative/percentage form by the caller.
-      if (p.scale) { acc.sx += ((p.scale[0] == null ? 100 : p.scale[0]) - 100) * w; acc.sy += ((p.scale[1] == null ? 100 : p.scale[1]) - 100) * w; }
+      if (p.scale) {
+        var dsx = (p.scale[0] == null ? 100 : p.scale[0]) - 100, dsy = (p.scale[1] == null ? 100 : p.scale[1]) - 100;
+        acc.sx += dsx * w; acc.sy += dsy * w;
+        if (dsx || dsy) pivotBasedOn = pivotBasedOn || basedOn;
+      }
       if (p.opacity != null) acc.op += (p.opacity - 100) * w;
+    }
+    // Only rotation/scale need a pivot at all — a pure position/opacity
+    // animator leaves ax/ay unset and elementMotionAt below falls back to
+    // the base element's own anchor untouched. Which animator's basedOn
+    // wins when several disagree: the first one that actually turns or
+    // scales this stroke — the near-universal case is either one animator,
+    // or several sharing the same basedOn, in which case this is exact;
+    // composing per-animator pivots in true AE sequential-matrix fashion is
+    // a larger rewrite (every animator becoming its own matrix step instead
+    // of summing into flat deltas) and not needed for this fix.
+    if (acc && pivotBasedOn) {
+      var idxP = SMTextSelector.unitIndexOf(sd, pivotBasedOn);
+      if (idxP != null) {
+        var ownB = _taStrokeRestBounds(sd);
+        var shared = taUnitPivotCenter(li, frameIdx, pivotBasedOn, idxP);
+        if (ownB && shared) {
+          acc.ax = shared.cx - (ownB[0] + ownB[2]) / 2;
+          acc.ay = shared.cy - (ownB[1] + ownB[3]) / 2;
+        }
+      }
     }
     return acc;
   }
@@ -4043,7 +4122,12 @@
       dx: m.dx + ta.dx, dy: m.dy + ta.dy, rot: m.rot + ta.rot,
       sx: m.sx * (1 + ta.sx / 100), sy: m.sy * (1 + ta.sy / 100),
       op: Math.max(0, Math.min(1, m.op * (1 + ta.op / 100))),
-      ax: m.ax, ay: m.ay,
+      // ta.ax/ay (set only when a rotating/scaling animator touched this
+      // stroke — see textAnimatorContribution) re-centres the pivot on the
+      // whole character instead of this one Path's own bounds. Added to
+      // whatever explicit per-element anchor already existed, same as every
+      // other field above.
+      ax: m.ax + (ta.ax || 0), ay: m.ay + (ta.ay || 0),
     };
   }
   // Extended per-shape property: Fill color (2026-07 — audit gap
