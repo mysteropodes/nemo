@@ -2048,8 +2048,12 @@ layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,parentKeys:l.parentKeys,pare
       // number of layers' effects stacks by referencing its id.
       customEffects:state.customEffects,
       // audio: only the persistable fields — _buffer/_peaksCanvas/_srcNode
-      // are live runtime objects that must never hit JSON
-      audioTracks:(state.audioTracks||[]).map(function(t){return{name:t.name,dataB64:t.dataB64,offsetFrames:t.offsetFrames||0,volume:t.volume!==undefined?t.volume:1,muted:!!t.muted,audioId:t.audioId};}),
+      // are live runtime objects that must never hit JSON. trimStart/
+      // trimEnd/motion/motionStatic added 2026-08-31 (feedback #218, trim
+      // + animatable volume) — CLAUDE.md §1's family of bug #1 exactly:
+      // a field this allowlist doesn't know about is silently dropped on
+      // every save, not just missing from the screen.
+      audioTracks:(state.audioTracks||[]).map(function(t){return{name:t.name,dataB64:t.dataB64,offsetFrames:t.offsetFrames||0,volume:t.volume!==undefined?t.volume:1,muted:!!t.muted,audioId:t.audioId,trimStart:t.trimStart||0,trimEnd:(t.trimEnd!==undefined&&t.trimEnd!==null)?t.trimEnd:null,motion:t.motion||undefined,motionStatic:t.motionStatic||undefined};}),
       refMedia:state.refMedia?{type:state.refMedia.type,name:state.refMedia.name,src:state.refMedia.src,frames:state.refMedia.frames,opacity:state.refMedia.opacity,visible:state.refMedia.visible,offsetFrames:state.refMedia.offsetFrames||0}:null,
       // layerUid/linked/path/audioId/sizeBytes (2026-07-31): added for the
       // real asset-panel pass — a field written here but missing from the

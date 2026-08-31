@@ -2157,6 +2157,16 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
    renderAudioLayerRows) — .audio-vol is reused there directly */
 .audio-vol{width:52px;height:10px}
 .lrow.audio-lrow{cursor:default;}
+.lrow.audio-lrow:hover{background:rgba(255,255,255,.03);}
+.lrow.audio-lrow.act{background:rgba(63,107,245,.08);box-shadow:inset 3px 0 0 #4E6FF2;}
+.lrow.audio-lrow.act .lnm{color:#9FB4FA;}
+/* Trim (feedback #218) — dim overlays + handles reuse .layer-inout-handle's
+   own look (style.css above) but sit directly in .audio-row, not inside
+   .audio-wave, which clips its children (overflow:hidden) and would cut the
+   handle's hit-padding off at the waveform's own edge. */
+.audio-trim-dim{position:absolute;background:rgba(0,0,0,.45);pointer-events:none;z-index:3;border-radius:3px;}
+.audio-trim-handle{position:absolute;width:7px;background:var(--pill,#C9D6D2);cursor:ew-resize;border-radius:3px;z-index:5;opacity:.85;}
+.audio-trim-handle:hover{opacity:1;background:var(--pill-hot,#fff);box-shadow:0 0 0 3px rgba(255,255,255,.18);}
 
 /* Drag-and-drop import hover feedback (drop-import.js) */
 #canvas-area.drop-hover,#timeline-area.drop-hover{outline:2px dashed var(--accent);outline-offset:-2px;}
