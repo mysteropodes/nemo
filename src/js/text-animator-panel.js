@@ -38,6 +38,22 @@
     }
     return null;
   }
+  // A whole, not-yet-split RASTER text block — the layer/stored-frame
+  // equivalent of updateTextActionsPanel's own selectedPaths-based
+  // isWholeText check (timeline.js), used here only to decide whether the
+  // shared section should stay visible for the split action before any
+  // per-character unit exists yet. Vector text never matches this (it's
+  // already split at creation, so it's always caught by activeTextLayer
+  // above instead).
+  function wholeTextLayerContext() {
+    if (!window.state || !state.layers) return null;
+    var li = state.activeLayerIdx, ld = state.layers[li];
+    if (!ld) return null;
+    var strokes = (typeof getEffectiveStrokes === 'function') ? getEffectiveStrokes(li, state.currentFrame) : null;
+    if (!strokes || strokes.length !== 1) return null;
+    var s = strokes[0];
+    return (s && s.isRaster && s.isText && !s.isTextChar) ? { li: li, ld: ld } : null;
+  }
 
   function commit(ld) {
     if (typeof saveActiveLayerFrame === 'function') saveActiveLayerFrame();
@@ -278,18 +294,37 @@
     }
   }
 
+  // Owns the shared section's overall visibility (merged 2026-08-31 with
+  // the former standalone "Text" section — see index.html's comment on
+  // #p-textanim-sec). Runs LAST in the update chain (updatePropsContext
+  // calls this after updateTextActionsPanel already ran, timeline.js), so
+  // it's the authoritative display decision — updateTextActionsPanel only
+  // ever toggles its own two rows, never the section itself, precisely so
+  // the two can't stomp each other regardless of call order.
   function render() {
     var sec = el('p-textanim-sec');
     if (!sec) return;
     var ctx = activeTextLayer();
-    if (!ctx) { sec.style.display = 'none'; return; }
+    var wholeCtx = ctx ? null : wholeTextLayerContext();
+    if (!ctx && !wholeCtx) { sec.style.display = 'none'; return; }
     sec.style.display = '';
+    var addRow = el('p-textanim-add-row');
+    if (addRow) addRow.style.display = ctx ? '' : 'none';
+    var hint = el('p-textanim-empty');
     var list = el('p-textanim-list');
+    if (!ctx) {
+      // Whole, not-yet-split text: nothing to list or add yet — the
+      // section stays open purely so text-split-row (updateTextActionsPanel)
+      // has somewhere to live, matching this file's own "add" affordance
+      // pattern rather than inventing a second empty-state.
+      if (list) list.innerHTML = '';
+      if (hint) hint.style.display = 'none';
+      return;
+    }
     if (!list) return;
     list.innerHTML = '';
     var anims = (window.SMMotion && SMMotion.textAnimatorsOf) ? SMMotion.textAnimatorsOf(ctx.li) : [];
     for (var i = 0; i < anims.length; i++) buildAnimator(list, ctx.ld, anims[i], i);
-    var hint = el('p-textanim-empty');
     if (hint) hint.style.display = anims.length ? 'none' : '';
   }
 
