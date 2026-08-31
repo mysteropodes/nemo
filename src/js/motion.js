@@ -7047,8 +7047,23 @@
     if (ld.isNullLayer && !ld.isFolderLayer) renderNullShapeRow(body, ld);
     renderFollowPathRow(body, ld, state.activeLayerIdx);
     renderTimeLinkRow(body, ld, state.activeLayerIdx);
-    renderBlendRow(body, ld, state.activeLayerIdx);
-    renderMatteRow(body, ld, state.activeLayerIdx);
+    // Blend/Matte swapped for Size on a widget layer (2026-08-31, "enlever
+    // ce qui n'a pas lieu d'être blend + [matte] et mettre à la place les
+    // size width et height") — a widget is NEVER rendered (CLAUDE.md §13:
+    // getEffectiveStrokes returns [], zero pixels in export or on screen),
+    // so a compositing blend mode and a matte source are both meaningless
+    // on it — there is nothing for either to act on. Width/Height (the
+    // pad/track size, ld.widget.size) is the one thing this layer kind has
+    // that no other does, and it previously only lived in the separate
+    // "Rig widget" panel section (rig-widget.js's renderWidgetPanel) —
+    // still there, unchanged, this just ALSO surfaces it where Blend/Matte
+    // used to sit so it doesn't need a second panel to find.
+    if (ld.isWidgetLayer) {
+      renderWidgetSizeRow(body, ld);
+    } else {
+      renderBlendRow(body, ld, state.activeLayerIdx);
+      renderMatteRow(body, ld, state.activeLayerIdx);
+    }
     // A targeted SHAPE shows its own Transform, not the layer's (2026-08-30,
     // feedback #173: "si on select une shape dans elements alors dans layer
     // properties on voit les propriétés de la shape, pareil si on select une
@@ -7064,6 +7079,46 @@
     if (elSel) {
       var elHolder = ensureElementHolder(ld, elSel);
       renderTransformGroup(body, elHolder, SM.t('hdrTransformElement'));
+      // Extended per-shape properties (2026-08-31, "voir si toute les
+      // propriétés keyframable pour les shapes apparaissent aussi dans
+      // layer properties") — Path/Mesh/Fill/Stroke/Brush Size/Trim Paths
+      // are each their own opt-in group, but every one of them was only
+      // ever built for the LEFT list's own per-element loop
+      // (renderLayerListMotion, a few thousand lines down) — this branch
+      // stopped at the base Transform group and never called any of them,
+      // so a targeted shape's keyable Path/Fill/Stroke/etc. were fully
+      // functional (keyable, saved, rendered) yet invisible here. Same
+      // exact gating conditions as that loop, applied to the ONE entry
+      // matching elSel instead of iterating every element — CLAUDE.md
+      // §11's alignment invariant, now a THIRD surface (left list / grid /
+      // this panel) that must agree, not just the usual two.
+      var elEntries = layerElements(state.activeLayerIdx, ld) || [];
+      var elEntry = elEntries.filter(function (en) { return en.strokeId === elSel; })[0];
+      if (elEntry) {
+        if (!elEntry.sd.isRaster && pathVertexRowCount(elEntry.sd)) {
+          renderPathVertexGroup(body, elHolder, pathVertexRowCount(elEntry.sd));
+        }
+        if (elEntry.sd.isRaster && elEntry.sd.meshId && meshVertexRowCount(elEntry.sd.meshId)) {
+          renderMeshVertexGroup(body, ensureElementHolder(ld, elEntry.sd.meshId), meshVertexRowCount(elEntry.sd.meshId));
+        }
+        if (elEntry.sd.fillColor && (!elEntry.sd.isVectorBrush || elEntry.sd.__linkedFillStrokeId)) {
+          renderFillColorRow(body, elHolder, elEntry.sd.fillColor);
+        }
+        var hasRealStrokeEl2 = elEntry.sd.hasRealStroke !== undefined ? elEntry.sd.hasRealStroke : !!elEntry.sd.strokeColor;
+        if (hasRealStrokeEl2 || elEntry.sd.isVectorBrush) {
+          var inkDefault2 = elEntry.sd.__inkColor !== undefined ? elEntry.sd.__inkColor : elEntry.sd.fillColor;
+          renderStrokeColorRow(body, elHolder, elEntry.sd.isVectorBrush ? inkDefault2 : elEntry.sd.strokeColor);
+          if (!elEntry.sd.isVectorBrush && elEntry.sd.strokeWidth !== undefined) {
+            renderTrimScalarRow(body, elHolder, 'strokeWidth', 'Stroke Width', 'px', 0, 200, elEntry.sd.strokeWidth);
+          }
+        }
+        if (elEntry.sd.isVectorBrush && elEntry.sd.centerSegments && elEntry.sd.centerSegments.length >= 2) {
+          renderTrimScalarRow(body, elHolder, 'brushSize', 'Brush Size', '%', 10, 500, 100);
+        }
+        if (!elEntry.sd.isRaster && elEntry.sd.segments && elEntry.sd.segments.length) {
+          renderTrimPathsGroup(body, elHolder);
+        }
+      }
       return;
     }
     renderTransformGroup(body, ld, 'Transform');
@@ -7168,6 +7223,51 @@
   }
   function matteModeLabelSafe(m) {
     return (typeof matteModeLabel === 'function') ? matteModeLabel(m) : m;
+  }
+  // Width/Height, IN Layer Properties, for a widget layer (2026-08-31) —
+  // see renderMotionPropsPanel's own comment on why this replaces Blend/
+  // Matte there. Plain scrub fields, NOT a keyframable Motion property:
+  // ld.widget.size is deliberately presentation, not part of the control's
+  // own declaration (rig-widget.js's header comment — "the same control
+  // read by an expression is just a number, and a second widget could map
+  // the same control over a different range"), the exact same reasoning
+  // that already keeps min/max/rest out of the keyframe system. Writes the
+  // SAME ld.widget.size field the "Rig widget" section's own #p-widget-w/h
+  // inputs do (rig-widget.js's bindWidgetField) — this is a second surface
+  // for the same value, not a second value, so both are refreshed on every
+  // edit and can never disagree.
+  function renderWidgetSizeRow(body, ld) {
+    var w = ld.widget;
+    if (!w) return;
+    var DEFAULT_SIZE = { joystick: [160, 160], slider: [200, 26] };
+    var size = w.size || DEFAULT_SIZE[w.kind] || [160, 160];
+    var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
+    var pnm = document.createElement('div'); pnm.className = 'lnm motion-prop-name';
+    pnm.innerHTML = '<span>' + SM.t('fieldSize') + '</span>';
+    row.appendChild(pnm);
+    var fields = document.createElement('div'); fields.className = 'motion-fields';
+    var wLabel = document.createElement('span'); wLabel.className = 'motion-dim-label'; wLabel.textContent = 'W';
+    var wIn = document.createElement('input'); wIn.type = 'number'; wIn.className = 'pi scrub motion-val'; wIn.step = '1'; wIn.value = Math.round(size[0]);
+    var hLabel = document.createElement('span'); hLabel.className = 'motion-dim-label'; hLabel.textContent = 'H';
+    var hIn = document.createElement('input'); hIn.type = 'number'; hIn.className = 'pi scrub motion-val'; hIn.step = '1'; hIn.value = Math.round(size[1]);
+    var unit = document.createElement('span'); unit.className = 'motion-unit'; unit.textContent = 'px';
+    function commit() {
+      var wv = Math.max(8, parseFloat(wIn.value));
+      var hv = Math.max(8, parseFloat(hIn.value));
+      if (!isFinite(wv) || !isFinite(hv)) return;
+      pushUndo();
+      w.size = [wv, hv];
+      saveActiveLayerFrame(); renderLayerList(); renderTimeline();
+      if (window.renderRigWidgetPanel) window.renderRigWidgetPanel();
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    }
+    wIn.addEventListener('change', commit);
+    hIn.addEventListener('change', commit);
+    fields.appendChild(wLabel); fields.appendChild(wIn);
+    fields.appendChild(hLabel); fields.appendChild(hIn);
+    fields.appendChild(unit);
+    row.appendChild(fields);
+    body.appendChild(row);
   }
   // Blend mode, IN Layer Properties (feedback #201, "je n'ai pas de dropdown
   // menu de blend" — Motion mode genuinely had no way to reach it: the
