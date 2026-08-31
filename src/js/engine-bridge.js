@@ -2387,6 +2387,14 @@
         if (penItems.length) layers.push({ items: penItems });
         var rigItems = buildRigPreviewItems();
         if (rigItems.length) layers.push({ items: rigItems });
+        // Perspective's live cursor guide (2026-08-31, perspective-bridge.js)
+        // — same volatile-items reasoning as the eraser/pressure/pen cursors
+        // just above: it follows the pointer, so it must be rebuilt every
+        // move rather than riding the cached scene prefix a drag reuses
+        // (buildPerspectiveGuideItems, the static VP fan, stays OUTSIDE this
+        // block on purpose — it never moves).
+        var perspCursorItems = window.buildPerspectiveCursorGuideItems ? window.buildPerspectiveCursorGuideItems() : [];
+        if (perspCursorItems.length) layers.push({ items: perspCursorItems });
       }
       var arcItems = buildArcHandleItems();
       if (arcItems.length) layers.push({ items: arcItems });
