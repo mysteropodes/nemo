@@ -5163,6 +5163,61 @@
     _symUnionCache.set(ck, rect);
     return rect;
   }
+  // The element's bounding box ACCOUNTING for its own vertex-key offsets
+  // (2026-08-31, feedback #195: "si les keyframes sont actives dans les
+  // vertex de shape et que je bouge les vertex... la bounding box ne
+  // s'adapte pas à la nouvelle taille de la shape"). t.bounds (below, in
+  // motionBoxGeom) comes straight from the LIVE Paper item's own .bounds —
+  // correct for every other kind of Motion (position/rotation/scale all
+  // apply at RENDER time on top of untouched raw geometry, CLAUDE.md's
+  // space-discipline invariant), but per-vertex offsets are exactly the one
+  // property that changes the shape's own EXTENT, not just where it sits —
+  // t.bounds never moves, so the box stops matching the shape the instant a
+  // vertex is dragged past its own original corner. Confirmed live: a plain
+  // rectangle with one vertex keyed +100,+100 rendered as a lopsided
+  // triangle-ish shape reaching well past the box's own bottom edge.
+  //
+  // Reuses applyPathVertexOffsets — the SAME function buildSceneJson/
+  // export.js already call to get the RENDERED geometry — so this can never
+  // drift from what's actually drawn. A temp Paper Path (never inserted,
+  // removed immediately) gets the bounds instead of hand-rolling bezier-
+  // curve bounds math, which per-vertex handles would otherwise need.
+  // Gated on hasPathVertexMotion so the overwhelmingly common case (no
+  // vertex keys at all) costs nothing beyond that one cheap check — same
+  // opt-in-fast-path shape every other reader of this function already uses.
+  function vertexPosedElementBounds(t) {
+    if (!t || !t.strokeId || !t.holder || !hasPathVertexMotion(t.holder)) return null;
+    var item = findElementItem(t.li, t.strokeId);
+    if (!item || !item.segments || !item.segments.length) return null;
+    var rawSegs = item.segments.map(function (s) {
+      return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] };
+    });
+    var offsetSegs;
+    if (item.data && item.data.isVectorBrush) {
+      // A vector brush's vertices are its CENTERLINE, not its baked outline
+      // (#181's own distinction, isVectorBrushSd) — offsetting the outline
+      // segments directly would be editing the wrong geometry. Rebuild the
+      // real ribbon outline through the same path applyVectorBrushOutlineFor
+      // already uses for rendering, keyed off the stored sd rather than the
+      // live item (its centerSegments/widthProfile are the static recording,
+      // exactly what that function expects).
+      var ld2 = state.layers[t.li];
+      var entry = ld2 && window.layerElements && layerElements(t.li, ld2).filter(function (e) { return e.strokeId === t.strokeId; })[0];
+      offsetSegs = entry ? applyVectorBrushOutlineFor(t.li, t.strokeId, entry.sd, state.currentFrame) : null;
+      if (!offsetSegs) return null;
+    } else {
+      offsetSegs = applyPathVertexOffsets(rawSegs, t.holder, state.currentFrame);
+    }
+    var tmp = new Path({ insert: false });
+    offsetSegs.forEach(function (s) {
+      tmp.add(new Segment(new Point(s.point[0], s.point[1]), new Point(s.handleIn[0], s.handleIn[1]), new Point(s.handleOut[0], s.handleOut[1])));
+    });
+    tmp.closed = !!item.closed;
+    var b = tmp.bounds;
+    tmp.remove();
+    if (!b || !isFinite(b.width) || !isFinite(b.height)) return null;
+    return { left: b.left, top: b.top, right: b.right, bottom: b.bottom, width: b.width, height: b.height, center: { x: b.center.x, y: b.center.y } };
+  }
   function motionBoxGeom(t) {
     var ld = state.layers[t.li];
     var lb;
@@ -5199,7 +5254,7 @@
       // no usable shapes (an empty layer, a Null, a Guide).
       var posedLb = (!t.strokeId && !(ld && ld.symbolId) && window.perObjectPosedUnionLocal)
         ? perObjectPosedUnionLocal(userLayers[t.li]) : null;
-      lb = (t.strokeId && t.bounds) ? t.bounds
+      lb = (t.strokeId && t.bounds) ? (vertexPosedElementBounds(t) || t.bounds)
         : (posedLb || ((ld && ld.symbolId) ? symbolUnionBounds(t.li) : (userLayers[t.li] && userLayers[t.li].bounds)));
     }
     if (!lb) return null;
