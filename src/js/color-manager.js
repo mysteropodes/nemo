@@ -40,6 +40,17 @@
       selectedPaths.forEach(function (p) {
         if (p.fillColor) addColor(map, colorHex8(p.fillColor));
         if (p.strokeColor) addColor(map, colorHex8(p.strokeColor));
+        // A vector-brush ribbon drawn with Fill enabled is really TWO Paper.js
+        // items — the ribbon itself (selectable, fillColor holds what reads as
+        // its "stroke") and a separate filled backdrop, data.isLinkedFillCompanion,
+        // excluded from selection everywhere (isSelectablePathChild, app.js) —
+        // so its OWN fillColor (the shape's actual visible fill) never showed up
+        // here at all (feedback #200, "select l'objet... n'affiche pas la couleur
+        // du fill"). Same companion lookup effects-panel.js's syncCompanionEffects
+        // already uses for the identical "fill is a wholly separate item" gap.
+        var companion = (p.data && p.data.linkedFillId && typeof findLinkedFillCompanion === 'function')
+          ? findLinkedFillCompanion(userLayers[state.activeLayerIdx], p) : null;
+        if (companion && companion.fillColor) addColor(map, colorHex8(companion.fillColor));
       });
     } else {
       // Context colors (2026-07, "si on sélectionne rien on voit toutes les
@@ -82,6 +93,13 @@
       selectedPaths.forEach(function (p) {
         if (p.fillColor && colorHex8(p.fillColor).toUpperCase() === oldNorm) p.fillColor = newHex;
         if (p.strokeColor && colorHex8(p.strokeColor).toUpperCase() === oldNorm) p.strokeColor = newHex;
+        // Write-side mirror of computeUsedColors' own companion lookup above —
+        // without this, a fill row sourced from the companion recolors nothing
+        // (the ribbon's own fillColor never matched oldNorm), so the row looked
+        // permanently stuck no matter what was picked.
+        var companion = (p.data && p.data.linkedFillId && typeof findLinkedFillCompanion === 'function')
+          ? findLinkedFillCompanion(userLayers[state.activeLayerIdx], p) : null;
+        if (companion && companion.fillColor && colorHex8(companion.fillColor).toUpperCase() === oldNorm) companion.fillColor = newHex;
       });
       saveActiveLayerFrame();
     } else {
