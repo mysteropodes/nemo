@@ -1404,6 +1404,17 @@ window.SM={
     if(src.isEffectorLayer&&src.effector){state.layers[ni].isEffectorLayer=true;state.layers[ni].effector=JSON.parse(JSON.stringify(src.effector));}
     if(src.widget)state.layers[ni].widget=JSON.parse(JSON.stringify(src.widget));
     if(src.isTextLayer)state.layers[ni].isTextLayer=true;
+    // Text animators travel with the layer: they are plain numbers keyed by
+    // character INDEX, never by strokeId, so a deep copy lands on the
+    // duplicate's own glyphs with nothing to remap. The id IS regenerated,
+    // unlike a widget's xc_ control key — that one has to be copied verbatim
+    // because it names a track inside the copied motion data (§13), whereas
+    // this id only addresses the animator within its own layer and nothing
+    // points at it.
+    if(Array.isArray(src.textAnimators)&&src.textAnimators.length){
+      state.layers[ni].textAnimators=JSON.parse(JSON.stringify(src.textAnimators)).map(function(a){
+        a.id='ta_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e4);return a;});
+    }
     return ni;}
     var srcIdx=state.activeLayerIdx;var srcLd=state.layers[srcIdx];
     // Folder children (2026-08-29, Cyril: "Duplique ce qu'il y a
@@ -1984,7 +1995,7 @@ window.SM={
       // level setting like canvasW/fps above (not per-layer, not per-
       // symbol/montage snapshot — a linked-vs-embedded choice is global).
       mediaMode:state.mediaMode||'embedded',
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,blendKeys:l.blendKeys,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,mattesMore:l.mattesMore,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,isWidgetLayer:l.isWidgetLayer,widget:l.widget,isEffectorLayer:l.isEffectorLayer,effector:l.effector,effects:l.effects,footage:l.footage,
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,blendKeys:l.blendKeys,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,mattesMore:l.mattesMore,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,isWidgetLayer:l.isWidgetLayer,widget:l.widget,textAnimators:l.textAnimators,isEffectorLayer:l.isEffectorLayer,effector:l.effector,effects:l.effects,footage:l.footage,
         // Layer parenting (2026-07-25). BOTH of these were missing from this
         // list, so every parent link was silently dropped on save — a rig
         // survived the session and nothing more. `uid` is the stable identity
@@ -2308,6 +2319,15 @@ layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,parentKeys:l.parentKeys,pare
       if(ld.isWidgetLayer&&ld.widget&&typeof ld.widget==='object'&&ld.widget.x&&typeof ld.widget.x.key==='string'){
         state.layers[idx].isWidgetLayer=true;
         state.layers[idx].widget=JSON.parse(JSON.stringify(ld.widget));
+      }
+      // Text animators (2026-08-31) — guarded on SHAPE for the same reason as
+      // the widget block above: these are read by elementMotionAt on the very
+      // first render, so a corrupted nemo-auto carrying junk here would reach
+      // the selector maths before anything could reject it. Anything that is
+      // not a list of objects carrying a selector is dropped whole.
+      if(Array.isArray(ld.textAnimators)){
+        var _tas=ld.textAnimators.filter(function(a){return a&&typeof a==='object'&&a.selector&&typeof a.selector==='object';});
+        if(_tas.length)state.layers[idx].textAnimators=JSON.parse(JSON.stringify(_tas));
       }
       // Effector layer (2026-08-30) — guarded on the SHAPE of ld.effector,
       // same reasoning as the widget block right above: a corrupted

@@ -2685,7 +2685,7 @@ function getEffectiveStrokes(layerIdx,frameIdx,countOnly){
       if(window.SMMotion){
         layerStrokes=layerStrokes.map(function(sd){
           if(sd.isRaster||!sd.strokeId)return sd;
-          var elMat=SMMotion.elementMotionAt(layerIdx,sd.strokeId,frameIdx);
+          var elMat=SMMotion.elementMotionAt(layerIdx,sd.strokeId,frameIdx,sd);
           if(!elMat)return sd;
           var sd2=JSON.parse(JSON.stringify(sd));
           var tmp=new Path({insert:false});

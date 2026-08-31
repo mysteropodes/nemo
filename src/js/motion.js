@@ -3901,10 +3901,144 @@
   // existed on `ld.elementMotion`. Lifted 2026-07 ("precomp par calque"):
   // getEffectiveStrokes' ld.symbolId branch (app.js) now applies this
   // per-stroke, same nesting order as the plain-layer case above.
-  function elementMotionAt(li, strokeId, frameIdx) {
+  // ---- TEXT ANIMATORS (2026-08-31) ----
+  // ld.textAnimators is a list of { selector, props } living on the LAYER, not
+  // on the glyphs — see text-selector.js's header for why that distinction is
+  // the whole point (baked per-glyph keys are orphaned the moment the text is
+  // re-typed, measured). Each animator contributes props × weight(unitIndex),
+  // summed over the list, and the sum is ADDED to whatever the element's own
+  // holder already resolved.
+  //
+  // Every selector field is read through valueAtFrame on an ordinary Motion
+  // holder, so start/end/offset/amount are keyframable, expression-drivable
+  // and undo-able with no new machinery — the same reuse lever already proven
+  // for audio tracks and rig widgets (holders never required a layer).
+  var TA_SELECTOR_KEYS = ['start', 'end', 'offset', 'amount', 'easeHigh', 'easeLow', 'smooth'];
+  function taSelectorAt(an, frameIdx) {
+    var sel = {};
+    for (var k in an.selector) sel[k] = an.selector[k];
+    // A holder is only consulted for the numeric fields; shape/units/basedOn
+    // are discrete choices, not animatable values.
+    if (an.motion || an.motionStatic) {
+      for (var i = 0; i < TA_SELECTOR_KEYS.length; i++) {
+        var key = TA_SELECTOR_KEYS[i];
+        if (trackFor(an, key) || (an.motionStatic && an.motionStatic[key])) {
+          sel[key] = valueAtFrame(an, key, frameIdx)[0];
+        }
+      }
+    }
+    return sel;
+  }
+  // Total addressable units for the block this glyph belongs to. Counted from
+  // the layer's own stored strokes rather than the live Paper items so the
+  // export path (which never materialises them) agrees with the screen.
+  //
+  // Memoised per (layer, frame, basedOn): this is called once per GLYPH while
+  // building a scene, and getEffectiveStrokes is the single most-walked
+  // function in the render path (CLAUDE.md §5bis' "an access that isn't free")
+  // — without the cache a 50-character title would walk the layer's strokes
+  // 50 times per frame for a number that cannot change between those calls.
+  var _taCountCache = { key: '', n: 0 };
+  function taUnitCount(li, frameIdx, basedOn) {
+    var key = li + '|' + frameIdx + '|' + basedOn + '|' + (state._sceneVersion || 0);
+    if (_taCountCache.key === key) return _taCountCache.n;
+    var strokes = (typeof getEffectiveStrokes === 'function') ? getEffectiveStrokes(li, frameIdx) : null;
+    var max = -1;
+    if (strokes) {
+      for (var i = 0; i < strokes.length; i++) {
+        var u = SMTextSelector.unitIndexOf(strokes[i], basedOn);
+        if (u != null && u > max) max = u;
+      }
+    }
+    _taCountCache.key = key; _taCountCache.n = max + 1;
+    return _taCountCache.n;
+  }
+  function textAnimatorContribution(li, sd, frameIdx) {
     var ld = state.layers[li];
-    if (!ld || !ld.elementMotion) return null;
-    return computeMotionMat(ld.elementMotion[strokeId], frameIdx);
+    if (!ld || !ld.textAnimators || !ld.textAnimators.length || !sd) return null;
+    if (typeof window === 'undefined' || !window.SMTextSelector) return null;
+    var acc = null;
+    for (var a = 0; a < ld.textAnimators.length; a++) {
+      var an = ld.textAnimators[a];
+      if (!an || an.enabled === false || !an.props) continue;
+      var basedOn = (an.selector && an.selector.basedOn) || 'chars';
+      var idx = SMTextSelector.unitIndexOf(sd, basedOn);
+      if (idx == null) continue;
+      var total = taUnitCount(li, frameIdx, basedOn);
+      if (!total) continue;
+      var w = SMTextSelector.weightAt(taSelectorAt(an, frameIdx), idx, total);
+      if (!w) continue;
+      var p = an.props;
+      acc = acc || { dx: 0, dy: 0, rot: 0, sx: 0, sy: 0, op: 0 };
+      if (p.position) { acc.dx += (p.position[0] || 0) * w; acc.dy += (p.position[1] || 0) * w; }
+      if (p.rotation != null) acc.rot += p.rotation * w;
+      // Scale and opacity are authored as a DELTA from 100% (AE's own
+      // convention: an animator's Scale 0% means "shrink to nothing at full
+      // weight"), so they accumulate around 0 here and are folded into the
+      // multiplicative/percentage form by the caller.
+      if (p.scale) { acc.sx += ((p.scale[0] == null ? 100 : p.scale[0]) - 100) * w; acc.sy += ((p.scale[1] == null ? 100 : p.scale[1]) - 100) * w; }
+      if (p.opacity != null) acc.op += (p.opacity - 100) * w;
+    }
+    return acc;
+  }
+  // Creating an animator is deliberately NOT a bake: it writes one small
+  // descriptor of plain numbers on the layer. Nothing is written per glyph,
+  // which is exactly why re-typing the text cannot orphan it.
+  function addTextAnimator(li, props, selector) {
+    var ld = state.layers[li];
+    if (!ld || typeof window === 'undefined' || !window.SMTextSelector) return null;
+    if (!Array.isArray(ld.textAnimators)) ld.textAnimators = [];
+    var sel = SMTextSelector.defaultSelector();
+    if (selector) for (var k in selector) sel[k] = selector[k];
+    var an = {
+      id: 'ta_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e4),
+      enabled: true,
+      selector: sel,
+      // Authored as AE does: position/rotation are deltas from 0, scale and
+      // opacity are percentages where 100 means "unchanged at full weight".
+      props: props || { position: [0, 0], scale: [100, 100], rotation: 0, opacity: 100 },
+    };
+    ld.textAnimators.push(an);
+    return an;
+  }
+  function removeTextAnimator(li, id) {
+    var ld = state.layers[li];
+    if (!ld || !Array.isArray(ld.textAnimators)) return false;
+    for (var i = 0; i < ld.textAnimators.length; i++) {
+      if (ld.textAnimators[i].id === id) { ld.textAnimators.splice(i, 1); return true; }
+    }
+    return false;
+  }
+  // Read-only view of what an animator currently weighs, per unit — used by
+  // the panel to draw the ramp, and the cheapest way to assert the whole
+  // chain end to end from a test or the console.
+  function textAnimatorWeights(li, animIdx, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld || !ld.textAnimators || !ld.textAnimators[animIdx]) return [];
+    if (typeof window === 'undefined' || !window.SMTextSelector) return [];
+    var an = ld.textAnimators[animIdx];
+    var basedOn = (an.selector && an.selector.basedOn) || 'chars';
+    var f = frameIdx == null ? state.currentFrame : frameIdx;
+    var total = taUnitCount(li, f, basedOn);
+    return SMTextSelector.weights(taSelectorAt(an, f), total);
+  }
+  // sd (the stroke dict) is optional and only carries the char/word/line
+  // indices — every existing caller that has one gains text animators for
+  // free, and the two that don't (node handles) keep their previous
+  // behaviour exactly.
+  function elementMotionAt(li, strokeId, frameIdx, sd) {
+    var ld = state.layers[li];
+    if (!ld) return null;
+    var base = ld.elementMotion ? computeMotionMat(ld.elementMotion[strokeId], frameIdx) : null;
+    var ta = textAnimatorContribution(li, sd, frameIdx);
+    if (!ta) return base;
+    var m = base || { dx: 0, dy: 0, rot: 0, sx: 1, sy: 1, op: 1, ax: 0, ay: 0 };
+    return {
+      dx: m.dx + ta.dx, dy: m.dy + ta.dy, rot: m.rot + ta.rot,
+      sx: m.sx * (1 + ta.sx / 100), sy: m.sy * (1 + ta.sy / 100),
+      op: Math.max(0, Math.min(1, m.op * (1 + ta.op / 100))),
+      ax: m.ax, ay: m.ay,
+    };
   }
   // Extended per-shape property: Fill color (2026-07 — audit gap
   // "propriétés étendues par forme... reste un chantier futur"). First
@@ -12604,6 +12738,10 @@
     // reachable from outside this closure with an arbitrary holder object.
     computeMotionMatFor: computeMotionMat,
     elementMotionAt: elementMotionAt,
+    addTextAnimator: addTextAnimator,
+    removeTextAnimator: removeTextAnimator,
+    textAnimatorsOf: function (li) { var ld = state.layers[li]; return (ld && ld.textAnimators) || []; },
+    textAnimatorWeights: textAnimatorWeights,
     elementFillColorAt: elementFillColorAt,
     elementStrokeColorAt: elementStrokeColorAt,
     elementStrokeWidthAt: elementStrokeWidthAt,
