@@ -6316,6 +6316,19 @@
   }
   function renderLayerListMotion(list) {
     ensureMotionHeaderTools();
+    // Camera row (2026-08-31, feedback #186: "le layer camera n'apparait
+    // pas dans motion il faudrait le mettre avec ses propre properties
+    // ainsi que dans layer properties"). renderPanelRow (camera.js) is
+    // already mode-agnostic — icon, eye toggle, click to switch to the
+    // camera tool, right-click menu — the ONLY reason it never showed here
+    // is that Animation 2D's own renderLayerList calls it, and this
+    // function is Motion's own early-return replacement for that whole
+    // function (see renderLayerList's own comment), so the call was simply
+    // never reached. Same row, unmodified: clicking it sets state.tool =
+    // 'camera', which already shows the SAME #camera-sec panel (properties:
+    // position/width/rotation keys, ease curve) regardless of appMode —
+    // updateCameraPanel's own show condition never checked appMode either.
+    if (window.SMCamera) SMCamera.renderPanelRow(list);
     if (!list._motionEmptySelectBound) {
       list._motionEmptySelectBound = true;
       list.addEventListener('pointerdown', function (e) {
