@@ -26,6 +26,20 @@
   }
 
   function tracks() { return state.audioTracks || (state.audioTracks = []); }
+  // Animatable volume (feedback #218, "juste un slider pour le control du
+  // volume pas de value animable") — a track object is not a state.layers
+  // entry, but SMMotion.setValue/valueAtFrame/toggleAnimated never actually
+  // required that: they only ever touch holder.motion/.motionStatic (same
+  // non-layer-holder pattern ld.elementMotion already uses). Reading through
+  // this ONE helper everywhere (the slider, playback gain, scrub blips)
+  // means the legacy plain track.volume field (every project saved before
+  // this feature) keeps working as the fallback for a track that has never
+  // had its volume keyed or set through motionStatic.
+  function currentVolume(track, frame) {
+    if (window.SMMotion && SMMotion.isAnimated(track, 'volume')) return SMMotion.valueAtFrame(track, 'volume', frame === undefined ? state.currentFrame : frame)[0];
+    if (track.motionStatic && track.motionStatic.volume !== undefined) return track.motionStatic.volume[0];
+    return track.volume !== undefined ? track.volume : 1;
+  }
   // Feedback action log (2026-07, "récupère des données exploitable pour
   // résoudre les soucis") — state.audioTracks isn't part of
   // layersSnapshotNow()'s undo snapshot, so these mutations can't route
@@ -143,6 +157,71 @@
         document.addEventListener('pointerup', up);
       });
       row.appendChild(img);
+
+      // In/out trim (feedback #218, "pas de in/out point pour trim") —
+      // track.trimStart/trimEnd are seconds LOCAL to the decoded buffer
+      // (unset trimEnd means "full duration", same "unset = default"
+      // convention layer-inout.js's own ld.inPoint/outPoint already use).
+      // Only meaningful once the buffer is actually decoded — before that
+      // there's no duration to trim against, same gate peaksCanvasFor
+      // already has for drawing real waveform data.
+      if (track._buffer) {
+        var pxPerSec = state.fps * FC;
+        var baseLeft = track.offsetFrames * FC;
+        var dimL = document.createElement('div'); dimL.className = 'audio-trim-dim';
+        dimL.style.top = '2px'; dimL.style.height = STRIP_H + 'px';
+        row.appendChild(dimL);
+        var dimR = document.createElement('div'); dimR.className = 'audio-trim-dim';
+        dimR.style.top = '2px'; dimR.style.height = STRIP_H + 'px';
+        row.appendChild(dimR);
+        var hL = document.createElement('div'); hL.className = 'layer-inout-handle left audio-trim-handle';
+        hL.style.top = '2px'; hL.style.height = STRIP_H + 'px';
+        hL.title = 'Point d’entrée — glisser pour rogner';
+        row.appendChild(hL);
+        var hR = document.createElement('div'); hR.className = 'layer-inout-handle right audio-trim-handle';
+        hR.style.top = '2px'; hR.style.height = STRIP_H + 'px';
+        hR.title = 'Point de sortie — glisser pour rogner';
+        row.appendChild(hR);
+        (function (track, dimL, dimR, hL, hR, pxPerSec, baseLeft) {
+          function layoutTrim() {
+            var s = track.trimStart || 0;
+            var e = (track.trimEnd !== undefined && track.trimEnd !== null) ? track.trimEnd : track._buffer.duration;
+            var startPx = baseLeft + s * pxPerSec, endPx = baseLeft + e * pxPerSec;
+            dimL.style.display = s > 0.001 ? 'block' : 'none';
+            dimL.style.left = baseLeft + 'px'; dimL.style.width = (s * pxPerSec) + 'px';
+            var tailSec = track._buffer.duration - e;
+            dimR.style.display = tailSec > 0.001 ? 'block' : 'none';
+            dimR.style.left = endPx + 'px'; dimR.style.width = (tailSec * pxPerSec) + 'px';
+            hL.style.left = startPx + 'px';
+            hR.style.left = (endPx - 4) + 'px';
+          }
+          layoutTrim();
+          function trimDrag(side, handle) {
+            handle.addEventListener('pointerdown', function (e) {
+              e.preventDefault(); e.stopPropagation();
+              var startX = e.clientX;
+              var origStart = track.trimStart || 0;
+              var origEnd = (track.trimEnd !== undefined && track.trimEnd !== null) ? track.trimEnd : track._buffer.duration;
+              function mv(ev) {
+                var dSec = (ev.clientX - startX) / pxPerSec;
+                if (side === 'left') track.trimStart = Math.max(0, Math.min(origStart + dSec, origEnd - 1 / state.fps));
+                else track.trimEnd = Math.min(track._buffer.duration, Math.max(origEnd + dSec, origStart + 1 / state.fps));
+                layoutTrim();
+              }
+              function up() {
+                document.removeEventListener('pointermove', mv);
+                document.removeEventListener('pointerup', up);
+                logAudio('trim');
+                if (state.playing) restartAt(state.currentFrame);
+              }
+              document.addEventListener('pointermove', mv);
+              document.addEventListener('pointerup', up);
+            });
+          }
+          trimDrag('left', hL);
+          trimDrag('right', hR);
+        })(track, dimL, dimR, hL, hR, pxPerSec, baseLeft);
+      }
       wrap.appendChild(row);
     });
     // extend the playhead over the audio rows so the time cursor reads
@@ -178,8 +257,21 @@
     list.querySelectorAll('.audio-lrow').forEach(function (r) { r.remove(); });
     tracks().forEach(function (track, ti) {
       var row = document.createElement('div');
-      row.className = 'lrow audio-lrow';
+      row.className = 'lrow audio-lrow' + (state._audioSelId === track.audioId ? ' act' : '');
       row.dataset.audioTrack = ti;
+      // Select-like-a-layer (feedback #218, "impossible de le select") —
+      // .act is the exact class every real layer row already uses for its
+      // own highlight (style.css), so an audio row now reads as "selected"
+      // the same way. Click-to-toggle, not click-to-always-select: every
+      // icon button on this row (mute/stopwatch/delete) already calls
+      // e.stopPropagation() on its own click, and the volume slider on its
+      // own 'click' listener too, so this only ever fires for a click on
+      // the row's own body/name — never steals a click meant for one of
+      // those controls.
+      row.addEventListener('click', function () {
+        state._audioSelId = (state._audioSelId === track.audioId) ? null : track.audioId;
+        renderStrip();
+      });
 
       var spacer = document.createElement('div'); spacer.className = 'lico larrow-spacer'; row.appendChild(spacer);
 
@@ -222,18 +314,67 @@
         input.addEventListener('dblclick', function (e2) { e2.stopPropagation(); });
       });
 
+      // Volume stopwatch (feedback #218) — same 3-state convention (hollow/
+      // blue-outline/solid-blue) and the same arm/remove-last-key-falls-
+      // back-to-static/remove-key dance every other per-property stopwatch
+      // in this app already does (motion.js's renderVertexRow is the
+      // closest sibling — no shared helper exists there either, this just
+      // follows the same inline shape).
+      var swOn = !!(window.SMMotion && SMMotion.isAnimated(track, 'volume'));
+      var swTrack = swOn && SMMotion.trackFor(track, 'volume');
+      var hasKeyHere = !!(swTrack && SMMotion.keyAt(swTrack, state.currentFrame));
+      var sw = document.createElement('div');
+      sw.className = 'lico motion-stopwatch' + (swOn ? ' on' : '');
+      sw.title = SMMotion.stopwatchTitle('audioAnimateVolume', swOn, hasKeyHere);
+      sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
+      sw.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (!swOn) {
+          SMMotion.toggleAnimated(track, 'volume');
+        } else if (hasKeyHere) {
+          if (swTrack.keys.length === 1) {
+            var fv = SMMotion.valueAtFrame(track, 'volume', state.currentFrame);
+            track.motion.volume = { keys: [] };
+            if (!track.motionStatic) track.motionStatic = {};
+            track.motionStatic.volume = fv;
+          } else {
+            SMMotion.removeKeyAtCurrentFrame(track, 'volume');
+          }
+        } else {
+          SMMotion.setKeyAtCurrentFrame(track, 'volume', [currentVolume(track)]);
+        }
+        logAudio('volumeKey');
+        renderStrip();
+      });
+      row.appendChild(sw);
+
       // level (renamed from "opacity" per user request — a volume slider,
       // not a per-frame opacity, so it doesn't share that word)
       var vol = document.createElement('input');
-      vol.type = 'range'; vol.min = 0; vol.max = 100; vol.value = Math.round((track.volume !== undefined ? track.volume : 1) * 100);
+      vol.type = 'range'; vol.min = 0; vol.max = 100; vol.value = Math.round(currentVolume(track) * 100);
       vol.className = 'audio-vol'; vol.title = 'Niveau audio';
       vol.addEventListener('click', function (e) { e.stopPropagation(); });
       vol.addEventListener('input', function () {
-        track.volume = vol.value / 100;
-        if (track._gainNode) track._gainNode.gain.value = track.muted ? 0 : track.volume;
+        var v = vol.value / 100;
+        if (window.SMMotion) SMMotion.setValue(track, 'volume', [v]);
+        else track.volume = v;
+        if (track._gainNode) track._gainNode.gain.value = track.muted ? 0 : v;
       });
       vol.addEventListener('change', function () { logAudio('volume'); });
       row.appendChild(vol);
+
+      // Split at playhead (feedback #218, "pas de... coupé") — same
+      // "trim.start < split < trim.end" validation splitTrackAt already
+      // does, kept here too only for the icon's title (the click handler's
+      // own toast covers the actual out-of-range case).
+      var split = document.createElement('div');
+      split.className = 'lico'; split.title = window.SM.t('audioSplitTrack');
+      split.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="6" r="2.3"/><circle cx="6" cy="18" r="2.3"/><path d="M8 7.5 20 19M8 16.5 20 5"/></svg>';
+      split.addEventListener('click', function (e) {
+        e.stopPropagation();
+        splitTrackAt(track, state.currentFrame);
+      });
+      row.appendChild(split);
 
       // feedback #218 ("je peux pas le supprimer") — deletion already
       // worked (splice below, unchanged), but the control was a bare "×"
@@ -280,19 +421,65 @@
   // used throughout this app's other symbol/montage-context bugs this
   // session.
   function _audioContextSuspended() { return !!(state.activeSymbolId || state.activeMontageViewId); }
+  // trimStart/trimEnd are seconds LOCAL to the decoded buffer — see
+  // renderStrip's own trim-handle comment for why unset trimEnd means
+  // "full duration" rather than some other sentinel.
+  function trimOf(track) {
+    return {
+      start: track.trimStart || 0,
+      end: (track.trimEnd !== undefined && track.trimEnd !== null) ? track.trimEnd : (track._buffer ? track._buffer.duration : 0),
+    };
+  }
   function startTrack(track, fromFrame) {
     if (track.muted || !track._buffer || _audioContextSuspended()) return;
     var c = ensureCtx();
     if (!c) return;
+    var trim = trimOf(track);
+    var tSec = (fromFrame - (track.offsetFrames || 0)) / state.fps;
+    if (tSec >= trim.end) return;
+    // playFrom/playDuration are in the buffer's OWN local seconds — trim
+    // only clips WHICH slice of the buffer plays, it never moves
+    // offsetFrames (the anchor between buffer-local time 0 and the
+    // timeline), so a trimmed-in track still starts counting from the
+    // exact same timeline frame it always did.
+    var playFrom = Math.max(tSec, trim.start);
+    var playDuration = trim.end - playFrom;
+    if (playDuration <= 0) return;
+    // Timeline frame at which audio ACTUALLY becomes audible, and the
+    // AudioContext time that corresponds to — same reference point either
+    // way, whether playback starts right now (tSec already past trim.start)
+    // or later (tSec hasn't reached trim.start yet — either because the
+    // track's own untrimmed beginning is still ahead on the timeline, the
+    // pre-#218 case, or because trim.start alone pushes it out). The
+    // animated-volume curve below samples valueAtFrame from THIS frame
+    // forward, not fromFrame, so delayed playback doesn't silently burn
+    // through a chunk of its curve before any sound exists.
+    var startsNow = tSec >= trim.start;
+    var startAudioTime = startsNow ? c.currentTime : c.currentTime + (trim.start - tSec);
+    var startFrame = startsNow ? fromFrame : fromFrame + (trim.start - tSec) * state.fps;
     var src = c.createBufferSource();
     src.buffer = track._buffer;
     var gain = c.createGain();
-    gain.gain.value = track.volume !== undefined ? track.volume : 1;
+    // Animated volume (feedback #218) — a real gain envelope instead of a
+    // flat value, sampled once per FRAME (matching how every other Motion
+    // curve is quantized) across whatever fraction of the buffer will
+    // actually play. Capped at 2000 samples for the same reason the canvas
+    // overlays elsewhere in this app cap their own per-frame dot count —
+    // no audible benefit past that density, and it's one array built per
+    // playback start, not per frame.
+    if (window.SMMotion && SMMotion.isAnimated(track, 'volume')) {
+      var n = Math.max(2, Math.min(2000, Math.ceil(playDuration * state.fps) + 1));
+      var curve = new Float32Array(n);
+      for (var i = 0; i < n; i++) curve[i] = Math.max(0, SMMotion.valueAtFrame(track, 'volume', startFrame + i)[0]);
+      var dur = (n - 1) / state.fps;
+      if (dur > 0) gain.gain.setValueCurveAtTime(curve, startAudioTime, dur);
+      else gain.gain.value = curve[0];
+    } else {
+      gain.gain.value = currentVolume(track, fromFrame);
+    }
     src.connect(gain); gain.connect(c.destination);
-    var tSec = (fromFrame - (track.offsetFrames || 0)) / state.fps;
-    if (tSec >= track._buffer.duration) return;
-    if (tSec >= 0) src.start(0, tSec);
-    else src.start(c.currentTime - tSec, 0); // track starts later on the timeline — delay it
+    if (startsNow) src.start(0, playFrom, playDuration);
+    else src.start(startAudioTime, trim.start, playDuration); // starts later on the timeline — delay it
     track._srcNode = src;
     track._gainNode = gain;
   }
@@ -304,6 +491,50 @@
   function restartAt(frame) {
     stopAll();
     tracks().forEach(function (t) { startTrack(t, frame); });
+  }
+
+  // Cut/split (feedback #218, "pas de... coupé") — the split point is a
+  // TIMELINE frame, converted to buffer-local seconds through the SAME
+  // offsetFrames anchor playback already uses. Splitting produces two
+  // independent tracks sharing the same dataB64/decoded _buffer (a
+  // reference share, not a duplicate decode — dataB64 is an immutable
+  // string, so this is exactly as safe as any other plain-value share) but
+  // with disjoint trim windows either side of the cut, so each half is
+  // independently trimmable/deletable/mutable from here on. Volume
+  // keyframes are deep-cloned onto both halves (JSON round-trip, the same
+  // fast-clone convention CLAUDE.md §5bis already established for this
+  // codebase) rather than dropped — a cut splitting a fade in two is far
+  // less surprising than a cut silently erasing the fade from one side.
+  function splitTrackAt(track, timelineFrame) {
+    var trim = trimOf(track);
+    var minGap = 1 / state.fps;
+    var splitLocal = (timelineFrame - (track.offsetFrames || 0)) / state.fps;
+    if (splitLocal <= trim.start + minGap || splitLocal >= trim.end - minGap) {
+      if (window.showToast) showToast(SM.t('toastAudioSplitOutOfRange'));
+      return false;
+    }
+    var list = tracks();
+    var idx = list.indexOf(track);
+    if (idx < 0) return false;
+    var partB = {
+      name: track.name,
+      dataB64: track.dataB64,
+      offsetFrames: track.offsetFrames,
+      volume: track.volume,
+      muted: track.muted,
+      trimStart: splitLocal,
+      trimEnd: trim.end,
+      audioId: 'au' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      _buffer: track._buffer,
+    };
+    if (track.motion) partB.motion = JSON.parse(JSON.stringify(track.motion));
+    if (track.motionStatic) partB.motionStatic = JSON.parse(JSON.stringify(track.motionStatic));
+    track.trimEnd = splitLocal;
+    list.splice(idx + 1, 0, partB);
+    logAudio('split');
+    if (state.playing) restartAt(state.currentFrame);
+    renderStrip();
+    return true;
   }
 
   // ---- import ----
@@ -359,12 +590,13 @@
     if (!c) return;
     tracks().forEach(function (track) {
       if (track.muted || !track._buffer) return;
+      var trim = trimOf(track);
       var tSec = (frame - (track.offsetFrames || 0)) / state.fps;
-      if (tSec < 0 || tSec >= track._buffer.duration) return;
+      if (tSec < trim.start || tSec >= trim.end) return;
       var src = c.createBufferSource();
       src.buffer = track._buffer;
       var gain = c.createGain();
-      gain.gain.value = track.volume !== undefined ? track.volume : 1;
+      gain.gain.value = currentVolume(track, frame);
       src.connect(gain); gain.connect(c.destination);
       src.start(0, tSec, Math.max(1 / state.fps, 0.045));
     });

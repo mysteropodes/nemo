@@ -476,6 +476,17 @@
     // "Align" is on — matching Friction's own default, see the research
     // note on FollowPathEffect).
     pathPercent: [0], pathInfluence: [100],
+    // Audio track volume (2026-08-31, feedback #218) — audio-bridge.js's
+    // holder isn't a state.layers entry (a plain track object gets its own
+    // .motion/.motionStatic, same non-layer-holder pattern ld.elementMotion
+    // already uses), but setValue/valueAtFrame/toggleAnimated don't care —
+    // they only ever touch holder.motion/.motionStatic. Only reachable via
+    // toggleAnimated's OFF->ON seed (displayValueFor -> staticValue) when a
+    // track has never had its volume touched yet — every other read goes
+    // through audio-bridge.js's own currentVolume(), which checks
+    // motionStatic/the legacy track.volume field first. 1 (full volume),
+    // matching the un-animated default every existing track already has.
+    volume: [1],
     // Dynamic shape corners (2026-08-18) — safety-net fallback only; the
     // REAL per-shape default is each rect's own data.paramShape.tl/tr/br/bl
     // (every shape has its own baked radii, unlike every other prop here
@@ -12227,6 +12238,19 @@
 
   window.SMMotion = {
     valueAtFrame: valueAtFrame,
+    // Generic, holder-based keyframe writers/toggles (2026-08-31, feedback
+    // #218) — every one of these already worked on an arbitrary holder
+    // (only ld.motion/.motionStatic are ever touched, see ensureTrack's own
+    // comment), but nothing outside this file could reach them directly
+    // before now; setLayerValue below only ever resolves state.layers[li],
+    // which a non-layer holder (audio-bridge.js's own track objects) isn't.
+    toggleAnimated: toggleAnimated,
+    setValue: setValue,
+    trackFor: trackFor,
+    keyAt: keyAt,
+    stopwatchTitle: stopwatchTitle,
+    setKeyAtCurrentFrame: setKeyAtCurrentFrame,
+    removeKeyAtCurrentFrame: removeKeyAtCurrentFrame,
     // The PRE-expression value of a property — the keyframed/static curve
     // an expression is overriding. The graph editor plots both (see
     // motion-graph.js): without this it could only ever draw the result,
