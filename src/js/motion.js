@@ -6946,8 +6946,18 @@
       // right panel calls (renderMotionPropsPanel below) — one writer,
       // just appended to a different parent element — so a key added from
       // either surface is immediately visible on both.
-      renderParentRow(list, ld, li);
-      renderBlendRow(list, ld, li);
+      // feedback #220 ("si je fais raccourci 'p' la propriété de position
+      // ne s'affiche pas à la place j'ai parent et blend") — these two
+      // rows render unconditionally, never checking _propFilter at all
+      // (they're outside the PROPS list a P/A/R/S/T shortcut narrows),
+      // so pressing P to isolate Position always left Parent+Blend
+      // cluttering the result above it too. Neither has a shortcut letter
+      // of its own (PROP_SHORTCUT has none to spare — see its own comment;
+      // "parent"/"blend" here are just filter-check keys, not new
+      // shortcuts), so the correct behavior is simply to hide with
+      // everything else once a filter narrows to something specific.
+      if (!isPropFiltered('parent')) renderParentRow(list, ld, li);
+      if (!isPropFiltered('blend')) renderBlendRow(list, ld, li);
       renderTransformGroup(list, ld, 'Transform');
       // Per-element sub-list used to be component-exclusive ("a symbol
       // instance's actual strokes live inside the SYMBOL's own sub-layer,
@@ -10229,9 +10239,10 @@
       if (!expanded) return;
       // Mirrors renderLayerListMotion's own Parent/Blend rows exactly —
       // same condition (li's own layer, expanded), same order, same two
-      // rows — CLAUDE.md §11's panel/grid alignment invariant.
-      renderDiscreteKeyGridRow(grid, ld, 'parentKeys', SM.t('fieldParent') || 'Parent', ld.parentKeys || [], function (frame) { SMMotion.removeParentKeyAt(ld, frame); });
-      renderDiscreteKeyGridRow(grid, ld, 'blendKeys', SM.t('fieldBlend'), ld.blendKeys || [], function (frame) { SMMotion.removeBlendKeyAt(ld, frame); });
+      // rows, same feedback #220 filter gate — CLAUDE.md §11's panel/grid
+      // alignment invariant.
+      if (!isPropFiltered('parent')) renderDiscreteKeyGridRow(grid, ld, 'parentKeys', SM.t('fieldParent') || 'Parent', ld.parentKeys || [], function (frame) { SMMotion.removeParentKeyAt(ld, frame); });
+      if (!isPropFiltered('blend')) renderDiscreteKeyGridRow(grid, ld, 'blendKeys', SM.t('fieldBlend'), ld.blendKeys || [], function (frame) { SMMotion.removeBlendKeyAt(ld, frame); });
       if (showsGroupHeader()) {
         // 'motion-group-row' too, not just 'frow' (2026-07-30 fix, Cyril:
         // "encore des problème de calage d'ui"): .motion-group-row carries
