@@ -1766,9 +1766,33 @@
           // cssColorToRgba above already produces — never touched unless
           // the user actually keyed/set it (elementFillColorAt returns
           // null otherwise, see its own comment in motion.js).
+          //
+          // feedback #203 ("le fill properties... agit aussi sur le
+          // stroke... il devrait y avoir une propriété keyframable de
+          // stroke séparé pour les shape fait avec brush"): a vector-brush
+          // ribbon's (and its dabs') own paint IS its fillColor — see the
+          // isVectorBrush "their visible ink IS the fill" note further
+          // down — so applying the Fill track here unconditionally meant
+          // keying "Fill" repainted the brush's INK (what the user sees as
+          // its stroke), with no way to key the ink on its own. The Stroke
+          // track drives ink color for these two item kinds instead — the
+          // anchor and its dabs deliberately share the SAME cStrokeId (see
+          // that variable's own comment above: correct for the render
+          // TRANSFORM, but not for which color track should reach them). A
+          // genuine linked-fill companion (isLinkedFillCompanion, drawn
+          // when "brush stroke + fill" is enabled, feedback #200) is a real
+          // separate fill region and keeps the Fill track exactly as
+          // before — same cStrokeId (fillAnchorStrokeId aliases it to the
+          // anchor's), different item, different paint attribute.
+          var isBrushInk = !!(c.data && (c.data.isVectorBrush || c.data.isBrushTextureCopy));
           if (window.SMMotion && cStrokeId) {
-            var fcOverride = SMMotion.elementFillColorAt(i, cStrokeId, renderFrame);
-            if (fcOverride) item.fillColor = fcOverride;
+            if (isBrushInk) {
+              var inkOverride = SMMotion.elementStrokeColorAt(i, cStrokeId, renderFrame);
+              if (inkOverride) item.fillColor = inkOverride;
+            } else {
+              var fcOverride = SMMotion.elementFillColorAt(i, cStrokeId, renderFrame);
+              if (fcOverride) item.fillColor = fcOverride;
+            }
           }
           // Gradient fill (2026-07) — takes priority over the flat fillColor
           // above on the Rust side (geometry-wasm's paint_fill), same
