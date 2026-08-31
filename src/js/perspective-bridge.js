@@ -128,6 +128,56 @@
   }
   window.buildPerspectiveGuideItems = buildPerspectiveGuideItems;
 
+  // ---- Live cursor guide (2026-08-31, Sketchbook's own "rotating compass"
+  // — Cyril, with a reference video: "on a un guide sur 3 axes qui suit la
+  // souris > 1 axe qui va vers point 1 de perspective > axe 2 vers l'autre
+  // point > et un axe vertical [...] quand on dessine ça suit la direction
+  // de là où l'on va") ----
+  //
+  // The static fan above radiates from each VP and never moves; this is
+  // the OTHER half Sketchbook shows — a short dashed crosshair centered on
+  // the CURSOR itself, pivoting as the cursor moves so its own axes always
+  // point at the VPs from wherever the cursor currently is, plus one fixed
+  // vertical axis. One axis per configured VP (so 1pt draws VP+vertical,
+  // 2pt draws VP1+VP2+vertical — the exact 3-axis case Cyril described and
+  // the video shows, 3pt draws all three VPs+vertical) rather than
+  // hardcoding "exactly 2 VPs" — this is purely a drawing AID, so a 4th
+  // reference line in 3pt mode costs nothing and never needs a special
+  // case. This is a VISUAL INDICATOR ONLY: the actual snap-while-drawing
+  // behavior it's showing you already exists (findVPRayByAngle/snapToVP
+  // above, wired into draw-bridge.js) — short axes, not full-canvas rays,
+  // so it doesn't compete with the static fan for attention.
+  var CURSOR_GUIDE_REACH_PX = 46;
+  function buildPerspectiveCursorGuideItems() {
+    if (!state.perspectiveEnabled || !cursorWorld) return [];
+    var vps = ensurePerspectiveVPs();
+    var items = [];
+    var zs = 1 / Math.max(0.0001, view.zoom);
+    var reach = CURSOR_GUIDE_REACH_PX * zs;
+    var col = [255, 255, 255, 210];
+    var cx = cursorWorld.x, cy = cursorWorld.y;
+    function addAxis(dx, dy) {
+      var len = Math.hypot(dx, dy);
+      if (len < 1e-6) return; // cursor sits ON a VP — no direction to draw
+      var ux = dx / len, uy = dy / len;
+      items.push({
+        segments: [{ point: [cx - ux * reach, cy - uy * reach] }, { point: [cx + ux * reach, cy + uy * reach] }],
+        closed: false, fillColor: null, strokeColor: col, strokeWidth: 1 * zs, strokeCap: 'butt',
+        dashPattern: [4 * zs, 3 * zs],
+      });
+    }
+    vps.forEach(function (vp) { addAxis(vp.x - cx, vp.y - cy); });
+    addAxis(0, 1); // vertical — screen-space up/down regardless of VP layout
+    // Small center dot so the pivot point itself reads clearly against
+    // three crossing dashed lines.
+    items.push({
+      segments: [{ point: [cx - 1.5 * zs, cy] }, { point: [cx + 1.5 * zs, cy] }],
+      closed: false, fillColor: null, strokeColor: col, strokeWidth: 1.5 * zs, strokeCap: 'round',
+    });
+    return items;
+  }
+  window.buildPerspectiveCursorGuideItems = buildPerspectiveCursorGuideItems;
+
   // Snaps `end` onto whichever vanishing point's ray from `start` is
   // closest in ANGLE (within SNAP_DEG) — preserves the drawn length (the
   // point is projected onto the ray, not replaced by the VP itself), so a
@@ -287,6 +337,25 @@
   // Locked VPs stay put even during a whole-guide drag.
   var dragging = null; // the VP object currently being dragged, or null
   var draggingWhole = null; // {startX,startY,orig:[{x,y}...]} or null
+  // Live cursor position for the 3-axis follow guide below — updated
+  // UNGATED, on every pointermove over the canvas, unlike dragging/
+  // draggingWhole's own onMove body which only runs mid-drag. Read by
+  // buildPerspectiveCursorGuideItems (this file) from engine-bridge.js's
+  // VOLATILE items block — same "cheap live visual, expensive commit at
+  // drop" split as eraserCursorWorld (engine-bridge.js's own pointer-
+  // following overlay) already uses, and for the same reason: this file's
+  // OWN buildPerspectiveGuideItems (the static VP fan) is built OUTSIDE
+  // that block, so it's part of the cached scene prefix during a drag —
+  // fine for a fan that never moves, but a cursor-following crosshair
+  // bundled in there would freeze at wherever the cursor was when the
+  // current drag/cache started, exactly the "grease pencil onion ghost
+  // never refreshed" class of bug CLAUDE.md already warns about elsewhere.
+  var cursorWorld = null;
+  function trackCursor(e) {
+    if (!engineOn() || !state.perspectiveEnabled) { cursorWorld = null; return; }
+    var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    cursorWorld = { x: w[0], y: w[1] };
+  }
   // Broadened 2026-07 — same reasoning as symmetry-bridge.js's own
   // shouldEdit (feedback: "garder l'outil brush sélectionné et pouvoir
   // modifier les guides dans le canvas quand même"): dragging a VP/horizon
@@ -336,6 +405,12 @@
     }
   }
   function onMove(e) {
+    // Ungated — see trackCursor's own comment. Runs even when this same
+    // move goes on to be ignored (no VP drag active) or later stopped by a
+    // DIFFERENT tool's own capture-phase listener further down the chain:
+    // this file loads before every drawing-tool bridge (index.html script
+    // order), so its capture listener always sees the event first.
+    trackCursor(e);
     if (!shouldEdit() || (!dragging && !draggingWhole)) return;
     e.stopImmediatePropagation(); e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
@@ -364,6 +439,12 @@
     target.addEventListener('pointermove', onMove, { capture: true });
     target.addEventListener('pointerup', onUp, { capture: true });
     target.addEventListener('pointercancel', onUp, { capture: true });
+    // Clears the live cursor guide the instant the pointer leaves the
+    // canvas — pointermove alone never fires again once outside, so
+    // without this the crosshair would freeze at its last position
+    // instead of disappearing, the exact "ghost" class of bug a stale
+    // volatile cursor overlay always risks.
+    target.addEventListener('pointerleave', function () { cursorWorld = null; window.SMEngineBridge && window.SMEngineBridge.renderNow(); }, { capture: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
