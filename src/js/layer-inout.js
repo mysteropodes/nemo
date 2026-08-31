@@ -1414,7 +1414,7 @@
     // user will actually meet it — on the handle itself.
     hleft.title = 'Point d\'entrée — glisser pour rogner. Alt+glisser : emmener aussi les keyframes.\nAvec plusieurs barres sélectionnées, toute la sélection suit.';
     hright.title = 'Point de sortie — glisser pour rogner (les keyframes ne bougent pas : rogner la fin ne déplace rien).';
-    bar.title = 'Glisser le corps : déplace le calque ET ses keyframes. Alt+glisser : déplacer la fenêtre de visibilité seule, keyframes en place.';
+    bar.title = SM.t('inoutBarBodyTitle');
     bar.appendChild(hleft); bar.appendChild(hright);
     // Parent in Time — 3 on-timeline connection points (2026-07-30, Van
     // Dijk 2.1). Glisser directement depuis la barre plutôt que par le
@@ -1434,9 +1434,9 @@
       // .is-child/.is-parent opt back out of that gate unconditionally).
       if (childAnchor === mode) a.classList.add('is-child');
       if (isTimeLinkParentAnchor(li, mode)) a.classList.add('is-parent');
-      a.title = (mode === 'in' ? 'Glisser vers un autre calque : lie le point d’entrée de ce calque à son temps'
-        : mode === 'out' ? 'Glisser vers un autre calque : lie le point de sortie de ce calque à son temps'
-        : 'Glisser vers un autre calque : lie tout le calque (entrée + sortie) à son temps') + ' — clic droit pour délier';
+      a.title = (mode === 'in' ? SM.t('inoutLinkIn')
+        : mode === 'out' ? SM.t('inoutLinkOut')
+        : SM.t('inoutLinkBoth')) + SM.t('inoutLinkUnlinkSuffix');
       a.addEventListener('mousedown', function (e) {
         if (!window.SMMotion || !window.SMMotion.startTimeLinkPickwhip) return;
         window.SMMotion.startTimeLinkPickwhip(li, a, e, mode === 'whole' ? 'both' : mode);

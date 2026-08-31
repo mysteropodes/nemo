@@ -6692,7 +6692,7 @@
       // Mograph duplicator toggle — shown here too since the dupOffset*
       // properties it reveals live/get keyframed in this list (same
       // reasoning as the 3D toggle above).
-      var ddup = document.createElement('div'); ddup.className = 'lico motion-col-duplicator' + (ld.duplicator ? '' : ' off'); ddup.title = 'Duplicator (grille / radial / chemin)'; ddup.innerHTML = ICO_DUP;
+      var ddup = document.createElement('div'); ddup.className = 'lico motion-col-duplicator' + (ld.duplicator ? '' : ' off'); ddup.title = SM.t('dupColTitle'); ddup.innerHTML = ICO_DUP;
       ddup.addEventListener('click', function (e) { e.stopPropagation(); toggleLayerDuplicator(li); });
       row.appendChild(ddup);
       // Same badge as Animation 2D's rows, from the same decider — Motion is
@@ -7292,7 +7292,7 @@
     var hasKeyHere = keyed && ld.blendKeys.some(function (k) { return k.frame === state.currentFrame; });
     var sw = document.createElement('div');
     sw.className = 'lico motion-stopwatch' + (keyed ? ' on' : '');
-    sw.title = stopwatchTitle('motionAnimateFill', keyed, hasKeyHere);
+    sw.title = stopwatchTitle('motionAnimateProp', keyed, hasKeyHere);
     sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
     sw.addEventListener('click', function (e) {
       e.stopPropagation(); pushUndo();
@@ -7573,7 +7573,7 @@
     var parentKeyHere = parentKeyed && ld.parentKeys.some(function (k) { return k.frame === state.currentFrame; });
     var sw = document.createElement('div');
     sw.className = 'lico motion-stopwatch' + (parentKeyed ? ' on' : '');
-    sw.title = stopwatchTitle('motionAnimateFill', parentKeyed, parentKeyHere);
+    sw.title = stopwatchTitle('motionAnimateProp', parentKeyed, parentKeyHere);
     sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (parentKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
     sw.addEventListener('click', function (e) {
       e.stopPropagation(); pushUndo();
@@ -8235,7 +8235,7 @@
       var exprErr = holder.expressions && holder.expressions[prop] && holder.expressions[prop].lastError;
       var exprBtn = document.createElement('div');
       exprBtn.className = 'lico motion-expr-btn' + (exprOn ? ' on' : '') + (exprErr ? ' err' : '');
-      exprBtn.title = exprErr ? ('Expression en erreur : ' + exprErr) : (exprOn ? 'Expression active — clic pour éditer' : 'Ajouter une expression sur cette propriété');
+      exprBtn.title = exprErr ? (SM.t('exprErrorPrefix') + exprErr) : (exprOn ? SM.t('exprActiveEdit') : SM.t('exprAddOnProp'));
       exprBtn.innerHTML = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 4c-2 0-3 1.2-3 3v10c0 2-1 3-3 3M16 4c2 0 3 1.2 3 3v10c0 2 1 3 3 3M9 12h6"/></svg>';
       exprBtn.addEventListener('click', function (e) {
         e.stopPropagation();
@@ -8266,7 +8266,7 @@
       if (prop === 'anchor') {
         var gridBtn = document.createElement('div');
         gridBtn.className = 'lico motion-anchor-grid-btn' + (window._anchorGridOpenFor === holder ? ' on' : '');
-        gridBtn.title = 'Point d\'ancrage — grille rapide';
+        gridBtn.title = SM.t('anchorQuickGrid');
         gridBtn.innerHTML = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 3.5v17M14.5 3.5v17"/></svg>';
         gridBtn.addEventListener('click', function (e) {
           e.stopPropagation();
@@ -8382,7 +8382,7 @@
       if (prop === 'scale' && PROP_DIM[prop] === 2) {
         var lockBtn = document.createElement('div');
         lockBtn.className = 'lico motion-scale-lock' + (_scaleLockedHolders.has(holder) ? ' on' : '');
-        lockBtn.title = 'Lier Scale X et Y (garder le ratio)';
+        lockBtn.title = SM.t('scaleLinkXY');
         lockBtn.innerHTML = _scaleLockedHolders.has(holder)
           ? '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'
           : '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>';

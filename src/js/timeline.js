@@ -5951,7 +5951,7 @@ function renderLayerList(frameOnly){
       var garr=document.createElement('div');garr.className='lico larrow';garr.style.cursor='pointer';
       var gmeta=state.layerLinkGroups[entry.linkGroupId];
       garr.textContent=gmeta.collapsed?'▸':'▾';
-      garr.title=gmeta.collapsed?'Afficher les calques Stroke/Fill/Shadow liés':'Masquer les calques Stroke/Fill/Shadow liés';
+      garr.title=gmeta.collapsed?SM.t('lfsShow'):SM.t('lfsHide');
       garr.addEventListener('click',function(e){e.stopPropagation();gmeta.collapsed=!gmeta.collapsed;renderLayerList();renderTimeline();});
       row.appendChild(garr);
     }else if(!ld.folderId){var spacer=document.createElement('div');spacer.className='lico larrow-spacer';row.appendChild(spacer);}
@@ -6116,7 +6116,7 @@ function renderLayerList(frameOnly){
       var shArrow=document.createElement('div');shArrow.className='lico larrow';shArrow.style.cursor='pointer';
       var shExpanded=!!(window._layerShapesExpanded&&window._layerShapesExpanded[i]);
       shArrow.textContent=shExpanded?'▾':'▸';
-      shArrow.title=shExpanded?'Masquer les formes/groupes':'Afficher les formes/groupes de ce calque';
+      shArrow.title=shExpanded?SM.t('shapesGroupsHide'):SM.t('shapesGroupsShow');
       shArrow.addEventListener('click',function(e){
         e.stopPropagation();
         if(!window._layerShapesExpanded)window._layerShapesExpanded={};
@@ -10336,11 +10336,11 @@ document.getElementById('tl-cf').addEventListener('change',function(){
 document.getElementById('btn-al').addEventListener('click',function(e){
   var r=this.getBoundingClientRect();
   window.showContextMenu(r.left,r.bottom+4,[
-    {label:'Calque',action:function(){window.SM.addLayer();}},
-    {label:'Calque Null',action:function(){window.SM.addNullLayer();}},
-    {label:'Dossier',action:function(){window.SM.addFolderLayer();}},
-    {label:'Calque d’effet',action:function(){window.SM.addEffectLayer();}},
-    {label:'Calque Guide',action:function(){window.SM.addGuideLayer();}},
+    {label:SM.t('ctxInsertLayer'),action:function(){window.SM.addLayer();}},
+    {label:SM.t('ctxInsertLayerNull'),action:function(){window.SM.addNullLayer();}},
+    {label:SM.t('ctxInsertLayerFolder'),action:function(){window.SM.addFolderLayer();}},
+    {label:SM.t('ctxInsertLayerEffect'),action:function(){window.SM.addEffectLayer();}},
+    {label:SM.t('ctxInsertLayerGuide'),action:function(){window.SM.addGuideLayer();}},
     {label:SM.t('ctxInsertLayerJoystick'),action:function(){window.SM.addJoystickLayer();}},
     {label:SM.t('ctxInsertLayerSlider'),action:function(){window.SM.addSliderLayer();}},
   ]);
