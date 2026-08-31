@@ -6943,8 +6943,21 @@
     pill.appendChild(lab);
     pill.addEventListener('click', function (e) {
       e.preventDefault(); e.stopPropagation();
-      window.SM.setActiveLayer(li);
-      if (window.openBlendDropdownAt) window.openBlendDropdownAt(pill);
+      // feedback #206, "le menu blend ne s'affiche pas là où l'on clic" —
+      // setActiveLayer(li) is a no-op here (li IS already state.activeLayerIdx,
+      // this row only ever renders for the active layer) but it UNCONDITIONALLY
+      // re-renders via updateUI(), which rebuilds #motion-props-body from
+      // scratch — by the time openBlendDropdownAt ran, `pill` was a DETACHED
+      // node from the PREVIOUS render, and its getBoundingClientRect() on a
+      // detached element is all-zero, pinning the popup to the top-left
+      // corner (confirmed live from the screenshot). Same trap
+      // openBlendDropdownAt's own doc comment already calls out ("a captured
+      // DOM node goes stale the moment the list re-renders") and the exact
+      // reason the layer-row context-menu entry (timeline.js) passes a
+      // synthetic rect built from the click instead of the row itself —
+      // mirrored here rather than re-triggering it.
+      var _bx = e.clientX, _by = e.clientY;
+      if (window.openBlendDropdownAt) window.openBlendDropdownAt({ getBoundingClientRect: function () { return { left: _bx, right: _bx, top: _by, bottom: _by, width: 0, height: 0 }; } });
     });
     row.appendChild(pill);
     body.appendChild(row);
