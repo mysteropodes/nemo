@@ -68,6 +68,15 @@
   // fresh scan rather than trusting the last hover result). Topmost child
   // first, same z-order convention as Paper's own hitTest.
   function hitTestOrientedBoxA2D(pt, targetLayer) {
+    // The boxes are built from RAW geometry (orientedBoxForPath), so the
+    // world click has to come back into the layer's own space first
+    // (2026-08-31). Without it, a layer under any Motion transform drew its
+    // boxes in one place and tested clicks in another: measured with the
+    // layer moved +300/-200, a click dead on the shape landed at world
+    // (2269,142) against a box at [1820,301,2060,481] — no hit, so the drag
+    // never started and the shape "could be selected but not moved".
+    var liOB = userLayers.indexOf(targetLayer);
+    if (liOB >= 0 && window.layerLocalPoint) pt = layerLocalPoint(liOB, pt);
     var kids = targetLayer.children;
     for (var i = kids.length - 1; i >= 0; i--) {
       var c = kids[i];
@@ -377,6 +386,16 @@
   var rotCenter = null, rotStartAngle = 0, rotLastAngle = 0;
   var marqueeStart = null;
   var moveStarted = false;
+  // The grabbed point, in the LAYER's own space, tracked through the whole
+  // move gesture (2026-08-31). Needed because a layer's Motion pivot is
+  // userLayers[i].bounds.center — DERIVED FROM THE CONTENT — so translating
+  // a shape moves the pivot, which rotates/scales the whole layer around a
+  // new centre and lands the dragged shape somewhere other than under the
+  // cursor. Measured with the layer at rotation 25°: a geometry delta of
+  // (240,42) drifted the pivot by (154,21) and moved the shape (223,76) on
+  // screen where (200,139) was asked for. Knowing where the grab point
+  // WENT lets the move correct itself against where it should be.
+  var moveGrabLocal = null;
   var draggingArc = null;
   var arcDragCache = null;
   var ANCHOR_MAP = { nw: 'se', ne: 'sw', sw: 'ne', se: 'nw', n: 's', s: 'n', e: 'w', w: 'e' };
@@ -515,6 +534,15 @@
   function hitTestHandles(pt, altHeld) {
     var h = computeHandles();
     if (!h) return null;
+    // NOTE (2026-08-31): `pt` stays in WORLD space here on purpose.
+    // computeHandles already maps its corners/ring/anchor through the
+    // layer's Motion transform (its own `WP` helper), so both sides are
+    // world-space and agree. Converting the point here — as
+    // hitTestOrientedBoxA2D genuinely must, since orientedBoxForPath is
+    // raw geometry — was tried and broke the drag outright: with a
+    // selection live, the mismatched point matched a handle, onDown took
+    // the handle branch and never reached the branch that sets mode
+    // 'move', so a shape could be selected and then not moved at all.
     var tol = 9 / view.zoom;
     // Anchor crosshair — checked FIRST/exclusively, but ONLY while Alt is
     // held (live feedback 2026-07: "ça peut être confusant quand il faut
@@ -757,9 +785,39 @@
       if (window._motionExpandedElement != null || window._perObjBoxes === state.activeLayerIdx) {
         var lyrEx = userLayers[state.activeLayerIdx];
         var ptEx = new Point(w0[0], w0[1]);
-        var hitEx = lyrEx ? lyrEx.hitTest(ptEx, { fill: true, stroke: true, tolerance: 6 / view.zoom }) : null;
+        // Hit-test in the LAYER's own space (2026-08-31): its geometry never
+        // moves, the Motion transform is applied at render, so testing the
+        // raw world point misses every shape as soon as the layer is
+        // animated. perObjectUnionBounds below is already world-space and
+        // keeps ptEx. Measured with the layer moved/rotated/scaled: clicking
+        // a shape dead-centre targeted nothing.
+        // hitTestPosed undoes the layer's transform AND each element's own,
+        // per element — a plain layer.hitTest tests one point against
+        // geometry that several independent transforms have moved, so once
+        // two elements had been dragged apart inside the group, clicking
+        // either of them at its visible position matched nothing.
+        var hitEx = (lyrEx && window.hitTestPosed) ? hitTestPosed(state.activeLayerIdx, ptEx, 6 / view.zoom) : null;
         var itEx = hitEx && hitEx.item;
         while (itEx && itEx.parent && itEx.parent !== lyrEx) itEx = itEx.parent;
+        // Route through resolveBrushAnchor (tools.js) before reading strokeId
+        // (2026-08-31 follow-up) — a vector brush's linked-fill companion
+        // (data.isLinkedFillCompanion) is a separate live Paper item with its
+        // OWN strokeId, and topmost z-order sometimes puts it in front of the
+        // anchor at the exact pixel clicked (same "des fois ça sélectionne le
+        // tout des fois juste le fill" inconsistency resolveBrushAnchor was
+        // already written to fix for every OTHER click path — this isolation
+        // block had its own separate itEx.data.strokeId read that never went
+        // through it). Per-element Motion is only ever recorded under the
+        // ANCHOR's strokeId (motion.js's layerElements folds the companion
+        // out of the Elements list) — without this, a click that happened to
+        // land on the companion created a SECOND, independent
+        // ld.elementMotion entry keyed by the companion's own strokeId, and
+        // now that a click-drag actually moves things (the fix above this
+        // block), dragging it split the fill away from its own outline.
+        // Found live: after two drags the companion's motionStatic.position
+        // was [-96.9,192.1] while the anchor's was [-101.5,338.8] — same
+        // stroke, two different places, reading as two separate wavy shapes.
+        itEx = (window.resolveBrushAnchor && lyrEx) ? resolveBrushAnchor(itEx, lyrEx) : itEx;
         var sidEx = itEx && itEx.data && itEx.data.strokeId;
         // Clicking a SIBLING hands the isolation over to it rather than
         // ending it — same continuity Animation 2D's per-object mode has, and
@@ -767,21 +825,72 @@
         // space still INSIDE the group box drops back to "all boxes, none
         // targeted" (you are still in the group, Illustrator-style); only a
         // click outside the box leaves it.
+        var sortiDuGroupe = false;
         if (sidEx && sidEx !== window._motionExpandedElement) {
           window._motionExpandedElement = sidEx;
           window._perObjBoxes = state.activeLayerIdx;
           if (SMMotion.selectShapesByStrokeIds) SMMotion.selectShapesByStrokeIds(state.activeLayerIdx, [sidEx]);
+          // Re-run onDown now that the target has actually switched to the
+          // sibling under the cursor (2026-08-31 follow-up, "je déplace un
+          // éléments et que dans le même groupe je déplace un autre élément
+          // l'autre éléments ne déplace que la box et pas la shape"). The
+          // SMMotion.onDown call above (this file's own top-of-onDown, a few
+          // lines up) ran BEFORE _motionExpandedElement was updated, so its
+          // body-hit-test always compared the click against the OLD target's
+          // box — a click on a sibling is never inside that box, so it fell
+          // through to plain re-targeting every time and this whole block
+          // just consumed the event. A click-and-drag done as one continuous
+          // gesture (mousedown then move without releasing — the normal way
+          // to select-and-drag in any design tool) therefore relocated the
+          // box to the sibling's real, UNMOVED position and then dragged
+          // nothing: no _motionDrag was ever created, so the following
+          // pointermoves had nothing to act on and setValue was never
+          // called — confirmed live, ld.elementMotion[sidEx] stayed `{}`
+          // after a full press-drag-release. One retry with the NOW-current
+          // target lets onDown's own body-hit-test (bottom of the function)
+          // match this same click and start 'elementMove' properly, so the
+          // single gesture both selects AND drags the sibling, like every
+          // other grab in this file already does for the FIRST element.
+          SMMotion.onDown({ point: ptEx, altKey: e.altKey });
         } else if (!sidEx) {
           var uEx = (lyrEx && window.perObjectUnionBounds) ? perObjectUnionBounds(lyrEx) : null;
           window._motionExpandedElement = null;
-          if (!uEx || !uEx.contains(ptEx)) window._perObjBoxes = null;
+          if (!uEx || !uEx.contains(ptEx)) {
+            window._perObjBoxes = null;
+            sortiDuGroupe = true;
+            // _motionExpandedLayer is a THIRD flag (tools.js's double-click
+            // group entry sets it alongside _perObjBoxes, motion.js:5409) —
+            // activeMotionTarget() prefers it over state.activeLayerIdx
+            // whenever it's non-null, so leaving it behind here meant the
+            // canvas gizmo kept drawing THIS layer's box forever after
+            // exiting, even once a different layer had genuinely become
+            // active (row highlight, Layer Properties panel, selectedPaths
+            // all correctly showed the new layer — only the canvas box and
+            // the timeline's own row highlight, which reads this same flag,
+            // stayed stuck). Found live: exit Layer 2's group, click Layer
+            // 1's shape — state.activeLayerIdx became 0 right away, but
+            // window._motionExpandedLayer stayed 1, so the gizmo kept
+            // hugging Layer 2 no matter what got selected afterward. Scoped
+            // to the layer actually being exited, matching _perObjBoxes'
+            // own scoping just above.
+            if (window._motionExpandedLayer === state.activeLayerIdx) window._motionExpandedLayer = null;
+          }
         }
         window._sceneVersion = (window._sceneVersion || 0) + 1;
         if (window.renderLayerList) renderLayerList();
         if (window.renderTimeline) renderTimeline();
         window.SMEngineBridge.renderNow();
-        e.stopImmediatePropagation(); e.preventDefault();
-        return;
+        // Leaving the group must NOT eat the click (2026-08-31, feedback en
+        // Motion: "je ressort en cliquant ailleurs ... j'essaye de clic sur
+        // l'autre groupe dans l'autre layer alors il select le premier
+        // groupe"). Exiting is a side effect of clicking somewhere else, not
+        // the point of the gesture: the click still means "select whatever
+        // is here", which may well be a shape on another layer. Consuming it
+        // forced a second click, and the first one appeared to do nothing —
+        // or worse, left the old group selected. Every other outcome of this
+        // block (targeting a sibling, dropping the target while staying in
+        // the group) IS the whole gesture, so those still consume it.
+        if (!sortiDuGroupe) { e.stopImmediatePropagation(); e.preventDefault(); return; }
       }
     }
     if (!shouldIntercept()) return;
@@ -1085,7 +1194,13 @@
     // handles above (xformMap) — so testing against geometry that never
     // actually moved uses a point in the space it still lives in.
     var hitPt = pt;
-    if (state.appMode === 'motion' && window.SMMotion) {
+    // No longer gated on Motion mode (2026-08-31): buildSceneJson applies a
+    // layer's motionMat in EITHER mode (CLAUDE.md §8), so an animated layer
+    // renders moved in Animation 2D too — and there the click was still
+    // tested against the un-moved geometry, so nothing could be selected
+    // where it visibly sits. Both call sites (left click and right click)
+    // get it, or the two would disagree about what is under the cursor.
+    if (window.SMMotion) {
       var hitMap = SMMotion.layerMotionPointMap(state.activeLayerIdx);
       // 3D layers (2026-07-29 fix) — layerMotionPointMap returns null for a
       // 3D-toggled layer even with real rotationX/rotationY set (it only
@@ -1095,8 +1210,27 @@
       if (!hitMap && SMMotion.layerMotion3DPointMap) hitMap = SMMotion.layerMotion3DPointMap(state.activeLayerIdx);
       if (hitMap) { var hg = hitMap.inv(pt.x, pt.y); hitPt = new Point(hg[0], hg[1]); }
     }
-    var hit = (activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
-    if (hit && !combineHitConfirm(hit, hitPt, state.activeLayerIdx)) hit = null;
+    // Per-ELEMENT transforms on top of the layer's (2026-08-31): hitTestPosed
+    // undoes each child's own Motion for that child alone, which a single
+    // layer.hitTest cannot do — it tests one point against geometry that
+    // several independent transforms have moved. Measured in Animation 2D
+    // with the layer transformed AND the two elements dragged apart:
+    // clicking either at its visible position selected nothing. hitPt
+    // (layer-space) stays the fallback, and the posed test hands back the
+    // point in the element's own space for combineHitConfirm.
+    var posedDispo = !!window.hitTestPosed && !(activeLdForLock.locked && !activeLdForLock.symbolId);
+    var posedHit = posedDispo ? hitTestPosed(state.activeLayerIdx, pt, 8 / view.zoom) : null;
+    // No raw fallback once the posed test has spoken (2026-08-31): it tests
+    // the shapes where they are DRAWN, so "no hit" means the cursor really is
+    // over nothing on this layer. Falling back to layer.hitTest(hitPt) then
+    // re-tested the same click against the layer's UN-posed geometry, which
+    // for a transformed layer sits somewhere else entirely — a click on
+    // another layer's shape matched a shape of the active layer and selected
+    // it instead. That is the "il select le premier groupe" report. The raw
+    // test only remains for the case where the posed one could not run.
+    var hit = posedDispo ? posedHit : ((activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom }));
+    var confirmPt = (posedHit && posedHit.localPoint) ? posedHit.localPoint : hitPt;
+    if (hit && !combineHitConfirm(hit, confirmPt, state.activeLayerIdx)) hit = null;
     var hitOtherLayerIdx = -1;
     // If nothing on the active layer, check every OTHER normal (non-
     // component) layer too — clicking a stroke that lives on layer 1 while
@@ -1163,6 +1297,57 @@
           if (!bld2 || bld2.locked || !bld2.visible || bld2.symbolId) continue;
           var bh = hitTestOrientedBoxA2D(pt, bpl);
           if (bh) { hit = { item: bh }; hitOtherLayerIdx = boli; break; }
+        }
+      }
+    }
+    // Motion's own version of the fallback just above (2026-08-31 follow-up
+    // to the same feedback that built it — "peu importe où on clic dans la
+    // boîte de hover si celle-ci est affiché ça doit select le group"). The
+    // gate above assumed SMMotion.onDown() already covered every Motion
+    // click, but onDown only grabs handles/dots/anchors on the CURRENT
+    // target; a plain click elsewhere within a layer's own shown box
+    // (layerWorldBoundsUnion — the exact bounds hoverOverlayItems draws,
+    // motion.js) still fell through to the precise per-child hitTest above,
+    // which misses in the gap between two elements or near a corner the box
+    // covers but no ink reaches. Found live chasing "impossible de
+    // reselect parfois, j'arrive pas à savoir quand": once two elements
+    // inside a group have been dragged apart, their combined box has a lot
+    // of empty middle that LOOKS selectable (it's the box actually drawn)
+    // but wasn't. Null/native-video/Component layers are excluded — each
+    // already has its own dedicated, better-tailored hit-test a few lines
+    // below (nullHit/nvHit/compHit), which only runs `if (!hit)`; matching
+    // them here first would silently skip that specialized handling.
+    // Set when the fallback below is the ONLY reason `hit` is truthy — read
+    // much further down (mode = ... 'move') to keep this a pure SELECT, not
+    // also a drag start. See that read site's own comment for why.
+    var motionBoxFallbackOnly = false;
+    if (!hit && state.appMode === 'motion' && window.SMMotion && window.SMMotion.layerWorldBoundsUnion) {
+      var motionLayerBoxHit = function (li) {
+        var mld = state.layers[li];
+        if (!mld || mld.locked || !mld.visible || mld.threeD || mld.symbolId || mld.isNullLayer || mld.nativeVideo) return null;
+        var mb = SMMotion.layerWorldBoundsUnion([li], state.currentFrame);
+        if (!mb || pt.x < mb.x || pt.x > mb.x + mb.w || pt.y < mb.y || pt.y > mb.y + mb.h) return null;
+        var mul = userLayers[li];
+        if (!mul) return null;
+        for (var mci = mul.children.length - 1; mci >= 0; mci--) {
+          var mc = mul.children[mci];
+          if (!(mc instanceof Path || mc instanceof Raster)) continue;
+          if (mc.data && (mc.data.isLinkedFillCompanion || mc.data.isBrushTextureCopy || mc.data.isDuplicatorCopy)) continue;
+          return mc;
+        }
+        return null;
+      };
+      var mActiveHit = motionLayerBoxHit(state.activeLayerIdx);
+      if (mActiveHit) {
+        hit = { item: mActiveHit };
+        motionBoxFallbackOnly = true;
+      } else {
+        for (var mpli = project.layers.length - 1; mpli >= 0; mpli--) {
+          var mpl = project.layers[mpli];
+          var moli = userLayers.indexOf(mpl);
+          if (moli < 0 || moli === state.activeLayerIdx) continue;
+          var mItemHit = motionLayerBoxHit(moli);
+          if (mItemHit) { hit = { item: mItemHit }; hitOtherLayerIdx = moli; motionBoxFallbackOnly = true; break; }
         }
       }
     }
@@ -1416,7 +1601,24 @@
         if (!skipGroupWiden) clickedSet.forEach(function (m) { if (selectedPaths.indexOf(m) < 0) selectedPaths.push(m); });
       }
       state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
-      mode = selectedPaths.length ? 'move' : null;
+      // motionBoxFallbackOnly (set above): this hit came ONLY from clicking
+      // inside a layer's shown box, not from landing on real ink — the
+      // fallback's own job is SELECT ("ça doit select le group"), same as
+      // its A2D precedent. Letting it also arm a drag turned every
+      // near-miss inside (or just after leaving) a group into a silent
+      // WHOLE-LAYER move: found live chasing "entrée double clic >
+      // impossible de déplacer les éléments" — a click aimed at an element
+      // but landing outside its own small box exits the group (previous
+      // commit) and, with mode='move' armed here, immediately started
+      // dragging the entire layer on the very same gesture instead of
+      // either grabbing the element or doing nothing. ld.elementMotion for
+      // both elements stayed `{}` while ld.motionStatic.position picked up
+      // every one of these misses — moving together is not the same bug as
+      // not moving at all, but it read exactly like "impossible de
+      // déplacer les éléments" from the canvas. A precise hit (this flag
+      // false) is unaffected — that path already worked and still starts a
+      // drag immediately, matching every other grab in this file.
+      mode = (selectedPaths.length && !(state.appMode === 'motion' && motionBoxFallbackOnly)) ? 'move' : null;
       moveStarted = false;
       _multiLayerDrag = null;
     } else {
@@ -1747,6 +1949,8 @@
           o.layer.children.forEach(function (c) { if (c.data && c.data.strokeId === o.strokeId && selectedPaths.indexOf(c) < 0) selectedPaths.push(c); });
         });
         moveStarted = true;
+        moveGrabLocal = (window.layerLocalPoint && state.appMode !== 'motion')
+          ? layerLocalPoint(state.activeLayerIdx, lastPt) : null;
       }
       var delta = pt.subtract(lastPt);
       // Layer under a Motion transform: the pointer moves in RENDERED
@@ -1811,6 +2015,11 @@
       // space), so switch to it here rather than touching every one of
       // the several `delta` reads below individually.
       delta = geomDelta;
+      // Applied through a function so the residual correction below can run
+      // the exact same work a second time — every companion, gradient,
+      // centerline and anchor has to move with it, and a correction that
+      // skipped any of them would tear the drawing apart.
+      var appliquerDelta = function (d) {
       // translate(delta), not position=position.add(delta) — .position is
       // a bounds-CENTER getter/setter, so a move via .position re-derives
       // bounds on every single tick of the drag (many times per gesture)
@@ -1825,15 +2034,15 @@
       // N ticks of translate(delta) is always bit-identical to one
       // translate(delta*N) — zero accumulated drift by construction.
       selectedPaths.forEach(function (p) {
-        p.translate(delta);
-        if (window.syncParamShapeBoxOnTranslate) window.syncParamShapeBoxOnTranslate(p, delta.x, delta.y);
-        transformFillGradient(p, function (gp) { return gp.add(delta); });
+        p.translate(d);
+        if (window.syncParamShapeBoxOnTranslate) window.syncParamShapeBoxOnTranslate(p, d.x, d.y);
+        transformFillGradient(p, function (gp) { return gp.add(d); });
         if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
-          p.data.centerSegments.forEach(function (s) { s.point = [s.point[0] + delta.x, s.point[1] + delta.y]; });
+          p.data.centerSegments.forEach(function (s) { s.point = [s.point[0] + d.x, s.point[1] + d.y]; });
         }
-        if (p.data && p.data.linkedFill && !p.data.linkedFill.removed) p.data.linkedFill.translate(delta);
+        if (p.data && p.data.linkedFill && !p.data.linkedFill.removed) p.data.linkedFill.translate(d);
         if (p.data && p.data.brushCompanions) {
-          p.data.brushCompanions.forEach(function (c) { if (!c.removed) c.translate(delta); });
+          p.data.brushCompanions.forEach(function (c) { if (!c.removed) c.translate(d); });
         }
         // Custom anchor point (2026-07: "on déplace un point d'ancrage avec
         // alt et l'on bouge l'objet après ... celui-ci ne se déplace pas
@@ -1843,17 +2052,38 @@
         // translated explicitly here or it's left stranded at its old
         // position the moment the shape moves out from under it.
         if (p.data && p.data.xformAnchorCustom) {
-          p.data.xformAnchorCustom = [p.data.xformAnchorCustom[0] + delta.x, p.data.xformAnchorCustom[1] + delta.y];
+          p.data.xformAnchorCustom = [p.data.xformAnchorCustom[0] + d.x, p.data.xformAnchorCustom[1] + d.y];
         }
       });
-      // Same fix for the session-level anchor (state.xformAnchorCustom) the
-      // on-canvas crosshair/gizmo actually reads (tools.js's xformAnchorPoint)
-      // — a single global value, translated once per move tick rather than
-      // once per selected path.
       if (state.xformAnchorCustom) {
-        state.xformAnchorCustom = [state.xformAnchorCustom[0] + delta.x, state.xformAnchorCustom[1] + delta.y];
+        state.xformAnchorCustom = [state.xformAnchorCustom[0] + d.x, state.xformAnchorCustom[1] + d.y];
       }
-      symGestureAccumulate(new Matrix().translate(delta));
+      symGestureAccumulate(new Matrix().translate(d));
+      if (moveGrabLocal) moveGrabLocal = moveGrabLocal.add(d);
+      };
+      appliquerDelta(delta);
+      // Residual correction: aim at the RESULT ON SCREEN, not at the
+      // geometry. Only when the layer actually rotates or scales — with a
+      // pure translation the pivot drift cancels out exactly (the maths
+      // reduce to screen delta == geometry delta), which is why a moved
+      // layer always dragged correctly and a rotated one never did.
+      // Two passes are enough: each one removes the pivot drift caused by
+      // the previous, and the drift is a fraction of the delta, so it
+      // converges immediately. Bailing out under half a pixel keeps a
+      // normal drag at exactly one pass.
+      if (moveGrabLocal && window.SMMotion && SMMotion.layerMotionPointMap) {
+        for (var passe = 0; passe < 2; passe++) {
+          var mapNow = SMMotion.layerMotionPointMap(state.activeLayerIdx);
+          if (!mapNow || !mapNow.fwd || !mapNow.invVec) break;
+          var atterri = mapNow.fwd(moveGrabLocal.x, moveGrabLocal.y);
+          var ax = (atterri.x !== undefined ? atterri.x : atterri[0]);
+          var ay = (atterri.y !== undefined ? atterri.y : atterri[1]);
+          var rx = pt.x - ax, ry = pt.y - ay;
+          if (Math.abs(rx) < 0.5 && Math.abs(ry) < 0.5) break;
+          var cv2 = mapNow.invVec(rx, ry);
+          appliquerDelta(new Point(cv2[0], cv2[1]));
+        }
+      }
     } else if (mode === 'xform-scale') {
       // Geometry-space pointer (NOT reassigning pt — lastPt at the end of
       // this handler must stay world-space).
@@ -2435,7 +2665,13 @@
     // layer whole-instance click, brush-anchor resolution) so right-click
     // selects exactly what a left-click would.
     var hitPt = pt;
-    if (state.appMode === 'motion' && window.SMMotion) {
+    // No longer gated on Motion mode (2026-08-31): buildSceneJson applies a
+    // layer's motionMat in EITHER mode (CLAUDE.md §8), so an animated layer
+    // renders moved in Animation 2D too — and there the click was still
+    // tested against the un-moved geometry, so nothing could be selected
+    // where it visibly sits. Both call sites (left click and right click)
+    // get it, or the two would disagree about what is under the cursor.
+    if (window.SMMotion) {
       var hitMap = SMMotion.layerMotionPointMap(state.activeLayerIdx);
       // 3D layers (2026-07-29 fix) — layerMotionPointMap returns null for a
       // 3D-toggled layer even with real rotationX/rotationY set (it only
@@ -2445,8 +2681,27 @@
       if (!hitMap && SMMotion.layerMotion3DPointMap) hitMap = SMMotion.layerMotion3DPointMap(state.activeLayerIdx);
       if (hitMap) { var hg = hitMap.inv(pt.x, pt.y); hitPt = new Point(hg[0], hg[1]); }
     }
-    var hit = (activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
-    if (hit && !combineHitConfirm(hit, hitPt, state.activeLayerIdx)) hit = null;
+    // Per-ELEMENT transforms on top of the layer's (2026-08-31): hitTestPosed
+    // undoes each child's own Motion for that child alone, which a single
+    // layer.hitTest cannot do — it tests one point against geometry that
+    // several independent transforms have moved. Measured in Animation 2D
+    // with the layer transformed AND the two elements dragged apart:
+    // clicking either at its visible position selected nothing. hitPt
+    // (layer-space) stays the fallback, and the posed test hands back the
+    // point in the element's own space for combineHitConfirm.
+    var posedDispo = !!window.hitTestPosed && !(activeLdForLock.locked && !activeLdForLock.symbolId);
+    var posedHit = posedDispo ? hitTestPosed(state.activeLayerIdx, pt, 8 / view.zoom) : null;
+    // No raw fallback once the posed test has spoken (2026-08-31): it tests
+    // the shapes where they are DRAWN, so "no hit" means the cursor really is
+    // over nothing on this layer. Falling back to layer.hitTest(hitPt) then
+    // re-tested the same click against the layer's UN-posed geometry, which
+    // for a transformed layer sits somewhere else entirely — a click on
+    // another layer's shape matched a shape of the active layer and selected
+    // it instead. That is the "il select le premier groupe" report. The raw
+    // test only remains for the case where the posed one could not run.
+    var hit = posedDispo ? posedHit : ((activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom }));
+    var confirmPt = (posedHit && posedHit.localPoint) ? posedHit.localPoint : hitPt;
+    if (hit && !combineHitConfirm(hit, confirmPt, state.activeLayerIdx)) hit = null;
     var clickedPath = null;
     if (hit && (hit.item instanceof Path || hit.item instanceof Raster)) {
       clickedPath = resolveBrushAnchor(hit.item, layer);

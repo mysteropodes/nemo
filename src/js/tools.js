@@ -1144,11 +1144,35 @@ function selBoxAngleOf(){
   }
   return a||0;
 }
+// Posed union of the current selection, or null when nothing in it carries
+// an element-level Motion transform (2026-08-31). Deliberately narrow: the
+// DRAWN box has to sit on the artwork once an element has been moved with
+// Motion, but xformSelBounds also feeds the panel's Position/Size fields and
+// the move/scale WRITE math, which operate on raw geometry — so this is used
+// for the box only, and only in the case that was actually wrong.
+function posedSelBoundsIfMoved(){
+  if(!window.elementPosedBounds||!selectedPaths.length)return null;
+  var b=null,bouge=false;
+  for(var i=0;i<selectedPaths.length;i++){
+    var p=selectedPaths[i];
+    if(!p||!p.bounds||!p.parent)continue;
+    var eb=elementPosedBounds(p.parent,p);
+    if(Math.abs(eb.x-p.strokeBounds.x)>0.01||Math.abs(eb.y-p.strokeBounds.y)>0.01
+      ||Math.abs(eb.width-p.strokeBounds.width)>0.01||Math.abs(eb.height-p.strokeBounds.height)>0.01)bouge=true;
+    b=b?b.unite(eb):eb.clone();
+  }
+  return bouge?b:null;
+}
 function orientedSelBox(){
   if(!selectedPaths.length)return null;
-  var b0=xformSelBounds();if(!b0)return null;
+  var posed=posedSelBoundsIfMoved();
+  var b0=posed||xformSelBounds();if(!b0)return null;
   var ang=selBoxAngleOf();
   if(!ang)return{b:b0,angle:0,pivot:b0.center};
+  // A posed selection keeps the axis-aligned posed union: the per-path
+  // counter-rotation below reads each path's RAW geometry, which is exactly
+  // what the pose has moved away from.
+  if(posed)return{b:posed,angle:ang,pivot:posed.center};
   var pivot=b0.center,b=null;
   selectedPaths.forEach(function(p){
     if(!p||!p.bounds)return;
@@ -7620,11 +7644,114 @@ function elementPosedBounds(layer,c){
   });
   return new Rectangle(new Point(minX,minY),new Point(maxX,maxY));
 }
+// Union of the layer's elements AFTER their own transforms but BEFORE the
+// layer's — i.e. still in the layer's own space. This is the box the layer
+// gizmo should hug: Motion's motionBoxGeom and Animation 2D's selection box
+// both applied the layer transform themselves to a RAW union, so moving two
+// elements apart inside the group left the global box at its old size while
+// the elements visibly spread out of it (measured: drawn box unchanged at
+// [830,332,1772,447] while the real extent grew to [510,-240,2112,1039]).
+// Returns null when the layer has fewer than one usable shape, so callers
+// can fall back to their previous source.
+function perObjectPosedUnionLocal(layer){
+  var sh=perObjectShapesOf(layer),b=null;
+  sh.forEach(function(c){var eb=elementPosedBounds(layer,c);b=b?b.unite(eb):eb.clone();});
+  return sh.length?b:null;
+}
+window.perObjectPosedUnionLocal=perObjectPosedUnionLocal;
 function perObjectUnionBounds(layer){
   var sh=perObjectShapesOf(layer),b=null;
   sh.forEach(function(c){var eb=elementPosedBounds(layer,c);b=b?b.unite(eb):eb.clone();});
-  return sh.length>=2?b:null;
+  if(sh.length<2)return null;
+  // ...then through the LAYER's own Motion transform (2026-08-31): moving the
+  // LAYER left this region behind while the per-element boxes drawn on screen
+  // followed it, so after a layer move you had to double-click where the
+  // shapes USED to be to enter the group, and clicking on them counted as
+  // "outside" and exited. Measured in both modes: boxes moved +400/-300 with
+  // the layer, this union did not move at all.
+  //
+  // elementPosedBounds deliberately stays element-only: engine-bridge and
+  // motion.js apply layerMotionPointMap themselves on top of it when drawing,
+  // so folding the layer map in there would apply it twice. Composed once,
+  // here, for the hit region — which is the one consumer that needs the full
+  // chain in a single value.
+  if(!(window.SMMotion&&SMMotion.layerMotionPointMap))return b;
+  var li=userLayers.indexOf(layer);
+  if(li<0)return b;
+  var map=SMMotion.layerMotionPointMap(li);
+  if(!map||!map.fwd)return b;
+  var pts=[map.fwd(b.left,b.top),map.fwd(b.right,b.top),map.fwd(b.right,b.bottom),map.fwd(b.left,b.bottom)];
+  var xs=pts.map(function(p){return p.x!==undefined?p.x:p[0];});
+  var ys=pts.map(function(p){return p.y!==undefined?p.y:p[1];});
+  return new Rectangle(new Point(Math.min.apply(null,xs),Math.min.apply(null,ys)),
+                       new Point(Math.max.apply(null,xs),Math.max.apply(null,ys)));
 }
+// A world point expressed in a layer's OWN (raw, untransformed) space —
+// the space its geometry actually lives in (2026-08-31). A layer's Motion
+// transform is applied at RENDER time and never touches the stored points,
+// so hit-testing a click straight against layer.hitTest tests the shape
+// where it used to be. Measured with the layer moved +380/-260, rotated 18°
+// and scaled 120%: clicking a shape dead-centre on screen selected nothing,
+// in BOTH modes.
+//
+// Same inverse select-bridge's main click path already used — but it applied
+// it only when state.appMode==='motion', even though buildSceneJson applies
+// motionMat to any layer in any mode (CLAUDE.md §8). 3D layers need the
+// dedicated perspective-correct map, exactly as that call site documents.
+function layerLocalPoint(li,pt){
+  if(!window.SMMotion||!SMMotion.layerMotionPointMap)return pt;
+  var map=SMMotion.layerMotionPointMap(li);
+  if(!map&&SMMotion.layerMotion3DPointMap)map=SMMotion.layerMotion3DPointMap(li);
+  if(!map||!map.inv)return pt;
+  var g=map.inv(pt.x,pt.y);
+  return new Point(g[0],g[1]);
+}
+window.layerLocalPoint=layerLocalPoint;
+// A point already in LAYER space, expressed in ONE element's own space —
+// i.e. undoing that element's own Motion transform (2026-08-31). Exact
+// inverse of transformSegments (motion.js): scale about the pivot, rotate
+// about the pivot, translate last, so undoing means subtracting the
+// translation, unrotating and unscaling about that same pivot. The pivot is
+// the item's own bounds centre offset by the anchor — the same one
+// buildSceneJson and export.js compute.
+function elementLocalPoint(layer,c,pt){
+  if(!window.SMMotion||!SMMotion.elementMotionAt)return pt;
+  var li=userLayers.indexOf(layer);
+  var sid=c.data&&c.data.strokeId;
+  if(li<0||!sid)return pt;
+  var m=SMMotion.elementMotionAt(li,sid,state.currentFrame);
+  if(!m)return pt;
+  if(!m.dx&&!m.dy&&!m.rot&&m.sx===1&&m.sy===1)return pt;
+  var pc=c.bounds.center;
+  var px=pc.x+(m.ax||0), py=pc.y+(m.ay||0);
+  var x=pt.x-(m.dx||0)-px, y=pt.y-(m.dy||0)-py;
+  var a=-(m.rot||0)*Math.PI/180, ca=Math.cos(a), sa=Math.sin(a);
+  var rx=x*ca-y*sa, ry=x*sa+y*ca;
+  var sx=m.sx||1, sy=m.sy||1;
+  return new Point(px+(sx?rx/sx:rx), py+(sy?ry/sy:ry));
+}
+// Hit-test a WORLD point against what is actually DRAWN: the layer's own
+// transform undone once, then each child's own transform undone for that
+// child alone. layer.hitTest cannot do this — it tests one point against
+// geometry that several different transforms may have moved independently.
+// Symptom without it: after dragging two elements apart inside a group,
+// clicking either of them at its visible position targeted nothing.
+// Topmost-first, matching Paper's own hitTest z-order convention.
+function hitTestPosed(li,worldPt,tol){
+  var layer=userLayers[li];
+  if(!layer)return null;
+  var lp=layerLocalPoint(li,worldPt);
+  for(var i=layer.children.length-1;i>=0;i--){
+    var c=layer.children[i];
+    if(!c||!c.data)continue;
+    var ep=elementLocalPoint(layer,c,lp);
+    var h=c.hitTest(ep,{fill:true,stroke:true,tolerance:tol});
+    if(h)return {item:c,localPoint:ep};
+  }
+  return null;
+}
+window.elementLocalPoint=elementLocalPoint;
+window.hitTestPosed=hitTestPosed;
 window.perObjectShapesOf=perObjectShapesOf;
 window.elementPosedBounds=elementPosedBounds;
 window.perObjectUnionBounds=perObjectUnionBounds;
@@ -7675,7 +7802,8 @@ function onViewDoubleClick(event){
     // shape. 8 screen px is the same order of slack every other hit-test in
     // this file uses, and it stays constant as you zoom.
     var mTol=8/Math.max(0.0001,view.zoom);
-    var mHit=mLayer.hitTest(event.point,{fill:true,stroke:true,tolerance:mTol});
+    // Through the layer's own transform first — see layerLocalPoint.
+    var mHit=hitTestPosed(state.activeLayerIdx,event.point,mTol);
     // Enter the group from anywhere INSIDE its box, not only by landing on
     // a shape (2026-08-31, feedback #176, clarified with the Illustrator
     // analogy: "peu importe où je double clic dans la bounding box de ces
@@ -7683,6 +7811,8 @@ function onViewDoubleClick(event){
     // Requiring a direct hit is what made it "difficile de rentrer": on a
     // layer of thin or scattered shapes most of the group box is empty.
     if(!mHit||!mHit.item){
+      // perObjectUnionBounds is already in WORLD space (it composes the
+      // layer transform itself), so this one tests the raw event point.
       var mUnion=window.perObjectUnionBounds&&perObjectUnionBounds(mLayer);
       if(mUnion&&mUnion.contains(event.point)){
         // Inside the group but on no shape: reveal every element's box and
@@ -7736,7 +7866,7 @@ function onViewDoubleClick(event){
   // filled shape, so it gets the same doorway.
   // Same screen-space tolerance as the Motion path above — 4/view.zoom is
   // sub-pixel once you zoom out, which is half of why entering was hard.
-  var hit=layer.hitTest(event.point,{fill:true,stroke:true,tolerance:8/Math.max(0.0001,view.zoom)});
+  var hit=hitTestPosed(state.activeLayerIdx,event.point,8/Math.max(0.0001,view.zoom));
   if(!hit||!hit.item){
     // Enter the group from anywhere inside its box (feedback #176) — see the
     // Motion branch's comment. Reveals every element's box and targets none;

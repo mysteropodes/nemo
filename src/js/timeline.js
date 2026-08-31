@@ -1429,6 +1429,23 @@ window.SM={
     });
     activateUL(ni);_layerSel=[ni];_layerSelAnchor=ni;loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx,preserveLayerSel){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
+    // Release Motion's per-element group isolation when it belongs to a
+    // DIFFERENT layer than the one being picked (2026-08-31, Cyril: "quand
+    // je select le groupe de gauche pourquoi le layer 2 reste highlighté
+    // dans la timeline" — no double-click involved, a plain row click).
+    // select-bridge.js's canvas click path already clears these three flags
+    // on exit, but this function is the CANONICAL entry point for every
+    // OTHER way to switch layers (a timeline row click chief among them,
+    // per this function's own comment below) — none of those ever went
+    // through that canvas code, so a group entered on layer N stayed
+    // "entered" (_perObjBoxes/_motionExpandedLayer still N) forever after,
+    // even once a totally different layer's row was clicked straight in
+    // the panel — its Elements tree kept rendering expanded with no way to
+    // close it short of re-entering and manually backing out. Scoped to
+    // "picking a DIFFERENT layer" so re-clicking the currently-isolated
+    // layer's own row is still a no-op, same as the canvas path.
+    if (window._perObjBoxes != null && window._perObjBoxes !== idx) { window._perObjBoxes = null; window._motionExpandedElement = null; }
+    if (window._motionExpandedLayer != null && window._motionExpandedLayer !== idx) window._motionExpandedLayer = null;
     window._layerActiveExplicit=true; // see clearSel()'s own comment — an explicit timeline row click, not a canvas deselect
     // canonical entry point: every caller (canvas hit, camera/media-library/nemo-script/shapes-panel)
     // gets the row highlight for free. preserveLayerSel=true is for the row's own Cmd/Shift-click

@@ -3333,7 +3333,16 @@
     indices.forEach(function (li) {
       var ld = state.layers[li], layer = window.userLayers && userLayers[li];
       if (!ld || !layer) return;
-      var b = layer.bounds;
+      // POSED bounds, not raw (2026-08-31, feedback en Motion: "la box de
+      // hover n'est pas à jour si je bouge un éléments dans le groupe").
+      // layer.bounds is the untransformed geometry, so a layer whose
+      // elements carry their own Motion offsets reported its OLD extent —
+      // the hover box, and every other consumer of this union, stayed where
+      // the shapes used to be. perObjectPosedUnionLocal (tools.js) applies
+      // each element's own transform and stops there, which is exactly this
+      // function's input space: the layer transform and the parent chain
+      // are applied just below, as before.
+      var b = (window.perObjectPosedUnionLocal && perObjectPosedUnionLocal(layer)) || layer.bounds;
       if (!b || !isFinite(b.width) || !isFinite(b.height) || (b.width === 0 && b.height === 0)) return;
       var corners = [[b.left, b.top], [b.right, b.top], [b.right, b.bottom], [b.left, b.bottom]];
       var pts = corners.map(function (c) { return { point: c, handleIn: [0, 0], handleOut: [0, 0] }; });
@@ -4630,6 +4639,10 @@
   // unified multi-target box, or nothing selected at all) via the thin
   // wrapper below, not threaded through each of those branches.
   var _hoverLi = -1;
+  // Cheap fingerprint of the hovered layer's CURRENT bounds (2026-08-31) —
+  // see onHoverMove's own comment for why this exists alongside _hoverLi.
+  function hoverBoundsSig(b) { return b ? (b.x + ',' + b.y + ',' + b.w + ',' + b.h) : null; }
+  var _hoverBoundsSig = null;
   function hitTestLayerAt(pt, frame) {
     // Reverse (topmost-drawn-first) — same z-order convention the Null
     // marker hit-test already uses (select-bridge.js). Skips locked/hidden/
@@ -4648,11 +4661,34 @@
   }
   // Returns true when the hover target changed (caller re-renders only
   // then, avoiding a redraw on every pixel of idle mouse movement).
+  //
+  // "changed" used to mean ONLY "the hovered LAYER INDEX is different from
+  // last time" — but the box this drives (hoverOverlayItems) is drawn from
+  // that layer's CURRENT bounds, which can change out from under an
+  // unmoving mouse: drag that layer's elements apart in one gesture, exit,
+  // dive into a DIFFERENT layer's group, then come back to hover the first
+  // one — the index round-trips to the same value it already was (no drag
+  // ever runs onHoverMove at all, per the caller's own onDrag-first gate),
+  // so the box never got the redraw its now-stale geometry needed. Found
+  // live chasing Cyril's report + screenshot: a group's hover box stopped
+  // short of a rotated element sitting well outside the box's own stale
+  // extent. A second fingerprint (the bounds themselves, not just which
+  // layer they belong to) catches exactly this without paying for a
+  // redraw on every idle pixel of movement — the common case (mouse
+  // drifting inside one static layer) still short-circuits on the index
+  // check before this ever runs a comparison.
   function onHoverMove(pt) {
-    if (state.appMode !== 'motion') { var had = _hoverLi !== -1; _hoverLi = -1; return had; }
+    if (state.appMode !== 'motion') { var had = _hoverLi !== -1; _hoverLi = -1; _hoverBoundsSig = null; return had; }
     var li = hitTestLayerAt(pt, state.currentFrame);
-    if (li === _hoverLi) return false;
-    _hoverLi = li;
+    if (li !== _hoverLi) {
+      _hoverLi = li;
+      _hoverBoundsSig = li >= 0 ? hoverBoundsSig(layerWorldBoundsUnion([li], state.currentFrame)) : null;
+      return true;
+    }
+    if (li < 0) return false;
+    var sig = hoverBoundsSig(layerWorldBoundsUnion([li], state.currentFrame));
+    if (sig === _hoverBoundsSig) return false;
+    _hoverBoundsSig = sig;
     return true;
   }
   function hoverOverlayItems() {
@@ -4699,6 +4735,14 @@
   // layer gets a dim outline, so each one reads as individually targetable
   // — clicking its row, or double-clicking it on canvas, makes it active.
   function perObjectBoxItems() {
+    // MOTION ONLY. Animation 2D draws its own per-object boxes from
+    // buildTransformBoxItems (engine-bridge) — this builder exists because
+    // that one returns [] in Motion. Without this gate both fired in
+    // Animation 2D and every element got TWO boxes, in two slightly
+    // different blues ([74,158,255,190] over [63,107,245,120]); found by
+    // reading the emitted overlay layers, not by looking, because at a
+    // 1px stroke the pair reads as one slightly-wrong box.
+    if (state.appMode !== 'motion') return [];
     if (window._perObjBoxes !== state.activeLayerIdx) return [];
     var lyr = userLayers[state.activeLayerIdx];
     if (!lyr) return [];
@@ -5145,8 +5189,18 @@
       // Only when a strokeId is actually targeted; the whole-layer case
       // (t.strokeId null) keeps the union it always used, and a Component
       // keeps symbolUnionBounds' duration-stable box.
+      // The whole-LAYER box is built from the elements' POSED bounds, not
+      // the layer's raw ones (2026-08-31): moving two elements apart with
+      // their own Motion left this box at its old size while they visibly
+      // spread outside it. perObjectPosedUnionLocal returns the union after
+      // each element's own transform but BEFORE the layer's, which is
+      // exactly this function's input space — it applies the layer transform
+      // itself just below. Falls back to the raw bounds when the layer has
+      // no usable shapes (an empty layer, a Null, a Guide).
+      var posedLb = (!t.strokeId && !(ld && ld.symbolId) && window.perObjectPosedUnionLocal)
+        ? perObjectPosedUnionLocal(userLayers[t.li]) : null;
       lb = (t.strokeId && t.bounds) ? t.bounds
-        : ((ld && ld.symbolId) ? symbolUnionBounds(t.li) : (userLayers[t.li] && userLayers[t.li].bounds));
+        : (posedLb || ((ld && ld.symbolId) ? symbolUnionBounds(t.li) : (userLayers[t.li] && userLayers[t.li].bounds)));
     }
     if (!lb) return null;
     var anc = valueAtFrame(t.holder, 'anchor', state.currentFrame);
@@ -5455,6 +5509,27 @@
     return null;
   }
   function onDown(event) {
+    // Inside a group with nothing picked yet, a click that lands ON a shape
+    // belongs to that shape (2026-08-31). Without this the whole-LAYER gizmo
+    // claimed it first — its ring, corners and body all sit over the very
+    // shapes you are trying to pick, and the more the layer is rotated or
+    // scaled the more of them fall under the cursor. Measured with the layer
+    // at rotation 25°: clicking a shape inside the group targeted nothing
+    // (_motionExpandedElement stayed empty) and the following drag moved the
+    // whole layer instead, which reads exactly as "I can select an object
+    // but not drag it".
+    //
+    // Deliberately narrow: only while per-object mode is on for THIS layer,
+    // only while no element is targeted yet, and only when the point is
+    // really on a shape. Every other Motion gesture — including the layer
+    // gizmo outside a group, and every grab once an element IS targeted —
+    // is untouched. Returning false hands the click to select-bridge, whose
+    // Motion block does the targeting.
+    if (window._perObjBoxes === state.activeLayerIdx && window._motionExpandedElement == null
+        && window.hitTestPosed && userLayers[state.activeLayerIdx]) {
+      var surForme = hitTestPosed(state.activeLayerIdx, event.point, 6 / Math.max(0.0001, view.zoom));
+      if (surForme && surForme.item && surForme.item.data && surForme.item.data.strokeId) return false;
+    }
     var ml = multiLayerBox();
     if (ml) {
       var mb = ml.bounds, mz = 1 / Math.max(0.0001, view.zoom);
@@ -5660,7 +5735,26 @@
           // rotated/scaled, so comparing a world point against it directly
           // would hit-test a rectangle that isn't the one on screen. inv()
           // exists for exactly this (it was added for vertex dragging).
-          var lp = gBody.inv(event.point.x, event.point.y);
+          //
+          // event.point must go through outerLocalPoint FIRST (2026-08-31
+          // fix) — motionBoxGeom's own inv is explicitly LOCAL-only (see its
+          // comment: "no outer wrapping... every caller composes that
+          // separately via outerWorldPoint/outerLocalPoint"), but this is
+          // the one caller in this file that fed it the raw world point
+          // directly. Every sibling grab just above (handles, position
+          // dots, anchor, effector) already wraps through outerWorldPoint/
+          // outerLocalPoint; this one, added later for feedback #170, never
+          // got the same treatment. Invisible as long as the CONTAINING
+          // layer had no Motion of its own — the two points coincide then —
+          // which is why it went unnoticed until Cyril moved a whole group
+          // and then tried to drag one of its elements: the box still drew
+          // in the right (rotated) place, but a click dead-center on it
+          // computed `lp` as if the layer had never moved, missing the
+          // element's own local bounds entirely. Measured: layer rotated
+          // 76.8°, click at the element's true rendered center — old code
+          // path declined every time; onDown now grabs it.
+          var outerPt = outerLocalPoint(t, { x: event.point.x, y: event.point.y });
+          var lp = gBody.inv(outerPt.x, outerPt.y);
           var bb = gBody.bounds;
           var insideEl = lp && lp.x >= bb.left && lp.x <= bb.right && lp.y >= bb.top && lp.y <= bb.bottom;
           if (insideEl) {
@@ -5677,6 +5771,12 @@
     }
     return false;
   }
+  // Local accessor for the layer point map — layerMotionPointMap is defined
+  // on the exported SMMotion object at the bottom of this file, not as a
+  // closure function, so callers inside the closure go through window.
+  function layerMotionPointMapFor(li) {
+    return (window.SMMotion && window.SMMotion.layerMotionPointMap) ? window.SMMotion.layerMotionPointMap(li) : null;
+  }
   function onDrag(event) {
     if (!_motionDrag) return false;
     if (_motionDrag.mode === 'elementMove') {
@@ -5684,9 +5784,25 @@
       // for — same setValue every other Motion drag uses, so it keys at the
       // playhead when the stopwatch is on and writes motionStatic when it
       // isn't, with no second writer.
+      // The pointer delta is WORLD space; an element's Position is applied
+      // to its geometry BEFORE the layer's own transform, so it has to be
+      // pulled back through that transform first (2026-08-31). Without it
+      // the delta got rotated a second time at render: measured with the
+      // layer at 25°, a drag of (200,140) moved the element (122,211) —
+      // exactly (200,140) rotated by 25°.
+      //
+      // Note the asymmetry with the LAYER's own Position a few files over
+      // (select-bridge): that one deliberately does NOT invert, because a
+      // layer's dx/dy is a plain translation applied on top of its own
+      // rotation, i.e. it already lives in post-rotation space. An
+      // ELEMENT's does not — it sits underneath the layer transform.
+      var dxEl = event.point.x - _motionDrag.start.x;
+      var dyEl = event.point.y - _motionDrag.start.y;
+      var mapEl = layerMotionPointMapFor(_motionDrag.t.li);
+      if (mapEl && mapEl.invVec) { var vEl = mapEl.invVec(dxEl, dyEl); dxEl = vEl[0]; dyEl = vEl[1]; }
       setValue(_motionDrag.t.holder, 'position', [
-        _motionDrag.basePos[0] + (event.point.x - _motionDrag.start.x),
-        _motionDrag.basePos[1] + (event.point.y - _motionDrag.start.y)
+        _motionDrag.basePos[0] + dxEl,
+        _motionDrag.basePos[1] + dyEl
       ]);
       // The DOCUMENT changed, so say so (2026-08-30, "n'est pas en temps
       // reel, il bouge pas sur le canvas pendant le drag que au
@@ -5871,6 +5987,17 @@
     if (!_motionDrag) return false;
     _motionDrag = null;
     renderLayerList(); // scrub fields must reflect the dragged position/handle
+    // ...and the GRID half, or a key the drag just created is invisible
+    // until something unrelated happens to repaint it (2026-08-31, feedback
+    // en Motion: "si j'ai mis des keyframes à une des shape dans le groupe
+    // que je la bouge cela ne créer pas de keyframes tout de suite dans le
+    // propertie en question dans la timeline"). setValue DOES write the key
+    // — isAnimated is true, so it goes through setKeyAtCurrentFrame — the
+    // diamond simply had no repaint to appear in. Once per gesture END, not
+    // per tick: renderTimeline rebuilds every row (CLAUDE.md §5bis measured
+    // 27.7ms at 40 layers), which is exactly why the drag itself must not
+    // call it.
+    renderTimeline();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
     return true;
   }
