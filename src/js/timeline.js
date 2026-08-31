@@ -3825,6 +3825,15 @@ function renderTimeline(){
   // reads the ACTUAL rendered content height after renderTimelineMotion
   // populates it, which stays correct regardless of how many tracks render.
   if(state.appMode==='motion'){
+    // Camera row (2026-08-31, feedback #186: "le layer camera n'apparait
+    // pas dans motion") — same early-return shape as the bug this comment
+    // block already documents twice over (playhead, audio strip): Motion's
+    // branch returns before ever reaching SMCamera.renderGridRow further
+    // down, so the camera's own keyframe row simply never rendered here.
+    // Grid isn't cleared per-branch (renderTimelineMotion appends, same as
+    // this call), so prepending it here — same position Animation 2D's own
+    // tail below uses — is a straight, un-risky addition.
+    if(window.SMCamera)SMCamera.renderGridRow(grid);
     if(window.SMMotion)SMMotion.renderTimelineMotion(grid);
     var mph=document.getElementById('playhead');
     mph.style.left=playheadLeftPx(state.currentFrame)+'px';
