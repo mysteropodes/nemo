@@ -1317,6 +1317,10 @@
     // already has its own dedicated, better-tailored hit-test a few lines
     // below (nullHit/nvHit/compHit), which only runs `if (!hit)`; matching
     // them here first would silently skip that specialized handling.
+    // Set when the fallback below is the ONLY reason `hit` is truthy — read
+    // much further down (mode = ... 'move') to keep this a pure SELECT, not
+    // also a drag start. See that read site's own comment for why.
+    var motionBoxFallbackOnly = false;
     if (!hit && state.appMode === 'motion' && window.SMMotion && window.SMMotion.layerWorldBoundsUnion) {
       var motionLayerBoxHit = function (li) {
         var mld = state.layers[li];
@@ -1336,13 +1340,14 @@
       var mActiveHit = motionLayerBoxHit(state.activeLayerIdx);
       if (mActiveHit) {
         hit = { item: mActiveHit };
+        motionBoxFallbackOnly = true;
       } else {
         for (var mpli = project.layers.length - 1; mpli >= 0; mpli--) {
           var mpl = project.layers[mpli];
           var moli = userLayers.indexOf(mpl);
           if (moli < 0 || moli === state.activeLayerIdx) continue;
           var mItemHit = motionLayerBoxHit(moli);
-          if (mItemHit) { hit = { item: mItemHit }; hitOtherLayerIdx = moli; break; }
+          if (mItemHit) { hit = { item: mItemHit }; hitOtherLayerIdx = moli; motionBoxFallbackOnly = true; break; }
         }
       }
     }
@@ -1596,7 +1601,24 @@
         if (!skipGroupWiden) clickedSet.forEach(function (m) { if (selectedPaths.indexOf(m) < 0) selectedPaths.push(m); });
       }
       state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
-      mode = selectedPaths.length ? 'move' : null;
+      // motionBoxFallbackOnly (set above): this hit came ONLY from clicking
+      // inside a layer's shown box, not from landing on real ink — the
+      // fallback's own job is SELECT ("ça doit select le group"), same as
+      // its A2D precedent. Letting it also arm a drag turned every
+      // near-miss inside (or just after leaving) a group into a silent
+      // WHOLE-LAYER move: found live chasing "entrée double clic >
+      // impossible de déplacer les éléments" — a click aimed at an element
+      // but landing outside its own small box exits the group (previous
+      // commit) and, with mode='move' armed here, immediately started
+      // dragging the entire layer on the very same gesture instead of
+      // either grabbing the element or doing nothing. ld.elementMotion for
+      // both elements stayed `{}` while ld.motionStatic.position picked up
+      // every one of these misses — moving together is not the same bug as
+      // not moving at all, but it read exactly like "impossible de
+      // déplacer les éléments" from the canvas. A precise hit (this flag
+      // false) is unaffected — that path already worked and still starts a
+      // drag immediately, matching every other grab in this file.
+      mode = (selectedPaths.length && !(state.appMode === 'motion' && motionBoxFallbackOnly)) ? 'move' : null;
       moveStarted = false;
       _multiLayerDrag = null;
     } else {
