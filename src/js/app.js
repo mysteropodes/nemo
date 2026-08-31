@@ -367,6 +367,18 @@ function nextLayerName(){
   var n=1;while(names.indexOf('Layer '+n)>=0)n++;
   return 'Layer '+n;
 }
+// Same "first free name" rule as nextLayerName, for any base string. Used by
+// duplicateLayer: 'X copy' was handed out unconditionally, so duplicating the
+// same layer four times produced four layers all literally named 'X copy'.
+// The layerUid keeps them distinct internally (nothing was broken), but the
+// panel became unreadable and layer("X copy") in an expression resolves an
+// arbitrary one of them. Suffixes from 2 up, AE's own convention.
+function uniqueLayerName(base){
+  var names=state.layers.map(function(l){return l.name;});
+  if(names.indexOf(base)<0)return base;
+  var n=2;while(names.indexOf(base+' '+n)>=0)n++;
+  return base+' '+n;
+}
 function activateUL(idx){state.activeLayerIdx=idx;if(userLayers[idx])userLayers[idx].activate();}
 activateUL(0);
 // Drag-to-reorder in the layer panel — array index i in state.layers/
