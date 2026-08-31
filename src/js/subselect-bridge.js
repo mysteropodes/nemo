@@ -96,6 +96,28 @@
       var inv = symMatrixOf(ld).inverted();
       if (inv) p = inv.transform(p);
     }
+    // feedback #210 ("impossible de déplacer les vertex avec subselect dans
+    // motion si la shape est dans un groupe [...] ou si je rentre dans le
+    // groupe aussi") — a shape animated with its OWN per-element Motion
+    // (CLAUDE.md §8 "Motion niveau SHAPE" — exactly what entering a
+    // per-object group and keying one of its members produces) renders
+    // through a THIRD transform beyond symMatrix/layer Motion:
+    // buildNodeHandleItems (engine-bridge.js) already composes it into the
+    // overlay's drawn position (elementMotionAt + transformSegments,
+    // applied innermost, before symMatrix/layer Motion), but this function
+    // never undid it — so a click/drag landed short of nodeHandles[].pos
+    // (renderNodeHandles, tools.js — still raw, untransformed positions) by
+    // exactly the element's Motion delta, and the hit-test tolerance missed
+    // every handle whenever that delta was non-zero. elementLocalPoint
+    // (tools.js) is the exact inverse of transformSegments already used
+    // elsewhere for element-aware hit-testing (hitTestPosed) — undone LAST,
+    // mirroring the forward order (element -> symMatrix -> layer) in
+    // reverse (layer -> symMatrix -> element).
+    if (window.elementLocalPoint && typeof nodeEditTargetPath === 'function') {
+      var tgt = nodeEditTargetPath();
+      var layer = userLayers[layerIdx];
+      if (tgt && layer) p = elementLocalPoint(layer, tgt, p);
+    }
     return p;
   }
 
