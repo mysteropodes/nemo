@@ -196,12 +196,21 @@
       // entirely different persistence layer vtxN exists specifically to
       // bypass (CLAUDE.md §8 "le path est keyable au niveau du VERTEX").
       // Scoped to 'point' handles only — vtxN has no notion of tangent
-      // handles (applyPathVertexOffsets only ever offsets s.point) — and to
-      // non-vector-brush paths, since a brush's editable geometry lives in
-      // data.centerSegments, a different space this track was never built
-      // to read.
+      // handles (applyPathVertexOffsets only ever offsets s.point).
+      // Vector-brush ribbons included (2026-08-31 follow-up, "ce que tu as
+      // fait qui marche bien avec paramétric shape faut le faire aussi pour
+      // brush shape"): their editable geometry is data.centerSegments, not
+      // path.segments, but every piece this needs is already brush-aware —
+      // nodeEditSegmentsData (tools.js, used below by renderNodeHandles/
+      // buildNodeHandleItems) already hands back centerSegments for a brush
+      // path (feedback #181), and applyVectorBrushOutlineFor (motion.js)
+      // already reads THIS SAME vtxN track off centerSegments to rebuild the
+      // outline at render time — that whole read side predates this fix and
+      // was simply never reachable because nothing could ever WRITE to it.
+      // setPathVertexOffset itself never touches segments/centerSegments at
+      // all (just holder.motion['vtx'+vi]), so no branch is needed here.
       var vtxTargetPath = typeof nodeEditTargetPath === 'function' ? nodeEditTargetPath() : null;
-      var vtxStrokeId = (bestNh.type === 'point' && vtxTargetPath && vtxTargetPath.data && !vtxTargetPath.data.isVectorBrush) ? vtxTargetPath.data.strokeId : null;
+      var vtxStrokeId = (bestNh.type === 'point' && vtxTargetPath && vtxTargetPath.data) ? vtxTargetPath.data.strokeId : null;
       var isMotionVertexDrag = !!(vtxStrokeId && state.appMode === 'motion' && window.SMMotion && SMMotion.hasPathVertexMotionFor(state.activeLayerIdx, vtxStrokeId));
 
       pushUndo();
