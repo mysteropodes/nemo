@@ -2052,7 +2052,11 @@
       // tick()'s catch treats exactly like the screen_to_world Float64Array
       // bug above: setEnabled(false) for the rest of the session, not just
       // a skipped frame.
-      var bm = state.layers[i].blendMode;
+      // layerBlendModeAt (feedback #207) resolves ld.blendKeys when present
+      // (Duik-style hold-only keyframes) and falls back to the plain static
+      // field otherwise — zero behavior change for any layer that never
+      // turned keying on.
+      var bm = (window.SMMotion && SMMotion.layerBlendModeAt) ? SMMotion.layerBlendModeAt(i, renderFrame) : state.layers[i].blendMode;
       if (typeof bm !== 'string') bm = undefined;
       // Track matte (2026-07, scouted from Caddis's Layer.matteMode):
       // AE convention — the matte SOURCE is implicitly the layer directly

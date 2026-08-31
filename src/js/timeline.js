@@ -1984,7 +1984,7 @@ window.SM={
       // level setting like canvasW/fps above (not per-layer, not per-
       // symbol/montage snapshot — a linked-vs-embedded choice is global).
       mediaMode:state.mediaMode||'embedded',
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,mattesMore:l.mattesMore,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,isWidgetLayer:l.isWidgetLayer,widget:l.widget,isEffectorLayer:l.isEffectorLayer,effector:l.effector,effects:l.effects,footage:l.footage,
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,blendKeys:l.blendKeys,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,mattesMore:l.mattesMore,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,isWidgetLayer:l.isWidgetLayer,widget:l.widget,isEffectorLayer:l.isEffectorLayer,effector:l.effector,effects:l.effects,footage:l.footage,
         // Layer parenting (2026-07-25). BOTH of these were missing from this
         // list, so every parent link was silently dropped on save — a rig
         // survived the session and nothing more. `uid` is the stable identity
@@ -2260,6 +2260,13 @@ window.SM={
       // permanently disables the whole Rust renderer for the session
       // (see engine-bridge.js's tick() catch).
       if(typeof ld.blendMode==='string')state.layers[idx].blendMode=ld.blendMode;
+      // Blend keys (2026-08-31, feedback #207) — same shape-guarded pattern
+      // as mattesMore right below: a corrupted nemo-auto carrying junk here
+      // would otherwise reach layerBlendModeAt/engine-bridge's resolver.
+      if(Array.isArray(ld.blendKeys)){
+        var _bk=ld.blendKeys.filter(function(k){return k&&typeof k.frame==='number'&&typeof k.mode==='string';});
+        if(_bk.length)state.layers[idx].blendKeys=_bk;
+      }
       if(typeof ld.matteMode==='string')state.layers[idx].matteMode=ld.matteMode;
       if(typeof ld.matteSourceLayerUid==='string')state.layers[idx].matteSourceLayerUid=ld.matteSourceLayerUid;
       // Additional mattes (2026-08-30). Guarded on SHAPE, not just presence,
@@ -9819,6 +9826,12 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
   function currentLd(){return state.layers[state.activeLayerIdx];}
   function applyPreview(v){
     var ld=currentLd();if(!ld)return;
+    // Keyed layers (feedback #207, Duik-inspired hold-only Blend keys) skip
+    // the live hover preview here — layerBlendModeAt (motion.js) ignores
+    // ld.blendMode entirely once ld.blendKeys exists, so writing it on
+    // hover would have zero visible effect. The click handler below writes
+    // the real keyed value instead, at commit time.
+    if(ld.blendKeys&&ld.blendKeys.length)return;
     ld.blendMode=v==='normal'?undefined:v;
     window._sceneVersion=(window._sceneVersion||0)+1;
     if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
@@ -9836,7 +9849,10 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
   // the click — a captured DOM node goes stale the moment the list re-renders.
   function open(anchorEl){
     var ld=currentLd();if(!ld)return;
-    origMode=ld.blendMode||'normal';
+    // Keyed layers show/revert-to the value AT THE PLAYHEAD (feedback
+    // #207), not the (irrelevant once keyed) static field.
+    var keyedAtOpen=!!(ld.blendKeys&&ld.blendKeys.length);
+    origMode=keyedAtOpen?((window.SMMotion&&SMMotion.layerBlendModeAt)?SMMotion.layerBlendModeAt(state.activeLayerIdx,state.currentFrame):(ld.blendMode||'normal')):(ld.blendMode||'normal');
     pop.innerHTML='';
     Object.keys(BLEND_MODE_LABELS).forEach(function(v){
       var it=document.createElement('div');
@@ -9845,14 +9861,29 @@ var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',screen:'Screen',overl
       it.addEventListener('mouseenter',function(){applyPreview(v);});
       it.addEventListener('click',function(e){
         e.stopPropagation();
-        // Restore the original first so pushUndo snapshots the true
-        // pre-preview state, then commit the pick on top of it.
-        var ld2=currentLd();if(ld2)ld2.blendMode=origMode==='normal'?undefined:origMode;
-        pushUndo();
-        applyPreview(v);
+        var ld2=currentLd();if(!ld2){close(false);return;}
+        if(ld2.blendKeys&&ld2.blendKeys.length){
+          // Duik-style hold key: SNAP the mode at the current frame instead
+          // of overwriting the static field — see upsertBlendKeyAt's own
+          // comment (motion.js).
+          pushUndo();
+          if(window.SMMotion&&SMMotion.upsertBlendKeyAt)SMMotion.upsertBlendKeyAt(ld2,state.currentFrame,v);
+          window._sceneVersion=(window._sceneVersion||0)+1;
+          if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
+        }else{
+          // Restore the original first so pushUndo snapshots the true
+          // pre-preview state, then commit the pick on top of it.
+          ld2.blendMode=origMode==='normal'?undefined:origMode;
+          pushUndo();
+          applyPreview(v);
+        }
         setLabel(v);
         origMode=null;
         close(false);
+        // Refresh Motion's own panel/grid so the pill label and any new key
+        // marker show up immediately, not just on the next unrelated redraw.
+        if(window.SMMotion&&SMMotion.renderMotionPropsPanel)SMMotion.renderMotionPropsPanel();
+        if(window.renderTimeline)renderTimeline();
       });
       pop.appendChild(it);
     });
