@@ -2765,10 +2765,11 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 
 /* Text animator weight ramp (2026-08-31) — the per-character weight the
    selector currently produces, drawn from the SAME textAnimatorWeights the
-   renderer reads so the two can never disagree. Sized and coloured from the
-   panel's existing tokens rather than new ones. */
-.ta-ramp{display:flex;align-items:flex-end;gap:1px;height:22px;flex:1;min-width:0;
-  padding:2px 3px;background:var(--bg2,#1b1b1f);border:1px solid var(--line,#2c2c33);border-radius:4px;overflow:hidden}
-.ta-ramp i{display:block;flex:1 1 0;min-width:2px;background:var(--acc,#4a9eff);border-radius:1px;opacity:.9}
-.ta-ramp-empty{font-size:10px;opacity:.55;align-self:center;padding-left:2px}
-.ta-sep{height:1px;background:var(--line,#2c2c33);margin:8px 0 6px;opacity:.6}
+   renderer reads so the two can never disagree. Sized like a .pi field so it
+   sits on the panel's own grid: flex:1 fills the column every other row's
+   input occupies, and the tokens are the panel's, not new ones. */
+.ta-ramp{display:flex;align-items:flex-end;gap:1px;height:26px;flex:1;min-width:0;
+  padding:3px 4px;background:var(--panel3);border-radius:5px;overflow:hidden;}
+.ta-ramp i{display:block;flex:1 1 0;min-width:2px;background:var(--accent);border-radius:1px;opacity:.85;min-height:1px;}
+.ta-ramp-empty{font-size:10.5px;color:rgba(236,234,231,.45);align-self:center;padding-left:2px;}
+.ta-sep{height:1px;background:rgba(236,234,231,.10);margin:9px 0 7px;}
