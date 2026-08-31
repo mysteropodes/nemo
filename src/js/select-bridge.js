@@ -806,6 +806,7 @@
         // space still INSIDE the group box drops back to "all boxes, none
         // targeted" (you are still in the group, Illustrator-style); only a
         // click outside the box leaves it.
+        var sortiDuGroupe = false;
         if (sidEx && sidEx !== window._motionExpandedElement) {
           window._motionExpandedElement = sidEx;
           window._perObjBoxes = state.activeLayerIdx;
@@ -813,14 +814,23 @@
         } else if (!sidEx) {
           var uEx = (lyrEx && window.perObjectUnionBounds) ? perObjectUnionBounds(lyrEx) : null;
           window._motionExpandedElement = null;
-          if (!uEx || !uEx.contains(ptEx)) window._perObjBoxes = null;
+          if (!uEx || !uEx.contains(ptEx)) { window._perObjBoxes = null; sortiDuGroupe = true; }
         }
         window._sceneVersion = (window._sceneVersion || 0) + 1;
         if (window.renderLayerList) renderLayerList();
         if (window.renderTimeline) renderTimeline();
         window.SMEngineBridge.renderNow();
-        e.stopImmediatePropagation(); e.preventDefault();
-        return;
+        // Leaving the group must NOT eat the click (2026-08-31, feedback en
+        // Motion: "je ressort en cliquant ailleurs ... j'essaye de clic sur
+        // l'autre groupe dans l'autre layer alors il select le premier
+        // groupe"). Exiting is a side effect of clicking somewhere else, not
+        // the point of the gesture: the click still means "select whatever
+        // is here", which may well be a shape on another layer. Consuming it
+        // forced a second click, and the first one appeared to do nothing —
+        // or worse, left the old group selected. Every other outcome of this
+        // block (targeting a sibling, dropping the target while staying in
+        // the group) IS the whole gesture, so those still consume it.
+        if (!sortiDuGroupe) { e.stopImmediatePropagation(); e.preventDefault(); return; }
       }
     }
     if (!shouldIntercept()) return;
@@ -1148,9 +1158,17 @@
     // clicking either at its visible position selected nothing. hitPt
     // (layer-space) stays the fallback, and the posed test hands back the
     // point in the element's own space for combineHitConfirm.
-    var posedHit = (window.hitTestPosed && !(activeLdForLock.locked && !activeLdForLock.symbolId))
-      ? hitTestPosed(state.activeLayerIdx, pt, 8 / view.zoom) : null;
-    var hit = posedHit || ((activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom }));
+    var posedDispo = !!window.hitTestPosed && !(activeLdForLock.locked && !activeLdForLock.symbolId);
+    var posedHit = posedDispo ? hitTestPosed(state.activeLayerIdx, pt, 8 / view.zoom) : null;
+    // No raw fallback once the posed test has spoken (2026-08-31): it tests
+    // the shapes where they are DRAWN, so "no hit" means the cursor really is
+    // over nothing on this layer. Falling back to layer.hitTest(hitPt) then
+    // re-tested the same click against the layer's UN-posed geometry, which
+    // for a transformed layer sits somewhere else entirely — a click on
+    // another layer's shape matched a shape of the active layer and selected
+    // it instead. That is the "il select le premier groupe" report. The raw
+    // test only remains for the case where the posed one could not run.
+    var hit = posedDispo ? posedHit : ((activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom }));
     var confirmPt = (posedHit && posedHit.localPoint) ? posedHit.localPoint : hitPt;
     if (hit && !combineHitConfirm(hit, confirmPt, state.activeLayerIdx)) hit = null;
     var hitOtherLayerIdx = -1;
@@ -2543,9 +2561,17 @@
     // clicking either at its visible position selected nothing. hitPt
     // (layer-space) stays the fallback, and the posed test hands back the
     // point in the element's own space for combineHitConfirm.
-    var posedHit = (window.hitTestPosed && !(activeLdForLock.locked && !activeLdForLock.symbolId))
-      ? hitTestPosed(state.activeLayerIdx, pt, 8 / view.zoom) : null;
-    var hit = posedHit || ((activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom }));
+    var posedDispo = !!window.hitTestPosed && !(activeLdForLock.locked && !activeLdForLock.symbolId);
+    var posedHit = posedDispo ? hitTestPosed(state.activeLayerIdx, pt, 8 / view.zoom) : null;
+    // No raw fallback once the posed test has spoken (2026-08-31): it tests
+    // the shapes where they are DRAWN, so "no hit" means the cursor really is
+    // over nothing on this layer. Falling back to layer.hitTest(hitPt) then
+    // re-tested the same click against the layer's UN-posed geometry, which
+    // for a transformed layer sits somewhere else entirely — a click on
+    // another layer's shape matched a shape of the active layer and selected
+    // it instead. That is the "il select le premier groupe" report. The raw
+    // test only remains for the case where the posed one could not run.
+    var hit = posedDispo ? posedHit : ((activeLdForLock.locked && !activeLdForLock.symbolId) ? null : layer.hitTest(hitPt, { stroke: true, fill: true, tolerance: 8 / view.zoom }));
     var confirmPt = (posedHit && posedHit.localPoint) ? posedHit.localPoint : hitPt;
     if (hit && !combineHitConfirm(hit, confirmPt, state.activeLayerIdx)) hit = null;
     var clickedPath = null;

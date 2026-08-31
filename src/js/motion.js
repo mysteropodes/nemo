@@ -3333,7 +3333,16 @@
     indices.forEach(function (li) {
       var ld = state.layers[li], layer = window.userLayers && userLayers[li];
       if (!ld || !layer) return;
-      var b = layer.bounds;
+      // POSED bounds, not raw (2026-08-31, feedback en Motion: "la box de
+      // hover n'est pas à jour si je bouge un éléments dans le groupe").
+      // layer.bounds is the untransformed geometry, so a layer whose
+      // elements carry their own Motion offsets reported its OLD extent —
+      // the hover box, and every other consumer of this union, stayed where
+      // the shapes used to be. perObjectPosedUnionLocal (tools.js) applies
+      // each element's own transform and stops there, which is exactly this
+      // function's input space: the layer transform and the parent chain
+      // are applied just below, as before.
+      var b = (window.perObjectPosedUnionLocal && perObjectPosedUnionLocal(layer)) || layer.bounds;
       if (!b || !isFinite(b.width) || !isFinite(b.height) || (b.width === 0 && b.height === 0)) return;
       var corners = [[b.left, b.top], [b.right, b.top], [b.right, b.bottom], [b.left, b.bottom]];
       var pts = corners.map(function (c) { return { point: c, handleIn: [0, 0], handleOut: [0, 0] }; });
@@ -5932,6 +5941,17 @@
     if (!_motionDrag) return false;
     _motionDrag = null;
     renderLayerList(); // scrub fields must reflect the dragged position/handle
+    // ...and the GRID half, or a key the drag just created is invisible
+    // until something unrelated happens to repaint it (2026-08-31, feedback
+    // en Motion: "si j'ai mis des keyframes à une des shape dans le groupe
+    // que je la bouge cela ne créer pas de keyframes tout de suite dans le
+    // propertie en question dans la timeline"). setValue DOES write the key
+    // — isAnimated is true, so it goes through setKeyAtCurrentFrame — the
+    // diamond simply had no repaint to appear in. Once per gesture END, not
+    // per tick: renderTimeline rebuilds every row (CLAUDE.md §5bis measured
+    // 27.7ms at 40 layers), which is exactly why the drag itself must not
+    // call it.
+    renderTimeline();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
     return true;
   }
