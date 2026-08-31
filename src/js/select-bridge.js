@@ -811,6 +811,28 @@
           window._motionExpandedElement = sidEx;
           window._perObjBoxes = state.activeLayerIdx;
           if (SMMotion.selectShapesByStrokeIds) SMMotion.selectShapesByStrokeIds(state.activeLayerIdx, [sidEx]);
+          // Re-run onDown now that the target has actually switched to the
+          // sibling under the cursor (2026-08-31 follow-up, "je déplace un
+          // éléments et que dans le même groupe je déplace un autre élément
+          // l'autre éléments ne déplace que la box et pas la shape"). The
+          // SMMotion.onDown call above (this file's own top-of-onDown, a few
+          // lines up) ran BEFORE _motionExpandedElement was updated, so its
+          // body-hit-test always compared the click against the OLD target's
+          // box — a click on a sibling is never inside that box, so it fell
+          // through to plain re-targeting every time and this whole block
+          // just consumed the event. A click-and-drag done as one continuous
+          // gesture (mousedown then move without releasing — the normal way
+          // to select-and-drag in any design tool) therefore relocated the
+          // box to the sibling's real, UNMOVED position and then dragged
+          // nothing: no _motionDrag was ever created, so the following
+          // pointermoves had nothing to act on and setValue was never
+          // called — confirmed live, ld.elementMotion[sidEx] stayed `{}`
+          // after a full press-drag-release. One retry with the NOW-current
+          // target lets onDown's own body-hit-test (bottom of the function)
+          // match this same click and start 'elementMove' properly, so the
+          // single gesture both selects AND drags the sibling, like every
+          // other grab in this file already does for the FIRST element.
+          SMMotion.onDown({ point: ptEx, altKey: e.altKey });
         } else if (!sidEx) {
           var uEx = (lyrEx && window.perObjectUnionBounds) ? perObjectUnionBounds(lyrEx) : null;
           window._motionExpandedElement = null;
