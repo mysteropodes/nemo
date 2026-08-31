@@ -3888,6 +3888,48 @@
     if (!holder) return 0;
     return valueAtFrame(holder, 'order', frameIdx)[0];
   }
+  // ---- Blend Mode keyframing (2026-08-31, feedback #207: "inspire-toi de
+  // Duik") — Duik's own time-varying rig properties (e.g. re-parenting a
+  // picked-up prop) never interpolate the underlying identity/enum value;
+  // they SNAP at each key and hold until the next one, because there's no
+  // meaningful halfway point between "Multiply" and "Screen" the way there
+  // is between two numbers. ld.blendKeys is a plain [{frame,mode}] array,
+  // sorted by frame — NOT routed through the generic numeric holder.motion
+  // track system (which assumes lerp-able number arrays throughout;
+  // shoehorning a mode NAME through it would need a fragile index<->name
+  // encoding for no real benefit here, since "hold-only" is this whole
+  // feature's point, not an edge case of it).
+  // Opt-in, zero cost unless used: ld.blendKeys is absent for every layer
+  // that has never turned this on, in which case the plain static
+  // ld.blendMode (completely unchanged, still what most consumers read —
+  // see this function's own callers list below) applies at every frame,
+  // same contract Order/3D/Widget layers already establish elsewhere in
+  // this file.
+  function layerBlendModeAt(li, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld) return undefined;
+    var keys = ld.blendKeys;
+    if (!keys || !keys.length) return ld.blendMode;
+    var v = keys[0].mode;
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i].frame <= frameIdx) v = keys[i].mode; else break;
+    }
+    return v;
+  }
+  function sortBlendKeys(ld) {
+    ld.blendKeys.sort(function (a, b) { return a.frame - b.frame; });
+  }
+  // Add/update the key AT this frame. pushUndo() is the CALLER's job,
+  // matching every other write helper in this file.
+  function upsertBlendKeyAt(ld, frame, mode) {
+    if (!ld.blendKeys) ld.blendKeys = [];
+    var k = ld.blendKeys.filter(function (kk) { return kk.frame === frame; })[0];
+    if (k) k.mode = mode; else { ld.blendKeys.push({ frame: frame, mode: mode }); sortBlendKeys(ld); }
+  }
+  function removeBlendKeyAt(ld, frame) {
+    if (!ld.blendKeys) return;
+    ld.blendKeys = ld.blendKeys.filter(function (k) { return k.frame !== frame; });
+  }
   // Cheap "does ANY layer/element on this layer actually use Order" scans —
   // engine-bridge.js calls these ONCE per buildSceneJson / once per layer
   // respectively, so the stable-sort + per-item lookup below them is fully
@@ -6932,11 +6974,42 @@
   // a second dropdown implementation — one writer of ld.blendMode either way.
   function renderBlendRow(body, ld, li) {
     var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
+    // Stopwatch (feedback #207, Duik-inspired): turns ld.blendKeys on/off,
+    // same on/hasKeyHere/click shape renderColorRow's own stopwatch uses —
+    // OFF collapses back to the plain static field (the pre-#207 behavior,
+    // still what most other consumers of ld.blendMode read, see
+    // layerBlendModeAt's own comment), ON seeds a single key at the
+    // playhead with whatever mode was showing.
+    var keyed = !!(ld.blendKeys && ld.blendKeys.length);
+    var hasKeyHere = keyed && ld.blendKeys.some(function (k) { return k.frame === state.currentFrame; });
+    var sw = document.createElement('div');
+    sw.className = 'lico motion-stopwatch' + (keyed ? ' on' : '');
+    sw.title = stopwatchTitle('motionAnimateFill', keyed, hasKeyHere);
+    sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
+    sw.addEventListener('click', function (e) {
+      e.stopPropagation(); pushUndo();
+      if (!keyed) {
+        ld.blendKeys = [{ frame: state.currentFrame, mode: ld.blendMode || 'normal' }];
+      } else if (hasKeyHere) {
+        if (ld.blendKeys.length === 1) {
+          var fv = ld.blendKeys[0].mode;
+          ld.blendMode = fv === 'normal' ? undefined : fv;
+          delete ld.blendKeys;
+        } else {
+          SMMotion.removeBlendKeyAt ? SMMotion.removeBlendKeyAt(ld, state.currentFrame) : (ld.blendKeys = ld.blendKeys.filter(function (k) { return k.frame !== state.currentFrame; }));
+        }
+      } else {
+        SMMotion.upsertBlendKeyAt(ld, state.currentFrame, layerBlendModeAt(li, state.currentFrame));
+      }
+      renderLayerList(); renderTimeline();
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    });
+    row.appendChild(sw);
     var label = document.createElement('span');
     label.textContent = SM.t('fieldBlend'); label.style.minWidth = '70px';
     row.appendChild(label);
     var pill = document.createElement('div');
-    var mode = ld.blendMode || 'normal';
+    var mode = layerBlendModeAt(li, state.currentFrame) || 'normal';
     pill.className = 'lparent motion-parent-pill' + (mode === 'normal' ? ' none' : '');
     var lab = document.createElement('span'); lab.className = 'mp-label';
     lab.textContent = (typeof BLEND_MODE_LABELS !== 'undefined' && BLEND_MODE_LABELS[mode]) || mode;
@@ -11815,6 +11888,9 @@
     // already goes through.
     outerWorldPoint: outerWorldPoint,
     outerLocalPoint: outerLocalPoint,
+    layerBlendModeAt: layerBlendModeAt,
+    upsertBlendKeyAt: upsertBlendKeyAt,
+    removeBlendKeyAt: removeBlendKeyAt,
     // rig-widget.js's "+" button (feedback #185) reads the SAME per-layer
     // property list every Motion row already goes through (§11's single-
     // decider invariant), instead of guessing a parallel list, and writes
