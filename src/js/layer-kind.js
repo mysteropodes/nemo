@@ -72,7 +72,7 @@
   var FALLBACK = {
     draw: 'Dessin', image: 'Image', sequence: 'Séquence', video: 'Vidéo', camera: 'Caméra',
     effect: 'Effet', text: 'Texte', 'null': 'Null', component: 'Composant', montage: 'Montage', folder: 'Dossier',
-    widget: 'Widget', effector: 'Effector',
+    widget: 'Widget', effector: 'Effector', guide: 'Guide',
   };
 
   function everyStrokeIsRaster(ld) {

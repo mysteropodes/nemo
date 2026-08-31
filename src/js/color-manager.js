@@ -179,7 +179,7 @@
     // broken by omission rather than by a bug (2026-07-28 screenshot,
     // arrow pointing at the swatch: "je clic là et ça ne fait rien").
     var sw = document.createElement('div'); sw.className = 'cw-mini'; sw.style.flexShrink = '0'; sw.style.cursor = 'pointer';
-    sw.title = 'Choisir une couleur…';
+    sw.title = SM.t('colorPickTitle');
     sw.addEventListener('click', function (e) {
       e.stopPropagation();
       if (!window.ColorPicker) return;
@@ -199,7 +199,7 @@
     var opacityInput = document.createElement('input');
     opacityInput.type = 'number'; opacityInput.className = 'pi scrub color-opacity-input'; opacityInput.min = 0; opacityInput.max = 100; opacityInput.dataset.step = '1';
     var pct = document.createElement('span'); pct.className = 'color-pct'; pct.textContent = '%';
-    var selBtn = document.createElement('div'); selBtn.className = 'lico color-select-btn'; selBtn.title = 'Sélectionner les formes de cette couleur (calque/frame actifs)';
+    var selBtn = document.createElement('div'); selBtn.className = 'lico color-select-btn'; selBtn.title = SM.t('colorSelectShapes');
     selBtn.innerHTML = ICON_CROSSHAIR;
 
     // `row.dataset.liveEditing` brackets the recolorColor() call so that

@@ -196,7 +196,7 @@
     var leftHandle = document.createElement('div'), rightHandle = document.createElement('div');
     [leftHandle, rightHandle].forEach(function (h, i) {
       h.className = 'tlzoom-sb-handle ' + (i === 0 ? 'tlzoom-sb-left' : 'tlzoom-sb-right');
-      h.title = 'Glisser pour zoomer / dézoomer la timeline';
+      h.title = (window.SM && SM.t) ? SM.t('tlZoomDragTitle') : 'Drag to zoom the timeline in / out';
       h.style.cssText = 'position:absolute;top:0;width:' + EDGE_PX + 'px;height:' + BAR_H + 'px;cursor:ew-resize;border-radius:' + (i === 0 ? (BAR_H / 2) + 'px 2px 2px ' + (BAR_H / 2) + 'px' : '2px ' + (BAR_H / 2) + 'px ' + (BAR_H / 2) + 'px 2px') + ';' + (i === 0 ? 'left:0;' : 'right:0;');
       thumb.appendChild(h);
     });
