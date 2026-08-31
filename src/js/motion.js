@@ -6797,6 +6797,7 @@
     if (ld.isNullLayer && !ld.isFolderLayer) renderNullShapeRow(body, ld);
     renderFollowPathRow(body, ld, state.activeLayerIdx);
     renderTimeLinkRow(body, ld, state.activeLayerIdx);
+    renderBlendRow(body, ld, state.activeLayerIdx);
     renderMatteRow(body, ld, state.activeLayerIdx);
     // A targeted SHAPE shows its own Transform, not the layer's (2026-08-30,
     // feedback #173: "si on select une shape dans elements alors dans layer
@@ -6917,6 +6918,36 @@
   }
   function matteModeLabelSafe(m) {
     return (typeof matteModeLabel === 'function') ? matteModeLabel(m) : m;
+  }
+  // Blend mode, IN Layer Properties (feedback #201, "je n'ai pas de dropdown
+  // menu de blend" — Motion mode genuinely had no way to reach it: the
+  // right-panel #p-blendmode dropdown has been display:none in EVERY
+  // context since #172 folded it into the layer row's right-click menu
+  // (timeline.js), and that replacement was Animation-2D-only — Motion's
+  // own row context menu (this file) never got the equivalent entry, so
+  // the feature was reachable from neither surface here. Same pill-and-
+  // popover idiom as renderMatteRow right below (which got this exact
+  // "buried, no entry point" fix for Matte on 2026-08-30), reusing
+  // window.openBlendDropdownAt/BLEND_MODE_LABELS (timeline.js) rather than
+  // a second dropdown implementation — one writer of ld.blendMode either way.
+  function renderBlendRow(body, ld, li) {
+    var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
+    var label = document.createElement('span');
+    label.textContent = SM.t('fieldBlend'); label.style.minWidth = '70px';
+    row.appendChild(label);
+    var pill = document.createElement('div');
+    var mode = ld.blendMode || 'normal';
+    pill.className = 'lparent motion-parent-pill' + (mode === 'normal' ? ' none' : '');
+    var lab = document.createElement('span'); lab.className = 'mp-label';
+    lab.textContent = (typeof BLEND_MODE_LABELS !== 'undefined' && BLEND_MODE_LABELS[mode]) || mode;
+    pill.appendChild(lab);
+    pill.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      window.SM.setActiveLayer(li);
+      if (window.openBlendDropdownAt) window.openBlendDropdownAt(pill);
+    });
+    row.appendChild(pill);
+    body.appendChild(row);
   }
   // One menu: pick the SOURCE layer, then the MODE. Two short lists in one
   // place beat the old split between a right-panel dropdown (mode) and a
