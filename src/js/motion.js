@@ -11736,6 +11736,13 @@
     // already goes through.
     outerWorldPoint: outerWorldPoint,
     outerLocalPoint: outerLocalPoint,
+    // rig-widget.js's "+" button (feedback #185) reads the SAME per-layer
+    // property list every Motion row already goes through (§11's single-
+    // decider invariant), instead of guessing a parallel list, and writes
+    // through the SAME expression setter the property-row wiring menu uses
+    // (widgetWiringMenuItems above) — one writer, two entry points.
+    propsFor: propsFor,
+    setExpressionCode: setExpressionCode,
     // Exposed for getEffectiveStrokes' symbolId branch (app.js, 2026-07-29
     // fix: "un calque interne d'un component multi-calques n'anime jamais
     // depuis l'extérieur") — composing a sym.layers[] entry's OWN layer-
