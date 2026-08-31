@@ -235,8 +235,17 @@
       vol.addEventListener('change', function () { logAudio('volume'); });
       row.appendChild(vol);
 
+      // feedback #218 ("je peux pas le supprimer") — deletion already
+      // worked (splice below, unchanged), but the control was a bare "×"
+      // glyph with none of the affordance every other row icon in this
+      // panel has (mute just above uses a real flat SVG, matching the
+      // panel's own established "flat monochrome SVGs, not emoji/glyphs"
+      // convention) — easy to read as decoration on a tightly-packed row
+      // rather than a clickable delete, which is very likely what actually
+      // read as "can't delete it" live.
       var del = document.createElement('div');
-      del.className = 'lico'; del.textContent = '×'; del.title = window.SM.t('audioDeleteTrack');
+      del.className = 'lico'; del.title = window.SM.t('audioDeleteTrack');
+      del.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3h6l1 2h4v2H4V5h4z"/><path d="M6 9h12l-1 12H7z"/></svg>';
       del.addEventListener('click', function (e) {
         e.stopPropagation();
         stopTrack(track);
