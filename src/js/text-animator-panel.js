@@ -141,21 +141,22 @@
     var sel = an.selector, props = an.props;
 
     // --- header: name, enable, delete -----------------------------------
-    var head = document.createElement('div');
-    head.className = 'pr';
-    var name = document.createElement('span');
-    name.className = 'pl';
-    name.style.width = 'auto';
-    name.style.fontWeight = '600';
-    name.textContent = t('textAnimTitle', 'Animator') + ' ' + (idx + 1);
-    head.appendChild(name);
+    // An ordinary .pr with the name in .pl and icon buttons on the right,
+    // rather than a bespoke sub-heading: the panel has no sub-group style of
+    // its own, and .pl's fixed 68px column is exactly what keeps every row
+    // below aligned with the rest of the app's sections.
+    var head = row(host, t('textAnimTitle', 'Animator') + ' ' + (idx + 1));
+    var spacer = document.createElement('div');
+    spacer.style.flex = '1';
+    head.appendChild(spacer);
 
-    var eye = document.createElement('div');
-    eye.className = 'lico' + (an.enabled === false ? ' off' : '');
-    eye.style.marginLeft = 'auto';
+    var eye = document.createElement('button');
+    eye.type = 'button';
+    eye.className = 'pbtn icon-only-btn' + (an.enabled === false ? '' : ' active');
     eye.title = t('textAnimToggleTitle', 'Enable / disable this animator');
-    eye.textContent = an.enabled === false ? '○' : '●';
-    eye.style.cursor = 'pointer';
+    eye.innerHTML = an.enabled === false
+      ? '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>'
+      : '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
     eye.addEventListener('click', function () {
       if (typeof pushUndo === 'function') pushUndo();
       an.enabled = an.enabled === false;
@@ -163,21 +164,20 @@
     });
     head.appendChild(eye);
 
-    var del = document.createElement('div');
-    del.className = 'lico';
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'pbtn icon-only-btn';
     del.title = t('textAnimRemoveTitle', 'Remove this animator');
-    del.style.cursor = 'pointer';
-    del.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    del.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
     del.addEventListener('click', function () {
       if (typeof pushUndo === 'function') pushUndo();
       SMMotion.removeTextAnimator(state.activeLayerIdx, an.id);
       commit(ld);
     });
     head.appendChild(del);
-    host.appendChild(head);
 
     // --- selector --------------------------------------------------------
-    var rRange = row(host, t('textAnimRange', 'Range'), 'dims-row');
+    var rRange = row(host, t('textAnimRange', 'Range'));
     numField(rRange, function () { return sel.start; }, function (v, live) { sel.start = v; if (!live) commit(ld); else liveRefresh(ld); }, 1, -200, 200);
     numField(rRange, function () { return sel.end; }, function (v, live) { sel.end = v; if (!live) commit(ld); else liveRefresh(ld); }, 1, -200, 200);
     stopwatch(rRange, an, 'start', ld);
@@ -204,7 +204,7 @@
       sel.basedOn = v; commit(ld);
     });
 
-    var rEase = row(host, t('textAnimEase', 'Ease hi/lo'), 'dims-row');
+    var rEase = row(host, t('textAnimEase', 'Ease hi/lo'));
     numField(rEase, function () { return sel.easeHigh; }, function (v, live) { sel.easeHigh = v; if (!live) commit(ld); else liveRefresh(ld); }, 5, -100, 100);
     numField(rEase, function () { return sel.easeLow; }, function (v, live) { sel.easeLow = v; if (!live) commit(ld); else liveRefresh(ld); }, 5, -100, 100);
 
@@ -213,11 +213,11 @@
     stopwatch(rAmt, an, 'amount', ld);
 
     // --- driven properties ----------------------------------------------
-    var rPos = row(host, t('propPosition', 'Position'), 'dims-row');
+    var rPos = row(host, t('propPosition', 'Position'));
     numField(rPos, function () { return (props.position || [0, 0])[0]; }, function (v, live) { props.position = props.position || [0, 0]; props.position[0] = v; if (!live) commit(ld); else liveRefresh(ld); }, 1);
     numField(rPos, function () { return (props.position || [0, 0])[1]; }, function (v, live) { props.position = props.position || [0, 0]; props.position[1] = v; if (!live) commit(ld); else liveRefresh(ld); }, 1);
 
-    var rScale = row(host, t('propScale', 'Scale'), 'dims-row');
+    var rScale = row(host, t('propScale', 'Scale'));
     numField(rScale, function () { return (props.scale || [100, 100])[0]; }, function (v, live) { props.scale = props.scale || [100, 100]; props.scale[0] = v; if (!live) commit(ld); else liveRefresh(ld); }, 1, 0, 1000);
     numField(rScale, function () { return (props.scale || [100, 100])[1]; }, function (v, live) { props.scale = props.scale || [100, 100]; props.scale[1] = v; if (!live) commit(ld); else liveRefresh(ld); }, 1, 0, 1000);
 
