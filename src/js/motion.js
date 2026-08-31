@@ -11729,6 +11729,13 @@
     layerMotion3DPointMap: layerMotion3DPointMap,
     setLayerValue: function (li, prop, vals) { var ld = state.layers[li]; if (ld) setValue(ld, prop, vals); },
     layerMotionAt: layerMotionAt,
+    // World<->layer-local point conversion through the parent chain only
+    // (t.strokeId left null) — rig-widget.js reuses this instead of
+    // reimplementing chain inversion, same battle-tested math every other
+    // on-canvas drag (anchor point, position keys, effector handles, gizmo)
+    // already goes through.
+    outerWorldPoint: outerWorldPoint,
+    outerLocalPoint: outerLocalPoint,
     // Exposed for getEffectiveStrokes' symbolId branch (app.js, 2026-07-29
     // fix: "un calque interne d'un component multi-calques n'anime jamais
     // depuis l'extérieur") — composing a sym.layers[] entry's OWN layer-

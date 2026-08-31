@@ -79,7 +79,7 @@
     slider: { size: [200, 26], min: 0, max: 100, rest: 0, names: ['Value'] },
   };
 
-  var drag = null;   // {li, axis:'x'|'y'|'xy', moved:boolean}
+  var drag = null;   // {li, mode:'puck'|'move', moved:boolean, ...}
 
   function engineOn() { return window.SMEngineBridge && SMEngineBridge.isEnabled() && !state.playing; }
 
@@ -271,9 +271,10 @@
       var pl = puckLocal(g);
       var tol = Math.max(puckRadius(g), 10 / view.zoom);
       if (Math.hypot(loc[0] - pl[0], loc[1] - pl[1]) <= tol) return { g: g, local: loc, onPuck: true };
-      // Clicking anywhere inside the pad jumps the puck there, the way a
-      // scrollbar trough or a real fader does — otherwise a 12px target is
-      // the only way in.
+      // Clicking the pad anywhere OTHER than the puck moves the whole
+      // widget instead (feedback #184: "le bouton rond... ne devrait
+      // bouger que si on clic sur le rond") — see onDown below for the
+      // drag-mode split. No more trough-jump-to-value on a body click.
       if (Math.abs(loc[0]) <= g.w / 2 && Math.abs(loc[1]) <= g.h / 2) return { g: g, local: loc, onPuck: false };
     }
     return null;
@@ -284,21 +285,42 @@
     var hit = hitTest(e.clientX, e.clientY);
     if (!hit) return;
     e.stopImmediatePropagation(); e.preventDefault();
-    drag = { li: hit.g.li, moved: false };
     pushUndo();
     SMEngineBridge.suspend();
-    // A click in the trough is already a value change, not just an arming
-    // gesture — commit it immediately so a single click lands somewhere.
-    if (!hit.onPuck) { writeFromLocal(hit.g, hit.local[0], hit.local[1]); drag.moved = true; }
+    if (hit.onPuck) {
+      drag = { li: hit.g.li, mode: 'puck', moved: false };
+    } else {
+      // Body click (anywhere in the pad but not the puck) drags the WHOLE
+      // widget — writes the layer's own Position track, exactly like
+      // dragging a Null marker. t.strokeId stays null: outerLocalPoint only
+      // needs to undo the PARENT chain here, the widget's own Position is
+      // what's being edited, not composed into "local" already (mirrors
+      // geomFor: ownMat applied first, parent chain on top).
+      var t = { li: hit.g.li, strokeId: null };
+      var wpt0 = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+      var startLocal = SMMotion.outerLocalPoint(t, { x: wpt0[0], y: wpt0[1] });
+      var ownMat0 = SMMotion.layerMotionAt(hit.g.li, state.currentFrame);
+      drag = { li: hit.g.li, mode: 'move', moved: false, t: t, startLocal: startLocal, startDx: ownMat0 ? ownMat0.dx : 0, startDy: ownMat0 ? ownMat0.dy : 0 };
+    }
     SMEngineBridge.renderNow();
   }
   function onMove(e) {
     if (!drag) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    if (drag.mode === 'move') {
+      var wpt = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+      var curLocal = SMMotion.outerLocalPoint(drag.t, { x: wpt[0], y: wpt[1] });
+      var ndx = drag.startDx + (curLocal.x - drag.startLocal.x);
+      var ndy = drag.startDy + (curLocal.y - drag.startLocal.y);
+      SMMotion.setLayerValue(drag.li, 'position', [ndx, ndy]);
+      drag.moved = true;
+      SMEngineBridge.renderNow();
+      return;
+    }
     var g = geomFor(drag.li);
     if (!g) { drag = null; return; }
-    e.stopImmediatePropagation(); e.preventDefault();
-    var wpt = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-    var loc = toLocal(g, wpt[0], wpt[1]);
+    var wpt2 = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
+    var loc = toLocal(g, wpt2[0], wpt2[1]);
     writeFromLocal(g, loc[0], loc[1]);
     drag.moved = true;
     SMEngineBridge.renderNow();
@@ -453,6 +475,73 @@
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
 
+  // ---- right-panel properties (feedback #184, "avoir leurs properties
+  // dans layer properties, pouvoir ajuster leur taille/longueur") ----
+  // Same section-that-only-exists-for-one-selection-kind pattern as
+  // image-mesh-bridge.js's own panel (renderImageMeshPanel) — a static
+  // #p-widget-sec block in index.html, shown/hidden and populated from
+  // here, hooked into updatePropsContext() (timeline.js) right next to it.
+  function el(id) { return document.getElementById(id); }
+  function activeWidget() {
+    var li = state.activeLayerIdx, ld = state.layers[li], w = widgetOf(ld);
+    return w ? { li: li, ld: ld, w: w } : null;
+  }
+  function renderWidgetPanel() {
+    var sec = el('p-widget-sec');
+    if (!sec) return;
+    var aw = activeWidget();
+    if (!aw) { sec.style.display = 'none'; return; }
+    sec.style.display = '';
+    var ld = aw.ld, w = aw.w, size = w.size || DEFAULTS[w.kind].size;
+    var wEl = el('p-widget-w'), hEl = el('p-widget-h');
+    if (wEl) wEl.value = Math.round(size[0]);
+    if (hEl) hEl.value = Math.round(size[1]);
+    var xl = el('p-widget-xlabel'); if (xl) xl.textContent = axisLabel(ld, w.x) || 'X';
+    var xmin = el('p-widget-xmin'), xmax = el('p-widget-xmax'), xrest = el('p-widget-xrest');
+    if (xmin) xmin.value = w.x.min;
+    if (xmax) xmax.value = w.x.max;
+    if (xrest) xrest.value = (w.x.rest === undefined ? w.x.min : w.x.rest);
+    var hasY = w.kind === 'joystick' && !!w.y;
+    var yRangeRow = el('p-widget-yrange-row'), yRestRow = el('p-widget-yrest-row');
+    if (yRangeRow) yRangeRow.style.display = hasY ? '' : 'none';
+    if (yRestRow) yRestRow.style.display = hasY ? '' : 'none';
+    if (hasY) {
+      var yl = el('p-widget-ylabel'); if (yl) yl.textContent = axisLabel(ld, w.y) || 'Y';
+      var ymin = el('p-widget-ymin'), ymax = el('p-widget-ymax'), yrest = el('p-widget-yrest');
+      if (ymin) ymin.value = w.y.min;
+      if (ymax) ymax.value = w.y.max;
+      if (yrest) yrest.value = (w.y.rest === undefined ? w.y.min : w.y.rest);
+    }
+  }
+  window.renderRigWidgetPanel = renderWidgetPanel;
+  // One shared handler shape: read the active widget fresh (never captured
+  // by closure — the panel section can end up bound to a different widget
+  // layer between the field's creation and any given edit), undo-snapshot,
+  // apply, refresh. Mirrors bindWidgetField's sibling in image-mesh-bridge.js.
+  function bindWidgetField(id, apply) {
+    var fld = el(id);
+    if (!fld) return;
+    fld.addEventListener('change', function () {
+      var aw = activeWidget();
+      if (!aw) return;
+      var v = parseFloat(this.value);
+      if (!isFinite(v)) return;
+      pushUndo();
+      apply(aw.w, v);
+      afterWidgetEdit(aw.ld);
+    });
+  }
+  function initWidgetPanelFields() {
+    bindWidgetField('p-widget-w', function (w, v) { w.size = [Math.max(8, v), (w.size || DEFAULTS[w.kind].size)[1]]; });
+    bindWidgetField('p-widget-h', function (w, v) { w.size = [(w.size || DEFAULTS[w.kind].size)[0], Math.max(8, v)]; });
+    bindWidgetField('p-widget-xmin', function (w, v) { w.x.min = v; });
+    bindWidgetField('p-widget-xmax', function (w, v) { w.x.max = v; });
+    bindWidgetField('p-widget-xrest', function (w, v) { w.x.rest = v; });
+    bindWidgetField('p-widget-ymin', function (w, v) { if (w.y) w.y.min = v; });
+    bindWidgetField('p-widget-ymax', function (w, v) { if (w.y) w.y.max = v; });
+    bindWidgetField('p-widget-yrest', function (w, v) { if (w.y) w.y.rest = v; });
+  }
+
   window.SMRigWidget = {
     addWidgetLayer: addWidgetLayer,
     openWidgetMenu: openWidgetMenu,
@@ -470,6 +559,7 @@
 
   // ---- listeners -------------------------------------------------------
   function init() {
+    initWidgetPanelFields();
     // Capture phase on DOCUMENT, not on #canvas-area — see
     // image-mesh-bridge.js's own long note: motion.js registers a
     // capture-phase pointerdown on #canvas-area and loads FIRST, and among

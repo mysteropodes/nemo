@@ -3029,6 +3029,10 @@ function updatePropsContext(){
   // above: both are sections that only exist for ONE kind of single
   // selection, so they re-evaluate wherever the selection is refreshed.
   if(window.renderImageMeshPanel)window.renderImageMeshPanel();
+  // Rig widget size/axis-range fields (feedback #184, "avoir leurs
+  // properties dans layer properties") — same hook point, same reason: a
+  // section that only exists for ONE kind of single selection.
+  if(window.renderRigWidgetPanel)window.renderRigWidgetPanel();
   var hdrEl=document.getElementById('props-context-hdr');if(hdrEl)hdrEl.textContent=hdrText;
   // Document panel presented like a selection (2026-08-30, feedback #171
   // "l'onglet document pourrait disparaitre et se mettre comme pour element
