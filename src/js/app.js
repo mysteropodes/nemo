@@ -1753,6 +1753,52 @@ function rigWeighOnePoint(rig,boneIds,p,radius,softness){
   });
   return w;
 }
+// Shapper's own anchoring model (2026-08-31, from the AE expression Cyril
+// supplied): a vertex is weighed against each CONTROL POINT of a bone, not
+// against the single nearest location on its curve. Its shapeDataArray is
+// literally a per-shape-point list of {pointIndex, influence} — one
+// percentage per skeleton point — which is what makes an assignment
+// inspectable and correctable ("les box d'influences comme dans Shapper sur
+// les vecteurs que tu peux modifier si l'assignement automatique ne
+// fonctionne pas").
+//
+// The two models differ in what they can express, not just in how they are
+// stored. The offset model binds a vertex to ONE place on ONE bone, so
+// moving a control point re-evaluates the whole curve underneath it. The
+// control-point model spreads a vertex across SEVERAL anchors with explicit
+// shares, so which point pulls what is both predictable and editable —
+// exactly the behaviour in Cyril's three captures.
+//
+// Emitted for new binds; entries carrying `offset` (every rig saved before
+// today) keep the old path in applyRigDeform. Both shapes coexist inside one
+// weight list without ambiguity because the discriminator is the presence of
+// `ptIndex`, not a version flag that could drift.
+function rigWeighOnePointByControl(rig,boneIds,p,radius,softness){
+  var w=[];
+  boneIds.forEach(function(bid){
+    var bone=rig.bones[bid];if(!bone)return;
+    var segs=bone.restSegments||[];
+    var boneRadius=bone.radius||radius;
+    for(var k=0;k<segs.length;k++){
+      var cp=segs[k].point;if(!cp)continue;
+      var dist=Math.sqrt((p.x-cp[0])*(p.x-cp[0])+(p.y-cp[1])*(p.y-cp[1]));
+      var t=Math.max(0,1-dist/boneRadius);
+      var infl=softness?t+(t*t*(3-2*t)-t)*softness:t;
+      if(infl>0)w.push({boneId:bid,ptIndex:k,w:infl});
+    }
+  });
+  return w;
+}
+// Chord angle at control point k, Shapper's own
+// `atan2(next[1]-prev[1], next[0]-prev[0])` with its end clamping: the first
+// and last points borrow the direction of their only neighbour rather than
+// falling back to zero, which would snap a shape flat at the tips.
+function _rigChordAngle(segs,k){
+  if(!segs||segs.length<2)return 0;
+  var prev=segs[Math.max(k-1,0)].point,next=segs[Math.min(k+1,segs.length-1)].point;
+  return Math.atan2(next[1]-prev[1],next[0]-prev[0]);
+}
+function _rigNormalizeAngle(a){return((a+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;}
 function rigBindStroke(ld,path,boneIds,radius,rotate,softness){
   var rig=ensureLayerRig(ld);
   // CompoundPath BEFORE the segments/length guard, deliberately: a
@@ -1807,8 +1853,13 @@ function rigBindStroke(ld,path,boneIds,radius,rotate,softness){
   // exact same way a full bind pass would, instead of a second,
   // independently-maintained copy of this formula (CLAUDE.md §3).
   function weighForPoints(pts){
+    // New binds use Shapper's control-point anchoring (2026-08-31). Existing
+    // binds are untouched: they already carry `offset` entries and
+    // anchorFor routes those down the original path, so no saved rig
+    // changes shape under this build.
+    var weigh=(window.SM_RIG_CONTROL_POINT_WEIGHTS===false)?rigWeighOnePoint:rigWeighOnePointByControl;
     return pts.map(function(pt){
-      return rigWeighOnePoint(rig,boneIds,new Point(pt[0],pt[1]),radius,softness);
+      return weigh(rig,boneIds,new Point(pt[0],pt[1]),radius,softness);
     });
   }
   var rest=path.segments.map(function(s){return[s.point.x,s.point.y];});
@@ -1895,8 +1946,9 @@ function rigBindMesh(ld,raster,boneIds,radius,rotate,softness){
   var restMesh={verts:mesh.verts,offsets:mesh.verts.map(function(){return[0,0];})};
   var world=SMImageMesh.worldVerts(restMesh,rect,null);
   var rest=world.map(function(p){return[p[0],p[1]];});
+  var meshWeigh=(window.SM_RIG_CONTROL_POINT_WEIGHTS===false)?rigWeighOnePoint:rigWeighOnePointByControl;
   var weights=rest.map(function(pt){
-    return rigWeighOnePoint(rig,boneIds,new Point(pt[0],pt[1]),radius,softness);
+    return meshWeigh(rig,boneIds,new Point(pt[0],pt[1]),radius,softness);
   });
   // Re-binding replaces rather than stacks, same rule as a path's.
   rig.binds=rig.binds.filter(function(b){return b.meshId!==raster.data.meshId;});
@@ -2018,6 +2070,41 @@ function applyRigDeform(ld){
     boneCache[bid]=entry;
     return entry;
   }
+  // One weight entry -> where it wants this vertex, and by how much it turned.
+  // The two anchoring models converge here so every caller below (boundary,
+  // centerSegments, mesh) gets both without a third copy of the maths — the
+  // §3 reasoning the mesh bind already applied within this file.
+  //
+  //   ptIndex  -> Shapper's model: anchor on a CONTROL POINT, angle from the
+  //               chord through its neighbours.
+  //   offset   -> the original model: anchor anywhere along the bone curve,
+  //               angle from the curve's own tangent there. Kept because
+  //               every rig saved before today stores this, and because a
+  //               curved bone samples more smoothly this way than from two
+  //               control points.
+  //
+  // Returns null when the entry cannot be resolved, so callers skip it
+  // without folding a bogus zero into their weighted average.
+  function anchorFor(wentry){
+    if(wentry.ptIndex!=null){
+      var bone=rig.bones[wentry.boneId];
+      if(!bone||!bone.restSegments||!bone.segments)return null;
+      var k=wentry.ptIndex;
+      var rs=bone.restSegments[k],cs=bone.segments[k];
+      if(!rs||!cs)return null;
+      return {
+        restX:rs.point[0],restY:rs.point[1],curX:cs.point[0],curY:cs.point[1],
+        da:_rigNormalizeAngle(_rigChordAngle(bone.segments,k)-_rigChordAngle(bone.restSegments,k)),
+      };
+    }
+    var bp=bonePaths(wentry.boneId);
+    var curLoc=bp.cur.getLocationAt(wentry.offset),restLoc=bp.rest.getLocationAt(wentry.offset);
+    if(!curLoc||!restLoc)return null;
+    return {
+      restX:restLoc.point.x,restY:restLoc.point.y,curX:curLoc.point.x,curY:curLoc.point.y,
+      da:Math.atan2(curLoc.tangent.y,curLoc.tangent.x)-Math.atan2(restLoc.tangent.y,restLoc.tangent.x),
+    };
+  }
   // Per-vertex displacement, factored out (2026-08-30) so a MESH bind uses
   // the identical formula instead of a second copy that would drift from it
   // (CLAUDE.md §3's reasoning, applied within one file). Takes a rest point
@@ -2025,21 +2112,18 @@ function applyRigDeform(ld){
   function displaceOne(b,restPt,wlist){
     var dx=0,dy=0,sumW=0;
     (wlist||[]).forEach(function(wentry){
-      var bp=bonePaths(wentry.boneId);
-      var curLoc=bp.cur.getLocationAt(wentry.offset),restLoc=bp.rest.getLocationAt(wentry.offset);
-      if(!curLoc||!restLoc)return;
+      var a=anchorFor(wentry);
+      if(!a)return;
       sumW+=wentry.w;
       if(b.rotate){
-        var restAng=Math.atan2(restLoc.tangent.y,restLoc.tangent.x);
-        var curAng=Math.atan2(curLoc.tangent.y,curLoc.tangent.x);
-        var da=curAng-restAng,cosA=Math.cos(da),sinA=Math.sin(da);
-        var offX=restPt[0]-restLoc.point.x,offY=restPt[1]-restLoc.point.y;
+        var cosA=Math.cos(a.da),sinA=Math.sin(a.da);
+        var offX=restPt[0]-a.restX,offY=restPt[1]-a.restY;
         var rOffX=offX*cosA-offY*sinA,rOffY=offX*sinA+offY*cosA;
-        dx+=wentry.w*((curLoc.point.x+rOffX)-restPt[0]);
-        dy+=wentry.w*((curLoc.point.y+rOffY)-restPt[1]);
+        dx+=wentry.w*((a.curX+rOffX)-restPt[0]);
+        dy+=wentry.w*((a.curY+rOffY)-restPt[1]);
       }else{
-        dx+=wentry.w*(curLoc.point.x-restLoc.point.x);
-        dy+=wentry.w*(curLoc.point.y-restLoc.point.y);
+        dx+=wentry.w*(a.curX-a.restX);
+        dy+=wentry.w*(a.curY-a.restY);
       }
     });
     var norm=sumW>1?sumW:1;
@@ -2074,9 +2158,8 @@ function applyRigDeform(ld){
       // mode and would wrongly read 0 otherwise.
       var sumDaW=0,sumWRot=0;
       (b.weights[i]||[]).forEach(function(wentry){
-        var bp=bonePaths(wentry.boneId);
-        var curLoc=bp.cur.getLocationAt(wentry.offset),restLoc=bp.rest.getLocationAt(wentry.offset);
-        if(!curLoc||!restLoc)return;
+        var a=anchorFor(wentry);
+        if(!a)return;
         sumW+=wentry.w;
         if(b.rotate){
           // Rotate the vertex's own rest-offset FROM the bone by the bone's
@@ -2086,17 +2169,15 @@ function applyRigDeform(ld){
           // translate by how far that point itself moved. This is
           // rotation-aware LBS, generalized from "one bone-angle" to "a
           // tangent field along the curve."
-          var restAng=Math.atan2(restLoc.tangent.y,restLoc.tangent.x);
-          var curAng=Math.atan2(curLoc.tangent.y,curLoc.tangent.x);
-          var da=curAng-restAng,cosA=Math.cos(da),sinA=Math.sin(da);
-          var offX=restPt[0]-restLoc.point.x,offY=restPt[1]-restLoc.point.y;
+          var da=a.da,cosA=Math.cos(da),sinA=Math.sin(da);
+          var offX=restPt[0]-a.restX,offY=restPt[1]-a.restY;
           var rOffX=offX*cosA-offY*sinA,rOffY=offX*sinA+offY*cosA;
-          dx+=wentry.w*((curLoc.point.x+rOffX)-restPt[0]);
-          dy+=wentry.w*((curLoc.point.y+rOffY)-restPt[1]);
+          dx+=wentry.w*((a.curX+rOffX)-restPt[0]);
+          dy+=wentry.w*((a.curY+rOffY)-restPt[1]);
           sumDaW+=da*wentry.w;sumWRot+=wentry.w;
         }else{
-          dx+=wentry.w*(curLoc.point.x-restLoc.point.x);
-          dy+=wentry.w*(curLoc.point.y-restLoc.point.y);
+          dx+=wentry.w*(a.curX-a.restX);
+          dy+=wentry.w*(a.curY-a.restY);
         }
       });
       // Normalize by total weight — but ONLY when it exceeds 1 (2026-07-30
@@ -2166,22 +2247,19 @@ function applyRigDeform(ld){
       for(var ci=0;ci<centerSegs.length&&ci<b.centerRest.length;ci++){
         var cRest=b.centerRest[ci],cRestP=cRest.point,cdx=0,cdy=0,cSumW=0,cSumDaW=0,cTotalW=0;
         (b.centerWeights[ci]||[]).forEach(function(wentry){
-          var bp=bonePaths(wentry.boneId);
-          var curLoc=bp.cur.getLocationAt(wentry.offset),restLoc=bp.rest.getLocationAt(wentry.offset);
-          if(!curLoc||!restLoc)return;
+          var a=anchorFor(wentry);
+          if(!a)return;
           cTotalW+=wentry.w;
           if(b.rotate){
-            var restAng=Math.atan2(restLoc.tangent.y,restLoc.tangent.x);
-            var curAng=Math.atan2(curLoc.tangent.y,curLoc.tangent.x);
-            var da=curAng-restAng,cosA=Math.cos(da),sinA=Math.sin(da);
-            var offX=cRestP[0]-restLoc.point.x,offY=cRestP[1]-restLoc.point.y;
+            var da=a.da,cosA=Math.cos(da),sinA=Math.sin(da);
+            var offX=cRestP[0]-a.restX,offY=cRestP[1]-a.restY;
             var rOffX=offX*cosA-offY*sinA,rOffY=offX*sinA+offY*cosA;
-            cdx+=wentry.w*((curLoc.point.x+rOffX)-cRestP[0]);
-            cdy+=wentry.w*((curLoc.point.y+rOffY)-cRestP[1]);
+            cdx+=wentry.w*((a.curX+rOffX)-cRestP[0]);
+            cdy+=wentry.w*((a.curY+rOffY)-cRestP[1]);
             cSumDaW+=da*wentry.w;cSumW+=wentry.w;
           }else{
-            cdx+=wentry.w*(curLoc.point.x-restLoc.point.x);
-            cdy+=wentry.w*(curLoc.point.y-restLoc.point.y);
+            cdx+=wentry.w*(a.curX-a.restX);
+            cdy+=wentry.w*(a.curY-a.restY);
           }
         });
         // Same over-saturation clamp as the boundary loop above (2026-07-30
