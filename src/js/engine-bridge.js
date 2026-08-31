@@ -2248,7 +2248,16 @@
       var refItem = window.SMReference.buildRefItem(registerCachedImage);
       if (refItem) bgItems.push(refItem);
     }
-    layers.unshift({ items: bgItems });
+    // isCanvasBackground (2026-08-31, feedback #197: "le fond du canvas ne
+    // devrait pas être affecté par un calque d'effet surtout en
+    // déformation") — engine.rs's composite_scene reads this flag to keep
+    // the background OUT of what any Effect/adjustment layer can grade or
+    // distort: painted into its own isolated texture before the main loop
+    // and re-composited back in only after every effect layer has already
+    // run, never part of the accumulator an effect layer treats as
+    // "everything below it". See composite_scene's own canvas_bg_view
+    // comment for the full reasoning.
+    layers.unshift({ items: bgItems, isCanvasBackground: true });
     // "Clip to canvas" (Document panel, off by default — off-canvas artwork
     // is visible by default, matching every vector tool's normal behavior)
     // is a mask, not a real GPU clip: four opaque bands, colored to match
