@@ -68,6 +68,15 @@
   // fresh scan rather than trusting the last hover result). Topmost child
   // first, same z-order convention as Paper's own hitTest.
   function hitTestOrientedBoxA2D(pt, targetLayer) {
+    // The boxes are built from RAW geometry (orientedBoxForPath), so the
+    // world click has to come back into the layer's own space first
+    // (2026-08-31). Without it, a layer under any Motion transform drew its
+    // boxes in one place and tested clicks in another: measured with the
+    // layer moved +300/-200, a click dead on the shape landed at world
+    // (2269,142) against a box at [1820,301,2060,481] — no hit, so the drag
+    // never started and the shape "could be selected but not moved".
+    var liOB = userLayers.indexOf(targetLayer);
+    if (liOB >= 0 && window.layerLocalPoint) pt = layerLocalPoint(liOB, pt);
     var kids = targetLayer.children;
     for (var i = kids.length - 1; i >= 0; i--) {
       var c = kids[i];
@@ -377,6 +386,16 @@
   var rotCenter = null, rotStartAngle = 0, rotLastAngle = 0;
   var marqueeStart = null;
   var moveStarted = false;
+  // The grabbed point, in the LAYER's own space, tracked through the whole
+  // move gesture (2026-08-31). Needed because a layer's Motion pivot is
+  // userLayers[i].bounds.center — DERIVED FROM THE CONTENT — so translating
+  // a shape moves the pivot, which rotates/scales the whole layer around a
+  // new centre and lands the dragged shape somewhere other than under the
+  // cursor. Measured with the layer at rotation 25°: a geometry delta of
+  // (240,42) drifted the pivot by (154,21) and moved the shape (223,76) on
+  // screen where (200,139) was asked for. Knowing where the grab point
+  // WENT lets the move correct itself against where it should be.
+  var moveGrabLocal = null;
   var draggingArc = null;
   var arcDragCache = null;
   var ANCHOR_MAP = { nw: 'se', ne: 'sw', sw: 'ne', se: 'nw', n: 's', s: 'n', e: 'w', w: 'e' };
@@ -515,6 +534,15 @@
   function hitTestHandles(pt, altHeld) {
     var h = computeHandles();
     if (!h) return null;
+    // NOTE (2026-08-31): `pt` stays in WORLD space here on purpose.
+    // computeHandles already maps its corners/ring/anchor through the
+    // layer's Motion transform (its own `WP` helper), so both sides are
+    // world-space and agree. Converting the point here — as
+    // hitTestOrientedBoxA2D genuinely must, since orientedBoxForPath is
+    // raw geometry — was tried and broke the drag outright: with a
+    // selection live, the mismatched point matched a handle, onDown took
+    // the handle branch and never reached the branch that sets mode
+    // 'move', so a shape could be selected and then not moved at all.
     var tol = 9 / view.zoom;
     // Anchor crosshair — checked FIRST/exclusively, but ONLY while Alt is
     // held (live feedback 2026-07: "ça peut être confusant quand il faut
@@ -1775,6 +1803,8 @@
           o.layer.children.forEach(function (c) { if (c.data && c.data.strokeId === o.strokeId && selectedPaths.indexOf(c) < 0) selectedPaths.push(c); });
         });
         moveStarted = true;
+        moveGrabLocal = (window.layerLocalPoint && state.appMode !== 'motion')
+          ? layerLocalPoint(state.activeLayerIdx, lastPt) : null;
       }
       var delta = pt.subtract(lastPt);
       // Layer under a Motion transform: the pointer moves in RENDERED
@@ -1839,6 +1869,11 @@
       // space), so switch to it here rather than touching every one of
       // the several `delta` reads below individually.
       delta = geomDelta;
+      // Applied through a function so the residual correction below can run
+      // the exact same work a second time — every companion, gradient,
+      // centerline and anchor has to move with it, and a correction that
+      // skipped any of them would tear the drawing apart.
+      var appliquerDelta = function (d) {
       // translate(delta), not position=position.add(delta) — .position is
       // a bounds-CENTER getter/setter, so a move via .position re-derives
       // bounds on every single tick of the drag (many times per gesture)
@@ -1853,15 +1888,15 @@
       // N ticks of translate(delta) is always bit-identical to one
       // translate(delta*N) — zero accumulated drift by construction.
       selectedPaths.forEach(function (p) {
-        p.translate(delta);
-        if (window.syncParamShapeBoxOnTranslate) window.syncParamShapeBoxOnTranslate(p, delta.x, delta.y);
-        transformFillGradient(p, function (gp) { return gp.add(delta); });
+        p.translate(d);
+        if (window.syncParamShapeBoxOnTranslate) window.syncParamShapeBoxOnTranslate(p, d.x, d.y);
+        transformFillGradient(p, function (gp) { return gp.add(d); });
         if (p.data && p.data.isVectorBrush && p.data.centerSegments) {
-          p.data.centerSegments.forEach(function (s) { s.point = [s.point[0] + delta.x, s.point[1] + delta.y]; });
+          p.data.centerSegments.forEach(function (s) { s.point = [s.point[0] + d.x, s.point[1] + d.y]; });
         }
-        if (p.data && p.data.linkedFill && !p.data.linkedFill.removed) p.data.linkedFill.translate(delta);
+        if (p.data && p.data.linkedFill && !p.data.linkedFill.removed) p.data.linkedFill.translate(d);
         if (p.data && p.data.brushCompanions) {
-          p.data.brushCompanions.forEach(function (c) { if (!c.removed) c.translate(delta); });
+          p.data.brushCompanions.forEach(function (c) { if (!c.removed) c.translate(d); });
         }
         // Custom anchor point (2026-07: "on déplace un point d'ancrage avec
         // alt et l'on bouge l'objet après ... celui-ci ne se déplace pas
@@ -1871,17 +1906,38 @@
         // translated explicitly here or it's left stranded at its old
         // position the moment the shape moves out from under it.
         if (p.data && p.data.xformAnchorCustom) {
-          p.data.xformAnchorCustom = [p.data.xformAnchorCustom[0] + delta.x, p.data.xformAnchorCustom[1] + delta.y];
+          p.data.xformAnchorCustom = [p.data.xformAnchorCustom[0] + d.x, p.data.xformAnchorCustom[1] + d.y];
         }
       });
-      // Same fix for the session-level anchor (state.xformAnchorCustom) the
-      // on-canvas crosshair/gizmo actually reads (tools.js's xformAnchorPoint)
-      // — a single global value, translated once per move tick rather than
-      // once per selected path.
       if (state.xformAnchorCustom) {
-        state.xformAnchorCustom = [state.xformAnchorCustom[0] + delta.x, state.xformAnchorCustom[1] + delta.y];
+        state.xformAnchorCustom = [state.xformAnchorCustom[0] + d.x, state.xformAnchorCustom[1] + d.y];
       }
-      symGestureAccumulate(new Matrix().translate(delta));
+      symGestureAccumulate(new Matrix().translate(d));
+      if (moveGrabLocal) moveGrabLocal = moveGrabLocal.add(d);
+      };
+      appliquerDelta(delta);
+      // Residual correction: aim at the RESULT ON SCREEN, not at the
+      // geometry. Only when the layer actually rotates or scales — with a
+      // pure translation the pivot drift cancels out exactly (the maths
+      // reduce to screen delta == geometry delta), which is why a moved
+      // layer always dragged correctly and a rotated one never did.
+      // Two passes are enough: each one removes the pivot drift caused by
+      // the previous, and the drift is a fraction of the delta, so it
+      // converges immediately. Bailing out under half a pixel keeps a
+      // normal drag at exactly one pass.
+      if (moveGrabLocal && window.SMMotion && SMMotion.layerMotionPointMap) {
+        for (var passe = 0; passe < 2; passe++) {
+          var mapNow = SMMotion.layerMotionPointMap(state.activeLayerIdx);
+          if (!mapNow || !mapNow.fwd || !mapNow.invVec) break;
+          var atterri = mapNow.fwd(moveGrabLocal.x, moveGrabLocal.y);
+          var ax = (atterri.x !== undefined ? atterri.x : atterri[0]);
+          var ay = (atterri.y !== undefined ? atterri.y : atterri[1]);
+          var rx = pt.x - ax, ry = pt.y - ay;
+          if (Math.abs(rx) < 0.5 && Math.abs(ry) < 0.5) break;
+          var cv2 = mapNow.invVec(rx, ry);
+          appliquerDelta(new Point(cv2[0], cv2[1]));
+        }
+      }
     } else if (mode === 'xform-scale') {
       // Geometry-space pointer (NOT reassigning pt — lastPt at the end of
       // this handler must stay world-space).

@@ -5473,6 +5473,27 @@
     return null;
   }
   function onDown(event) {
+    // Inside a group with nothing picked yet, a click that lands ON a shape
+    // belongs to that shape (2026-08-31). Without this the whole-LAYER gizmo
+    // claimed it first — its ring, corners and body all sit over the very
+    // shapes you are trying to pick, and the more the layer is rotated or
+    // scaled the more of them fall under the cursor. Measured with the layer
+    // at rotation 25°: clicking a shape inside the group targeted nothing
+    // (_motionExpandedElement stayed empty) and the following drag moved the
+    // whole layer instead, which reads exactly as "I can select an object
+    // but not drag it".
+    //
+    // Deliberately narrow: only while per-object mode is on for THIS layer,
+    // only while no element is targeted yet, and only when the point is
+    // really on a shape. Every other Motion gesture — including the layer
+    // gizmo outside a group, and every grab once an element IS targeted —
+    // is untouched. Returning false hands the click to select-bridge, whose
+    // Motion block does the targeting.
+    if (window._perObjBoxes === state.activeLayerIdx && window._motionExpandedElement == null
+        && window.hitTestPosed && userLayers[state.activeLayerIdx]) {
+      var surForme = hitTestPosed(state.activeLayerIdx, event.point, 6 / Math.max(0.0001, view.zoom));
+      if (surForme && surForme.item && surForme.item.data && surForme.item.data.strokeId) return false;
+    }
     var ml = multiLayerBox();
     if (ml) {
       var mb = ml.bounds, mz = 1 / Math.max(0.0001, view.zoom);
@@ -5695,6 +5716,12 @@
     }
     return false;
   }
+  // Local accessor for the layer point map — layerMotionPointMap is defined
+  // on the exported SMMotion object at the bottom of this file, not as a
+  // closure function, so callers inside the closure go through window.
+  function layerMotionPointMapFor(li) {
+    return (window.SMMotion && window.SMMotion.layerMotionPointMap) ? window.SMMotion.layerMotionPointMap(li) : null;
+  }
   function onDrag(event) {
     if (!_motionDrag) return false;
     if (_motionDrag.mode === 'elementMove') {
@@ -5702,9 +5729,25 @@
       // for — same setValue every other Motion drag uses, so it keys at the
       // playhead when the stopwatch is on and writes motionStatic when it
       // isn't, with no second writer.
+      // The pointer delta is WORLD space; an element's Position is applied
+      // to its geometry BEFORE the layer's own transform, so it has to be
+      // pulled back through that transform first (2026-08-31). Without it
+      // the delta got rotated a second time at render: measured with the
+      // layer at 25°, a drag of (200,140) moved the element (122,211) —
+      // exactly (200,140) rotated by 25°.
+      //
+      // Note the asymmetry with the LAYER's own Position a few files over
+      // (select-bridge): that one deliberately does NOT invert, because a
+      // layer's dx/dy is a plain translation applied on top of its own
+      // rotation, i.e. it already lives in post-rotation space. An
+      // ELEMENT's does not — it sits underneath the layer transform.
+      var dxEl = event.point.x - _motionDrag.start.x;
+      var dyEl = event.point.y - _motionDrag.start.y;
+      var mapEl = layerMotionPointMapFor(_motionDrag.t.li);
+      if (mapEl && mapEl.invVec) { var vEl = mapEl.invVec(dxEl, dyEl); dxEl = vEl[0]; dyEl = vEl[1]; }
       setValue(_motionDrag.t.holder, 'position', [
-        _motionDrag.basePos[0] + (event.point.x - _motionDrag.start.x),
-        _motionDrag.basePos[1] + (event.point.y - _motionDrag.start.y)
+        _motionDrag.basePos[0] + dxEl,
+        _motionDrag.basePos[1] + dyEl
       ]);
       // The DOCUMENT changed, so say so (2026-08-30, "n'est pas en temps
       // reel, il bouge pas sur le canvas pendant le drag que au
