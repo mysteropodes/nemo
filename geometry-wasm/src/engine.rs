@@ -3302,7 +3302,31 @@ impl VelloEngine {
             return Ok(());
         }
 
-        clear_texture(&self.device, &self.queue, &self.blend_accum_a_view, wgpu_color_from(base_color));
+        // Cleared TRANSPARENT, not base_color (2026-08-31, feedback #209:
+        // "le blend mode fait disparaître le canvas") — the accumulator used
+        // to start OPAQUE (base_color, e.g. the dark-gray live-view padding),
+        // which meant its alpha was already 1.0 EVERYWHERE from the very
+        // first layer's composite_pass onward (an opaque backdrop makes the
+        // W3C compositing formula's `ao` come out >=ab regardless of the
+        // layer's own alpha) — by the time the canvas-bg re-composite step
+        // below ran, there was no transparent gap left anywhere for
+        // canvas_bg_view to show through, so the white artboard vanished
+        // under the (fully opaque, dark-gray-tinted) accumulator. Invisible
+        // as long as no layer actually used a non-default blend mode: the
+        // fast path a few lines up (no has_blend/matte/effect/mask/folder)
+        // paints every layer's items — INCLUDING the canvas-bg layer's own
+        // white rect — directly into one pass and never reaches this
+        // function at all, so #197 (which only touches this slow path) went
+        // untested against a real blend-mode layer until #201/#207 made
+        // Blend Mode reachable from Motion's UI for the first time. Also
+        // invisible in export (render_to_pixels): its base_color is already
+        // TRANSPARENT, so this bug's precondition never held there either —
+        // confirmed by #197's own PNG-based verification passing.
+        // Matches render_to_pixels()'s own accumulator behavior now (its
+        // base_color has always been TRANSPARENT) — base_color is instead
+        // applied as the FINAL backdrop, below, after every layer AND the
+        // canvas background have had their chance to fill it in.
+        clear_texture(&self.device, &self.queue, &self.blend_accum_a_view, wgpu::Color::TRANSPARENT);
         let mut accum_is_a = true;
         let layer_params = RenderParams { base_color: Color::TRANSPARENT, width: self.width, height: self.height, antialiasing_method: AaConfig::Area };
         // Canvas background, painted into its own isolated texture BEFORE
@@ -3616,6 +3640,28 @@ impl VelloEngine {
                 &self.device, &self.queue, &self.blend_pipeline, &self.blend_bind_group_layout,
                 &self.blend_sampler, &self.blend_uniform_buf,
                 &self.canvas_bg_view, source_view, 0, target_view,
+            );
+            accum_is_a = !accum_is_a;
+        }
+        // Flatten whatever is STILL transparent (the live view's dark-gray
+        // padding outside the artboard, or the whole frame when this scene
+        // has no canvas-bg layer at all) against base_color — the one place
+        // base_color still applies now that the accumulator itself starts
+        // transparent (see the clear_texture call above). A no-op byte-for-
+        // byte in export (base_color is already TRANSPARENT there), so this
+        // never changes render_to_pixels()'s own already-correct output.
+        // mask_accum_a_view is RENDER_ATTACHMENT (create_matte_result_texture
+        // — already clear_texture'd earlier in this same function for masks)
+        // and free to reuse here: nothing reads its per-layer mask content
+        // after the main loop above has finished.
+        {
+            clear_texture(&self.device, &self.queue, &self.mask_accum_a_view, wgpu_color_from(base_color));
+            let (source_view, target_view) =
+                if accum_is_a { (&self.blend_accum_a_view, &self.blend_accum_b_view) } else { (&self.blend_accum_b_view, &self.blend_accum_a_view) };
+            composite_pass(
+                &self.device, &self.queue, &self.blend_pipeline, &self.blend_bind_group_layout,
+                &self.blend_sampler, &self.blend_uniform_buf,
+                &self.mask_accum_a_view, source_view, 0, target_view,
             );
             accum_is_a = !accum_is_a;
         }
