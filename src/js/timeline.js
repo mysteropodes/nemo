@@ -940,7 +940,7 @@ window.SM={
     });
     if(moved&&fld.folderCollapsed){fld.folderCollapsed=false;} // reveal what was just dropped in
     loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
-    if(moved)showToast(moved>1?(moved+' calques déplacés dans « '+(fld.name||'Dossier')+' »'):('Calque déplacé dans « '+(fld.name||'Dossier')+' »'));
+    if(moved){var _fn=fld.name||SM.t('layerKindFolder');showToast(moved>1?SM.t('toastLayersMovedToFolder').replace('{n}',moved).replace('{folder}',_fn):SM.t('toastLayerMovedToFolder').replace('{folder}',_fn));}
   },
   // Explicit un-parent (2026-08) — context-menu counterpart to dragging a
   // layer out via the plain reorder gesture (finishLayerReorder above),
@@ -1006,7 +1006,7 @@ window.SM={
   addFolderLayer:function(){
     saveAllLayerFrames();pushUndoLayers(true);
     var preSel=_layerSel.slice();
-    var idx=createUserLayer(nextLayerName().replace(/^Layer/,'Dossier'));
+    var idx=createUserLayer(nextLayerName().replace(/^Layer/,SM.t('layerKindFolder')));
     var ld=state.layers[idx];
     ld.isNullLayer=true;ld.isFolderLayer=true;ld.folderCollapsed=false;
     ld.nullShape='cross';ld.effects=[];
@@ -1237,7 +1237,7 @@ window.SM={
     // one shared copy list, not a second one that drifts (the exact
     // field-drop bug family this function's own history documents a
     // dozen times over).
-    function dupOne(srcIdx){var src=state.layers[srcIdx];var ni=createUserLayer(src.name+' copy');state.layers[ni].frames=JSON.parse(JSON.stringify(src.frames));if(src.blendMode)state.layers[ni].blendMode=src.blendMode;state.layers[ni].color=src.color;if(src.motion)state.layers[ni].motion=JSON.parse(JSON.stringify(src.motion));if(src.motionStatic)state.layers[ni].motionStatic=JSON.parse(JSON.stringify(src.motionStatic));
+    function dupOne(srcIdx){var src=state.layers[srcIdx];var ni=createUserLayer(uniqueLayerName(src.name+' copy'));state.layers[ni].frames=JSON.parse(JSON.stringify(src.frames));if(src.blendMode)state.layers[ni].blendMode=src.blendMode;state.layers[ni].color=src.color;if(src.motion)state.layers[ni].motion=JSON.parse(JSON.stringify(src.motion));if(src.motionStatic)state.layers[ni].motionStatic=JSON.parse(JSON.stringify(src.motionStatic));
     // matteMode was dropped here entirely (pre-existing, found by the
     // 2026-07-31 uid-matte scoping) — a duplicated matted layer silently
     // lost its matte. The uid travels with it (the duplicate masks against
@@ -5328,7 +5328,7 @@ function groupSelectionIntoFolder(){
   for(var k=1;k<sorted.length;k++)if(sorted[k]!==sorted[k-1]+1){showToast(SM.t('toastLayersMustBeConsecutive'));return;}
   if(sorted.some(function(i){return state.layers[i].folderId;})){showToast(SM.t('toastSelectedLayerAlreadyInFolder'));return;}
   var fid='folder-'+Date.now()+'-'+Math.floor(Math.random()*1000);
-  state.layerFolders[fid]={name:'Dossier',collapsed:false};
+  state.layerFolders[fid]={name:SM.t('layerKindFolder'),collapsed:false};
   sorted.forEach(function(i){state.layers[i].folderId=fid;});
   renderLayerList();renderTimeline();
 }
