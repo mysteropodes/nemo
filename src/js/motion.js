@@ -9577,6 +9577,35 @@
               renderTimeline();
               return;
             }
+            // feedback #221 ("impossible de sélectionner... comme les
+            // autres propriétés") — Shift-range, mirroring the numeric
+            // row's own handler: reuse the marquee's rectangle-selection
+            // between the anchor cell and this one, so it picks up
+            // whatever else is in that box too (now that applyMarqueeSelection
+            // itself also scans this row's own .motion-group-row class).
+            if (e.shiftKey) {
+              var anchorCell = null;
+              if (_keyAnchor) {
+                var rowsA = document.querySelectorAll('#frame-grid .motion-track-row, #frame-grid .motion-group-row');
+                for (var ri = 0; ri < rowsA.length; ri++) {
+                  if (rowsA[ri]._smHolder === _keyAnchor.holder && rowsA[ri]._smProp === _keyAnchor.prop) {
+                    anchorCell = rowsA[ri].querySelector('.fc[data-frame="' + _keyAnchor.frame + '"]');
+                    break;
+                  }
+                }
+              }
+              if (anchorCell) {
+                var ar = anchorCell.getBoundingClientRect(), cr = c.getBoundingClientRect();
+                var ax = ar.left + ar.width / 2, ay = ar.top + ar.height / 2;
+                var bx = cr.left + cr.width / 2, by = cr.top + cr.height / 2;
+                applyMarqueeSelection(Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by));
+              } else {
+                setKeySel([{ holder: holder, prop: prop, key: k }]);
+                _keyAnchor = { holder: holder, prop: prop, frame: frame };
+              }
+              renderTimeline();
+              return;
+            }
             pushUndo();
             if (isKeySelected(holder, prop, k)) {
               // Already part of the current selection — drag the WHOLE
@@ -9613,6 +9642,18 @@
           });
         })(fi, key);
         c.appendChild(dia);
+      } else {
+        // feedback #221 ("impossible de sélectionner avec rec de
+        // sélection") — a numeric row's own empty cells start a marquee on
+        // mousedown (trackRowHtml); this row's cells never got the same
+        // listener at all, so a drag STARTING on empty space within it
+        // never even called startMarquee. Diamonds keep their own handler
+        // above (dragging one moves it, not a marquee) — this is only for
+        // the gaps between them.
+        c.addEventListener('mousedown', function (e) {
+          e.stopPropagation();
+          startMarquee(e);
+        });
       }
       row.appendChild(c);
     }
@@ -10798,7 +10839,14 @@
   // universe the marquee itself draws over).
   function invertKeySelection() {
     var all = [], prevSel = _motionKeySel;
-    document.querySelectorAll('.motion-track-row').forEach(function (rowEl) {
+    // feedback #221 ("impossible de sélectionner avec rec de sélection les
+    // keyframes comme les autres propriétés") — .motion-group-row also
+    // covers renderDiscreteKeyGridRow's Blend/Parent rows (feedback #214),
+    // tagged with the same _smHolder/_smProp convention; an UNTAGGED
+    // group-row (a plain section header/divider) safely no-ops on the
+    // `if (!holder) return` guards already below, so widening this scan
+    // costs nothing for every other kind of .motion-group-row.
+    document.querySelectorAll('.motion-track-row, .motion-group-row').forEach(function (rowEl) {
       var holder = rowEl._smHolder, prop = rowEl._smProp;
       var track = trackFor(holder, prop);
       if (!track) return;
@@ -10822,7 +10870,8 @@
   }
   function applyMarqueeSelection(x0, y0, x1, y1) {
     var sel = [];
-    document.querySelectorAll('.motion-track-row').forEach(function (rowEl) {
+    // feedback #221 — see invertKeySelection's identical comment just above.
+    document.querySelectorAll('.motion-track-row, .motion-group-row').forEach(function (rowEl) {
       var holder = rowEl._smHolder, prop = rowEl._smProp;
       if (!holder) return;
       rowEl.querySelectorAll('.motion-key').forEach(function (dia) {
