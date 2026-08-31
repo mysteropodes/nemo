@@ -444,6 +444,17 @@
   function trackFor(holder, prop) {
     if (!holder) return null;
     if (prop === 'timeRemap') return holder.timeRemap || null;
+    // Discrete hold-key tracks (feedback #207/#212/#214) — Blend/Parent
+    // keys live directly on the layer (ld.blendKeys/ld.parentKeys), not
+    // under holder.motion[prop] like every numeric track, because they
+    // aren't lerp-able values (see setLayerParent's own header comment on
+    // this whole discrete-key pattern). Wrapping the LIVE array in
+    // {keys:...} here — not a copy — is what lets every generic
+    // selection/drag/delete consumer of trackFor(...).keys (deleteSelectedKeys,
+    // onDragMove's group-drag, sortKeys) work on these two props exactly
+    // like any numeric one, with zero changes to any of them.
+    if (prop === 'blendKeys') return holder.blendKeys ? { keys: holder.blendKeys } : null;
+    if (prop === 'parentKeys') return holder.parentKeys ? { keys: holder.parentKeys } : null;
     return (holder.motion && holder.motion[prop]) || null;
   }
   var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', order: 'Order', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', matteOn: 'Matte On', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie', cornerTL: 'Coin ↖', cornerTR: 'Coin ↗', cornerBR: 'Coin ↘', cornerBL: 'Coin ↙', arcStart: 'Début (arc)', arcSweep: 'Ouverture (arc)', arcInner: 'Rayon interne', starInner: 'Rayon interne', starCorner: 'Coins', pathPercent: 'Position sur le chemin', pathInfluence: 'Influence (rotation)' };
@@ -9467,26 +9478,77 @@
   // in v1 — unlike Position/Path, neither Blend nor Parent benefit from a
   // "move several keys together" gesture, since each row here is its own
   // single, independent track.
-  function renderDiscreteKeyGridRow(grid, label, frames, removeAt) {
+  // feedback #214 ("impossible de select et déplacer des keyframes de
+  // parent et blend et si j'essaye de faire une selection... et touche
+  // supp ça fait bug l'app") — this row's diamonds used to only navigate
+  // the playhead on click and offer a right-click delete; there was no
+  // way to SELECT one at all, so _motionKeySel always stayed empty for
+  // them, and every generic selection-driven feature (drag, Delete key,
+  // the selection box) silently no-op'd rather than acting on these keys.
+  //
+  // Rather than duplicating trackRowHtml's full mousedown pipeline (ease
+  // boxes, hold/linear context-menu items, skew-drag — none of which make
+  // sense for a hold-only discrete track, CLAUDE.md §11's "reuse the
+  // pattern" note doesn't mean copy every feature), this reuses only the
+  // pieces that ARE generic across any {holder,prop,key} triple:
+  // setKeySel/_motionKeySel/isKeySelected for selection, and the shared
+  // window._motionKeyDrag group-drag object — onDragMove/onDragUp (below
+  // in this file) only ever touch `.key.frame` for a group drag, and
+  // deleteSelectedKeys/shiftKeySelection only ever touch trackFor(...).keys
+  // — none of that cares what prop string it's given, so extending
+  // trackFor (below) to resolve 'blendKeys'/'parentKeys' is the one piece
+  // that makes all of it work for these rows too, unmodified.
+  function renderDiscreteKeyGridRow(grid, holder, prop, label, keys, removeAt) {
     var row = document.createElement('div'); row.className = 'frow motion-group-row';
-    var mark = {};
-    frames.forEach(function (f) { mark[f] = 1; });
+    row._smHolder = holder; row._smProp = prop;
+    var byFrame = {};
+    keys.forEach(function (k) { byFrame[k.frame] = k; });
     for (var fi = 0; fi < state.totalFrames; fi++) {
       var c = document.createElement('div');
       c.className = 'fc motion-fc' + (fi === state.currentFrame ? ' cur' : '');
       c.dataset.frame = fi;
-      if (mark[fi]) {
+      var key = byFrame[fi];
+      if (key) {
         var dia = document.createElement('div');
-        dia.className = 'motion-key hold' + (fi === state.currentFrame ? ' cur' : '');
+        dia.className = 'motion-key hold' + (fi === state.currentFrame ? ' cur' : '') + (isKeySelected(holder, prop, key) ? ' sel' : '');
         dia.title = label + ' · image ' + (fi + 1);
         if (typeof FC === 'number' && FC > 0 && FC < 7) {
           var dsz = Math.max(3, FC);
           dia.style.width = dsz + 'px'; dia.style.height = dsz + 'px';
         }
-        (function (frame) {
+        (function (frame, k) {
           dia.addEventListener('mousedown', function (e) {
             e.stopPropagation(); e.preventDefault();
+            if (e.metaKey || e.ctrlKey) {
+              if (isKeySelected(holder, prop, k)) {
+                setKeySel(_motionKeySel.filter(function (s) { return !(s.holder === holder && s.prop === prop && s.key === k); }));
+              } else {
+                setKeySel(_motionKeySel.concat([{ holder: holder, prop: prop, key: k }]));
+              }
+              _keyAnchor = { holder: holder, prop: prop, frame: frame };
+              renderTimeline();
+              return;
+            }
+            pushUndo();
+            if (isKeySelected(holder, prop, k)) {
+              // Already part of the current selection — drag the WHOLE
+              // group together, same convention a numeric row's own
+              // mousedown uses.
+              _keyAnchor = { holder: holder, prop: prop, frame: frame };
+              window._motionKeyDrag = {
+                group: true, startX: e.clientX, startScrollLeft: motionDragScrollLeft(),
+                keys: _motionKeySel.map(function (s) { return { holder: s.holder, prop: s.prop, key: s.key, origFrame: s.key.frame }; })
+              };
+            } else {
+              setKeySel([{ holder: holder, prop: prop, key: k }]);
+              _keyAnchor = { holder: holder, prop: prop, frame: frame };
+              window._motionKeyDrag = {
+                group: true, startX: e.clientX, startScrollLeft: motionDragScrollLeft(),
+                keys: [{ holder: holder, prop: prop, key: k, origFrame: k.frame }]
+              };
+            }
             if (frame !== state.currentFrame) goToFrame(frame);
+            renderTimeline();
           });
           dia.addEventListener('contextmenu', function (e) {
             e.preventDefault(); e.stopPropagation();
@@ -9495,12 +9557,13 @@
               { label: SM.t('ctxDeleteThisKey'), action: function () {
                 pushUndo();
                 removeAt(frame);
+                setKeySel(_motionKeySel.filter(function (s) { return !(s.holder === holder && s.prop === prop && s.key === k); }));
                 renderLayerList(); renderTimeline();
                 if (window.SMEngineBridge) SMEngineBridge.renderNow();
               } },
             ]);
           });
-        })(fi);
+        })(fi, key);
         c.appendChild(dia);
       }
       row.appendChild(c);
@@ -10055,8 +10118,8 @@
       // Mirrors renderLayerListMotion's own Parent/Blend rows exactly —
       // same condition (li's own layer, expanded), same order, same two
       // rows — CLAUDE.md §11's panel/grid alignment invariant.
-      renderDiscreteKeyGridRow(grid, SM.t('fieldParent') || 'Parent', (ld.parentKeys || []).map(function (k) { return k.frame; }), function (frame) { SMMotion.removeParentKeyAt(ld, frame); });
-      renderDiscreteKeyGridRow(grid, SM.t('fieldBlend'), (ld.blendKeys || []).map(function (k) { return k.frame; }), function (frame) { SMMotion.removeBlendKeyAt(ld, frame); });
+      renderDiscreteKeyGridRow(grid, ld, 'parentKeys', SM.t('fieldParent') || 'Parent', ld.parentKeys || [], function (frame) { SMMotion.removeParentKeyAt(ld, frame); });
+      renderDiscreteKeyGridRow(grid, ld, 'blendKeys', SM.t('fieldBlend'), ld.blendKeys || [], function (frame) { SMMotion.removeBlendKeyAt(ld, frame); });
       if (showsGroupHeader()) {
         // 'motion-group-row' too, not just 'frow' (2026-07-30 fix, Cyril:
         // "encore des problème de calage d'ui"): .motion-group-row carries
