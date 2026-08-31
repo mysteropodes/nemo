@@ -1988,7 +1988,9 @@
       // correct for it anyway).
       if (_anyElemOrder) {
         items.forEach(function (it, ix) { it.__ordIx = ix; });
-        items.sort(function (a, b) { return ((a.__ord || 0) - (b.__ord || 0)) || (a.__ordIx - b.__ordIx); });
+        // Same flip as the layer-level sort above (feedback #205) — higher
+        // Order now means further toward the BACK, 1 being the frontmost.
+        items.sort(function (a, b) { return ((b.__ord || 0) - (a.__ord || 0)) || (a.__ordIx - b.__ordIx); });
         items.forEach(function (it) { delete it.__ord; delete it.__ordIx; });
       }
       // Non-destructive combine groups (2026-07-29) — post-process on the
@@ -2174,8 +2176,18 @@
     // (object identity), which this comment block's own header already
     // documents as immune to exactly this kind of reordering.
     if (_anyLayerOrder) {
+      // Direction flipped (2026-08-31, feedback #205, "layer index devrait
+      // être dans le sens positif et commencer par layer tout en haut 1
+      // après 2...") — Order now counts from the FRONT: 1 is the topmost/
+      // frontmost layer, 2 sits just behind it, and so on, matching how you'd
+      // naturally number a stack of physical sheets from the one facing you.
+      // Was ascending-toward-front (higher = later in this array = painted
+      // last = on top); now descending-toward-front (higher = EARLIER in
+      // this array = painted first = further back). Ties (the default 0,
+      // an untouched layer) still keep original document order — that half
+      // is orthogonal to which direction an explicit value pushes.
       var _orderPairs = layers.map(function (entry, idx) { return { entry: entry, idx: idx, ord: SMMotion.layerOrderAt(idx, renderFrame) }; });
-      _orderPairs.sort(function (a, b) { return (a.ord - b.ord) || (a.idx - b.idx); });
+      _orderPairs.sort(function (a, b) { return (b.ord - a.ord) || (a.idx - b.idx); });
       layers = _orderPairs.map(function (p) { return p.entry; });
     }
     // artboard background as the bottom item of a synthetic bottom layer,
