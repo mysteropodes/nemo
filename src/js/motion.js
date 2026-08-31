@@ -3428,6 +3428,17 @@
       if (window.showToast) showToast(SM.t('toastParentingRefusedCycle'));
       return;
     }
+    // Keyed re-parent (feedback #207) — a layer with ld.parentKeys already
+    // turned on gets a NEW KEY at the playhead instead of the static field
+    // overwrite below, matching Blend's own setExpressionCode-vs-
+    // upsertBlendKeyAt split. Deliberately skips the keep-transform
+    // compensation just below — see layerParentUidAt's own header comment
+    // for why a correct per-frame version of that is out of scope here.
+    if (ld.parentKeys && ld.parentKeys.length) {
+      upsertParentKeyAt(ld, state.currentFrame, parentUid || null);
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+      return;
+    }
     // Keep-transform compensation (2026-08, feedback: "quand on parent un
     // objet au null il doit conserver sa position initiale (offset)") —
     // without this, parenting to a target that isn't currently sitting at
@@ -3726,7 +3737,11 @@
     if (!ld) return mats;
     var visited = {};
     visited[li] = true;
-    var curUid = ld.parentLayerUid;
+    // layerParentUidAt (feedback #207) resolves ld.parentKeys when present,
+    // falling back to the plain static field otherwise — the ONE place
+    // this chain-walker needs to become frame-aware for keyed re-parenting
+    // to actually change what renders.
+    var curUid = layerParentUidAt(li, frameIdx);
     var guard = 0;
     while (curUid && guard++ < 64) {
       var idx = findLayerIndexByUid(curUid);
@@ -3749,7 +3764,7 @@
       } else if (m && userLayers[idx] && userLayers[idx].bounds) {
         mats.push({ mat: m, pivot: { x: userLayers[idx].bounds.center.x + m.ax, y: userLayers[idx].bounds.center.y + m.ay } });
       }
-      curUid = state.layers[idx].parentLayerUid;
+      curUid = layerParentUidAt(idx, frameIdx);
     }
     return mats;
   }
@@ -3929,6 +3944,54 @@
   function removeBlendKeyAt(ld, frame) {
     if (!ld.blendKeys) return;
     ld.blendKeys = ld.blendKeys.filter(function (k) { return k.frame !== frame; });
+  }
+  // ---- Parent keyframing (2026-08-31, feedback #207: "et le parentage
+  // doit être keyframable") — same shape and same reasoning as Blend Mode
+  // right above: Duik's own "pick up an object" gesture re-parents at a
+  // single frame, no interpolation (there's no meaningful halfway point
+  // between two different parent layers). ld.parentKeys is a plain
+  // [{frame,uid}] array (uid null = "no parent"), sorted by frame, NOT
+  // routed through the numeric holder.motion track system, for the exact
+  // same reason blendKeys isn't. Opt-in: absent ld.parentKeys means every
+  // reader falls back to the plain static ld.parentLayerUid, unchanged.
+  //
+  // Deliberately scoped to the PRIMARY parent only — parentLayerUidB (the
+  // weighted second-parent crossfade, 2026-07-30) is a separate, already-
+  // intricate feature (composedPivotWorld, blendedAncestorMat, the
+  // parentBlend track) that this does not touch or extend; a layer with a
+  // second parent set keeps behaving exactly as it already did.
+  //
+  // Also deliberately WITHOUT setLayerParent's "keep transform" position
+  // compensation (see that function's own note where it branches on
+  // ld.parentKeys) — computing the right compensating Position KEY (not a
+  // static overwrite, which would wrongly affect every earlier frame too)
+  // for a re-parent that only takes effect at one specific frame is real
+  // additional complexity this pass intentionally left out rather than
+  // risk getting subtly wrong. A keyed re-parent can visibly "pop" at its
+  // frame; keying Position there too is the manual fix, same as it would
+  // be in any other tool that doesn't auto-compensate.
+  function layerParentUidAt(li, frameIdx) {
+    var ld = state.layers[li];
+    if (!ld) return null;
+    var keys = ld.parentKeys;
+    if (!keys || !keys.length) return ld.parentLayerUid || null;
+    var v = keys[0].uid;
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i].frame <= frameIdx) v = keys[i].uid; else break;
+    }
+    return v;
+  }
+  function sortParentKeys(ld) {
+    ld.parentKeys.sort(function (a, b) { return a.frame - b.frame; });
+  }
+  function upsertParentKeyAt(ld, frame, uid) {
+    if (!ld.parentKeys) ld.parentKeys = [];
+    var k = ld.parentKeys.filter(function (kk) { return kk.frame === frame; })[0];
+    if (k) k.uid = uid || null; else { ld.parentKeys.push({ frame: frame, uid: uid || null }); sortParentKeys(ld); }
+  }
+  function removeParentKeyAt(ld, frame) {
+    if (!ld.parentKeys) return;
+    ld.parentKeys = ld.parentKeys.filter(function (k) { return k.frame !== frame; });
   }
   // Cheap "does ANY layer/element on this layer actually use Order" scans —
   // engine-bridge.js calls these ONCE per buildSceneJson / once per layer
@@ -6777,6 +6840,17 @@
       });
       list.appendChild(row);
       if (!expanded) return;
+      // Blend/Parent (feedback #207) get their own keyframe-bearing rows
+      // HERE too, not just in the right-panel mirror — "mettre les
+      // keyframes à droite pour cohérence dans le panel" meant the bottom
+      // #layer-list/#frame-grid split specifically (§11's "panel"/"grid"),
+      // where every OTHER keyable property already shows its markers.
+      // renderParentRow/renderBlendRow are the exact same functions the
+      // right panel calls (renderMotionPropsPanel below) — one writer,
+      // just appended to a different parent element — so a key added from
+      // either surface is immediately visible on both.
+      renderParentRow(list, ld, li);
+      renderBlendRow(list, ld, li);
       renderTransformGroup(list, ld, 'Transform');
       // Per-element sub-list used to be component-exclusive ("a symbol
       // instance's actual strokes live inside the SYMBOL's own sub-layer,
@@ -7250,6 +7324,37 @@
   // otherwise completely inert from the user's side.
   function renderParentRow(body, ld, li) {
     var row = document.createElement('div'); row.className = 'lrow motion-prop-row';
+    // Stopwatch (feedback #207, Duik-inspired hold keys — same on/
+    // hasKeyHere/click shape as renderBlendRow's own): ON seeds a key at
+    // the playhead with whatever parent (Parent A only — see
+    // layerParentUidAt's header comment for why Parent B stays untouched)
+    // is currently resolved; OFF collapses back to the plain static field
+    // (single key) or removes just the current-frame key (multiple keys).
+    var parentKeyed = !!(ld.parentKeys && ld.parentKeys.length);
+    var parentKeyHere = parentKeyed && ld.parentKeys.some(function (k) { return k.frame === state.currentFrame; });
+    var sw = document.createElement('div');
+    sw.className = 'lico motion-stopwatch' + (parentKeyed ? ' on' : '');
+    sw.title = stopwatchTitle('motionAnimateFill', parentKeyed, parentKeyHere);
+    sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (parentKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
+    sw.addEventListener('click', function (e) {
+      e.stopPropagation(); pushUndo();
+      if (!parentKeyed) {
+        ld.parentKeys = [{ frame: state.currentFrame, uid: ld.parentLayerUid || null }];
+      } else if (parentKeyHere) {
+        if (ld.parentKeys.length === 1) {
+          var fv = ld.parentKeys[0].uid;
+          ld.parentLayerUid = fv || null;
+          delete ld.parentKeys;
+        } else {
+          removeParentKeyAt(ld, state.currentFrame);
+        }
+      } else {
+        upsertParentKeyAt(ld, state.currentFrame, layerParentUidAt(li, state.currentFrame));
+      }
+      renderLayerList(); renderTimeline();
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    });
+    row.appendChild(sw);
     var label = document.createElement('span'); label.textContent = 'Parent'; label.style.minWidth = '70px';
     row.appendChild(label);
 
@@ -7258,7 +7363,11 @@
     // same context menu (buildParentMenuItems, timeline.js) so Parent A/B
     // can't drift between the two surfaces. Unconstrained width here (no
     // .lparent max-width): this row isn't as cramped as the layer list.
-    var pIdx = _layerIndexByUid(ld.parentLayerUid);
+    // Parent A's own name is read through layerParentUidAt (feedback #207)
+    // so a keyed layer's pill shows the parent RESOLVED AT THE PLAYHEAD,
+    // not the (irrelevant once keyed) static field — Parent B has no
+    // keying concept, so it stays a direct static read.
+    var pIdx = _layerIndexByUid(layerParentUidAt(li, state.currentFrame));
     var pName = (pIdx >= 0 && state.layers[pIdx]) ? (state.layers[pIdx].name || ('Layer ' + (pIdx + 1))) : null;
     var pbIdx = _layerIndexByUid(ld.parentLayerUidB);
     var pbName = (pbIdx >= 0 && state.layers[pbIdx]) ? (state.layers[pbIdx].name || ('Layer ' + (pbIdx + 1))) : null;
@@ -9225,6 +9334,57 @@
     }
     grid.appendChild(row);
   }
+  // Generic grid row for a DISCRETE (hold-only) key track — Blend/Parent
+  // (feedback #207, "le parentage doit être keyframable... mettre les
+  // keyframes à droite pour cohérence dans le panel") share this exact
+  // shape: a plain [{frame,...}] array with no interpolation between
+  // entries, so the marker row only needs a frame list, not a full
+  // property/holder pair the way renderTracksFor's generic numeric-track
+  // machinery expects. Click navigates to that frame (same as every other
+  // keyframe row's left-click); right-click removes it. No drag-to-retime
+  // in v1 — unlike Position/Path, neither Blend nor Parent benefit from a
+  // "move several keys together" gesture, since each row here is its own
+  // single, independent track.
+  function renderDiscreteKeyGridRow(grid, label, frames, removeAt) {
+    var row = document.createElement('div'); row.className = 'frow motion-group-row';
+    var mark = {};
+    frames.forEach(function (f) { mark[f] = 1; });
+    for (var fi = 0; fi < state.totalFrames; fi++) {
+      var c = document.createElement('div');
+      c.className = 'fc motion-fc' + (fi === state.currentFrame ? ' cur' : '');
+      c.dataset.frame = fi;
+      if (mark[fi]) {
+        var dia = document.createElement('div');
+        dia.className = 'motion-key hold' + (fi === state.currentFrame ? ' cur' : '');
+        dia.title = label + ' · image ' + (fi + 1);
+        if (typeof FC === 'number' && FC > 0 && FC < 7) {
+          var dsz = Math.max(3, FC);
+          dia.style.width = dsz + 'px'; dia.style.height = dsz + 'px';
+        }
+        (function (frame) {
+          dia.addEventListener('mousedown', function (e) {
+            e.stopPropagation(); e.preventDefault();
+            if (frame !== state.currentFrame) goToFrame(frame);
+          });
+          dia.addEventListener('contextmenu', function (e) {
+            e.preventDefault(); e.stopPropagation();
+            if (!window.showContextMenu) return;
+            window.showContextMenu(e.clientX, e.clientY, [
+              { label: SM.t('ctxDeleteThisKey'), action: function () {
+                pushUndo();
+                removeAt(frame);
+                renderLayerList(); renderTimeline();
+                if (window.SMEngineBridge) SMEngineBridge.renderNow();
+              } },
+            ]);
+          });
+        })(fi);
+        c.appendChild(dia);
+      }
+      row.appendChild(c);
+    }
+    grid.appendChild(row);
+  }
   // Image mesh accordion (2026-08-30) — identical to renderPathVertexGroup
   // above apart from its label, and sharing its expand state
   // (_motionExpandedPathHolder is keyed by HOLDER, and a mesh holder is a
@@ -9766,6 +9926,11 @@
       if (window.SMLayerInOut) SMLayerInOut.buildBar(spacer, li);
       grid.appendChild(spacer);
       if (!expanded) return;
+      // Mirrors renderLayerListMotion's own Parent/Blend rows exactly —
+      // same condition (li's own layer, expanded), same order, same two
+      // rows — CLAUDE.md §11's panel/grid alignment invariant.
+      renderDiscreteKeyGridRow(grid, SM.t('fieldParent') || 'Parent', (ld.parentKeys || []).map(function (k) { return k.frame; }), function (frame) { SMMotion.removeParentKeyAt(ld, frame); });
+      renderDiscreteKeyGridRow(grid, SM.t('fieldBlend'), (ld.blendKeys || []).map(function (k) { return k.frame; }), function (frame) { SMMotion.removeBlendKeyAt(ld, frame); });
       if (showsGroupHeader()) {
         // 'motion-group-row' too, not just 'frow' (2026-07-30 fix, Cyril:
         // "encore des problème de calage d'ui"): .motion-group-row carries
@@ -11891,6 +12056,9 @@
     layerBlendModeAt: layerBlendModeAt,
     upsertBlendKeyAt: upsertBlendKeyAt,
     removeBlendKeyAt: removeBlendKeyAt,
+    layerParentUidAt: layerParentUidAt,
+    upsertParentKeyAt: upsertParentKeyAt,
+    removeParentKeyAt: removeParentKeyAt,
     // rig-widget.js's "+" button (feedback #185) reads the SAME per-layer
     // property list every Motion row already goes through (§11's single-
     // decider invariant), instead of guessing a parallel list, and writes
