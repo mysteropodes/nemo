@@ -458,6 +458,51 @@
     return (holder.motion && holder.motion[prop]) || null;
   }
   var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', order: 'Order', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', matteOn: 'Matte On', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie', cornerTL: 'Coin ↖', cornerTR: 'Coin ↗', cornerBR: 'Coin ↘', cornerBL: 'Coin ↙', arcStart: 'Début (arc)', arcSweep: 'Ouverture (arc)', arcInner: 'Rayon interne', starInner: 'Rayon interne', starCorner: 'Coins', pathPercent: 'Position sur le chemin', pathInfluence: 'Influence (rotation)' };
+  // PROP_LABEL above is the FALLBACK table (and was, until 2026-08-31, the
+  // only source — so a French UI still read "Position / Anchor Point / Scale"
+  // while the rows around them were translated, and the table itself had
+  // drifted into a mix of English and hardcoded French). The labels are
+  // rewritten from i18n below, keyed prop -> i18n key; anything without an
+  // entry (or whose translation is missing) keeps its fallback string.
+  //
+  // Rewriting the table in place rather than translating at each read site is
+  // deliberate: PROP_LABEL is read from 7 places (search filter, curve editor
+  // title, row name, expression pickwhip path, keyframe tooltip, the public
+  // SM.propLabel), and expression CONTROLS write their own user-typed names
+  // into the same table (registerControlPropMeta) — those must never be
+  // overwritten, which a blanket per-read translation could not express.
+  var PROP_LABEL_I18N = {
+    position: 'propPosition', anchor: 'propAnchorPoint', rotation: 'propRotation',
+    scale: 'propScale', opacity: 'propOpacity', order: 'propOrder',
+    timeRemap: 'propTimeRemap', positionZ: 'propPositionZ',
+    rotationX: 'propRotationX', rotationY: 'propRotationY',
+    dupOffsetPos: 'propDupOffset', dupOffsetRot: 'propDupRotation',
+    dupOffsetScale: 'propDupScale', dupOffsetOpacity: 'propDupOpacity',
+    dupOffsetPosZ: 'propDupOffsetZ', dupOffsetRotX: 'propDupRotationX',
+    dupOffsetRotY: 'propDupRotationY', parentBlend: 'propParentBlend',
+    matteOn: 'propMatteOn', timeLinkInOffset: 'propTimeLinkInOffset',
+    timeLinkOutOffset: 'propTimeLinkOutOffset', cornerTL: 'propCornerTL',
+    cornerTR: 'propCornerTR', cornerBR: 'propCornerBR', cornerBL: 'propCornerBL',
+    arcStart: 'propArcStart', arcSweep: 'propArcSweep', arcInner: 'propArcInner',
+    starInner: 'propStarInner', starCorner: 'propStarCorner',
+    pathPercent: 'propPathPercent', pathInfluence: 'propPathInfluence',
+  };
+  var PROP_LABEL_FALLBACK = {};
+  for (var _plk in PROP_LABEL) PROP_LABEL_FALLBACK[_plk] = PROP_LABEL[_plk];
+  function refreshPropLabels() {
+    if (!(window.SM && window.SM.t)) return;
+    for (var k in PROP_LABEL_I18N) {
+      var key = PROP_LABEL_I18N[k], tr = SM.t(key);
+      PROP_LABEL[k] = (tr && tr !== key) ? tr : PROP_LABEL_FALLBACK[k];
+    }
+  }
+  // Re-run on every language switch, via the same afterI18n list linked-media
+  // and media-library already use for labels whose text is not a static
+  // data-i18n attribute.
+  window.SM = window.SM || {};
+  window.SM.afterI18n = window.SM.afterI18n || [];
+  if (window.SM.afterI18n.indexOf(refreshPropLabels) < 0) window.SM.afterI18n.push(refreshPropLabels);
+  refreshPropLabels();
   var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, order: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, matteOn: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1, cornerTL: 1, cornerTR: 1, cornerBR: 1, cornerBL: 1, arcStart: 1, arcSweep: 1, arcInner: 1, starInner: 1, starCorner: 1, pathPercent: 1, pathInfluence: 1 };
   var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', order: '', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', matteOn: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f', cornerTL: 'px', cornerTR: 'px', cornerBR: 'px', cornerBL: 'px', arcStart: '°', arcSweep: '°', arcInner: '%', starInner: '%', starCorner: 'px', pathPercent: '%', pathInfluence: '%' };
   // parentBlend defaults to 0 — "0%" reads as "fully Parent A" (the
@@ -6985,7 +7030,7 @@
       // everything else once a filter narrows to something specific.
       if (!isPropFiltered('parent')) renderParentRow(list, ld, li);
       if (!isPropFiltered('blend')) renderBlendRow(list, ld, li);
-      renderTransformGroup(list, ld, 'Transform');
+      renderTransformGroup(list, ld, SM.t('hdrTransform'));
       // Per-element sub-list used to be component-exclusive ("a symbol
       // instance's actual strokes live inside the SYMBOL's own sub-layer,
       // not addressable as elements of this outer layer") — true only
@@ -7109,11 +7154,11 @@
           var inkDefault2 = elEntry.sd.__inkColor !== undefined ? elEntry.sd.__inkColor : elEntry.sd.fillColor;
           renderStrokeColorRow(body, elHolder, elEntry.sd.isVectorBrush ? inkDefault2 : elEntry.sd.strokeColor);
           if (!elEntry.sd.isVectorBrush && elEntry.sd.strokeWidth !== undefined) {
-            renderTrimScalarRow(body, elHolder, 'strokeWidth', 'Stroke Width', 'px', 0, 200, elEntry.sd.strokeWidth);
+            renderTrimScalarRow(body, elHolder, 'strokeWidth', SM.t('propStrokeWidth'), 'px', 0, 200, elEntry.sd.strokeWidth);
           }
         }
         if (elEntry.sd.isVectorBrush && elEntry.sd.centerSegments && elEntry.sd.centerSegments.length >= 2) {
-          renderTrimScalarRow(body, elHolder, 'brushSize', 'Brush Size', '%', 10, 500, 100);
+          renderTrimScalarRow(body, elHolder, 'brushSize', SM.t('propBrushSize'), '%', 10, 500, 100);
         }
         if (!elEntry.sd.isRaster && elEntry.sd.segments && elEntry.sd.segments.length) {
           renderTrimPathsGroup(body, elHolder);
@@ -7121,7 +7166,7 @@
       }
       return;
     }
-    renderTransformGroup(body, ld, 'Transform');
+    renderTransformGroup(body, ld, SM.t('hdrTransform'));
   }
   // Track matte, IN Layer Properties (2026-08-30, "un bouton matte qui
   // ouvre dans le menu déroulant des properties de calques la config pour
@@ -9326,7 +9371,7 @@
         var inkDefault = entry.sd.__inkColor !== undefined ? entry.sd.__inkColor : entry.sd.fillColor;
         renderStrokeColorRow(list, strokeHolder, entry.sd.isVectorBrush ? inkDefault : entry.sd.strokeColor);
         if (!entry.sd.isVectorBrush && entry.sd.strokeWidth !== undefined) {
-          renderTrimScalarRow(list, strokeHolder, 'strokeWidth', 'Stroke Width', 'px', 0, 200, entry.sd.strokeWidth);
+          renderTrimScalarRow(list, strokeHolder, 'strokeWidth', SM.t('propStrokeWidth'), 'px', 0, 200, entry.sd.strokeWidth);
         }
       }
       // Brush size (2026-08 — third slice, the "brush" piece of
@@ -9335,7 +9380,7 @@
       // a plain shape has no width profile to scale. % of the shape's own
       // recorded pressure widths, same convention as the base Scale prop.
       if (entry.sd.isVectorBrush && entry.sd.centerSegments && entry.sd.centerSegments.length >= 2) {
-        renderTrimScalarRow(list, ensureElementHolder(ld, entry.strokeId), 'brushSize', 'Brush Size', '%', 10, 500, 100);
+        renderTrimScalarRow(list, ensureElementHolder(ld, entry.strokeId), 'brushSize', SM.t('propBrushSize'), '%', 10, 500, 100);
       }
       // Trim Paths (2026-08, "animer les stroke en in et out"): opt-in,
       // same visibility gate as Path above (needs real vertex geometry).
@@ -9429,10 +9474,10 @@
     list.appendChild(row);
   }
   function renderFillColorRow(list, holder, currentFillColorHex) {
-    renderColorRow(list, holder, 'fillColor', 'Fill', SM.t('shapeFillColorTitle'), currentFillColorHex);
+    renderColorRow(list, holder, 'fillColor', SM.t('propFill'), SM.t('shapeFillColorTitle'), currentFillColorHex);
   }
   function renderStrokeColorRow(list, holder, currentStrokeColorHex) {
-    renderColorRow(list, holder, 'strokeColor', 'Stroke', SM.t('shapeStrokeColorTitle'), currentStrokeColorHex);
+    renderColorRow(list, holder, 'strokeColor', SM.t('propStroke'), SM.t('shapeStrokeColorTitle'), currentStrokeColorHex);
   }
   // Trim Paths (2026-08, "animer les stroke en in et out"): 3 scalar rows
   // (Start/End/Offset, %), same stopwatch/keying contract as
@@ -9505,7 +9550,7 @@
     var grp = document.createElement('div'); grp.className = 'lrow motion-group-row';
     var expanded = window._motionExpandedTrimHolder === holder;
     var arrow = document.createElement('span'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
-    var label = document.createElement('span'); label.textContent = 'Trim Paths';
+    var label = document.createElement('span'); label.textContent = SM.t('hdrTrimPaths');
     grp.title = SM.t('titleTrimPathGroupHint');
     grp.appendChild(arrow); grp.appendChild(label);
     grp.addEventListener('click', function (e) {
@@ -9515,9 +9560,9 @@
     });
     list.appendChild(grp);
     if (!expanded) return;
-    renderTrimScalarRow(list, holder, 'trimStart', 'Start', '%', 0, 100, 0);
-    renderTrimScalarRow(list, holder, 'trimEnd', 'End', '%', 0, 100, 100);
-    renderTrimScalarRow(list, holder, 'trimOffset', 'Offset', '%', -100, 100, 0);
+    renderTrimScalarRow(list, holder, 'trimStart', SM.t('propTrimStart'), '%', 0, 100, 0);
+    renderTrimScalarRow(list, holder, 'trimEnd', SM.t('propTrimEnd'), '%', 0, 100, 100);
+    renderTrimScalarRow(list, holder, 'trimOffset', SM.t('propTrimOffset'), '%', -100, 100, 0);
   }
   // "Path" group — one row per vertex, each independently keyable (2026-07,
   // "les properties de path dont les vertices peuvent être animé
@@ -9614,7 +9659,7 @@
       renderLayerList(); renderTimeline();
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
-    var label = document.createElement('span'); label.textContent = 'Path';
+    var label = document.createElement('span'); label.textContent = SM.t('hdrPath');
     grp.appendChild(sw); grp.appendChild(arrow); grp.appendChild(label);
     grp.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -9876,7 +9921,7 @@
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     });
     row.appendChild(sw);
-    var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = 'Vertex ' + (vi + 1);
+    var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = SM.t('propVertex') + ' ' + (vi + 1);
     decorateMotionPropertyRow(row, holder, prop, nm);
     row.appendChild(nm);
     list.appendChild(row);
