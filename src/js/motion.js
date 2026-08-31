@@ -712,16 +712,44 @@
       (motionViewIsNarrowed() && layerMatchesMotionView(state.layers[li]));
   }
   // Does ANY per-element holder on this layer carry animated content?
-  // Text-animator's per-glyph offsets (opacity/position/scale — see
-  // text-animator.js's ALL_PRESET_PROPS) and any hand-keyed per-shape
-  // property live ONLY on ld.elementMotion[strokeId], never on the
-  // layer's own holder — U's reveal (below) needs this to know whether a
-  // target layer's animated content is hiding down in the Elements tree.
+  // The OLD preset-based text-animator's per-glyph offsets (opacity/
+  // position/scale — see text-animator.js's ALL_PRESET_PROPS) and any
+  // hand-keyed per-shape property live ONLY on ld.elementMotion[strokeId],
+  // never on the layer's own holder — U's reveal (below) needs this to know
+  // whether a target layer's animated content is hiding down in the
+  // Elements tree.
+  //
+  // ld.textAnimators (the range-selector engine, 2026-08-31) is a SEPARATE
+  // holder this function never checked — found live via Cyril's own
+  // question ("est-ce que U révèle les keyframes de n'importe quelle
+  // propriété"): a layer with ONLY text-animator keys (no elementMotion at
+  // all, since this system never touches it) reported false here, so U
+  // opened the layer's Transform group but left the Text Animators section
+  // entirely unrevealed — the exact same complaint feedback #145 already
+  // fixed once for the OLD system, silently reopened by the NEW one.
   function layerHasAnimatedElements(ld) {
-    if (!ld.elementMotion) return false;
-    for (var k in ld.elementMotion) {
-      var h = ld.elementMotion[k];
-      if (h && PROPS.some(function (p) { return propHasContent(h, p); })) return true;
+    if (ld.elementMotion) {
+      for (var k in ld.elementMotion) {
+        var h = ld.elementMotion[k];
+        if (h && PROPS.some(function (p) { return propHasContent(h, p); })) return true;
+      }
+    }
+    if (ld.textAnimators) {
+      for (var a = 0; a < ld.textAnimators.length; a++) {
+        if (textAnimatorHasKeys(ld.textAnimators[a])) return true;
+      }
+    }
+    return false;
+  }
+  // An animator's own keyed selector fields (start/end/offset/amount/
+  // easeHigh/easeLow/smooth — TA_TIMELINE_FIELDS) — shared by the reveal
+  // check above and handleRevealAnimatedShortcut below, which needs the
+  // SAME predicate to decide which individual animators U should expand.
+  function textAnimatorHasKeys(an) {
+    if (!an || !an.motion) return false;
+    for (var p in an.motion) {
+      var t = an.motion[p];
+      if (t && t.keys && t.keys.length) return true;
     }
     return false;
   }
@@ -740,6 +768,21 @@
     window._motionRevealedElementLayers = targets.filter(function (li) {
       var ld = state.layers[li];
       return ld && layerHasAnimatedElements(ld);
+    });
+    // Being in the Elements tree is only HALF of "U reveals the keyframes"
+    // for a text animator — the group row above still hides its own Start/
+    // End/etc. rows behind the single-animator accordion
+    // (_motionExpandedTextAnimator). Every animator that actually carries a
+    // key gets added to this multi-value set instead, exactly mirroring how
+    // _motionRevealedElementLayers sits alongside the single-layer
+    // _motionExpandedLayer one level up.
+    window._motionRevealedTextAnimators = [];
+    targets.forEach(function (li) {
+      var ld = state.layers[li];
+      if (!ld || !ld.textAnimators) return;
+      ld.textAnimators.forEach(function (an) {
+        if (textAnimatorHasKeys(an)) window._motionRevealedTextAnimators.push(an.id);
+      });
     });
     // Un-collapse any folder hiding an ANIMATED target (2026-08-29 audit
     // finding, confirmed live: with the only animated layer inside a
@@ -9833,7 +9876,15 @@
     { prop: 'easeLow', labelKey: 'textAnimEaseLow', unit: '', min: -100, max: 100, def: 0 },
     { prop: 'smooth', labelKey: 'textAnimSmoothness', unit: '%', min: 0, max: 100, def: 100 },
   ];
-  function isTextAnimatorExpanded(an) { return window._motionExpandedTextAnimator === an; }
+  // _motionExpandedTextAnimator (click-to-expand, ONE animator at a time) OR
+  // _motionRevealedTextAnimators (U's multi-value reveal set, by id since
+  // it must survive a rebuild that produces new ld.textAnimators object
+  // identity — mirrors _motionRevealedElementLayers's own by-index list one
+  // level up).
+  function isTextAnimatorExpanded(an) {
+    return window._motionExpandedTextAnimator === an ||
+      !!(an && window._motionRevealedTextAnimators && window._motionRevealedTextAnimators.indexOf(an.id) >= 0);
+  }
   function renderTextAnimatorsList(list, li, ld) {
     if (!ld.textAnimators || !ld.textAnimators.length) return;
     var hdr = document.createElement('div'); hdr.className = 'lrow motion-group-row'; hdr.textContent = SM.t('hdrTextAnimators');
@@ -10889,7 +10940,7 @@
         ld.textAnimators.forEach(function (an) {
           var taRowSpacer = document.createElement('div'); taRowSpacer.className = 'frow';
           grid.appendChild(taRowSpacer);
-          if (window._motionExpandedTextAnimator !== an) return;
+          if (!isTextAnimatorExpanded(an)) return;
           TA_TIMELINE_FIELDS.forEach(function (f) { renderTracksFor(grid, an, f.prop); });
         });
       }
@@ -12518,6 +12569,7 @@
     if (state.appMode === 'motion' && mode !== 'motion') {
       window._motionRevealedLayers = null;
       window._motionRevealedElementLayers = null;
+      window._motionRevealedTextAnimators = null;
       removeKeySelectionBox();
       removeLayerStaggerBox();
       // The graph editor hides #frame-grid while it's open — leaving Motion
