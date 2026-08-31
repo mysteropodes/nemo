@@ -799,6 +799,25 @@
         var hitEx = (lyrEx && window.hitTestPosed) ? hitTestPosed(state.activeLayerIdx, ptEx, 6 / view.zoom) : null;
         var itEx = hitEx && hitEx.item;
         while (itEx && itEx.parent && itEx.parent !== lyrEx) itEx = itEx.parent;
+        // Route through resolveBrushAnchor (tools.js) before reading strokeId
+        // (2026-08-31 follow-up) — a vector brush's linked-fill companion
+        // (data.isLinkedFillCompanion) is a separate live Paper item with its
+        // OWN strokeId, and topmost z-order sometimes puts it in front of the
+        // anchor at the exact pixel clicked (same "des fois ça sélectionne le
+        // tout des fois juste le fill" inconsistency resolveBrushAnchor was
+        // already written to fix for every OTHER click path — this isolation
+        // block had its own separate itEx.data.strokeId read that never went
+        // through it). Per-element Motion is only ever recorded under the
+        // ANCHOR's strokeId (motion.js's layerElements folds the companion
+        // out of the Elements list) — without this, a click that happened to
+        // land on the companion created a SECOND, independent
+        // ld.elementMotion entry keyed by the companion's own strokeId, and
+        // now that a click-drag actually moves things (the fix above this
+        // block), dragging it split the fill away from its own outline.
+        // Found live: after two drags the companion's motionStatic.position
+        // was [-96.9,192.1] while the anchor's was [-101.5,338.8] — same
+        // stroke, two different places, reading as two separate wavy shapes.
+        itEx = (window.resolveBrushAnchor && lyrEx) ? resolveBrushAnchor(itEx, lyrEx) : itEx;
         var sidEx = itEx && itEx.data && itEx.data.strokeId;
         // Clicking a SIBLING hands the isolation over to it rather than
         // ending it — same continuity Animation 2D's per-object mode has, and
