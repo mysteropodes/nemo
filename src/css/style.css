@@ -979,6 +979,18 @@ body.mode-motion #btn-tween-curves{display:none;}
    layer are visually indented and slightly recessed. */
 .motion-group-row{padding-left:24px;padding-right:8px;color:var(--text-dim);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;cursor:default;background:rgba(255,255,255,.015);display:flex;align-items:center;justify-content:space-between;margin-top:6px;}
 .motion-group-row:first-child{margin-top:0;}
+/* The 24px/8px padding above is a PANEL-only concept (indents the "Transform"/
+   "Path"/etc group LABEL text) — every other .motion-group-row on the grid
+   side is a blank spacer with no children, so the padding is invisible there.
+   renderPathGroupTrackRow (motion.js) is the one exception: it reuses this
+   class for a row that DOES hold real per-frame .fc cells (the "global" path
+   keyframes), and the inherited padding-left shoved its whole cell strip
+   right by exactly 24px relative to every other track row — confirmed live,
+   feedback #199 ("les keyframes globales de path ne sont pas bien aligné par
+   rapport au curseur, comme les autres keyframes"): its "current frame" cell
+   measured 24px right of Position's, byte-for-byte the padding-left value.
+   Zeroing it here can't affect any other .motion-group-row on this side. */
+#frame-grid .motion-group-row{padding-left:0;padding-right:0;}
 .motion-filter-btn{display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;cursor:pointer;color:var(--text-dark);flex-shrink:0;}
 .motion-filter-btn:hover{background:var(--panel3);color:var(--text);}
 .motion-filter-btn.on{color:var(--accent);}
