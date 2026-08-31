@@ -9055,7 +9055,17 @@
       }
       // Fill color (2026-07): opt-in extended property, hidden unless the
       // element actually has a fill — same convention as Path above.
-      if (entry.sd.fillColor) {
+      //
+      // feedback #203 (brush half, other side of the same bug the Stroke
+      // block below fixes): for a vector-brush shape, entry.sd.fillColor is
+      // either borrowed from a REAL linked-fill companion (layerElements'
+      // own merge sets __linkedFillStrokeId when one exists — a genuine
+      // second paint, feedback #200) or, when there's no companion, IS the
+      // ink color itself (nothing to merge) — that second case isn't a real
+      // fill to key, it's the same ink the Stroke row now drives, and
+      // showing this row for it was the Fill-side phantom-row twin of the
+      // bug hasRealStroke already guards against for Stroke.
+      if (entry.sd.fillColor && (!entry.sd.isVectorBrush || entry.sd.__linkedFillStrokeId)) {
         renderFillColorRow(list, ensureElementHolder(ld, entry.strokeId), entry.sd.fillColor);
       }
       // Stroke color/width (2026-08 — second slice of the "propriétés
@@ -9080,10 +9090,20 @@
       // always there and both look keyable, on a shape that never actually
       // had a stroke to animate.
       var hasRealStrokeEl = entry.sd.hasRealStroke !== undefined ? entry.sd.hasRealStroke : !!entry.sd.strokeColor;
-      if (hasRealStrokeEl) {
+      // feedback #203 (brush half, "il devrait y avoir une propriété
+      // keyframable de stroke séparé pour les shape fait avec brush"): a
+      // vector-brush ribbon's ink lives in its OWN fillColor — isVectorBrush
+      // forcing hasRealStroke false above is correct, there's no real
+      // outline stroke to animate — but the Stroke track now DRIVES that
+      // ink (engine-bridge.js's isBrushInk branch, same feedback) once this
+      // row exists to key it, so it's shown here too. Default swatch reads
+      // the shape's own current ink color (sd.fillColor), not
+      // sd.strokeColor (always null for a brush ribbon). No width row: a
+      // brush's own "Brush Size" row just below already covers scale.
+      if (hasRealStrokeEl || entry.sd.isVectorBrush) {
         var strokeHolder = ensureElementHolder(ld, entry.strokeId);
-        renderStrokeColorRow(list, strokeHolder, entry.sd.strokeColor);
-        if (entry.sd.strokeWidth !== undefined) {
+        renderStrokeColorRow(list, strokeHolder, entry.sd.isVectorBrush ? entry.sd.fillColor : entry.sd.strokeColor);
+        if (!entry.sd.isVectorBrush && entry.sd.strokeWidth !== undefined) {
           renderTrimScalarRow(list, strokeHolder, 'strokeWidth', 'Stroke Width', 'px', 0, 200, entry.sd.strokeWidth);
         }
       }
@@ -10147,7 +10167,9 @@
           // than #frame-grid for any shape with a fill — every row further
           // down (a later Forme's own Transform/Path/Fill rows) drifted out
           // of alignment with its own keyframe track from that point on.
-          if (entry.sd.fillColor) renderTracksFor(grid, elHolder, 'fillColor');
+          // feedback #203 (brush half) — mirrors renderElementsList's own
+          // isVectorBrush narrowing of this same condition exactly.
+          if (entry.sd.fillColor && (!entry.sd.isVectorBrush || entry.sd.__linkedFillStrokeId)) renderTracksFor(grid, elHolder, 'fillColor');
           // Stroke color/width (mirrors renderElementsList's own Stroke
           // block exactly — same condition, same order: color row then,
           // only if the shape also reports a width, the width row).
@@ -10155,9 +10177,12 @@
           // renderElementsList's own Stroke block above exactly, same
           // condition (feedback #203, see that block's own comment).
           var hasRealStrokeElGrid = entry.sd.hasRealStroke !== undefined ? entry.sd.hasRealStroke : !!entry.sd.strokeColor;
-          if (hasRealStrokeElGrid) {
+          // feedback #203 (brush half) — mirrors renderElementsList's own
+          // isVectorBrush widening of this same condition exactly, see its
+          // comment there.
+          if (hasRealStrokeElGrid || entry.sd.isVectorBrush) {
             renderTracksFor(grid, elHolder, 'strokeColor');
-            if (entry.sd.strokeWidth !== undefined) renderTracksFor(grid, elHolder, 'strokeWidth');
+            if (!entry.sd.isVectorBrush && entry.sd.strokeWidth !== undefined) renderTracksFor(grid, elHolder, 'strokeWidth');
           }
           // Brush size (mirrors renderElementsList's own Brush size row —
           // same condition).
