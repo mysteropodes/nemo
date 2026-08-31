@@ -7280,7 +7280,14 @@
       // per-element content (text-animator glyphs, hand-keyed shapes) —
       // narrower than "every U-revealed layer", so #42's clutter complaint
       // stays fixed for the common case of a layer with no per-element keys.
-      if (window._motionExpandedLayer === li || (window._motionRevealedElementLayers && window._motionRevealedElementLayers.indexOf(li) >= 0)) renderElementsList(list, li, ld);
+      if (window._motionExpandedLayer === li || (window._motionRevealedElementLayers && window._motionRevealedElementLayers.indexOf(li) >= 0)) {
+        renderElementsList(list, li, ld);
+        // Text Animators (2026-08-31) — same gate as Elements right above:
+        // a layer-level accordion group, not nested inside one element
+        // (ld.textAnimators lives on the layer itself), so it shows
+        // whenever the layer's own breakdown is open, same as Elements.
+        renderTextAnimatorsList(list, li, ld);
+      }
     });
     // Right-panel mirror of the active layer's Transform group ("il
     // faudrait afficher les properties d'un calque sélectionné et la
@@ -9788,6 +9795,59 @@
     renderTrimScalarRow(list, holder, 'trimEnd', SM.t('propTrimEnd'), '%', 0, 100, 100);
     renderTrimScalarRow(list, holder, 'trimOffset', SM.t('propTrimOffset'), '%', -100, 100, 0);
   }
+  // ---- Text Animators — TIMELINE rows (2026-08-31) ----
+  // Cyril: "pblm dans la timeline y a pas les propriété d'animation pour le
+  // texte dans le layer avec les keyframes." text-animator-panel.js gave the
+  // Layer Properties panel real stopwatches, but nothing wired the SAME
+  // holders (each ld.textAnimators[i] entry) into the Motion timeline itself
+  // — a key set from that panel had no diamond to show, and no way to be
+  // dragged/marquee'd/selected like every other key in this app.
+  //
+  // Shape mirrors renderTrimPathsGroup exactly: a group header, then one
+  // SEPARATE renderTrimScalarRow per field — Trim Paths already established
+  // that a range-like triple is 3 independent 1D tracks, not one 2D pair, and
+  // a text animator's selector is the same kind of thing. Start/End split
+  // into two rows here (the panel visually pairs them on one dims-row, which
+  // is fine — the underlying tracks were always two separate props, same as
+  // Trim Paths' own Start/End).
+  //
+  // Single source of truth for BOTH sides (§11): renderTimelineMotion's own
+  // mirror below iterates this SAME array, so the row COUNT can never drift
+  // even though — per every other group in this file — the two remain
+  // separate function calls, not shared DOM.
+  var TA_TIMELINE_FIELDS = [
+    { prop: 'start', labelKey: 'textAnimStart', unit: '', min: -500, max: 500, def: 0 },
+    { prop: 'end', labelKey: 'textAnimEnd', unit: '', min: -500, max: 500, def: 100 },
+    { prop: 'offset', labelKey: 'textAnimOffset', unit: '', min: -500, max: 500, def: 0 },
+    { prop: 'amount', labelKey: 'textAnimAmount', unit: '%', min: -100, max: 100, def: 100 },
+    { prop: 'easeHigh', labelKey: 'textAnimEaseHigh', unit: '', min: -100, max: 100, def: 0 },
+    { prop: 'easeLow', labelKey: 'textAnimEaseLow', unit: '', min: -100, max: 100, def: 0 },
+    { prop: 'smooth', labelKey: 'textAnimSmoothness', unit: '%', min: 0, max: 100, def: 100 },
+  ];
+  function isTextAnimatorExpanded(an) { return window._motionExpandedTextAnimator === an; }
+  function renderTextAnimatorsList(list, li, ld) {
+    if (!ld.textAnimators || !ld.textAnimators.length) return;
+    var hdr = document.createElement('div'); hdr.className = 'lrow motion-group-row'; hdr.textContent = SM.t('hdrTextAnimators');
+    list.appendChild(hdr);
+    ld.textAnimators.forEach(function (an, idx) {
+      var row = document.createElement('div'); row.className = 'lrow motion-elem-row';
+      var expanded = isTextAnimatorExpanded(an);
+      var arrow = document.createElement('div'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
+      var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch'; swatch.style.background = 'transparent';
+      if (an.enabled === false) swatch.style.opacity = '0.35';
+      var nm = document.createElement('div'); nm.className = 'lnm'; nm.textContent = SM.t('textAnimTitle') + ' ' + (idx + 1);
+      row.appendChild(arrow); row.appendChild(swatch); row.appendChild(nm);
+      row.addEventListener('click', function () {
+        window._motionExpandedTextAnimator = expanded ? null : an;
+        renderLayerList(); renderTimeline();
+      });
+      list.appendChild(row);
+      if (!expanded) return;
+      TA_TIMELINE_FIELDS.forEach(function (f) {
+        renderTrimScalarRow(list, an, f.prop, SM.t(f.labelKey), f.unit, f.min, f.max, f.def);
+      });
+    });
+  }
   // "Path" group — one row per vertex, each independently keyable (2026-07,
   // "les properties de path dont les vertices peuvent être animé
   // séparément on doit voir cette propriété"). Single-accordion per holder
@@ -10799,6 +10859,22 @@
               renderTracksFor(grid, elHolder, 'trimOffset');
             }
           }
+        });
+      }
+      // Text Animators (2026-08-31) — mirrors renderTextAnimatorsList (the
+      // LEFT list) exactly: same top-level condition as `els` just above
+      // (a SIBLING gate, not nested inside `if (els.length)` — the panel
+      // side calls renderElementsList and renderTextAnimatorsList as two
+      // separate calls under the same outer `if`, so this grid side must
+      // not fold the second one inside the first one's own row-count check).
+      if (ld.textAnimators && ld.textAnimators.length && (window._motionExpandedLayer === li || (window._motionRevealedElementLayers && window._motionRevealedElementLayers.indexOf(li) >= 0))) {
+        var taHdrSpacer = document.createElement('div'); taHdrSpacer.className = 'frow motion-group-row';
+        grid.appendChild(taHdrSpacer);
+        ld.textAnimators.forEach(function (an) {
+          var taRowSpacer = document.createElement('div'); taRowSpacer.className = 'frow';
+          grid.appendChild(taRowSpacer);
+          if (window._motionExpandedTextAnimator !== an) return;
+          TA_TIMELINE_FIELDS.forEach(function (f) { renderTracksFor(grid, an, f.prop); });
         });
       }
     });
