@@ -540,6 +540,58 @@
     bindWidgetField('p-widget-ymin', function (w, v) { if (w.y) w.y.min = v; });
     bindWidgetField('p-widget-ymax', function (w, v) { if (w.y) w.y.max = v; });
     bindWidgetField('p-widget-yrest', function (w, v) { if (w.y) w.y.rest = v; });
+    var xAdd = el('p-widget-xadd');
+    if (xAdd) xAdd.addEventListener('click', function (e) { var aw = activeWidget(); if (aw) openAddLinkMenu(e.clientX, e.clientY, aw.li, 'x'); });
+    var yAdd = el('p-widget-yadd');
+    if (yAdd) yAdd.addEventListener('click', function (e) { var aw = activeWidget(); if (aw) openAddLinkMenu(e.clientX, e.clientY, aw.li, 'y'); });
+  }
+
+  // ---- add-link button (feedback #185, "lier ce qu'ils contrôlent avec
+  // des boutons add... dans layer properties") ----
+  // The mirror image of widgetWiringMenuItems (motion.js): THAT is a
+  // right-click on a property row picking a widget axis to link to; THIS
+  // is a "+" on a widget's own axis row picking a PROPERTY to link. Same
+  // two modes (plain link / drive-a-pose), same underlying writer
+  // (SMMotion.setExpressionCode) — one writer, two entry points, so a
+  // link made either way is indistinguishable to every other reader
+  // (graph editor, expression textarea, export).
+  //
+  // propertyChoices() deliberately reuses SMMotion.propsFor — the SAME
+  // single decider every Motion row (panel AND grid) already calls before
+  // it can render (§11) — instead of guessing a parallel list of keyable
+  // properties that would silently drift from the real one.
+  function propertyChoices() {
+    if (!window.SMMotion || !SMMotion.propsFor) return [];
+    var out = [];
+    for (var li = 0; li < state.layers.length; li++) {
+      var ld = state.layers[li];
+      var props = SMMotion.propsFor(ld);
+      for (var i = 0; i < props.length; i++) {
+        out.push({ li: li, ld: ld, layerName: ld.name, prop: props[i], label: SMMotion.propLabel(props[i]) });
+      }
+    }
+    return out;
+  }
+  function openAddLinkMenu(x, y, li, axisKey) {
+    var ld = state.layers[li], w = widgetOf(ld);
+    if (!w || !w[axisKey] || !window.SMMotion || !window.showContextMenu) return;
+    var refStr = axisRef({ uid: SMMotion.ensureLayerUid(ld), name: axisLabel(ld, w[axisKey]) });
+    function sub(label, wrap, toastKey) {
+      return { label: label, action: function () {
+        var choices = propertyChoices();
+        if (!choices.length) return;
+        window.showContextMenu(x + 8, y + 8, choices.map(function (c) {
+          return { label: c.layerName + ' · ' + c.label, action: function () {
+            SMMotion.setExpressionCode(c.ld, c.prop, wrap(refStr));
+            if (window.showToast) showToast(SM.t(toastKey));
+          } };
+        }));
+      } };
+    }
+    window.showContextMenu(x, y, [
+      sub(SM.t('ctxWidgetAddLinkPropertyEllipsis'), function (r) { return r; }, 'toastLinkedToWidget'),
+      sub(SM.t('ctxWidgetAddDrivePoseEllipsis'), function (r) { return 'self.at(' + r + ')'; }, 'toastPoseDrivenByWidget'),
+    ]);
   }
 
   window.SMRigWidget = {
