@@ -74,9 +74,13 @@ alpha doit transiter par `el.dataset.hex8` en plus de `.value` :
 
 ## 3. Rust : deux fonctions dupliquées doivent rester identiques
 
-`render()` et `render_to_pixels()` (engine.rs) sont des copies quasi-identiques (l'une pour
-l'écran, l'autre pour l'export) qui DOIVENT rester en phase — toute modif de l'une (couleur,
-blend mode, dash, etc.) doit être répercutée dans l'autre immédiatement, pas "plus tard".
+`render()` et `render_to_pixels()` (engine.rs) ont longtemps été deux copies quasi-identiques
+(l'une pour l'écran, l'autre pour l'export) à maintenir en phase à la main. **Ce n'est plus le
+cas** : toute la composition passe par `composite_scene()` (un seul corps, appelé par les
+deux), et il ne reste dans chacune que la sortie propre à son cas (blit vers la surface vs.
+readback vers un buffer CPU) et la couleur de fond (pasteboard opaque à l'écran, transparent
+à l'export). **Toute modif de rendu va dans `composite_scene`, jamais dans l'une des deux
+enveloppes** — y remettre de la logique de scène recréerait la divergence d'origine.
 Même principe pour les paires JS/Rust dupliquées (résample, tween matching, erase) : la
 version WASM est essayée en premier avec repli JS silencieux en cas d'erreur — un bug
 seulement côté Rust peut donc ne JAMAIS se voir en test si le fallback JS masque la différence.
@@ -103,6 +107,13 @@ seulement côté Rust peut donc ne JAMAIS se voir en test si le fallback JS masq
   En cas de "ça ne marche toujours pas" qui contredit un test qui vient de passer : redémarrer
   le serveur preview sur un port jamais utilisé dans la session, PUIS seulement chercher un
   vrai bug de fond.
+- **Moteur Rust OFF par défaut dans un onglet frais du Browser pane.** `SMEngineBridge.isEnabled()`
+  reste `false` tant que `await SMEngineBridge.setEnabled(true)` n'a pas RÉSOLU (l'init
+  WebGPU est asynchrone, `ensureEngine` refuse tant qu'elle n'est pas finie). Un appel non
+  awaité suivi d'un `setTimeout` lit encore `false`, et le canvas reste silencieusement sur le
+  repli Paper.js : pas de combine, pas d'element Motion, pas d'effets — ça ressemble
+  EXACTEMENT à « mon fix ne marche pas ». Avant tout A/B pixel ou capture censée montrer le
+  rendu moteur : awaiter `setEnabled(true)`, puis vérifier `isEnabled() === true`.
 
 ## 5. Performance du pipeline de rendu (résolu 2026-07, à préserver)
 
