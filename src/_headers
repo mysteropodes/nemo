@@ -1,0 +1,26 @@
+# Security headers for every static asset response.
+#
+# This file exists INSTEAD of setting them in worker/index.js, because Workers
+# serves static assets ahead of the Worker script by default -- the Worker is
+# never invoked for a request that matches a file, so headers set there never
+# reached the actual site. (Confirmed live: the Worker set them and curl saw
+# none.) The alternative, assets.run_worker_first, would invoke the Worker on
+# every asset request just to add four headers; _headers is handled by the
+# asset server itself, so it costs nothing.
+#
+# Worker-generated responses are NOT covered by this file, so /api/google-font
+# sets the same headers in code (withSecurityHeaders, worker/index.js).
+#
+# No script-src/style-src on purpose: the app needs 'unsafe-inline' (an inline
+# <script>, 492 style="" attributes), 'unsafe-eval' (the nemo.* scripting API
+# runs user code via new Function) and wasm eval (the Rust render engine). A
+# policy permissive enough to keep that working would protect nothing while
+# looking like it does. Only directives that are both safe here and actually
+# useful are set. Permissions-Policy leaves clipboard alone -- the app uses it.
+/*
+  Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Strict-Transport-Security: max-age=31536000
