@@ -305,6 +305,21 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   // eye dots measured 7px vs 15px (ratio 2.04!) — at that size the ratio
   // is pure pen noise, and cel features that small legitimately jitter.
   var ratioPen=(lenRatio>1.6&&Math.abs(fA.length-fB.length)>15)?Math.min(0.7,(lenRatio-1.6)*0.5):0;
+  // Smooth length-identity term (2026-09, with TW_MATCH_RELATIONAL —
+  // Cyril's turning face, "grosse confusion des traits"): the eye cluster
+  // dropped 130 px while the rest of the face barely moved, so proximity
+  // (even motion-predicted) preferred sliding the chain — eye onto the
+  // brow's partner, lower lid onto the eye's — over brow→brow (147 vs
+  // 141 px) / eye→eye (87 vs 94). Arrangement is preserved by both
+  // chains, so the relational term can't tell them apart; what a viewer
+  // uses is that a brow is LONGER than an eye. ratioPen above only bites
+  // past 1.6 (and 1.62 cost 0.01); this ramps from 1.3 (the corpus's
+  // legitimate-pair ceiling, see ratioPen's own comment) to 0.25 at 2×
+  // (0.03 at 1.4×, 0.08 at 1.6×, 0.19 at 1.9×). 0.15 left the brow/eye
+  // chain 0.13 short; 0.35 flipped it but pushed a legitimately-redrawn
+  // lip (155 → 82 px, ratio 1.9) over the fade threshold. Same
+  // micro-stroke exemption as ratioPen.
+  var lenT=(TW_MATCH_RELATIONAL&&Math.abs(fA.length-fB.length)>15)?Math.min(1,Math.max(0,Math.log(lenRatio)-Math.log(1.3))/Math.log(2))*0.25:0;
   // 0.35 only when BOTH closed flags are ground truth. When either side is
   // a heuristic guess (vector-brush centerline — see strokeFeat's
   // closedIsGuess), a disagreement is as likely a drawing accident as a
@@ -333,7 +348,7 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   var strokeClash=fA.strokeCol&&fB.strokeCol&&colorDist(fA.strokeCol,fB.strokeCol)>0.35;
   var colorPenalty=(fillClash||strokeClash)?0.4:0;
   var idxBonus=sameIndex?-0.03:0;
-  return proxT*.48+alignT*.15+curveT*.12+fourD*.10+rel*.10+szD*.06+colD*.15+typePenalty+colorPenalty+ratioPen+closedPen+idxBonus;
+  return proxT*.48+alignT*.15+curveT*.12+fourD*.10+rel*.10+szD*.06+colD*.15+typePenalty+colorPenalty+ratioPen+lenT+closedPen+idxBonus;
 }
 // "Force line" motion model: eyes, chin, and other small close-together
 // features are exactly where independent per-stroke shape/position matching
@@ -537,6 +552,27 @@ function autoMatchJS(sA,sB){
     return f.pts.map(function(pt){var q=applySimilarityTransform(tf,pt[0],pt[1]);return[q.x,q.y];});
   });
   var cost2=buildCost(ptsT);
+  // TWO-CHANNEL UNARY (2026-09, with TW_MATCH_RELATIONAL — Cyril's
+  // "confusion des 2 yeux" on a turning face): pass 2 used to score every
+  // pairing ONLY at the motion-predicted position. When the local motion
+  // model is wrong for a region (the eyes hadn't moved — 7 px from their
+  // partners — while the seeds around them said "30 px left and down"),
+  // the prediction PUSHES the true pairing away and the Hungarian crosses
+  // the two eyes on unary cost alone; the old path only recovered by luck
+  // (uncrossMatches re-scored on raw proximity). A stroke is either where
+  // the motion says it is OR where it was: each pairing takes the cheaper
+  // of the predicted cost and the raw pass-1 cost (plus a small bias so a
+  // motion-consistent explanation wins a tie), and the relational pass
+  // arbitrates the rest. Confidence-weighting the prediction by its
+  // seeds' residual was tried first and rejected: it fixed the eyes but
+  // un-fixed testC's legs (residual/spread 0.54 vs 0.42 — no separation).
+  var PRED_RAW_BIAS=0.03;
+  if(TW_MATCH_RELATIONAL){
+    for(var ra2=0;ra2<n;ra2++)for(var rb2=0;rb2<m;rb2++){
+      var rawC=cost[ra2][rb2]+PRED_RAW_BIAS;
+      if(rawC<cost2[ra2][rb2])cost2[ra2][rb2]=rawC;
+    }
+  }
   var assign2=hungarian(cost2);
   var matches2=[];
   for(var a4=0;a4<n;a4++){var b4=assign2[a4];if(b4!==undefined&&b4>=0&&b4<m)matches2.push({a:a4,b:b4,score:cost2[a4][b4]});}
