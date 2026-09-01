@@ -77,6 +77,20 @@ var TW_DTW_SYMMETRIC=false;
 // uncrossMatches on this path; JS-only (the wasm auto_match stays the
 // exact twin of the previous behaviour and is bypassed while this is on).
 var TW_MATCH_RELATIONAL=true;
+// TW_ALIGN_HAIRPIN (2026-09, Cyril's bent leg unfolding: "le moteur
+// inverse les coordonnées"): a stroke drawn down one side of a limb and
+// back up the other is a HAIRPIN — its two ends sit close together, so
+// resampledIsClosed took it for a loop and alignResampledPair searched
+// every cyclic rotation of the start point. On a loop that's right (a
+// spinning wheel has no start); on a hairpin the pen's start is real, and
+// the similarity-fit residual used for loops can't tell a bent leg from a
+// straight one anyway (measured: the winner implied a +77°/×1.4 whole-leg
+// rotation and sent the HIP to the FOOT, 474 px away, while hip↔hip sat
+// 24 px away). A hairpin is recognised by its two halves lying on top of
+// each other (points i and n−1−i close); it then only gets the
+// reverse-or-not choice, scored on position. JS-only, wasm align_pair
+// bypassed while on (twin of the old behaviour).
+var TW_ALIGN_HAIRPIN=true;
 // ---- MATCHING ----
 function buildTP(sd){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});return p;}
 // A stroke's color and fill/stroke "type" are what a viewer actually reads
@@ -3112,6 +3126,9 @@ function alignCost(a,b){
   return s;
 }
 function alignResampledPair(a,b){
+  // The hairpin rule lives in JS only (see TW_ALIGN_HAIRPIN) — the wasm
+  // port is the exact twin of the old rotation search and would skip it.
+  if(TW_ALIGN_HAIRPIN)return alignResampledPairJS(a,b);
   if(window.GeometryWasm&&window.GeometryWasm.ready){
     try{
       // Rust's ResampledJsonIn requires isVectorBrush (plain `bool`, no
@@ -3238,8 +3255,32 @@ function alignTurnDisagreement(a,b){
   return cnt?sum/cnt:0; // mean per-vertex turning disagreement, radians
 }
 var ALIGN_TURN_W=1.5;
+// May the start point be rotated for alignment? (see TW_ALIGN_HAIRPIN.)
+// Only for a stroke the artist actually closed — end gap under 8 % of the
+// bbox diagonal — or one whose gap is under resampledIsClosed's 15 % but
+// whose two halves do NOT lie on top of each other (mean distance between
+// point i and its mirror n−1−i ≥ 25 % of the diagonal: a genuine loop,
+// where a circle averages ~0.64). A limb contour drawn there-and-back
+// fails both: its gap is the limb's width (measured 10 % / 14 % on the
+// reported leg) and its halves overlap (0.30 / 0.16). A first cut vetoed
+// on overlap alone and regressed testF (26 → 44 self-crossings): a FLAT
+// closed loop (an eye, gap 0.02–0.08, overlap 0.09–0.22) is geometrically
+// a hairpin too — the gap is what tells them apart.
+var ROT_GAP_STRICT=0.08,ROT_LOOP_MIN_SPREAD=0.25;
+function resampledRotationOk(r){
+  var s=r.segments,n=s.length;if(n<6)return false;
+  var minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
+  s.forEach(function(sg){minx=Math.min(minx,sg.point[0]);miny=Math.min(miny,sg.point[1]);maxx=Math.max(maxx,sg.point[0]);maxy=Math.max(maxy,sg.point[1]);});
+  var diag=Math.sqrt((maxx-minx)*(maxx-minx)+(maxy-miny)*(maxy-miny))||1;
+  var gx=s[0].point[0]-s[n-1].point[0],gy=s[0].point[1]-s[n-1].point[1];
+  if(Math.sqrt(gx*gx+gy*gy)/diag<ROT_GAP_STRICT)return true;
+  var sum=0,cnt=0;
+  for(var i=0;i<n/2;i++){var p=s[i].point,q=s[n-1-i].point;sum+=Math.sqrt((p[0]-q[0])*(p[0]-q[0])+(p[1]-q[1])*(p[1]-q[1]));cnt++;}
+  return (sum/cnt)/diag>=ROT_LOOP_MIN_SPREAD;
+}
 function alignResampledPairJS(a,b){
   var closed=resampledIsClosed(a)&&resampledIsClosed(b);
+  if(closed&&TW_ALIGN_HAIRPIN&&!(resampledRotationOk(a)&&resampledRotationOk(b)))closed=false; // a hairpin's start is the pen's start — no rotation
   var baseFn=closed?rotationFitResidual:alignCost;
   var costFn=function(x,y){return baseFn(x,y)*(1+ALIGN_TURN_W*alignTurnDisagreement(x,y));};
   var best=b,bestC=costFn(a,b);
