@@ -57,6 +57,26 @@ var TW_FOLD_UNWRAP=true;
 // and testF 26->34 regress, 56->64 overall. Opt-in until judged on real
 // work; flip from the console and regenerate.
 var TW_DTW_SYMMETRIC=false;
+// TW_MATCH_RELATIONAL (2026-09, Cyril: "une meilleure fonctionnalité de
+// reconnaissance", not another weight tweak): stroke matching becomes
+// STRUCTURE-aware. Until now every stroke was scored against every
+// candidate on its own (proximity, curvature, silhouette, colour…) plus a
+// local motion prediction, then a couple of crossing/order heuristics
+// tried to repair twin swaps after the fact — and a synthetic benchmark
+// on the real test drawings showed those heuristics UNDOING a correct
+// assignment (testG ticks 3/4: pass 2 right at 0.011 vs 0.224, uncross
+// flipped it). The relational pass instead adds, to each candidate
+// pairing (i→a), how well the drawing's arrangement is preserved: the
+// vector from stroke i to each of its nearest neighbours j, carried by the
+// local motion at i, must land on the vector from a to j's own partner.
+// Cel features keep their spatial arrangement; two look-alike ticks are
+// told apart by WHERE they sit relative to everything else, which no
+// per-stroke descriptor can see. Solved by a few rounds of Hungarian on
+// the unary+relational cost (a standard relaxation of the quadratic
+// assignment), starting from the motion-predicted assignment. Replaces
+// uncrossMatches on this path; JS-only (the wasm auto_match stays the
+// exact twin of the previous behaviour and is bypassed while this is on).
+var TW_MATCH_RELATIONAL=true;
 // ---- MATCHING ----
 function buildTP(sd){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});return p;}
 // A stroke's color and fill/stroke "type" are what a viewer actually reads
@@ -399,6 +419,9 @@ function _strokeInJson(sd){
 }
 function autoMatch(sA,sB){
   if(!sA.length||!sB.length)return[];
+  // Relational matching lives in JS only (see TW_MATCH_RELATIONAL) — the
+  // wasm port is the exact twin of the OLD pipeline and would skip it.
+  if(TW_MATCH_RELATIONAL)return autoMatchJS(sA,sB);
   if(window.GeometryWasm&&window.GeometryWasm.ready){
     try{
       var json=window.GeometryWasm.auto_match(JSON.stringify(sA.map(_strokeInJson)),JSON.stringify(sB.map(_strokeInJson)));
@@ -475,6 +498,7 @@ function autoMatchJS(sA,sB){
   // is degenerate, and for tiny seed sets (<=K) where "local" would just
   // be the same as global anyway.
   var K_LOCAL=4;
+  var localTfs=new Array(fA.length); // per-A-stroke motion model, reused by the relational pass
   var ptsT=fA.map(function(f,ai){
     var tf=transform;
     if(seeds.length>K_LOCAL){
@@ -495,13 +519,85 @@ function autoMatchJS(sA,sB){
         if(lmag>0.15&&lmag<8)tf=lt;
       }
     }
+    localTfs[ai]=tf;
     return f.pts.map(function(pt){var q=applySimilarityTransform(tf,pt[0],pt[1]);return[q.x,q.y];});
   });
   var cost2=buildCost(ptsT);
   var assign2=hungarian(cost2);
   var matches2=[];
   for(var a4=0;a4<n;a4++){var b4=assign2[a4];if(b4!==undefined&&b4>=0&&b4<m)matches2.push({a:a4,b:b4,score:cost2[a4][b4]});}
+  if(TW_MATCH_RELATIONAL)return relationalRefine(matches2,fA,fB,cost2,localTfs,n,m,FADE_COST);
   return uncrossMatches(matches2,fA,fB);
+}
+// ---- RELATIONAL matching (2026-09, see TW_MATCH_RELATIONAL) ----
+// Quadratic-assignment relaxation: a few rounds of Hungarian on
+//   cost(i→a) = unary(i,a) + λ · mean over i's K nearest neighbours j of
+//               err( T_i(c_j − c_i),  c_σ(j) − c_a )
+// where T_i is the local similarity fitted for stroke i in pass 2 (rotation
+// + scale only — the translation is what we're testing), c are centroids
+// and σ the current assignment. err is a size-normalised vector mismatch in
+// [0,1]. Neighbours currently faded out contribute nothing. Starts from
+// pass 2's assignment and stops when a round changes nothing (max 6).
+// Unary is pass 2's own augmented matrix, so the fade opt-out keeps its
+// exact meaning; the relational term only ever ADDS cost to arrangement-
+// breaking pairings, which is why a correct assignment can't be degraded
+// by it the way the crossing heuristics could.
+// No "confident unary match is frozen" guard, deliberately: it was tried
+// (freeze when score ≤ 0.25 and the runner-up is ≥ 0.10 worse) and it
+// pinned look-alikes that were individually CONFIDENT but WRONG (a twin
+// scoring 0.06 after a slightly-off local motion prediction), cascading
+// the whole neighbourhood — benchmark errors went 2 → 24. The one real
+// pairing it "protected" (testC 16→31, the pair uncrossMatches' comment
+// calls "must NOT swap") turned out, seen live, to be the two LEGS
+// swapped; the relational answer is the right one there.
+var REL_K=6,REL_LAMBDA=0.45,REL_ROUNDS=6;
+function relationalRefine(matches,fA,fB,cost,localTfs,n,m,fadeCost){
+  if(n<3||m<2)return matches;
+  var N=n+m;
+  // neighbours in A (by centroid), with the relative vectors
+  var K=Math.min(REL_K,n-1);
+  var nb=fA.map(function(f,i){
+    var arr=[];
+    for(var j=0;j<n;j++){if(j===i)continue;var dx=fA[j].cx-f.cx,dy=fA[j].cy-f.cy;arr.push({j:j,dx:dx,dy:dy,d2:dx*dx+dy*dy});}
+    arr.sort(function(p,q){return p.d2-q.d2;});
+    return arr.slice(0,K);
+  });
+  function predVec(i,dx,dy){var t=localTfs[i];if(!t)return[dx,dy];return[t.wRe*dx-t.wIm*dy,t.wIm*dx+t.wRe*dy];}
+  function sizeOf(f){return Math.sqrt(f.bounds.w*f.bounds.w+f.bounds.h*f.bounds.h)+1;}
+  var sigma=new Array(n).fill(-1);
+  matches.forEach(function(mm){sigma[mm.a]=mm.b;});
+  var cur=cost;
+  for(var round=0;round<REL_ROUNDS;round++){
+    var aug=[];
+    for(var i=0;i<N;i++){
+      var row=cost[i].slice();
+      if(i<n){
+        var nbi=nb[i],sz=sizeOf(fA[i]);
+        for(var a=0;a<m;a++){
+          var acc=0,cnt=0;
+          for(var q=0;q<nbi.length;q++){
+            var j=nbi[q].j,b=sigma[j];
+            if(b<0||b===a)continue;
+            var p=predVec(i,nbi[q].dx,nbi[q].dy);
+            var qx=fB[b].cx-fB[a].cx,qy=fB[b].cy-fB[a].cy;
+            var ex=p[0]-qx,ey=p[1]-qy;
+            var norm=Math.sqrt(p[0]*p[0]+p[1]*p[1])+Math.sqrt(qx*qx+qy*qy)+sz;
+            acc+=Math.min(1,Math.sqrt(ex*ex+ey*ey)/norm*2);cnt++;
+          }
+          if(cnt)row[a]+=REL_LAMBDA*acc/cnt;
+        }
+      }
+      aug.push(row);
+    }
+    var assign=hungarian(aug);
+    var changed=false,next=new Array(n).fill(-1);
+    for(var a2=0;a2<n;a2++){var b2=assign[a2];next[a2]=(b2!==undefined&&b2>=0&&b2<m)?b2:-1;if(next[a2]!==sigma[a2])changed=true;}
+    sigma=next;cur=aug;
+    if(!changed)break;
+  }
+  var out=[];
+  for(var a3=0;a3<n;a3++){if(sigma[a3]>=0)out.push({a:a3,b:sigma[a3],score:cost[a3][sigma[a3]]});}
+  return out;
 }
 // ---- trajectory uncrossing (2026-07-17, "les yeux s'inversent") ----
 // Found on a real hand-drawn animation: two nearly-identical eye strokes
@@ -572,6 +668,12 @@ function uncrossMatches(ms,fA,fB){
       // decide this gate (individual matchSc, lower is better):
       //   testD eyes, must swap:      0.444 / 0.580  — both mediocre, tied
       //   testC 16/17, must NOT swap: 0.121 / 0.371  — one near-certain
+      //   (2026-09 correction, seen live with both keys overlaid: that
+      //   "near-certain" pairing was the character's RIGHT leg sent to
+      //   the LEFT leg's new position — a 17px hop for one leg and 143px
+      //   for the other. The relational matcher (TW_MATCH_RELATIONAL)
+      //   picks the coherent left→left/right→right pairing; this gate
+      //   only still applies on the legacy path.)
       // The 0.121 pairing is two centroids 17px apart; swapping it produced
       // two mediocre 84px/77px pairings for the same total travel. Anchoring
       // on the BEST current score separates the two by 3.7x, rather than the
