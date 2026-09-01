@@ -3979,23 +3979,98 @@ function applyStrokeStyle(p){
 // only ever engages on paths that were ALREADY self-intersecting, so an
 // already-clean stroke (straight, gentle curve, ordinary corner) is
 // untouched by it — verified identical before/after.
+// Cheap pre-filter for _ribbonHasRealSelfIntersections below (2026-09,
+// tween audit): the exact Bezier `getIntersections` was 68 ms of a 250 ms
+// tween generation (182 outlines, only 19 of which actually crossed).
+// Flatten every curve to 4 sub-segments and sweep the resulting polyline's
+// segment bboxes sorted by x — near-linear. "Maybe" (true) when two
+// non-adjacent flattened segments cross OR pass within 0.5 px of each
+// other; only then does the exact test run. The near-touch tolerance is
+// NOT optional: a pure crossing test on the flattened polyline missed 4
+// of 123 real crossings over 1282 outlines from the six test files
+// (tangential, sub-flattening-error crossings), and 6 subdivisions still
+// missed 2. With the tolerance: 0 misses on the same corpus, and the
+// exact test still runs on only 546 of the 1282 (the rest is skipped
+// outright). Adjacent segments share an endpoint and are skipped, like
+// the exact test skips adjacent curves' shared endpoint.
+// Returns null when no two flattened segments cross or come close, else
+// the list of CURVE index pairs [ci,oi] (ci<oi, deduplicated) the exact
+// test must look at — so the Bezier intersection runs per candidate pair
+// instead of over the whole contour (Paper's contour.getIntersections is
+// all-pairs, O(curves²), and was still 26 ms/182 outlines on testD after
+// the contour-level skip alone).
+function _polylineCrossCandidates(contour){
+  var curves=contour.curves,n=curves.length;
+  if(n<4)return null;
+  var SUB=4,TOL=0.5,TOL2=TOL*TOL;
+  var pts=[],owner=[]; // owner[k] = curve index the flattened point k starts from
+  for(var i=0;i<n;i++){
+    var cv=curves[i];
+    pts.push(cv.point1);owner.push(i);
+    if(cv.hasHandles())for(var su=1;su<SUB;su++){pts.push(cv.getPointAtTime(su/SUB));owner.push(i);}
+  }
+  var m=pts.length;
+  if(m<4)return null;
+  var segs=new Array(m);
+  for(var k=0;k<m;k++){
+    var a=pts[k],b=pts[(k+1)%m];
+    segs[k]={i:k,x0:Math.min(a.x,b.x)-TOL,x1:Math.max(a.x,b.x)+TOL,y0:Math.min(a.y,b.y)-TOL,y1:Math.max(a.y,b.y)+TOL,a:a,b:b};
+  }
+  segs.sort(function(p,q){return p.x0-q.x0;});
+  function ccw(p,q,r){return (r.y-p.y)*(q.x-p.x)>(q.y-p.y)*(r.x-p.x);}
+  function pd2(p,q,r){ // squared distance from point p to segment q-r
+    var vx=r.x-q.x,vy=r.y-q.y,wx=p.x-q.x,wy=p.y-q.y,l2=vx*vx+vy*vy;
+    var tt=l2>0?(wx*vx+wy*vy)/l2:0;if(tt<0)tt=0;else if(tt>1)tt=1;
+    var dx=q.x+tt*vx-p.x,dy=q.y+tt*vy-p.y;return dx*dx+dy*dy;
+  }
+  var pairs=null,seen={};
+  for(var s=0;s<m;s++){
+    var S=segs[s];
+    for(var t=s+1;t<m;t++){
+      var T=segs[t];
+      if(T.x0>S.x1)break;
+      if(T.y0>S.y1||T.y1<S.y0)continue;
+      var di=Math.abs(S.i-T.i);
+      if(di===1||di===m-1)continue;
+      var hit=(ccw(S.a,T.a,T.b)!==ccw(S.b,T.a,T.b)&&ccw(S.a,S.b,T.a)!==ccw(S.a,S.b,T.b))
+        ||pd2(S.a,T.a,T.b)<TOL2||pd2(S.b,T.a,T.b)<TOL2||pd2(T.a,S.a,S.b)<TOL2||pd2(T.b,S.a,S.b)<TOL2;
+      if(!hit)continue;
+      var ci=owner[S.i],oi=owner[T.i];
+      if(ci>oi){var tmp=ci;ci=oi;oi=tmp;}
+      var key=ci*n+oi;
+      if(seen[key])continue;
+      seen[key]=true;
+      (pairs||(pairs=[])).push([ci,oi]);
+    }
+  }
+  return pairs;
+}
 function _ribbonHasRealSelfIntersections(path){
   var contours=path.className==='CompoundPath'?path.children:[path];
   for(var c=0;c<contours.length;c++){
-    var contour=contours[c],ix;
-    try{ix=contour.getIntersections(contour);}catch(e){continue;}
-    if(!ix||!ix.length)continue;
-    var n=contour.curves.length;
-    for(var k=0;k<ix.length;k++){
-      var loc=ix[k],t=loc.time,isB=t<1e-6||t>1-1e-6;
-      var other=loc.intersection,oT=other?other.time:0,oB=other&&(oT<1e-6||oT>1-1e-6);
-      if(isB&&oB){
-        var ci=loc.curve.index,oi=other.curve.index;
-        // Adjacent curves always "touch" at their shared endpoint — that's
-        // not a defect, only a genuine mid-curve crossing counts.
-        if(Math.abs(ci-oi)===1||Math.abs(ci-oi)===n-1||ci===oi)continue;
+    var contour=contours[c],curves=contour.curves,n=curves.length;
+    var pairs=_polylineCrossCandidates(contour);
+    if(!pairs)continue;
+    for(var p=0;p<pairs.length;p++){
+      var ci=pairs[p][0],oi=pairs[p][1],ix;
+      // Adjacent curves always "touch" at their shared endpoint — that's
+      // not a defect; but a genuine MID-curve crossing between two
+      // neighbours (a kink looping back into the next curve) is, and it
+      // is the most common real crossing on a ribbon: all 6 misses of a
+      // first version that skipped neighbours outright were exactly that.
+      // So neighbours are tested too, and only the endpoint touch is
+      // ignored — same rule the old contour-level test applied. A curve
+      // flagged against ITSELF goes through Paper's own self-intersection
+      // handling.
+      var neighbours=ci===oi||Math.abs(ci-oi)===1||Math.abs(ci-oi)===n-1;
+      try{ix=curves[ci].getIntersections(curves[oi]);}catch(e){continue;}
+      if(!ix||!ix.length)continue;
+      for(var k=0;k<ix.length;k++){
+        var loc=ix[k],t=loc.time,isB=t<1e-6||t>1-1e-6;
+        var other=loc.intersection,oT=other?other.time:0,oB=other&&(oT<1e-6||oT>1-1e-6);
+        if(isB&&oB&&neighbours)continue;
+        return true;
       }
-      return true;
     }
   }
   return false;
