@@ -316,7 +316,11 @@
     var row = _elDrag.kind === 'paint'
       ? el && el.closest('#shapes-list .lrow[data-paintid]')
       : _elDrag.kind === 'member'
-      ? el && el.closest('#shapes-list .lrow[data-groupmember]')
+      // A member row can land on another member row (same OR a different
+      // group — performMemberReorder ejects it from its own group when the
+      // two differ) or on any top-level row (a plain shape, or a group's
+      // own header) — see performMemberReorder's 2026-09 fix.
+      ? el && el.closest('#shapes-list .lrow[data-groupmember], #shapes-list .lrow[data-toplevel]')
       : el && el.closest('#shapes-list .lrow[data-toplevel]');
     if (row) row.classList.add('drag-over');
   });
@@ -391,18 +395,44 @@
   // the top-level shape/group reorder above, just gated to require the
   // drop target be a member of the exact SAME group as the dragged item
   // (_elDrag.extra, stamped at mousedown — see buildShapeRow's member
-  // branch). Dropping on a member of a DIFFERENT group, or anywhere with
-  // no data-groupmember at all, is a no-op rather than silently moving a
-  // shape out of its group — that's a distinct, bigger feature (dragging
-  // INTO/OUT of a group) nobody asked for here.
+  // branch).
   function performMemberReorder(overRow) {
-    var destGroupGid = overRow.dataset.groupmember, destStrokeId = overRow.dataset.strokeid;
-    if (!destGroupGid || destGroupGid !== _elDrag.extra || destStrokeId === _elDrag.id) return;
+    var destGroupGid = overRow.dataset.groupmember, destStrokeId = overRow.dataset.strokeid, destGid = overRow.dataset.gid;
+    if (destStrokeId === _elDrag.id) return;
     var c = currentLayer(); if (!c.ld) return;
+    var layer = window.userLayers && userLayers[c.li];
     var srcItem = window.SMMotion.liveItemByStrokeId(c.li, _elDrag.id);
-    var destItem = window.SMMotion.liveItemByStrokeId(c.li, destStrokeId);
-    if (!srcItem || !destItem) return;
+    if (!srcItem || !layer) return;
+    var sameGroup = destGroupGid && destGroupGid === _elDrag.extra;
+    var destItem;
+    if (sameGroup) {
+      destItem = window.SMMotion.liveItemByStrokeId(c.li, destStrokeId);
+    } else if (destGid) {
+      // Dropped on a (collapsed or expanded) DIFFERENT group's own header
+      // row — land adjacent to the whole group, same "front-most member"
+      // convention performReorder's own group-destination branch uses.
+      var destMembers = window.SMMotion.layerElements(c.li, c.ld).filter(function (e) { return e.sd.groupId === destGid; });
+      if (!destMembers.length) return;
+      destItem = window.SMMotion.liveItemByStrokeId(c.li, destMembers[destMembers.length - 1].strokeId);
+    } else if (destStrokeId) {
+      // Either a member row of a DIFFERENT group, or a plain top-level
+      // shape — both resolve to that exact item.
+      destItem = window.SMMotion.liveItemByStrokeId(c.li, destStrokeId);
+    }
+    if (!destItem) return;
     pushUndo();
+    if (!sameGroup && srcItem.data && srcItem.data.groupId && window.SMGroup) {
+      // Bug #730 ("une shape par dessus un groupe ça ne réordonné pas la
+      // visibilité") — dragging a shape OUT of its group and dropping it
+      // elsewhere (a different group, or a plain top-level shape) used to
+      // be a hard no-op: this function required the SAME source group,
+      // and the hover-detection below didn't even highlight a valid drop
+      // target outside it, so nothing ever ran. Ejecting the shape from
+      // its group first (same helper Cmd+Shift+G's per-member variant
+      // uses, group-bridge.js) then reordering matches AE/Illustrator/
+      // Figma: dragging a layer out of its group stack takes it out.
+      window.SMGroup.removeMemberFromGroup(srcItem, c.ld, layer, { skipUndo: true, silent: true });
+    }
     srcItem.insertAbove(destItem);
     saveActiveLayerFrame();
     renderShapesPanel();
