@@ -1468,7 +1468,29 @@
     _liToRow[li] = row;
     hleft.addEventListener('mousedown', function (e) { onDown(li, row, 'in', e); });
     hright.addEventListener('mousedown', function (e) { onDown(li, row, 'out', e); });
-    bar.addEventListener('mousedown', function (e) { if (e.target === bar) onDown(li, row, 'both', e); });
+    // Y-dominant drag reorders the layer's stack index, in PARALLEL with
+    // onDown's own move-in-time drag below, not instead of it (2026-09-01,
+    // Cyril: "en y peut importe où l'on prend le calque on peut le
+    // changer d'index comme sur after effects et dans la partie gauche" —
+    // the layer LIST panel already supports grab-anywhere reorder via
+    // this exact mechanism, armLayerReorder/moveLayerReorder,
+    // timeline.js; the frame-grid's own bar never armed it, so the tiny
+    // sticky reorder grip — installLayerReorderGrip, whose own comment
+    // documents the still-imperfect collision it has with an in-handle
+    // sitting at frame 0 — was the ONLY way to reorder from this side).
+    // Safe to arm unconditionally alongside onDown: moveLayerReorder only
+    // ever activates past its own Y-dominance threshold (dy>=4 &&
+    // dy>=dx*.55, timeline.js), so a genuinely horizontal drag leaves it
+    // permanently inert and onDown's move-in-time logic below proceeds
+    // completely unaffected — the two systems never actually compete for
+    // the same drag, only one of them ever measures a nonzero delta for
+    // any given direction. Skipped on a modifier click (selection
+    // gestures below, never a drag at all) so it can't preempt those.
+    bar.addEventListener('mousedown', function (e) {
+      if (e.target !== bar) return;
+      if (!e.metaKey && !e.ctrlKey && !e.shiftKey && window.armLayerReorder) armLayerReorder(e, li, 'grid', row);
+      onDown(li, row, 'both', e);
+    });
     bar.addEventListener('contextmenu', function (e) {
       e.preventDefault(); e.stopPropagation();
       if (!window.showContextMenu) return;
