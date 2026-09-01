@@ -154,7 +154,16 @@
     var items = [];
     var zs = 1 / Math.max(0.0001, view.zoom);
     var reach = CURSOR_GUIDE_REACH_PX * zs;
-    var col = [255, 255, 255, 210];
+    // 2026-09 fix (Cyril, live: "va sur brush perspective guide" showed
+    // nothing) — this was pure white [255,255,255,210], invisible against
+    // the default white canvas (state.canvasBg) that the overwhelming
+    // majority of projects start on. Every OTHER element this same file
+    // draws (the static fan, the horizon, the VP markers below) already
+    // uses a saturated, opaque-ish color for exactly this reason — matched
+    // to the VP markers' own orange/coral (they're both "live, interactive"
+    // elements: the point you're aiming at and the guide following your
+    // cursor toward it, as opposed to the fan's soft passive blue).
+    var col = [255, 150, 100, 220];
     var cx = cursorWorld.x, cy = cursorWorld.y;
     function addAxis(dx, dy) {
       var len = Math.hypot(dx, dy);
