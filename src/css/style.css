@@ -2683,10 +2683,33 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 .ecp-pane{flex:1;min-height:0;display:flex;overflow:hidden;background:#16161a;}
 .ecp-gutter{flex:0 0 auto;padding:8px 6px 8px 10px;text-align:right;
   font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
-  color:rgba(236,234,231,.28);white-space:pre;overflow:hidden;user-select:none;}
-.ecp-code{flex:1;min-width:0;resize:none;border:none;outline:none;background:none;
-  padding:8px 10px 8px 4px;color:var(--text);
+  color:rgba(236,234,231,.28);overflow:hidden;user-select:none;}
+/* Syntax highlighting (2026-09-01) — a <textarea> can't color its own text,
+   so .ecp-highlight is an identically-fonted/padded <pre> sitting BEHIND
+   the (now transparent-text) textarea; only the native caret/selection come
+   from the real element, every visible glyph comes from the highlight
+   layer through it. Both share .ecp-line — one div per SOURCE line (not
+   per wrapped visual row: a long line already wrapped before this and the
+   gutter's line-per-source-line convention is unchanged) so an error can
+   tint exactly one of them without a second measurement pass. */
+.ecp-code-wrap{position:relative;flex:1;min-width:0;}
+.ecp-highlight{position:absolute;inset:0;margin:0;padding:8px 10px 8px 4px;
+  overflow:hidden;pointer-events:none;color:var(--text);
+  font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+  white-space:pre-wrap;word-wrap:break-word;}
+.ecp-code{position:absolute;inset:0;resize:none;border:none;outline:none;background:none;
+  padding:8px 10px 8px 4px;color:transparent;caret-color:var(--text);
   font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;}
+.ecp-code::selection{background:rgba(120,150,255,.35);}
+.ecp-line{min-height:16.5px;}
+.ecp-line.err{background:rgba(255,90,90,.14);margin:0 -10px 0 -4px;padding:0 10px 0 4px;}
+.ecp-gutter .ecp-line.err{background:rgba(255,90,90,.22);margin:0 -6px 0 -10px;
+  padding:0 6px 0 10px;color:#ff8b8b;font-weight:600;}
+.tok-com{color:#7c9a7c;}
+.tok-str{color:#ce9878;}
+.tok-num{color:#a8cea0;}
+.tok-kw{color:#7aa8e0;}
+.tok-fn{color:var(--accent-hover);}
 .ecp-err{padding:6px 10px;font-size:10.5px;color:#ff8b8b;
   border-top:1px solid var(--border);white-space:pre-wrap;}
 /* Drag edge. Sits ON the border rather than taking layout width, so the

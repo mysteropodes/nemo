@@ -2245,9 +2245,11 @@
 <script src="js/camera.js"></script>
 <script src="js/text-selector.js"></script>
 <script src="js/motion.js"></script>
-<!-- Categorized library of expression snippets (window.SM_EXPR_EXAMPLES),
-     consumed by expr-code-panel.js's "Examples" button — must load first. -->
+<!-- Categorized library of expression snippets (window.SM_EXPR_EXAMPLES) and
+     the atomic function reference (window.SM_EXPR_FUNCTIONS), consumed by
+     expr-code-panel.js's "Examples"/"Functions" buttons — must load first. -->
 <script src="js/expr-examples.js"></script>
+<script src="js/expr-functions.js"></script>
 <!-- Split code editor for expressions. Must load BEFORE any renderLayerList
      runs, since buildExprEditorRow only draws its open/close button when
      window.SMExprPanel already exists. -->
