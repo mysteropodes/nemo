@@ -52,58 +52,28 @@
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   };
 
-  // Builds the overlay items: a small diamond marker + N radiating lines
-  // per vanishing point, plus a horizon line through the first two VPs
-  // (the classic "eye-level" reference line, only meaningful with >=2
-  // points). Lines are drawn far enough past the VP to cross the whole
-  // canvas regardless of zoom/pan — the renderer clips to the visible
-  // viewport on its own, same as every other overlay.
+  // Builds the overlay items — the VP markers only. Used to also draw N
+  // static radiating lines per VP (+ a horizon line, + fisheye's concentric
+  // rings) spanning the whole canvas at all times.
+  //
+  // 2026-09 removed (Cyril, live: "j'ai toujours les guides bleu, le but
+  // c'est de pouvoir dessiner partout dans les axes avec le gizmo plus les
+  // guides d'avant sauf les points de perspective que l'on peut bouger") —
+  // that permanent fan was exactly the clutter he wanted gone: the moving
+  // cursor crosshair (buildPerspectiveCursorGuideItems below, "le gizmo")
+  // is now the ONLY axis indicator while drawing, always centered on where
+  // you're actually about to draw instead of a fixed grid burned across the
+  // whole canvas. The VPs themselves stay — draggable, visible, exactly as
+  // before — since repositioning them is still how you set the guide up.
+  // `state.perspectiveDensity` and the reach/candidate-ray math it used to
+  // feed here are UNCHANGED and still live in nearestGuideProjection/
+  // findGuideRayNear/buildPerspectiveGuideItems's siblings below — density
+  // still controls how many candidate rays the snap logic considers, it
+  // just no longer controls how many get drawn (nothing does, anymore).
   function buildPerspectiveGuideItems() {
     if (!state.perspectiveEnabled) return [];
     var vps = ensurePerspectiveVPs();
     var items = [];
-    var reach = Math.max(state.canvasW, state.canvasH) * 4; // long enough to always cross the canvas from any VP position, even one placed off-canvas
-    var col = [120, 170, 255, 90];
-    var n = Math.max(4, state.perspectiveDensity | 0);
-    vps.forEach(function (vp) {
-      for (var i = 0; i < n; i++) {
-        var a = (i / n) * Math.PI * 2;
-        items.push({
-          segments: [{ point: [vp.x, vp.y] }, { point: [vp.x + Math.cos(a) * reach, vp.y + Math.sin(a) * reach] }],
-          closed: false, fillColor: null, strokeColor: col, strokeWidth: 1, strokeCap: 'butt',
-        });
-      }
-    });
-    // Fisheye's extra rings — a handful of concentric circles around the
-    // single eye point, approximating the "radial + concentric" read of a
-    // barrel-lens guide (not true spherical-projection math, just the same
-    // visual language: straight rays + rings bowing around a center).
-    if (state.perspectiveMode === 'fisheye' && vps.length) {
-      var eye = vps[0];
-      var maxR = Math.max(state.canvasW, state.canvasH) * 0.75;
-      var ringCount = 5;
-      for (var ri = 1; ri <= ringCount; ri++) {
-        var r = (ri / ringCount) * maxR;
-        var segs = [];
-        var ringPts = 32;
-        for (var pi = 0; pi <= ringPts; pi++) {
-          var pa = (pi / ringPts) * Math.PI * 2;
-          segs.push({ point: [eye.x + Math.cos(pa) * r, eye.y + Math.sin(pa) * r] });
-        }
-        items.push({ segments: segs, closed: true, fillColor: null, strokeColor: col, strokeWidth: 1, strokeCap: 'butt' });
-      }
-    }
-    // Horizon (eye-level line) through the first two VPs, 2pt/3pt only —
-    // a single VP has no second point to define a line through.
-    if (vps.length >= 2) {
-      var dx = vps[1].x - vps[0].x, dy = vps[1].y - vps[0].y;
-      var len = Math.hypot(dx, dy) || 1;
-      var ux = dx / len, uy = dy / len;
-      items.push({
-        segments: [{ point: [vps[0].x - ux * reach, vps[0].y - uy * reach] }, { point: [vps[1].x + ux * reach, vps[1].y + uy * reach] }],
-        closed: false, fillColor: null, strokeColor: [255, 200, 80, 130], strokeWidth: 1.4, strokeCap: 'butt',
-      });
-    }
     // VP markers themselves — draggable-point handles, Sketchbook-style
     // (feedback: "dans sketchbook on a des points que l'on peut
     // déplacer... regarde bien sketchbook" — a ring + filled center dot
