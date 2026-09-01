@@ -57,6 +57,49 @@ var TW_FOLD_UNWRAP=true;
 // and testF 26->34 regress, 56->64 overall. Opt-in until judged on real
 // work; flip from the console and regenerate.
 var TW_DTW_SYMMETRIC=false;
+// TW_MATCH_RELATIONAL (2026-09, Cyril: "une meilleure fonctionnalité de
+// reconnaissance", not another weight tweak): stroke matching becomes
+// STRUCTURE-aware. Until now every stroke was scored against every
+// candidate on its own (proximity, curvature, silhouette, colour…) plus a
+// local motion prediction, then a couple of crossing/order heuristics
+// tried to repair twin swaps after the fact — and a synthetic benchmark
+// on the real test drawings showed those heuristics UNDOING a correct
+// assignment (testG ticks 3/4: pass 2 right at 0.011 vs 0.224, uncross
+// flipped it). The relational pass instead adds, to each candidate
+// pairing (i→a), how well the drawing's arrangement is preserved: the
+// vector from stroke i to each of its nearest neighbours j, carried by the
+// local motion at i, must land on the vector from a to j's own partner.
+// Cel features keep their spatial arrangement; two look-alike ticks are
+// told apart by WHERE they sit relative to everything else, which no
+// per-stroke descriptor can see. Solved by a few rounds of Hungarian on
+// the unary+relational cost (a standard relaxation of the quadratic
+// assignment), starting from the motion-predicted assignment. Replaces
+// uncrossMatches on this path; JS-only (the wasm auto_match stays the
+// exact twin of the previous behaviour and is bypassed while this is on).
+var TW_MATCH_RELATIONAL=true;
+// Weight of the smooth length-identity term in matchSc (relational path
+// only) — see lenT's comment there. Swept on the real cases: 0.25 fixes
+// the turning face's brow (147 px brow vs 87 px eye, 1.6×) but breaks the
+// cat's tuft (152 → 65 px, a LEGITIMATE 2.3× shrink: nose lands on the
+// tuft, ear on the mouth — three strokes wrong); 0.15 keeps the cat right
+// and stable (0.2 flips, 0.22 flips back — that case sits on a knife
+// edge) and leaves the face's eye cluster shifted by one. Three gross
+// errors vs one subtle one: 0.15.
+var MATCH_LEN_W=0.15;
+// TW_ALIGN_HAIRPIN (2026-09, Cyril's bent leg unfolding: "le moteur
+// inverse les coordonnées"): a stroke drawn down one side of a limb and
+// back up the other is a HAIRPIN — its two ends sit close together, so
+// resampledIsClosed took it for a loop and alignResampledPair searched
+// every cyclic rotation of the start point. On a loop that's right (a
+// spinning wheel has no start); on a hairpin the pen's start is real, and
+// the similarity-fit residual used for loops can't tell a bent leg from a
+// straight one anyway (measured: the winner implied a +77°/×1.4 whole-leg
+// rotation and sent the HIP to the FOOT, 474 px away, while hip↔hip sat
+// 24 px away). A hairpin is recognised by its two halves lying on top of
+// each other (points i and n−1−i close); it then only gets the
+// reverse-or-not choice, scored on position. JS-only, wasm align_pair
+// bypassed while on (twin of the old behaviour).
+var TW_ALIGN_HAIRPIN=true;
 // ---- MATCHING ----
 function buildTP(sd){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});return p;}
 // A stroke's color and fill/stroke "type" are what a viewer actually reads
@@ -271,6 +314,21 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   // eye dots measured 7px vs 15px (ratio 2.04!) — at that size the ratio
   // is pure pen noise, and cel features that small legitimately jitter.
   var ratioPen=(lenRatio>1.6&&Math.abs(fA.length-fB.length)>15)?Math.min(0.7,(lenRatio-1.6)*0.5):0;
+  // Smooth length-identity term (2026-09, with TW_MATCH_RELATIONAL —
+  // Cyril's turning face, "grosse confusion des traits"): the eye cluster
+  // dropped 130 px while the rest of the face barely moved, so proximity
+  // (even motion-predicted) preferred sliding the chain — eye onto the
+  // brow's partner, lower lid onto the eye's — over brow→brow (147 vs
+  // 141 px) / eye→eye (87 vs 94). Arrangement is preserved by both
+  // chains, so the relational term can't tell them apart; what a viewer
+  // uses is that a brow is LONGER than an eye. ratioPen above only bites
+  // past 1.6 (and 1.62 cost 0.01); this ramps from 1.3 (the corpus's
+  // legitimate-pair ceiling, see ratioPen's own comment) to 0.25 at 2×
+  // (0.03 at 1.4×, 0.08 at 1.6×, 0.19 at 1.9×). 0.15 left the brow/eye
+  // chain 0.13 short; 0.35 flipped it but pushed a legitimately-redrawn
+  // lip (155 → 82 px, ratio 1.9) over the fade threshold. Same
+  // micro-stroke exemption as ratioPen.
+  var lenT=(TW_MATCH_RELATIONAL&&Math.abs(fA.length-fB.length)>15)?Math.min(1,Math.max(0,Math.log(lenRatio)-Math.log(1.3))/Math.log(2))*MATCH_LEN_W:0;
   // 0.35 only when BOTH closed flags are ground truth. When either side is
   // a heuristic guess (vector-brush centerline — see strokeFeat's
   // closedIsGuess), a disagreement is as likely a drawing accident as a
@@ -299,7 +357,7 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   var strokeClash=fA.strokeCol&&fB.strokeCol&&colorDist(fA.strokeCol,fB.strokeCol)>0.35;
   var colorPenalty=(fillClash||strokeClash)?0.4:0;
   var idxBonus=sameIndex?-0.03:0;
-  return proxT*.48+alignT*.15+curveT*.12+fourD*.10+rel*.10+szD*.06+colD*.15+typePenalty+colorPenalty+ratioPen+closedPen+idxBonus;
+  return proxT*.48+alignT*.15+curveT*.12+fourD*.10+rel*.10+szD*.06+colD*.15+typePenalty+colorPenalty+ratioPen+lenT+closedPen+idxBonus;
 }
 // "Force line" motion model: eyes, chin, and other small close-together
 // features are exactly where independent per-stroke shape/position matching
@@ -399,6 +457,9 @@ function _strokeInJson(sd){
 }
 function autoMatch(sA,sB){
   if(!sA.length||!sB.length)return[];
+  // Relational matching lives in JS only (see TW_MATCH_RELATIONAL) — the
+  // wasm port is the exact twin of the OLD pipeline and would skip it.
+  if(TW_MATCH_RELATIONAL)return autoMatchJS(sA,sB);
   if(window.GeometryWasm&&window.GeometryWasm.ready){
     try{
       var json=window.GeometryWasm.auto_match(JSON.stringify(sA.map(_strokeInJson)),JSON.stringify(sB.map(_strokeInJson)));
@@ -475,10 +536,19 @@ function autoMatchJS(sA,sB){
   // is degenerate, and for tiny seed sets (<=K) where "local" would just
   // be the same as global anyway.
   var K_LOCAL=4;
+  var localTfs=new Array(fA.length); // per-A-stroke motion model, reused by the relational pass
   var ptsT=fA.map(function(f,ai){
     var tf=transform;
-    if(seeds.length>K_LOCAL){
-      var near=seeds.slice().sort(function(s1,s2){
+    // LEAVE-ONE-OUT (2026-09, with TW_MATCH_RELATIONAL — Cyril's cat,
+    // "confusion totale"): a stroke's OWN pass-1 match used to be one of
+    // the seeds predicting its motion. When that match is a confident
+    // mistake (the nose landing on the tuft's raw position, 0.22), the
+    // local model then predicts "the nose stays put" and pass 2 confirms
+    // the mistake it was built from. A stroke's motion is now predicted
+    // from its neighbours only, never from itself.
+    var seedPool=TW_MATCH_RELATIONAL?seeds.filter(function(s){return s.a!==ai;}):seeds;
+    if(seedPool.length>K_LOCAL){
+      var near=seedPool.slice().sort(function(s1,s2){
         var d1=Math.pow(fA[s1.a].cx-f.cx,2)+Math.pow(fA[s1.a].cy-f.cy,2);
         var d2=Math.pow(fA[s2.a].cx-f.cx,2)+Math.pow(fA[s2.a].cy-f.cy,2);
         return d1-d2;
@@ -495,13 +565,106 @@ function autoMatchJS(sA,sB){
         if(lmag>0.15&&lmag<8)tf=lt;
       }
     }
+    localTfs[ai]=tf;
     return f.pts.map(function(pt){var q=applySimilarityTransform(tf,pt[0],pt[1]);return[q.x,q.y];});
   });
   var cost2=buildCost(ptsT);
+  // TWO-CHANNEL UNARY (2026-09, with TW_MATCH_RELATIONAL — Cyril's
+  // "confusion des 2 yeux" on a turning face): pass 2 used to score every
+  // pairing ONLY at the motion-predicted position. When the local motion
+  // model is wrong for a region (the eyes hadn't moved — 7 px from their
+  // partners — while the seeds around them said "30 px left and down"),
+  // the prediction PUSHES the true pairing away and the Hungarian crosses
+  // the two eyes on unary cost alone; the old path only recovered by luck
+  // (uncrossMatches re-scored on raw proximity). A stroke is either where
+  // the motion says it is OR where it was: each pairing takes the cheaper
+  // of the predicted cost and the raw pass-1 cost (plus a small bias so a
+  // motion-consistent explanation wins a tie), and the relational pass
+  // arbitrates the rest. Confidence-weighting the prediction by its
+  // seeds' residual was tried first and rejected: it fixed the eyes but
+  // un-fixed testC's legs (residual/spread 0.54 vs 0.42 — no separation).
+  var PRED_RAW_BIAS=0.03;
+  if(TW_MATCH_RELATIONAL){
+    for(var ra2=0;ra2<n;ra2++)for(var rb2=0;rb2<m;rb2++){
+      var rawC=cost[ra2][rb2]+PRED_RAW_BIAS;
+      if(rawC<cost2[ra2][rb2])cost2[ra2][rb2]=rawC;
+    }
+  }
   var assign2=hungarian(cost2);
   var matches2=[];
   for(var a4=0;a4<n;a4++){var b4=assign2[a4];if(b4!==undefined&&b4>=0&&b4<m)matches2.push({a:a4,b:b4,score:cost2[a4][b4]});}
+  if(TW_MATCH_RELATIONAL)return relationalRefine(matches2,fA,fB,cost2,localTfs,n,m,FADE_COST);
   return uncrossMatches(matches2,fA,fB);
+}
+// ---- RELATIONAL matching (2026-09, see TW_MATCH_RELATIONAL) ----
+// Quadratic-assignment relaxation: a few rounds of Hungarian on
+//   cost(i→a) = unary(i,a) + λ · mean over i's K nearest neighbours j of
+//               err( T_i(c_j − c_i),  c_σ(j) − c_a )
+// where T_i is the local similarity fitted for stroke i in pass 2 (rotation
+// + scale only — the translation is what we're testing), c are centroids
+// and σ the current assignment. err is a size-normalised vector mismatch in
+// [0,1]. Neighbours currently faded out contribute nothing. Starts from
+// pass 2's assignment and stops when a round changes nothing (max 6).
+// Unary is pass 2's own augmented matrix, so the fade opt-out keeps its
+// exact meaning; the relational term only ever ADDS cost to arrangement-
+// breaking pairings, which is why a correct assignment can't be degraded
+// by it the way the crossing heuristics could.
+// No "confident unary match is frozen" guard, deliberately: it was tried
+// (freeze when score ≤ 0.25 and the runner-up is ≥ 0.10 worse) and it
+// pinned look-alikes that were individually CONFIDENT but WRONG (a twin
+// scoring 0.06 after a slightly-off local motion prediction), cascading
+// the whole neighbourhood — benchmark errors went 2 → 24. The one real
+// pairing it "protected" (testC 16→31, the pair uncrossMatches' comment
+// calls "must NOT swap") turned out, seen live, to be the two LEGS
+// swapped; the relational answer is the right one there.
+var REL_K=6,REL_LAMBDA=0.45,REL_ROUNDS=6;
+function relationalRefine(matches,fA,fB,cost,localTfs,n,m,fadeCost){
+  if(n<3||m<2)return matches;
+  var N=n+m;
+  // neighbours in A (by centroid), with the relative vectors
+  var K=Math.min(REL_K,n-1);
+  var nb=fA.map(function(f,i){
+    var arr=[];
+    for(var j=0;j<n;j++){if(j===i)continue;var dx=fA[j].cx-f.cx,dy=fA[j].cy-f.cy;arr.push({j:j,dx:dx,dy:dy,d2:dx*dx+dy*dy});}
+    arr.sort(function(p,q){return p.d2-q.d2;});
+    return arr.slice(0,K);
+  });
+  function predVec(i,dx,dy){var t=localTfs[i];if(!t)return[dx,dy];return[t.wRe*dx-t.wIm*dy,t.wIm*dx+t.wRe*dy];}
+  function sizeOf(f){return Math.sqrt(f.bounds.w*f.bounds.w+f.bounds.h*f.bounds.h)+1;}
+  var sigma=new Array(n).fill(-1);
+  matches.forEach(function(mm){sigma[mm.a]=mm.b;});
+  var cur=cost;
+  for(var round=0;round<REL_ROUNDS;round++){
+    var aug=[];
+    for(var i=0;i<N;i++){
+      var row=cost[i].slice();
+      if(i<n){
+        var nbi=nb[i],sz=sizeOf(fA[i]);
+        for(var a=0;a<m;a++){
+          var acc=0,cnt=0;
+          for(var q=0;q<nbi.length;q++){
+            var j=nbi[q].j,b=sigma[j];
+            if(b<0||b===a)continue;
+            var p=predVec(i,nbi[q].dx,nbi[q].dy);
+            var qx=fB[b].cx-fB[a].cx,qy=fB[b].cy-fB[a].cy;
+            var ex=p[0]-qx,ey=p[1]-qy;
+            var norm=Math.sqrt(p[0]*p[0]+p[1]*p[1])+Math.sqrt(qx*qx+qy*qy)+sz;
+            acc+=Math.min(1,Math.sqrt(ex*ex+ey*ey)/norm*2);cnt++;
+          }
+          if(cnt)row[a]+=REL_LAMBDA*acc/cnt;
+        }
+      }
+      aug.push(row);
+    }
+    var assign=hungarian(aug);
+    var changed=false,next=new Array(n).fill(-1);
+    for(var a2=0;a2<n;a2++){var b2=assign[a2];next[a2]=(b2!==undefined&&b2>=0&&b2<m)?b2:-1;if(next[a2]!==sigma[a2])changed=true;}
+    sigma=next;cur=aug;
+    if(!changed)break;
+  }
+  var out=[];
+  for(var a3=0;a3<n;a3++){if(sigma[a3]>=0)out.push({a:a3,b:sigma[a3],score:cost[a3][sigma[a3]]});}
+  return out;
 }
 // ---- trajectory uncrossing (2026-07-17, "les yeux s'inversent") ----
 // Found on a real hand-drawn animation: two nearly-identical eye strokes
@@ -572,6 +735,12 @@ function uncrossMatches(ms,fA,fB){
       // decide this gate (individual matchSc, lower is better):
       //   testD eyes, must swap:      0.444 / 0.580  — both mediocre, tied
       //   testC 16/17, must NOT swap: 0.121 / 0.371  — one near-certain
+      //   (2026-09 correction, seen live with both keys overlaid: that
+      //   "near-certain" pairing was the character's RIGHT leg sent to
+      //   the LEFT leg's new position — a 17px hop for one leg and 143px
+      //   for the other. The relational matcher (TW_MATCH_RELATIONAL)
+      //   picks the coherent left→left/right→right pairing; this gate
+      //   only still applies on the legacy path.)
       // The 0.121 pairing is two centroids 17px apart; swapping it produced
       // two mediocre 84px/77px pairings for the same total travel. Anchoring
       // on the BEST current score separates the two by 3.7x, rather than the
@@ -3010,6 +3179,9 @@ function alignCost(a,b){
   return s;
 }
 function alignResampledPair(a,b){
+  // The hairpin rule lives in JS only (see TW_ALIGN_HAIRPIN) — the wasm
+  // port is the exact twin of the old rotation search and would skip it.
+  if(TW_ALIGN_HAIRPIN)return alignResampledPairJS(a,b);
   if(window.GeometryWasm&&window.GeometryWasm.ready){
     try{
       // Rust's ResampledJsonIn requires isVectorBrush (plain `bool`, no
@@ -3136,8 +3308,32 @@ function alignTurnDisagreement(a,b){
   return cnt?sum/cnt:0; // mean per-vertex turning disagreement, radians
 }
 var ALIGN_TURN_W=1.5;
+// May the start point be rotated for alignment? (see TW_ALIGN_HAIRPIN.)
+// Only for a stroke the artist actually closed — end gap under 8 % of the
+// bbox diagonal — or one whose gap is under resampledIsClosed's 15 % but
+// whose two halves do NOT lie on top of each other (mean distance between
+// point i and its mirror n−1−i ≥ 25 % of the diagonal: a genuine loop,
+// where a circle averages ~0.64). A limb contour drawn there-and-back
+// fails both: its gap is the limb's width (measured 10 % / 14 % on the
+// reported leg) and its halves overlap (0.30 / 0.16). A first cut vetoed
+// on overlap alone and regressed testF (26 → 44 self-crossings): a FLAT
+// closed loop (an eye, gap 0.02–0.08, overlap 0.09–0.22) is geometrically
+// a hairpin too — the gap is what tells them apart.
+var ROT_GAP_STRICT=0.08,ROT_LOOP_MIN_SPREAD=0.25;
+function resampledRotationOk(r){
+  var s=r.segments,n=s.length;if(n<6)return false;
+  var minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
+  s.forEach(function(sg){minx=Math.min(minx,sg.point[0]);miny=Math.min(miny,sg.point[1]);maxx=Math.max(maxx,sg.point[0]);maxy=Math.max(maxy,sg.point[1]);});
+  var diag=Math.sqrt((maxx-minx)*(maxx-minx)+(maxy-miny)*(maxy-miny))||1;
+  var gx=s[0].point[0]-s[n-1].point[0],gy=s[0].point[1]-s[n-1].point[1];
+  if(Math.sqrt(gx*gx+gy*gy)/diag<ROT_GAP_STRICT)return true;
+  var sum=0,cnt=0;
+  for(var i=0;i<n/2;i++){var p=s[i].point,q=s[n-1-i].point;sum+=Math.sqrt((p[0]-q[0])*(p[0]-q[0])+(p[1]-q[1])*(p[1]-q[1]));cnt++;}
+  return (sum/cnt)/diag>=ROT_LOOP_MIN_SPREAD;
+}
 function alignResampledPairJS(a,b){
   var closed=resampledIsClosed(a)&&resampledIsClosed(b);
+  if(closed&&TW_ALIGN_HAIRPIN&&!(resampledRotationOk(a)&&resampledRotationOk(b)))closed=false; // a hairpin's start is the pen's start — no rotation
   var baseFn=closed?rotationFitResidual:alignCost;
   var costFn=function(x,y){return baseFn(x,y)*(1+ALIGN_TURN_W*alignTurnDisagreement(x,y));};
   var best=b,bestC=costFn(a,b);
@@ -3737,6 +3933,7 @@ function generateTweens(explicitRestrictTo){
     var RESCUE_CEIL=0.78;
     var cntRatio=Math.max(sA.length,sB.length)/Math.max(1,Math.min(sA.length,sB.length));
     var rescueCeil=cntRatio>=3?MATCH_TH+0.1:RESCUE_CEIL;
+    var rescueCands=[];
     matches.forEach(function(m){
       if(m.score<=MATCH_TH)return; // already handled by the first pass
       if(m.score>rescueCeil)return; // beyond any plausible same-object motion — fade/trim instead
@@ -3749,9 +3946,35 @@ function generateTweens(explicitRestrictTo){
       // between two drawings of the same limb must not block the rescue
       // (same rationale as matchSc's softened closedPen above).
       var closedOk=fta.closed===ftb.closed||fta.closedIsGuess||ftb.closedIsGuess;
-      if(fta.type===ftb.type&&closedOk&&!clash){
-        pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;
+      if(fta.type===ftb.type&&closedOk&&!clash)rescueCands.push({m:m,fa:fta,fb:ftb});
+    });
+    // MOTION-SUPPORT gate (2026-09, with TW_MATCH_RELATIONAL — Cyril's
+    // turning face: "une pupille qui part sur la bouche"). The ceiling
+    // above was calibrated on ONE raised arm (0.739): a big stroke moving
+    // less than its own length. It let an 87 px eye scoring 0.60 travel
+    // 361 px onto a lip — 4× its size, 9× the drawing's median motion —
+    // because nothing here looked at the displacement at all. The
+    // reference can't be global (testC 16→31: four eye ticks legitimately
+    // ride 240 px with the head while the body moves 60) nor the stroke's
+    // size alone (those ticks are 15 px): what a rescued pair needs is a
+    // NEIGHBOUR that moves the same way — a confident match or another
+    // candidate. The eye→lip has none (brow down 130, lid 30); the ticks
+    // have each other; a big stroke moving less than its own length
+    // (the arm) needs no witness.
+    var refDisp=pairSpecs.map(function(ps){var a=strokeFeat(ps.aData),b=strokeFeat(ps.bData);return{x:a.cx,y:a.cy,dx:b.cx-a.cx,dy:b.cy-a.cy};});
+    rescueCands.forEach(function(c){refDisp.push({x:c.fa.cx,y:c.fa.cy,dx:c.fb.cx-c.fa.cx,dy:c.fb.cy-c.fa.cy,cand:c});});
+    rescueCands.forEach(function(c){
+      var m=c.m;
+      if(TW_MATCH_RELATIONAL){
+        var dx=c.fb.cx-c.fa.cx,dy=c.fb.cy-c.fa.cy,disp=Math.sqrt(dx*dx+dy*dy);
+        var big=disp<=Math.max(c.fa.length,c.fb.length);
+        if(!big){
+          var near=refDisp.filter(function(r){return r.cand!==c;}).map(function(r){return{r:r,d2:(r.x-c.fa.cx)*(r.x-c.fa.cx)+(r.y-c.fa.cy)*(r.y-c.fa.cy)};}).sort(function(p,q){return p.d2-q.d2;}).slice(0,3);
+          var supported=near.some(function(nq){var r=nq.r,rd=Math.sqrt(r.dx*r.dx+r.dy*r.dy);var ddx=r.dx-dx,ddy=r.dy-dy;return Math.sqrt(ddx*ddx+ddy*ddy)<=0.35*Math.max(disp,rd)+15;});
+          if(!supported)return; // moves unlike everything around it — fade instead
+        }
       }
+      pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;
     });
     var unA=[],unB=[];
     for(var ai=0;ai<sA.length;ai++)if(!aMatched[ai])unA.push(ai);
