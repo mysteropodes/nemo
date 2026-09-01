@@ -76,6 +76,28 @@
       'let c = src.rgb;',
       'return vec4<f32>(vec3<f32>(c.r + (c.g - c.r) * params.p1, c.g + (c.b - c.g) * params.p2, c.b + (c.r - c.b) * params.p3), src.a);',
     ]),
+    // 2026-09 — first entry in a new 'Channel' category (closes a gap: only
+    // Channel Mixer above touched the idea, and it BLENDS channels rather
+    // than reassigning them). Each output channel independently sources
+    // from any input channel — the params are plain numeric sliders like
+    // everywhere else in this file (no dropdown control exists), so the
+    // meaning of each integer is documented in the label rather than shown
+    // as text in the UI: 0=Red 1=Green 2=Blue 3=Alpha 4=Luminance 5=Full
+    // (opaque white/1.0). Defaults (0,1,2,3) are the identity mapping — a
+    // freshly-added instance of this effect changes nothing until touched,
+    // same convention Cell Pattern's Style param uses for its own 0/1 pick.
+    fx('shader_shift_channels', 'Shift Channels', 'Channel', [
+      param('p1', 'Red src (0R 1G 2B 3A 4Lum 5Full)', 0, 5, 1, '', 0),
+      param('p2', 'Green src (0R 1G 2B 3A 4Lum 5Full)', 0, 5, 1, '', 1),
+      param('p3', 'Blue src (0R 1G 2B 3A 4Lum 5Full)', 0, 5, 1, '', 2),
+      param('p4', 'Alpha src (0R 1G 2B 3A 4Lum 5Full)', 0, 5, 1, '', 3),
+    ], [
+      'let lum = dot(src.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));',
+      'var chans: array<f32, 6> = array<f32, 6>(src.r, src.g, src.b, src.a, lum, 1.0);',
+      'let ri = i32(clamp(params.p1, 0.0, 5.0) + 0.5); let gi = i32(clamp(params.p2, 0.0, 5.0) + 0.5);',
+      'let bi = i32(clamp(params.p3, 0.0, 5.0) + 0.5); let ai = i32(clamp(params.p4, 0.0, 5.0) + 0.5);',
+      'return vec4<f32>(chans[ri], chans[gi], chans[bi], chans[ai]);',
+    ]),
     fx('shader_levels', 'Levels', 'Color', [
       param('p1', 'Black', 0, 1, 0.01, '', 0),
       param('p2', 'White', 0, 1, 0.01, '', 1),
@@ -1243,7 +1265,7 @@
     ]),
   ];
 
-  window.SMSHADER_EFFECT_CATEGORIES = ['Color', 'Blur', 'Stylize', 'Generate', 'Distort', 'Keying', 'Particles'];
+  window.SMSHADER_EFFECT_CATEGORIES = ['Color', 'Blur', 'Stylize', 'Generate', 'Distort', 'Keying', 'Particles', 'Channel'];
   window.SMSHADER_EFFECTS = effects;
   window.SMShaderEffectDef = function (id) {
     for (var i = 0; i < effects.length; i++) if (effects[i].id === id) return effects[i];
