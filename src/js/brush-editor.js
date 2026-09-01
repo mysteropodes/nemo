@@ -35,6 +35,11 @@
     // (échantillonnée une seule fois au tracé), distincte d'opacityJitter
     // ci-dessus qui varie PAR TAMPON — les deux se cumulent. 0 = neutre.
     { key: 'noise', label: 'Var. opacité par trait', min: 0, max: 1, step: 0.05 },
+    // Grain de valeur (2026-09, audit brush) — lerp par-dab vers le noir/blanc
+    // (jitterColorValue, tools.js), le canal de variation MyPaint/Krita qui
+    // manquait : sans lui, un trait texturé reste une couleur plate malgré
+    // toute la variation de forme/opacité déjà présente.
+    { key: 'valueJitter', label: 'Var. valeur (grain)', min: 0, max: 0.5, step: 0.02 },
     { key: 'scatter', label: 'Dispersion', min: 0, max: 1, step: 0.05 },
     { key: 'dashGap', label: 'Trous (bord cassé)', min: 0, max: 0.6, step: 0.02 },
     { key: 'edgeNoise', label: 'Bord irrégulier', min: 0, max: 0.4, step: 0.02 },
@@ -66,7 +71,7 @@
     { value: 'scribble', label: 'Gribouillis (graphite/fusain)' },
     { value: 'custom', label: 'Personnalisé (dessiné)…' },
   ];
-  var DEFAULT_PARAMS = { nibSize: 1, roundness: 0.9, spacing: 0.4, spaceJitter: 0.2, rotationMode: 'tangent', rotationJitter: 20, sizeJitter: 0.2, opacity: 0.6, opacityJitter: 0.2, scatter: 0.15, dashGap: 0, tipShape: 'ellipse', edgeNoise: 0, polySides: 5, bristleCount: 5, tipCorner: 0.15, scribbleCount: 8, scribbleLen: 1.4, scribbleLenJitter: 0.4, scribbleWidth: 0.12, scribbleSpread: 0.6, scribbleAngleSpread: 70, pressureStart: 1, pressureMid: 1, pressureEnd: 1, sharpness: 1, markerTip: true, grain: 1, noise: 0 };
+  var DEFAULT_PARAMS = { nibSize: 1, roundness: 0.9, spacing: 0.4, spaceJitter: 0.2, rotationMode: 'tangent', rotationJitter: 20, sizeJitter: 0.2, opacity: 0.6, opacityJitter: 0.2, scatter: 0.15, dashGap: 0, tipShape: 'ellipse', edgeNoise: 0, polySides: 5, bristleCount: 5, tipCorner: 0.15, scribbleCount: 8, scribbleLen: 1.4, scribbleLenJitter: 0.4, scribbleWidth: 0.12, scribbleSpread: 0.6, scribbleAngleSpread: 70, pressureStart: 1, pressureMid: 1, pressureEnd: 1, sharpness: 1, markerTip: true, grain: 1, noise: 0, valueJitter: 0 };
 
   function closePopover() {
     if (!popover) return;
@@ -181,6 +186,23 @@
     syncCaptureRowVisibility();
     syncMarkerTipVisibility();
 
+    // Canvas-2D mirror of jitterColorValue (tools.js): that helper works on a
+    // Paper.js Color, and getComputedStyle hands back a plain "rgb(...)"
+    // string here — cheaper to lerp the channels directly than to round-trip
+    // through Paper's Color parser for a debug preview.
+    function jitterCssColor(cssColor, delta) {
+      if (!delta) return cssColor;
+      var m = cssColor.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i), r, g, b;
+      if (m) { r = +m[1]; g = +m[2]; b = +m[3]; }
+      else {
+        var hex = cssColor.replace('#', '');
+        if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
+        r = parseInt(hex.substr(0, 2), 16); g = parseInt(hex.substr(2, 2), 16); b = parseInt(hex.substr(4, 2), 16);
+      }
+      var mixWith = delta < 0 ? 0 : 255, amt = Math.min(1, Math.abs(delta));
+      r += (mixWith - r) * amt; g += (mixWith - g) * amt; b += (mixWith - b) * amt;
+      return 'rgb(' + (r | 0) + ',' + (g | 0) + ',' + (b | 0) + ')';
+    }
     function renderPreview() {
       var ctx = canvas.getContext('2d'), w = canvas.width, h = canvas.height;
       ctx.clearRect(0, 0, w, h);
@@ -190,7 +212,7 @@
       var textColor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#eee';
       dabs.forEach(function (dab) {
         ctx.globalAlpha = dab.data.dabOpacity;
-        ctx.fillStyle = textColor;
+        ctx.fillStyle = jitterCssColor(textColor, dab.data.dabValueDelta);
         traceOnCanvas2D(ctx, dab);
         ctx.fill();
         dab.remove();

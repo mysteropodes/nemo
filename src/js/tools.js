@@ -4205,31 +4205,39 @@ function _unsliceRingPath(path){
 //   dashGap    — 0..1 probability a given dab is skipped entirely (broken/
 //                torn edge, replaces the old preset system's literal dash
 //                array)
+//   valueJitter — 0..1, per-dab lerp toward black/white (jitterColorValue,
+//                see applyBrushTexture) so a textured stroke reads as real
+//                grain instead of a flat wash of one color — the one
+//                MyPaint/Krita color-variation channel this engine was
+//                missing (2026-09 brush audit). Only given to the pencil/
+//                charcoal/chalk family below: a marker or ink line is
+//                supposed to be a flat, consistent color, so those presets
+//                are deliberately left at the implicit default of 0.
 var BRUSH_PRESETS={
-  'chalk-blunt':     {nibSize:1.3,roundness:.85,spacing:.55,spaceJitter:.25,rotationMode:'random',rotationJitter:60, sizeJitter:.25,opacity:.55,opacityJitter:.25,scatter:.18,dashGap:0},
-  'chalk-round':     {nibSize:1.1,roundness:1,  spacing:.4, spaceJitter:.2, rotationMode:'random',rotationJitter:30, sizeJitter:.18,opacity:.5, opacityJitter:.2, scatter:.12,dashGap:0},
-  'chalk-scribble':  {nibSize:1.0,roundness:.7, spacing:.7, spaceJitter:.4, rotationMode:'random',rotationJitter:180,sizeJitter:.4, opacity:.4, opacityJitter:.3, scatter:.3, dashGap:.15},
-  'charcoal-feather':{nibSize:1.4,roundness:.6, spacing:.6, spaceJitter:.35,rotationMode:'random',rotationJitter:90, sizeJitter:.45,opacity:.3, opacityJitter:.35,scatter:.35,dashGap:.1},
-  'charcoal-pencil': {nibSize:.8, roundness:.9, spacing:.3, spaceJitter:.15,rotationMode:'tangent',rotationJitter:15, sizeJitter:.15,opacity:.7, opacityJitter:.15,scatter:.08,dashGap:0},
-  'charcoal-rough':  {nibSize:1.5,roundness:.65,spacing:.65,spaceJitter:.45,rotationMode:'random',rotationJitter:180,sizeJitter:.55,opacity:.4, opacityJitter:.35,scatter:.4, dashGap:.18},
-  'charcoal-rounded':{nibSize:1.3,roundness:1,  spacing:.45,spaceJitter:.2, rotationMode:'random',rotationJitter:45, sizeJitter:.15,opacity:.55,opacityJitter:.2, scatter:.15,dashGap:0},
-  'charcoal-smooth': {nibSize:1.2,roundness:1,  spacing:.25,spaceJitter:.1, rotationMode:'random',rotationJitter:20, sizeJitter:.1, opacity:.65,opacityJitter:.1, scatter:.06,dashGap:0},
-  'charcoal-soft':   {nibSize:1.6,roundness:.75,spacing:.5, spaceJitter:.3, rotationMode:'random',rotationJitter:90, sizeJitter:.3, opacity:.32,opacityJitter:.3, scatter:.25,dashGap:.05},
-  'charcoal-tapered':{nibSize:1.2,roundness:.8, spacing:.45,spaceJitter:.2, rotationMode:'tangent',rotationJitter:25, sizeJitter:.2, opacity:.55,opacityJitter:.2, scatter:.15,dashGap:0},
-  'charcoal-thick':  {nibSize:2.2,roundness:.9, spacing:.4, spaceJitter:.2, rotationMode:'random',rotationJitter:40, sizeJitter:.15,opacity:.6, opacityJitter:.15,scatter:.12,dashGap:0},
-  'charcoal-thin':   {nibSize:.6, roundness:.9, spacing:.35,spaceJitter:.15,rotationMode:'random',rotationJitter:30, sizeJitter:.15,opacity:.65,opacityJitter:.15,scatter:.1, dashGap:0},
-  'charcoal-varied': {nibSize:1.3,roundness:.7, spacing:.6, spaceJitter:.5, rotationMode:'random',rotationJitter:180,sizeJitter:.65,opacity:.4, opacityJitter:.4, scatter:.3, dashGap:.12},
-  'pencil-feather':  {nibSize:.7, roundness:.6, spacing:.6, spaceJitter:.35,rotationMode:'random',rotationJitter:90, sizeJitter:.3, opacity:.3, opacityJitter:.3, scatter:.2, dashGap:.15},
-  'pencil-thick':    {nibSize:1.8,roundness:.9, spacing:.3, spaceJitter:.15,rotationMode:'tangent',rotationJitter:15, sizeJitter:.15,opacity:.7, opacityJitter:.15,scatter:.08,dashGap:0},
-  'pencil-thin':     {nibSize:.5, roundness:.9, spacing:.3, spaceJitter:.1, rotationMode:'tangent',rotationJitter:10, sizeJitter:.1, opacity:.8, opacityJitter:.1, scatter:.05,dashGap:0},
+  'chalk-blunt':     {nibSize:1.3,roundness:.85,spacing:.55,spaceJitter:.25,rotationMode:'random',rotationJitter:60, sizeJitter:.25,opacity:.55,opacityJitter:.25,scatter:.18,dashGap:0, valueJitter:.12},
+  'chalk-round':     {nibSize:1.1,roundness:1,  spacing:.4, spaceJitter:.2, rotationMode:'random',rotationJitter:30, sizeJitter:.18,opacity:.5, opacityJitter:.2, scatter:.12,dashGap:0, valueJitter:.10},
+  'chalk-scribble':  {nibSize:1.0,roundness:.7, spacing:.7, spaceJitter:.4, rotationMode:'random',rotationJitter:180,sizeJitter:.4, opacity:.4, opacityJitter:.3, scatter:.3, dashGap:.15,valueJitter:.15},
+  'charcoal-feather':{nibSize:1.4,roundness:.6, spacing:.6, spaceJitter:.35,rotationMode:'random',rotationJitter:90, sizeJitter:.45,opacity:.3, opacityJitter:.35,scatter:.35,dashGap:.1, valueJitter:.14},
+  'charcoal-pencil': {nibSize:.8, roundness:.9, spacing:.3, spaceJitter:.15,rotationMode:'tangent',rotationJitter:15, sizeJitter:.15,opacity:.7, opacityJitter:.15,scatter:.08,dashGap:0, valueJitter:.08},
+  'charcoal-rough':  {nibSize:1.5,roundness:.65,spacing:.65,spaceJitter:.45,rotationMode:'random',rotationJitter:180,sizeJitter:.55,opacity:.4, opacityJitter:.35,scatter:.4, dashGap:.18,valueJitter:.15},
+  'charcoal-rounded':{nibSize:1.3,roundness:1,  spacing:.45,spaceJitter:.2, rotationMode:'random',rotationJitter:45, sizeJitter:.15,opacity:.55,opacityJitter:.2, scatter:.15,dashGap:0, valueJitter:.10},
+  'charcoal-smooth': {nibSize:1.2,roundness:1,  spacing:.25,spaceJitter:.1, rotationMode:'random',rotationJitter:20, sizeJitter:.1, opacity:.65,opacityJitter:.1, scatter:.06,dashGap:0, valueJitter:.08},
+  'charcoal-soft':   {nibSize:1.6,roundness:.75,spacing:.5, spaceJitter:.3, rotationMode:'random',rotationJitter:90, sizeJitter:.3, opacity:.32,opacityJitter:.3, scatter:.25,dashGap:.05,valueJitter:.13},
+  'charcoal-tapered':{nibSize:1.2,roundness:.8, spacing:.45,spaceJitter:.2, rotationMode:'tangent',rotationJitter:25, sizeJitter:.2, opacity:.55,opacityJitter:.2, scatter:.15,dashGap:0, valueJitter:.10},
+  'charcoal-thick':  {nibSize:2.2,roundness:.9, spacing:.4, spaceJitter:.2, rotationMode:'random',rotationJitter:40, sizeJitter:.15,opacity:.6, opacityJitter:.15,scatter:.12,dashGap:0, valueJitter:.10},
+  'charcoal-thin':   {nibSize:.6, roundness:.9, spacing:.35,spaceJitter:.15,rotationMode:'random',rotationJitter:30, sizeJitter:.15,opacity:.65,opacityJitter:.15,scatter:.1, dashGap:0, valueJitter:.09},
+  'charcoal-varied': {nibSize:1.3,roundness:.7, spacing:.6, spaceJitter:.5, rotationMode:'random',rotationJitter:180,sizeJitter:.65,opacity:.4, opacityJitter:.4, scatter:.3, dashGap:.12,valueJitter:.15},
+  'pencil-feather':  {nibSize:.7, roundness:.6, spacing:.6, spaceJitter:.35,rotationMode:'random',rotationJitter:90, sizeJitter:.3, opacity:.3, opacityJitter:.3, scatter:.2, dashGap:.15,valueJitter:.12},
+  'pencil-thick':    {nibSize:1.8,roundness:.9, spacing:.3, spaceJitter:.15,rotationMode:'tangent',rotationJitter:15, sizeJitter:.15,opacity:.7, opacityJitter:.15,scatter:.08,dashGap:0, valueJitter:.09},
+  'pencil-thin':     {nibSize:.5, roundness:.9, spacing:.3, spaceJitter:.1, rotationMode:'tangent',rotationJitter:10, sizeJitter:.1, opacity:.8, opacityJitter:.1, scatter:.05,dashGap:0, valueJitter:.08},
   // Non-circular tip shapes (tipShape, added alongside the original
   // deformed-ellipse dabs) — the vector answer to Photoshop's flat/chisel,
   // angular, splatter and bristle tip families. See buildDabShape/
   // buildBrushDabs (above) for how each shape is actually constructed.
   'marker-flat':     {nibSize:1.6,roundness:.4, spacing:.25,spaceJitter:.05,rotationMode:'fixed',fixedAngle:35,rotationJitter:4,  sizeJitter:.05,opacity:.85,opacityJitter:.05,scatter:.02,dashGap:0, tipShape:'rect',tipCorner:.1},
   'ink-chisel':      {nibSize:1.2,roundness:.3, spacing:.3, spaceJitter:.08,rotationMode:'tangent',rotationJitter:8,  sizeJitter:.1, opacity:.9, opacityJitter:.05,scatter:.03,dashGap:0, tipShape:'rect',tipCorner:.05},
-  'pastel-chip':     {nibSize:1.7,roundness:.85,spacing:.5, spaceJitter:.3, rotationMode:'random',rotationJitter:180,sizeJitter:.3, opacity:.5, opacityJitter:.25,scatter:.2, dashGap:.05,tipShape:'polygon',polySides:6,edgeNoise:.12},
-  'chalk-facet':     {nibSize:1.3,roundness:.9, spacing:.45,spaceJitter:.25,rotationMode:'random',rotationJitter:180,sizeJitter:.25,opacity:.45,opacityJitter:.3, scatter:.15,dashGap:0, tipShape:'polygon',polySides:5,edgeNoise:.18},
+  'pastel-chip':     {nibSize:1.7,roundness:.85,spacing:.5, spaceJitter:.3, rotationMode:'random',rotationJitter:180,sizeJitter:.3, opacity:.5, opacityJitter:.25,scatter:.2, dashGap:.05,tipShape:'polygon',polySides:6,edgeNoise:.12,valueJitter:.12},
+  'chalk-facet':     {nibSize:1.3,roundness:.9, spacing:.45,spaceJitter:.25,rotationMode:'random',rotationJitter:180,sizeJitter:.25,opacity:.45,opacityJitter:.3, scatter:.15,dashGap:0, tipShape:'polygon',polySides:5,edgeNoise:.18,valueJitter:.12},
   'ink-splatter':    {nibSize:1.4,roundness:1,  spacing:1.1,spaceJitter:.6, rotationMode:'random',rotationJitter:180,sizeJitter:.7, opacity:.75,opacityJitter:.2, scatter:.5, dashGap:.1, tipShape:'splatter',edgeNoise:.08},
   'drybrush-bristle':{nibSize:2.2,roundness:1,  spacing:.35,spaceJitter:.15,rotationMode:'tangent',rotationJitter:12, sizeJitter:.3, opacity:.55,opacityJitter:.3, scatter:.6, dashGap:0, tipShape:'bristle',bristleCount:7},
   'watercolor-edge': {nibSize:2.6,roundness:.7, spacing:.5, spaceJitter:.2, rotationMode:'random',rotationJitter:60, sizeJitter:.35,opacity:.22,opacityJitter:.3, scatter:.3, dashGap:0, tipShape:'ellipse',edgeNoise:.25},
@@ -4241,7 +4249,7 @@ var BRUSH_PRESETS={
   // Scribble-fill tip (tipShape:'scribble', buildBrushDabs above) — a woven
   // patch of short independently-angled marks instead of a line of blobs,
   // the graphite/charcoal "scribbled shading" look from the reference pack.
-  'graphite-scribble':{nibSize:1.4,roundness:1,  spacing:.5, spaceJitter:.25,rotationMode:'tangent',rotationJitter:0, sizeJitter:0,   opacity:.5, opacityJitter:.3, scatter:0,   dashGap:0, tipShape:'scribble',scribbleCount:9,scribbleLen:1.5,scribbleLenJitter:.4,scribbleWidth:.1,scribbleSpread:.7,scribbleAngleSpread:75},
+  'graphite-scribble':{nibSize:1.4,roundness:1,  spacing:.5, spaceJitter:.25,rotationMode:'tangent',rotationJitter:0, sizeJitter:0,   opacity:.5, opacityJitter:.3, scatter:0,   dashGap:0, tipShape:'scribble',scribbleCount:9,scribbleLen:1.5,scribbleLenJitter:.4,scribbleWidth:.1,scribbleSpread:.7,scribbleAngleSpread:75,valueJitter:.10},
   // p5.brush-inspired (2026-08, feedback #61) — the two settings p5.brush
   // exposes that nothing above did: a fixed start/mid/end width curve
   // ("pressure", independent of the stylet) and a soft/blurred edge
@@ -4321,6 +4329,26 @@ function seededRng(seed){
 // vector" requirement. `edgeNoise` perturbs any shape's own segment
 // points radially and re-smooths — a cheap, fully-vector way to get an
 // organic broken edge (torn paper / dry-media chip) without a texture map.
+// Value jitter (2026-09-01, brush audit: "rendre les texture existante
+// plus proche de trait de crayon" — real graphite is never a perfectly
+// flat tone, individual grains catch/miss the paper's tooth). `delta` in
+// [-1,1]: negative blends the color toward BLACK, positive toward WHITE,
+// by that fraction — a proper lighten/darken lerp rather than a naive
+// channel multiply (which can only ever darken a bright color and can
+// never lighten a pure black one, since 0×anything is still 0). Small
+// deltas (the only ones any preset below actually uses) read as the
+// subtle per-grain density variation real pencil/charcoal has; large ones
+// still degrade gracefully toward solid black/white rather than an
+// out-of-gamut color.
+function jitterColorValue(color,delta){
+  if(!color||!delta)return color;
+  var c=color.clone();
+  var mixWith=delta<0?0:1,amt=Math.min(1,Math.abs(delta));
+  c.red=c.red+(mixWith-c.red)*amt;
+  c.green=c.green+(mixWith-c.green)*amt;
+  c.blue=c.blue+(mixWith-c.blue)*amt;
+  return c;
+}
 function buildDabShape(w,h,preset,rand){
   var shape=preset.tipShape||'ellipse';
   var path;
@@ -4591,7 +4619,7 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
           // real scribbling gets darker), not through each mark being
           // opaque on its own; a full-opacity mark here would read as one
           // solid stripe instead of a woven texture.
-          mark.data={dabOpacity:Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))*.6*strokeNoiseMul))};
+          mark.data={dabOpacity:Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))*.6*strokeNoiseMul)),dabValueDelta:(rand()*2-1)*(preset.valueJitter||0)};
           dabs.push(mark);
         }
       }else if(preset.tipShape==='bristle'){
@@ -4611,7 +4639,7 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
           var dab=buildDabShape(w,h,preset,rand);
           dab.rotate(angle);
           dab.position=center;
-          dab.data={dabOpacity:Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))*.7*strokeNoiseMul))};
+          dab.data={dabOpacity:Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))*.7*strokeNoiseMul)),dabValueDelta:(rand()*2-1)*(preset.valueJitter||0)};
           dabs.push(dab);
         }
       }else{
@@ -4622,11 +4650,15 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
         var h2=Math.max(.3,w2*roundness);
         var angle2=angleBase+(rand()*2-1)*(preset.rotationJitter||0);
         var baseOp=Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))*strokeNoiseMul));
+        // One draw per STAMP POSITION, not per sharpness layer below — the
+        // concentric soft-edge copies are one logical dab, they should all
+        // share the same grain darkness rather than each rolling its own.
+        var valDelta=(rand()*2-1)*(preset.valueJitter||0);
         if(sharpness>=1){
           var dab2=buildDabShape(w2,h2,preset,rand);
           dab2.rotate(angle2);
           dab2.position=center2;
-          dab2.data={dabOpacity:baseOp};
+          dab2.data={dabOpacity:baseOp,dabValueDelta:valDelta};
           dabs.push(dab2);
         }else{
           // Soft edge (feedback #61, p5.brush's "sharpness") simulated in
@@ -4651,7 +4683,7 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
             layerDab.position=center2;
             // opMul is already exactly 1 at lt=0 (the center layer) — no
             // sl===0 special case needed, the formula covers it.
-            layerDab.data={dabOpacity:baseOp*opMul};
+            layerDab.data={dabOpacity:baseOp*opMul,dabValueDelta:valDelta};
             dabs.push(layerDab);
           }
         }
@@ -4682,7 +4714,7 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
         var buildDab=buildDabShape(nibDiam*bMul,nibDiam*roundness*bMul,preset,rand);
         buildDab.rotate(tan.angle);
         buildDab.position=pt;
-        buildDab.data={dabOpacity:Math.min(1,baseOp*1.4)};
+        buildDab.data={dabOpacity:Math.min(1,baseOp*1.4),dabValueDelta:(rand()*2-1)*(preset.valueJitter||0)};
         dabs.push(buildDab);
       }
     });
@@ -4748,7 +4780,12 @@ function applyBrushTexture(basePath,presetKey){
   var groupId='bg'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);
   var dabs=buildBrushDabs(pathLike,preset,baseWidth,null,widthProfile);
   var companions=dabs.map(function(dab){
-    dab.fillColor=baseColor;dab.strokeColor=null;dab.opacity=dab.data.dabOpacity;
+    // dabValueDelta (buildBrushDabs) is per-DAB grain: a light lerp toward
+    // black/white so a textured stroke isn't a flat wash of one color, closer
+    // to how a real pencil/charcoal mark varies with grain and pressure. Must
+    // be read HERE, before dab.data is overwritten to the isBrushTextureCopy
+    // marker below — there is no other point in the pipeline where it survives.
+    dab.fillColor=jitterColorValue(baseColor,dab.data.dabValueDelta);dab.strokeColor=null;dab.opacity=dab.data.dabOpacity;
     dab.data={isBrushTextureCopy:true,brushGroupId:groupId};
     // Above, not below: when basePath also carries a fill (kept visible,
     // see the fill-case branch just below), inserting dabs UNDER it left
