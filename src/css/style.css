@@ -2052,6 +2052,7 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 .cp-eyedrop:hover{color:var(--text);border-color:var(--border2);}
 .ctx-sep{height:1px;background:var(--border);margin:4px 2px;}
 .lrow.drag-over{border-top:2px solid var(--accent);}
+.lrow.drag-over-after{border-bottom:2px solid var(--accent);} /* Elements panel: drop lands BEHIND this row (feedback #735) */
 .lrow.dragging{opacity:.4;}
 
 /* START SCREEN — matches the Home.dc.html design (claude.ai/design project

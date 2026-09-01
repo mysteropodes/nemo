@@ -9451,6 +9451,23 @@
         out.push({ type: 'shape', strokeId: entry.strokeId, sd: entry.sd });
       }
     });
+    // Feedback #735 ("peu importe l'index cela ne se reflète pas dans le
+    // canvas") — the tree used to list BACK-most first, the reverse of the
+    // layer list right next to it (renderLayerList iterates layers from
+    // the last index down, so the top row IS the front, like AE/Figma/
+    // Illustrator). Front-most first now, reversed HERE so every consumer
+    // (Elements panel, Motion's element rows, both timeline mirrors) flips
+    // together and the CLAUDE.md §11 panel/grid row alignment holds.
+    out.reverse();
+    // Stable "Shape N"/"Image N" numbering (same feedback: two rows both
+    // read "Shape 1"): consumers used to number rows with a running
+    // counter as they rendered, so a shape's label changed with the
+    // expand/collapse state of the groups above it. Numbered once here by
+    // DRAW order (creation order for a hand-drawn layer), independent of
+    // display order and of what is expanded.
+    var labelIdx = {};
+    flat.forEach(function (entry, i) { labelIdx[entry.strokeId] = i; });
+    out.labelIdx = labelIdx;
     return out;
   }
   // Resolves a strokeId back to its LIVE Paper item on layer `li` — the
@@ -9592,7 +9609,7 @@
         return;
       }
       var entry = { strokeId: node.strokeId, sd: node.sd };
-      var idx = shapeIdx++;
+      var idx = tree.labelIdx && tree.labelIdx[entry.strokeId] !== undefined ? tree.labelIdx[entry.strokeId] : shapeIdx++; // stable draw-order label, see buildShapeTree
       var expanded = window._motionExpandedElement === entry.strokeId;
       var row = document.createElement('div'); row.className = 'lrow motion-elem-row';
       var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';

@@ -2059,13 +2059,44 @@
         // Set, not indexOf — this runs once per item per rendered frame, and
         // a big combine group made it items × members per frame.
         var suppressSet = combineRes.suppress.length ? new Set(combineRes.suppress) : null;
-        items.forEach(function (it) {
+        // Where each combined outline goes in z (feedback #735, "c'est
+        // quand c'est mergé que ça marche plus la hiérarchie"): it used
+        // to be pushed at the END of the layer's items, i.e. drawn on top
+        // of every other shape in the layer no matter where the group sat
+        // in the Elements order. It now lands right after the group's
+        // FRONT-most member — the depth the group actually occupies — so
+        // a shape ordered above the group stays above its merge.
+        var frontIdxByGid = {};
+        items.forEach(function (it, ix) {
           if (suppressSet && it.__srcC && suppressSet.has(it.__srcC)) {
             it.fillColor = null; it.strokeColor = null; delete it.strokeWidth; delete it.dashPattern; delete it.dashOffset; delete it.fillGradient;
+            var mg = it.__srcC.data && it.__srcC.data.groupId;
+            if (mg) frontIdxByGid[mg] = ix;
           }
           delete it.__srcC;
         });
-        combineRes.extra.forEach(function (ex) {
+        // A nested member carries its INNER group's id; resolve each
+        // combine's top-level gid to the front-most of ALL its members.
+        var extrasWithIdx = combineRes.extra.map(function (ex) {
+          var gid = ex.groupCombineOf, idx = frontIdxByGid[gid];
+          if (idx === undefined && window.SMGroup && SMGroup.resolveGroupMembers) {
+            var mems = SMGroup.resolveGroupMembers(gid, state.layers[i], userLayers[i]);
+            var memSet = new Set(mems);
+            // items no longer carry __srcC here; fall back to the group's
+            // members' own live indexes, which items mirror in order.
+            var best = -1;
+            userLayers[i].children.forEach(function (ch, cix) { if (memSet.has(ch) && cix > best) best = cix; });
+            idx = best >= 0 ? Math.min(best, items.length - 1) : items.length - 1;
+          }
+          return { ex: ex, idx: idx === undefined ? items.length - 1 : idx };
+        });
+        // Insert from the back-most target forward so earlier splices
+        // don't shift later targets; islands of one group stay in order.
+        extrasWithIdx.sort(function (a, b) { return b.idx - a.idx; });
+        var lastIdx = null, insertCursor = 0;
+        extrasWithIdx.forEach(function (rec) {
+          var ex = rec.ex;
+          if (rec.idx !== lastIdx) { lastIdx = rec.idx; insertCursor = rec.idx + 1; }
           var op2 = ex.path.opacity !== undefined ? ex.path.opacity : 1;
           var exSegs = ex.path.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; });
           // Layer Motion transform (2026-07-29 fix, QA-confirmed "le gizmo/
@@ -2092,7 +2123,7 @@
           };
           var exSc = cssColorToRgba(ex.path.strokeColor ? colorHex8(ex.path.strokeColor) : null, op2);
           if (exSc) { extraItem.strokeColor = exSc; extraItem.strokeWidth = ex.path.strokeWidth || 1; }
-          items.push(extraItem);
+          items.splice(insertCursor++, 0, extraItem);
         });
       } else {
         items.forEach(function (it) { delete it.__srcC; });

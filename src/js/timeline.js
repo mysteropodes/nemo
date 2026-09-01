@@ -5192,7 +5192,7 @@ function renderShapeTreeRowsInto(list,li,ld){
       list.appendChild(grow);
       return;
     }
-    var idx=shapeIdx++;
+    var idx=tree.labelIdx&&tree.labelIdx[node.strokeId]!==undefined?tree.labelIdx[node.strokeId]:shapeIdx++; // stable draw-order label, see buildShapeTree
     var srow=document.createElement('div');srow.className='lrow motion-elem-row';
     var sswatch=document.createElement('div');sswatch.className='motion-elem-swatch';sswatch.style.background=node.sd.fillColor||node.sd.strokeColor||'transparent';
     var snm=document.createElement('div');snm.className='lnm';snm.textContent=SMMotion.elementLabel(node,idx,ld);
