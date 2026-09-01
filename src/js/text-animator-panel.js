@@ -105,6 +105,58 @@
     return i;
   }
 
+  // [r,g,b,a] 0-255 (elementFillColorAt's own contract, motion.js) <-> the
+  // #rrggbbaa string a native <input type=color> + .dataset.hex8 speaks
+  // (CLAUDE.md §2 — .value alone silently drops alpha to ff on read/write).
+  function rgbaArrToHex8(a) {
+    function h(n) { return Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0'); }
+    return '#' + h(a[0]) + h(a[1]) + h(a[2]) + h(a[3] == null ? 255 : a[3]);
+  }
+  function hex8ToRgbaArr(hex) {
+    var s = hex.replace('#', '');
+    var a = s.length === 8 ? parseInt(s.slice(6, 8), 16) : 255;
+    return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16), a];
+  }
+  // A property with no meaningful "neutral" value (unlike Position 0 or
+  // Scale 100%, there's no "does nothing" color) — opt-in via a checkbox
+  // rather than always-shown like the transform rows above. `defaultColor`
+  // seeds a visible starting point the moment it's switched on.
+  function colorPropRow(host, ld, labelText, getArr, setArr, defaultColor) {
+    var r = row(host, labelText);
+    var chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.checked = !!getArr();
+    r.insertBefore(chk, r.firstChild.nextSibling); // right after the .pl label
+    var swatch = document.createElement('input');
+    swatch.type = 'color';
+    swatch.style.cssText = 'width:24px;height:22px;border:none;cursor:pointer;padding:0;';
+    function syncSwatch() {
+      var arr = getArr();
+      swatch.disabled = !arr;
+      var hex = rgbaArrToHex8(arr || defaultColor);
+      swatch.value = hex.slice(0, 7);
+      swatch.dataset.hex8 = hex;
+    }
+    syncSwatch();
+    chk.addEventListener('change', function () {
+      if (typeof pushUndo === 'function') pushUndo();
+      setArr(chk.checked ? defaultColor.slice() : null);
+      syncSwatch();
+      commit(ld);
+    });
+    swatch.addEventListener('input', function () {
+      var arr = hex8ToRgbaArr(this.dataset.hex8 || this.value);
+      setArr(arr);
+      liveRefresh(ld);
+    });
+    swatch.addEventListener('change', function () {
+      if (typeof pushUndo === 'function') pushUndo();
+      commit(ld);
+    });
+    r.appendChild(swatch);
+    return r;
+  }
+
   function selField(r, options, get, set) {
     var s = document.createElement('select');
     s.className = 'psel';
@@ -290,6 +342,15 @@
 
     var rOp = row(host, t('propOpacity', 'Opacity'));
     numField(rOp, function () { return props.opacity == null ? 100 : props.opacity; }, function (v, live) { props.opacity = v; if (!live) commit(ld); else liveRefresh(ld); }, 1, 0, 100);
+
+    colorPropRow(host, ld, t('propFill', 'Fill'),
+      function () { return props.fillColor; },
+      function (v) { if (v) props.fillColor = v; else delete props.fillColor; },
+      [255, 80, 80, 255]);
+    colorPropRow(host, ld, t('propStroke', 'Stroke'),
+      function () { return props.strokeColor; },
+      function (v) { if (v) props.strokeColor = v; else delete props.strokeColor; },
+      [255, 255, 255, 255]);
 
     // --- weight ramp preview --------------------------------------------
     // Shows what the selector currently weighs, per unit. It is the one thing

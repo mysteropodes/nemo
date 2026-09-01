@@ -4094,6 +4094,29 @@
         if (dsx || dsy) pivotBasedOn = pivotBasedOn || basedOn;
       }
       if (p.opacity != null) acc.op += (p.opacity - 100) * w;
+      // Fill/Stroke color (2026-09 — "Add Property" gap: only Position/
+      // Scale/Rotation/Opacity were wired up). Unlike those, color has no
+      // neutral "delta from 0" — at weight 0 a character must show its OWN
+      // paint, not some baseline color, so this can't accumulate the same
+      // way. Instead: weighted-average the animator's target color (for
+      // when several color animators overlap on one character) and the
+      // weighted-SUM of w as the blend-toward-target strength, applied by
+      // the caller as lerp(base, avgTarget, min(1, sumW)) — one lerp at the
+      // render site, using the SAME [r,g,b,a] 0-255 shape and the SAME
+      // per-element override slot (elementFillColorAt/elementStrokeColorAt,
+      // motion.js) the manual Fill/Stroke color track already writes to,
+      // so a hand-set override and an animator's pull compose exactly the
+      // way position/rotation already do (animator adds on top of a base).
+      if (p.fillColor) {
+        acc.fcR = (acc.fcR || 0) + p.fillColor[0] * w; acc.fcG = (acc.fcG || 0) + p.fillColor[1] * w;
+        acc.fcB = (acc.fcB || 0) + p.fillColor[2] * w; acc.fcA = (acc.fcA || 0) + (p.fillColor[3] == null ? 255 : p.fillColor[3]) * w;
+        acc.fcW = (acc.fcW || 0) + w;
+      }
+      if (p.strokeColor) {
+        acc.scR = (acc.scR || 0) + p.strokeColor[0] * w; acc.scG = (acc.scG || 0) + p.strokeColor[1] * w;
+        acc.scB = (acc.scB || 0) + p.strokeColor[2] * w; acc.scA = (acc.scA || 0) + (p.strokeColor[3] == null ? 255 : p.strokeColor[3]) * w;
+        acc.scW = (acc.scW || 0) + w;
+      }
     }
     // Only rotation/scale need a pivot at all — a pure position/opacity
     // animator leaves ax/ay unset and elementMotionAt below falls back to
@@ -4114,6 +4137,22 @@
           acc.ay = shared.cy - (ownB[1] + ownB[3]) / 2;
         }
       }
+    }
+    // Normalize the color weighted-sums into a single target + blend
+    // strength (see the accumulation comment above for why colour can't
+    // just accumulate as a delta like the other properties) and drop the
+    // raw partial sums — elementMotionAt below merges this object with its
+    // own transform fields, and fcTarget/fcBlend is the whole contract the
+    // render site needs.
+    if (acc && acc.fcW) {
+      acc.fcTarget = [acc.fcR / acc.fcW, acc.fcG / acc.fcW, acc.fcB / acc.fcW, acc.fcA / acc.fcW];
+      acc.fcBlend = Math.max(0, Math.min(1, acc.fcW));
+      delete acc.fcR; delete acc.fcG; delete acc.fcB; delete acc.fcA; delete acc.fcW;
+    }
+    if (acc && acc.scW) {
+      acc.scTarget = [acc.scR / acc.scW, acc.scG / acc.scW, acc.scB / acc.scW, acc.scA / acc.scW];
+      acc.scBlend = Math.max(0, Math.min(1, acc.scW));
+      delete acc.scR; delete acc.scG; delete acc.scB; delete acc.scA; delete acc.scW;
     }
     return acc;
   }
@@ -4179,6 +4218,11 @@
       // whatever explicit per-element anchor already existed, same as every
       // other field above.
       ax: m.ax + (ta.ax || 0), ay: m.ay + (ta.ay || 0),
+      // Passed through as-is (not composed with `base` — a manual Fill/
+      // Stroke color track has no "color delta" to combine with, the
+      // render site does base -> lerp(base, fcTarget, fcBlend) in one step,
+      // see textAnimatorContribution's own comment).
+      fcTarget: ta.fcTarget, fcBlend: ta.fcBlend, scTarget: ta.scTarget, scBlend: ta.scBlend,
     };
   }
   // Extended per-shape property: Fill color (2026-07 — audit gap
