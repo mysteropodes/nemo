@@ -1696,7 +1696,14 @@ function editRefusalReason(){
   // button is the actual fix.
   if(ld.duplicator&&!ld._dupEditSource)return 'Calque duplicateur — « Modifier la forme source » (panneau Duplicator) pour éditer';
   if(ld.locked)return 'Calque verrouillé — déverrouille-le (cadenas) pour dessiner dessus';
-  if(ld.nativeVideo)return 'Calque vidéo — dessine sur un calque normal au-dessus';
+  // Mask mode is the one exception (2026-09, Cyril: "on ne peut pas
+  // masquer directement sur la vidéo ?") — a mask never becomes real
+  // CONTENT on this layer (engine-bridge.js pulls any data.isMask child
+  // out into the compositor's clip list, never paints it as an item, see
+  // its own comment), so it doesn't violate "this layer's picture is the
+  // video decode, nothing else" the way ordinary drawing would. Ordinary
+  // drawing stays refused — the message just also points at the new door.
+  if(ld.nativeVideo&&!state.maskMode)return 'Calque vidéo — dessine sur un calque normal au-dessus, ou active Masque pour masquer directement cette vidéo';
   if(ld.montageId)return 'Calque montage — son contenu s\u2019édite dans le StoryBoard';
   return null;
 }

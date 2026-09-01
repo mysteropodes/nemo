@@ -2940,13 +2940,22 @@ function unlinkTimeLinkPreserveRange(ld){
 function getEffectiveStrokes(layerIdx,frameIdx,countOnly){
   var ld=state.layers[layerIdx];if(!ld)return[];
   if(layerHasTimeRange(ld)&&(frameIdx<layerInPoint(ld)||frameIdx>layerOutPoint(ld)))return[];
-  // EXPERIMENTAL (native-video-decode): a natively-decoded video layer has
-  // no vector strokes at all — its picture is an engine-side image item
-  // (buildSceneJson, engine-bridge.js), not frame data.
-  if(ld.nativeVideo)return[];
+  // EXPERIMENTAL (native-video-decode): a natively-decoded video layer's
+  // PICTURE is an engine-side image item (buildSceneJson, engine-bridge.js),
+  // never frame data — but a nativeVideo layer CAN legitimately carry mask
+  // strokes now (2026-09, Cyril: "on ne peut pas masquer directement sur la
+  // vidéo ?" — editRefusalReason, tools.js, now lets Mask-mode drawing
+  // through on this exact layer type, the only kind it still allows).
+  // No special-casing needed beyond just NOT early-returning here: none of
+  // montageId/lfsGroup/symbolId below ever apply to a nativeVideo layer
+  // (mutually exclusive creation paths, see this function's own header
+  // comment), so falling through lands directly in the ordinary "plain
+  // layer" tail — which returns f.strokes untouched, exactly what's wanted
+  // since _collectLayerStrokes (below) only ever populates that array with
+  // mask children for this layer type in the first place.
   // Null/Effect layer (2026-07, Motion) — never have real content by
   // design (see SM.addNullLayer/addEffectLayer's own comments); same
-  // "no strokes to speak of" early-return as nativeVideo above.
+  // "no strokes to speak of" early-return nativeVideo used to have above.
   // Widget (rig control) layer (2026-08-30, rig-widget.js) — a joystick or
   // slider you drag on canvas; its picture is an editor-only overlay
   // (buildRigWidgetOverlayItems), never content. This ONE line is what
@@ -4469,7 +4478,15 @@ function _flattenCompoundChildren(li){
 function _collectLayerStrokes(li,ld){
   var strokes=[];
   _flattenCompoundChildren(li);
-  userLayers[li].children.forEach(function(c){if(c.data&&c.data.ghostFrame!==undefined)return;if(c instanceof Path&&c.segments.length>0){enforceChannelStrip(ld,c);strokes.push(serP(c));}else if(c instanceof Raster)strokes.push(serR(c));});
+  // nativeVideo (2026-09): this layer's own picture is engine-side, never a
+  // Paper child (getEffectiveStrokes' own comment) — editRefusalReason
+  // (tools.js) still refuses ordinary drawing on this layer type, so a
+  // mask is the ONLY legitimate child that can ever exist here. Filtered
+  // explicitly rather than trusting that invariant alone (CLAUDE.md §1) —
+  // a stray non-mask child must never get silently baked into persisted
+  // frame data for a layer whose real content is the video decode.
+  var nativeVideoOnly=!!ld.nativeVideo;
+  userLayers[li].children.forEach(function(c){if(c.data&&c.data.ghostFrame!==undefined)return;if(nativeVideoOnly&&!(c.data&&c.data.isMask))return;if(c instanceof Path&&c.segments.length>0){enforceChannelStrip(ld,c);strokes.push(serP(c));}else if(c instanceof Raster)strokes.push(serR(c));});
   return strokes;
 }
 // A hand-edited tween frame is promoted to a full keyframe outright rather
@@ -4547,7 +4564,13 @@ function saveActiveLayerFrame(){
   // Rig tool is the one interaction in this app where "live but
   // uncommitted" is meant to survive far longer than a single gesture
   // (Commit/Reset are deliberate separate actions, not implied by mouseup).
-  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.nativeVideo||ld.montageId||ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer||ld.lfsGroup||(ld.duplicator&&!ld._dupEditSource)||ld._rigPoseLive)return;
+  // nativeVideo dropped from this skip list (2026-09) — no longer
+  // unconditionally "synthetic content, real data lives elsewhere" now that
+  // Mask-mode drawing is allowed on this layer type: a real mask CAN live
+  // in userLayers[li].children here, and _collectLayerStrokes below already
+  // filters it to mask-only for this exact layer type, so falling through
+  // to the ordinary save path is correct and safe.
+  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.montageId||ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer||ld.lfsGroup||(ld.duplicator&&!ld._dupEditSource)||ld._rigPoseLive)return;
   if(!layerIsEffectivelyVisible(state.activeLayerIdx))return;
   // Same class of bug as the eye/solo guard right above, found live
   // 2026-07-30 (Cyril: "avec plein d'aller retour, scrub, trim de layer
@@ -4581,7 +4604,9 @@ function saveAllLayerFrames(){
   _invalidateSymbolUnionIfEditingSymbol();
   _writeBackGhostProxies(state.activeLayerIdx);
   // duplicator skip: same reason as saveActiveLayerFrame's guard above.
-  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].nativeVideo||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||state.layers[i].isGuideLayer||state.layers[i].isWidgetLayer||state.layers[i].lfsGroup||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource)||state.layers[i]._rigPoseLive)continue;
+  // nativeVideo dropped from this list too — see the identical comment on
+  // saveActiveLayerFrame's own guard above for why.
+  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||state.layers[i].isGuideLayer||state.layers[i].isWidgetLayer||state.layers[i].lfsGroup||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource)||state.layers[i]._rigPoseLive)continue;
   if(!layerIsEffectivelyVisible(i))continue;
   // Trim-range guard — see saveActiveLayerFrame's identical check for the
   // full explanation. Per-layer here (unlike the single active layer
