@@ -3562,11 +3562,11 @@
     // Keyed re-parent (feedback #207) — a layer with ld.parentKeys already
     // turned on gets a NEW KEY at the playhead instead of the static field
     // overwrite below, matching Blend's own setExpressionCode-vs-
-    // upsertBlendKeyAt split. Deliberately skips the keep-transform
-    // compensation just below — see layerParentUidAt's own header comment
-    // for why a correct per-frame version of that is out of scope here.
+    // upsertBlendKeyAt split. Keep-transform compensation for THIS path
+    // lives inside upsertParentKeyAt itself (2026-09-01) — see its own
+    // header comment.
     if (ld.parentKeys && ld.parentKeys.length) {
-      upsertParentKeyAt(ld, state.currentFrame, parentUid || null);
+      upsertParentKeyAt(li, state.currentFrame, parentUid || null);
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
       return;
     }
@@ -4343,15 +4343,11 @@
   // parentBlend track) that this does not touch or extend; a layer with a
   // second parent set keeps behaving exactly as it already did.
   //
-  // Also deliberately WITHOUT setLayerParent's "keep transform" position
-  // compensation (see that function's own note where it branches on
-  // ld.parentKeys) — computing the right compensating Position KEY (not a
-  // static overwrite, which would wrongly affect every earlier frame too)
-  // for a re-parent that only takes effect at one specific frame is real
-  // additional complexity this pass intentionally left out rather than
-  // risk getting subtly wrong. A keyed re-parent can visibly "pop" at its
-  // frame; keying Position there too is the manual fix, same as it would
-  // be in any other tool that doesn't auto-compensate.
+  // Keep-transform compensation for THIS keyed path (2026-09-01, Cyril:
+  // "si j'anim le parentage l'élément revient à sa position initiale
+  // alors qu'il faudrait qu'il conserve sa position") now lives in
+  // upsertParentKeyAt below, not here — see its own header comment for
+  // why it's a Position KEY at the switch frame, not a static overwrite.
   function layerParentUidAt(li, frameIdx) {
     var ld = state.layers[li];
     if (!ld) return null;
@@ -4366,10 +4362,43 @@
   function sortParentKeys(ld) {
     ld.parentKeys.sort(function (a, b) { return a.frame - b.frame; });
   }
-  function upsertParentKeyAt(ld, frame, uid) {
+  // Keep-transform compensation for a KEYED parent switch (2026-09-01,
+  // Cyril: "si j'anim le parentage l'élément revient à sa position
+  // initiale alors qu'il faudrait qu'il conserve sa position") — measures
+  // this layer's own pivot in world space before/after the switch (same
+  // composedPivotWorld setLayerParent's own static-field compensation
+  // already uses just above) and folds the difference into a Position
+  // KEYFRAME exactly at the switch frame. A static overwrite (like
+  // setLayerParent's) would be wrong here: it would retroactively change
+  // every earlier frame too, since a keyed re-parent only takes effect
+  // from its own frame onward. Translation only — same deliberate scope
+  // as setLayerParent's own compensation (a rotated/scaled parent still
+  // reorients the child going forward, same as After Effects).
+  function upsertParentKeyAt(li, frame, uid) {
+    var ld = state.layers[li];
+    if (!ld) return;
+    var before = composedPivotWorld(li, frame);
     if (!ld.parentKeys) ld.parentKeys = [];
     var k = ld.parentKeys.filter(function (kk) { return kk.frame === frame; })[0];
     if (k) k.uid = uid || null; else { ld.parentKeys.push({ frame: frame, uid: uid || null }); sortParentKeys(ld); }
+    var after = composedPivotWorld(li, frame);
+    var dx = before[0] - after[0], dy = before[1] - after[1];
+    if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return; // nothing visibly moved — pinning the same already-active parent, the common case
+    var curLocal = valueAtFrame(ld, 'position', frame);
+    if (!isAnimated(ld, 'position') && frame > 0) {
+      // Seed a HOLD key one frame earlier with the UNCOMPENSATED value so
+      // every frame before the switch stays exactly as it was — a plain
+      // setKeyAtFrame at `frame` alone would convert Position from static
+      // to a single-key track, and rawValueAtFrame holds a lone key's
+      // value for every frame in the timeline, retroactively moving
+      // frames before the switch too. hold=true (not an eased segment)
+      // because there's no meaningful halfway point between two different
+      // parent states, same reasoning layerParentUidAt's own header
+      // comment gives for parentKeys being a plain discrete list.
+      var seedKey = setKeyAtFrame(ld, 'position', frame - 1, curLocal.slice());
+      if (seedKey) seedKey.hold = true;
+    }
+    setKeyAtFrame(ld, 'position', frame, [curLocal[0] + dx, curLocal[1] + dy]);
   }
   function removeParentKeyAt(ld, frame) {
     if (!ld.parentKeys) return;
@@ -7907,7 +7936,7 @@
           removeParentKeyAt(ld, state.currentFrame);
         }
       } else {
-        upsertParentKeyAt(ld, state.currentFrame, layerParentUidAt(li, state.currentFrame));
+        upsertParentKeyAt(li, state.currentFrame, layerParentUidAt(li, state.currentFrame));
       }
       renderLayerList(); renderTimeline();
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
