@@ -29,8 +29,115 @@
 
   var _ref = null, _prop = null, _label = '';
   var _panel = null, _ta = null, _gutter = null, _errEl = null, _titleEl = null, _cb = null;
+  var _exMenu = null, _exExpandedCat = null;
 
   function canvasArea() { return document.getElementById('canvas-area'); }
+
+  // ---- example library (window.SM_EXPR_EXAMPLES, expr-examples.js) ------
+  // A two-level dropdown (category -> example), reusing showContextMenu's
+  // visual language (.ctx-menu/.ctx-item) but built by hand: the shared
+  // context-menu system is flat by design (see openExprControlsMenu's own
+  // comment, motion.js — "showContextMenu has no real submenus"), and an
+  // accordion (click a category to expand it in place) fits this panel's
+  // existing vocabulary better than a second flyout mechanism anyway — the
+  // Layer Properties panel right next to this one is itself one big
+  // accordion of sections.
+  function closeExamplesMenu() {
+    if (_exMenu) { _exMenu.remove(); _exMenu = null; }
+  }
+  function insertExampleCode(code) {
+    if (!_ta) return;
+    var s = _ta.selectionStart, en = _ta.selectionEnd;
+    var before = _ta.value.slice(0, s), after = _ta.value.slice(en);
+    // A blank editor gets the snippet with no extra ceremony; inserting into
+    // existing code gets blank lines around it so it doesn't run into
+    // whatever was already there.
+    var sep = before.trim() ? (before.endsWith('\n\n') ? '' : (before.endsWith('\n') ? '\n' : '\n\n')) : '';
+    var insert = sep + code + '\n';
+    _ta.value = before + insert + after;
+    var caret = (before + insert).length;
+    _ta.selectionStart = _ta.selectionEnd = caret;
+    paintGutter();
+    commit();
+    _ta.focus();
+    if (window.showToast) showToast(SM.t('toastExprExampleInserted'));
+  }
+  function buildExamplesMenu(anchorBtn) {
+    var cats = window.SM_EXPR_EXAMPLES || [];
+    var menu = document.createElement('div');
+    menu.className = 'ctx-menu ecp-examples-menu';
+    cats.forEach(function (cat) {
+      var hdr = document.createElement('div');
+      hdr.className = 'ctx-item ecp-examples-cat-hdr';
+      var expanded = _exExpandedCat === cat.id;
+      var arrow = document.createElement('span');
+      arrow.className = 'lico larrow';
+      arrow.textContent = expanded ? '▾' : '▸';
+      var lbl = document.createElement('span');
+      lbl.textContent = cat.label;
+      lbl.style.flex = '1';
+      hdr.appendChild(arrow); hdr.appendChild(lbl);
+      hdr.addEventListener('click', function (e) {
+        e.stopPropagation();
+        _exExpandedCat = expanded ? null : cat.id;
+        var fresh = buildExamplesMenu(anchorBtn);
+        closeExamplesMenu();
+        document.body.appendChild(fresh);
+        _exMenu = fresh;
+        positionExamplesMenu(anchorBtn);
+      });
+      menu.appendChild(hdr);
+      if (!expanded) return;
+      cat.examples.forEach(function (ex) {
+        var row = document.createElement('div');
+        row.className = 'ctx-item ecp-examples-item';
+        row.title = ex.source || '';
+        var rlbl = document.createElement('span');
+        rlbl.textContent = ex.label;
+        row.appendChild(rlbl);
+        row.addEventListener('click', function (e) {
+          e.stopPropagation();
+          closeExamplesMenu();
+          insertExampleCode(ex.code);
+        });
+        menu.appendChild(row);
+      });
+    });
+    if (!cats.length) {
+      var empty = document.createElement('div');
+      empty.className = 'ctx-item disabled';
+      empty.textContent = '—';
+      menu.appendChild(empty);
+    }
+    return menu;
+  }
+  function positionExamplesMenu(anchorBtn) {
+    if (!_exMenu) return;
+    document.body.appendChild(_exMenu); // measure at natural size first
+    var r = anchorBtn.getBoundingClientRect();
+    var mw = _exMenu.offsetWidth, mh = _exMenu.offsetHeight;
+    _exMenu.style.position = 'fixed';
+    _exMenu.style.left = Math.min(r.left, window.innerWidth - mw - 4) + 'px';
+    _exMenu.style.top = Math.min(r.bottom + 4, window.innerHeight - mh - 4) + 'px';
+  }
+  function toggleExamplesMenu(anchorBtn) {
+    if (_exMenu) { closeExamplesMenu(); return; }
+    _exMenu = buildExamplesMenu(anchorBtn);
+    document.body.appendChild(_exMenu);
+    positionExamplesMenu(anchorBtn);
+    // Dismiss on an outside click, one tick later so THIS click (the one
+    // that opened the menu) doesn't immediately close it again.
+    setTimeout(function () {
+      document.addEventListener('mousedown', function dismiss(e) {
+        if (_exMenu && !_exMenu.contains(e.target) && e.target !== anchorBtn) {
+          closeExamplesMenu();
+          document.removeEventListener('mousedown', dismiss);
+        } else if (!_exMenu) {
+          document.removeEventListener('mousedown', dismiss);
+        }
+      });
+    }, 0);
+  }
 
   function savedWidth() {
     var v = parseInt(localStorage.getItem(WIDTH_KEY) || '', 10);
@@ -97,6 +204,12 @@
     _titleEl = document.createElement('div');
     _titleEl.className = 'ecp-title';
     head.appendChild(_titleEl);
+    var examplesBtn = document.createElement('button');
+    examplesBtn.className = 'ecp-close ecp-examples-btn';
+    examplesBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22.5v-18Z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/></svg>';
+    examplesBtn.title = SM.t('titleExprExamples');
+    examplesBtn.addEventListener('click', function (e) { e.stopPropagation(); toggleExamplesMenu(examplesBtn); });
+    head.appendChild(examplesBtn);
     var closeBtn = document.createElement('button');
     closeBtn.className = 'ecp-close';
     closeBtn.textContent = '×';
@@ -226,6 +339,7 @@
   }
 
   function close() {
+    closeExamplesMenu();
     var wrap = document.getElementById(WRAP_ID);
     if (!wrap) return;
     // Commit before tearing down — closing the panel is not a way to discard
