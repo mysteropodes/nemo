@@ -10793,7 +10793,23 @@
       var spacer = document.createElement('div');
       spacer.className = 'frow' + (_layerSel.indexOf(li) >= 0 ? ' act motion-selected' : '');
       spacer.dataset.layer = li;
-      if (window.installLayerReorderGrip) installLayerReorderGrip(spacer, li);
+      // No installLayerReorderGrip call here anymore (2026-09-01, Cyril:
+      // "enlève ce qui gêne pour attraper le in point quand celui est
+      // calé à la première image") — that sticky grip sat at z-index:9,
+      // ABOVE the in/out bar buildBar is about to insert (z-index:2), so a
+      // layer whose inPoint landed at frame 0 had its in-handle physically
+      // UNDER the grip: every native click there resolved to the grip
+      // first. Two rounds of hand-off patches (a click-point distance
+      // test, then a rect-overlap test; feedback 2026-08 and feedback
+      // #137) narrowed that collision but never actually removed it,
+      // since the grip kept existing at exactly the pixels the handle
+      // needed. buildBar's own mousedown now arms the SAME reorder system
+      // itself (layer-inout.js, in parallel with its move-in-time drag) —
+      // grabbing the bar body ANYWHERE, including well away from the
+      // handle, reorders the layer on a Y-dominant drag, so the frame-0
+      // collision has nothing left in Motion to collide with. Animation
+      // 2D's frame-grid (timeline.js) still installs this same grip —
+      // it has no in/out bar of its own to grab instead.
       if (window.SMLayerInOut) SMLayerInOut.buildBar(spacer, li);
       grid.appendChild(spacer);
       if (!expanded) return;
@@ -12780,27 +12796,11 @@
       // THIS function on every attempt, zero trace of the rect's own
       // listener ever running.
       //
-      // .layer-reorder-grip (feedback #137, found live while investigating
-      // "difficile d'attraper le in point... interfère avec le déplacement
-      // de layer en index"): the grip (timeline.js, installLayerReorderGrip)
-      // was added 2026-08-24 with its OWN mousedown/pointerdown listener but
-      // was never added to THIS exemption list — same missing-exemption bug
-      // as every entry above, just in a different file, so it was easy to
-      // miss. The practical effect was worse than "hard to grab": since this
-      // CAPTURE-phase listener always runs first and this class wasn't
-      // exempted, EVERY mousedown on the grip was swallowed into a marquee-
-      // select before the grip's own handler ever ran — verified live via
-      // dispatchEvent trace (grip's own listener never fired, not even
-      // once) and by dragging the grip a full 65px vertically, which is
-      // normally more than enough to reorder, and nothing moved. So
-      // dragging the grip to reorder a layer directly in the frame-grid
-      // didn't actually work AT ALL, frame 0 or not — only the layer-list
-      // panel's own row-drag (a separate, unaffected code path) did. The
-      // SAME-DAY fix for the frame-0 handle-vs-grip overlap (dd7a202) was
-      // therefore built and shipped on top of a handler that could never
-      // run in the first place. Exempting the grip here is what actually
-      // makes both that fix and normal grid-side reordering reachable.
-      if (e.target.closest('.fc.motion-fc, .layer-inout-handle, .layer-inout-key, .layer-inout-bar, .motion-key-connect, .layer-reorder-grip, #frame-hdr, #playhead-flag, #bars-row, #motion-graph-resize')) return;
+      // .layer-reorder-grip is NOT in this list (2026-09-01): Motion no
+      // longer installs that grip at all — see renderTimelineMotion's own
+      // comment on why (the bar's mousedown arms reordering itself now).
+      // .layer-inout-bar's own exemption below is what that relies on.
+      if (e.target.closest('.fc.motion-fc, .layer-inout-handle, .layer-inout-key, .layer-inout-bar, .motion-key-connect, #frame-hdr, #playhead-flag, #bars-row, #motion-graph-resize')) return;
       // Scrollbar clicks land on the wrap itself but outside its client
       // area — intercepting them would break scrollbar dragging.
       var r = wrap.getBoundingClientRect();

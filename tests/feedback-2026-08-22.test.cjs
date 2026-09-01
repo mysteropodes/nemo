@@ -132,12 +132,18 @@ test('Motion key drags provide snapping guides and scroll-aware deltas', () => {
 test('layer order drag works from both timeline halves with one outline ghost', () => {
   const timeline = read('src/js/timeline.js');
   const motion = read('src/js/motion.js');
+  const layerInout = read('src/js/layer-inout.js');
   const css = read('src/css/style.css');
+  // Animation 2D's frame-grid still installs the sticky grip (it has no
+  // in/out bar of its own to arm reordering from) — Motion (below) does not,
+  // 2026-09-01, so a layer's inPoint sitting at frame 0 can never again put
+  // that grip on top of the in-handle in Motion specifically.
   assert.match(timeline, /function installLayerReorderGrip\(/);
   assert.match(timeline, /window\.installLayerReorderGrip=installLayerReorderGrip/);
   assert.match(timeline, /\.lrow\[data-layer\],#frame-grid \.frow\[data-layer\]/);
   assert.match(timeline, /className='layer-drag-ghost'/);
-  assert.match(motion, /installLayerReorderGrip\(spacer, li\)/);
+  assert.doesNotMatch(motion, /installLayerReorderGrip\(spacer, li\)/);
+  assert.match(layerInout, /armLayerReorder\(e, li, 'grid', row\)/);
   assert.match(css, /\.layer-reorder-grip\{/);
   assert.match(css, /\.layer-drag-ghost\{[^}]*background:transparent/);
 });

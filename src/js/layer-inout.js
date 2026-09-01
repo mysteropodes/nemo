@@ -512,22 +512,22 @@
   // or shrinks the range from the SAME fixed end rather than drifting.
   var _barAnchorLi = null;
   // forceHandleEl (2026-08, feedback: "quand les calques sont calé au tout
-  // début c'est compliqué d'attraper le in point avec la souris") — the
-  // sticky reorder grip (installLayerReorderGrip, timeline.js) sits at
-  // z-index:9, ABOVE this bar's own z-index:2 stacking context, so the
-  // instant a bar's inPoint lands near frame 0 (or a scroll parks the
-  // viewport's left edge inside a bar), the in-handle physically
-  // coincides with the grip and every mousedown resolves to the grip
-  // first — the handle becomes literally unclickable, not just fiddly.
-  // Raising the WHOLE bar's z-index above the grip was rejected: the
-  // grip's sole reason to exist is staying reachable even while a long
-  // bar's BODY covers the viewport's left edge after scrolling — that
-  // would trade one unreachable target for another. Instead the grip's
-  // own handler (installLayerReorderGrip) hit-tests for a handle first
-  // and, when the click is really on one, calls this SAME onDown with
-  // the real handle element passed explicitly — forceHandleEl lets that
-  // caller's e.target (the grip, not the handle) not leak into the
-  // handle's own hover-lock behavior (.hot class below).
+  // début c'est compliqué d'attraper le in point avec la souris") — lets a
+  // caller whose own e.target ISN'T the handle (a hand-off from something
+  // else entirely) pass the real handle element explicitly, so it doesn't
+  // leak into the handle's own hover-lock behavior (.hot class below).
+  // Historically this existed because Motion's sticky reorder grip
+  // (installLayerReorderGrip, timeline.js) sat at z-index:9, ABOVE this
+  // bar's own z-index:2, so a bar whose inPoint landed near frame 0 put
+  // its in-handle physically under the grip — every mousedown resolved to
+  // the grip first, and the grip's own handler hit-tested for a handle and
+  // handed off here when it found one. 2026-09-01 (Cyril: "enlève ce qui
+  // gêne pour attraper le in point"): Motion stopped installing that grip
+  // at all — see renderTimelineMotion's own comment — so this exact
+  // collision can no longer happen there. The parameter stays (Animation
+  // 2D's frame-grid still installs the same grip, on rows that never have
+  // a handle to begin with, so its own hand-off branch is a permanent
+  // no-op there rather than genuinely dead code).
   function onDown(li, row, type, e, forceHandleEl) {
     e.stopPropagation(); e.preventDefault();
     var ld = state.layers[li]; if (!ld) return;
@@ -1473,11 +1473,18 @@
     // Cyril: "en y peut importe où l'on prend le calque on peut le
     // changer d'index comme sur after effects et dans la partie gauche" —
     // the layer LIST panel already supports grab-anywhere reorder via
-    // this exact mechanism, armLayerReorder/moveLayerReorder,
-    // timeline.js; the frame-grid's own bar never armed it, so the tiny
-    // sticky reorder grip — installLayerReorderGrip, whose own comment
-    // documents the still-imperfect collision it has with an in-handle
-    // sitting at frame 0 — was the ONLY way to reorder from this side).
+    // this exact mechanism, armLayerReorder/moveLayerReorder, timeline.js;
+    // the frame-grid's own bar never armed it, so the tiny sticky reorder
+    // grip — installLayerReorderGrip, whose z-index-9 stacking put an
+    // in-handle at frame 0 physically underneath it — was the ONLY way to
+    // reorder from this side. First pass just patched the grip's own
+    // hand-off logic and left it installed; still wasn't enough (Cyril,
+    // same day: "tu as n'as pas enlever ce qui gêne") — the grip itself
+    // was still there, still sitting on top of the handle. Motion no
+    // longer installs that grip at ALL (renderTimelineMotion, motion.js),
+    // which is what actually removes the collision rather than patching
+    // around it once more; Animation 2D's frame-grid still uses the grip,
+    // since it has no in/out bar of its own to arm reordering from here.
     // Safe to arm unconditionally alongside onDown: moveLayerReorder only
     // ever activates past its own Y-dominance threshold (dy>=4 &&
     // dy>=dx*.55, timeline.js), so a genuinely horizontal drag leaves it
