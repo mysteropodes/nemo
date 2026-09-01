@@ -1,0 +1,23 @@
+[package]
+name = "vectorize-core"
+version = "0.1.0"
+edition = "2021"
+# Machine-readable declaration of THIS crate's own license, so `cargo license`
+# and any downstream tooling report Nemo correctly instead of "N/A".
+license = "GPL-3.0-or-later"
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
+# Image vectorization (2026-09) — traces a raster into color regions with
+# cubic-bezier boundaries (Illustrator "Image Trace" equivalent). MIT OR
+# Apache-2.0, pinned to the stable 0.6 line (not the 1.0.0-alpha rewrite
+# currently on crates.io — different, evolving API).
+vtracer = "0.6"
+image = "0.23"
+# vtracer's own geometry types (CompoundPath/Spline/Color) — needed
+# directly to walk the traced output into Nemo's own path segments
+# instead of round-tripping through an SVG string.
+visioncortex = "0.8"
+serde = { version = "1", features = ["derive"] }

@@ -9,15 +9,20 @@
 // GEOMETRY once, the exact same "materialize, don't mutate the source"
 // shape as the mograph Duplicator and Combine/Flatten).
 //
-// Runs natively in Rust (src-tauri/src/vectorize.rs, the `vtracer` crate,
-// MIT OR Apache-2.0) via a Tauri command — desktop-only for now, same
-// tauriOk() gate as feedback submission/native video. The heavy lifting
-// (color clustering, curve fitting) happens off the main thread in the
-// Rust backend; this file only builds Paper.js geometry from the returned
-// JSON and never touches an SVG string (see vectorize.rs's own comment).
+// Runs in Rust (`vtracer` crate, MIT OR Apache-2.0) compiled to
+// wasm32-unknown-unknown (vectorize-wasm/, loaded lazily via
+// vectorize-wasm-loader.js — only the first time this dialog opens, not
+// on every app boot) — works identically in the desktop app's Tauri
+// webview AND a plain browser tab AND the web public beta, one code path
+// everywhere (2026-09 revision: originally shipped as a Tauri-only native
+// command, changed after Cyril pointed out a plain wasm build works fine
+// too and the desktop-only gate made it untestable/unusable from a
+// browser). The vtracer pipeline itself is shared with the still-present
+// native Tauri command (src-tauri/src/vectorize.rs) via ../vectorize-core
+// — see that crate's own doc comment for why neither reimplements it.
+// This file only builds Paper.js geometry from the returned JSON and
+// never touches an SVG string (see vectorize-core's own comment).
 (function () {
-  function tauriOk() { return typeof window.__TAURI__ !== 'undefined'; }
-
   function activeLayer() { return state.layers[state.activeLayerIdx]; }
 
   // Finds the raster to trace: the first isRaster stroke in the active
@@ -130,11 +135,17 @@
     return item;
   }
 
+  // Browser-native base64 -> Uint8Array (atob + charCodeAt) — the wasm
+  // binding takes raw bytes, not a base64 string; no library needed for
+  // this one conversion.
+  function base64ToBytes(b64) {
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  }
+
   async function runVectorize(cfg) {
-    if (!tauriOk()) {
-      showToast(SM && SM.t ? SM.t('vectorizeDesktopOnly') : 'Vectorization is desktop-only for now.');
-      return;
-    }
     var raster = findActiveRasterStroke();
     if (!raster) {
       showToast(SM && SM.t ? SM.t('vectorizeNoImage') : 'Select a layer with an image first.');
@@ -145,20 +156,19 @@
       showToast(SM && SM.t ? SM.t('vectorizeNoImage') : 'Select a layer with an image first.');
       return;
     }
-    var t = window.__TAURI__;
     var result;
     try {
-      result = await t.core.invoke('vectorize_image', {
-        imageBase64: m[2],
-        config: {
-          colorMode: cfg.colorMode,
-          hierarchical: cfg.hierarchical,
-          filterSpeckle: cfg.filterSpeckle,
-          colorPrecision: cfg.colorPrecision,
-          layerDifference: cfg.layerDifference,
-          cornerThreshold: cfg.cornerThreshold,
-        },
+      await window.VectorizeWasm.load();
+      var configJson = JSON.stringify({
+        colorMode: cfg.colorMode,
+        hierarchical: cfg.hierarchical,
+        filterSpeckle: cfg.filterSpeckle,
+        colorPrecision: cfg.colorPrecision,
+        layerDifference: cfg.layerDifference,
+        cornerThreshold: cfg.cornerThreshold,
       });
+      var resultJson = window.VectorizeWasm.vectorize_image(base64ToBytes(m[2]), configJson);
+      result = JSON.parse(resultJson);
     } catch (e) {
       showToast((SM && SM.t ? SM.t('vectorizeFailed') : 'Vectorization failed: ') + (e && e.message ? e.message : e));
       return;
