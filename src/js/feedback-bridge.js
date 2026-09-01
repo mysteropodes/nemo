@@ -22,12 +22,28 @@
   function tauriOk() { return typeof window.__TAURI__ !== 'undefined'; }
   function projectKey() { return (window.SMProject && window.SMProject.getProjectKey()) || 'untitled-autosave'; }
 
-  // Browser-only transport for the two GitHub calls Tauri does via Rust
-  // (submit_feedback_issue/upload_feedback_attachment) — see worker-feedback/
-  // (repo root).
+  // The single transport for both GitHub calls, desktop included — see
+  // worker-feedback/ (repo root). Desktop used to post to GitHub directly from
+  // Rust with a token compiled into the binary via env!(). That token was
+  // extractable from any copy of the app, could not be rotated without
+  // shipping a new build (both previous ones silently expired), and would have
+  // needed Contents:write on the code repo once feedback moved to nemo. Now
+  // the only token lives as a Cloudflare secret in the Worker and is never
+  // distributed.
+  //
+  // On desktop the request goes through the Tauri HTTP plugin rather than
+  // fetch(), same as kitsu.js already does. That is deliberate: the app's CSP
+  // connect-src does not list the Worker, and the Worker's CORS allowlist
+  // holds the web origins, not tauri://localhost — a plain fetch() would be
+  // blocked twice over. Going through the plugin issues the request from Rust,
+  // so neither applies, and neither guard has to be widened.
   var FEEDBACK_WORKER_URL = 'https://nemo-feedback.mysteropodes-auth.workers.dev';
+  function workerFetch() {
+    var t = window.__TAURI__;
+    return (t && t.http && t.http.fetch) ? t.http.fetch : fetch;
+  }
   async function workerPost(path, payload) {
-    var resp = await fetch(FEEDBACK_WORKER_URL + path, {
+    var resp = await workerFetch()(FEEDBACK_WORKER_URL + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -316,12 +332,10 @@
     // Best-effort: beta testers have no shared Sync folder (that's a local/
     // network-drive mechanism for Cyril's own machines) — this is THEIR
     // transport instead: one GitHub Issue per feedback entry, in the public
-    // mysteropodes/strokemotion-feedback repo. On Tauri the write-scoped
-    // token lives entirely in Rust (submit_feedback_issue, src-tauri/src/
-    // lib.rs) so it never appears in this file or a devtools-visible
-    // fetch(); on the web build there IS no Rust backend to hide it behind,
-    // so the same call instead goes to the nemo-feedback Worker (see
-    // githubIssue()/githubAttachment() below), which holds the token
+    // mysteropodes/nemo repo. Desktop and web now take the same route: the
+    // nemo-feedback Worker, which is the only place the write token exists.
+    // Desktop used to post from Rust with the token compiled into the binary;
+    // see workerPost() above for why that was replaced rather than kept
     // server-side the same way. 2026-08: this used to be Tauri-only and
     // silently no-op on web — a tester's feedback looked "saved" but never
     // reached anyone, see worker-feedback/README for the fix.
@@ -334,10 +348,10 @@
   function fbTagLabelPlain(tag) {
     return { bug: 'bug', perf: 'perf', idee: 'idée', polish: 'polish' }[tag] || tag;
   }
-  // Commits each screenshot into strokemotion-feedback's attachments/
-  // folder via the GitHub Contents API (Rust command upload_feedback_
-  // attachment — same reasoning as submit_feedback_issue for keeping the
-  // token out of JS/devtools) and returns an array of raw.githubusercontent.com
+  // Commits each screenshot into strokemotion-feedback's attachments/ folder
+  // via the Worker (issues live on nemo now, attachments deliberately stay on
+  // the old repo so no token ever needs Contents:write on the source tree)
+  // and returns an array of raw.githubusercontent.com
   // URLs that render inline in the issue body via normal Markdown image
   // syntax — GFM does NOT render data: URIs, so each file has to actually
   // land in the repo, not just be inlined as base64 in the issue text.
@@ -360,14 +374,8 @@
       if (!m) continue;
       var ext = m[1] === 'jpeg' ? 'jpg' : m[1];
       var filename = entry.id + (dataUrls.length > 1 ? '-' + (i + 1) : '') + '.' + ext;
-      var url = null;
-      if (tauriOk()) {
-        var t = window.__TAURI__;
-        url = await t.core.invoke('upload_feedback_attachment', { filename: filename, contentBase64: m[2] });
-      } else {
-        var data = await workerPost('/attachment', { filename: filename, contentBase64: m[2] });
-        url = data && data.url;
-      }
+      var data = await workerPost('/attachment', { filename: filename, contentBase64: m[2] });
+      var url = data && data.url;
       if (url) urls.push(url);
     }
     return urls;
@@ -417,11 +425,6 @@
       '',
       '<!-- sm-feedback-id: ' + entry.id + ' -->',
     ].join('\n');
-    if (tauriOk()) {
-      var t = window.__TAURI__;
-      await t.core.invoke('submit_feedback_issue', { title: title, body: body, labels: labels });
-      return;
-    }
     await workerPost('/issue', { title: title, body: body, labels: labels });
   }
 

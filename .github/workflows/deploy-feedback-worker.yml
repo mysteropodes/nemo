@@ -10,10 +10,12 @@ name: Deploy feedback Worker to Cloudflare
 #   1. The Worker needs its OWN Cloudflare-side secret — NOT a GitHub
 #      Actions secret, set once via the CLI directly against the account:
 #        npx wrangler secret put GITHUB_FEEDBACK_TOKEN --name nemo-feedback
-#      (run locally, with a fine-grained GitHub PAT scoped ONLY to
-#      mysteropodes/strokemotion-feedback, Issues:write + Contents:write —
-#      the same scope src-tauri's STROKEMOTION_FEEDBACK_TOKEN already uses;
-#      can be the same token value or a fresh one).
+#      (run locally, with a fine-grained GitHub PAT covering both repos:
+#      mysteropodes/nemo for Issues:write — reports live with the code —
+#      and mysteropodes/strokemotion-feedback for Contents:write, where
+#      screenshots stay so no token needs write access to the source tree.
+#      This is now the ONLY feedback token: the desktop build no longer
+#      compiles one in, it posts through this Worker like the web build.)
 #   2. CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID (GitHub Actions repo
 #      secrets) — already added for deploy-web.yml, reused here.
 # ALLOWED_ORIGINS (the editor's real origin(s)) and feedback-bridge.js's
