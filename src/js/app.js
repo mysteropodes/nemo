@@ -441,6 +441,17 @@ function reorderLayersAtGap(fromIndices,gapIdx){
   var insertIdx=0;
   for(var i=0;i<gapIdx;i++)if(moving.indexOf(i)<0)insertIdx++;
   var activeLd=state.layers[state.activeLayerIdx];
+  // Selection follows the LAYER, not the array slot it used to occupy
+  // (2026-09-01, Cyril: "si on déplace l'order d'un calque select celui
+  // ci ne reste pas select, c'est le premier calque qui est select à
+  // chaque fois") — same identity-capture-then-relocate pattern activeLd
+  // already uses just above, applied to the multi-select array too:
+  // _layerSel/_layerSelAnchor are raw ARRAY INDICES, and the splice below
+  // moves layers between indices, so leaving them untouched pointed the
+  // highlight at whatever layer happened to land on that OLD index
+  // afterward — not necessarily the one the user actually selected.
+  var selLds=(typeof _layerSel!=='undefined'&&_layerSel.length)?_layerSel.map(function(i){return state.layers[i];}):null;
+  var anchorLd=(typeof _layerSelAnchor!=='undefined'&&_layerSelAnchor>=0)?state.layers[_layerSelAnchor]:null;
   var movedLd=moving.map(function(i){return state.layers[i];});
   var movedUL=moving.map(function(i){return userLayers[i];});
   var keptLd=state.layers.filter(function(_l,i){return moving.indexOf(i)<0;});
@@ -459,6 +470,14 @@ function reorderLayersAtGap(fromIndices,gapIdx){
   userLayers.forEach(function(l){l.insertBelow(arcLayer);});
   var newActiveIdx=state.layers.indexOf(activeLd);
   state.activeLayerIdx=newActiveIdx>=0?newActiveIdx:0;
+  if(selLds){
+    _layerSel=selLds.map(function(ld){return state.layers.indexOf(ld);}).filter(function(i){return i>=0;});
+  }
+  if(typeof _layerSelAnchor!=='undefined'&&anchorLd){
+    var newAnchorIdx=state.layers.indexOf(anchorLd);
+    _layerSelAnchor=newAnchorIdx>=0?newAnchorIdx:-1;
+  }
+  if(typeof window!=='undefined'&&window.SMMotion&&window.SMMotion.syncBarSelToLayerSel)window.SMMotion.syncBarSelToLayerSel();
   activateUL(state.activeLayerIdx);
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(SM.t(moving.length>1?'toastLayersReordered':'toastLayerReordered'));
 }

@@ -70,6 +70,44 @@ test('layer gap reorder preserves objects, active layer, and visual bottom drop'
   assert.match(read('src/css/style.css'), /\.layer-drop-indicator\s*\{/);
 });
 
+test('layer gap reorder moves the selection with the layer, not the array slot', () => {
+  // 2026-09-01, Cyril: "si on déplace l'order d'un calque select celui ci
+  // ne reste pas select, c'est le premier calque qui est select à chaque
+  // fois" — _layerSel/_layerSelAnchor are raw ARRAY INDICES, and the
+  // splice inside reorderLayersAtGap moves layers between indices, so an
+  // untouched index just landed on whatever layer happened to be there
+  // afterward instead of following the one the user actually selected.
+  const source = read('src/js/app.js');
+  const start = source.indexOf('function reorderLayersAtGap(');
+  const end = source.indexOf('function drawStage(', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const layers = ['A', 'B', 'C', 'D'].map((name) => ({ name }));
+  const userLayers = layers.map((layer) => ({ layer, insertBelow() {} }));
+  const state = { layers, activeLayerIdx: 1, currentFrame: 0 };
+  let syncCalls = 0;
+  const sandbox = {
+    state, userLayers, arcLayer: {},
+    // B (index 1) and D (index 3) selected, anchored on B — same shape a
+    // real Shift/Ctrl-click multi-select leaves behind.
+    _layerSel: [1, 3], _layerSelAnchor: 1,
+    saveAllLayerFrames() {}, pushUndoLayers() {}, activateUL() {}, loadFrame() {},
+    renderOS() {}, renderArcs() {}, updateUI() {}, showToast() {},
+    SM: { t(value) { return value; } }, Math, Array,
+    window: { SMMotion: { syncBarSelToLayerSel() { syncCalls++; } } },
+  };
+  vm.runInNewContext(`${source.slice(start, end)}\nthis.reorder = reorderLayersAtGap;`, sandbox);
+  // Move A (index 0, unselected) to the very end — B, C, D each shift down
+  // one slot, so a naive index-only selection would now point at C and
+  // nothing instead of following B and D.
+  sandbox.reorder([0], 4);
+  assert.deepEqual(state.layers.map((l) => l.name), ['B', 'C', 'D', 'A']);
+  const selectedNames = sandbox._layerSel.map((i) => state.layers[i].name).sort();
+  assert.deepEqual(selectedNames, ['B', 'D']);
+  assert.equal(state.layers[sandbox._layerSelAnchor].name, 'B');
+  assert.equal(syncCalls, 1);
+});
+
 test('multi-layer selection has one union overlay and three transforms in both modes', () => {
   const source = read('src/js/motion.js');
   assert.match(source, /function multiLayerBox\(\)/);
