@@ -113,12 +113,26 @@
   // proximity lock above (decided instantly at pointerdown, since distance-
   // to-a-drawn-line is already known from a single point), the ANGLE lock
   // needs a couple of pixels of real drag before a direction even exists to
-  // compare against a vanishing point — guideStartPt is the gesture's true
-  // (unconstrained) first point, guideLockDecided flips true the moment
-  // EITHER kind of lock has been resolved (found a ray, or confirmed none
-  // applies), so the angle check only ever runs once per gesture, not on
-  // every subsequent sample.
-  var guideStartPt = null, guideLockDecided = false;
+  // compare against a vanishing point.
+  //
+  // 2026-09 fix (Cyril, live: "ça dessine toujours sur les guides et pas
+  // avec les guides d'axe") — guideConstrain below used to let the
+  // PROXIMITY lock decide instantly at pointerdown and, if it found
+  // anything, permanently skip the angle check for the rest of the
+  // gesture. Measured live: with the default 2pt VP layout, a pointerdown
+  // 1500+ world-px from a VP still landed within LOCK_TOLERANCE_PX (40
+  // SCREEN px, i.e. hundreds of world px once zoomed out) of some
+  // unrelated fan ray at a completely different angle than the one the
+  // user actually dragged toward — so the stroke locked onto whichever
+  // static guide LINE happened to be underfoot, never onto the true
+  // direction toward a vanishing point (the "axis guide" behavior the
+  // cursor crosshair shows). Every fan ray already radiates FROM a vp, so
+  // the angle check below reproduces "start on a drawn ray" correctly on
+  // its own (the ray's own direction points straight at that vp by
+  // construction) — the proximity candidate is now only a FALLBACK for
+  // when no vp matches by angle at all, tried once real drag exists,
+  // instead of preempting the angle check outright.
+  var guideStartPt = null, guideLockDecided = false, guideProximityFallback = null;
   var lastMoveT = 0, lastWorldPt = null;
   var lastPenPressure = null; // held across a real-pen gesture, see pressureOf()
   // state.stabilizer (position-averaging while drawing) used to only exist
@@ -338,18 +352,22 @@
   function guideConstrain(w, isStart) {
     if (isStart) {
       guideStartPt = new Point(w[0], w[1]);
-      // Proximity lock still applies IMMEDIATELY when the stroke starts
-      // right on a drawn ray (or the horizon) — a single point is already
-      // enough distance-to-line info, no need to wait for a direction.
-      lockedGuideRay = window.perspectiveFindGuideRayNear ? window.perspectiveFindGuideRayNear(guideStartPt) : null;
-      guideLockDecided = !!lockedGuideRay;
+      lockedGuideRay = null;
+      guideLockDecided = false;
+      // Remember a proximity candidate (starting right on a drawn ray or
+      // the horizon) but DON'T commit to it yet — the angle-based check
+      // below gets first refusal once a direction exists (see the
+      // 2026-09 comment on this file's own guideStartPt declaration for
+      // why: proximity alone was locking strokes onto whatever line was
+      // underfoot, ignoring the direction actually drawn).
+      guideProximityFallback = window.perspectiveFindGuideRayNear ? window.perspectiveFindGuideRayNear(guideStartPt) : null;
     } else if (!guideLockDecided && guideStartPt) {
       var curPt = new Point(w[0], w[1]);
       // Needs real direction before the angle check means anything — same
       // 4px-of-drag floor snapToVP itself uses (perspective-bridge.js).
       if (curPt.getDistance(guideStartPt) >= 4) {
-        lockedGuideRay = window.perspectiveFindVPRayByAngle ? window.perspectiveFindVPRayByAngle(guideStartPt, curPt) : null;
-        guideLockDecided = true; // decided either way — never re-checked again this gesture, so a stroke that isn't aimed at any VP just draws free for its whole length, not just its first few px
+        lockedGuideRay = (window.perspectiveFindVPRayByAngle ? window.perspectiveFindVPRayByAngle(guideStartPt, curPt) : null) || guideProximityFallback;
+        guideLockDecided = true; // decided either way — never re-checked again this gesture, so a stroke that isn't aimed at any VP (or a drawn ray) just draws free for its whole length, not just its first few px
       }
     }
     if (lockedGuideRay && window.perspectiveProjectOnRay) {
@@ -724,7 +742,7 @@
     // catch-up behavior Photoshop/Clip Studio's stabilized brushes use.
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     w = guideConstrain(w, false);
-    lockedGuideRay = null; guideStartPt = null; guideLockDecided = false; // stroke over — next pointerdown re-evaluates from scratch
+    lockedGuideRay = null; guideStartPt = null; guideLockDecided = false; guideProximityFallback = null; // stroke over — next pointerdown re-evaluates from scratch
     var pressure = smoothPressure(wantsPressure() ? pressureOf(e, w) : 1);
     if (modeler) {
       // The modeler's own end-of-stroke catch-up (physics iterated until
