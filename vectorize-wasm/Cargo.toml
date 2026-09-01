@@ -1,0 +1,21 @@
+[package]
+name = "vectorize-wasm"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# The vtracer pipeline itself lives in ../vectorize-core, shared verbatim
+# with the native Tauri command (src-tauri/src/vectorize.rs) — see that
+# crate's own doc comment. This crate is only the wasm-bindgen boundary:
+# bytes + a JSON config string in, a JSON result string out (JSON rather
+# than serde-wasm-bindgen's JsValue conversion — one fewer dependency, and
+# the exact same wire shape the Tauri IPC path already uses, so
+# vectorize-bridge.js's response handling doesn't need to branch on which
+# path produced it).
+vectorize-core = { path = "../vectorize-core" }
+wasm-bindgen = "0.2"
+serde_json = "1"

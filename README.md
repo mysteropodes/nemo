@@ -113,7 +113,16 @@ in either mode:
 cd geometry-wasm && wasm-pack build --target web --out-dir ../src/wasm
 ```
 
-Run the tests with `npm test` (Node) and `cargo test` (inside `geometry-wasm/`).
+Same for the image vectorizer (`vectorize-wasm/`, sharing its actual tracing logic with
+`vectorize-core/` — see that crate's own doc comment) — loaded lazily, only the first time
+the "Vectorize Image" dialog opens, not on every app boot:
+
+```bash
+cd vectorize-wasm && wasm-pack build --target web --out-dir ../src/wasm-vectorize
+```
+
+Run the tests with `npm test` (Node) and `cargo test` (inside `geometry-wasm/`,
+`vectorize-core/`, or `src-tauri/`).
 
 ## How it's built
 

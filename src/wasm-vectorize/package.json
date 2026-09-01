@@ -1,0 +1,16 @@
+{
+  "name": "vectorize-wasm",
+  "type": "module",
+  "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
+  "files": [
+    "vectorize_wasm_bg.wasm",
+    "vectorize_wasm.js",
+    "vectorize_wasm.d.ts"
+  ],
+  "main": "vectorize_wasm.js",
+  "types": "vectorize_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
