@@ -83,10 +83,23 @@
   // submission, but one level earlier — on the JS-side compute itself,
   // which the render-side coalescing alone can't save.
   var _liveDabCache = null, _liveDabCacheAt = 0;
+  // strokeSeed (2026-09, Cyril: "la brush change de forme pendant le
+  // dessin... il faudrait une certaine constance") — allocated fresh per
+  // gesture in onDown, reused for EVERY live rebuild during that same drag
+  // AND the final commit (commitStroke's applyBrushTexture calls). Without
+  // it, every ~16ms rebuild below re-walked the whole growing path with a
+  // fresh Math.random, reshuffling every already-drawn dab's opacity/size/
+  // rotation/edge-noise on every frame instead of just adding new ones at
+  // the tip — and the committed result (also unseeded) wouldn't even match
+  // whatever was last visible right before mouseup. Reusing one seed for
+  // the whole gesture keeps the walk over any already-drawn PREFIX of the
+  // path deterministic as it grows (see buildBrushDabs/roughenPath's own
+  // seeding comments in tools.js), so only the active tip visibly changes.
+  var strokeSeed = 0;
   function liveBrushDabs(pathLike, preset, baseWidth, widthProfile) {
     var now = performance.now();
     if (_liveDabCache && now - _liveDabCacheAt < 16) return _liveDabCache;
-    _liveDabCache = buildBrushDabs(pathLike, preset, baseWidth, null, widthProfile);
+    _liveDabCache = buildBrushDabs(pathLike, preset, baseWidth, seededRng(strokeSeed), widthProfile);
     _liveDabCacheAt = now;
     return _liveDabCache;
   }
@@ -587,6 +600,7 @@
     dragging = true;
     samples = [];
     _liveDabCache = null; _liveDabCacheAt = 0;
+    strokeSeed = (Math.random() * 0xFFFFFFFF) >>> 0;
     lastMoveT = 0; lastWorldPt = null; lastPenPressure = null;
     stabQueue = []; resetPressureFilter();
     var w0 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
@@ -988,7 +1002,7 @@
       // baseWidth for a shape whose width varies along its length) — now
       // that it accepts a widthProfile, wire it up here too so a preset
       // actually applies to pressure strokes at draw time.
-      if (!state.shadowMode && state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
+      if (!state.shadowMode && state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset, strokeSeed);
     } else {
       path = new Path();
       // Left-panel stroke eye honored here too (it always was for the
@@ -1018,7 +1032,7 @@
       // Raster companion instead of many vector dabs; the path committed
       // above (fill included) stays as the real, subselect-editable anchor.
       if (!state.shadowMode && state.strokeEnabled && state.bitmapBrushOn && window.SMBitmapBrush) window.SMBitmapBrush.applyToPath(path, null, samples);
-      else if (!state.shadowMode && state.strokeEnabled && state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset);
+      else if (!state.shadowMode && state.strokeEnabled && state.brushPreset && state.brushPreset !== 'none') applyBrushTexture(path, state.brushPreset, strokeSeed);
       if (state.drawMode === 'behind') {
         userLayers[state.activeLayerIdx].insertChild(0, path);
         // Same re-anchor need as the linkedFill case a few lines up in the

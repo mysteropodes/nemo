@@ -4317,8 +4317,20 @@ function resolveBrushPreset(key){
 // must be reproducible across calls — tween generation re-stamps the dabs
 // on every generated inbetween frame from the interpolated centerline, and
 // a fresh Math.random each frame would make the texture "boil" violently
-// instead of sticking to the morphing stroke. Interactive application keeps
-// true randomness (rng omitted → Math.random).
+// instead of sticking to the morphing stroke. A LIVE stroke has the exact
+// same problem while it's being drawn (2026-09, Cyril: "la brush change de
+// forme pendant le dessin... il faudrait une certaine constance") — the
+// live preview re-walks the whole growing path on every rebuild
+// (draw-bridge.js's liveBrushDabs), so an unseeded rng was reshuffling
+// every already-drawn dab's opacity/size/rotation/edge-noise on every
+// frame, not just adding NEW ones at the tip. draw-bridge.js now allocates
+// one seed per gesture (at pointerdown) and reuses it for every live
+// rebuild AND the final commit, so the already-drawn portion of a stroke
+// stays visually still while dragging, and what's shown right before
+// mouseup matches exactly what gets committed. Every other caller
+// (brush-preset-picker.js, brush-editor.js, brush-menu-bridge.js, a preset
+// re-applied later via timeline.js) still omits rng/seed and keeps true
+// per-call randomness — unaffected.
 function seededRng(seed){
   var t=seed>>>0;
   return function(){
@@ -4521,38 +4533,70 @@ function sampleGaussian(rand){
 // path dabs get stamped along, one octave BELOW edgeNoise — a handful of
 // slow bumps over the whole stroke's length instead of independent
 // per-dab jitter, because a real unsteady hand wanders slowly, it doesn't
-// vibrate. Built once per buildBrushDabs call as a small set of random
-// control offsets, cosine-interpolated so consecutive dabs land on a
-// continuous, gently-curving deviation rather than a jagged random walk.
-// Disposable ({insert:false}) — never touches the caller's own path.
+// vibrate.
+//
+// Returns a duck-typed {length,getPointAt,getTangentAt} object, not a real
+// Path — buildBrushDabs only ever calls those three members on pathLike
+// (see its own parameter comment: "works equally on a throwaway preview
+// path"), so an analytic wrapper is a legal substitute and, critically,
+// avoids ever discretizing+smoothing a new Path. An earlier version built
+// a fixed-resolution resampled Path and called Path#smooth on it — smooth
+// is a GLOBAL fit over every point in that build, so a live drag (which
+// rebuilds this every ~16ms over a GROWING path, see buildBrushDabs'
+// seeding comment) got a measurably different curve under the SAME
+// already-drawn prefix on every rebuild (~2.4px measured) even with a
+// fixed seed. Evaluating the wobble analytically per query removes that
+// source of drift entirely: bumpOffset(i) is a pure, stateless hash of
+// (bumpSeed, i) — same mixing as seededRng, just index-addressable instead
+// of sequential — and smoothAt keys off ABSOLUTE arc-length divided by a
+// FIXED spacing constant, never off a fraction of the CURRENT total
+// length. So the offset at any given absolute position on the stroke is
+// fixed for good the moment the path first reaches that far; a longer
+// path afterward only reveals FURTHER offsets, it never reinterprets ones
+// already drawn under. The only rand() draw is the single bumpSeed below —
+// constant count regardless of stroke length, so it doesn't shift
+// whatever else the shared stream produces afterward either.
 function roughenPath(pathLike,amount,baseWidth,rand){
   if(!amount)return pathLike;
   var len=pathLike.length;
   if(!(len>0))return pathLike;
-  // ~1 bump per 120px of length, clamped 2..8 — enough for a long stroke
-  // to visibly wander without the frequency creeping toward edgeNoise's
-  // per-dab territory.
-  var bumps=Math.max(2,Math.min(8,Math.round(len/120)));
-  var offsets=[];
-  for(var i=0;i<=bumps;i++)offsets.push(rand()*2-1);
-  function smoothAt(frac){
-    var f=frac*bumps,i0=Math.floor(f),i1=Math.min(bumps,i0+1),t=f-i0;
+  var bumpSeed=(rand()*0xFFFFFFFF)>>>0;
+  function bumpOffset(i){
+    var h=(bumpSeed^Math.imul(i+1,0x9E3779B1))>>>0;
+    h=Math.imul(h^h>>>15,1|h);
+    h=h+Math.imul(h^h>>>7,61|h)^h;
+    return(((h^h>>>14)>>>0)/4294967296)*2-1;
+  }
+  // Spacing between control points, in px of ARC LENGTH (not a fraction of
+  // total length) — "one octave below edgeNoise", a slow wander rather
+  // than per-dab noise.
+  var BUMP_SPACING=120;
+  function smoothAt(at){
+    var f=at/BUMP_SPACING,i0=Math.floor(f),t=f-i0;
     var ease=.5-.5*Math.cos(t*Math.PI); // cosine interpolation — smoother than a linear lerp between bumps
-    return offsets[i0]*(1-ease)+offsets[i1]*ease;
+    return bumpOffset(i0)*(1-ease)+bumpOffset(i0+1)*ease;
   }
   var mag=amount*Math.max(1,baseWidth)*.8;
-  var steps=Math.max(bumps*8,24);
-  var out=new Path({insert:false});
-  for(var s=0;s<=steps;s++){
-    var frac=s/steps,at=frac*len;
-    var pt=pathLike.getPointAt(at);
-    var tan=pathLike.getTangentAt(at)||new Point(1,0);
+  function offsetPointAt(at){
+    var clamped=Math.max(0,Math.min(len,at));
+    var pt=pathLike.getPointAt(clamped);
+    var tan=pathLike.getTangentAt(clamped)||new Point(1,0);
     var normal=new Point(-tan.y,tan.x);
-    var p=pt.add(normal.multiply(smoothAt(frac)*mag));
-    if(s===0)out.moveTo(p);else out.lineTo(p);
+    return pt.add(normal.multiply(smoothAt(clamped)*mag));
   }
-  out.smooth({type:'continuous'});
-  return out;
+  // Small finite-difference step (arc-length units) to estimate the
+  // wobbled tangent — fine enough to track BUMP_SPACING's own low
+  // frequency without amplifying float noise.
+  var eps=Math.max(.01,len/2000);
+  return{
+    length:len,
+    getPointAt:offsetPointAt,
+    getTangentAt:function(at){
+      var a=Math.max(0,at-eps),b=Math.min(len,at+eps);
+      var d=offsetPointAt(b).subtract(offsetPointAt(a));
+      return d.length>1e-9?d.normalize():(pathLike.getTangentAt(at)||new Point(1,0));
+    },
+  };
 }
 function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
   var rand=rng||Math.random;
@@ -4830,7 +4874,12 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
 // relinkBrushCompanions() after every layer rebuild — see that function's
 // own comment in app.js for why a live object-reference array can't
 // survive a save/reload on its own).
-function applyBrushTexture(basePath,presetKey){
+// seed (optional, 2026-09 — "la brush change de forme pendant le dessin",
+// Cyril): omitted, this reproduces the exact prior behavior (fresh
+// Math.random per call — every caller except draw-bridge.js's live-drag
+// commit, which now passes the SAME seed it used for the gesture's live
+// preview, see liveBrushDabs there). Threaded straight to buildBrushDabs.
+function applyBrushTexture(basePath,presetKey,seed){
   var preset=resolveBrushPreset(presetKey);
   if(!preset||!basePath.segments||basePath.segments.length<2)return basePath;
   // Pressure (vectorBrush) ribbons are a FILLED SHAPE whose width varies
@@ -4872,7 +4921,7 @@ function applyBrushTexture(basePath,presetKey){
   // come out colorless.
   var baseColor=basePath.strokeColor||(basePath.data&&basePath.data.preTextureStroke?new Color(basePath.data.preTextureStroke):null)||(isPressure?basePath.fillColor:null);
   var groupId='bg'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);
-  var dabs=buildBrushDabs(pathLike,preset,baseWidth,null,widthProfile);
+  var dabs=buildBrushDabs(pathLike,preset,baseWidth,seed!==undefined?seededRng(seed):null,widthProfile);
   var companions=dabs.map(function(dab){
     // dabValueDelta (buildBrushDabs) is per-DAB grain: a light lerp toward
     // black/white so a textured stroke isn't a flat wash of one color, closer
