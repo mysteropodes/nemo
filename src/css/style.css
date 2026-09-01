@@ -2695,6 +2695,14 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
   cursor:ew-resize;z-index:5;}
 .ecp-grip:hover{background:var(--accent);opacity:.5;}
 .motion-expr-pop{margin-left:4px;}
+/* Examples button/menu (2026-09-01) — the button reuses .ecp-close's own
+   sizing (icon-sized, borderless) rather than a new button class; the
+   dropdown reuses .ctx-menu/.ctx-item (ui.js) for the same reason every
+   other floating menu in the app looks the same. */
+.ecp-examples-btn svg{display:block;}
+.ecp-examples-menu{max-height:70vh;overflow-y:auto;}
+.ecp-examples-cat-hdr{font-weight:600;color:var(--text-dim);}
+.ecp-examples-item{padding-left:22px;font-size:10.5px;}
 
 /* Alpha warning on the start screen (index.html, above #start-cards).
    Amber rather than red: this is "know what you're getting into", not an
