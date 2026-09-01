@@ -45,13 +45,29 @@
 
   // vtracer's own three built-in presets (cmdapp/src/config.rs, verified
   // against the exact published source of the pinned 0.6.5) — same
-  // Bw/Poster/Photo vocabulary VTracer's own CLI/webapp uses, so a preset
-  // picked here behaves identically to picking it anywhere else VTracer
-  // ships.
+  // Bw/Poster/Photo vocabulary VTracer's own CLI/webapp uses, EXCEPT
+  // hierarchical, deliberately overridden to 'cutout' here (VTracer's own
+  // presets all default to 'stacked').
+  //
+  // Found live (2026-09, tracing a plain circle): in 'stacked' mode, each
+  // shape's geometry is only correct WHEN COMPOSITED IN PAINT ORDER — the
+  // "blue circle" shape traced out as the FULL CANVAS RECTANGLE (color
+  // blue, geometry = the whole square), with the actual tight circle
+  // instead living as a HOLE cut into the white background shape drawn on
+  // top. The final on-screen composite still looked correct (which is why
+  // Phase 0's own visual verification didn't catch this), but each
+  // individual shape is meaningless on its own — exactly the opposite of
+  // what Nemo needs, since every traced shape becomes its own independent,
+  // separately-selectable document object, and Phase 1's paramShape fit
+  // needs a shape's OWN geometry to match what it visually represents.
+  // 'cutout' runs vtracer's second reclustering pass (config.rs's own
+  // Hierarchical::Cutout branch) specifically so every shape is a real,
+  // self-contained region — confirmed on the same circle: the blue shape's
+  // own contour is the tight circle, not the canvas rect.
   var PRESETS = {
-    bw: { colorMode: 'binary', hierarchical: 'stacked', filterSpeckle: 4, colorPrecision: 6, layerDifference: 16, cornerThreshold: 60 },
-    poster: { colorMode: 'color', hierarchical: 'stacked', filterSpeckle: 4, colorPrecision: 8, layerDifference: 16, cornerThreshold: 60 },
-    photo: { colorMode: 'color', hierarchical: 'stacked', filterSpeckle: 10, colorPrecision: 8, layerDifference: 48, cornerThreshold: 180 },
+    bw: { colorMode: 'binary', hierarchical: 'cutout', filterSpeckle: 4, colorPrecision: 6, layerDifference: 16, cornerThreshold: 60 },
+    poster: { colorMode: 'color', hierarchical: 'cutout', filterSpeckle: 4, colorPrecision: 8, layerDifference: 16, cornerThreshold: 60 },
+    photo: { colorMode: 'color', hierarchical: 'cutout', filterSpeckle: 10, colorPrecision: 8, layerDifference: 48, cornerThreshold: 180 },
   };
 
   // Converts a vtracer "1+3n" absolute cubic-bezier control-point chain
@@ -91,6 +107,109 @@
     return contour.kind === 'spline' ? splineToSegments(contour.points, mapPt) : polygonToSegments(contour.points, mapPt);
   }
 
+  // ---- Phase 1: parametric shape recognition (2026-09) ----
+  // "des forme qui peuvent être paramétrique" — when a traced contour is
+  // well-approximated by a primitive Nemo already knows how to edit
+  // natively (rounded rect, ellipse — see tools.js's buildRoundRectPath/
+  // buildArcEllipsePath/stampParamShapeBox, the same machinery the
+  // Rectangle/Ellipse tools themselves use), emit a REAL editable
+  // paramShape instead of a frozen bezier blob: corner-radius handles,
+  // the Motion cornerTL..BL/arcStart/arcSweep properties, the Coins panel
+  // — all of it comes for free, because the shape IS indistinguishable
+  // from one drawn by hand with those tools.
+  //
+  // Deliberately axis-aligned only in v1 — Nemo's own ellipse paramShape
+  // has no rotation concept at all (applyParamShapeEllipse never calls
+  // reapplyParamShapeAngle, unlike rect/star), and detecting a ROTATED
+  // rect's angle from a traced contour is extra work with its own
+  // failure modes; a rotated shape just falls through to the plain-path
+  // path below, unchanged from Phase 0. Star/polygon fitting (needs
+  // rotational-symmetry detection, a harder problem) is not attempted
+  // here either — circle/ellipse and rect/rounded-rect cover the large
+  // majority of real flat graphics (logos, icons, UI chrome) on their
+  // own.
+  //
+  // Fit against the contour's PAPER anchor points (segment.point, handles
+  // ignored) — a reasonable point-cloud sample of the boundary, cheap,
+  // and already in the exact world-space paramShape's own box will use.
+  var ELLIPSE_FIT_RMSE_MAX = 0.05; // normalized (x/rx)²+(y/ry)² residual
+  var RECT_AREA_RATIO_MIN = 0.90;  // traced-area / bbox-area
+
+  function fitEllipse(pts, bounds) {
+    var cx = bounds.center.x, cy = bounds.center.y, rx = bounds.width / 2, ry = bounds.height / 2;
+    if (rx < 2 || ry < 2 || pts.length < 5) return null;
+    var sumSq = 0;
+    pts.forEach(function (p) {
+      var u = (p.x - cx) / rx, v = (p.y - cy) / ry;
+      var e = u * u + v * v - 1;
+      sumSq += e * e;
+    });
+    var rmse = Math.sqrt(sumSq / pts.length);
+    return rmse <= ELLIPSE_FIT_RMSE_MAX ? { cx: cx, cy: cy, rx: rx, ry: ry } : null;
+  }
+
+  function shoelaceArea(pts) {
+    var a = 0;
+    for (var i = 0; i < pts.length; i++) {
+      var p1 = pts[i], p2 = pts[(i + 1) % pts.length];
+      a += p1.x * p2.y - p2.x * p1.y;
+    }
+    return Math.abs(a) / 2;
+  }
+
+  function fitRoundedRect(pts, bounds) {
+    var w = bounds.width, h = bounds.height;
+    if (w < 4 || h < 4 || pts.length < 4) return null;
+    if (shoelaceArea(pts) / (w * h) < RECT_AREA_RATIO_MIN) return null;
+    var x1 = bounds.left, y1 = bounds.top, x2 = bounds.right, y2 = bounds.bottom;
+    var corners = { tl: [x1, y1], tr: [x2, y1], br: [x2, y2], bl: [x1, y2] };
+    var maxRadius = Math.min(w, h) / 2;
+    var radii = {}, ok = true;
+    // The traced point closest to an exact sharp corner sits on the
+    // rounding arc itself (or right at the corner if radius≈0) — for the
+    // standard quarter-circle corner buildRoundRectPath draws, that
+    // closest point is exactly radius·(√2−1) away from the sharp corner
+    // (distance corner→arc-center is radius·√2, minus the radius itself).
+    // An exact closed-form recovery of the radius, not a guess.
+    Object.keys(corners).forEach(function (k) {
+      var cx = corners[k][0], cy = corners[k][1], dMin = Infinity;
+      pts.forEach(function (p) {
+        var d = Math.hypot(p.x - cx, p.y - cy);
+        if (d < dMin) dMin = d;
+      });
+      var r = dMin / (Math.SQRT2 - 1);
+      if (r > maxRadius * 1.15) ok = false;
+      radii[k] = Math.max(0, Math.min(maxRadius, r));
+    });
+    if (!ok) return null;
+    return { x1: x1, y1: y1, x2: x2, y2: y2, tl: radii.tl, tr: radii.tr, br: radii.br, bl: radii.bl };
+  }
+
+  // Tries ellipse first (a circle/donut/pie IS an ellipse fit in Nemo's
+  // model — no separate "circle" kind exists), then rounded-rect. Returns
+  // a real, already-inserted-ready paper.Path with data.paramShape
+  // stamped, or null if neither fit well enough — the caller falls back
+  // to the plain traced path in that case.
+  function tryParamShapeFit(anchorPts, bounds, fill) {
+    var e = fitEllipse(anchorPts, bounds);
+    if (e && window.buildArcEllipsePath) {
+      var ep = window.buildArcEllipsePath(e.cx, e.cy, e.rx, e.ry, 0, 359.9, 0);
+      ep.data.paramShape = { kind: 'ellipse', startAngle: 0, sweep: 359.9, innerRadius: 0 };
+      if (window.stampParamShapeBox) window.stampParamShapeBox(ep);
+      ep.fillColor = fill; ep.strokeColor = null;
+      return ep;
+    }
+    var r = fitRoundedRect(anchorPts, bounds);
+    if (r && window.buildRoundRectPath) {
+      var rp = window.buildRoundRectPath(r.x1, r.y1, r.x2, r.y2, r.tl, r.tr, r.br, r.bl);
+      rp.data.paramShape = { kind: 'rect', tl: r.tl, tr: r.tr, br: r.br, bl: r.bl };
+      if (window.stampParamShapeBox) window.stampParamShapeBox(rp);
+      rp.fillColor = fill; rp.strokeColor = null;
+      return rp;
+    }
+    return null;
+  }
+
   // Builds ONE Paper item per traced shape — a plain Path for a single
   // contour, a CompoundPath (CLAUDE.md §1's own convention for anything
   // with holes) when vtracer emitted more than one, e.g. a donut. Fill
@@ -117,6 +236,13 @@
     if (!childPaths.length) return null;
     var item;
     if (childPaths.length === 1) {
+      // Try recognizing a parametric primitive BEFORE settling for the
+      // raw traced path — single-contour shapes only (a donut/shape-with-
+      // a-hole is a CompoundPath below; ellipse's own innerRadius COULD
+      // represent a donut too, but that's a real fit case for later, not
+      // attempted here).
+      var fitted = tryParamShapeFit(childPaths[0].segments.map(function (s) { return s.point; }), childPaths[0].bounds, fill);
+      if (fitted) { childPaths[0].remove(); return fitted; }
       item = childPaths[0];
     } else {
       // A real, multi-contour CompoundPath — correct here, and left alone.
@@ -230,7 +356,6 @@
       '<label style="font-size:11px;color:var(--text-dim)"><span data-i18n="vectorizeFilterSpeckle">Filter speckle</span><br><input type="number" id="vt-speckle" class="pi scrub" data-step="1" style="width:100%"></label>' +
       '<label style="font-size:11px;color:var(--text-dim)"><span data-i18n="vectorizeColorPrecision">Color precision</span><br><input type="number" id="vt-precision" class="pi scrub" data-step="1" style="width:100%"></label>' +
       '<label style="font-size:11px;color:var(--text-dim)"><span data-i18n="vectorizeCornerThreshold">Corner threshold</span><br><input type="number" id="vt-corner" class="pi scrub" data-step="1" style="width:100%"></label>' +
-      '<label style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px"><input type="checkbox" id="vt-cutout"><span data-i18n="vectorizeCutout">Cutout (punch holes instead of stacking)</span></label>' +
       '<div id="vt-error" style="display:none;font-size:10px;color:#ff8080"></div>' +
       '<div class="pr" style="gap:6px;justify-content:flex-end">' +
       '<button class="pbtn" id="vt-cancel" data-i18n="btnCancel">Cancel</button>' +
@@ -268,7 +393,7 @@
     var p = PRESETS[_preset] || PRESETS.poster;
     return {
       colorMode: p.colorMode,
-      hierarchical: modalEl.querySelector('#vt-cutout').checked ? 'cutout' : 'stacked',
+      hierarchical: p.hierarchical,
       filterSpeckle: parseInt(modalEl.querySelector('#vt-speckle').value, 10) || p.filterSpeckle,
       colorPrecision: parseInt(modalEl.querySelector('#vt-precision').value, 10) || p.colorPrecision,
       layerDifference: p.layerDifference,
@@ -279,7 +404,6 @@
     ensureModal();
     modalEl.querySelector('#vt-error').style.display = 'none';
     applyPreset('poster');
-    modalEl.querySelector('#vt-cutout').checked = false;
     modalEl.style.display = 'flex';
   }
   window.openVectorizeDialog = openVectorizeDialog;
