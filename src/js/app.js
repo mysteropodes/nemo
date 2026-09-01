@@ -128,6 +128,16 @@ var state={
   // OFF by default (2026-08-31, feedback #189) — rulers-bridge.js restores
   // the user's own choice from localStorage at init when they made one.
   rulersOn:false,guidesLocked:false,guidesSnap:true,guides:{h:[],v:[]},
+  // Snap to Pixel Grid (2026-09) — OFF by default, unlike guidesSnap: this
+  // rounds a moved object's position to the nearest whole world pixel,
+  // which fights against smooth sub-pixel animation the moment it's on —
+  // an opt-in precision tool for layout work, not a default behavior.
+  pixelGridSnap:false,
+  // Outline View (2026-09) — Illustrator-style hairline rendering, see
+  // engine-bridge.js buildSceneJson's own comment for the AE-vs-Illustrator
+  // distinction that led to this. A pure display mode, never persisted
+  // into project data (not in exportJSON) — same category as previewAlphaBg.
+  outlineView:false,
   // Live "show transparency" preview (2026-08-27, "il manque un bouton
   // pour afficher ou pas le fond en alpha") — the Export panel already
   // has its own "Fond transparent (alpha)" checkbox (engine-bridge.js's

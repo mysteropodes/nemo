@@ -10222,6 +10222,27 @@ document.getElementById('canvas-fit-btn').addEventListener('click',function(e){
     {label:(state.guidesSnap?'✓ ':'')+(SM&&SM.t?SM.t('snapToGuidesMenuLabel'):'Snap to Guides'),action:function(){
       state.guidesSnap=!state.guidesSnap;
     }},
+    // Snap-to-pixel-grid (2026-09, AE help sweep after the two items above:
+    // AE itself calls this "Snap to Grid", separate from guide-snapping —
+    // rounds a moved object's world position to the nearest whole pixel,
+    // same on/off convention as the toggle right above it. Independent of
+    // Rulers/guides on purpose (a project with no guides placed should
+    // still be able to snap to the pixel grid), scoped to Animation 2D's
+    // 'move' drag only, same scope as Snap to Guides right above.
+    {label:(state.pixelGridSnap?'✓ ':'')+(SM&&SM.t?SM.t('snapToPixelGridMenuLabel'):'Snap to Pixel Grid'),action:function(){
+      state.pixelGridSnap=!state.pixelGridSnap;
+    }},
+    {sep:true},
+    // Outline View (2026-09) — Illustrator's View > Outline, not AE's own
+    // "wireframe" (that's an automatic performance fallback, not a manual
+    // toggle — see engine-bridge.js's buildSceneJson comment). A rendering
+    // MODE, not a drag preference like the two snap toggles above, so it
+    // needs an immediate re-render rather than waiting for the next
+    // natural invalidation — same reasoning as the alpha-checker toggle.
+    {label:(state.outlineView?'✓ ':'')+(SM&&SM.t?SM.t('outlineViewMenuLabel'):'Outline View'),action:function(){
+      state.outlineView=!state.outlineView;
+      if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    }},
   ]);
 });
 document.getElementById('p-resamp').addEventListener('input',function(){window.SM.setResamplePts(parseInt(this.value));});

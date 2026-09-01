@@ -263,6 +263,14 @@
     return new Point(bestVx != null ? bestVx : worldPt.x, bestHy != null ? bestHy : worldPt.y);
   }
 
+  // Snap to Pixel Grid (2026-09) — independent of guides/rulers on purpose,
+  // see state.pixelGridSnap's own comment (app.js): a project with no
+  // guides placed should still be able to snap a drag to whole pixels.
+  function snapToPixelGrid(worldPt) {
+    if (!state.pixelGridSnap) return worldPt;
+    return new Point(Math.round(worldPt.x), Math.round(worldPt.y));
+  }
+
   function loop() {
     requestAnimationFrame(loop);
     if (!state.rulersOn || !area || document.hidden) return;
@@ -315,5 +323,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  window.SMRulers = { toggleOn: toggleOn, snapPoint: snapPoint, render: function () { lastZoom = null; } };
+  window.SMRulers = { toggleOn: toggleOn, snapPoint: snapPoint, snapToPixelGrid: snapToPixelGrid, render: function () { lastZoom = null; } };
 })();

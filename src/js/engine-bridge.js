@@ -2526,6 +2526,42 @@
       fEntry.folderChildIndices = resolved;
       delete fEntry._folderChildStateIdxs;
     }
+    // Outline View (2026-09, AE-help sweep after Distribute/Alt-drag-dup —
+    // AE's own "wireframe" is an automatic PERFORMANCE fallback (Fast
+    // Previews), not a manual look, so this instead follows Illustrator's
+    // View > Outline: every real path renders as a plain hairline, fills
+    // hidden, so overlapping/hidden shapes become inspectable. A pure
+    // POST-PASS over already-built items rather than touching any of the
+    // many branches above that construct fillColor/strokeColor (CLAUDE.md
+    // §1 — this function has too many independent item-shape branches to
+    // safely thread a new concern through every one of them without
+    // missing a case) — scoped to userLayerEntries specifically (the
+    // tracked canonical entry per real document layer, already used by the
+    // matte/folder resolution passes just above) so it never touches
+    // editor-overlay chrome (transform box, handles, rulers/guides, mesh/
+    // widget overlays — all pushed separately, outside this array) or the
+    // isCanvasBackground layer unshifted below. Raster/image items
+    // (imageId/image, no fillColor/strokeColor fields at all) pass through
+    // untouched — v1 doesn't attempt an image bounding-box outline.
+    // Gated on includeEditorOverlays (same flag §13's widget/mesh overlays
+    // use, "seul point de readback GPU, partagé par l'export PNG ET le
+    // cache de lecture") so export/pixel-readback/the playback cache NEVER
+    // inherit this editor-only display mode — same exclusion precedent as
+    // previewAlphaBg's own comment a few hundred lines up this function.
+    if (state.outlineView && includeEditorOverlays) {
+      var OUTLINE_COLOR = [0, 0, 0, 255], OUTLINE_WIDTH = 1;
+      userLayerEntries.forEach(function (entry) {
+        if (!entry || !entry.items) return;
+        entry.items.forEach(function (it) {
+          if (it.imageId || it.image) return;
+          if (!('fillColor' in it) && !('strokeColor' in it)) return;
+          it.fillColor = null;
+          it.strokeColor = OUTLINE_COLOR;
+          it.strokeWidth = OUTLINE_WIDTH;
+          if (it.fillGradient) delete it.fillGradient;
+        });
+      });
+    }
     var frameForFx = renderFrame || 0;
     var fpsForFx = Math.max(1, state.fps || 24);
     var _sceneOut = JSON.stringify({ time: frameForFx / fpsForFx, layers: layers });
