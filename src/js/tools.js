@@ -4349,7 +4349,7 @@ function jitterColorValue(color,delta){
   c.blue=c.blue+(mixWith-c.blue)*amt;
   return c;
 }
-function buildDabShape(w,h,preset,rand){
+function buildDabShape(w,h,preset,rand,edgeNoiseOverride){
   var shape=preset.tipShape||'ellipse';
   var path;
   if(shape==='rect'){
@@ -4398,7 +4398,11 @@ function buildDabShape(w,h,preset,rand){
   }else{
     path=new Path.Ellipse({center:[0,0],radius:[w/2,h/2],insert:false});
   }
-  var edgeNoise=preset.edgeNoise||0;
+  // edgeNoiseOverride (pressure-linked grain, buildBrushDabs above): when
+  // omitted (every existing caller — brush-preset-picker.js, brush-
+  // editor.js's live preview, captureBrushStamp's own uses), this reduces
+  // to preset.edgeNoise exactly as before.
+  var edgeNoise=edgeNoiseOverride!==undefined?edgeNoiseOverride:(preset.edgeNoise||0);
   if(edgeNoise>0&&path.segments&&path.segments.length){
     path.segments.forEach(function(seg){
       seg.point=seg.point.multiply(1+(rand()*2-1)*edgeNoise);
@@ -4527,6 +4531,35 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
     var base=(!widthProfile||!widthProfile.length)?baseWidth:widthAtFrac(widthProfile,len>0?at/len:0);
     return base*pressureCurveMul(preset,len>0?at/len:0);
   }
+  // Pressure-linked grain (2026-09, brush audit priority #2 — Procreate's
+  // "Grain: Moving" model): press harder and the texture should visibly
+  // tighten up and clean up; press lighter and it should open up and get
+  // rougher — the thing that makes a brush read as responding to the hand
+  // instead of stamping a pattern independent of the gesture. Reads the
+  // RAW widthProfile (real recorded stylet pressure on a vectorBrush
+  // ribbon), never the preset's own pressureCurveMul shape above — same
+  // independence pressureCurveMul's own header comment already establishes
+  // for width, kept here for grain. A flat or absent profile (every non-
+  // ribbon caller: plain Draw strokes, the Nib editor preview, the preset
+  // picker) leaves the multiplier at a constant 1 — bit-for-bit unaffected,
+  // same guarantee widthProfile itself already gives localWidth above.
+  var wpMin=Infinity,wpMax=-Infinity;
+  if(widthProfile&&widthProfile.length){
+    for(var _wi=0;_wi<widthProfile.length;_wi++){
+      var _ww=widthProfile[_wi].width;
+      if(_ww<wpMin)wpMin=_ww;
+      if(_ww>wpMax)wpMax=_ww;
+    }
+  }
+  var hasPressureSignal=!!(widthProfile&&widthProfile.length&&(wpMax-wpMin)>1e-6);
+  function pressureGrainMul(at){
+    if(!hasPressureSignal)return 1;
+    var raw=widthAtFrac(widthProfile,len>0?at/len:0);
+    var norm=Math.max(0,Math.min(1,(raw-wpMin)/(wpMax-wpMin)));
+    // 1.5x scatter/edgeNoise at the lightest touch, 0.5x at the hardest —
+    // symmetric around the unmodulated 1x a flat profile returns above.
+    return 1.5-norm;
+  }
   // Cap-safety spacing floor: derived from the SMALLEST width along the
   // profile (or baseWidth when constant) so the total-dab-count bound
   // below is always a safe worst-case, regardless of where along the
@@ -4579,6 +4612,7 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
     // stays consistent as a pressure stroke tapers, same as it already did
     // across different fixed stroke widths.
     var localW=localWidth(at);
+    var grainMul=pressureGrainMul(at);
     var nibDiam=Math.max(.5,localW*nibScale);
     var spacing=Math.max(minAllowedSpacing,Math.max(.4,nibDiam*spacingFrac));
     if(spacing<capFloorSpacing)spacing=capFloorSpacing;
@@ -4629,21 +4663,21 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
         // produce, closest vector analog to Photoshop's Bristle tip family.
         for(var b=0;b<bristleCount&&dabs.length<BRUSH_MAX_DABS;b++){
           var frac=bristleCount>1?(b/(bristleCount-1)-.5):0;
-          var strandOffset=frac*nibDiam*(.5+ (preset.scatter||0));
-          var jitterOffset=(rand()*2-1)*nibDiam*(preset.scatter||0)*.3;
+          var strandOffset=frac*nibDiam*(.5+ (preset.scatter||0)*grainMul);
+          var jitterOffset=(rand()*2-1)*nibDiam*(preset.scatter||0)*grainMul*.3;
           var center=pt.add(normal.multiply(strandOffset+jitterOffset));
           var sizeMul=1+(rand()*2-1)*(preset.sizeJitter||0);
           var w=Math.max(.3,(nibDiam/Math.max(2,bristleCount*.7))*sizeMul);
           var h=Math.max(.3,nibDiam*roundness*(.7+rand()*.5));
           var angle=angleBase+(rand()*2-1)*(preset.rotationJitter||0);
-          var dab=buildDabShape(w,h,preset,rand);
+          var dab=buildDabShape(w,h,preset,rand,(preset.edgeNoise||0)*grainMul);
           dab.rotate(angle);
           dab.position=center;
           dab.data={dabOpacity:Math.max(0,Math.min(1,(preset.opacity!==undefined?preset.opacity:.5)*(1+(rand()*2-1)*(preset.opacityJitter||0))*.7*strokeNoiseMul)),dabValueDelta:(rand()*2-1)*(preset.valueJitter||0)};
           dabs.push(dab);
         }
       }else{
-        var scatterAmt=sampleAcrossWidth(rand,preset.scatterDistribution)*nibDiam*(preset.scatter||0);
+        var scatterAmt=sampleAcrossWidth(rand,preset.scatterDistribution)*nibDiam*(preset.scatter||0)*grainMul;
         var center2=pt.add(normal.multiply(scatterAmt));
         var sizeMul2=1+(rand()*2-1)*(preset.sizeJitter||0);
         var w2=Math.max(.3,nibDiam*sizeMul2);
@@ -4654,8 +4688,9 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
         // concentric soft-edge copies are one logical dab, they should all
         // share the same grain darkness rather than each rolling its own.
         var valDelta=(rand()*2-1)*(preset.valueJitter||0);
+        var edgeNoiseMul=(preset.edgeNoise||0)*grainMul;
         if(sharpness>=1){
-          var dab2=buildDabShape(w2,h2,preset,rand);
+          var dab2=buildDabShape(w2,h2,preset,rand,edgeNoiseMul);
           dab2.rotate(angle2);
           dab2.position=center2;
           dab2.data={dabOpacity:baseOp,dabValueDelta:valDelta};
@@ -4678,7 +4713,7 @@ function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
             var lt=SHARPNESS_LAYERS>1?sl/(SHARPNESS_LAYERS-1):0;
             var layerScale=1+lt*(haloScale-1);
             var opMul=Math.exp(-lt*lt*2.5);
-            var layerDab=buildDabShape(w2*layerScale,h2*layerScale,preset,rand);
+            var layerDab=buildDabShape(w2*layerScale,h2*layerScale,preset,rand,edgeNoiseMul);
             layerDab.rotate(angle2);
             layerDab.position=center2;
             // opMul is already exactly 1 at lt=0 (the center layer) — no
