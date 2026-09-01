@@ -138,3 +138,44 @@ test('a single-unit block does not divide by zero', () => {
   }
   assert.deepEqual(sel.weights(base(), 0), []);
 });
+
+test('wiggly selector: same seed+time+index is deterministic and finite', () => {
+  const s = base({ selectorType: 'wiggly', seed: 42 });
+  const a = sel.weights(s, 5, 1.37);
+  const b = sel.weights(s, 5, 1.37);
+  assert.deepEqual(a, b, 'identical inputs must reproduce identical output');
+  for (const v of a) assert.ok(Number.isFinite(v), `wiggly weight was ${v}`);
+});
+
+test('wiggly selector stays within wiggleMin..wiggleMax (as a fraction of 100)', () => {
+  const s = base({ selectorType: 'wiggly', seed: 7, wiggleMin: -30, wiggleMax: 60 });
+  for (let f = 0; f < 40; f++) {
+    const w = sel.weights(s, 6, f * 0.2);
+    for (const v of w) assert.ok(v >= -0.3 - 1e-9 && v <= 0.6 + 1e-9, `${v} outside [-0.3, 0.6]`);
+  }
+});
+
+test('wiggly selector changes over time (it is an animated selector, not a static one)', () => {
+  const s = base({ selectorType: 'wiggly', seed: 3, wigglesPerSec: 2 });
+  const early = sel.weights(s, 4, 0);
+  const later = sel.weights(s, 4, 5);
+  assert.notDeepEqual(early, later);
+});
+
+test('wiggly correlation=100 makes every unit wiggle in unison', () => {
+  const s = base({ selectorType: 'wiggly', seed: 11, correlation: 100 });
+  const w = sel.weights(s, 8, 0.6);
+  for (let i = 1; i < w.length; i++) assert.equal(w[i], w[0], `unit ${i} should match unit 0 at full correlation`);
+});
+
+test('wiggly correlation=0 lets units diverge (not all identical)', () => {
+  const s = base({ selectorType: 'wiggly', seed: 11, correlation: 0 });
+  const w = sel.weights(s, 8, 0.6);
+  const allSame = w.every((v) => v === w[0]);
+  assert.ok(!allSame, 'independent units should not all land on the exact same value');
+});
+
+test('a range selector is unaffected by the new timeSec parameter', () => {
+  const s = base({ shape: SHAPE.RAMP_UP, start: 0, end: 100 });
+  assert.deepEqual(sel.weights(s, 9), sel.weights(s, 9, 123.456));
+});
