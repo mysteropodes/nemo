@@ -185,6 +185,107 @@
     return { x1: x1, y1: y1, x2: x2, y2: y2, tl: radii.tl, tr: radii.tr, br: radii.br, bl: radii.bl };
   }
 
+  // ---- Phase 2: occlusion completion (2026-09) ----
+  // "quand les élément sont les uns devant les autres [garder] en vrai
+  // forme non cassé par la forme de devant. Deviner la forme complète."
+  // (Cyril). The plan agreed on: never guess blind — derive. A shape
+  // whose visible fragment fits a primitive is completed by REFITTING
+  // that primitive on just the non-occluded points, never by hallucinating
+  // the hidden part.
+  //
+  // Scoped to CIRCLES only in v1 (not general ellipses or rects): a
+  // circle's bounding box is unusable here — the VISIBLE fragment's bbox
+  // is smaller/offset from the true full circle's, so fitEllipse's
+  // "derive center/radii from bounds" approach (fine for a COMPLETE shape,
+  // Phase 1) is wrong on a cut one. A circle alone has a closed-form
+  // algebraic least-squares fit that needs no bounding box at all — the
+  // Kåsa method: minimize Σ(xi²+yi²+D·xi+E·yi+F)² by solving the 3×3
+  // normal-equations system directly (this is genuinely a DERIVATION from
+  // the visible points, not a guess). Ellipse/rect completion is real
+  // future work, not attempted here — flagged in the roadmap, not silently
+  // dropped.
+  function fitCircleKasa(pts) {
+    if (pts.length < 8) return null; // too few visible points to trust a fit
+    // Normal equations for Σ(x²+y²) = -D·Σx - E·Σy - F·n (and the two
+    // moment equations) — solved by Cramer's rule on the 3×3 system
+    // [Σx² Σxy Σx; Σxy Σy² Σy; Σx Σy n] · [D;E;F] = [-Σx(x²+y²); -Σy(x²+y²); -Σ(x²+y²)]
+    var n = pts.length, Sx = 0, Sy = 0, Sxx = 0, Syy = 0, Sxy = 0, Sxz = 0, Syz = 0, Sz = 0;
+    pts.forEach(function (p) {
+      var z = p.x * p.x + p.y * p.y;
+      Sx += p.x; Sy += p.y; Sxx += p.x * p.x; Syy += p.y * p.y; Sxy += p.x * p.y;
+      Sxz += p.x * z; Syz += p.y * z; Sz += z;
+    });
+    var a11 = Sxx, a12 = Sxy, a13 = Sx, b1 = -Sxz;
+    var a21 = Sxy, a22 = Syy, a23 = Sy, b2 = -Syz;
+    var a31 = Sx, a32 = Sy, a33 = n, b3 = -Sz;
+    var det = a11 * (a22 * a33 - a23 * a32) - a12 * (a21 * a33 - a23 * a31) + a13 * (a21 * a32 - a22 * a31);
+    if (Math.abs(det) < 1e-9) return null; // degenerate (collinear points)
+    function detWithCol(col) {
+      var m = [[a11, a12, a13], [a21, a22, a23], [a31, a32, a33]];
+      for (var r = 0; r < 3; r++) m[r][col] = [b1, b2, b3][r];
+      return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+    }
+    var D = detWithCol(0) / det, E = detWithCol(1) / det, F = detWithCol(2) / det;
+    var cx = -D / 2, cy = -E / 2, r2 = cx * cx + cy * cy - F;
+    if (r2 <= 0) return null;
+    var r = Math.sqrt(r2);
+    if (r < 2) return null;
+    var sumSq = 0;
+    pts.forEach(function (p) { var d = Math.hypot(p.x - cx, p.y - cy) - r; sumSq += d * d; });
+    var rmse = Math.sqrt(sumSq / n);
+    // Relative to the radius — an absolute pixel tolerance would be too
+    // strict for a large circle and too loose for a tiny one.
+    return rmse / r <= 0.04 ? { cx: cx, cy: cy, r: r } : null;
+  }
+
+  // For a shape that did NOT fit as a complete primitive (Phase 1), looks
+  // for a NEIGHBORING shape (any other traced shape, regardless of paint
+  // order — see below) and strips the points that sit on the SEAM shared
+  // with it, then retries the fit on what's left.
+  //
+  // Found live testing a red circle occluded by a blue rectangle: this
+  // does NOT filter by "is the point inside the neighbor's fill". In
+  // vtracer's 'cutout' mode (the default since Phase 1's own fix), traced
+  // regions are already non-overlapping — a occluded shape's own contour
+  // never actually dips INSIDE the occluder's fill, it's already the cut
+  // fragment. What needs excluding is the STRAIGHT SEAM edge where the
+  // fragment was clipped, which is not "inside" anything — it's ON the
+  // neighbor's own boundary. hitTest(point, {stroke:true}) against the
+  // neighbor's outline catches exactly that, cleanly, without needing to
+  // classify curved-vs-straight contour segments by hand. Paint order is
+  // therefore irrelevant here too (unlike a hypothetical 'stacked'-mode
+  // version of this) — every OTHER shape is a valid candidate neighbor.
+  function tryOccludedCircleFit(pts, otherItems, fill) {
+    // Tolerance scaled to the point cloud's own size (not a fixed pixel
+    // count) — stays correct whether the traced image is 50px or 5000px.
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    pts.forEach(function (p) { if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x; if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y; });
+    var tol = Math.max(1, Math.hypot(maxX - minX, maxY - minY) * 0.02);
+    for (var i = 0; i < otherItems.length; i++) {
+      var neighbor = otherItems[i];
+      if (!neighbor || !neighbor.bounds) continue;
+      var remaining = pts.filter(function (p) { return !neighbor.hitTest(p, { stroke: true, fill: false, tolerance: tol }); });
+      // Found live: do NOT also require "some point got filtered" here —
+      // a real occluded circle's own anchor points (including the couple
+      // sitting right on the cut seam) can already sit close enough to
+      // the true circle for the algebraic fit to succeed on the FULL,
+      // unfiltered point set (a chord across a short cut doesn't deviate
+      // far from the arc it replaces). Demanding a seam be found first
+      // rejected an already-correct fit outright. fitCircleKasa's own
+      // RMSE/r gate is what actually guards result quality — filtering
+      // only helps it MORE, never gates whether to accept.
+      if (remaining.length < pts.length * 0.35) continue; // too little left to trust
+      var fit = fitCircleKasa(remaining);
+      if (!fit) continue;
+      var built = window.buildArcEllipsePath(fit.cx, fit.cy, fit.r, fit.r, 0, 359.9, 0);
+      built.data.paramShape = { kind: 'ellipse', startAngle: 0, sweep: 359.9, innerRadius: 0 };
+      if (window.stampParamShapeBox) window.stampParamShapeBox(built);
+      built.fillColor = fill; built.strokeColor = null;
+      return built;
+    }
+    return null;
+  }
+
   // Tries ellipse first (a circle/donut/pie IS an ellipse fit in Nemo's
   // model — no separate "circle" kind exists), then rounded-rect. Returns
   // a real, already-inserted-ready paper.Path with data.paramShape
@@ -215,6 +316,14 @@
   // with holes) when vtracer emitted more than one, e.g. a donut. Fill
   // only (VTracer's Color has no alpha — transparency was already
   // consumed upstream to decide which regions to keep, see vectorize.rs).
+  //
+  // Returns {item, fixed, rawPts, fill} — `fixed:true` means item is
+  // final (either a clean Phase 1 paramShape fit, or a multi-contour
+  // CompoundPath, which occlusion completion below never attempts).
+  // `fixed:false` means item is the raw, uncompleted single-contour path
+  // — kept around (with its own point cloud) so the occlusion-completion
+  // pass in runVectorize can still rescue it against a shape drawn later
+  // in paint order.
   function buildShapeItem(shape, mapPt) {
     var fill = new Color(shape.r / 255, shape.g / 255, shape.b / 255, 1);
     // insert:false on every Path — Paper.js auto-inserts a plain
@@ -234,31 +343,31 @@
       return p;
     }).filter(function (p) { return p.segments.length >= 2; });
     if (!childPaths.length) return null;
-    var item;
     if (childPaths.length === 1) {
       // Try recognizing a parametric primitive BEFORE settling for the
       // raw traced path — single-contour shapes only (a donut/shape-with-
       // a-hole is a CompoundPath below; ellipse's own innerRadius COULD
       // represent a donut too, but that's a real fit case for later, not
       // attempted here).
-      var fitted = tryParamShapeFit(childPaths[0].segments.map(function (s) { return s.point; }), childPaths[0].bounds, fill);
-      if (fitted) { childPaths[0].remove(); return fitted; }
-      item = childPaths[0];
-    } else {
-      // A real, multi-contour CompoundPath — correct here, and left alone.
-      // Nemo's own save pipeline (_flattenCompoundChildren, app.js) already
-      // walks every layer for exactly this case before every
-      // saveActiveLayerFrame() — _collectLayerStrokes only knows how to
-      // persist `instanceof Path`/Raster, so it keyhole-merges any
-      // CompoundPath into the same island/hole representation every other
-      // consumer expects (CLAUDE.md §1). Don't pre-flatten here too — that
-      // safety net is the established, single place this already happens.
-      item = new CompoundPath({ insert: false });
-      item.addChildren(childPaths);
+      var pts = childPaths[0].segments.map(function (s) { return s.point; });
+      var fitted = tryParamShapeFit(pts, childPaths[0].bounds, fill);
+      if (fitted) { childPaths[0].remove(); return { item: fitted, fixed: true }; }
+      childPaths[0].fillColor = fill; childPaths[0].strokeColor = null;
+      return { item: childPaths[0], fixed: false, rawPts: pts, fill: fill };
     }
+    // A real, multi-contour CompoundPath — correct here, and left alone.
+    // Nemo's own save pipeline (_flattenCompoundChildren, app.js) already
+    // walks every layer for exactly this case before every
+    // saveActiveLayerFrame() — _collectLayerStrokes only knows how to
+    // persist `instanceof Path`/Raster, so it keyhole-merges any
+    // CompoundPath into the same island/hole representation every other
+    // consumer expects (CLAUDE.md §1). Don't pre-flatten here too — that
+    // safety net is the established, single place this already happens.
+    var item = new CompoundPath({ insert: false });
+    item.addChildren(childPaths);
     item.fillColor = fill;
     item.strokeColor = null;
-    return item;
+    return { item: item, fixed: true };
   }
 
   // Browser-native base64 -> Uint8Array (atob + charCodeAt) — the wasm
@@ -284,7 +393,6 @@
     }
     var result;
     try {
-      await window.VectorizeWasm.load();
       var configJson = JSON.stringify({
         colorMode: cfg.colorMode,
         hierarchical: cfg.hierarchical,
@@ -293,7 +401,14 @@
         layerDifference: cfg.layerDifference,
         cornerThreshold: cfg.cornerThreshold,
       });
-      var resultJson = window.VectorizeWasm.vectorize_image(base64ToBytes(m[2]), configJson);
+      // Runs inside vectorize-worker.js (a real Web Worker, not just an
+      // async-wrapped call) — color clustering + spline fitting on a real
+      // photo can take real seconds, and a synchronous wasm call blocks
+      // whichever thread runs it for its whole duration no matter how the
+      // JS around it is structured; only a worker keeps the editor
+      // responsive and the progress bar below actually animating while it
+      // runs (2026-09, "que le rastérize se fasse en arrière-plan").
+      var resultJson = await window.VectorizeWasm.vectorize(base64ToBytes(m[2]), configJson);
       result = JSON.parse(resultJson);
     } catch (e) {
       showToast((SM && SM.t ? SM.t('vectorizeFailed') : 'Vectorization failed: ') + (e && e.message ? e.message : e));
@@ -323,15 +438,30 @@
     var li = state.activeLayerIdx;
     var newLayer = userLayers[li];
     state.layers[li].name = sourceName + ' traced';
-    var built = 0;
-    result.shapes.forEach(function (shape) {
-      var item = buildShapeItem(shape, mapPt);
-      if (item) { newLayer.addChild(item); built++; }
-    });
+
+    // Pass 1: build every shape's geometry (Phase 1's own paramShape fit
+    // already tried inline) — nothing inserted into the layer yet, so
+    // Pass 2 below can still swap a raw fragment out for a completed
+    // primitive before anything becomes permanent document content.
+    var built = result.shapes.map(function (shape) { return buildShapeItem(shape, mapPt); }).filter(Boolean);
+
+    // Pass 2 (occlusion completion): for every shape Phase 1 couldn't fit
+    // as a complete primitive, check every OTHER traced shape as a
+    // possible neighbor sharing a cut seam (see tryOccludedCircleFit's own
+    // comment for why paint order doesn't matter in 'cutout' mode — array
+    // order here is just "not itself", nothing more).
+    for (var bi = 0; bi < built.length; bi++) {
+      if (built[bi].fixed) continue;
+      var others = built.filter(function (b, idx) { return idx !== bi; }).map(function (b) { return b.item; });
+      var completed = tryOccludedCircleFit(built[bi].rawPts, others, built[bi].fill);
+      if (completed) { built[bi].item.remove(); built[bi].item = completed; }
+    }
+
+    built.forEach(function (b) { newLayer.addChild(b.item); });
     saveActiveLayerFrame();
     renderArcs(); updateUI();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-    showToast((SM && SM.t ? SM.t('vectorizeDone') : 'Vectorized: ') + built + (SM && SM.t ? '' : ' shapes'));
+    showToast((SM && SM.t ? SM.t('vectorizeDone') : 'Vectorized: ') + built.length + (SM && SM.t ? '' : ' shapes'));
   }
 
 
@@ -357,6 +487,20 @@
       '<label style="font-size:11px;color:var(--text-dim)"><span data-i18n="vectorizeColorPrecision">Color precision</span><br><input type="number" id="vt-precision" class="pi scrub" data-step="1" style="width:100%"></label>' +
       '<label style="font-size:11px;color:var(--text-dim)"><span data-i18n="vectorizeCornerThreshold">Corner threshold</span><br><input type="number" id="vt-corner" class="pi scrub" data-step="1" style="width:100%"></label>' +
       '<div id="vt-error" style="display:none;font-size:10px;color:#ff8080"></div>' +
+      // Same visual language as the existing background-optimize progress
+      // row (media-library.js) — an INDETERMINATE bar, not a percentage:
+      // vtracer's own API doesn't report incremental progress, so a real
+      // percentage isn't available; a moving bar honestly says "still
+      // working", not "X% done". Runs in vectorize-worker.js (a real Web
+      // Worker — see runVectorize's own comment for why), so the editor
+      // stays responsive and this bar keeps animating smoothly the whole
+      // time, and the dialog can be dismissed (Cancel/×) without
+      // cancelling the job — it keeps tracing in the background and the
+      // result still lands (toast + new layer) whenever it finishes.
+      '<div id="vt-progress" style="display:none">' +
+      '<div style="font-size:11px;color:var(--text-dim);margin-bottom:4px" data-i18n="vectorizeWorking">Vectorizing…</div>' +
+      '<div class="media-row-progress"><div class="media-row-progress-bar"></div></div>' +
+      '</div>' +
       '<div class="pr" style="gap:6px;justify-content:flex-end">' +
       '<button class="pbtn" id="vt-cancel" data-i18n="btnCancel">Cancel</button>' +
       '<button class="pbtn ac" id="vt-run" data-i18n="vectorizeRun">Vectorize</button>' +
@@ -372,9 +516,29 @@
     });
     modalEl.querySelector('#vt-run').addEventListener('click', function () {
       var btn = modalEl.querySelector('#vt-run');
+      var progress = modalEl.querySelector('#vt-progress');
+      var presets = modalEl.querySelector('#vt-presets');
       btn.disabled = true;
+      progress.style.display = '';
+      presets.style.display = 'none';
+      ['#vt-speckle', '#vt-precision', '#vt-corner'].forEach(function (sel) {
+        modalEl.querySelector(sel).closest('label').style.display = 'none';
+      });
       var cfg = readForm();
-      runVectorize(cfg).finally(function () { btn.disabled = false; close(); });
+      // Deliberately NOT disabling #vt-close/#vt-cancel — the whole point
+      // of running this in a Worker (see runVectorize's own comment) is
+      // that the job survives the dialog closing: dismiss it and keep
+      // working, the result (toast + new layer) still lands whenever
+      // tracing finishes, exactly like any other background task.
+      runVectorize(cfg).finally(function () {
+        btn.disabled = false;
+        progress.style.display = 'none';
+        presets.style.display = '';
+        ['#vt-speckle', '#vt-precision', '#vt-corner'].forEach(function (sel) {
+          modalEl.querySelector(sel).closest('label').style.display = '';
+        });
+        close();
+      });
     });
     return modalEl;
   }
