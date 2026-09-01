@@ -7295,6 +7295,7 @@
           { label: ld.timeRemap ? SM.t('ctxDisableTimeRemap') : SM.t('ctxEnableTimeRemap'),
             action: function () { ld.timeRemap ? disableTimeRemap(li) : enableTimeRemap(li); } },
           { label: SM.t('ctxMergeSelectedLayers'), disabled: !multi, action: function () { window.SM.mergeLayersIntoOne(_layerSel.slice()); } },
+          { label: SM.t('ctxObjectDuplicatorEllipsis'), disabled: !multi, action: function () { window.SM.convertSelectionToObjectDuplicator(_layerSel.slice()); } },
           { sep: true },
           { label: SM.t('ctxStaggerSelectedLayersEllipsis'), disabled: !multi, action: function () {
             var v = prompt(SM.t('promptStaggerOffsetFrames'), '2');

@@ -1387,6 +1387,19 @@
             <option value="path" data-i18n="dupModePath">Chemin</option>
           </select>
         </div>
+        <!-- Object mode source pool (2026-09-01) — only shown when
+             ld.duplicator.sourceMode==='objects' (created via "convert
+             selection" on the layer list, not toggled here — see
+             convertSelectionToObjectDuplicator, app.js). #dup-source-list
+             is rebuilt from ld.duplicator.sourceLayerUids on every
+             updateDuplicatorPanel call, same variable-length-list pattern
+             as #dup-effectors-list below. -->
+        <div id="dup-source-sec" style="display:none">
+          <div class="pr"><span class="pl" data-i18n="fieldDupSource">Source</span>
+            <select class="psel" id="dup-source-add"></select>
+          </div>
+          <div id="dup-source-list"></div>
+        </div>
         <div class="pr dims-row" id="dup-grid-row">
           <span class="pl" data-i18n="fieldDupRows">Lignes</span><input type="number" class="pi scrub" id="dup-rows" value="2" min="1" max="30" data-step="1">
           <span class="pl" data-i18n="fieldDupCols">Col.</span><input type="number" class="pi scrub" id="dup-cols" value="3" min="1" max="30" data-step="1">
@@ -1418,7 +1431,7 @@
              per-copy time offset instead of the current frame, wrapping
              within the layer's own effective span. Math lives in
              applyLayerDuplicator (app.js). -->
-        <div class="pr" style="border-top:1px solid var(--border);padding-top:8px;margin-top:2px">
+        <div class="pr" id="dup-anim-hdr-row" style="border-top:1px solid var(--border);padding-top:8px;margin-top:2px">
           <span class="pl" data-i18n="dupAnimHdr">Animation (décalage temporel)</span>
           <label style="display:flex;gap:5px;align-items:center;font-size:10px;cursor:pointer;margin-left:auto"><input type="checkbox" id="dup-anim-enabled"> <span data-i18n="dupAnimEnabled">Actif</span></label>
         </div>
@@ -1443,7 +1456,7 @@
           <button class="pbtn" id="btn-dup-add-effector" style="margin-left:auto" data-i18n="dupAddEffector" data-i18n-title="dupAddEffectorTitle" title="Ajoute un point d'influence qui modifie les copies proches de lui (comme un Effector Cinema 4D / LottieFiles) — son repère se règle en le glissant sur le canvas, en mode Motion">+ Effector</button>
         </div>
         <div id="dup-effectors-list"></div>
-        <div class="pr"><button class="pbtn ac" id="btn-dup-edit-source" style="flex:1" data-i18n="dupEditSource">Modifier la forme source…</button></div>
+        <div class="pr" id="dup-edit-source-row"><button class="pbtn ac" id="btn-dup-edit-source" style="flex:1" data-i18n="dupEditSource">Modifier la forme source…</button></div>
       </div>
     </div>
     <!-- Rig tool (2026-07) — "à la Shapper": bones are plain-JSON vector
