@@ -18,7 +18,13 @@
 // (workers.dev preview + any custom domain); wide open by default only
 // because that origin isn't picked yet.
 
-const REPO = 'mysteropodes/strokemotion-feedback';
+// Issues land on the code repo, so a report sits next to the code and the
+// other reports. Attachments stay on the old feedback repo on purpose:
+// committing screenshots into nemo would require Contents:write on the source
+// tree -- the one permission that turns a leaked token into a way to reach
+// main -- and would bloat the repo (44 PNGs already). Two repos, two roles.
+const ISSUE_REPO = 'mysteropodes/nemo';
+const ATTACHMENT_REPO = 'mysteropodes/strokemotion-feedback';
 
 function corsHeaders(request, env) {
   const origin = request.headers.get('Origin') || '';
@@ -42,8 +48,8 @@ function json(data, status, headers) {
   });
 }
 
-async function githubFetch(env, path, init) {
-  return fetch(`https://api.github.com/repos/${REPO}${path}`, {
+async function githubFetch(env, repo, path, init) {
+  return fetch(`https://api.github.com/repos/${repo}${path}`, {
     ...init,
     headers: Object.assign(
       {
@@ -132,7 +138,7 @@ async function handleIssue(request, env, cors) {
   if (spam) {
     return json({ error: `rejected: ${spam}` }, 400, cors);
   }
-  const resp = await githubFetch(env, '/issues', {
+  const resp = await githubFetch(env, ISSUE_REPO, '/issues', {
     method: 'POST',
     body: JSON.stringify({ title, body, labels }),
   });
@@ -165,7 +171,7 @@ async function handleAttachment(request, env, cors) {
     return json({ error: 'invalid or oversized content' }, 400, cors);
   }
   const path = `attachments/${filename}`;
-  const resp = await githubFetch(env, `/contents/${path}`, {
+  const resp = await githubFetch(env, ATTACHMENT_REPO, `/contents/${path}`, {
     method: 'PUT',
     body: JSON.stringify({ message: `Feedback attachment: ${filename}`, content: contentBase64 }),
   });
@@ -173,7 +179,7 @@ async function handleAttachment(request, env, cors) {
     const text = await resp.text();
     return json({ error: `GitHub upload error ${resp.status}: ${text}` }, 502, cors);
   }
-  return json({ url: `https://raw.githubusercontent.com/${REPO}/main/${path}` }, 200, cors);
+  return json({ url: `https://raw.githubusercontent.com/${ATTACHMENT_REPO}/main/${path}` }, 200, cors);
 }
 
 export default {
