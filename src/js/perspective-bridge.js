@@ -52,27 +52,57 @@
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   };
 
-  // Builds the overlay items — the VP markers only. Used to also draw N
-  // static radiating lines per VP (+ a horizon line, + fisheye's concentric
-  // rings) spanning the whole canvas at all times.
+  // Builds the overlay items: the VP markers, a line connecting every pair
+  // of VPs, and a permanent vertical line through each VP. Used to also
+  // draw N dense radiating rays per VP (+ a horizon line stretching well
+  // past the VPs, + fisheye's concentric rings) — a full-canvas fan burned
+  // in at all times.
   //
-  // 2026-09 removed (Cyril, live: "j'ai toujours les guides bleu, le but
-  // c'est de pouvoir dessiner partout dans les axes avec le gizmo plus les
-  // guides d'avant sauf les points de perspective que l'on peut bouger") —
-  // that permanent fan was exactly the clutter he wanted gone: the moving
-  // cursor crosshair (buildPerspectiveCursorGuideItems below, "le gizmo")
-  // is now the ONLY axis indicator while drawing, always centered on where
-  // you're actually about to draw instead of a fixed grid burned across the
-  // whole canvas. The VPs themselves stay — draggable, visible, exactly as
-  // before — since repositioning them is still how you set the guide up.
-  // `state.perspectiveDensity` (the old fan's ray count) has no reader left
-  // anywhere in this file as of the very next fix below — the snap-while-
-  // drawing functions no longer use a dense fixed-angle fan either, see
-  // axisCandidates' own 2026-09 comment.
+  // 2026-09, first removed the dense fan entirely (Cyril, live: "j'ai
+  // toujours les guides bleu, le but c'est de pouvoir dessiner partout dans
+  // les axes avec le gizmo plus les guides d'avant sauf les points de
+  // perspective que l'on peut bouger") — that permanent fan was exactly the
+  // clutter he wanted gone, replaced by the moving cursor crosshair
+  // (buildPerspectiveCursorGuideItems below, "le gizmo") as the only axis
+  // indicator while actually drawing.
+  //
+  // Then brought back a MINIMAL static reference, same day (Cyril: "ça
+  // serait bien qu'il soit relié par un repère et que chaque point est un
+  // repère vertical aussi") — two thin, fixed marks, not a dense grid: one
+  // line per VP PAIR (so 2pt gets a single connecting line — effectively
+  // the old horizon, just no longer reaching 4x past the canvas — and 3pt
+  // gets a full triangle), plus one vertical line through EVERY vp (not
+  // just wherever the cursor happens to be, unlike the gizmo). 1pt/fisheye
+  // has no pair to connect, so only the vertical(s) apply.
+  // `state.perspectiveDensity` (the old dense fan's ray count) has no
+  // reader left anywhere in this file — the snap-while-drawing functions
+  // don't use a dense fixed-angle fan either, see axisCandidates' own
+  // 2026-09 comment.
   function buildPerspectiveGuideItems() {
     if (!state.perspectiveEnabled) return [];
     var vps = ensurePerspectiveVPs();
     var items = [];
+    var reach = Math.max(state.canvasW, state.canvasH) * 2; // long enough to read as a real reference line past the canvas edge, short of the old 4x full-fan reach
+    var repereCol = [255, 200, 80, 130]; // same amber the old horizon line used — "this is a fixed reference," distinct from the VP markers' own orange/coral
+    for (var i = 0; i < vps.length; i++) {
+      for (var j = i + 1; j < vps.length; j++) {
+        var a = vps[i], b = vps[j];
+        var dx = b.x - a.x, dy = b.y - a.y;
+        var len = Math.hypot(dx, dy) || 1;
+        var ux = dx / len, uy = dy / len;
+        items.push({
+          segments: [{ point: [a.x - ux * reach, a.y - uy * reach] }, { point: [b.x + ux * reach, b.y + uy * reach] }],
+          closed: false, fillColor: null, strokeColor: repereCol, strokeWidth: 1.4, strokeCap: 'butt',
+        });
+      }
+    }
+    vps.forEach(function (vp) {
+      items.push({
+        segments: [{ point: [vp.x, vp.y - reach] }, { point: [vp.x, vp.y + reach] }],
+        closed: false, fillColor: null, strokeColor: repereCol, strokeWidth: 1, strokeCap: 'butt',
+        dashPattern: [6, 5],
+      });
+    });
     // VP markers themselves — draggable-point handles, Sketchbook-style
     // (feedback: "dans sketchbook on a des points que l'on peut
     // déplacer... regarde bien sketchbook" — a ring + filled center dot
@@ -226,11 +256,18 @@
   // magnetSnap per-point fallback in draw-bridge.js that used the same fan)
   // are gone now — axisCandidates above is the SAME finite set of axes as
   // the gizmo draws (each VP + vertical), nothing invisible left to snap to.
-  function findVPRayByAngle(start, currentPt) {
+  //
+  // toleranceDeg lets a caller widen the catch angle beyond SNAP_DEG — the
+  // Line tool (snapToVP above) wants a tight, ruler-like snap, but
+  // draw-bridge.js's freehand PULL (see its own 2026-09 comment) wants a
+  // much wider capture zone since it's blending toward the axis rather than
+  // locking onto it outright, so a hand that's merely "roughly aimed at" a
+  // VP should still feel the influence.
+  function findVPRayByAngle(start, currentPt, toleranceDeg) {
     if (!state.perspectiveEnabled) return null;
     var dx = currentPt.x - start.x, dy = currentPt.y - start.y;
     var dragAngle = Math.atan2(dy, dx);
-    var best = null, bestDiff = SNAP_DEG * Math.PI / 180;
+    var best = null, bestDiff = (toleranceDeg || SNAP_DEG) * Math.PI / 180;
     axisCandidates(start).forEach(function (ax) {
       var vAngle = Math.atan2(ax.y, ax.x);
       var diff = Math.abs(Math.atan2(Math.sin(dragAngle - vAngle), Math.cos(dragAngle - vAngle)));

@@ -103,25 +103,11 @@
     _liveDabCacheAt = now;
     return _liveDabCache;
   }
-  // Perspective guide hard-lock (2026-07, perspective-bridge.js's
-  // findVPRayByAngle/projectOnRay). Set once at pointerdown's first real
-  // direction, held for the whole gesture, cleared at pointerup.
-  //
-  // 2026-09 (Cyril, live, two rounds of feedback the same day): first
-  // "ça dessine toujours sur les guides et pas avec les guides d'axe" — a
-  // proximity-to-a-fixed-fan-ray lock used to fire instantly at pointerdown
-  // and permanently skip the angle-toward-the-VP check for the rest of the
-  // gesture. Then, after the fan stopped being DRAWN (buildPerspectiveGuideItems
-  // fix) but its ghost geometry was still a fallback here: "ça dessine pas
-  // dans les guides du gizmo mais encore sur les anciens guides" — the
-  // invisible fan was still catching strokes via magnetSnap/the proximity
-  // fallback. Both are gone now: perspective-bridge.js's findVPRayByAngle is
-  // the ONLY lock source, and its candidate set (axisCandidates) is exactly
-  // the axes the cursor gizmo draws — each VP direction plus vertical — so
-  // there's nothing left to lock onto that isn't visibly shown while you
-  // draw. A stroke whose direction doesn't match any of those within
-  // SNAP_DEG just draws free, for its whole length, same as always.
-  var guideStartPt = null, guideLockDecided = false;
+  // Perspective guide SOFT PULL — see guideConstrain's own comment below
+  // for the full history (hard proximity lock → hard angle lock → this).
+  // guideStartPt anchors the gesture's overall direction; that's the only
+  // state carried between calls now.
+  var guideStartPt = null;
   var lastMoveT = 0, lastWorldPt = null;
   var lastPenPressure = null; // held across a real-pen gesture, see pressureOf()
   // state.stabilizer (position-averaging while drawing) used to only exist
@@ -320,33 +306,47 @@
     var base = isFillBrush() ? state.fillBrushSize : state.brushSize;
     return base * (lo + (hi - lo) * p);
   }
-  // Hard directional lock (2026-07, perspective-bridge.js's
-  // findVPRayByAngle/projectOnRay) — call this at every point of a Draw/
-  // Fillbrush stroke. Locks onto whichever gizmo axis (a VP direction, or
-  // vertical) is closest once the gesture has a real direction, and hard-
-  // projects every later point onto that same axis for the rest of the
-  // stroke, regardless of distance. A stroke whose direction never matches
-  // any axis within SNAP_DEG just draws free for its whole length — same as
-  // always when the guide is off.
+  // Perspective guide, freehand PULL — history: a proximity-to-fan lock
+  // ("ça dessine toujours sur les guides et pas avec les guides d'axe"),
+  // then a hard ANGLE lock that froze onto one axis and force-projected
+  // every point exactly onto it for the rest of the gesture. Cyril's next
+  // round of feedback rejected the whole HARD-LOCK premise, not just which
+  // axis it picked: "il faut du dessin libre mais que les axes guide la
+  // brush tout le long vers les points de fuites" — free drawing, with the
+  // axes influencing the brush throughout, not replacing the hand.
+  //
+  // 2026-09 rewrite: every point past a 4px-of-drag floor is blended
+  // PART-WAY toward its projection onto whichever gizmo axis (a VP
+  // direction, or vertical) best matches the OVERALL direction from
+  // guideStartPt — never snapped fully onto it. The blend fraction eases
+  // from GUIDE_PULL_STRENGTH down to 0 as the angular gap widens toward
+  // GUIDE_PULL_MAX_DEG, so the pull is strongest when already roughly
+  // aimed at a vanishing point and fades out (not cuts out) as the hand
+  // drifts away — the stroke keeps its own wobble/character, it just
+  // trends toward the VP the way a hand-drawn perspective line does,
+  // never ruler-straight. Re-evaluated every point rather than decided
+  // once, so if the overall direction drifts toward a different axis
+  // partway through, the pull can follow it — no single frozen verdict a
+  // few pixels into the gesture.
+  var GUIDE_PULL_MAX_DEG = 30;
+  var GUIDE_PULL_STRENGTH = 0.55;
   function guideConstrain(w, isStart) {
-    if (isStart) {
-      guideStartPt = new Point(w[0], w[1]);
-      lockedGuideRay = null;
-      guideLockDecided = false;
-    } else if (!guideLockDecided && guideStartPt) {
-      var curPt = new Point(w[0], w[1]);
-      // Needs real direction before the angle check means anything — same
-      // 4px-of-drag floor snapToVP itself uses (perspective-bridge.js).
-      if (curPt.getDistance(guideStartPt) >= 4) {
-        lockedGuideRay = window.perspectiveFindVPRayByAngle ? window.perspectiveFindVPRayByAngle(guideStartPt, curPt) : null;
-        guideLockDecided = true; // decided either way — never re-checked again this gesture
-      }
-    }
-    if (lockedGuideRay && window.perspectiveProjectOnRay) {
-      var p = window.perspectiveProjectOnRay(new Point(w[0], w[1]), lockedGuideRay);
-      return [p.x, p.y];
-    }
-    return w;
+    if (isStart) { guideStartPt = new Point(w[0], w[1]); return w; }
+    if (!guideStartPt || !window.perspectiveFindVPRayByAngle || !window.perspectiveProjectOnRay) return w;
+    var raw = new Point(w[0], w[1]);
+    var dx = raw.x - guideStartPt.x, dy = raw.y - guideStartPt.y;
+    // Needs real direction before "closest axis" means anything — same
+    // 4px-of-drag floor snapToVP itself uses (perspective-bridge.js).
+    if (Math.hypot(dx, dy) < 4) return w;
+    var ray = window.perspectiveFindVPRayByAngle(guideStartPt, raw, GUIDE_PULL_MAX_DEG);
+    if (!ray) return w;
+    var curAngle = Math.atan2(dy, dx);
+    var axAngle = Math.atan2(ray.dy, ray.dx);
+    var diffDeg = Math.abs(Math.atan2(Math.sin(curAngle - axAngle), Math.cos(curAngle - axAngle))) * 180 / Math.PI;
+    var t = Math.max(0, 1 - diffDeg / GUIDE_PULL_MAX_DEG) * GUIDE_PULL_STRENGTH;
+    if (t <= 0) return w;
+    var proj = window.perspectiveProjectOnRay(raw, ray);
+    return [raw.x + (proj.x - raw.x) * t, raw.y + (proj.y - raw.y) * t];
   }
   function hexToRgba(css, opacityPct) {
     if (!css) return null;
@@ -714,7 +714,7 @@
     // catch-up behavior Photoshop/Clip Studio's stabilized brushes use.
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     w = guideConstrain(w, false);
-    lockedGuideRay = null; guideStartPt = null; guideLockDecided = false; // stroke over — next pointerdown re-evaluates from scratch
+    guideStartPt = null; // stroke over — next pointerdown re-anchors from scratch
     var pressure = smoothPressure(wantsPressure() ? pressureOf(e, w) : 1);
     if (modeler) {
       // The modeler's own end-of-stroke catch-up (physics iterated until
