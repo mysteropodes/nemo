@@ -311,7 +311,7 @@
     }
     moveDragGhost(e);
     var list = document.getElementById('shapes-list'); if (!list) return;
-    Array.prototype.forEach.call(list.querySelectorAll('.lrow'), function (r) { r.classList.remove('drag-over'); });
+    Array.prototype.forEach.call(list.querySelectorAll('.lrow'), function (r) { r.classList.remove('drag-over', 'drag-over-after'); });
     var el = document.elementFromPoint(e.clientX, e.clientY);
     var row = _elDrag.kind === 'paint'
       ? el && el.closest('#shapes-list .lrow[data-paintid]')
@@ -322,19 +322,29 @@
       // own header) — see performMemberReorder's 2026-09 fix.
       ? el && el.closest('#shapes-list .lrow[data-groupmember], #shapes-list .lrow[data-toplevel]')
       : el && el.closest('#shapes-list .lrow[data-toplevel]');
-    if (row) row.classList.add('drag-over');
+    if (row) {
+      // Feedback #735 ("très difficile d'organiser") — a drop used to mean
+      // only "in front of the target", with no way to land BEHIND the
+      // last row and no visual cue of where the item would go. Upper half
+      // of the row = in front of it (insertion line on its top edge),
+      // lower half = behind it (line on its bottom edge). A paint swap has
+      // no before/after — it's a swap.
+      var rr = row.getBoundingClientRect();
+      _elDrag.dropAfter = _elDrag.kind !== 'paint' && e.clientY > rr.top + rr.height / 2;
+      row.classList.add(_elDrag.dropAfter ? 'drag-over-after' : 'drag-over');
+    }
   });
   window.addEventListener('mouseup', function () {
     if (!_elDrag.active) return;
     if (_elDrag.moved) {
       window._elDragJustEnded = true;
       var list = document.getElementById('shapes-list');
-      var overRow = list && list.querySelector('.lrow.drag-over');
+      var overRow = list && list.querySelector('.lrow.drag-over, .lrow.drag-over-after');
       if (overRow) performReorder(overRow);
     }
     stopDragGhost();
     var list2 = document.getElementById('shapes-list');
-    if (list2) Array.prototype.forEach.call(list2.querySelectorAll('.lrow'), function (r) { r.classList.remove('dragging', 'drag-over'); });
+    if (list2) Array.prototype.forEach.call(list2.querySelectorAll('.lrow'), function (r) { r.classList.remove('dragging', 'drag-over', 'drag-over-after'); });
     _elDrag.active = false; _elDrag.moved = false;
   });
   // Fill<->Stroke swap (2026-08, "pourquoi il est pas possible de select
@@ -396,6 +406,14 @@
   // drop target be a member of the exact SAME group as the dragged item
   // (_elDrag.extra, stamped at mousedown — see buildShapeRow's member
   // branch).
+  // Puts `items` (given back-to-front, i.e. layer.children order) right in
+  // front of `dest`, or right behind it — keeping their own relative
+  // order either way. The one z-order primitive both reorder paths use.
+  function _placeItems(items, dest, after) {
+    var anchor = dest;
+    if (after) items.slice().reverse().forEach(function (it) { it.insertBelow(anchor); anchor = it; });
+    else items.forEach(function (it) { it.insertAbove(anchor); anchor = it; });
+  }
   function performMemberReorder(overRow) {
     var destGroupGid = overRow.dataset.groupmember, destStrokeId = overRow.dataset.strokeid, destGid = overRow.dataset.gid;
     if (destStrokeId === _elDrag.id) return;
@@ -403,17 +421,18 @@
     var layer = window.userLayers && userLayers[c.li];
     var srcItem = window.SMMotion.liveItemByStrokeId(c.li, _elDrag.id);
     if (!srcItem || !layer) return;
+    var after = !!_elDrag.dropAfter;
     var sameGroup = destGroupGid && destGroupGid === _elDrag.extra;
     var destItem;
     if (sameGroup) {
       destItem = window.SMMotion.liveItemByStrokeId(c.li, destStrokeId);
     } else if (destGid) {
       // Dropped on a (collapsed or expanded) DIFFERENT group's own header
-      // row — land adjacent to the whole group, same "front-most member"
-      // convention performReorder's own group-destination branch uses.
+      // row — land adjacent to the whole group, same convention as
+      // performReorder's own group-destination branch.
       var destMembers = window.SMMotion.layerElements(c.li, c.ld).filter(function (e) { return e.sd.groupId === destGid; });
       if (!destMembers.length) return;
-      destItem = window.SMMotion.liveItemByStrokeId(c.li, destMembers[destMembers.length - 1].strokeId);
+      destItem = window.SMMotion.liveItemByStrokeId(c.li, destMembers[after ? 0 : destMembers.length - 1].strokeId);
     } else if (destStrokeId) {
       // Either a member row of a DIFFERENT group, or a plain top-level
       // shape — both resolve to that exact item.
@@ -433,7 +452,7 @@
       // Figma: dragging a layer out of its group stack takes it out.
       window.SMGroup.removeMemberFromGroup(srcItem, c.ld, layer, { skipUndo: true, silent: true });
     }
-    srcItem.insertAbove(destItem);
+    _placeItems([srcItem], destItem, after);
     saveActiveLayerFrame();
     renderShapesPanel();
     if (window.renderArcs) renderArcs();
@@ -446,13 +465,15 @@
     var destGid = overRow.dataset.gid, destStrokeId = overRow.dataset.strokeid;
     if (_elDrag.kind === 'group' && destGid === _elDrag.id) return; // dropped on itself
     if (_elDrag.kind === 'shape' && destStrokeId === _elDrag.id) return;
+    var after = !!_elDrag.dropAfter; // lower half of the row = land BEHIND it (see the mousemove handler)
     var destItem;
     if (destGid) {
       var destMembers = window.SMMotion.layerElements(c.li, c.ld).filter(function (e) { return e.sd.groupId === destGid; });
       if (!destMembers.length) return;
-      // Front-most (last) member — the dragged block lands adjacent to the
-      // WHOLE group rather than injected into its middle.
-      destItem = window.SMMotion.liveItemByStrokeId(c.li, destMembers[destMembers.length - 1].strokeId);
+      // The dragged block lands adjacent to the WHOLE group rather than
+      // injected into its middle: in front of its front-most (last)
+      // member, or behind its back-most (first) one.
+      destItem = window.SMMotion.liveItemByStrokeId(c.li, destMembers[after ? 0 : destMembers.length - 1].strokeId);
     } else if (destStrokeId) {
       destItem = window.SMMotion.liveItemByStrokeId(c.li, destStrokeId);
     }
@@ -466,9 +487,9 @@
       srcItems = it ? [it] : [];
     }
     if (!srcItems.length) return;
+    if (srcItems.indexOf(destItem) !== -1) return; // dropped onto (part of) itself
     pushUndo();
-    var anchor = destItem;
-    srcItems.forEach(function (it) { it.insertAbove(anchor); anchor = it; });
+    _placeItems(srcItems, destItem, after);
     saveActiveLayerFrame();
     renderShapesPanel();
     if (window.renderArcs) renderArcs();
@@ -714,12 +735,16 @@
         });
         list.appendChild(grow);
         if (expanded) {
-          memberEntries.forEach(function (me) {
-            buildShapeRow(list, c, { strokeId: me.strokeId, sd: me.sd }, shapeIdx++, 20, false, node.gid);
+          // Front-most member first, same reading direction as the tree
+          // itself (buildShapeTree, feedback #735).
+          memberEntries.slice().reverse().forEach(function (me) {
+            var mIdx = tree.labelIdx && tree.labelIdx[me.strokeId] !== undefined ? tree.labelIdx[me.strokeId] : shapeIdx++;
+            buildShapeRow(list, c, { strokeId: me.strokeId, sd: me.sd }, mIdx, 20, false, node.gid);
           });
         }
       } else {
-        buildShapeRow(list, c, node, shapeIdx++, 0, true);
+        var sIdx = tree.labelIdx && tree.labelIdx[node.strokeId] !== undefined ? tree.labelIdx[node.strokeId] : shapeIdx++;
+        buildShapeRow(list, c, node, sIdx, 0, true);
       }
     });
   }
