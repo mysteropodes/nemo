@@ -11080,6 +11080,10 @@
         if (items.length) items.push({ sep: true });
         items.push({ label: SM.t('ctxExprControlsEllipsis'), action: function () { openExprControlsMenu(e.clientX, e.clientY, holder); } });
       }
+      if (hasExpr(holder, prop)) {
+        if (items.length) items.push({ sep: true });
+        items.push({ label: SM.t('ctxBakeExpressionEllipsis'), action: function () { bakeExpressionOnRow(holder, prop); } });
+      }
       if (!items.length) return;
       window.showContextMenu(e.clientX, e.clientY, items);
     });
@@ -11117,6 +11121,27 @@
     reloadIfTimeLinkOffset(prop);
     renderLayerList(); renderTimeline();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
+  // "Bake expression to keyframes…" — Cyril: "j'aimerais un baking
+  // optimisé que ça créer des keyframes optimale [...] si on peut le
+  // reproduire en lissage/courbes avec moins de keyframes on le fait".
+  // Sampling runs over the whole comp (not just the layer's own in/out
+  // range) — this fires from a per-property row, and a shape-level element
+  // holder has no inPoint/outPoint of its own, only a layer does.
+  // expr-bake.js does the actual RDP reduction + writes the keys; this is
+  // just the toast/refresh wiring, same split as setExpressionCode above.
+  function bakeExpressionOnRow(holder, prop) {
+    if (!window.SMExprBake) return;
+    var result = SMExprBake.bakeExpressionToKeyframes(holder, prop, 0, state.totalFrames - 1);
+    if (!result) return;
+    if (holder._exprCompiled) delete holder._exprCompiled[prop];
+    renderLayerList(); renderTimeline();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    if (window.showToast) {
+      showToast(result.constant
+        ? SM.t('toastBakedConstant')
+        : SM.t('toastBakedKeyframes').replace('{n}', result.keyframeCount).replace('{m}', result.sampledFrameCount));
+    }
   }
   function widgetWiringMenuItems(holder, prop, x, y) {
     if (!window.SMRigWidget) return [];
@@ -12824,6 +12849,12 @@
     DUP_TARGET_PROPS: DUP_TARGET_PROPS,
     DUP_OFFSET_PROP: DUP_OFFSET_PROP,
     propDim: function (prop) { return PROP_DIM[prop] || 1; },
+    // The exact eased-progress evaluator rawValueAtFrame uses at render
+    // time — exposed so expr-bake.js can check "would this fitted curve
+    // actually reconstruct within tolerance" against the SAME math that
+    // will later render it, instead of a second hand-ported copy drifting
+    // out of sync with this one (CLAUDE.md §3's duplicated-function rule).
+    evalCurvePoints: evalCurvePoints,
     propLabel: function (prop) { return PROP_LABEL[prop] || prop; },
     propUnit: function (prop) { return PROP_UNIT[prop] || ''; },
     propDimLabels: function (prop) { return PROP_DIM_LABELS[prop] || null; },

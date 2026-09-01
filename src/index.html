@@ -2254,6 +2254,11 @@
      runs, since buildExprEditorRow only draws its open/close button when
      window.SMExprPanel already exists. -->
 <script src="js/expr-code-panel.js"></script>
+<!-- Expression-to-keyframes baking (RDP curve reduction). Pure algorithm,
+     called lazily from motion.js's property-row context menu — load order
+     relative to motion.js doesn't matter, only that it exists before the
+     menu item can be clicked. -->
+<script src="js/expr-bake.js"></script>
 <!-- Duplicator effectors as their own layer kind. After motion.js: propsFor
      calls into it, and it calls back into SMMotion for value resolution. -->
 <script src="js/effector-layer.js"></script>
