@@ -88,15 +88,57 @@ views of the same document.
   real production Kitsu instance — treat as experimental for now)*
 - Interactive in-app tutorial, 25 modules, in **English, French, Japanese, and Spanish**
 
-## The bigger goal
+## What's next
 
-Nemo aims to eventually cover the whole broadcast production chain in one application:
-pre-production, storyboard, editing, sound design, 2D animation, motion, and compositing.
+The goal is one application for the whole 2D production chain — so a project stops being a
+relay race between five programs that each own a piece of it and each disagree about what a
+frame, a layer or a timing actually is. Blender showed that a single app can hold a whole
+pipeline. 2D still has no open-source equivalent.
 
-Today only **Animation 2D** and **Motion** really exist, and that's on purpose — a tool
-that's useful and solid on a narrow scope beats an ambitious suite that's fragile
-everywhere. StoryBoard is started but marked in-dev in the UI. Everything else is future
-work, and which piece comes next will be driven by what beta feedback actually asks for.
+Today **Animation 2D** and **Motion** are the two parts that really exist, and that's
+deliberate: a tool that is solid on a narrow scope beats an ambitious suite that is fragile
+everywhere. StoryBoard is started, and marked in-dev in the UI.
+
+Here is the rest of the map. None of it is promised, and the order will follow what beta
+feedback actually asks for.
+
+### Infinite canvas — pre-production
+
+A free space for research: references, sketches, colour keys, design exploration, notes.
+Where a project lives before it has a timeline.
+
+### StoryBoard
+
+Boards, sequencing and timing, feeding straight into the animation stage instead of being
+exported and re-imported.
+
+### Editing — node-based
+
+Cutting animated assets and boards together. Deliberately a **node graph** rather than a
+classic track timeline: in an animation pipeline a shot is rarely a flat strip of video,
+it's a graph of sources, versions and dependencies. A graph describes that honestly, where
+stacked tracks force you to flatten it.
+
+### Compositing — node-based
+
+The same reasoning, one stage later: layers, effects and render passes as a graph.
+
+### Sound design
+
+Timing sound *with* the animation instead of against it — the stage most 2D pipelines
+postpone to another program, and then fight.
+
+### This needs more than one person
+
+I won't build all of this alone, and I would rather say so plainly than present a roadmap
+as a schedule. Each of these is its own craft: an editor, a compositor and a sound stage
+are three different disciplines, not three more features.
+
+So if one of them is *your* craft, that is exactly where you would matter most — and the
+earlier you show up, the more the design is still open to being shaped by someone who
+actually does that job. The scripting API and the plugin system exist partly for this: a
+whole area can be prototyped without touching the core first. See
+[Contributing](#contributing).
 
 ## Building
 
