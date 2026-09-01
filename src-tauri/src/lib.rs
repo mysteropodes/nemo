@@ -4,6 +4,7 @@ use tauri_plugin_shell::ShellExt;
 
 // EXPERIMENTAL (experimental/native-video-decode) — see the module header.
 mod video_decode;
+mod vectorize;
 
 #[tauri::command]
 async fn run_ffmpeg(app: tauri::AppHandle, window: tauri::Window, args: Vec<String>) -> Result<i32, String> {
@@ -279,7 +280,8 @@ pub fn run() {
             video_decode::autobench_config,
             video_decode::autobench_report,
             video_decode::optimized_media_target,
-            video_decode::create_optimized_media
+            video_decode::create_optimized_media,
+            vectorize::vectorize_image
         ])
         // "Vérifier les mises à jour…" in the app (StrokeMotion) menu — same
         // check the Réglages button and the silent startup check already

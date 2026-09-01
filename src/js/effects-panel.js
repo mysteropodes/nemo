@@ -355,6 +355,24 @@
         });
       });
     }
+    // Vectorize Image (2026-09) — "ça sera dans effet même si pas wgsl":
+    // discoverable right here since that's where an artist looks for
+    // "processing" on a layer, even though it isn't a per-frame ld.effects
+    // entry at all — clicking it opens a dialog whose Apply BAKES traced
+    // paths into a brand-new layer once (vectorize-bridge.js), the same
+    // "materialize, don't mutate the source" shape as the Duplicator and
+    // Combine/Flatten. A single row, not a submenu category — there's
+    // only one action, the dialog is where its own options live.
+    var vectorizeRow = document.createElement('div');
+    vectorizeRow.className = 'fx-addmenu-cat';
+    vectorizeRow.innerHTML = '<span>' + window.SM.t('vectorizeMenuLabel') + '</span>';
+    vectorizeRow.addEventListener('click', function (e) {
+      e.stopPropagation(); closeAddMenu();
+      if (window.openVectorizeDialog) window.openVectorizeDialog();
+    });
+    categoryWrap.appendChild(vectorizeRow);
+    searchableItem(window.SM.t('vectorizeMenuLabel'), null, function () { if (window.openVectorizeDialog) window.openVectorizeDialog(); }, '');
+
     // Custom shaders (2026-07) — user-authored effects saved in
     // state.customEffects, plus a fixed entry to open the authoring modal.
     var customRow = document.createElement('div');
