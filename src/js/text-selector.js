@@ -28,6 +28,7 @@
   var SHAPE = { SQUARE: 1, RAMP_UP: 2, RAMP_DOWN: 3, TRIANGLE: 4, ROUND: 5, SMOOTH: 6 };
 
   var DEFAULT_SELECTOR = {
+    selectorType: 'range', // 'range' | 'wiggly' — see weightAt's own comment
     start: 0,          // %  (or unit index when units === 'index')
     end: 100,          // %
     offset: 0,         // %  — animate THIS alone and the effect sweeps
@@ -38,6 +39,15 @@
     easeHigh: 0,       // -100..100
     easeLow: 0,        // -100..100
     smooth: 100,       // %
+    // Wiggly Selector fields (AE: Add > Selector > Wiggly) — only read when
+    // selectorType === 'wiggly'. wiggleMin/wiggleMax bracket the weight as a
+    // percentage the same way `amount` does for the range selector; 2 and 50
+    // are AE's own defaults for wigglesPerSec/correlation.
+    wiggleMin: -50,
+    wiggleMax: 50,
+    wigglesPerSec: 2,
+    correlation: 50,   // 0 = every unit wiggles independently, 100 = in unison
+    seed: 1,
   };
 
   // Cubic-bezier solver, same role as lottie-web's BezierFactory. Bisection
@@ -75,8 +85,55 @@
     return { s: s, e: e };
   }
 
+  // Deterministic pseudo-random in [0,1) from two integers — same hash shape
+  // as the sin-based hashes buildBrushDabs/seededRng (tools.js) already use
+  // elsewhere in this codebase, so a wiggle and a brush texture read equally
+  // reproducibly from the same seed philosophy.
+  function hashRand(seed, i) {
+    var x = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453;
+    return x - Math.floor(x);
+  }
+  // 1D value noise (smoothstep-interpolated random keys at integer `t`) —
+  // organic, continuous wiggle rather than a fresh random value every frame,
+  // the same character AE's own Perlin-based wiggle() has. Range [-1, 1].
+  function smoothNoise1D(seed, t) {
+    var i0 = Math.floor(t), i1 = i0 + 1, f = t - i0;
+    var v0 = hashRand(seed, i0) * 2 - 1, v1 = hashRand(seed, i1) * 2 - 1;
+    var u = f * f * (3 - 2 * f); // smoothstep
+    return v0 + (v1 - v0) * u;
+  }
+  // Wiggly Selector (AE: Add > Selector > Wiggly) — a per-unit weight that
+  // oscillates over TIME instead of reading a fixed start/end range. Each
+  // unit gets its own noise phase (so characters don't all wiggle in lock-
+  // step) blended against one shared, unit-independent noise track by
+  // `correlation` — 0% is every character wiggling on its own, 100% is the
+  // whole block moving together, exactly AE's own definition of the field.
+  function wigglyWeightAt(sel, ind, timeSec) {
+    var seed = sel.seed || 1;
+    var hz = sel.wigglesPerSec == null ? 2 : sel.wigglesPerSec;
+    var t = (timeSec || 0) * hz;
+    // A large, index-derived phase offset decorrelates neighbouring units'
+    // noise tracks — without it two adjacent characters would sample nearly
+    // the same point on the curve and wiggle almost identically regardless
+    // of `correlation`.
+    var localT = t + ind * 37.13;
+    var local = smoothNoise1D(seed, localT);
+    var global = smoothNoise1D(seed + 9973, t); // distinct seed offset so global != local's own ind=0 case
+    var corr = Math.max(0, Math.min(100, sel.correlation == null ? 50 : sel.correlation)) / 100;
+    var n = local + (global - local) * corr; // -1..1
+    var lo = sel.wiggleMin == null ? -50 : sel.wiggleMin, hi = sel.wiggleMax == null ? 50 : sel.wiggleMax;
+    var pct = lo + (n * 0.5 + 0.5) * (hi - lo); // -1..1 -> lo..hi, same % convention as `amount`
+    // NOT clamped to 0..1 — same contract the range selector's own
+    // `mult * amt` return already has (a negative `amount` there gives a
+    // negative weight too): wiggleMin defaults negative by design, exactly
+    // like AE's Min Amount, so the property should invert on the low side
+    // of the wiggle rather than floor at zero.
+    return pct / 100;
+  }
+
   // lottie-web's getMult(ind): the 0..1 weight for one unit index.
-  function weightAt(sel, ind, totalUnits) {
+  function weightAt(sel, ind, totalUnits, timeSec) {
+    if (sel.selectorType === 'wiggly') return wigglyWeightAt(sel, ind, timeSec);
     var r = resolveRange(sel, totalUnits);
     var s = r.s, e = r.e, tot = e - s;
     var shape = sel.shape || SHAPE.SQUARE;
@@ -137,9 +194,9 @@
     return mult * amt;
   }
 
-  function weights(sel, totalUnits) {
+  function weights(sel, totalUnits, timeSec) {
     var out = [];
-    for (var i = 0; i < totalUnits; i++) out.push(weightAt(sel, i, totalUnits));
+    for (var i = 0; i < totalUnits; i++) out.push(weightAt(sel, i, totalUnits, timeSec));
     return out;
   }
 

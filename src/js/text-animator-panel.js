@@ -193,21 +193,16 @@
     head.appendChild(del);
 
     // --- selector --------------------------------------------------------
-    var rRange = row(host, t('textAnimRange', 'Range'));
-    numField(rRange, function () { return sel.start; }, function (v, live) { sel.start = v; if (!live) commit(ld); else liveRefresh(ld); }, 1, -200, 200);
-    numField(rRange, function () { return sel.end; }, function (v, live) { sel.end = v; if (!live) commit(ld); else liveRefresh(ld); }, 1, -200, 200);
-    stopwatch(rRange, an, 'start', ld);
-
-    var rOff = row(host, t('textAnimOffset', 'Offset'));
-    numField(rOff, function () { return sel.offset; }, function (v, live) { sel.offset = v; if (!live) commit(ld); else liveRefresh(ld); }, 1, -200, 200);
-    // Offset is THE field to keyframe — two keys on it sweep the effect along
-    // the whole block, which is what replaces N staggered per-glyph series.
-    stopwatch(rOff, an, 'offset', ld);
-
-    var rShape = row(host, t('textAnimShape', 'Shape'));
-    selField(rShape, shapeOptions(), function () { return sel.shape; }, function (v) {
+    // Type picker first — everything below branches on it. A whole rebuild
+    // on change (via commit) is fine here: switching selector type is a rare,
+    // deliberate action, not something scrubbed like the numeric fields below.
+    var rType = row(host, t('textAnimSelectorType', 'Selector'));
+    selField(rType, [
+      { value: 'range', label: t('textAnimSelectorRange', 'Range') },
+      { value: 'wiggly', label: t('textAnimSelectorWiggly', 'Wiggly') },
+    ], function () { return sel.selectorType || 'range'; }, function (v) {
       if (typeof pushUndo === 'function') pushUndo();
-      sel.shape = parseInt(v, 10); commit(ld);
+      sel.selectorType = v; commit(ld);
     });
 
     var rBased = row(host, t('textAnimBasedOn', 'Based on'));
@@ -220,13 +215,66 @@
       sel.basedOn = v; commit(ld);
     });
 
-    var rEase = row(host, t('textAnimEase', 'Ease hi/lo'));
-    numField(rEase, function () { return sel.easeHigh; }, function (v, live) { sel.easeHigh = v; if (!live) commit(ld); else liveRefresh(ld); }, 5, -100, 100);
-    numField(rEase, function () { return sel.easeLow; }, function (v, live) { sel.easeLow = v; if (!live) commit(ld); else liveRefresh(ld); }, 5, -100, 100);
+    if (sel.selectorType === 'wiggly') {
+      // Wiggly Selector (AE: Add > Selector > Wiggly) — see text-selector.js's
+      // wigglyWeightAt for the math. No Range/Offset/Shape/Ease here: those
+      // describe a fixed spatial window, which a time-driven wiggle has no
+      // use for.
+      var rHz = row(host, t('textAnimWigglesPerSec', 'Wiggles/sec'));
+      numField(rHz, function () { return sel.wigglesPerSec == null ? 2 : sel.wigglesPerSec; }, function (v, live) { sel.wigglesPerSec = v; if (!live) commit(ld); else liveRefresh(ld); }, 0.5, 0, 60);
+      stopwatch(rHz, an, 'wigglesPerSec', ld);
 
-    var rAmt = row(host, t('textAnimAmount', 'Amount'));
-    numField(rAmt, function () { return sel.amount; }, function (v, live) { sel.amount = v; if (!live) commit(ld); else liveRefresh(ld); }, 5, -100, 100);
-    stopwatch(rAmt, an, 'amount', ld);
+      var rWMin = row(host, t('textAnimWiggleMin', 'Min amount'));
+      numField(rWMin, function () { return sel.wiggleMin == null ? -50 : sel.wiggleMin; }, function (v, live) { sel.wiggleMin = v; if (!live) commit(ld); else liveRefresh(ld); }, 5, -100, 100);
+      stopwatch(rWMin, an, 'wiggleMin', ld);
+
+      var rWMax = row(host, t('textAnimWiggleMax', 'Max amount'));
+      numField(rWMax, function () { return sel.wiggleMax == null ? 50 : sel.wiggleMax; }, function (v, live) { sel.wiggleMax = v; if (!live) commit(ld); else liveRefresh(ld); }, 5, -100, 100);
+      stopwatch(rWMax, an, 'wiggleMax', ld);
+
+      var rCorr = row(host, t('textAnimCorrelation', 'Correlation'));
+      numField(rCorr, function () { return sel.correlation == null ? 50 : sel.correlation; }, function (v, live) { sel.correlation = v; if (!live) commit(ld); else liveRefresh(ld); }, 5, 0, 100);
+      stopwatch(rCorr, an, 'correlation', ld);
+
+      var rSeed = row(host, t('textAnimSeed', 'Seed'));
+      numField(rSeed, function () { return sel.seed == null ? 1 : sel.seed; }, function (v, live) { sel.seed = v; if (!live) commit(ld); else liveRefresh(ld); }, 1);
+      var shuffle = document.createElement('button');
+      shuffle.type = 'button';
+      shuffle.className = 'pbtn icon-only-btn';
+      shuffle.title = t('textAnimSeedShuffleTitle', 'Randomize the seed');
+      shuffle.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>';
+      shuffle.addEventListener('click', function () {
+        if (typeof pushUndo === 'function') pushUndo();
+        sel.seed = Math.floor(Math.random() * 1e6);
+        commit(ld);
+      });
+      rSeed.appendChild(shuffle);
+    } else {
+      var rRange = row(host, t('textAnimRange', 'Range'));
+      numField(rRange, function () { return sel.start; }, function (v, live) { sel.start = v; if (!live) commit(ld); else liveRefresh(ld); }, 1, -200, 200);
+      numField(rRange, function () { return sel.end; }, function (v, live) { sel.end = v; if (!live) commit(ld); else liveRefresh(ld); }, 1, -200, 200);
+      stopwatch(rRange, an, 'start', ld);
+
+      var rOff = row(host, t('textAnimOffset', 'Offset'));
+      numField(rOff, function () { return sel.offset; }, function (v, live) { sel.offset = v; if (!live) commit(ld); else liveRefresh(ld); }, 1, -200, 200);
+      // Offset is THE field to keyframe — two keys on it sweep the effect along
+      // the whole block, which is what replaces N staggered per-glyph series.
+      stopwatch(rOff, an, 'offset', ld);
+
+      var rShape = row(host, t('textAnimShape', 'Shape'));
+      selField(rShape, shapeOptions(), function () { return sel.shape; }, function (v) {
+        if (typeof pushUndo === 'function') pushUndo();
+        sel.shape = parseInt(v, 10); commit(ld);
+      });
+
+      var rEase = row(host, t('textAnimEase', 'Ease hi/lo'));
+      numField(rEase, function () { return sel.easeHigh; }, function (v, live) { sel.easeHigh = v; if (!live) commit(ld); else liveRefresh(ld); }, 5, -100, 100);
+      numField(rEase, function () { return sel.easeLow; }, function (v, live) { sel.easeLow = v; if (!live) commit(ld); else liveRefresh(ld); }, 5, -100, 100);
+
+      var rAmt = row(host, t('textAnimAmount', 'Amount'));
+      numField(rAmt, function () { return sel.amount; }, function (v, live) { sel.amount = v; if (!live) commit(ld); else liveRefresh(ld); }, 5, -100, 100);
+      stopwatch(rAmt, an, 'amount', ld);
+    }
 
     // --- driven properties ----------------------------------------------
     var rPos = row(host, t('propPosition', 'Position'));

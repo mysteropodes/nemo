@@ -3963,7 +3963,8 @@
   // holder, so start/end/offset/amount are keyframable, expression-drivable
   // and undo-able with no new machinery — the same reuse lever already proven
   // for audio tracks and rig widgets (holders never required a layer).
-  var TA_SELECTOR_KEYS = ['start', 'end', 'offset', 'amount', 'easeHigh', 'easeLow', 'smooth'];
+  var TA_SELECTOR_KEYS = ['start', 'end', 'offset', 'amount', 'easeHigh', 'easeLow', 'smooth',
+    'wiggleMin', 'wiggleMax', 'wigglesPerSec', 'correlation'];
   function taSelectorAt(an, frameIdx) {
     var sel = {};
     for (var k in an.selector) sel[k] = an.selector[k];
@@ -4077,7 +4078,7 @@
       if (idx == null) continue;
       var total = taUnitCount(li, frameIdx, basedOn);
       if (!total) continue;
-      var w = SMTextSelector.weightAt(taSelectorAt(an, frameIdx), idx, total);
+      var w = SMTextSelector.weightAt(taSelectorAt(an, frameIdx), idx, total, frameIdx / _exprFps());
       if (!w) continue;
       var p = an.props;
       acc = acc || { dx: 0, dy: 0, rot: 0, sx: 0, sy: 0, op: 0 };
@@ -4155,7 +4156,7 @@
     var basedOn = (an.selector && an.selector.basedOn) || 'chars';
     var f = frameIdx == null ? state.currentFrame : frameIdx;
     var total = taUnitCount(li, f, basedOn);
-    return SMTextSelector.weights(taSelectorAt(an, f), total);
+    return SMTextSelector.weights(taSelectorAt(an, f), total, f / _exprFps());
   }
   // sd (the stroke dict) is optional and only carries the char/word/line
   // indices — every existing caller that has one gains text animators for
