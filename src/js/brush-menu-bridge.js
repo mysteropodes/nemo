@@ -196,12 +196,12 @@
   var STAB_TITLE = 'Lisse la POSITION en direct pendant que tu dessines (corrige le tremblement de la main) — agit AVANT que le trait soit posé, indépendamment de Lissage ci-dessous. Mets ça sur Off si tu veux un tracé qui suit ta main au pixel près.';
   var SMOOTH_TITLE = 'Simplifie la courbe APRÈS coup (moins de points) — n\'a aucun effet sur le tremblement pendant le dessin, c\'est le Stabilisateur ci-dessus qui s\'en charge. À 0, le trait peut rester visiblement adouci si le Stabilisateur est activé.';
   function buildVectorParams(params) {
-    numRow(params, 'Taille', state.brushSize || 3, 1, 300, 1, function (v) { driveOriginal('p-sw', v, false, 'change'); });
-    selectRow(params, 'Stabilisateur', state.stabilizer !== undefined ? state.stabilizer : 2, [
-      { value: 0, label: 'Off' }, { value: 1, label: 'Low' }, { value: 2, label: 'Medium' }, { value: 3, label: 'High' },
-      { value: 4, label: 'Plume — légère' }, { value: 5, label: 'Plume — moyenne' }, { value: 6, label: 'Plume — forte' },
+    numRow(params, window.SM.t('fieldSize'), state.brushSize || 3, 1, 300, 1, function (v) { driveOriginal('p-sw', v, false, 'change'); });
+    selectRow(params, window.SM.t('fieldStabilizer'), state.stabilizer !== undefined ? state.stabilizer : 2, [
+      { value: 0, label: window.SM.t('stabOff') }, { value: 1, label: window.SM.t('stabLow') }, { value: 2, label: window.SM.t('stabMedium') }, { value: 3, label: window.SM.t('stabHigh') },
+      { value: 4, label: window.SM.t('stabPlumeLight') }, { value: 5, label: window.SM.t('stabPlumeMed') }, { value: 6, label: window.SM.t('stabPlumeHigh') },
     ], function (v) { driveOriginal('p-stab', v, false, 'change'); }, STAB_TITLE);
-    numRow(params, 'Lissage', state.smoothing || 0, 0, 60, 1, function (v) { driveOriginal('p-smooth', v, false, 'input'); }, SMOOTH_TITLE);
+    numRow(params, window.SM.t('fieldSmooth'), state.smoothing || 0, 0, 60, 1, function (v) { driveOriginal('p-smooth', v, false, 'input'); }, SMOOTH_TITLE);
     checkRow(params, 'Pressure brush', !!state.vectorBrush, function (v) { driveOriginal('p-vecbrush', v, true, 'change'); });
     checkRow(params, 'Taper ends', !!state.taperEnds, function (v) { driveOriginal('p-taper', v, true, 'change'); });
     // Créer/éditer un brush personnalisé (2026-08, feedback: "on a pas les
@@ -236,18 +236,18 @@
     // bitmap drawing, choosing a vector preset deactivates it. The preset is
     // the mode, so the UI cannot end up showing one family while drawing
     // with the other.
-    numRow(params, 'Taille', state.brushSize || 3, 1, 300, 1, function (v) { driveOriginal('p-sw', v, false, 'change'); });
+    numRow(params, window.SM.t('fieldSize'), state.brushSize || 3, 1, 300, 1, function (v) { driveOriginal('p-sw', v, false, 'change'); });
     // Spacing/Scatter/Opacity/Pressure no longer have a Stroke-panel element
     // to drive at all (removed, 2026-07 harmonization) — call
     // bitmap-brush.js's own state+live-selection setters directly instead of
     // routing through driveOriginal (which would now silently no-op).
-    numRow(params, 'Espacement', state.bitmapSpacing !== undefined ? state.bitmapSpacing : 15, 2, 100, 1, function (v) { if (window.SM && window.SM.setBitmapSpacing) window.SM.setBitmapSpacing(v); });
-    numRow(params, 'Dispersion', state.bitmapScatter !== undefined ? state.bitmapScatter : 20, 0, 100, 1, function (v) { if (window.SM && window.SM.setBitmapScatter) window.SM.setBitmapScatter(v); });
-    numRow(params, 'Opacité', state.bitmapOpacity !== undefined ? state.bitmapOpacity : 100, 5, 100, 1, function (v) { if (window.SM && window.SM.setBitmapOpacity) window.SM.setBitmapOpacity(v); });
-    checkRow(params, 'Pression (tablette)', state.bitmapPressure !== false, function (v) { if (window.SM && window.SM.setBitmapPressure) window.SM.setBitmapPressure(v); });
-    selectRow(params, 'Stabilisateur', state.stabilizer !== undefined ? state.stabilizer : 2, [
-      { value: 0, label: 'Off' }, { value: 1, label: 'Low' }, { value: 2, label: 'Medium' }, { value: 3, label: 'High' },
-      { value: 4, label: 'Plume — légère' }, { value: 5, label: 'Plume — moyenne' }, { value: 6, label: 'Plume — forte' },
+    numRow(params, window.SM.t('fieldSpacing'), state.bitmapSpacing !== undefined ? state.bitmapSpacing : 15, 2, 100, 1, function (v) { if (window.SM && window.SM.setBitmapSpacing) window.SM.setBitmapSpacing(v); });
+    numRow(params, window.SM.t('fieldScatter'), state.bitmapScatter !== undefined ? state.bitmapScatter : 20, 0, 100, 1, function (v) { if (window.SM && window.SM.setBitmapScatter) window.SM.setBitmapScatter(v); });
+    numRow(params, window.SM.t('fieldOpacity'), state.bitmapOpacity !== undefined ? state.bitmapOpacity : 100, 5, 100, 1, function (v) { if (window.SM && window.SM.setBitmapOpacity) window.SM.setBitmapOpacity(v); });
+    checkRow(params, window.SM.t('brushMenuPressureTablet'), state.bitmapPressure !== false, function (v) { if (window.SM && window.SM.setBitmapPressure) window.SM.setBitmapPressure(v); });
+    selectRow(params, window.SM.t('fieldStabilizer'), state.stabilizer !== undefined ? state.stabilizer : 2, [
+      { value: 0, label: window.SM.t('stabOff') }, { value: 1, label: window.SM.t('stabLow') }, { value: 2, label: window.SM.t('stabMedium') }, { value: 3, label: window.SM.t('stabHigh') },
+      { value: 4, label: window.SM.t('stabPlumeLight') }, { value: 5, label: window.SM.t('stabPlumeMed') }, { value: 6, label: window.SM.t('stabPlumeHigh') },
     ], function (v) { driveOriginal('p-stab', v, false, 'change'); }, STAB_TITLE);
     // Import .abr — was the Stroke panel's own button + hidden file input
     // (2026-07 harmonization, removed along with the rest of that section);
@@ -423,8 +423,8 @@
   function buildContent(el) {
     el.innerHTML = '';
     var tabs = document.createElement('div'); tabs.className = 'brush-menu-tabs';
-    var vecTab = document.createElement('button'); vecTab.className = 'brush-menu-tab' + (currentTab === 'vector' ? ' active' : ''); vecTab.textContent = 'Vecteur';
-    var bmpTab = document.createElement('button'); bmpTab.className = 'brush-menu-tab' + (currentTab === 'bitmap' ? ' active' : ''); bmpTab.textContent = 'Bitmap';
+    var vecTab = document.createElement('button'); vecTab.className = 'brush-menu-tab' + (currentTab === 'vector' ? ' active' : ''); vecTab.textContent = window.SM.t('brushMenuTabVector');
+    var bmpTab = document.createElement('button'); bmpTab.className = 'brush-menu-tab' + (currentTab === 'bitmap' ? ' active' : ''); bmpTab.textContent = window.SM.t('brushMenuTabBitmap');
     vecTab.addEventListener('click', function () { currentTab = 'vector'; buildContent(el); });
     bmpTab.addEventListener('click', function () { currentTab = 'bitmap'; buildContent(el); });
     tabs.appendChild(vecTab); tabs.appendChild(bmpTab);
