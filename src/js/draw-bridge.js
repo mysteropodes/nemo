@@ -104,35 +104,24 @@
     return _liveDabCache;
   }
   // Perspective guide hard-lock (2026-07, perspective-bridge.js's
-  // findGuideRayNear/projectOnRay — see their own header comment for why
-  // this replaced a pure per-point magnet). Set once at pointerdown, held
-  // for the whole gesture, cleared at pointerup.
-  var lockedGuideRay = null;
-  // Angle-based lock (2026-07 — feedback: "dans sketchbook tu fais tes
-  // traits n'importe où ils vont suivre la perspective"): unlike the
-  // proximity lock above (decided instantly at pointerdown, since distance-
-  // to-a-drawn-line is already known from a single point), the ANGLE lock
-  // needs a couple of pixels of real drag before a direction even exists to
-  // compare against a vanishing point.
+  // findVPRayByAngle/projectOnRay). Set once at pointerdown's first real
+  // direction, held for the whole gesture, cleared at pointerup.
   //
-  // 2026-09 fix (Cyril, live: "ça dessine toujours sur les guides et pas
-  // avec les guides d'axe") — guideConstrain below used to let the
-  // PROXIMITY lock decide instantly at pointerdown and, if it found
-  // anything, permanently skip the angle check for the rest of the
-  // gesture. Measured live: with the default 2pt VP layout, a pointerdown
-  // 1500+ world-px from a VP still landed within LOCK_TOLERANCE_PX (40
-  // SCREEN px, i.e. hundreds of world px once zoomed out) of some
-  // unrelated fan ray at a completely different angle than the one the
-  // user actually dragged toward — so the stroke locked onto whichever
-  // static guide LINE happened to be underfoot, never onto the true
-  // direction toward a vanishing point (the "axis guide" behavior the
-  // cursor crosshair shows). Every fan ray already radiates FROM a vp, so
-  // the angle check below reproduces "start on a drawn ray" correctly on
-  // its own (the ray's own direction points straight at that vp by
-  // construction) — the proximity candidate is now only a FALLBACK for
-  // when no vp matches by angle at all, tried once real drag exists,
-  // instead of preempting the angle check outright.
-  var guideStartPt = null, guideLockDecided = false, guideProximityFallback = null;
+  // 2026-09 (Cyril, live, two rounds of feedback the same day): first
+  // "ça dessine toujours sur les guides et pas avec les guides d'axe" — a
+  // proximity-to-a-fixed-fan-ray lock used to fire instantly at pointerdown
+  // and permanently skip the angle-toward-the-VP check for the rest of the
+  // gesture. Then, after the fan stopped being DRAWN (buildPerspectiveGuideItems
+  // fix) but its ghost geometry was still a fallback here: "ça dessine pas
+  // dans les guides du gizmo mais encore sur les anciens guides" — the
+  // invisible fan was still catching strokes via magnetSnap/the proximity
+  // fallback. Both are gone now: perspective-bridge.js's findVPRayByAngle is
+  // the ONLY lock source, and its candidate set (axisCandidates) is exactly
+  // the axes the cursor gizmo draws — each VP direction plus vertical — so
+  // there's nothing left to lock onto that isn't visibly shown while you
+  // draw. A stroke whose direction doesn't match any of those within
+  // SNAP_DEG just draws free, for its whole length, same as always.
+  var guideStartPt = null, guideLockDecided = false;
   var lastMoveT = 0, lastWorldPt = null;
   var lastPenPressure = null; // held across a real-pen gesture, see pressureOf()
   // state.stabilizer (position-averaging while drawing) used to only exist
@@ -331,50 +320,33 @@
     var base = isFillBrush() ? state.fillBrushSize : state.brushSize;
     return base * (lo + (hi - lo) * p);
   }
-  // Sticks a freehand sample onto the nearest perspective guide line
-  // (perspective-bridge.js) when it's within the magnet tolerance — no-op
-  // (returns the point unchanged) whenever the guide is off or nothing's
-  // close enough, so this is always safe to call unconditionally on every
-  // sample of a Draw/Fillbrush stroke.
-  function magnetSnap(w) {
-    if (!window.perspectiveSnapPointMagnetic) return w;
-    var snapped = window.perspectiveSnapPointMagnetic(new Point(w[0], w[1]));
-    return snapped ? [snapped.x, snapped.y] : w;
-  }
   // Hard directional lock (2026-07, perspective-bridge.js's
-  // findGuideRayNear/projectOnRay) — call this instead of magnetSnap at
-  // every point of a Draw/Fillbrush stroke. Locks onto whichever guide ray
-  // is closest at the VERY FIRST call of a gesture (pointerdown) and then
-  // hard-projects every later point onto that same ray for the rest of the
-  // stroke, regardless of distance — falls back to the old per-point
-  // magnetSnap when nothing was close enough to lock at the start (so a
-  // stroke drawn nowhere near the guide still behaves exactly as before).
+  // findVPRayByAngle/projectOnRay) — call this at every point of a Draw/
+  // Fillbrush stroke. Locks onto whichever gizmo axis (a VP direction, or
+  // vertical) is closest once the gesture has a real direction, and hard-
+  // projects every later point onto that same axis for the rest of the
+  // stroke, regardless of distance. A stroke whose direction never matches
+  // any axis within SNAP_DEG just draws free for its whole length — same as
+  // always when the guide is off.
   function guideConstrain(w, isStart) {
     if (isStart) {
       guideStartPt = new Point(w[0], w[1]);
       lockedGuideRay = null;
       guideLockDecided = false;
-      // Remember a proximity candidate (starting right on a drawn ray or
-      // the horizon) but DON'T commit to it yet — the angle-based check
-      // below gets first refusal once a direction exists (see the
-      // 2026-09 comment on this file's own guideStartPt declaration for
-      // why: proximity alone was locking strokes onto whatever line was
-      // underfoot, ignoring the direction actually drawn).
-      guideProximityFallback = window.perspectiveFindGuideRayNear ? window.perspectiveFindGuideRayNear(guideStartPt) : null;
     } else if (!guideLockDecided && guideStartPt) {
       var curPt = new Point(w[0], w[1]);
       // Needs real direction before the angle check means anything — same
       // 4px-of-drag floor snapToVP itself uses (perspective-bridge.js).
       if (curPt.getDistance(guideStartPt) >= 4) {
-        lockedGuideRay = (window.perspectiveFindVPRayByAngle ? window.perspectiveFindVPRayByAngle(guideStartPt, curPt) : null) || guideProximityFallback;
-        guideLockDecided = true; // decided either way — never re-checked again this gesture, so a stroke that isn't aimed at any VP (or a drawn ray) just draws free for its whole length, not just its first few px
+        lockedGuideRay = window.perspectiveFindVPRayByAngle ? window.perspectiveFindVPRayByAngle(guideStartPt, curPt) : null;
+        guideLockDecided = true; // decided either way — never re-checked again this gesture
       }
     }
     if (lockedGuideRay && window.perspectiveProjectOnRay) {
       var p = window.perspectiveProjectOnRay(new Point(w[0], w[1]), lockedGuideRay);
       return [p.x, p.y];
     }
-    return magnetSnap(w);
+    return w;
   }
   function hexToRgba(css, opacityPct) {
     if (!css) return null;
@@ -742,7 +714,7 @@
     // catch-up behavior Photoshop/Clip Studio's stabilized brushes use.
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     w = guideConstrain(w, false);
-    lockedGuideRay = null; guideStartPt = null; guideLockDecided = false; guideProximityFallback = null; // stroke over — next pointerdown re-evaluates from scratch
+    lockedGuideRay = null; guideStartPt = null; guideLockDecided = false; // stroke over — next pointerdown re-evaluates from scratch
     var pressure = smoothPressure(wantsPressure() ? pressureOf(e, w) : 1);
     if (modeler) {
       // The modeler's own end-of-stroke catch-up (physics iterated until
