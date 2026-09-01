@@ -367,8 +367,30 @@
   // already use in app.js) — including a manual companion pre-merge for a
   // linked-fill ribbon member, since these transient paths carry no live
   // .data for foldBooleanOp's own companion lookup to find.
-  function applyCombinesToStrokes(strokes, ld) {
+  //
+  // li/frameIdx (2026-09, twin of the #723 fix): when the caller knows which
+  // state.layers index and frame these dicts belong to, each member's
+  // per-element Motion (elementMotionAt) is baked into its transient Path
+  // BEFORE the boolean op — exactly what computeGroupCombine does on the
+  // live side via elementMotionBakedClone (tools.js). Without it the
+  // combined outline (which carries no strokeId, so the caller's own
+  // per-stroke elMat pass never reaches it) rendered at the member's REST
+  // pose in every export/onion frame while the canvas showed it animated.
+  // Both optional: a caller without a frame context (StoryBoard reading a
+  // symbol's inner layer) keeps the un-baked behavior.
+  function applyCombinesToStrokes(strokes, ld, li, frameIdx) {
     if (!ld || !ld.groups || !strokes || !strokes.length) return strokes;
+    var canBake = li != null && frameIdx != null && !!window.SMMotion;
+    function bakeElementMotion(p, sd) {
+      if (!canBake || !sd.strokeId) return p;
+      var m = SMMotion.elementMotionAt(li, sd.strokeId, frameIdx, sd);
+      if (!m || (m.dx === 0 && m.dy === 0 && m.rot === 0 && m.sx === 1 && m.sy === 1)) return p;
+      var pivot = new Point(p.bounds.center.x + (m.ax || 0), p.bounds.center.y + (m.ay || 0));
+      p.scale(m.sx, m.sy, pivot);
+      p.rotate(m.rot, pivot);
+      p.translate(m.dx, m.dy);
+      return p;
+    }
     function dictToPath(sd) {
       var p = new Path({ insert: false });
       sd.segments.forEach(function (s) { p.add(new Segment(new Point(s.point[0], s.point[1]), new Point(s.handleIn[0], s.handleIn[1]), new Point(s.handleOut[0], s.handleOut[1]))); });
@@ -437,7 +459,10 @@
               suppressed.push(companionDict);
             }
           }
-          return p;
+          // After the companion merge, so the whole visible shape (ribbon +
+          // its fill) moves as one — a companion has no elementMotion entry
+          // of its own, it follows its anchor.
+          return bakeElementMotion(p, sd);
         });
         memberDicts.forEach(function (sd) { suppressed.push(sd); });
         var styleSource = memberDicts[memberDicts.length - 1];
