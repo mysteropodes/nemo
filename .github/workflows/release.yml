@@ -1,0 +1,126 @@
+name: Release
+
+# Builds the desktop app on a tag and publishes it as a GitHub Release,
+# updater manifest included.
+#
+# It produces the public binaries and, via includeUpdaterJson, the latest.json
+# the auto-updater will read. Pointing the app AT it is a deliberate follow-up:
+# that means editing src-tauri/src/lib.rs, which PR #710 is already rewriting,
+# and stacking both edits on one file would only create a conflict. Until that
+# lands the app still reads the old endpoint, so this workflow's value today is
+# the public builds, not the update path.
+#
+# This supersedes scripts/publish-update.sh, which pushed the .app.tar.gz into
+# the private strokemotion-updates repo and served it through the Contents
+# API. That arrangement had four problems, all fixed by moving to Releases:
+# the app carried a token just to READ a private repo; 22 MB binaries were
+# committed to git, so every version bloated history permanently; the
+# unauthenticated Contents API is capped at 60 requests/hour per IP; and the
+# manifest was maintained by hand, which is why it still advertised 0.6.2
+# long after the app had moved to 0.7.0-alpha.1 -- an updater that silently
+# offered nothing to anyone.
+#
+# The token was never what secured an update: Tauri verifies the downloaded
+# archive against the minisign pubkey baked into the app. Dropping it costs
+# no security, only the ability to keep the repo private.
+#
+# ONLY macOS arm64 IS BUILT TODAY, and that is a hard constraint rather than
+# a choice -- see the `matrix` comment below before adding a platform.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (must already exist)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-14 and later are Apple Silicon runners, matching the only
+        # ffmpeg sidecar that exists: src-tauri/binaries/ffmpeg-aarch64-apple-darwin.
+        #
+        # Adding windows-latest or ubuntu-latest here WILL fail the build, and
+        # not for a reason CI can fix: bundle.externalBin declares
+        # "binaries/ffmpeg", so Tauri requires a binary named
+        # ffmpeg-<target-triple> for whatever it is building, and only the
+        # aarch64-apple-darwin one exists.
+        #
+        # Producing the others is not a matter of downloading a build. ffmpeg
+        # here is deliberately LGPL, rebuilt without --enable-gpl and without
+        # any patent-encumbered encoder (see THIRD_PARTY_NOTICES.md), and it
+        # regains H.264/H.265/ProRes export through --enable-videotoolbox --
+        # Apple's own OS encoder, whose patent licensing Apple already holds.
+        # Most prebuilt ffmpeg binaries are GPL and would silently undo that.
+        # The Windows equivalent is --enable-mediafoundation (h264_mf/hevc_mf,
+        # Microsoft's OS encoder, same reasoning); on Linux it is VAAPI, which
+        # additionally depends on the user's drivers.
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build geometry-wasm
+        working-directory: geometry-wasm
+        run: wasm-pack build --target web --out-dir ../src/wasm
+
+      # The committed ffmpeg links dynamically against these Homebrew dylibs,
+      # and scripts/bundle-ffmpeg-dylibs.py copies them into the .app to make
+      # it self-contained. They are needed to BUNDLE, not to build ffmpeg --
+      # the binary itself is already committed.
+      - name: Install ffmpeg's runtime dylibs
+        run: |
+          brew install nasm libvmaf openjpeg opus lame libvpx webp libass \
+            freetype fontconfig theora libvorbis snappy aom zimg svt-av1 harfbuzz
+
+      - run: npm ci || npm install
+
+      - name: Build and publish the release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.event.inputs.tag || github.ref_name }}
+          releaseName: 'Nemo __VERSION__'
+          releaseBody: |
+            Nemo __VERSION__ — early alpha.
+
+            The app is not code-signed. macOS will refuse it on first launch:
+            right-click the app and choose **Open**, then confirm.
+          releaseDraft: true
+          prerelease: true
+          args: --target ${{ matrix.target }}
+          # Writes latest.json next to the artifacts, which is what
+          # tauri.conf.json's updater endpoint now reads.
+          includeUpdaterJson: true
+
+      - name: Make the .app self-contained
+        run: python3 scripts/bundle-ffmpeg-dylibs.py || echo "::warning::dylib bundling skipped"
