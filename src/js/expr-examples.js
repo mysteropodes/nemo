@@ -228,6 +228,59 @@
             'var a = radians(time * degreesPerSecond);\n' +
             'return [center[0] + Math.cos(a) * radius, center[1] + Math.sin(a) * radius];',
         },
+        {
+          id: 'fadeInOut',
+          label: 'Fade in, hold, fade out (Opacity)',
+          source: 'Extremely common AE pattern, Nemo-native',
+          code:
+            '// Fades in over the first inDur frames, holds, fades out over the\n' +
+            '// last outDur. No keyframes needed — comp.frames is the scene\'s\n' +
+            '// own total length. Opacity (1D). remap() already clamps its\n' +
+            "// input to the given range, so this never overshoots 0..100.\n" +
+            'var inDur = 12, outDur = 12;\n' +
+            'var fadeIn = remap(frame, 0, inDur, 0, 100);\n' +
+            'var fadeOut = remap(frame, comp.frames - outDur, comp.frames, 100, 0);\n' +
+            'return Math.min(fadeIn, fadeOut);',
+        },
+        {
+          id: 'blinkFlicker',
+          label: 'Blink / flicker (Opacity)',
+          source: 'Common AE pattern (step on a sine), Nemo-native',
+          code:
+            "// Hard on/off blink at a fixed rate — a caution light, a text\n" +
+            '// cursor. Opacity (1D). For a softer flicker, replace the > 0\n' +
+            "// step with the sine value itself, remapped to 0..100.\n" +
+            'var blinksPerSecond = 2;\n' +
+            'return Math.sin(time * blinksPerSecond * Math.PI * 2) > 0 ? 100 : 0;',
+        },
+        {
+          id: 'rhythmicPulse',
+          label: 'Rhythmic pulse / heartbeat (Scale)',
+          source: 'Common AE pattern, Nemo-native',
+          code:
+            '// A steady scale pulse — a heartbeat, a breathing UI element.\n' +
+            '// Scale (2D, percent) — see "Basic wiggle" above for why\n' +
+            "// value[0]/[1] rather than `value + ...` on a 2D property.\n" +
+            'var speed = 2, amount = 15;\n' +
+            'var pulse = Math.sin(time * speed * Math.PI * 2) * amount;\n' +
+            'return [value[0] + pulse, value[1] + pulse];',
+        },
+        {
+          id: 'dvdBounce',
+          label: 'DVD-screensaver edge bounce (Position)',
+          source: 'Classic AE cheat-sheet pattern, Nemo-native',
+          code:
+            '// Bounces linearly back and forth across the WHOLE canvas —\n' +
+            '// the classic DVD-logo screensaver, no keyframes needed. A\n' +
+            '// triangle wave via modulo: comp.width/height read the actual\n' +
+            '// canvas size, so this adapts if the project is resized.\n' +
+            '// Position (2D).\n' +
+            'var speedX = 300, speedY = 220;\n' +
+            'var w = comp.width, h = comp.height;\n' +
+            'var rawX = (time * speedX) % (2 * w);\n' +
+            'var rawY = (time * speedY) % (2 * h);\n' +
+            'return [rawX > w ? 2 * w - rawX : rawX, rawY > h ? 2 * h - rawY : rawY];',
+        },
       ],
     },
     {
@@ -283,6 +336,19 @@
             '// Keeps this layer visually level even while its parent spins —\n' +
             "// e.g. a sign that stays upright on a rotating wheel. Rotation (1D).\n" +
             'return self.hasParent ? value - self.parent.rotation : value;',
+        },
+        {
+          id: 'maintainScaleWhenParented',
+          label: 'Maintain scale when parented (Scale)',
+          source: 'Common AE pattern, Nemo-native — sibling of "Cancel inherited parent rotation"',
+          code:
+            "// Counteracts the parent's own scale so this layer's ON-SCREEN\n" +
+            '// size stays constant even while the parent scales — e.g. an\n' +
+            '// icon that should not shrink when its container does. Scale\n' +
+            '// (2D, percent). Same self.parent read as the rotation version above.\n' +
+            'if (!self.hasParent) return value;\n' +
+            'var ps = self.parent.scale;\n' +
+            'return [value[0] * 100 / ps[0], value[1] * 100 / ps[1]];',
         },
       ],
     },

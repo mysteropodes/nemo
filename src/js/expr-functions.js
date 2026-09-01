@@ -83,11 +83,30 @@
         { name: 'self', insert: 'self', doc: 'This SAME holder — {at, velocity, speed, keys, control, index, name, property, hasParent, parent, marker, isShape}.' },
         { name: 'self.hasParent / self.parent', insert: 'self.hasParent ? self.parent.rotation : value', doc: 'self.parent is a full layer() snapshot of the parent, or null.' },
         { name: 'self.index / self.name', insert: 'self.name', doc: "This layer's position in the layer stack, and its name." },
+        { name: 'self.inPoint / self.outPoint', insert: 'self.inPoint', doc: 'The frame range this layer is actually active for (in frames).' },
+        { name: 'self.property', insert: 'self.property', doc: "The property name this expression is running on (e.g. 'position') — for one shared expression pasted onto several different properties that should behave differently on each." },
         { name: 'comp', insert: 'comp', doc: '{width, height, fps, frames, layers, name, marker} — the scene/component this expression lives in.' },
         { name: 'marker.at(i) / marker.nearest(f)', insert: 'marker.nearest(frame)', doc: 'Comp-level markers — {frame, time, name, color, index}, or null. self.marker is the same API scoped to this layer.' },
         { name: 'control(name, frame?)', insert: "control('Amount')", doc: "This layer's own expression control (rig-widget.js), by name — the self shorthand for self.control(...)." },
         { name: 'layerControl(uidOrName, name, frame?)', insert: "layerControl('LayerName', 'Amount')", doc: 'Cross-layer control read — cheaper than layer(x).control(y) when only one number is needed (skips building a whole snapshot).' },
         { name: 'contentBox()', insert: 'contentBox()', doc: 'This holder’s own drawn bounds this frame — {x, y, width, height, top, left}.' },
+      ],
+    },
+    {
+      // Only meaningful on a per-vertex property (vtx0, vtx1, ...) of an
+      // image mesh (image-mesh.js, CLAUDE.md §12ter) — narrow enough that
+      // it would clutter the main Layers category above for the common
+      // case, but real, working, and documented (§12ter's own worked
+      // example is literally `self.vertexUV`), so it belongs here rather
+      // than being silently missing from what claims to be the reference.
+      id: 'mesh',
+      label: 'Image Mesh (per-vertex)',
+      fns: [
+        { name: 'self.isMesh', insert: 'self.isMesh', doc: 'True when this expression is running on an image-mesh vertex property.' },
+        { name: 'self.vertexIndex', insert: 'self.vertexIndex', doc: "This vertex's index into the mesh." },
+        { name: 'self.vertexCount', insert: 'self.vertexCount', doc: 'Total vertex count of this mesh.' },
+        { name: 'self.vertexUV', insert: 'self.vertexUV', doc: "This vertex's REST position, normalized 0..1 over the image — [u, v]. The offset a vtxN expression returns is ADDED to the sculpted pose, same as any other Motion property." },
+        { name: 'self.isOutlineVertex', insert: 'self.isOutlineVertex', doc: 'True when this vertex sits on the mesh’s outline (its mask boundary) rather than the interior.' },
       ],
     },
   ];
