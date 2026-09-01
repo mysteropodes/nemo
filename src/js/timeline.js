@@ -1547,6 +1547,7 @@ window.SM={
   splitLayerIntoElementsCore:function(li,opts){return splitLayerIntoElementsCore(li,opts);},
   splitLayerIntoElements:function(li){return splitLayerIntoElements(li);},
   mergeLayersIntoOne:function(indices,opts){return mergeLayersIntoOne(indices,opts);},
+  convertSelectionToObjectDuplicator:function(indices){return convertSelectionToObjectDuplicator(indices);},
   exitToScene:function(){exitToScene();},
   closeSymbolTab:function(symId){closeSymbolTab(symId);},
   enterMontageView:function(montageId){enterMontageView(montageId);},
@@ -6246,6 +6247,7 @@ function renderLayerList(frameOnly){
         {label:SM.t('elementsRename'),action:function(){startLayerRename(idx4);}},
         {label:l4.isTextLayer?SM.t('ctxRemoveTextLayerMark'):SM.t('ctxMarkAsTextLayer'),action:function(){l4.isTextLayer=!l4.isTextLayer;renderLayerList();}},
         {label:SM.t('ctxGroupIntoFolder'),disabled:_layerSel.length<2,action:function(){groupSelectionIntoFolder();}},
+        {label:SM.t('ctxObjectDuplicatorEllipsis'),disabled:_layerSel.length<2,action:function(){window.SM.convertSelectionToObjectDuplicator(_layerSel.slice());}},
         // Split / merge as a reversible PAIR (2026-07-25). "Éclater" existed
         // only as a Motion double-click with no visible entry point and no
         // inverse; both directions now sit next to each other, in both
@@ -6659,6 +6661,17 @@ function updateDuplicatorPanel(){
   sec.style.display='block';
   var dup=ld.duplicator;
   var mode=dup.mode||'grid';
+  // Object mode (2026-09-01): a "source" pool of OTHER layers instead of
+  // this layer's own drawn shape — see convertSelectionToObjectDuplicator
+  // (app.js). Temporal stagger re-samples the SEED's own frame content by
+  // definition (applyLayerDuplicator's own comment on tOffOn), which
+  // doesn't apply to a source pool of DIFFERENT layers, and there is no
+  // single seed shape to "Modifier la forme source…" — both rows hide.
+  var isObjects=dup.sourceMode==='objects';
+  document.getElementById('dup-source-sec').style.display=isObjects?'block':'none';
+  document.getElementById('dup-anim-hdr-row').style.display=isObjects?'none':'flex';
+  document.getElementById('dup-edit-source-row').style.display=isObjects?'none':'flex';
+  if(isObjects)renderDuplicatorSourcePool(dup);
   document.getElementById('dup-mode').value=mode;
   document.getElementById('dup-grid-row').style.display=mode==='grid'?'flex':'none';
   document.getElementById('dup-grid-spacing-row').style.display=mode==='grid'?'flex':'none';
@@ -6687,7 +6700,7 @@ function updateDuplicatorPanel(){
   // own runtime guard, this is just the UI half).
   var tOff=dup.timeOffset||{};
   document.getElementById('dup-anim-enabled').checked=!!tOff.enabled;
-  document.getElementById('dup-anim-row').style.display=tOff.enabled?'flex':'none';
+  document.getElementById('dup-anim-row').style.display=(tOff.enabled&&!isObjects)?'flex':'none';
   document.getElementById('dup-anim-offset').value=tOff.offsetFrames!=null?tOff.offsetFrames:1;
   document.getElementById('dup-anim-direction').value=tOff.direction||'forward';
   var sel=document.getElementById('dup-path-layer');
@@ -6702,6 +6715,51 @@ function updateDuplicatorPanel(){
   editBtn.textContent=ld._dupEditSource?(window.SM&&SM.t?SM.t('dupEditSourceDone'):'Terminé — réactiver la duplication'):(window.SM&&SM.t?SM.t('dupEditSource'):'Modifier la forme source…');
   editBtn.classList.toggle('ac',!ld._dupEditSource);
   renderDuplicatorEffectors(dup);
+}
+// Object-mode source pool (2026-09-01) — rebuilt from scratch every call,
+// same variable-length-list pattern as renderDuplicatorEffectors below.
+// Each row is a pool member (name + remove); the header <select> adds any
+// OTHER eligible layer (not the host itself, not already in the pool, not
+// itself a duplicator — no chained duplicators, same refusal
+// _resolveDuplicatorPath's own runtime guard enforces for path mode).
+function renderDuplicatorSourcePool(dup){
+  var list=document.getElementById('dup-source-list');
+  var addSel=document.getElementById('dup-source-add');
+  if(!list||!addSel)return;
+  var M=window.SMMotion;
+  var uids=dup.sourceLayerUids||(dup.sourceLayerUids=[]);
+  list.innerHTML='';
+  uids.forEach(function(uid,i){
+    var idx=M?M.findLayerIndexByUid(uid):-1;
+    var row=document.createElement('div');row.className='pr';
+    var nm=document.createElement('span');nm.className='pl';
+    nm.textContent=(idx>=0&&state.layers[idx])?(state.layers[idx].name||('Layer '+(idx+1))):SM.t('dupSourceMissingLayer');
+    if(idx<0)nm.style.opacity='.5';
+    row.appendChild(nm);
+    var rm=document.createElement('button');rm.className='pbtn';rm.textContent='✕';rm.style.marginLeft='auto';rm.title=SM.t('titleRemoveEffectorProp');
+    rm.addEventListener('click',function(){pushUndo();uids.splice(i,1);renderDuplicatorSourcePool(dup);dupRefreshFromPanel();});
+    row.appendChild(rm);
+    list.appendChild(row);
+  });
+  addSel.innerHTML='';
+  var placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=SM.t('dupSourceAddPlaceholder');addSel.appendChild(placeholder);
+  var hostIdx=state.activeLayerIdx;
+  var already={};uids.forEach(function(uid){already[uid]=true;});
+  state.layers.forEach(function(l,i){
+    if(i===hostIdx||l.duplicator||already[l.layerUid])return;
+    var o=document.createElement('option');o.value=l.layerUid||'';o.textContent=l.name||('Layer '+(i+1));addSel.appendChild(o);
+  });
+  // #dup-source-add is STATIC markup (unlike the per-effector <select>s
+  // below, which are recreated fresh each render) — .onchange assignment
+  // rather than addEventListener, so a repeat call REPLACES the handler
+  // instead of stacking another one on top of it (a stale `dup` closure
+  // firing alongside the current one on every future change).
+  addSel.onchange=function(){
+    if(!addSel.value)return;
+    pushUndo();
+    uids.push(addSel.value);
+    renderDuplicatorSourcePool(dup);dupRefreshFromPanel();
+  };
 }
 // Effector rows (2026-07-29) — rebuilt from scratch every call, same
 // "variable-length list, no static markup" pattern as renderCompFrameStrip

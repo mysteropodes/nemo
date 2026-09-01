@@ -1539,6 +1539,31 @@ function applyLayerDuplicator(ld,base,frameIdx,layerIdx,opts){
   if(count<=1)return base;
   var pivot=_boundsCenterOfStrokes(base);
   var M=window.SMMotion;
+  // Object mode (2026-09-01, Cyril: "mettre dans un duplicator les calques
+  // select[ionnés]... utilise le même système que duplicator" — C4D
+  // Cloner's Object mode). `base` is the HOST's own content (deliberately
+  // empty — see convertSelectionToObjectDuplicator); each slot instead
+  // pulls a WHOLE OTHER layer's own effective content, cycling through the
+  // pool by index (Iterate, C4D's own default) so the placement count and
+  // the pool size are independent — a 12-slot grid with a 3-layer pool
+  // repeats the pool 4 times, same as C4D. Resolved by uid, not index: a
+  // layer's stack position can change under it (delete/reorder elsewhere),
+  // uid is the same stable-reference convention parentLayerUid/
+  // pathLayerUid already use.
+  var pool=null;
+  if(dup.sourceMode==='objects'&&dup.sourceLayerUids&&dup.sourceLayerUids.length){
+    pool=dup.sourceLayerUids.map(function(uid){
+      return M?M.findLayerIndexByUid(uid):-1;
+    }).filter(function(i){
+      // A deleted source, or one that itself became a duplicator after
+      // being added to the pool, silently drops out rather than crashing —
+      // no chained duplicators (same refusal _resolveDuplicatorPath already
+      // enforces for path mode), and a missing layer is just one fewer
+      // pool member, not a broken render.
+      return i>=0&&i!==layerIdx&&!state.layers[i].duplicator;
+    });
+    if(!pool.length)return base; // every referenced layer is gone — nothing to draw, not a crash
+  }
   // Temporal stagger (2026-07-29, LottieFiles Duplicator "Animation" tab
   // equivalent — the user explicitly asked for this after seeing it there):
   // each copy re-samples the SEED LAYER'S OWN content (getEffectiveStrokes,
@@ -1581,7 +1606,32 @@ function applyLayerDuplicator(ld,base,frameIdx,layerIdx,opts){
   var out=[];
   for(var k=0;k<count;k++){
     var baseK=base,pivotK=pivot;
-    if(tOffOn){
+    if(pool){
+      // Iterate (C4D default): slot k always maps to the SAME pool member
+      // for a given k, so re-ordering slots (grid rows/cols, radial angle)
+      // never reshuffles which object sits where — only the placement
+      // pattern moves them.
+      var poolIdx=pool[k%pool.length];
+      var pooled=getEffectiveStrokes(poolIdx,frameIdx);
+      if(pooled.length){
+        // Recenter THIS member onto the SHARED pivot before placing it —
+        // pool members are ordinary layers scattered wherever they were
+        // originally drawn, and dupMatrixFromDescriptor's placement offset
+        // (baseDx/baseDy) is relative to `pivot`, so leaving each member at
+        // its own original position would scatter the "grid" across
+        // whatever the source layers' own positions happened to be instead
+        // of laying out a clean pattern. Same reasoning C4D's own Cloner
+        // uses when it takes multiple children: the pattern comes from the
+        // cloner, not from where each child happened to sit beforehand.
+        var memberCenter=_boundsCenterOfStrokes(pooled);
+        var dx0=pivot.x-memberCenter.x,dy0=pivot.y-memberCenter.y;
+        if(dx0||dy0){
+          var shiftMat=new Matrix(1,0,0,1,dx0,dy0);
+          pooled=pooled.map(function(sd){return applyMatrixToStrokeData(cloneStrokeForTransform(sd),shiftMat);});
+        }
+        baseK=pooled;pivotK=pivot;
+      } else baseK=[]; // this member has nothing at this frame (time range/hold-blank) — an empty slot, not the host's own (empty) content
+    } else if(tOffOn){
       var shiftFrames;
       if(tOff.direction==='backward')shiftFrames=(count-1-k)*tOff.offsetFrames;
       else if(tOff.direction==='centerOut')shiftFrames=Math.round(Math.abs(k-(count-1)/2)*tOff.offsetFrames);
@@ -1648,8 +1698,78 @@ function applyLayerDuplicator(ld,base,frameIdx,layerIdx,opts){
 function getEffectiveStrokesRendered(layerIdx,frameIdx){
   var base=getEffectiveStrokes(layerIdx,frameIdx);
   var ld=state.layers[layerIdx];
-  if(!ld||!ld.duplicator||ld._dupEditSource||!base.length)return base;
+  if(!ld||!ld.duplicator||ld._dupEditSource)return base;
+  // Object mode (2026-09-01): the host layer is an otherwise-empty
+  // container — its OWN base content is deliberately [] (see
+  // convertSelectionToObjectDuplicator below), content comes from the
+  // source pool instead. The `!base.length` short-circuit below exists so
+  // an ordinary (shape-mode) duplicator with nothing drawn yet skips the
+  // math entirely; it must NOT apply to Object mode or an empty host would
+  // always render nothing.
+  if(!base.length&&(!ld.duplicator||ld.duplicator.sourceMode!=='objects'))return base;
   return applyLayerDuplicator(ld,base,frameIdx,layerIdx);
+}
+// Object-mode Duplicator (2026-09-01, Cyril: "mettre dans un duplicator
+// les calques select[ionnés]... utilise le même système que duplicator" —
+// C4D Cloner's Object mode). Unlike toggleLayerDuplicator's ordinary
+// duplicator (clone THIS layer's own content N times), this creates a
+// fresh, otherwise-empty CONTAINER layer whose duplicator cycles through a
+// POOL of the selected layers (applyLayerDuplicator's `pool` branch above)
+// — one clone per grid/radial/path slot, Iterate order, same as any other
+// duplicator mode/effector/stagger control working on top. The pool
+// members themselves are only HIDDEN (visible=false), not locked or
+// converted: they stay ordinary, independently editable layers — their
+// own drawn content is what the duplicator reads every frame, so editing
+// one updates every clone of it. Un-hide to get the original back on
+// screen by itself, same "opt-in, reversible" principle as everything
+// else in this codebase (CLAUDE.md §8's Component conversion, §13's
+// widget layers).
+function convertSelectionToObjectDuplicator(indices){
+  var idx=(indices||[]).slice().sort(function(a,b){return a-b;});
+  idx=idx.filter(function(v,i){return i===0||v!==idx[i-1];}); // de-dup, same guard mergeLayersIntoOne uses
+  var M=window.SMMotion;
+  var pool=[];
+  for(var a=0;a<idx.length;a++){
+    var l=state.layers[idx[a]];
+    // No chained duplicators (same refusal _resolveDuplicatorPath and
+    // applyLayerDuplicator's own pool filter already enforce) — silently
+    // skipped rather than refusing the whole action, since the REST of the
+    // selection is still a perfectly good pool.
+    if(!l||l.duplicator)continue;
+    pool.push(l);
+  }
+  if(pool.length<2){if(window.showToast)showToast(SM.t('toastSelectAtLeast2LayersCap'));return -1;}
+  saveAllLayerFrames();pushUndo(true); // save already just happened — same reusable-save convention mergeLayersIntoOne follows
+  var uids=pool.map(function(l){return M?M.ensureLayerUid(l):l.layerUid;});
+  var hostIdx=createUserLayer(uniqueLayerName('Duplicator'));
+  var host=state.layers[hostIdx];
+  // Same default field shape as toggleLayerDuplicator's shape-mode
+  // (motion.js) — sourceMode/sourceLayerUids are the only fields THAT
+  // function doesn't set, everything else must match so the rest of the
+  // panel/render pipeline sees a familiar, complete config either way.
+  host.duplicator={
+    mode:'grid',
+    rows:1,cols:pool.length,
+    spacingX:150,spacingY:150,
+    count:pool.length,
+    radius:200,startAngle:0,endAngle:null,radialOrient:false,
+    pathLayerUid:null,pathAlignTangent:true,
+    seed:Math.floor(Math.random()*1e6),
+    staggerRandom:{position:false,rotation:false,scale:false,opacity:false},
+    timeOffset:{enabled:false,offsetFrames:1,direction:'forward'},
+    sourceMode:'objects',
+    sourceLayerUids:uids,
+  };
+  host.locked=true; // same "not a normal drawing surface" convention as the shape-mode duplicator
+  pool.forEach(function(l){l.visible=false;});
+  if(typeof activateUL==='function')activateUL(hostIdx);
+  loadFrame(state.currentFrame);
+  invalidateSymbolUnionBounds(); // same cache-staleness fix toggleLayerDuplicator applies
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  renderLayerList();renderTimeline();
+  if(window.updateDuplicatorPanel)updateDuplicatorPanel();
+  if(window.showToast)showToast(SM.t('toastObjectDuplicatorCreated').replace('{n}',pool.length));
+  return hostIdx;
 }
 // ---- RIG (2026-07-29) — "un système de rig à la Shapper", promoted from
 // the dormant src/js/labs/rig-deform.js prototype. Shapper (the studio's
