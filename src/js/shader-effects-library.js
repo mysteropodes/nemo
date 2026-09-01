@@ -445,6 +445,37 @@
       'let pos = floor(uv * vec2<f32>(params.tex_w, params.tex_h) / max(params.p1, 1.0)); let chk = fract((pos.x + pos.y) * 0.5) * 2.0;',
       'return vec4<f32>(mix(src.rgb, mix(vec3<f32>(0.08), vec3<f32>(0.9), chk), clamp(params.p2, 0.0, 1.0)), src.a);',
     ]),
+    // 2026-09 — closes AE's "Cell Pattern" gap (Generate's own staple,
+    // formerly absent: Checkerboard/Grid above are regular tilings, not a
+    // cellular/Voronoi pattern). Standard 3x3-neighbourhood Worley noise:
+    // per-cell jittered point, F1 = distance to the nearest one, F2 = to the
+    // second-nearest. F1 alone renders soft blobby cells ("Bubbles"); F2-F1
+    // (near zero exactly on a cell boundary, since two points are then
+    // equidistant) renders thin cracked lines ("Crystals") — Style picks
+    // between the two rather than shipping two separate effects, since it's
+    // the same computation either way.
+    fx('shader_cell_pattern', 'Cell Pattern', 'Generate', [
+      param('p1', 'Size', 4, 200, 1, 'px', 40, true),
+      param('p2', 'Randomness', 0, 1, 0.01, '', 1),
+      param('p3', 'Style', 0, 1, 1, '', 0),
+      param('p4', 'Blend', 0, 1, 0.01, '', 1),
+    ], [
+      'let cellSize = max(params.p1, 1.0); let pos = uv * vec2<f32>(params.tex_w, params.tex_h) / cellSize;',
+      'let ip = floor(pos); let fp = fract(pos); let scatter = clamp(params.p2, 0.0, 1.0);',
+      'var f1 = 8.0; var f2 = 8.0;',
+      'for (var cy = -1; cy <= 1; cy = cy + 1) {',
+      '  for (var cx = -1; cx <= 1; cx = cx + 1) {',
+      '    let neighbor = vec2<f32>(f32(cx), f32(cy)); let cellId = ip + neighbor;',
+      '    let rnd = vec2<f32>(fract(sin(dot(cellId, vec2<f32>(127.1, 311.7))) * 43758.5453), fract(sin(dot(cellId, vec2<f32>(269.5, 183.3))) * 43758.5453));',
+      '    let point = neighbor + 0.5 + (rnd - 0.5) * scatter;',
+      '    let d = length(point - fp);',
+      '    if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) { f2 = d; }',
+      '  }',
+      '}',
+      'let cellVal = clamp(f1, 0.0, 1.0); let edgeVal = 1.0 - smoothstep(0.0, 0.06, f2 - f1);',
+      'let v = mix(cellVal, edgeVal, step(0.5, params.p3));',
+      'return vec4<f32>(mix(src.rgb, vec3<f32>(v), clamp(params.p4, 0.0, 1.0)), src.a);',
+    ]),
     fx('shader_gradient_ramp', 'Gradient Ramp', 'Generate', [
       param('p1', 'Angle', 0, 360, 1, 'deg', 0),
       param('p2', 'Blend', 0, 1, 0.01, '', 1),
