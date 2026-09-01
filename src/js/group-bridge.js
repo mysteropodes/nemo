@@ -244,7 +244,16 @@
     pushUndo();
     var style = members[members.length - 1];
     var mode = grp.combineMode === 'none' ? 'unite' : grp.combineMode;
-    var folded = foldBooleanOp(mode, members, layer);
+    // Bake per-shape element Motion into a disposable clone before the
+    // boolean op sees it (2026-09 fix, see elementMotionBakedClone's own
+    // comment in tools.js) — this call used to go straight to foldBooleanOp
+    // with the members' raw, un-animated segments, silently snapping any
+    // Motion-transformed member back to its un-transformed position the
+    // moment the group was flattened.
+    var li = window.userLayers ? userLayers.indexOf(layer) : -1;
+    var motionMembers = li >= 0 ? members.map(function (m) { return elementMotionBakedClone(li, m, state.currentFrame); }) : members;
+    var folded = foldBooleanOp(mode, motionMembers, layer);
+    var disposable = motionMembers === members ? [] : motionMembers.filter(function (m, idx) { return m !== members[idx]; });
     var insertAt = layer.children.indexOf(members[0]);
     // Stroke-only style source (2026-07-29 fix, same as booleanOp's own —
     // insertBooleanResult always drops the stroke on its islands, so a
@@ -263,6 +272,7 @@
     var islands = insertBooleanResult(layer, insertAt, folded.result, flattenFill, style.opacity, null, fillSource.data);
     members.forEach(function (m) { m.remove(); });
     folded.companions.forEach(function (c) { if (!c.removed) c.remove(); });
+    disposable.forEach(function (c) { if (!c.removed) c.remove(); });
     delete ld.groups[gid];
     selectedPaths = islands; state.selectedStrokeIndices = [];
     fillRegenerateLinked(layer, islands[0]);
@@ -285,7 +295,7 @@
   // on (in the JSON item only, never on the item itself) plus the extra
   // combined-result path(s) to append, styled from the topmost member
   // ("what's on top wins", matching AE/Illustrator/Figma's own convention).
-  function renderCombinesFromChildren(layer, ld) {
+  function renderCombinesFromChildren(layer, ld, frameIdx) {
     var suppress = [], extra = [];
     if (!ld || !ld.groups) return { suppress: suppress, extra: extra };
     Object.keys(ld.groups).forEach(function (gid) {
@@ -309,7 +319,7 @@
         members.forEach(function (m) { suppress.push(m); });
         var styleSource = members[members.length - 1];
         var islands;
-        try { islands = computeGroupCombine(members, grp.combineMode, layer); }
+        try { islands = computeGroupCombine(members, grp.combineMode, layer, frameIdx); }
         catch (e) { console.warn('[SMGroup] combine failed for group', gid, e); return; }
         // Vector-brush ribbon style source (2026-08 fix, feedback: "les
         // combine gère mal stroke plus fill" for Pressure-brush shapes) —
