@@ -1362,6 +1362,36 @@ function effectorChannels(eff){
   eff.channels=ch;
   return ch;
 }
+// Rotates a hex color's HUE by `deg` degrees around the color wheel,
+// preserving saturation/lightness and any trailing alpha byte
+// (#rrggbb or #rrggbbaa — CLAUDE.md §2's hex8 convention). Standard
+// RGB<->HSL round-trip; a non-hex or falsy input passes through
+// unchanged rather than throwing, since fillColor/strokeColor can
+// legitimately be null (stroke-only or fill-only shapes).
+function hexHueRotate(hex,deg){
+  if(!hex||typeof hex!=='string'||!deg)return hex;
+  var m=/^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(hex);
+  if(!m)return hex;
+  var r=parseInt(m[1].slice(0,2),16)/255,g=parseInt(m[1].slice(2,4),16)/255,b=parseInt(m[1].slice(4,6),16)/255;
+  var max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min,h=0,s=0,l=(max+min)/2;
+  if(d){
+    s=l>0.5?d/(2-max-min):d/(max+min);
+    if(max===r)h=(g-b)/d+(g<b?6:0);
+    else if(max===g)h=(b-r)/d+2;
+    else h=(r-g)/d+4;
+    h*=60;
+  }
+  h=(h+deg)%360;if(h<0)h+=360;
+  function hue2rgb(p,q,t){if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;}
+  var r2,g2,b2;
+  if(!s){r2=g2=b2=l;}
+  else{
+    var q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;
+    r2=hue2rgb(p,q,h/360+1/3);g2=hue2rgb(p,q,h/360);b2=hue2rgb(p,q,h/360-1/3);
+  }
+  function toHex(v){var s2=Math.round(v*255).toString(16);return s2.length<2?'0'+s2:s2;}
+  return '#'+toHex(r2)+toHex(g2)+toHex(b2)+(m[2]||'');
+}
 function dupMatrixFromDescriptor(m,pivot){
   var rad=(m.rot||0)*Math.PI/180,cs=Math.cos(rad),sn=Math.sin(rad);
   var a=cs*m.sx,b=sn*m.sx,c=-sn*m.sy,d=cs*m.sy;
@@ -1433,7 +1463,14 @@ function _resolveDuplicatorPath(dup,frameIdx){
 // alongside dup.effectors — see effector-layer.js. Optional on purpose: the
 // nativeVideo call sites in engine-bridge.js don't have a layer descriptor
 // handy, and simply get the inline effectors they always got.
-function _duplicatorClonePlacement(dup,k,pivotK,baseDx,baseDy,baseRot,dPos,dRot,dScale,dOpacity,dPosZ,dRotX,dRotY,randMode,is3DLayer,ownerLd,frameIdx){
+// `count` (2026-09-01, added for the Step effector below) and `dHue`
+// (2026-09-01, added for the Color/Hue channel below) are the only two
+// additions to this signature since the header comment above was written —
+// every existing positional argument keeps its place, so an old call site
+// that hasn't been touched yet just needs the two new ones threaded through
+// (count already exists at every call site as the loop bound; dHue can be
+// 0 where a caller has no color concept, e.g. nativeVideo's raster clones).
+function _duplicatorClonePlacement(dup,k,count,pivotK,baseDx,baseDy,baseRot,dPos,dRot,dScale,dOpacity,dHue,dPosZ,dRotX,dRotY,randMode,is3DLayer,ownerLd,frameIdx){
   var rngK=seededRng(((dup.seed||0)+k*7919)>>>0);
   var rx=rngK(),ry=rngK(),rrr=rngK(),rsx=rngK(),rsy=rngK(),rop=rngK();
   var posK=randMode.position?[(2*rx-1)*dPos[0],(2*ry-1)*dPos[1]]:[k*dPos[0],k*dPos[1]];
@@ -1444,6 +1481,12 @@ function _duplicatorClonePlacement(dup,k,pivotK,baseDx,baseDy,baseRot,dPos,dRot,
   var dzK=randMode.position?(2*rz-1)*dPosZ:k*dPosZ;
   var drxK=randMode.rotation?(2*rrx-1)*dRotX:k*dRotX;
   var dryK=randMode.rotation?(2*rry-1)*dRotY:k*dRotY;
+  // Hue draw comes AFTER the original 9 (2026-09-01) — same reasoning the
+  // 3D draws' own comment gives: appending keeps every pre-existing
+  // duplicator's random pattern byte-identical, an insertion in the middle
+  // would silently reshuffle every draw after it.
+  var rhue=rngK();
+  var hueK=randMode.hue?(2*rhue-1)*(dHue||0):k*(dHue||0);
   var instX=pivotK.x+baseDx,instY=pivotK.y+baseDy;
   // Inline effectors and effector LAYERS summed through the SAME loop —
   // resolveEffector hands back the identical shape, so there is one piece
@@ -1455,15 +1498,23 @@ function _duplicatorClonePlacement(dup,k,pivotK,baseDx,baseDy,baseRot,dPos,dRot,
     if(_fromLayers.length)_effList=_effList.concat(_fromLayers);
   }
   _effList.forEach(function(eff){
-    var ddx=instX-(eff.pos?eff.pos.x:0),ddy=instY-(eff.pos?eff.pos.y:0);
     var w;
-    if(eff.falloff==='linear'){
-      var rad=(eff.angle||0)*Math.PI/180;
-      var proj=ddx*Math.cos(rad)+ddy*Math.sin(rad);
-      w=Math.max(0,Math.min(1,1-proj/(eff.radius||1)));
+    // Step (2026-09-01, C4D Cloner's own Step effector): weight ramps by
+    // CLONE INDEX, not spatial distance — no pos/radius/angle involved at
+    // all, so it stays meaningful even dragged off-canvas or left at its
+    // default origin. The only falloff of the three that needs `count`.
+    if(eff.falloff==='step'){
+      w=count>1?k/(count-1):0;
     }else{
-      var dist=Math.hypot(ddx,ddy);
-      w=Math.max(0,Math.min(1,1-dist/(eff.radius||1)));
+      var ddx=instX-(eff.pos?eff.pos.x:0),ddy=instY-(eff.pos?eff.pos.y:0);
+      if(eff.falloff==='linear'){
+        var rad=(eff.angle||0)*Math.PI/180;
+        var proj=ddx*Math.cos(rad)+ddy*Math.sin(rad);
+        w=Math.max(0,Math.min(1,1-proj/(eff.radius||1)));
+      }else{
+        var dist=Math.hypot(ddx,ddy);
+        w=Math.max(0,Math.min(1,1-dist/(eff.radius||1)));
+      }
     }
     w*=(eff.strength!=null?eff.strength:100)/100;
     if(!w)return;
@@ -1477,12 +1528,13 @@ function _duplicatorClonePlacement(dup,k,pivotK,baseDx,baseDy,baseRot,dPos,dRot,
         case 'rotationY':dryK+=w*(v[0]||0);break;
         case 'scale':scaleK[0]+=w*(v[0]||0);scaleK[1]+=w*(v[1]||0);break;
         case 'opacity':opK+=w*(v[0]||0);break;
+        case 'hue':hueK+=w*(v[0]||0);break;
       }
     });
   });
   var opFactor=Math.max(0,Math.min(1,1+opK/100));
   var dup3D=(is3DLayer&&(dzK||drxK||dryK))?{dz:dzK,drx:drxK,dry:dryK}:null;
-  return{dx:baseDx+posK[0],dy:baseDy+posK[1],rot:baseRot+rotK,sx:1+scaleK[0]/100,sy:1+scaleK[1]/100,opacityFactor:opFactor,dup3D:dup3D};
+  return{dx:baseDx+posK[0],dy:baseDy+posK[1],rot:baseRot+rotK,sx:1+scaleK[0]/100,sy:1+scaleK[1]/100,opacityFactor:opFactor,hueDeg:hueK,dup3D:dup3D};
 }
 // Hard cap mirrors _registerCap's "never unbounded" philosophy
 // (engine-bridge.js) — a typo'd count degrades to "big", never "hangs".
@@ -1586,6 +1638,13 @@ function applyLayerDuplicator(ld,base,frameIdx,layerIdx,opts){
   var dRot=M?M.valueAtFrame(ld,'dupOffsetRot',frameIdx)[0]:0;
   var dScale=M?M.valueAtFrame(ld,'dupOffsetScale',frameIdx):[0,0];
   var dOpacity=M?M.valueAtFrame(ld,'dupOffsetOpacity',frameIdx)[0]:0;
+  // Hue (2026-09-01, "des choses à prévoir un peu comme sur C4D" —
+  // MoGraph's own Color/Random effector shifts fill hue per clone). A
+  // degrees-of-rotation-around-the-color-wheel value, same k×delta/random
+  // shape as every other dupOffset* — applied to fillColor/strokeColor in
+  // the stamping loop below via hexHueRotate, not a matrix operation like
+  // the others.
+  var dHue=M?M.valueAtFrame(ld,'dupOffsetHue',frameIdx)[0]:0;
   // positionZ/rotationX/rotationY (2026-07-30, "en 3D aussi avec ID de
   // chaque cloner") — same k×delta/±delta stagger as the original 4,
   // ADDED alongside them rather than folded into one generic per-property
@@ -1656,7 +1715,7 @@ function applyLayerDuplicator(ld,base,frameIdx,layerIdx,opts){
     // descriptor all live in _duplicatorClonePlacement (shared with the
     // nativeVideo render path, engine-bridge.js) — see its own comment for
     // why pivotK is passed in rather than always using `pivot`.
-    var place=_duplicatorClonePlacement(dup,k,pivotK,baseDx,baseDy,baseRot,dPos,dRot,dScale,dOpacity,dPosZ,dRotX,dRotY,randMode,is3DLayer,ld,frameIdx);
+    var place=_duplicatorClonePlacement(dup,k,count,pivotK,baseDx,baseDy,baseRot,dPos,dRot,dScale,dOpacity,dHue,dPosZ,dRotX,dRotY,randMode,is3DLayer,ld,frameIdx);
     // Stagger folded into ONE matrix with the mode's own placement:
     // rotate/scale in place around the seed's own bounds-center first, the
     // placement translate last — same inner-transform-then-outer-placement
@@ -1670,9 +1729,19 @@ function applyLayerDuplicator(ld,base,frameIdx,layerIdx,opts){
     // per-dupIndex 3D projector instead of sharing the single layer-wide
     // one every other item on a 3D layer uses.
     var dup3D=place.dup3D;
+    var hueDeg=place.hueDeg;
     baseK.forEach(function(sd){
       var sd2=applyMatrixToStrokeData(cloneStrokeForTransform(sd),mat);
       sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*opFactor;
+      // Hue shift (2026-09-01) — a color value, not a matrix operation, so
+      // it's applied here rather than folded into `mat` above. Only
+      // touches fields that are actually set: a stroke-only shape has no
+      // fillColor, a fill-only shape has no strokeColor, and hexHueRotate
+      // itself is a no-op for a falsy/non-hex input.
+      if(hueDeg){
+        if(sd2.fillColor)sd2.fillColor=hexHueRotate(sd2.fillColor,hueDeg);
+        if(sd2.strokeColor)sd2.strokeColor=hexHueRotate(sd2.strokeColor,hueDeg);
+      }
       sd2.isDuplicatorCopy=true;sd2.dupIndex=k;
       // Stable per-clone identity ("ID de chaque cloner") — deterministic
       // from the duplicator's own seed + this copy's index, so it's
@@ -1755,7 +1824,7 @@ function convertSelectionToObjectDuplicator(indices){
     radius:200,startAngle:0,endAngle:null,radialOrient:false,
     pathLayerUid:null,pathAlignTangent:true,
     seed:Math.floor(Math.random()*1e6),
-    staggerRandom:{position:false,rotation:false,scale:false,opacity:false},
+    staggerRandom:{position:false,rotation:false,scale:false,opacity:false,hue:false},
     timeOffset:{enabled:false,offsetFrames:1,direction:'forward'},
     sourceMode:'objects',
     sourceLayerUids:uids,

@@ -6695,6 +6695,7 @@ function updateDuplicatorPanel(){
   document.getElementById('dup-rand-rot').checked=!!sr.rotation;
   document.getElementById('dup-rand-scale').checked=!!sr.scale;
   document.getElementById('dup-rand-op').checked=!!sr.opacity;
+  document.getElementById('dup-rand-hue').checked=!!sr.hue;
   // Path-layer picker: every OTHER layer that isn't itself a duplicator
   // (no chained duplicators in v1 — same refusal as _resolveDuplicatorPath's
   // own runtime guard, this is just the UI half).
@@ -6804,10 +6805,17 @@ function renderDuplicatorEffectors(dup){
     var hdr=line();hdr.classList.add('dims-row');
     var modeSel=document.createElement('select');modeSel.className='psel';
     modeSel.title=SM.t('titleEffectorRadialLinear');
-    ['radial','linear'].forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v==='radial'?'Radial':'Linear';if(eff.falloff===v||(!eff.falloff&&v==='radial'))o.selected=true;modeSel.appendChild(o);});
+    // Step (2026-09-01, C4D Cloner's own Step effector — Cyril's own "des
+    // choses à prévoir un peu comme sur C4D"): weight ramps by CLONE INDEX
+    // instead of spatial distance, so radius/angle are meaningless for it
+    // — hidden below, same conditional-row pattern angRow already uses for
+    // linear-only angle.
+    ['radial','linear','step'].forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v==='radial'?'Radial':(v==='linear'?'Linear':SM.t('dupEffectorStep'));if(eff.falloff===v||(!eff.falloff&&v==='radial'))o.selected=true;modeSel.appendChild(o);});
     modeSel.addEventListener('change',function(){pushUndo();eff.falloff=modeSel.value;renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
     hdr.appendChild(modeSel);
-    var rad=num('R',function(v){eff.radius=v;},eff.radius||200,1,'Rayon d’action (px) — distance à laquelle l’influence de cet effector retombe à zéro. Le point d’origine se règle en glissant le repère de l’effector sur le canvas, en mode Motion.');hdr.appendChild(rad[0]);hdr.appendChild(rad[1]);
+    if(eff.falloff!=='step'){
+      var rad=num('R',function(v){eff.radius=v;},eff.radius||200,1,'Rayon d’action (px) — distance à laquelle l’influence de cet effector retombe à zéro. Le point d’origine se règle en glissant le repère de l’effector sur le canvas, en mode Motion.');hdr.appendChild(rad[0]);hdr.appendChild(rad[1]);
+    }
     var str=num('%',function(v){eff.strength=v;},eff.strength!=null?eff.strength:100,1,'Force globale de cet effector (%) — multiplie toutes ses propriétés ci-dessous. 0% = aucun effet, 100% = plein effet au centre.');hdr.appendChild(str[0]);hdr.appendChild(str[1]);
     var delBtn=document.createElement('button');delBtn.className='pbtn';delBtn.textContent='✕';delBtn.style.marginLeft='auto';delBtn.title='Supprimer cet effector';
     delBtn.addEventListener('click',function(){pushUndo();dup.effectors.splice(i,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
@@ -10507,7 +10515,7 @@ document.getElementById('comp-offset').addEventListener('change',function(){wind
     renderDuplicatorEffectors(d);dupRefresh();
   });
   function wireRand(id,key){document.getElementById(id).addEventListener('change',function(){var d=dupOf();if(!d)return;pushUndo();(d.staggerRandom||(d.staggerRandom={}))[key]=this.checked;dupRefresh();});}
-  wireRand('dup-rand-pos','position');wireRand('dup-rand-rot','rotation');wireRand('dup-rand-scale','scale');wireRand('dup-rand-op','opacity');
+  wireRand('dup-rand-pos','position');wireRand('dup-rand-rot','rotation');wireRand('dup-rand-scale','scale');wireRand('dup-rand-op','opacity');wireRand('dup-rand-hue','hue');
   document.getElementById('btn-dup-edit-source').addEventListener('click',function(){
     var ld=state.layers[state.activeLayerIdx];
     if(!ld||!ld.duplicator||!window.SMMotion)return;
