@@ -432,17 +432,25 @@
   // below). Reading issues needs no auth at all (public repo); only
   // labeling/closing/commenting needs Cyril's token, entered once in
   // Réglages → Feedback and kept in localStorage on his own machine only. ----
-  var GH_REPO = 'mysteropodes/strokemotion-feedback';
+  var GH_REPO = 'mysteropodes/nemo';
   var GH_TOKEN_KEY = 'nemo-github-triage-token';
   function githubTriageToken() { try { return localStorage.getItem(GH_TOKEN_KEY) || ''; } catch (e) { return ''; } }
   function setGithubTriageToken(token) { try { localStorage.setItem(GH_TOKEN_KEY, token || ''); } catch (e) {} }
 
+  // Uses the Search API rather than /issues, because GH_REPO is now the code
+  // repo: /issues returns pull requests too, and with 700+ PRs the newest 100
+  // items would be almost entirely PRs, so the real reports would fall off the
+  // end and simply not show up. `is:issue` excludes them server-side, so all
+  // 100 slots hold actual feedback. The pull_request filter below is kept as a
+  // belt-and-braces guard.
   async function fetchGithubIssues() {
-    var res = await fetch('https://api.github.com/repos/' + GH_REPO + '/issues?state=all&per_page=100', {
+    var q = encodeURIComponent('repo:' + GH_REPO + ' is:issue');
+    var res = await fetch('https://api.github.com/search/issues?q=' + q + '&per_page=100&sort=created&order=desc', {
       headers: { 'Accept': 'application/vnd.github+json' },
     });
     if (!res.ok) throw new Error('GitHub list failed: ' + res.status);
-    var issues = await res.json();
+    var payload = await res.json();
+    var issues = payload.items || [];
     return issues.filter(function (i) { return !i.pull_request; }).map(function (i) {
       var m = /sm-feedback-id:\s*(\S+)\s*-->/.exec(i.body || '');
       return {
