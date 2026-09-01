@@ -2055,7 +2055,7 @@
       // own ld.groups, cheap no-op for the overwhelmingly common case of no
       // combine-groups at all.
       if (window.SMGroup && state.layers[i].groups && Object.keys(state.layers[i].groups).length) {
-        var combineRes = SMGroup.renderCombinesFromChildren(userLayers[i], state.layers[i]);
+        var combineRes = SMGroup.renderCombinesFromChildren(userLayers[i], state.layers[i], renderFrame);
         var suppressArr = combineRes.suppress;
         items.forEach(function (it) {
           if (suppressArr.length && it.__srcC && suppressArr.indexOf(it.__srcC) !== -1) {

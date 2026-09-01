@@ -6340,6 +6340,44 @@ function flattenBooleanResult(result,preserveGeometry){
   result.remove();
   return islands;
 }
+// 2026-09 fix (Cyril: "quand j'essaie de merge le groupe dans éléments le
+// rectangle de droite se décale") — foldBooleanOp/Paper.js's own .unite()
+// etc. only ever see a Path's RAW stored segments. A member animated via
+// per-shape element Motion (Position/Scale/Rotation keyed on
+// ld.elementMotion, §12/12bis-era "propriétés étendues par forme") is drawn
+// on screen through a SEPARATE transform applied only at render time
+// (elementMotionAt, motion.js) — the live Paper.js item itself never moves,
+// confirmed live: for a shape with `elementMotion.motionStatic.position:
+// [299,-11]`, `c.bounds` sat at its UN-shifted raw position while the
+// canvas correctly showed it 299px to the right. Combine/Flatten fed that
+// raw, unshifted geometry straight into the boolean op, so the merged
+// result silently snapped that member back to where it'd be with no Motion
+// at all — a real, silent geometry corruption, not just a stale preview.
+//
+// Fixed by baking each member's elementMotionAt transform into a DISPOSABLE
+// clone before the boolean op ever sees it — same scale/rotate/translate-
+// around-pivot recipe app.js's own component-flattening code already uses
+// for the identical problem (elMat.ax/ay pivot, then scale, rotate,
+// translate, in that order). Clones (not live-item mutation) so
+// foldBooleanOp's internal findLinkedFillCompanion lookup — which matches
+// by `data.linkedFillId` against the LIVE layer — still finds the real
+// companion via the id Paper's .clone() preserves on `.data`; only the
+// GEOMETRY changes, nothing about the live document is touched, matching
+// this file's own "never touch the live document" contract for the
+// non-destructive preview path.
+function elementMotionBakedClone(li,p,frameIdx){
+  if(li==null||!window.SMMotion||!p.data||!p.data.strokeId)return p;
+  var elMat=SMMotion.elementMotionAt(li,p.data.strokeId,frameIdx==null?state.currentFrame:frameIdx,p.data);
+  if(!elMat)return p;
+  var noop=elMat.dx===0&&elMat.dy===0&&elMat.rot===0&&elMat.sx===1&&elMat.sy===1;
+  if(noop)return p;
+  var clone=p.clone({insert:false});
+  var pivot=new Point(clone.bounds.center.x+(elMat.ax||0),clone.bounds.center.y+(elMat.ay||0));
+  clone.scale(elMat.sx,elMat.sy,pivot);
+  clone.rotate(elMat.rot,pivot);
+  clone.translate(elMat.dx,elMat.dy);
+  return clone;
+}
 // Non-destructive combine-group core (2026-07-29): given N live/transient
 // Paths and a mode, returns the combined result as detached flat Paths —
 // NEVER removes or mutates the sources, and never inserts anything into a
@@ -6347,10 +6385,16 @@ function flattenBooleanResult(result,preserveGeometry){
 // hard-won correctness work (vector-brush companion pre-union, hole-merging,
 // degenerate-loop cleanup) the destructive tool already has, with zero
 // duplicated boolean-op logic (CLAUDE.md §3: don't duplicate a matcher/loop).
-function computeGroupCombine(paths,mode,layer){
+function computeGroupCombine(paths,mode,layer,frameIdx){
   if(paths.length<2)return paths.slice();
-  var folded=foldBooleanOp(mode,paths,layer);
-  return flattenBooleanResult(folded.result);
+  var li=window.userLayers?userLayers.indexOf(layer):-1;
+  var motionAware=li>=0?paths.map(function(p){return elementMotionBakedClone(li,p,frameIdx);}):paths;
+  var folded=foldBooleanOp(mode,motionAware,layer);
+  var disposable=[];
+  if(motionAware!==paths)motionAware.forEach(function(m,idx){if(m!==paths[idx])disposable.push(m);});
+  var out=flattenBooleanResult(folded.result);
+  disposable.forEach(function(c){if(!c.removed)c.remove();});
+  return out;
 }
 
 // ---- DYNAMIC SHAPES, phase 1 (2026-08-18) — Rectangle, independent
