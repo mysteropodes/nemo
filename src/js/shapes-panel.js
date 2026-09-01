@@ -409,10 +409,36 @@
   // Puts `items` (given back-to-front, i.e. layer.children order) right in
   // front of `dest`, or right behind it — keeping their own relative
   // order either way. The one z-order primitive both reorder paths use.
+  //
+  // Brush shapes (Cyril, #735: "attention de tester avec des shapes faites
+  // au brush aussi"): one Elements row is SEVERAL live items — the
+  // vector-brush ribbon + its linked-fill companion (shared
+  // data.linkedFillId, draw-bridge.js) and, for a textured brush, its dab
+  // copies (shared data.brushGroupId). layerElements folds them into the
+  // anchor's row, so moving only the anchor left the fill/texture at the
+  // old depth — the shape's outline moved, its fill didn't. Every source
+  // row and the destination are expanded to their full visual block here.
+  function _visualBlock(it, layer) {
+    var d = it.data || {}, out = [it];
+    if (layer && (d.linkedFillId || d.brushGroupId)) {
+      layer.children.forEach(function (c) {
+        if (c === it || !c.data) return;
+        if ((d.linkedFillId && c.data.linkedFillId === d.linkedFillId) || (d.brushGroupId && c.data.brushGroupId === d.brushGroupId)) out.push(c);
+      });
+    }
+    return out;
+  }
   function _placeItems(items, dest, after) {
-    var anchor = dest;
-    if (after) items.slice().reverse().forEach(function (it) { it.insertBelow(anchor); anchor = it; });
-    else items.forEach(function (it) { it.insertAbove(anchor); anchor = it; });
+    var layer = dest.parent;
+    var block = [], seen = [];
+    items.forEach(function (it) { _visualBlock(it, layer).forEach(function (m) { if (seen.indexOf(m) === -1) { seen.push(m); block.push(m); } }); });
+    block.sort(function (a, b) { return a.index - b.index; }); // back-to-front, as in layer.children
+    var destBlock = _visualBlock(dest, layer).filter(function (m) { return seen.indexOf(m) === -1; });
+    if (!destBlock.length) return;
+    destBlock.sort(function (a, b) { return a.index - b.index; });
+    var anchor = after ? destBlock[0] : destBlock[destBlock.length - 1];
+    if (after) block.slice().reverse().forEach(function (it) { it.insertBelow(anchor); anchor = it; });
+    else block.forEach(function (it) { it.insertAbove(anchor); anchor = it; });
   }
   function performMemberReorder(overRow) {
     var destGroupGid = overRow.dataset.groupmember, destStrokeId = overRow.dataset.strokeid, destGid = overRow.dataset.gid;
