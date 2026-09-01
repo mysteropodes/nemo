@@ -85,7 +85,20 @@ var state={
   onionSkin:false,onionPrevOpacity:30,onionNextOpacity:30,onionMode:'tinted',
   onionIn:0,onionOut:23,
   brushSize:3,fillBrushSize:40,strokeColor:'#000000',fillColor:'#ff0000',fillEnabled:true,strokeEnabled:true,shadowMode:false,brushPreset:'none',
-  smoothing:10,stabilizer:2,strokeCap:'round',strokeJoin:'round',opacity:100,
+  // stabilizer default (2026-09, brush audit priority #3, confirmed with
+  // Cyril): was 2 ("Medium", the classic trailing moving average) — that
+  // averaging technique inherently LAGS behind the hand, more so at speed
+  // (see draw-bridge.js's own comment on the same tradeoff for pressure
+  // smoothing), and it never fully catches up to where the pen actually
+  // stopped. Level 4 is the lightest tier of the stroke-modeler ("Plume")
+  // physical spring-damper model (Google ink-stroke-modeler, same one
+  // rnote uses) — same Krita precedent the audit cites: their physical
+  // Stabilizer is the default behavior, not a mode buried past a wall of
+  // near-identical "more smoothing" options. Not persisted anywhere
+  // (neither exportJSON nor localStorage), so this only affects what a
+  // fresh session starts on — never touches an existing project's data,
+  // and the Stabilizer dropdown still offers every prior level.
+  smoothing:10,stabilizer:4,strokeCap:'round',strokeJoin:'round',opacity:100,
   miterLimit:10,dashOffset:0,paintOrder:'fillFirst',
   // 2026-07 feedback ("dans Moho je peux commencer un trait tout fin et
   // finir tout fin ou finir gros et inversement, en fonction de la
