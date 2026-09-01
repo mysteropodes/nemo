@@ -465,6 +465,11 @@
           return bakeElementMotion(p, sd);
         });
         memberDicts.forEach(function (sd) { suppressed.push(sd); });
+        // z-position of the merged result: right after the group's
+        // front-most member dict, not appended after every other stroke
+        // (feedback #735 — twin of buildSceneJson's own fix).
+        var afterIdx = -1;
+        memberDicts.forEach(function (sd) { var ix = strokes.indexOf(sd); if (ix > afterIdx) afterIdx = ix; });
         var styleSource = memberDicts[memberDicts.length - 1];
         var combFill, combStroke;
         if (styleSource.isVectorBrush) {
@@ -495,6 +500,7 @@
         catch (e) { console.warn('[SMGroup] combine failed for group', gid, e); return; }
         islands.forEach(function (isl) {
           extra.push({
+            __afterIdx: afterIdx, // consumed (and removed) by the splice at the end
             segments: isl.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; }),
             closed: isl.closed,
             fillColor: combFill, strokeColor: combStroke, strokeWidth: styleSource.strokeWidth, opacity: styleSource.opacity,
@@ -526,7 +532,17 @@
       }
       return sd;
     });
-    return out.concat(extra);
+    // Splice each merged result right after its group's front-most member
+    // (same depth rule as buildSceneJson's fix) — back-most target first
+    // so earlier splices never shift a later one; islands keep their order.
+    extra.sort(function (a, b) { return b.__afterIdx - a.__afterIdx; });
+    var lastAfter = null, cursor = 0;
+    extra.forEach(function (ex) {
+      if (ex.__afterIdx !== lastAfter) { lastAfter = ex.__afterIdx; cursor = ex.__afterIdx + 1; }
+      delete ex.__afterIdx;
+      out.splice(cursor++, 0, ex);
+    });
+    return out;
   }
 
   window.SMGroup = {
