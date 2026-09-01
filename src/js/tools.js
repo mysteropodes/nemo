@@ -1321,6 +1321,50 @@ function alignSelection(mode){
   saveActiveLayerFrame();renderArcs();updateUI();
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
 }
+// Distribute (2026-09 — alignSelection's own comment already named this
+// panel "Align/distribute" back in 2026-07-09, but only Align ever got
+// built). EQUAL-GAP spacing (Figma's "Tidy up" convention), not equal
+// center-to-center distance — the latter looks uneven the moment objects
+// have different sizes, which is the common case. The first and last
+// object (by their CURRENT left/top edge, i.e. reading order along the
+// chosen axis) are the fixed anchors, exactly like every reference app:
+// only the objects between them move. Same per-path translate + companion
+// list (vector-brush centerline, linkedFill, brush-texture dabs) as
+// alignSelection right above, for the identical "don't tear the drawing
+// apart" reason (CLAUDE.md §1).
+function distributeSelection(mode){
+  if(selectedPaths.length<3)return;
+  pushUndo();
+  var isH=mode==='horizontal';
+  var sorted=selectedPaths.slice().sort(function(a,b){return isH?a.bounds.left-b.bounds.left:a.bounds.top-b.bounds.top;});
+  var first=sorted[0],last=sorted[sorted.length-1];
+  var spanStart=isH?first.bounds.left:first.bounds.top;
+  var spanEnd=isH?last.bounds.right:last.bounds.bottom;
+  var totalSize=sorted.reduce(function(sum,p){return sum+(isH?p.bounds.width:p.bounds.height);},0);
+  var gap=(spanEnd-spanStart-totalSize)/(sorted.length-1);
+  var moved=false,cursor=spanStart;
+  sorted.forEach(function(p,idx){
+    var size=isH?p.bounds.width:p.bounds.height;
+    if(idx===0){cursor+=size;return;}
+    if(idx===sorted.length-1)return; // last object is the other fixed anchor — never moves
+    var targetStart=cursor+gap;
+    var curStart=isH?p.bounds.left:p.bounds.top;
+    var delta=targetStart-curStart;
+    cursor=targetStart+size;
+    if(Math.abs(delta)<1e-6)return;
+    moved=true;
+    var d=isH?new Point(delta,0):new Point(0,delta);
+    p.translate(d);
+    transformFillGradient(p,function(pt){return pt.add(d);});
+    if(p.data&&p.data.isVectorBrush&&p.data.centerSegments)p.data.centerSegments.forEach(function(s){s.point=[s.point[0]+d.x,s.point[1]+d.y];});
+    if(p.data&&p.data.linkedFill&&!p.data.linkedFill.removed)p.data.linkedFill.translate(d);
+    if(p.data&&p.data.brushCompanions)p.data.brushCompanions.forEach(function(c){if(!c.removed)c.translate(d);});
+  });
+  if(!moved){state.undoStack.pop();return;}
+  fillRegenerateLinked(userLayers[state.activeLayerIdx],null);
+  saveActiveLayerFrame();renderArcs();updateUI();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
 // Rotation/scale pivot picker (redesign 2026-07-09, AE-style 9-dot anchor
 // widget) — a TOOL preference like state.tool, not document content: it
 // resets to center on a fresh selection rather than being saved per-object,

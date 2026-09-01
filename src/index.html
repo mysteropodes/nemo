@@ -416,6 +416,14 @@
           <button class="align-btn" data-align="top" data-i18n-title="alignTop" title="Aligner en haut"><svg viewBox="0 0 24 24"><line x1="3" y1="4" x2="21" y2="4" stroke="currentColor" stroke-width="2"/><rect x="6" y="7" width="5" height="10" fill="currentColor"/><rect x="14" y="7" width="5" height="6" fill="currentColor"/></svg></button>
           <button class="align-btn" data-align="centerV" data-i18n-title="alignCenterV" title="Centrer verticalement"><svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="2"/><rect x="6" y="7" width="5" height="10" fill="currentColor"/><rect x="14" y="9" width="5" height="6" fill="currentColor"/></svg></button>
           <button class="align-btn" data-align="bottom" data-i18n-title="alignBottom" title="Aligner en bas"><svg viewBox="0 0 24 24"><line x1="3" y1="20" x2="21" y2="20" stroke="currentColor" stroke-width="2"/><rect x="6" y="7" width="5" height="10" fill="currentColor"/><rect x="14" y="11" width="5" height="6" fill="currentColor"/></svg></button>
+          <span style="width:1px;height:16px;background:var(--border2);margin:0 4px"></span>
+          <!-- Distribute (2026-09) — this toolbar's own 2026-07-09 comment
+               already called it "Align/distribute", only Align got built
+               then. 3+ objects only (see updateSelPropsPanel), equal-GAP
+               spacing (not equal center distance — see distributeSelection's
+               own comment in tools.js for why). -->
+          <button class="align-btn" data-distribute="horizontal" data-i18n-title="distributeHorizontal" title="Distribuer horizontalement"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="4" height="12" fill="currentColor"/><rect x="10" y="9" width="4" height="6" fill="currentColor"/><rect x="18" y="6" width="4" height="12" fill="currentColor"/></svg></button>
+          <button class="align-btn" data-distribute="vertical" data-i18n-title="distributeVertical" title="Distribuer verticalement"><svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="4" fill="currentColor"/><rect x="9" y="10" width="6" height="4" fill="currentColor"/><rect x="6" y="18" width="12" height="4" fill="currentColor"/></svg></button>
           <span style="flex:1"></span>
           <span id="sel-count" style="font-size:9px;color:var(--text-dim)"></span>
         </div>
