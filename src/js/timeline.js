@@ -5241,7 +5241,7 @@ function renderShapeTreeRowsInto(list,li,ld){
 // are v1-unsupported (mirrors engine.rs's is_folder_layer doc comment):
 // rather than silently losing its own children's rows from the list, a
 // folder-shaped layer always renders as its own independent top-level-ish
-// row. The UI drop handler (installLayerReorderGrip) additionally refuses
+// row. The UI drop handler (moveLayerReorder) additionally refuses
 // to let you create this situation via drag in the first place.
 function folderLayerChildMap(){
   var folderUidByIdx={},childrenOf={},childOf={};
@@ -6346,6 +6346,15 @@ function armLayerReorder(e,srcIdx,origin,sourceRow){
   _layerDrag.origin=origin||'panel';
   _layerDrag.grabOffsetY=r?Math.max(0,Math.min(r.height,e.clientY-r.top)):17;
 }
+// Sticky reorder grip — Animation 2D's frame-grid ONLY (2026-09-01: MOTION
+// stopped calling this; motion.js's rows no longer have a grip at all, see
+// installLayerReorderGrip's own call-site comment below for why). Animation
+// 2D's rows have no in/out bar to grab instead (renderTimeline's own comment
+// a few hundred lines up: "the in/out bar is Motion-mode-only visually"), so
+// this stays their only frame-grid reorder entry point — and since an
+// Animation 2D row never has a `.layer-inout-handle` in the first place, the
+// hand-off branch below is permanently a no-op there, not dead code kept
+// around for nothing.
 function installLayerReorderGrip(row,li){
   if(!row||row.querySelector('.layer-reorder-grip'))return;
   var grip=document.createElement('div');
@@ -6353,38 +6362,13 @@ function installLayerReorderGrip(row,li){
   grip.title=(window.SM&&SM.t)?SM.t('titleDragReorderLayer'):'Drag vertically to reorder the layer';
   function begin(e){
     if(e.button!==0)return;
-    // Grip sits at z-index:9 (sticky, always reachable even while a long
-    // bar's body scrolls under it) — ABOVE the in/out bar's own z-index:2,
-    // so a bar whose inPoint lands near frame 0 puts its in-handle
-    // physically under this grip: every native click there resolves to
-    // the grip first, making the handle unclickable (feedback 2026-08:
-    // "quand les calques sont calé au tout début c'est compliqué
-    // d'attraper le in point"). Hit-test for a handle FIRST and hand off
-    // to its real onDown instead of reordering when one is really there;
-    // native reordering is unaffected everywhere else, including the
-    // long-bar-scrolled-under-the-grip case this grip exists for (a
-    // handle is never physically there in that case).
-    //
-    // feedback #137 ("des difficultés à attraper le in point... et va
-    // interférer avec le déplacement de layer en index"): the original
-    // version of this hand-off distance-tested the CLICK POINT against
-    // each handle's rect with a fixed ±6px tolerance — reachable in
-    // theory, but fragile in practice. A click that misses that radius by
-    // a hair (real mouse/trackpad imprecision, HiDPI rounding) falls
-    // through to armLayerReorder below; armLayerReorder itself stays
-    // inert for a purely-horizontal drag (moveLayerReorder requires
-    // dy>=4 AND dy>=dx*.55 before it actually reorders anything), but a
-    // real hand's natural vertical wobble while dragging "horizontally"
-    // is often enough to cross that threshold — turning a missed trim
-    // grab into a genuinely unwanted reorder, exactly the interference
-    // reported. Testing rect OVERLAP instead of click-point distance
-    // removes the magic-number fragility: whenever a handle is visually
-    // co-located with the grip at all (the only time this ambiguity can
-    // exist in the first place), every click anywhere on the grip
-    // unconditionally favors that handle — there is no legitimate "I
-    // meant reorder" click in that overlapping region anyway, and the
-    // layer-list panel's own row-drag (a separate, non-overlapping
-    // affordance) still reorders layers normally in the meantime.
+    // Hand-off to a real handle when one happens to be physically under the
+    // grip (rect-overlap test, not click-point distance — see feedback #137
+    // in this function's git history for why the earlier ±6px version was
+    // fragile). Motion no longer installs this grip at all (frame-0 handle
+    // collision fixed by removing the grip from that side entirely, not by
+    // improving this hand-off further) — this only still matters if a FUTURE
+    // caller ever reuses this grip somewhere handles also exist.
     if(window.SMLayerInOut&&window.SMLayerInOut.onDown){
       var gripRect=grip.getBoundingClientRect();
       var handles=row.querySelectorAll('.layer-inout-handle');
