@@ -2056,9 +2056,11 @@
       // combine-groups at all.
       if (window.SMGroup && state.layers[i].groups && Object.keys(state.layers[i].groups).length) {
         var combineRes = SMGroup.renderCombinesFromChildren(userLayers[i], state.layers[i], renderFrame);
-        var suppressArr = combineRes.suppress;
+        // Set, not indexOf — this runs once per item per rendered frame, and
+        // a big combine group made it items × members per frame.
+        var suppressSet = combineRes.suppress.length ? new Set(combineRes.suppress) : null;
         items.forEach(function (it) {
-          if (suppressArr.length && it.__srcC && suppressArr.indexOf(it.__srcC) !== -1) {
+          if (suppressSet && it.__srcC && suppressSet.has(it.__srcC)) {
             it.fillColor = null; it.strokeColor = null; delete it.strokeWidth; delete it.dashPattern; delete it.dashOffset; delete it.fillGradient;
           }
           delete it.__srcC;

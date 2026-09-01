@@ -600,7 +600,10 @@
       var b=document.createElement('button');
       b.dataset.preset=key;
       b.title=cp.name+' — clic : appliquer, clic droit : supprimer';
-      b.innerHTML=buildThumbSvg(cp.points)+'<span>'+cp.name+'</span>';
+      // Name via textContent, not innerHTML — it comes straight from a
+      // window.prompt, so a "<" in it used to break the button's markup.
+      b.innerHTML=buildThumbSvg(cp.points);
+      var nmSpan=document.createElement('span');nmSpan.textContent=cp.name;b.appendChild(nmSpan);
       b.addEventListener('click',function(){setActivePoints(clonePts(cp.points));selected=null;draw();upP();pushCurve();});
       b.addEventListener('contextmenu',function(e){
         e.preventDefault();

@@ -78,7 +78,9 @@ function exportBuildFrame(frameIdx,alpha){
     // each combine-group member's own fill/stroke in this EXPORT-ONLY copy
     // (the real stored strokes are untouched) and append the combined
     // outline(s).
-    if(window.SMGroup&&ld.groups)strokes=SMGroup.applyCombinesToStrokes(strokes,ld);
+    // li/frameIdx so a member's per-element Motion is baked into the
+    // combined outline (group-bridge.js, twin of the #723 live fix).
+    if(window.SMGroup&&ld.groups)strokes=SMGroup.applyCombinesToStrokes(strokes,ld,li,frameIdx);
     // Motion mode (motion.js): unlike buildSceneJson (engine-bridge.js),
     // exportBuildFrame merges every original layer's strokes straight into
     // the ONE shared throwaway `L`, so there's no per-layer Paper object left
@@ -1105,7 +1107,7 @@ function lottieBuild(start,end){
       var fStrokes=getEffectiveStrokesRendered(li,f).filter(function(sd){return sd.opacity!==0&&!sd.isRaster&&!sd.isRevisionGhost&&!sd.isMask&&(state.exportIncludeShadowGuides||sd.channelTag!=='shadow');});
       // Non-destructive combine groups (2026-07-29) — same post-process as
       // exportBuildFrame/buildSceneJson.
-      if(window.SMGroup&&ld.groups)fStrokes=SMGroup.applyCombinesToStrokes(fStrokes,ld);
+      if(window.SMGroup&&ld.groups)fStrokes=SMGroup.applyCombinesToStrokes(fStrokes,ld,li,f);
       framesStrokes[f]=fStrokes;
     }
 
