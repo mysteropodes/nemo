@@ -1794,6 +1794,22 @@
               if (fcOverride) item.fillColor = fcOverride;
             }
           }
+          // Text animator Fill Color (2026-09 — "Add Property" gap): lerp
+          // toward elMat.fcTarget by elMat.fcBlend, ON TOP of whatever the
+          // block above already produced (an animator pulling toward a
+          // color composes with a manual override exactly the way an
+          // animator's Position composes with elementMotion's own, per
+          // textAnimatorContribution's own comment on why color can't just
+          // accumulate as a delta).
+          if (elMat && elMat.fcBlend && item.fillColor) {
+            var fct = elMat.fcTarget, fcb = elMat.fcBlend;
+            item.fillColor = [
+              item.fillColor[0] + (fct[0] - item.fillColor[0]) * fcb,
+              item.fillColor[1] + (fct[1] - item.fillColor[1]) * fcb,
+              item.fillColor[2] + (fct[2] - item.fillColor[2]) * fcb,
+              item.fillColor[3] + (fct[3] - item.fillColor[3]) * fcb,
+            ];
+          }
           // Gradient fill (2026-07) — takes priority over the flat fillColor
           // above on the Rust side (geometry-wasm's paint_fill), same
           // "richer field wins" precedent as centerline/image. Anchor points
@@ -1897,6 +1913,18 @@
               if (scOverride) item.strokeColor = scOverride;
               var swOverride = SMMotion.elementStrokeWidthAt(i, cStrokeId, renderFrame);
               if (swOverride !== null) item.strokeWidth = swOverride * (item.pathTransform ? 1 : strokeScale);
+            }
+            // Text animator Stroke Color — same lerp-on-top as Fill Color
+            // above, and the same "can't animate a stroke into existence"
+            // scope: only reachable here, inside `if (sc)`.
+            if (elMat && elMat.scBlend && item.strokeColor) {
+              var sct = elMat.scTarget, scb = elMat.scBlend;
+              item.strokeColor = [
+                item.strokeColor[0] + (sct[0] - item.strokeColor[0]) * scb,
+                item.strokeColor[1] + (sct[1] - item.strokeColor[1]) * scb,
+                item.strokeColor[2] + (sct[2] - item.strokeColor[2]) * scb,
+                item.strokeColor[3] + (sct[3] - item.strokeColor[3]) * scb,
+              ];
             }
           }
           if (includeEditorOverlays && state.currentFrameOutline) {
