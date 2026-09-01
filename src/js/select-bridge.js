@@ -356,6 +356,17 @@
   var _multiLayerDrag = null;
   var xformDir = null, xformAnchor = null, xformOrigHandlePos = null, xformLastSx = 1, xformLastSy = 1;
   var xformMap = null; // geometry<->rendered-world mapper when the active layer has a Motion transform
+  // Alt-held-during-scale-drag = scale from the box's own center instead of
+  // the opposite corner/edge (Illustrator/Photoshop Free Transform
+  // convention, 2026-09 — "Alt pour redimensionner depuis le centre").
+  // xformCenterAnchor is captured once at gesture start (same geometry
+  // space as xformAnchor/gCorners); xformActiveAnchor records which of the
+  // two the LAST onMove tick actually scaled around, so onUp's text-field
+  // resync (anchorTopLeft) uses the anchor that really applied instead of
+  // always assuming the corner — toggling Alt mid-drag is legal (matches
+  // Shift's own per-tick re-evaluation right below) and would otherwise
+  // desync vector-text metadata from the geometry it just scaled.
+  var xformCenterAnchor = null, xformActiveAnchor = null;
   // Skew-on-hover (2026-08, Graphite-style — user reference: the edge
   // midpoints of the transform box, past the plain resize handle's own
   // hit radius, grab a single-axis shear instead of a resize). Shear
@@ -1113,6 +1124,11 @@
         // Geometry-space anchor/handle (gesture math mutates raw geometry).
         xformAnchor = h.gCorners[ANCHOR_MAP[hh.dir]].clone();
         xformOrigHandlePos = h.gCorners[hh.dir].clone();
+        // Same GP(x,y)=selBoxPt(x,y,box) mapping computeHandles used to
+        // build gCorners itself, applied to the box's own local center —
+        // lands in the identical geometry space as xformAnchor.
+        xformCenterAnchor = selBoxPt(h.bounds.center.x, h.bounds.center.y, h.box).clone();
+        xformActiveAnchor = xformAnchor;
         xformMap = h.map;
         xformLastSx = 1; xformLastSy = 1;
       }
@@ -1849,6 +1865,12 @@
     // magnetically-adjusted one). SMRulers.snapPoint no-ops (returns pt
     // unchanged) whenever rulers/snap are off or nothing's close enough.
     if (mode === 'move' && state.appMode !== 'motion' && window.SMRulers) pt = window.SMRulers.snapPoint(pt, 8);
+    // Snap-to-pixel-grid — same scope as the guide-snap right above,
+    // independent toggle (state.pixelGridSnap, rulers-bridge.js). Applied
+    // AFTER guide-snap so a guide near a pixel boundary still wins the tie
+    // (guide placement is a deliberate, precise choice; the pixel grid is
+    // an always-available fallback).
+    if (mode === 'move' && state.appMode !== 'motion' && window.SMRulers && window.SMRulers.snapToPixelGrid) pt = window.SMRulers.snapToPixelGrid(pt);
 
     if (_multiLayerDrag && mode.indexOf('layer-multi-') === 0) {
       if (mode === 'layer-multi-move') {
@@ -2187,7 +2209,12 @@
       // this handler must stay world-space).
       var ptS = pt;
       if (xformMap) { var ptgS = xformMap.inv(pt.x, pt.y); ptS = new Point(ptgS[0], ptgS[1]); }
-      var anchor = xformAnchor, dir = xformDir, sx = 1, sy = 1;
+      // Alt = scale from the box's own center instead of the opposite
+      // corner/edge — re-evaluated every tick like Shift's proportional
+      // lock just below, so pressing/releasing Alt mid-drag re-centers
+      // immediately rather than needing a fresh gesture.
+      var anchor = (e.altKey && xformCenterAnchor) ? xformCenterAnchor : xformAnchor, dir = xformDir, sx = 1, sy = 1;
+      xformActiveAnchor = anchor;
       if (dir === 'nw' || dir === 'ne' || dir === 'sw' || dir === 'se') {
         var origDX = xformOrigHandlePos.x - anchor.x, origDY = xformOrigHandlePos.y - anchor.y;
         var curDX = ptS.x - anchor.x, curDY = ptS.y - anchor.y;
@@ -2555,8 +2582,13 @@
             if (troot.data.letterSpacing) troot.data.letterSpacing *= Math.abs(xformLastSx);
             if (troot.data.wordSpacing) troot.data.wordSpacing *= Math.abs(xformLastSx);
             if (troot.data.anchorTopLeft) {
+              // xformActiveAnchor (not xformAnchor) — the drag may have
+              // scaled around the box CENTER on its last tick (Alt held),
+              // not the corner captured at gesture start; see its own
+              // declaration comment.
+              var scaleAnchor = xformActiveAnchor || xformAnchor;
               var apt = new Point(troot.data.anchorTopLeft.x, troot.data.anchorTopLeft.y);
-              apt = new Point(xformAnchor.x + (apt.x - xformAnchor.x) * xformLastSx, xformAnchor.y + (apt.y - xformAnchor.y) * xformLastSy);
+              apt = new Point(scaleAnchor.x + (apt.x - scaleAnchor.x) * xformLastSx, scaleAnchor.y + (apt.y - scaleAnchor.y) * xformLastSy);
               troot.data.anchorTopLeft = { x: apt.x, y: apt.y };
             }
           });
