@@ -185,6 +185,28 @@
       var nd = pt.getDistance(nh.pos);
       if (nd < bestNd) { bestNd = nd; bestNh = nh; }
     }
+    // Add a vertex (2026-09, the counterpart to the Delete-key removal
+    // that already existed — see insertVertexAt's own header, tools.js):
+    // Alt+click that missed every existing point/handle (bestNh above)
+    // but lands on the edit target's own curve inserts a new anchor
+    // there. Scoped to an ALREADY-selected target (nodeEditTargetPath()
+    // requires selectedPaths.length===1) rather than any path under the
+    // cursor — same "see the handles first, then Alt+click again"
+    // two-step toggleTangentAt already trains the user on, and it means
+    // this can never fire on the SAME click that first selects a path
+    // (which still needs to fall through to the subHit branch below).
+    if (!bestNh && e.altKey) {
+      var insertTarget = nodeEditTargetPath();
+      if (insertTarget) {
+        var newIdx = insertVertexAt(insertTarget, pt);
+        if (newIdx >= 0) {
+          _nodeSel = [newIdx];
+          nodeSelCommitTail(insertTarget);
+          window.SMEngineBridge.renderNow();
+          return;
+        }
+      }
+    }
     if (bestNh) {
       // feedback #216 ("dans motion ajouté une keyframe de path > modifié le
       // path avec subselect ne créer pas un blend de vertex ni de keyframes

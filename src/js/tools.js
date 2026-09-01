@@ -1012,6 +1012,65 @@ function nodeSelCommitTail(path){
   renderArcs();updateUI();
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
 }
+// Add a vertex on the edit target's own outline (2026-09, "l'ajout/
+// suppression de sommets" — the counterpart the Subselect Delete-key
+// handler, timeline.js, already covers for REMOVAL; addition never
+// existed). Illustrator/Figma convention: Alt+click on a curve BETWEEN
+// two existing points inserts a new anchor there — subselect-bridge.js's
+// onDown already reserves Alt+click on an EXISTING point/handle for
+// "toggle tangent" (toggleTangentAt above), so this only ever fires when
+// the click missed every nodeHandles entry, no ambiguity between the two.
+//
+// getNearestLocation/divideAt (Paper.js) subdivide the exact bezier
+// already there — the curve's visible shape doesn't change, only its
+// point count does, unlike naively lerping a new point onto a straight
+// chord. Returns the new point's index (0-based, matching nodeHandles'
+// own segIndex convention) or -1 if the click landed further than
+// `tolerance` from the curve — a pure, non-mutating query in that case,
+// so a caller can safely try this before committing to pushUndo().
+//
+// Same isVectorBrush/centerSegments branch nodeSelApplyMove/Scale/Rotate
+// already use: a ribbon's editable spine is data.centerSegments, never
+// the baked outline (path.segments) — same reasoning as those three,
+// see nodeSelApplyMove's own header. A disposable {insert:false} Path is
+// built from the raw dict array (Segment already accepts point/handleIn/
+// handleOut as plain [x,y] pairs, same construction rebuildVectorBrushOutline
+// uses for the linked-fill sync above) purely so Paper's own curve-
+// subdivision math can run on it; centerSegments is overwritten from the
+// result and the temp path discarded either way.
+//
+// No Motion-vertex-track (vtxN) reindexing here — the sibling Delete-key
+// removal handler (timeline.js) doesn't do this either (checked before
+// writing this), so a shape with an armed Path vertex track can drift its
+// vtxN-to-point mapping after either an insert or a delete. Consistent
+// with the already-shipped half of this feature; fixing that interaction
+// for both at once is a separate, bigger piece of work if it turns out to
+// matter in practice.
+function insertVertexAt(path,pt,tolerance){
+  var tol=tolerance||8/view.zoom;
+  var isCenter=!!(path.data&&path.data.isVectorBrush&&path.data.centerSegments);
+  var tmp=null,loc;
+  if(isCenter){
+    var cs=path.data.centerSegments;
+    tmp=new Path({insert:false});
+    cs.forEach(function(s){tmp.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});
+    loc=tmp.getNearestLocation(pt);
+  }else{
+    loc=path.getNearestLocation(pt);
+  }
+  if(!loc||loc.distance>tol){if(tmp)tmp.remove();return -1;}
+  pushUndo();
+  if(isCenter){
+    var newSeg=tmp.divideAt(loc);
+    var newIndex=newSeg?newSeg.index:-1;
+    path.data.centerSegments=tmp.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});
+    rebuildVectorBrushOutline(path);
+    tmp.remove();
+    return newIndex;
+  }
+  var newSeg2=path.divideAt(loc);
+  return newSeg2?newSeg2.index:-1;
+}
 function nodeSelApplyMove(dx,dy,skipUndo){
   var path=nodeEditTargetPath();
   if((!dx&&!dy)||!path||!_nodeSel.length)return;
