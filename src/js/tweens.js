@@ -31,6 +31,32 @@ var FOLDBACK_MIN=0.02;
 // _intrinsicSegs' `else` branch. Set false to restore forward-only
 // integration.
 var TW_INTRINSIC_ANCHOR=true;
+// 2026-09 (tween audit) — two interpolation-QUALITY changes, each behind
+// its own flag so they can be A/B'd from the console and rolled back
+// independently (set to false, regenerate). Left for Cyril to judge on
+// real files before either becomes the only path.
+//
+// TW_FOLD_UNWRAP: the expected turn angle of a fold (candScore's
+// foldAngleErr term + the per-frame correction pass) used to circular-lerp
+// per vertex on the SHORTEST arc. On a hairpin that straddles ±180° (say
+// +160° -> -37°) the shortest arc runs THROUGH 180° — i.e. expects the
+// vertex to pass through a perfect cusp — while what a drawn contour does
+// (and what the intrinsic engine actually produces, ~58° at midframe
+// there) is unfold through straight. The scoring term therefore penalised
+// the right answer on exactly the strokes it was built for. With the flag,
+// the raw difference thB-thA is used (never re-wrapped): a fold always
+// opens through 0, never through the cusp.
+var TW_FOLD_UNWRAP=true;
+// TW_DTW_SYMMETRIC: the DTW position cost compared A mapped by the global
+// A->B similarity against B only. Mirroring it (B mapped by the B->A fit
+// against A, averaged) removes the dependence on which side is the
+// "predictor" — the two fits differ whenever the pair isn't a pure
+// similarity, which is every real deformation. Default OFF: measured on
+// the six test files (self-crossings summed over generated frames, lower
+// is better) it is mixed — testC 11->9 and testD 9->7 improve, testB 1->5
+// and testF 26->34 regress, 56->64 overall. Opt-in until judged on real
+// work; flip from the console and regenerate.
+var TW_DTW_SYMMETRIC=false;
 // ---- MATCHING ----
 function buildTP(sd){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});return p;}
 // A stroke's color and fill/stroke "type" are what a viewer actually reads
@@ -952,10 +978,21 @@ function _dtwCorrespondence(pA,lenA,pB,lenB,n){
   var transform=fitSimilarityTransform(ptsA,ptsB);
   if(!transform)return null;
   var predA=ptsA.map(function(p){return applySimilarityTransform(transform,p.x,p.y);});
+  // See TW_DTW_SYMMETRIC at the top of the file: the mirror fit (B->A),
+  // so the position term doesn't depend on which side predicts which.
+  var predB=null;
+  if(TW_DTW_SYMMETRIC){
+    var transformBA=fitSimilarityTransform(ptsB,ptsA);
+    if(transformBA)predB=ptsB.map(function(p){return applySimilarityTransform(transformBA,p.x,p.y);});
+  }
   var normScale=Math.max(1,(lenA+lenB)/2*0.25); // "far" ≈ a quarter of the stroke's own length
   function cost(i,j){
     var dx=predA[i].x-ptsB[j].x,dy=predA[i].y-ptsB[j].y;
     var posC=Math.hypot(dx,dy)/normScale;
+    if(predB){
+      var dx2=ptsA[i].x-predB[j].x,dy2=ptsA[i].y-predB[j].y;
+      posC=(posC+Math.hypot(dx2,dy2)/normScale)*0.5;
+    }
     var ad=Math.abs(_wrapPI(tanA[i]-tanB[j]))/Math.PI; // 0..1
     // Curvature agreement — kept a MODEST tie-breaker (like the tangent
     // term above), never allowed to outweigh position: a wrist curl and a
@@ -1997,7 +2034,7 @@ function _reharmoniseCore(segs,A,B,et){
 }
 function _applyFoldCorrection(segs,rA,et){
   if(!TW_CORRECTION_PASS)return segs;
-  var thA=rA._twFoldThA,thB=rA._twFoldThB,w=rA._twFoldW;
+  var thA=rA._twFoldThA,thB=rA._twFoldThB,w=rA._twFoldW,dTh=rA._twFoldDelta;
   if(!thA)return segs;
   var n2=segs.length;
   var baseX=_segsSelfXCount(segs);
@@ -2008,7 +2045,7 @@ function _applyFoldCorrection(segs,rA,et){
     for(var i=1;i<n2-1;i++){
       var wv=w[i];
       if(!wv||wv<0.35){raw[i]=0;continue;} // ~20°+ turn only — genuine corners, not noise (same bar as the scoring term)
-      var expTheta=thA[i]+_wrapPI(thB[i]-thA[i])*et;
+      var expTheta=thA[i]+(dTh&&dTh[i]!==undefined?dTh[i]:_wrapPI(thB[i]-thA[i]))*et; // same branch as the score (TW_FOLD_UNWRAP)
       var p0=cur[i-1].point,p1=cur[i].point,p2=cur[i+1].point;
       var a1=Math.atan2(p1[1]-p0[1],p1[0]-p0[0]),a2=Math.atan2(p2[1]-p1[1],p2[0]-p1[0]);
       var actual=_wrapPI(a2-a1);
@@ -2668,12 +2705,17 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
               // block only runs ONCE per pair (guarded by
               // rA._twIwProbe===undefined below), while the correction
               // pass runs on every frame this pair generates.
-              rA._twFoldThA=new Array(n);rA._twFoldThB=new Array(n);
+              rA._twFoldThA=new Array(n);rA._twFoldThB=new Array(n);rA._twFoldDelta=new Array(n);
               for(var fi7=1;fi7<n-1;fi7++){
                 var thA7=turnAngle(rA.segments,fi7),thB7=turnAngle(rB.segments,fi7);
-                _foldExp[fi7]=thA7+_wrapPI(thB7-thA7)*0.5;
+                // See TW_FOLD_UNWRAP at the top of the file: raw difference
+                // (unfold through straight) vs shortest arc (may pass
+                // through the cusp). Stored so the per-frame correction
+                // pass lerps along the SAME branch as this score.
+                var dTh7=TW_FOLD_UNWRAP?(thB7-thA7):_wrapPI(thB7-thA7);
+                _foldExp[fi7]=thA7+dTh7*0.5;
                 _foldW[fi7]=Math.max(Math.abs(thA7),Math.abs(thB7));
-                rA._twFoldThA[fi7]=thA7;rA._twFoldThB[fi7]=thB7;
+                rA._twFoldThA[fi7]=thA7;rA._twFoldThB[fi7]=thB7;rA._twFoldDelta[fi7]=dTh7;
               }
               rA._twFoldW=_foldW;
             }
