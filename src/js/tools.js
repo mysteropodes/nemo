@@ -4213,6 +4213,15 @@ function _unsliceRingPath(path){
 //                charcoal/chalk family below: a marker or ink line is
 //                supposed to be a flat, consistent color, so those presets
 //                are deliberately left at the implicit default of 0.
+//   roughness  — 0..1, low-frequency wobble applied to the STROKE'S OWN
+//                TRAJECTORY before stamping (roughenPath, above), rough.js's
+//                roughness/bowing idea — distinct from edgeNoise (which only
+//                perturbs each dab's own silhouette, the centerline stays
+//                glass-smooth). Deliberately opt-in and left at 0 on every
+//                built-in preset below (2026-09 brush audit) — this changes
+//                the actual path of the stroke, a more perceptible change
+//                than a color/opacity variation, so it's offered through the
+//                Nib editor rather than defaulted onto anything.
 var BRUSH_PRESETS={
   'chalk-blunt':     {nibSize:1.3,roundness:.85,spacing:.55,spaceJitter:.25,rotationMode:'random',rotationJitter:60, sizeJitter:.25,opacity:.55,opacityJitter:.25,scatter:.18,dashGap:0, valueJitter:.12},
   'chalk-round':     {nibSize:1.1,roundness:1,  spacing:.4, spaceJitter:.2, rotationMode:'random',rotationJitter:30, sizeJitter:.18,opacity:.5, opacityJitter:.2, scatter:.12,dashGap:0, valueJitter:.10},
@@ -4505,10 +4514,60 @@ function sampleGaussian(rand){
   var u1=Math.max(1e-12,rand()),u2=rand();
   return Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);
 }
+// Trajectory perturbation (2026-09, brush audit priority #4 — rough.js's
+// roughness/bowing): edgeNoise/scatter above only perturb what happens AT
+// each stamp position — the centerline itself stays perfectly smooth no
+// matter how shaky the "hand" is supposed to look. This wobbles the actual
+// path dabs get stamped along, one octave BELOW edgeNoise — a handful of
+// slow bumps over the whole stroke's length instead of independent
+// per-dab jitter, because a real unsteady hand wanders slowly, it doesn't
+// vibrate. Built once per buildBrushDabs call as a small set of random
+// control offsets, cosine-interpolated so consecutive dabs land on a
+// continuous, gently-curving deviation rather than a jagged random walk.
+// Disposable ({insert:false}) — never touches the caller's own path.
+function roughenPath(pathLike,amount,baseWidth,rand){
+  if(!amount)return pathLike;
+  var len=pathLike.length;
+  if(!(len>0))return pathLike;
+  // ~1 bump per 120px of length, clamped 2..8 — enough for a long stroke
+  // to visibly wander without the frequency creeping toward edgeNoise's
+  // per-dab territory.
+  var bumps=Math.max(2,Math.min(8,Math.round(len/120)));
+  var offsets=[];
+  for(var i=0;i<=bumps;i++)offsets.push(rand()*2-1);
+  function smoothAt(frac){
+    var f=frac*bumps,i0=Math.floor(f),i1=Math.min(bumps,i0+1),t=f-i0;
+    var ease=.5-.5*Math.cos(t*Math.PI); // cosine interpolation — smoother than a linear lerp between bumps
+    return offsets[i0]*(1-ease)+offsets[i1]*ease;
+  }
+  var mag=amount*Math.max(1,baseWidth)*.8;
+  var steps=Math.max(bumps*8,24);
+  var out=new Path({insert:false});
+  for(var s=0;s<=steps;s++){
+    var frac=s/steps,at=frac*len;
+    var pt=pathLike.getPointAt(at);
+    var tan=pathLike.getTangentAt(at)||new Point(1,0);
+    var normal=new Point(-tan.y,tan.x);
+    var p=pt.add(normal.multiply(smoothAt(frac)*mag));
+    if(s===0)out.moveTo(p);else out.lineTo(p);
+  }
+  out.smooth({type:'continuous'});
+  return out;
+}
 function buildBrushDabs(pathLike,preset,baseWidth,rng,widthProfile){
   var rand=rng||Math.random;
   var len=pathLike.length;
   if(!(len>0))return[];
+  // Roughness reassigns pathLike to a disposable wobbled copy and
+  // re-measures len off IT — every downstream at/len fractional lookup
+  // (width profile included) then naturally runs along the wobbled
+  // trajectory instead of the original. amount 0 (every preset without
+  // this field, i.e. all of them today) returns pathLike unchanged —
+  // bit-for-bit identical to before this parameter existed.
+  if(preset.roughness){
+    pathLike=roughenPath(pathLike,preset.roughness,baseWidth,rand);
+    len=pathLike.length;
+  }
   var nibScale=preset.nibSize!==undefined?preset.nibSize:1;
   // grain (feedback #61, p5.brush's "grain" — "controls how dense the
   // texture is, higher = smoother/more continuous line"): a MULTIPLIER on
