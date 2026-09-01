@@ -386,6 +386,20 @@
   var rotCenter = null, rotStartAngle = 0, rotLastAngle = 0;
   var marqueeStart = null;
   var moveStarted = false;
+  // Shift axis-lock (2026-09, Illustrator-style: hold Shift while dragging
+  // an object to constrain it to horizontal/vertical). moveGestureOrigin is
+  // the world point the CURRENT move gesture started from; moveAppliedTotal
+  // is the running sum of every delta actually applied since then. Snapping
+  // the TOTAL displacement (gestureOrigin -> current pointer) to an axis
+  // each tick — rather than just zeroing a per-tick delta's off-axis
+  // component — is what keeps the object exactly on the axis line even
+  // though real hand movement never travels in a perfectly straight line;
+  // zeroing only the per-tick component would let off-axis drift from
+  // ticks before Shift was pressed (or from sub-pixel hand wobble) survive
+  // uncorrected. Toggling Shift mid-drag is seamless: moveAppliedTotal is
+  // kept up to date every tick regardless of Shift state, so re-engaging
+  // the lock later in the same gesture still measures from the true origin.
+  var moveGestureOrigin = null, moveAppliedTotal = null;
   // The grabbed point, in the LAYER's own space, tracked through the whole
   // move gesture (2026-08-31). Needed because a layer's Motion pivot is
   // userLayers[i].bounds.center — DERIVED FROM THE CONTENT — so translating
@@ -1984,8 +1998,26 @@
         moveStarted = true;
         moveGrabLocal = (window.layerLocalPoint && state.appMode !== 'motion')
           ? layerLocalPoint(state.activeLayerIdx, lastPt) : null;
+        // lastPt is still the pointerdown position here (this is the first
+        // move tick) — the true baseline the Shift axis-lock measures from.
+        moveGestureOrigin = lastPt.clone();
+        moveAppliedTotal = new Point(0, 0);
       }
       var delta = pt.subtract(lastPt);
+      // Shift axis-lock (Illustrator-style) — snap the TOTAL displacement
+      // since the gesture began onto whichever axis it's closer to, then
+      // emit only the corrective delta needed this tick to land exactly on
+      // that snapped total. See moveGestureOrigin's own declaration for why
+      // this measures from the gesture origin rather than clamping each
+      // tick's own (already-tiny, noisy) delta independently.
+      if (moveGestureOrigin) {
+        if (e.shiftKey) {
+          var totalRaw = pt.subtract(moveGestureOrigin);
+          var totalSnapped = Math.abs(totalRaw.x) >= Math.abs(totalRaw.y) ? new Point(totalRaw.x, 0) : new Point(0, totalRaw.y);
+          delta = totalSnapped.subtract(moveAppliedTotal);
+        }
+        moveAppliedTotal = moveAppliedTotal.add(delta);
+      }
       // Layer under a Motion transform: the pointer moves in RENDERED
       // space, the geometry lives underneath — pull the delta back
       // (inverse rotate + inverse scale) or the drag drifts/overshoots.
@@ -2613,6 +2645,7 @@
     } else if (mode === 'move') {
       var didMove = moveStarted;
       moveStarted = false;
+      moveGestureOrigin = null; moveAppliedTotal = null;
       // Motion mode: same reasoning as the xform-scale/xform-rotate guard
       // above — this gesture never touched geometry (onMove's early
       // return), so re-loading/re-saving frame content here would be pure
