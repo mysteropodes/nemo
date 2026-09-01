@@ -10202,6 +10202,17 @@ document.getElementById('canvas-fit-btn').addEventListener('click',function(e){
       if(window.SMRulers)SMRulers.toggleOn();
       var btn=document.getElementById('btn-rulers');if(btn)btn.classList.toggle('active',!!state.rulersOn);
     }},
+    // Snap-to-guides toggle (2026-09, "une option d'accroche que l'on peut
+    // mettre dans le menu où y a fit comme sur illustrator") — the actual
+    // snap (SMRulers.snapPoint, rulers-bridge.js) already existed, gated on
+    // state.guidesSnap, and was already wired into the move-drag
+    // (select-bridge.js) — it just had NO way to turn it off, defaulting to
+    // true with zero UI anywhere. Same checkmark-prefix convention as
+    // Rulers & Guides right above, in the same menu, since Cyril pointed at
+    // this exact spot.
+    {label:(state.guidesSnap?'✓ ':'')+(SM&&SM.t?SM.t('snapToGuidesMenuLabel'):'Snap to Guides'),action:function(){
+      state.guidesSnap=!state.guidesSnap;
+    }},
   ]);
 });
 document.getElementById('p-resamp').addEventListener('input',function(){window.SM.setResamplePts(parseInt(this.value));});
