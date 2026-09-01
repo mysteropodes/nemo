@@ -43,6 +43,13 @@
     { key: 'scatter', label: 'Dispersion', min: 0, max: 1, step: 0.05 },
     { key: 'dashGap', label: 'Trous (bord cassé)', min: 0, max: 0.6, step: 0.02 },
     { key: 'edgeNoise', label: 'Bord irrégulier', min: 0, max: 0.4, step: 0.02 },
+    // Tremblement du tracé (2026-09, audit brush) — contrairement à Bord
+    // irrégulier ci-dessus (qui ne perturbe que le contour de CHAQUE dab),
+    // ceci fait onduler la trajectoire ELLE-MÊME avant le tamponnage —
+    // une octave plus bas, quelques ondulations lentes sur tout le trait
+    // plutôt qu'un bruit par dab (roughenPath, tools.js). 0 = trajectoire
+    // parfaitement lisse, identique à avant ce paramètre.
+    { key: 'roughness', label: 'Tremblement du tracé', min: 0, max: 1, step: 0.05 },
     // Bord doux (p5.brush "sharpness", feedback #61) — 1 = net (identique
     // à avant), plus bas = halo dégressif simulé par dabs concentriques
     // (buildBrushDabs, tools.js) puisque tout ici reste 100% vectoriel,
@@ -71,7 +78,7 @@
     { value: 'scribble', label: 'Gribouillis (graphite/fusain)' },
     { value: 'custom', label: 'Personnalisé (dessiné)…' },
   ];
-  var DEFAULT_PARAMS = { nibSize: 1, roundness: 0.9, spacing: 0.4, spaceJitter: 0.2, rotationMode: 'tangent', rotationJitter: 20, sizeJitter: 0.2, opacity: 0.6, opacityJitter: 0.2, scatter: 0.15, dashGap: 0, tipShape: 'ellipse', edgeNoise: 0, polySides: 5, bristleCount: 5, tipCorner: 0.15, scribbleCount: 8, scribbleLen: 1.4, scribbleLenJitter: 0.4, scribbleWidth: 0.12, scribbleSpread: 0.6, scribbleAngleSpread: 70, pressureStart: 1, pressureMid: 1, pressureEnd: 1, sharpness: 1, markerTip: true, grain: 1, noise: 0, valueJitter: 0 };
+  var DEFAULT_PARAMS = { nibSize: 1, roundness: 0.9, spacing: 0.4, spaceJitter: 0.2, rotationMode: 'tangent', rotationJitter: 20, sizeJitter: 0.2, opacity: 0.6, opacityJitter: 0.2, scatter: 0.15, dashGap: 0, tipShape: 'ellipse', edgeNoise: 0, polySides: 5, bristleCount: 5, tipCorner: 0.15, scribbleCount: 8, scribbleLen: 1.4, scribbleLenJitter: 0.4, scribbleWidth: 0.12, scribbleSpread: 0.6, scribbleAngleSpread: 70, pressureStart: 1, pressureMid: 1, pressureEnd: 1, sharpness: 1, markerTip: true, grain: 1, noise: 0, valueJitter: 0, roughness: 0 };
 
   function closePopover() {
     if (!popover) return;
