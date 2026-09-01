@@ -235,7 +235,31 @@
     var rmse = Math.sqrt(sumSq / n);
     // Relative to the radius — an absolute pixel tolerance would be too
     // strict for a large circle and too loose for a tiny one.
-    return rmse / r <= 0.04 ? { cx: cx, cy: cy, r: r } : null;
+    if (rmse / r > 0.04) return null;
+    // Found live (2026-09, Cyril tracing a real illustration): distance
+    // residual ALONE is not enough — it's the classic osculating-circle
+    // trap. A long, gently-curved boundary (a mountain ridge, a lake
+    // edge — anything with many anchor points tracing ONE smooth sweep)
+    // can sit well within 4% of SOME circle's radius locally without the
+    // shape being circular at all; the points only occupy a narrow
+    // angular slice of that circle, never wrapping around it. A real
+    // (even significantly occluded) circle's boundary points, by
+    // contrast, spread across MOST of the circle's circumference —
+    // there's exactly one gap (where the occluder sits), not many, and
+    // it isn't the majority of the circle. Reject anything that doesn't
+    // cover at least half the circle (180°): permissive enough for a
+    // circle occluded on one whole side, tight enough to reject a shape
+    // that's fundamentally not round.
+    var angles = pts.map(function (p) { return Math.atan2(p.y - cy, p.x - cx); }).sort(function (a, b) { return a - b; });
+    var maxGap = 0;
+    for (var gi = 0; gi < angles.length; gi++) {
+      var next = gi === angles.length - 1 ? angles[0] + 2 * Math.PI : angles[gi + 1];
+      var gap = next - angles[gi];
+      if (gap > maxGap) maxGap = gap;
+    }
+    var coverage = 2 * Math.PI - maxGap;
+    if (coverage < Math.PI) return null;
+    return { cx: cx, cy: cy, r: r };
   }
 
   // For a shape that did NOT fit as a complete primitive (Phase 1), looks
