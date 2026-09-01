@@ -77,6 +77,15 @@ var TW_DTW_SYMMETRIC=false;
 // uncrossMatches on this path; JS-only (the wasm auto_match stays the
 // exact twin of the previous behaviour and is bypassed while this is on).
 var TW_MATCH_RELATIONAL=true;
+// Weight of the smooth length-identity term in matchSc (relational path
+// only) — see lenT's comment there. Swept on the real cases: 0.25 fixes
+// the turning face's brow (147 px brow vs 87 px eye, 1.6×) but breaks the
+// cat's tuft (152 → 65 px, a LEGITIMATE 2.3× shrink: nose lands on the
+// tuft, ear on the mouth — three strokes wrong); 0.15 keeps the cat right
+// and stable (0.2 flips, 0.22 flips back — that case sits on a knife
+// edge) and leaves the face's eye cluster shifted by one. Three gross
+// errors vs one subtle one: 0.15.
+var MATCH_LEN_W=0.15;
 // TW_ALIGN_HAIRPIN (2026-09, Cyril's bent leg unfolding: "le moteur
 // inverse les coordonnées"): a stroke drawn down one side of a limb and
 // back up the other is a HAIRPIN — its two ends sit close together, so
@@ -319,7 +328,7 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   // chain 0.13 short; 0.35 flipped it but pushed a legitimately-redrawn
   // lip (155 → 82 px, ratio 1.9) over the fade threshold. Same
   // micro-stroke exemption as ratioPen.
-  var lenT=(TW_MATCH_RELATIONAL&&Math.abs(fA.length-fB.length)>15)?Math.min(1,Math.max(0,Math.log(lenRatio)-Math.log(1.3))/Math.log(2))*0.25:0;
+  var lenT=(TW_MATCH_RELATIONAL&&Math.abs(fA.length-fB.length)>15)?Math.min(1,Math.max(0,Math.log(lenRatio)-Math.log(1.3))/Math.log(2))*MATCH_LEN_W:0;
   // 0.35 only when BOTH closed flags are ground truth. When either side is
   // a heuristic guess (vector-brush centerline — see strokeFeat's
   // closedIsGuess), a disagreement is as likely a drawing accident as a
@@ -530,8 +539,16 @@ function autoMatchJS(sA,sB){
   var localTfs=new Array(fA.length); // per-A-stroke motion model, reused by the relational pass
   var ptsT=fA.map(function(f,ai){
     var tf=transform;
-    if(seeds.length>K_LOCAL){
-      var near=seeds.slice().sort(function(s1,s2){
+    // LEAVE-ONE-OUT (2026-09, with TW_MATCH_RELATIONAL — Cyril's cat,
+    // "confusion totale"): a stroke's OWN pass-1 match used to be one of
+    // the seeds predicting its motion. When that match is a confident
+    // mistake (the nose landing on the tuft's raw position, 0.22), the
+    // local model then predicts "the nose stays put" and pass 2 confirms
+    // the mistake it was built from. A stroke's motion is now predicted
+    // from its neighbours only, never from itself.
+    var seedPool=TW_MATCH_RELATIONAL?seeds.filter(function(s){return s.a!==ai;}):seeds;
+    if(seedPool.length>K_LOCAL){
+      var near=seedPool.slice().sort(function(s1,s2){
         var d1=Math.pow(fA[s1.a].cx-f.cx,2)+Math.pow(fA[s1.a].cy-f.cy,2);
         var d2=Math.pow(fA[s2.a].cx-f.cx,2)+Math.pow(fA[s2.a].cy-f.cy,2);
         return d1-d2;
@@ -3916,6 +3933,7 @@ function generateTweens(explicitRestrictTo){
     var RESCUE_CEIL=0.78;
     var cntRatio=Math.max(sA.length,sB.length)/Math.max(1,Math.min(sA.length,sB.length));
     var rescueCeil=cntRatio>=3?MATCH_TH+0.1:RESCUE_CEIL;
+    var rescueCands=[];
     matches.forEach(function(m){
       if(m.score<=MATCH_TH)return; // already handled by the first pass
       if(m.score>rescueCeil)return; // beyond any plausible same-object motion — fade/trim instead
@@ -3928,9 +3946,35 @@ function generateTweens(explicitRestrictTo){
       // between two drawings of the same limb must not block the rescue
       // (same rationale as matchSc's softened closedPen above).
       var closedOk=fta.closed===ftb.closed||fta.closedIsGuess||ftb.closedIsGuess;
-      if(fta.type===ftb.type&&closedOk&&!clash){
-        pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;
+      if(fta.type===ftb.type&&closedOk&&!clash)rescueCands.push({m:m,fa:fta,fb:ftb});
+    });
+    // MOTION-SUPPORT gate (2026-09, with TW_MATCH_RELATIONAL — Cyril's
+    // turning face: "une pupille qui part sur la bouche"). The ceiling
+    // above was calibrated on ONE raised arm (0.739): a big stroke moving
+    // less than its own length. It let an 87 px eye scoring 0.60 travel
+    // 361 px onto a lip — 4× its size, 9× the drawing's median motion —
+    // because nothing here looked at the displacement at all. The
+    // reference can't be global (testC 16→31: four eye ticks legitimately
+    // ride 240 px with the head while the body moves 60) nor the stroke's
+    // size alone (those ticks are 15 px): what a rescued pair needs is a
+    // NEIGHBOUR that moves the same way — a confident match or another
+    // candidate. The eye→lip has none (brow down 130, lid 30); the ticks
+    // have each other; a big stroke moving less than its own length
+    // (the arm) needs no witness.
+    var refDisp=pairSpecs.map(function(ps){var a=strokeFeat(ps.aData),b=strokeFeat(ps.bData);return{x:a.cx,y:a.cy,dx:b.cx-a.cx,dy:b.cy-a.cy};});
+    rescueCands.forEach(function(c){refDisp.push({x:c.fa.cx,y:c.fa.cy,dx:c.fb.cx-c.fa.cx,dy:c.fb.cy-c.fa.cy,cand:c});});
+    rescueCands.forEach(function(c){
+      var m=c.m;
+      if(TW_MATCH_RELATIONAL){
+        var dx=c.fb.cx-c.fa.cx,dy=c.fb.cy-c.fa.cy,disp=Math.sqrt(dx*dx+dy*dy);
+        var big=disp<=Math.max(c.fa.length,c.fb.length);
+        if(!big){
+          var near=refDisp.filter(function(r){return r.cand!==c;}).map(function(r){return{r:r,d2:(r.x-c.fa.cx)*(r.x-c.fa.cx)+(r.y-c.fa.cy)*(r.y-c.fa.cy)};}).sort(function(p,q){return p.d2-q.d2;}).slice(0,3);
+          var supported=near.some(function(nq){var r=nq.r,rd=Math.sqrt(r.dx*r.dx+r.dy*r.dy);var ddx=r.dx-dx,ddy=r.dy-dy;return Math.sqrt(ddx*ddx+ddy*ddy)<=0.35*Math.max(disp,rd)+15;});
+          if(!supported)return; // moves unlike everything around it — fade instead
+        }
       }
+      pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;
     });
     var unA=[],unB=[];
     for(var ai=0;ai<sA.length;ai++)if(!aMatched[ai])unA.push(ai);
