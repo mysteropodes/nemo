@@ -1175,7 +1175,7 @@
               nvRects = [];
               for (var nvk = 0; nvk < nvCount; nvk++) {
                 var nvOff = _duplicatorModeOffset(nvDup, nvMode, nvk, nvCount, nvCols, nvPathInfo);
-                var nvPlace = _duplicatorClonePlacement(nvDup, nvk, nvPivot, nvOff.baseDx, nvOff.baseDy, nvOff.baseRot, [0, 0], 0, [0, 0], 0, 0, 0, 0, nvDup.staggerRandom || {}, false);
+                var nvPlace = _duplicatorClonePlacement(nvDup, nvk, nvCount, nvPivot, nvOff.baseDx, nvOff.baseDy, nvOff.baseRot, [0, 0], 0, [0, 0], 0, 0, 0, 0, 0, nvDup.staggerRandom || {}, false);
                 nvRects.push({ rect: SMMotion.transformImageRect(nvRectBase, nvPivot, nvPlace), opacityFactor: nvPlace.opacityFactor });
               }
               if (nvPathInfo) nvPathInfo.path.remove();
@@ -1264,7 +1264,7 @@
                 nvsymRects = [];
                 for (var nvsymK2 = 0; nvsymK2 < nvsymCount; nvsymK2++) {
                   var nvsymOff = _duplicatorModeOffset(nvsymDup, nvsymMode, nvsymK2, nvsymCount, nvsymCols, nvsymPathInfo);
-                  var nvsymPlace = _duplicatorClonePlacement(nvsymDup, nvsymK2, nvsymPivot, nvsymOff.baseDx, nvsymOff.baseDy, nvsymOff.baseRot, [0, 0], 0, [0, 0], 0, 0, 0, 0, nvsymDup.staggerRandom || {}, false);
+                  var nvsymPlace = _duplicatorClonePlacement(nvsymDup, nvsymK2, nvsymCount, nvsymPivot, nvsymOff.baseDx, nvsymOff.baseDy, nvsymOff.baseRot, [0, 0], 0, [0, 0], 0, 0, 0, 0, 0, nvsymDup.staggerRandom || {}, false);
                   nvsymRects.push({ rect: SMMotion.transformImageRect(nvsymRectBase, nvsymPivot, nvsymPlace), opacityFactor: nvsymPlace.opacityFactor });
                 }
                 if (nvsymPathInfo) nvsymPathInfo.path.remove();

@@ -92,7 +92,7 @@
   // unconditionally here anyway, same "extra property exists, does nothing
   // until its prerequisite is met" precedent Time Remap already sets for
   // a non-Component layer.
-  var PROPS_DUP_EXTRA = ['dupOffsetPos', 'dupOffsetRot', 'dupOffsetScale', 'dupOffsetOpacity', 'dupOffsetPosZ', 'dupOffsetRotX', 'dupOffsetRotY'];
+  var PROPS_DUP_EXTRA = ['dupOffsetPos', 'dupOffsetRot', 'dupOffsetScale', 'dupOffsetOpacity', 'dupOffsetHue', 'dupOffsetPosZ', 'dupOffsetRotX', 'dupOffsetRotY'];
   // Time Remap (AE, 2026-07-25) is an EXTRA row, not a 6th transform: it
   // never feeds computeMotionMat — it drives which internal frame a
   // component instance shows (resolveSymbolFrameIdx, app.js). Both the
@@ -457,7 +457,7 @@
     if (prop === 'parentKeys') return holder.parentKeys ? { keys: holder.parentKeys } : null;
     return (holder.motion && holder.motion[prop]) || null;
   }
-  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', order: 'Order', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', matteOn: 'Matte On', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie', cornerTL: 'Coin ↖', cornerTR: 'Coin ↗', cornerBR: 'Coin ↘', cornerBL: 'Coin ↙', arcStart: 'Début (arc)', arcSweep: 'Ouverture (arc)', arcInner: 'Rayon interne', starInner: 'Rayon interne', starCorner: 'Coins', pathPercent: 'Position sur le chemin', pathInfluence: 'Influence (rotation)' };
+  var PROP_LABEL = { position: 'Position', anchor: 'Anchor Point', rotation: 'Rotation', scale: 'Scale', opacity: 'Opacity', order: 'Order', timeRemap: 'Time Remap', positionZ: 'Position Z', rotationX: 'Rotation X', rotationY: 'Rotation Y', dupOffsetPos: 'Dup. Offset', dupOffsetRot: 'Dup. Rotation', dupOffsetScale: 'Dup. Scale', dupOffsetOpacity: 'Dup. Opacity', dupOffsetHue: 'Dup. Hue', dupOffsetPosZ: 'Dup. Offset Z', dupOffsetRotX: 'Dup. Rotation X', dupOffsetRotY: 'Dup. Rotation Y', parentBlend: 'Parent Blend', matteOn: 'Matte On', timeLinkInOffset: 'Décalage entrée', timeLinkOutOffset: 'Décalage sortie', cornerTL: 'Coin ↖', cornerTR: 'Coin ↗', cornerBR: 'Coin ↘', cornerBL: 'Coin ↙', arcStart: 'Début (arc)', arcSweep: 'Ouverture (arc)', arcInner: 'Rayon interne', starInner: 'Rayon interne', starCorner: 'Coins', pathPercent: 'Position sur le chemin', pathInfluence: 'Influence (rotation)' };
   // PROP_LABEL above is the FALLBACK table (and was, until 2026-08-31, the
   // only source — so a French UI still read "Position / Anchor Point / Scale"
   // while the rows around them were translated, and the table itself had
@@ -478,6 +478,7 @@
     rotationX: 'propRotationX', rotationY: 'propRotationY',
     dupOffsetPos: 'propDupOffset', dupOffsetRot: 'propDupRotation',
     dupOffsetScale: 'propDupScale', dupOffsetOpacity: 'propDupOpacity',
+    dupOffsetHue: 'propDupHue',
     dupOffsetPosZ: 'propDupOffsetZ', dupOffsetRotX: 'propDupRotationX',
     dupOffsetRotY: 'propDupRotationY', parentBlend: 'propParentBlend',
     matteOn: 'propMatteOn', timeLinkInOffset: 'propTimeLinkInOffset',
@@ -503,14 +504,14 @@
   window.SM.afterI18n = window.SM.afterI18n || [];
   if (window.SM.afterI18n.indexOf(refreshPropLabels) < 0) window.SM.afterI18n.push(refreshPropLabels);
   refreshPropLabels();
-  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, order: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, matteOn: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1, cornerTL: 1, cornerTR: 1, cornerBR: 1, cornerBL: 1, arcStart: 1, arcSweep: 1, arcInner: 1, starInner: 1, starCorner: 1, pathPercent: 1, pathInfluence: 1 };
-  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', order: '', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', matteOn: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f', cornerTL: 'px', cornerTR: 'px', cornerBR: 'px', cornerBL: 'px', arcStart: '°', arcSweep: '°', arcInner: '%', starInner: '%', starCorner: 'px', pathPercent: '%', pathInfluence: '%' };
+  var PROP_DIM = { position: 2, anchor: 2, rotation: 1, scale: 2, opacity: 1, order: 1, timeRemap: 1, positionZ: 1, rotationX: 1, rotationY: 1, dupOffsetPos: 2, dupOffsetRot: 1, dupOffsetScale: 2, dupOffsetOpacity: 1, dupOffsetHue: 1, dupOffsetPosZ: 1, dupOffsetRotX: 1, dupOffsetRotY: 1, parentBlend: 1, matteOn: 1, timeLinkInOffset: 1, timeLinkOutOffset: 1, cornerTL: 1, cornerTR: 1, cornerBR: 1, cornerBL: 1, arcStart: 1, arcSweep: 1, arcInner: 1, starInner: 1, starCorner: 1, pathPercent: 1, pathInfluence: 1 };
+  var PROP_UNIT = { position: 'px', anchor: 'px', rotation: '°', scale: '%', opacity: '%', order: '', timeRemap: 'f', positionZ: 'px', rotationX: '°', rotationY: '°', dupOffsetPos: 'px', dupOffsetRot: '°', dupOffsetScale: '%', dupOffsetOpacity: '%', dupOffsetHue: '°', dupOffsetPosZ: 'px', dupOffsetRotX: '°', dupOffsetRotY: '°', parentBlend: '%', matteOn: '%', timeLinkInOffset: 'f', timeLinkOutOffset: 'f', cornerTL: 'px', cornerTR: 'px', cornerBR: 'px', cornerBL: 'px', arcStart: '°', arcSweep: '°', arcInner: '%', starInner: '%', starCorner: 'px', pathPercent: '%', pathInfluence: '%' };
   // parentBlend defaults to 0 — "0%" reads as "fully Parent A" (the
   // pre-existing single parent), matching the invariant that assigning a
   // second parent must never itself move anything until the user actually
   // animates the blend (same "adding a feature is a visual no-op until
   // deliberately used" precedent enableTimeRemap's own seeded keys follow).
-  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], order: [0], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0], dupOffsetPosZ: [0], dupOffsetRotX: [0], dupOffsetRotY: [0], parentBlend: [0], matteOn: [100], timeLinkInOffset: [0], timeLinkOutOffset: [0],
+  var PROP_DEFAULT = { position: [0, 0], anchor: [0, 0], rotation: [0], scale: [100, 100], opacity: [100], order: [0], timeRemap: [0], positionZ: [0], rotationX: [0], rotationY: [0], dupOffsetPos: [0, 0], dupOffsetRot: [0], dupOffsetScale: [0, 0], dupOffsetOpacity: [0], dupOffsetHue: [0], dupOffsetPosZ: [0], dupOffsetRotX: [0], dupOffsetRotY: [0], parentBlend: [0], matteOn: [100], timeLinkInOffset: [0], timeLinkOutOffset: [0],
     // Trim Paths (2026-08, AE parity — "animer les stroke en in et out"):
     // start/end as % of the path's own arc length, offset as a % that
     // shifts the whole [start,end] window — same 3-field shape as AE's own
@@ -572,8 +573,14 @@
   // color etc. aren't PROP_DIM-registered as keyframable at all yet).
   // Exported so app.js's applyLayerDuplicator/Effector UI don't hardcode a
   // second copy of this list (CLAUDE.md §3's duplicated-pair trap).
-  var DUP_TARGET_PROPS = ['position', 'positionZ', 'rotation', 'rotationX', 'rotationY', 'scale', 'opacity'];
-  var DUP_OFFSET_PROP = { position: 'dupOffsetPos', positionZ: 'dupOffsetPosZ', rotation: 'dupOffsetRot', rotationX: 'dupOffsetRotX', rotationY: 'dupOffsetRotY', scale: 'dupOffsetScale', opacity: 'dupOffsetOpacity' };
+  // 'hue' (2026-09-01) is the one entry here with no matching real Motion
+  // property on an ordinary layer — a duplicator-only concept (MoGraph's
+  // Color/Random effector), registered in PROP_DIM/PROP_LABEL etc. below
+  // purely so the effector-channel picker and the Dup. Hue row get a
+  // proper localized label/unit like everything else in this list, same
+  // as parentBlend/matteOn already do for their own synthetic properties.
+  var DUP_TARGET_PROPS = ['position', 'positionZ', 'rotation', 'rotationX', 'rotationY', 'scale', 'opacity', 'hue'];
+  var DUP_OFFSET_PROP = { position: 'dupOffsetPos', positionZ: 'dupOffsetPosZ', rotation: 'dupOffsetRot', rotationX: 'dupOffsetRotX', rotationY: 'dupOffsetRotY', scale: 'dupOffsetScale', opacity: 'dupOffsetOpacity', hue: 'dupOffsetHue' };
   // AE's own shortcuts: P/A/R/S/T reveal just that property's row. Kept as
   // a lookup table (not hardcoded in the keydown handler) so the property
   // list and its shortcuts can't silently drift apart.
@@ -3173,7 +3180,7 @@
         radius: 200, startAngle: 0, endAngle: null, radialOrient: false,
         pathLayerUid: null, pathAlignTangent: true,
         seed: Math.floor(Math.random() * 1e6),
-        staggerRandom: { position: false, rotation: false, scale: false, opacity: false },
+        staggerRandom: { position: false, rotation: false, scale: false, opacity: false, hue: false },
         // Temporal stagger (2026-07-29, LottieFiles "Animation" tab
         // equivalent) — off by default, see applyLayerDuplicator (app.js).
         timeOffset: { enabled: false, offsetFrames: 1, direction: 'forward' },
