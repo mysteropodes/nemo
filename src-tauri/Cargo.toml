@@ -49,6 +49,19 @@ base64 = "0.22"
 # build and dynamically linking GPL-licensed code into this binary. See
 # video_decode.rs's own module doc comment for the full rationale.
 
+# Image vectorization (2026-09, src/vectorize.rs) — traces a raster image
+# into color regions with cubic-bezier boundaries (Illustrator "Image
+# Trace" equivalent). MIT OR Apache-2.0, pinned to the stable 0.6 line
+# (not the 1.0.0-alpha rewrite currently on crates.io — different,
+# evolving API). `image = "0.23"` matches vtracer 0.6.5's OWN pinned
+# version exactly so Cargo unifies to one copy instead of compiling two.
+vtracer = "0.6"
+image = "0.23"
+# vtracer's own geometry types (CompoundPath/Spline/Color) — needed
+# directly to walk the traced output into Nemo's own path segments
+# instead of round-tripping through an SVG string.
+visioncortex = "0.8"
+
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
 block = "0.1"
