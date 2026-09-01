@@ -103,7 +103,23 @@
     if (!this.pos) return this.down(x, y, t, p);
     var sm = this._wobble(x, y, t);
     var dt = Math.max(1e-4, t - this.lastT);
-    var n = Math.max(1, Math.min(50, Math.ceil(dt * this.P.rate)));
+    // 2026-09 fix — the substep count used to be capped at a flat 50
+    // regardless of dt, so `ddt = dt/n` grew UNBOUNDED for any real gap
+    // wider than 50/rate (≈0.42s at rate=120): explicit Euler on this
+    // spring-damper is only stable for small ddt, so a big-enough gap made
+    // `_step` diverge — position and velocity doubling in magnitude and
+    // flipping sign every iteration, out to values in the sextillions
+    // within one gesture. Reproduced live (perspective-guide drag, level-1
+    // stabilizer, a background-tab timer stall inflating the real dt
+    // between synthetic pointermoves) and confirmed the SAME divergence
+    // happens with the guide off — this was always latent, any lag spike
+    // or backgrounded tab mid-stroke could trigger it, not something
+    // specific to the guide. Each substep costs two multiply-adds per
+    // axis, so there is no real reason to cap the WORK — only ddt needs a
+    // ceiling. Uncapping n (up to a generous safety net, still far cheaper
+    // than a single frame budget even fully used) keeps ddt pinned near
+    // 1/rate for any dt, however large.
+    var n = Math.max(1, Math.min(20000, Math.ceil(dt * this.P.rate)));
     var ddt = dt / n, out = [];
     for (var i = 1; i <= n; i++) {
       var f = i / n;

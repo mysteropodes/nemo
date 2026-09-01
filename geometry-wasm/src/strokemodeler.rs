@@ -140,7 +140,12 @@ impl StrokeModeler {
         }
         let sm = self.wobble(x, y, t);
         let dt = (t - self.last_t).max(1e-4);
-        let n = ((dt * self.params.rate).ceil() as i32).clamp(1, 50);
+        // 2026-09 fix — mirrors stroke-modeler.js's JsModeler::move (same
+        // date, same comment there for the full story): capping n at a flat
+        // 50 let ddt grow unbounded for any dt past ≈0.42s at rate=120,
+        // which diverges this explicit-Euler spring-damper. Substeps are
+        // O(1) each, so only ddt needs a ceiling, not the work.
+        let n = ((dt * self.params.rate).ceil() as i32).clamp(1, 20000);
         let ddt = dt / n as f64;
         let mut out = Vec::with_capacity(n as usize);
         for i in 1..=n {
