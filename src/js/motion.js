@@ -12858,6 +12858,12 @@
     // Bar-side Shift/Ctrl selection → layer-list mirror (layer-inout.js
     // onDown calls this; see the function's own comment).
     syncLayerSelFromBarSel: syncLayerSelFromBarSel,
+    // Layer-list selection → bar mirror (the OTHER direction — see this
+    // function's own comment: "call after every _layerSel assignment").
+    // Exported so app.js's reorderLayersAtGap can push a remapped
+    // selection into the Motion frame-grid's own highlight after a drag
+    // reorder, without a second copy of this trivial mapping.
+    syncBarSelToLayerSel: syncBarSelToLayerSel,
     // Menu-based Parent-in-Time creation (timeline.js buildTimeLinkMenuItems
     // — same core-setter split as setLayerParent/buildParentMenuItems).
     setLayerTimeLink: setLayerTimeLink,
