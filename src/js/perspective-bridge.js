@@ -65,11 +65,10 @@
   // you're actually about to draw instead of a fixed grid burned across the
   // whole canvas. The VPs themselves stay — draggable, visible, exactly as
   // before — since repositioning them is still how you set the guide up.
-  // `state.perspectiveDensity` and the reach/candidate-ray math it used to
-  // feed here are UNCHANGED and still live in nearestGuideProjection/
-  // findGuideRayNear/buildPerspectiveGuideItems's siblings below — density
-  // still controls how many candidate rays the snap logic considers, it
-  // just no longer controls how many get drawn (nothing does, anymore).
+  // `state.perspectiveDensity` (the old fan's ray count) has no reader left
+  // anywhere in this file as of the very next fix below — the snap-while-
+  // drawing functions no longer use a dense fixed-angle fan either, see
+  // axisCandidates' own 2026-09 comment.
   function buildPerspectiveGuideItems() {
     if (!state.perspectiveEnabled) return [];
     var vps = ensurePerspectiveVPs();
@@ -157,13 +156,31 @@
   }
   window.buildPerspectiveCursorGuideItems = buildPerspectiveCursorGuideItems;
 
-  // Snaps `end` onto whichever vanishing point's ray from `start` is
-  // closest in ANGLE (within SNAP_DEG) — preserves the drawn length (the
-  // point is projected onto the ray, not replaced by the VP itself), so a
-  // short stroke drawn toward a far-off vanishing point still comes out
-  // short, just perfectly straight toward it. Returns `end` unchanged if
-  // guides are off, no VP is close enough in angle, or the drag is too
-  // short to have a meaningful direction yet.
+  // The exact axis set the cursor gizmo (buildPerspectiveCursorGuideItems
+  // above) shows from a given point: one direction per configured VP, plus
+  // the fixed vertical — shared by every snap function below so "what you
+  // can lock onto" is provably the same set as "what the gizmo draws," not
+  // a second, independently-tuned notion of "the guide."
+  function axisCandidates(from) {
+    var vps = ensurePerspectiveVPs();
+    var out = [];
+    vps.forEach(function (vp) {
+      var vx = vp.x - from.x, vy = vp.y - from.y;
+      var vlen = Math.hypot(vx, vy);
+      if (vlen < 1) return; // sitting ON the VP — no meaningful direction
+      out.push({ x: vx / vlen, y: vy / vlen });
+    });
+    out.push({ x: 0, y: 1 }); // vertical — same as the gizmo's own fixed axis
+    return out;
+  }
+
+  // Snaps `end` onto whichever gizmo axis from `start` is closest in ANGLE
+  // (within SNAP_DEG) — preserves the drawn length (the point is projected
+  // onto the axis, not replaced by the VP itself), so a short stroke drawn
+  // toward a far-off vanishing point still comes out short, just perfectly
+  // straight toward it. Returns `end` unchanged if guides are off, no axis
+  // is close enough in angle, or the drag is too short to have a meaningful
+  // direction yet.
   var SNAP_DEG = 6;
   function snapToVP(start, end) {
     if (!state.perspectiveEnabled) return end;
@@ -171,134 +188,53 @@
     var dragLen = Math.hypot(dx, dy);
     if (dragLen < 4) return end;
     var dragAngle = Math.atan2(dy, dx);
-    var vps = ensurePerspectiveVPs();
     var best = null, bestDiff = SNAP_DEG * Math.PI / 180;
-    vps.forEach(function (vp) {
-      var vx = vp.x - start.x, vy = vp.y - start.y;
-      if (Math.hypot(vx, vy) < 1) return; // start point sits ON the VP — no meaningful direction to snap to
-      var vAngle = Math.atan2(vy, vx);
+    axisCandidates(start).forEach(function (ax) {
+      var vAngle = Math.atan2(ax.y, ax.x);
       var diff = Math.abs(Math.atan2(Math.sin(dragAngle - vAngle), Math.cos(dragAngle - vAngle)));
-      if (diff < bestDiff) { bestDiff = diff; best = { x: vx, y: vy }; }
+      if (diff < bestDiff) { bestDiff = diff; best = ax; }
     });
     if (!best) return end;
-    var uLen = Math.hypot(best.x, best.y);
-    var ux = best.x / uLen, uy = best.y / uLen;
-    return new Point(start.x + ux * dragLen, start.y + uy * dragLen);
+    return new Point(start.x + best.x * dragLen, start.y + best.y * dragLen);
   }
   window.perspectiveSnapPoint = snapToVP;
 
-  // Magnetic per-point snapping used by freehand/pressure-brush strokes
-  // (draw-bridge.js) — unlike snapToVP above (which locks a whole straight
-  // Line-tool drag onto a single ray from its start point), this projects
-  // an ARBITRARY point onto the closest guide line (any VP's radiating ray,
-  // or the horizon) if it's within a small screen-pixel tolerance, and
-  // returns the point UNCHANGED otherwise. Called per sample as a freehand
-  // stroke is drawn, so the brush sticks to a guide line when the hand
-  // wanders near one and draws normally everywhere else — same "magnetic"
-  // assist Sketchbook's Perspective Guide gives to any brush, not just a
-  // ruler tool.
-  var MAGNET_PX = 14;
-  function nearestGuideProjection(worldPt) {
-    if (!state.perspectiveEnabled) return null;
-    var vps = ensurePerspectiveVPs();
-    if (!vps.length) return null;
-    var tol = MAGNET_PX / view.zoom;
-    var best = null, bestDist = tol;
-    function tryLine(px, py, dx, dy) {
-      var vx = worldPt.x - px, vy = worldPt.y - py;
-      var t = vx * dx + vy * dy;
-      var projx = px + dx * t, projy = py + dy * t;
-      var dist = Math.hypot(worldPt.x - projx, worldPt.y - projy);
-      if (dist < bestDist) { bestDist = dist; best = new Point(projx, projy); }
-    }
-    var n = Math.max(4, state.perspectiveDensity | 0);
-    vps.forEach(function (vp) {
-      for (var i = 0; i < n; i++) {
-        var a = (i / n) * Math.PI * 2;
-        tryLine(vp.x, vp.y, Math.cos(a), Math.sin(a));
-      }
-    });
-    if (vps.length >= 2) {
-      var dx = vps[1].x - vps[0].x, dy = vps[1].y - vps[0].y;
-      var len = Math.hypot(dx, dy) || 1;
-      tryLine(vps[0].x, vps[0].y, dx / len, dy / len);
-    }
-    return best;
-  }
-  window.perspectiveSnapPointMagnetic = nearestGuideProjection;
-
-  // Hard directional lock (2026-07 — feedback: "la contrainte par rapport
-  // aux guides est légère... ça dépend comment on fait notre trait mais il
-  // peut partir dans une autre direction que le guide"). nearestGuideProjection
-  // above is a per-POINT proximity magnet: it only pulls a sample onto a
-  // guide line while that exact sample is within MAGNET_PX, so a stroke that
-  // starts near a ray but then wanders away keeps drawing free-hand instead
-  // of staying on the ray — not how Sketchbook's Perspective Guide actually
-  // behaves once a stroke commits to a vanishing point. These two functions
-  // let draw-bridge.js instead LOCK a whole stroke onto whichever ray is
-  // closest at pointerdown (generous LOCK_TOLERANCE_PX, wider than the
-  // per-point magnet's own, since committing to a direction should be easy
-  // to trigger deliberately) and hard-project every subsequent point onto
-  // that SAME ray for the rest of the gesture, regardless of how far the
-  // hand later strays from it — matching a ruler-against-the-guide feel.
-  // A stroke that starts far from every ray still draws completely free, by
-  // design (not "near the guide" at all is a real, common intent).
-  var LOCK_TOLERANCE_PX = 40;
-  function findGuideRayNear(worldPt) {
-    if (!state.perspectiveEnabled) return null;
-    var vps = ensurePerspectiveVPs();
-    if (!vps.length) return null;
-    var tol = LOCK_TOLERANCE_PX / view.zoom;
-    var best = null, bestDist = tol;
-    function tryLine(px, py, dx, dy) {
-      var vx = worldPt.x - px, vy = worldPt.y - py;
-      var t = vx * dx + vy * dy;
-      var projx = px + dx * t, projy = py + dy * t;
-      var dist = Math.hypot(worldPt.x - projx, worldPt.y - projy);
-      if (dist < bestDist) { bestDist = dist; best = { px: px, py: py, dx: dx, dy: dy }; }
-    }
-    var n = Math.max(4, state.perspectiveDensity | 0);
-    vps.forEach(function (vp) {
-      for (var i = 0; i < n; i++) {
-        var a = (i / n) * Math.PI * 2;
-        tryLine(vp.x, vp.y, Math.cos(a), Math.sin(a));
-      }
-    });
-    if (vps.length >= 2) {
-      var dx = vps[1].x - vps[0].x, dy = vps[1].y - vps[0].y;
-      var len = Math.hypot(dx, dy) || 1;
-      tryLine(vps[0].x, vps[0].y, dx / len, dy / len);
-    }
-    return best;
-  }
-  window.perspectiveFindGuideRayNear = findGuideRayNear;
   // Angle-based freehand lock (2026-07 — feedback: "dans sketchbook tu fais
-  // tes traits n'importe où ils vont suivre la perspective" — the PROXIMITY
-  // lock above (findGuideRayNear) only fires when the stroke STARTS within
-  // LOCK_TOLERANCE_PX of an already-drawn guide ray, which is exactly the
-  // opposite of Sketchbook's own behavior: there, the guide's ANGLE from a
-  // vanishing point is what matters, not the stroke's distance from any
-  // drawn line — you can start a stroke anywhere on the canvas and, once
-  // its direction reads as "aimed at a VP," it locks onto that VP's ray.
-  // Mirrors snapToVP's angle math above (same SNAP_DEG, same "closest VP
-  // direction wins" logic) but returns a {px,py,dx,dy} ray struct usable by
-  // projectOnRay/draw-bridge.js's guideConstrain, instead of a single
-  // projected point — draw-bridge.js calls this once dragLen has crossed a
-  // few pixels (see its own guideLockDecided comment for why the decision
-  // can't happen at pointerdown, before any direction is known at all).
+  // tes traits n'importe où ils vont suivre la perspective" — the guide's
+  // ANGLE from a point is what matters, not the stroke's distance from any
+  // drawn line: you can start a stroke anywhere on the canvas and, once its
+  // direction reads as "aimed at a VP" — or straight up/down, matching the
+  // gizmo's own vertical axis — it locks onto that axis for the rest of the
+  // gesture). Mirrors snapToVP's angle math above (same SNAP_DEG, same
+  // axisCandidates, same "closest axis wins" logic) but returns a
+  // {px,py,dx,dy} ray struct usable by projectOnRay/draw-bridge.js's
+  // guideConstrain, instead of a single projected point — draw-bridge.js
+  // calls this once dragLen has crossed a few pixels (see its own
+  // guideLockDecided comment for why the decision can't happen at
+  // pointerdown, before any direction is known at all).
+  //
+  // 2026-09 (Cyril, live: "ça dessine pas dans les guides du gizmo mais
+  // encore sur les anciens guides") — this used to only test VP directions,
+  // and draw-bridge.js additionally fell back to findGuideRayNear/
+  // nearestGuideProjection (proximity to one of a DENSE fan of fixed-angle
+  // rays per VP, `state.perspectiveDensity` of them) whenever the angle
+  // check found nothing. That fan stopped being drawn in the previous fix
+  // (buildPerspectiveGuideItems no longer renders it) but kept functioning
+  // invisibly — so a stroke could still lock onto one of dozens of ghost
+  // rays that had never matched the direction the user actually dragged,
+  // let alone anything the gizmo showed. Both of those functions (and the
+  // magnetSnap per-point fallback in draw-bridge.js that used the same fan)
+  // are gone now — axisCandidates above is the SAME finite set of axes as
+  // the gizmo draws (each VP + vertical), nothing invisible left to snap to.
   function findVPRayByAngle(start, currentPt) {
     if (!state.perspectiveEnabled) return null;
     var dx = currentPt.x - start.x, dy = currentPt.y - start.y;
     var dragAngle = Math.atan2(dy, dx);
-    var vps = ensurePerspectiveVPs();
     var best = null, bestDiff = SNAP_DEG * Math.PI / 180;
-    vps.forEach(function (vp) {
-      var vx = vp.x - start.x, vy = vp.y - start.y;
-      var vlen = Math.hypot(vx, vy);
-      if (vlen < 1) return; // start point sits ON the VP — no meaningful direction to compare against
-      var vAngle = Math.atan2(vy, vx);
+    axisCandidates(start).forEach(function (ax) {
+      var vAngle = Math.atan2(ax.y, ax.x);
       var diff = Math.abs(Math.atan2(Math.sin(dragAngle - vAngle), Math.cos(dragAngle - vAngle)));
-      if (diff < bestDiff) { bestDiff = diff; best = { px: start.x, py: start.y, dx: vx / vlen, dy: vy / vlen }; }
+      if (diff < bestDiff) { bestDiff = diff; best = { px: start.x, py: start.y, dx: ax.x, dy: ax.y }; }
     });
     return best;
   }

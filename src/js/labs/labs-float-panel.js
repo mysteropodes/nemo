@@ -448,20 +448,12 @@
       pModeNext.addEventListener('click', function () { cyclePerspMode(1); });
       pModePill.appendChild(pModeLbl); pModePill.appendChild(pModePrev); pModePill.appendChild(pModeVal); pModePill.appendChild(pModeNext);
       paramsWrap.appendChild(pModePill);
-      var densPill = stepperPill('perspective');
-      var densLbl = document.createElement('span'); densLbl.className = 'lfs-label'; densLbl.textContent = SM.t('lfsLabelDensity');
-      var densMinus = document.createElement('button'); densMinus.className = 'lfs-btn'; densMinus.textContent = '−';
-      var densVal = document.createElement('span'); densVal.className = 'lfs-val'; densVal.textContent = state.perspectiveDensity;
-      var densPlus = document.createElement('button'); densPlus.className = 'lfs-btn'; densPlus.textContent = '+';
-      function setDensity(v) {
-        state.perspectiveDensity = Math.max(4, Math.min(72, v));
-        densVal.textContent = state.perspectiveDensity;
-        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-      }
-      densMinus.addEventListener('click', function () { setDensity(state.perspectiveDensity - 2); });
-      densPlus.addEventListener('click', function () { setDensity(state.perspectiveDensity + 2); });
-      densPill.appendChild(densLbl); densPill.appendChild(densMinus); densPill.appendChild(densVal); densPill.appendChild(densPlus);
-      paramsWrap.appendChild(densPill);
+      // Density control removed (2026-09) — it tuned the ray count of the
+      // static fan that buildPerspectiveGuideItems no longer draws, and
+      // the snap-while-drawing logic dropped its own dense-fan fallback in
+      // the same pass (perspective-bridge.js's axisCandidates), so nothing
+      // reads state.perspectiveDensity anymore. Left in state/project I/O
+      // as inert legacy data rather than touching the save format.
       var lockPill = stepperPill('perspective');
       var lockBtn = document.createElement('button'); lockBtn.className = 'lfs-btn wide';
       lockBtn.textContent = SM.t('lfsBtnLock'); lockBtn.title = SM.t('lfsLockTitle');
