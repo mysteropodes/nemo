@@ -3364,6 +3364,12 @@ function updateSelPropsPanel(){
   // signature-change check below, since it only depends on count.
   var alignBar=document.getElementById('align-toolbar');
   if(alignBar)alignBar.style.display=selectedPaths.length>=2?'flex':'none';
+  // Distribute needs a THIRD object to redistribute BETWEEN (the first/
+  // last are the fixed anchors, see distributeSelection's own comment) —
+  // shown/hidden independently of the align buttons right next to it,
+  // same "toggled every call, count-only" reasoning as the bar itself.
+  var distOn=selectedPaths.length>=3;
+  document.querySelectorAll('#align-toolbar .align-btn[data-distribute]').forEach(function(btn){btn.style.display=distOn?'':'none';});
   var sig=selectedPaths.map(function(p){return p.id;}).sort(function(a,c){return a-c;}).join(',');
   if(sig!==_selPropsSig){
     state.selRotAccum=0;_selPropsSig=sig;
@@ -9855,8 +9861,11 @@ document.querySelectorAll('#xform-anchor-grid .xa-dot').forEach(function(btn){
   });
 });
 renderXformAnchorGrid();
-document.querySelectorAll('#align-toolbar .align-btn').forEach(function(btn){
+document.querySelectorAll('#align-toolbar .align-btn[data-align]').forEach(function(btn){
   btn.addEventListener('click',function(){alignSelection(btn.dataset.align);});
+});
+document.querySelectorAll('#align-toolbar .align-btn[data-distribute]').forEach(function(btn){
+  btn.addEventListener('click',function(){distributeSelection(btn.dataset.distribute);});
 });
 document.getElementById('btn-pt-corner').addEventListener('click',function(){window.SM.setPointType('corner');});
 document.getElementById('btn-pt-smooth').addEventListener('click',function(){window.SM.setPointType('smooth');});

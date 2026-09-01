@@ -1120,16 +1120,49 @@
       return;
     }
 
-    // Alt+click anywhere (not on a handle — already handled above) with an
-    // active selection relocates the rotate/scale pivot to that exact point
-    // — Illustrator/Figma "Option+click to move the reference point"
-    // convention, reported as "avec alt et l'outil de sélection il faudrait
-    // pouvoir changer le point d'ancrage de place". Doesn't touch geometry
-    // (no pushUndo — this is a UI/pivot preference, not a document edit)
-    // and doesn't fall through to select/move/marquee below: the click is
-    // entirely consumed by placing the anchor, matching how the reference
-    // apps behave (an Alt+click never ALSO reselects or starts a drag).
-    if (e.altKey && selectedPaths.length) {
+    // Maps a world point into the current selection's own (possibly
+    // rotated) box space, same transform computeHandles()'s callers already
+    // apply — hoisted out so the Alt+click disambiguation just below and
+    // the body-hit-test right after it don't each carry their own copy.
+    function pointInSelectionBody(worldPt, handle) {
+      if (!handle) return false;
+      var p = worldPt;
+      if (handle.map) { var g = handle.map.inv(p.x, p.y); p = new Point(g[0], g[1]); }
+      if (handle.box && handle.box.angle) p = p.rotate(-handle.box.angle, handle.box.pivot);
+      return handle.bounds.contains(p);
+    }
+    // Alt+click with an active selection is two DIFFERENT things depending
+    // on WHERE it lands (2026-09 — "je veux dupliquer avec alt en glissant
+    // comme sur illustrator", but Alt+click was already Illustrator/Figma's
+    // own "Option+click to move the reference point" convention, built
+    // earlier per "avec alt et l'outil de sélection il faudrait pouvoir
+    // changer le point d'ancrage de place" — the two conventions collide on
+    // the same modifier, so the click's own position is what disambiguates,
+    // confirmed with Cyril): landing INSIDE the current selection's own box
+    // duplicates it and drags the copy, matching every reference app's
+    // Alt/Option-drag; landing OUTSIDE it (empty canvas, or repositioning
+    // the pivot somewhere away from the shape) keeps the original
+    // anchor-placement behavior untouched.
+    if (e.altKey && selectedPaths.length && pointInSelectionBody(pt, computeHandles())) {
+      // Same clone pipeline as duplicateSelection()/pasteSelection's
+      // "same place" branch (tools.js) — offset 0 so the copy starts
+      // exactly where the original sits, THEN falls through to the body-
+      // hit-test right below (now re-evaluated against these fresh
+      // clones, at the same position, so it finds the click inside them
+      // too) to set mode='move' and drag them for the rest of this same
+      // gesture. The originals are left completely untouched underneath.
+      pushUndo();
+      var dupLayer = userLayers[state.activeLayerIdx];
+      var dupSnaps = selectedPaths.map(_snapshotForClone).filter(Boolean);
+      if (dupSnaps.length) {
+        var dupClones = _materializeClones(dupSnaps, dupLayer, 0);
+        selectedPaths = dupClones.filter(isSelectablePathChild);
+        state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
+        saveActiveLayerFrame();
+      }
+      // Deliberately no `return` — falls through to the body-hit-test
+      // below, same as an ordinary (non-Alt) click on the selection body.
+    } else if (e.altKey && selectedPaths.length) {
       placeAnchorAt(pt, e.shiftKey);
       if (window.renderXformAnchorGrid) renderXformAnchorGrid();
       window.SMEngineBridge.resume();
@@ -1155,13 +1188,7 @@
     if (selectedPaths.length) {
       var bodyHandle = computeHandles();
       if (bodyHandle) {
-        var bodyPt = pt;
-        if (bodyHandle.map) {
-          var bodyGeom = bodyHandle.map.inv(bodyPt.x, bodyPt.y);
-          bodyPt = new Point(bodyGeom[0], bodyGeom[1]);
-        }
-        if (bodyHandle.box && bodyHandle.box.angle) bodyPt = bodyPt.rotate(-bodyHandle.box.angle, bodyHandle.box.pivot);
-        if (bodyHandle.bounds.contains(bodyPt)) {
+        if (pointInSelectionBody(pt, bodyHandle)) {
           // Widen to the clicked item's full group/combine-group BEFORE
           // starting the move (2026-07-29, QA-confirmed): this shortcut
           // fires and returns on ANY click inside the current selection's
