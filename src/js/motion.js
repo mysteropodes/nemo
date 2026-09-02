@@ -1070,7 +1070,15 @@
       var i = track.keys.indexOf(s.key);
       if (i >= 0) { track.keys.splice(i, 1); n++; }
     });
-    if (n) { setKeySel([]); renderLayerList(); renderTimeline(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); }
+    if (n) {
+      setKeySel([]); renderLayerList(); renderTimeline();
+      // Same content-vs-transform split as the drag and value paths (#774):
+      // deleting a Time Remap key reshapes the curve, so the source frame
+      // exposed at the playhead has to be re-resolved by loadFrame — a
+      // renderNow only redraws the frame already uploaded.
+      if (sel.some(function (s) { return s.prop === 'timeRemap'; }) && window.loadFrame) loadFrame(state.currentFrame);
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    }
     return n;
   }
   // Copy/paste keeps frames RELATIVE to the earliest key copied, so pasting at
@@ -2853,6 +2861,23 @@
     if (prop === 'order' && !_orderEngineWarnShown && window.SMEngineBridge && !window.SMEngineBridge.isEnabled()) {
       _orderEngineWarnShown = true;
       if (window.showToast) showToast(SM.t('toastOrderNeedsEngine'));
+    }
+    // Time Remap (2026-09, feedback #774: "le timeremmaping sur une vidéo
+    // n'est toujours pas actif, il ne change pas l'exposition des frames de
+    // la vidéo ... en temps réel dans le canvas"). Same content-changing
+    // family as the timeLink offsets above, and the reason #753's decode
+    // fix looked dead: writing a new remap value at the playhead changes
+    // WHICH source frame this layer exposes, but nothing re-resolved it —
+    // the video's frame sync only runs from loadFrame (app.js calls
+    // SMNativeVideo.onFrameChanged there), and a Component's content comes
+    // from getEffectiveStrokes, also only re-read by loadFrame. So the data
+    // moved and the canvas kept the frame it was already showing until the
+    // playhead happened to move. Verified live in the browser: at timeline
+    // frame 30, remap 6 -> 20 uploaded no new video frame before this,
+    // uploads source frame 20 after.
+    if (prop === 'timeRemap') {
+      if (window.loadFrame) loadFrame(state.currentFrame);
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     }
   }
   var _orderEngineWarnShown = false;
@@ -12932,9 +12957,17 @@
     if (window._motionSkewDrag) { window._motionSkewDrag = null; clearMotionSnapGuide(); flushMotionDragTimelineRender(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
     if (window._motionConnectDrag) { window._motionConnectDrag = null; clearMotionSnapGuide(); document.body.style.cursor = ''; flushMotionDragTimelineRender(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); return; }
     if (!window._motionKeyDrag) return;
+    var dragged = window._motionKeyDrag.keys || [];
     window._motionKeyDrag = null;
     clearMotionSnapGuide();
     flushMotionDragTimelineRender();
+    // Second half of the #774 fix: retiming a Time Remap key changes which
+    // source frame the playhead exposes just as much as retyping its value
+    // does, and renderNow alone can't show it — the video's frame sync and
+    // a Component's content are both re-resolved by loadFrame only. Found
+    // live: dragging the key at frame 30 to 56 moved the curve (value at
+    // the playhead 20 -> 11) while the canvas kept showing source frame 20.
+    if (dragged.some(function (d) { return d.prop === 'timeRemap'; }) && window.loadFrame) loadFrame(state.currentFrame);
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   document.addEventListener('mousemove', onDragMove);
