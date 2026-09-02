@@ -1862,7 +1862,14 @@ function convertSelectionToObjectDuplicator(indices){
   pool.forEach(function(l){l.visible=false;});
   if(typeof activateUL==='function')activateUL(hostIdx);
   loadFrame(state.currentFrame);
-  invalidateSymbolUnionBounds(); // same cache-staleness fix toggleLayerDuplicator applies
+  // Bare call → ReferenceError (2026-09 QA sweep): this function lives in
+  // motion.js's closure and is only reachable as SMMotion.
+  // invalidateSymbolUnionBounds — every other caller (undo/redo, dupRefresh,
+  // saveActiveLayerFrame) goes through the namespace. Creating an object
+  // duplicator therefore threw here, AFTER the host layer had been created
+  // and the pool hidden: the action half-completed, no toast, no panel, and
+  // the exception took the rest of the click handler with it.
+  if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds(); // same cache-staleness fix toggleLayerDuplicator applies
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
   renderLayerList();renderTimeline();
   if(window.updateDuplicatorPanel)updateDuplicatorPanel();
