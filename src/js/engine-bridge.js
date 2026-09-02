@@ -1127,7 +1127,10 @@
       // parent-chain) — this is a transient state, a plain rect at the
       // right size/position/rotation covers it without duplicating that
       // whole pipeline for something that shows for a few hundred ms.
-      if (state.layers[i].nativeVideo && window.SMEngineBridge && !registeredImageIds['nv:' + i]) {
+      // Texture id follows the LAYER (layerUid), not its index — see
+      // native-video-bridge's nvKeyFor for the reorder bug this closes.
+      var nvId = state.layers[i].nativeVideo ? ((window.SMNativeVideo && SMNativeVideo.nvImageIdFor) ? SMNativeVideo.nvImageIdFor(state.layers[i], i) : ('nv:' + i)) : null;
+      if (state.layers[i].nativeVideo && window.SMEngineBridge && !registeredImageIds[nvId]) {
         var nvPH = state.layers[i].nativeVideo;
         var inFPH = window.layerInPoint ? layerInPoint(state.layers[i]) : 0;
         var outFPH = window.layerOutPoint ? layerOutPoint(state.layers[i]) : state.totalFrames - 1;
@@ -1145,7 +1148,7 @@
           items.push(boundsRectItem(phRect.x, phRect.y, phRect.x + phRect.width, phRect.y + phRect.height, [38, 36, 42, Math.round(255 * phOp)], [110, 110, 122, Math.round(200 * phOp)], 1.5));
         }
       }
-      if (state.layers[i].nativeVideo && window.SMEngineBridge && registeredImageIds['nv:' + i]) {
+      if (state.layers[i].nativeVideo && window.SMEngineBridge && registeredImageIds[nvId]) {
         var nv = state.layers[i].nativeVideo;
         var inF = window.layerInPoint ? layerInPoint(state.layers[i]) : 0;
         var outF = window.layerOutPoint ? layerOutPoint(state.layers[i]) : state.totalFrames - 1;
@@ -1209,7 +1212,7 @@
           var nvMat = (!is3D && window.SMMotion) ? SMMotion.layerMotionAt(i, renderFrame) : null;
           var nvChain = is3D ? [] : SMMotion.parentChainMats(i, renderFrame);
           var nvProject3D = (is3D && window.SMMotion) ? SMMotion.make3DProjector(state.layers[i], nvRectBase, renderFrame, state.canvasW, state.canvasH, parent3D) : null;
-          _touchImage('nv:' + i); // one shared texture for every clone — touch once, not per clone
+          _touchImage(nvId); // one shared texture for every clone — touch once, not per clone
           for (var nvri = 0; nvri < nvRects.length; nvri++) {
             var nvRect = nvRects[nvri].rect, nvOp = nvRects[nvri].opacityFactor;
             if (nvMat) {
@@ -1219,7 +1222,7 @@
             }
             for (var nvpc = 0; nvpc < nvChain.length; nvpc++) { nvRect = SMMotion.transformImageRect(nvRect, nvChain[nvpc].pivot, nvChain[nvpc].mat); nvOp *= nvChain[nvpc].mat.op; }
             if (nvProject3D) nvRect = SMMotion.project3DImageRect(nvRect, nvProject3D);
-            var nvImgItem = { imageId: 'nv:' + i, x: nvRect.x, y: nvRect.y, width: nvRect.width, height: nvRect.height, opacity: nvOp, rotation: nvRect.rotation || 0 };
+            var nvImgItem = { imageId: nvId, x: nvRect.x, y: nvRect.y, width: nvRect.width, height: nvRect.height, opacity: nvOp, rotation: nvRect.rotation || 0 };
             // Image mesh on a VIDEO (2026-09, feedback #779). Exactly the
             // raster branch's treatment above, with the id read off the
             // LAYER (ld.videoMeshId) because a video has no Paper item to
