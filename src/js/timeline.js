@@ -6121,8 +6121,36 @@ function reconcileLayerIndexState(){
     }else _idxShadow[name]=null;
   });
 }
+// Animation 2D's frame-cell selection (_sel.frames, entries {layer, frame})
+// is the same kind of index — and it feeds F5/F6, copy/paste of frames and
+// generateTweens' span restriction. Found live right after the reconciler
+// above shipped: cells selected on "ArcA", layer moved to the end, the
+// selection now sat on "ArcB". _layerSel had been remapped by
+// reorderLayersAtGap; this array never was. Each entry is a plain object
+// that lives across renders, so it carries its own layer identity: stamped
+// the first time it is seen, remapped whenever its index stops naming that
+// layer, dropped when the layer is gone.
+function reconcileFrameSelection(){
+  if(typeof _sel==='undefined'||!Array.isArray(_sel.frames))return;
+  var out=[];
+  _sel.frames.forEach(function(s){
+    var cur=state.layers[s.layer];
+    if(s._uid==null){
+      s._uid=_layerKeyOf(cur);
+      if(s._uid!=null)out.push(s);
+      return;
+    }
+    if(_layerKeyOf(cur)===s._uid){out.push(s);return;}
+    var ni=_indexOfLayerKey(s._uid);
+    if(ni>=0){s.layer=ni;out.push(s);}
+  });
+  if(out.length!==_sel.frames.length||out.some(function(s,i){return s!==_sel.frames[i];})){
+    _sel.frames.length=0;Array.prototype.push.apply(_sel.frames,out);
+  }
+}
 function renderLayerList(frameOnly){
   reconcileLayerIndexState();
+  reconcileFrameSelection();
   if(frameOnly&&state.appMode!=='motion')return;
   // Split code editor sync (2026-08-30, found by driving: deleting the
   // layer whose expression the panel was showing left the panel open on a
@@ -9543,6 +9571,27 @@ function onKeyDown(event){
     var nudgeStep=event.shiftKey?10:1;
     var ndx=k==='ArrowLeft'?-nudgeStep:k==='ArrowRight'?nudgeStep:0;
     var ndy=k==='ArrowUp'?-nudgeStep:k==='ArrowDown'?nudgeStep:0;
+    // Motion (2026-09 QA sweep): the canvas drag of this same selection
+    // writes the layer's Motion Position (select-bridge's motion branch),
+    // never the geometry — a nudge went straight to selPropsApplyMove and
+    // moved the DRAWING instead. Confirmed live: ArrowRight in Motion moved
+    // the path by 11 world units and left motionStatic.position untouched,
+    // so the nudge was not keyable, not undoable as a Motion edit, and
+    // silently edited the frame's artwork. Same route as the drag: pull the
+    // world delta back through the parent chain, write through setLayerValue
+    // (keys at the playhead when the stopwatch is on).
+    if(state.appMode==='motion'&&window.SMMotion&&SMMotion.setLayerValue){
+      var nLi=state.activeLayerIdx;
+      if(!state.layers[nLi])return;
+      pushUndo();
+      var nCur=SMMotion.getLayerValue(nLi,'position');
+      var nPd=(SMMotion.invertVectorThroughParentChain)?SMMotion.invertVectorThroughParentChain(nLi,state.currentFrame,ndx,ndy):[ndx,ndy];
+      SMMotion.setLayerValue(nLi,'position',[nCur[0]+nPd[0],nCur[1]+nPd[1]]);
+      window._sceneVersion=(window._sceneVersion||0)+1;
+      if(SMMotion.liveRefreshVisiblePropertyFields)SMMotion.liveRefreshVisiblePropertyFields();
+      if(window.SMEngineBridge)SMEngineBridge.renderNow();
+      return;
+    }
     selPropsApplyMove(ndx,ndy);
   }
   else if(k==='ArrowLeft'){if(state.playing)stopPlay();goToFrame(state.currentFrame-1);}
