@@ -778,7 +778,96 @@
       badge.style.display = n ? '' : 'none';
     }
     renderEffectsList();
+    renderPathFxList();
   }
+  // ---- Effets de TRACÉ (path-fx.js) ----
+  // Une seconde pile, sous celle des effets d'image, parce qu'elle agit sur
+  // une autre matière : la GÉOMÉTRIE, avant rasterisation. Les mélanger dans
+  // une seule liste laisserait croire qu'on peut intercaler un flou entre
+  // deux déformations de contour, ce qui est faux — le flou travaille sur
+  // des pixels que la déformation n'a pas encore produits.
+  function pathFxHost() {
+    var ld = activeLayer();
+    return (ld && !ld.isNullLayer) ? ld : null;
+  }
+  function pathFxPushUndo() { if (typeof pushUndo === 'function') pushUndo(); }
+  function pathFxChanged() {
+    // Surtout PAS de saveActiveLayerFrame ici : les objets vivants portent la
+    // géométrie déformée (voir le garde-fou de saveActiveLayerFrame, app.js).
+    window._sceneVersion = (window._sceneVersion || 0) + 1;
+    if (typeof loadFrame === 'function') loadFrame(state.currentFrame);
+    if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    renderPathFxList();
+    if (window.updateUI) updateUI();
+  }
+  function addPathFx(type) {
+    var ld = pathFxHost(); if (!ld || !window.SMPathFx) return;
+    pathFxPushUndo();
+    if (!ld.pathFx) ld.pathFx = [];
+    ld.pathFx.push(SMPathFx.defaultsFor(type));
+    pathFxChanged();
+  }
+  function renderPathFxList() {
+    var list = document.getElementById('path-fx-list');
+    if (!list || !window.SMPathFx) return;
+    var ld = pathFxHost();
+    var wrap = document.getElementById('path-fx-sec');
+    if (wrap) wrap.style.display = ld ? '' : 'none';
+    if (!ld) return;
+    list.innerHTML = '';
+    (ld.pathFx || []).forEach(function (fx, idx) {
+      var def = SMPathFx.typeDef(fx.type); if (!def) return;
+      var row = document.createElement('div');
+      row.style.cssText = 'border:1px solid var(--border);border-radius:5px;padding:5px 6px;margin-bottom:4px;';
+      var head = document.createElement('div');
+      head.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:10px;';
+      var eye = document.createElement('input');
+      eye.type = 'checkbox'; eye.checked = fx.enabled !== false;
+      eye.style.accentColor = 'var(--accent)';
+      eye.addEventListener('change', function () { pathFxPushUndo(); fx.enabled = eye.checked; pathFxChanged(); });
+      var name = document.createElement('span');
+      name.textContent = window.SM.t(def.label); name.style.flex = '1';
+      var del = document.createElement('button');
+      del.className = 'pbtn'; del.textContent = '×'; del.style.cssText = 'padding:1px 6px;font-size:11px;';
+      del.addEventListener('click', function () { pathFxPushUndo(); ld.pathFx.splice(idx, 1); pathFxChanged(); });
+      head.appendChild(eye); head.appendChild(name); head.appendChild(del);
+      row.appendChild(head);
+      def.params.forEach(function (p) {
+        var pr = document.createElement('div');
+        pr.className = 'pr'; pr.style.cssText = 'margin-top:4px;';
+        var lbl = document.createElement('span'); lbl.className = 'pl'; lbl.textContent = window.SM.t(p.label);
+        var inp = document.createElement('input');
+        inp.type = 'number'; inp.className = 'pi scrub';
+        inp.min = p.min; inp.max = p.max; inp.step = p.step;
+        inp.value = SMPathFx.paramValue(fx, p.key);
+        var live = false;
+        inp.addEventListener('input', function () {
+          if (!live) { pathFxPushUndo(); live = true; }
+          fx[p.key] = parseFloat(inp.value) || 0;
+          pathFxChanged();
+        });
+        inp.addEventListener('change', function () { live = false; });
+        pr.appendChild(lbl); pr.appendChild(inp);
+        row.appendChild(pr);
+      });
+      list.appendChild(row);
+    });
+    var add = document.getElementById('path-fx-add');
+    if (add && !add._wired) {
+      add._wired = true;
+      add.addEventListener('change', function () {
+        if (!add.value) return;
+        addPathFx(add.value);
+        add.value = '';
+      });
+      SMPathFx.TYPES.forEach(function (t) {
+        var o = document.createElement('option');
+        o.value = t.id; o.textContent = window.SM.t(t.label);
+        add.appendChild(o);
+      });
+    }
+  }
+  window.updatePathFxPanel = renderPathFxList;
   window.updateEffectsPanel = renderEffectsSection;
 
   function init() {

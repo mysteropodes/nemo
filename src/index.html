@@ -629,6 +629,15 @@
              scope to that element instead of the whole layer. -->
         <div class="pr" id="effects-target-hint" style="font-size:10px;color:var(--accent);display:none" data-i18n="effectsTargetHint">Élément sélectionné — l'effet s'appliquera juste à lui.</div>
         <div id="effects-list"></div>
+        <!-- Effets de TRACÉ (path-fx.js) : pile séparée, elle agit sur la
+             géométrie avant rasterisation, pas sur les pixels. -->
+        <div id="path-fx-sec" style="margin-top:10px">
+          <div class="phdr" style="padding:0 0 4px 0;font-size:9px;color:var(--text-dim)" data-i18n="pathFxHdr">Effets de tracé</div>
+          <div id="path-fx-list"></div>
+          <select class="psel" id="path-fx-add" style="width:100%;margin-top:4px">
+            <option value="" data-i18n="pathFxAdd">+ Ajouter un effet de tracé…</option>
+          </select>
+        </div>
         <!-- Categorized flyout with preview thumbnails (feedback 2026-07:
              "on a pas de préviz vignette et de sous menu. Pense bien
              l'architecture ui qui marcherait le mieux") — replaces the
@@ -2334,6 +2343,7 @@
 <script src="js/color-manager.js"></script>
 <script src="js/effects-panel.js"></script>
 <script src="js/shader-effects-library.js"></script>
+<script src="js/path-fx.js"></script>
 <script src="js/custom-effects.js"></script>
 <script src="js/vectorize-bridge.js"></script>
 <script src="js/project.js"></script>
