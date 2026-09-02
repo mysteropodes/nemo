@@ -1631,13 +1631,43 @@ function cutSelection(){
 function pasteSelection(){
   if(!_canvasClip||!_canvasClip.snaps.length){showToast(SM.t('toastNothingToPaste'));return;}
   pushUndo();
+  // A HELD frame is neither a keyframe nor an interpolated one, and
+  // saveActiveLayerFrame() returns early on exactly that — so the pasted
+  // shapes appeared on canvas and were stored NOWHERE, vanishing at the
+  // next frame change (2026-09, feedback #752: "j'ai copié-collé un élément
+  // dans un autre calque mais celui-ci disparaît quand je scrubbe la
+  // timeline après" — measured: 1 item on canvas, 0 stored). Every other
+  // content-writing gesture already handles this; paste was the one that
+  // didn't. Two different right answers, one per mode:
+  //  - Animation 2D promotes the held frame, the convention drawing on a
+  //    held frame already follows (ensureKeyframe, select-bridge's move).
+  //  - Motion holds ONE drawing across a span and animates its transform;
+  //    promoting there would make the pasted shape appear only from the
+  //    playhead on, which reads as "it disappeared" again the moment you
+  //    scrub back. It writes into the keyframe the held frame inherits
+  //    from instead, so the shape belongs to the whole hold — which is
+  //    what Cyril's own report asks for ("il disparaît quand je scrubbe").
+  var _pasteHeldOrigin=-1;
+  var _pasteLd=state.layers[state.activeLayerIdx];
+  var _pasteF=_pasteLd&&_pasteLd.frames[state.currentFrame];
+  if(_pasteF&&!_pasteF.isKeyframe&&!_pasteF.isInterpolated){
+    if(state.appMode!=='motion'){ if(typeof ensureKeyframe==='function')ensureKeyframe(); }
+    else { for(var _oi=state.currentFrame;_oi>=0;_oi--){ if(_pasteLd.frames[_oi]&&_pasteLd.frames[_oi].isKeyframe){_pasteHeldOrigin=_oi;break;} } }
+  }
   var layer=userLayers[state.activeLayerIdx];
   var samePlace=(_canvasClip.layerIdx===state.activeLayerIdx&&_canvasClip.frameIdx===state.currentFrame);
   var clones=_materializeClones(_canvasClip.snaps,layer,samePlace?12:0);
   clearSel();
   selectedPaths=clones.filter(isSelectablePathChild);
   state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
-  saveActiveLayerFrame();renderArcs();updateUI();
+  if(_pasteHeldOrigin>=0&&typeof _collectLayerStrokes==='function'){
+    // Motion, held frame: write the layer's live content into the hold's
+    // OWN keyframe (see the comment above). saveActiveLayerFrame would
+    // return early here, which is the whole bug.
+    _pasteLd.frames[_pasteHeldOrigin].strokes=_collectLayerStrokes(state.activeLayerIdx,_pasteLd);
+    window._sceneVersion++;
+  } else saveActiveLayerFrame();
+  renderArcs();updateUI();
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
   showToast(SM.t('toastPasted')+clones.filter(isSelectablePathChild).length+')');
 }
