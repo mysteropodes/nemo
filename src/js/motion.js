@@ -11841,6 +11841,33 @@
       });
     });
     setKeySel(sel); // also refreshes the selection box (updateKeySelectionBox below)
+    if (_motionMarquee) _motionMarquee.layers = marqueeLayersIn(y0, y1);
+  }
+  // #769 ("pourquoi le rec de selection dans motion sur la timeline à droite
+  // ne selectionne pas aussi sur la partie gauche les calques ?") — the grid
+  // half of a row IS that layer's row, same reading endMarquee already
+  // applies to a plain click (selectLayerFromGrid). A rectangle crossing a
+  // layer's rows therefore selects that layer on the left too.
+  // Property/element track rows carry no data-layer of their own, so the
+  // owning layer is the last .frow[data-layer] seen ABOVE them in document
+  // order — the grid is a flat list of rows in exactly that order.
+  function marqueeLayersIn(y0, y1) {
+    var grid = document.getElementById('frame-grid');
+    if (!grid) return [];
+    var out = [], cur = null;
+    Array.prototype.forEach.call(grid.children, function (row) {
+      if (!row.classList || !row.classList.contains('frow')) return;
+      if (row.dataset && row.dataset.layer != null && row.dataset.layer !== '') {
+        var li = parseInt(row.dataset.layer, 10);
+        cur = isNaN(li) ? null : li;
+      }
+      if (cur == null) return;
+      var b = row.getBoundingClientRect();
+      if (b.height <= 0) return;
+      if (b.bottom < y0 || b.top > y1) return;
+      if (out.indexOf(cur) < 0) out.push(cur);
+    });
+    return out;
   }
   // ---- visible selection box: skew edges + move fill (2026-07) ----
   // Feedback history on this ONE feature: a hidden Alt+drag gesture wasn't
@@ -12550,8 +12577,28 @@
     if (!_motionMarquee) return;
     var moved = _motionMarquee.moved;
     var downLayer = _motionMarquee.layer;
+    var sweptLayers = _motionMarquee.layers || [];
     _motionMarquee.rectEl.remove();
     _motionMarquee = null;
+    // #769 — a real drag mirrors the swept rows into the LAYER selection so
+    // the left panel lights up with the grid. Committed here rather than in
+    // applyMarqueeSelection because that one runs on every mousemove, and
+    // renderLayerList/renderTimeline rebuild the very rows the drag is
+    // measuring against.
+    if (moved && sweptLayers.length) {
+      var same = sweptLayers.length === _layerSel.length && sweptLayers.every(function (li) { return _layerSel.indexOf(li) >= 0; });
+      if (!same) {
+        // setActiveLayer FIRST, then the multi-selection: found live —
+        // setActiveLayer collapses _layerSel to the single layer it makes
+        // active, so setting the list before it silently left [first] behind.
+        if (window.SM && SM.setActiveLayer) SM.setActiveLayer(sweptLayers[0]);
+        _layerSel = sweptLayers.slice();
+        _layerSelAnchor = sweptLayers[0];
+        syncBarSelToLayerSel();
+        renderLayerList(); renderTimeline();
+        if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+      }
+    }
     // A plain click that landed ON a layer's own grid row SELECTS that layer
     // rather than clearing — the grid half of a row is still that row.
     if (!moved && downLayer != null) { selectLayerFromGrid(downLayer); return; }
