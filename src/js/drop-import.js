@@ -26,10 +26,15 @@
     var files = Array.prototype.slice.call(e.dataTransfer.files || []);
     if (!files.length) return;
     var audioFiles = files.filter(function (f) { return f.type.indexOf('audio/') === 0; });
-    var imageFiles = files.filter(function (f) { return f.type.indexOf('image/') === 0; });
+    // SVG is an image MIME but not a picture (2026-09, feedback #749: "drag
+    // and drop un svg l'importe en tant qu'image pas vecteur") — peeled off
+    // BEFORE the image pile so it reaches the vector importer instead of
+    // being rasterised.
+    var svgFiles = files.filter(function (f) { return window.SMSvgImport && SMSvgImport.isSvgFile(f); });
+    var imageFiles = files.filter(function (f) { return f.type.indexOf('image/') === 0 && svgFiles.indexOf(f) === -1; });
     var videoFiles = files.filter(function (f) { return f.type.indexOf('video/') === 0; });
     var otherFiles = files.filter(function (f) {
-      return f.type.indexOf('audio/') !== 0 && f.type.indexOf('image/') !== 0 && f.type.indexOf('video/') !== 0;
+      return f.type.indexOf('audio/') !== 0 && f.type.indexOf('image/') !== 0 && f.type.indexOf('video/') !== 0 && svgFiles.indexOf(f) === -1;
     });
     if (audioFiles.length && window.SMAudio) audioFiles.forEach(function (f) { window.SMAudio.importFile(f); });
     // Image/video dropped on canvas or timeline become real layers — same
@@ -38,16 +43,18 @@
     // to (2026-08 fix, feedback: "quand on drag and drop une image ou vidéo
     // dans le canvas celui ci doit devenir un élément layer comme quand on
     // importé via média").
+    if (svgFiles.length && window.SMSvgImport) SMSvgImport.importFiles(svgFiles);
     if (imageFiles.length && window.SM && window.SM.importImageFiles) window.SM.importImageFiles(imageFiles);
     if (videoFiles.length && window.SM && window.SM.importVideoFile) videoFiles.forEach(function (f) { window.SM.importVideoFile(f); });
     // Anything left (neither audio, image, nor video — e.g. a PDF) still
     // falls back to the roto reference importer, which reports its own
     // "format not recognized" error for genuinely unsupported files.
     if (otherFiles.length && window.SMReference) window.SMReference.importFiles(otherFiles);
-    if (!audioFiles.length && !imageFiles.length && !videoFiles.length && !otherFiles.length) return;
+    if (!audioFiles.length && !imageFiles.length && !videoFiles.length && !otherFiles.length && !svgFiles.length) return;
     var parts = [];
     if (audioFiles.length) parts.push(audioFiles.length + ' piste(s) audio');
     if (imageFiles.length) parts.push(imageFiles.length + ' image(s)');
+    if (svgFiles.length) parts.push(svgFiles.length + ' SVG (vecteurs)');
     if (videoFiles.length) parts.push(videoFiles.length + ' vidéo(s)');
     if (otherFiles.length) parts.push('référence');
     if (window.showToast) showToast('Import : ' + parts.join(' + '));

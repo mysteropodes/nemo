@@ -131,13 +131,13 @@
     opts = opts || {};
     var root;
     try { root = project.importSVG(svgText, { insert: false, expandShapes: true }); }
-    catch (e) { if (typeof showToast === 'function') showToast('SVG invalide : ' + e.message); return 0; }
-    if (!root) { if (typeof showToast === 'function') showToast('SVG invalide ou vide'); return 0; }
+    catch (e) { if (typeof showToast === 'function') showToast(SM.t('toastSvgImportFailed')); return 0; }
+    if (!root) { if (typeof showToast === 'function') showToast(SM.t('toastSvgImportFailed')); return 0; }
 
     var leaves = [], skipped = [];
     collectLeaves(root, leaves, skipped);
     if (!leaves.length) {
-      if (typeof showToast === 'function') showToast('Aucune forme vectorielle importable dans ce SVG');
+      if (typeof showToast === 'function') showToast(SM.t('toastSvgImportEmpty'));
       root.remove();
       return 0;
     }
@@ -189,8 +189,8 @@
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
 
-    var msg = inserted.length + ' forme(s) importée(s) du SVG';
-    if (skipped.length) msg += ' (' + skipped.length + ' élément(s) non-vectoriel(s) ignoré(s) : ' + skipped.join(', ') + ')';
+    var msg = SM.t('toastSvgImported').replace('{n}', inserted.length);
+    if (skipped.length) msg += ' — ' + SM.t('toastSvgSkipped').replace('{n}', skipped.length) + ' (' + skipped.join(', ') + ')';
     if (typeof showToast === 'function') showToast(msg);
     return inserted.length;
   };
@@ -229,7 +229,52 @@
 
   // Public entry point. The SMLabs.* names above are kept as aliases so any
   // script or plugin written against the prototype keeps working.
-  window.SMSvgImport = { openFile: importSVGFile, importString: importSVGString };
+  // ---- Ways IN (2026-09, feedback #749: "drag and drop un svg l'importe
+  // en tant qu'image pas vecteur. Y a-t-il moyen aussi de copier depuis
+  // Figma ou Illustrator et coller dans Nemo les éléments vecteurs ?") ----
+  // The parser above already produced editable geometry; it just had one
+  // door (the Importer… button). An .svg dropped on the canvas went to
+  // images.js's raster importer instead, because .svg IS an image MIME —
+  // technically right, useless in practice. These two entry points route
+  // the same file/markup to importSVGString instead.
+  function isSvgFile(f) { return !!f && (f.type === 'image/svg+xml' || /\.svg$/i.test(f.name || '')); }
+  function importFiles(files) {
+    (files || []).filter(isSvgFile).forEach(function (f) {
+      var r = new FileReader();
+      r.onload = function () { importSVGString(String(r.result || '')); };
+      r.readAsText(f);
+    });
+  }
+  function looksLikeSvg(t) { return typeof t === 'string' && /<svg[\s>]/i.test(t); }
+  // Figma's and Illustrator's "Copy as SVG" both put the markup on the
+  // clipboard as plain text (Figma also as an text/html fragment). Reading
+  // it from the paste EVENT needs no clipboard permission, unlike
+  // navigator.clipboard.readText — which is refused outright in the browser
+  // build (confirmed live: NotAllowedError), and is why timeline.js's Cmd+V
+  // branch deliberately lets the default through when Nemo's own clipboard
+  // is empty, so this listener gets a chance to see the data.
+  function onPaste(e) {
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    var cd = e.clipboardData; if (!cd) return;
+    var items = Array.prototype.slice.call(cd.items || []);
+    var svgItem = items.filter(function (i) { return i.type === 'image/svg+xml' && i.kind === 'file'; })[0];
+    var file = svgItem ? svgItem.getAsFile() : null;
+    var txt = file ? null : (cd.getData('text/plain') || '');
+    if (!file && !looksLikeSvg(txt)) txt = cd.getData('text/html') || '';
+    if (!file && !looksLikeSvg(txt)) return;
+    e.preventDefault();
+    // Cmd+V armed a "paste frames" fallback before letting the default
+    // through (timeline.js); real SVG arrived, so cancel it.
+    if (window._svgPasteFallback) { clearTimeout(window._svgPasteFallback); window._svgPasteFallback = null; }
+    if (file) importFiles([file]);
+    else {
+      var m = txt.match(/<svg[\s\S]*?<\/svg\s*>/i);
+      importSVGString(m ? m[0] : txt);
+    }
+  }
+  document.addEventListener('paste', onPaste);
+  window.SMSvgImport = { openFile: importSVGFile, importString: importSVGString, importFiles: importFiles, isSvgFile: isSvgFile };
   // Aliases for anything written against the prototype (a user script, a
   // plugin) — set only if Labs is present, so this module no longer depends
   // on it to load.
