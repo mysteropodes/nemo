@@ -3593,6 +3593,19 @@ function splitTweenables(strokes,manualMode){
     // (generateTweens' emit loop) instead of participating in
     // autoMatch/interpStroke at all — dabs above are re-stamped fresh each
     // frame instead, a different mechanism for a different reason.
+    // An imported image/video frame (isRaster) has no `segments` at all —
+    // it goes through desR, not desP (see this file's own onion-skin
+    // branches). Letting one into `list` fed strokeFeat -> buildTPFeat a
+    // dict whose segments is undefined, and the resulting
+    // "Cannot read properties of undefined (reading 'forEach')" was thrown
+    // from renderArcs INSIDE the select tool's pointerdown/pointerup
+    // handlers — so clicking a footage layer's image on the canvas aborted
+    // the rest of the gesture (2026-09, feedback #778: "pblm de selection
+    // des footage dans le canvas"). Held, not dropped: a raster is exactly
+    // the kind of content the held path already exists for — copied
+    // unchanged into every generated inbetween instead of being morphed,
+    // which is also the only sensible reading of "tween an image".
+    if(sd.isRaster){held.push(sd);return;}
     if(manualMode&&!sd.tweenOn){held.push(sd);return;}
     list.push(sd);orig.push(i);
   });
