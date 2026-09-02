@@ -6589,20 +6589,106 @@ function elementMotionBakedClone(li,p,frameIdx){
 // several operands (measured: a union of two brush RINGS returns 3 islands
 // — outer boundary plus two hole boundaries — so the parent combined 3
 // unrelated pieces instead of one shape).
-function computeGroupCombineRaw(paths,mode,layer,frameIdx){
+function computeGroupCombineRaw(paths,mode,layer,frameIdx,skipMemo){
   if(paths.length<2)return null;
+  // Nested combines land here directly (a child's result handed up to its
+  // parent) — same memo, same key shape. skipMemo is set by
+  // computeGroupCombine, which memoises the flattened result instead and
+  // would otherwise store the same work twice.
+  var _sig=null;
+  if(!skipMemo){
+    _sig='R'+_combineSig(paths,mode,layer,frameIdx);
+    var _hit=_combineMemoGet(_sig);
+    if(_hit&&_hit.length)return _hit[0];
+  }
   var li=window.userLayers?userLayers.indexOf(layer):-1;
   var motionAware=li>=0?paths.map(function(p){return elementMotionBakedClone(li,p,frameIdx);}):paths;
   var folded=foldBooleanOp(mode,motionAware,layer);
   var disposable=[];
   if(motionAware!==paths)motionAware.forEach(function(m,idx){if(m!==paths[idx])disposable.push(m);});
   disposable.forEach(function(c){if(!c.removed)c.remove();});
+  if(_sig&&folded.result)_combineMemoPut(_sig,[folded.result]);
   return folded.result;
+}
+// Memoised combine (2026-09, feedback #827 "j'ai l'impression d'un lag
+// dans le canvas avec mode de fusion dans éléments quand groupe fusionné,
+// testé avec 3 brush stroke/fill"). Measured on 3 members of ~220 segments:
+// building the scene took 0.4 ms without the group and 14.6 ms with it
+// (peak 32 ms) — and this runs on EVERY rendered frame, so a single
+// combine group ate a third of a 24 fps budget while nothing about it had
+// changed. The booleans themselves are already as cheap as Paper makes
+// them; what was missing is "don't redo an identical one".
+//
+// The key is a full checksum of everything the boolean actually reads —
+// each operand's segment coordinates, its closed/visible state, the
+// linked-fill companion foldBooleanOp merges in, and the element-motion
+// transform baked in per frame — so any real edit (drag, node edit, motion
+// key, eye toggle) misses the cache immediately, while a static combine
+// hits it on every frame INCLUDING across a scrub (frameIdx is deliberately
+// not part of the key: only the motion values it produces are, so a group
+// that doesn't move reuses one result for the whole timeline).
+var _combineMemo=Object.create(null),_combineMemoKeys=[];
+var COMBINE_MEMO_MAX=48;
+function _combinePathChk(p){
+  if(!p||p.removed)return 'x';
+  var segs=p.segments||[],h=(segs.length*2654435761)>>>0;
+  for(var i=0;i<segs.length;i++){
+    var pt=segs[i].point,hi=segs[i].handleIn,ho=segs[i].handleOut;
+    h=(Math.imul(h,31)+((pt.x*1000)|0))>>>0;
+    h=(Math.imul(h,31)+((pt.y*1000)|0))>>>0;
+    if(hi)h=(Math.imul(h,31)+((hi.x*100)|0)+((hi.y*100)|0))>>>0;
+    if(ho)h=(Math.imul(h,31)+((ho.x*100)|0)+((ho.y*100)|0))>>>0;
+  }
+  return h.toString(36)+(p.closed?'c':'o')+(p.visible===false?'h':'')+(p.strokeWidth||0);
+}
+function _combineSig(paths,mode,layer,frameIdx){
+  var li=window.userLayers?userLayers.indexOf(layer):-1;
+  var out=[mode,li];
+  for(var i=0;i<paths.length;i++){
+    var p=paths[i];
+    var part=(p&&p.data&&p.data.strokeId||('#'+i))+':'+_combinePathChk(p);
+    // The companion carries half of a vector-brush shape's geometry into
+    // the boolean (see foldBooleanOp) — an edit that only moves the fill
+    // backdrop has to miss the cache too.
+    if(p&&layer&&typeof findLinkedFillCompanion==='function'){
+      var comp=findLinkedFillCompanion(layer,p);
+      if(comp)part+='+'+_combinePathChk(comp);
+    }
+    if(li>=0&&window.SMMotion&&p&&p.data&&p.data.strokeId){
+      var m=SMMotion.elementMotionAt(li,p.data.strokeId,frameIdx==null?state.currentFrame:frameIdx,p.data);
+      if(m)part+='@'+[m.dx,m.dy,m.rot,m.sx,m.sy,m.ax,m.ay].map(function(v){return Math.round((v||0)*100)/100;}).join(',');
+    }
+    out.push(part);
+  }
+  return out.join('|');
+}
+function _combineMemoGet(sig){
+  var hit=_combineMemo[sig];
+  if(!hit)return null;
+  // Handed out as clones: callers restyle, transform and remove() what
+  // they get back, and a cached instance must survive all of that.
+  for(var i=0;i<hit.length;i++)if(hit[i].removed)return null;
+  return hit.map(function(p){return p.clone({insert:false});});
+}
+function _combineMemoPut(sig,paths){
+  if(!paths)return paths;
+  _combineMemo[sig]=paths.map(function(p){return p.clone({insert:false});});
+  _combineMemoKeys.push(sig);
+  while(_combineMemoKeys.length>COMBINE_MEMO_MAX){
+    var old=_combineMemoKeys.shift();
+    if(old!==sig)delete _combineMemo[old];
+  }
+  return paths;
 }
 function computeGroupCombine(paths,mode,layer,frameIdx){
   if(paths.length<2)return paths.slice();
-  var res=computeGroupCombineRaw(paths,mode,layer,frameIdx);
-  return flattenBooleanResult(res);
+  var sig='F'+_combineSig(paths,mode,layer,frameIdx);
+  var cached=_combineMemoGet(sig);
+  if(cached)return cached;
+  var res=computeGroupCombineRaw(paths,mode,layer,frameIdx,true);
+  var islands=flattenBooleanResult(res);
+  _combineMemoPut(sig,islands);
+  return islands;
 }
 
 // ---- DYNAMIC SHAPES, phase 1 (2026-08-18) — Rectangle, independent
