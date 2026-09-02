@@ -321,7 +321,9 @@
       // two differ) or on any top-level row (a plain shape, or a group's
       // own header) — see performMemberReorder's 2026-09 fix.
       ? el && el.closest('#shapes-list .lrow[data-groupmember], #shapes-list .lrow[data-toplevel]')
-      : el && el.closest('#shapes-list .lrow[data-toplevel]');
+      // A group row is a valid target at ANY depth now (2026-09, #738) —
+      // dropping INTO it is how a shape or a whole group gets nested.
+      : el && el.closest('#shapes-list .lrow[data-toplevel], #shapes-list .lrow[data-gid]');
     if (row) {
       // Feedback #735 ("très difficile d'organiser") — a drop used to mean
       // only "in front of the target", with no way to land BEHIND the
@@ -330,6 +332,15 @@
       // lower half = behind it (line on its bottom edge). A paint swap has
       // no before/after — it's a swap.
       var rr = row.getBoundingClientRect();
+      // Third zone (2026-09, #738 — "drag between levels"): the MIDDLE band
+      // of a group row means "into this group", the top/bottom quarters
+      // keep their before/after meaning. Only for a whole shape or group
+      // being dragged — a member drag already has its own move-between-
+      // groups path, and a paint sub-row has no group to enter.
+      var canInto = !!row.dataset.gid && (_elDrag.kind === 'shape' || _elDrag.kind === 'group') && row.dataset.gid !== _elDrag.id;
+      var rel = (e.clientY - rr.top) / Math.max(1, rr.height);
+      _elDrag.dropInto = canInto && rel > 0.25 && rel < 0.75;
+      if (_elDrag.dropInto) { row.classList.add('drag-into'); return; }
       _elDrag.dropAfter = _elDrag.kind !== 'paint' && e.clientY > rr.top + rr.height / 2;
       row.classList.add(_elDrag.dropAfter ? 'drag-over-after' : 'drag-over');
     }
@@ -339,12 +350,12 @@
     if (_elDrag.moved) {
       window._elDragJustEnded = true;
       var list = document.getElementById('shapes-list');
-      var overRow = list && list.querySelector('.lrow.drag-over, .lrow.drag-over-after');
+      var overRow = list && list.querySelector('.lrow.drag-over, .lrow.drag-over-after, .lrow.drag-into');
       if (overRow) performReorder(overRow);
     }
     stopDragGhost();
     var list2 = document.getElementById('shapes-list');
-    if (list2) Array.prototype.forEach.call(list2.querySelectorAll('.lrow'), function (r) { r.classList.remove('dragging', 'drag-over', 'drag-over-after'); });
+    if (list2) Array.prototype.forEach.call(list2.querySelectorAll('.lrow'), function (r) { r.classList.remove('dragging', 'drag-over', 'drag-over-after', 'drag-into'); });
     _elDrag.active = false; _elDrag.moved = false;
   });
   // Fill<->Stroke swap (2026-08, "pourquoi il est pas possible de select
@@ -484,8 +495,62 @@
     if (window.renderArcs) renderArcs();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
+  // "Drag between levels" (2026-09, #738): moves the dragged shape or
+  // group INTO the group whose row it was dropped on. Data-only — the
+  // z-order move right after keeps the canvas stack matching what the
+  // panel now shows.
+  function performDropInto(destGid) {
+    var c = currentLayer(); if (!c.ld || !c.ld.groups || !c.ld.groups[destGid]) return;
+    var ld = c.ld, layer = window.userLayers ? userLayers[c.li] : null;
+    if (!layer) return;
+    function isAncestorOf(a, b) { // is `a` an ancestor of `b`?
+      var cur = b, guard = 0;
+      while (cur && guard++ < 32) { var m = ld.groups[cur]; if (!m || !m.parent) return false; if (m.parent === a) return true; cur = m.parent; }
+      return false;
+    }
+    pushUndo();
+    var srcItems = [];
+    if (_elDrag.kind === 'group') {
+      var gid = _elDrag.id;
+      if (gid === destGid || isAncestorOf(gid, destGid)) return; // a group can't go inside itself
+      var oldParent = ld.groups[gid].parent;
+      if (oldParent && ld.groups[oldParent]) ld.groups[oldParent].order = (ld.groups[oldParent].order || []).filter(function (e) { return e !== gid; });
+      ld.groups[gid].parent = destGid;
+      ld.groups[destGid].order.push(gid);
+      if (oldParent && ld.groups[oldParent] && (ld.groups[oldParent].order || []).length < 2 && window.SMGroup) SMGroup.dissolveGroup(oldParent, ld, layer);
+      srcItems = window.SMGroup ? SMGroup.resolveGroupMembers(gid, ld, layer) : [];
+    } else {
+      var sid = _elDrag.id;
+      var it = window.SMMotion.liveItemByStrokeId(c.li, sid);
+      if (!it) return;
+      Object.keys(ld.groups).forEach(function (g) {
+        var o = ld.groups[g].order || []; var ix = o.indexOf(sid);
+        if (ix !== -1) o.splice(ix, 1);
+      });
+      ld.groups[destGid].order.push(sid);
+      it.data = it.data || {};
+      it.data.groupId = destGid;
+      srcItems = [it];
+    }
+    // Land just in front of the destination group's front-most member so
+    // the canvas stack agrees with the panel's new row order.
+    var destIds = window.SMGroup ? SMGroup.collectGroupStrokeIds(destGid, ld) : [];
+    var destItems = destIds.map(function (id) { return window.SMMotion.liveItemByStrokeId(c.li, id); }).filter(Boolean)
+      .filter(function (x) { return srcItems.indexOf(x) === -1; });
+    if (destItems.length && srcItems.length) {
+      destItems.sort(function (a, b) { return a.index - b.index; });
+      _placeItems(srcItems, destItems[destItems.length - 1], false);
+    }
+    expandedGroups[destGid] = true;
+    saveActiveLayerFrame();
+    renderShapesPanel();
+    if (window.renderArcs) renderArcs();
+    if (window.updateUI) updateUI();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
   function performReorder(overRow) {
     if (_elDrag.kind === 'paint') { performPaintSwap(overRow); return; }
+    if (_elDrag.dropInto && overRow.dataset.gid) { performDropInto(overRow.dataset.gid); return; }
     if (_elDrag.kind === 'member') { performMemberReorder(overRow); return; }
     var c = currentLayer(); if (!c.ld) return;
     var destGid = overRow.dataset.gid, destStrokeId = overRow.dataset.strokeid;
@@ -701,20 +766,26 @@
       return;
     }
     var shapeIdx = 0;
-    tree.forEach(function (node) {
+    // Recursive (2026-09, #738 — nested groups): a group's children may
+    // themselves be groups, so the top level and every level below share
+    // ONE renderer. `indent` is the pixel offset buildShapeRow already
+    // took; `parentGid` is null at the top level and the enclosing group
+    // below it (used for the member-drag wiring, exactly as before).
+    function renderNode(node, indent, parentGid) {
       if (node.type === 'group') {
         // Recompute this group's own member strokeIds from the flat list
         // (layerElements), not the already-collapsed tree — same reason
         // motion.js's own renderElementsList does this (click-select,
         // rename and now expand-render all need the full membership, not
         // just "a group exists here").
-        var memberEntries = window.SMMotion.layerElements(c.li, c.ld).filter(function (e) { return e.sd.groupId === node.gid; });
-        var memberIds = memberEntries.map(function (e) { return e.strokeId; });
+        var memberIds = node.memberIds || window.SMMotion.layerElements(c.li, c.ld).filter(function (e) { return e.sd.groupId === node.gid; }).map(function (e) { return e.strokeId; });
         var expanded = !!expandedGroups[node.gid];
         var anySelected = memberIds.some(function (sid) { return isStrokeSelected(c.li, sid); });
 
         var grow = document.createElement('div'); grow.className = 'lrow motion-elem-row motion-elem-group';
-        grow.dataset.toplevel = '1'; grow.dataset.gid = node.gid;
+        if (indent) grow.style.paddingLeft = (24 + indent) + 'px';
+        if (!parentGid) grow.dataset.toplevel = '1';
+        grow.dataset.gid = node.gid;
         if (anySelected) grow.classList.add('act');
         var arrow = document.createElement('span'); arrow.className = 'lico larrow'; arrow.textContent = expanded ? '▾' : '▸';
         arrow.addEventListener('click', function (e) {
@@ -749,7 +820,7 @@
           if (window._elDragJustEnded) { window._elDragJustEnded = false; return; }
           applySelection(c.li, memberIds, e.shiftKey || e.altKey);
         });
-        grow.addEventListener('mousedown', function (e) { armDrag(e, 'group', node.gid); });
+        if (!parentGid) grow.addEventListener('mousedown', function (e) { armDrag(e, 'group', node.gid); });
         grow.addEventListener('dblclick', function (e) { e.stopPropagation(); startRename(grow, node.name, commitGroupRename); });
         grow.addEventListener('contextmenu', function (e) {
           e.preventDefault(); e.stopPropagation();
@@ -781,11 +852,13 @@
             { sep: true },
             { label: SM.t('elementsUngroup'), action: function () {
               pushUndo();
-              memberIds.forEach(function (sid) {
-                var it = window.SMMotion.liveItemByStrokeId(c.li, sid);
-                if (it && it.data) delete it.data.groupId;
-              });
-              if (c.ld.groups) delete c.ld.groups[node.gid];
+              // One level only (2026-09, #738): SMGroup.dissolveGroup
+              // promotes this group's child GROUPS to its own place instead
+              // of erasing the whole subtree — untagging every leaf, as this
+              // did before, would have destroyed the nesting below it.
+              var layer = window.userLayers ? userLayers[c.li] : null;
+              if (window.SMGroup && SMGroup.dissolveGroup) SMGroup.dissolveGroup(node.gid, c.ld, layer);
+              else { memberIds.forEach(function (sid) { var it = window.SMMotion.liveItemByStrokeId(c.li, sid); if (it && it.data) delete it.data.groupId; }); if (c.ld.groups) delete c.ld.groups[node.gid]; }
               delete expandedGroups[node.gid];
               saveActiveLayerFrame(); renderShapesPanel();
               if (window.SMEngineBridge) SMEngineBridge.renderNow();
@@ -794,18 +867,24 @@
         });
         list.appendChild(grow);
         if (expanded) {
-          // Front-most member first, same reading direction as the tree
-          // itself (buildShapeTree, feedback #735).
-          memberEntries.slice().reverse().forEach(function (me) {
-            var mIdx = tree.labelIdx && tree.labelIdx[me.strokeId] !== undefined ? tree.labelIdx[me.strokeId] : shapeIdx++;
-            buildShapeRow(list, c, { strokeId: me.strokeId, sd: me.sd }, mIdx, 20, false, node.gid);
-          });
+          // Children come from the tree itself now (front-first already,
+          // see groupNode in motion.js) instead of being re-derived from
+          // the flat groupId tag, which could only ever see DIRECT members.
+          var kids = node.children || [];
+          if (!kids.length) {
+            kids = memberIds.map(function (sid) {
+              var e = window.SMMotion.layerElements(c.li, c.ld).filter(function (x) { return x.strokeId === sid; })[0];
+              return e ? { type: 'shape', strokeId: e.strokeId, sd: e.sd } : null;
+            }).filter(Boolean).reverse();
+          }
+          kids.forEach(function (kid) { renderNode(kid, indent + 20, node.gid); });
         }
       } else {
         var sIdx = tree.labelIdx && tree.labelIdx[node.strokeId] !== undefined ? tree.labelIdx[node.strokeId] : shapeIdx++;
-        buildShapeRow(list, c, node, sIdx, 0, true);
+        buildShapeRow(list, c, node, sIdx, indent, !parentGid, parentGid || undefined);
       }
-    });
+    }
+    tree.forEach(function (node) { renderNode(node, 0, null); });
   }
   window.renderShapesPanel = renderShapesPanel;
 })();

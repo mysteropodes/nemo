@@ -6504,16 +6504,27 @@ function elementMotionBakedClone(li,p,frameIdx){
 // hard-won correctness work (vector-brush companion pre-union, hole-merging,
 // degenerate-loop cleanup) the destructive tool already has, with zero
 // duplicated boolean-op logic (CLAUDE.md §3: don't duplicate a matcher/loop).
-function computeGroupCombine(paths,mode,layer,frameIdx){
-  if(paths.length<2)return paths.slice();
+// The un-flattened result: ONE Path/CompoundPath, holes included. Needed by
+// nested combine groups (2026-09, #738) — a child group must reach its
+// parent as a SINGLE operand, and flattenBooleanResult below deliberately
+// splits a result into separate island Paths, which would hand the parent
+// several operands (measured: a union of two brush RINGS returns 3 islands
+// — outer boundary plus two hole boundaries — so the parent combined 3
+// unrelated pieces instead of one shape).
+function computeGroupCombineRaw(paths,mode,layer,frameIdx){
+  if(paths.length<2)return null;
   var li=window.userLayers?userLayers.indexOf(layer):-1;
   var motionAware=li>=0?paths.map(function(p){return elementMotionBakedClone(li,p,frameIdx);}):paths;
   var folded=foldBooleanOp(mode,motionAware,layer);
   var disposable=[];
   if(motionAware!==paths)motionAware.forEach(function(m,idx){if(m!==paths[idx])disposable.push(m);});
-  var out=flattenBooleanResult(folded.result);
   disposable.forEach(function(c){if(!c.removed)c.remove();});
-  return out;
+  return folded.result;
+}
+function computeGroupCombine(paths,mode,layer,frameIdx){
+  if(paths.length<2)return paths.slice();
+  var res=computeGroupCombineRaw(paths,mode,layer,frameIdx);
+  return flattenBooleanResult(res);
 }
 
 // ---- DYNAMIC SHAPES, phase 1 (2026-08-18) — Rectangle, independent

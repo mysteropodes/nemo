@@ -24,29 +24,123 @@
 // below, and from there the EXISTING shared-transform-box code just works
 // unmodified on whatever `selectedPaths` now contains.
 (function () {
+  // ---- NESTING (2026-09, issue #738 — Cyril: "si on a un groupe avec
+  // merge qui est dans un sous groupe alors celui-ci est considéré comme
+  // un seul élément pour le merge du groupe parent") ----
+  // The DATA model already allowed it: a group's `order` may hold child
+  // GIDs as well as leaf strokeIds, and collectGroupStrokeIds/
+  // resolveGroupMembers below have always recursed through them. What was
+  // missing was (a) any UI that creates the nesting, (b) the upward link
+  // needed to answer "which group is the outermost one for this stroke",
+  // and (c) a combine that treats a combined CHILD as one operand.
+  // The upward link is `parent` on the CHILD's own ld.groups entry — the
+  // per-stroke `data.groupId` tag keeps meaning the stroke's INNERMOST
+  // group, so every existing consumer of that tag is untouched.
+  function groupMeta(gid, ld) { return (ld && ld.groups && ld.groups[gid]) || null; }
+  function parentGroupOf(gid, ld) { var g = groupMeta(gid, ld); return (g && g.parent && groupMeta(g.parent, ld)) ? g.parent : null; }
+  // Outermost ancestor of `gid` (itself when it has no parent). Depth-capped
+  // like resolveGroupMembers, so a corrupt parent cycle can never hang.
+  function rootGroupOf(gid, ld) {
+    var cur = gid, seen = {};
+    for (var i = 0; i < 32 && cur; i++) {
+      if (seen[cur]) { console.warn('[SMGroup] cyclic group parent, stopping at', cur); return cur; }
+      seen[cur] = true;
+      var up = parentGroupOf(cur, ld);
+      if (!up) return cur;
+      cur = up;
+    }
+    return cur;
+  }
+  function rootGroupOfItem(p, ld) {
+    var gid = p && p.data && p.data.groupId;
+    return gid && groupMeta(gid, ld) ? rootGroupOf(gid, ld) : (gid || null);
+  }
+  // Detaches one leaf strokeId from whatever group entry currently lists
+  // it, dissolving that group if it drops below 2 entries — the shared
+  // core of removeMemberFromGroup and of re-grouping a shape that already
+  // belonged somewhere else.
+  function detachLeaf(sid, ld, layer) {
+    if (!sid || !ld || !ld.groups) return;
+    Object.keys(ld.groups).forEach(function (gid) {
+      var grp = ld.groups[gid]; if (!grp || !grp.order) return;
+      var ix = grp.order.indexOf(sid); if (ix === -1) return;
+      grp.order.splice(ix, 1);
+      if (grp.order.length < 2) dissolveGroup(gid, ld, layer);
+    });
+  }
+  // Dissolves ONE level: leaf members lose their tag, child groups are
+  // promoted to wherever this group sat (its own parent, or top level).
+  function dissolveGroup(gid, ld, layer) {
+    var grp = groupMeta(gid, ld); if (!grp) return;
+    var up = grp.parent && groupMeta(grp.parent, ld) ? grp.parent : null;
+    (grp.order || []).forEach(function (entry) {
+      if (groupMeta(entry, ld)) {
+        if (up) ld.groups[entry].parent = up; else delete ld.groups[entry].parent;
+      } else {
+        var item = findByStrokeId(layer, entry);
+        if (item && item.data) { if (up) item.data.groupId = up; else delete item.data.groupId; }
+      }
+    });
+    if (up) {
+      var pOrder = ld.groups[up].order || [];
+      var ix = pOrder.indexOf(gid);
+      if (ix !== -1) pOrder.splice.apply(pOrder, [ix, 1].concat(grp.order || []));
+    }
+    delete ld.groups[gid];
+  }
   function groupSelection() {
     if ((state.tool !== 'select' && state.tool !== 'subselect') || !window.selectedPaths || selectedPaths.length < 2) {
       if (window.showToast) showToast(SM.t('toastSelectAtLeast2ElementsToGroup'));
       return;
     }
+    var li = state.activeLayerIdx, ld = state.layers[li], layer = window.userLayers ? userLayers[li] : null;
+    if (!ld) return;
+    ensureLayerGroups(ld);
+    // UNITS, not shapes (2026-09, #738): a selection that contains every
+    // member of an existing group nests that WHOLE group as one entry
+    // instead of dissolving it into loose members — which is what made
+    // "group a group with a shape" flatten before. A group only PARTLY
+    // selected still contributes its selected shapes as loose leaves
+    // (they leave their old group on the way, which is what the old code
+    // did implicitly, minus the dangling `order` entries it left behind).
+    var ordered = selectedPaths.slice();
+    if (layer) ordered.sort(function (a, b) { return layer.children.indexOf(a) - layer.children.indexOf(b); });
+    var selSet = ordered;
+    var units = [], seenGid = {};
+    ordered.forEach(function (p) {
+      var root = rootGroupOfItem(p, ld);
+      if (root && groupMeta(root, ld)) {
+        if (seenGid[root]) return;
+        var leaves = resolveGroupMembers(root, ld, layer);
+        var whole = leaves.length > 0 && leaves.every(function (m) { return selSet.indexOf(m) !== -1; });
+        if (whole) { seenGid[root] = true; units.push({ kind: 'group', gid: root }); return; }
+      }
+      units.push({ kind: 'leaf', p: p });
+    });
+    if (units.length < 2) {
+      // Everything selected already belongs to one and the same group —
+      // grouping it again would just wrap a single unit, which is a no-op
+      // the user would read as "Cmd+G does nothing".
+      if (window.showToast) showToast(SM.t('toastSelectAtLeast2ElementsToGroup'));
+      return;
+    }
     pushUndo();
     var gid = 'grp_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6);
-    var li = state.activeLayerIdx, ld = state.layers[li];
-    selectedPaths.forEach(function (p) { if (!p.data) p.data = {}; p.data.groupId = gid; ensureStrokeId(p); });
-    // Named from the moment it's created (2026-07-31, group/shape tree
-    // panel — Cyril: "vrai panel de gestion de group") — a plain Cmd+G
-    // group used to have NO ld.groups entry at all, only the members'
-    // data.groupId tag; a combine-group (below) had metadata but no name.
-    // Unified here so both kinds of group show up named in the tree panel
-    // from day one, not just after an explicit rename.
-    if (ld) {
-      ensureLayerGroups(ld);
-      // 2026-08 fix: hardcoded French default name, shown regardless of locale.
-      ld.groups[gid] = { name: SM.t('autoNameGroup'), combineMode: 'none', order: selectedPaths.map(function (p) { return p.data.strokeId; }) };
-    }
+    var order = [];
+    units.forEach(function (u) {
+      if (u.kind === 'group') { ld.groups[u.gid].parent = gid; order.push(u.gid); return; }
+      var p = u.p;
+      if (!p.data) p.data = {};
+      var sid = ensureStrokeId(p);
+      detachLeaf(sid, ld, layer);
+      p.data.groupId = gid;
+      order.push(sid);
+    });
+    // 2026-08 fix: hardcoded French default name, shown regardless of locale.
+    ld.groups[gid] = { name: SM.t('autoNameGroup'), combineMode: 'none', order: order };
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-    if (window.showToast) showToast(SM.t('toastGroupCreatedSuffix') + selectedPaths.length + SM.t('toastElementsCloseParen'));
+    if (window.showToast) showToast(SM.t('toastGroupCreatedSuffix') + units.length + SM.t('toastElementsCloseParen'));
   }
   function ungroupSelection() {
     // Both refusals were silent while groupSelection's own ("Sélectionnez au
@@ -62,7 +156,16 @@
       return;
     }
     pushUndo();
-    selectedPaths.forEach(function (p) { if (p.data) delete p.data.groupId; });
+    // One LEVEL at a time (2026-09, #738): dissolve the outermost group of
+    // each selected shape, which promotes its child groups instead of
+    // erasing the whole nested structure in one keystroke — Cmd+Shift+G
+    // pressed again then peels the next level, matching Illustrator/Figma.
+    var uli = state.activeLayerIdx, uld = state.layers[uli], ulayer = window.userLayers ? userLayers[uli] : null;
+    var roots = {};
+    selectedPaths.forEach(function (p) { var r = rootGroupOfItem(p, uld); if (r && groupMeta(r, uld)) roots[r] = true; });
+    var rootKeys = Object.keys(roots);
+    if (rootKeys.length) rootKeys.forEach(function (r) { dissolveGroup(r, uld, ulayer); });
+    else selectedPaths.forEach(function (p) { if (p.data) delete p.data.groupId; });
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     if (window.showToast) showToast(SM.t('toastGroupUngrouped'));
@@ -73,6 +176,18 @@
   function membersOf(p, layer) {
     var gid = p.data && p.data.groupId;
     if (!gid || !layer) return [p];
+    // Nested groups (2026-09, #738): clicking any shape selects its
+    // OUTERMOST group, the same "click selects the top-level group, you
+    // step inside from the tree" convention Figma/Illustrator use — with
+    // the flat model these two were always the same thing, so this is the
+    // one behavioural change nesting brings to canvas selection.
+    var li = window.userLayers ? userLayers.indexOf(layer) : -1;
+    var ld = li >= 0 ? state.layers[li] : null;
+    var root = ld ? rootGroupOfItem(p, ld) : gid;
+    if (ld && root && groupMeta(root, ld)) {
+      var leaves = resolveGroupMembers(root, ld, layer);
+      if (leaves.length) return leaves;
+    }
     return layer.children.filter(function (c) { return c.data && c.data.groupId === gid; });
   }
 
@@ -218,15 +333,11 @@
     var sid = p.data.strokeId;
     grp.order = (grp.order || []).filter(function (e) { return e !== sid; });
     delete p.data.groupId;
-    // Mirrors groupSelection's own "a group needs >=2 members" invariant —
-    // one member left isn't a group anymore.
-    if (grp.order.length < 2) {
-      grp.order.forEach(function (e) {
-        var item = findByStrokeId(layer, e);
-        if (item && item.data) delete item.data.groupId;
-      });
-      delete ld.groups[gid];
-    }
+    // Mirrors groupSelection's own ">=2 entries" invariant — one entry left
+    // isn't a group anymore. dissolveGroup (not an inline loop) since an
+    // entry may now be a child GROUP, which has to be promoted rather than
+    // untagged (2026-09, #738).
+    if (grp.order.length < 2) dissolveGroup(gid, ld, layer);
     if (!opts.silent) {
       saveActiveLayerFrame(); updateUI();
       if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
@@ -273,7 +384,15 @@
     members.forEach(function (m) { m.remove(); });
     folded.companions.forEach(function (c) { if (!c.removed) c.remove(); });
     disposable.forEach(function (c) { if (!c.removed) c.remove(); });
-    delete ld.groups[gid];
+    // Descendant group entries go with it (2026-09, #738): flatten bakes
+    // every leaf underneath into one shape, so a surviving child entry
+    // would reference strokeIds that no longer exist and keep a `parent`
+    // pointing at a group that is gone.
+    (function removeSubtree(g, depth) {
+      var meta = ld.groups[g]; if (!meta || depth > 16) return;
+      (meta.order || []).forEach(function (entry) { if (ld.groups[entry]) removeSubtree(entry, depth + 1); });
+      delete ld.groups[g];
+    })(gid, 0);
     selectedPaths = islands; state.selectedStrokeIndices = [];
     fillRegenerateLinked(layer, islands[0]);
     saveActiveLayerFrame(); updateUI();
@@ -298,9 +417,97 @@
   function renderCombinesFromChildren(layer, ld, frameIdx) {
     var suppress = [], extra = [];
     if (!ld || !ld.groups) return { suppress: suppress, extra: extra };
+    // NESTED COMBINE (2026-09, #738 — "un groupe avec merge dans un sous
+    // groupe est considéré comme un seul élément pour le merge du parent").
+    // The walk is now top-down from ROOT groups instead of a flat pass over
+    // every group id, because the two questions a nested combine asks can
+    // only be answered with the parent in hand:
+    //  - what are my operands? a child group that combines contributes ONE
+    //    operand (its own result); a child group that doesn't contributes
+    //    its leaves, exactly as if it weren't there;
+    //  - do I emit my result, or is my parent about to consume it?
+    // A child's result is therefore computed once and either handed up or
+    // drawn, never both — which is what stops the old flat pass from
+    // drawing the inner merge and the outer merge on top of each other.
+    function emit(gid, dupIndex, parentCombines, ancestors, depth, temps) {
+      var grp = ld.groups[gid];
+      if (!grp || depth > 16 || ancestors.indexOf(gid) !== -1) return [];
+      var next = ancestors.concat([gid]);
+      var mode = grp.combineMode || 'none';
+      var operands = [];
+      (grp.order || []).forEach(function (entry) {
+        if (ld.groups[entry]) {
+          operands = operands.concat(emit(entry, dupIndex, mode !== 'none', next, depth + 1, temps));
+        } else {
+          var item = findByStrokeId(layer, entry, dupIndex);
+          if (item) operands.push(item);
+        }
+      });
+      if (mode === 'none' || operands.length < 2) return operands;
+      var leaves = resolveGroupMembers(gid, ld, layer, null, 0, dupIndex);
+      // Consumed by a combining parent: hand up the UN-flattened result, so
+      // the parent sees ONE shape (holes included) — that is the whole
+      // point of #738. Emitted for real: flatten into islands, which is
+      // what the renderer's item list expects.
+      if (parentCombines) {
+        var raw;
+        try { raw = computeGroupCombineRaw(operands, mode, layer, frameIdx); }
+        catch (e2) { console.warn('[SMGroup] nested combine failed for group', gid, e2); return operands; }
+        if (!raw) return operands;
+        leaves.forEach(function (m) { if (suppress.indexOf(m) === -1) suppress.push(m); });
+        operands.forEach(function (o) { if (temps.indexOf(o) === -1 && layer && o.parent !== layer) temps.push(o); });
+        // Style is irrelevant upstream (the outermost group paints the
+        // final result from its own topmost leaf), but a fill-less operand
+        // would be mistaken for a stroke-only shape and expanded.
+        if (!raw.fillColor) raw.fillColor = '#000000';
+        raw.strokeColor = null;
+        return [raw];
+      }
+      var islands;
+      try { islands = computeGroupCombine(operands, mode, layer, frameIdx); }
+      catch (e) { console.warn('[SMGroup] combine failed for group', gid, e); return operands; }
+      leaves.forEach(function (m) { if (suppress.indexOf(m) === -1) suppress.push(m); });
+      // Operands that were themselves computed (a child's result) are
+      // scratch geometry: keep them alive until the parent's boolean has
+      // consumed them, then drop whatever the result doesn't reuse.
+      operands.forEach(function (o) { if (temps.indexOf(o) === -1 && layer && o.parent !== layer) temps.push(o); });
+      if (parentCombines) return islands;
+      var styleSource = leaves[leaves.length - 1] || operands[operands.length - 1];
+      // Vector-brush ribbon style source (2026-08 fix, feedback: "les
+      // combine gère mal stroke plus fill" for Pressure-brush shapes) —
+      // a ribbon's OWN fillColor is its ink/stroke color, never a real
+      // fill (isVectorBrush ribbons paint through fillColor — see
+      // app.js's serP comment); any real Fill the user set lives on a
+      // completely separate companion Path.
+      var srcIsVB = !!(styleSource.data && styleSource.data.isVectorBrush);
+      var isl_fill, isl_stroke;
+      if (srcIsVB) {
+        var srcCompanion = findLinkedFillCompanion(layer, styleSource);
+        isl_fill = srcCompanion ? srcCompanion.fillColor : null;
+        isl_stroke = styleSource.fillColor;
+      } else {
+        // Stroke-only style source (2026-07-29 fix, QA-confirmed live):
+        // computeGroupCombine expands a stroke-only member into its real
+        // filled ribbon geometry, so painting that geometry with ONLY a
+        // strokeColor drew just its outline.
+        isl_fill = styleSource.fillColor || styleSource.strokeColor;
+        isl_stroke = styleSource.fillColor ? styleSource.strokeColor : null;
+      }
+      islands.forEach(function (isl) {
+        isl.fillColor = isl_fill;
+        isl.strokeColor = isl_stroke;
+        isl.strokeWidth = styleSource.strokeWidth;
+        isl.opacity = styleSource.opacity;
+        extra.push({ path: isl, groupCombineOf: gid });
+      });
+      return islands;
+    }
     Object.keys(ld.groups).forEach(function (gid) {
       var grp = ld.groups[gid];
-      if (!grp || grp.combineMode === 'none') return;
+      if (!grp) return;
+      // Roots only — a child is reached through its parent's own walk, and
+      // reaching it twice is exactly the double-draw this replaces.
+      if (grp.parent && ld.groups[grp.parent]) return;
       var strokeIds = collectGroupStrokeIds(gid, ld);
       if (!strokeIds.length) return;
       // One combine per duplicator COPY (see findByStrokeId's comment) —
@@ -313,48 +520,12 @@
         if (c.data && c.data.strokeId && strokeIds.indexOf(c.data.strokeId) !== -1) dupIndices[c.data.dupIndex || 0] = true;
       });
       Object.keys(dupIndices).forEach(function (dupIndexKey) {
-        var dupIndex = Number(dupIndexKey);
-        var members = resolveGroupMembers(gid, ld, layer, null, 0, dupIndex);
-        if (members.length < 2) return;
-        members.forEach(function (m) { suppress.push(m); });
-        var styleSource = members[members.length - 1];
-        var islands;
-        try { islands = computeGroupCombine(members, grp.combineMode, layer, frameIdx); }
-        catch (e) { console.warn('[SMGroup] combine failed for group', gid, e); return; }
-        // Vector-brush ribbon style source (2026-08 fix, feedback: "les
-        // combine gère mal stroke plus fill" for Pressure-brush shapes) —
-        // a ribbon's OWN fillColor is its ink/stroke color, never a real
-        // fill (isVectorBrush ribbons paint through fillColor — see
-        // app.js's serP comment); any real Fill the user set lives on a
-        // completely separate companion Path. Reading styleSource.fillColor
-        // unconditionally as "the fill" painted the combined shape solid
-        // in the STROKE's own color with no fill at all — confirmed live.
-        // Resolve both from the ribbon's own companion, same lookup
-        // foldBooleanOp already uses to fold it into the boolean operand.
-        var srcIsVB = !!(styleSource.data && styleSource.data.isVectorBrush);
-        var isl_fill, isl_stroke;
-        if (srcIsVB) {
-          var srcCompanion = findLinkedFillCompanion(layer, styleSource);
-          isl_fill = srcCompanion ? srcCompanion.fillColor : null;
-          isl_stroke = styleSource.fillColor;
-        } else {
-          // Stroke-only style source (2026-07-29 fix, QA-confirmed live:
-          // combining two stroke-only brush strokes rendered as a thin
-          // outline tracing the merged silhouette instead of a solid merged
-          // stroke) — computeGroupCombine already expands a stroke-only
-          // member into its real filled ribbon geometry (foldBooleanOp), so
-          // painting that geometry with ONLY strokeColor (no fill) drew just
-          // its outline. Flip to filled-with-the-stroke's-own-color, same
-          // convention as eraseExpandStrokeToFill/booleanOp's identical fix.
-          isl_fill = styleSource.fillColor || styleSource.strokeColor;
-          isl_stroke = styleSource.fillColor ? styleSource.strokeColor : null;
-        }
-        islands.forEach(function (isl) {
-          isl.fillColor = isl_fill;
-          isl.strokeColor = isl_stroke;
-          isl.strokeWidth = styleSource.strokeWidth;
-          isl.opacity = styleSource.opacity;
-          extra.push({ path: isl, groupCombineOf: gid });
+        var temps = [];
+        var result = emit(gid, Number(dupIndexKey), false, [], 0, temps);
+        temps.forEach(function (t) {
+          if (t.removed || result.indexOf(t) !== -1) return;
+          if (extra.some(function (ex) { return ex.path === t; })) return;
+          t.remove();
         });
       });
     });
@@ -417,9 +588,126 @@
     // fully blank in export. Bucketing member dicts by dupIndex below and
     // suppressing only the exact dicts in each bucket fixes both at once.
     var suppressed = [], extra = [];
+    // Same top-down, parent-aware walk as renderCombinesFromChildren above
+    // (2026-09, #738) — see its comment for why a nested combine can't be
+    // resolved by a flat pass. Operands here are transient Paths built from
+    // dicts; a child group that combines hands its result Path up as ONE
+    // operand, a child that doesn't hands up its members' Paths.
+    function dictOperands(gid, dicts, dupIndex, parentCombines, ancestors, depth, temps, out) {
+      var grp = ld.groups[gid];
+      if (!grp || depth > 16 || ancestors.indexOf(gid) !== -1) return [];
+      var next = ancestors.concat([gid]);
+      var mode = grp.combineMode || 'none';
+      var operands = [];
+      (grp.order || []).forEach(function (entry) {
+        if (ld.groups[entry]) {
+          operands = operands.concat(dictOperands(entry, dicts, dupIndex, mode !== 'none', next, depth + 1, temps, out));
+        } else {
+          var sd = dicts[entry];
+          if (!sd || sd.isRaster || !sd.segments || !sd.segments.length) return;
+          operands.push(dictPathFor(sd, temps));
+        }
+      });
+      if (mode === 'none' || operands.length < 2) return operands;
+      var leafIds = collectGroupStrokeIds(gid, ld);
+      var memberDicts = leafIds.map(function (id) { return dicts[id]; }).filter(function (sd) { return sd && !sd.isRaster && sd.segments && sd.segments.length; });
+      if (memberDicts.length < 2) return operands;
+      operands.forEach(function (o) { if (temps.indexOf(o) === -1) temps.push(o); });
+      // Same single-operand rule as the live twin above (#738).
+      if (parentCombines) {
+        var raw;
+        try { raw = computeGroupCombineRaw(operands, mode, null); }
+        catch (e2) { console.warn('[SMGroup] nested combine failed for group', gid, e2); return operands; }
+        if (!raw) return operands;
+        memberDicts.forEach(function (sd) { if (suppressed.indexOf(sd) === -1) suppressed.push(sd); });
+        if (!raw.fillColor) raw.fillColor = '#000000';
+        raw.strokeColor = null;
+        return [raw];
+      }
+      var islands;
+      try { islands = computeGroupCombine(operands, mode, null); }
+      catch (e) { console.warn('[SMGroup] combine failed for group', gid, e); return operands; }
+      memberDicts.forEach(function (sd) { if (suppressed.indexOf(sd) === -1) suppressed.push(sd); });
+      // z-position of the merged result: right after the group's
+      // front-most member dict, not appended after every other stroke
+      // (feedback #735 — twin of buildSceneJson's own fix).
+      var afterIdx = -1;
+      memberDicts.forEach(function (sd) { var ix = strokes.indexOf(sd); if (ix > afterIdx) afterIdx = ix; });
+      var styleSource = memberDicts[memberDicts.length - 1];
+      var thisDi = memberDicts[0].dupIndex;
+      var combFill, combStroke;
+      if (styleSource.isVectorBrush) {
+        // Same fix as renderCombinesFromChildren's twin above, dict form: a
+        // ribbon dict's own fillColor is its ink/stroke color, never a real
+        // fill — the real Fill (if any) is a separate companion dict.
+        var styleCompanion = styleSource.linkedFillId ? strokes.filter(function (d) {
+          return d.isLinkedFillCompanion && d.linkedFillId === styleSource.linkedFillId && (d.dupIndex || 0) === (styleSource.dupIndex || 0);
+        })[0] : null;
+        combFill = styleCompanion ? styleCompanion.fillColor : null;
+        combStroke = styleSource.fillColor;
+      } else {
+        // Stroke-only style source (2026-07-29 fix) — computeGroupCombine
+        // just expanded a stroke-only member into a real filled ribbon, so
+        // the exported dict must flip to filled-with-the-stroke's-color too.
+        var srcHasRealStroke = !!styleSource.hasRealStroke;
+        combFill = styleSource.fillColor || (srcHasRealStroke ? styleSource.strokeColor : null);
+        combStroke = (styleSource.fillColor && srcHasRealStroke) ? styleSource.strokeColor : null;
+      }
+      islands.forEach(function (isl) {
+        extra.push({
+          __afterIdx: afterIdx, // consumed (and removed) by the splice at the end
+          segments: isl.segments.map(function (sg) { return { point: [sg.point.x, sg.point.y], handleIn: [sg.handleIn.x, sg.handleIn.y], handleOut: [sg.handleOut.x, sg.handleOut.y] }; }),
+          closed: isl.closed,
+          fillColor: combFill, strokeColor: combStroke, strokeWidth: styleSource.strokeWidth, opacity: styleSource.opacity,
+          // hasRealStroke (app.js desP / export.js lottieBuild) is
+          // AUTHORITATIVE, checked as !!sd.hasRealStroke — derived, not
+          // copied straight from styleSource (2026-07-29 QA-confirmed).
+          hasRealStroke: !!combStroke,
+          isGroupCombineResult: true, groupCombineOf: gid,
+          isDuplicatorCopy: memberDicts[0].isDuplicatorCopy, dupIndex: thisDi,
+        });
+      });
+      return islands;
+    }
+    // A member's transient Path, companion pre-merged and element Motion
+    // baked — extracted from the old inline loop so the recursion above can
+    // build one operand at a time.
+    function dictPathFor(sd, temps) {
+      var p = dictToPath(sd);
+      if (sd.linkedFillId) {
+        var companionDict = strokes.filter(function (d) {
+          return d.isLinkedFillCompanion && d.linkedFillId === sd.linkedFillId && (d.dupIndex || 0) === (sd.dupIndex || 0);
+        })[0];
+        if (companionDict && companionDict.segments && companionDict.segments.length) {
+          var cp = dictToPath(companionDict);
+          // Same ring-vs-boolean problem as foldBooleanOp's own pre-step
+          // (tools.js) — p.unite(cp) on a closed vector-brush ribbon (a
+          // self-touching "sliced ring" Path) can come back empty. The
+          // companion already fills the ring's own hole by construction, so
+          // recovering the ring's outer boundary alone sidesteps it.
+          var unsliced = _unsliceRingPath(p);
+          if (unsliced) {
+            var outerP = new Path({ insert: false, closed: true });
+            unsliced.exterior.forEach(function (seg) { outerP.add(seg); });
+            p.remove(); p = outerP;
+          } else {
+            try { var merged = p.unite(cp, { insert: false }); if (merged) { p.remove(); p = merged; } } catch (e) {}
+          }
+          cp.remove();
+          if (suppressed.indexOf(companionDict) === -1) suppressed.push(companionDict);
+        }
+      }
+      // After the companion merge, so the whole visible shape (ribbon + its
+      // fill) moves as one — a companion has no elementMotion entry of its
+      // own, it follows its anchor.
+      p = bakeElementMotion(p, sd);
+      temps.push(p);
+      return p;
+    }
     Object.keys(ld.groups).forEach(function (gid) {
       var grp = ld.groups[gid];
-      if (!grp || grp.combineMode === 'none') return;
+      if (!grp) return;
+      if (grp.parent && ld.groups[grp.parent]) return; // roots only
       var strokeIds = collectGroupStrokeIds(gid, ld);
       if (!strokeIds.length) return;
       var byDupIndex = {};
@@ -429,93 +717,11 @@
         (byDupIndex[di] || (byDupIndex[di] = [])).push(sd);
       });
       Object.keys(byDupIndex).forEach(function (diKey) {
-        var memberDicts = byDupIndex[diKey].filter(function (sd) { return !sd.isRaster && sd.segments && sd.segments.length; });
-        if (memberDicts.length < 2) return;
-        var thisDi = memberDicts[0].dupIndex;
-        var paths = memberDicts.map(function (sd) {
-          var p = dictToPath(sd);
-          if (sd.linkedFillId) {
-            var companionDict = strokes.filter(function (d) {
-              return d.isLinkedFillCompanion && d.linkedFillId === sd.linkedFillId && (d.dupIndex || 0) === (sd.dupIndex || 0);
-            })[0];
-            if (companionDict && companionDict.segments && companionDict.segments.length) {
-              var cp = dictToPath(companionDict);
-              // Same ring-vs-boolean problem as foldBooleanOp's own
-              // pre-step (tools.js) — p.unite(cp) on a closed vector-brush
-              // ribbon (a self-touching "sliced ring" Path, see
-              // _findRingRevisit's comment there) can come back empty. The
-              // companion already fills the ring's own hole by
-              // construction, so recovering the ring's outer boundary
-              // alone — no boolean call — sidesteps it here too.
-              var unsliced = _unsliceRingPath(p);
-              if (unsliced) {
-                var outerP = new Path({ insert: false, closed: true });
-                unsliced.exterior.forEach(function (seg) { outerP.add(seg); });
-                p.remove(); p = outerP;
-              } else {
-                try { var merged = p.unite(cp, { insert: false }); if (merged) { p.remove(); p = merged; } } catch (e) {}
-              }
-              cp.remove();
-              suppressed.push(companionDict);
-            }
-          }
-          // After the companion merge, so the whole visible shape (ribbon +
-          // its fill) moves as one — a companion has no elementMotion entry
-          // of its own, it follows its anchor.
-          return bakeElementMotion(p, sd);
-        });
-        memberDicts.forEach(function (sd) { suppressed.push(sd); });
-        // z-position of the merged result: right after the group's
-        // front-most member dict, not appended after every other stroke
-        // (feedback #735 — twin of buildSceneJson's own fix).
-        var afterIdx = -1;
-        memberDicts.forEach(function (sd) { var ix = strokes.indexOf(sd); if (ix > afterIdx) afterIdx = ix; });
-        var styleSource = memberDicts[memberDicts.length - 1];
-        var combFill, combStroke;
-        if (styleSource.isVectorBrush) {
-          // Same fix as renderCombinesFromChildren's twin above, dict
-          // form: a ribbon dict's own fillColor is its ink/stroke color,
-          // never a real fill — the real Fill (if any) is a separate
-          // companion dict, same lookup used a few lines up to merge its
-          // geometry in.
-          var styleCompanion = styleSource.linkedFillId ? strokes.filter(function (d) {
-            return d.isLinkedFillCompanion && d.linkedFillId === styleSource.linkedFillId && (d.dupIndex || 0) === (styleSource.dupIndex || 0);
-          })[0] : null;
-          combFill = styleCompanion ? styleCompanion.fillColor : null;
-          combStroke = styleSource.fillColor;
-        } else {
-          // Stroke-only style source (2026-07-29 fix, same one as
-          // renderCombinesFromChildren's twin above) — computeGroupCombine
-          // just expanded a stroke-only member into a real filled ribbon
-          // (dictToPath's new paint-carrying + foldBooleanOp's own
-          // eraseExpandStrokeToFill step), so the exported dict must flip to
-          // filled-with-the-stroke's-color too, or it round-trips as an
-          // outline-only shape (or, pre-fix, nothing visible at all).
-          var srcHasRealStroke = !!styleSource.hasRealStroke;
-          combFill = styleSource.fillColor || (srcHasRealStroke ? styleSource.strokeColor : null);
-          combStroke = (styleSource.fillColor && srcHasRealStroke) ? styleSource.strokeColor : null;
-        }
-        var islands;
-        try { islands = computeGroupCombine(paths, grp.combineMode, null); }
-        catch (e) { console.warn('[SMGroup] combine failed for group', gid, e); return; }
-        islands.forEach(function (isl) {
-          extra.push({
-            __afterIdx: afterIdx, // consumed (and removed) by the splice at the end
-            segments: isl.segments.map(function (s) { return { point: [s.point.x, s.point.y], handleIn: [s.handleIn.x, s.handleIn.y], handleOut: [s.handleOut.x, s.handleOut.y] }; }),
-            closed: isl.closed,
-            fillColor: combFill, strokeColor: combStroke, strokeWidth: styleSource.strokeWidth, opacity: styleSource.opacity,
-            // hasRealStroke (app.js desP / export.js lottieBuild) is
-            // AUTHORITATIVE, checked as !!sd.hasRealStroke — see
-            // combFill/combStroke above for why it's derived, not copied
-            // straight from styleSource anymore (2026-07-29 QA-confirmed:
-            // copying it straight resurrected a phantom white stroke
-            // whenever the topmost member was one of the strokeless
-            // members CLAUDE.md §2 documents).
-            hasRealStroke: !!combStroke,
-            isGroupCombineResult: true, groupCombineOf: gid,
-            isDuplicatorCopy: memberDicts[0].isDuplicatorCopy, dupIndex: thisDi,
-          });
-        });
+        var dicts = {};
+        byDupIndex[diKey].forEach(function (sd) { dicts[sd.strokeId] = sd; });
+        var temps = [];
+        var result = dictOperands(gid, dicts, Number(diKey), false, [], 0, temps, extra);
+        temps.forEach(function (t) { if (!t.removed && result.indexOf(t) === -1) t.remove(); });
       });
     });
     if (!extra.length) return strokes;
@@ -548,6 +754,8 @@
   window.SMGroup = {
     groupSelection: groupSelection, ungroupSelection: ungroupSelection, membersOf: membersOf,
     ensureLayerGroups: ensureLayerGroups, resolveGroupMembers: resolveGroupMembers,
+    collectGroupStrokeIds: collectGroupStrokeIds, rootGroupOf: rootGroupOf, rootGroupOfItem: rootGroupOfItem,
+    parentGroupOf: parentGroupOf, dissolveGroup: dissolveGroup,
     combineSelection: combineSelection, setGroupCombineMode: setGroupCombineMode,
     removeMemberFromGroup: removeMemberFromGroup, flattenGroup: flattenGroup, renameGroup: renameGroup,
     renderCombinesFromChildren: renderCombinesFromChildren, applyCombinesToStrokes: applyCombinesToStrokes,

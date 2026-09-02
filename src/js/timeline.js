@@ -5170,7 +5170,7 @@ function renderShapeTreeRowsInto(list,li,ld){
       var gswatch=document.createElement('div');gswatch.className='motion-elem-swatch';gswatch.textContent='▤';gswatch.style.background='transparent';
       var gnm=document.createElement('div');gnm.className='lnm';gnm.textContent=node.name;
       grow.appendChild(gswatch);grow.appendChild(gnm);
-      var memberIds=SMMotion.layerElements(li,ld).filter(function(e){return e.sd.groupId===node.gid;}).map(function(e){return e.strokeId;});
+      var memberIds=node.memberIds||SMMotion.layerElements(li,ld).filter(function(e){return e.sd.groupId===node.gid;}).map(function(e){return e.strokeId;});
       function commitGroupRename(v){pushUndo();if(window.SMGroup&&SMGroup.renameGroup)SMGroup.renameGroup(node.gid,ld,v,memberIds);saveActiveLayerFrame();renderLayerList();renderTimeline();}
       grow.addEventListener('click',function(){SMMotion.selectShapesByStrokeIds(li,memberIds);});
       grow.addEventListener('dblclick',function(e){e.stopPropagation();SMMotion.startShapeTreeRename(grow,node.name,commitGroupRename);});
