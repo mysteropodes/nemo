@@ -586,7 +586,12 @@ function setHex8Input(el,hex){
 // fill companions, brush-texture dab copies). One helper so a future sibling
 // tag (CLAUDE.md's own example) can't be added to one call site and
 // forgotten in the other twelve.
-function isSelectablePathChild(c){return !(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));}
+// visible===false covers the element eye/solo (applyElemVisibility below):
+// Paper's own hitTest already ignores invisible items, so a canvas click
+// can't reach a hidden element — this keeps the OTHER selection entry
+// point (Select All) consistent with it, instead of silently handing back
+// a selection the user can't see.
+function isSelectablePathChild(c){return c.visible!==false&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy));}
 // Pressure-brush ribbons are already the exact visible outline of the
 // authored stroke. A second, darker Paper stroke around that outline read as
 // an unintended double contour (feedback #52), especially after changing
@@ -772,7 +777,7 @@ function serP(p){var isVB=!!(p.data&&p.data.isVectorBrush);var center=isVB&&p.da
   // declared intent (which corner is which, for the Coins panel to read
   // back and for per-corner Motion to target), not a second source of
   // truth for the geometry itself.
-  paramShape:(p.data&&p.data.paramShape)?p.data.paramShape:undefined,
+  elemHidden:(p.data&&p.data.elemHidden)?true:undefined,paramShape:(p.data&&p.data.paramShape)?p.data.paramShape:undefined,
   // Per-ELEMENT effects (2026-07, effects-panel.js — "possible de
   // différencié les effet par éléments sélectionné"): same {type,enabled,
   // p1,p2,p3,p4}[] shape as ld.effects, but scoped to just this one shape
@@ -863,7 +868,7 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
   // outline it never had ("un trait blanc apparaît autour du fill après
   // ctrl+Z"). Legacy data predating the field (undefined) keeps the old
   // fallback chain untouched.
-  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=typeof d.strokeCap==='string'?d.strokeCap:'round';p.strokeJoin=typeof d.strokeJoin==='string'?d.strokeJoin:'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.strokeProfile)p.data.strokeProfile=d.strokeProfile;if(d.profileBase)p.data.profileBase=d.profileBase;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.isFillCloseLine)p.data.isFillCloseLine=true;if(d.fillSeed)p.data.fillSeed=d.fillSeed;if(d.fillSeeds&&d.fillSeeds.length)p.data.fillSeeds=d.fillSeeds;if((d.fillSeed||(d.fillSeeds&&d.fillSeeds.length))&&d.fillGapPx!==undefined)p.data.fillGapPx=d.fillGapPx;if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isLinkedFillCompanion)p.data.isLinkedFillCompanion=true;if(d.linkedFillId)p.data.linkedFillId=d.linkedFillId;if(d.tweenOn)p.data.tweenOn=true;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.shadowSwatchId)p.data.shadowSwatchId=d.shadowSwatchId;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;if(d.preRevisionOpacity!==undefined)p.data.preRevisionOpacity=d.preRevisionOpacity;if(d.fillGradient)p.data.fillGradient=d.fillGradient;if(d.groupId)p.data.groupId=d.groupId;if(d.paramShape)p.data.paramShape=d.paramShape;if(d.effects&&d.effects.length)p.data.effects=d.effects;
+  p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));p.strokeWidth=d.strokeWidth||3;p.strokeCap=typeof d.strokeCap==='string'?d.strokeCap:'round';p.strokeJoin=typeof d.strokeJoin==='string'?d.strokeJoin:'round';if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;if(d.paintOrder){p.data.paintOrder=d.paintOrder;}if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.strokeProfile)p.data.strokeProfile=d.strokeProfile;if(d.profileBase)p.data.profileBase=d.profileBase;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}if(d.isFillCloseLine)p.data.isFillCloseLine=true;if(d.fillSeed)p.data.fillSeed=d.fillSeed;if(d.fillSeeds&&d.fillSeeds.length)p.data.fillSeeds=d.fillSeeds;if((d.fillSeed||(d.fillSeeds&&d.fillSeeds.length))&&d.fillGapPx!==undefined)p.data.fillGapPx=d.fillGapPx;if(d.fillWalls)p.data.fillWalls=d.fillWalls;if(d.strokeId)p.data.strokeId=d.strokeId;if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;if(d.isLinkedFillCompanion)p.data.isLinkedFillCompanion=true;if(d.linkedFillId)p.data.linkedFillId=d.linkedFillId;if(d.tweenOn)p.data.tweenOn=true;if(d.boxAngle)p.data.boxAngle=d.boxAngle;if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;if(d.channelTag)p.data.channelTag=d.channelTag;if(d.shadowSwatchId)p.data.shadowSwatchId=d.shadowSwatchId;if(d.ownerId)p.data.ownerId=d.ownerId;if(d.ownerName)p.data.ownerName=d.ownerName;if(d.ownerColor)p.data.ownerColor=d.ownerColor;if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;if(d.isRevisionGhost)p.data.isRevisionGhost=true;if(d.revisionAction)p.data.revisionAction=d.revisionAction;if(d.preRevisionOpacity!==undefined)p.data.preRevisionOpacity=d.preRevisionOpacity;if(d.fillGradient)p.data.fillGradient=d.fillGradient;if(d.groupId)p.data.groupId=d.groupId;if(d.elemHidden){p.data.elemHidden=true;p.visible=false;}if(d.paramShape)p.data.paramShape=d.paramShape;if(d.effects&&d.effects.length)p.data.effects=d.effects;
   // Tracked-role attach (2026-08-29, feedback #151) — see serP's own
   // comment on these three fields for the full round-trip contract.
   if(d.trackRoleId)p.data.trackRoleId=d.trackRoleId;
@@ -4714,6 +4719,10 @@ function loadFrame(idx,dupOnly){
   // through them.
   strokes.forEach(function(sd){if(sd.isRaster)desR(sd,userLayers[i]);else desP(sd,userLayers[i]);});relinkBrushCompanions(userLayers[i]);relinkLinkedFills(userLayers[i]);if(state.layers[i].rig)relinkRigBinds(state.layers[i],userLayers[i]);
   userLayers[i]._matStrokes=strokes;userLayers[i]._smGeomDirty=false;}
+  // Element eye/solo (see applyElemVisibility) — re-derived after every
+  // frame build, which is also what keeps a regenerated brush companion
+  // following its ribbon.
+  applyElemVisibilityAll();
   userLayers[state.activeLayerIdx].activate();
   // Vue caméra (v18) : loadFrame est LE point de passage de tout changement
   // de frame (scrub, lecture, goToFrame) — même raison que le hook
@@ -4727,6 +4736,75 @@ function loadFrame(idx,dupOnly){
 // behaves. A transient view-only concept, not part of the saved project
 // (state.layers[i].solo is simply never read by serialize/save-project).
 function anyLayerSoloed(){for(var i=0;i<state.layers.length;i++)if(state.layers[i].solo)return true;return false;}
+// ---- ELEMENT eye / solo (2026-09, Cyril: "il faudrait eyes et solo pour
+// chaque layer dans ce panel") ----
+// Per-ELEMENT twin of the layer eye/solo just above, keeping the same two
+// rules that pair already distinguishes: the EYE is document data (serP
+// writes elemHidden, desP restores it, so it survives save/reload and
+// export), SOLO is session-only and never serialized — same reason stated
+// above for state.layers[i].solo.
+// Both resolve onto the LIVE Paper item's own `visible` flag rather than
+// being re-tested by each renderer: Paper.js then draws nothing for it,
+// hitTest already skips invisible items (so a hidden element can't be
+// clicked or box-selected — no new guard needed in select-bridge), and
+// engine-bridge only had to learn one thing, "skip visible===false".
+// A vector-brush element is not ONE item but a visual BLOCK (ribbon +
+// linked-fill backdrop + texture dabs, see shapes-panel's _visualBlock).
+// The flag is stored on the row's own stroke and RE-DERIVED onto the rest
+// of its block here on every frame load, so a companion regenerated later
+// by rebuildVectorBrushOutline still follows its ribbon.
+var _elemSolo={}; // li -> { strokeId:true }, session-only
+function anyElemSoloed(li){var s=_elemSolo[li];if(!s)return false;for(var k in s)if(s[k])return true;return false;}
+function _elemBlockOf(d){return(d&&(d.linkedFillId||d.brushGroupId))||null;}
+function applyElemVisibility(li){
+  var layer=window.userLayers&&userLayers[li];if(!layer)return;
+  var solo=anyElemSoloed(li)?_elemSolo[li]:null;
+  var hiddenBlk={},soloBlk={};
+  layer.children.forEach(function(c){
+    var d=c.data||{},blk=_elemBlockOf(d);if(!blk)return;
+    if(d.elemHidden)hiddenBlk[blk]=1;
+    if(solo&&d.strokeId&&solo[d.strokeId])soloBlk[blk]=1;
+  });
+  layer.children.forEach(function(c){
+    var d=c.data||{},blk=_elemBlockOf(d);
+    c.visible=solo?!!((d.strokeId&&solo[d.strokeId])||(blk&&soloBlk[blk]))
+                  :!(d.elemHidden||(blk&&hiddenBlk[blk]));
+  });
+}
+function applyElemVisibilityAll(){for(var i=0;i<state.layers.length;i++)applyElemVisibility(i);}
+function elemIsHidden(li,strokeId){
+  var it=window.SMMotion&&SMMotion.liveItemByStrokeId?SMMotion.liveItemByStrokeId(li,strokeId):null;
+  return !!(it&&it.data&&it.data.elemHidden);
+}
+function elemIsSoloed(li,strokeId){var s=_elemSolo[li];return !!(s&&s[strokeId]);}
+// hide undefined = toggle, decided by the FIRST id's current state, so a
+// group row resolves all its members one way instead of flipping each
+// independently (same "all follow the row you clicked" semantics the
+// timeline's own folder eye uses).
+function setElemHidden(li,strokeIds,hide){
+  if(!strokeIds||!strokeIds.length)return;
+  if(hide===undefined)hide=!elemIsHidden(li,strokeIds[0]);
+  pushUndoLayers();
+  strokeIds.forEach(function(sid){
+    var it=window.SMMotion&&SMMotion.liveItemByStrokeId?SMMotion.liveItemByStrokeId(li,sid):null;
+    if(!it)return;
+    it.data=it.data||{};
+    if(hide)it.data.elemHidden=true;else delete it.data.elemHidden;
+  });
+  applyElemVisibility(li);
+  saveActiveLayerFrame();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  if(window.updateUI)updateUI();
+}
+function setElemSolo(li,strokeIds,on){
+  if(!strokeIds||!strokeIds.length)return;
+  if(on===undefined)on=!elemIsSoloed(li,strokeIds[0]);
+  var s=_elemSolo[li]=_elemSolo[li]||{};
+  strokeIds.forEach(function(sid){if(on)s[sid]=true;else delete s[sid];});
+  applyElemVisibility(li);
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  if(window.updateUI)updateUI();
+}
 // Un calque Dossier propage œil et solo à son sous-arbre (audit
 // 2026-08-29, confirmé en pilotant : masquer le dossier laissait ses
 // enfants rendus tels quels — pixels identiques avant/après — et soloer
