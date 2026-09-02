@@ -659,7 +659,12 @@
   // ONE predicate for both renderers — the panel builds this header and the
   // grid builds a blank spacer to match it, and a row that exists on one side
   // only is the alignment bug CLAUDE.md §11 opens with.
-  function showsGroupHeader() { return !_propFilter; }
+  // U (reveal animated) narrows the same way (2026-09, feedback #789: "avec
+  // le raccourci u dans motion n'afficher que les properties avec keyframe
+  // pas TRANSFORM") — it is the same intent as a P/S/R filter, a list
+  // narrowed to exactly what you asked for, so the group title that only
+  // exists to organize the FULL list has nothing left to organize.
+  function showsGroupHeader() { return !_propFilter && !_hideUnanimated; }
   // Which layers a property shortcut acts on: the selection, or EVERY layer
   // when nothing is selected (2026-07-27: "si je fais 'p' alors ça affiche
   // seulement toutes les prop position de tous les calques ou ceux de la
@@ -11437,12 +11442,55 @@
       row.classList.toggle('prop-selected', !!(row._smHolder && row._smProp && isMotionPropSelected(row._smHolder, row._smProp)));
     });
   }
+  // Which LAYER a holder belongs to — the holder is either the layer object
+  // itself (its own tracks) or one of its element holders, keyed by strokeId
+  // or meshId (see ensureElementHolder).
+  function layerIndexOfHolder(holder) {
+    if (!holder) return -1;
+    var direct = state.layers.indexOf(holder);
+    if (direct >= 0) return direct;
+    for (var i = 0; i < state.layers.length; i++) {
+      var em = state.layers[i].elementMotion;
+      if (!em) continue;
+      for (var k in em) { if (Object.prototype.hasOwnProperty.call(em, k) && em[k] === holder) return i; }
+    }
+    return -1;
+  }
+  // Clicking a key selects its layer too (2026-09, feedback #791: "si je
+  // clic sur une keyframe de propriété ça doit select le layer aussi si pas
+  // déjà select"). Done HERE rather than at each of the ~8 key-click sites
+  // — setKeySel is the single funnel every one of them already goes
+  // through, the same "one writer" reasoning selectLayerForEdit uses for
+  // value edits (#761).
+  function syncLayerSelToKeySel() {
+    if (state.appMode !== 'motion') return;
+    // The rectangle does its own layer sync at drop (#769) and calls this
+    // funnel on every mousemove — selecting layers per move would re-render
+    // the very rows the drag measures against.
+    if (_motionMarquee) return;
+    if (!_motionKeySel.length) return; // clearing a key selection never clears layers
+    var lis = [];
+    _motionKeySel.forEach(function (s) {
+      var li = layerIndexOfHolder(s.holder);
+      if (li >= 0 && lis.indexOf(li) < 0) lis.push(li);
+    });
+    if (!lis.length) return;
+    if (lis.length === _layerSel.length && lis.every(function (li) { return _layerSel.indexOf(li) >= 0; })) return;
+    // setActiveLayer FIRST — it collapses _layerSel to the layer it makes
+    // active (same ordering trap as #769/#776).
+    if (window.SM && SM.setActiveLayer) SM.setActiveLayer(lis[0], true);
+    _layerSel = lis.slice();
+    _layerSelAnchor = lis[0];
+    if (typeof syncBarSelToLayerSel === 'function') syncBarSelToLayerSel();
+    renderLayerList(); // the grid half is repainted by the caller's own renderTimeline()
+  }
   function setKeySel(sel) {
     _motionKeySel = sel || [];
     _motionPropSel = uniquePropSelection(_motionKeySel);
     if (_motionPropSel.length) _motionPropAnchor = _motionPropSel[_motionPropSel.length - 1];
     paintMotionPropertySelection();
     updateKeySelectionBox();
+    syncLayerSelToKeySel();
   }
   function keysForPropertySelection() {
     var out = [];
