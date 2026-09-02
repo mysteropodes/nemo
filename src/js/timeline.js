@@ -8869,7 +8869,24 @@ function onKeyDown(event){
     if(state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection()){SMMotion.copySelectedKeys();return;}
     if(selectedPaths.length)copySelection();else window.SM.copyFrames();return;}
   if((event.metaKey||event.ctrlKey)&&event.key==='x'){if(inField)return;event.preventDefault();if(selectedPaths.length)cutSelection();else window.SM.cutFrames();return;}
-  if((event.metaKey||event.ctrlKey)&&event.key==='v'){if(inField)return;event.preventDefault();
+  if((event.metaKey||event.ctrlKey)&&event.key==='v'){if(inField)return;
+    // SVG on the SYSTEM clipboard (2026-09, feedback #749 — Figma's and
+    // Illustrator's "Copy as SVG"). Reaching it needs the browser's OWN
+    // paste event, which never fires if this handler calls preventDefault
+    // — and reading the clipboard directly (navigator.clipboard.readText)
+    // is refused without the clipboard-read permission, confirmed live:
+    // NotAllowedError. So when Nemo's own clipboard is EMPTY, this lets
+    // the default through, svg-import.js's listener gets the data with no
+    // permission at all, and a short timer restores the ordinary
+    // "paste frames" fallback if what arrived wasn't SVG.
+    var _hasInternalClip = (state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard())
+      || !!(_canvasClip&&_canvasClip.snaps.length) || !!(_sel.clipboard&&_sel.clipboard.length);
+    if(!_hasInternalClip&&window.SMSvgImport){
+      if(window._svgPasteFallback)clearTimeout(window._svgPasteFallback);
+      window._svgPasteFallback=setTimeout(function(){window._svgPasteFallback=null;window.SM.pasteFrames();},80);
+      return;
+    }
+    event.preventDefault();
     if(state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard()){SMMotion.pasteKeys();return;}
     if(window._lastClipKind==='canvas'&&_canvasClip&&_canvasClip.snaps.length)pasteSelection();
     else if(window._lastClipKind==='frames'&&_sel.clipboard&&_sel.clipboard.length)window.SM.pasteFrames();
