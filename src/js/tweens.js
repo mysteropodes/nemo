@@ -121,6 +121,20 @@ var MM_MIN_SUPPORT=3,MM_SHAPE_TH=0.5,MM_BIAS=0.04,MM_BIAS_SUPPORT=0.08,MM_MAX_HY
 // TW_REL_2OPT: exact-objective pairwise swap pass at the end of
 // relationalRefine (see its comment). Same PR; separately flippable.
 var TW_REL_2OPT=true;
+// TW_MATCH_TRACKING (2026-09, "tracking" — Cyril's idea list, point 1+3):
+// a stroke's identity persists across keys (generateTweens stamps the
+// pair's strokeId on the B key, which is the next pair's A key), so when
+// matching K1→K2 we know how each K1 stroke moved in K0→K1. Two uses.
+// PIECES: strokes that moved TOGETHER in K0→K1 (same displacement
+// cluster, non-static) are a known piece; in K1→K2 a displacement
+// cluster made of members of one known piece counts as a hypothesis with
+// only 2 votes instead of 3 (co-membership is prior evidence), and its
+// pruning threshold drops likewise. MOMENTUM: each known piece also
+// proposes "same displacement again" as a hypothesis — free when the
+// motion is roughly constant, pruned when nobody adopts it (a reversal).
+// History is read from the layer's stored keyframes, never written.
+var TW_MATCH_TRACKING=true;
+var MM_MIN_SUPPORT_KNOWN=2;
 // ---- MATCHING ----
 function buildTP(sd){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});return p;}
 // A stroke's color and fill/stroke "type" are what a viewer actually reads
@@ -476,11 +490,11 @@ function _strokeInJson(sd){
   // same input, purely depending on which one happened to run.
   return{segments:sd.segments||[],centerSegments:sd.centerSegments,strokeColor:realStrokeColor(sd)||null,fillColor:sd.fillColor||null,isVectorBrush:!!sd.isVectorBrush,closed:!!sd.closed};
 }
-function autoMatch(sA,sB){
+function autoMatch(sA,sB,hist){
   if(!sA.length||!sB.length)return[];
   // Relational matching lives in JS only (see TW_MATCH_RELATIONAL) — the
   // wasm port is the exact twin of the OLD pipeline and would skip it.
-  if(TW_MATCH_RELATIONAL)return autoMatchJS(sA,sB);
+  if(TW_MATCH_RELATIONAL)return autoMatchJS(sA,sB,hist);
   if(window.GeometryWasm&&window.GeometryWasm.ready){
     try{
       var json=window.GeometryWasm.auto_match(JSON.stringify(sA.map(_strokeInJson)),JSON.stringify(sB.map(_strokeInJson)));
@@ -489,7 +503,7 @@ function autoMatch(sA,sB){
   }
   return autoMatchJS(sA,sB);
 }
-function autoMatchJS(sA,sB){
+function autoMatchJS(sA,sB,hist){
   if(!sA.length||!sB.length)return[];
   var fA=sA.map(strokeFeat),fB=sB.map(strokeFeat);
   var bA=unionBounds(fA),bB=unionBounds(fB);
@@ -616,7 +630,7 @@ function autoMatchJS(sA,sB){
   // the cheapest explanation, and the winning hypothesis becomes that
   // stroke's local model for the relational pass.
   var hypOf=null,hyps=null,assign2,matches2=[];
-  if(TW_MATCH_RELATIONAL&&TW_MATCH_MULTI_MOTION)hyps=multiMotionHypotheses(fA,fB,n,m);
+  if(TW_MATCH_RELATIONAL&&TW_MATCH_MULTI_MOTION)hyps=multiMotionHypotheses(fA,fB,n,m,hist);
   if(hyps&&hyps.length){
     // Pre-score every pairing under every hypothesis once; then solve,
     // count how many matched strokes actually ADOPT each hypothesis, drop
@@ -659,7 +673,7 @@ function autoMatchJS(sA,sB){
       var adopters=hyps.map(function(){return 0;});
       matches2.forEach(function(mm3){var h5=hypOf[mm3.a*m+mm3.b];if(h5!==undefined)adopters[h5]++;});
       var dropped=false;
-      for(var di=0;di<hyps.length;di++)if(alive[di]&&adopters[di]<MM_MIN_SUPPORT){alive[di]=false;dropped=true;}
+      for(var di=0;di<hyps.length;di++)if(alive[di]&&adopters[di]<(hyps[di].minAdopt||MM_MIN_SUPPORT)){alive[di]=false;dropped=true;}
       if(!dropped)return matches2;
     }
     return matches2;
@@ -671,6 +685,49 @@ function autoMatchJS(sA,sB){
   return uncrossMatches(matches2,fA,fB);
 }
 // ---- MULTI-MOTION hypotheses (see TW_MATCH_MULTI_MOTION) ----
+function _quickCentroid(sd){
+  var segs=(sd.centerSegments&&sd.centerSegments.length>1)?sd.centerSegments:sd.segments;
+  if(!segs||!segs.length)return null;
+  var x=0,y=0;for(var i=0;i<segs.length;i++){x+=segs[i].point[0];y+=segs[i].point[1];}
+  return[x/segs.length,y/segs.length];
+}
+// History for TW_MATCH_TRACKING: per A stroke, its displacement since the
+// previous key (by strokeId) and the co-motion piece it belongs to.
+// Returns null when nothing usable (first pair, no ids, all static).
+function _trackingHistory(sA,prevStrokes){
+  if(!TW_MATCH_TRACKING||!prevStrokes||!prevStrokes.length)return null;
+  var prevById={},dupe={};
+  prevStrokes.forEach(function(sd){if(!sd.strokeId)return;if(prevById[sd.strokeId])dupe[sd.strokeId]=1;else prevById[sd.strokeId]=sd;});
+  var vel=new Array(sA.length),any=false,diag=0;
+  var x1=Infinity,y1=Infinity,x2=-Infinity,y2=-Infinity;
+  sA.forEach(function(sd,i){
+    vel[i]=null;
+    var c=_quickCentroid(sd);if(!c)return;
+    x1=Math.min(x1,c[0]);y1=Math.min(y1,c[1]);x2=Math.max(x2,c[0]);y2=Math.max(y2,c[1]);
+    if(!sd.strokeId||dupe[sd.strokeId])return;
+    var pv=prevById[sd.strokeId];if(!pv)return;
+    var pc=_quickCentroid(pv);if(!pc)return;
+    vel[i]=[c[0]-pc[0],c[1]-pc[1]];any=true;
+  });
+  if(!any)return null;
+  diag=Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
+  var tol=Math.max(30,diag*0.06);
+  // greedy displacement clustering, static strokes excluded (not moving
+  // says nothing about belonging together)
+  var pieceOf=new Array(sA.length),clusters=[];
+  for(var i=0;i<sA.length;i++){pieceOf[i]=-1;var v=vel[i];if(!v||Math.sqrt(v[0]*v[0]+v[1]*v[1])<tol)continue;
+    var best=-1,bd=tol;
+    clusters.forEach(function(cl,ci){var d=Math.sqrt((cl.mx-v[0])*(cl.mx-v[0])+(cl.my-v[1])*(cl.my-v[1]));if(d<bd){bd=d;best=ci;}});
+    if(best<0){clusters.push({mx:v[0],my:v[1],members:[i]});best=clusters.length-1;}
+    else{var cl=clusters[best];cl.members.push(i);var k=cl.members.length;cl.mx+=(v[0]-cl.mx)/k;cl.my+=(v[1]-cl.my)/k;}
+    pieceOf[i]=best;
+  }
+  var pieces=[],remap={};
+  clusters.forEach(function(cl,ci){if(cl.members.length>=2){remap[ci]=pieces.length;pieces.push({members:cl.members,mx:cl.mx,my:cl.my});}});
+  pieceOf=pieceOf.map(function(ci){return(ci<0||remap[ci]===undefined)?-1:remap[ci];});
+  if(!pieces.length)return null;
+  return{vel:vel,pieceOf:pieceOf,pieces:pieces};
+}
 function _tfDist(t1,t2,f){
   var d=0;
   [[f.x,f.y],[f.x+f.w,f.y],[f.x,f.y+f.h],[f.x+f.w,f.y+f.h],[f.x+f.w/2,f.y+f.h/2]].forEach(function(p){
@@ -679,8 +736,9 @@ function _tfDist(t1,t2,f){
   });
   return d;
 }
-function multiMotionHypotheses(fA,fB,n,m){
+function multiMotionHypotheses(fA,fB,n,m,hist){
   if(n<6||m<6)return[];
+  var pieceOf=(hist&&hist.pieceOf)||null;
   var tol=Math.max(30,_matchNorm*0.06);
   var cands=[];
   for(var a=0;a<n;a++)for(var b=0;b<m;b++){
@@ -719,13 +777,28 @@ function multiMotionHypotheses(fA,fB,n,m){
   var hyps=[];
   clusters.forEach(function(cl){
     var uniq=distinct(cl.members);
-    if(uniq.length<MM_MIN_SUPPORT)return;
+    var known=false;
+    if(uniq.length<MM_MIN_SUPPORT){
+      // a cluster of strokes that already moved together last time
+      // needs less evidence (see TW_MATCH_TRACKING)
+      if(!pieceOf||uniq.length<MM_MIN_SUPPORT_KNOWN)return;
+      var p0=pieceOf[uniq[0].a];if(p0<0)return;
+      for(var ui=1;ui<uniq.length;ui++)if(pieceOf[uniq[ui].a]!==p0)return;
+      known=true;
+    }
     var tf=fitOf(uniq);if(!tf)return;
     // absorb every shape-compatible candidate the fit predicts, refit once
     var absorbed=cands.filter(function(c){var q=applySimilarityTransform(tf,fA[c.a].cx,fA[c.a].cy);return Math.hypot(q.x-fB[c.b].cx,q.y-fB[c.b].cy)<tol;});
     var uniq2=distinct(absorbed);
     if(uniq2.length>=uniq.length){var tf2=fitOf(uniq2);if(tf2){tf=tf2;uniq=uniq2;}}
-    hyps.push({tf:tf,support:uniq.length});
+    hyps.push({tf:tf,support:uniq.length,minAdopt:known?MM_MIN_SUPPORT_KNOWN:MM_MIN_SUPPORT});
+  });
+  // MOMENTUM: each known piece proposes its previous displacement again
+  if(hist&&hist.pieces)hist.pieces.forEach(function(pc){
+    var pa=pc.members.map(function(i){return{x:fA[i].cx,y:fA[i].cy};});
+    var pb=pc.members.map(function(i){return{x:fA[i].cx+pc.mx,y:fA[i].cy+pc.my};});
+    var tf=fitSimilarityTransform(pa,pb);if(!tf)return;
+    hyps.push({tf:tf,support:pc.members.length,minAdopt:MM_MIN_SUPPORT_KNOWN,momentum:true});
   });
   hyps.sort(function(p,q){return q.support-p.support;});
   var ub=unionBounds(fA),kept=[];
@@ -4058,7 +4131,8 @@ function generateTweens(explicitRestrictTo){
     // before. Only skip when there is genuinely nothing to tween on either
     // side; zero matches with real strokes still flows through so the
     // fade-out/fade-in machinery below does its job.
-    var matches=autoMatch(sA,sB);if(!sA.length&&!sB.length&&!forcedPairs.length)continue;
+    var hist=(ki>0)?_trackingHistory(sA,ld.frames[keys[ki-1]].strokes):null;
+    var matches=autoMatch(sA,sB,hist);if(!sA.length&&!sB.length&&!forcedPairs.length)continue;
     // Only morph plausible pairs. A stroke whose best assignment still
     // scores badly (no real counterpart in the other key — count mismatch,
     // or a shape that genuinely appears/disappears) cross-fades in place
