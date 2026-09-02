@@ -9403,6 +9403,17 @@ function onKeyDown(event){
     // duplicateSelection and cloned the drawing INSIDE the layer instead
     // (measured: 1 → 2 children, layer count unchanged).
     if(state.appMode==='motion'){window.SM.duplicateLayer();return;}
+    // Animation 2D, feedback #803 ("quand on select un calque dans la
+    // timeline motion ou animation 2D et que l'on fait cmd + d alors il
+    // faut que le layer se duplique"): clicking a layer row auto-selects
+    // that layer's whole content (the Animate/AE convention, see the frame
+    // -cell mousedown handler) — so selectedPaths was never empty after a
+    // row click and Cmd+D cloned the DRAWING inside the layer (measured:
+    // 3 → 6 shapes, layer count unchanged). window._layerActiveExplicit is
+    // exactly "this selection came from a timeline row click" (set by
+    // setActiveLayer, cleared by any canvas clearSel), so it tells the two
+    // gestures apart without guessing from the selection's contents.
+    if(window._layerActiveExplicit){window.SM.duplicateLayer();return;}
     if(selectedPaths.length)duplicateSelection();
     else if(_sel.frames.length)window.SM.duplicateSelectedFrames();
     else window.SM.duplicateLayer();
