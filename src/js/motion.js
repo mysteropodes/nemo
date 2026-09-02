@@ -4819,6 +4819,16 @@
   // rendering four figures' worth of rows on both sides would lock the UI;
   // the vertices past the cap are still animatable by dragging them on
   // canvas, they just have no row.
+  // A VIDEO layer's mesh id lives on the layer (ld.videoMeshId, #779) — it
+  // has no strokes, so it never appears in the per-element list the image
+  // mesh rows hang off. Its rows are therefore LAYER-level, right after the
+  // layer's own Transform group, and this is the single predicate both
+  // halves of the timeline ask (CLAUDE.md §11: the panel and the grid must
+  // never disagree about how many rows a layer has).
+  function videoMeshRowsFor(ld) {
+    if (!ld || !ld.nativeVideo || !ld.videoMeshId) return 0;
+    return meshVertexRowCount(ld.videoMeshId);
+  }
   var MESH_ROW_CAP = 200;
   function meshVertexRowCount(meshId) {
     if (!window.SMImageMesh) return 0;
@@ -7506,6 +7516,16 @@
       if (discreteRowVisible(ld, 'parent')) renderParentRow(list, ld, li);
       if (discreteRowVisible(ld, 'blend')) renderBlendRow(list, ld, li);
       renderTransformGroup(list, ld, SM.t('hdrTransform'));
+      // Image mesh on a VIDEO (2026-09, #779 follow-up): the vertex rows of
+      // an ordinary image hang off its element entry, and a video has none —
+      // so they sit here instead, at layer level, immediately after the
+      // layer's own Transform group. Same builder, same holder machinery
+      // (keyed by meshId, see meshHolder), same stopwatches; only the place
+      // in the row list differs. MUST stay mirrored by renderTimelineMotion's
+      // grid half — CLAUDE.md §11.
+      if (videoMeshRowsFor(ld)) {
+        renderMeshVertexGroup(list, ensureElementHolder(ld, ld.videoMeshId), videoMeshRowsFor(ld));
+      }
       // Per-element sub-list used to be component-exclusive ("a symbol
       // instance's actual strokes live inside the SYMBOL's own sub-layer,
       // not addressable as elements of this outer layer") — true only
@@ -11171,6 +11191,20 @@
         if (entry.row === 'dupHeader') { var dupSpacer = document.createElement('div'); dupSpacer.className = 'frow motion-group-row'; grid.appendChild(dupSpacer); return; }
         renderTracksFor(grid, ld, entry.prop);
       });
+      // Video image mesh — exact mirror of renderLayerListMotion's own
+      // renderMeshVertexGroup call just after ITS Transform group: same
+      // predicate (videoMeshRowsFor), one header row then the vertex tracks
+      // only while the group is expanded. Same shape as the element-level
+      // mesh mirror further down, one level up.
+      var vmRows = videoMeshRowsFor(ld);
+      if (vmRows) {
+        var vmHolder = ensureElementHolder(ld, ld.videoMeshId);
+        var vmHdrSpacer = document.createElement('div'); vmHdrSpacer.className = 'frow motion-group-row';
+        grid.appendChild(vmHdrSpacer);
+        if (isPathGroupExpanded(vmHolder)) {
+          for (var vmi = 0; vmi < vmRows; vmi++) renderTracksFor(grid, vmHolder, 'vtx' + vmi);
+        }
+      }
       // Mirrors renderElementsList's panel structure: one spacer per tree
       // node (shape OR group header — 2026-07-31, group/shape tree panel),
       // its own track rows only when that ONE shape entry is expanded (only
