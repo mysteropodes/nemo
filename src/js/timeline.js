@@ -1216,6 +1216,11 @@ window.SM={
     if(ld.effects)dst.effects=JSON.parse(JSON.stringify(ld.effects));
     if(ld.markers)dst.markers=JSON.parse(JSON.stringify(ld.markers));
     if(ld.symbolId){dst.symbolId=ld.symbolId;dst.symPlayMode=ld.symPlayMode;dst.symSpeed=ld.symSpeed;dst.symPlacedAt=ld.symPlacedAt;dst.symSingleFrame=ld.symSingleFrame;dst.symMatrix=ld.symMatrix;dst.locked=ld.locked;}
+    // Same gap as duplicateLayer's (see its nativeVideo comment): cutting a
+    // video layer at the playhead left the second half blank.
+    if(ld.nativeVideo){dst.nativeVideo=JSON.parse(JSON.stringify(ld.nativeVideo));if(ld._nvSessionId)dst._nvSessionId=ld._nvSessionId;}
+    if(ld.footage)dst.footage=JSON.parse(JSON.stringify(ld.footage));
+    if(ld.timeRemap)dst.timeRemap=JSON.parse(JSON.stringify(ld.timeRemap));
     dst.inPoint=f;dst.outPoint=outF;
     ld.outPoint=f-1;
     // Splitting materialises hard in/out values on both halves, which a
@@ -1257,6 +1262,17 @@ window.SM={
     if(src.matteMode)state.layers[ni].matteMode=src.matteMode;
     if(src.matteSourceLayerUid)state.layers[ni].matteSourceLayerUid=src.matteSourceLayerUid;
     if(src.mattesMore&&src.mattesMore.length)state.layers[ni].mattesMore=src.mattesMore.map(function(m){return{uid:m.uid,mode:m.mode};});
+    // Video/footage (2026-09 QA sweep): a video layer keeps NOTHING in its
+    // frames (getEffectiveStrokes returns [] for nativeVideo, app.js), so
+    // the frames clone above produced an empty copy — "Dupliquer" on a
+    // video gave a blank layer, measured: "tr copy" with no nativeVideo and
+    // no session. The record is deep-copied (its own offsetFrames/time
+    // settings from here on); the decode SESSION is shared by id — it is a
+    // read-only decoder, and frames are cached per layerUid since #808, so
+    // two layers reading one session cannot cross their pictures. Same for
+    // the descriptive footage tag.
+    if(src.nativeVideo){state.layers[ni].nativeVideo=JSON.parse(JSON.stringify(src.nativeVideo));if(src._nvSessionId)state.layers[ni]._nvSessionId=src._nvSessionId;}
+    if(src.footage)state.layers[ni].footage=JSON.parse(JSON.stringify(src.footage));
     // elementMotion is keyed by strokeId, and duplicateLayer's frames clone
     // above (JSON.stringify) preserves each stroke's strokeId unchanged —
     // so the duplicate's strokes carry the SAME ids the original's element
