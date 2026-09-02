@@ -3089,6 +3089,18 @@ var _combineSecHome=null;
 // Where #canvas-sec normally sits, captured once before it is ever moved
 // to the top for the Document context (see updatePropsContext).
 var _canvasSecHome=null;
+// One helper for both "remember the slot" sections above (2026-09 QA sweep,
+// PR #820): a captured next sibling can itself be moved away by the OTHER
+// mechanism (#combine-opts-sec goes into the selection block, and it was
+// #canvas-sec's captured neighbour) — insertBefore then throws and the whole
+// updateUI aborts. Anchor on the next sibling while it is still attached,
+// else on whatever now follows the previous sibling, else the parent's end.
+function _captureSlotHome(node){return{parent:node.parentNode,next:node.nextSibling,prev:node.previousSibling};}
+function _restoreSlotHome(node,home){
+  var anchor=home.next;
+  if(anchor&&anchor.parentNode!==home.parent)anchor=(home.prev&&home.prev.parentNode===home.parent)?home.prev.nextSibling:null;
+  if(node.parentNode!==home.parent||node.nextSibling!==anchor)home.parent.insertBefore(node,anchor);
+}
 function updatePropsContext(){
   var hasSel=(state.tool==='select'||state.tool==='subselect')&&selectedPaths.length>0;
   var ctx,hdrText;
@@ -3262,7 +3274,7 @@ function updatePropsContext(){
     // — restoring by "put it back after shapes-sec" would break the moment
     // anything else is inserted there, whereas the original next sibling is
     // exactly the contract "this is my slot".
-    if(!_canvasSecHome)_canvasSecHome={parent:canvasSec.parentNode,next:canvasSec.nextSibling,prev:canvasSec.previousSibling};
+    if(!_canvasSecHome)_canvasSecHome=_captureSlotHome(canvasSec);
     if(ctx==='document'){
       // Document fields sit at the TOP, on the dark ground, exactly where a
       // selection puts Position/Size/Rotate (2026-08-30, feedback #171
@@ -3284,16 +3296,7 @@ function updatePropsContext(){
       if(canvasBody)canvasBody.classList.remove('hid');
       if(canvasHdr)canvasHdr.classList.remove('closed');
     }else{
-      // The captured next sibling can itself have been detached since
-      // (a section rebuilt by its own panel code) — insertBefore then
-      // throws "not a child of this node" and the WHOLE updateUI aborts
-      // mid-way for every non-document context after that (2026-09 QA
-      // sweep, hit live: combineSelection → updateUI → throw). Fall back to
-      // the slot's previous sibling, then to the end of the parent.
-      var home=_canvasSecHome, anchor=home.next;
-      if(anchor&&anchor.parentNode!==home.parent)anchor=(home.prev&&home.prev.parentNode===home.parent)?home.prev.nextSibling:null;
-      var moved=(canvasSec.parentNode!==home.parent)||(canvasSec.nextSibling!==anchor);
-      if(moved)home.parent.insertBefore(canvasSec,anchor);
+      _restoreSlotHome(canvasSec,_canvasSecHome);
       canvasSec.classList.remove('psec-identity');
       if(canvasHdr)canvasHdr.style.display='';
     }
@@ -3305,7 +3308,7 @@ function updatePropsContext(){
   // listeners, same updateCombinePanel().
   var combineSec=document.getElementById('combine-opts-sec');
   if(combineSec){
-    if(!_combineSecHome)_combineSecHome={parent:combineSec.parentNode,next:combineSec.nextSibling};
+    if(!_combineSecHome)_combineSecHome=_captureSlotHome(combineSec);
     var combineHdr=combineSec.querySelector('.phdr');
     var combineBody=combineSec.querySelector('.pbdy');
     var selBody=document.getElementById('sel-props-sec')&&document.getElementById('sel-props-sec').querySelector('.pbdy');
@@ -3328,8 +3331,7 @@ function updatePropsContext(){
       var modeRow=document.getElementById('combine-mode-row');
       if(modeRow)modeRow.style.display='none';
     }else{
-      var cmoved=(combineSec.parentNode!==_combineSecHome.parent)||(combineSec.nextSibling!==_combineSecHome.next);
-      if(cmoved)_combineSecHome.parent.insertBefore(combineSec,_combineSecHome.next);
+      _restoreSlotHome(combineSec,_combineSecHome);
       combineSec.classList.remove('psec-inline');
       if(combineHdr)combineHdr.style.display='';
       var modeRowBack=document.getElementById('combine-mode-row');
