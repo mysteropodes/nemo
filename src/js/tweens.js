@@ -4615,6 +4615,37 @@ function renderGhostAll(){
 // the `__` prefix marks that, same convention as data.__engineSrcDict.
 // Read by engine-bridge.js's onionLayerItems.
 function osTagFrame(item,li,fi){if(item&&item.data){item.data.__osLayer=li;item.data.__osFrame=fi;}}
+// Teintes de pelure d'oignon et calage (2026-09).
+// Les modes Tinted/Outline peignaient un rouge (1,.3,.3) et un bleu
+// (.3,.55,1) codés en dur ; ils sont maintenant réglables et mémorisés.
+// Le CALAGE (« shift and trace », OpenToonz) décale les fantômes à l'écran
+// pour aligner un mouvement sur le dessin voisin : c'est une aide au tracé,
+// donc volontairement HORS du document — rien n'est enregistré dans le
+// projet, seulement dans les préférences locales.
+var ONION_TINT_DEFAULTS={prev:'#ff4d4d',next:'#4d8cff'};
+function onionTint(which){
+  try{return localStorage.getItem('nemo-onion-tint-'+which)||ONION_TINT_DEFAULTS[which];}
+  catch(e){return ONION_TINT_DEFAULTS[which];}
+}
+function setOnionTint(which,hex){
+  try{localStorage.setItem('nemo-onion-tint-'+which,hex);}catch(e){}
+  renderOS();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
+function onionTintColor(which,alpha){
+  var c=new Color(onionTint(which));c.alpha=alpha;return c;
+}
+function onionShift(){
+  try{
+    var raw=localStorage.getItem('nemo-onion-shift');
+    if(!raw)return{x:0,y:0,next:false};
+    var o=JSON.parse(raw);
+    return{x:Number(o.x)||0,y:Number(o.y)||0,next:!!o.next};
+  }catch(e){return{x:0,y:0,next:false};}
+}
+function setOnionShift(o){
+  try{localStorage.setItem('nemo-onion-shift',JSON.stringify({x:Number(o.x)||0,y:Number(o.y)||0,next:!!o.next}));}catch(e){}
+  renderOS();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+}
 function renderOS(){
   // toggleOnion()/setOnionMode()/setOnionRange()/toggleGhostAll() etc. all
   // just mutate state then call renderOS() — none of them ever bumped
@@ -4662,6 +4693,7 @@ function renderOS(){
   // frame in view stays visibly present, nearer frames are progressively
   // more opaque, and widening the range genuinely changes what's legible
   // instead of just adding more scene items nobody can see.
+  var _osShift=onionShift();
   var prevRangeSpan=Math.max(1,cf-state.onionIn);
   var nextRangeSpan=Math.max(1,state.onionOut-cf);
   // sd.hasRealStroke (serP, app.js) gates the manufactured tint/outline
@@ -4706,8 +4738,8 @@ function renderOS(){
   // outline modes still never touch texture-tagged items (canTint excludes
   // them) — that's the original stray-blue-line halo bug this skip was
   // added to prevent, still guarded, just no longer by omitting them outright.
-  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes=SMGroup.applyCombinesToStrokes(strokes,osLd,li,fi);var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-(dist/prevRangeSpan)*.85);strokes.forEach(function(sd){var isTex=!!(sd.isBrushTextureCopy||sd.brushTexturePreset);if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;osTagFrame(pr,li,fi);return;}var effOp=isTex?op*(sd.opacity!==undefined?sd.opacity:1):op;var p=desP(sd,onionPrevLayer,effOp);var canTint=(sd.hasRealStroke||sd.fillColor)&&!isTex;if(state.onionMode==='tinted'&&canTint)p.strokeColor=new Color(1,.3,.3,op);else if(state.onionMode==='outline'&&canTint){p.fillColor=null;p.strokeColor=new Color(1,.3,.3,op*.8);p.strokeWidth=1;}else p.opacity=effOp;});}
-  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes2=SMGroup.applyCombinesToStrokes(strokes2,osLd,li,fi2);var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-(dist2/nextRangeSpan)*.85);strokes2.forEach(function(sd){var isTex2=!!(sd.isBrushTextureCopy||sd.brushTexturePreset);if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;osTagFrame(nr,li,fi2);return;}var effOp2=isTex2?op2*(sd.opacity!==undefined?sd.opacity:1):op2;var p=desP(sd,onionNextLayer,effOp2);var canTint2=(sd.hasRealStroke||sd.fillColor)&&!isTex2;if(state.onionMode==='tinted'&&canTint2)p.strokeColor=new Color(.3,.55,1,op2);else if(state.onionMode==='outline'&&canTint2){p.fillColor=null;p.strokeColor=new Color(.3,.55,1,op2*.8);p.strokeWidth=1;}else p.opacity=effOp2;});}
+  for(var fi=cf-1;fi>=state.onionIn&&fi>=0;fi--){var strokes=getEffectiveStrokes(li,fi);if(!strokes.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes=SMGroup.applyCombinesToStrokes(strokes,osLd,li,fi);var dist=cf-fi;var op=(state.onionPrevOpacity/100)*Math.max(.15,1-(dist/prevRangeSpan)*.85);strokes.forEach(function(sd){var isTex=!!(sd.isBrushTextureCopy||sd.brushTexturePreset);if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;osTagFrame(pr,li,fi);return;}var effOp=isTex?op*(sd.opacity!==undefined?sd.opacity:1):op;var p=desP(sd,onionPrevLayer,effOp);var canTint=(sd.hasRealStroke||sd.fillColor)&&!isTex;if(state.onionMode==='tinted'&&canTint)p.strokeColor=onionTintColor('prev',op);else if(state.onionMode==='outline'&&canTint){p.fillColor=null;p.strokeColor=onionTintColor('prev',op*.8);p.strokeWidth=1;}else p.opacity=effOp;if(_osShift.x||_osShift.y)p.translate(new Point(_osShift.x,_osShift.y));});}
+  for(var fi2=cf+1;fi2<=state.onionOut&&fi2<state.totalFrames;fi2++){var strokes2=getEffectiveStrokes(li,fi2);if(!strokes2.length)continue;if(window.SMGroup&&osLd&&osLd.groups)strokes2=SMGroup.applyCombinesToStrokes(strokes2,osLd,li,fi2);var dist2=fi2-cf;var op2=(state.onionNextOpacity/100)*Math.max(.15,1-(dist2/nextRangeSpan)*.85);strokes2.forEach(function(sd){var isTex2=!!(sd.isBrushTextureCopy||sd.brushTexturePreset);if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;osTagFrame(nr,li,fi2);return;}var effOp2=isTex2?op2*(sd.opacity!==undefined?sd.opacity:1):op2;var p=desP(sd,onionNextLayer,effOp2);var canTint2=(sd.hasRealStroke||sd.fillColor)&&!isTex2;if(state.onionMode==='tinted'&&canTint2)p.strokeColor=onionTintColor('next',op2);else if(state.onionMode==='outline'&&canTint2){p.fillColor=null;p.strokeColor=onionTintColor('next',op2*.8);p.strokeWidth=1;}else p.opacity=effOp2;if(_osShift.next&&(_osShift.x||_osShift.y))p.translate(new Point(_osShift.x,_osShift.y));});}
   userLayers[state.activeLayerIdx].activate();
 }
 
