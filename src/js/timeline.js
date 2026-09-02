@@ -10234,6 +10234,11 @@ document.getElementById('canvas-fit-btn').addEventListener('click',function(e){
     // this exact spot.
     {label:(state.guidesSnap?'✓ ':'')+(SM&&SM.t?SM.t('snapToGuidesMenuLabel'):'Snap to Guides'),action:function(){
       state.guidesSnap=!state.guidesSnap;
+    }},,
+    {label:(state.smartGuides?'✓ ':'')+(SM&&SM.t?SM.t('smartGuidesMenuLabel'):'Smart Guides'),action:function(){
+      state.smartGuides=!state.smartGuides;
+      if(!state.smartGuides)window._smartGuideLines=null;
+      if(window.SMEngineBridge)SMEngineBridge.renderNow();
     }},
     // Snap-to-pixel-grid (2026-09, AE help sweep after the two items above:
     // AE itself calls this "Snap to Grid", separate from guide-snapping —

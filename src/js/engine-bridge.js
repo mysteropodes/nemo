@@ -2419,6 +2419,20 @@
       if (nodeItems.length) layers.push({ items: nodeItems });
       var xformItems = buildTransformBoxItems();
       if (xformItems.length) layers.push({ items: xformItems });
+      // Smart alignment guides (2026-09, feedback #747) — computed by
+      // rulers-bridge's smartAlignDelta during a move drag and published on
+      // window._smartGuideLines; drawn here, above the shapes and below the
+      // handles, and gone the moment the drag ends. Inside
+      // includeEditorOverlays, so no export ever sees them.
+      if (window._smartGuideLines && window._smartGuideLines.length) {
+        var zsg = 1 / view.zoom;
+        var sgItems = window._smartGuideLines.map(function (L) {
+          var it = lineItem([L.x1, L.y1], [L.x2, L.y2], [255, 45, 120, 235], 1 * zsg);
+          it.dashPattern = [5 * zsg, 4 * zsg];
+          return it;
+        });
+        layers.push({ items: sgItems });
+      }
       var hoverBoxItems = buildHoverBoxItems();
       if (hoverBoxItems.length) layers.push({ items: hoverBoxItems });
       var textBoxItems = buildTextDragBoxItems();

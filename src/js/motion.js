@@ -9444,6 +9444,43 @@
     node.children.reverse(); // front-first, like the top level
     return node;
   }
+  // One node for a whole vector-text run (2026-09, #747). Not a ld.groups
+  // entry — a text run's `data.groupId` is a bare tag written by
+  // vector-text-bridge, with no group metadata behind it — so this builds
+  // the node straight from the run's own glyph entries, in draw order, and
+  // takes its label from the root glyph's stored string.
+  function textNode(gid, flat) {
+    var members = flat.filter(function (e) { return e.sd.isVectorText && e.sd.groupId === gid; });
+    var rootEntry = members.filter(function (e) { return e.sd.isTextRoot; })[0] || members[0];
+    var label = (rootEntry && rootEntry.sd.text) ? String(rootEntry.sd.text).replace(/\s+/g, ' ').trim() : '';
+    if (label.length > 24) label = label.slice(0, 24) + '\u2026';
+    return {
+      type: 'group', isText: true, gid: gid,
+      name: label || (SM.t ? SM.t('autoNameText') : 'Text'),
+      children: members.map(function (e) { return { type: 'shape', strokeId: e.strokeId, sd: e.sd }; }).reverse(),
+      memberIds: members.map(function (e) { return e.strokeId; }),
+    };
+  }
+  // "Éclater en formes" (#747) — drops the text identity from every glyph
+  // of a run, so they become ordinary shapes: the run stops being one
+  // element and its letters stop being re-buildable as text. Deliberately
+  // explicit (the string is gone afterwards), which is why it only ever
+  // happens from the context menu.
+  function explodeTextRun(li, ld, gid) {
+    var layer = window.userLayers && userLayers[li]; if (!layer) return;
+    pushUndo();
+    layer.children.forEach(function (c) {
+      var d = c.data; if (!d || !d.isVectorText || d.groupId !== gid) return;
+      delete d.isVectorText; delete d.groupId; delete d.vectorChar;
+      delete d.charIndex; delete d.wordIndex; delete d.lineIndex;
+      delete d.isText; delete d.isTextRoot; delete d.text; delete d.vectorFont;
+    });
+    saveActiveLayerFrame();
+    if (window.renderLayerList) renderLayerList();
+    if (window.renderTimeline) renderTimeline();
+    if (window.renderShapesPanel) renderShapesPanel();
+    if (window.SMEngineBridge) SMEngineBridge.renderNow();
+  }
   function buildShapeTree(li, ld) {
     var flat = layerElements(li, ld);
     var byStrokeId = {};
@@ -9465,6 +9502,23 @@
       // checked, so they already listed individually. Vector text now gets
       // the same treatment: skip the group-collapse, list each glyph as its
       // own expandable element row, exactly like every other ungrouped shape.
+      //
+      // 2026-09 (feedback #747, "possible qu'un élément texte soit
+      // identifié comme tel et ne devienne pas un shape sauf clic droit
+      // éclater"): listing every glyph at TOP level was the other extreme —
+      // a five-letter word arrived as five anonymous "Shape N" rows and
+      // nothing said "this is text". It is now ONE node, labelled with its
+      // own string, that EXPANDS to its glyphs — which keeps the per-letter
+      // rows the paragraph above exists for one click away instead of
+      // always underfoot. A run only becomes ordinary shapes on purpose,
+      // through "Éclater en formes" (explodeTextRun below).
+      if (entry.sd.isVectorText && entry.sd.groupId) {
+        if (!emittedGroups[entry.sd.groupId]) {
+          emittedGroups[entry.sd.groupId] = true;
+          out.push(textNode(entry.sd.groupId, flat));
+        }
+        return;
+      }
       var gid = entry.sd.isVectorText ? null : entry.sd.groupId;
       // Nested groups (2026-09, #738): a shape's own tag names its
       // INNERMOST group, but the tree lists the OUTERMOST one — the inner
@@ -13027,6 +13081,7 @@
     // 2D's own layer-row shape list (timeline.js) so both modes' trees can
     // never diverge in content or z-order.
     buildShapeTree: buildShapeTree, groupNode: groupNode, shapeTreeRowPlan: shapeTreeRowPlan,
+    textNode: textNode, explodeTextRun: explodeTextRun,
     toggleShapeGroupExpanded: toggleShapeGroupExpanded, toggleShapesSectionCollapsed: toggleShapesSectionCollapsed,
     selectShapesByStrokeIds: selectShapesByStrokeIds,
     elementLabel: elementLabel,

@@ -2051,6 +2051,8 @@
         // move tick) — the true baseline the Shift axis-lock measures from.
         moveGestureOrigin = lastPt.clone();
         moveAppliedTotal = new Point(0, 0);
+        // Smart-guide targets are per-gesture (see resetSmartTargets).
+        if (window.SMRulers && SMRulers.resetSmartTargets) SMRulers.resetSmartTargets();
       }
       var delta = pt.subtract(lastPt);
       // Shift axis-lock (Illustrator-style) — snap the TOTAL displacement
@@ -2065,6 +2067,16 @@
           var totalSnapped = Math.abs(totalRaw.x) >= Math.abs(totalRaw.y) ? new Point(totalRaw.x, 0) : new Point(0, totalRaw.y);
           delta = totalSnapped.subtract(moveAppliedTotal);
         }
+        // Smart alignment guides (2026-09, #747) — correct this tick's
+        // delta so the selection's own edges/centres land exactly on a
+        // neighbour's, and hand the overlay the lines to draw while the
+        // magnet holds. Skipped under Shift: the axis lock right above is
+        // an explicit constraint and a diagonal correction would fight it.
+        if (!e.shiftKey && state.appMode !== 'motion' && window.SMRulers && SMRulers.smartAlignDelta) {
+          var _sg = SMRulers.smartAlignDelta(selectedPaths, delta, 8);
+          if (_sg && _sg.fix && (_sg.fix.x || _sg.fix.y)) delta = delta.add(_sg.fix);
+          window._smartGuideLines = _sg ? _sg.lines : null;
+        } else if (window._smartGuideLines) window._smartGuideLines = null;
         moveAppliedTotal = moveAppliedTotal.add(delta);
       }
       // Layer under a Motion transform: the pointer moves in RENDERED
@@ -2702,6 +2714,7 @@
       _marquee.active = false;
       renderArcs(); updateUI();
     } else if (mode === 'move') {
+      window._smartGuideLines = null; // the magnet's lines only exist during the drag (#747)
       var didMove = moveStarted;
       moveStarted = false;
       moveGestureOrigin = null; moveAppliedTotal = null;

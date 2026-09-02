@@ -263,6 +263,88 @@
     return new Point(bestVx != null ? bestVx : worldPt.x, bestHy != null ? bestHy : worldPt.y);
   }
 
+  // ---- SMART ALIGNMENT GUIDES (2026-09, feedback #747: "que celui-ci
+  // s'aligne avec des repères comme sur figma") ----
+  // The manual guides above are placed by hand and live in state.guides;
+  // these are computed live from what is actually on the canvas, so a drag
+  // lines up with its NEIGHBOURS with nothing to set up first. Same
+  // contract as snapPoint: it either returns a correction or nothing, and
+  // the caller stays in charge of applying it.
+  // Candidates are the three x's (left, centre, right) and three y's (top,
+  // centre, bottom) of every other visible element in the active layer,
+  // plus the canvas edges and its centre. Tolerance is in SCREEN pixels so
+  // the magnet feels the same at any zoom.
+  // Targets are rebuilt ONCE per drag, not per tick: nothing but the
+  // dragged selection moves during a gesture, and reading every sibling's
+  // bounds on every mousemove is the kind of per-tick O(n) that only shows
+  // up on a heavy layer. select-bridge calls resetSmartTargets() when a
+  // move gesture starts.
+  var _sgTargets = null;
+  function resetSmartTargets() { _sgTargets = null; }
+  function smartAlignDelta(selPaths, delta, tolPx) {
+    if (!state.smartGuides || !selPaths || !selPaths.length) return null;
+    var layer = window.userLayers && userLayers[state.activeLayerIdx];
+    if (!layer) return null;
+    var b = null;
+    selPaths.forEach(function (p) {
+      if (!p || !p.bounds || p.visible === false) return;
+      b = b ? b.unite(p.bounds) : p.bounds.clone();
+    });
+    if (!b || (!b.width && !b.height)) return null;
+    b = b.clone(); b.x += delta.x; b.y += delta.y;
+    var tolWorld = (tolPx || 8) / Math.max(0.0001, view.zoom);
+    if (!_sgTargets) _sgTargets = buildSmartTargets(layer, selPaths);
+    var xs = _sgTargets.xs, ys = _sgTargets.ys;
+    function best(edges, targets) {
+      var out = null;
+      edges.forEach(function (edge) {
+        targets.forEach(function (t) {
+          var d = t.c - edge;
+          if (Math.abs(d) > tolWorld) return;
+          if (!out || Math.abs(d) < Math.abs(out.d)) out = { d: d, t: t, edge: edge };
+        });
+      });
+      return out;
+    }
+    var bx = best([b.left, b.center.x, b.right], xs);
+    var by = best([b.top, b.center.y, b.bottom], ys);
+    if (!bx && !by) return null;
+    // The line spans BOTH objects, like Figma's own — from the top of
+    // whichever is higher to the bottom of whichever is lower — so it reads
+    // as "these two line up", not as an anonymous full-canvas rule.
+    var fixX = bx ? bx.d : 0, fixY = by ? by.d : 0;
+    var top = b.top + fixY, bottom = b.bottom + fixY, left = b.left + fixX, right = b.right + fixX;
+    var lines = [];
+    if (bx) lines.push({ x1: bx.t.c, y1: Math.min(bx.t.min, top), x2: bx.t.c, y2: Math.max(bx.t.max, bottom) });
+    if (by) lines.push({ x1: Math.min(by.t.min, left), y1: by.t.c, x2: Math.max(by.t.max, right), y2: by.t.c });
+    return { fix: new Point(fixX, fixY), lines: lines };
+  }
+
+  function buildSmartTargets(layer, selPaths) {
+    var xs = [], ys = [];
+    function pushTarget(arr, coord, min, max) { arr.push({ c: coord, min: min, max: max }); }
+    // Canvas frame — the one target that always exists, even in an
+    // otherwise empty document.
+    pushTarget(xs, 0, 0, state.canvasH); pushTarget(xs, state.canvasW / 2, 0, state.canvasH); pushTarget(xs, state.canvasW, 0, state.canvasH);
+    pushTarget(ys, 0, 0, state.canvasW); pushTarget(ys, state.canvasH / 2, 0, state.canvasW); pushTarget(ys, state.canvasH, 0, state.canvasW);
+    layer.children.forEach(function (c) {
+      if (selPaths.indexOf(c) !== -1 || c.visible === false || !c.bounds) return;
+      // Companions and texture dabs are not independent elements — they
+      // ride their ribbon, so aligning to them would mean aligning to the
+      // same shape twice (the exclusion isSelectablePathChild already makes).
+      if (c.data && (c.data.isLinkedFillCompanion || c.data.isBrushTextureCopy)) return;
+      var cb = c.bounds;
+      if (!cb.width && !cb.height) return;
+      pushTarget(xs, cb.left, cb.top, cb.bottom);
+      pushTarget(xs, cb.center.x, cb.top, cb.bottom);
+      pushTarget(xs, cb.right, cb.top, cb.bottom);
+      pushTarget(ys, cb.top, cb.left, cb.right);
+      pushTarget(ys, cb.center.y, cb.left, cb.right);
+      pushTarget(ys, cb.bottom, cb.left, cb.right);
+    });
+    return { xs: xs, ys: ys };
+  }
+
   // Snap to Pixel Grid (2026-09) — independent of guides/rulers on purpose,
   // see state.pixelGridSnap's own comment (app.js): a project with no
   // guides placed should still be able to snap a drag to whole pixels.
@@ -323,5 +405,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  window.SMRulers = { toggleOn: toggleOn, snapPoint: snapPoint, snapToPixelGrid: snapToPixelGrid, render: function () { lastZoom = null; } };
+  window.SMRulers = { toggleOn: toggleOn, snapPoint: snapPoint, smartAlignDelta: smartAlignDelta, resetSmartTargets: resetSmartTargets, snapToPixelGrid: snapToPixelGrid, render: function () { lastZoom = null; } };
 })();
