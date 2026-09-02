@@ -1318,7 +1318,7 @@ function alignSelection(mode){
   });
   if(!moved){state.undoStack.pop();return;}
   fillRegenerateLinked(userLayers[state.activeLayerIdx],null);
-  saveActiveLayerFrame();renderArcs();updateUI();
+  saveActiveLayerFrameOrPromote();renderArcs();updateUI();
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
 }
 // Distribute (2026-09 — alignSelection's own comment already named this
@@ -1362,7 +1362,7 @@ function distributeSelection(mode){
   });
   if(!moved){state.undoStack.pop();return;}
   fillRegenerateLinked(userLayers[state.activeLayerIdx],null);
-  saveActiveLayerFrame();renderArcs();updateUI();
+  saveActiveLayerFrameOrPromote();renderArcs();updateUI();
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
 }
 // Rotation/scale pivot picker (redesign 2026-07-09, AE-style 9-dot anchor
@@ -1642,7 +1642,7 @@ function duplicateSelection(){
   clearSel();
   selectedPaths=clones.filter(isSelectablePathChild);
   state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
-  saveActiveLayerFrame();renderArcs();updateUI();
+  saveActiveLayerFrameOrPromote();renderArcs();updateUI();
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
 }
 // ---- CANVAS ELEMENT COPY / CUT / PASTE (2026-07) ----

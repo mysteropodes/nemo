@@ -4916,6 +4916,32 @@ function layerIsEffectivelyVisible(i){var ld=state.layers[i];if(!ld)return false
 // a consistent key/held state (distinct from the existing
 // state.layers[i].lfsGroup/symbol-based system, whose 3 channels are each
 // their own independent mini-timeline with NO shared timing at all).
+// saveActiveLayerFrame() deliberately does nothing on a HELD frame (a scrub
+// must never mint keyframes) — but a real edit made on one has to land
+// somewhere, or it snaps back on the next scrub (feedback #752, then #823/
+// #824/#825, 2026-09 QA sweep: flip, align, distribute, duplicate, smooth
+// all had the same hole). Same two answers as pasteSelection: Animation 2D
+// promotes the held frame — here AFTER the fact, from the live content
+// (which loadFrame materialised from the hold and the gesture just edited)
+// by flagging it a keyframe and letting the ordinary save path store it;
+// Motion writes into the keyframe the hold inherits from. On a keyframe or
+// an inbetween this is exactly saveActiveLayerFrame().
+function saveActiveLayerFrameOrPromote(){
+  var li=state.activeLayerIdx,ld=state.layers[li],f=ld&&ld.frames[state.currentFrame];
+  if(!f||f.isKeyframe||f.isInterpolated){saveActiveLayerFrame();return;}
+  if(state.appMode!=='motion'){
+    if(typeof canEditActiveLayer==='function'&&!canEditActiveLayer())return;
+    f.isKeyframe=true;f.isInterpolated=false;ld._justEnsuredKeyframeAt=state.currentFrame;
+    saveActiveLayerFrame();
+    syncLinkedKeyframeFolder(li,state.currentFrame);
+    if(window.renderTimeline)renderTimeline();
+    return;
+  }
+  for(var o=state.currentFrame;o>=0;o--){
+    if(ld.frames[o]&&ld.frames[o].isKeyframe){ld.frames[o].strokes=_collectLayerStrokes(li,ld);window._sceneVersion=(window._sceneVersion||0)+1;return;}
+  }
+  saveActiveLayerFrame();
+}
 function syncLinkedKeyframeFolder(sourceLayerIdx,frameIdx){
   var srcLd=state.layers[sourceLayerIdx];
   var gid=srcLd&&srcLd.linkGroupId;

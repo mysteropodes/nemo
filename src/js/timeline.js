@@ -780,7 +780,7 @@ window.SM={
       regenerateBrushTexture(p,userLayers[state.activeLayerIdx]);
     });
     fillRegenerateLinked(userLayers[state.activeLayerIdx],null);
-    saveActiveLayerFrame();updateUI();
+    saveActiveLayerFrameOrPromote();updateUI();
   },
   setVectorBrush:function(v){state.vectorBrush=v;},setTaperEnds:function(v){state.taperEnds=v;},setShadowMode:function(v){state.shadowMode=v;},
   setMaskMode:function(v){state.maskMode=v;},setMaskModeType:function(v){state.maskModeType=v;},
@@ -2011,7 +2011,7 @@ window.SM={
         s.point=[2*cx-s.point[0],s.point[1]];s.handleIn=[-s.handleIn[0],s.handleIn[1]];s.handleOut=[-s.handleOut[0],s.handleOut[1]];
       });}
     });
-    saveActiveLayerFrame();updateUI();showToast('Flip horizontal');
+    saveActiveLayerFrameOrPromote();updateUI();showToast('Flip horizontal');
   },
   flipVertical:function(){
     if(state.tool!=='select'||!selectedPaths.length){showToast(SM.t('toastSelectStrokes'));return;}
@@ -2022,7 +2022,7 @@ window.SM={
         s.point=[s.point[0],2*cy-s.point[1]];s.handleIn=[s.handleIn[0],-s.handleIn[1]];s.handleOut=[s.handleOut[0],-s.handleOut[1]];
       });}
     });
-    saveActiveLayerFrame();updateUI();showToast('Flip vertical');
+    saveActiveLayerFrameOrPromote();updateUI();showToast('Flip vertical');
   },
   exportJSON:function(){
     // Never exits an open component: the 30s autosave calls this, and the
