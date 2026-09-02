@@ -385,7 +385,7 @@
     list.innerHTML = '<div style="font-size:10px;color:var(--text-dim)">Ouverture du shot…</div>';
     try {
       var res = await window.SMKitsu.openShot(window.SMKitsu.getSession(), project, sequence, shot);
-      hideModal(); hideStartScreen(); ensureInitialTab();
+      hideModal(); if(window.SMProject&&SMProject.enterEditor)SMProject.enterEditor();
       updateKitsuShotUI();
       var previewNote = res.previews && res.previews.length ? (' — ' + res.previews.length + ' référence(s) publiée(s) visibles dans l\'historique Kitsu') : '';
       showToast('Shot ouvert : ' + shot.name + ' (' + res.meta.w + '×' + res.meta.h + ', ' + res.meta.fps + 'fps, ' + res.meta.frameCount + ' frames)' + previewNote);

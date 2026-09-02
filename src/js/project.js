@@ -396,7 +396,16 @@
     return report;
   }
 
-  window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){newProject(cfg);hideStartScreen();ensureInitialTab();},pushVersionSnapshot:pushVersionSnapshot,listVersionHistory:listVersionHistory,restoreVersion:restoreVersion,autosaveWrite:autosaveWrite,
+  window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){newProject(cfg);hideStartScreen();ensureInitialTab();},
+    // "A project is now open, show the editor" — hideStartScreen +
+    // ensureInitialTab, the pair newProject above already runs. Exported
+    // (2026-09 QA sweep) because kitsu.js called those two by their bare
+    // names, which live only in this closure: opening a shot from Kitsu
+    // threw ReferenceError right after the shot had loaded, so the start
+    // screen stayed up, no tab was created, and the user got
+    // "hideStartScreen is not defined" in the shot list instead of the
+    // success toast.
+    enterEditor:function(){hideStartScreen();ensureInitialTab();},pushVersionSnapshot:pushVersionSnapshot,listVersionHistory:listVersionHistory,restoreVersion:restoreVersion,autosaveWrite:autosaveWrite,
     getSyncFolder:getSyncFolder,chooseSyncFolder:chooseSyncFolder,disableSync:disableSync,publishToShared:publishToShared,checkSharedUpdates:checkSharedUpdates,pullAndMerge:pullAndMerge,
     // Stable per-project filesystem-safe identifier — same slug/hash
     // feedback-bridge.js's local + shared feedback storage keys off, so a
