@@ -492,10 +492,21 @@
     // layer in a browser (loaded project) just fails its lazy re-open with
     // a console error, same as any other unreachable source.
     for (var i = 0; i < state.layers.length; i++) {
-      if (state.layers[i].nativeVideo) _layerFrameSync(i, state.layers[i], frame);
+      if (state.layers[i].nativeVideo) _layerFrameSync(nvKeyFor(state.layers[i], i), state.layers[i], frame);
     }
     _syncSymbolVideos(frame);
   }
+  // The sync state (JS frame cache, lastShown, prefetch queue) and the
+  // engine texture id used to be keyed by the layer's INDEX. Reordering two
+  // video layers then served each one the other's cached frames — confirmed
+  // live (2026-09, QA sweep): after swapping "tr" and "tr2", 'nv:3' (now
+  // "tr") kept receiving tr2's frames and 'nv:2' got tr's, the two videos
+  // literally showing each other's picture until the caches happened to
+  // roll over. Keyed by layerUid instead — stable across reorder, delete,
+  // duplicate AND undo (engine-bridge builds the scene item's imageId from
+  // the same helper, see nvImageIdFor there). Index fallback only for a
+  // layer that somehow has no uid.
+  function nvKeyFor(ld, i) { return (ld && ld.layerUid) ? ('nv:' + ld.layerUid) : i; }
   // Nested video (2026-07-30 fix — Cyril: "attaque le chantier pour les
   // vidéo dans des component"): the loop above only ever walks TOP-LEVEL
   // state.layers, by index — while editing INSIDE a Component, state.layers
@@ -835,6 +846,7 @@
   // key here is ALREADY the full 'nvsym:<symbolId>:<subLayerIndex>' string
   // _syncSymbolVideos built, so this just picks the right prefix by type.
   function _imageIdFor(key) { return typeof key === 'number' ? ('nv:' + key) : key; }
+  function nvImageIdFor(ld, i) { return _imageIdFor(nvKeyFor(ld, i)); }
 
   // ---- optimized media (the DaVinci Resolve pattern) ----
   // Long-GOP sources (H.264/HEVC/VP9…) make every seek cost a keyframe
@@ -1299,6 +1311,7 @@
     // dependency direction stays the same as every other cross-file call here.
     retryWebLinkedSessions: retryWebLinkedSessions,
     onFrameChanged: onFrameChanged,
+    nvImageIdFor: nvImageIdFor,
     displayRect: displayRect,
     transformBox: transformBox,
     stats: stats,
