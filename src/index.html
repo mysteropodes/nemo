@@ -374,6 +374,10 @@
          reassignment; yellow = a reassignment is pending, click confirms
          the currently-selected element as the new target. -->
     <div id="tween-reassign-badge" style="display:none"></div>
+    <!-- Marqueur du point de suivi (tracker-panel.js). Même convention que le
+         badge juste au-dessus : un élément DOM frère de #canvas-area, jamais
+         un item Paper — un item vivant finirait dans le document. -->
+    <div id="track-marker" style="display:none;position:fixed;z-index:120;pointer-events:none;width:18px;height:18px;margin:-9px 0 0 -9px;border:1.5px solid #ffb86c;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.5)"></div>
   </div>
 
   <div id="props-panel-resize" data-i18n-title="dragToResize" title="Glisser pour redimensionner"></div>
@@ -1376,6 +1380,26 @@
         <div class="pr" id="footage-count-row"><span class="pl" data-i18n="fieldFrames">Frames</span><div class="psel" id="footage-count" style="pointer-events:none;background-image:none">0</div></div>
         <!-- Fusion d'images (2026-09) : n'a de sens qu'avec un Time Remap,
              la ligne est donc masquée sans lui. -->
+        <!-- Suivi de mouvement (tracker.js) : le noyau Lucas-Kanade est en
+             Rust (geometry-wasm/src/track.rs) ; ici seulement le pilotage. -->
+        <div class="pr" id="footage-track-sec" style="flex-direction:column;align-items:stretch;gap:4px;border-top:1px solid var(--border);margin-top:6px;padding-top:6px">
+          <span class="pl" style="font-size:9px" data-i18n="trackHdr">Suivi de mouvement</span>
+          <div class="pr dims-row">
+            <span class="pl">X</span><input type="number" class="pi scrub" id="track-x" value="0" data-step="1">
+            <span class="pl">Y</span><input type="number" class="pi scrub" id="track-y" value="0" data-step="1">
+          </div>
+          <div class="pr"><button class="pbtn" id="btn-track-pick" style="flex:1" data-i18n="trackPick">Poser le point sur le canevas</button></div>
+          <div class="pr dims-row">
+            <span class="pl" data-i18n="trackFrom">De</span><input type="number" class="pi scrub" id="track-start" value="0" data-step="1">
+            <span class="pl" data-i18n="trackTo">À</span><input type="number" class="pi scrub" id="track-end" value="0" data-step="1">
+          </div>
+          <div class="pr"><button class="pbtn ac" id="btn-track-run" style="flex:1" data-i18n="trackRun">Analyser</button></div>
+          <div class="pr" id="track-apply-row" style="display:none">
+            <select class="psel" id="track-target" style="flex:1"></select>
+            <button class="pbtn" id="btn-track-apply" data-i18n="trackApply">Appliquer</button>
+          </div>
+          <div id="track-status" style="font-size:9px;color:var(--text-dim)"></div>
+        </div>
         <div class="pr" id="footage-blend-row" style="display:none">
           <label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer">
             <input type="checkbox" id="footage-frame-blend" style="accent-color:var(--accent)">
@@ -2374,6 +2398,7 @@
 <script src="js/lipsync.js"></script>
 <script src="js/comp-preview.js"></script>
 <script src="js/tracker.js"></script>
+<script src="js/tracker-panel.js"></script>
 <script src="js/custom-effects.js"></script>
 <script src="js/vectorize-bridge.js"></script>
 <script src="js/project.js"></script>
