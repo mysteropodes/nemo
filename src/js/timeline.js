@@ -1446,6 +1446,20 @@ window.SM={
       if(state.layers[nci].parentLayerUid===srcLd.layerUid)state.layers[nci].parentLayerUid=state.layers[ni].layerUid;
       if(state.layers[nci].parentLayerUidB===srcLd.layerUid)state.layers[nci].parentLayerUidB=state.layers[ni].layerUid;
     });
+    // Motion's Éléments breakdown follows the duplicate (2026-09, feedback
+    // #798, "pourquoi le calque dupliqué n'apparaît pas dans elements"): the
+    // accordion is keyed by layer INDEX (_motionExpandedLayer), so after a
+    // duplication it still pointed at the SOURCE layer — the new layer was
+    // selected and active while the Éléments list underneath kept showing
+    // the original's shapes, and the copy's own never appeared until it was
+    // expanded by hand. Only moved when the source was the expanded one, so
+    // duplicating some other layer doesn't steal an open breakdown.
+    // Two cases, because the copy is spliced in right after its source, so
+    // every index above it shifts by one: the expanded layer IS the source
+    // (follow the copy), or it sits above the insertion point (keep pointing
+    // at the same layer, which has just moved down one).
+    if(window._motionExpandedLayer===srcIdx)window._motionExpandedLayer=ni;
+    else if(typeof window._motionExpandedLayer==='number'&&window._motionExpandedLayer>=ni)window._motionExpandedLayer++;
     activateUL(ni);_layerSel=[ni];_layerSelAnchor=ni;loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx,preserveLayerSel){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
     // Release Motion's per-element group isolation when it belongs to a
