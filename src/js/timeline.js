@@ -1226,9 +1226,14 @@ window.SM={
     // matte, text/animator identity, parent links, 3D/duplicator/shy/keyLock
     // flags and — for a Null/Guide/Widget — its very KIND. Everything the
     // layer IS travels with the cut; what it SHOWS was already cloned above.
+    // Second pass (fuzz over every exportJSON key, same day): combine
+    // groups (the strokes' groupId strings pointed at a `groups` map the
+    // second half no longer had), expression controls, Parent in Time,
+    // follow-path, extra parents, Instance-Effect link, motion blur,
+    // custom shape names, folder/link-group membership.
     var deep=function(v){return JSON.parse(JSON.stringify(v));};
-    ['blendKeys','expressions','mattesMore','textAnimators','parentKeys','duplicator','widget','nullPos','nullShape','guidePos','effector','lfsIds','lfsSettings'].forEach(function(k){if(ld[k]!=null)dst[k]=deep(ld[k]);});
-    ['matteMode','matteSourceLayerUid','parentLayerUid','parentLayerUidB','channel','keyLock','shy','threeD','isTextLayer','isNullLayer','isGuideLayer','guideOrientation','isWidgetLayer','isEffectLayer','isEffectorLayer','lfsGroup'].forEach(function(k){if(ld[k]!=null)dst[k]=ld[k];});
+    ['blendKeys','expressions','exprControls','mattesMore','textAnimators','parentKeys','parentsMore','followPath','duplicator','widget','nullPos','nullShape','guidePos','effector','lfsIds','lfsSettings','groups','shapeNames'].forEach(function(k){if(ld[k]!=null)dst[k]=deep(ld[k]);});
+    ['matteMode','matteSourceLayerUid','parentLayerUid','parentLayerUidB','channel','keyLock','shy','threeD','motionBlur','effectsFrom','folderId','linkGroupId','isTextLayer','isNullLayer','isGuideLayer','guideOrientation','isWidgetLayer','isEffectLayer','isEffectorLayer','lfsGroup'].forEach(function(k){if(ld[k]!=null)dst[k]=ld[k];});
     if(ld.visible===false)dst.visible=false;
     dst.inPoint=f;dst.outPoint=outF;
     ld.outPoint=f-1;
@@ -1291,6 +1296,18 @@ window.SM={
     if(src.blendKeys&&src.blendKeys.length)state.layers[ni].blendKeys=JSON.parse(JSON.stringify(src.blendKeys));
     if(src.channel)state.layers[ni].channel=src.channel;
     if(src.visible===false)state.layers[ni].visible=false;
+    // Second pass — a fuzz that stamps EVERY exportJSON per-layer key on a
+    // layer and diffs the copy (2026-09 QA sweep): parent keyframes, follow-path, the Effector descriptor (isEffectorLayer
+    // came across, its settings did not), custom shape names (keyed by
+    // strokeId, which the frames clone keeps) and legacy-folder membership.
+    // linkGroupId is deliberately NOT copied: whether a copy should move
+    // with its original's link group is a product call, not a field drop.
+    (function(){
+      var deep=function(v){return JSON.parse(JSON.stringify(v));};
+      var dst=state.layers[ni];
+      ['parentKeys','followPath','effector','shapeNames'].forEach(function(k){if(src[k]!=null&&dst[k]==null)dst[k]=deep(src[k]);});
+      if(src.folderId&&dst.folderId==null)dst.folderId=src.folderId;
+    })();
     // elementMotion is keyed by strokeId, and duplicateLayer's frames clone
     // above (JSON.stringify) preserves each stroke's strokeId unchanged —
     // so the duplicate's strokes carry the SAME ids the original's element
