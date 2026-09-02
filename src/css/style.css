@@ -1365,6 +1365,12 @@ body.mode-motion #layer-list .pi.motion-val{width:28px;padding-left:2px;padding-
    the panel/grid alignment contract remains exact. */
 body.mode-motion #layer-list .motion-group-row,
 body.mode-motion #frame-grid .motion-group-row{height:22px;min-height:22px;margin-top:2px;}
+/* Parent/Blend on the grid side reuse .motion-group-row so key selection can
+   find them (motion.js's renderDiscreteKeyGridRow says why), but their panel
+   twins are plain property rows with no margin — without this the 2px above
+   pushed every row below them out of line with its own keyframe track
+   (feedback #788). */
+body.mode-motion #frame-grid .motion-discrete-row{margin-top:0;}
 .motion-snap-guide{position:absolute;top:0;bottom:0;width:1px;background:#5cb7ff;box-shadow:0 0 7px rgba(92,183,255,.8);pointer-events:none;z-index:8;}
 .motion-snap-guide::after{content:attr(data-label);position:absolute;top:43px;left:4px;padding:2px 4px;border-radius:3px;background:rgba(20,26,35,.92);color:#9fd6ff;font-size:9px;white-space:nowrap;}
 /* Both columns reserve the SAME bottom band, so #fg-wrap and #layer-list
