@@ -1211,7 +1211,26 @@
             }
             for (var nvpc = 0; nvpc < nvChain.length; nvpc++) { nvRect = SMMotion.transformImageRect(nvRect, nvChain[nvpc].pivot, nvChain[nvpc].mat); nvOp *= nvChain[nvpc].mat.op; }
             if (nvProject3D) nvRect = SMMotion.project3DImageRect(nvRect, nvProject3D);
-            items.push({ image: { imageId: 'nv:' + i, x: nvRect.x, y: nvRect.y, width: nvRect.width, height: nvRect.height, opacity: nvOp, rotation: nvRect.rotation || 0 } });
+            var nvImgItem = { imageId: 'nv:' + i, x: nvRect.x, y: nvRect.y, width: nvRect.width, height: nvRect.height, opacity: nvOp, rotation: nvRect.rotation || 0 };
+            // Image mesh on a VIDEO (2026-09, feedback #779). Exactly the
+            // raster branch's treatment above, with the id read off the
+            // LAYER (ld.videoMeshId) because a video has no Paper item to
+            // carry data.meshId. Built from nvRect, the FINAL rect, so the
+            // mesh rides the Motion/parent/3D/duplicator chain for free —
+            // and each duplicated clone gets the same deformation in its own
+            // rect, which is what the stroke path does too.
+            var nvMeshId = state.layers[i].videoMeshId;
+            if (nvMeshId && window.SMImageMesh && SMImageMesh.scenePayloadFor) {
+              var nvPose = null;
+              if (window.SMMotion && SMMotion.hasMeshVertexMotionFor && SMMotion.hasMeshVertexMotionFor(i, nvMeshId)) {
+                nvPose = (function (li2, mid2) {
+                  return function (vi) { return SMMotion.meshVertexOffsetAt(li2, mid2, vi, renderFrame); };
+                })(i, nvMeshId);
+              }
+              var nvMeshPayload = SMImageMesh.scenePayloadFor(nvMeshId, nvRect, nvPose);
+              if (nvMeshPayload) nvImgItem.mesh = nvMeshPayload;
+            }
+            items.push({ image: nvImgItem });
           }
         }
       }

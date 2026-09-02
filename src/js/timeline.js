@@ -1277,6 +1277,14 @@ window.SM={
           st.meshId=map[st.meshId];
         });
       });
+      // A VIDEO layer's mesh id sits on the layer, not in a stroke dict
+      // (#779) — same "must not be shared with the copy" rule as above,
+      // just a different place to read it from.
+      var vmId=state.layers[ni].videoMeshId;
+      if(vmId){
+        if(!map[vmId]){var vnid=SMImageMesh.duplicate(vmId);if(vnid)map[vmId]=vnid;}
+        if(map[vmId])state.layers[ni].videoMeshId=map[vmId];
+      }
       var em=state.layers[ni].elementMotion;
       if(em)Object.keys(map).forEach(function(oldId){
         if(em[oldId]){em[map[oldId]]=em[oldId];delete em[oldId];}
@@ -2004,7 +2012,7 @@ window.SM={
         // be just as useless. Note isNullLayer above was already persisted,
         // and its own tooltip calls a null layer a "pivot/parent pour d'autres
         // calques" — the pivot came back, everything hung off it did not.
-layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,parentKeys:l.parentKeys,parentLayerUidB:l.parentLayerUidB,parentsMore:l.parentsMore,followPath:l.followPath,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink,
+videoMeshId:l.videoMeshId,layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,parentKeys:l.parentKeys,parentLayerUidB:l.parentLayerUidB,parentsMore:l.parentsMore,followPath:l.followPath,markers:l.markers,shy:l.shy,keyLock:l.keyLock,timeRemap:l.timeRemap,motionBlur:l.motionBlur,effectsFrom:l.effectsFrom,timeLink:l.timeLink,
         // Expression controls (2026-08-30) — the DECLARATIONS only
         // ({key,name,type,default}). Their keyframes are ordinary tracks and
         // already ride along inside `motion`/`motionStatic` above, keyed by
@@ -2377,6 +2385,13 @@ layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,parentKeys:l.parentKeys,pare
       // (_nvSessionId) — native-video-bridge reopens it lazily from
       // nativeVideo.path on the first frame sync after this load.
       if(ld.nativeVideo)state.layers[idx].nativeVideo=ld.nativeVideo;
+      // Image mesh on a video (2026-09, #779) — the id lives on the LAYER
+      // because a video has no stroke dict to carry it; the mesh itself
+      // rides in state.imageMeshes like every other one. Guarded on the
+      // layer really being a video, same shape check the widget/matte
+      // fields use, so a corrupted nemo-auto can't leave a dangling id on
+      // an ordinary layer.
+      if(ld.videoMeshId&&ld.nativeVideo)state.layers[idx].videoMeshId=ld.videoMeshId;
       if(ld.montageId)state.layers[idx].montageId=ld.montageId;
       // Footage tag (2026-07-27) — descriptive only (it changes no
       // stroke), but exportJSON persists it, so the import side has to
