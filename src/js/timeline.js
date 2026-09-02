@@ -1232,7 +1232,7 @@ window.SM={
     // follow-path, extra parents, Instance-Effect link, motion blur,
     // custom shape names, folder/link-group membership.
     var deep=function(v){return JSON.parse(JSON.stringify(v));};
-    ['blendKeys','expressions','exprControls','mattesMore','textAnimators','parentKeys','parentsMore','followPath','duplicator','widget','nullPos','nullShape','guidePos','effector','lfsIds','lfsSettings','groups','shapeNames','pathFx'].forEach(function(k){if(ld[k]!=null)dst[k]=deep(ld[k]);});
+    ['blendKeys','expressions','exprControls','mattesMore','textAnimators','parentKeys','parentsMore','followPath','duplicator','widget','nullPos','nullShape','guidePos','effector','lfsIds','lfsSettings','groups','shapeNames','pathFx','lipSync'].forEach(function(k){if(ld[k]!=null)dst[k]=deep(ld[k]);});
     // The RIG travels with the cut (2026-09 sweep) — duplicateLayer already
     // copies it, splitting did not, so cutting a rigged character in two
     // left the second half with no skeleton at all. Cloned through
@@ -2114,7 +2114,7 @@ window.SM={
       // level setting like canvasW/fps above (not per-layer, not per-
       // symbol/montage snapshot — a linked-vs-embedded choice is global).
       mediaMode:state.mediaMode||'embedded',
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,blendKeys:l.blendKeys,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,mattesMore:l.mattesMore,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,isWidgetLayer:l.isWidgetLayer,widget:l.widget,textAnimators:l.textAnimators,isEffectorLayer:l.isEffectorLayer,effector:l.effector,effects:l.effects,pathFx:l.pathFx,footage:l.footage,
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,blendKeys:l.blendKeys,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,mattesMore:l.mattesMore,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,isWidgetLayer:l.isWidgetLayer,widget:l.widget,textAnimators:l.textAnimators,isEffectorLayer:l.isEffectorLayer,effector:l.effector,effects:l.effects,pathFx:l.pathFx,lipSync:l.lipSync,footage:l.footage,
         // Layer parenting (2026-07-25). BOTH of these were missing from this
         // list, so every parent link was silently dropped on save — a rig
         // survived the session and nothing more. `uid` is the stable identity
@@ -2550,7 +2550,8 @@ videoMeshId:l.videoMeshId,layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,pa
       if(ld.threeD)state.layers[idx].threeD=true;                         // calque 3D
       if(ld.duplicator){state.layers[idx].duplicator=ld.duplicator;state.layers[idx].locked=true;} // duplicateur mograph (relock: _dupEditSource n'est jamais persisté)
       if(ld.rig)state.layers[idx].rig=ld.rig;                             // rig (os/binds/IK) — relinkRigBinds fait le reste au premier loadFrame
-      if(ld.pathFx)state.layers[idx].pathFx=ld.pathFx;           // effets de tracé (path-fx.js)
+      if(ld.pathFx)state.layers[idx].pathFx=ld.pathFx;
+      if(ld.lipSync&&typeof ld.lipSync==='object')state.layers[idx].lipSync=ld.lipSync;  // charte de bouches (lipsync.js)           // effets de tracé (path-fx.js)
       if(ld.groups)state.layers[idx].groups=ld.groups;                    // groupes de combinaison non-destructifs — data.groupId sur chaque stroke fait déjà le tour via serP/desP
       if(ld.shapeNames)state.layers[idx].shapeNames=ld.shapeNames;        // noms personnalisés de formes (2026-07-31, panel groupes/formes) — keyés par strokeId, même identité stable que serP/desP
       state.layers[idx].color=ld.color||nextLayerColor();
@@ -7037,9 +7038,65 @@ function updateCompInstancePanel(){
 // cell matching what's actually resolved right now (via resolveSymbolFrameIdx,
 // same math the renderer uses) is highlighted so the strip always shows
 // "what's playing" even in loop/ping-pong/once modes.
+// Panneau de synchro labiale (lipsync.js) — rendu à côté de la bande
+// d'images, dont il réutilise les vignettes : choisir la bouche d'un son,
+// c'est choisir une image interne du composant, exactement le même geste.
+function renderLipSyncPanel(ld){
+  var chart=document.getElementById('lip-chart');
+  if(!chart||!window.SMLipSync)return;
+  var sym=state.symbols[ld.symbolId];if(!sym)return;
+  var st=SMLipSync.settingsOf(ld);
+  var total=Math.max(1,sym.totalFrames);
+  // pistes audio
+  var sel=document.getElementById('lip-track');
+  if(sel){
+    var tracks=state.audioTracks||[];
+    sel.innerHTML='';
+    tracks.forEach(function(t,i){
+      var o=document.createElement('option');
+      o.value=String(i);
+      o.textContent=(t.name||('Piste '+(i+1)))+(t._buffer?'':' …');
+      sel.appendChild(o);
+    });
+    if(!tracks.length){var o2=document.createElement('option');o2.value='';o2.textContent=SM.t('lipNoAudio');sel.appendChild(o2);}
+    sel.value=String(Math.min(st.trackIdx||0,Math.max(0,tracks.length-1)));
+  }
+  var sF=document.getElementById('lip-start'),eF=document.getElementById('lip-end');
+  if(sF)sF.value=st.start||0;
+  if(eF)eF.value=st.end||Math.max(0,state.totalFrames-1);
+  var sn=document.getElementById('lip-sens'),hd=document.getElementById('lip-hold');
+  if(sn)sn.value=st.sensitivity!=null?st.sensitivity:1;
+  if(hd)hd.value=st.hold!=null?st.hold:2;
+  chart.innerHTML='';
+  SMLipSync.MOUTHS.forEach(function(m){
+    var cell=document.createElement('div');
+    cell.style.cssText='display:flex;flex-direction:column;align-items:center;gap:2px;width:46px;';
+    var thumbWrap=document.createElement('div');
+    thumbWrap.style.cssText='width:44px;height:34px;border:1px solid '+(m.auto?'var(--border)':'rgba(255,184,108,.5)')+';border-radius:3px;overflow:hidden;background:var(--bg);display:flex;align-items:center;justify-content:center;';
+    var fIdx=Math.min(total-1,Math.max(0,Math.floor(st.map[m.id]||0)));
+    var url=window.SMStoryboard&&SMStoryboard.thumbDataUrl?SMStoryboard.thumbDataUrl(ld.symbolId,fIdx):null;
+    if(url){var img=document.createElement('img');img.src=url;img.style.cssText='max-width:100%;max-height:100%';thumbWrap.appendChild(img);}
+    else thumbWrap.textContent=String(fIdx);
+    if(!m.auto)thumbWrap.title=SM.t('lipManualOnly');
+    var lbl=document.createElement('span');
+    lbl.textContent=SM.t(m.label);
+    lbl.style.cssText='font-size:8px;color:'+(m.auto?'var(--text-dim)':'rgba(255,184,108,.9)');
+    var inp=document.createElement('input');
+    inp.type='number';inp.className='pi scrub';inp.min=0;inp.max=total-1;inp.step=1;
+    inp.value=fIdx;inp.style.cssText='width:44px;font-size:9px;padding:1px 2px';
+    inp.addEventListener('input',function(){
+      st.map[m.id]=Math.max(0,Math.min(total-1,parseInt(inp.value)||0));
+      renderLipSyncPanel(ld);
+    });
+    cell.appendChild(thumbWrap);cell.appendChild(lbl);cell.appendChild(inp);
+    chart.appendChild(cell);
+  });
+}
+window.renderLipSyncPanel=renderLipSyncPanel;
 function renderCompFrameStrip(ld){
   var strip=document.getElementById('comp-frame-strip');strip.innerHTML='';
   var sym=state.symbols[ld.symbolId];if(!sym)return;
+  renderLipSyncPanel(ld);
   var total=Math.max(1,sym.totalFrames);
   var current=resolveSymbolFrameIdx(sym,ld,state.currentFrame);
   for(var i=0;i<total;i++){
@@ -11191,6 +11248,36 @@ document.getElementById('btn-loop').addEventListener('contextmenu',function(e){e
     var badge=document.getElementById('os-st-panel');
     if(badge){badge.textContent=state.onionSkin?'ON':'OFF';badge.style.color=state.onionSkin?'var(--green)':'var(--text-dim)';}
   }
+})();
+// Synchro labiale : réglages + lancement. L'écriture passe par
+// SMLipSync.apply, qui ne pose une clé QUE là où la bouche change.
+(function initLipSync(){
+  function ld(){var l=state.layers[state.activeLayerIdx];return (l&&l.symbolId&&window.SMLipSync)?l:null;}
+  function num(id){var e=document.getElementById(id);return e?parseFloat(e.value):null;}
+  ['lip-start','lip-end','lip-sens','lip-hold'].forEach(function(id){
+    var el=document.getElementById(id);if(!el)return;
+    el.addEventListener('input',function(){
+      var l=ld();if(!l)return;
+      var st=SMLipSync.settingsOf(l);
+      st.start=Math.max(0,num('lip-start')||0);
+      st.end=Math.max(0,num('lip-end')||0);
+      st.sensitivity=Math.max(0.2,num('lip-sens')||1);
+      st.hold=Math.max(1,num('lip-hold')||2);
+    });
+  });
+  var sel=document.getElementById('lip-track');
+  if(sel)sel.addEventListener('change',function(){var l=ld();if(l)SMLipSync.settingsOf(l).trackIdx=parseInt(sel.value)||0;});
+  var btn=document.getElementById('btn-lip-apply');
+  if(btn)btn.addEventListener('click',function(){
+    var l=ld();if(!l)return;
+    var res=SMLipSync.analyze(l);
+    if(res.error){if(window.showToast)showToast(SM.t('lipNoAudio'));return;}
+    saveAllLayerFrames();pushUndoLayers(true);
+    var out=SMLipSync.apply(state.activeLayerIdx,res);
+    loadFrame(state.currentFrame);updateUI();
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+    if(window.showToast)showToast(SM.t('lipDone')+' ('+out.written+')');
+  });
 })();
 document.getElementById('p-omode').addEventListener('change',function(){window.SM.setOnionMode(this.value);});
 // Teintes + calage de la pelure d'oignon (2026-09) — voir onionTint /
