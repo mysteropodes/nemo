@@ -509,11 +509,19 @@
           operands = operands.concat(emit(entry, dupIndex, mode !== 'none', next, depth + 1, temps));
         } else {
           var item = findByStrokeId(layer, entry, dupIndex);
-          if (item) operands.push(item);
+          // Element eye / solo (2026-09, app.js's applyElemVisibility —
+          // Cyril: "solo et œil n'ont pas l'air d'être actifs"): a hidden
+          // member must leave the COMBINE too, not just stop drawing its
+          // own item. Without this the merged outline still contained the
+          // shape you had just hidden, so the eye looked inert on every
+          // member of a combine group — and solo, which hides all the
+          // others, looked inert for the same reason.
+          if (item && item.visible !== false) operands.push(item);
         }
       });
       if (mode === 'none' || operands.length < 2) return operands;
-      var leaves = resolveGroupMembers(gid, ld, layer, null, 0, dupIndex);
+      var leaves = resolveGroupMembers(gid, ld, layer, null, 0, dupIndex)
+        .filter(function (m) { return m.visible !== false; });
       // Consumed by a combining parent: hand up the UN-flattened result, so
       // the parent sees ONE shape (holes included) — that is the whole
       // point of #738. Emitted for real: flatten into islands, which is
@@ -674,12 +682,17 @@
         } else {
           var sd = dicts[entry];
           if (!sd || sd.isRaster || !sd.segments || !sd.segments.length) return;
+          // Element eye, dict side (2026-09) — twin of the live guard
+          // above. Solo deliberately does NOT reach this path: it is
+          // session state with no serialized counterpart, same split
+          // documented in app.js next to _elemSolo.
+          if (sd.elemHidden) return;
           operands.push(dictPathFor(sd, temps));
         }
       });
       if (mode === 'none' || operands.length < 2) return operands;
       var leafIds = collectGroupStrokeIds(gid, ld);
-      var memberDicts = leafIds.map(function (id) { return dicts[id]; }).filter(function (sd) { return sd && !sd.isRaster && sd.segments && sd.segments.length; });
+      var memberDicts = leafIds.map(function (id) { return dicts[id]; }).filter(function (sd) { return sd && !sd.isRaster && sd.segments && sd.segments.length && !sd.elemHidden; });
       if (memberDicts.length < 2) return operands;
       operands.forEach(function (o) { if (temps.indexOf(o) === -1) temps.push(o); });
       // Same single-operand rule as the live twin above (#738).
