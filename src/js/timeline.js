@@ -1233,6 +1233,14 @@ window.SM={
     // custom shape names, folder/link-group membership.
     var deep=function(v){return JSON.parse(JSON.stringify(v));};
     ['blendKeys','expressions','exprControls','mattesMore','textAnimators','parentKeys','parentsMore','followPath','duplicator','widget','nullPos','nullShape','guidePos','effector','lfsIds','lfsSettings','groups','shapeNames'].forEach(function(k){if(ld[k]!=null)dst[k]=deep(ld[k]);});
+    // The RIG travels with the cut (2026-09 sweep) — duplicateLayer already
+    // copies it, splitting did not, so cutting a rigged character in two
+    // left the second half with no skeleton at all. Cloned through
+    // cloneRigForSymbol, which strips the live Paper references (`_live`)
+    // that a plain JSON clone would choke on; relinkRigBinds rebuilds them
+    // on the next loadFrame, and the frames clone above keeps the very
+    // strokeIds the binds point at.
+    if(ld.rig&&window.cloneRigForSymbol)dst.rig=cloneRigForSymbol(ld.rig);
     ['matteMode','matteSourceLayerUid','parentLayerUid','parentLayerUidB','channel','keyLock','shy','threeD','motionBlur','effectsFrom','folderId','linkGroupId','isTextLayer','isNullLayer','isGuideLayer','guideOrientation','isWidgetLayer','isEffectLayer','isEffectorLayer','lfsGroup'].forEach(function(k){if(ld[k]!=null)dst[k]=ld[k];});
     if(ld.visible===false)dst.visible=false;
     dst.inPoint=f;dst.outPoint=outF;
@@ -2150,7 +2158,9 @@ videoMeshId:l.videoMeshId,layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,pa
           // here exported every mesh bind with meshId undefined, so a rigged
           // image came back unrigged after a save/reload while the symbol path
           // kept working. Caught by round-tripping a real export.
-          binds:(l.rig.binds||[]).map(function(b){return{strokeId:b.strokeId,meshId:b.meshId,rest:b.rest,weights:b.weights,rotate:b.rotate};})}:undefined,
+          // restHandles: see cloneRigForSymbol's own note (2026-09 sweep) —
+          // without it a saved rig stops rotating its bezier handles.
+          binds:(l.rig.binds||[]).map(function(b){return{strokeId:b.strokeId,meshId:b.meshId,rest:b.rest,restHandles:b.restHandles,weights:b.weights,rotate:b.rotate};})}:undefined,
         // Non-destructive combine groups (2026-07-29) — copied wholesale
         // like duplicator/rig above. Membership itself is the plain
         // data.groupId tag on each stroke (already round-trips via serP/

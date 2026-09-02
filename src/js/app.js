@@ -3221,7 +3221,14 @@ function badComponentSourceReason(l){
 function cloneRigForSymbol(rig){
   if(!rig)return undefined;
   return{bones:rig.bones,ikChains:rig.ikChains,nextId:rig.nextId,
-    binds:(rig.binds||[]).map(function(b){return{strokeId:b.strokeId,meshId:b.meshId,rest:b.rest,weights:b.weights,rotate:b.rotate};})};
+    // restHandles (2026-09 QA sweep) — the immutable rest TANGENTS
+    // applyRigDeform rotates a bound vertex's bezier handles from (#678).
+    // Dropped by both whitelists, so a rigged curve came back from a save
+    // (or from becoming a Component) with the handle rotation silently
+    // disabled — applyRigDeform guards on `b.restHandles`, so it just
+    // stopped bending the curves it used to bend. Same class as the meshId
+    // line documented in exportJSON's own copy of this list.
+    binds:(rig.binds||[]).map(function(b){return{strokeId:b.strokeId,meshId:b.meshId,rest:b.rest,restHandles:b.restHandles,weights:b.weights,rotate:b.rotate};})};
 }
 // Component exposed properties (2026-08-18) — declares a property on the
 // SYMBOL (state.symbols[symId].exposedProps), bound to one stroke inside it
