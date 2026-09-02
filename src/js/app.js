@@ -4842,6 +4842,20 @@ function setElemHidden(li,strokeIds,hide){
   if(!strokeIds||!strokeIds.length)return;
   if(hide===undefined)hide=!elemIsHidden(li,strokeIds[0]);
   pushUndoLayers();
+  // Held frame (2026-09 QA sweep): the flag went onto the LIVE items and
+  // saveActiveLayerFrame() then returned early (a held frame is neither a
+  // keyframe nor an interpolated one), so the eye toggle silently reverted
+  // on the next scrub — same shape as feedback #752 for paste, same two
+  // answers per mode (see pasteSelection, tools.js): Animation 2D promotes
+  // the held frame FIRST (ensureKeyframe rebuilds the layer, so the flags
+  // are applied after it), Motion writes into the keyframe the hold
+  // inherits from, so the visibility belongs to the whole hold.
+  var ld=state.layers[li],f=ld&&ld.frames[state.currentFrame];
+  var heldOrigin=-1;
+  if(f&&!f.isKeyframe&&!f.isInterpolated){
+    if(state.appMode!=='motion'&&li===state.activeLayerIdx&&typeof ensureKeyframe==='function'){ensureKeyframe();f=ld.frames[state.currentFrame];}
+    if(!f.isKeyframe&&!f.isInterpolated){for(var o=state.currentFrame;o>=0;o--){if(ld.frames[o]&&ld.frames[o].isKeyframe){heldOrigin=o;break;}}}
+  }
   strokeIds.forEach(function(sid){
     var it=window.SMMotion&&SMMotion.liveItemByStrokeId?SMMotion.liveItemByStrokeId(li,sid):null;
     if(!it)return;
@@ -4849,7 +4863,12 @@ function setElemHidden(li,strokeIds,hide){
     if(hide)it.data.elemHidden=true;else delete it.data.elemHidden;
   });
   applyElemVisibility(li);
-  saveActiveLayerFrame();
+  // Persist on the layer the flag was set on — it is not always the active
+  // one (the Elements panel takes `li`), and saveActiveLayerFrame() only
+  // ever wrote the active layer.
+  if(heldOrigin>=0){ld.frames[heldOrigin].strokes=_collectLayerStrokes(li,ld);window._sceneVersion++;}
+  else if(li===state.activeLayerIdx)saveActiveLayerFrame();
+  else if(f&&(f.isKeyframe||f.isInterpolated)){f.strokes=_collectLayerStrokes(li,ld);window._sceneVersion++;}
   if(window.SMEngineBridge)SMEngineBridge.renderNow();
   if(window.updateUI)updateUI();
 }
