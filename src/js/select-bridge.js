@@ -2709,6 +2709,43 @@
         // already takes (line ~2090: selectedStrokeIndices=[]).
         var spansLayers = state.activeSymbolId && selectedPaths.some(function (p) { return p.layer !== userLayers[state.activeLayerIdx]; });
         state.selectedStrokeIndices = spansLayers ? [] : selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
+        // Footage in a marquee (2026-09, feedback #778: "pblm de selection
+        // des footage dans le canvas"). A video layer draws no Paper item at
+        // all — getEffectiveStrokes returns [] for it (app.js) and the
+        // picture is engine-side — so the children walk above can never see
+        // one, and a rubber band drawn right around a video selected
+        // nothing while every stroke and image around it got picked up.
+        // Same priority rule the click hit-test already states: drawings sit
+        // ON TOP of footage, so a marquee that caught any stroke keeps that
+        // selection and only an otherwise-empty one falls through to the
+        // topmost video it covers. Rotation-aware through the rect's own
+        // four corners, matching the click path's own spun-back test.
+        if (!selectedPaths.length && window.SMNativeVideo && window.SMMotion) {
+          var nvMarq = -1;
+          for (var nvj = state.layers.length - 1; nvj >= 0; nvj--) {
+            var nvld = state.layers[nvj];
+            if (!nvld || !nvld.nativeVideo || !nvld.visible || nvld.locked) continue;
+            var nvr2 = SMNativeVideo.displayRect(nvj);
+            if (!nvr2) continue;
+            var ncx2 = nvr2.x + nvr2.width / 2, ncy2 = nvr2.y + nvr2.height / 2;
+            var na2 = (nvr2.rotation || 0) * Math.PI / 180, nc2 = Math.cos(na2), ns2 = Math.sin(na2);
+            var corners = [[nvr2.x, nvr2.y], [nvr2.x + nvr2.width, nvr2.y], [nvr2.x + nvr2.width, nvr2.y + nvr2.height], [nvr2.x, nvr2.y + nvr2.height]].map(function (c2) {
+              var dx2 = c2[0] - ncx2, dy2 = c2[1] - ncy2;
+              return new Point(ncx2 + dx2 * nc2 - dy2 * ns2, ncy2 + dx2 * ns2 + dy2 * nc2);
+            });
+            var quad = new Path({ segments: corners, closed: true, insert: false });
+            var hitMarq = lassoPath
+              ? (lassoPath.contains(quad.position) || lassoPath.intersects(quad))
+              : mb.intersects(quad.bounds);
+            if (hitMarq) { nvMarq = nvj; break; }
+          }
+          if (nvMarq >= 0) {
+            state.activeLayerIdx = nvMarq;
+            activateUL(nvMarq);
+            syncMotionLayerSelection(nvMarq, false);
+            window._nvSelectedLayer = nvMarq; // same gizmo the click path arms
+          }
+        }
         _marquee.rect.remove(); _marquee.rect = null;
       }
       _marquee.active = false;
