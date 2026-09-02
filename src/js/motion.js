@@ -12155,14 +12155,20 @@
   function enableTimeRemap(li) {
     var ld = state.layers[li];
     if (!ld) return false;
-    if (!ld.symbolId) { if (window.showToast) showToast(SM.t('toastTimeRemapAppliesToComponents')); return false; }
-    var sym = state.symbols[ld.symbolId];
-    if (!sym) return false;
+    // Videos too (2026-09, feedback #751) — a natively-decoded video layer
+    // has exactly what Time Remap needs, an internal frame count and a
+    // consumer that resolves the source frame through ONE chokepoint
+    // (native-video-bridge's _targetFor). Refusing it was never a
+    // capability limit, just the Component-only scope this shipped in.
+    var isVideo = !!ld.nativeVideo;
+    if (!ld.symbolId && !isVideo) { if (window.showToast) showToast(SM.t('toastTimeRemapAppliesToComponents')); return false; }
+    var sym = isVideo ? null : state.symbols[ld.symbolId];
+    if (!isVideo && !sym) return false;
     if (ld.timeRemap) { if (window.showToast) showToast(SM.t('toastTimeRemapAlreadyActive')); return false; }
     pushUndo();
     var inF = window.layerInPoint ? layerInPoint(ld) : (ld.inPoint != null ? ld.inPoint : 0);
     var outF = window.layerOutPoint ? layerOutPoint(ld) : (ld.outPoint != null ? ld.outPoint : state.totalFrames - 1);
-    var last = Math.max(0, (sym.totalFrames || 1) - 1);
+    var last = Math.max(0, ((isVideo ? ld.nativeVideo.frameCount : sym.totalFrames) || 1) - 1);
     ld.timeRemap = { keys: [
       { frame: inF, v: [0], curvePoints: cloneCurvePts(CURVE_LINEAR), hOut: [0, 0], hIn: [0, 0] },
       { frame: Math.max(inF + 1, outF), v: [last], curvePoints: cloneCurvePts(CURVE_LINEAR), hOut: [0, 0], hIn: [0, 0] },
