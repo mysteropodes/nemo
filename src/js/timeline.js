@@ -4011,13 +4011,13 @@ function renderTimeline(){
     // per-LAYER; a shape/group row has none of its own to show here). Same
     // "call the same enumerator on both sides" contract as Motion's own
     // renderElementsList/renderTimelineMotion pair.
-    if(window._layerShapesExpanded&&window._layerShapesExpanded[li]&&window.SMMotion&&SMMotion.buildShapeTree){
+    if(window._layerShapesExpanded&&window._layerShapesExpanded[li]&&window.SMMotion&&SMMotion.shapeTreeRowPlan){
       var ld2=state.layers[li];
-      var shTree=SMMotion.buildShapeTree(li,ld2);
-      if(shTree.length){
+      var shPlan=SMMotion.shapeTreeRowPlan(li,ld2);
+      if(shPlan.length){
         var shHdrSpacer=document.createElement('div');shHdrSpacer.className='frow motion-group-row';
         grid.appendChild(shHdrSpacer);rowCount++;
-        shTree.forEach(function(){var shSpacer=document.createElement('div');shSpacer.className='frow';grid.appendChild(shSpacer);rowCount++;});
+        shPlan.slice(1).forEach(function(){var shSpacer=document.createElement('div');shSpacer.className='frow';grid.appendChild(shSpacer);rowCount++;});
       }
     }
   });
@@ -5157,19 +5157,31 @@ function startLayerRename(idx){
 // has no per-shape Motion track to reveal), so the row count is fixed —
 // simpler to keep in lockstep than Motion's variable-expand case.
 function renderShapeTreeRowsInto(list,li,ld){
-  if(!window.SMMotion||!SMMotion.buildShapeTree)return;
-  var tree=SMMotion.buildShapeTree(li,ld);
-  if(!tree.length)return;
-  // 2026-08 fix: hardcoded French header, shown regardless of locale.
-  var hdr=document.createElement('div');hdr.className='lrow motion-group-row';hdr.textContent=SM.t('hdrShapes');
+  if(!window.SMMotion||!SMMotion.shapeTreeRowPlan)return;
+  // Shared row plan (2026-09, #746) — see shapeTreeRowPlan's own comment in
+  // motion.js for why all four renderers of this list read it instead of
+  // walking the tree themselves.
+  var plan=SMMotion.shapeTreeRowPlan(li,ld);
+  if(!plan.length)return;
+  var tree={labelIdx:plan.labelIdx};
+  var hdr=document.createElement('div');hdr.className='lrow motion-group-row';
+  var hdrArrow=document.createElement('span');hdrArrow.className='lico larrow';hdrArrow.textContent=window._motionShapesCollapsed?'▸':'▾';
+  var hdrLabel=document.createElement('span');hdrLabel.textContent=SM.t('hdrShapes');
+  hdr.appendChild(hdrArrow);hdr.appendChild(hdrLabel);
+  hdr.addEventListener('click',function(e){e.stopPropagation();SMMotion.toggleShapesSectionCollapsed();});
   list.appendChild(hdr);
   var shapeIdx=0;
-  tree.forEach(function(node){
-    if(node.type==='group'){
+  plan.slice(1).forEach(function(planRow){
+    var node=planRow.node,depth=planRow.depth||0;
+    if(planRow.kind==='group'){
       var grow=document.createElement('div');grow.className='lrow motion-elem-row motion-elem-group';
+      if(depth)grow.style.paddingLeft=(10+depth*14)+'px';
+      var gArrow=document.createElement('span');gArrow.className='lico larrow';
+      gArrow.textContent=(window._motionExpandedShapeGroups&&window._motionExpandedShapeGroups[node.gid])?'▾':'▸';
+      gArrow.addEventListener('click',function(e){e.stopPropagation();SMMotion.toggleShapeGroupExpanded(node.gid);});
       var gswatch=document.createElement('div');gswatch.className='motion-elem-swatch';gswatch.textContent='▤';gswatch.style.background='transparent';
       var gnm=document.createElement('div');gnm.className='lnm';gnm.textContent=node.name;
-      grow.appendChild(gswatch);grow.appendChild(gnm);
+      grow.appendChild(gArrow);grow.appendChild(gswatch);grow.appendChild(gnm);
       var memberIds=node.memberIds||SMMotion.layerElements(li,ld).filter(function(e){return e.sd.groupId===node.gid;}).map(function(e){return e.strokeId;});
       function commitGroupRename(v){pushUndo();if(window.SMGroup&&SMGroup.renameGroup)SMGroup.renameGroup(node.gid,ld,v,memberIds);saveActiveLayerFrame();renderLayerList();renderTimeline();}
       grow.addEventListener('click',function(){SMMotion.selectShapesByStrokeIds(li,memberIds);});
@@ -5194,6 +5206,7 @@ function renderShapeTreeRowsInto(list,li,ld){
     }
     var idx=tree.labelIdx&&tree.labelIdx[node.strokeId]!==undefined?tree.labelIdx[node.strokeId]:shapeIdx++; // stable draw-order label, see buildShapeTree
     var srow=document.createElement('div');srow.className='lrow motion-elem-row';
+    if(depth)srow.style.paddingLeft=(10+depth*14)+'px';
     var sswatch=document.createElement('div');sswatch.className='motion-elem-swatch';sswatch.style.background=node.sd.fillColor||node.sd.strokeColor||'transparent';
     var snm=document.createElement('div');snm.className='lnm';snm.textContent=SMMotion.elementLabel(node,idx,ld);
     srow.appendChild(sswatch);srow.appendChild(snm);
