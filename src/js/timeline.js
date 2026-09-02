@@ -1689,7 +1689,7 @@ window.SM={
         var fA=kfs[i],fB=kfs[i+1];
         var newFA=movedFrameMap[li+':'+fA];newFA=(newFA!==undefined)?newFA:fA;
         var newFB=movedFrameMap[li+':'+fB];newFB=(newFB!==undefined)?newFB:fB;
-        rekeyTweenPairData(fA,fB,newFA,newFB);
+        rekeyTweenPairData(fA,fB,newFA,newFB,li);
         pairs.push({fA:fA,fB:fB,newFA:newFA,newFB:newFB});
       }
       retimeTweenSpans(li,pairs,capturedInbetweens[li]||{});
@@ -2499,6 +2499,34 @@ videoMeshId:l.videoMeshId,layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,pa
       }
       state.tweenOverrides=migrate(state.tweenOverrides);
       state.tweenEasing=migrate(state.tweenEasing);
+      // Motion arcs (arcKey, tweens.js): the old "fA-fB-i" form carried NO
+      // layer at all. An old entry is attributed to the ONE layer that has
+      // drawn keyframes at both fA and fB; if several layers qualify the
+      // attribution would be a guess, and a mis-assigned arc bends the
+      // wrong drawing — the entry is dropped instead (an untouched arc is
+      // the default straight line, so dropping costs the curve, never the
+      // tween).
+      (function migrateArcs(){
+        var arcs=state.motionArcs;if(!arcs)return;
+        var out={};
+        Object.keys(arcs).forEach(function(k){
+          var m=/^(\d+)-(\d+)-(\d+)$/.exec(k);
+          if(!m){out[k]=arcs[k];return;}
+          var fA=parseInt(m[1],10),fB=parseInt(m[2],10);
+          var owners=[];
+          state.layers.forEach(function(ld,li){
+            var fr=ld.frames||[];
+            var a=fr[fA],b=fr[fB];
+            if(a&&a.isKeyframe&&a.strokes&&a.strokes.length&&b&&b.isKeyframe&&b.strokes&&b.strokes.length)owners.push(li);
+          });
+          if(owners.length===1){
+            var ld=state.layers[owners[0]];
+            if(!ld.layerUid)ld.layerUid='ly_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);
+            out[ld.layerUid+':'+k]=arcs[k];
+          }
+        });
+        state.motionArcs=out;
+      })();
     })();
     // Migration (2026-07): the old shipped DEFAULT easing points
     // ({.42,0}/{.58,1} — CSS control values misread as on-curve knots, a
