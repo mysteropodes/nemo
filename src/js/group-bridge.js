@@ -429,6 +429,26 @@
     // A child's result is therefore computed once and either handed up or
     // drawn, never both — which is what stops the old flat pass from
     // drawing the inner merge and the outer merge on top of each other.
+    // A member is a visual BLOCK, not one item (2026-09, Cyril: "avec un
+    // brush ça marche pas pareil"): a vector-brush ribbon carries a linked
+    // FILL BACKDROP (and, when textured, its dabs) as separate sibling
+    // Paths. foldBooleanOp merges the backdrop INTO the operand, so
+    // leaving it painted draws that member's fill a second time, on top of
+    // the merged result — visible as the un-merged brush shape sitting
+    // over the combine. The dict twin already suppressed the companion
+    // (applyCombinesToStrokes' dictPathFor); this brings the live path in
+    // line with it (CLAUDE.md §3).
+    function suppressBlock(m) {
+      if (suppress.indexOf(m) === -1) suppress.push(m);
+      var d = m.data; if (!d || !layer) return;
+      if (!d.linkedFillId && !d.brushGroupId) return;
+      layer.children.forEach(function (c) {
+        if (c === m || !c.data) return;
+        if ((d.linkedFillId && c.data.linkedFillId === d.linkedFillId) || (d.brushGroupId && c.data.brushGroupId === d.brushGroupId)) {
+          if (suppress.indexOf(c) === -1) suppress.push(c);
+        }
+      });
+    }
     function emit(gid, dupIndex, parentCombines, ancestors, depth, temps) {
       var grp = ld.groups[gid];
       if (!grp || depth > 16 || ancestors.indexOf(gid) !== -1) return [];
@@ -454,7 +474,7 @@
         try { raw = computeGroupCombineRaw(operands, mode, layer, frameIdx); }
         catch (e2) { console.warn('[SMGroup] nested combine failed for group', gid, e2); return operands; }
         if (!raw) return operands;
-        leaves.forEach(function (m) { if (suppress.indexOf(m) === -1) suppress.push(m); });
+        leaves.forEach(suppressBlock);
         operands.forEach(function (o) { if (temps.indexOf(o) === -1 && layer && o.parent !== layer) temps.push(o); });
         // Style is irrelevant upstream (the outermost group paints the
         // final result from its own topmost leaf), but a fill-less operand
@@ -466,7 +486,7 @@
       var islands;
       try { islands = computeGroupCombine(operands, mode, layer, frameIdx); }
       catch (e) { console.warn('[SMGroup] combine failed for group', gid, e); return operands; }
-      leaves.forEach(function (m) { if (suppress.indexOf(m) === -1) suppress.push(m); });
+      leaves.forEach(suppressBlock);
       // Operands that were themselves computed (a child's result) are
       // scratch geometry: keep them alive until the parent's boolean has
       // consumed them, then drop whatever the result doesn't reuse.
