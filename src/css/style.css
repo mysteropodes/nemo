@@ -994,6 +994,11 @@ body.mode-motion #btn-tween-curves{display:none;}
 .motion-filter-btn{display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;cursor:pointer;color:var(--text-dark);flex-shrink:0;}
 .motion-filter-btn:hover{background:var(--panel3);color:var(--text);}
 .motion-filter-btn.on{color:var(--accent);}
+/* The icon has to READ as a state, not just change colour (2026-09,
+   feedback #758: "faudrait pivoter cette icône si fermé") — colour alone
+   left "filtering" and "not filtering" looking like the same control. */
+.motion-filter-btn svg{transition:transform .12s ease;}
+.motion-filter-btn.on svg{transform:rotate(-90deg);}
 .motion-prop-row{padding-left:24px;gap:6px;}
 .motion-prop-row:hover{background:rgba(255,255,255,.03);}
 .motion-prop-select-target{cursor:pointer;border-radius:3px;}
