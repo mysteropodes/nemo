@@ -7001,16 +7001,20 @@ function updateFootagePanel(){
   if(blendRow){
     var showBlend=kind.key==='video'&&!!ld.nativeVideo&&!!ld.timeRemap;
     blendRow.style.display=showBlend?'flex':'none';
-    var cb=document.getElementById('footage-frame-blend');
-    if(cb){
-      cb.checked=!!(ld.nativeVideo&&ld.nativeVideo.frameBlend);
-      if(!cb._wired){
-        cb._wired=true;
-        cb.addEventListener('change',function(){
+    var sel=document.getElementById('footage-interp-mode');
+    if(sel){
+      var nv=ld.nativeVideo||{};
+      // L'ancien booléen reste la valeur de repli : un projet enregistré avant
+      // les trois modes doit rouvrir sur ce qu'il faisait.
+      sel.value=nv.interpMode||(nv.frameBlend?'blend':'none');
+      if(!sel._wired){
+        sel._wired=true;
+        sel.addEventListener('change',function(){
           var l=state.layers[state.activeLayerIdx];
           if(!l||!l.nativeVideo)return;
           saveAllLayerFrames();pushUndoLayers(true);
-          l.nativeVideo.frameBlend=cb.checked;
+          l.nativeVideo.interpMode=sel.value;
+          l.nativeVideo.frameBlend=(sel.value!=='none');
           if(window.SMNativeVideo&&SMNativeVideo.invalidate)SMNativeVideo.invalidate();
           loadFrame(state.currentFrame);
           if(window.SMEngineBridge)SMEngineBridge.renderNow();

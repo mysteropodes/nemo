@@ -634,8 +634,45 @@
   // trente-deuxième réutilisent le même tampon au lieu de refaire huit
   // millions d'octets pour un écart invisible.
   var _blendBuf = null, _blendKey = null;
+  // Mode d'interpolation : 'none', 'blend' (fondu croisé) ou 'motion'
+  // (compensée en mouvement, interp.rs). L'ancien booléen frameBlend est
+  // toujours lu, pour qu'un projet enregistré avant ce changement continue de
+  // faire ce qu'il faisait.
+  function _interpMode(ld) {
+    if (!ld || !ld.nativeVideo || !ld.timeRemap) return 'none';
+    var m = ld.nativeVideo.interpMode;
+    if (m === 'motion' || m === 'blend' || m === 'none') return m;
+    return ld.nativeVideo.frameBlend ? 'blend' : 'none';
+  }
   function _blendEnabled(ld) {
-    return !!(ld && ld.nativeVideo && ld.nativeVideo.frameBlend && ld.timeRemap);
+    return _interpMode(ld) !== 'none';
+  }
+  // Le champ de mouvement ne dépend PAS de l'instant demandé : une paire
+  // d'images sources sert autant d'images intermédiaires qu'on veut, et c'est
+  // cette étape qui coûte. D'où un cache d'UNE paire — celle qu'on est en
+  // train de traverser.
+  var _flowCache = { key: null, field: null };
+  function _flowFor(sess, f0, f1, a, b, w, h) {
+    var key = sess + ':' + f0 + ':' + f1;
+    if (_flowCache.key === key && _flowCache.field) return _flowCache.field;
+    if (!window.GeometryWasm || !GeometryWasm.compute_flow) return null;
+    if (_flowCache.field && _flowCache.field.free) { try { _flowCache.field.free(); } catch (e) {} }
+    var field = GeometryWasm.compute_flow(a, b, w, h);
+    _flowCache = { key: key, field: field };
+    return field;
+  }
+  function _mixed(ld, a, b, t, f0, f1, w, h, cacheKey) {
+    if (_interpMode(ld) === 'motion' && window.GeometryWasm && GeometryWasm.interpolate_at) {
+      try {
+        var field = _flowFor(ld._nvSessionId, f0, f1, a, b, w, h);
+        if (field) return GeometryWasm.interpolate_at(a, b, field, t);
+      } catch (e) {
+        // Une interpolation qui échoue ne doit pas faire disparaître l'image :
+        // on retombe sur le fondu, qui marche toujours.
+        if (window.console) console.warn('interpolation compensée indisponible, repli sur le fondu', e);
+      }
+    }
+    return _blendPixels(a, b, t, cacheKey);
   }
   function _blendWeight(exact) {
     var t = exact - Math.floor(exact);
@@ -660,7 +697,7 @@
   // engine-bridge.js's nvMat handling), so reusing stale JSON there would
   // freeze the video at its LAST rendered position/scale while only its
   // pixels kept updating. Falls back to a full renderNow() for those.
-  window.SMNativeVideo_blendTest = { exact: _targetExactFor, weight: _blendWeight, blend: _blendPixels };
+  window.SMNativeVideo_blendTest = { exact: _targetExactFor, weight: _blendWeight, blend: _blendPixels, mode: _interpMode };
   function _canFastRender(ld) {
     return !(ld && ld.motion && Object.keys(ld.motion).length);
   }
@@ -887,7 +924,7 @@
           var pa = _jsCacheGet(st, b0) || await frameBytes(ld._nvSessionId, b0);
           var pb = _jsCacheGet(st, b1) || await frameBytes(ld._nvSessionId, b1);
           _jsCachePut(st, b0, pa); _jsCachePut(st, b1, pb);
-          var mix = _blendPixels(pa, pb, tw, ld._nvSessionId + ':' + b0 + ':' + tw);
+          var mix = _mixed(ld, pa, pb, tw, b0, b1, nv.width, nv.height, ld._nvSessionId + ':' + b0 + ':' + tw);
           if (window.SMEngineBridge) SMEngineBridge.registerImageRaw(_imageIdFor(key), mix, nv.width, nv.height);
           st.lastShown = kk;
           window._sceneVersion++;

@@ -11,7 +11,7 @@ window.GeometryWasm = {
   ready: false, boolean_op: null, boolean_op_multi: null, fill_find: null, create_engine: null, hit_test: null,
   interp_stroke: null, auto_match: null, resample_stroke: null, align_pair: null, erase_at_point: null,
   line_segments: null, rect_segments: null, ellipse_segments: null,
-  resolve_symbol_frame: null, effective_frame_index: null, track_points: null,
+  resolve_symbol_frame: null, effective_frame_index: null, track_points: null, compute_flow: null, interpolate_at: null,
 };
 // Cache-busted on every load: the glue JS and the .wasm binary live at fixed
 // URLs the browser caches aggressively (documented project gotcha — a stale
@@ -40,6 +40,8 @@ import('../wasm/geometry_wasm.js?v=' + wasmBust).then(function (mod) {
     // Class export (not a function): stateful per-stroke input smoother —
     // see stroke-modeler.js (JS reference) / strokemodeler.rs (Rust port).
     window.GeometryWasm.track_points = mod.track_points;   // suivi Lucas-Kanade (track.rs)
+    window.GeometryWasm.compute_flow = mod.compute_flow;   // interpolation compensée (interp.rs)
+    window.GeometryWasm.interpolate_at = mod.interpolate_at;
     window.GeometryWasm.StrokeModeler = mod.StrokeModeler;
     window.GeometryWasm.ready = true;
   });

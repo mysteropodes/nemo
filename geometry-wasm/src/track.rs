@@ -20,27 +20,27 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 #[derive(Deserialize)]
-struct TrackIn {
-    width: usize,
-    height: usize,
+pub struct TrackIn {
+    pub width: usize,
+    pub height: usize,
     /// Luminance 0-255, une valeur par pixel, image de départ puis d'arrivée.
-    prev: Vec<u8>,
-    next: Vec<u8>,
+    pub prev: Vec<u8>,
+    pub next: Vec<u8>,
     /// Points à suivre, en pixels image.
-    points: Vec<[f32; 2]>,
+    pub points: Vec<[f32; 2]>,
     #[serde(default = "default_window")]
-    window: usize,
+    pub window: usize,
     #[serde(default = "default_levels")]
-    levels: usize,
+    pub levels: usize,
     #[serde(default = "default_iters")]
-    iterations: usize,
+    pub iterations: usize,
 }
 fn default_window() -> usize { 15 }
 fn default_levels() -> usize { 3 }
 fn default_iters() -> usize { 20 }
 
 #[derive(Serialize)]
-struct TrackOut {
+pub struct TrackOut {
     points: Vec<[f32; 2]>,
     /// true quand le point a convergé ET que la fenêtre est restée dans
     /// l'image : un point perdu doit être signalé, pas rendu à une position
@@ -48,7 +48,7 @@ struct TrackOut {
     ok: Vec<bool>,
     /// Erreur résiduelle moyenne par pixel (0-255) — sert à repérer un point
     /// qui « suit » une zone qui ne lui ressemble plus.
-    error: Vec<f32>,
+    pub error: Vec<f32>,
 }
 
 struct Level {
@@ -272,6 +272,63 @@ pub fn track_points_impl(input: TrackIn) -> TrackOut {
         out_err.push(err);
     }
     TrackOut { points: out_pts, ok: out_ok, error: out_err }
+}
+
+
+/// Champ de mouvement échantillonné sur une grille régulière — la forme dont
+/// l'interpolation d'images a besoin (interp.rs). Les vecteurs sont dans
+/// l'échelle des images fournies.
+pub struct GridFlow {
+    pub gw: usize,
+    pub gh: usize,
+    /// Position du premier point de grille, et pas de la grille, en pixels.
+    pub origin: f32,
+    pub step: f32,
+    pub u: Vec<f32>,
+    pub v: Vec<f32>,
+    pub ok: Vec<bool>,
+}
+
+/// Lance le suivi sur une grille régulière de points. Chaque point est traité
+/// indépendamment, exactement comme un point de suivi ordinaire — c'est le
+/// même noyau, appelé en nombre.
+pub fn track_grid(
+    prev: &[u8],
+    next: &[u8],
+    w: usize,
+    h: usize,
+    step: usize,
+    window: usize,
+    levels: usize,
+    iterations: usize,
+) -> GridFlow {
+    let step = step.max(2);
+    let origin = (step / 2) as f32;
+    let gw = ((w as f32 - origin) / step as f32).ceil().max(1.0) as usize;
+    let gh = ((h as f32 - origin) / step as f32).ceil().max(1.0) as usize;
+    let mut points = Vec::with_capacity(gw * gh);
+    for gy in 0..gh {
+        for gx in 0..gw {
+            points.push([origin + (gx * step) as f32, origin + (gy * step) as f32]);
+        }
+    }
+    let out = track_points_impl(TrackIn {
+        width: w,
+        height: h,
+        prev: prev.to_vec(),
+        next: next.to_vec(),
+        points: points.clone(),
+        window,
+        levels,
+        iterations,
+    });
+    let mut u = Vec::with_capacity(points.len());
+    let mut v = Vec::with_capacity(points.len());
+    for i in 0..points.len() {
+        u.push(out.points[i][0] - points[i][0]);
+        v.push(out.points[i][1] - points[i][1]);
+    }
+    GridFlow { gw, gh, origin, step: step as f32, u, v, ok: out.ok }
 }
 
 #[wasm_bindgen]
