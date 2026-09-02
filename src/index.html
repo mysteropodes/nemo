@@ -1374,6 +1374,14 @@
           <span class="pl" data-i18n="fieldH">H</span><input type="number" class="pi" id="footage-h" value="0" disabled>
         </div>
         <div class="pr" id="footage-count-row"><span class="pl" data-i18n="fieldFrames">Frames</span><div class="psel" id="footage-count" style="pointer-events:none;background-image:none">0</div></div>
+        <!-- Fusion d'images (2026-09) : n'a de sens qu'avec un Time Remap,
+             la ligne est donc masquée sans lui. -->
+        <div class="pr" id="footage-blend-row" style="display:none">
+          <label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="checkbox" id="footage-frame-blend" style="accent-color:var(--accent)">
+            <span data-i18n="footageFrameBlend">Fusion d'images au remappage</span>
+          </label>
+        </div>
         <div class="pr"><button class="pbtn" id="btn-footage-replace" style="flex:1" data-i18n="footageReplace">Remplacer la source…</button></div>
       </div>
     </div>

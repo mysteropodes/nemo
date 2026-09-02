@@ -6995,6 +6995,29 @@ function updateFootagePanel(){
   for(var i=0;i<st.length;i++){if(st[i]&&st[i].isRaster){ras=st[i];break;}}
   document.getElementById('footage-w').value=ras?Math.round(ras.width):0;
   document.getElementById('footage-h').value=ras?Math.round(ras.height):0;
+  // Fusion d'images vidéo (native-video-bridge.js) : proposée seulement là où
+  // elle agit, c'est-à-dire sur une vidéo effectivement remappée dans le temps.
+  var blendRow=document.getElementById('footage-blend-row');
+  if(blendRow){
+    var showBlend=kind.key==='video'&&!!ld.nativeVideo&&!!ld.timeRemap;
+    blendRow.style.display=showBlend?'flex':'none';
+    var cb=document.getElementById('footage-frame-blend');
+    if(cb){
+      cb.checked=!!(ld.nativeVideo&&ld.nativeVideo.frameBlend);
+      if(!cb._wired){
+        cb._wired=true;
+        cb.addEventListener('change',function(){
+          var l=state.layers[state.activeLayerIdx];
+          if(!l||!l.nativeVideo)return;
+          saveAllLayerFrames();pushUndoLayers(true);
+          l.nativeVideo.frameBlend=cb.checked;
+          if(window.SMNativeVideo&&SMNativeVideo.invalidate)SMNativeVideo.invalidate();
+          loadFrame(state.currentFrame);
+          if(window.SMEngineBridge)SMEngineBridge.renderNow();
+        });
+      }
+    }
+  }
   var countRow=document.getElementById('footage-count-row');
   var isSeq=kind.key==='sequence';
   countRow.style.display=isSeq?'flex':'none';

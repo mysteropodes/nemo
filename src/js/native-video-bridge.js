@@ -606,13 +606,52 @@
   // static offset entirely — the same single-chokepoint rule the Component
   // path already follows (see symbolFrameAt, app.js), now shared by video.
   function _targetFor(ld, frame) {
+    return Math.round(_targetExactFor(ld, frame));
+  }
+  // Valeur NON ARRONDIE de l'image source. Sans time remap elle est entière
+  // par construction ; avec un remappage lent elle tombe entre deux images,
+  // et c'est précisément cet écart que la fusion d'images exploite.
+  function _targetExactFor(ld, frame) {
     var nv = (ld && ld.nativeVideo) ? ld.nativeVideo : ld; // tolerate an nv record (older call shape)
     var last = Math.max(0, (nv.frameCount || 1) - 1);
     if (ld && ld.nativeVideo && ld.timeRemap && window.SMMotion && SMMotion.timeRemapValue) {
       var rv = SMMotion.timeRemapValue(ld, frame);
-      if (rv != null) return Math.max(0, Math.min(last, Math.round(rv)));
+      if (rv != null) return Math.max(0, Math.min(last, rv));
     }
     return Math.max(0, Math.min(last, frame - (nv.offsetFrames || 0)));
+  }
+
+  // ---- FUSION D'IMAGES (2026-09) ----
+  // Cyril : « système d'interpolation sur vidéo puissant quand on timeremappe,
+  // en option ». Un ralenti sans fusion saute d'une image source à l'autre :
+  // c'est du pas-à-pas, pas du ralenti. Ici l'image affichée est le mélange
+  // des deux images sources voisines, pondéré par la partie fractionnaire —
+  // le « frame blend » des monteurs. Ce n'est PAS du flot optique : rien
+  // n'est déplacé, deux images sont superposées ; sur un mouvement rapide ça
+  // donne un fantôme, ce qui reste très au-dessus du saut brut et coûte zéro
+  // décodage supplémentaire au-delà des deux images voisines.
+  // Le mélange est quantifié au 1/32 : deux images projet qui tombent au même
+  // trente-deuxième réutilisent le même tampon au lieu de refaire huit
+  // millions d'octets pour un écart invisible.
+  var _blendBuf = null, _blendKey = null;
+  function _blendEnabled(ld) {
+    return !!(ld && ld.nativeVideo && ld.nativeVideo.frameBlend && ld.timeRemap);
+  }
+  function _blendWeight(exact) {
+    var t = exact - Math.floor(exact);
+    return Math.round(t * 32) / 32;
+  }
+  function _blendPixels(a, b, t, key) {
+    if (_blendKey === key && _blendBuf) return _blendBuf;
+    var n = Math.min(a.length, b.length);
+    if (!_blendBuf || _blendBuf.length !== n) _blendBuf = new Uint8ClampedArray(n);
+    var out = _blendBuf, w = Math.round(t * 256), iw = 256 - w;
+    // Entiers plutôt que flottants : le mélange tourne sur des millions
+    // d'octets par image, et un décalage de 8 bits y est mesurablement moins
+    // cher qu'une multiplication flottante par composante.
+    for (var i = 0; i < n; i++) out[i] = (a[i] * iw + b[i] * w) >> 8;
+    _blendKey = key;
+    return out;
   }
   // renderImageOnly reuses the cached scene JSON verbatim — safe ONLY when
   // this layer's image rect (x/y/width/height in buildSceneJson) can't have
@@ -621,6 +660,7 @@
   // engine-bridge.js's nvMat handling), so reusing stale JSON there would
   // freeze the video at its LAST rendered position/scale while only its
   // pixels kept updating. Falls back to a full renderNow() for those.
+  window.SMNativeVideo_blendTest = { exact: _targetExactFor, weight: _blendWeight, blend: _blendPixels };
   function _canFastRender(ld) {
     return !(ld && ld.motion && Object.keys(ld.motion).length);
   }
@@ -837,6 +877,28 @@
         }
       }
       var target = _targetFor(ld, frame);
+      if (_blendEnabled(ld)) {
+        var exactA = _targetExactFor(ld, frame);
+        var tw = _blendWeight(exactA);
+        var b0 = Math.floor(exactA), b1 = Math.min(Math.max(0, nv.frameCount - 1), b0 + 1);
+        if (tw > 0 && b1 !== b0) {
+          var kk = 'b' + b0 + ':' + tw;
+          if (kk === st.lastShown) return;
+          var pa = _jsCacheGet(st, b0) || await frameBytes(ld._nvSessionId, b0);
+          var pb = _jsCacheGet(st, b1) || await frameBytes(ld._nvSessionId, b1);
+          _jsCachePut(st, b0, pa); _jsCachePut(st, b1, pb);
+          var mix = _blendPixels(pa, pb, tw, ld._nvSessionId + ':' + b0 + ':' + tw);
+          if (window.SMEngineBridge) SMEngineBridge.registerImageRaw(_imageIdFor(key), mix, nv.width, nv.height);
+          st.lastShown = kk;
+          window._sceneVersion++;
+          if (window.SMEngineBridge && SMEngineBridge.isEnabled()) {
+            if (_canFastRender(ld)) SMEngineBridge.renderImageOnly(); else SMEngineBridge.renderNow();
+          }
+          _stats.serves++;
+          _prefetch(key, ld, b1);
+          return;
+        }
+      }
       if (target === st.lastShown) return;
       var tI = performance.now();
       var px = await frameBytes(ld._nvSessionId, target);
@@ -1328,6 +1390,12 @@
     // own comment; exposed rather than wired through a DOM event so the
     // dependency direction stays the same as every other cross-file call here.
     retryWebLinkedSessions: retryWebLinkedSessions,
+    // Force le prochain service à repeindre : `lastShown` court-circuite tout
+    // rendu quand l'image cible n'a pas changé, donc basculer la fusion
+    // d'images ne se verrait qu'au prochain déplacement de la tête de lecture.
+    invalidate: function (ld) {
+      Object.keys(_layerSync).forEach(function (k) { _layerSync[k].lastShown = -1; });
+    },
     onFrameChanged: onFrameChanged,
     nvImageIdFor: nvImageIdFor,
     displayRect: displayRect,
