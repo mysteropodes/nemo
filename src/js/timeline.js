@@ -6007,7 +6007,69 @@ function paintFillSwatches(v){
 // property track prints its VALUE at the playhead — so the decision lives
 // here, next to the mode branch that already exists, rather than in the
 // caller.
+// ---- Index-keyed UI state survives layer reorders/deletes (2026-09) ----
+//
+// Several pieces of UI state hold a raw LAYER INDEX: Motion's expanded
+// accordion (_motionExpandedLayer), its per-element isolation (_perObjBoxes),
+// the selected video gizmo (_nvSelectedLayer), and the U-reveal sets
+// (_motionRevealedLayers/_motionRevealedElementLayers). Thirteen different
+// places mutate state.layers' order (reorder, delete, duplicate, merge,
+// split, undo…) and only two of them remembered to remap ONE of these
+// globals — so after a drag-reorder the accordion showed another layer's
+// keyframes, and after deleting a layer above a selected video the gizmo sat
+// on whatever slid into its slot. Found while sweeping for the family of bug
+// feedback #798 exposed (duplicate → Éléments of the wrong layer); confirmed
+// live for reorder + expansion and reorder + isolation.
+//
+// Rather than a 14th ad-hoc remap at each site, this reconciles ONCE, here,
+// at the single point every one of those mutations already passes through
+// afterwards. The rule distinguishes "the layers shifted under an unchanged
+// index" (remap it, by layerUid so it even survives an undo's rebuilt layer
+// objects) from "code set a new index on purpose" (trust it, re-record):
+// a global whose value differs from what this saw last time was written
+// deliberately since; one whose value is unchanged but now names a
+// different layer than it did has simply been slid under.
+var _idxShadow={};
+function _layerKeyOf(ld){return ld?(ld.layerUid||ld):null;}
+function _indexOfLayerKey(key){
+  if(key==null)return -1;
+  for(var i=0;i<state.layers.length;i++){var l=state.layers[i];if(l===key||(l&&l.layerUid&&l.layerUid===key))return i;}
+  return -1;
+}
+function reconcileLayerIndexState(){
+  ['_motionExpandedLayer','_perObjBoxes','_nvSelectedLayer'].forEach(function(name){
+    var cur=window[name];
+    var sh=_idxShadow[name];
+    if(typeof cur==='number'){
+      if(sh&&sh.idx===cur&&_layerKeyOf(state.layers[cur])!==sh.key){
+        var ni=_indexOfLayerKey(sh.key);
+        window[name]=ni>=0?ni:null;
+        cur=window[name];
+      }
+      _idxShadow[name]=(typeof cur==='number')?{idx:cur,key:_layerKeyOf(state.layers[cur])}:null;
+    }else _idxShadow[name]=null;
+  });
+  ['_motionRevealedLayers','_motionRevealedElementLayers'].forEach(function(name){
+    var arr=window[name];
+    var sh=_idxShadow[name];
+    if(Array.isArray(arr)){
+      if(sh&&sh.arr===arr){
+        // Same array object as last time: nobody reassigned it, so its
+        // entries are index values that may have slid — remap in place.
+        var keys=sh.keys,out=[];
+        for(var i=0;i<arr.length;i++){
+          var k=i<keys.length?keys[i]:_layerKeyOf(state.layers[arr[i]]);
+          var ni=_indexOfLayerKey(k);
+          if(ni>=0&&out.indexOf(ni)<0)out.push(ni);
+        }
+        arr.length=0;Array.prototype.push.apply(arr,out);
+      }
+      _idxShadow[name]={arr:arr,keys:arr.map(function(i){return _layerKeyOf(state.layers[i]);})};
+    }else _idxShadow[name]=null;
+  });
+}
 function renderLayerList(frameOnly){
+  reconcileLayerIndexState();
   if(frameOnly&&state.appMode!=='motion')return;
   // Split code editor sync (2026-08-30, found by driving: deleting the
   // layer whose expression the panel was showing left the panel open on a
