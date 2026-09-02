@@ -106,14 +106,32 @@
     var ordered = selectedPaths.slice();
     if (layer) ordered.sort(function (a, b) { return layer.children.indexOf(a) - layer.children.indexOf(b); });
     var selSet = ordered;
+    // The LARGEST fully-selected ancestor, not just the root (2026-09,
+    // several nesting levels): selecting exactly one INNER group's members
+    // plus a sibling has to nest that inner group, which testing only the
+    // root missed — the root isn't fully selected there, so every member
+    // fell through to "loose leaf" and the inner group was flattened.
+    // Walks up while each level is still entirely inside the selection.
+    function largestFullySelected(p) {
+      var gid = p.data && p.data.groupId;
+      if (!gid || !groupMeta(gid, ld)) return null;
+      var best = null, cur = gid;
+      for (var i = 0; i < 32 && cur && groupMeta(cur, ld); i++) {
+        var leaves = resolveGroupMembers(cur, ld, layer);
+        if (!leaves.length || !leaves.every(function (m) { return selSet.indexOf(m) !== -1; })) break;
+        best = cur;
+        cur = parentGroupOf(cur, ld);
+      }
+      return best;
+    }
     var units = [], seenGid = {};
     ordered.forEach(function (p) {
-      var root = rootGroupOfItem(p, ld);
-      if (root && groupMeta(root, ld)) {
-        if (seenGid[root]) return;
-        var leaves = resolveGroupMembers(root, ld, layer);
-        var whole = leaves.length > 0 && leaves.every(function (m) { return selSet.indexOf(m) !== -1; });
-        if (whole) { seenGid[root] = true; units.push({ kind: 'group', gid: root }); return; }
+      var unitGid = largestFullySelected(p);
+      if (unitGid) {
+        if (seenGid[unitGid]) return;
+        seenGid[unitGid] = true;
+        units.push({ kind: 'group', gid: unitGid });
+        return;
       }
       units.push({ kind: 'leaf', p: p });
     });
@@ -126,18 +144,49 @@
     }
     pushUndo();
     var gid = 'grp_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6);
+    // Where the new group goes in the tree: the units' own current owner.
+    // Grouping two members of a sub-group must produce a group INSIDE that
+    // sub-group, not a new top-level one — otherwise the second nesting
+    // level silently flattens the first (2026-09, "plusieurs niveaux").
+    function ownerOf(key) {
+      var found = null;
+      Object.keys(ld.groups).forEach(function (g) { if ((ld.groups[g].order || []).indexOf(key) !== -1) found = g; });
+      return found;
+    }
+    var keys = units.map(function (u) { return u.kind === 'group' ? u.gid : (u.p.data && u.p.data.strokeId) || ensureStrokeId(u.p); });
+    var owners = keys.map(ownerOf);
+    var commonOwner = owners.every(function (o) { return o === owners[0]; }) ? owners[0] : null;
+    var insertAt = -1;
+    if (commonOwner) {
+      var pOrder = ld.groups[commonOwner].order || [];
+      keys.forEach(function (k) { var ix = pOrder.indexOf(k); if (ix !== -1 && (insertAt === -1 || ix < insertAt)) insertAt = ix; });
+    }
+    // Detach every unit from wherever it currently sits, WITHOUT the
+    // "<2 entries dissolves the group" rule firing mid-way — the new group
+    // is about to be inserted in their place, so the count is only final
+    // once that has happened.
+    keys.forEach(function (k) {
+      Object.keys(ld.groups).forEach(function (g) {
+        var o = ld.groups[g].order || []; var ix = o.indexOf(k);
+        if (ix !== -1) o.splice(ix, 1);
+      });
+    });
     var order = [];
-    units.forEach(function (u) {
+    units.forEach(function (u, i) {
       if (u.kind === 'group') { ld.groups[u.gid].parent = gid; order.push(u.gid); return; }
       var p = u.p;
       if (!p.data) p.data = {};
-      var sid = ensureStrokeId(p);
-      detachLeaf(sid, ld, layer);
       p.data.groupId = gid;
-      order.push(sid);
+      order.push(keys[i]);
     });
     // 2026-08 fix: hardcoded French default name, shown regardless of locale.
     ld.groups[gid] = { name: SM.t('autoNameGroup'), combineMode: 'none', order: order };
+    if (commonOwner && ld.groups[commonOwner]) {
+      ld.groups[gid].parent = commonOwner;
+      var co = ld.groups[commonOwner].order || (ld.groups[commonOwner].order = []);
+      co.splice(insertAt >= 0 ? insertAt : co.length, 0, gid);
+      if (co.length < 2) dissolveGroup(commonOwner, ld, layer);
+    }
     saveActiveLayerFrame(); updateUI();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
     if (window.showToast) showToast(SM.t('toastGroupCreatedSuffix') + units.length + SM.t('toastElementsCloseParen'));
