@@ -1391,6 +1391,24 @@
           <div id="comp-frame-strip" style="display:flex;gap:2px;overflow-x:auto;padding:2px 0"></div>
         </div>
         <div class="pr"><button class="pbtn ac" id="btn-comp-enter" style="flex:1" data-i18n="btnEditComponent">Éditer le composant…</button></div>
+        <!-- Synchro labiale (lipsync.js) : la « mouth chart » du dessin
+             animé — une bouche par son, et l'audio decide laquelle joue a
+             quelle image. La sortie passe par componentFrame, le mecanisme
+             d'image fixe deja en place. -->
+        <div class="pr" style="flex-direction:column;align-items:stretch;gap:4px;border-top:1px solid var(--border);margin-top:6px;padding-top:6px">
+          <span class="pl" style="font-size:9px" data-i18n="lipHdr">Synchro labiale</span>
+          <div class="pr"><span class="pl" data-i18n="lipTrack">Piste</span><select class="psel" id="lip-track" style="flex:1"></select></div>
+          <div class="pr dims-row">
+            <span class="pl" data-i18n="lipFrom">De</span><input type="number" class="pi scrub" id="lip-start" value="0" data-step="1">
+            <span class="pl" data-i18n="lipTo">A</span><input type="number" class="pi scrub" id="lip-end" value="0" data-step="1">
+          </div>
+          <div class="pr dims-row">
+            <span class="pl" data-i18n="lipSens">Sensibilite</span><input type="number" class="pi scrub" id="lip-sens" value="1" min="0.2" max="4" step="0.1" data-step="0.1">
+            <span class="pl" data-i18n="lipHold">Tenue</span><input type="number" class="pi scrub" id="lip-hold" value="2" min="1" max="8" step="1" data-step="1">
+          </div>
+          <div id="lip-chart" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+          <button class="pbtn ac" id="btn-lip-apply" data-i18n="lipApply">Analyser et appliquer</button>
+        </div>
         <div class="pr"><button class="pbtn" id="btn-comp-detach" style="flex:1" data-i18n-title="compDetachTitle" title="Bake the component's animation back into a normal layer" data-i18n="compDetachBtn">Décomposer en calque</button></div>
       </div>
     </div>
@@ -2344,6 +2362,7 @@
 <script src="js/effects-panel.js"></script>
 <script src="js/shader-effects-library.js"></script>
 <script src="js/path-fx.js"></script>
+<script src="js/lipsync.js"></script>
 <script src="js/custom-effects.js"></script>
 <script src="js/vectorize-bridge.js"></script>
 <script src="js/project.js"></script>
