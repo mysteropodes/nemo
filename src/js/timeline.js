@@ -8168,10 +8168,46 @@ function commitVectorText(txt,fontKey,size,align,color,fixedWidthWorld){
   var ldForTag=state.layers[state.activeLayerIdx];
   var wasEmpty=layer.children.length===0;
   pushUndo();
-  if(editingRoot)window.SMVectorText.vectorTextGroupMembers(editingRoot).forEach(function(p){p.remove();});
+  // Editing a text block rebuilds every glyph from scratch, with fresh
+  // strokeIds — and per-character animation (elementMotion, text-animator.js)
+  // is keyed BY strokeId. Measured live: applying "fadeIn" then changing
+  // "NEMO" to "NEMO 2" left 9 orphaned entries and a dead animation (alpha
+  // 255 on every frame). Same for a custom shape name. So the ids travel by
+  // CHARACTER INDEX across the rebuild: a character that is still there
+  // keeps its identity (and its animation), one that disappeared has its
+  // entry dropped instead of lingering as dead weight.
+  var _oldIdByChar=null;
+  if(editingRoot){
+    // A character can be several paths (a counter, an accent), so this is a
+    // LIST per character index, consumed in document order on the way back.
+    _oldIdByChar={};
+    window.SMVectorText.vectorTextGroupMembers(editingRoot).forEach(function(p){
+      if(!p.data||p.data.charIndex==null||!p.data.strokeId)return;
+      (_oldIdByChar[p.data.charIndex]=_oldIdByChar[p.data.charIndex]||[]).push(p.data.strokeId);
+    });
+    window.SMVectorText.vectorTextGroupMembers(editingRoot).forEach(function(p){p.remove();});
+  }
   else if(wasEmpty&&!ldForTag.isTextLayer)ldForTag.isTextLayer=true;
   closeTextPopover();
   window.SMVectorText.buildVectorTextGroup(txt,fontKey,size,color,align,fixedWidthWorld,topLeft,layer).then(function(){
+    if(_oldIdByChar){
+      var reused={},queues={};
+      Object.keys(_oldIdByChar).forEach(function(ci){queues[ci]=_oldIdByChar[ci].slice();});
+      layer.children.forEach(function(p){
+        if(!p.data||p.data.charIndex==null)return;
+        var q=queues[p.data.charIndex];
+        if(!q||!q.length)return;
+        var oid=q.shift();
+        p.data.strokeId=oid;reused[oid]=1;
+      });
+      Object.keys(_oldIdByChar).forEach(function(ci){
+        _oldIdByChar[ci].forEach(function(oid){
+          if(reused[oid])return;
+          if(ldForTag.elementMotion)delete ldForTag.elementMotion[oid];
+          if(ldForTag.shapeNames)delete ldForTag.shapeNames[oid];
+        });
+      });
+    }
     saveActiveLayerFrame();updateUI();
     if(window.SMEngineBridge)window.SMEngineBridge.renderNow();
   }).catch(function(e){
