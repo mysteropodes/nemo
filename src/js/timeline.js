@@ -7336,7 +7336,7 @@ var TOOL_SHORTCUTS=[
   {action:'rect',key:'r',label:'Rectangle'},
   {action:'ellipse',key:'l',label:'Ellipse'},
   {action:'speechbubble',key:'d',label:'Bulle de dialogue'},
-  {action:'star',key:'k',label:'Étoile / Polygone'},
+  {action:'star',key:'q',label:'Étoile / Polygone'},
   {action:'eraser',key:'e',label:'Eraser'},
   {action:'fill',key:'g',label:'Fill'},
   {action:'fillbrush',key:'n',label:'Fill Brush'},
@@ -7366,16 +7366,86 @@ var TOOL_SHORTCUTS=[
   // deleting the binding rather than re-adding a button the UI review
   // that removed it explicitly didn't want back.
 ];
+// COMMANDES remappables (2026-09) — jusqu'ici seuls les 21 OUTILS étaient
+// reconfigurables dans Réglages ▸ Raccourcis, alors que 63 autres touches
+// étaient câblées en dur dans onKeyDown : un animateur venu de TVPaint ou
+// d'After Effects ne pouvait déplacer aucune commande. Ce tableau est la
+// liste de celles qui passent par la même table d'overrides que les outils
+// (même stockage, même détection de conflit) ; leurs anciennes branches en
+// dur ont été retirées du gestionnaire pour qu'une touche réassignée ne
+// déclenche pas les deux. Le reste des touches est exposé en LECTURE SEULE
+// dans le panneau (READONLY_SHORTCUTS plus bas) plutôt que d'être passé
+// sous silence — le panneau devient la carte complète du clavier.
+var COMMAND_SHORTCUTS=[
+  {action:'cmdPrevKey',key:'j',cat:'nav',label:'shortcutCmdPrevKey',run:function(){if(state.playing)stopPlay();goToFrame(prevKeyframeFrame(state.activeLayerIdx,state.currentFrame));}},
+  {action:'cmdNextKey',key:'k',cat:'nav',label:'shortcutCmdNextKey',run:function(){if(state.playing)stopPlay();goToFrame(nextKeyframeFrame(state.activeLayerIdx,state.currentFrame));}},
+  {action:'cmdPrevFrame',key:',',cat:'nav',label:'shortcutCmdPrevFrame',run:function(){if(state.playing)stopPlay();goToFrame(state.currentFrame-1);}},
+  {action:'cmdNextFrame',key:'.',cat:'nav',label:'shortcutCmdNextFrame',run:function(){if(state.playing)stopPlay();goToFrame(state.currentFrame+1);}},
+  {action:'cmdGoStart',key:'Home',cat:'nav',label:'shortcutCmdGoStart',run:function(){if(state.playing)stopPlay();goToFrame(0);}},
+  {action:'cmdGoEnd',key:'End',cat:'nav',label:'shortcutCmdGoEnd',run:function(){if(state.playing)stopPlay();goToFrame(state.totalFrames-1);}},
+  {action:'cmdInsertFrame',key:'F5',cat:'frames',label:'shortcutCmdInsertFrame',run:function(e){e.preventDefault();insertFrame();}},
+  {action:'cmdInsertKey',key:'F6',cat:'frames',label:'shortcutCmdInsertKey',run:function(e){e.preventDefault();insertKeyframe();}},
+  {action:'cmdInsertBlankKey',key:'F7',cat:'frames',label:'shortcutCmdInsertBlankKey',run:function(e){e.preventDefault();insertBlankKeyframe();}},
+  {action:'cmdDuplicateKey',key:'',cat:'frames',label:'shortcutCmdDuplicateKey',run:function(){window.SM.duplicateKeyframe();}},
+  {action:'cmdExtendExposure',key:'+',cat:'frames',label:'shortcutCmdExtendExposure',run:function(){window.SM.extendExposure(1);}},
+  {action:'cmdTween',key:'t',cat:'frames',label:'shortcutCmdTween',run:function(){window.SM.generateTweens();}},
+  {action:'cmdFlipPreview',key:'f',cat:'view',label:'shortcutCmdFlipPreview',run:function(e){if(!e.shiftKey)window.SM.flipPreview();}},
+  {action:'cmdResetView',key:'/',cat:'view',label:'shortcutCmdResetView',run:function(e){e.preventDefault();window.SM.resetView();}},
+  {action:'cmdRenameLayer',key:'F2',cat:'layers',label:'shortcutCmdRenameLayer',run:function(e){e.preventDefault();if(state.layers[state.activeLayerIdx])startLayerRename(state.activeLayerIdx);}},
+];
+// Touches câblées ailleurs (playback, presse-papier, modes, gestes) : listées
+// pour que le panneau soit exhaustif, marquées non réassignables.
+var READONLY_SHORTCUTS=[
+  {keys:'Espace',label:'shortcutRoPlay',cat:'nav'},
+  {keys:'←  →',label:'shortcutRoStepFrame',cat:'nav'},
+  {keys:'⇧ Page',label:'shortcutRoStepLayer',cat:'layers'},
+  {keys:'⌘Z / ⇧⌘Z',label:'shortcutRoUndo',cat:'edit'},
+  {keys:'⌘C / ⌘V / ⌘X',label:'shortcutRoClipboard',cat:'edit'},
+  {keys:'⌘D',label:'shortcutRoDuplicate',cat:'edit'},
+  {keys:'⌘G / ⇧⌘G',label:'shortcutRoGroup',cat:'edit'},
+  {keys:'⌘A',label:'shortcutRoSelectAll',cat:'edit'},
+  {keys:'⌫',label:'shortcutRoDelete',cat:'edit'},
+  {keys:'B / N',label:'shortcutRoWorkArea',cat:'nav'},
+  {keys:'F9',label:'shortcutRoEasyEase',cat:'frames'},
+  {keys:'⌥ ← →',label:'shortcutRoNudgeKeys',cat:'frames'},
+  {keys:'⇧⌘D',label:'shortcutRoSplitLayer',cat:'layers'},
+  {keys:'Échap',label:'shortcutRoEscape',cat:'edit'},
+];
+var SHORTCUT_CATS=[{id:'tools',label:'shortcutCatTools'},{id:'nav',label:'shortcutCatNav'},{id:'frames',label:'shortcutCatFrames'},{id:'layers',label:'shortcutCatLayers'},{id:'view',label:'shortcutCatView'},{id:'edit',label:'shortcutCatEdit'}];
 var _shortcutOverrides=null;
 function shortcutOverrides(){
   if(_shortcutOverrides)return _shortcutOverrides;
   try{_shortcutOverrides=JSON.parse(localStorage.getItem('nemo-shortcuts')||'{}');}catch(e){_shortcutOverrides={};}
   return _shortcutOverrides;
 }
+function shortcutDefFor(action){
+  return TOOL_SHORTCUTS.find(function(s){return s.action===action;})||COMMAND_SHORTCUTS.find(function(s){return s.action===action;})||null;
+}
 function shortcutKeyFor(action){
   var ov=shortcutOverrides();if(ov[action])return ov[action];
-  var d=TOOL_SHORTCUTS.find(function(s){return s.action===action;});
+  var d=shortcutDefFor(action);
   return d?d.key:null;
+}
+// Une touche = une action, outils ET commandes confondus (la détection de
+// conflit du panneau ne regardait que les outils).
+function shortcutClashFor(action,key){
+  var lk=(key||'').toLowerCase();
+  if(!lk)return null;
+  var all=TOOL_SHORTCUTS.concat(COMMAND_SHORTCUTS);
+  for(var i=0;i<all.length;i++){
+    if(all[i].action===action)continue;
+    if((shortcutKeyFor(all[i].action)||'').toLowerCase()===lk)return all[i];
+  }
+  return null;
+}
+function runCommandShortcut(k,event){
+  var lk=(k||'').toLowerCase();
+  if(!lk)return false;
+  for(var i=0;i<COMMAND_SHORTCUTS.length;i++){
+    var c=COMMAND_SHORTCUTS[i];
+    if((shortcutKeyFor(c.action)||'').toLowerCase()===lk){c.run(event);return true;}
+  }
+  return false;
 }
 function setShortcutKey(action,key){
   var ov=shortcutOverrides();
@@ -7419,34 +7489,108 @@ function runToolShortcut(k){
 function renderShortcutsList(){
   var list=document.getElementById('shortcuts-list');if(!list)return;
   list.innerHTML='';
-  TOOL_SHORTCUTS.forEach(function(s){
+  // Filtre de recherche + regroupement par catégorie (2026-09) : la liste
+  // était une seule colonne de 21 lignes sans en-têtes ni recherche, et ne
+  // montrait QUE les outils — impossible d'y retrouver une commande, encore
+  // moins de vérifier ce qu'une touche fait déjà. Elle liste maintenant les
+  // outils, les commandes réassignables et, en lecture seule, les touches
+  // câblées ailleurs : le panneau est la carte complète du clavier.
+  var q='';
+  var search=document.createElement('input');
+  search.type='search';search.className='pi';
+  search.placeholder=SM.t('shortcutSearchPlaceholder');
+  search.style.cssText='width:100%;margin-bottom:8px;';
+  list.appendChild(search);
+  var body=document.createElement('div');
+  body.style.cssText='display:flex;flex-direction:column;gap:2px;';
+  list.appendChild(body);
+  function matches(label,key){
+    if(!q)return true;
+    return (label||'').toLowerCase().indexOf(q)>=0||(key||'').toLowerCase().indexOf(q)>=0;
+  }
+  function keyRow(label,keyText,onAssign){
     var row=document.createElement('div');
-    row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:4px;font-size:11px;';
-    var lbl=document.createElement('span');lbl.textContent=s.label;
+    row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:4px;font-size:11px;';
+    var lbl=document.createElement('span');lbl.textContent=label;lbl.style.cssText='flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
     row.appendChild(lbl);
-    var keyBtn=document.createElement('button');
-    keyBtn.className='pbtn';keyBtn.style.cssText='min-width:60px;font-family:monospace;text-transform:uppercase;';
-    keyBtn.textContent=shortcutKeyFor(s.action);
-    keyBtn.title=SM.t('shortcutClickThenPressTitle');
-    keyBtn.addEventListener('click',function(){
-      keyBtn.textContent='…';keyBtn.classList.add('ac');
-      function capture(ev){
-        ev.preventDefault();ev.stopPropagation();
-        if(ev.key==='Escape'){keyBtn.textContent=shortcutKeyFor(s.action);}
-        else{
-          // reject a key already bound to a different tool action
-          var clash=TOOL_SHORTCUTS.find(function(o){return o.action!==s.action&&shortcutKeyFor(o.action)===ev.key.toLowerCase();});
-          if(clash){showToast(SM.t('shortcutKeyClashToast').replace('{label}',clash.label));keyBtn.textContent=shortcutKeyFor(s.action);}
-          else{setShortcutKey(s.action,ev.key);keyBtn.textContent=ev.key.toLowerCase();}
+    if(!onAssign){
+      var ro=document.createElement('span');
+      ro.textContent=keyText;
+      ro.title=SM.t('shortcutNotRebindableTitle');
+      ro.style.cssText='min-width:60px;text-align:center;font-family:monospace;font-size:10px;color:var(--text-dim);border:1px dashed var(--border);border-radius:4px;padding:2px 6px;';
+      row.appendChild(ro);
+    }else{
+      var keyBtn=document.createElement('button');
+      keyBtn.className='pbtn';keyBtn.style.cssText='min-width:60px;font-family:monospace;text-transform:uppercase;';
+      keyBtn.textContent=keyText;
+      keyBtn.title=SM.t('shortcutClickThenPressTitle');
+      keyBtn.addEventListener('click',function(){
+        keyBtn.textContent='…';keyBtn.classList.add('ac');
+        function capture(ev){
+          ev.preventDefault();ev.stopPropagation();
+          onAssign(ev,keyBtn);
+          keyBtn.classList.remove('ac');
+          document.removeEventListener('keydown',capture,true);
         }
-        keyBtn.classList.remove('ac');
-        document.removeEventListener('keydown',capture,true);
+        document.addEventListener('keydown',capture,true);
+      });
+      row.appendChild(keyBtn);
+    }
+    return row;
+  }
+  function assignFor(def){
+    return function(ev,keyBtn){
+      if(ev.key==='Escape'){keyBtn.textContent=shortcutKeyFor(def.action)||'—';return;}
+      var clash=shortcutClashFor(def.action,ev.key);
+      if(clash){
+        showToast(SM.t('shortcutKeyClashToast').replace('{label}',clash.label&&clash.label.indexOf('shortcut')===0?SM.t(clash.label):clash.label));
+        keyBtn.textContent=shortcutKeyFor(def.action)||'—';
+      }else{
+        setShortcutKey(def.action,ev.key);
+        keyBtn.textContent=ev.key.toLowerCase();
       }
-      document.addEventListener('keydown',capture,true);
+    };
+  }
+  function draw(){
+    body.innerHTML='';
+    var shown=0;
+    SHORTCUT_CATS.forEach(function(cat){
+      var rows=[];
+      if(cat.id==='tools'){
+        TOOL_SHORTCUTS.forEach(function(d){
+          var key=shortcutKeyFor(d.action)||'';
+          if(matches(d.label,key))rows.push(keyRow(d.label,key||'—',assignFor(d)));
+        });
+      }
+      COMMAND_SHORTCUTS.forEach(function(d){
+        if(d.cat!==cat.id)return;
+        var label=SM.t(d.label),key=shortcutKeyFor(d.action)||'';
+        if(matches(label,key))rows.push(keyRow(label,key||'—',assignFor(d)));
+      });
+      READONLY_SHORTCUTS.forEach(function(d){
+        if(d.cat!==cat.id)return;
+        var label=SM.t(d.label);
+        if(matches(label,d.keys))rows.push(keyRow(label,d.keys,null));
+      });
+      if(!rows.length)return;
+      var hdr=document.createElement('div');
+      hdr.className='phdr';
+      hdr.style.cssText='padding:8px 0 3px 0;font-size:9px;color:var(--text-dim);';
+      hdr.textContent=SM.t(cat.label);
+      body.appendChild(hdr);
+      rows.forEach(function(r){body.appendChild(r);shown++;});
     });
-    row.appendChild(keyBtn);
-    list.appendChild(row);
-  });
+    if(!shown){
+      var none=document.createElement('div');
+      none.style.cssText='font-size:10px;color:var(--text-dim);padding:8px 4px;';
+      none.textContent=SM.t('shortcutNoMatch');
+      body.appendChild(none);
+    }
+  }
+  search.addEventListener('input',function(){q=search.value.trim().toLowerCase();draw();});
+  // La saisie de la recherche ne doit pas déclencher les raccourcis eux-mêmes.
+  search.addEventListener('keydown',function(e){e.stopPropagation();});
+  draw();
 }
 // Team review: anchored comment pins. `_activeComment` is either an
 // existing entry from state.comments (edit-in-place) or a fresh draft
@@ -9660,15 +9804,15 @@ function onKeyDown(event){
     return;
   }
   if(runToolShortcut(k)){}
+  // Commandes reconfigurables (COMMAND_SHORTCUTS) — placées ici, juste après
+  // les outils, pour que leurs anciennes branches en dur (retirées plus bas)
+  // ne puissent pas répondre en double à une touche réassignée.
+  else if(runCommandShortcut(k,event)){}
   // NLE-style transport: J/K jump to the previous/next real keyframe on the
   // active layer (Premiere/Final Cut convention); ','/'.' step exactly one
   // frame at a time regardless of keyframes. K was freed up from Fill Brush
   // (moved to N) specifically to make room for this — J/K next-key/prev-key
   // navigation was an explicit, named request.
-  else if(k==='j'||k==='J'){if(state.playing)stopPlay();goToFrame(prevKeyframeFrame(state.activeLayerIdx,state.currentFrame));}
-  else if(k==='k'||k==='K'){if(state.playing)stopPlay();goToFrame(nextKeyframeFrame(state.activeLayerIdx,state.currentFrame));}
-  else if(k===','){if(state.playing)stopPlay();goToFrame(state.currentFrame-1);}
-  else if(k==='.'||k===';'){if(state.playing)stopPlay();goToFrame(state.currentFrame+1);}
   // UI/UX audit (2026-07-30): X was bound twice in this same chain — once
   // here (fires first, always wins) and once further down to flipHorizontal/
   // flipVertical (shiftKey-gated), making the second binding permanently
@@ -9680,7 +9824,6 @@ function onKeyDown(event){
     if(event.shiftKey){if(event.altKey)window.SM.flipVertical();else window.SM.flipHorizontal();}
     else window.SM.swapStrokeFill();
   }
-  else if(k==='t'||k==='T')window.SM.generateTweens();
   // [ ] brush/eraser size — Photoshop/Procreate/Clip Studio convention,
   // absent here entirely before this (grepped: no bracket-key handler
   // anywhere). 1px per press, 5px with Shift; eraser gets its own
@@ -9814,8 +9957,6 @@ function onKeyDown(event){
   // in/out-point trim) and plain [ ] are brush size, so PageUp/PageDown —
   // entirely unclaimed here, and Krita's own binding for exactly this.
   else if(k==='PageUp'||k==='PageDown'){event.preventDefault();stepActiveLayer(k==='PageUp'?-1:1);}
-  else if(k==='Home'){if(state.playing)stopPlay();goToFrame(0);}
-  else if(k==='End'){if(state.playing)stopPlay();goToFrame(state.totalFrames-1);}
   // Alt+[ / Alt+] "trim layer in/out point to current time" (AE convention)
   // — layer-inout.js already has the full in/out-point system (draggable
   // bar/handles, layerInPoint/layerOutPoint, app.js) but only via mouse
@@ -9930,27 +10071,19 @@ function onKeyDown(event){
     else if(state.tool==='select'&&!event.shiftKey&&state.layers.length){event.preventDefault();window.SM.deleteLayer();}
     else if(event.shiftKey)removeFrame();
   }
-  else if(k==='F5'){event.preventDefault();insertFrame();}
   // Shift+F6 — Animate's "Clear Keyframe". Must be checked BEFORE plain F6:
   // that branch never excluded shiftKey, so Shift+F6 accidentally INSERTED
   // a keyframe instead (2026-07-31 parity sweep). clearKeyframe (app.js)
   // was previously reachable only via the frame-cell right-click menu.
   else if(k==='F6'&&event.shiftKey){event.preventDefault();clearKeyframe();}
-  else if(k==='F6'){event.preventDefault();insertKeyframe();}
-  else if(k==='F7'){event.preventDefault();insertBlankKeyframe();}
   // F2 — rename the active layer (Windows/Finder convention; AE's own
   // binding is plain Return, firmly claimed by Play/pen/rig above by
   // deliberate design). Also the ONLY rename path in Motion mode, whose
   // row dblclick is claimed by enterComponentLayer (2026-07-31 sweep).
-  else if(k==='F2'){event.preventDefault();if(state.layers[state.activeLayerIdx])startLayerRename(state.activeLayerIdx);}
   // '/' — AE's "100% zoom / actual size" → resetView (zoom=1 + recenter).
   // Deliberately NOT shift-gated: on AZERTY, typing '/' requires Shift, so
   // a Shift+/ distinction (AE's fit-to-window) is unreachable for French
   // layouts — fit already has Ctrl+Alt+0.
-  else if(k==='/'){event.preventDefault();window.SM.resetView();}
-  else if(k==='d'||k==='D'){window.SM.duplicateKeyframe();}
-  else if(k==='f'||k==='F'){if(!event.shiftKey)window.SM.flipPreview();}
-  else if(k==='+'||k==='='){window.SM.extendExposure(1);}
 }
 // Longest hold still read as a tap. Generous enough to survive a slow
 // keypress, short enough that parking a thumb on Space to pan and thinking
