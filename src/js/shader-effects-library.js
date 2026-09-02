@@ -804,6 +804,46 @@
       'let a = src.a * keep;',
       'return vec4<f32>(src.rgb * select(0.0, a / max(src.a, 0.001), src.a > 0.001), a);',
     ]),
+    // Chroma Key (2026-09) — l'incrustation « pro » qui manquait à côté du
+    // Color Key existant : celui-ci compare des RGB NORMALISÉS, donc il
+    // décroche dès que le fond vert n'est pas uniformément éclairé (un coin
+    // sombre du cyclo n'est plus la même couleur normalisée). Ici la
+    // comparaison se fait dans le plan de CHROMINANCE (Cb/Cr), qui ignore la
+    // luminance par construction — c'est ce que font les incrusteurs vidéo.
+    // S'y ajoutent les deux réglages sans lesquels une incrustation n'est pas
+    // utilisable : le DÉBORDEMENT (le liseré vert sur le sujet) et le
+    // RESSERREMENT du cache, plus une vue du CACHE en noir et blanc, seule
+    // façon de régler tolérance et douceur en voyant ce qu'on fait.
+    fx('shader_chroma_key', 'Chroma Key', 'Keying', [
+      param('p1', 'Screen R', 0, 1, 0.01, '', 0.05),
+      param('p2', 'Screen G', 0, 1, 0.01, '', 0.75),
+      param('p3', 'Screen B', 0, 1, 0.01, '', 0.15),
+      param('p4', 'Tolerance', 0, 1, 0.01, '', 0.15),
+      param('p5', 'Softness', 0, 1, 0.01, '', 0.10),
+      param('p6', 'Spill', 0, 1, 0.01, '', 0.60),
+      param('p7', 'Choke', -0.4, 0.4, 0.01, '', 0),
+      param('p8', 'View matte', 0, 1, 1, '', 0),
+    ], [
+      'let screen = vec3<f32>(params.p1, params.p2, params.p3);',
+      'let y_src = dot(src.rgb, vec3<f32>(0.299, 0.587, 0.114));',
+      'let y_key = dot(screen, vec3<f32>(0.299, 0.587, 0.114));',
+      'let c_src = vec2<f32>(src.b - y_src, src.r - y_src);',
+      'let c_key = vec2<f32>(screen.b - y_key, screen.r - y_key);',
+      'let d = distance(c_src, c_key);',
+      'var a = smoothstep(params.p4, params.p4 + params.p5 + 0.001, d);',
+      // Resserrement : p7 > 0 ronge le bord du cache, p7 < 0 l'élargit.
+      'a = clamp((a - max(params.p7, 0.0)) / max(0.001, 1.0 - abs(params.p7)) + max(-params.p7, 0.0), 0.0, 1.0);',
+      // Débordement : on retire la part de chrominance alignée sur l'écran.
+      'let kdir = normalize(c_key + vec2<f32>(0.0001, 0.0001));',
+      'let along = max(dot(c_src, kdir), 0.0) * params.p6;',
+      'var rgb = src.rgb;',
+      'rgb.b = rgb.b - along * kdir.x;',
+      'rgb.r = rgb.r - along * kdir.y;',
+      'rgb = clamp(rgb, vec3<f32>(0.0), vec3<f32>(1.0));',
+      'let out_a = src.a * a;',
+      'if (params.p8 > 0.5) { return vec4<f32>(vec3<f32>(a), 1.0); }',
+      'return vec4<f32>(rgb * select(0.0, out_a / max(src.a, 0.001), src.a > 0.001), out_a);',
+    ]),
     fx('shader_photo_filter', 'Photo Filter', 'Color', [
       param('p1', 'Density', 0, 1, 0.01, '', 0.35),
       param('p2', 'Warmth', -1, 1, 0.01, '', 0.4),
