@@ -4759,6 +4759,28 @@ function loadFrame(idx,dupOnly){
   // following its ribbon.
   applyElemVisibilityAll();
   userLayers[state.activeLayerIdx].activate();
+  // Stroke selection vs rebuilt layers (2026-09 QA sweep): the rebuild above
+  // replaces a layer's Paper items with fresh ones, but `selectedPaths`
+  // (tools.js) kept pointing at the OLD, now-detached objects — add a layer
+  // while a shape is selected and the panel went on saying "1 element
+  // selected" about a ghost that no gesture could reach. Re-resolve each
+  // selected item by strokeId on the active layer (its rebuilt twin — which
+  // is also what lets a Motion selection follow the same object across
+  // keyframes), drop what has no twin, keep the index array in step.
+  if(typeof selectedPaths!=='undefined'&&selectedPaths.length){
+    var _selLayer=userLayers[state.activeLayerIdx],_selChanged=false;
+    var _selNext=selectedPaths.map(function(p){
+      if(p&&!p.removed&&p.layer===_selLayer)return p;
+      _selChanged=true;
+      var sid=p&&p.data&&p.data.strokeId;if(!sid||!_selLayer)return null;
+      var twin=_selLayer.getItem({match:function(it){return !!(it.data&&it.data.strokeId===sid);}});
+      return (twin&&!twin.removed)?twin:null;
+    }).filter(Boolean);
+    if(_selChanged){
+      selectedPaths=_selNext;
+      state.selectedStrokeIndices=_selNext.map(function(p){return _selLayer.children.indexOf(p);}).filter(function(x){return x>=0;});
+    }
+  }
   // Vue caméra (v18) : loadFrame est LE point de passage de tout changement
   // de frame (scrub, lecture, goToFrame) — même raison que le hook
   // SMReference au-dessus. Le hook updatePlayhead seul ne couvrait que la
