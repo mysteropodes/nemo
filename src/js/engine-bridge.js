@@ -699,7 +699,15 @@
   // be a Uint8Array of exactly w*h*4 bytes.
   function registerImageRaw(id, pixels, w, h) {
     if (!engine) return false;
-    engine.register_image(id, pixels, w, h);
+    // Same re-entrancy window as the renderers above (a video frame landing
+    // while a readback is awaiting). Reported as false rather than thrown:
+    // the video bridge's own lastShown guard then simply retries on the next
+    // frame sync instead of the exception escaping into loadFrame.
+    try { engine.register_image(id, pixels, w, h); }
+    catch (e) {
+      if (/recursive use of an object/i.test(String(e && e.message || e))) return false;
+      throw e;
+    }
     registeredImageIds[id] = true;
     _noteImageRegistered(id, w, h);
     return true;
@@ -3906,11 +3914,45 @@
   // the stage via canvasRotation alone (no zoom/pan change alongside it)
   // never tripped the dirty-check and silently never re-rendered.
   function viewportKeyNow() { return view.zoom + '|' + view.center.x + ',' + view.center.y + '|' + (state.canvasRotation || 0); }
+  // ---- readback in flight (2026-09, trouvé en vérifiant l'app Tauri) ----
+  //
+  // render_to_pixels is ASYNC: the wasm object stays borrowed across the
+  // await. Any other engine.* call landing in that window — the rAF tick
+  // below, a renderNow from a pointer handler, a video frame's
+  // register_image — makes wasm-bindgen throw
+  // "recursive use of an object detected which would lead to unsafe
+  // aliasing in rust". That is NOT a poisoned module (unlike a real WASM
+  // trap, see tick's catch), but the catch treated it like one and disabled
+  // the engine for the whole session: no combine, no 3D, no image mesh, no
+  // effects, silently, until the next reload. Reachable in production the
+  // moment a readback overlaps a normal frame — the playback cache, an
+  // export, a StoryBoard thumbnail — which is exactly the "mon fix ne
+  // marche pas / le moteur ne fait plus rien" shape this codebase has been
+  // bitten by before (CLAUDE.md §4).
+  //
+  // Two halves: this counter makes the collision not happen (callers defer),
+  // and tick's catch below no longer disables on that specific message, so
+  // any path not covered here degrades to one skipped frame instead.
+  var _readbackInFlight = 0;
+  var _pendingAfterReadback = null; // 'now' | 'image'
+  function _deferForReadback(kind) {
+    if (!_readbackInFlight) return false;
+    if (kind === 'now' || !_pendingAfterReadback) _pendingAfterReadback = kind; // a full render supersedes an image-only one
+    return true;
+  }
+  function _flushAfterReadback() {
+    if (_readbackInFlight || !_pendingAfterReadback) return;
+    var kind = _pendingAfterReadback; _pendingAfterReadback = null;
+    if (kind === 'image') renderImageOnly(); else renderNow();
+  }
   var lastViewportKey = '';
   var lastSceneVersion = -1; // forces the very first tick to build+render regardless
   function tick() {
     if (!enabled || !engine) return;
     if (suspended) { rafId = requestAnimationFrame(tick); return; }
+    // A frame skipped here is repainted by the next tick — the dirty check
+    // below is state-based, not edge-based, so nothing is lost.
+    if (_readbackInFlight) { rafId = requestAnimationFrame(tick); return; }
     try {
       // Dirty-check both the scene content and the viewport before paying
       // for a render — the first version re-rendered unconditionally on
@@ -3958,6 +4000,12 @@
       // rien" reports before anyone thought to check devtools — a distinct,
       // explicit toast (not setEnabled's own generic "Rendu: Paper.js")
       // makes the actual cause visible instead of just the symptom.
+      // Transient, not a poisoned module — see _readbackInFlight above.
+      if (/recursive use of an object/i.test(String(e && e.message || e))) {
+        console.warn('[engine-bridge] render skipped (appel réentrant pendant un readback)');
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
       console.error('[engine-bridge] render failed, disabling', e);
       if (window.showToast) showToast('Moteur de rendu Rust interrompu (géométrie invalide) — passage en Paper.js. Sauvegardez et rechargez pour le restaurer.');
       setEnabled(false, true);
@@ -4254,6 +4302,7 @@
   var viewportRafId = 0;
   function renderNow(viewportOnly) {
     if (!engine) return;
+    if (_deferForReadback('now')) return;
     if (viewportOnly) {
       // Same rAF coalescing rationale as renderWithOverlayItem — pan/rotate
       // pointermoves outrun the display. The callback reads lastSceneJson at
@@ -4325,6 +4374,7 @@
   // it doesn't redundantly rebuild+diff on the very next rAF.
   function renderImageOnly() {
     if (!engine) return;
+    if (_deferForReadback('image')) return;
     if (!lastSceneJson) { renderNow(); return; } // nothing built yet — first frame
     engine.render(lastSceneJson);
     lastSceneVersion = window._sceneVersion;
@@ -4404,7 +4454,22 @@
   // loadFrame/buildSceneJson/render_to_pixels sequence instead of
   // duplicating it (CLAUDE.md §3). Caller must already have the engine at
   // the size it wants (resizeEngineOffscreen) before calling this.
-  async function renderFrameRawPixels(frameIdx, alphaBg) {
+  // Readbacks are SERIALIZED, not just guarded (2026-09, second half of the
+  // Tauri verification): two overlapping render_to_pixels calls don't merely
+  // throw the wasm re-entrancy error — the losing one's promise never
+  // settles, so a caller awaiting it hangs forever (measured: 6 concurrent
+  // readbacks, 2 errors, the batch never resolved). And even without the
+  // wasm layer they would corrupt each other, since the body below starts
+  // with loadFrame(frameIdx) — two of them racing means one builds its scene
+  // from the other's frame. One queue, therefore, for every caller: the
+  // playback cache, the exporters, StoryBoard thumbnails.
+  var _readbackChain = Promise.resolve();
+  function renderFrameRawPixels(frameIdx, alphaBg) {
+    var run = _readbackChain.then(function () { return _renderFrameRawPixelsNow(frameIdx, alphaBg); });
+    _readbackChain = run.then(function () {}, function () {}); // a failed readback must not break the queue
+    return run;
+  }
+  async function _renderFrameRawPixelsNow(frameIdx, alphaBg) {
     loadFrame(frameIdx);
     _fxFrameOverride = frameIdx;
     var json;
@@ -4416,7 +4481,10 @@
         alphaBg: !!alphaBg,
       });
     } finally { _fxFrameOverride = null; }
-    var bytes = await engine.render_to_pixels(json);
+    var bytes;
+    _readbackInFlight++;
+    try { bytes = await engine.render_to_pixels(json); }
+    finally { _readbackInFlight--; _flushAfterReadback(); }
     return new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   }
   async function renderFrameToPixelsPNG(frameIdx, scale, alphaBg) {
