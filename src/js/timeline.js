@@ -4469,6 +4469,13 @@ function buildTweenCurveSVG(li,fA,fB,svgW,svgH){
         // entirely. `svg` itself is never destroyed by redraw() (only its
         // children are), so capturing there instead survives every redraw.
         svg.setPointerCapture(e.pointerId);
+        // One undo entry per curve-point GESTURE (2026-09 QA sweep):
+        // state.tweenEasing was written straight through with no snapshot,
+        // so Cmd+Z after re-shaping an ease jumped to the previous action
+        // and left the new curve in place. The snapshot now carries
+        // tweenEasing (layersSnapshotNow, tweens.js), so one push here is
+        // all this needs.
+        if(typeof pushUndo==='function')pushUndo();
         function move(ev){
           var r=svg.getBoundingClientRect();
           var nx=fromSX(ev.clientX-r.left),ny=fromSY(ev.clientY-r.top);

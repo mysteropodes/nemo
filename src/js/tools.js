@@ -7365,7 +7365,7 @@ function onMouseDown(event){
     // unrelated action happened to trigger the next render tick.
     if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
   }else if(state.tool==='select'){
-    for(var i=0;i<arcHandles.length;i++){var ah=arcHandles[i];if(event.point.getDistance(ah.handle.position)<14/view.zoom){draggingArc=ah;arcDragCache=computeArcMatchState();return;}}draggingArc=null;
+    for(var i=0;i<arcHandles.length;i++){var ah=arcHandles[i];if(event.point.getDistance(ah.handle.position)<14/view.zoom){pushUndo();draggingArc=ah;arcDragCache=computeArcMatchState();return;}}draggingArc=null;
     var bestXh=null,bestXd=9/view.zoom;
     // Ring band check first (2026-07): a 'rotate' entry now stores
     // {center,radius} instead of a single pos — anywhere within ~7px of
@@ -8102,7 +8102,7 @@ function onMouseUp(event){
       }
       _marquee.active=false;renderArcs();updateUI();
     }
-    else if(draggingArc){draggingArc=null;arcDragCache=null;generateTweens();}else if(selectedPaths.length>0){
+    else if(draggingArc){draggingArc=null;arcDragCache=null;generateTweens(undefined,true);}else if(selectedPaths.length>0){
       _moveDragStarted=false;
       var mLd2=state.layers[state.activeLayerIdx];
       if(mLd2&&mLd2.symbolId){

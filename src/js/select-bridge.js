@@ -1017,6 +1017,12 @@
     var ah = hitTestArc(pt);
     if (ah) {
       mode = 'arc';
+      // One undo entry per arc-handle GESTURE (2026-09 QA sweep): dragging
+      // a motion-arc handle rewrote state.motionArcs with no snapshot at
+      // all, so Cmd+Z jumped straight past it to the previous action and
+      // the bent trajectory stayed bent. Pushed at grab time, before the
+      // first setArcHandle, like every other drag in this file.
+      if (typeof pushUndo === 'function') pushUndo();
       draggingArc = ah;
       // Perf fix 2026-07: compute the (expensive, O(n³) autoMatch) stroke
       // pairing ONCE here instead of on every pointermove — only the
@@ -2547,7 +2553,7 @@
     if (mode === 'arc') {
       draggingArc = null;
       arcDragCache = null;
-      generateTweens();
+      generateTweens(undefined,true);
     } else if (mode === 'xform-scale' || mode === 'xform-rotate' || mode === 'xform-skew') {
       // Motion mode: geometry was never touched during this gesture (see
       // onMove's early-return) — none of the fork/regenerate/save-frame

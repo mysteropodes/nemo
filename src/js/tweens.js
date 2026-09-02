@@ -3769,7 +3769,7 @@ function _dedupeFrameStrokeIds(strokes,frameIdx){
     else seen[sd.strokeId]=1;
   }
 }
-function generateTweens(explicitRestrictTo){
+function generateTweens(explicitRestrictTo,skipUndo){
   saveAllLayerFrames();var li=state.activeLayerIdx;var ld=state.layers[li];
   var keys=[];for(var i=0;i<state.totalFrames;i++){if(ld.frames[i].isKeyframe&&ld.frames[i].strokes.length>0)keys.push(i);}
   if(keys.length<2){showToast(SM.t('toastNeedAtLeast2DrawnKeyframes'));return;}
@@ -3789,7 +3789,12 @@ function generateTweens(explicitRestrictTo){
     restrictTo={};
     selOnLayer.forEach(function(fi0){for(var pi=fi0;pi>=0;pi--){if(ld.frames[pi].isKeyframe){restrictTo[pi]=true;break;}}});
   }
-  pushUndoLayers();
+  // skipUndo: the caller already snapshotted BEFORE its own mutation (the
+  // motion-arc handle drag, which changes state.motionArcs at grab time) —
+  // a second entry here would split one gesture across two Cmd+Z presses,
+  // the same "one gesture, one undo" rule feedback #755 established for
+  // the layer reorder.
+  if(!skipUndo)pushUndoLayers();
   var resN=state.resamplePts;var step=state.tweenStep;var total=0;
   for(var ki=0;ki<keys.length-1;ki++){
     var fA=keys[ki],fB=keys[ki+1];
@@ -4847,6 +4852,13 @@ function layersSnapshotNow(){return{type:'layers',layers:_cloneLayersForUndo(sta
   // entry behind (renamed folders came back with the new name, too).
   layerFolders:JSON.parse(JSON.stringify(state.layerFolders||{})),
   layerLinkGroups:JSON.parse(JSON.stringify(state.layerLinkGroups||{})),
+  // Tween-side state (2026-09 QA sweep) — same blind spot again: a motion
+  // ARC handle and an ease CURVE point are real edits to the animation,
+  // but they live in these maps, not in any frame's strokes, so undo left
+  // them exactly as the (now undone) gesture had set them.
+  motionArcs:JSON.parse(JSON.stringify(state.motionArcs||{})),
+  tweenEasing:JSON.parse(JSON.stringify(state.tweenEasing||{})),
+  tweenOverrides:JSON.parse(JSON.stringify(state.tweenOverrides||{})),
   symbolId:state.activeSymbolId||null,montageViewId:state.activeMontageViewId||null};}
 // Human-readable "where this undo entry belongs", for the cross-context
 // guard in undo()/redo() below. Falls back to '?' for a symbol/montage
@@ -4905,6 +4917,9 @@ function restoreLayersSnapshot(s){
   // snapshot taken before this existed, left untouched in that case.
   if(s.layerFolders)state.layerFolders=JSON.parse(JSON.stringify(s.layerFolders));
   if(s.layerLinkGroups)state.layerLinkGroups=JSON.parse(JSON.stringify(s.layerLinkGroups));
+  if(s.motionArcs)state.motionArcs=JSON.parse(JSON.stringify(s.motionArcs));
+  if(s.tweenEasing)state.tweenEasing=JSON.parse(JSON.stringify(s.tweenEasing));
+  if(s.tweenOverrides)state.tweenOverrides=JSON.parse(JSON.stringify(s.tweenOverrides));
   // The `state.layers=[]` above replaces the array, which breaks the alias
   // enterSymbol set up (state.layers === state.symbols[id].layers). Re-point
   // it immediately so anything reading the SYMBOL rather than `state` mid-
