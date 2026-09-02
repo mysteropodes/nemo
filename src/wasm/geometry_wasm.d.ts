@@ -1,6 +1,17 @@
 /* tslint:disable */
 /* eslint-disable */
 
+export class FlowField {
+    private constructor();
+    free(): void;
+    [Symbol.dispose](): void;
+    /**
+     * Grandeur moyenne du mouvement, en pixels — sert côté JS à décider si
+     * une interpolation vaut la peine (un plan fixe n'a rien à interpoler).
+     */
+    magnitude(): number;
+}
+
 export class StrokeModeler {
     free(): void;
     [Symbol.dispose](): void;
@@ -226,6 +237,12 @@ export function boolean_op(op: string, a_json: string, b_json: string): string;
 export function boolean_op_multi(op: string, a_json: string, b_json: string): string;
 
 /**
+ * Estime le mouvement entre deux images RGBA. À appeler UNE fois par paire
+ * d'images sources, puis `interpolate_at` autant de fois que nécessaire.
+ */
+export function compute_flow(prev_rgba: Uint8Array, next_rgba: Uint8Array, w: number, h: number): FlowField;
+
+/**
  * Async because WebGPU adapter/device negotiation is inherently async —
  * JS must `await` this once, then reuse the returned handle every frame.
  * Sets up wgpu manually (rather than via vello::util::RenderContext) so we
@@ -290,6 +307,8 @@ export function hit_test(scene_json: string, x: number, y: number, tolerance: nu
 
 export function interp_stroke(json: string): string;
 
+export function interpolate_at(prev_rgba: Uint8Array, next_rgba: Uint8Array, field: FlowField, t: number): Uint8Array;
+
 export function line_segments(x0: number, y0: number, x1: number, y1: number): string;
 
 export function rect_segments(x0: number, y0: number, x1: number, y1: number): string;
@@ -337,11 +356,22 @@ export interface InitOutput {
     readonly auto_match: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly resample_stroke: (a: number, b: number, c: number) => [number, number, number, number];
     readonly fill_find: (a: number, b: number) => [number, number, number, number];
-    readonly __wbg_strokemodeler_free: (a: number, b: number) => void;
-    readonly ellipse_segments: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly __wbg_flowfield_free: (a: number, b: number) => void;
+    readonly compute_flow: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
+    readonly erase_at_point: (a: number, b: number) => [number, number, number, number];
+    readonly flowfield_magnitude: (a: number) => number;
     readonly hit_test: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
+    readonly interpolate_at: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly boolean_op: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly boolean_op_multi: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly track_points: (a: number, b: number) => [number, number, number, number];
+    readonly __wbg_strokemodeler_free: (a: number, b: number) => void;
+    readonly effective_frame_index: (a: number, b: number, c: number) => [number, number, number];
+    readonly ellipse_segments: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly interp_stroke: (a: number, b: number) => [number, number, number, number];
     readonly line_segments: (a: number, b: number, c: number, d: number) => [number, number];
     readonly rect_segments: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly resolve_symbol_frame: (a: number, b: number, c: number) => [number, number, number];
     readonly strokemodeler_down: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly strokemodeler_down_packed: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly strokemodeler_move: (a: number, b: number, c: number, d: number, e: number) => [number, number];
@@ -349,13 +379,6 @@ export interface InitOutput {
     readonly strokemodeler_new: (a: number, b: number) => number;
     readonly strokemodeler_up: (a: number, b: number, c: number, d: number, e: number) => [number, number];
     readonly strokemodeler_up_packed: (a: number, b: number, c: number, d: number, e: number) => [number, number];
-    readonly erase_at_point: (a: number, b: number) => [number, number, number, number];
-    readonly interp_stroke: (a: number, b: number) => [number, number, number, number];
-    readonly boolean_op: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
-    readonly boolean_op_multi: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
-    readonly effective_frame_index: (a: number, b: number, c: number) => [number, number, number];
-    readonly resolve_symbol_frame: (a: number, b: number, c: number) => [number, number, number];
-    readonly track_points: (a: number, b: number) => [number, number, number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h4177160f1dac6248: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h49909fab4bc066b4: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen__convert__closures_____invoke__h29bfc5eda1199406: (a: number, b: number, c: any) => void;

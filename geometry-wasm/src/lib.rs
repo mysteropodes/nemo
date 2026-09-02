@@ -30,6 +30,8 @@ mod shapes;
 pub use shapes::{ellipse_segments, line_segments, rect_segments};
 mod track;
 pub use track::track_points;
+mod interp;
+pub use interp::{compute_flow, interpolate_at, FlowField};
 mod timeline;
 mod strokemodeler;
 pub use timeline::{effective_frame_index, resolve_symbol_frame};

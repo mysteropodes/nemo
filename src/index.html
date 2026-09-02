@@ -1401,10 +1401,12 @@
           <div id="track-status" style="font-size:9px;color:var(--text-dim)"></div>
         </div>
         <div class="pr" id="footage-blend-row" style="display:none">
-          <label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer">
-            <input type="checkbox" id="footage-frame-blend" style="accent-color:var(--accent)">
-            <span data-i18n="footageFrameBlend">Fusion d'images au remappage</span>
-          </label>
+          <span class="pl" data-i18n="footageInterp">Interpolation</span>
+          <select class="psel" id="footage-interp-mode" style="flex:1">
+            <option value="none" data-i18n="footageInterpNone">Aucune (image la plus proche)</option>
+            <option value="blend" data-i18n="footageInterpBlend">Fondu croisé</option>
+            <option value="motion" data-i18n="footageInterpMotion">Compensée en mouvement</option>
+          </select>
         </div>
         <div class="pr"><button class="pbtn" id="btn-footage-replace" style="flex:1" data-i18n="footageReplace">Remplacer la source…</button></div>
       </div>

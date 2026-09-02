@@ -1,5 +1,34 @@
 /* @ts-self-types="./geometry_wasm.d.ts" */
 
+export class FlowField {
+    static __wrap(ptr) {
+        const obj = Object.create(FlowField.prototype);
+        obj.__wbg_ptr = ptr;
+        FlowFieldFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        FlowFieldFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_flowfield_free(ptr, 0);
+    }
+    /**
+     * Grandeur moyenne du mouvement, en pixels — sert côté JS à décider si
+     * une interpolation vaut la peine (un plan fixe n'a rien à interpoler).
+     * @returns {number}
+     */
+    magnitude() {
+        const ret = wasm.flowfield_magnitude(this.__wbg_ptr);
+        return ret;
+    }
+}
+if (Symbol.dispose) FlowField.prototype[Symbol.dispose] = FlowField.prototype.free;
+
 export class StrokeModeler {
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
@@ -701,6 +730,27 @@ export function boolean_op_multi(op, a_json, b_json) {
 }
 
 /**
+ * Estime le mouvement entre deux images RGBA. À appeler UNE fois par paire
+ * d'images sources, puis `interpolate_at` autant de fois que nécessaire.
+ * @param {Uint8Array} prev_rgba
+ * @param {Uint8Array} next_rgba
+ * @param {number} w
+ * @param {number} h
+ * @returns {FlowField}
+ */
+export function compute_flow(prev_rgba, next_rgba, w, h) {
+    const ptr0 = passArray8ToWasm0(prev_rgba, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArray8ToWasm0(next_rgba, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.compute_flow(ptr0, len0, ptr1, len1, w, h);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return FlowField.__wrap(ret[0]);
+}
+
+/**
  * Async because WebGPU adapter/device negotiation is inherently async —
  * JS must `await` this once, then reuse the returned handle every frame.
  * Sets up wgpu manually (rather than via vello::util::RenderContext) so we
@@ -888,6 +938,28 @@ export function interp_stroke(json) {
     } finally {
         wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
     }
+}
+
+/**
+ * @param {Uint8Array} prev_rgba
+ * @param {Uint8Array} next_rgba
+ * @param {FlowField} field
+ * @param {number} t
+ * @returns {Uint8Array}
+ */
+export function interpolate_at(prev_rgba, next_rgba, field, t) {
+    const ptr0 = passArray8ToWasm0(prev_rgba, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArray8ToWasm0(next_rgba, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    _assertClass(field, FlowField);
+    const ret = wasm.interpolate_at(ptr0, len0, ptr1, len1, field.__wbg_ptr, t);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v3;
 }
 
 /**
@@ -1117,10 +1189,6 @@ function __wbg_get_imports() {
         __wbg_dispatchWorkgroups_0cf298d736b85a78: function(arg0, arg1, arg2, arg3) {
             arg0.dispatchWorkgroups(arg1 >>> 0, arg2 >>> 0, arg3 >>> 0);
         },
-        __wbg_document_179650d6cb13c263: function(arg0) {
-            const ret = arg0.document;
-            return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
-        },
         __wbg_draw_ad0811de56a2d768: function(arg0, arg1, arg2, arg3, arg4) {
             arg0.draw(arg1 >>> 0, arg2 >>> 0, arg3 >>> 0, arg4 >>> 0);
         },
@@ -1160,10 +1228,6 @@ function __wbg_get_imports() {
             const ret = arg0.getContext(getStringFromWasm0(arg1, arg2));
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
         }, arguments); },
-        __wbg_getContext_fd298c901058eb31: function() { return handleError(function (arg0, arg1, arg2) {
-            const ret = arg0.getContext(getStringFromWasm0(arg1, arg2));
-            return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
-        }, arguments); },
         __wbg_getCurrentTexture_51975ae7185fd15f: function() { return handleError(function (arg0) {
             const ret = arg0.getCurrentTexture();
             return ret;
@@ -1175,10 +1239,6 @@ function __wbg_get_imports() {
         __wbg_getPreferredCanvasFormat_1b8495aeb1d11ab1: function(arg0) {
             const ret = arg0.getPreferredCanvasFormat();
             return (__wbindgen_enum_GpuTextureFormat.indexOf(ret) + 1 || 96) - 1;
-        },
-        __wbg_get_b2053e9bfdf3ca8e: function(arg0, arg1) {
-            const ret = arg0[arg1 >>> 0];
-            return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
         },
         __wbg_gpu_a7c12045c25d009a: function(arg0) {
             const ret = arg0.gpu;
@@ -1221,16 +1281,6 @@ function __wbg_get_imports() {
             let result;
             try {
                 result = arg0 instanceof GPUValidationError;
-            } catch (_) {
-                result = false;
-            }
-            const ret = result;
-            return ret;
-        },
-        __wbg_instanceof_Window_05ba1ee4f6781663: function(arg0) {
-            let result;
-            try {
-                result = arg0 instanceof Window;
             } catch (_) {
                 result = false;
             }
@@ -1439,10 +1489,6 @@ function __wbg_get_imports() {
             const ret = arg0.push(arg1);
             return ret;
         },
-        __wbg_querySelectorAll_7e98cbe256deaadd: function() { return handleError(function (arg0, arg1, arg2) {
-            const ret = arg0.querySelectorAll(getStringFromWasm0(arg1, arg2));
-            return ret;
-        }, arguments); },
         __wbg_queueMicrotask_0ab5b2d2393e99b9: function(arg0) {
             const ret = arg0.queueMicrotask;
             return ret;
@@ -2078,17 +2124,17 @@ function __wbg_get_imports() {
             arg0.writeTexture(arg1, getArrayU8FromWasm0(arg2, arg3), arg4, arg5);
         }, arguments); },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 57, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 59, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h29bfc5eda1199406);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 87, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 88, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h4177160f1dac6248);
             return ret;
         },
         __wbindgen_cast_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUUncapturedErrorEvent")], shim_idx: 57, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUUncapturedErrorEvent")], shim_idx: 59, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h29bfc5eda1199406_2);
             return ret;
         },
@@ -2220,6 +2266,9 @@ const __wbindgen_enum_GpuVertexFormat = ["uint8", "uint8x2", "uint8x4", "sint8",
 
 
 const __wbindgen_enum_GpuVertexStepMode = ["vertex", "instance"];
+const FlowFieldFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_flowfield_free(ptr, 1));
 const StrokeModelerFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_strokemodeler_free(ptr, 1));
@@ -2231,6 +2280,12 @@ function addToExternrefTable0(obj) {
     const idx = wasm.__externref_table_alloc();
     wasm.__wbindgen_externrefs.set(idx, obj);
     return idx;
+}
+
+function _assertClass(instance, klass) {
+    if (!(instance instanceof klass)) {
+        throw new Error(`expected instance of ${klass.name}`);
+    }
 }
 
 const CLOSURE_DTORS = (typeof FinalizationRegistry === 'undefined')
