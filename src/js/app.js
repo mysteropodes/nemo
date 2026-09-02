@@ -3296,7 +3296,14 @@ function convertLayerToComponent(layerIdx){
 // creating N separate one-layer components instead of one N-layer component.
 function convertLayersToComponent(indices){
   if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
-  indices=indices.slice().sort(function(a,b){return a-b;}).filter(function(i){return state.layers[i]&&!state.layers[i].symbolId;});
+  indices=indices.slice().sort(function(a,b){return a-b;}).filter(function(i){return !!state.layers[i];});
+  // The symbolId half of that filter used to run HERE, BEFORE the guard
+  // below (2026-09 QA sweep): badComponentSourceReason already refuses a
+  // component source with a spoken reason ("un composant"), but the filter
+  // removed those layers first, so the message was unreachable — selecting
+  // an instance plus a plain layer and asking for a component silently
+  // produced a component containing only the plain layer, no explanation,
+  // instance left behind (measured live: 2 selected, 1 inside, no toast).
   // Type guard (2026-07-30 fix): the filter above only ever dropped
   // already-symbolId layers silently — a montage/video/Null/effect layer
   // sailed straight into symLayers below with its `.frames` blindly cloned,
