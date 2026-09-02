@@ -1817,6 +1817,10 @@ function editRefusalReason(){
   // truth — the duplicator is the actual reason, and the panel's edit-source
   // button is the actual fix.
   if(ld.duplicator&&!ld._dupEditSource)return 'Calque duplicateur — « Modifier la forme source » (panneau Duplicator) pour éditer';
+  // pathFx (2026-09), même logique que le duplicateur : ce qui est à l'écran
+  // est la géométrie DÉFORMÉE, donc dessiner dessus écrirait par-dessus le
+  // dessin d'origine. On le dit, au lieu de perdre le trait en silence.
+  if(window.SMPathFx&&SMPathFx.hasAny(ld))return 'Effets de tracé actifs — désactive-les (panneau Effets) pour redessiner dessus';
   if(ld.locked)return 'Calque verrouillé — déverrouille-le (cadenas) pour dessiner dessus';
   // Mask mode is the one exception (2026-09, Cyril: "on ne peut pas
   // masquer directement sur la vidéo ?") — a mask never becomes real

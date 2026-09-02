@@ -1796,6 +1796,11 @@ function applyLayerDuplicator(ld,base,frameIdx,layerIdx,opts){
 function getEffectiveStrokesRendered(layerIdx,frameIdx){
   var base=getEffectiveStrokes(layerIdx,frameIdx);
   var ld=state.layers[layerIdx];
+  // Effets de TRACÉ (path-fx.js) — modificateurs de géométrie non
+  // destructifs, appliqués ici pour que le rendu, l'export et les vignettes
+  // Motion voient tous la même chose (même entonnoir que le duplicateur
+  // juste en dessous). Le cas courant, pile vide, ne coûte rien.
+  if(ld&&window.SMPathFx&&SMPathFx.hasAny(ld))base=SMPathFx.apply(base,ld,frameIdx);
   if(!ld||!ld.duplicator||ld._dupEditSource)return base;
   // Object mode (2026-09-01): the host layer is an otherwise-empty
   // container — its OWN base content is deliberately [] (see
@@ -3407,7 +3412,7 @@ function convertLayersToComponent(indices){
     symLayers.forEach(function(sl,k){
       var src=state.layers[indices[k]];
       var skip=function(f){return k===0&&lifted.indexOf(f)>=0;};
-      ['effects','blendKeys','parentKeys','parentsMore','expressions','exprControls','timeLink','markers','followPath','textAnimators','shapeNames'].forEach(function(f){if(!skip(f)&&src[f]!=null&&sl[f]==null)sl[f]=deep(src[f]);});
+      ['effects','pathFx','blendKeys','parentKeys','parentsMore','expressions','exprControls','timeLink','markers','followPath','textAnimators','shapeNames'].forEach(function(f){if(!skip(f)&&src[f]!=null&&sl[f]==null)sl[f]=deep(src[f]);});
       ['layerUid','parentLayerUid','parentLayerUidB','matteSourceLayerUid','inPoint','outPoint','threeD','motionBlur','shy','keyLock','channel','isTextLayer','color','effectsFrom'].forEach(function(f){if(!skip(f)&&src[f]!=null&&sl[f]==null)sl[f]=src[f];});
     });
   })();
@@ -3657,7 +3662,7 @@ function splitLayerIntoElementsCore(li,opts){
     // into its siblings.
     (function(){
       var deep=function(v){return JSON.parse(JSON.stringify(v));};
-      ['effects','blendKeys','parentKeys','parentsMore','followPath','markers','textAnimators'].forEach(function(f){if(ld[f]!=null)nl[f]=deep(ld[f]);});
+      ['effects','pathFx','blendKeys','parentKeys','parentsMore','followPath','markers','textAnimators'].forEach(function(f){if(ld[f]!=null)nl[f]=deep(ld[f]);});
       ['shy','keyLock','channel','effectsFrom','folderId','linkGroupId','isTextLayer'].forEach(function(f){if(ld[f]!=null)nl[f]=ld[f];});
     })();
     // matteMode: with a frozen matteSourceLayerUid (2026-07-31, uid-based
@@ -3914,7 +3919,7 @@ function mergeLayersIntoOne(indices,opts){
   // there is nothing for them to conflict over.
   (function(){
     var deep=function(v){return JSON.parse(JSON.stringify(v));};
-    ['effects','blendKeys','parentKeys','parentsMore','followPath','textAnimators','effectsFrom'].forEach(function(k){if(srcs[0][k]!=null)merged[k]=deep(srcs[0][k]);});
+    ['effects','pathFx','blendKeys','parentKeys','parentsMore','followPath','textAnimators','effectsFrom'].forEach(function(k){if(srcs[0][k]!=null)merged[k]=deep(srcs[0][k]);});
     ['folderId','channel','shy','keyLock','isTextLayer','linkGroupId'].forEach(function(k){if(srcs[0][k]!=null)merged[k]=srcs[0][k];});
     var mk=[];srcs.forEach(function(l){(l.markers||[]).forEach(function(m){if(!mk.some(function(x){return x.frame===m.frame&&x.label===m.label;}))mk.push(deep(m));});});
     if(mk.length){mk.sort(function(x,y){return (x.frame||0)-(y.frame||0);});merged.markers=mk;}
@@ -4641,7 +4646,12 @@ function saveActiveLayerFrame(){
   // in userLayers[li].children here, and _collectLayerStrokes below already
   // filters it to mask-only for this exact layer type, so falling through
   // to the ordinary save path is correct and safe.
-  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.montageId||ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer||ld.lfsGroup||(ld.duplicator&&!ld._dupEditSource)||ld._rigPoseLive)return;
+  // pathFx (2026-09) : même raison que le duplicateur juste au-dessus — les
+  // objets vivants du calque portent la géométrie DÉFORMÉE par la pile
+  // d'effets de tracé, pas le dessin. Les relire ici cuirait la déformation
+  // dans le document, et chaque changement de réglage la recuirait par-dessus
+  // (mesuré avant ce garde-fou : 4 points → 192 → 1152).
+  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.montageId||ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer||ld.lfsGroup||(ld.duplicator&&!ld._dupEditSource)||ld._rigPoseLive||(window.SMPathFx&&SMPathFx.hasAny(ld)))return;
   if(!layerIsEffectivelyVisible(state.activeLayerIdx))return;
   // Same class of bug as the eye/solo guard right above, found live
   // 2026-07-30 (Cyril: "avec plein d'aller retour, scrub, trim de layer
@@ -4677,7 +4687,7 @@ function saveAllLayerFrames(){
   // duplicator skip: same reason as saveActiveLayerFrame's guard above.
   // nativeVideo dropped from this list too — see the identical comment on
   // saveActiveLayerFrame's own guard above for why.
-  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||state.layers[i].isGuideLayer||state.layers[i].isWidgetLayer||state.layers[i].lfsGroup||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource)||state.layers[i]._rigPoseLive)continue;
+  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||state.layers[i].isGuideLayer||state.layers[i].isWidgetLayer||state.layers[i].lfsGroup||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource)||state.layers[i]._rigPoseLive||(window.SMPathFx&&SMPathFx.hasAny(state.layers[i])))continue;
   if(!layerIsEffectivelyVisible(i))continue;
   // Trim-range guard — see saveActiveLayerFrame's identical check for the
   // full explanation. Per-layer here (unlike the single active layer

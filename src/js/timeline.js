@@ -1232,7 +1232,7 @@ window.SM={
     // follow-path, extra parents, Instance-Effect link, motion blur,
     // custom shape names, folder/link-group membership.
     var deep=function(v){return JSON.parse(JSON.stringify(v));};
-    ['blendKeys','expressions','exprControls','mattesMore','textAnimators','parentKeys','parentsMore','followPath','duplicator','widget','nullPos','nullShape','guidePos','effector','lfsIds','lfsSettings','groups','shapeNames'].forEach(function(k){if(ld[k]!=null)dst[k]=deep(ld[k]);});
+    ['blendKeys','expressions','exprControls','mattesMore','textAnimators','parentKeys','parentsMore','followPath','duplicator','widget','nullPos','nullShape','guidePos','effector','lfsIds','lfsSettings','groups','shapeNames','pathFx'].forEach(function(k){if(ld[k]!=null)dst[k]=deep(ld[k]);});
     // The RIG travels with the cut (2026-09 sweep) — duplicateLayer already
     // copies it, splitting did not, so cutting a rigged character in two
     // left the second half with no skeleton at all. Cloned through
@@ -1313,7 +1313,7 @@ window.SM={
     (function(){
       var deep=function(v){return JSON.parse(JSON.stringify(v));};
       var dst=state.layers[ni];
-      ['parentKeys','followPath','effector','shapeNames'].forEach(function(k){if(src[k]!=null&&dst[k]==null)dst[k]=deep(src[k]);});
+      ['parentKeys','followPath','effector','shapeNames','pathFx'].forEach(function(k){if(src[k]!=null&&dst[k]==null)dst[k]=deep(src[k]);});
       if(src.folderId&&dst.folderId==null)dst.folderId=src.folderId;
     })();
     // elementMotion is keyed by strokeId, and duplicateLayer's frames clone
@@ -2114,7 +2114,7 @@ window.SM={
       // level setting like canvasW/fps above (not per-layer, not per-
       // symbol/montage snapshot — a linked-vs-embedded choice is global).
       mediaMode:state.mediaMode||'embedded',
-      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,blendKeys:l.blendKeys,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,mattesMore:l.mattesMore,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,isWidgetLayer:l.isWidgetLayer,widget:l.widget,textAnimators:l.textAnimators,isEffectorLayer:l.isEffectorLayer,effector:l.effector,effects:l.effects,footage:l.footage,
+      layers:sceneLayers.map(function(l){return{name:l.name,visible:l.visible,locked:l.locked,frames:l.frames,symbolId:l.symbolId,symPlayMode:l.symPlayMode,symSpeed:l.symSpeed,symPlacedAt:l.symPlacedAt,symSingleFrame:l.symSingleFrame,symMatrix:l.symMatrix,lfsGroup:l.lfsGroup,lfsIds:l.lfsIds,lfsSettings:l.lfsSettings,blendMode:l.blendMode,blendKeys:l.blendKeys,folderId:l.folderId,channel:l.channel,linkGroupId:l.linkGroupId,color:l.color,motion:l.motion,motionStatic:l.motionStatic,elementMotion:l.elementMotion,inPoint:l.inPoint,outPoint:l.outPoint,nativeVideo:l.nativeVideo,matteMode:l.matteMode,matteSourceLayerUid:l.matteSourceLayerUid,mattesMore:l.mattesMore,montageId:l.montageId,expressions:l.expressions,isTextLayer:l.isTextLayer,isNullLayer:l.isNullLayer,nullPos:l.nullPos,nullShape:l.nullShape,isEffectLayer:l.isEffectLayer,isFolderLayer:l.isFolderLayer,folderCollapsed:l.folderCollapsed,isGuideLayer:l.isGuideLayer,guidePos:l.guidePos,guideOrientation:l.guideOrientation,isWidgetLayer:l.isWidgetLayer,widget:l.widget,textAnimators:l.textAnimators,isEffectorLayer:l.isEffectorLayer,effector:l.effector,effects:l.effects,pathFx:l.pathFx,footage:l.footage,
         // Layer parenting (2026-07-25). BOTH of these were missing from this
         // list, so every parent link was silently dropped on save — a rig
         // survived the session and nothing more. `uid` is the stable identity
@@ -2550,6 +2550,7 @@ videoMeshId:l.videoMeshId,layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,pa
       if(ld.threeD)state.layers[idx].threeD=true;                         // calque 3D
       if(ld.duplicator){state.layers[idx].duplicator=ld.duplicator;state.layers[idx].locked=true;} // duplicateur mograph (relock: _dupEditSource n'est jamais persisté)
       if(ld.rig)state.layers[idx].rig=ld.rig;                             // rig (os/binds/IK) — relinkRigBinds fait le reste au premier loadFrame
+      if(ld.pathFx)state.layers[idx].pathFx=ld.pathFx;           // effets de tracé (path-fx.js)
       if(ld.groups)state.layers[idx].groups=ld.groups;                    // groupes de combinaison non-destructifs — data.groupId sur chaque stroke fait déjà le tour via serP/desP
       if(ld.shapeNames)state.layers[idx].shapeNames=ld.shapeNames;        // noms personnalisés de formes (2026-07-31, panel groupes/formes) — keyés par strokeId, même identité stable que serP/desP
       state.layers[idx].color=ld.color||nextLayerColor();
