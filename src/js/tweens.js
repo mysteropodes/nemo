@@ -1617,7 +1617,18 @@ function getEasingForPair(li,fA,fB){
   return getEasing();
 }
 function lerp(a,b,t){return a+(b-a)*t;}function lerpV(a,b,t){return[lerp(a[0],b[0],t),lerp(a[1],b[1],t)];}
-function arcKey(fA,fB,i){return fA+'-'+fB+'-'+i;}
+// Motion-arc key now carries the LAYER (2026-09 QA sweep): it used to be
+// "fA-fB-i" alone, so an arc bent for stroke i of the 0→10 span on one layer
+// bent stroke i of EVERY other layer with keys at 0 and 10 — confirmed live,
+// a straight horizontal tween on a fresh layer rose from y=400 to y=175
+// because of an arc that belonged to a different layer. Same uid identity
+// as tweenSpanKey; `li` defaults to the active layer, which is the only
+// layer generateTweens/renderArcs/setArcHandle ever operate on.
+function arcKey(fA,fB,i,li){
+  var ld=state.layers[li==null?state.activeLayerIdx:li];
+  var id=(ld&&ld.layerUid)?ld.layerUid:(li==null?state.activeLayerIdx:li);
+  return id+':'+fA+'-'+fB+'-'+i;
+}
 // Cubic bezier through ptA/ptB with independent OUT (leaving A) and IN
 // (arriving at B) handles — upgraded 2026-07 from a single shared quadratic
 // control point, live feedback: "le motion path de caméra a des poignées
@@ -1678,15 +1689,16 @@ function cubicBez(a,c1,c2,b,t){var u=1-t;return u*u*u*a+3*u*u*t*c1+3*u*t*t*c2+t*
 // touch) — so this MOVES the entry to the new key instead of dropping it,
 // called by moveFrames for every keyframe pair whose fA and/or fB frame
 // index changed in that move.
-function rekeyTweenPairData(fA,fB,newFA,newFB){
+function rekeyTweenPairData(fA,fB,newFA,newFB,li){
   if(fA===newFA&&fB===newFB)return;
-  var oldPrefix=fA+'-'+fB+'-';
+  var oldPrefix=arcKey(fA,fB,'',li); // "<uid>:fA-fB-"
+  var newPrefix=arcKey(newFA,newFB,'',li);
   Object.keys(state.motionArcs).forEach(function(k){
     if(k.indexOf(oldPrefix)!==0)return;
     var idx=k.slice(oldPrefix.length);
     var val=state.motionArcs[k];
     delete state.motionArcs[k];
-    state.motionArcs[newFA+'-'+newFB+'-'+idx]=val;
+    state.motionArcs[newPrefix+idx]=val;
   });
 }
 // Rotates+scales a vector (px,py) by angle ang (radians) and uniform factor
