@@ -9820,7 +9820,14 @@ function onKeyDown(event){
         }
       }
     }
-    else if(state.tool==='select'&&selectedPaths.length>0)window.SM.deleteSelStrokes();
+    // Same rule as Cmd+D (feedback #803, see that branch): a timeline row
+    // click auto-selects the layer's whole content, so this branch fired
+    // for a LAYER selection too and Delete emptied the drawing instead of
+    // removing the layer — while the next branch, added for feedback #107
+    // ("la touche supprimer ne marche pas pour supprimer un calque dans la
+    // timeline"), only ever saw the case where the layer happened to be
+    // empty. window._layerActiveExplicit tells the two apart.
+    else if(state.tool==='select'&&selectedPaths.length>0&&!window._layerActiveExplicit)window.SM.deleteSelStrokes();
     // Delete key on the Select tool with nothing on canvas selected — but a
     // layer row IS (feedback #107: "la touche supprimer ne marche pas pour
     // supprimer un calque dans la timeline"). Every branch above only ever
