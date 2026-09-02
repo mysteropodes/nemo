@@ -284,15 +284,24 @@
   // to persist and the live File to open a decode session on right now.
   // Called only from a real user-gesture handler (the Vidéo… button), same
   // hard requirement as pickWebImages above.
-  async function pickWebVideo() {
+  // multiple:true (2026-09, feedback #806 "on ne peut pas importer
+  // plusieurs vidéos en même temps") — returns the first pick as before so
+  // every existing caller is unchanged, plus `.all` with every picked file
+  // for the callers that import a whole batch.
+  async function pickWebVideo(opts) {
     if (!isWebLinkingSupported()) throw new Error('File System Access API indisponible dans ce navigateur (Safari/Firefox) — utilisez le mode Intégrés ou Chrome/Edge.');
-    var handles = await window.showOpenFilePicker({ multiple: false, types: VIDEO_PICKER_TYPES });
-    var handle = handles[0];
-    if (!handle) return null;
-    var file = await handle.getFile();
-    var id = uid();
-    await putHandle(id, handle);
-    return { webHandleId: id, file: file, name: file.name };
+    var handles = await window.showOpenFilePicker({ multiple: !!(opts && opts.multiple), types: VIDEO_PICKER_TYPES });
+    if (!handles || !handles.length) return null;
+    var picked = [];
+    for (var i = 0; i < handles.length; i++) {
+      var file = await handles[i].getFile();
+      var id = uid();
+      await putHandle(id, handles[i]);
+      picked.push({ webHandleId: id, file: file, name: file.name });
+    }
+    var first = picked[0];
+    first.all = picked;
+    return first;
   }
 
   // Resolve a persisted handle id back to a live File — the video

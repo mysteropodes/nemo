@@ -495,12 +495,18 @@
   // mirror here.
   async function importVideoWebLinked(){
     var picked;
-    try{picked=await SMLinkedMedia.pickWebVideo();}
+    try{picked=await SMLinkedMedia.pickWebVideo({multiple:true});}
     catch(e){
       if(e&&e.name==='AbortError')return; // user cancelled the picker
       showToast(String((e&&e.message)||e),'warn');return;
     }
     if(!picked)return;
+    // Batch (feedback #806) — pickWebVideo now returns every picked file in
+    // .all; more than one goes through the shared sequential loop.
+    if(picked.all&&picked.all.length>1){
+      await importVideoFiles(picked.all.map(function(p){return p.file;}),picked.all);
+      return;
+    }
     var adoptId=null;
     try{await SMNativeVideo.importAsLayer(picked.file,{webHandleId:picked.webHandleId});return;}
     catch(e){
@@ -557,6 +563,49 @@
       throw e2;
     }finally{URL.revokeObjectURL(blobUrl);}
   }
+  // Sequential batch import (2026-09, feedback #806 "on ne peut pas
+  // importer plusieurs vidéos en même temps ça serait bien de pouvoir le
+  // faire"). One failure does not abandon the rest of the batch — it is
+  // reported and the loop carries on, same tolerance as importImageFiles.
+  // The Tauri single-file import body, callable per path so the batch loop
+  // above reuses it verbatim instead of duplicating the native/ffmpeg
+  // fallback dance (CLAUDE.md §3).
+  async function importVideoPath(path){
+    if(window.SMNativeVideo){
+      try{await SMNativeVideo.importAsLayer(path);return;}
+      catch(e){showToast(SM.t('toastNativeDecoderUnavailable')+(e&&e.message||e)+') — import classique…');}
+    }
+    var frames=await decodeVideoFramesFfmpeg(path);
+    await importVideoFrames(frames,baseName(path).replace(/\.[^.]+$/,''));
+  }
+  // A file already picked through the linked-media picker (it carries a
+  // durable handle) — same body as importVideoWebLinked's single case.
+  async function importVideoPicked(picked){
+    try{await SMNativeVideo.importAsLayer(picked.file,{webHandleId:picked.webHandleId});return;}
+    catch(e){
+      var adoptId=e&&e.pendingMediaId||null;
+      showToast(SM.t('toastWebCodecsUnavailable')+(e&&e.message||e)+') — import classique…');
+      warnLinkedVideoBaking();
+      if(window.SMLinkedMedia&&SMLinkedMedia.forgetHandle)SMLinkedMedia.forgetHandle(picked.webHandleId).catch(function(){});
+      var blobUrl=URL.createObjectURL(picked.file);
+      try{
+        var frames=await decodeVideoFrames(blobUrl);
+        await importVideoFrames(frames,picked.name.replace(/\.[^.]+$/,''),adoptId);
+      }finally{URL.revokeObjectURL(blobUrl);}
+    }
+  }
+  async function importVideoFiles(files,pickInfos){
+    var okN=0,failed=[];
+    for(var i=0;i<files.length;i++){
+      try{
+        if(pickInfos&&pickInfos[i])await importVideoPicked(pickInfos[i]);
+        else await importVideoFile(files[i]);
+        okN++;
+      }catch(e){failed.push((files[i]&&files[i].name)||('#'+(i+1)));}
+    }
+    if(files.length>1)showToast(failed.length?(okN+'/'+files.length+' vidéos importées — échec : '+failed.join(', ')):(okN+' vidéos importées'),failed.length?'warn':'success');
+    else if(failed.length)showToast('Import vidéo échoué : '+failed[0],'warn');
+  }
   async function importVideo(){
     if(!tauriOk()){
       // Web + linked mode (2026-08-30, feedback #154) — same dispatch shape
@@ -581,11 +630,26 @@
     // dialog filter below is a convenience default, not an enforced
     // whitelist — "All files" is offered too since ffmpeg itself is the
     // real gate, not this list.
-    var path=await window.__TAURI__.dialog.open({title:'Import Video',multiple:false,filters:[
+    var path=await window.__TAURI__.dialog.open({title:'Import Video',multiple:true,filters:[
       {name:'Videos',extensions:['mp4','mov','webm','m4v','ogv','mkv','avi','flv','wmv','mts','m2ts','3gp','mpg','mpeg','vob','ts','webp']},
       {name:'All files',extensions:['*']},
     ]});
     if(!path)return;
+    // multiple:true above (feedback #806) — the dialog hands back an array
+    // when several files are picked, a bare string for one. Normalised
+    // here so the single-file path below stays exactly as it was.
+    var paths=Array.isArray(path)?path:[path];
+    if(!paths.length)return;
+    if(paths.length>1){
+      var okN=0,failed=[];
+      for(var pi=0;pi<paths.length;pi++){
+        try{await importVideoPath(paths[pi]);okN++;}
+        catch(e){failed.push(baseName(paths[pi]));}
+      }
+      showToast(failed.length?(okN+'/'+paths.length+' vidéos importées — échec : '+failed.join(', ')):(okN+' vidéos importées'),failed.length?'warn':'success');
+      return;
+    }
+    path=paths[0];
     // EXPERIMENTAL (native-video-decode branch): instant import via a live
     // native decode session (SMNativeVideo.importAsLayer) instead of baking
     // the whole file to per-frame JPEGs — the JPEG path below remains the
@@ -632,8 +696,12 @@
     }
   }
   document.getElementById('video-input')&&document.getElementById('video-input').addEventListener('change',function(e){
-    var file=e.target.files[0];e.target.value='';if(!file)return;
-    importVideoFile(file);
+    var files=Array.prototype.slice.call(e.target.files);e.target.value='';if(!files.length)return;
+    // One at a time, not Promise.all (2026-09, feedback #806): each import
+    // creates a layer, decodes and writes frames through the same shared
+    // state — running them concurrently would interleave those writes. The
+    // sequential loop keeps the picked order in the layer stack too.
+    importVideoFiles(files);
   });
   document.getElementById('btn-import-video')&&document.getElementById('btn-import-video').addEventListener('click',importVideo);
 
