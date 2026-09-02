@@ -461,7 +461,7 @@ function reorderLayersBatch(fromIndices,toIdx){
 // unlike a destination row which cannot distinguish its upper/lower edge.
 // Keeping this translation beside the actual array mutation guarantees the
 // blue insertion line and the committed order describe the same operation.
-function reorderLayersAtGap(fromIndices,gapIdx){
+function reorderLayersAtGap(fromIndices,gapIdx,skipUndo){
   var moving=fromIndices.filter(function(i){return i>=0&&i<state.layers.length;})
     .filter(function(i,p,a){return a.indexOf(i)===p;}).sort(function(a,b){return a-b;});
   if(!moving.length)return;
@@ -488,7 +488,10 @@ function reorderLayersAtGap(fromIndices,gapIdx){
   // unnecessary undo entry and full scene rebuild.
   var same=moving.every(function(orig,j){return orig===insertIdx+j;});
   if(same)return;
-  saveAllLayerFrames();pushUndoLayers(true);
+  // skipUndo: the caller already snapshotted BEFORE its own mutations (the
+  // folder un-parent in timeline.js's drop handler) — a second entry here
+  // would split one gesture across two Cmd+Z presses (feedback #755).
+  if(!skipUndo){saveAllLayerFrames();pushUndoLayers(true);}
   var nextLd=keptLd.slice(0,insertIdx).concat(movedLd,keptLd.slice(insertIdx));
   var nextUL=keptUL.slice(0,insertIdx).concat(movedUL,keptUL.slice(insertIdx));
   // Mutate the existing arrays instead of replacing them: inside a
