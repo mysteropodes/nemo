@@ -3772,6 +3772,37 @@ function syncPlayheadToViewport(){
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
 })();
+// ---- The grid re-lays out when the window does (2026-09, feedback #767:
+// "quand on resize la fenêtre du navigateur et que l'on vient d'ouvrir un
+// projet la timeline de motion à droite ne s'adapte pas") ----
+// #frame-grid / #frame-hdr / #bars-row all get an EXPLICIT pixel width,
+// max(totalFrames*FC, #fg-wrap.clientWidth) — see gridMinWidth's own
+// comment for why they can't be left to flexbox. That width is computed
+// while rendering, and nothing re-rendered on a window resize: the widths
+// stayed frozen at whatever the viewport was the last time something else
+// happened to trigger a render, which right after opening a project is
+// the size the window had at load. Observing the wrapper (not the window)
+// also covers a panel drag or a devtools open, the same reasoning the
+// playhead sync above already follows.
+(function(){
+  var pending=0;
+  function resync(){
+    if(pending)return;
+    pending=requestAnimationFrame(function(){
+      pending=0;
+      if(typeof renderTimeline==='function')renderTimeline();
+    });
+  }
+  function bindResize(){
+    var wrap=document.getElementById('fg-wrap');
+    if(!wrap)return;
+    if(window.ResizeObserver){
+      try{ new ResizeObserver(resync).observe(wrap); return; }catch(_){ }
+    }
+    window.addEventListener('resize',resync);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindResize);else bindResize();
+})();
 function _tlScrollSnapshot(){
   var wrap=document.getElementById('fg-wrap'),panel=document.getElementById('layer-list');
   return {wrap:wrap,panel:panel,
