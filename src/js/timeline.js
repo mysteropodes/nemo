@@ -7018,6 +7018,7 @@ function updateFootagePanel(){
       }
     }
   }
+  if(window.SMTrackerPanel)SMTrackerPanel.render();   // suivi de mouvement (tracker-panel.js)
   var countRow=document.getElementById('footage-count-row');
   var isSeq=kind.key==='sequence';
   countRow.style.display=isSeq?'flex':'none';
