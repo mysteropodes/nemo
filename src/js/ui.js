@@ -772,6 +772,11 @@
   // here anymore.
   // (scrubbable number fields show their own value directly — no separate label span to sync anymore)
   var rh=document.getElementById('tl-resize'),ta=document.getElementById('timeline-area'),rsy,rsh;
+  // The timeline's own height was the one resize this file never remembered
+  // (2026-09, feedback #790, "resize et organisation des panels non
+  // enregistrés") — same restore-then-save-on-mouseup shape as the panel
+  // widths below, and the same value SMWorkspace carries into the project.
+  try{var savedTlH=localStorage.getItem('nemo-timeline-height'); if(savedTlH)ta.style.height=savedTlH;}catch(e){}
   rh.addEventListener('mousedown',function(e){rsy=e.clientY;rsh=ta.offsetHeight;window._tlResize=true;e.preventDefault();});
   window.addEventListener('mousemove',function(e){
     if(!window._tlResize)return;
@@ -785,7 +790,11 @@
     var maxH=Math.max(500,window.innerHeight-150);
     ta.style.height=Math.max(80,Math.min(maxH,rsh+(rsy-e.clientY)))+'px';
   });
-  window.addEventListener('mouseup',function(){window._tlResize=false;});
+  window.addEventListener('mouseup',function(){
+    if(!window._tlResize)return;
+    window._tlResize=false;
+    try{localStorage.setItem('nemo-timeline-height',ta.style.height||'');}catch(e){}
+  });
 
   // Layers panel horizontal resize — same drag-a-thin-bar pattern as the
   // timeline's own vertical #tl-resize above.
@@ -835,6 +844,93 @@
   ppr.addEventListener('mousedown',function(e){pprx=e.clientX;pprw=pp.offsetWidth;window._ppResize=true;ppr.classList.add('active');e.preventDefault();});
   window.addEventListener('mousemove',function(e){if(!window._ppResize)return;pp.style.width=Math.max(240,Math.min(520,pprw-(e.clientX-pprx)))+'px';window.dispatchEvent(new Event('resize'));});
   window.addEventListener('mouseup',function(){if(!window._ppResize)return;window._ppResize=false;ppr.classList.remove('active');window.dispatchEvent(new Event('resize'));savePanelWidth('nemo-props-panel-width',pp);});
+
+  // ---- WORKSPACE (2026-09, feedback #790) ------------------------------
+  //
+  // "resize et organisation des panels non enregistrés dans le fichier save
+  // du projet". Every piece of it already existed, each remembered on its
+  // own in localStorage (per MACHINE); what was missing is a single object
+  // the project file can carry, so a project reopens with the layout it was
+  // saved in — on any machine, and per project rather than one global
+  // layout for all of them.
+  //
+  // localStorage stays the fallback: a project with no workspace block (any
+  // file saved before today) leaves the current layout alone, and a new
+  // window still restores the last one used. apply() writes BOTH, so the
+  // layout a project brings also becomes the one a fresh window opens with.
+  function _secOrderNow(){
+    var pp=document.getElementById('props-panel');
+    if(!pp)return null;
+    return Array.prototype.slice.call(pp.querySelectorAll('.psec:not(.floating)')).map(secKey);
+  }
+  function _applySecOrder(order){
+    var pp=document.getElementById('props-panel');
+    if(!pp||!order||!order.length)return;
+    order.forEach(function(k){
+      var secs=Array.prototype.slice.call(pp.querySelectorAll('.psec'));
+      var m=secs.filter(function(s){return secKey(s)===k||secLegacyKey(s)===k;})[0];
+      if(m)pp.appendChild(m);
+    });
+  }
+  function _w(id){var el=document.getElementById(id);return el&&el.style.width?el.style.width:null;}
+  window.SMWorkspace={
+    capture:function(){
+      var ta=document.getElementById('timeline-area');
+      var pp=document.getElementById('props-panel');
+      var ws={
+        layerPanelWidth:_w('layer-panel'),
+        toolsPanelWidth:_w('tools-panel'),
+        // A collapsed props panel has no inline width of its own — the
+        // expanded one is stashed aside by togglePropsPanelCollapse, and
+        // that is the width worth restoring.
+        propsPanelWidth:(pp&&pp.classList.contains('collapsed'))?(window._propsExpandedWidth||null):_w('props-panel'),
+        propsPanelCollapsed:!!(pp&&pp.classList.contains('collapsed')),
+        timelineHeight:(ta&&ta.style.height)?ta.style.height:null,
+        panelOrder:_secOrderNow(),
+      };
+      try{ws.motionColumns=localStorage.getItem('nemo-motion-columns')||null;}catch(e){}
+      return ws;
+    },
+    apply:function(ws){
+      if(!ws||typeof ws!=='object')return false;
+      function set(id,v,key){
+        var el=document.getElementById(id);
+        if(!el||!v||typeof v!=='string')return;
+        el.style.width=v;
+        try{localStorage.setItem(key,v);}catch(e){}
+      }
+      set('layer-panel',ws.layerPanelWidth,'nemo-layer-panel-width');
+      set('tools-panel',ws.toolsPanelWidth,'nemo-tools-panel-width');
+      var pp=document.getElementById('props-panel');
+      if(pp&&ws.propsPanelWidth&&typeof ws.propsPanelWidth==='string'){
+        window._propsExpandedWidth=ws.propsPanelWidth;
+        if(!pp.classList.contains('collapsed'))pp.style.width=ws.propsPanelWidth;
+        try{localStorage.setItem('nemo-props-panel-width',ws.propsPanelWidth);}catch(e){}
+      }
+      if(typeof ws.propsPanelCollapsed==='boolean'&&pp&&window.togglePropsPanelCollapse){
+        var isCollapsed=pp.classList.contains('collapsed');
+        if(isCollapsed!==ws.propsPanelCollapsed)window.togglePropsPanelCollapse(ws.propsPanelCollapsed);
+      }
+      var ta=document.getElementById('timeline-area');
+      if(ta&&ws.timelineHeight&&typeof ws.timelineHeight==='string'){
+        ta.style.height=ws.timelineHeight;
+        try{localStorage.setItem('nemo-timeline-height',ws.timelineHeight);}catch(e){}
+      }
+      if(Array.isArray(ws.panelOrder)&&ws.panelOrder.length){
+        _applySecOrder(ws.panelOrder);
+        try{localStorage.setItem('nemo-panel-order',JSON.stringify(ws.panelOrder));}catch(e){}
+      }
+      if(ws.motionColumns&&typeof ws.motionColumns==='string'){
+        try{localStorage.setItem('nemo-motion-columns',ws.motionColumns);}catch(e){}
+        var lp=document.getElementById('layer-panel');
+        if(lp)lp.dataset.motionColumns=ws.motionColumns;
+      }
+      // The canvas sizes itself from a window resize (see the panel drag
+      // handlers above, which fire one for the same reason).
+      window.dispatchEvent(new Event('resize'));
+      return true;
+    },
+  };
 
   // No local FC here (was a stale hardcoded 14, a duplicate of app.js's
   // global FC that drifted out of sync with it — real bug, caused the

@@ -2075,6 +2075,14 @@ videoMeshId:l.videoMeshId,layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,pa
       // every save, not just missing from the screen.
       audioTracks:(state.audioTracks||[]).map(function(t){return{name:t.name,dataB64:t.dataB64,offsetFrames:t.offsetFrames||0,volume:t.volume!==undefined?t.volume:1,muted:!!t.muted,audioId:t.audioId,trimStart:t.trimStart||0,trimEnd:(t.trimEnd!==undefined&&t.trimEnd!==null)?t.trimEnd:null,motion:t.motion||undefined,motionStatic:t.motionStatic||undefined};}),
       refMedia:state.refMedia?{type:state.refMedia.type,name:state.refMedia.name,src:state.refMedia.src,frames:state.refMedia.frames,opacity:state.refMedia.opacity,visible:state.refMedia.visible,offsetFrames:state.refMedia.offsetFrames||0}:null,
+      // Workspace (2026-09, feedback #790: "resize et organisation des
+      // panels non enregistrés dans le fichier save du projet") — widths,
+      // timeline height, props-panel collapse, right-panel section order,
+      // Motion column preset. Captured from the LIVE layout (ui.js's
+      // SMWorkspace), so a project reopens the way it was left, on any
+      // machine; localStorage keeps doing its own per-machine job for a
+      // file saved before this existed.
+      workspace:(window.SMWorkspace&&SMWorkspace.capture)?SMWorkspace.capture():undefined,
       // layerUid/linked/path/audioId/sizeBytes (2026-07-31): added for the
       // real asset-panel pass — a field written here but missing from the
       // import restore below is the exact "writer updated, reader forgotten"
@@ -2503,6 +2511,9 @@ videoMeshId:l.videoMeshId,layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,pa
     state.audioTracks=d.audioTracks||[];
     if(window.SMAudio)SMAudio.reload();
     state.refMedia=d.refMedia||null;
+    // Workspace — see exportJSON's own comment (#790). Absent in any file
+    // saved before this shipped, and then the current layout is left alone.
+    if(d.workspace&&window.SMWorkspace&&SMWorkspace.apply)SMWorkspace.apply(d.workspace);
     state.storyboard=d.storyboard||null;
     if(window.SMReference)SMReference.reload();
     state.mediaLibrary=d.mediaLibrary||[];
