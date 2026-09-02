@@ -3373,6 +3373,9 @@ function convertLayersToComponent(indices){
   // layers are spliced away right below, so keeping their uids inside the
   // symbol cannot collide with anything; an inner uid pointing at a layer
   // that stayed OUTSIDE simply dangles (safe no-op, same as everywhere).
+  // Fuzz pass (same day): matteSourceLayerUid (matteMode was copied, its
+  // uid-frozen source was not — the matte fell back to legacy adjacency)
+  // and custom shape names (keyed by strokeId, which the frames clone keeps).
   (function(){
     var deep=function(v){return JSON.parse(JSON.stringify(v));};
     // Fields newLd lifts from firstSrc onto the OUTER component layer (see
@@ -3383,8 +3386,8 @@ function convertLayersToComponent(indices){
     symLayers.forEach(function(sl,k){
       var src=state.layers[indices[k]];
       var skip=function(f){return k===0&&lifted.indexOf(f)>=0;};
-      ['effects','blendKeys','parentKeys','parentsMore','expressions','exprControls','timeLink','markers','followPath','textAnimators'].forEach(function(f){if(!skip(f)&&src[f]!=null&&sl[f]==null)sl[f]=deep(src[f]);});
-      ['layerUid','parentLayerUid','parentLayerUidB','inPoint','outPoint','threeD','motionBlur','shy','keyLock','channel','isTextLayer','color','effectsFrom'].forEach(function(f){if(!skip(f)&&src[f]!=null&&sl[f]==null)sl[f]=src[f];});
+      ['effects','blendKeys','parentKeys','parentsMore','expressions','exprControls','timeLink','markers','followPath','textAnimators','shapeNames'].forEach(function(f){if(!skip(f)&&src[f]!=null&&sl[f]==null)sl[f]=deep(src[f]);});
+      ['layerUid','parentLayerUid','parentLayerUidB','matteSourceLayerUid','inPoint','outPoint','threeD','motionBlur','shy','keyLock','channel','isTextLayer','color','effectsFrom'].forEach(function(f){if(!skip(f)&&src[f]!=null&&sl[f]==null)sl[f]=src[f];});
     });
   })();
   state.symbols[symId]={name:'Composant',totalFrames:state.totalFrames,fps:state.fps,layers:symLayers};
@@ -3634,7 +3637,7 @@ function splitLayerIntoElementsCore(li,opts){
     (function(){
       var deep=function(v){return JSON.parse(JSON.stringify(v));};
       ['effects','blendKeys','parentKeys','parentsMore','followPath','markers','textAnimators'].forEach(function(f){if(ld[f]!=null)nl[f]=deep(ld[f]);});
-      ['shy','keyLock','channel','effectsFrom','folderId','isTextLayer'].forEach(function(f){if(ld[f]!=null)nl[f]=ld[f];});
+      ['shy','keyLock','channel','effectsFrom','folderId','linkGroupId','isTextLayer'].forEach(function(f){if(ld[f]!=null)nl[f]=ld[f];});
     })();
     // matteMode: with a frozen matteSourceLayerUid (2026-07-31, uid-based
     // mattes) the source no longer depends on array adjacency, so EVERY
