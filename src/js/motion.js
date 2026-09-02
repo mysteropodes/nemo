@@ -9421,8 +9421,33 @@
   // layerElements) — the same function backs both Motion's renderElementsList
   // AND Animation 2D's forthcoming layer-row shape list, so the two can
   // never diverge in which shapes/groups exist or in what order.
+  // One group node, with its subtree. `children` is front-first (same
+  // convention as the top level below); `memberIds` is every LEAF strokeId
+  // underneath it, at any depth — consumers that need "the whole group"
+  // (select, rename, eye/solo, the timeline mirror) read that instead of
+  // re-deriving membership from the flat tag, which only ever knew about
+  // direct members.
+  function groupNode(gid, ld, byStrokeId, depth) {
+    var meta = (ld.groups && ld.groups[gid]) || null;
+    var node = { type: 'group', gid: gid, name: (meta && meta.name) || SM.t('autoNameGroup'), children: [], memberIds: [] };
+    if (!meta || depth > 16) return node;
+    (meta.order || []).forEach(function (entry) {
+      if (ld.groups && ld.groups[entry]) {
+        var child = groupNode(entry, ld, byStrokeId, depth + 1);
+        node.children.push(child);
+        node.memberIds = node.memberIds.concat(child.memberIds);
+      } else if (byStrokeId[entry]) {
+        node.children.push({ type: 'shape', strokeId: entry, sd: byStrokeId[entry].sd });
+        node.memberIds.push(entry);
+      }
+    });
+    node.children.reverse(); // front-first, like the top level
+    return node;
+  }
   function buildShapeTree(li, ld) {
     var flat = layerElements(li, ld);
+    var byStrokeId = {};
+    flat.forEach(function (e) { byStrokeId[e.strokeId] = e; });
     var out = [], emittedGroups = {};
     flat.forEach(function (entry) {
       // Feedback #143 ("toujours pas de keyframes de properties par rapport
@@ -9441,11 +9466,17 @@
       // the same treatment: skip the group-collapse, list each glyph as its
       // own expandable element row, exactly like every other ungrouped shape.
       var gid = entry.sd.isVectorText ? null : entry.sd.groupId;
-      if (gid) {
-        if (!emittedGroups[gid]) {
-          emittedGroups[gid] = true;
-          var meta = ld.groups && ld.groups[gid];
-          out.push({ type: 'group', gid: gid, name: (meta && meta.name) || SM.t('autoNameGroup') });
+      // Nested groups (2026-09, #738): a shape's own tag names its
+      // INNERMOST group, but the tree lists the OUTERMOST one — the inner
+      // ones become child nodes of it, built from ld.groups[gid].order
+      // (which has always been allowed to hold child gids, see
+      // collectGroupStrokeIds). Falls back to the tag itself when there is
+      // no ld.groups entry, i.e. exactly the old flat behaviour.
+      var root = (gid && window.SMGroup && SMGroup.rootGroupOf && ld.groups && ld.groups[gid]) ? SMGroup.rootGroupOf(gid, ld) : gid;
+      if (root) {
+        if (!emittedGroups[root]) {
+          emittedGroups[root] = true;
+          out.push(groupNode(root, ld, byStrokeId, 0));
         }
       } else {
         out.push({ type: 'shape', strokeId: entry.strokeId, sd: entry.sd });
@@ -9576,7 +9607,7 @@
         // (layerElements), not the already-collapsed tree — click-select
         // and rename both need the full membership, not just "a group
         // exists here".
-        var memberIds = layerElements(li, ld).filter(function (e) { return e.sd.groupId === node.gid; }).map(function (e) { return e.strokeId; });
+        var memberIds = node.memberIds || layerElements(li, ld).filter(function (e) { return e.sd.groupId === node.gid; }).map(function (e) { return e.strokeId; });
         function commitGroupRename(v) {
           pushUndo();
           // SMGroup.renameGroup (group-bridge.js) — creates ld.groups[gid]
@@ -12933,7 +12964,7 @@
     // Group/shape tree (2026-07-31) — mode-agnostic, reused by Animation
     // 2D's own layer-row shape list (timeline.js) so both modes' trees can
     // never diverge in content or z-order.
-    buildShapeTree: buildShapeTree,
+    buildShapeTree: buildShapeTree, groupNode: groupNode,
     selectShapesByStrokeIds: selectShapesByStrokeIds,
     elementLabel: elementLabel,
     layerElements: layerElements,
