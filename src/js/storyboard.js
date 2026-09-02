@@ -109,8 +109,14 @@
   function invalidateThumb(symbolId) {
     Object.keys(_thumbCache).forEach(function (k) { if (k.indexOf(symbolId + ':') === 0) delete _thumbCache[k]; });
   }
-  function thumbDataUrl(symbolId, frame, bypassCache) {
-    var key = symbolId + ':' + frame;
+  // maxPx (2026-09) : la fenêtre de prévisualisation d'un composant
+  // (comp-preview.js) montre l'image en grand — 96 px, taille des cartes de
+  // StoryBoard, y est floue. La taille entre donc dans la CLÉ de cache, sans
+  // quoi une demande en 320 recevrait la vignette 96 déjà en cache (et
+  // réciproquement).
+  function thumbDataUrl(symbolId, frame, bypassCache, maxPx) {
+    var maxSide = Math.max(16, Math.round(maxPx || 96));
+    var key = symbolId + ':' + frame + ':' + maxSide;
     if (!bypassCache && _thumbCache[key]) return _thumbCache[key];
     var sym = state.symbols[symbolId];
     if (!sym || !window.project) return null;
@@ -144,7 +150,7 @@
       // bars around the contained image, which read as a random-colored
       // rect rather than "a frame of this document". Larger side capped
       // near 96px, same budget as before.
-      var res = Math.min(1, 96 / Math.max(cw, ch));
+      var res = Math.min(1, maxSide / Math.max(cw, ch));
       var bgCanvas = document.createElement('canvas');
       bgCanvas.width = Math.max(1, Math.round(cw * res));
       bgCanvas.height = Math.max(1, Math.round(ch * res));
