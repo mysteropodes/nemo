@@ -793,7 +793,10 @@
           expandedGroups[node.gid] = !expanded;
           renderShapesPanel();
         });
-        var gswatch = document.createElement('div'); gswatch.className = 'motion-elem-swatch icon'; gswatch.innerHTML = ICO_GROUP;
+        var gswatch = document.createElement('div'); gswatch.className = 'motion-elem-swatch icon';
+        // A text run reads as text, not as a generic group (2026-09, #747).
+        if (node.isText) { gswatch.textContent = 'T'; gswatch.style.font = '700 11px/1 system-ui'; }
+        else gswatch.innerHTML = ICO_GROUP;
         var gnm = document.createElement('div'); gnm.className = 'lnm'; gnm.textContent = node.name;
         grow.appendChild(arrow); grow.appendChild(gswatch); grow.appendChild(gnm);
         // Combined Shape indicator (2026-08) — .lico so armDrag's own
@@ -801,6 +804,7 @@
         // arming the row's group-drag; click cycles to the next mode.
         var curCombineMode = (c.ld.groups && c.ld.groups[node.gid] && c.ld.groups[node.gid].combineMode) || 'none';
         var combineBadge = document.createElement('div'); combineBadge.className = 'lico motion-combine-badge';
+        if (node.isText) combineBadge.style.display = 'none'; // no combine on a text run (#747)
         combineBadge.innerHTML = combineIconHtml(curCombineMode, node.gid);
         combineBadge.title = SM.t(combineModeLabelKey(curCombineMode));
         combineBadge.addEventListener('click', function (e) {
@@ -839,6 +843,16 @@
               if (window.SMGroup && SMGroup.setGroupCombineMode) SMGroup.setGroupCombineMode(node.gid, c.ld, mode);
               renderShapesPanel();
             } };
+          }
+          if (node.isText) {
+            // A text run has no combine/ungroup semantics — its one
+            // structural action is to stop being text (#747).
+            window.showContextMenu(e.clientX, e.clientY, [
+              { label: SM.t('elementsSelectMembers'), action: function () { window.SMMotion.selectShapesByStrokeIds(c.li, memberIds); } },
+              { sep: true },
+              { label: SM.t('elementsExplodeText'), action: function () { window.SMMotion.explodeTextRun(c.li, c.ld, node.gid); } },
+            ]);
+            return;
           }
           window.showContextMenu(e.clientX, e.clientY, [
             { label: SM.t('elementsRename'), action: function () { startRename(grow, node.name, commitGroupRename); } },

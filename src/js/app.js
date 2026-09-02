@@ -128,6 +128,11 @@ var state={
   // OFF by default (2026-08-31, feedback #189) — rulers-bridge.js restores
   // the user's own choice from localStorage at init when they made one.
   rulersOn:false,guidesLocked:false,guidesSnap:true,guides:{h:[],v:[]},
+  // Smart alignment guides (2026-09, feedback #747) — ON by default, unlike
+  // the ruler guides above: they need nothing set up (they read the canvas
+  // itself), and every design tool that has them has them on. Toggle lives
+  // in the same canvas context menu as Snap to Guides.
+  smartGuides:true,
   // Snap to Pixel Grid (2026-09) — OFF by default, unlike guidesSnap: this
   // rounds a moved object's position to the nearest whole world pixel,
   // which fights against smooth sub-pixel animation the moment it's on —
