@@ -352,6 +352,142 @@
         },
       ],
     },
+    {
+      id: 'staging',
+      label: 'Staging & Layout',
+      examples: [
+        {
+          id: 'staggerByIndex',
+          label: 'Stagger by layer index (any property)',
+          source: 'AE « index-based delay » cheat-sheet pattern, ported',
+          code:
+            '// Décale le MÊME mouvement d\'un calque à l\'autre : la seule\n' +
+            '// expression qui transforme dix copies immobiles en vague. En AE on\n' +
+            '// écrit valueAtTime(time - index*delay) ; ici self.at() lit la valeur\n' +
+            '// BRUTE (pré-expression) de cette propriété à une autre image, donc\n' +
+            '// aucune récursion possible.\n' +
+            'var delayFrames = 3;\n' +
+            'return self.at(frame - self.index * delayFrames);',
+        },
+        {
+          id: 'delayedFollow',
+          label: 'Delayed follow / motion trail (Position)',
+          source: 'AE « echo with delay » pattern, ported',
+          code:
+            '// Suit un autre calque avec du retard — la traînée classique.\n' +
+            '// Position (2D). Empile plusieurs copies avec des retards croissants\n' +
+            '// pour obtenir une traîne complète.\n' +
+            'var lead = layer(\'Leader\');\n' +
+            'var delayFrames = 4;\n' +
+            'if (!lead) return value;\n' +
+            'return lead.position.at(frame - delayFrames);',
+        },
+        {
+          id: 'proximityFade',
+          label: 'Fade with distance to another layer (Opacity)',
+          source: 'AE proximity/opacity pattern, ported',
+          code:
+            '// Plus le calque cible est loin, plus celui-ci s\'efface.\n' +
+            '// Opacity (1D). Utile pour un halo, une ombre de contact, un repère\n' +
+            '// qui n\'apparaît qu\'à l\'approche.\n' +
+            'var target = layer(\'Target\');\n' +
+            'if (!target) return value;\n' +
+            'var d = length(self.at(frame), target.position);\n' +
+            'return remapEase(d, 0, 400, 100, 0);',
+        },
+        {
+          id: 'clampToCanvas',
+          label: 'Keep inside the canvas (Position)',
+          source: 'Nemo-native (comp.width/height)',
+          code:
+            '// Empêche un calque de sortir du cadre, marge comprise.\n' +
+            '// Position (2D).\n' +
+            'var m = 40;\n' +
+            'return [clamp(value[0], m, comp.width - m), clamp(value[1], m, comp.height - m)];',
+        },
+      ],
+    },
+    {
+      id: 'physics',
+      label: 'Physics & Reaction',
+      examples: [
+        {
+          id: 'squashStretch',
+          label: 'Squash & stretch from speed (Scale)',
+          source: 'AE velocity-driven squash, ported to self.velocity()',
+          code:
+            '// Étire dans le sens du déplacement et écrase dans l\'autre, en\n' +
+            '// conservant à peu près le volume. Scale (2D, en pourcentage).\n' +
+            '// À poser sur Scale d\'un calque dont la POSITION bouge : self.velocity()\n' +
+            '// donnerait la vitesse de Scale elle-même (donc zéro), on lit donc la\n' +
+            '// position du calque une image avant et une après.\n' +
+            'var amount = 0.06, maxStretch = 40;\n' +
+            'var me = layer(self.name);\n' +
+            'if (!me) return value;\n' +
+            'var p0 = me.at(\'position\', frame - 1), p1 = me.at(\'position\', frame + 1);\n' +
+            'var speed = length(p0, p1) * comp.fps / 2;\n' +
+            'var s = clamp(speed * amount, 0, maxStretch);\n' +
+            'return [value[0] + s, value[1] - s];',
+        },
+        {
+          id: 'springAfterKey',
+          label: 'Spring settle after the last key (any property)',
+          source: 'Dan Ebberts overshoot pattern, ported',
+          code:
+            '// Ressort amorti APRÈS la dernière clé : la propriété dépasse puis\n' +
+            '// se pose. Marche en 1D comme en 2D.\n' +
+            'var freq = 3, decay = 5, amp = 0.35;\n' +
+            'if (self.keys.count < 2) return value;\n' +
+            'var last = self.keys.at(self.keys.count);\n' +
+            'if (frame <= last.frame) return value;\n' +
+            'var t = toSeconds(frame - last.frame);\n' +
+            'var v = self.velocity(last.frame - 1);\n' +
+            'var osc = amp * Math.sin(freq * t * Math.PI * 2) * Math.exp(-decay * t);\n' +
+            'return Array.isArray(value) ? add(value, mul(Array.isArray(v) ? v : [v, 0], osc))\n' +
+            '                            : value + (Array.isArray(v) ? v[0] : v) * osc;',
+        },
+        {
+          id: 'windowedWiggle',
+          label: 'Wiggle only between two frames (any property)',
+          source: 'AE « wiggle window » pattern, ported',
+          code:
+            '// Un tremblement qui existe seulement dans une fenêtre de temps, avec\n' +
+            '// une entrée et une sortie en fondu — plus lisible qu\'un wiggle qu\'on\n' +
+            '// coupe brutalement.\n' +
+            'var startF = 24, endF = 72, fadeF = 8;\n' +
+            'var w = remapEase(frame, startF, startF + fadeF, 0, 1) * remapEase(frame, endF, endF - fadeF, 0, 1);\n' +
+            'if (w <= 0) return value;\n' +
+            'var full = wiggle(4, 30);\n' +
+            'return Array.isArray(value) ? add(value, mul(sub(full, value), w)) : value + (full - value) * w;',
+        },
+        {
+          id: 'cameraShake',
+          label: 'Camera shake with decay (Position)',
+          source: 'Common AE shake preset, ported',
+          code:
+            '// Secousse d\'impact : forte au départ, éteinte en une seconde.\n' +
+            '// Position (2D). Régler hitFrame sur l\'image du choc.\n' +
+            'var hitFrame = 0, amp = 60, decay = 4;\n' +
+            'var t = toSeconds(frame - hitFrame);\n' +
+            'if (t < 0) return value;\n' +
+            'var k = Math.exp(-decay * t);\n' +
+            'var shake = wiggle(14, amp * k, 2);\n' +
+            'return shake;',
+        },
+        {
+          id: 'randomEveryN',
+          label: 'A new random value every N frames (any property)',
+          source: 'AE posterizeTime + random, ported to stepTime()',
+          code:
+            '// Tire une valeur au hasard qui ne change que toutes les N images —\n' +
+            '// glitch, néon défaillant, texte qui se réécrit.\n' +
+            'stepTime(6);\n' +
+            'seed(self.index);\n' +
+            'return Array.isArray(value) ? add(value, [random(-40, 40), random(-40, 40)])\n' +
+            '                            : value + random(-40, 40);',
+        },
+      ],
+    },
   ];
 
   window.SM_EXPR_EXAMPLES = CATEGORIES;
