@@ -1952,7 +1952,17 @@ window.SM={
     }
     return true;
   },
-  deleteSelStrokes:function(){if(selectedPaths.length>0){pushUndo();selectedPaths.forEach(function(p){
+  deleteSelStrokes:function(){if(selectedPaths.length>0){pushUndo();
+    // Held frame (2026-09 QA sweep, same family as #823/#824): the items
+    // were removed from the live layer and saveActiveLayerFrame() then
+    // returned early, so a shape deleted on a held frame came back on the
+    // next scrub. Animation 2D promotes the held frame first (loadFrame
+    // re-resolves the selection by strokeId, #822); Motion writes the
+    // deletion into the keyframe the hold inherits from.
+    _selPropsPromoteHeld();
+    var _dLi=state.activeLayerIdx,_dLd=state.layers[_dLi],_dF=_dLd&&_dLd.frames[state.currentFrame],_dOrigin=-1;
+    if(_dF&&!_dF.isKeyframe&&!_dF.isInterpolated){for(var _o=state.currentFrame;_o>=0;_o--){if(_dLd.frames[_o]&&_dLd.frames[_o].isKeyframe){_dOrigin=_o;break;}}}
+    selectedPaths.forEach(function(p){
     // Team review: deleting someone else's stroke ghosts it instead of
     // removing it outright — see markDeleteAsRevision's own comment.
     if(markDeleteAsRevision(p))return;
@@ -1964,7 +1974,9 @@ window.SM={
     if(p.data&&p.data.linkedFill&&!p.data.linkedFill.removed)p.data.linkedFill.remove();
     if(p.data&&p.data.brushCompanions)p.data.brushCompanions.forEach(function(c){if(!c.removed)c.remove();});
     p.remove();
-  });clearSel();saveActiveLayerFrame();updateUI();}},
+  });clearSel();
+    if(_dOrigin>=0){_dLd.frames[_dOrigin].strokes=_collectLayerStrokes(_dLi,_dLd);window._sceneVersion=(window._sceneVersion||0)+1;}else saveActiveLayerFrame();
+    updateUI();}},
   flipPreview:function(){
     var prev=state.currentFrame;var wa=state.waIn;var wo=state.waOut;
     if(state._flipping){state._flipping=false;return;}
