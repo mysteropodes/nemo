@@ -2800,7 +2800,29 @@
   // Editing a value field: if animated, this is a scrub at the CURRENT
   // frame — auto-adds/updates a key there (AE convention). If not
   // animated, it's just the static override.
+  // Editing a property selects its layer (2026-09, feedback #761: "à partir
+  // du moment où on change une propriété dans un calque celui-ci doit être
+  // sélectionné dans la timeline motion et dans le canvas"). The right
+  // panel edits whatever layer is ACTIVE, which is not necessarily the one
+  // highlighted in the timeline — so a value could change on a layer whose
+  // row looked unselected and whose transform box wasn't on screen. One
+  // hook here rather than at each field: setValue is the single writer
+  // every editor goes through (fields, scrub drags, expression controls).
+  // Element holders are not layers (indexOf -1) and are left alone, and the
+  // "already selected" guard makes a scrub drag pay for this exactly once.
+  function selectLayerForEdit(holder) {
+    if (state.appMode !== 'motion') return;
+    var li = state.layers.indexOf(holder);
+    if (li < 0) return;
+    if (state.activeLayerIdx === li && _layerSel.length === 1 && _layerSel[0] === li) return;
+    _layerSel = [li];
+    _layerSelAnchor = li;
+    if (typeof syncBarSelToLayerSel === 'function') syncBarSelToLayerSel();
+    window.SM.setActiveLayer(li, true);
+    renderLayerList(); renderTimeline();
+  }
   function setValue(ld, prop, values) {
+    selectLayerForEdit(ld);
     if (isAnimated(ld, prop)) setKeyAtCurrentFrame(ld, prop, values);
     else { if (!ld.motionStatic) ld.motionStatic = {}; ld.motionStatic[prop] = values.slice(); }
     // Order (feedback #97, "l'order n'a pas l'air de marcher... dans le
