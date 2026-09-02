@@ -768,8 +768,40 @@
     }
     return false;
   }
+  // Parent/Blend live outside the PROPS list, so `_hideUnanimated` never
+  // reached them: U (which turns that filter on to mean "only what is
+  // animated") still showed both rows on every revealed layer, keyed or not
+  // (2026-09, feedback #764: "u révèle blend et parent alors qu'ils n'ont
+  // pas de keyframes"). Their keys live directly on the layer, not in
+  // ld.motion — see trackFor's own note.
+  function discreteRowVisible(ld, kind) {
+    if (isPropFiltered(kind)) return false;
+    if (!_hideUnanimated) return true;
+    var keys = kind === 'parent' ? ld.parentKeys : ld.blendKeys;
+    return !!(keys && keys.length);
+  }
   function handleRevealAnimatedShortcut() {
     if (state.appMode !== 'motion') return false;
+    // U is a TOGGLE (2026-09, feedback #762: "si je révèle les keyframes
+    // avec u je dois aussi pouvoir refermer la révélation avec u") — same
+    // press-again-to-fold contract handlePropShortcut already has. "Already
+    // showing" means the reveal set covers exactly what this press would
+    // target AND the filter it turns on is still on, so U after some other
+    // reveal (E, M, a P filter) still means "show me the animated ones"
+    // rather than silently folding everything.
+    var wanted = (window._layerSel && window._layerSel.length) ? window._layerSel.slice() : state.layers.map(function (_l, i) { return i; });
+    var showing = _hideUnanimated && !_propFilter && window._motionRevealedLayers &&
+      window._motionRevealedLayers.length === wanted.length &&
+      wanted.every(function (li) { return window._motionRevealedLayers.indexOf(li) >= 0; });
+    if (showing) {
+      window._motionRevealedLayers = [];
+      window._motionRevealedElementLayers = [];
+      window._motionRevealedTextAnimators = [];
+      window._motionExpandedLayer = null;
+      _hideUnanimated = false;
+      renderLayerList(); renderTimeline();
+      return true;
+    }
     var targets = (window._layerSel && window._layerSel.length) ? window._layerSel.slice() : state.layers.map(function (_l, i) { return i; });
     window._motionRevealedLayers = targets;
     // Also open the Elements tree for any target layer whose animated
@@ -7045,6 +7077,14 @@
       // also changing what's selected, the way AE's twirl behaves.
       arrow.addEventListener('click', function (e) {
         e.stopPropagation();
+        // Read "is it open?" BEFORE dropping it from the reveal set
+        // (2026-09, feedback #764: "si j'ai fait u sur des calques et que
+        // j'utilise l'onglet de fermeture du calque je suis obligé de
+        // cliquer deux fois"). A U-revealed row is open ONLY through that
+        // set, so asking afterwards answered "closed" and the line below
+        // re-opened it through the accordion instead — the first click
+        // looked like it did nothing.
+        var wasOpen = isLayerExpanded(li);
         if (window._motionRevealedLayers) {
           var ri2 = window._motionRevealedLayers.indexOf(li);
           if (ri2 >= 0) window._motionRevealedLayers.splice(ri2, 1);
@@ -7053,7 +7093,7 @@
           var rei2 = window._motionRevealedElementLayers.indexOf(li);
           if (rei2 >= 0) window._motionRevealedElementLayers.splice(rei2, 1);
         }
-        window._motionExpandedLayer = isLayerExpanded(li) ? null : li;
+        window._motionExpandedLayer = wasOpen ? null : li;
         window._motionExpandedElement = null;
         _propFilter = null; // a hand-opened layer shows all its properties
         renderLayerList(); renderTimeline();
@@ -7395,8 +7435,8 @@
       // "parent"/"blend" here are just filter-check keys, not new
       // shortcuts), so the correct behavior is simply to hide with
       // everything else once a filter narrows to something specific.
-      if (!isPropFiltered('parent')) renderParentRow(list, ld, li);
-      if (!isPropFiltered('blend')) renderBlendRow(list, ld, li);
+      if (discreteRowVisible(ld, 'parent')) renderParentRow(list, ld, li);
+      if (discreteRowVisible(ld, 'blend')) renderBlendRow(list, ld, li);
       renderTransformGroup(list, ld, SM.t('hdrTransform'));
       // Per-element sub-list used to be component-exclusive ("a symbol
       // instance's actual strokes live inside the SYMBOL's own sub-layer,
@@ -11040,8 +11080,9 @@
       // same condition (li's own layer, expanded), same order, same two
       // rows, same feedback #220 filter gate — CLAUDE.md §11's panel/grid
       // alignment invariant.
-      if (!isPropFiltered('parent')) renderDiscreteKeyGridRow(grid, ld, 'parentKeys', SM.t('fieldParent') || 'Parent', ld.parentKeys || [], function (frame) { SMMotion.removeParentKeyAt(ld, frame); });
-      if (!isPropFiltered('blend')) renderDiscreteKeyGridRow(grid, ld, 'blendKeys', SM.t('fieldBlend'), ld.blendKeys || [], function (frame) { SMMotion.removeBlendKeyAt(ld, frame); });
+      // Same gate as the panel half (discreteRowVisible) — §11.
+      if (discreteRowVisible(ld, 'parent')) renderDiscreteKeyGridRow(grid, ld, 'parentKeys', SM.t('fieldParent') || 'Parent', ld.parentKeys || [], function (frame) { SMMotion.removeParentKeyAt(ld, frame); });
+      if (discreteRowVisible(ld, 'blend')) renderDiscreteKeyGridRow(grid, ld, 'blendKeys', SM.t('fieldBlend'), ld.blendKeys || [], function (frame) { SMMotion.removeBlendKeyAt(ld, frame); });
       if (showsGroupHeader()) {
         // 'motion-group-row' too, not just 'frow' (2026-07-30 fix, Cyril:
         // "encore des problème de calage d'ui"): .motion-group-row carries
