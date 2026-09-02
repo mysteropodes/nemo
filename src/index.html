@@ -1967,6 +1967,26 @@
     <button type="button" class="pbtn" id="om-span-5" style="flex:1;font-size:9px;padding:4px 2px">±5</button>
     <button type="button" class="pbtn" id="om-span-all" style="flex:1;font-size:9px;padding:4px 2px" data-i18n="onionSpanAll">Tout</button>
   </div>
+  <!-- Teintes de la pelure d'oignon (2026-09) : les modes Tinted/Outline
+       peignaient un rouge et un bleu CODÉS EN DUR. Deux sélecteurs, pour que
+       chacun règle son code couleur (Krita/OpenToonz font pareil). -->
+  <div class="pr" style="margin-bottom:6px;gap:6px;align-items:center">
+    <span class="pl" data-i18n="onionTints">Teintes</span>
+    <input type="color" id="p-onion-tint-prev" value="#ff4d4d" data-i18n-title="onionTintPrevTitle" title="Teinte des images précédentes" style="width:26px;height:20px;padding:0;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer">
+    <input type="color" id="p-onion-tint-next" value="#4d8cff" data-i18n-title="onionTintNextTitle" title="Teinte des images suivantes" style="width:26px;height:20px;padding:0;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer">
+    <button type="button" class="pbtn" id="p-onion-tint-reset" style="font-size:9px;padding:3px 6px" data-i18n="onionTintReset">Défaut</button>
+  </div>
+  <!-- Calage (« shift and trace ») : décale TEMPORAIREMENT les fantômes pour
+       aligner un mouvement sur un dessin voisin, sans toucher au dessin. -->
+  <div class="pr" style="margin-bottom:4px;gap:6px;align-items:center">
+    <span class="pl" data-i18n="onionShift">Calage</span>
+    <input type="number" class="pi scrub" id="p-onion-shift-x" value="0" data-step="1" style="width:44px" data-i18n-title="onionShiftXTitle" title="Décalage horizontal des fantômes">
+    <input type="number" class="pi scrub" id="p-onion-shift-y" value="0" data-step="1" style="width:44px" data-i18n-title="onionShiftYTitle" title="Décalage vertical des fantômes">
+    <button type="button" class="pbtn" id="p-onion-shift-reset" style="font-size:9px;padding:3px 6px" data-i18n="onionShiftReset">Zéro</button>
+  </div>
+  <div class="pr" style="margin-bottom:6px">
+    <label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-onion-shift-next" style="accent-color:var(--accent)"> <span data-i18n="onionShiftNextOnly">Décaler aussi les suivantes</span></label>
+  </div>
   <div class="pr"><label style="font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="p-om-follow" style="accent-color:var(--accent)"> <span data-i18n="onionFollowLabel">Marqueurs suivent le curseur</span></label></div>
 </div>
 <div id="comment-popover" style="display:none;position:absolute;z-index:200;width:240px;max-height:calc(100vh - 24px);overflow-y:auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:8px">

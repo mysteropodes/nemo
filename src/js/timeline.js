@@ -11192,6 +11192,31 @@ document.getElementById('btn-loop').addEventListener('contextmenu',function(e){e
   }
 })();
 document.getElementById('p-omode').addEventListener('change',function(){window.SM.setOnionMode(this.value);});
+// Teintes + calage de la pelure d'oignon (2026-09) — voir onionTint /
+// onionShift (tweens.js). Les champs sont pré-remplis à l'ouverture du
+// popover ET au chargement, sinon un réglage mémorisé n'apparaîtrait qu'après
+// une première modification.
+(function initOnionTintShift(){
+  var tp=document.getElementById('p-onion-tint-prev'),tn=document.getElementById('p-onion-tint-next'),tr=document.getElementById('p-onion-tint-reset');
+  var sx=document.getElementById('p-onion-shift-x'),sy=document.getElementById('p-onion-shift-y'),sr=document.getElementById('p-onion-shift-reset'),sn=document.getElementById('p-onion-shift-next');
+  if(!tp||!sx)return;
+  function sync(){
+    tp.value=onionTint('prev');tn.value=onionTint('next');
+    var o=onionShift();sx.value=o.x;sy.value=o.y;sn.checked=!!o.next;
+  }
+  tp.addEventListener('input',function(){setOnionTint('prev',tp.value);});
+  tn.addEventListener('input',function(){setOnionTint('next',tn.value);});
+  tr.addEventListener('click',function(){
+    try{localStorage.removeItem('nemo-onion-tint-prev');localStorage.removeItem('nemo-onion-tint-next');}catch(e){}
+    sync();renderOS();if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  });
+  function pushShift(){setOnionShift({x:parseFloat(sx.value)||0,y:parseFloat(sy.value)||0,next:sn.checked});}
+  sx.addEventListener('input',pushShift);sy.addEventListener('input',pushShift);sn.addEventListener('change',pushShift);
+  sr.addEventListener('click',function(){sx.value=0;sy.value=0;pushShift();});
+  var btn=document.getElementById('btn-os');
+  if(btn)btn.addEventListener('contextmenu',function(){setTimeout(sync,0);});
+  sync();
+})();
 document.getElementById('p-opop').addEventListener('input',function(){window.SM.setOnionPrevOp(parseInt(this.value));});
 document.getElementById('p-onop').addEventListener('input',function(){window.SM.setOnionNextOp(parseInt(this.value));});
 document.getElementById('btn-ff').addEventListener('click',function(){if(state.playing)stopPlay();goToFrame(state.waIn);});
