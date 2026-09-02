@@ -3871,6 +3871,22 @@ function mergeLayersIntoOne(indices,opts){
   // as color/matteMode/timeLink right above.
   if(srcs[0].inPoint!=null)merged.inPoint=srcs[0].inPoint;
   if(srcs[0].outPoint!=null)merged.outPoint=srcs[0].outPoint;
+  // Diffed against exportJSON's per-layer field list (2026-09 QA sweep,
+  // same audit that fixed splitLayerAtPlayhead/duplicateLayer, PR #814):
+  // the merged layer still dropped its EFFECTS stack, Blend/parent
+  // keyframes, follow-path, text identity + animators, the Instance-Effect
+  // link, LFS channel, shy/keyLock, link-group — and its FOLDER, so merging
+  // two layers inside a folder popped the result out of it. Topmost source
+  // wins, same convention as every field above. Markers are the one
+  // exception: frame-stamped annotations from every source are unioned,
+  // there is nothing for them to conflict over.
+  (function(){
+    var deep=function(v){return JSON.parse(JSON.stringify(v));};
+    ['effects','blendKeys','parentKeys','parentsMore','followPath','textAnimators','effectsFrom'].forEach(function(k){if(srcs[0][k]!=null)merged[k]=deep(srcs[0][k]);});
+    ['folderId','channel','shy','keyLock','isTextLayer','linkGroupId'].forEach(function(k){if(srcs[0][k]!=null)merged[k]=srcs[0][k];});
+    var mk=[];srcs.forEach(function(l){(l.markers||[]).forEach(function(m){if(!mk.some(function(x){return x.frame===m.frame&&x.label===m.label;}))mk.push(deep(m));});});
+    if(mk.length){mk.sort(function(x,y){return (x.frame||0)-(y.frame||0);});merged.markers=mk;}
+  })();
   if(Object.keys(elMotion).length)merged.elementMotion=elMotion;
   if(Object.keys(mergedGroups).length)merged.groups=mergedGroups;
   // Any OTHER layer parented to one of the layers about to disappear must
