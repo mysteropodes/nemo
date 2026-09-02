@@ -1519,7 +1519,7 @@ window.SM={
   toggleLayerSolo:function(idx){state.layers[idx].solo=!state.layers[idx].solo;loadFrame(state.currentFrame);updateUI();},
   renameLayer:function(idx,n){state.layers[idx].name=n;updateUI();},
   reorderLayer:function(fromIdx,toIdx){reorderLayer(fromIdx,toIdx);},
-  reorderLayersAtGap:function(fromIndices,gapIdx){reorderLayersAtGap(fromIndices,gapIdx);},
+  reorderLayersAtGap:function(fromIndices,gapIdx,skipUndo){reorderLayersAtGap(fromIndices,gapIdx,skipUndo);},
   reorderLayersBatch:function(fromIndices,toIdx){reorderLayersBatch(fromIndices,toIdx);},
   // Stroke profiles (van Dijk 6.2). Acts on the current canvas selection;
   // one undo step for the whole batch, like every other selection command.
@@ -6515,10 +6515,19 @@ function finishLayerReorder(){
       // folderLayerChildMap's own comment), so this must be an explicit
       // setLayerParent(null) call; a position-only reorder would leave the
       // layer re-appearing nested under its old folder next render.
+      // ONE undo entry for ONE gesture (2026-09, feedback #755: "quand on
+      // réordonne des calques le undo ne marche pas"). setLayerParent
+      // mutates ld.parentLayerUid without snapshotting, and
+      // reorderLayersAtGap snapshots only when IT runs — so the snapshot
+      // captured a document that had ALREADY left the folder, and undo gave
+      // back the old order with the layer still un-parented. Snapshot here,
+      // before either mutation, and tell the reorder not to add a second.
+      var unparenting=moving.some(function(mi){return window.SMMotion&&folderLayerParentIdx(mi)>=0;});
+      if(unparenting){saveAllLayerFrames();pushUndoLayers(true);}
       moving.forEach(function(mi){
         if(window.SMMotion&&folderLayerParentIdx(mi)>=0)SMMotion.setLayerParent(mi,null);
       });
-      window.SM.reorderLayersAtGap(moving,_layerDrag.dropGap);
+      window.SM.reorderLayersAtGap(moving,_layerDrag.dropGap,unparenting);
     }
   }
   document.querySelectorAll('.lrow,.frow').forEach(function(r){r.classList.remove('dragging','drag-over','folder-drop-target');});

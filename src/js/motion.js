@@ -7228,6 +7228,16 @@
       // above, so no duplicate drag logic needed here at all.
       function beginMotionLayerReorder(e) {
         if (e.button !== 0 || e.target.closest('.lico')) return;
+        // Anything in the row that owns its own drag must not also arm a
+        // layer reorder (2026-09, feedback #756: "le link de parentage
+        // réordonne des calques au lieu de link"). The parenting pickwhip
+        // is the reported case — its gesture is a drag ONTO another layer,
+        // which is exactly the shape of a reorder drag, so both started and
+        // the reorder won. Animation 2D's own rows never had the bug: their
+        // parent cell stops mousedown from propagating (timeline.js), which
+        // this row has no equivalent of since the drag is armed on the row
+        // itself. Fields are in the list for the same reason.
+        if (e.target.closest('.lpick, .motion-parent-pill, input, select, textarea, [contenteditable="true"]')) return;
         armLayerReorder(e, li, 'panel', row);
       }
       row.addEventListener('mousedown', beginMotionLayerReorder);
