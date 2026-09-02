@@ -293,7 +293,25 @@
   // both backends. tauri::ipc::Response arrives as an ArrayBuffer (one
   // structured-clone copy across the IPC boundary, no JSON/base64); the
   // web backend produces the same shape via _decodeWebFrame/getImageData.
-  async function frameBytes(sessionId, frameIndex) {
+  // One decode at a time PER SESSION (2026-09 QA sweep). A session can have
+  // several readers: a duplicated video layer shares its source's session
+  // (duplicateLayer, timeline.js), and a video inside a Component is read
+  // both as its own layer ('nv:') and as an instance ('nvsym:'). The
+  // per-LAYER busy/pending coalescing in _layerFrameSync never knew about
+  // each other, so two layers could drive one WebCodecs decoder at once —
+  // measured right after sharing sessions: the original layer's sync died
+  // with "décodeur WebCodecs muet (aucune image en 4s)" while its copy
+  // decoded fine, because the second request's flush starved the first.
+  // A promise chain per session queues them; the desktop (ffmpeg) backend
+  // gets the same ordering for free.
+  var _sessionChain = {};
+  function frameBytes(sessionId, frameIndex) {
+    var prev = _sessionChain[sessionId] || Promise.resolve();
+    var run = prev.then(function () { return _frameBytesNow(sessionId, frameIndex); });
+    _sessionChain[sessionId] = run.then(function () {}, function () {}); // a failed decode must not jam the queue
+    return run;
+  }
+  async function _frameBytesNow(sessionId, frameIndex) {
     if (String(sessionId).indexOf('web-') === 0) {
       var ws = webSessions[sessionId];
       if (!ws) throw new Error('unknown web session ' + sessionId);
