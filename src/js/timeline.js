@@ -7725,6 +7725,99 @@ function closeInPlaceTextEditor(cancel){
   });
 }
 window.openInPlaceTextEditor=openInPlaceTextEditor;
+// ---- In-place editing for RASTER text (2026-09, feedback #794) ----------
+//
+// "pourquoi je ne peux pas éditer le texte directement sur l'objet du canvas
+// et pas dans un pop up ?" — in-place editing already existed but was
+// vector-only (see openInPlaceTextEditor's header), so a block typed with an
+// ordinary font still opened the side popover. Same gesture, same overlay,
+// same commit key (blur or Cmd/Ctrl+Enter, Escape cancels); what differs is
+// what happens at commit: a raster block has no glyph outlines to rebuild,
+// it is re-baked — and re-baked by the EXISTING writer (commitText's
+// _textEditingRaster branch, a few hundred lines up) rather than a second
+// copy of the bake, so the re-edit stays pixel-identical to the popover's
+// (CLAUDE.md §3).
+var _rasterInplaceTa=null,_rasterInplaceItem=null,_rasterInplacePrevOpacity=1;
+function openInPlaceRasterTextEditor(raster){
+  if(!raster||!raster.data)return false;
+  if(_rasterInplaceTa)closeInPlaceRasterTextEditor(true);
+  var d=raster.data;
+  // Same opacity-not-visible trick as the vector editor: buildSceneJson
+  // never reads .visible on an item, only .opacity.
+  _rasterInplacePrevOpacity=raster.opacity;
+  raster.opacity=0;
+  _rasterInplaceItem=raster;
+  var ta=document.createElement('textarea');
+  ta.id='tp-inplace-editor';
+  ta.value=d.text||'';
+  ta.spellcheck=false;
+  document.body.appendChild(ta);
+  _rasterInplaceTa=ta;
+  var topLeftWorld=raster.bounds.topLeft.clone();
+  function reposition(){
+    // Motion-mapped anchor then screen projection — identical treatment to
+    // the vector editor's own reposition (see its comment on feedback #131:
+    // a layer with any Motion key renders somewhere else than its raw
+    // geometry, and the overlay has to follow the picture).
+    var motionMap=(window.SMMotion&&SMMotion.layerMotionPointMap)?SMMotion.layerMotionPointMap(state.activeLayerIdx):null;
+    var a=motionMap?motionMap.fwd(topLeftWorld.x,topLeftWorld.y):[topLeftWorld.x,topLeftWorld.y];
+    var v=view.projectToView(new Point(a[0],a[1]));
+    var cr=document.getElementById('drawing-canvas').getBoundingClientRect();
+    ta.style.left=(cr.left+v.x)+'px';
+    ta.style.top=(cr.top+v.y)+'px';
+    ta.style.fontSize=((d.size||48)*view.zoom)+'px';
+    ta.style.fontFamily=d.font||'sans-serif';
+    ta.style.color=d.color||'#000000';
+    ta.style.textAlign=d.align||'left';
+    // 1.25 is computeTextLayout's own line height (size*SS*1.25) — the
+    // overlay has to wrap where the bake will wrap, not near it.
+    ta.style.lineHeight='1.25';
+    if(d.fixedWidth){ta.style.whiteSpace='pre-wrap';ta.style.width=(d.fixedWidth*view.zoom)+'px';}
+    else{ta.style.whiteSpace='pre';ta.style.width=Math.max(20,ta.scrollWidth)+'px';}
+    ta.style.height=ta.scrollHeight+'px';
+    window._inplaceTextBoxBounds={
+      left:a[0],top:a[1],
+      right:a[0]+parseFloat(ta.style.width)/view.zoom,
+      bottom:a[1]+parseFloat(ta.style.height)/view.zoom,
+    };
+    if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  }
+  reposition();
+  ta.addEventListener('input',reposition);
+  ta.addEventListener('keydown',function(e){
+    e.stopPropagation();
+    if(e.key==='Escape'){e.preventDefault();closeInPlaceRasterTextEditor(true);}
+    else if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();closeInPlaceRasterTextEditor(false);}
+  });
+  ta.addEventListener('blur',function(){closeInPlaceRasterTextEditor(false);});
+  ta.focus();ta.select();
+  return true;
+}
+function closeInPlaceRasterTextEditor(cancel){
+  var ta=_rasterInplaceTa,raster=_rasterInplaceItem,prevOp=_rasterInplacePrevOpacity;
+  if(!ta)return;
+  _rasterInplaceTa=null;_rasterInplaceItem=null;
+  window._inplaceTextBoxBounds=null;
+  var newText=ta.value;
+  ta.remove();
+  if(raster&&!raster.removed)raster.opacity=prevOp;
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  if(cancel||!raster||raster.removed||!raster.data)return;
+  if(!newText.trim()||newText===raster.data.text)return; // nothing to re-bake
+  // Hand the edit to the popover's own writer: same fields, same branch,
+  // same undo — this function only ever collected the new string.
+  var d=raster.data;
+  _textPendingPt=null;
+  _textEditingRaster=raster;
+  _textPendingBox=d.fixedWidth?{topLeft:raster.bounds.topLeft.clone(),width:d.fixedWidth}:null;
+  resetTextPopoverFields(newText,d.size,d.font,d.color,d.align);
+  commitText();
+}
+window.openInPlaceRasterTextEditor=openInPlaceRasterTextEditor;
+// One gate for BOTH editors — engine-bridge asks "is text being typed right
+// now" and must not care which kind it is.
+var _wasInPlaceTextEditing=window.isInPlaceTextEditing;
+window.isInPlaceTextEditing=function(){return !!_rasterInplaceTa||(_wasInPlaceTextEditing?_wasInPlaceTextEditing():false);};
 // Shared layout pass (2026-07) — used by BOTH commitText's flattened bake
 // AND splitTextIntoCharacters' per-character split, so a split always
 // matches the flattened text pixel-for-pixel (same wrap decisions, same
