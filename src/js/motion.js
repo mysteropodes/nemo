@@ -7168,11 +7168,18 @@
       // (app.js), the same choke point Motion's own render pipeline already
       // goes through — no extra plumbing needed for the toggles to actually
       // affect what's shown.
-      var cdot = document.createElement('div'); cdot.className = 'lico layer-color-dot motion-col-color'; cdot.title = 'Couleur du calque';
+      var cdot = document.createElement('div'); cdot.className = 'lico layer-color-dot motion-col-color'; cdot.title = SM.t('layerColorDotTitle');
       cdot.style.setProperty('--dot-color', ld.color || '#8b8b9e');
+      // Assign to the whole selection, Shift+click to select every layer
+      // wearing this color (#776) — both live in timeline.js next to the
+      // swatch popover so Animation 2D's identical dot shares them.
       cdot.addEventListener('click', function (e) {
         e.stopPropagation();
-        openLayerColorSwatches(cdot, ld.color || '#8b8b9e', function (hex) { ld.color = hex; cdot.style.setProperty('--dot-color', hex); renderTimeline(); });
+        if (e.shiftKey) { if (window.selectLayersByColor) selectLayersByColor(ld.color); return; }
+        openLayerColorSwatches(cdot, ld.color || '#8b8b9e', function (hex) {
+          if (window.applyLayerColor) applyLayerColor(li, hex);
+          else { ld.color = hex; renderTimeline(); }
+        });
       });
       row.appendChild(cdot);
       var eye = document.createElement('div'); eye.className = 'lico motion-col-visibility' + (ld.visible ? '' : ' off'); eye.title = SM.t('layerEyeTitle'); eye.innerHTML = ld.visible ? ICO_EYE : ICO_EYE_CLOSED;
