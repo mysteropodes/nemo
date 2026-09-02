@@ -43,8 +43,15 @@
     for (var i = 0; i < 8; i++) {
       var d = dbx(u);
       if (Math.abs(d) < 1e-6) break;
+      // 1e-9, not the 1e-5 this used to accept (2026-09): the exit test is
+      // on x, and the y it then returns is off by that error TIMES the local
+      // slope — on a steep curve (0.9,0,0.1,1) that turned into a visible
+      // disagreement with the other two solvers in this app (measured 2.8e-5
+      // between camera and text selector; see tests/easing-reference.test.cjs).
+      // Newton converges quadratically, so the extra precision costs at most
+      // an iteration or two of the eight already budgeted.
       var err = bx(u) - t;
-      if (Math.abs(err) < 1e-5) return by(u);
+      if (Math.abs(err) < 1e-9) return by(u);
       u = Math.max(0, Math.min(1, u - err / d));
     }
     var lo = 0, hi = 1;
