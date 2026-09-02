@@ -417,50 +417,24 @@ activateUL(0);
 // above everything inserted so far, ending with the highest index on top).
 function reorderLayer(fromIdx,toIdx){
   if(fromIdx===toIdx||fromIdx<0||toIdx<0||fromIdx>=state.layers.length||toIdx>=state.layers.length)return;
-  saveAllLayerFrames();pushUndoLayers(true);
-  var ld=state.layers.splice(fromIdx,1)[0];state.layers.splice(toIdx,0,ld);
-  var ul=userLayers.splice(fromIdx,1)[0];userLayers.splice(toIdx,0,ul);
-  userLayers.forEach(function(l){l.insertBelow(arcLayer);});
-  if(state.activeLayerIdx===fromIdx)state.activeLayerIdx=toIdx;
-  else if(fromIdx<state.activeLayerIdx&&toIdx>=state.activeLayerIdx)state.activeLayerIdx--;
-  else if(fromIdx>state.activeLayerIdx&&toIdx<=state.activeLayerIdx)state.activeLayerIdx++;
-  activateUL(state.activeLayerIdx);
-  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(SM.t('toastLayerReordered'));
+  // Delegates to reorderLayersAtGap (2026-09 QA sweep, CLAUDE.md §3): this
+  // and reorderLayersBatch were two more copies of the same splice, and
+  // only the gap version had received the "selection follows the LAYER,
+  // not the array slot" fix (2026-09-01) — a multi-selection reordered
+  // through this API still highlighted whatever landed on the old indices.
+  // "Move to index toIdx" is the gap just after toIdx when moving down,
+  // the gap at toIdx when moving up (the removed layer shifts everything
+  // below it up by one).
+  reorderLayersAtGap([fromIdx],toIdx>fromIdx?toIdx+1:toIdx);
 }
-
 // Batch version of reorderLayer() — moves every index in `fromIndices` as a
-// single contiguous block to wherever `toIdx` currently sits, preserving
-// their relative order. Fixes "impossible de réordonner par lot": the
-// single-item drag (reorderLayer above) only ever knew about the one row
-// literally under the mouse at mousedown, ignoring the rest of a multi-
-// selection entirely.
+// contiguous block to sit just BEFORE the layer currently at toIdx. Same
+// delegation as reorderLayer above, same reason.
 function reorderLayersBatch(fromIndices,toIdx){
   fromIndices=fromIndices.slice().sort(function(a,b){return a-b;});
   if(!fromIndices.length||fromIndices.indexOf(toIdx)>=0)return;
-  saveAllLayerFrames();pushUndoLayers(true);
-  var destLd=state.layers[toIdx];
-  var activeLd=state.layers[state.activeLayerIdx];
-  var movedLd=[],movedUL=[];
-  for(var i=fromIndices.length-1;i>=0;i--){
-    var idx=fromIndices[i];
-    movedLd.unshift(state.layers.splice(idx,1)[0]);
-    movedUL.unshift(userLayers.splice(idx,1)[0]);
-  }
-  var destNewIdx=state.layers.indexOf(destLd);
-  if(destNewIdx<0)destNewIdx=state.layers.length; // dest was itself moved (shouldn't happen, guarded above) — append as fallback
-  Array.prototype.splice.apply(state.layers,[destNewIdx,0].concat(movedLd));
-  Array.prototype.splice.apply(userLayers,[destNewIdx,0].concat(movedUL));
-  userLayers.forEach(function(l){l.insertBelow(arcLayer);});
-  var newActiveIdx=state.layers.indexOf(activeLd);
-  state.activeLayerIdx=newActiveIdx>=0?newActiveIdx:0;
-  activateUL(state.activeLayerIdx);
-  loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(SM.t('toastLayersReordered'));
+  reorderLayersAtGap(fromIndices,toIdx);
 }
-// Gap-based counterpart used by the layer-panel drag affordance. A gap is
-// unambiguous (0 = before the first row, layers.length = after the last),
-// unlike a destination row which cannot distinguish its upper/lower edge.
-// Keeping this translation beside the actual array mutation guarantees the
-// blue insertion line and the committed order describe the same operation.
 function reorderLayersAtGap(fromIndices,gapIdx,skipUndo){
   var moving=fromIndices.filter(function(i){return i>=0&&i<state.layers.length;})
     .filter(function(i,p,a){return a.indexOf(i)===p;}).sort(function(a,b){return a-b;});
