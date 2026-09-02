@@ -6532,6 +6532,19 @@
   function layerMotionPointMapFor(li) {
     return (window.SMMotion && window.SMMotion.layerMotionPointMap) ? window.SMMotion.layerMotionPointMap(li) : null;
   }
+  // Shift axis-lock for Motion's own canvas drags (2026-09, feedback #802:
+  // "le shift + drag un objet ne le contraint pas en x ou y"). Animation 2D
+  // got this in #724 through select-bridge's move branch, but Motion's
+  // drags never pass through it — motion.js intercepts the gesture in
+  // capture phase and moves the element/layer itself. Same rule as there:
+  // snap the TOTAL displacement since the gesture began onto whichever axis
+  // it is closer to, never the per-tick delta (hand movement is noisy, and
+  // a per-tick clamp lets the off-axis drift accumulated before Shift was
+  // pressed survive).
+  function axisLocked(shift, dx, dy) {
+    if (!shift) return [dx, dy];
+    return Math.abs(dx) >= Math.abs(dy) ? [dx, 0] : [0, dy];
+  }
   function onDrag(event) {
     if (!_motionDrag) return false;
     if (_motionDrag.mode === 'elementMove') {
@@ -6553,6 +6566,10 @@
       // ELEMENT's does not — it sits underneath the layer transform.
       var dxEl = event.point.x - _motionDrag.start.x;
       var dyEl = event.point.y - _motionDrag.start.y;
+      // Locked in WORLD space, before the layer transform is undone below —
+      // the axis the user sees is the screen/world one, not the shape's own
+      // rotated frame.
+      var lkEl = axisLocked(event.shiftKey, dxEl, dyEl); dxEl = lkEl[0]; dyEl = lkEl[1];
       var mapEl = layerMotionPointMapFor(_motionDrag.t.li);
       if (mapEl && mapEl.invVec) { var vEl = mapEl.invVec(dxEl, dyEl); dxEl = vEl[0]; dyEl = vEl[1]; }
       setValue(_motionDrag.t.holder, 'position', [
@@ -6571,6 +6588,7 @@
       window._sceneVersion = (window._sceneVersion || 0) + 1;
     } else if (_motionDrag.mode === 'multiLayerMove') {
       var mdx=event.point.x-_motionDrag.start.x,mdy=event.point.y-_motionDrag.start.y;
+      var lkML=axisLocked(event.shiftKey,mdx,mdy); mdx=lkML[0]; mdy=lkML[1]; // #802
       _motionDrag.records.forEach(function(r){setValue(r.t.holder,'position',[r.pos[0]+mdx,r.pos[1]+mdy]);});
     } else if (_motionDrag.mode === 'multiLayerScale') {
       var mDist=Math.hypot(event.point.x-_motionDrag.pivot.x,event.point.y-_motionDrag.pivot.y);
