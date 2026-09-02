@@ -3818,9 +3818,24 @@ function clearGhostSelection(){
   _ghostProxyActive=false;
   clearSel();loadFrame(state.currentFrame);updateUI();
 }
+// Held frame (2026-09 QA sweep): the three selPropsApply* below mutate the
+// live items and then saveActiveLayerFrame(), which returns early on a
+// held frame — an arrow-key nudge or a Position/Size/Rotation field edit
+// on a held frame moved the shape on screen and snapped back on the next
+// scrub. The canvas drag of the same selection already promotes the held
+// frame (select-bridge.js, ensureKeyframe); same rule here for Animation
+// 2D. Motion never edits geometry through these (its fields/nudge write
+// layer Motion values). loadFrame re-resolves selectedPaths by strokeId
+// after the rebuild (app.js), so the callers keep operating on the twins.
+function _selPropsPromoteHeld(){
+  if(state.appMode==='motion'||typeof ensureKeyframe!=='function')return;
+  var ld=state.layers[state.activeLayerIdx],f=ld&&ld.frames[state.currentFrame];
+  if(f&&!f.isKeyframe&&!f.isInterpolated)ensureKeyframe();
+}
 function selPropsApplyMove(dx,dy,skipUndo){
   if((!dx&&!dy)||!selectedPaths.length)return;
   if(!skipUndo)pushUndo();
+  _selPropsPromoteHeld();
   // translate(), not position=position.add() — see select-bridge.js's live
   // canvas-drag move handler for the full explanation (same fix, same
   // reason): .position round-trips through a bounds computation that the
@@ -3843,6 +3858,7 @@ function selPropsApplyMove(dx,dy,skipUndo){
 function selPropsApplyScale(sx,sy,anchor,skipUndo){
   if((sx===1&&sy===1)||!selectedPaths.length)return;
   if(!skipUndo)pushUndo();
+  _selPropsPromoteHeld();
   selectedPaths.forEach(function(p){
     p.scale(sx,sy,anchor);
     if(window.syncParamShapeBoxOnScale)window.syncParamShapeBoxOnScale(p,sx,sy,anchor);
@@ -3855,6 +3871,7 @@ function selPropsApplyScale(sx,sy,anchor,skipUndo){
 function selPropsApplyRotate(deltaDeg,center,skipUndo){
   if(!deltaDeg||!selectedPaths.length)return;
   if(!skipUndo)pushUndo();
+  _selPropsPromoteHeld();
   selectedPaths.forEach(function(p){
     p.rotate(deltaDeg,center);
     // Keep data.boxAngle in sync (2026-08 fix, "la box du hover ne correspond
