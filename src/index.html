@@ -1200,6 +1200,11 @@
         </div>
         <div class="pr" style="gap:4px">
           <button class="pbtn icon-only-btn" id="btn-palette-replace" data-i18n-title="paletteReplaceTitle" title="Remplacer une couleur dans le calque actif : clic sur la source, puis sur la cible"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>
+          <select class="psel" id="palette-replace-scope" style="flex:1;min-width:0" data-i18n-title="paletteScopeTitle" title="Portée du remplacement de couleur">
+            <option value="frame" data-i18n="paletteScopeFrame">Image courante</option>
+            <option value="layer" data-i18n="paletteScopeLayer">Tout le calque</option>
+            <option value="selection" data-i18n="paletteScopeSelection">Calques sélectionnés</option>
+          </select>
         </div>
       </div>
     </div>

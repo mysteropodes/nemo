@@ -56,9 +56,68 @@
     if (!hex1 || !hex2) return hex1 === hex2;
     return hex1.toLowerCase() === hex2.toLowerCase();
   }
+  // Portée du remplacement (2026-09, demande de Cyril : « qu'il le fasse sur
+  // un calque et toutes les keyframes des calques sélectionnés en option »).
+  // Trois portées, mémorisées entre deux sessions :
+  //   frame     — le calque actif, à l'image courante (comportement d'origine)
+  //   layer     — le calque actif, sur TOUTES ses images
+  //   selection — tous les calques sélectionnés, sur toutes leurs images
+  // Les deux dernières travaillent sur les dictionnaires de traits stockés,
+  // pas sur les objets Paper vivants : c'est la seule vue qui contient les
+  // images non chargées. loadFrame rebâtit ensuite l'image courante.
+  var REPLACE_SCOPE_KEY = 'nemo-palette-replace-scope';
+  function replaceScope() {
+    try { return localStorage.getItem(REPLACE_SCOPE_KEY) || 'frame'; } catch (e) { return 'frame'; }
+  }
+  function setReplaceScope(v) {
+    try { localStorage.setItem(REPLACE_SCOPE_KEY, v); } catch (e) {}
+  }
+  function scopeLayers() {
+    if (replaceScope() !== 'selection') return [state.activeLayerIdx];
+    var sel = (typeof _layerSel !== 'undefined' && _layerSel && _layerSel.length) ? _layerSel.slice() : [state.activeLayerIdx];
+    return sel.filter(function (i) { return state.layers[i]; });
+  }
+  // Un trait stocké porte sa couleur à quatre endroits possibles : le
+  // remplissage, le contour, le contour d'origine d'une texture de brosse
+  // (preTextureStroke, mis à null sur l'objet vivant — voir serP) et les
+  // arrêts d'un dégradé.
+  function replaceInStrokeDict(sd, fromHex, toHex) {
+    var n = 0;
+    if (sd.fillColor && colorsEqual(sd.fillColor, fromHex)) { sd.fillColor = toHex; n++; }
+    if (sd.strokeColor && colorsEqual(sd.strokeColor, fromHex)) { sd.strokeColor = toHex; n++; }
+    if (sd.preTextureStroke && colorsEqual(sd.preTextureStroke, fromHex)) { sd.preTextureStroke = toHex; n++; }
+    if (sd.fillGradient && sd.fillGradient.stops) {
+      sd.fillGradient.stops.forEach(function (st) {
+        if (st && st.color && colorsEqual(st.color, fromHex)) { st.color = toHex; n++; }
+      });
+    }
+    return n;
+  }
+  function replaceAcrossFrames(fromHex, toHex) {
+    var layers = scopeLayers(), n = 0;
+    if (typeof saveAllLayerFrames === 'function') saveAllLayerFrames();
+    if (typeof pushUndoLayers === 'function') pushUndoLayers(true);
+    layers.forEach(function (li) {
+      var ld = state.layers[li]; if (!ld) return;
+      (ld.frames || []).forEach(function (f) {
+        (f && f.strokes || []).forEach(function (sd) { n += replaceInStrokeDict(sd, fromHex, toHex); });
+      });
+    });
+    if (n) {
+      loadFrame(state.currentFrame);
+      updateUI();
+      if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+    }
+    return { count: n, layers: layers.length };
+  }
+  function replaceColor(fromHex, toHex) {
+    if (replaceScope() === 'frame') return { count: replaceInActiveLayer(fromHex, toHex), layers: 1 };
+    return replaceAcrossFrames(fromHex, toHex);
+  }
   function replaceInActiveLayer(fromHex, toHex) {
     var layer = userLayers[state.activeLayerIdx];
     if (!layer) return 0;
+    if (typeof pushUndo === 'function') pushUndo();
     var n = 0;
     layer.children.forEach(function (c) {
       if (!(c instanceof Path || c instanceof CompoundPath)) return;
@@ -108,8 +167,10 @@
       btn.addEventListener('click', function (e) {
         if (replaceArmed) {
           if (replaceSource === null) { replaceSource = hex; render(); return; }
-          var n = replaceInActiveLayer(replaceSource, hex);
-          showToast(n ? (n + SM.t('toastColorsReplacedSuffix')) : 'Aucune correspondance dans le calque actif');
+          var res = replaceColor(replaceSource, hex);
+          showToast(res.count
+            ? (res.count + SM.t('toastColorsReplacedSuffix') + (replaceScope() === 'selection' ? ' (' + res.layers + ' ' + SM.t('paletteScopeLayersWord') + ')' : ''))
+            : SM.t('toastColorNoMatchInScope'));
           cancelReplace();
           return;
         }
@@ -129,6 +190,8 @@
       });
       grid.appendChild(btn);
     });
+    var scopeSel = document.getElementById('palette-replace-scope');
+    if (scopeSel && scopeSel.value !== replaceScope()) scopeSel.value = replaceScope();
     var replaceBtn = document.getElementById('btn-palette-replace');
     if (replaceBtn) {
       replaceBtn.classList.toggle('active', replaceArmed);
@@ -210,6 +273,11 @@
     });
     var replaceBtn = document.getElementById('btn-palette-replace');
     if (replaceBtn) replaceBtn.addEventListener('click', function () { if (replaceArmed) cancelReplace(); else startReplace(); });
+    var scopeSel = document.getElementById('palette-replace-scope');
+    if (scopeSel) {
+      scopeSel.value = replaceScope();
+      scopeSel.addEventListener('change', function () { setReplaceScope(scopeSel.value); render(); });
+    }
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && replaceArmed) cancelReplace(); });
     render();
   }
