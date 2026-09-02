@@ -105,7 +105,7 @@
         var prevA = (stop.color && stop.color.length === 9) ? stop.color.slice(7, 9) : 'ff';
         stop.color = this.value + prevA;
         this.dataset.hex8 = stop.color;
-        saveActiveLayerFrame(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+        saveActiveLayerFrameOrPromote(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       });
       var offInp = document.createElement('input');
       offInp.type = 'number'; offInp.className = 'pi scrub'; offInp.min = 0; offInp.max = 100; offInp.step = 1; offInp.dataset.step = '1';
@@ -114,7 +114,7 @@
       offInp.addEventListener('change', function () {
         pushUndo(); stop.offset = Math.max(0, Math.min(100, parseFloat(this.value) || 0)) / 100;
         normalizeStops(grad);
-        saveActiveLayerFrame(); renderGradientPanel(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+        saveActiveLayerFrameOrPromote(); renderGradientPanel(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       });
       var pct = document.createElement('span'); pct.style.cssText = 'font-size:9px;color:var(--text-dim)'; pct.textContent = '%';
       var rmBtn = document.createElement('button');
@@ -125,7 +125,7 @@
         pushUndo();
         var idx = grad.stops.indexOf(stop);
         if (idx >= 0) grad.stops.splice(idx, 1);
-        saveActiveLayerFrame(); renderGradientPanel(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+        saveActiveLayerFrameOrPromote(); renderGradientPanel(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       });
       row.appendChild(colorInp); row.appendChild(offInp); row.appendChild(pct); row.appendChild(rmBtn);
       stopsList.appendChild(row);
@@ -133,7 +133,14 @@
   }
   window.renderGradientPanel = renderGradientPanel;
 
-  function toggleGradient(on) {
+  // Every commit in this file goes through saveActiveLayerFrameOrPromote
+// (2026-09 QA sweep, same family as #823/#824/#825/#828): a gradient is a
+// per-stroke property written on the LIVE path, and saveActiveLayerFrame()
+// does nothing on a held frame — so enabling a gradient, dragging its
+// gizmo or editing a stop on a held frame all came back undone at the next
+// scrub. The helper promotes the held frame in Animation 2D and writes
+// into the hold's own keyframe in Motion.
+function toggleGradient(on) {
     var target = singleTarget();
     if (!target) return;
     pushUndo();
@@ -143,7 +150,7 @@
     } else {
       delete target.data.fillGradient;
     }
-    saveActiveLayerFrame(); updateUI(); renderGradientPanel();
+    saveActiveLayerFrameOrPromote(); updateUI(); renderGradientPanel();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
   function addStop() {
@@ -163,7 +170,7 @@
     var mid = (a.offset + b.offset) / 2;
     grad.stops.push({ offset: mid, color: a.color });
     normalizeStops(grad);
-    saveActiveLayerFrame(); renderGradientPanel();
+    saveActiveLayerFrameOrPromote(); renderGradientPanel();
     if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
   }
 
@@ -283,7 +290,7 @@
     e.stopImmediatePropagation(); e.preventDefault();
     dragging = null;
     window.SMEngineBridge.resume();
-    saveActiveLayerFrame(); renderGradientPanel();
+    saveActiveLayerFrameOrPromote(); renderGradientPanel();
     window.SMEngineBridge.renderNow();
   }
 
@@ -296,7 +303,7 @@
         var target = singleTarget();
         if (!target || !target.data.fillGradient) return;
         pushUndo(); target.data.fillGradient.kind = this.value;
-        saveActiveLayerFrame(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
+        saveActiveLayerFrameOrPromote(); if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       });
     }
     var target = document.getElementById('canvas-area') || document.getElementById('drawing-canvas');

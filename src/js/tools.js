@@ -6018,7 +6018,13 @@ function booleanOp(op){
   // comment) may have used one of the booleaned shapes as a wall; keep
   // re-tracing those, same as before this fix.
   fillRegenerateLinked(boolLayer,islands[0]);
-  saveActiveLayerFrame();updateUI();showToast(SM.t('toastBooleanOpApplied'));
+  // Held frame (2026-09 QA sweep, same family as #823/#824/#825/#828):
+  // saveActiveLayerFrame() does nothing on a held frame, so a Union /
+  // Subtract / Intersect applied there redrew the canvas and came back
+  // un-merged on the next scrub (measured live: the geometry changed on
+  // screen, the stored frames did not). Promotes in Animation 2D, writes
+  // into the hold's own keyframe in Motion.
+  saveActiveLayerFrameOrPromote();updateUI();showToast(SM.t('toastBooleanOpApplied'));
 }
 
 // ---- PRECISION VECTOR ERASER ----
