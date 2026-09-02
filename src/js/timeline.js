@@ -7097,6 +7097,7 @@ function renderCompFrameStrip(ld){
   var strip=document.getElementById('comp-frame-strip');strip.innerHTML='';
   var sym=state.symbols[ld.symbolId];if(!sym)return;
   renderLipSyncPanel(ld);
+  if(window.SMCompPreview&&SMCompPreview.isOpen())SMCompPreview.refresh();
   var total=Math.max(1,sym.totalFrames);
   var current=resolveSymbolFrameIdx(sym,ld,state.currentFrame);
   for(var i=0;i<total;i++){
@@ -11251,6 +11252,14 @@ document.getElementById('btn-loop').addEventListener('contextmenu',function(e){e
 })();
 // Synchro labiale : réglages + lancement. L'écriture passe par
 // SMLipSync.apply, qui ne pose une clé QUE là où la bouche change.
+(function initCompPreview(){
+  var b=document.getElementById('btn-comp-preview');
+  if(b)b.addEventListener('click',function(){if(window.SMCompPreview)SMCompPreview.toggle();});
+  // La bande d'images reste le raccourci ; un double-clic dessus ouvre la
+  // version en grand sur l'image cliquée.
+  var strip=document.getElementById('comp-frame-strip');
+  if(strip)strip.addEventListener('dblclick',function(){if(window.SMCompPreview)SMCompPreview.show();});
+})();
 (function initLipSync(){
   function ld(){var l=state.layers[state.activeLayerIdx];return (l&&l.symbolId&&window.SMLipSync)?l:null;}
   function num(id){var e=document.getElementById(id);return e?parseFloat(e.value):null;}
