@@ -569,8 +569,21 @@
       registerRenderMs: { p50: _pctl(_stats.renderMs, 0.5), p95: _pctl(_stats.renderMs, 0.95) },
     };
   }
-  function _targetFor(nv, frame) {
-    return Math.max(0, Math.min(nv.frameCount - 1, frame - (nv.offsetFrames || 0)));
+  // Which SOURCE frame this timeline frame shows. Takes the LAYER, not just
+  // its nativeVideo record, because Time Remap lives on the layer (2026-09,
+  // feedback #751: "le time remapping sur une vidéo n'a pas l'air de
+  // fonctionner, ça change pas à la bonne frame dans le canvas"). A keyed
+  // remap curve names the source frame directly and therefore overrides the
+  // static offset entirely — the same single-chokepoint rule the Component
+  // path already follows (see symbolFrameAt, app.js), now shared by video.
+  function _targetFor(ld, frame) {
+    var nv = (ld && ld.nativeVideo) ? ld.nativeVideo : ld; // tolerate an nv record (older call shape)
+    var last = Math.max(0, (nv.frameCount || 1) - 1);
+    if (ld && ld.nativeVideo && ld.timeRemap && window.SMMotion && SMMotion.timeRemapValue) {
+      var rv = SMMotion.timeRemapValue(ld, frame);
+      if (rv != null) return Math.max(0, Math.min(last, Math.round(rv)));
+    }
+    return Math.max(0, Math.min(last, frame - (nv.offsetFrames || 0)));
   }
   // renderImageOnly reuses the cached scene JSON verbatim — safe ONLY when
   // this layer's image rect (x/y/width/height in buildSceneJson) can't have
@@ -628,7 +641,7 @@
     var nv = ld.nativeVideo;
     var st = _syncState(key);
     if (ld._nvSessionId && nv.frameCount) {
-      var target = _targetFor(nv, frame);
+      var target = _targetFor(ld, frame);
       if (target === st.lastShown) return; // frame unchanged — loadFrame ran for an unrelated reason
       // SYNC fast path: the prefetched frame is exactly the one needed —
       // upload inside this very loadFrame turn, no decode wait. Must call
@@ -794,7 +807,7 @@
           nv.width = info.width; nv.height = info.height; nv.fps = info.fps;
         }
       }
-      var target = _targetFor(nv, frame);
+      var target = _targetFor(ld, frame);
       if (target === st.lastShown) return;
       var tI = performance.now();
       var px = await frameBytes(ld._nvSessionId, target);
@@ -1087,7 +1100,7 @@
     // change) — reuse the decode above for it only when they're the same
     // frame; decode frame 0 separately in the (uncommon: importing with
     // the playhead already moved) case where they differ.
-    var target0 = _targetFor(ld.nativeVideo, state.currentFrame);
+    var target0 = _targetFor(ld, state.currentFrame);
     var px0 = null;
     try { px0 = await frameBytes(info.session_id, target0); } catch (e) { /* falls through to loadFrame's own (slower) decode below */ }
     if (px0) {
