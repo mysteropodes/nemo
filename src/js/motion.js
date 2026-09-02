@@ -10489,7 +10489,19 @@
   // trackFor (below) to resolve 'blendKeys'/'parentKeys' is the one piece
   // that makes all of it work for these rows too, unmodified.
   function renderDiscreteKeyGridRow(grid, holder, prop, label, keys, removeAt) {
-    var row = document.createElement('div'); row.className = 'frow motion-group-row';
+    // 'motion-group-row' is kept because the key-selection machinery finds
+    // this row by that class (applyMarqueeSelection and the Shift-range
+    // anchor lookup both query '.motion-track-row, .motion-group-row' —
+    // feedback #221). But this is NOT a group header: its panel twin is
+    // renderParentRow/renderBlendRow, a plain '.motion-prop-row' with no
+    // margin, while .motion-group-row carries margin-top:2px in Motion.
+    // Those 2px per row accumulated into a real misalignment — measured
+    // live: Parent +2px, Blend +4px, and every row below a layer's header
+    // stayed 4px off its own keyframe track (2026-09, feedback #788,
+    // "pblm de calage de keyframe de parentage dans motion"). The extra
+    // class zeroes just that margin, so the class stays for selection and
+    // the geometry matches the panel again — CLAUDE.md §11.
+    var row = document.createElement('div'); row.className = 'frow motion-group-row motion-discrete-row';
     row._smHolder = holder; row._smProp = prop;
     var byFrame = {};
     keys.forEach(function (k) { byFrame[k.frame] = k; });
