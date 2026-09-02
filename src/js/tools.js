@@ -8224,6 +8224,14 @@ function onViewDoubleClick(event){
     var textLayer=userLayers[state.activeLayerIdx];
     var textHit=textLayer.hitTest(event.point,{fill:true,stroke:true,tolerance:4/view.zoom});
     if(textHit&&textHit.item instanceof Raster&&textHit.item.data&&textHit.item.data.isText&&!textHit.item.data.isTextChar){
+      // In place, on the object (2026-09, feedback #794: "pourquoi je ne
+      // peux pas éditer le texte directement sur l'objet du canvas et pas
+      // dans un pop up ?") — the vector branch below has edited in place
+      // since 2026-08-16; raster text kept opening the side popover, so
+      // which of the two you got depended on the font you happened to
+      // pick. The popover stays as the fallback if the in-place editor
+      // can't open (and it is still the CREATION surface).
+      if(window.openInPlaceRasterTextEditor&&openInPlaceRasterTextEditor(textHit.item))return;
       if(window.openTextPopoverForEdit)openTextPopoverForEdit(textHit.item);
       return;
     }
