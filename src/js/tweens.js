@@ -1593,8 +1593,22 @@ function getEasing(){if(window._curveEditor)return window._curveEditor.evalCurve
 // pure evaluator (ui.js) — independent of whatever the curve widget
 // happens to be showing right now, unlike evalCurve/activePoints which
 // only reflect the currently-open view.
+// The key every per-span tween setting is stored under (state.tweenEasing,
+// state.tweenOverrides). It used to start with the layer's INDEX, so any
+// reorder/delete/duplicate silently handed a span's easing curve and forced
+// pairings to whichever layer slid into that index — confirmed live (2026-09
+// QA sweep): easing set on layer 5, layer moved to index 6, the entry stayed
+// at "5:0-10". Keyed by layerUid now, the same stable identity parenting and
+// mattes already rely on; importJSON migrates files saved with index keys.
+// Index fallback only for a layer without a uid (should not exist).
+function tweenSpanKey(li,fA,fB){
+  var ld=state.layers[li];
+  var id=(ld&&ld.layerUid)?ld.layerUid:li;
+  return id+':'+fA+'-'+fB;
+}
+window.tweenSpanKey=tweenSpanKey;
 function getEasingForPair(li,fA,fB){
-  var key=li+':'+fA+'-'+fB;
+  var key=tweenSpanKey(li,fA,fB);
   var custom=state.tweenEasing&&state.tweenEasing[key];
   if(custom&&custom.points&&custom.points.length&&window._curveEditor&&window._curveEditor.evalPointsCurve){
     var pts=custom.points;
@@ -3801,7 +3815,7 @@ function generateTweens(explicitRestrictTo){
     // A stroke removed since the override was made just makes that one
     // override silently inert (falls through to auto-matching again),
     // rather than erroring the whole tween generation.
-    var ovKey=li+':'+fA+'-'+fB;
+    var ovKey=tweenSpanKey(li,fA,fB);
     var overrides=(state.tweenOverrides&&state.tweenOverrides[ovKey])||[];
     var forcedAIdx={},forcedBIdx={},forcedPairs=[];
     overrides.forEach(function(ov){
@@ -4432,7 +4446,7 @@ function computeArcMatchBase(){
   // time, so dragging it has zero effect on the actual tween. Found live
   // 2026-07: dragged both handles of a forced pair substantially, motionArcs
   // held real offsets, but the in-between frame's content never moved.
-  var ovKey=li+':'+fA+'-'+fB;
+  var ovKey=tweenSpanKey(li,fA,fB);
   var overrides=(state.tweenOverrides&&state.tweenOverrides[ovKey])||[];
   var forcedAIdx={},forcedBIdx={},forcedPairs=[];
   overrides.forEach(function(ov){
@@ -5006,7 +5020,7 @@ function reassignHandleClick(pt){
   }
   // step 2
   saveActiveLayerFrame();
-  var key=li+':'+_reassign.frameA+'-'+_reassign.frameB;
+  var key=tweenSpanKey(li,_reassign.frameA,_reassign.frameB);
   var list=state.tweenOverrides[key]=state.tweenOverrides[key]||[];
   // replace any earlier override touching either side of this pair — one
   // strokeId can't sensibly be forced into two different correspondences
@@ -5117,7 +5131,7 @@ function updateReassignBadge(cached){
       var sid=ensureStrokeId(target);
       saveActiveLayerFrame();
       var li=_reassign.layer;
-      var key=li+':'+_reassign.frameA+'-'+_reassign.frameB;
+      var key=tweenSpanKey(li,_reassign.frameA,_reassign.frameB);
       var list=state.tweenOverrides[key]=state.tweenOverrides[key]||[];
       state.tweenOverrides[key]=list.filter(function(ov){
         var ovA=ov.aIds||[ov.aId];
