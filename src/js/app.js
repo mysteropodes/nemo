@@ -3390,6 +3390,29 @@ function convertLayersToComponent(indices){
       matteMode:src.matteMode,blendMode:src.blendMode,
       mattesMore:src.mattesMore?src.mattesMore.map(function(m){return{uid:m.uid,mode:m.mode};}):undefined};
   });
+  // Diffed against exportJSON's per-layer field list (2026-09 QA sweep,
+  // same audit as PR #814/#815): the inner layers lost their layerUid AND
+  // parentLayerUid, so two layers parented to each other stopped following
+  // each other the moment they became a component — plus effects, Blend/
+  // parent keyframes, in/out window, expressions, Parent-in-Time, markers,
+  // 3D/motion-blur/shy/keyLock, text identity and layer color. The outer
+  // layers are spliced away right below, so keeping their uids inside the
+  // symbol cannot collide with anything; an inner uid pointing at a layer
+  // that stayed OUTSIDE simply dangles (safe no-op, same as everywhere).
+  (function(){
+    var deep=function(v){return JSON.parse(JSON.stringify(v));};
+    // Fields newLd lifts from firstSrc onto the OUTER component layer (see
+    // the firstSrc block below) are skipped for inner layer 0, or a
+    // position expression / time link would apply twice — once outside,
+    // once inside.
+    var lifted=["duplicator","exprControls","expressions","inPoint","outPoint","motionBlur","parentLayerUid","parentLayerUidB","threeD","timeLink"];
+    symLayers.forEach(function(sl,k){
+      var src=state.layers[indices[k]];
+      var skip=function(f){return k===0&&lifted.indexOf(f)>=0;};
+      ['effects','blendKeys','parentKeys','parentsMore','expressions','exprControls','timeLink','markers','followPath','textAnimators'].forEach(function(f){if(!skip(f)&&src[f]!=null&&sl[f]==null)sl[f]=deep(src[f]);});
+      ['layerUid','parentLayerUid','parentLayerUidB','inPoint','outPoint','threeD','motionBlur','shy','keyLock','channel','isTextLayer','color','effectsFrom'].forEach(function(f){if(!skip(f)&&src[f]!=null&&sl[f]==null)sl[f]=src[f];});
+    });
+  })();
   state.symbols[symId]={name:'Composant',totalFrames:state.totalFrames,fps:state.fps,layers:symLayers};
   if(window.SMStoryboard)SMStoryboard.addInstanceAuto(symId);
   var insertAt=indices[0];
@@ -3628,6 +3651,17 @@ function splitLayerIntoElementsCore(li,opts){
       // a "keep what was already true of this content" carry-over.
       threeD:ld.threeD,motionBlur:ld.motionBlur,
     };
+    // Same audit as PR #814/#815 (2026-09 QA sweep): every split-off piece
+    // is still "this content, as it was" — its effects stack, Blend/parent
+    // keyframes, follow-path, Instance-Effect link, markers, LFS channel,
+    // shy/keyLock, text identity + animators and folder membership were
+    // all dropped here. Deep-copied so an edit on one piece never leaks
+    // into its siblings.
+    (function(){
+      var deep=function(v){return JSON.parse(JSON.stringify(v));};
+      ['effects','blendKeys','parentKeys','parentsMore','followPath','markers','textAnimators'].forEach(function(f){if(ld[f]!=null)nl[f]=deep(ld[f]);});
+      ['shy','keyLock','channel','effectsFrom','folderId','isTextLayer'].forEach(function(f){if(ld[f]!=null)nl[f]=ld[f];});
+    })();
     // matteMode: with a frozen matteSourceLayerUid (2026-07-31, uid-based
     // mattes) the source no longer depends on array adjacency, so EVERY
     // split-off piece can keep the matte and still mask against the same
