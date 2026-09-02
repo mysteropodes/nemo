@@ -63,7 +63,11 @@
       var lo = 0, hi = 1, t = x;
       for (var i = 0; i < 24; i++) {
         var cx = calcX(t);
-        if (Math.abs(cx - x) < 1e-6) break;
+        // 1e-9 for the same reason camera.js's Newton exit was tightened:
+        // the test is on x, the returned y is off by that times the slope.
+        // Pure bisection halves the interval every step regardless, so this
+        // only removes an early exit — never adds iterations.
+        if (Math.abs(cx - x) < 1e-9) break;
         if (cx < x) lo = t; else hi = t;
         t = (lo + hi) / 2;
       }
