@@ -135,6 +135,21 @@ var TW_REL_2OPT=true;
 // History is read from the layer's stored keyframes, never written.
 var TW_MATCH_TRACKING=true;
 var MM_MIN_SUPPORT_KNOWN=2;
+// TW_PIECE_COMPLETION (2026-09, Cyril's face: "la pupille gauche part
+// dans le nez, la droite part en haut au lieu d'aller vers le petit point
+// du bas"): a 106 px pupil line becomes a 6 px dot when the eye narrows —
+// a 20× length ratio no shape score can accept, and no motion model
+// predicts it either (the eye SQUASHES: brow −131 px, lower lid −10 px,
+// and the brow isn't even a pass-1 seed). What a viewer uses is
+// structure: one leftover mark sits between the brow and the lower lid
+// in A, one leftover mark sits between the SAME two (matched) strokes in
+// B — they are the same thing. After matching + rescue, an unmatched A
+// stroke and an unmatched B stroke whose two nearest matched neighbours
+// are the same two pairs are paired, shape ignored (bounded: the
+// leftover is no longer than its anchors and sits within their bounds;
+// several leftovers inside one anchor pair are assigned by position).
+var TW_PIECE_COMPLETION=true;
+var PC_MAX_D=0.5;
 // ---- MATCHING ----
 function buildTP(sd){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});return p;}
 // A stroke's color and fill/stroke "type" are what a viewer actually reads
@@ -3975,6 +3990,65 @@ function dabRecordsForTween(rec,presetKey,colorHexStr,baseWidth,seed,opacityMul)
 // Renames any stroke past the FIRST one in `strokes` that shares a
 // strokeId already claimed earlier in the SAME array — see the call
 // site's comment for why this can happen and why it matters.
+// Piece completion (see TW_PIECE_COMPLETION). pairSpecs: confirmed pairs
+// so far (aIdx/bIdx); unA/unB: unmatched indices (mutated: paired ones are
+// removed). Returns the number of pairs added.
+function _pieceCompletion(sA,sB,pairSpecs,unA,unB){
+  if(!TW_PIECE_COMPLETION||!unA.length||!unB.length||pairSpecs.length<2)return 0;
+  var fa={},fb={};
+  function feat(list,cache,i){if(!cache[i])cache[i]=strokeFeat(list[i]);return cache[i];}
+  var anchors=pairSpecs.map(function(ps,k){return{k:k,a:ps.aIdx,b:ps.bIdx,fa:feat(sA,fa,ps.aIdx),fb:feat(sB,fb,ps.bIdx)};});
+  function nearestTwo(f,side){
+    var arr=anchors.map(function(an){var g=side==='a'?an.fa:an.fb;var dx=g.cx-f.cx,dy=g.cy-f.cy;return{an:an,d2:dx*dx+dy*dy};}).sort(function(p,q){return p.d2-q.d2;});
+    return arr.slice(0,2).map(function(x){return x.an;});
+  }
+  function keyOf(two){return two.map(function(an){return an.k;}).sort(function(x,y){return x-y;}).join('|');}
+  function fits(f,two,side){
+    var g1=side==='a'?two[0].fa:two[0].fb,g2=side==='a'?two[1].fa:two[1].fb;
+    if(f.length>Math.max(g1.length,g2.length))return false;
+    var x1=Math.min(g1.bounds.x,g2.bounds.x),y1=Math.min(g1.bounds.y,g2.bounds.y);
+    var x2=Math.max(g1.bounds.x+g1.bounds.w,g2.bounds.x+g2.bounds.w),y2=Math.max(g1.bounds.y+g1.bounds.h,g2.bounds.y+g2.bounds.h);
+    var mx=(x2-x1)*0.25+10,my=(y2-y1)*0.25+10;
+    return f.cx>=x1-mx&&f.cx<=x2+mx&&f.cy>=y1-my&&f.cy<=y2+my;
+  }
+  // relative position inside the anchor pair, for disambiguation
+  function relPos(f,two,side){
+    var g1=side==='a'?two[0].fa:two[0].fb,g2=side==='a'?two[1].fa:two[1].fb;
+    var ax=g2.cx-g1.cx,ay=g2.cy-g1.cy,l2=ax*ax+ay*ay||1;
+    var px=f.cx-g1.cx,py=f.cy-g1.cy;
+    return{t:(px*ax+py*ay)/l2,s:(px*ay-py*ax)/Math.sqrt(l2)};
+  }
+  var groupsA={},groupsB={};
+  unA.forEach(function(i){var f=feat(sA,fa,i);var two=nearestTwo(f,'a');if(!fits(f,two,'a'))return;(groupsA[keyOf(two)]=groupsA[keyOf(two)]||[]).push({i:i,f:f,two:two});});
+  unB.forEach(function(i){var f=feat(sB,fb,i);var two=nearestTwo(f,'b');if(!fits(f,two,'b'))return;(groupsB[keyOf(two)]=groupsB[keyOf(two)]||[]).push({i:i,f:f,two:two});});
+  var added=0;
+  Object.keys(groupsA).forEach(function(key){
+    var ga=groupsA[key],gb=groupsB[key];if(!gb)return;
+    // same anchor order on both sides
+    ga.forEach(function(ea){
+      if(!gb.length)return;
+      var typeOk=gb.filter(function(eb){return eb.f.type===ea.f.type;});if(!typeOk.length)return;
+      var two=ea.two;var pa=relPos(ea.f,two,'a');
+      var best=null,bd=Infinity;
+      typeOk.forEach(function(eb){
+        var twoB=(eb.two[0].k===two[0].k)?eb.two:[eb.two[1],eb.two[0]];
+        var pb=relPos(eb.f,twoB,'b');
+        var d=Math.abs(pa.t-pb.t)+Math.abs(pa.s-pb.s)/Math.max(1,Math.sqrt(Math.pow(two[1].fa.cx-two[0].fa.cx,2)+Math.pow(two[1].fa.cy-two[0].fa.cy,2)));
+        if(d<bd){bd=d;best=eb;}
+      });
+      // the leftover must sit at the same place relative to its anchors on
+      // both sides (|Δt| + lateral offset / anchor spacing): 0.12 and 0.38
+      // for the two pupils, 0.18 for testG's ticks, 0.89 for a testC
+      // stroke lying OUTSIDE its anchor pair on one side (rejected)
+      if(!best||bd>PC_MAX_D)return;
+      gb.splice(gb.indexOf(best),1);
+      pairSpecs.push({aIdx:ea.i,bIdx:best.i,aData:sA[ea.i],bData:sB[best.i],mi:-1000-added,score:0.7,completion:true});
+      unA.splice(unA.indexOf(ea.i),1);unB.splice(unB.indexOf(best.i),1);
+      added++;
+    });
+  });
+  return added;
+}
 function _dedupeFrameStrokeIds(strokes,frameIdx){
   var seen={};
   for(var i=0;i<strokes.length;i++){
@@ -4236,6 +4310,7 @@ function generateTweens(explicitRestrictTo){
     for(var bi2=0;bi2<sB.length;bi2++)if(!bMatched[bi2])unB.push(bi2);
     // N:1 rescue pass — may convert fades + a mediocre pair into clean
     // piece-wise morphs by splitting a merged stroke (see resolveSplitMatches)
+    if(unA.length&&unB.length)_pieceCompletion(sA,sB,pairSpecs,unA,unB);
     if(unA.length||unB.length)resolveSplitMatches(sA,sB,pairSpecs,unA,unB);
     var fadeOutA=unA.map(function(i){return sA[i];}),fadeInB=unB.map(function(i){return sB[i];});
     // Identity-COLLISION guard (2026-07, live-reported: 2 real frames
