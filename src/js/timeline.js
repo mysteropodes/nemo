@@ -2475,6 +2475,31 @@ videoMeshId:l.videoMeshId,layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,pa
     }
     state.layerFolders=d.layerFolders||{};state.layerLinkGroups=d.layerLinkGroups||{};
     state.motionArcs=d.motionArcs||{};state.tweenOverrides=d.tweenOverrides||{};state.tweenEasing=d.tweenEasing||{};
+    // Migration (2026-09): tween span keys used to start with the layer's
+    // INDEX ("5:0-10"); they now start with its layerUid (tweenSpanKey,
+    // tweens.js). At load time the indices are still consistent with the
+    // file, which is the only moment this rewrite is unambiguous.
+    (function migrateTweenSpanKeys(){
+      function migrate(map){
+        if(!map)return map;
+        var out={};
+        Object.keys(map).forEach(function(k){
+          var m=/^(\d+):(.*)$/.exec(k);
+          if(m){
+            var ld=state.layers[parseInt(m[1],10)];
+            if(ld){
+              if(!ld.layerUid)ld.layerUid='ly_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);
+              out[ld.layerUid+':'+m[2]]=map[k];
+              return;
+            }
+          }
+          out[k]=map[k];
+        });
+        return out;
+      }
+      state.tweenOverrides=migrate(state.tweenOverrides);
+      state.tweenEasing=migrate(state.tweenEasing);
+    })();
     // Migration (2026-07): the old shipped DEFAULT easing points
     // ({.42,0}/{.58,1} — CSS control values misread as on-curve knots, a
     // park/teleport/park cliff, see app.js's easingCurve comment) were
@@ -4247,7 +4272,7 @@ window.renderTweenCurveStrips=renderTweenCurveStrips;
 // inline and via the popup (right-click a cell → "Éditer la courbe de ce
 // tween…", still available when the toggle is off) always agree.
 function buildTweenCurveSVG(li,fA,fB,svgW,svgH){
-  var key=li+':'+fA+'-'+fB;
+  var key=tweenSpanKey(li,fA,fB);
   if(!state.tweenEasing)state.tweenEasing={};
   var seg=state.tweenEasing[key]=state.tweenEasing[key]||{};
   if(!seg.points||!seg.points.length){
@@ -4389,7 +4414,7 @@ function openTweenCurveInset(li,fA,fB){
   closeTweenCurveInset();
   var row=findLayerRow(li);
   if(!row)return;
-  var key=li+':'+fA+'-'+fB;
+  var key=tweenSpanKey(li,fA,fB);
   var rowRect=row.getBoundingClientRect();
   var HDR=20,pad=10;
   var W=Math.max(140,(fB-fA)*FC);
@@ -4452,7 +4477,7 @@ function editTweenSegForCell(li,fi,fr0){
   openPropsSection('tween-sec');openPropsSection('easing-sec');
   var pair=tweenPairForCell(li,fi);
   if(!pair||!window._curveEditor||!window._curveEditor.editTweenPair)return;
-  var key=li+':'+pair.a+'-'+pair.b;
+  var key=tweenSpanKey(li,pair.a,pair.b);
   if(!state.tweenEasing)state.tweenEasing={};
   var seg=state.tweenEasing[key]=state.tweenEasing[key]||{};
   // Captured BEFORE onTweenPairCurveChanged's own selClear/selAdd dance
@@ -4470,12 +4495,12 @@ function editTweenSegForCell(li,fi,fr0){
 // frames landing in the same span only regenerate it once. Falls back to
 // the single-pair path unchanged when nothing else is selected.
 function applyTweenCurveToSelection(li,pair,seg,selSnapshot){
-  var seen={};seen[li+':'+pair.a+'-'+pair.b]=true;
+  var seen={};seen[tweenSpanKey(li,pair.a,pair.b)]=true;
   var touched=[{li:li,fA:pair.a}];
   (selSnapshot||[]).forEach(function(s){
     var p2=tweenPairForCell(s.layer,s.frame);
     if(!p2)return;
-    var k2=s.layer+':'+p2.a+'-'+p2.b;
+    var k2=tweenSpanKey(s.layer,p2.a,p2.b);
     if(seen[k2])return;
     seen[k2]=true;
     if(!state.tweenEasing)state.tweenEasing={};
