@@ -567,6 +567,37 @@
     row.addEventListener('mousedown', function (e) { e.stopPropagation(); armDrag(e, 'paint', entry.strokeId + ':' + kind); });
     list.appendChild(row);
   }
+  // Eye + solo, per element (2026-09, Cyril: "il faudrait eyes et solo
+  // pour chaque layer dans ce panel"). Same two glyphs, classes and
+  // semantics the timeline's own LAYER rows already use (ICO_EYE /
+  // .solo-btn 'S'), so the two levels read identically; the model itself
+  // lives in app.js next to anyLayerSoloed (setElemHidden/setElemSolo).
+  // ids = every stroke the row stands for: one for a shape row, the whole
+  // membership for a group row.
+  function appendVisIcons(row, li, ids) {
+    var hidden = ids.length && ids.every(function (sid) { return window.elemIsHidden(li, sid); });
+    var soloed = ids.length && ids.every(function (sid) { return window.elemIsSoloed(li, sid); });
+    if (hidden) row.classList.add('elem-hidden');
+    var eye = document.createElement('div');
+    eye.className = 'lico motion-col-visibility elem-vis' + (hidden ? ' off' : '');
+    eye.title = SM.t('elemEyeTitle');
+    eye.innerHTML = hidden ? ICO_EYE_CLOSED : ICO_EYE;
+    eye.addEventListener('click', function (e) {
+      e.stopPropagation();
+      window.setElemHidden(li, ids);
+      renderShapesPanel();
+    });
+    var solo = document.createElement('div');
+    solo.className = 'lico solo-btn elem-solo ' + (soloed ? 'on' : 'off');
+    solo.title = SM.t('elemSoloTitle');
+    solo.textContent = 'S';
+    solo.addEventListener('click', function (e) {
+      e.stopPropagation();
+      window.setElemSolo(li, ids);
+      renderShapesPanel();
+    });
+    row.appendChild(eye); row.appendChild(solo);
+  }
   // Builds one shape row — used both at top level and, indented, as a
   // group's expanded member row, so the two never visually drift apart.
   function buildShapeRow(list, c, node, idx, indent, topLevel, groupGid) {
@@ -643,6 +674,7 @@
         { label: SM.t('elementsSelect'), action: function () { window.SMMotion.selectShapesByStrokeIds(c.li, [entry.strokeId]); } },
       ]);
     });
+    appendVisIcons(row, c.li, [entry.strokeId]);
     list.appendChild(row);
     if (expanded) {
       // Front-most first (paintRowOrder) so the row ORDER itself already
@@ -707,6 +739,7 @@
           renderShapesPanel();
         });
         grow.appendChild(combineBadge);
+        appendVisIcons(grow, c.li, memberIds);
         function commitGroupRename(v) {
           pushUndo();
           if (window.SMGroup && SMGroup.renameGroup) SMGroup.renameGroup(node.gid, c.ld, v, memberIds);

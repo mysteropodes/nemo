@@ -1340,6 +1340,12 @@
         // render-only filter, same shape as the revisionView one just
         // above: geometry/document data is untouched, only what goes into
         // THIS render is affected.
+        // Element eye / solo (2026-09, app.js's applyElemVisibility) — one
+        // guard covers both: the model resolves everything onto the live
+        // item's own `visible`, and nothing else in this codebase sets that
+        // on a layer CHILD (only on whole Paper Layers), so this can't
+        // swallow anything it shouldn't.
+        if (c.visible === false) continue;
         if (!state.showShadowGuides && c.data && c.data.channelTag === 'shadow') continue;
         // Texture-brush dab reveal (2026-08-20) — "il faudrait mettre en
         // place le trim du coup": a dab (isBrushTextureCopy) isn't shaped
@@ -2635,6 +2641,7 @@
       // Same Shadow Brush guide-line filter as buildSceneJson() above — an
       // onion-skin/Ghost-All ghost of a shadow-tagged guide line shouldn't
       // reappear just because the CURRENT frame's own copy got hidden.
+      if (c.visible === false) return; // element eye/solo, same as buildSceneJson
       if (!state.showShadowGuides && c.data && c.data.channelTag === 'shadow') return;
       // Same Raster handling as buildSceneJson() above — an imported image/
       // video-frame ghosted onto the onion-skin layer (desR, tweens.js

@@ -1298,6 +1298,11 @@ body.mode-motion .lrow.act.motion-selected{background:rgba(63,107,245,.16);box-s
 .lico:hover{background:var(--panel3);color:var(--text);}
 .lico.off{color:var(--text-dark);}
 .solo-btn{font-size:10px;font-weight:800;}
+/* Element eye/solo in the Elements panel (2026-09) — pushed to the row's
+   right edge, Figma-style, while the timeline keeps its own left-hand
+   column layout for LAYER rows. */
+.motion-elem-row .elem-vis{margin-left:auto;}
+.motion-elem-row.elem-hidden .lnm,.motion-elem-row.elem-hidden .motion-elem-swatch{opacity:.4;}
 .solo-btn.on{color:#000;background:#ffcc00;}
 .solo-btn.on:hover{background:#ffd633;}
 .lnm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px;}

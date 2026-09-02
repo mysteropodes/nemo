@@ -68,6 +68,14 @@ function exportBuildFrame(frameIdx,alpha){
     // reviewer to interact with; the exclusion belongs here, at every
     // actual output path, not at the shared read.
     strokes=strokes.filter(function(sd){return!sd.isRevisionGhost;});
+    // Element eye (2026-09, app.js's elemHidden) — the eye is document
+    // data, so a hidden element must not export either. Its session-only
+    // twin, element SOLO, deliberately does NOT reach this path: it is a
+    // working aid, not saved with the file, exactly like the note above
+    // for layer solo except in the other direction — layer solo IS
+    // resolved here because layerIsEffectivelyVisible reads it, and this
+    // one has no serialized counterpart to read.
+    strokes=strokes.filter(function(sd){return!sd.elemHidden;});
     // Shadow Brush guide lines (2026-07) — their whole purpose is to
     // disappear once they've delimited a fill area (see shadow-brush-
     // bridge.js's header comment); default OFF so a fresh export doesn't
