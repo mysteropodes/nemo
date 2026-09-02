@@ -1636,11 +1636,25 @@ window.SM={
   closeSymbolTab:function(symId){closeSymbolTab(symId);},
   enterMontageView:function(montageId){enterMontageView(montageId);},
   exitMontageView:function(){exitMontageView();},
-  setSymbolPlayMode:function(v){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;ld.symPlayMode=v;loadFrame(state.currentFrame);renderOS();updateUI();},
-  setSymbolSpeed:function(v){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;ld.symSpeed=Math.max(0.1,parseFloat(v)||1);loadFrame(state.currentFrame);renderOS();updateUI();},
-  setSymbolSingleFrame:function(v){
+  // Undo for the four component-instance settings (2026-09 QA sweep): these
+  // are wired straight from their panel controls and none of them
+  // snapshotted, so changing a component's play mode / single frame /
+  // speed / offset could not be undone — and the NEXT Cmd+Z silently
+  // reverted them anyway, as collateral of an unrelated snapshot (the
+  // fields live on the layer object the snapshot clones). One entry per
+  // real change: a setter called with the value it already has pushes
+  // nothing, which also keeps the frame-strip click (single frame + play
+  // mode in one gesture) to a single undo step.
+  _pushSymUndoIfChanged:function(ld,field,value){
+    if(!ld||ld[field]===value)return false;
+    saveAllLayerFrames();pushUndoLayers(true);return true;
+  },
+  setSymbolPlayMode:function(v,skipUndo){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;if(!skipUndo)window.SM._pushSymUndoIfChanged(ld,'symPlayMode',v);ld.symPlayMode=v;loadFrame(state.currentFrame);renderOS();updateUI();},
+  setSymbolSpeed:function(v){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;var _sv=Math.max(0.1,parseFloat(v)||1);window.SM._pushSymUndoIfChanged(ld,'symSpeed',_sv);ld.symSpeed=_sv;loadFrame(state.currentFrame);renderOS();updateUI();},
+  setSymbolSingleFrame:function(v,skipUndo){
     var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;
     var picked=Math.max(0,parseInt(v)||0);
+    if(!skipUndo)window.SM._pushSymUndoIfChanged(ld,'symSingleFrame',picked);
     ld.symSingleFrame=picked;
     // When the playhead is on an outer component key, the choice belongs to
     // that key (and is held until the next one). Older projects and frames
@@ -1649,7 +1663,7 @@ window.SM={
     if(f&&f.isKeyframe){f.componentFrame=picked;delete f.blankOverride;}
     loadFrame(state.currentFrame);renderOS();updateUI();
   },
-  setSymbolPlacedAt:function(v){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;ld.symPlacedAt=parseInt(v)||0;loadFrame(state.currentFrame);renderOS();updateUI();},
+  setSymbolPlacedAt:function(v){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;var _pv=parseInt(v)||0;window.SM._pushSymUndoIfChanged(ld,'symPlacedAt',_pv);ld.symPlacedAt=_pv;loadFrame(state.currentFrame);renderOS();updateUI();},
   moveFrames:function(sel,dLayer,dFrame){
     if(!sel.length)return;
     var b=selBounds();if(!b)return;
@@ -7027,7 +7041,13 @@ function renderCompFrameStrip(ld){
     cell.style.background=isSingleSel?'var(--accent)':(isCur?'rgba(255,255,255,.25)':'var(--bg)');
     cell.style.border='1px solid '+(isCur?'var(--accent)':'rgba(255,255,255,.15)');
     cell.title='Frame '+i;
-    cell.addEventListener('click',function(idx){return function(){window.SM.setSymbolSingleFrame(idx);window.SM.setSymbolPlayMode('single');updateCompInstancePanel();};}(i));
+    cell.addEventListener('click',function(idx){return function(){
+      // ONE undo entry for this ONE gesture: the click sets both the single
+      // frame and the play mode, so each setter's own snapshot would make it
+      // two Cmd+Z (measured: 2 entries, one undo left the mode on 'single').
+      var _cl=state.layers[state.activeLayerIdx];
+      if(_cl&&_cl.symbolId&&(_cl.symSingleFrame!==idx||_cl.symPlayMode!=='single')){saveAllLayerFrames();pushUndoLayers(true);}
+      window.SM.setSymbolSingleFrame(idx,true);window.SM.setSymbolPlayMode('single',true);updateCompInstancePanel();};}(i));
     strip.appendChild(cell);
   }
 }
