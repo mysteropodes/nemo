@@ -4411,7 +4411,17 @@ function generateTweens(explicitRestrictTo){
       for(var i=0;i<K;i++){var best=1e18;for(var j=0;j<K;j++){var dx=fX.pts[i][0]-fY.pts[j][0],dy=fX.pts[i][1]-fY.pts[j][1];var d=dx*dx+dy*dy;if(d<best)best=d;}sumXY+=Math.sqrt(best);}
       for(var j2=0;j2<K;j2++){var best2=1e18;for(var i2=0;i2<K;i2++){var dx2=fX.pts[i2][0]-fY.pts[j2][0],dy2=fX.pts[i2][1]-fY.pts[j2][1];var d2=dx2*dx2+dy2*dy2;if(d2<best2)best2=d2;}sumYX+=Math.sqrt(best2);}
       var scale=Math.sqrt(fX.bounds.w*fX.bounds.w+fX.bounds.h*fX.bounds.h)+Math.sqrt(fY.bounds.w*fY.bounds.w+fY.bounds.h*fY.bounds.h);
-      var cham=(sumXY+sumYX)/(2*K)/Math.max(1,scale*0.5);
+      // Normalisation FLOOR (2026-09, Cyril's cat: "un œil droit qui se
+      // confond avec le museau"). Dividing only by the two strokes' own
+      // size makes an honest displacement explode for tiny strokes: the
+      // 5 px eye dot travels 174 px with the head, scale/2 ≈ 6 px, so its
+      // CORRECT pairing scored 27 while pairing it with the 338 px muzzle
+      // scored ~21 (a big scale in the denominator) — the pass then
+      // "uncrossed" the eye onto the muzzle and the muzzle onto the eye.
+      // Both terms are meant to compare SHAPES here, so the denominator
+      // gets the same drawing-relative floor matchSc uses.
+      var scaleFloor=Math.max(scale*0.5,(typeof _matchNorm==='number'?_matchNorm*0.04:0)+1);
+      var cham=(sumXY+sumYX)/(2*K)/Math.max(1,scaleFloor);
       var lenRatio=Math.max(fX.length,fY.length)/Math.max(1,Math.min(fX.length,fY.length));
       var typePenalty=fX.type!==fY.type?0.5:0;
       var colD=(colorDist(fX.strokeCol,fY.strokeCol)+colorDist(fX.fillCol,fY.fillCol))/2;
@@ -4430,6 +4440,15 @@ function generateTweens(explicitRestrictTo){
         var curCost=_ocCost(_ocFeatA[oc1],_ocFeatB[oc1])+_ocCost(_ocFeatA[oc2],_ocFeatB[oc2]);
         var swapCost=_ocCost(_ocFeatA[oc1],_ocFeatB[oc2])+_ocCost(_ocFeatA[oc2],_ocFeatB[oc1]);
         if(swapCost>curCost+0.15)continue; // meaningfully worse — likely a real intended crossing, leave it
+        // IDENTITY GUARD (2026-09, same cat case): never let this pass
+        // create a pairing the matcher itself would call absurd. A swap
+        // that turns two same-size pairs into two wildly mismatched ones
+        // (a dot onto a muzzle) is not an "equally plausible substitute",
+        // whatever the costs say.
+        function _ocRatio(fX,fY){return Math.max(fX.length,fY.length)/Math.max(1,Math.min(fX.length,fY.length));}
+        var curWorst=Math.max(_ocRatio(_ocFeatA[oc1],_ocFeatB[oc1]),_ocRatio(_ocFeatA[oc2],_ocFeatB[oc2]));
+        var swapWorst=Math.max(_ocRatio(_ocFeatA[oc1],_ocFeatB[oc2]),_ocRatio(_ocFeatA[oc2],_ocFeatB[oc1]));
+        if(swapWorst>Math.max(2,curWorst*1.5))continue;
         var tmpData=ocP.bData,tmpIdx=ocP.bIdx;
         ocP.bData=ocQ.bData;ocP.bIdx=ocQ.bIdx;
         ocQ.bData=tmpData;ocQ.bIdx=tmpIdx;
