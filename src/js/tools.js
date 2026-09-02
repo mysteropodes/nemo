@@ -1525,8 +1525,49 @@ function _snapshotForClone(p){
 // across a frame/layer change) — a single code path so brush-texture dabs
 // and vector-brush fill backdrops can't drift out of sync between the two
 // features (see CLAUDE.md §1's "family of bug #1").
-function _materializeClones(snaps,layer,offset){
+// Pasted/duplicated clones and combine groups (2026-09 QA sweep): serP
+// copies each stroke's groupId verbatim, but nothing ever recreated the
+// GROUP — pasted in place, the clones wore the original group's id while
+// its `order` still listed only the originals (4 shapes tagged on a group
+// of 2); pasted into another layer, the id pointed at a group that layer
+// never had, and the combination silently vanished. Same shape of bug
+// mergeLayersIntoOne's group remap already guards against ("reusing an id
+// string across two originally-separate things"). srcGroups is the source
+// layer's `groups` map captured at copy time; sidMap is old strokeId → new.
+function _remapCombineGroups(clones,srcGroups,layer,sidMap){
+  var dstIdx=userLayers.indexOf(layer);var dstLd=dstIdx>=0?state.layers[dstIdx]:null;
+  if(!dstLd||!srcGroups)return;
+  if(!dstLd.groups)dstLd.groups={};
+  var gidMap={};
+  function parentOf(gid){var pg=null;Object.keys(srcGroups).forEach(function(k){if(pg)return;if((srcGroups[k].order||[]).indexOf(gid)>=0)pg=k;});return pg;}
+  function fresh(oldGid){
+    if(gidMap[oldGid])return gidMap[oldGid];
+    var g=srcGroups[oldGid];if(!g)return null;
+    var ng='grp_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6)+'_'+Object.keys(gidMap).length;
+    gidMap[oldGid]=ng;
+    // Only members that actually came along: strokeIds via sidMap, nested
+    // groups recreated recursively; anything else (an unselected member)
+    // is dropped from the copy's order.
+    var order=(g.order||[]).map(function(e){return srcGroups[e]?fresh(e):(sidMap[e]||null);}).filter(Boolean);
+    dstLd.groups[ng]=Object.assign(JSON.parse(JSON.stringify(g)),{order:order});
+    return ng;
+  }
+  clones.forEach(function(c){
+    var og=c.data&&c.data.groupId;if(!og)return;
+    if(!srcGroups[og]){delete c.data.groupId;return;}
+    c.data.groupId=fresh(og);
+    // Recreate the ancestors too, so a copied sub-group keeps its place in
+    // the copied root group's combine tree.
+    var pg=parentOf(og);while(pg){fresh(pg);pg=parentOf(pg);}
+  });
+  // A recreated group with fewer than two operands (the other members
+  // stayed behind) is meaningless as a combine — drop it and untag, so a
+  // single copied member pastes as the plain shape it now is.
+  Object.keys(gidMap).forEach(function(og){var ng=gidMap[og];if(dstLd.groups[ng]&&dstLd.groups[ng].order.length<2){delete dstLd.groups[ng];clones.forEach(function(c){if(c.data&&c.data.groupId===ng)delete c.data.groupId;});}});
+}
+function _materializeClones(snaps,layer,offset,srcGroups){
   var clones=[];
+  var sidMap={};
   // Brush-texture anchors share a brushGroupId with their dab companions
   // (tools.js applyBrushTexture / app.js relinkBrushCompanions) — every
   // cloned member of a group must land on the SAME fresh id, or
@@ -1539,6 +1580,7 @@ function _materializeClones(snaps,layer,offset){
   }
   snaps.forEach(function(snap){
     var d=JSON.parse(JSON.stringify(snap.d));
+    var oldSid=d.strokeId;
     d.strokeId=undefined; // fresh identity below — must NOT alias the source's
     // Tracked-role tag (2026-08-29, feedback #151) — a duplicate/copy must
     // NOT silently claim to be the role's current occupant (see
@@ -1550,6 +1592,7 @@ function _materializeClones(snaps,layer,offset){
     var clone=desP(d,layer,d.opacity);
     if(offset)clone.translate(new Point(offset,offset));
     ensureStrokeId(clone);
+    if(oldSid)sidMap[oldSid]=clone.data.strokeId;
     if(d.isVectorBrush&&d.centerSegments){
       clone.data.centerSegments=JSON.parse(JSON.stringify(d.centerSegments)).map(function(s){if(offset){s.point[0]+=offset;s.point[1]+=offset;}return s;});
       // Vector-brush fill backdrop (draw-bridge.js) — regenerated from the
@@ -1587,6 +1630,7 @@ function _materializeClones(snaps,layer,offset){
   });
   if(typeof relinkBrushCompanions==='function')relinkBrushCompanions(layer);
   if(typeof fillRegenerateLinked==='function')fillRegenerateLinked(layer,null);
+  if(srcGroups)_remapCombineGroups(clones,srcGroups,layer,sidMap);
   return clones;
 }
 function duplicateSelection(){
@@ -1594,7 +1638,7 @@ function duplicateSelection(){
   pushUndo();
   var layer=userLayers[state.activeLayerIdx];
   var snaps=selectedPaths.map(_snapshotForClone).filter(Boolean);
-  var clones=_materializeClones(snaps,layer,12); // px — small, deliberate nudge so the copy doesn't sit invisibly on top of the source
+  var clones=_materializeClones(snaps,layer,12,(state.layers[state.activeLayerIdx]||{}).groups); // px — small, deliberate nudge so the copy doesn't sit invisibly on top of the source
   clearSel();
   selectedPaths=clones.filter(isSelectablePathChild);
   state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});
@@ -1618,7 +1662,11 @@ function copySelection(){
   if(!selectedPaths.length)return;
   var snaps=selectedPaths.map(_snapshotForClone).filter(Boolean);
   if(!snaps.length)return;
-  _canvasClip={snaps:snaps,layerIdx:state.activeLayerIdx,frameIdx:state.currentFrame};
+  // Combine groups (group-bridge.js) travel with the copy: a pasted set of
+  // combined shapes has to become its OWN group at paste time (see
+  // _remapCombineGroups), and the source layer may have changed by then.
+  var _srcLd=state.layers[state.activeLayerIdx];
+  _canvasClip={snaps:snaps,layerIdx:state.activeLayerIdx,frameIdx:state.currentFrame,groups:(_srcLd&&_srcLd.groups)?JSON.parse(JSON.stringify(_srcLd.groups)):null};
   if(typeof window!=='undefined')window._lastClipKind='canvas';
   showToast(SM.t('toastCopied')+snaps.length+')');
 }
@@ -1656,7 +1704,7 @@ function pasteSelection(){
   }
   var layer=userLayers[state.activeLayerIdx];
   var samePlace=(_canvasClip.layerIdx===state.activeLayerIdx&&_canvasClip.frameIdx===state.currentFrame);
-  var clones=_materializeClones(_canvasClip.snaps,layer,samePlace?12:0);
+  var clones=_materializeClones(_canvasClip.snaps,layer,samePlace?12:0,_canvasClip.groups);
   clearSel();
   selectedPaths=clones.filter(isSelectablePathChild);
   state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});

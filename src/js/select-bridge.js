@@ -1175,7 +1175,7 @@
       var dupLayer = userLayers[state.activeLayerIdx];
       var dupSnaps = selectedPaths.map(_snapshotForClone).filter(Boolean);
       if (dupSnaps.length) {
-        var dupClones = _materializeClones(dupSnaps, dupLayer, 0);
+        var dupClones = _materializeClones(dupSnaps, dupLayer, 0, (state.layers[state.activeLayerIdx] || {}).groups);
         selectedPaths = dupClones.filter(isSelectablePathChild);
         state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
         saveActiveLayerFrame();

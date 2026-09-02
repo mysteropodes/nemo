@@ -3262,7 +3262,7 @@ function updatePropsContext(){
     // — restoring by "put it back after shapes-sec" would break the moment
     // anything else is inserted there, whereas the original next sibling is
     // exactly the contract "this is my slot".
-    if(!_canvasSecHome)_canvasSecHome={parent:canvasSec.parentNode,next:canvasSec.nextSibling};
+    if(!_canvasSecHome)_canvasSecHome={parent:canvasSec.parentNode,next:canvasSec.nextSibling,prev:canvasSec.previousSibling};
     if(ctx==='document'){
       // Document fields sit at the TOP, on the dark ground, exactly where a
       // selection puts Position/Size/Rotate (2026-08-30, feedback #171
@@ -3284,8 +3284,16 @@ function updatePropsContext(){
       if(canvasBody)canvasBody.classList.remove('hid');
       if(canvasHdr)canvasHdr.classList.remove('closed');
     }else{
-      var moved=(canvasSec.parentNode!==_canvasSecHome.parent)||(canvasSec.nextSibling!==_canvasSecHome.next);
-      if(moved)_canvasSecHome.parent.insertBefore(canvasSec,_canvasSecHome.next);
+      // The captured next sibling can itself have been detached since
+      // (a section rebuilt by its own panel code) — insertBefore then
+      // throws "not a child of this node" and the WHOLE updateUI aborts
+      // mid-way for every non-document context after that (2026-09 QA
+      // sweep, hit live: combineSelection → updateUI → throw). Fall back to
+      // the slot's previous sibling, then to the end of the parent.
+      var home=_canvasSecHome, anchor=home.next;
+      if(anchor&&anchor.parentNode!==home.parent)anchor=(home.prev&&home.prev.parentNode===home.parent)?home.prev.nextSibling:null;
+      var moved=(canvasSec.parentNode!==home.parent)||(canvasSec.nextSibling!==anchor);
+      if(moved)home.parent.insertBefore(canvasSec,anchor);
       canvasSec.classList.remove('psec-identity');
       if(canvasHdr)canvasHdr.style.display='';
     }
