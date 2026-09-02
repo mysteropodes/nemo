@@ -1221,6 +1221,15 @@ window.SM={
     if(ld.nativeVideo){dst.nativeVideo=JSON.parse(JSON.stringify(ld.nativeVideo));if(ld._nvSessionId)dst._nvSessionId=ld._nvSessionId;}
     if(ld.footage)dst.footage=JSON.parse(JSON.stringify(ld.footage));
     if(ld.timeRemap)dst.timeRemap=JSON.parse(JSON.stringify(ld.timeRemap));
+    // Diffed against exportJSON's per-layer field list (2026-09 QA sweep):
+    // the second half of a cut used to lose its Blend keys, expressions,
+    // matte, text/animator identity, parent links, 3D/duplicator/shy/keyLock
+    // flags and — for a Null/Guide/Widget — its very KIND. Everything the
+    // layer IS travels with the cut; what it SHOWS was already cloned above.
+    var deep=function(v){return JSON.parse(JSON.stringify(v));};
+    ['blendKeys','expressions','mattesMore','textAnimators','parentKeys','duplicator','widget','nullPos','nullShape','guidePos','effector','lfsIds','lfsSettings'].forEach(function(k){if(ld[k]!=null)dst[k]=deep(ld[k]);});
+    ['matteMode','matteSourceLayerUid','parentLayerUid','parentLayerUidB','channel','keyLock','shy','threeD','isTextLayer','isNullLayer','isGuideLayer','guideOrientation','isWidgetLayer','isEffectLayer','isEffectorLayer','lfsGroup'].forEach(function(k){if(ld[k]!=null)dst[k]=ld[k];});
+    if(ld.visible===false)dst.visible=false;
     dst.inPoint=f;dst.outPoint=outF;
     ld.outPoint=f-1;
     // Splitting materialises hard in/out values on both halves, which a
@@ -1273,6 +1282,15 @@ window.SM={
     // the descriptive footage tag.
     if(src.nativeVideo){state.layers[ni].nativeVideo=JSON.parse(JSON.stringify(src.nativeVideo));if(src._nvSessionId)state.layers[ni]._nvSessionId=src._nvSessionId;}
     if(src.footage)state.layers[ni].footage=JSON.parse(JSON.stringify(src.footage));
+    // Found by diffing exportJSON's per-layer field list against what this
+    // function copies (2026-09 QA sweep): the Blend KEYFRAMES (blendKeys —
+    // blendMode's static value was already copied, its animation was not),
+    // the LFS channel tag and the visibility flag were dropped by a
+    // duplicate. A duplicated hidden layer popping up visible is what AE
+    // never does either.
+    if(src.blendKeys&&src.blendKeys.length)state.layers[ni].blendKeys=JSON.parse(JSON.stringify(src.blendKeys));
+    if(src.channel)state.layers[ni].channel=src.channel;
+    if(src.visible===false)state.layers[ni].visible=false;
     // elementMotion is keyed by strokeId, and duplicateLayer's frames clone
     // above (JSON.stringify) preserves each stroke's strokeId unchanged —
     // so the duplicate's strokes carry the SAME ids the original's element
