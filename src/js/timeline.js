@@ -9429,7 +9429,15 @@ function onKeyDown(event){
   // (e.g. 2+ layers selected in the layer list instead) — group-bridge.js's
   // own groupSelection() already no-ops+toasts on <2 selectedPaths, so this
   // guard just decides which of the two "group" actions gets first refusal.
-  if((event.metaKey||event.ctrlKey)&&(event.key==='g'||event.key==='G')&&!event.shiftKey&&window.selectedPaths&&selectedPaths.length>=2){
+  // Same "where did this selection come from" rule as Cmd+D (#803) and
+  // Suppr: clicking timeline rows auto-selects their content, so a
+  // MULTI-LAYER timeline selection always looked like a canvas selection
+  // here and Cmd+G grouped the shapes of the active layer instead of
+  // putting the selected layers in a folder — which is the only thing that
+  // gesture can mean when the user just picked several layer rows. Falls
+  // through to the folder branch below in that case.
+  var _gLayerRows=!!window._layerActiveExplicit&&typeof _layerSel!=='undefined'&&_layerSel.length>=2;
+  if((event.metaKey||event.ctrlKey)&&(event.key==='g'||event.key==='G')&&!event.shiftKey&&!_gLayerRows&&window.selectedPaths&&selectedPaths.length>=2){
     event.preventDefault();
     if(window.SMGroup)SMGroup.groupSelection();
     return;
