@@ -689,6 +689,14 @@
     }
     window._motionRevealedLayers = targets;
     window._motionExpandedLayer = null; // the reveal set replaces the single-row accordion
+    // "Hide unanimated" would hide the very row this just revealed (2026-09,
+    // feedback #758: "les raccourcis de transform ne marchent pas si le menu
+    // de transform d'un calque dans motion est fermé"). What reads as a
+    // CLOSED Transform menu is that filter being ON — its blue funnel sits
+    // right in the header — and P on a layer with no Position keys then did
+    // nothing at all, since the row it reveals has no content to survive the
+    // filter. Asking for a property explicitly outranks a standing filter.
+    _hideUnanimated = false;
     if (shiftKey) {
       if (!_propFilter) _propFilter = PROPS.slice(); // shift on a fresh/all-shown state starts from "all", then removes
       var i = _propFilter.indexOf(prop);
