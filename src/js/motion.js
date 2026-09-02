@@ -9501,6 +9501,48 @@
     out.labelIdx = labelIdx;
     return out;
   }
+  // ---- ONE row plan for the Elements/Shapes list (2026-09, feedback #746:
+  // "le bouton déroulant comme pour transform mais shape et que element
+  // reflète les groupes du panel elements") ----
+  // Four renderers draw this same list — Motion's panel (renderElementsList)
+  // and its grid mirror (renderTimelineMotion), plus Animation 2D's
+  // timeline panel (renderShapeTreeRowsInto) and ITS grid mirror. They used
+  // to each walk buildShapeTree themselves, which was fine while the list
+  // was flat and always fully expanded; a collapsible section header and
+  // expandable GROUPS both change the row COUNT, and a row count that
+  // disagrees between a panel and its grid is exactly the misalignment
+  // CLAUDE.md §11 exists to prevent. So the shape of the list is decided
+  // once, here, and everyone renders what it returns.
+  // Session-only UI state, same precedent as _motionExpandedElement.
+  function shapeTreeRowPlan(li, ld) {
+    var tree = buildShapeTree(li, ld);
+    var rows = [];
+    if (!tree.length) return rows;
+    rows.push({ kind: 'header' });
+    rows.labelIdx = tree.labelIdx;
+    if (window._motionShapesCollapsed) return rows;
+    (function walk(nodes, depth) {
+      nodes.forEach(function (n) {
+        if (n.type === 'group') {
+          rows.push({ kind: 'group', node: n, depth: depth });
+          if (window._motionExpandedShapeGroups && window._motionExpandedShapeGroups[n.gid]) walk(n.children || [], depth + 1);
+        } else {
+          rows.push({ kind: 'shape', node: n, depth: depth });
+        }
+      });
+    })(tree, 0);
+    return rows;
+  }
+  function toggleShapeGroupExpanded(gid) {
+    if (!window._motionExpandedShapeGroups) window._motionExpandedShapeGroups = {};
+    window._motionExpandedShapeGroups[gid] = !window._motionExpandedShapeGroups[gid];
+    // Both halves, always — see the plan's own comment.
+    renderLayerList(); renderTimeline();
+  }
+  function toggleShapesSectionCollapsed() {
+    window._motionShapesCollapsed = !window._motionShapesCollapsed;
+    renderLayerList(); renderTimeline();
+  }
   // Resolves a strokeId back to its LIVE Paper item on layer `li` — the
   // panel operates on dicts (getEffectiveStrokes), but click-to-select and
   // delete both need the real canvas object. null for a strokeId that
@@ -9591,18 +9633,33 @@
     input.addEventListener('dblclick', function (e) { e.stopPropagation(); });
   }
   function renderElementsList(list, li, ld) {
-    var tree = buildShapeTree(li, ld);
-    if (!tree.length) return;
-    // 2026-08 fix: hardcoded French header, shown regardless of locale.
-    var hdr = document.createElement('div'); hdr.className = 'lrow motion-group-row'; hdr.textContent = SM.t('hdrElements');
+    var plan = shapeTreeRowPlan(li, ld);
+    if (!plan.length) return;
+    var tree = { labelIdx: plan.labelIdx };
+    // Collapsible section header (2026-09, #746) — same chevron idiom as
+    // the Path/Duplicator group headers one level down.
+    var hdr = document.createElement('div'); hdr.className = 'lrow motion-group-row';
+    var hdrArrow = document.createElement('span'); hdrArrow.className = 'lico larrow'; hdrArrow.textContent = window._motionShapesCollapsed ? '▸' : '▾';
+    var hdrLabel = document.createElement('span'); hdrLabel.textContent = SM.t('hdrElements');
+    hdr.appendChild(hdrArrow); hdr.appendChild(hdrLabel);
+    hdr.addEventListener('click', function (e) { e.stopPropagation(); toggleShapesSectionCollapsed(); });
     list.appendChild(hdr);
     var shapeIdx = 0;
-    tree.forEach(function (node) {
-      if (node.type === 'group') {
+    plan.slice(1).forEach(function (planRow) {
+      var node = planRow.node, depth = planRow.depth || 0;
+      if (planRow.kind === 'group') {
         var grow = document.createElement('div'); grow.className = 'lrow motion-elem-row motion-elem-group';
+        if (depth) grow.style.paddingLeft = (10 + depth * 14) + 'px';
+        // Expandable, and nested (2026-09, #746: "que element reflète les
+        // groupes du panel elements") — the children come from the tree
+        // itself, so this list now shows the exact same structure the
+        // Elements panel does.
+        var gArrow = document.createElement('span'); gArrow.className = 'lico larrow';
+        gArrow.textContent = (window._motionExpandedShapeGroups && window._motionExpandedShapeGroups[node.gid]) ? '▾' : '▸';
+        gArrow.addEventListener('click', function (e) { e.stopPropagation(); toggleShapeGroupExpanded(node.gid); });
         var gswatch = document.createElement('div'); gswatch.className = 'motion-elem-swatch'; gswatch.textContent = '▤'; gswatch.style.background = 'transparent';
         var gnm = document.createElement('div'); gnm.className = 'lnm'; gnm.textContent = node.name;
-        grow.appendChild(gswatch); grow.appendChild(gnm);
+        grow.appendChild(gArrow); grow.appendChild(gswatch); grow.appendChild(gnm);
         // Recompute this group's own member strokeIds from the flat list
         // (layerElements), not the already-collapsed tree — click-select
         // and rename both need the full membership, not just "a group
@@ -9643,6 +9700,7 @@
       var idx = tree.labelIdx && tree.labelIdx[entry.strokeId] !== undefined ? tree.labelIdx[entry.strokeId] : shapeIdx++; // stable draw-order label, see buildShapeTree
       var expanded = window._motionExpandedElement === entry.strokeId;
       var row = document.createElement('div'); row.className = 'lrow motion-elem-row';
+      if (depth) row.style.paddingLeft = (10 + depth * 14) + 'px';
       var swatch = document.createElement('div'); swatch.className = 'motion-elem-swatch';
       swatch.style.background = entry.sd.fillColor || entry.sd.strokeColor || 'transparent';
       if (elementHasMotion(ld, entry.strokeId)) swatch.classList.add('has-motion');
@@ -10948,12 +11006,16 @@
       // Same _motionRevealedElementLayers exception as the panel side
       // (feedback #145) — kept identical on both sides for the same
       // CLAUDE.md §11 reason this whole gate exists.
-      var els = (window._motionExpandedLayer === li || (window._motionRevealedElementLayers && window._motionRevealedElementLayers.indexOf(li) >= 0)) ? buildShapeTree(li, ld) : [];
+      // Same plan the panel renders (2026-09, #746) — a collapsed section
+      // or a collapsed group changes the row COUNT, so both halves have to
+      // read it from the one place that decides it (shapeTreeRowPlan).
+      var els = (window._motionExpandedLayer === li || (window._motionRevealedElementLayers && window._motionRevealedElementLayers.indexOf(li) >= 0)) ? shapeTreeRowPlan(li, ld) : [];
       if (els.length) {
         var elHdrSpacer = document.createElement('div'); elHdrSpacer.className = 'frow motion-group-row';
         grid.appendChild(elHdrSpacer);
-        els.forEach(function (entry) {
-          var elExpanded = entry.type === 'shape' && window._motionExpandedElement === entry.strokeId;
+        els.slice(1).forEach(function (planRow) {
+          var entry = planRow.node;
+          var elExpanded = planRow.kind === 'shape' && window._motionExpandedElement === entry.strokeId;
           var elSpacer = document.createElement('div'); elSpacer.className = 'frow';
           grid.appendChild(elSpacer);
           if (!elExpanded) return;
@@ -12964,7 +13026,8 @@
     // Group/shape tree (2026-07-31) — mode-agnostic, reused by Animation
     // 2D's own layer-row shape list (timeline.js) so both modes' trees can
     // never diverge in content or z-order.
-    buildShapeTree: buildShapeTree, groupNode: groupNode,
+    buildShapeTree: buildShapeTree, groupNode: groupNode, shapeTreeRowPlan: shapeTreeRowPlan,
+    toggleShapeGroupExpanded: toggleShapeGroupExpanded, toggleShapesSectionCollapsed: toggleShapesSectionCollapsed,
     selectShapesByStrokeIds: selectShapesByStrokeIds,
     elementLabel: elementLabel,
     layerElements: layerElements,
