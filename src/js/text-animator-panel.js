@@ -27,11 +27,35 @@
   // re-renders from updateUI on every frame change, and loadFrame rebuilds
   // items — the same transient-null trap image-mesh-bridge.js documents
   // (§12bis piège #2) would otherwise blink the section away mid-scrub.
+  // The strokes this layer's text lives in — the CURRENT frame first, and
+  // failing that any stored frame of the layer.
+  //
+  // The fallback is the fix for 2026-09 feedback #797 ("le panel d'animation
+  // de typo ne s'affiche pas quand je select un calque text dans motion"):
+  // getEffectiveStrokes returns [] whenever the playhead sits outside the
+  // layer's in/out range (and on any frame with no stored content), so
+  // selecting a perfectly ordinary text layer with the playhead parked past
+  // its out point hid this whole section. Reproduced live: same layer, same
+  // selection, panel shown at frame 5 and gone at frame 38 with outPoint 10.
+  // Animators live on the LAYER (ld.textAnimators), not in a frame, so the
+  // panel has no reason to depend on what is drawn right now.
+  function textStrokesOf(li, ld) {
+    if (typeof getEffectiveStrokes !== 'function') return null;
+    var strokes = getEffectiveStrokes(li, state.currentFrame);
+    if (strokes && strokes.length) return strokes;
+    var frames = ld && ld.frames;
+    if (!frames) return null;
+    for (var f = 0; f < frames.length; f++) {
+      var st = frames[f] && frames[f].strokes;
+      if (st && st.length) return st;
+    }
+    return null;
+  }
   function activeTextLayer() {
     if (!window.state || !state.layers) return null;
     var li = state.activeLayerIdx, ld = state.layers[li];
     if (!ld) return null;
-    var strokes = (typeof getEffectiveStrokes === 'function') ? getEffectiveStrokes(li, state.currentFrame) : null;
+    var strokes = textStrokesOf(li, ld);
     if (!strokes || !strokes.length) return null;
     for (var i = 0; i < strokes.length; i++) {
       if (strokes[i] && strokes[i].charIndex != null) return { li: li, ld: ld };
@@ -49,7 +73,7 @@
     if (!window.state || !state.layers) return null;
     var li = state.activeLayerIdx, ld = state.layers[li];
     if (!ld) return null;
-    var strokes = (typeof getEffectiveStrokes === 'function') ? getEffectiveStrokes(li, state.currentFrame) : null;
+    var strokes = textStrokesOf(li, ld); // same off-frame fallback as above (#797)
     if (!strokes || strokes.length !== 1) return null;
     var s = strokes[0];
     return (s && s.isRaster && s.isText && !s.isTextChar) ? { li: li, ld: ld } : null;
