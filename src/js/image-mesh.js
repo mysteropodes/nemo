@@ -343,6 +343,12 @@
     for (var s = 0; s < sets.length; s++) {
       var layers = sets[s];
       for (var l = 0; l < layers.length; l++) {
+        // A VIDEO layer holds its mesh id on the layer itself, not in a
+        // stroke dict — it has no stroke dicts at all (getEffectiveStrokes
+        // short-circuits to [] for nativeVideo, app.js). Without this the
+        // refcount below would read "unreferenced" and drop a mesh that is
+        // on screen (2026-09, feedback #779).
+        if (layers[l] && layers[l].videoMeshId === meshId) return true;
         var frames = layers[l] && layers[l].frames;
         if (!frames) continue;
         for (var f = 0; f < frames.length; f++) {
@@ -446,7 +452,15 @@
   // offsets. PR3 (Motion vertex keyframes) supplies it; PR1 passes nothing.
   function scenePayload(raster, rect, poseAt) {
     var meshId = raster && raster.data && raster.data.meshId;
-    if (!meshId) return null;
+    return scenePayloadFor(meshId, rect, poseAt);
+  }
+  // Same payload, addressed by mesh id instead of by the Raster carrying it
+  // — a native video layer has no Paper item to hang the id on, so it keeps
+  // it on the layer (ld.videoMeshId). ONE body for both callers on purpose
+  // (CLAUDE.md §3): a second copy of this mapping is exactly the kind of
+  // twin that drifts silently, and a drift here moves pixels.
+  function scenePayloadFor(meshId, rect, poseAt) {
+    if (!meshId || !rect) return null;
     var mesh = get(meshId);
     if (!mesh || !mesh.tris || !mesh.tris.length) return null;
     var rad = (rect.rotation || 0) * Math.PI / 180;
@@ -540,6 +554,30 @@
   NS.setOutline = setOutline;
   NS.rebuild = function (meshId) { var m = get(meshId); return m ? rebuild(m) : null; };
   NS.scenePayload = scenePayload;
+  NS.scenePayloadFor = scenePayloadFor;
+  // Video layers (2026-09, feedback #779: "le mesh sur une video ne persiste
+  // pas a la lecture ou scrub"). A video's picture is engine-side, so there
+  // is no Raster to tag and no per-frame dict to propagate into — the id
+  // lives on the layer, which is also why it cannot fall out of step with
+  // the frames the way a per-frame tag can (the failure mode §12 documents
+  // for images). Everything else — the store, undo, persistence of the mesh
+  // itself, the engine payload — is shared with the image path unchanged.
+  NS.attachToVideoLayer = function (li, opts) {
+    var ld = state.layers[li];
+    if (!ld || !ld.nativeVideo) return null;
+    var id = newId();
+    store()[id] = createMesh(opts);
+    ld.videoMeshId = id;
+    return id;
+  };
+  NS.detachFromVideoLayer = function (li) {
+    var ld = state.layers[li];
+    if (!ld || !ld.videoMeshId) return false;
+    var id = ld.videoMeshId;
+    delete ld.videoMeshId;
+    releaseIfUnused(id);
+    return true;
+  };
   NS.worldVerts = worldVerts;
   NS.normalizedOf = normalizedOf;
   NS.serialize = serialize;

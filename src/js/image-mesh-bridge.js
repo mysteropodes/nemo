@@ -63,11 +63,52 @@
     if (typeof userLayers === 'undefined' || !p.parent || userLayers.indexOf(p.parent) < 0) return null;
     return p;
   }
-  function targetMesh() {
+  // The selected NATIVE VIDEO layer, when that is what the canvas selection
+  // is (2026-09, feedback #779: "le mesh sur une video ne persiste pas a la
+  // lecture ou scrub"). A video draws no Paper item at all, so singleRaster
+  // can structurally never see one and the whole mesh feature was silently
+  // image-only. select-bridge arms window._nvSelectedLayer for exactly this
+  // selection, and it is the same flag the transform gizmo reads.
+  function singleVideoLayer() {
+    if (state.tool !== 'select' && state.tool !== 'subselect') return -1;
+    if (window.selectedPaths && selectedPaths.length) return -1; // a stroke selection wins, same priority as the click hit-test
+    var li = window._nvSelectedLayer;
+    if (li == null) return -1;
+    var ld = state.layers[li];
+    if (!ld || !ld.nativeVideo || ld.locked || !ld.visible) return -1;
+    return li;
+  }
+  // ONE target shape for both kinds, so everything downstream (panel,
+  // overlay, drag) is written once. `raster` is null for a video; `li` is
+  // the layer either way.
+  function currentTarget() {
     var r = singleRaster();
-    if (!r || !r.data || !r.data.meshId || !window.SMImageMesh) return null;
-    var mesh = SMImageMesh.get(r.data.meshId);
-    return mesh ? { raster: r, mesh: mesh, meshId: r.data.meshId } : null;
+    if (r) return { kind: 'raster', raster: r, li: state.activeLayerIdx };
+    var vli = singleVideoLayer();
+    if (vli >= 0) return { kind: 'video', raster: null, li: vli };
+    return null;
+  }
+  function meshIdOfTarget(t) {
+    if (!t) return null;
+    if (t.kind === 'video') return state.layers[t.li] && state.layers[t.li].videoMeshId || null;
+    return (t.raster && t.raster.data && t.raster.data.meshId) || null;
+  }
+  // The rect the mesh is normalized against. For an image that is the
+  // raster's own display rect and the layer's Motion still has to be applied
+  // on top (motionMap below); for a video, displayRect ALREADY composes
+  // Motion and the whole parent chain, so applying it again would double
+  // every transform.
+  function rectOfTarget(t) {
+    if (!t) return null;
+    if (t.kind === 'video') return window.SMNativeVideo ? SMNativeVideo.displayRect(t.li) : null;
+    return (window.SMEngineBridge && SMEngineBridge.rasterImageRect) ? SMEngineBridge.rasterImageRect(t.raster) : null;
+  }
+  function targetMesh() {
+    var t = currentTarget();
+    var id = meshIdOfTarget(t);
+    if (!t || !id || !window.SMImageMesh) return null;
+    var mesh = SMImageMesh.get(id);
+    return mesh ? { raster: t.raster, kind: t.kind, li: t.li, mesh: mesh, meshId: id } : null;
   }
 
   // Vertex positions in RENDERED space. Two mappings are involved and both
@@ -77,10 +118,15 @@
   // what buildNodeHandleItems does for path handles, and for the same
   // reason: without it the handles sit at the shape's pre-transform position
   // while the picture is somewhere else).
-  function motionMap() {
+  function motionMap(t) {
     if (!window.SMMotion) return null;
-    var m = SMMotion.layerMotionPointMap ? SMMotion.layerMotionPointMap(state.activeLayerIdx) : null;
-    if (!m && SMMotion.layerMotion3DPointMap) m = SMMotion.layerMotion3DPointMap(state.activeLayerIdx);
+    // A video's rect comes out of displayRect with Motion already folded in
+    // (see rectOfTarget) — mapping again would move the handles off the
+    // picture by exactly one extra transform.
+    if (t && t.kind === 'video') return null;
+    var li = t ? t.li : state.activeLayerIdx;
+    var m = SMMotion.layerMotionPointMap ? SMMotion.layerMotionPointMap(li) : null;
+    if (!m && SMMotion.layerMotion3DPointMap) m = SMMotion.layerMotion3DPointMap(li);
     return m;
   }
   // The animated pose for this mesh at the current frame, or null when it
@@ -90,16 +136,16 @@
   // showing the rest sculpt while the image renders its animated pose.
   function poseAtFor(t) {
     if (!window.SMMotion || !SMMotion.hasMeshVertexMotionFor) return null;
-    var li = state.activeLayerIdx;
+    var li = t.li != null ? t.li : state.activeLayerIdx;
     if (!SMMotion.hasMeshVertexMotionFor(li, t.meshId)) return null;
     return function (vi) { return SMMotion.meshVertexOffsetAt(li, t.meshId, vi, state.currentFrame); };
   }
   function renderedVerts(t) {
-    if (!window.SMEngineBridge || !SMEngineBridge.rasterImageRect) return null;
-    var rect = SMEngineBridge.rasterImageRect(t.raster);
+    var rect = rectOfTarget(t);
+    if (!rect) return null;
     var pts = SMImageMesh.worldVerts(t.mesh, rect, poseAtFor(t));
     if (!pts) return null;
-    var mm = motionMap();
+    var mm = motionMap(t);
     if (mm) pts = pts.map(function (p) { return mm.fwd(p[0], p[1]); });
     return { pts: pts, rect: rect, mm: mm };
   }
@@ -188,12 +234,13 @@
     var t = targetMesh();
     if (!t) { dragIdx = -1; return; }
     e.stopImmediatePropagation(); e.preventDefault();
-    var rect = SMEngineBridge.rasterImageRect(t.raster);
+    var rect = rectOfTarget(t);
+    if (!rect) { dragIdx = -1; return; }
     var w = SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     // Back through the layer's Motion transform first, into the raw space
     // the rect itself lives in, then into the rect's normalized space —
     // the exact reverse of renderedVerts' forward chain.
-    var mm = motionMap();
+    var mm = motionMap(t);
     if (mm && mm.inv) { var iv = mm.inv(w[0], w[1]); w = [iv[0], iv[1]]; }
     var uv = SMImageMesh.normalizedOf(rect, w[0], w[1]);
     var rest = t.mesh.verts[dragIdx];
@@ -202,7 +249,7 @@
     // override) on its vtxN track, an un-animated one edits the mesh's own
     // rest sculpt. The track value is a deviation ON TOP of the sculpt, so
     // it is measured from rest+sculpt rather than from rest.
-    var li = state.activeLayerIdx;
+    var li = t.li != null ? t.li : state.activeLayerIdx;
     if (window.SMMotion && SMMotion.isMeshVertexAnimated && SMMotion.isMeshVertexAnimated(li, t.meshId, dragIdx)) {
       var sculpt = (t.mesh.offsets && t.mesh.offsets[dragIdx]) || [0, 0];
       SMMotion.setMeshVertexOffset(li, t.meshId, dragIdx, uv[0] - rest[0] - sculpt[0], uv[1] - rest[1] - sculpt[1]);
@@ -225,7 +272,7 @@
     // would repaint it until the next unrelated UI event.
     var tUp = targetMesh();
     if (dragMoved && tUp && window.SMMotion && SMMotion.isMeshVertexAnimated
-        && SMMotion.isMeshVertexAnimated(state.activeLayerIdx, tUp.meshId, dragIdx)
+        && SMMotion.isMeshVertexAnimated(tUp.li != null ? tUp.li : state.activeLayerIdx, tUp.meshId, dragIdx)
         && typeof updateUI === 'function') updateUI();
     dragIdx = -1;
     SMEngineBridge.resume();
@@ -244,7 +291,7 @@
   function renderImageMeshPanel() {
     var sec = el('p-imagemesh-sec');
     if (!sec) return;
-    var r = singleRaster();
+    var tgt = currentTarget();
     // NOT `editing = false` here. This runs from updateUI, which fires on
     // every frame change — and loadFrame rebuilds the Paper items, so
     // singleRaster() is transiently null in the middle of an ordinary
@@ -254,9 +301,10 @@
     // is a sticky preference; with no valid target the overlay returns []
     // and the pointer handlers bail on their own, so leaving it on costs
     // nothing. It is cleared only when the mesh is genuinely gone (below).
-    if (!r) { sec.style.display = 'none'; return; }
+    if (!tgt) { sec.style.display = 'none'; return; }
     sec.style.display = '';
-    var has = !!(r.data && r.data.meshId && SMImageMesh.get(r.data.meshId));
+    var curId = meshIdOfTarget(tgt);
+    var has = !!(curId && SMImageMesh.get(curId));
     if (!has) editing = false;
     var onCb = el('p-imagemesh-on');
     if (onCb) onCb.checked = has;
@@ -265,7 +313,7 @@
     var body = el('p-imagemesh-body');
     if (body) body.style.display = has ? '' : 'none';
     if (has) {
-      var mesh = SMImageMesh.get(r.data.meshId);
+      var mesh = SMImageMesh.get(curId);
       var cols = el('p-imagemesh-cols'), rows = el('p-imagemesh-rows');
       if (cols) cols.value = mesh.cols;
       if (rows) rows.value = mesh.rows;
@@ -276,8 +324,8 @@
   window.renderImageMeshPanel = renderImageMeshPanel;
 
   function toggleMesh(on) {
-    var r = singleRaster();
-    if (!r) return;
+    var tgt = currentTarget();
+    if (!tgt) return;
     pushUndo();
     // attach/detach write BOTH the live Raster's data.meshId and every
     // frame's stored dict (SMImageMesh.propagate), so there is nothing left
@@ -286,8 +334,14 @@
     // the removed Raster, so the very next click on this panel found no
     // valid target and silently did nothing while the checkbox had already
     // flipped. Found live, toggling the real checkbox twice in a row.
-    if (on) SMImageMesh.attach(r, { cols: 4, rows: 4 });
-    else { SMImageMesh.detach(r); editing = false; }
+    // A video keeps its id on the LAYER — there is no Raster to tag and no
+    // per-frame dict to propagate into, which is also why it cannot go out
+    // of step with the frames (#779).
+    if (tgt.kind === 'video') {
+      if (on) SMImageMesh.attachToVideoLayer(tgt.li, { cols: 4, rows: 4 });
+      else { SMImageMesh.detachFromVideoLayer(tgt.li); editing = false; }
+    } else if (on) SMImageMesh.attach(tgt.raster, { cols: 4, rows: 4 });
+    else { SMImageMesh.detach(tgt.raster); editing = false; }
     renderImageMeshPanel();
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
@@ -441,15 +495,14 @@
   }
 
   window.SMImageMeshUI = {
-    canMesh: function () { return !!singleRaster(); },
-    hasMesh: function () { var r = singleRaster(); return !!(r && r.data && r.data.meshId); },
-    toggleMesh: function () { var r = singleRaster(); if (r) toggleMesh(!(r.data && r.data.meshId)); },
+    canMesh: function () { return !!currentTarget(); },
+    hasMesh: function () { return !!meshIdOfTarget(currentTarget()); },
+    toggleMesh: function () { var t = currentTarget(); if (t) toggleMesh(!meshIdOfTarget(t)); },
     isEditing: function () { return editing; },
     canMaskWithShape: function () { return !!maskPair(); },
     maskImageWithShape: maskImageWithShape,
     toggleEditing: function () {
-      var r = singleRaster();
-      if (!r || !(r.data && r.data.meshId)) return;
+      if (!meshIdOfTarget(currentTarget())) return;
       editing = !editing;
       renderImageMeshPanel();
       if (window.SMEngineBridge) SMEngineBridge.renderNow();
