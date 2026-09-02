@@ -317,7 +317,14 @@
         tick.style.left = ((frameIdx - inF) * FC) + 'px';
         tick.title = window.SM.t('layerInoutKeyTitle').replace('{n}', frameIdx + 1);
         bar.appendChild(tick);
-        if (!outside) tick.addEventListener('mousedown', function (e) { onKeyDown(li, row, bar, tick, frameIdx, e); });
+        // Draggable wherever it sits (2026-09, feedback #772: "pourquoi ne
+        // pourrait-on pas déplacer la keyframe d'animation 2D dans motion
+        // même si celle-ci est hors plage ?"). The first version made
+        // out-of-range ticks inert because the retime drag clamped to
+        // [in,out] and would have yanked them into the visible range; the
+        // clamp is the whole timeline now, so there is nothing left to
+        // protect them from.
+        tick.addEventListener('mousedown', function (e) { onKeyDown(li, row, bar, tick, frameIdx, e); });
       })(f);
     }
   }
@@ -341,8 +348,11 @@
     if (!_keyDrag) return;
     var ld = state.layers[_keyDrag.li]; if (!ld) { _keyDrag = null; return; }
     var dx = Math.round((e.clientX - _keyDrag.startX) / FC);
-    var inF = inPointOf(ld), outF = outPointOf(ld);
-    var nf = Math.max(inF, Math.min(outF, _keyDrag.origFrame + dx));
+    // The whole timeline, not the layer's in/out range (#772) — a drawing
+    // keyframe exists independently of the visibility window, and clamping
+    // to it made every out-of-range key jump inside on the first pixel.
+    var inF = inPointOf(ld);
+    var nf = Math.max(0, Math.min(state.totalFrames - 1, _keyDrag.origFrame + dx));
     _keyDrag.previewFrame = nf;
     _keyDrag.tickEl.style.left = ((nf - inF) * FC) + 'px';
   });
