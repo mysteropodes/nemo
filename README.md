@@ -9,7 +9,9 @@ desktop or in your browser.
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange)
 ![Version](https://img.shields.io/badge/version-0.7.0--alpha.1-lightgrey)
 
-<!-- TODO: screenshot or short demo GIF goes here -->
+![The Motion editor: five layers with staggered in/out bars, a Position track with its
+keyframes, an editable motion path with its tangent handle on the canvas, and the media panel
+holding a component and a video](assets/screenshot-motion.png)
 
 ---
 
