@@ -4933,14 +4933,36 @@ function saveActiveLayerFrameOrPromote(){
     if(typeof canEditActiveLayer==='function'&&!canEditActiveLayer())return;
     f.isKeyframe=true;f.isInterpolated=false;ld._justEnsuredKeyframeAt=state.currentFrame;
     saveActiveLayerFrame();
+    _reanchorMaterialized(li,f.strokes);
     syncLinkedKeyframeFolder(li,state.currentFrame);
     if(window.renderTimeline)renderTimeline();
     return;
   }
   for(var o=state.currentFrame;o>=0;o--){
-    if(ld.frames[o]&&ld.frames[o].isKeyframe){ld.frames[o].strokes=_collectLayerStrokes(li,ld);window._sceneVersion=(window._sceneVersion||0)+1;return;}
+    if(ld.frames[o]&&ld.frames[o].isKeyframe){
+      ld.frames[o].strokes=_collectLayerStrokes(li,ld);
+      _reanchorMaterialized(li,ld.frames[o].strokes);
+      window._sceneVersion=(window._sceneVersion||0)+1;return;
+    }
   }
   saveActiveLayerFrame();
+}
+// loadFrame skips rebuilding a layer whose materialised items still match
+// the strokes array it was built from (_canReuseMaterialized). On a HELD
+// frame that array IS the hold origin's — so after promoting, the live
+// items belong to the freshly written keyframe, not to the origin any
+// more. Leaving the anchor behind made the reuse test claim the edited
+// layer still represented the ORIGIN frame: measured live, a gradient
+// enabled on held frame 3 came back on keyframe 0 too, because navigating
+// there reused the edited items and the next frame change wrote them
+// back. Only bites edits that change no geometry (a geometry edit sets
+// _smGeomDirty, which already forces a rebuild) — which is exactly the
+// class the promotion helper opened up.
+function _reanchorMaterialized(li,strokes){
+  var lyr=window.userLayers&&userLayers[li];
+  if(!lyr||!strokes)return;
+  lyr._matStrokes=strokes;
+  lyr._smGeomDirty=false;
 }
 function syncLinkedKeyframeFolder(sourceLayerIdx,frameIdx){
   var srcLd=state.layers[sourceLayerIdx];
