@@ -4839,6 +4839,14 @@ function layersSnapshotNow(){return{type:'layers',layers:_cloneLayersForUndo(sta
   // through the module so `tris` comes back as a real Array rather than the
   // typed array Delaunator hands out — see SMImageMesh.serialize's comment.
   imageMeshes:(window.SMImageMesh?SMImageMesh.serialize():JSON.parse(JSON.stringify(state.imageMeshes||{}))),
+  // Folder + link-group METADATA (2026-09 QA sweep) — same blind spot as
+  // cameraKeys/imageMeshes above: a layer's membership lives on the layer
+  // (ld.folderId), but the folder's own name and collapsed state live in
+  // these two maps, which _cloneLayersForUndo cannot see. Without them an
+  // undo brought the layers back out of the folder and left its now-empty
+  // entry behind (renamed folders came back with the new name, too).
+  layerFolders:JSON.parse(JSON.stringify(state.layerFolders||{})),
+  layerLinkGroups:JSON.parse(JSON.stringify(state.layerLinkGroups||{})),
   symbolId:state.activeSymbolId||null,montageViewId:state.activeMontageViewId||null};}
 // Human-readable "where this undo entry belongs", for the cross-context
 // guard in undo()/redo() below. Falls back to '?' for a symbol/montage
@@ -4893,6 +4901,10 @@ function restoreLayersSnapshot(s){
   if(state.waOut>=s.totalFrames)state.waOut=s.totalFrames-1;window._waOut=state.waOut;
   if(state.currentFrame>=s.totalFrames)state.currentFrame=s.totalFrames-1;
   state.activeLayerIdx=Math.max(0,Math.min(s.active,state.layers.length-1));
+  // Folder/link-group metadata (see layersSnapshotNow) — undefined in any
+  // snapshot taken before this existed, left untouched in that case.
+  if(s.layerFolders)state.layerFolders=JSON.parse(JSON.stringify(s.layerFolders));
+  if(s.layerLinkGroups)state.layerLinkGroups=JSON.parse(JSON.stringify(s.layerLinkGroups));
   // The `state.layers=[]` above replaces the array, which breaks the alias
   // enterSymbol set up (state.layers === state.symbols[id].layers). Re-point
   // it immediately so anything reading the SYMBOL rather than `state` mid-

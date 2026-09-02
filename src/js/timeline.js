@@ -5596,6 +5596,11 @@ function groupSelectionIntoFolder(){
   var sorted=_layerSel.slice().sort(function(a,b){return a-b;});
   for(var k=1;k<sorted.length;k++)if(sorted[k]!==sorted[k-1]+1){showToast(SM.t('toastLayersMustBeConsecutive'));return;}
   if(sorted.some(function(i){return state.layers[i].folderId;})){showToast(SM.t('toastSelectedLayerAlreadyInFolder'));return;}
+  // No undo entry at all until now (2026-09 QA sweep, measured: 0 entries
+  // pushed, Cmd+Z gave back the previous action instead) — every other
+  // structural layer action snapshots. All the guards above run first so a
+  // refused grouping still costs nothing.
+  saveAllLayerFrames();pushUndoLayers(true);
   var fid='folder-'+Date.now()+'-'+Math.floor(Math.random()*1000);
   state.layerFolders[fid]={name:SM.t('layerKindFolder'),collapsed:false};
   sorted.forEach(function(i){state.layers[i].folderId=fid;});
@@ -5607,6 +5612,9 @@ function folderMemberIndices(fid){
   return idxs;
 }
 function ungroupFolder(fid){
+  // Same missing snapshot as groupSelectionIntoFolder above — dissolving a
+  // folder was equally un-undoable.
+  saveAllLayerFrames();pushUndoLayers(true);
   state.layers.forEach(function(ld){if(ld.folderId===fid)delete ld.folderId;});
   delete state.layerFolders[fid];
   renderLayerList();renderTimeline();
