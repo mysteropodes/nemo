@@ -1058,8 +1058,19 @@ window.SM={
         else if(window._motionExpandedLayer>idx)window._motionExpandedLayer--;
       }
     });
-    _layerSel=[];
     if(state.activeLayerIdx>=state.layers.length)state.activeLayerIdx=state.layers.length-1;
+    // The layer that becomes active after a delete is also the SELECTED one
+    // (2026-09 QA sweep). This used to leave _layerSel empty while
+    // activateUL highlighted the new active row — a row that LOOKS selected
+    // but that F5/F6, batch operations and Motion's key/bar sync all treat
+    // as nothing selected. Same "highlighted ≠ selected" desync feedback
+    // #769/#773 closed for other gestures; addLayer/duplicateLayer already
+    // set _layerSel=[idx] here.
+    _layerSel=(state.activeLayerIdx>=0)?[state.activeLayerIdx]:[];
+    _layerSelAnchor=state.activeLayerIdx;
+    // Motion's in/out bars mirror _layerSel (syncBarSelToLayerSel) — measured
+    // live: after a delete the row was selected and its bar was not.
+    if(window.SMMotion&&SMMotion.syncBarSelToLayerSel)SMMotion.syncBarSelToLayerSel();
     activateUL(state.activeLayerIdx);loadFrame(state.currentFrame);updateUI();showToast(SM.t('toastLayersDeletedUndoHint'));
   },
   // Standing "keyframes follow this edge" lock (Van Dijk 2.2). Stored per
@@ -9296,6 +9307,12 @@ function onKeyDown(event){
   if((event.metaKey||event.ctrlKey)&&(event.key==='d'||event.key==='D')){
     if(inField)return;
     event.preventDefault();
+    // Motion (2026-09 QA sweep): a canvas selection there stands for the
+    // LAYER (its drag writes the layer's Position, its nudge too), so
+    // Cmd+D on it must duplicate the layer — it fell into
+    // duplicateSelection and cloned the drawing INSIDE the layer instead
+    // (measured: 1 → 2 children, layer count unchanged).
+    if(state.appMode==='motion'){window.SM.duplicateLayer();return;}
     if(selectedPaths.length)duplicateSelection();
     else if(_sel.frames.length)window.SM.duplicateSelectedFrames();
     else window.SM.duplicateLayer();
