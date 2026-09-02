@@ -1616,6 +1616,10 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
    frame away instantly revealed the tick was there all along. */
 .layer-inout-bar .layer-inout-key{position:absolute;top:0;bottom:0;width:3px;margin-left:-1.5px;background:#fff;opacity:.85;cursor:ew-resize;z-index:6;border-radius:1px;}
 .layer-inout-bar .layer-inout-key:hover{opacity:1;background:var(--accent);width:4px;margin-left:-2px;}
+/* Drawing keyframes sitting OUTSIDE the layer's in/out range (2026-09,
+   feedback #754) — darker and inert: they say "there is a drawing here"
+   without pretending to be a handle. */
+.layer-inout-bar .layer-inout-key.outside{background:#6c7484;opacity:.5;pointer-events:none;width:2px;margin-left:-1px;}
 /* Blank-keyframe gaps inside the bar (layer-inout.js renderContentGaps,
    2026-07) — dims a genuinely empty stretch instead of letting it read as
    solid content, pointer-events:none so the bar underneath stays

@@ -299,16 +299,25 @@
     var old = bar.querySelectorAll('.layer-inout-key');
     for (var o = 0; o < old.length; o++) old[o].remove();
     if (!ld.frames) return;
-    for (var f = inF; f <= outF; f++) {
+    // Outside the in/out range too (2026-09, feedback #754: "les keyframes
+    // d'animation 2D dans motion devraient aussi être avant et après le out
+    // point mais dans une couleur plus foncée"). A trimmed bar used to hide
+    // the fact that the layer still HAS drawings on either side — you had to
+    // go back to Animation 2D to find out. They render darker and are not
+    // draggable: a tick outside the range is information about the drawing,
+    // not a handle (the retime drag clamps into [inF,outF], which would yank
+    // such a keyframe into the visible range on the smallest movement).
+    for (var f = 0; f < ld.frames.length; f++) {
       var fr = ld.frames[f];
       if (!fr || !fr.isKeyframe || !fr.strokes || !fr.strokes.length) continue;
       (function (frameIdx) {
+        var outside = frameIdx < inF || frameIdx > outF;
         var tick = document.createElement('div');
-        tick.className = 'layer-inout-key';
+        tick.className = 'layer-inout-key' + (outside ? ' outside' : '');
         tick.style.left = ((frameIdx - inF) * FC) + 'px';
         tick.title = window.SM.t('layerInoutKeyTitle').replace('{n}', frameIdx + 1);
         bar.appendChild(tick);
-        tick.addEventListener('mousedown', function (e) { onKeyDown(li, row, bar, tick, frameIdx, e); });
+        if (!outside) tick.addEventListener('mousedown', function (e) { onKeyDown(li, row, bar, tick, frameIdx, e); });
       })(f);
     }
   }
