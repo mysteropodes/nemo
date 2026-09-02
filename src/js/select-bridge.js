@@ -411,6 +411,10 @@
   // kept up to date every tick regardless of Shift state, so re-engaging
   // the lock later in the same gesture still measures from the true origin.
   var moveGestureOrigin = null, moveAppliedTotal = null;
+  // Set at pointerdown by a Shift-click on an already-selected item, applied
+  // at pointerup only when the gesture turned out to be a click — see its
+  // write site for the ambiguity this resolves (#802).
+  var _pendingShiftToggle = null;
   // The grabbed point, in the LAYER's own space, tracked through the whole
   // move gesture (2026-08-31). Needed because a layer's Motion pivot is
   // userLayers[i].bounds.center — DERIVED FROM THE CONTENT — so translating
@@ -1227,6 +1231,28 @@
               }
             }
           }
+          // Shift inside the selection's own box (2026-09, #802): this
+          // shortcut returns before the hit branch below, so its Shift
+          // handling never ran here — a Shift-click on an already-selected
+          // item could not remove it, and a Shift-click on an unselected
+          // one sitting inside the box could not add it. Same click-vs-drag
+          // split as down there: a toggle-off is DEFERRED to pointerup (so
+          // Shift+drag stays a constrained move of the whole selection),
+          // an add applies immediately (it can only grow what gets moved).
+          if (e.shiftKey) {
+            var shLayer = userLayers[state.activeLayerIdx];
+            var shHit = shLayer.hitTest(pt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
+            if (shHit && (shHit.item instanceof Path || shHit.item instanceof Raster)) {
+              var shP = resolveBrushAnchor(shHit.item, shLayer);
+              var shSet = window.SMGroup ? SMGroup.membersOf(shP, shLayer) : [shP];
+              if (selectedPaths.indexOf(shP) >= 0) _pendingShiftToggle = shSet.slice();
+              else {
+                shSet.forEach(function (m) { if (selectedPaths.indexOf(m) < 0) selectedPaths.push(m); });
+                state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
+                renderArcs(); updateUI();
+              }
+            }
+          }
           mode = 'move';
           moveStarted = false;
           return;
@@ -1608,7 +1634,17 @@
       var clickedSet = window.SMGroup ? SMGroup.membersOf(p, userLayers[state.activeLayerIdx]) : [p];
       var idx2 = selectedPaths.indexOf(p);
       if (e.shiftKey) {
-        if (idx2 >= 0) clickedSet.forEach(function (m) { var mi = selectedPaths.indexOf(m); if (mi >= 0) selectedPaths.splice(mi, 1); });
+        // Shift on an ALREADY-selected item is ambiguous: it means "remove
+        // me from the selection" for a CLICK, and "constrain this move to
+        // one axis" for a DRAG (Illustrator/Figma both read it that way).
+        // Removing it here settled the ambiguity at pointerdown, in favour
+        // of the click — so Shift+drag deselected the thing being dragged
+        // and the axis lock never got a selection to move (2026-09,
+        // feedback #802: "le shift + drag un objet ne le contraint pas en
+        // x ou y" — in Motion nothing moved at all, since the layer-body
+        // drag needs a non-empty selectedPaths to arm). Deferred to
+        // pointerup instead, and applied only if the gesture never moved.
+        if (idx2 >= 0) _pendingShiftToggle = clickedSet.slice();
         else clickedSet.forEach(function (m) { if (selectedPaths.indexOf(m) < 0) selectedPaths.push(m); });
       } else if (idx2 < 0) {
         // Clicking a NEW item without shift replaces the selection — but
@@ -1729,7 +1765,10 @@
     // to probe unconditionally without any extra state of our own.
     if (state.appMode === 'motion' && window.SMMotion) {
       var w1 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
-      if (SMMotion.onDrag({ point: new Point(w1[0], w1[1]) })) {
+      // shiftKey travels with the point (2026-09, #802): Motion's own drags
+      // (element move, multi-layer move) apply the axis lock themselves, and
+      // this forwarded event was the only place that state could come from.
+      if (SMMotion.onDrag({ point: new Point(w1[0], w1[1]), shiftKey: e.shiftKey })) {
         e.stopImmediatePropagation(); e.preventDefault();
         return;
       }
@@ -2443,6 +2482,16 @@
       e.stopImmediatePropagation(); e.preventDefault();
       return;
     }
+    // A deferred Shift-toggle (#802) whose gesture never armed a move —
+    // Motion's box-fallback leaves mode null, and a pending toggle left
+    // behind would fire on some later, unrelated pointerup.
+    if (_pendingShiftToggle && mode !== 'move') {
+      var _pstIdle = _pendingShiftToggle; _pendingShiftToggle = null;
+      _pstIdle.forEach(function (m) { var mi = selectedPaths.indexOf(m); if (mi >= 0) selectedPaths.splice(mi, 1); });
+      state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
+      renderArcs(); updateUI();
+      if (window.SMEngineBridge) SMEngineBridge.renderNow();
+    }
     if (!mode) return;
     e.stopImmediatePropagation();
     e.preventDefault();
@@ -2755,6 +2804,18 @@
       var didMove = moveStarted;
       moveStarted = false;
       moveGestureOrigin = null; moveAppliedTotal = null;
+      // A Shift-click that never became a drag: NOW it means "remove from
+      // the selection" (#802). A Shift-DRAG keeps everything selected — the
+      // axis lock above has just moved it.
+      if (_pendingShiftToggle) {
+        var _pst = _pendingShiftToggle; _pendingShiftToggle = null;
+        if (!didMove) {
+          _pst.forEach(function (m) { var mi = selectedPaths.indexOf(m); if (mi >= 0) selectedPaths.splice(mi, 1); });
+          state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });
+          renderArcs(); updateUI();
+          if (window.SMEngineBridge) SMEngineBridge.renderNow();
+        }
+      }
       // Motion mode: same reasoning as the xform-scale/xform-rotate guard
       // above — this gesture never touched geometry (onMove's early
       // return), so re-loading/re-saving frame content here would be pure
