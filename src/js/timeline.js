@@ -5511,6 +5511,45 @@ function openLayerColorSwatches(anchorEl,currentHex,onPick){
     });
   },0);
 }
+// Label colors as a SELECTION tool (2026-09, feedback #776: "la possibilite
+// dans motion d'attribue le meme label color aux calques select et avec
+// shift + clic sur le rond du label color de select tous les layers au meme
+// label"). Two behaviours, both hung off the one dot already on every row —
+// AE's own label column does exactly this pair. Shared by Animation 2D's
+// rows (renderLayerList below) and Motion's (motion.js), because it is the
+// same control on the same layers seen from two views.
+//
+// Assign: a color picked while several layers are selected AND the clicked
+// row is one of them paints the whole selection. A dot clicked outside the
+// selection still means just that layer — otherwise clicking a row's dot to
+// recolor it would silently repaint layers the user forgot were selected.
+function layerColorTargets(li){
+  return (_layerSel.length>1&&_layerSel.indexOf(li)>=0)?_layerSel.slice():[li];
+}
+function applyLayerColor(li,hex){
+  var targets=layerColorTargets(li);
+  pushUndoLayers();
+  targets.forEach(function(i){if(state.layers[i])state.layers[i].color=hex;});
+  renderLayerList();renderTimeline();
+  if(targets.length>1)showToast(SM.t('toastLayerColorApplied').replace('{n}',targets.length));
+  return targets.length;
+}
+// Select: Shift+click on a dot selects every layer wearing that same color,
+// so a label doubles as a saved selection ("les personnages en rouge").
+// setActiveLayer FIRST, then the list — it collapses _layerSel to the layer
+// it activates (same ordering trap as motion.js's marquee, feedback #769).
+function selectLayersByColor(hex){
+  var want=(hex||'').toLowerCase(),hits=[];
+  state.layers.forEach(function(l,i){if((l.color||'').toLowerCase()===want)hits.push(i);});
+  if(!hits.length)return 0;
+  if(window.SM&&SM.setActiveLayer)SM.setActiveLayer(hits[0],true);
+  _layerSel=hits.slice();_layerSelAnchor=hits[0];
+  if(window.SMMotion&&SMMotion.syncBarSelToLayerSel)SMMotion.syncBarSelToLayerSel();
+  renderLayerList();renderTimeline();
+  if(window.SMEngineBridge)SMEngineBridge.renderNow();
+  showToast(SM.t('toastLayersSelectedByColor').replace('{n}',hits.length));
+  return hits.length;
+}
 // AE's "Parent & Link" column, on the layer rows themselves (2026-07-25,
 // "il manque le système de parentage directement sur les calques comme dans
 // after"). The data model (ld.parentLayerUid), the cycle refusal
@@ -6035,9 +6074,13 @@ function renderLayerList(frameOnly){
     // already has SOME color (assigned at creation, app.js nextLayerColor),
     // this only ever changes which one, never turns it "off".
     var cdot=document.createElement('div');cdot.className='lico layer-color-dot';cdot.title='Couleur du calque';cdot.style.setProperty('--dot-color',ld.color||'#8b8b9e');
+    cdot.dataset.layer=i;
+    cdot.title=SM.t('layerColorDotTitle');
     cdot.addEventListener('click',function(e){
       e.stopPropagation();
-      openLayerColorSwatches(cdot,ld.color||'#8b8b9e',function(hex){ld.color=hex;cdot.style.setProperty('--dot-color',hex);renderTimeline();});
+      var myLi=parseInt(this.dataset.layer,10);
+      if(e.shiftKey){selectLayersByColor(state.layers[myLi]&&state.layers[myLi].color);return;}
+      openLayerColorSwatches(cdot,state.layers[myLi]&&state.layers[myLi].color||'#8b8b9e',function(hex){applyLayerColor(myLi,hex);});
     });
     row.appendChild(cdot);
     var eye=document.createElement('div');eye.className='lico'+(ld.visible?'':' off');eye.title='Show / hide layer';eye.innerHTML=ld.visible?ICO_EYE:ICO_EYE_CLOSED;eye.dataset.layer=i;eye.addEventListener('click',function(e){e.stopPropagation();window.SM.toggleLayerVis(parseInt(this.dataset.layer));});
