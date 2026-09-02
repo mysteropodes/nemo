@@ -789,7 +789,20 @@
     // target AND the filter it turns on is still on, so U after some other
     // reveal (E, M, a P filter) still means "show me the animated ones"
     // rather than silently folding everything.
-    var wanted = (window._layerSel && window._layerSel.length) ? window._layerSel.slice() : state.layers.map(function (_l, i) { return i; });
+    // Only layers that actually carry keys (2026-09, feedback #771: "le
+    // raccourci u ne doit pas ouvrir un calque dans motion si celui-ci n'a
+    // pas de clé, même pas révéler transform"). U means "show me the
+    // animated ones"; opening a bare Transform header on every other layer
+    // was noise the reveal exists to remove.
+    var pool = (window._layerSel && window._layerSel.length) ? window._layerSel.slice() : state.layers.map(function (_l, i) { return i; });
+    var wanted = pool.filter(function (li) {
+      var ld = state.layers[li];
+      if (!ld) return false;
+      return PROPS.some(function (p) { return propHasContent(ld, p); }) ||
+        layerHasAnimatedElements(ld) ||
+        !!(ld.parentKeys && ld.parentKeys.length) || !!(ld.blendKeys && ld.blendKeys.length) ||
+        !!(ld.timeRemap && ld.timeRemap.keys && ld.timeRemap.keys.length);
+    });
     var showing = _hideUnanimated && !_propFilter && window._motionRevealedLayers &&
       window._motionRevealedLayers.length === wanted.length &&
       wanted.every(function (li) { return window._motionRevealedLayers.indexOf(li) >= 0; });
@@ -802,7 +815,8 @@
       renderLayerList(); renderTimeline();
       return true;
     }
-    var targets = (window._layerSel && window._layerSel.length) ? window._layerSel.slice() : state.layers.map(function (_l, i) { return i; });
+    if (!wanted.length) { if (window.showToast) showToast(SM.t('toastNoAnimatedLayer')); return true; }
+    var targets = wanted;
     window._motionRevealedLayers = targets;
     // Also open the Elements tree for any target layer whose animated
     // content lives per-element rather than on the layer's own Transform
