@@ -8,7 +8,7 @@ desktop or in your browser.
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange)
 ![Version](https://img.shields.io/badge/version-0.7.0--alpha.1-lightgrey)
-[![Discord](https://img.shields.io/discord/1544955036193267774?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/r28KY7h8a)
+[![Join us on Discord](https://img.shields.io/badge/Discord-Join%20us-5865F2?logo=discord&logoColor=white)](https://discord.gg/r28KY7h8a)
 
 ![The Motion editor: five layers with staggered in/out bars, a Position track with its
 keyframes, an editable motion path with its tangent handle on the canvas, and the media panel
