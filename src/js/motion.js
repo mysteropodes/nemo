@@ -12721,7 +12721,7 @@
     if (!_motionMarquee) return;
     var moved = _motionMarquee.moved;
     var downLayer = _motionMarquee.layer;
-    var sweptLayers = _motionMarquee.layers || [];
+    var sweptLayers = (_motionMarquee.layers || []).slice();
     _motionMarquee.rectEl.remove();
     _motionMarquee = null;
     // #769 — a real drag mirrors the swept rows into the LAYER selection so
@@ -12729,6 +12729,21 @@
     // applyMarqueeSelection because that one runs on every mousemove, and
     // renderLayerList/renderTimeline rebuild the very rows the drag is
     // measuring against.
+    // #856 (deuxième passe) — un calque dont le lasso n'a attrapé QU'UN BORD
+    // de la barre ne doit PAS entrer dans la sélection de calques. Sinon le
+    // geste ne distingue plus trois situations que Cyril veut distinguer :
+    // sélectionner des calques, sélectionner des points d'entrée/sortie, et
+    // sélectionner des clés. Conséquence mesurée avant ce garde-fou : un
+    // balayage des moitiés gauches sélectionnait les calques entiers, donc le
+    // glissé suivant déplaçait les DEUX bords de chaque barre au lieu des
+    // seuls points attrapés — « ça bouge les calques complets en même temps ».
+    // Le mécanisme de glissé, lui, respectait déjà la partie de chaque membre
+    // (layer-inout.js, onDown) : c'est bien la sélection en amont qui était
+    // trop large.
+    var _bars = (window.SMLayerInOut && SMLayerInOut.getBarSelection) ? SMLayerInOut.getBarSelection() : [];
+    var _edgeOnly = {};
+    _bars.forEach(function (b) { if (b.part === 'in' || b.part === 'out') _edgeOnly[b.li] = true; });
+    sweptLayers = sweptLayers.filter(function (li) { return !_edgeOnly[li]; });
     if (moved && sweptLayers.length) {
       var same = sweptLayers.length === _layerSel.length && sweptLayers.every(function (li) { return _layerSel.indexOf(li) >= 0; });
       if (!same) {
