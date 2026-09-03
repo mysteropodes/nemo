@@ -4066,6 +4066,21 @@ function renderTimeline(){
   // quand même se coller à l'autre (mesuré : « 120 » collé à « 5s », 4 px).
   // Un numéro d'image n'est donc écrit que s'il est assez loin de la seconde
   // étiquetée la plus proche.
+  // Les petits traits suivent la même logique que les chiffres : en dessous
+  // de 7 px d'écart ils ne se lisent plus comme des graduations mais comme
+  // une trame grise (Cyril : « enlever les petits traits de frames quand ça
+  // devient illisible, simplifier au fur et à mesure »). Le pas est calé sur
+  // un diviseur du fps pour que la seconde reste un repère juste ; s'il faut
+  // aller jusqu'à la seconde entière, les traits d'image disparaissent et
+  // seules les secondes graduent la règle.
+  var _tickStep=0;
+  for(var _t=Math.max(1,Math.ceil(7/_fcpx));_t<fps;_t++){ if(fps%_t===0){_tickStep=_t;break;} }
+  // Un trait toutes les demi-secondes ou moins n'apprend plus rien à côté des
+  // lignes de seconde : à ce stade on ne garde que les secondes.
+  if(_tickStep>=fps/2)_tickStep=0;
+  // Et quand la seconde elle-même est trop étroite, seules les secondes
+  // ÉTIQUETÉES gardent leur trait — sinon la trame revient, en plus haut.
+  var _secTickAlways=fps*_fcpx>=7;
   var _secPeriod=_secStep*fps;
   function _farFromSec(i){
     var m=i%_secPeriod;
@@ -4089,8 +4104,13 @@ function renderTimeline(){
     //
     // The plain every-5 tick keeps showing the 1-based frame NUMBER (i+1),
     // which is what the rest of the UI displays — that part was never wrong.
-    if(i>0&&i%fps===0){c.classList.add('sec');if(Math.round(i/fps)%_secStep===0)c.textContent=Math.round(i/fps)+'s';}
-    else if(_showFrameNums&&(i+1)%_frameStep===0&&_farFromSec(i))c.textContent=i+1;
+    if(i>0&&i%fps===0){
+      var _lab=Math.round(i/fps)%_secStep===0;
+      if(_lab||_secTickAlways)c.classList.add('sec');
+      if(_lab)c.textContent=Math.round(i/fps)+'s';
+    }
+    else if(_showFrameNums&&(i+1)%_frameStep===0&&_farFromSec(i)){c.textContent=i+1;c.classList.add('tick','tickMaj');}
+    else if(_tickStep&&i%_tickStep===0)c.classList.add('tick');
     hdr.appendChild(c);
   }
   // Bug found 2026-07 ("pourquoi visuellement y a cette séparation du noir
