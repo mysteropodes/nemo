@@ -44,8 +44,8 @@ async fn run_ffmpeg(app: tauri::AppHandle, window: tauri::Window, args: Vec<Stri
 
 // Beta-tester feedback → public GitHub repo (mysteropodes/strokemotion-feedback),
 // one Issue per feedback entry. The write token is baked in at compile time
-// via env! (same pattern as STROKEMOTION_UPDATER_TOKEN above — export
-// STROKEMOTION_FEEDBACK_TOKEN before `tauri build`), scoped as a
+// via env! — export STROKEMOTION_FEEDBACK_TOKEN before `tauri build` —
+// scoped as a
 // fine-grained PAT to ONLY this one repo, ONLY "Issues: write" — nothing
 // else, so an extracted token can at worst spam issues in a repo that
 // contains no app source. The POST happens entirely in Rust (never in JS)
@@ -237,27 +237,14 @@ fn start_tablet_pressure_monitor(app: tauri::AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .plugin({
-            // The update channel is a private GitHub repo (strokemotion-updates),
-            // served through the Contents API rather than Releases — a release
-            // asset's numeric ID changes every publish, which the updater plugin
-            // can't resolve (it only ever does one static GET); a repo file's
-            // Contents-API URL stays the same forever, so `latest.json` and the
-            // platform artifact just get overwritten by scripts/publish-update.sh
-            // on each release and the same endpoint URL keeps working.
-            //
-            // The token is baked in at compile time via env! so it never sits in
-            // source control — export STROKEMOTION_UPDATER_TOKEN before running
-            // `tauri build` (see scripts/publish-update.sh's header comment for
-            // how to mint a fine-grained PAT scoped to just this one repo).
-            let token = env!("STROKEMOTION_UPDATER_TOKEN");
-            tauri_plugin_updater::Builder::new()
-                .header("Authorization", format!("Bearer {}", token))
-                .expect("invalid updater Authorization header")
-                .header("Accept", "application/vnd.github.raw+json")
-                .expect("invalid updater Accept header")
-                .build()
-        })
+        // The update channel is the public `nemo` repo's GitHub Releases —
+        // tauri.conf.json's updater endpoint points at the "latest release"
+        // alias (releases/latest/download/latest.json), which .github/
+        // workflows/release.yml writes via `includeUpdaterJson`. No auth
+        // needed: it's a public repo, read over plain HTTPS. (Previously
+        // this hit a private repo's Contents API with a baked-in token —
+        // dropped along with that repo.)
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())

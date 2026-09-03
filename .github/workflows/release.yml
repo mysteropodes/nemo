@@ -116,7 +116,13 @@ jobs:
             The app is not code-signed. macOS will refuse it on first launch:
             right-click the app and choose **Open**, then confirm.
           releaseDraft: true
-          prerelease: true
+          # Not marked prerelease: GitHub's "latest release" endpoint (which
+          # the Tauri updater reads, see tauri.conf.json) skips prereleases
+          # entirely. `releaseDraft: true` above is the real safety gate —
+          # nothing goes live until this draft is manually published on
+          # GitHub — so the prerelease label would only be cosmetic here,
+          # at the cost of breaking auto-update for every future version.
+          prerelease: false
           args: --target ${{ matrix.target }}
           # Writes latest.json next to the artifacts, which is what
           # tauri.conf.json's updater endpoint now reads.
