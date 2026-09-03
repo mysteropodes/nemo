@@ -44,7 +44,7 @@ async fn run_ffmpeg(app: tauri::AppHandle, window: tauri::Window, args: Vec<Stri
 
 // Beta-tester feedback → public GitHub repo (mysteropodes/strokemotion-feedback),
 // one Issue per feedback entry. The write token is baked in at compile time
-// via env! — export STROKEMOTION_FEEDBACK_TOKEN before `tauri build` —
+// via env! — export NEMO_FEEDBACK_TOKEN before `tauri build` —
 // scoped as a
 // fine-grained PAT to ONLY this one repo, ONLY "Issues: write" — nothing
 // else, so an extracted token can at worst spam issues in a repo that
@@ -54,7 +54,7 @@ async fn run_ffmpeg(app: tauri::AppHandle, window: tauri::Window, args: Vec<Stri
 // this command exists instead of a plain JS fetch.
 #[tauri::command]
 async fn submit_feedback_issue(title: String, body: String, labels: Vec<String>) -> Result<(), String> {
-    let token = env!("STROKEMOTION_FEEDBACK_TOKEN");
+    let token = env!("NEMO_FEEDBACK_TOKEN");
     let client = reqwest::Client::new();
     let payload = serde_json::json!({ "title": title, "body": body, "labels": labels });
     let resp = client
@@ -88,7 +88,7 @@ async fn submit_feedback_issue(title: String, body: String, labels: Vec<String>)
 // `content` field IS base64 already, no decode/re-encode needed here.
 #[tauri::command]
 async fn upload_feedback_attachment(filename: String, content_base64: String) -> Result<String, String> {
-    let token = env!("STROKEMOTION_FEEDBACK_TOKEN");
+    let token = env!("NEMO_FEEDBACK_TOKEN");
     let client = reqwest::Client::new();
     let path = format!("attachments/{}", filename);
     let payload = serde_json::json!({

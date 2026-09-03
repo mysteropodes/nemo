@@ -12,7 +12,7 @@ name: Deploy feedback Worker to Cloudflare
 #        npx wrangler secret put GITHUB_FEEDBACK_TOKEN --name nemo-feedback
 #      (run locally, with a fine-grained GitHub PAT scoped ONLY to
 #      mysteropodes/strokemotion-feedback, Issues:write + Contents:write —
-#      the same scope src-tauri's STROKEMOTION_FEEDBACK_TOKEN already uses;
+#      the same scope src-tauri's NEMO_FEEDBACK_TOKEN already uses;
 #      can be the same token value or a fresh one).
 #   2. CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID (GitHub Actions repo
 #      secrets) — already added for deploy-web.yml, reused here.

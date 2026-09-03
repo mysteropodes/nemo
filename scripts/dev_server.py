@@ -25,7 +25,7 @@ from pathlib import Path
 # `.feedback` directory so ordinary development never touches app data.
 FEEDBACK_ROOT = Path(
     os.environ.get(
-        "STROKEMOTION_FEEDBACK_ROOT",
+        "NEMO_FEEDBACK_ROOT",
         str(Path(__file__).resolve().parent.parent / ".feedback"),
     )
 ).expanduser()

@@ -33,7 +33,7 @@ Both POST-only, JSON in and out:
    ```
    Use a fine-grained GitHub PAT scoped ONLY to
    `mysteropodes/strokemotion-feedback`, `Issues: write` + `Contents: write`
-   — the exact same scope `STROKEMOTION_FEEDBACK_TOKEN` already uses for the
+   — the exact same scope `NEMO_FEEDBACK_TOKEN` already uses for the
    desktop build. Can be that same token value, or a fresh one.
 2. `ALLOWED_ORIGINS` is set in `wrangler.jsonc`'s `vars` (currently
    `https://nemo-editor.mysteropodes-auth.workers.dev`, comma-separated if

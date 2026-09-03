@@ -409,8 +409,7 @@ automatiquement, même si le remote dit `'approved'` — seule l'approbation loc
 [`mysteropodes/strokemotion-feedback`](https://github.com/mysteropodes/strokemotion-feedback)
 (aucun code de l'app dedans) — une Issue GitHub par feedback, créée depuis Rust
 (`submit_feedback_issue` dans `src-tauri/src/lib.rs`, **jamais** depuis JS) avec un token
-compilé à la build via `env!("STROKEMOTION_FEEDBACK_TOKEN")` (même pattern que
-`STROKEMOTION_UPDATER_TOKEN`) — fine-grained PAT scopé À CE SEUL REPO, permissions
+compilé à la build via `env!("NEMO_FEEDBACK_TOKEN")` — fine-grained PAT scopé À CE SEUL REPO, permissions
 "Issues: write" + "Contents: write" (élargi en 2026-07 pour les captures d'écran jointes,
 voir ci-dessous — décision utilisateur explicite, toujours zéro exposition de code) : un
 token extrait du binaire peut au pire spammer des issues ou écrire n'importe quel fichier
@@ -624,12 +623,11 @@ mutuellement. Règles à suivre **sans qu'on ait besoin de le redemander** :
   copie du repo GitHub ailleurs. Ne jamais partager ce dossier OneDrive directement avec un
   collaborateur pour du travail simultané (sync cloud + git en parallèle sur le même dossier
   risque de corrompre l'historique).
-- Secrets (`TAURI_SIGNING_PRIVATE_KEY`, `STROKEMOTION_PUBLISH_TOKEN`,
-  `STROKEMOTION_UPDATER_TOKEN`, `STROKEMOTION_FEEDBACK_TOKEN`) restent strictement
-  personnels à Cyril — jamais committés (déjà couvert par `.gitignore` pour les clés de
-  signature), jamais partagés même avec un collaborateur de confiance. Pour du dev normal,
-  des valeurs placeholder (`STROKEMOTION_FEEDBACK_TOKEN=dev-placeholder
-  STROKEMOTION_UPDATER_TOKEN=dev-placeholder`) suffisent à compiler et lancer `npm run dev`.
+- Secrets (`TAURI_SIGNING_PRIVATE_KEY(_PASSWORD)`, `NEMO_FEEDBACK_TOKEN`) restent
+  strictement personnels à Cyril — jamais committés (déjà couvert par `.gitignore` pour
+  les clés de signature), jamais partagés même avec un collaborateur de confiance. Pour
+  du dev normal, une valeur placeholder (`NEMO_FEEDBACK_TOKEN=dev-placeholder`) suffit à
+  compiler et lancer `npm run dev`.
 - **Avant de partir en investigation sur un bug rapporté (surtout Motion/canvas), vérifier
   les branches sœurs AVANT de diagnostiquer soi-même** — quand plusieurs sessions Claude
   travaillent en parallèle dans des worktrees séparés (ex. `nemo` sur `claude/web-public-beta`
