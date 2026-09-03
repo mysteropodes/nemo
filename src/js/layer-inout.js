@@ -420,6 +420,30 @@
   // the OVERLAP region's own midpoint, not the marquee rect's own bounds,
   // so a wide marquee that only grazes one edge of a narrow bar still
   // reads as a single-edge selection.
+  // Quelle(s) extrémité(s) le rectangle attrape-t-il VRAIMENT (2026-09-03) ?
+  // La règle précédente comparait le chevauchement au MILIEU de la barre : sur
+  // une barre longue de toute la timeline, un rectangle tracé quelque part
+  // dans la moitié droite sélectionnait le point de SORTIE, à des centaines de
+  // pixels de là. Cyril, capture à l'appui : « le out point du layer 1 est
+  // sélectionné alors que le rectangle est clair sur ce que je vais
+  // sélectionner ». On teste donc les POIGNÉES elles-mêmes, ce que l'œil voit,
+  // avec une petite tolérance parce qu'une poignée fait quatre pixels de large.
+  // Un rectangle qui couvre la barre sans toucher aucune poignée sélectionne
+  // la barre ENTIÈRE : il la désigne bien, il ne désigne simplement aucun bord
+  // en particulier.
+  var HANDLE_TOLERANCE_PX = 6;
+  function partForBoxHit(bar, barRect, x0, x1) {
+    var hl = bar.querySelector('.layer-inout-handle.left');
+    var hr = bar.querySelector('.layer-inout-handle.right');
+    if (!hl || !hr) return partForOverlap(barRect, Math.max(x0, barRect.left), Math.min(x1, barRect.right));
+    var rl = hl.getBoundingClientRect(), rr = hr.getBoundingClientRect();
+    var touches = function (r) { return (r.left - HANDLE_TOLERANCE_PX) <= x1 && (r.right + HANDLE_TOLERANCE_PX) >= x0; };
+    var inHit = touches(rl), outHit = touches(rr);
+    if (inHit && outHit) return 'both';
+    if (inHit) return 'in';
+    if (outHit) return 'out';
+    return 'both';
+  }
   function partForOverlap(barRect, ox0, ox1) {
     var mid = (barRect.left + barRect.right) / 2;
     var touchesLeft = ox0 <= mid, touchesRight = ox1 >= mid;
@@ -436,7 +460,7 @@
       var hit = b.left <= x1 && b.right >= x0 && b.top <= y1 && b.bottom >= y0;
       var part = null;
       if (hit) {
-        part = partForOverlap(b, Math.max(x0, b.left), Math.min(x1, b.right));
+        part = partForBoxHit(bar, b, x0, x1);
         sel.push({ li: li, part: part });
       }
       applySelClasses(bar, part);

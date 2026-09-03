@@ -98,6 +98,9 @@
     var allIn = items.every(function (it) { return sel.indexOf(it) >= 0; });
     if (allIn) items.forEach(function (it) { var ix = sel.indexOf(it); if (ix >= 0) sel.splice(ix, 1); });
     else items.forEach(function (it) { if (sel.indexOf(it) < 0) sel.push(it); });
+    // Même raison que dans selectShapesByStrokeIds (motion.js) : une sélection
+    // ADDITIVE de formes n'est pas une sélection de calque.
+    window._layerActiveExplicit = false;
     if (window.state) state.selectedStrokeIndices = sel.map(function (it) { return typeof getSI === 'function' ? getSI(it) : -1; }).filter(function (i2) { return i2 >= 0; });
     if (window.renderArcs) renderArcs();
     if (window.updateUI) updateUI();

@@ -9807,6 +9807,15 @@
     if (!items.length) return;
     window.SM.setActiveLayer(li);
     selectedPaths = items;
+    // setActiveLayer lève window._layerActiveExplicit, qui veut dire « cette
+    // sélection vient d'un clic sur une LIGNE DE CALQUE de la timeline ». Ici
+    // c'est faux : on vient de sélectionner des FORMES (panneau Éléments,
+    // recherche, pickwhip). Le laisser levé faisait dupliquer le CALQUE au
+    // Cmd+D — Cyril : « je sélectionne un groupe ou une shape dans elements,
+    // je fais Cmd+D et la duplication n'apparaît pas » : elle apparaissait
+    // ailleurs, dans un calque tout neuf. Même raison pour Suppr et Cmd+G,
+    // qui lisent le même drapeau.
+    window._layerActiveExplicit = false;
     // feedback #202, "si je select une shape dans elements ça doit être les
     // properties de cette shape qui s'affiche dans layer properties" —
     // renderMotionPropsPanel's "targeted shape" branch (2026-08-30, #173)
