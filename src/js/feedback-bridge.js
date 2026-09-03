@@ -22,12 +22,24 @@
   function tauriOk() { return typeof window.__TAURI__ !== 'undefined'; }
   function projectKey() { return (window.SMProject && window.SMProject.getProjectKey()) || 'untitled-autosave'; }
 
-  // Browser-only transport for the two GitHub calls Tauri does via Rust
-  // (submit_feedback_issue/upload_feedback_attachment) — see worker-feedback/
-  // (repo root).
+  // Transport for both GitHub calls (issue + attachment) — see
+  // worker-feedback/ (repo root). Both desktop and web post through this
+  // same Worker, so they share its spam filter (looksLikeSpam) and neither
+  // ever holds the write-scoped GitHub token itself.
+  //
+  // On Tauri, use tauri_plugin_http's fetch (window.__TAURI__.http.fetch)
+  // instead of plain window.fetch: the app's CSP connect-src doesn't list
+  // this Worker, and the Worker's own CORS allowlist holds the web origins,
+  // not tauri://localhost — a plain fetch() would be blocked twice over.
+  // The plugin issues the request from Rust, so neither guard applies and
+  // neither has to be widened just for this one call.
   var FEEDBACK_WORKER_URL = 'https://nemo-feedback.mysteropodes-auth.workers.dev';
+  function workerFetch() {
+    var t = window.__TAURI__;
+    return (t && t.http && t.http.fetch) ? t.http.fetch : fetch;
+  }
   async function workerPost(path, payload) {
-    var resp = await fetch(FEEDBACK_WORKER_URL + path, {
+    var resp = await workerFetch()(FEEDBACK_WORKER_URL + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -315,16 +327,13 @@
     }
     // Best-effort: beta testers have no shared Sync folder (that's a local/
     // network-drive mechanism for Cyril's own machines) — this is THEIR
-    // transport instead: one GitHub Issue per feedback entry, in the public
-    // mysteropodes/strokemotion-feedback repo. On Tauri the write-scoped
-    // token lives entirely in Rust (submit_feedback_issue, src-tauri/src/
-    // lib.rs) so it never appears in this file or a devtools-visible
-    // fetch(); on the web build there IS no Rust backend to hide it behind,
-    // so the same call instead goes to the nemo-feedback Worker (see
-    // githubIssue()/githubAttachment() below), which holds the token
-    // server-side the same way. 2026-08: this used to be Tauri-only and
-    // silently no-op on web — a tester's feedback looked "saved" but never
-    // reached anyone, see worker-feedback/README for the fix.
+    // transport instead: one GitHub Issue per feedback entry, in
+    // mysteropodes/nemo, posted through the nemo-feedback Worker (see
+    // workerPost above and worker-feedback/README.md) — desktop and web
+    // both go through it, so neither needs its own copy of the write token.
+    // 2026-08: this used to be Tauri-only and silently no-op on web — a
+    // tester's feedback looked "saved" but never reached anyone, see
+    // worker-feedback/README for the fix.
     try {
       await publishToGitHubIssue(entry);
     } catch (e) { console.warn('[feedback] GitHub publish failed', e); }
@@ -335,21 +344,20 @@
     return { bug: 'bug', perf: 'perf', idee: 'idée', polish: 'polish' }[tag] || tag;
   }
   // Commits each screenshot into strokemotion-feedback's attachments/
-  // folder via the GitHub Contents API (Rust command upload_feedback_
-  // attachment — same reasoning as submit_feedback_issue for keeping the
-  // token out of JS/devtools) and returns an array of raw.githubusercontent.com
+  // folder via the Worker's /attachment endpoint (GitHub Contents API
+  // under the hood) and returns an array of raw.githubusercontent.com
   // URLs that render inline in the issue body via normal Markdown image
   // syntax — GFM does NOT render data: URIs, so each file has to actually
   // land in the repo, not just be inlined as base64 in the issue text.
   //
   // feedback #208: was one screenshot per entry (uploadScreenshotIfAny,
   // singular) — now uploads however many were attached, sequentially (not
-  // Promise.all: the Rust command and the Worker both write via the GitHub
-  // Contents API, which 409s on two concurrent commits to the same repo —
-  // a real risk once this is more than one file per submission). filename
-  // includes an index (entry.id + '-' + i) so multiple images from the
-  // SAME entry never collide on the single-screenshot naming the old code
-  // used unconditionally. Compat: an older stored entry may only have the
+  // Promise.all: the Worker writes via the GitHub Contents API, which
+  // 409s on two concurrent commits to the same repo — a real risk once
+  // this is more than one file per submission). filename includes an
+  // index (entry.id + '-' + i) so multiple images from the SAME entry
+  // never collide on the single-screenshot naming the old code used
+  // unconditionally. Compat: an older stored entry may only have the
   // singular screenshotDataUrl field.
   async function uploadScreenshotsIfAny(entry) {
     var dataUrls = entry.screenshotDataUrls && entry.screenshotDataUrls.length ? entry.screenshotDataUrls
@@ -360,15 +368,8 @@
       if (!m) continue;
       var ext = m[1] === 'jpeg' ? 'jpg' : m[1];
       var filename = entry.id + (dataUrls.length > 1 ? '-' + (i + 1) : '') + '.' + ext;
-      var url = null;
-      if (tauriOk()) {
-        var t = window.__TAURI__;
-        url = await t.core.invoke('upload_feedback_attachment', { filename: filename, contentBase64: m[2] });
-      } else {
-        var data = await workerPost('/attachment', { filename: filename, contentBase64: m[2] });
-        url = data && data.url;
-      }
-      if (url) urls.push(url);
+      var data = await workerPost('/attachment', { filename: filename, contentBase64: m[2] });
+      if (data && data.url) urls.push(data.url);
     }
     return urls;
   }
@@ -417,11 +418,6 @@
       '',
       '<!-- sm-feedback-id: ' + entry.id + ' -->',
     ].join('\n');
-    if (tauriOk()) {
-      var t = window.__TAURI__;
-      await t.core.invoke('submit_feedback_issue', { title: title, body: body, labels: labels });
-      return;
-    }
     await workerPost('/issue', { title: title, body: body, labels: labels });
   }
 
