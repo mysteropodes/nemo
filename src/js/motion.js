@@ -11994,7 +11994,7 @@
       });
     });
     setKeySel(sel); // also refreshes the selection box (updateKeySelectionBox below)
-    if (_motionMarquee) _motionMarquee.layers = marqueeLayersIn(y0, y1);
+    if (_motionMarquee) _motionMarquee.layers = marqueeLayersIn(y0, y1, x0, x1);
   }
   // #769 ("pourquoi le rec de selection dans motion sur la timeline à droite
   // ne selectionne pas aussi sur la partie gauche les calques ?") — the grid
@@ -12004,20 +12004,37 @@
   // Property/element track rows carry no data-layer of their own, so the
   // owning layer is the last .frow[data-layer] seen ABOVE them in document
   // order — the grid is a flat list of rows in exactly that order.
-  function marqueeLayersIn(y0, y1) {
+  // x0/x1 (2026-09-03) : le rectangle doit atteindre la BARRE du calque, pas
+  // seulement sa ligne. Cyril, captures à l'appui : « mon rec de sélection
+  // monte jusqu'au layer 2 mais celui-ci est coupé bien après, il faut que le
+  // rec atteigne la partie non coupée pour que ça fonctionne ». Une ligne
+  // court sur toute la largeur de la timeline ; la barre, elle, s'arrête aux
+  // points d'entrée et de sortie — et c'est elle que l'œil voit. Un calque
+  // dont la barre n'est pas touchée n'entre donc plus dans la sélection.
+  // Sans barre rendue (Animation 2D, ligne de propriété), on garde l'ancien
+  // comportement : la ligne suffit.
+  function marqueeLayersIn(y0, y1, x0, x1) {
     var grid = document.getElementById('frame-grid');
     if (!grid) return [];
-    var out = [], cur = null;
+    var out = [], cur = null, curRow = null;
     Array.prototype.forEach.call(grid.children, function (row) {
       if (!row.classList || !row.classList.contains('frow')) return;
       if (row.dataset && row.dataset.layer != null && row.dataset.layer !== '') {
         var li = parseInt(row.dataset.layer, 10);
         cur = isNaN(li) ? null : li;
+        curRow = row;
       }
       if (cur == null) return;
       var b = row.getBoundingClientRect();
       if (b.height <= 0) return;
       if (b.bottom < y0 || b.top > y1) return;
+      if (x0 != null && x1 != null && curRow) {
+        var bar = curRow.querySelector('.layer-inout-bar');
+        if (bar) {
+          var rb = bar.getBoundingClientRect();
+          if (rb.width > 0 && (rb.right < x0 || rb.left > x1)) return;
+        }
+      }
       if (out.indexOf(cur) < 0) out.push(cur);
     });
     return out;
@@ -12592,7 +12609,25 @@
             var i = +r.getAttribute('data-i');
             sel = track.keys[i] && track.keys[i + 1] && keyQualifies(track.keys[i]) && keyQualifies(track.keys[i + 1]);
           }
-          if (sel) r.style.transform = 'translateX(' + px + 'px)';
+          if (sel) { r.style.transform = 'translateX(' + px + 'px)'; return; }
+          // Paire MIXTE : une seule extrémité bouge, donc la barre doit
+          // S'ÉTIRER, pas se translater — c'était le cas laissé de côté, et
+          // celui que Cyril voit : « la barre verte ne se met pas à jour en
+          // temps réel pendant le drag ». On réécrit x/width depuis les
+          // images d'ORIGINE des deux clés, ce qui reste juste à chaque
+          // mousemove sans accumuler d'erreur.
+          if (r.classList.contains('motion-key-durblock')) return;
+          var i2 = +r.getAttribute('data-i');
+          var ka = track.keys[i2], kb = track.keys[i2 + 1];
+          if (!ka || !kb) return;
+          var aSel = keyQualifies(ka), bSel = keyQualifies(kb);
+          if (!aSel && !bSel) return;
+          var fc = (typeof FC === 'number' && FC > 0) ? FC : (window.FC || 30);
+          var xa = ka.frame * fc + fc / 2 + (aSel ? px : 0);
+          var xb = kb.frame * fc + fc / 2 + (bSel ? px : 0);
+          r.style.transform = '';
+          r.setAttribute('x', Math.min(xa, xb));
+          r.setAttribute('width', Math.max(0, Math.abs(xb - xa)));
         });
       } else {
         rects.forEach(function (r) { r.style.transform = 'translateX(' + px + 'px)'; });
