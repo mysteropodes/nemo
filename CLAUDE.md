@@ -493,9 +493,13 @@ Checklist avant `npm run build` :
    l'instant — réimplémentation clean-room de RDD-36 (spec SMPTE publiée), aucun pool de
    brevets public connu contrairement à AVC/HEVC, risque plus faible mais pas fermé ;
    `prores_videotoolbox` (ci-dessus) le fermerait si besoin un jour.
-4. Si c'est un vrai changement fonctionnel (pas juste un patch de bug) : lancer
-   `./scripts/publish-update.sh "notes"` après la build pour que les installs existantes le
-   voient — voir §6 pour le détail des tokens nécessaires.
+4. Si c'est un vrai changement fonctionnel (pas juste un patch de bug) : pousser un tag
+   `v<version>` déclenche `.github/workflows/release.yml`, qui build, signe et publie une
+   Release GitHub en **draft** (le vrai verrou manuel : rien n'est visible tant qu'elle n'est
+   pas publiée à la main sur GitHub) — la publier la rend visible à l'updater intégré, qui lit
+   `releases/latest/download/latest.json` sur le repo public `mysteropodes/nemo` (aucun token,
+   endpoint dans `tauri.conf.json`). L'ancien script `publish-update.sh` (repo privé
+   `strokemotion-updates`, API Contents) est supprimé — plus utilisé depuis ce pipeline public.
 
 ## 8. Logique globale StoryBoard / Animation 2D / Motion (2026-07, validée avec l'utilisateur)
 

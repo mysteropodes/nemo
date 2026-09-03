@@ -45,7 +45,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://api.github.com/repos/mysteropodes/strokemotion-updates/contents/latest.json"
+        "https://github.com/mysteropodes/nemo/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFFNzBENUE3MjlDNzI4OUMKUldTY0tNY3BwOVZ3SHZGSWpBVk5ncisvWS9RNzVjR1dQcUc4YmpsbzdYVVVNTk9qTFhMKzQ3S2EK"
     }
