@@ -12738,7 +12738,18 @@
         if (window.SM && SM.setActiveLayer) SM.setActiveLayer(sweptLayers[0]);
         _layerSel = sweptLayers.slice();
         _layerSelAnchor = sweptLayers[0];
-        syncBarSelToLayerSel();
+        // #856 — NE PAS resynchroniser les barres depuis la sélection de
+        // calques quand ce même geste vient d'en sélectionner : le sync force
+        // chaque barre balayée à `part:'both'`, ce qui EFFACE la distinction
+        // entrée/sortie que le lasso avait établie (balayer les moitiés
+        // gauches de trois barres sélectionnait bien trois points d'entrée,
+        // puis le sync les remplaçait par trois barres entières — donc « on
+        // ne peut plus sélectionner les in/out séparément »). Le sync n'a de
+        // sens que dans l'autre cas : un lasso qui n'a attrapé QUE des clés,
+        // où les barres doivent suivre les calques plutôt que rester sur une
+        // sélection périmée.
+        var sweptBars = (window.SMLayerInOut && SMLayerInOut.getBarSelection) ? SMLayerInOut.getBarSelection() : [];
+        if (!sweptBars.length) syncBarSelToLayerSel();
         renderLayerList(); renderTimeline();
         if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
       }
