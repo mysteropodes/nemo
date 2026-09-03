@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo_nemo_alpha.png" alt="Nemo logo" width="120">
+</p>
+
 # Nemo
 
 **Open-source motion design and 2D animation, in one app.** A full keyframe motion editor —
