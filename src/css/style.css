@@ -2785,13 +2785,14 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
   background:transparent;}
 .psec-identity>.pbdy{padding:13px 16px 12px;background:transparent;}
 
-/* Project repo link on the start screen (index.html #start-github). Sits
-   under the action rows as a quiet footnote, not a fourth card: it's an
-   outbound link, not something you start work with — the visual weight has
-   to say so. */
-#start-github{display:inline-flex;align-items:center;gap:7px;margin:2px 0 20px;
+/* Project repo + community links on the start screen (index.html
+   #start-github, #start-discord). Sit under the action rows as quiet
+   footnotes, not a fourth card: they're outbound links, not something you
+   start work with — the visual weight has to say so. */
+#start-social{display:flex;align-items:center;gap:20px;margin:2px 0 20px;flex-wrap:wrap;}
+#start-github,#start-discord{display:inline-flex;align-items:center;gap:7px;
   font-size:11px;color:var(--text-dim);text-decoration:none;transition:color .15s;}
-#start-github:hover{color:var(--text);}
+#start-github:hover,#start-discord:hover{color:var(--text);}
 
 /* Document's BG + view-toggle row wraps instead of overflowing (2026-08-31,
    feedback #187: "les bouton de document devrait wrapper si je resize plus
