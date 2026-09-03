@@ -11651,6 +11651,28 @@ window.updateCombinePanel=updateCombinePanel;
     var aeCamHint=document.getElementById('exp-ae-camera-hint');
     if(aeCamHint)aeCamHint.style.display=(v==='ae-camera')?'flex':'none';
   }
+  // L'export Rive parle à Rive Editor par MCP sur 127.0.0.1:9791. Dans un
+  // navigateur, cette requête ne peut pas aboutir (origine locale bloquée, et
+  // aucune permission de joindre un service de la machine) : sur desktop elle
+  // passe par le client HTTP de Rust, qui n'a pas cette contrainte. Plutôt que
+  // de laisser l'utilisateur choisir un format qui échouera avec un message
+  // technique, l'option est GRISÉE hors de l'app, avec la raison écrite à côté.
+  (function gateDesktopOnlyFormats(){
+    if(typeof window.__TAURI__!=='undefined')return;
+    var opt=fmtSel.querySelector('option[value="rive"]');
+    if(!opt)return;
+    opt.disabled=true;
+    if(fmtSel.value==='rive')fmtSel.value='png';
+    var base=opt.textContent.trim();
+    // Le libellé passe par SM.afterI18n : ce fichier est chargé AVANT i18n.js,
+    // donc SM.t rendrait la clé brute si on l'appelait ici — et cette liste de
+    // rappels est justement rejouée à chaque changement de langue, ce qui règle
+    // le même problème une seconde fois.
+    window.SM=window.SM||{};
+    (window.SM.afterI18n=window.SM.afterI18n||[]).push(function(){
+      opt.textContent=base+' — '+SM.t('expAppOnly');
+    });
+  })();
   fmtSel.addEventListener('change',updateScaleVisibility);
   scaleSel.addEventListener('change',function(){
     if(scaleSel.value==='custom'){wInput.value=state.canvasW;hInput.value=state.canvasH;}

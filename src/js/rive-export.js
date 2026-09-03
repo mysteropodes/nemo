@@ -48,6 +48,9 @@
 // 3-point stroke), but not pixel-identical to the bezier "static" shapes.
 //
 // Known gaps vs the Lottie exporter (documented, not silently dropped):
+// - (corrigé le 2026-09-03 : le duplicateur mograph et les effets de tracé
+//   manquaient, faute de lire getEffectiveStrokesRendered — voir le
+//   commentaire au point de lecture.)
 // - Blend modes: path_editor's paint schema has no blendMode field, so
 //   layer blend modes are not carried over.
 // - Symbols/components: getEffectiveStrokes() already flattens these into
@@ -567,7 +570,16 @@
       // anonymous only — exactly the old behavior, no worse.
       var laneOf0={},laneCount0=0;
       for(var f0=r.start;f0<=r.end;f0++){
-        var arr0=getEffectiveStrokes(li0,f0).filter(function(sd){return !sd.isBrushTextureCopy&&(sd.opacity!==0||sd.brushTexturePreset);});
+        // getEffectiveStrokesRendered, pas getEffectiveStrokes (2026-09-03) :
+        // pour un calque ordinaire les deux rendent le MÊME tableau, mais la
+        // variante « Rendered » est la seule qui applique le duplicateur
+        // mograph et les effets de tracé (path-fx.js). En lisant la variante
+        // nue, cet export sortait la forme source d'un duplicateur sans
+        // aucune de ses copies, et une forme sans sa déformation — sans rien
+        // signaler. C'est la famille de bug n°1 du CLAUDE.md : un mécanisme
+        // branché sur UN lecteur et pas sur les autres. export.js (PNG,
+        // vidéo, Lottie) lisait déjà la bonne variante.
+        var arr0=getEffectiveStrokesRendered(li0,f0).filter(function(sd){return !sd.isBrushTextureCopy&&(sd.opacity!==0||sd.brushTexturePreset);});
         var row0=[],anon0=0;
         for(var s0=0;s0<arr0.length;s0++){
           var sd0=arr0[s0];
