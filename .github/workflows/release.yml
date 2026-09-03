@@ -101,6 +101,30 @@ jobs:
 
       - run: npm ci || npm install
 
+      # Two-phase build. Tauri has no post-app/pre-dmg hook (only
+      # beforeBuildCommand and beforeBundleCommand, both of which fire
+      # before the .app is even scaffolded — too early to patch its
+      # Contents/), so the .app has to be built and patched in its own
+      # pass BEFORE tauri-action's normal build+bundle+publish call gets
+      # anywhere near it.
+      #
+      # Bug this replaces (2026-09): the previous single-pass workflow ran
+      # tauri-action first (building AND publishing the dmg/tar.gz in one
+      # shot), then tried to patch the .app afterward — patching a file
+      # nobody would ever look at again, since the already-published dmg
+      # was built from the unpatched .app. On top of that, the patch step
+      # itself silently failed on every build (missing its one required
+      # argument, swallowed by `|| echo "::warning::..."`), so this had
+      # never actually worked even for the file it was patching. Net
+      # effect: every past release's ffmpeg sidecar still pointed at
+      # /opt/homebrew/opt/... paths that only exist on the CI runner — the
+      # app would crash on Export on any real user's Mac.
+      - name: Build the .app (no bundling yet)
+        run: npx tauri build --target ${{ matrix.target }} -b app
+
+      - name: Make the .app self-contained
+        run: python3 scripts/bundle-ffmpeg-dylibs.py "src-tauri/target/${{ matrix.target }}/release/bundle/macos/Nemo.app"
+
       - name: Build and publish the release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -123,10 +147,14 @@ jobs:
           # GitHub — so the prerelease label would only be cosmetic here,
           # at the cost of breaking auto-update for every future version.
           prerelease: false
+          # Cargo has nothing left to compile at this point (the previous
+          # step already built this exact target) — this call's own
+          # `tauri build` re-invocation is effectively just "assemble the
+          # dmg/updater-tar.gz around the .app that's already on disk and
+          # publish them", it should not touch Contents/Frameworks (added
+          # by the dylib patch above) since Tauri's bundler only manages
+          # the paths it knows about (binary, resources, sidecars, Info.plist).
           args: --target ${{ matrix.target }}
           # Writes latest.json next to the artifacts, which is what
           # tauri.conf.json's updater endpoint now reads.
           includeUpdaterJson: true
-
-      - name: Make the .app self-contained
-        run: python3 scripts/bundle-ffmpeg-dylibs.py || echo "::warning::dylib bundling skipped"
