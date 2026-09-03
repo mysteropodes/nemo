@@ -108,7 +108,7 @@ jobs:
           # fine-grained PAT scoped to ONLY mysteropodes/strokemotion-feedback,
           # Issues:write + Contents:write. Without it the build fails outright
           # (env! is a hard compile error, not a runtime default).
-          STROKEMOTION_FEEDBACK_TOKEN: ${{ secrets.STROKEMOTION_FEEDBACK_TOKEN }}
+          NEMO_FEEDBACK_TOKEN: ${{ secrets.NEMO_FEEDBACK_TOKEN }}
         with:
           tagName: ${{ github.event.inputs.tag || github.ref_name }}
           releaseName: 'Nemo __VERSION__'
