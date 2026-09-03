@@ -340,7 +340,7 @@
   function disableSync(){setSyncFolder(null);}
   async function publishToShared(){
     var root=getSyncFolder();
-    if(!root){showToast('Configurez un dossier de sync d\'abord');return;}
+    if(!root){showToast(SM.t('hsSetSyncFolderFirst'));return;}
     if(!tauriOk()){showToast(SM.t('toastTeamSyncRequiresDesktop'));return;}
     saveAllLayerFrames();
     var json=window.SM.exportJSON();
@@ -570,7 +570,7 @@
   }
   function closeTab(id){
     var idx=tabs.findIndex(function(t){return t.id===id;});if(idx<0)return;
-    if(tabs.length===1){showToast('Impossible de fermer le dernier onglet');return;}
+    if(tabs.length===1){showToast(SM.t('hsCannotCloseLastTab'));return;}
     var wasActive=id===activeTabId;
     tabs.splice(idx,1);
     if(wasActive){

@@ -604,7 +604,7 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
         row.appendChild(pct);
         var del = document.createElement('button');
         del.className = 'rig-weight-del'; del.textContent = '×';
-        del.title = 'Retirer cet os de ce vertex';
+        del.title = SM.t('hsRemoveBoneFromVertex');
         del.addEventListener('click', function () {
           ensureUndo();
           var idx = entries.indexOf(we);
@@ -631,7 +631,7 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
         });
         addRow.appendChild(sel);
         var addBtn = document.createElement('button');
-        addBtn.className = 'pbtn'; addBtn.textContent = '+ Ajouter';
+        addBtn.className = 'pbtn'; addBtn.textContent = SM.t('hsAdd');
         addBtn.addEventListener('click', function () {
           ensureUndo();
           var bone = ld.rig.bones[sel.value];
@@ -652,7 +652,7 @@ var _rigDraw = { path: null, boneId: null, ld: null, draggingHandle: false, last
       var resetBtn = document.createElement('button');
       resetBtn.className = 'pbtn';
       resetBtn.textContent = 'Réinitialiser (auto)';
-      resetBtn.title = 'Recalcule ce vertex avec la formule de poids automatique (distance aux os, rayon + adoucissement du panneau)';
+      resetBtn.title = SM.t('hsRecomputeVertexWeights');
       resetBtn.addEventListener('click', function () {
         ensureUndo();
         var boneIds = Object.keys(ld.rig.bones);

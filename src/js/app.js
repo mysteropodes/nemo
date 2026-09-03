@@ -3261,7 +3261,7 @@ function exposeSymbolProperty(symId,targetStrokeId,targetField,label,defaultVal)
 // function parsing fine). Registered in timeline.js's own literal instead.
 function convertLayerToComponent(layerIdx){
   if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
-  var ld=state.layers[layerIdx];if(!ld){showToast('Calque invalide');return;}
+  var ld=state.layers[layerIdx];if(!ld){showToast(SM.t('labsToastLayerInvalid'));return;}
   var bad=badComponentSourceReason(ld);
   if(bad){showToast('Impossible de convertir : '+bad);return;}
   saveAllLayerFrames();pushUndo(true);
@@ -3764,7 +3764,7 @@ function mergeLayersIntoOne(indices,opts){
   var srcs=[],bad=null;
   for(var a=0;a<idx.length;a++){
     var l=state.layers[idx[a]];
-    if(!l){if(!silent)showToast('Calque introuvable');return false;}
+    if(!l){if(!silent)showToast(SM.t('hsLayerNotFound'));return false;}
     // Non-stroke-holders have no `frames` content to concatenate — merging
     // one would quietly delete whatever it stands for (a component's whole
     // symbol, a montage, a decoded video). Refuse with a reason instead.
@@ -4276,7 +4276,7 @@ function enterMontageView(montageId){
   if(!window.SMStoryboard)return;
   var m=SMStoryboard.montageById(montageId);if(!m)return;
   var mods=SMStoryboard.chainModsForView(m);
-  if(!mods.length){showToast('Montage vide — accrochez des instances contre son bloc d\'abord');return;}
+  if(!mods.length){showToast(SM.t('hsMontageEmpty'));return;}
   saveAllLayerFrames();
   if(typeof clearSel==='function')clearSel(); // see enterSymbol's own comment — same document-swap stale-selection risk
   // markers/motionArcs/tweenOverrides/tweenEasing (2026-07-30 fix) — same
@@ -5049,7 +5049,7 @@ function enforceChannelStrip(ld,c){
 function convertLayerToStrokeFillShadowFolder(layerIdx){
   var src=state.layers[layerIdx];
   if(!src)return;
-  if(src.symbolId||src.lfsGroup){showToast('Impossible sur un composant ou un groupe LFS existant');return;}
+  if(src.symbolId||src.lfsGroup){showToast(SM.t('hsNotOnComponentOrLfs'));return;}
   saveAllLayerFrames();
   pushUndoLayers(true);
   // Items drawn with the Draw tool's "Shadow" toggle on carry

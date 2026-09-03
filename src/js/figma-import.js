@@ -569,7 +569,7 @@
       var token = (function () { try { return localStorage.getItem(TOKEN_KEY) || tokenInput.value; } catch (e) { return tokenInput.value; } })();
       var url = urlInput ? urlInput.value : '';
       if (!token) { if (window.showToast) showToast('Colle ton token Figma personnel d\'abord'); return; }
-      if (!url) { if (window.showToast) showToast('Colle un lien ou une clé de fichier Figma'); return; }
+      if (!url) { if (window.showToast) showToast(SM.t('hsFigmaPaste')); return; }
       if (window.showToast) showToast('Import Figma…');
       importFromToken(url, token).then(function (report) {
         var msg = report.framesImported + ' frame(s), ' + report.shapesImported + ' forme(s), ' + report.textsImported + ' texte(s), ' + report.imagesImported + ' image(s) importé(s)';

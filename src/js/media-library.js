@@ -789,10 +789,10 @@
         e.preventDefault();
         var openTabs = (window.SMProject && SMProject.getOpenTabs) ? SMProject.getOpenTabs() : [];
         var tab = openTabs.find(function (t) { return t.id === tabId; });
-        if (!tab || !tab.json) { if (window.showToast) showToast('Cet onglet de projet n\'est plus disponible.'); return; }
+        if (!tab || !tab.json) { if (window.showToast) showToast(SM.t('hsTabGone')); return; }
         var foreignData;
         try { foreignData = JSON.parse(tab.json); }
-        catch (e2) { if (window.showToast) showToast('Impossible de lire cet onglet de projet.'); return; }
+        catch (e2) { if (window.showToast) showToast(SM.t('hsTabUnreadable')); return; }
         if (window.instantiateForeignProjectAsComponent) window.instantiateForeignProjectAsComponent(foreignData, tab.name || 'Untitled');
       });
     }

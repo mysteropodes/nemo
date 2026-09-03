@@ -4010,7 +4010,7 @@
         return;
       }
       console.error('[engine-bridge] render failed, disabling', e);
-      if (window.showToast) showToast('Moteur de rendu Rust interrompu (géométrie invalide) — passage en Paper.js. Sauvegardez et rechargez pour le restaurer.');
+      if (window.showToast) showToast(SM.t('hsEngineHalted'));
       setEnabled(false, true);
       return;
     }

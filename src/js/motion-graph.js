@@ -200,7 +200,7 @@
     if (_rh && _rh.parentNode) return _rh;
     _rh = document.createElement('div');
     _rh.id = 'motion-graph-resize';
-    _rh.title = 'Glisser pour agrandir/réduire le graph en hauteur';
+    _rh.title = SM.t('hsGraphResize');
     // z-index high enough to win over #tlzoom-scrollbar (timeline-zoom.js,
     // z-index:auto, CLAUDE.md §11's "40px bottom band") — when the graph
     // fills #fg-wrap's full height (no override yet), this handle's default

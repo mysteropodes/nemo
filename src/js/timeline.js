@@ -952,7 +952,7 @@ window.SM={
     saveAllLayerFrames();pushUndoLayers(true);
     SMMotion.setLayerParent(idx,null);
     loadFrame(state.currentFrame);renderLayerList();renderTimeline();updateUI();
-    showToast('Calque retiré du dossier');
+    showToast(SM.t('hsLayerRemovedFromFolder'));
   },
   // Effect (adjustment) layer (2026-07, Motion) — AE's "Adjustment Layer":
   // no painted content of its own (frames/strokes ignored on purpose,
@@ -1041,7 +1041,7 @@ window.SM={
     // has nowhere to draw — but it was silent, so the trash button just
     // appeared broken (2026-07-25 UX audit). Every other refusal in this file
     // says why; this one now does too.
-    if(state.layers.length<=1){showToast('Impossible de supprimer le dernier calque');return;}
+    if(state.layers.length<=1){showToast(SM.t('hsCannotDeleteLastLayer'));return;}
     saveAllLayerFrames();
     pushUndoLayers(true);
     var sel=(_layerSel.length?_layerSel.slice():[state.activeLayerIdx]).sort(function(a,b){return b-a;});
@@ -1097,7 +1097,7 @@ window.SM={
     if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
     if(state.activeMontageViewId){showToast(SM.t('toastCloseMontageFirst'));return;}
     var inF=state.waIn||0,outF=(state.waOut!=null?state.waOut:state.totalFrames-1);
-    if(outF<=inF){showToast('Zone de travail trop courte');return;}
+    if(outF<=inF){showToast(SM.t('hsWorkAreaTooShort'));return;}
     if(inF===0&&outF===state.totalFrames-1){showToast(SM.t('toastWorkAreaAlreadyCoversAll'));return;}
     saveAllLayerFrames();pushUndoLayers(true);
     var n=outF-inF+1;
@@ -1199,7 +1199,7 @@ window.SM={
   // retimed independently afterwards without anything being lost).
   splitLayerAtPlayhead:function(li){
     li=(li==null?state.activeLayerIdx:li);
-    var ld=state.layers[li];if(!ld){showToast('Aucun calque');return;}
+    var ld=state.layers[li];if(!ld){showToast(SM.t('hsNoLayer'));return;}
     var f=state.currentFrame;
     var inF=window.layerInPoint?layerInPoint(ld):(ld.inPoint!=null?ld.inPoint:0);
     var outF=window.layerOutPoint?layerOutPoint(ld):(ld.outPoint!=null?ld.outPoint:state.totalFrames-1);
@@ -3815,7 +3815,7 @@ function selectGhostAll(){
   // self-enables Ghost All instead of requiring that separate step —
   // same side effects toggleGhostAll's own "turning on" branch has.
   var li=state.activeLayerIdx,cf=state.currentFrame;
-  var ld=state.layers[li];if(!ld||ld.symbolId){showToast('Ghost All ne fonctionne pas sur un composant');return;}
+  var ld=state.layers[li];if(!ld||ld.symbolId){showToast(SM.t('hsGhostAllNotOnComponent'));return;}
   if(!state.ghostAllFrames){
     state.ghostAllFrames=true;
     renderOS();
@@ -6398,7 +6398,7 @@ function renderLayerList(frameOnly){
     // color-picker popover used for stroke/fill swatches; every layer
     // already has SOME color (assigned at creation, app.js nextLayerColor),
     // this only ever changes which one, never turns it "off".
-    var cdot=document.createElement('div');cdot.className='lico layer-color-dot';cdot.title='Couleur du calque';cdot.style.setProperty('--dot-color',ld.color||'#8b8b9e');
+    var cdot=document.createElement('div');cdot.className='lico layer-color-dot';cdot.title=SM.t('hsLayerColour');cdot.style.setProperty('--dot-color',ld.color||'#8b8b9e');
     cdot.dataset.layer=i;
     cdot.title=SM.t('layerColorDotTitle');
     cdot.addEventListener('click',function(e){
@@ -6463,7 +6463,7 @@ function renderLayerList(frameOnly){
     // applies here -- a text layer's items are still ordinary Rasters).
     // Auto-set the first time text lands on an empty layer (commitText,
     // "Outil texte" section) or explicitly via the layer row's context menu.
-    if(ld.isTextLayer){var txb=document.createElement('div');txb.className='lico comp-badge';txb.title='Calque de texte';txb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">T</span>';row.appendChild(txb);}
+    if(ld.isTextLayer){var txb=document.createElement('div');txb.className='lico comp-badge';txb.title=SM.t('hsTextLayer');txb.innerHTML='<span style="font-size:11px;line-height:1;font-weight:700">T</span>';row.appendChild(txb);}
     // Null / Effect layer badges (2026-07, Motion) — same "lico comp-badge"
     // text-glyph convention as every badge above (this project's embedded
     // icon font is subsetted and silently renders blank for un-included
@@ -7319,7 +7319,7 @@ function renderDuplicatorEffectors(dup){
       var rad=num('R',function(v){eff.radius=v;},eff.radius||200,1,'Rayon d’action (px) — distance à laquelle l’influence de cet effector retombe à zéro. Le point d’origine se règle en glissant le repère de l’effector sur le canvas, en mode Motion.');hdr.appendChild(rad[0]);hdr.appendChild(rad[1]);
     }
     var str=num('%',function(v){eff.strength=v;},eff.strength!=null?eff.strength:100,1,'Force globale de cet effector (%) — multiplie toutes ses propriétés ci-dessous. 0% = aucun effet, 100% = plein effet au centre.');hdr.appendChild(str[0]);hdr.appendChild(str[1]);
-    var delBtn=document.createElement('button');delBtn.className='pbtn';delBtn.textContent='✕';delBtn.style.marginLeft='auto';delBtn.title='Supprimer cet effector';
+    var delBtn=document.createElement('button');delBtn.className='pbtn';delBtn.textContent='✕';delBtn.style.marginLeft='auto';delBtn.title=SM.t('hsDeleteEffector');
     delBtn.addEventListener('click',function(){pushUndo();dup.effectors.splice(i,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();});
     hdr.appendChild(delBtn);
     if((eff.falloff||'radial')==='linear'){
@@ -9511,7 +9511,7 @@ function fbDashCardEl(issue){
   }
   if(issue.body){
     var det=document.createElement('details');
-    var sum=document.createElement('summary');sum.textContent='Voir le trail complet';
+    var sum=document.createElement('summary');sum.textContent=SM.t('hsSeeFullTrail');
     var pre=document.createElement('pre');pre.textContent=issue.body;
     det.appendChild(sum);det.appendChild(pre);card.appendChild(det);
   }
@@ -10971,7 +10971,7 @@ function matteModeLabel(mode){
     // matteSourceLayerUid at commit below, so the default matches the old
     // behavior but survives reordering.
     if(state.layers.length<2){
-      if(window.showToast)showToast('Aucun autre calque pour servir de matte');
+      if(window.showToast)showToast(SM.t('hsNoOtherLayerForMatte'));
       return;
     }
     origMode=ld.matteMode||'none';

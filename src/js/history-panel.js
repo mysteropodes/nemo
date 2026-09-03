@@ -53,7 +53,7 @@ function renderHistoryPanel(){
   var header=document.createElement('div');header.className='hist-header';
   header.appendChild(document.createTextNode((undoStack.length+redoStack.length+1)+' états'));
   var clear=document.createElement('span');clear.className='hist-clear';clear.textContent='Effacer';
-  clear.title='Vider l\'historique de session (n\'affecte pas le contenu du projet)';
+  clear.title=SM.t('hsClearSessionHistory');
   clear.addEventListener('click',function(e){
     e.stopPropagation();
     state.undoStack=[];state.undoLabels=[];state.redoStack=[];state.redoLabels=[];
@@ -65,7 +65,7 @@ function renderHistoryPanel(){
 
   if(!undoStack.length&&!redoStack.length){
     var empty=document.createElement('div');empty.className='hist-empty';
-    empty.textContent='Aucune action encore dans cette session.';
+    empty.textContent=SM.t('hsNoActionYet');
     pop.appendChild(empty);
     return;
   }

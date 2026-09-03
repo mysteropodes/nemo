@@ -48,7 +48,7 @@
   var replaceArmed = false, replaceSource = null;
   function startReplace() {
     replaceArmed = true; replaceSource = null;
-    showToast('Remplacer : clique la couleur SOURCE dans le calque, puis la couleur CIBLE');
+    showToast(SM.t('hsPaletteReplaceHint'));
     render();
   }
   function cancelReplace() { replaceArmed = false; replaceSource = null; render(); }
@@ -183,7 +183,7 @@
           { label: 'Utiliser comme Fill', action: function () { window.SM.setFillColor(hex); if (!state.fillEnabled) window.SM.setFillEnabled(true); } },
           { label: 'Utiliser comme Stroke', action: function () { window.SM.setStrokeColor(hex); } },
           { sep: true },
-          { label: 'Remplacer dans le calque…', action: function () { replaceArmed = true; replaceSource = hex; render(); showToast('Clique la couleur CIBLE'); } },
+          { label: 'Remplacer dans le calque…', action: function () { replaceArmed = true; replaceSource = hex; render(); showToast(SM.t('hsClickTargetColor')); } },
           { sep: true },
           { label: 'Retirer de la palette', action: function () { removeColor(idx); } },
         ]);
@@ -251,7 +251,7 @@
     render();
   }
   function deletePalette(idx) {
-    if (palettes().length <= 1) { showToast('Il faut garder au moins une palette'); return; }
+    if (palettes().length <= 1) { showToast(SM.t('hsKeepOnePalette')); return; }
     palettes().splice(idx, 1);
     if (state.activePaletteIdx >= palettes().length) state.activePaletteIdx = palettes().length - 1;
     render();

@@ -161,7 +161,7 @@
     if (!layers.length) {
       var none = document.createElement('div');
       none.className = 'asset-folder-empty-hint';
-      none.textContent = 'Aucun calque dans ce fichier.';
+      none.textContent = SM.t('hsNoLayerInFile');
       layerList.appendChild(none);
     }
 
@@ -179,7 +179,7 @@
     if (!media.length) {
       var none2 = document.createElement('div');
       none2.className = 'asset-folder-empty-hint';
-      none2.textContent = 'Aucun média catalogué dans ce fichier.';
+      none2.textContent = SM.t('hsNoMediaInFile');
       mediaList.appendChild(none2);
     }
   }
@@ -338,7 +338,7 @@
     modalEl.querySelector('#tp-empty').style.display = '';
     modalEl.querySelector('#tp-lists').style.display = 'none';
     modalEl.querySelector('#tp-import').style.display = 'none';
-    modalEl.querySelector('#tp-title').textContent = 'Transplanter depuis un projet';
+    modalEl.querySelector('#tp-title').textContent = SM.t('transplantTitle');
     showError('');
     open();
   });

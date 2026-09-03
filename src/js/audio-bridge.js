@@ -176,11 +176,11 @@
         row.appendChild(dimR);
         var hL = document.createElement('div'); hL.className = 'layer-inout-handle left audio-trim-handle';
         hL.style.top = '2px'; hL.style.height = STRIP_H + 'px';
-        hL.title = 'Point d’entrée — glisser pour rogner';
+        hL.title = SM.t('hsAudioInTitle');
         row.appendChild(hL);
         var hR = document.createElement('div'); hR.className = 'layer-inout-handle right audio-trim-handle';
         hR.style.top = '2px'; hR.style.height = STRIP_H + 'px';
-        hR.title = 'Point de sortie — glisser pour rogner';
+        hR.title = SM.t('hsAudioOutTitle');
         row.appendChild(hR);
         (function (track, dimL, dimR, hL, hR, pxPerSec, baseLeft) {
           function layoutTrim() {

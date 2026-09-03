@@ -68,7 +68,7 @@
       var del = document.createElement('span');
       del.className = 'bp-item-del';
       del.textContent = '×';
-      del.title = 'Supprimer ce preset';
+      del.title = SM.t('hsDeletePreset');
       del.addEventListener('click', function (e) {
         e.stopPropagation();
         delete _presets[id];
