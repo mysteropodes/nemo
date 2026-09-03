@@ -4038,6 +4038,39 @@ function renderTimeline(){
   var _scroll=_tlScrollSnapshot();
   var hdr=document.getElementById('frame-hdr'),grid=document.getElementById('frame-grid');hdr.innerHTML='';grid.innerHTML='';
   var fps=Math.max(1,state.fps);
+  // Pas des graduations chiffrées, calculé d'après la largeur RÉELLE d'une
+  // image à l'écran (2026-09-03, Cyril : « quand on a une timeline très longue
+  // on a un problème avec la barre de temps »). Le pas était fixe — un chiffre
+  // toutes les 5 images, plus une étiquette par seconde — donc dès qu'on
+  // dézoome, ou sur une timeline longue, les nombres se chevauchent jusqu'à
+  // former une bouillie illisible. On choisit maintenant le plus petit pas
+  // « rond » qui laisse au moins 46 px entre deux étiquettes, ce qui est la
+  // place d'un nombre à trois chiffres plus sa respiration.
+  var _fcpx=(typeof FC==='number'&&FC>0)?FC:30;
+  var _minFrames=46/_fcpx;
+  var _ladder=[1,2,5,10,15,20,25,30,50,60,100,120,150,200,250,300,500,600,1000,1500,2000,3000,5000];
+  var _frameStep=_ladder.filter(function(v){return v>=_minFrames;})[0]||Math.ceil(_minFrames/1000)*1000;
+  // Les secondes se raréfient de la même façon ; au-delà, elles portent seules
+  // la lecture et les numéros d'image deviennent redondants.
+  var _secStep=Math.max(1,Math.ceil(_minFrames/fps));
+  var _showFrameNums=_frameStep<fps;
+  // Quand les deux familles cohabitent, le pas des images est calé sur un
+  // DIVISEUR du fps : sinon les numéros tombent de travers par rapport aux
+  // secondes et la garde ci-dessous en supprime un sur deux, ce qui donne un
+  // rythme bancal (« 10 · 1s · 40 · 2s · 60 ») au lieu d'une règle régulière.
+  if(_showFrameNums){
+    for(var _d=Math.ceil(_minFrames);_d<fps;_d++){ if(fps%_d===0){_frameStep=_d;break;} }
+  }
+  // Les numéros d'image et les secondes sont deux familles d'étiquettes
+  // indépendantes : chacune peut être assez espacée pour elle-même et venir
+  // quand même se coller à l'autre (mesuré : « 120 » collé à « 5s », 4 px).
+  // Un numéro d'image n'est donc écrit que s'il est assez loin de la seconde
+  // étiquetée la plus proche.
+  var _secPeriod=_secStep*fps;
+  function _farFromSec(i){
+    var m=i%_secPeriod;
+    return Math.min(m,_secPeriod-m)>=_minFrames;
+  }
   for(var i=0;i<state.totalFrames;i++){
     var c=document.createElement('div');c.className='fhc';if(i===state.currentFrame)c.classList.add('cur');
     // Second-boundary ticks (Animate-style ruler: "1s"/"2s" labels take
@@ -4056,8 +4089,8 @@ function renderTimeline(){
     //
     // The plain every-5 tick keeps showing the 1-based frame NUMBER (i+1),
     // which is what the rest of the UI displays — that part was never wrong.
-    if(i>0&&i%fps===0){c.classList.add('sec');c.textContent=Math.round(i/fps)+'s';}
-    else if((i+1)%5===0)c.textContent=i+1;
+    if(i>0&&i%fps===0){c.classList.add('sec');if(Math.round(i/fps)%_secStep===0)c.textContent=Math.round(i/fps)+'s';}
+    else if(_showFrameNums&&(i+1)%_frameStep===0&&_farFromSec(i))c.textContent=i+1;
     hdr.appendChild(c);
   }
   // Bug found 2026-07 ("pourquoi visuellement y a cette séparation du noir
