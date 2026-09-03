@@ -8,6 +8,7 @@ desktop or in your browser.
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange)
 ![Version](https://img.shields.io/badge/version-0.7.0--alpha.1-lightgrey)
+[![Discord](https://img.shields.io/discord/1544955036193267774?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/r28KY7h8a)
 
 ![The Motion editor: five layers with staggered in/out bars, a Position track with its
 keyframes, an editable motion path with its tangent handle on the canvas, and the media panel
@@ -37,7 +38,9 @@ important production on it without keeping backups.
 
 If you try it, [bug reports and ideas](https://github.com/mysteropodes/nemo/issues) are
 genuinely the most useful thing you can send — there's also a Comment button inside the
-app that files an issue for you, screenshot attached.
+app that files an issue for you, screenshot attached. There's also a
+[Discord](https://discord.gg/r28KY7h8a) if you'd rather chat, show off what you made, or
+just hang around.
 
 ## Try it
 
@@ -162,7 +165,7 @@ Every kind of contribution counts equally here:
 - **Money** — entirely optional, see below
 
 There's no CLA. By opening a PR you agree your contribution ships under the project's
-license.
+license. Active contributors get access to dev-only channels on [Discord](https://discord.gg/r28KY7h8a).
 
 ## Privacy
 
