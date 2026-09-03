@@ -1,6 +1,6 @@
 {
   "name": "nemo",
-  "version": "0.7.0-alpha.3",
+  "version": "0.7.0-alpha.4",
   "description": "Open-source motion design and 2D animation in one app — a keyframe motion editor alongside frame-by-frame drawing with automatic inbetweening",
   "scripts": {
     "tauri": "tauri",
