@@ -3019,8 +3019,14 @@ function getEffectiveStrokes(layerIdx,frameIdx,countOnly){
       sym.layers.forEach(function(symLayer){
         if(!symLayer||symLayer.visible===false)return;
         var sf=symLayer.frames[ii];if(!sf)return;
-        if(sf.isKeyframe||sf.isInterpolated){out=out.concat(sf.strokes);return;}
-        for(var k=ii-1;k>=0;k--){if(symLayer.frames[k].isKeyframe){out=out.concat(symLayer.frames[k].strokes);break;}}
+        // Effets de tracé posés DANS le composant (path-fx.js, 2026-09-03) :
+        // getEffectiveStrokesRendered ne voit que le calque d'INSTANCE, dont
+        // la pile est vide — sans ceci, entrer dans un composant, poser un
+        // zigzag et ressortir ne changeait rien à l'image, alors que la
+        // vignette du composant, elle, le montrait.
+        var _fx=function(arr){return (window.SMPathFx&&SMPathFx.hasAny(symLayer))?SMPathFx.apply(arr,symLayer,ii):arr;};
+        if(sf.isKeyframe||sf.isInterpolated){out=out.concat(_fx(sf.strokes));return;}
+        for(var k=ii-1;k>=0;k--){if(symLayer.frames[k].isKeyframe){out=out.concat(_fx(symLayer.frames[k].strokes));break;}}
       });
       return out;
     }
@@ -3031,6 +3037,9 @@ function getEffectiveStrokes(layerIdx,frameIdx,countOnly){
       if(sf.isKeyframe||sf.isInterpolated){layerStrokes=sf.strokes;}
       else{for(var k=ii-1;k>=0;k--){if(symLayer.frames[k].isKeyframe){layerStrokes=symLayer.frames[k].strokes;break;}}}
       if(!layerStrokes)return;
+      // Même raison que la branche ci-dessus : la pile d'effets de tracé
+      // appartient au calque INTERNE, pas à l'instance.
+      if(window.SMPathFx&&SMPathFx.hasAny(symLayer))layerStrokes=SMPathFx.apply(layerStrokes,symLayer,ii);
       // Element-level Motion (2026-07, "precomp par calque"): a per-shape
       // animated Position/Anchor/Rotation/Scale/Opacity INSIDE this component
       // instance — same descriptor and nesting order exportBuildFrame
