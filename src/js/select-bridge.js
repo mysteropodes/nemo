@@ -63,6 +63,29 @@
     _hoverPathA2D = itemA2D;
     return true;
   }
+  // Le rectangle de survol annonce CE QU'UN CLIC VA SÉLECTIONNER (c'est sa
+  // raison d'être : « peu importe où on clique, si la box de hover est
+  // affichée ça doit sélectionner l'objet »). Or un clic sur un membre de
+  // groupe sélectionne TOUT le groupe, alors que la box ne montrait que le
+  // membre survolé — sur un groupe fusionné, où les membres sont masqués au
+  // profit du résultat, le rectangle tombait donc à côté du dessin visible.
+  // Mesuré sur le fichier de test de Cyril (fusion imbriquée : soustraction
+  // d'un groupe uni et d'un groupe simple) : membre survolé 790..943 en x,
+  // dessin visible 791..1259 — d'où le décalage signalé.
+  // On remonte au groupe RACINE, celui qui est réellement dessiné, comme le
+  // fait déjà la sélection.
+  function hoverBoxForGroup(item) {
+    if (!item || !item.data || !item.data.groupId || !window.SMGroup) return null;
+    var li = state.activeLayerIdx, ld = state.layers[li], layer = userLayers[li];
+    if (!ld || !ld.groups || !layer) return null;
+    var gid = SMGroup.rootGroupOfItem ? SMGroup.rootGroupOfItem(item, ld) : item.data.groupId;
+    if (!gid || !ld.groups[gid]) return null;
+    var members = SMGroup.resolveGroupMembers(gid, ld, layer) || [];
+    if (members.length < 2) return null;
+    var b = null;
+    members.forEach(function (m) { if (m && m.bounds) b = b ? b.unite(m.bounds) : m.bounds.clone(); });
+    return b ? { b: b, angle: 0, pivot: b.center } : null;
+  }
   // Oriented-box containment scan (2026-08, click-inside-the-hover-box
   // fallback — see the onDown call site's own comment for why this is a
   // fresh scan rather than trusting the last hover result). Topmost child
@@ -3564,7 +3587,9 @@
       // Oriented (rotated) box, not the raw axis-aligned strokeBounds (2026-08
       // fix — see orientedBoxForPath's own comment, tools.js): a rotated
       // shape's AABB is bigger than and doesn't match its actual outline.
-      return (_hoverPathA2D && !_hoverPathA2D.removed) ? orientedBoxForPath(_hoverPathA2D) : null;
+      var p = (_hoverPathA2D && !_hoverPathA2D.removed) ? _hoverPathA2D : null;
+      if (!p) return null;
+      return hoverBoxForGroup(p) || orientedBoxForPath(p);
     },
     // Switching tools mid-marquee-drag (2026-07-29, QA-confirmed) used to
     // leave a stuck ghost selection rectangle: onUp's own finalization
