@@ -2090,10 +2090,14 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 #start-screen.hid{display:none;}
 #start-inner{width:520px;max-width:92vw;padding:30px 0 50px;}
 #start-brand{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:36px;}
-#start-brand-mark{width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex:none;}
-#start-brand-text{display:flex;flex-direction:column;align-items:flex-start;text-align:left;}
+/* 88px depuis la maquette du 2026-09-03 : Cyril a doublé la marque. */
+#start-brand-mark{width:88px;height:88px;display:flex;align-items:center;justify-content:center;flex:none;}
+#start-brand-text{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:0 12px;}
 #start-brand-title{font-size:26px;font-weight:800;letter-spacing:-.3px;color:#ECEAE7;line-height:1.2;}
-#start-brand-tagline{font-size:13px;color:#9aa0b4;margin-top:2px;}
+/* max-width plutôt qu'un <br> dans la chaîne : l'accroche est traduite en
+   quatre langues, et un retour forcé tomberait au mauvais endroit dans trois
+   d'entre elles. La largeur donne les deux lignes voulues dans chacune. */
+#start-brand-tagline{font-size:13px;color:#9aa0b4;margin-top:2px;max-width:250px;}
 #start-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;}
 #start-cards:not(.has-resume) #start-resume{display:none;}
 .start-card{background:#201f25;border-radius:8px;padding:26px 20px;cursor:pointer;display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;transition:background .15s;}
@@ -2761,8 +2765,8 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
    error — a red alarm on every launch reads as something being broken.
    Sized to sit quietly under the logo, but with a solid-fill badge so it
    can't be mistaken for body copy and skipped. */
-#start-alpha-note{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;
-  padding:10px 12px;border-radius:8px;
+#start-alpha-note{display:flex;align-items:flex-start;gap:10px;margin:11px 0 14px;
+  padding:11px 12px;border-radius:8px;
   background:rgba(232,182,76,.09);border:1px solid rgba(232,182,76,.28);}
 .start-alpha-badge{flex:0 0 auto;background:#e8b64c;color:#0b0a0d;
   font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
@@ -2789,7 +2793,7 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
    #start-github, #start-discord). Sit under the action rows as quiet
    footnotes, not a fourth card: they're outbound links, not something you
    start work with — the visual weight has to say so. */
-#start-social{display:flex;align-items:center;gap:20px;margin:2px 0 20px;flex-wrap:wrap;}
+#start-social{display:flex;align-items:center;gap:20px;margin:13px 0;flex-wrap:wrap;}
 #start-github,#start-discord{display:inline-flex;align-items:center;gap:7px;
   font-size:11px;color:var(--text-dim);text-decoration:none;transition:color .15s;}
 #start-github:hover,#start-discord:hover{color:var(--text);}

@@ -42,82 +42,20 @@ async fn run_ffmpeg(app: tauri::AppHandle, window: tauri::Window, args: Vec<Stri
     }
 }
 
-// Beta-tester feedback → public GitHub repo (mysteropodes/strokemotion-feedback),
-// one Issue per feedback entry. The write token is baked in at compile time
-// via env! — export STROKEMOTION_FEEDBACK_TOKEN before `tauri build` —
-// scoped as a
-// fine-grained PAT to ONLY this one repo, ONLY "Issues: write" — nothing
-// else, so an extracted token can at worst spam issues in a repo that
-// contains no app source. The POST happens entirely in Rust (never in JS)
-// so the token never touches the webview's network inspector or any
-// devtools-visible fetch() call — see feedback-bridge.js's comment for why
-// this command exists instead of a plain JS fetch.
-#[tauri::command]
-async fn submit_feedback_issue(title: String, body: String, labels: Vec<String>) -> Result<(), String> {
-    let token = env!("STROKEMOTION_FEEDBACK_TOKEN");
-    let client = reqwest::Client::new();
-    let payload = serde_json::json!({ "title": title, "body": body, "labels": labels });
-    let resp = client
-        .post("https://api.github.com/repos/mysteropodes/strokemotion-feedback/issues")
-        .header("Authorization", format!("Bearer {}", token))
-        .header("Accept", "application/vnd.github+json")
-        .header("User-Agent", "strokemotion-app")
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    if resp.status().is_success() {
-        Ok(())
-    } else {
-        let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-        Err(format!("GitHub API error {}: {}", status, text))
-    }
-}
-
-// Feedback screenshot attachments — committed via the GitHub Contents API
-// into strokemotion-feedback's attachments/ folder, then linked from the
-// issue body via raw.githubusercontent.com (GFM doesn't render data:
-// URIs, so the image has to actually be a file in the repo to show up
-// inline). Needs "Contents: Read and write" on top of submit_feedback_
-// issue's "Issues" permission — a deliberate scope increase on the same
-// embedded, repo-scoped token (see CLAUDE.md's feedback section for the
-// trade-off): a leaked token can now write arbitrary files into this one
-// code-free repo, not just spam issues, but still can't touch anything
-// else. content_base64 is passed straight through — the Contents API's
-// `content` field IS base64 already, no decode/re-encode needed here.
-#[tauri::command]
-async fn upload_feedback_attachment(filename: String, content_base64: String) -> Result<String, String> {
-    let token = env!("STROKEMOTION_FEEDBACK_TOKEN");
-    let client = reqwest::Client::new();
-    let path = format!("attachments/{}", filename);
-    let payload = serde_json::json!({
-        "message": format!("Feedback attachment: {}", filename),
-        "content": content_base64,
-    });
-    let resp = client
-        .put(format!(
-            "https://api.github.com/repos/mysteropodes/strokemotion-feedback/contents/{}",
-            path
-        ))
-        .header("Authorization", format!("Bearer {}", token))
-        .header("Accept", "application/vnd.github+json")
-        .header("User-Agent", "strokemotion-app")
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    if resp.status().is_success() {
-        Ok(format!(
-            "https://raw.githubusercontent.com/mysteropodes/strokemotion-feedback/main/{}",
-            path
-        ))
-    } else {
-        let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-        Err(format!("GitHub upload error {}: {}", status, text))
-    }
-}
+// Beta-tester feedback (issues + screenshot attachments) used to POST
+// straight to GitHub from here, with a write-scoped token baked in via
+// env!() at compile time. That token had to be embedded in every
+// distributed binary, and — since this bypassed the nemo-feedback Worker
+// entirely — it also skipped the Worker's spam filter (worker-feedback/
+// src/index.js's looksLikeSpam), the same protection the web build already
+// gets. Removed 2026-09: feedback-bridge.js now posts through that Worker
+// on desktop too, using tauri_plugin_http's fetch (window.__TAURI__.http.
+// fetch) instead of `window.fetch` — a plain fetch() would be blocked by
+// both the CSP's connect-src (which doesn't list the Worker) and the
+// Worker's own CORS allowlist (which only lists the web origins, not
+// tauri://localhost); routing the request through Rust via the plugin
+// sidesteps both without having to widen either guard. See
+// worker-feedback/README.md for the Worker side.
 
 // Live Google Fonts (2026-08-28, feedback: "peux t'on avoir d'autre typo
 // sans probleme de droit genre les google fonts ?" then "un vrai catalogue
@@ -258,8 +196,6 @@ pub fn run() {
         .manage(video_decode::VideoSessions::default())
         .invoke_handler(tauri::generate_handler![
             run_ffmpeg,
-            submit_feedback_issue,
-            upload_feedback_attachment,
             fetch_google_font,
             video_decode::open_video_session,
             video_decode::decode_video_frame,

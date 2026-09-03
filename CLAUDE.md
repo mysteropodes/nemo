@@ -405,22 +405,31 @@ Transport multi-poste : réutilise le dossier de Sync équipe déjà existant
 profils et importe leurs entrées en LOCAL avec `status:'pending'` (jamais approuvées
 automatiquement, même si le remote dit `'approved'` — seule l'approbation locale compte).
 
-**Transport beta-testeurs (2026-07)** : repo public dédié
+**Transport beta-testeurs — desktop ET web passent par le même Worker Cloudflare
+(2026-09).** `worker-feedback/` (racine du repo) est l'UNIQUE frontière de confiance : il
+détient le seul token GitHub write-scoped (secret Cloudflare `GITHUB_FEEDBACK_TOKEN`, posé
+une fois via `wrangler secret put`, **jamais** un secret GitHub Actions — voir
+`worker-feedback/README.md`). Aucun build (ni desktop ni web) n'embarque plus son propre
+token. `/issue` crée une Issue dans [`mysteropodes/nemo`](https://github.com/mysteropodes/nemo)
+(les retours vivent avec le code) ; `/attachment` committe les captures d'écran dans
 [`mysteropodes/strokemotion-feedback`](https://github.com/mysteropodes/strokemotion-feedback)
-(aucun code de l'app dedans) — une Issue GitHub par feedback, créée depuis Rust
-(`submit_feedback_issue` dans `src-tauri/src/lib.rs`, **jamais** depuis JS) avec un token
-compilé à la build via `env!("STROKEMOTION_FEEDBACK_TOKEN")` (même pattern que
-`STROKEMOTION_UPDATER_TOKEN`) — fine-grained PAT scopé À CE SEUL REPO, permissions
-"Issues: write" + "Contents: write" (élargi en 2026-07 pour les captures d'écran jointes,
-voir ci-dessous — décision utilisateur explicite, toujours zéro exposition de code) : un
-token extrait du binaire peut au pire spammer des issues ou écrire n'importe quel fichier
-dans CE repo précis, jamais toucher au code de l'app. Le label `pending` est posé
-automatiquement à la création.
+(repo séparé, sans code, pour ne pas gonfler l'historique git du repo principal avec des
+PNG). Le Worker filtre aussi le spam (`looksLikeSpam` dans `worker-feedback/src/index.js`).
+
+Historique : avant 2026-09, desktop postait directement depuis Rust
+(`submit_feedback_issue`/`upload_feedback_attachment` dans `src-tauri/src/lib.rs`) avec un
+token `env!()`-compilé — ça marchait, mais dupliquait le token (un par build desktop) ET
+contournait le filtre anti-spam du Worker. Supprimé : `feedback-bridge.js` appelle
+maintenant le Worker depuis desktop aussi, via `window.__TAURI__.http.fetch` (plugin
+`tauri_plugin_http`) plutôt que `window.fetch` — un `fetch()` classique serait bloqué à la
+fois par le `connect-src` de la CSP (qui ne liste pas le Worker) et par la CORS allowlist du
+Worker (qui liste les origines web, pas `tauri://localhost`) ; passer par Rust via le plugin
+contourne les deux sans avoir à élargir ni l'un ni l'autre.
 
 **Capture d'écran jointe (2026-07)** : l'outil Commentaire a une zone de drop
 (`#comment-shot-drop`) — glisser-déposer, clic-pour-parcourir, ou Cmd+V. Gardée en data URL
-localement (`entry.screenshotDataUrl`) ; à la publication GitHub, `uploadScreenshotIfAny()`
-(feedback-bridge.js) l'envoie à `upload_feedback_attachment` (Rust) qui la committe dans
+localement (`entry.screenshotDataUrl`) ; à la publication GitHub, `uploadScreenshotsIfAny()`
+(feedback-bridge.js) l'envoie au Worker (`/attachment`), qui la committe dans
 `attachments/<id>.<ext>` via l'API Contents, puis référence l'URL
 `raw.githubusercontent.com` résultante en Markdown dans le corps de l'issue — GFM ne rend
 PAS les data URIs, le fichier doit réellement exister dans le repo pour s'afficher inline.
@@ -432,18 +441,10 @@ uniquement — jamais embarqué dans le build distribué. Une copie de l'app liv
 beta-testeur a ce même panneau de triage dans le code, mais il est inutilisable sans le
 token perso de Cyril.
 
-**Build web (2026-08) : la publication GitHub passe par un Worker, pas par Rust.**
-Sur desktop, `submit_feedback_issue`/`upload_feedback_attachment` tournent en Rust — un
-navigateur n'a pas ce backend pour cacher le token. `worker-feedback/` (racine du repo) est
-un Worker Cloudflare séparé (secret `GITHUB_FEEDBACK_TOKEN` propre, jamais dans le Worker du
-site statique `nemo-editor`) qui joue exactement le même rôle de frontière de confiance.
-`feedback-bridge.js` branche sur `tauriOk()` : Tauri → `invoke()`, sinon → `fetch()` vers ce
-Worker (`FEEDBACK_WORKER_URL`, à mettre à jour après le premier déploiement). **Piège déjà
-tombé une fois** : le premier jet du build web gardait le vieux garde-fou `if (tauriOk())`
-autour de tout l'appel de publication — le feedback s'enregistrait bien en local
-(`localStorage`) et semblait "envoyé", mais ne partait jamais vers GitHub, silencieusement.
-Voir `worker-feedback/README.md` pour le setup (secret Worker à poser une fois via
-`wrangler secret put`, PAS un secret GitHub Actions).
+**Piège déjà tombé une fois** : le premier jet du build web gardait le vieux garde-fou
+`if (tauriOk())` autour de tout l'appel de publication — le feedback s'enregistrait bien en
+local (`localStorage`) et semblait "envoyé", mais ne partait jamais vers GitHub,
+silencieusement.
 
 ## 7. Avant chaque build : synchroniser le numéro de version partout
 
@@ -624,12 +625,13 @@ mutuellement. Règles à suivre **sans qu'on ait besoin de le redemander** :
   copie du repo GitHub ailleurs. Ne jamais partager ce dossier OneDrive directement avec un
   collaborateur pour du travail simultané (sync cloud + git en parallèle sur le même dossier
   risque de corrompre l'historique).
-- Secrets (`TAURI_SIGNING_PRIVATE_KEY`, `STROKEMOTION_PUBLISH_TOKEN`,
-  `STROKEMOTION_UPDATER_TOKEN`, `STROKEMOTION_FEEDBACK_TOKEN`) restent strictement
-  personnels à Cyril — jamais committés (déjà couvert par `.gitignore` pour les clés de
-  signature), jamais partagés même avec un collaborateur de confiance. Pour du dev normal,
-  des valeurs placeholder (`STROKEMOTION_FEEDBACK_TOKEN=dev-placeholder
-  STROKEMOTION_UPDATER_TOKEN=dev-placeholder`) suffisent à compiler et lancer `npm run dev`.
+- Secrets (`TAURI_SIGNING_PRIVATE_KEY`) restent strictement personnels à Cyril — jamais
+  committés (déjà couvert par `.gitignore` pour les clés de signature), jamais partagés même
+  avec un collaborateur de confiance. Depuis 2026-09, ni l'updater (releases GitHub
+  publiques, voir §7) ni le feedback (Worker Cloudflare, voir §6) n'ont besoin d'un token
+  compilé dans le binaire — le seul token GitHub feedback restant vit côté Cloudflare
+  (`GITHUB_FEEDBACK_TOKEN`, posé via `wrangler secret put`, voir `worker-feedback/README.md`),
+  pas dans ce repo ni dans les secrets GitHub Actions.
 - **Avant de partir en investigation sur un bug rapporté (surtout Motion/canvas), vérifier
   les branches sœurs AVANT de diagnostiquer soi-même** — quand plusieurs sessions Claude
   travaillent en parallèle dans des worktrees séparés (ex. `nemo` sur `claude/web-public-beta`
