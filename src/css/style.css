@@ -1661,7 +1661,7 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
    the text for the taller round-3 tick marks instead of the two visually
    colliding at this row's old, tighter height. */
 .fhc{width:var(--fc);min-width:var(--fc);font-size:9px;color:var(--text-dark);display:flex;align-items:flex-start;justify-content:center;padding-top:3px;box-sizing:border-box;position:relative;}
-.fhc:nth-child(5n){color:var(--text-dim);}
+.fhc.tickMaj{color:var(--text-dim);}
 /* Real tick marks (round 1 finding: the ruler previously had NO physical
    graduation at all, only a text-color change every 5th cell). Three
    tiers, tallest/brightest wins on a coincidence (CSS specificity alone
@@ -1675,8 +1675,8 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
      - every 5th:    6px/.32 — the mid-level landmark.
      - each second:  tallest/brightest (::before below) — the label
        ("1s"/"2s") already gets the same priority treatment. */
-.fhc::before{content:'';position:absolute;left:0;bottom:0;width:1px;height:4px;background:rgba(255,255,255,.16);}
-.fhc:nth-child(5n)::before{height:6px;background:rgba(255,255,255,.32);}
+.fhc.tick::before{content:'';position:absolute;left:0;bottom:0;width:1px;height:4px;background:rgba(255,255,255,.16);}
+.fhc.tickMaj::before{height:6px;background:rgba(255,255,255,.32);}
 .fhc.cur{color:var(--accent);font-weight:700;}
 .fhc.sec{color:var(--accent);font-weight:700;font-size:8.5px;}
 .fhc.sec::before{content:'';position:absolute;left:0;top:0;bottom:-2px;width:1px;background:rgba(255,255,255,.3);}
