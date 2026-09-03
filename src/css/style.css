@@ -2089,8 +2089,11 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 #start-screen{position:fixed;inset:0;z-index:500;background:#0b0a0d;display:flex;align-items:center;justify-content:center;overflow-y:auto;}
 #start-screen.hid{display:none;}
 #start-inner{width:520px;max-width:92vw;padding:30px 0 50px;}
-#start-brand{display:flex;align-items:center;justify-content:center;gap:12px;font-size:26px;font-weight:800;letter-spacing:-.3px;color:#ECEAE7;margin-bottom:36px;}
+#start-brand{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:36px;}
 #start-brand-mark{width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex:none;}
+#start-brand-text{display:flex;flex-direction:column;align-items:flex-start;text-align:left;}
+#start-brand-title{font-size:26px;font-weight:800;letter-spacing:-.3px;color:#ECEAE7;line-height:1.2;}
+#start-brand-tagline{font-size:13px;color:#9aa0b4;margin-top:2px;}
 #start-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;}
 #start-cards:not(.has-resume) #start-resume{display:none;}
 .start-card{background:#201f25;border-radius:8px;padding:26px 20px;cursor:pointer;display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;transition:background .15s;}
