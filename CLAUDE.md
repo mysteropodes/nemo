@@ -405,16 +405,23 @@ Transport multi-poste : réutilise le dossier de Sync équipe déjà existant
 profils et importe leurs entrées en LOCAL avec `status:'pending'` (jamais approuvées
 automatiquement, même si le remote dit `'approved'` — seule l'approbation locale compte).
 
-**Transport beta-testeurs (2026-07)** : repo public dédié
+**Transport beta-testeurs (2026-07, repos scindés depuis)** : une Issue GitHub par
+feedback, créée depuis Rust (`submit_feedback_issue` dans `src-tauri/src/lib.rs`,
+**jamais** depuis JS) directement dans **`mysteropodes/nemo`** (à côté de toutes les
+autres issues du projet, plus de silo séparé) ; les captures d'écran jointes restent
+dans le repo dédié sans code
 [`mysteropodes/strokemotion-feedback`](https://github.com/mysteropodes/strokemotion-feedback)
-(aucun code de l'app dedans) — une Issue GitHub par feedback, créée depuis Rust
-(`submit_feedback_issue` dans `src-tauri/src/lib.rs`, **jamais** depuis JS) avec un token
-compilé à la build via `env!("NEMO_FEEDBACK_TOKEN")` — fine-grained PAT scopé À CE SEUL REPO, permissions
-"Issues: write" + "Contents: write" (élargi en 2026-07 pour les captures d'écran jointes,
-voir ci-dessous — décision utilisateur explicite, toujours zéro exposition de code) : un
-token extrait du binaire peut au pire spammer des issues ou écrire n'importe quel fichier
-dans CE repo précis, jamais toucher au code de l'app. Le label `pending` est posé
-automatiquement à la création.
+(`upload_feedback_attachment`) — même répartition que `worker-feedback/src/index.js`
+côté web (`ISSUE_REPO`/`ATTACHMENT_REPO`). Un seul token compilé à la build via
+`env!("NEMO_FEEDBACK_TOKEN")`, fine-grained PAT scopé aux DEUX repos, permissions
+"Issues: write" + "Contents: write" sur chacun. ⚠️ Un fine-grained PAT applique le
+même jeu de permissions à tous les repos sélectionnés — ce token a donc aussi
+"Contents: write" sur `nemo` lui-même, pas seulement sur le repo sans code : un token
+extrait du binaire pourrait au pire écrire des fichiers dans le vrai code de l'app,
+pas juste spammer des issues. Compromis accepté (même que le Worker web utilise déjà
+en prod), à revisiter si ça devient gênant — un token séparé par repo serait plus
+strict mais demande un second `env!()`. Le label `pending` est posé automatiquement
+à la création.
 
 **Capture d'écran jointe (2026-07)** : l'outil Commentaire a une zone de drop
 (`#comment-shot-drop`) — glisser-déposer, clic-pour-parcourir, ou Cmd+V. Gardée en data URL

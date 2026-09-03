@@ -42,26 +42,37 @@ async fn run_ffmpeg(app: tauri::AppHandle, window: tauri::Window, args: Vec<Stri
     }
 }
 
-// Beta-tester feedback → public GitHub repo (mysteropodes/strokemotion-feedback),
-// one Issue per feedback entry. The write token is baked in at compile time
-// via env! — export NEMO_FEEDBACK_TOKEN before `tauri build` —
-// scoped as a
-// fine-grained PAT to ONLY this one repo, ONLY "Issues: write" — nothing
-// else, so an extracted token can at worst spam issues in a repo that
-// contains no app source. The POST happens entirely in Rust (never in JS)
-// so the token never touches the webview's network inspector or any
-// devtools-visible fetch() call — see feedback-bridge.js's comment for why
-// this command exists instead of a plain JS fetch.
+// Beta-tester feedback. Issues land in the public `nemo` repo itself
+// (mysteropodes/nemo) so they show up next to every other issue instead of
+// a separate silo; attachments still go to the code-free
+// mysteropodes/strokemotion-feedback (see upload_feedback_attachment) —
+// mirrors the split worker-feedback/src/index.js already uses on the web
+// path (ISSUE_REPO / ATTACHMENT_REPO there). The write token is baked in
+// at compile time via env! — export NEMO_FEEDBACK_TOKEN before
+// `tauri build` — a fine-grained PAT covering BOTH repos with
+// "Issues: write" + "Contents: write" (same token the web Worker's
+// GITHUB_FEEDBACK_TOKEN uses). Note this is broader than the old
+// single-repo design: because a fine-grained PAT applies one permission
+// set to every repo it's scoped to, giving it Issues+Contents on `nemo`
+// too means a leaked token could also write files into the real app
+// source, not just spam issues/attachments in the code-free repo. The POST
+// happens entirely in Rust (never in JS) so the token never touches the
+// webview's network inspector or any devtools-visible fetch() call — see
+// feedback-bridge.js's comment for why this command exists instead of a
+// plain JS fetch.
+const FEEDBACK_ISSUE_REPO: &str = "mysteropodes/nemo";
+const FEEDBACK_ATTACHMENT_REPO: &str = "mysteropodes/strokemotion-feedback";
+
 #[tauri::command]
 async fn submit_feedback_issue(title: String, body: String, labels: Vec<String>) -> Result<(), String> {
     let token = env!("NEMO_FEEDBACK_TOKEN");
     let client = reqwest::Client::new();
     let payload = serde_json::json!({ "title": title, "body": body, "labels": labels });
     let resp = client
-        .post("https://api.github.com/repos/mysteropodes/strokemotion-feedback/issues")
+        .post(format!("https://api.github.com/repos/{}/issues", FEEDBACK_ISSUE_REPO))
         .header("Authorization", format!("Bearer {}", token))
         .header("Accept", "application/vnd.github+json")
-        .header("User-Agent", "strokemotion-app")
+        .header("User-Agent", "nemo-app")
         .json(&payload)
         .send()
         .await
@@ -76,15 +87,11 @@ async fn submit_feedback_issue(title: String, body: String, labels: Vec<String>)
 }
 
 // Feedback screenshot attachments — committed via the GitHub Contents API
-// into strokemotion-feedback's attachments/ folder, then linked from the
+// into strokemotion-feedback's attachments/ folder (kept separate from the
+// issue itself, see FEEDBACK_ATTACHMENT_REPO above), then linked from the
 // issue body via raw.githubusercontent.com (GFM doesn't render data:
-// URIs, so the image has to actually be a file in the repo to show up
-// inline). Needs "Contents: Read and write" on top of submit_feedback_
-// issue's "Issues" permission — a deliberate scope increase on the same
-// embedded, repo-scoped token (see CLAUDE.md's feedback section for the
-// trade-off): a leaked token can now write arbitrary files into this one
-// code-free repo, not just spam issues, but still can't touch anything
-// else. content_base64 is passed straight through — the Contents API's
+// URIs, so the image has to actually be a file in a repo to show up
+// inline). content_base64 is passed straight through — the Contents API's
 // `content` field IS base64 already, no decode/re-encode needed here.
 #[tauri::command]
 async fn upload_feedback_attachment(filename: String, content_base64: String) -> Result<String, String> {
@@ -97,20 +104,20 @@ async fn upload_feedback_attachment(filename: String, content_base64: String) ->
     });
     let resp = client
         .put(format!(
-            "https://api.github.com/repos/mysteropodes/strokemotion-feedback/contents/{}",
-            path
+            "https://api.github.com/repos/{}/contents/{}",
+            FEEDBACK_ATTACHMENT_REPO, path
         ))
         .header("Authorization", format!("Bearer {}", token))
         .header("Accept", "application/vnd.github+json")
-        .header("User-Agent", "strokemotion-app")
+        .header("User-Agent", "nemo-app")
         .json(&payload)
         .send()
         .await
         .map_err(|e| e.to_string())?;
     if resp.status().is_success() {
         Ok(format!(
-            "https://raw.githubusercontent.com/mysteropodes/strokemotion-feedback/main/{}",
-            path
+            "https://raw.githubusercontent.com/{}/main/{}",
+            FEEDBACK_ATTACHMENT_REPO, path
         ))
     } else {
         let status = resp.status();
