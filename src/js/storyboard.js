@@ -562,7 +562,7 @@
     side.className = 'sb-side';
     var edit = document.createElement('div');
     edit.className = 'sb-edit';
-    edit.title = 'Éditer l’animation du composant';
+    edit.title = SM.t('hsEditComponentAnim');
     edit.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h9M4 12h6M4 18h7"/><path d="m14.5 15.5 5-5 2 2-5 5-2.6.6z"/></svg>';
     edit.addEventListener('click', function (e) { e.stopPropagation(); openSymbol(m); });
     side.appendChild(edit);
@@ -657,7 +657,7 @@
     var play = document.createElement('span');
     play.className = 'sb-play sb-block-play';
     play.textContent = _playingMontageId === m.id ? '◼' : '▶';
-    play.title = 'Lire / arrêter le montage';
+    play.title = SM.t('hsPlayStopMontage');
     play.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
     play.addEventListener('click', function (e) {
       e.stopPropagation();

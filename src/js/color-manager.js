@@ -162,7 +162,7 @@
     state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i) { return i >= 0; });
     if (window.renderArcs) renderArcs();
     updateUI();
-    if (!selectedPaths.length && window.showToast) showToast('Aucune forme avec cette couleur sur ce calque/cette frame');
+    if (!selectedPaths.length && window.showToast) showToast(SM.t('hsNoShapeWithColor'));
   }
 
   // Builds a row ONCE. Listeners read the CURRENT color from

@@ -104,7 +104,7 @@
       var del = document.createElement('span');
       del.className = 'bp-item-del';
       del.textContent = '×';
-      del.title = 'Supprimer ce preset';
+      del.title = SM.t('hsDeletePreset');
       del.addEventListener('click', function (e) {
         e.stopPropagation();
         delete _presets[id];
@@ -122,8 +122,8 @@
 
   function savePreset() {
     var ld = state.layers[state.activeLayerIdx];
-    if (!ld) { if (window.showToast) showToast('Sélectionnez un calque d\'abord'); return; }
-    if (!ld.motion && !ld.motionStatic) { if (window.showToast) showToast('Ce calque n\'a aucune propriété Transform animée ou modifiée'); return; }
+    if (!ld) { if (window.showToast) showToast(SM.t('hsSelectLayerFirst')); return; }
+    if (!ld.motion && !ld.motionStatic) { if (window.showToast) showToast(SM.t('hsLayerNoTransform')); return; }
     var name = prompt('Nom du preset', ld.name || 'Preset');
     if (!name || !name.trim()) return;
     var id = newId();
@@ -142,7 +142,7 @@
     var p = _presets[id];
     if (!p) return;
     var ld = state.layers[state.activeLayerIdx];
-    if (!ld) { if (window.showToast) showToast('Sélectionnez un calque cible d\'abord'); return; }
+    if (!ld) { if (window.showToast) showToast(SM.t('hsSelectTargetLayerFirst')); return; }
     saveAllLayerFrames();
     pushUndoLayers(true);
     ld.motion = p.motion ? JSON.parse(JSON.stringify(p.motion)) : null;

@@ -91,7 +91,7 @@
     addBtn.className = 'palette-swatch';
     addBtn.style.cssText = 'display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;color:var(--text-dim);background:var(--panel3);';
     addBtn.textContent = '+';
-    addBtn.title = 'Ajouter une couleur';
+    addBtn.title = SM.t('hsAddColor');
     addBtn.addEventListener('click', function () {
       var inp = document.createElement('input');
       inp.type = 'color'; inp.style.cssText = 'position:fixed;left:-9999px;';

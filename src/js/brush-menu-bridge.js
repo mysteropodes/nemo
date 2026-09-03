@@ -338,7 +338,7 @@
           if (onRefresh) onRefresh();
         });
       });
-      var delBtn = document.createElement('span'); delBtn.className = 'bp-item-del'; delBtn.title = 'Supprimer'; delBtn.textContent = '×';
+      var delBtn = document.createElement('span'); delBtn.className = 'bp-item-del'; delBtn.title = SM.t('elementsDelete'); delBtn.textContent = '×';
       delBtn.addEventListener('click', function (e) {
         e.preventDefault(); e.stopPropagation();
         if (window.state && state.customBrushPresets) delete state.customBrushPresets[key];

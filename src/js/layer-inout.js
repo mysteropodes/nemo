@@ -1431,8 +1431,8 @@
     // The Alt modifier is the only affordance for "with / without the
     // keyframes" (2026-07-25), so it has to be written down somewhere the
     // user will actually meet it — on the handle itself.
-    hleft.title = 'Point d\'entrée — glisser pour rogner. Alt+glisser : emmener aussi les keyframes.\nAvec plusieurs barres sélectionnées, toute la sélection suit.';
-    hright.title = 'Point de sortie — glisser pour rogner (les keyframes ne bougent pas : rogner la fin ne déplace rien).';
+    hleft.title = SM.t('hsInoutInTitle');
+    hright.title = SM.t('hsInoutOutTitle');
     bar.title = SM.t('inoutBarBodyTitle');
     bar.appendChild(hleft); bar.appendChild(hright);
     // Parent in Time — 3 on-timeline connection points (2026-07-30, Van

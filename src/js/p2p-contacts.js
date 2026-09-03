@@ -123,7 +123,7 @@
       key.style.cssText = 'font-size:8.5px;color:var(--text-dim);font-family:monospace;flex-shrink:0;';
       key.textContent = c.publicKey.slice(0, 10) + '…';
       var rm = document.createElement('button');
-      rm.className = 'pbtn'; rm.textContent = '×'; rm.title = 'Retirer ce contact'; rm.style.cssText = 'flex-shrink:0;padding:2px 7px;';
+      rm.className = 'pbtn'; rm.textContent = '×'; rm.title = SM.t('hsRemoveContact'); rm.style.cssText = 'flex-shrink:0;padding:2px 7px;';
       rm.addEventListener('click', function () { removeContact(c.publicKey); });
       row.appendChild(dot); row.appendChild(nm); row.appendChild(key); row.appendChild(rm);
       list.appendChild(row);

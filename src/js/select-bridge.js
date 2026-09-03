@@ -3406,7 +3406,7 @@
   function openAttachRolePicker(p0, x, y) {
     var roles = state.trackRoles || {};
     var roleIds = Object.keys(roles);
-    if (!roleIds.length) { showToast('Aucun rôle suivi défini — utilise d\'abord « Marquer comme rôle suivi… ».'); return; }
+    if (!roleIds.length) { showToast(SM.t('hsNoTrackedRole')); return; }
     roleIds.sort(function (a, b) { return (roles[a].name || a).localeCompare(roles[b].name || b); });
     var pickItems = roleIds.map(function (rid) {
       var isCurrent = !!(p0.data && p0.data.attachedToRoleId === rid);
@@ -3530,7 +3530,7 @@
   // "Marquer comme rôle suivi…" action. NEVER tags anything by itself.
   function applyRoleSuggestion(s) {
     var cand = _findClosestPathToPoint(s.center);
-    if (!cand) { showToast('Aucune forme trouvée sur cette frame.'); return; }
+    if (!cand) { showToast(SM.t('hsNoShapeOnFrame')); return; }
     clearSel();
     selectedPaths = [cand];
     state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; });

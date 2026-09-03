@@ -7024,7 +7024,7 @@
       tools = document.createElement('div'); tools.id = 'motion-header-tools';
       var label = document.createElement('span'); label.id = 'motion-context-label'; label.textContent = 'Motion';
       var btn = document.createElement('button'); btn.id = 'motion-filter-trigger'; btn.type = 'button';
-      btn.title = 'Rechercher, filtrer et configurer les colonnes';
+      btn.title = SM.t('hsSearchFilterColumns');
       btn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>';
       tools.appendChild(label); tools.appendChild(btn); hdr.appendChild(tools);
       btn.addEventListener('click', function (e) {
