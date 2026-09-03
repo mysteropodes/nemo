@@ -348,6 +348,12 @@
       // montage strip + card thumbnails — read fr.strokes raw, same gap
       // renderOS/renderGhostAll had (dict-based twin of buildSceneJson's
       // live renderCombinesFromChildren).
+      // Effets de tracé du calque interne (path-fx.js, 2026-09-03) : une
+      // vignette doit ressembler au composant. Le duplicateur mograph, lui,
+      // reste absent ici — il se résout par index de calque de SCÈNE
+      // (applyLayerDuplicator), que cette boucle sur sym.layers n'a pas ;
+      // c'est un chantier à part, pas un oubli.
+      if (window.SMPathFx && SMPathFx.hasAny(sl)) slStrokes = SMPathFx.apply(slStrokes, sl, fi);
       if (window.SMGroup && sl.groups) slStrokes = SMGroup.applyCombinesToStrokes(slStrokes, sl);
       // Duplicator (2026-07-30 fix) — same gap the combine-groups comment
       // right above already describes for this reader, confirmed live for
