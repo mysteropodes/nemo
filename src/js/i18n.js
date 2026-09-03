@@ -15,6 +15,7 @@
 (function(){
   var I18N={
     en:{
+      expAppOnly:"app only",
       hsLayerNotFound:"Layer not found",
       hsMontageEmpty:"Empty montage — snap instances against its block first",
       hsNotOnComponentOrLfs:"Not possible on a component or an existing LFS group",
@@ -1070,6 +1071,7 @@
       mgraphModeValue:'value',mgraphModeSpeed:'speed',mgraphFrozen:'frozen',mgraphExprLegend:'solid = expression, dashed = keyframes',
     },
     fr:{
+      expAppOnly:"app seulement",
       hsLayerNotFound:"Calque introuvable",
       hsMontageEmpty:"Montage vide — accrochez des instances contre son bloc d'abord",
       hsNotOnComponentOrLfs:"Impossible sur un composant ou un groupe LFS existant",
@@ -2124,6 +2126,7 @@
       mgraphModeValue:'valeur',mgraphModeSpeed:'vitesse',mgraphFrozen:'figé',mgraphExprLegend:'plein = expression, pointillés = clés',
     },
     ja:{
+      expAppOnly:"アプリのみ",
       linkedMediaBannerBtn:"アクセスを許可",
       mediaMissingFileBadge:"見つかりません",
       mediaNeedsPermissionBadge:"許可が必要",
@@ -3149,6 +3152,7 @@
       mgraphModeValue:'値',mgraphModeSpeed:'速度',mgraphFrozen:'固定',mgraphExprLegend:'実線 = 式、破線 = キーフレーム',
     },
     es:{
+      expAppOnly:"solo en la app",
       linkedMediaBannerBtn:"Permitir acceso",
       mediaMissingFileBadge:"No encontrado",
       mediaNeedsPermissionBadge:"Permiso necesario",
