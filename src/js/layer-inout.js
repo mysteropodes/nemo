@@ -442,7 +442,16 @@
     if (inHit && outHit) return 'both';
     if (inHit) return 'in';
     if (outHit) return 'out';
-    return 'both';
+    // Aucune poignée dans le rectangle : on ne sélectionne AUCUN point.
+    // Cyril : « ce qu'il faudrait c'est que les in/out point qui sont
+    // SEULEMENT dans le rec de sélection soient sélectionnés ». Un premier
+    // jet renvoyait 'both' ici — donc un rectangle tracé au milieu d'une
+    // barre sélectionnait ses DEUX bords, exactement ce qu'il ne veut pas.
+    // La barre n'est pas perdue pour autant : le lasso de la grille verse
+    // alors ce calque dans la sélection de CALQUES (motion.js, endMarquee),
+    // ce qui est la lecture honnête du geste — « j'ai encadré ces lignes,
+    // sans viser de bord ».
+    return null;
   }
   function partForOverlap(barRect, ox0, ox1) {
     var mid = (barRect.left + barRect.right) / 2;
@@ -461,7 +470,7 @@
       var part = null;
       if (hit) {
         part = partForBoxHit(bar, b, x0, x1);
-        sel.push({ li: li, part: part });
+        if (part) sel.push({ li: li, part: part });
       }
       applySelClasses(bar, part);
     });
