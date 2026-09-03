@@ -4,11 +4,8 @@ name: Release
 # updater manifest included.
 #
 # It produces the public binaries and, via includeUpdaterJson, the latest.json
-# the auto-updater will read. Pointing the app AT it is a deliberate follow-up:
-# that means editing src-tauri/src/lib.rs, which PR #710 is already rewriting,
-# and stacking both edits on one file would only create a conflict. Until that
-# lands the app still reads the old endpoint, so this workflow's value today is
-# the public builds, not the update path.
+# the auto-updater reads (tauri.conf.json points at this repo's own
+# releases/latest/download/latest.json — no token needed, it's public).
 #
 # This supersedes scripts/publish-update.sh, which pushed the .app.tar.gz into
 # the private strokemotion-updates repo and served it through the Contents
@@ -107,6 +104,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Baked into the binary at compile time via env! (src-tauri/src/lib.rs) —
+          # fine-grained PAT scoped to ONLY mysteropodes/strokemotion-feedback,
+          # Issues:write + Contents:write. Without it the build fails outright
+          # (env! is a hard compile error, not a runtime default).
+          STROKEMOTION_FEEDBACK_TOKEN: ${{ secrets.STROKEMOTION_FEEDBACK_TOKEN }}
         with:
           tagName: ${{ github.event.inputs.tag || github.ref_name }}
           releaseName: 'Nemo __VERSION__'
