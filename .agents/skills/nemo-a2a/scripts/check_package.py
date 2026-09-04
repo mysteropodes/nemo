@@ -96,13 +96,11 @@ def check_adoption() -> None:
         first_body_heading = text.find("# ", text.find("---", 3) + 3) if text.startswith("---") else text.find("# ")
         if match.start() > first_body_heading:
             fail(f"golden block is not the first body section in {relative(path)}")
-    if (SKILL_DIR / "VERSION").read_text().strip() != "1.2.0":
+    if (SKILL_DIR / "VERSION").read_text().strip() != "1.3.0":
         fail("unexpected skill VERSION")
     skill = (SKILL_DIR / "SKILL.md").read_text()
     fast_path_contract = {
         "heading": r"## Documentation publication fast path",
-        "operation budget": r"twelve\s+agent-initiated tool operations",
-        "time budget": r"two minutes of agent decision time",
         "bounded waits": r"Do not call a wait tool without a live operation or session identifier",
     }
     for requirement, pattern in fast_path_contract.items():
@@ -155,10 +153,7 @@ def check_buzz_preload_manifest() -> None:
         "schema_version": "buzz.project-preload.v2",
         "repository": REPOSITORY,
         "skills": ["nemo-a2a"],
-        "policy_resources": [
-            ".agents/skills/nemo-a2a/references/protocol.md",
-            ".agents/skills/nemo-a2a/references/receiver-grants.md",
-        ],
+        "policy_resources": [],
     }
     if manifest != expected:
         fail(f"Buzz preload manifest drifted: expected {expected}, got {manifest}")
@@ -400,7 +395,7 @@ def main() -> int:
     print(json.dumps({
         "ok": True,
         "protocol": "NEMO-A2A-1",
-        "skill_version": "1.2.0",
+        "skill_version": (SKILL_DIR / "VERSION").read_text().strip(),
         "mode": "package-only" if args.package_only else "integrated",
         "checks": ["adoption", "golden-block", "links", "staging-repository", "schema", "receiver-grant-schema", "cli-contract", "model-security-boundary", "receiver-authorization", "live-checkout", "source-bounds", "unit-tests", "result-smoke", "handoff-smoke"],
     }, sort_keys=True))

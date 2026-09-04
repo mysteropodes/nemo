@@ -1,3 +1,7 @@
+> Dedicated Nemo workspace: skill 1.3.0 is the current operating contract.
+> Manual pins, Project assignment, and explicit-grant steps below describe legacy/general
+> mode and infrastructure tests, not normal Nemo onboarding or task prerequisites.
+
 # Repository adoption
 
 The tracked package is canonical at `.agents/skills/nemo-a2a/`. Codex discovers repository

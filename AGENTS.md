@@ -22,7 +22,8 @@ Pass this `AGENTS.md` requirement and the skill path to every child agent.
 
 GitHub is canonical for source, issues, pull requests, CI, and review. Buzz carries signed
 coordination. A relay acknowledgement does not mean an agent accepted or completed work,
-and identity sponsorship does not grant repository or Project authority.
+and the dedicated Nemo community supplies Project/repository participation automatically.
+No manual agent assignment, revision pinning, or path-grant setup is required there.
 
 ## Start and scope work safely
 

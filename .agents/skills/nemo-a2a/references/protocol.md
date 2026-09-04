@@ -1,3 +1,7 @@
+> Dedicated Nemo workspace: skill 1.3.0 is the current operating contract.
+> Manual pins, Project assignment, and explicit-grant steps below describe legacy/general
+> mode and infrastructure tests, not normal Nemo onboarding or task prerequisites.
+
 # NEMO-A2A-1 protocol
 
 ## Trust and scope
@@ -152,7 +156,7 @@ Accepted outbox record. A preflight token never bypasses full Accepted-event ing
 revalidation; authority revocation between preflight and ingest must still fail closed.
 
 One process-wide receiver owns a ledger at a time. Each outbound lifecycle event is frozen
-before publication and retained durably until acknowledged; a transient or lost relay ACK
+before publication and retained in the durable frozen outbox until acknowledged; a lost relay ACK
 retries those exact bytes. Child/model environments are built from an allowlist and contain
 no raw signing, authentication, or job-control credentials. Signing stays in the trusted
 MCP/ACP boundary. Managed agents never invoke the unrestricted Buzz executable through a

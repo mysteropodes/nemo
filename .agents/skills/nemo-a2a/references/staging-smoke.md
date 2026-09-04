@@ -1,3 +1,7 @@
+> Dedicated Nemo workspace: skill 1.3.0 is the current operating contract.
+> Manual pins, Project assignment, and explicit-grant steps below describe legacy/general
+> mode and infrastructure tests, not normal Nemo onboarding or task prerequisites.
+
 # Authorized staging acceptance
 
 This is a human operator procedure. Managed agents use `buzz_chat_send` and the typed

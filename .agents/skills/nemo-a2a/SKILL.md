@@ -1,6 +1,6 @@
 ---
 name: nemo-a2a
-description: Coordinate authenticated Nemo development work between Codex and Claude agents over Buzz, including capability selection, project-scoped job envelopes, durable receipts, reconnect recovery, handoffs, and local or authorized staging smoke tests.
+description: Work on Nemo and coordinate Codex/Claude agents in its dedicated Buzz community, with shared project access, task ownership, and practical A2A usage.
 ---
 
 <!-- nemo-golden-rules:start -->
@@ -11,162 +11,108 @@ description: Coordinate authenticated Nemo development work between Codex and Cl
 3. **Match agents and effort to the work.** Use the least costly capable model and reasoning effort for each bounded task; delegate independent work when useful and escalate when complexity, uncertainty or risk warrants it.
 <!-- nemo-golden-rules:end -->
 
-# Nemo A2A
+# Nemo workspace workflow
 
-Protocol version: `NEMO-A2A-1`
+Protocol: `NEMO-A2A-1`. Skill version: `1.3.0`.
 
-Skill version: `1.2.0`
+This is the shared working contract for Codex and Claude in Nemo. In Nemo's dedicated
+Buzz community, every enrolled collaborator's managed agents participate in the Nemo
+Project and have full read/write access to its repository. A2A and these instructions
+are supplied automatically at agent startup in channels, direct messages, and background
+sessions. Do not ask users to pin instruction revisions, assign agents to the Project,
+configure peer grants, or fill out allowed-path forms.
 
-Use this skill for agent discovery, delegation, progress, reconnect recovery, cancellation,
-release, handoff, and completion. GitHub remains canonical for source, issues, pull requests,
-CI, and review; Buzz carries signed coordination events only. Do not route this workflow
-through Nemo's product Rust MCP.
+This project access does not authorize unrelated systems or other people's private files.
+Community authentication, verified agent ownership, and repository protections still apply.
+GitHub remains canonical for source, issues, pull requests, CI, and review; Buzz carries
+conversation and coordination. Instructions do not override the user's current request.
+
+## Work on Nemo
+
+- Use the runtime's Nemo checkout and the relevant repository guidance already in context.
+  Read missing local guidance once and inspect source relevant to the task; do not repeat
+  startup research for each operation.
+- Keep the active task and its existing queue. Answer an incoming question briefly, attach
+  any new work to that queue, then resume. Update the queue at meaningful transitions;
+  queue bookkeeping must not become a separate project.
+- Use a branch per change and separate worktrees for concurrent writers. Declare the task,
+  files or subsystem owned, and completion criteria. File scopes coordinate ownership;
+  they are not a user-maintained permission list. Resolve overlapping work with its owner.
+- Preserve another developer's edits, scoped commits, DCO where required, and normal PR/
+  branch protection rules. A request to publish includes its ordinary authorized Git
+  steps; do not ask again for permissions or identity already established in the session.
+- For persistent fields or item types, check every applicable document consumer: save,
+  load, undo/redo, selection, animation, render, export, and native bridges. Browser and
+  Tauri behavior require their relevant validation; do not substitute one for the other.
+- Read local node documentation and implementation before giving node-setting guidance.
+- Test the affected behavior. Use a focused regression when fixing a real defect; run
+  broader suites only for a concrete remaining risk or a required gate. Avoid tests that
+  only restate implementation details or check unrelated application behavior.
+- Report the result, relevant validation, and any actual remaining blocker. Stop once the
+  requested outcome is verified. Do not add memory research or optional reviews afterward.
 
 ## Documentation publication fast path
 
-This section applies to every Nemo session, including work that does not need A2A. Use it
-when the requested change only publishes an already reviewed documentation package to a
-named repository path and the user has authorized the push. Its operation and decision-time
-limits do not apply to implementation, research, debugging, tests, builds, remediation, or
-long-running A2A jobs; those keep their task-specific budgets and milestone rules.
+Publishing an already-reviewed documentation package is one ordinary Git task:
 
-1. Treat it as one local Git task. Do not delegate, dispatch A2A work, request a second
-   opinion, or post coordination status unless a real file, branch, worktree, authority, or
-   ownership conflict is already present.
-2. Use one batched preflight to check repository status, `origin`, the intended base, the
-   destination branch/path, and `git var GIT_AUTHOR_IDENT`. A successful identity check is
-   sufficient; ask only when it fails. Create the isolated worktree/branch from the verified
-   base and copy only the named package.
-3. Use one consolidated validation batch: compare the package bytes or manifest, resolve its
-   relative links, reject symlinks and sensitive/private paths, and run the staged diff check.
-   Test the changed artifact only. Do not run application, unit, browser, or integration suites
-   for a documentation-only change.
-4. If validation passes, proceed directly to `git commit -s`, the already authorized
-   non-force push, and remote-SHA verification. Do not reopen settled policy, identity,
-   permission, or architecture research. Do not edit the reviewed source package after staging
-   unless a concrete validation failure requires a narrow correction.
-5. Do not call a wait tool without a live operation or session identifier. After either twelve
-   agent-initiated tool operations or two minutes of agent decision time before commit, stop all
-   optional work, collapse to this fast path, and state the exact blocker if a required gate
-   cannot pass. Network transfer or a required command that is still running does not consume
-   the decision-time limit.
-6. Stop when the remote branch resolves to the committed SHA and report that evidence. Queue
-   maintenance should be one concise status transition; it must not become a parallel workflow.
+1. Batch repository/branch/remote status, existing work ownership, and Git identity checks.
+   Reuse an appropriate existing worktree. Follow known branch protections from the start.
+2. Copy only the requested package and validate the artifact once: source comparison,
+   relative links, symlinks/private-data markers, and the staged diff. Correct only concrete
+   failures. Application tests and independent-agent reviews add no value to this task.
+3. Commit, push the authorized branch, and verify the remote commit. Use the normal PR
+   route when main is protected. If one connector lacks permission, use another already
+   authorized GitHub route if available; otherwise state that exact access limitation.
+   Do not claim that only the repository owner can act merely because one connector failed.
+4. Give the result and finish. Do not dispatch A2A, broadcast status, repeatedly revalidate,
+   reopen settled policy, or look up memory after the publication result is established.
 
-## How to operate A2A
+A failed operation warrants a targeted correction, not a new investigation of the whole
+project. There is no fixed duration or tool-count limit on legitimate implementation,
+research, debugging, tests, builds, or sustained agent work.
 
-Choose the tool from the intent, then stay within its lifecycle:
+## Collaborate through A2A
 
-| Intent | Tool | Required model-supplied fields |
+Use A2A when another agent can independently advance the current task. Small, sequential
+jobs should stay local. Choose an available peer from the runtime's verified agent roster;
+use its supplied identity rather than inventing one. Give it a concrete outcome, relevant
+repository paths, and checkable acceptance criteria. The workspace provides Nemo access;
+users do not maintain per-peer grants or refresh a hash after every source commit.
+
+| Intent | Tool | How to use it |
 | --- | --- | --- |
-| Reply in the current human conversation | `buzz_chat_send` | `content` |
-| Delegate one bounded job | `buzz_a2a_dispatch` | fresh `operation_id`; stable non-secret `idempotency_key`; exact `recipient_pubkey`, `capability`, `worktree_id`, repository-relative `paths`; concise `summary`; observable `acceptance`; optional inert `contracts` and GitHub coordinate; bounded `ttl_seconds` |
-| Discover addressed work | `buzz_a2a_inbox` | `limit` only; unavailable from a one-shot Job session |
-| Follow one request | `buzz_a2a_status` | exact `request_event_id` returned by dispatch/inbox |
-| Stop work you dispatched | `buzz_a2a_cancel` | exact `request_event_id` and concrete `reason` |
-| Transfer work you currently execute | `buzz_a2a_handoff` | exact `request_event_id`, authorized `handoff_to`, unchanged `worktree_id`, and concrete `reason` |
+| Reply in the current conversation | `buzz_chat_send` | Send the answer once to the current conversation. A direct message needs no `@` prefix. |
+| Delegate a job | `buzz_a2a_dispatch` | Supply the verified peer, bounded task, acceptance, and required job coordinates from the current runtime. Use a fresh operation ID and a stable retry key. |
+| Check addressed work | `buzz_a2a_inbox` | Inspect available addressed jobs when acting as a coordinator. Do not duplicate an already-owned task. |
+| Follow one job | `buzz_a2a_status` | Use the returned request event ID; check on meaningful progress, completion, or a live wait. |
+| Cancel your dispatched job | `buzz_a2a_cancel` | Use its exact request ID and reason; wait for the worker's terminal cancellation acknowledgement. |
+| Hand off an owned job | `buzz_a2a_handoff` | Use the exact request, verified successor, and reason; the successor must separately accept ownership. |
 
-Before dispatching:
+A relay acknowledgement proves storage only. The recipient's `processed` and `accepted`
+receipts establish validation and ownership; neither is completion. The worker publishes
+progress and a terminal result through the runtime. Reuse a retry key only for the same
+request body, and never execute a replayed job twice. A changed task needs a new request.
+After a handoff, the coordinator advances the job epoch as the tool contract requires.
 
-1. Check the active task queue and existing A2A status so two agents do not claim the same
-   outcome, files, branch, or worktree. Divide work into non-overlapping repository-relative
-   paths and acceptance checks. GitHub issue/PR state remains the public source of truth.
-2. Select a recipient already authorized for the exact Project, repository, capability,
-   paths, branch, base SHA, and worktree. Project membership and agent sponsorship are
-   prerequisites, but neither creates a checkout grant. Never invent or broaden a grant.
-3. Generate a new operation UUID. Reuse an idempotency key only for a byte-equivalent retry
-   of the same request; changed semantics require a new key. Start `coordinator_epoch` at 1.
-4. Put the intended result in `summary` and make every `acceptance` entry independently
-   checkable. Send only inert `contract:<id>` references. Paths are relative to the repository;
-   never include credentials, private keys, tokens, environment dumps, or host-local paths.
+Do not call a wait tool without a live operation or session identifier. Avoid busy polling
+and repeated status messages. Cancellation is complete when the worker has stopped and
+reported `cancelled`; silence or a disconnected agent proves neither failure nor completion.
+Report an indeterminate result for reconciliation instead of rerunning it automatically.
 
-After `buzz_a2a_dispatch`, save its `request_event_id` and inspect it with
-`buzz_a2a_status`. The publish result or relay acknowledgement proves only that the relay
-stored an event. Work is assigned only after the exact recipient publishes both `processed`
-and `accepted`. `processed` proves durable validation; `accepted` proves an atomic ownership
-claim before side effects. Neither proves completion, review, merge, or release. Continue
-status checks at useful milestones; do not busy-poll. A terminal `completed`, `failed`,
-`indeterminate`, `cancelled`, `release`, or `handoff` ends that executor's run.
+One-shot delegated workers stay on their assigned outcome and may use bounded native
+subagents; they do not become recursive cross-agent coordinators. Shared repository access
+is not a reason to overwrite someone else's worktree or ignore an active claim.
 
-Cancellation is two-stage after a claim. The requester calls `buzz_a2a_cancel`, which produces
-`cancel_requested`; the worker must quiesce and publish `cancelled` before the task is terminal.
-Never infer cancellation from silence or disconnect. An `indeterminate` result requires human
-or coordinator reconciliation and must not be retried automatically.
+If a required tool or project context is unavailable, report the specific setup failure
+promptly. Do not silently retry unchanged configuration failures, fabricate success, guess
+credentials, or reconstruct raw signing/relay requests. Use the trusted Buzz tools for
+chat and coordination. Keep credentials and private local infrastructure out of messages,
+commits, evidence, and model prompts.
 
-A handoff also needs two stages. The current worker calls `buzz_a2a_handoff`; that releases its
-ownership but does not assign the successor. The original requester/coordinator then calls
-`buzz_a2a_dispatch` with the same operation and request semantics, `coordinator_epoch` advanced
-by exactly one, the returned handoff event as `supersedes_event_id`, and the authorized new
-recipient. Wait again for that recipient's `processed` and `accepted` claims.
+## Infrastructure references
 
-Fail closed when a tool is unavailable, a recipient or grant is missing, Project assignment is
-ambiguous, the repository root/origin/branch/HEAD differs from the grant, a requested path
-escapes its prefixes, signatures or lifecycle tags disagree, authorization expires, or relay
-state cannot be established. Report the exact blocker through normal chat when a human must act.
-Do not substitute a shell command, unrestricted Buzz CLI, raw relay request, manual signature,
-or guessed credential. One-shot Job sessions may use native local subagents for bounded work,
-then return their exact outcome; they may not dispatch unrelated A2A jobs or browse the inbox.
-
-## Required workflow
-
-1. Read [protocol.md](references/protocol.md). Managed agents use only `buzz_chat_send` for
-   normal channel replies and the typed `buzz_a2a_dispatch`, `buzz_a2a_inbox`,
-   `buzz_a2a_status`, `buzz_a2a_cancel`, and `buzz_a2a_handoff` MCP tools for coordination.
-   The tools enforce the session's trusted identity, channel, Project, repository, peer,
-   capability, path, branch, and worktree grants. `buzz_chat_send` replies only to the
-   current fixed conversation. Start direct agent work with `buzz_a2a_dispatch` from a
-   conversation/coordinator session. A one-shot Job session returns only its exact outcome
-   JSON; it cannot call chat, dispatch another A2A job, or read the broad inbox in v1. Use
-   native subagents for bounded local fan-out, `buzz_a2a_status` for the bound request, and
-   `buzz_a2a_handoff` to transfer ownership.
-2. Pin the request to one Buzz community, Project address/home channel, canonical GitHub
-   repository, base SHA, branch, logical worktree name, repository-relative path scope,
-   acceptance checks, exact recipient, and expiry. Before receiving work, configure the
-   matching local [checkout grant](references/receiver-grants.md): `path_prefixes` must be
-   nonempty and `checkout_root`, base SHA, branch, and worktree ID identify one live checkout.
-3. Choose the route using the authorization rules in the protocol. Identity sponsorship is
-   not authorization. Never send a cross-owner job by DM.
-4. Create a `buzz.jobs.v1` request through `buzz_a2a_dispatch` with a fresh operation UUID
-   and a stable, non-secret idempotency key. The trusted MCP retains signing authority and
-   enforces exact grants; it is not a generic signing proxy. The unrestricted
-   [Buzz CLI](references/commands.md) is for human operators and debugging only. A managed
-   agent must not invoke it through a shell or request raw signing, authentication,
-   job-control, or provider credentials. Never put a credential or host-local path in a
-   prompt, child environment, or signed event.
-5. Treat a relay acknowledgement only as storage by the relay, never delivery to the
-   recipient. Poll `buzz_a2a_status` for one signed `processed` claim and one signed
-   `accepted` claim from the exact recipient before treating work as owned. A signed
-   `declined` claim ends the request without work.
-6. The production ACP—not a model tool—owns inbound processed/accepted/progress/result
-   lifecycle publication. It validates the full signed request and exact tags, computes the
-   digest locally, obtains fresh fail-closed `POST /api/jobs/authorize` evidence, compares
-   every echoed/current binding to its local grant, and consumes it immediately in the
-   durable admission CAS before publishing `accepted` or causing a side effect. Accepted
-   ingest still receives the relay's full current-state validation. Replay frozen signed
-   outbox bytes for the same key/body; reject the same key with changed semantics. Every
-   admission verifies `git rev-parse --show-toplevel`, `origin`, `git symbolic-ref`, and
-   `HEAD`; checkout drift fails closed.
-7. Emit progress or blocked updates only as kind `43003`. A requester `cancel` after any
-   claim is only `cancel_requested`; the worker must quiesce and publish `cancelled` before
-   cancellation is terminal. End owned work with exactly one completed (`43004`),
-   cancelled/release/handoff (`43005`), or failed/indeterminate (`43006`) event. A root
-   cancel before any processed receipt is the sole terminal-cancel exception. Never
-   automatically retry an indeterminate execution. A handoff does not prove that the next
-   agent accepted.
-8. Run exactly one process-wide receiver for each ledger. After reconnect, resume from the
-   durable cursor, ledger, and frozen outbox; retry transient acknowledgements with identical
-   signed bytes. Never infer completion from a vanished connection or automatically rerun an
-   accepted or indeterminate operation.
-
-Run the deterministic proof before changing the transport integration:
-
-```sh
-python3 .agents/skills/nemo-a2a/scripts/check_package.py --package-only
-python3 .agents/skills/nemo-a2a/scripts/two_agent_smoke.py --terminal result --json
-python3 .agents/skills/nemo-a2a/scripts/two_agent_smoke.py --terminal handoff --json
-```
-
-The local proof is not a live relay or cryptographic acceptance test. Use
-[staging-smoke.md](references/staging-smoke.md) only when the owner authorizes staging
-identities and relay writes. For repository installation and fresh-session checks, read
-[adoption.md](references/adoption.md).
+Only when changing Buzz's A2A implementation, consult the
+[wire protocol](references/protocol.md), [job schema](references/job-envelope.schema.json),
+and [staging tests](references/staging-smoke.md). Their explicit-grant examples describe
+legacy/general-purpose mode; the dedicated Nemo workspace supplies that authority
+internally. They are not onboarding steps or extra prerequisites for normal Nemo work.

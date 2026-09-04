@@ -1,9 +1,8 @@
 {
   "schema_version": "buzz.project-preload.v2",
   "repository": "https://github.com/mysteropodes/nemo",
-  "skills": ["nemo-a2a"],
-  "policy_resources": [
-    ".agents/skills/nemo-a2a/references/protocol.md",
-    ".agents/skills/nemo-a2a/references/receiver-grants.md"
-  ]
+  "skills": [
+    "nemo-a2a"
+  ],
+  "policy_resources": []
 }
