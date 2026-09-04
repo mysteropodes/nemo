@@ -239,6 +239,32 @@ var MF_OUTLIER_K=3;        // graine rejetée si résidu > K × médiane
 // si un cas réel régresse.
 var TW_CHIRALITY=true;
 var REL_CHIR=0.10,CHIR_SIN=0.30;
+// TW_REL_REVERSE (2026-09-04, « entre 26 et 35 confusion au niveau de son
+// bras droit ») — INVERSION DE CÔTÉS entre voisins PROCHES. Les deux
+// contours du bras pendant (15, 16 de la clé 25, centroïdes à 20 px) se
+// croisaient pour rejoindre les deux boucles du bras plié : extérieur →
+// intérieur et inversement, d'où une grande boucle avec la main dedans à
+// mi-portée. Les coûts bruts étaient à 0,006 près égaux entre croisé et
+// non-croisé, et le terme relationnel existant n'y voit rien : il
+// normalise l'écart par la TAILLE des traits (~120 px de diagonale), donc
+// un arrangement à l'échelle de 15 px lui est invisible ; la chiralité
+// exige un triplet bien ouvert ; `uncrossMatches` exige des jumeaux de
+// même longueur (88 contre 140 ici) et ne tourne plus sur ce chemin.
+// Signal : pour chaque voisin j de i dont la distance est sous REV_NEAR ×
+// la plus petite des deux tailles, le vecteur relatif PRÉDIT (tourné par
+// le mouvement local de i, comme le reste du terme) et le vecteur
+// relatif obtenu en B ne doivent pas être opposés : cosinus sous −0,3,
+// gradué jusqu'à −0,8. Une rotation réelle du membre est absorbée par la
+// prédiction ; seul l'échange de côtés reste. Même objectif pour les
+// tours du Hongrois et pour le 2-opt (structTerm).
+// DÉSACTIVÉ par défaut : mesuré inutile pour le cas du bras (la garde
+// d'arrangement de la passe d'ordre, TW_OC_SIDE_GUARD, suffit : 6/6) et il
+// coûtait deux paires de moustaches sur 34→46 (petits traits qui suivent
+// une tête déplacée de 250 px). Gardé pour une prochaine mesure.
+var TW_REL_REVERSE=false,REL_REVERSE=0.30,REV_NEAR=0.5;
+// TW_OC_SIDE_GUARD — la passe d'ordre (fin de _spanPairSpecs) ne défait
+// pas un arrangement conservé ; voir le commentaire au point d'usage.
+var TW_OC_SIDE_GUARD=true;
 // TW_MATCH_WIDTH — l'épaisseur n'entrait pas dans le descripteur. Même
 // rampe douce que lenT (ratio 1.5 → 2.5), même exemption des micro-traits.
 var TW_MATCH_WIDTH=true;
@@ -1420,6 +1446,7 @@ function relationalRefine(matches,fA,fB,cost,localTfs,n,m,fadeCost){
   function sizeOf(f){return Math.sqrt(f.bounds.w*f.bounds.w+f.bounds.h*f.bounds.h)+1;}
   var S=_relStruct;
   var useChir=TW_CHIRALITY,useTopo=TW_MATCH_TOPOLOGY&&S&&S.contA&&S.contB,useReg=TW_MATCH_REGIONS&&S&&S.regA&&S.regB;
+  var useRev=TW_REL_REVERSE;
   // Structural terms for candidate (i→a) under assignment sig — shared by
   // the Hungarian rounds and the 2-opt objective so both optimise the
   // same thing.
@@ -1465,6 +1492,22 @@ function relationalRefine(matches,fA,fB,cost,localTfs,n,m,fadeCost){
       }
       if(cnt)t+=REL_TOPO*acc/cnt;
     }
+    if(useRev){
+      // voir TW_REL_REVERSE : échange de côtés entre voisins proches
+      var rv=0,rc=0,szi=sizeOf(fA[i]);
+      for(var q3=0;q3<nbi.length;q3++){
+        var j3=nbi[q3].j,b3=sig[j3];if(b3<0||b3===a)continue;
+        var near=REV_NEAR*Math.min(szi,sizeOf(fA[j3]));
+        if(nbi[q3].d2>near*near)continue;
+        var p3=predVec(i,nbi[q3].dx,nbi[q3].dy);
+        var qx3=fB[b3].cx-fB[a].cx,qy3=fB[b3].cy-fB[a].cy;
+        var lp3=Math.sqrt(p3[0]*p3[0]+p3[1]*p3[1]),lq3=Math.sqrt(qx3*qx3+qy3*qy3);
+        if(lp3<1e-6||lq3<1e-6)continue;
+        var cs3=(p3[0]*qx3+p3[1]*qy3)/(lp3*lq3);
+        rc++;if(cs3<-0.3)rv+=Math.min(1,(-0.3-cs3)/0.5);
+      }
+      if(rc)t+=REL_REVERSE*rv/rc;
+    }
     if(useReg){
       var r=0;
       var kA=S.regA[i];
@@ -1497,7 +1540,7 @@ function relationalRefine(matches,fA,fB,cost,localTfs,n,m,fadeCost){
             acc+=Math.min(1,Math.sqrt(ex*ex+ey*ey)/norm*2);cnt++;
           }
           if(cnt)row[a]+=REL_LAMBDA*acc/cnt;
-          if(useChir||useTopo||useReg)row[a]+=structTerm(i,a,sigma);
+          if(useChir||useTopo||useReg||useRev)row[a]+=structTerm(i,a,sigma);
         }
       }
       aug.push(row);
@@ -1528,7 +1571,7 @@ function relationalRefine(matches,fA,fB,cost,localTfs,n,m,fadeCost){
       acc+=Math.min(1,Math.sqrt(ex*ex+ey*ey)/norm*2);cnt++;
     }
     var t=cnt?REL_LAMBDA*acc/cnt:0;
-    if(useChir||useTopo||useReg)t+=structTerm(i,a,sig);
+    if(useChir||useTopo||useReg||useRev)t+=structTerm(i,a,sig);
     return t;
   }
   function objective(sig){
@@ -5200,6 +5243,25 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
       var qA=_ocCentroid(ocQ.aData),qB=_ocCentroid(ocQ.bData);
       if(!_ocSegsCross(pA,pB,qA,qB))continue;
       if(_ocSegsCross(pA,qB,qA,pB))continue; // swap still crosses — not a simple order inversion
+      // GARDE D'ARRANGEMENT (2026-09-04, « entre 26 et 35 confusion au
+      // niveau de son bras droit ») : deux contours parallèles d'un même
+      // membre (20 px d'écart, 100 px de long) qui glissent ensemble ont
+      // des trajectoires de centroïdes qui se croisent pour un rien — un
+      // artefact du mouvement parallèle, pas une inversion d'ordre. Le
+      // matcher relationnel avait choisi l'appariement non croisé
+      // (extérieur → extérieur) ; cette passe, sur son seul critère unaire
+      // où l'écart est de 0,006, le re-croisait, et l'intermédiaire
+      // montrait une grande boucle avec la main dedans. Si le vecteur
+      // relatif des deux traits en A et celui de leurs partenaires en B
+      // pointent déjà du même côté (cosinus > 0,3), l'arrangement est
+      // CONSERVÉ et l'échange le détruirait : on ne touche à rien. Un
+      // arrangement déjà inversé (cosinus < −0,3) reste candidat à
+      // l'échange comme avant.
+      if(TW_OC_SIDE_GUARD){
+        var rAx=qA[0]-pA[0],rAy=qA[1]-pA[1],rBx=qB[0]-pB[0],rBy=qB[1]-pB[1];
+        var rla=Math.sqrt(rAx*rAx+rAy*rAy),rlb=Math.sqrt(rBx*rBx+rBy*rBy);
+        if(rla>1e-6&&rlb>1e-6&&(rAx*rBx+rAy*rBy)/(rla*rlb)>0.3)continue;
+      }
       var curCost=_ocCost(_ocFeatA[oc1],_ocFeatB[oc1])+_ocCost(_ocFeatA[oc2],_ocFeatB[oc2]);
       var swapCost=_ocCost(_ocFeatA[oc1],_ocFeatB[oc2])+_ocCost(_ocFeatA[oc2],_ocFeatB[oc1]);
       if(swapCost>curCost+0.15)continue; // meaningfully worse — likely a real intended crossing, leave it
