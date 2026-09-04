@@ -58,3 +58,6 @@ vectorize-wasm/target/
 
 # Worktrees created by Claude Code background tasks — local scratch, never committed.
 .claude/worktrees/
+
+# VS Code DevMirror state is local workspace tooling, never project source.
+/.vscode/devmirror/
