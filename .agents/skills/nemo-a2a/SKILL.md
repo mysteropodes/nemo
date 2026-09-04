@@ -13,7 +13,7 @@ description: Work on Nemo and coordinate Codex/Claude agents in its dedicated Bu
 
 # Nemo workspace workflow
 
-Protocol: `NEMO-A2A-1`. Skill version: `1.3.0`.
+Protocol: `NEMO-A2A-1`. Skill version: `1.3.1`.
 
 This is the shared working contract for Codex and Claude in Nemo. In Nemo's dedicated
 Buzz community, every enrolled collaborator's managed agents participate in the Nemo
@@ -74,14 +74,15 @@ research, debugging, tests, builds, or sustained agent work.
 ## Collaborate through A2A
 
 Use A2A when another agent can independently advance the current task. Small, sequential
-jobs should stay local. Choose an available peer from the runtime's verified agent roster;
-use its supplied identity rather than inventing one. Give it a concrete outcome, relevant
+jobs should stay local. Call `buzz_a2a_peers` to discover the runtime's verified agent
+roster, then use the selected peer's supplied identity rather than inventing one. Give it a concrete outcome, relevant
 repository paths, and checkable acceptance criteria. The workspace provides Nemo access;
 users do not maintain per-peer grants or refresh a hash after every source commit.
 
 | Intent | Tool | How to use it |
 | --- | --- | --- |
 | Reply in the current conversation | `buzz_chat_send` | Send the answer once to the current conversation. A direct message needs no `@` prefix. |
+| Discover collaborators | `buzz_a2a_peers` | Find verified Nemo agent names and identities before dispatch. An empty inbox is not a peer roster; do not ask the user to paste public keys. |
 | Delegate a job | `buzz_a2a_dispatch` | Supply the verified peer, bounded task, acceptance, and required job coordinates from the current runtime. Use a fresh operation ID and a stable retry key. |
 | Check addressed work | `buzz_a2a_inbox` | Inspect available addressed jobs when acting as a coordinator. Do not duplicate an already-owned task. |
 | Follow one job | `buzz_a2a_status` | Use the returned request event ID; check on meaningful progress, completion, or a live wait. |
