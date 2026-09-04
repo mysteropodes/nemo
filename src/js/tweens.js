@@ -315,6 +315,24 @@ var MATCH_AXIS_W=0.40,AXIS_CAP=8,AXIS_FREE=0.7,AXIS_FULL=2.0,AXIS_MIN_PX=6;
 // récompenser ce choix. Arbitré en faveur des deux cas réels.
 var TW_MATCH_TURNING=true;
 var MATCH_TURN_W=0.30,TURN_FREE=2.1,TURN_FULL=4.4;
+// TW_MATCH_GAP (2026-09-04, « le corps devient le bras maintenant ») —
+// FERMETURE du trait : distance entre ses deux bouts rapportée à sa
+// diagonale. Mesuré sur cats_anim.json, c'est LE trait géométrique qui
+// sépare les cas que l'enroulement confondait : la patte en boucle se
+// referme (0,35), les mains aussi (0,28–0,39), alors que les traits du bras
+// plié de A — 290° d'enroulement comme une patte — restent OUVERTS
+// (0,75–0,81) et les lignes valent 1,0. Une patte ne doit pas devenir une
+// ligne (Δ 0,65), un bras plié peut se déplier en ligne (Δ 0,2). Même objet
+// `elong`, même câblage, même normalisation par ligne.
+// Poids : les deux termes ensemble ouvrent enfin une région LARGE et plate,
+// mesurée sur les trois cibles réelles à la fois (patte 6→16, bras et
+// contours du corps 34→46 — 8 paires exactes sur 8) :
+//   enroulement 0,20–0,40 × fermeture 0,40–1,0 : tout juste
+//   fermeture 0,30 : 7/8 ; fermeture seule (enroulement éteint) : 8/8 mais
+//   la patte redevient un bout du corps ; enroulement seul : voir sa fenêtre.
+// Réglé au centre : 0,30 / 0,50. Banc synthétique 55 (base 64).
+var TW_MATCH_GAP=true;
+var MATCH_GAP_W=0.50,GAP_FREE=0.3,GAP_FULL=0.6;
 // TW_MATCH_TOPOLOGY — « topologie floue » (FTP-SC 2018) : graphe de
 // contacts entre traits (extrémité posée sur un autre trait, à tolérance).
 // Une paire qui casse une jonction coûte, une paire qui la préserve gagne.
@@ -463,7 +481,12 @@ function pointElongation(pts){
     if(pv!==null)T+=_wrapPI(th-pv);
     pv=th;
   }
-  return{e:Math.min(AXIS_CAP,Math.sqrt(l1/l2)),scale:Math.sqrt(l1),T:Math.abs(T)};
+  // fermeture : écart bout-à-bout rapporté à la diagonale (voir TW_MATCH_GAP)
+  var gx1=Infinity,gy1=Infinity,gx2=-Infinity,gy2=-Infinity;
+  for(var g=0;g<n;g++){if(pts[g][0]<gx1)gx1=pts[g][0];if(pts[g][0]>gx2)gx2=pts[g][0];if(pts[g][1]<gy1)gy1=pts[g][1];if(pts[g][1]>gy2)gy2=pts[g][1];}
+  var gdiag=Math.hypot(gx2-gx1,gy2-gy1)||1;
+  var gap=Math.min(1,Math.hypot(pts[n-1][0]-pts[0][0],pts[n-1][1]-pts[0][1])/gdiag);
+  return{e:Math.min(AXIS_CAP,Math.sqrt(l1/l2)),scale:Math.sqrt(l1),T:Math.abs(T),gap:gap};
 }
 // Pénalité d'élongation d'UN trait de A contre tous les candidats de B,
 // NORMALISÉE PAR LIGNE : le candidat le plus compatible ne paie rien, les
@@ -497,15 +520,19 @@ function _shapePenalty(eA,eB){
     var dT=Math.abs(eA.T-eB.T);
     pen+=Math.min(1,Math.max(0,dT-TURN_FREE)/(TURN_FULL-TURN_FREE))*MATCH_TURN_W;
   }
+  if(TW_MATCH_GAP&&eA.gap!==undefined&&eB.gap!==undefined){
+    var dG=Math.abs(eA.gap-eB.gap);
+    pen+=Math.min(1,Math.max(0,dG-GAP_FREE)/(GAP_FULL-GAP_FREE))*MATCH_GAP_W;
+  }
   return pen;
 }
 function axisPenaltyPair(eA,eB){
-  if(!(TW_MATCH_AXIS||TW_MATCH_TURNING)||!eA||!eB||eA.scale<AXIS_MIN_PX||eB.scale<AXIS_MIN_PX)return 0;
+  if(!(TW_MATCH_AXIS||TW_MATCH_TURNING||TW_MATCH_GAP)||!eA||!eB||eA.scale<AXIS_MIN_PX||eB.scale<AXIS_MIN_PX)return 0;
   return _shapePenalty(eA,eB);
 }
 function _axisPenaltyRow(eA,featsB,out){
   var m=featsB.length,i;
-  if(!(TW_MATCH_AXIS||TW_MATCH_TURNING)||!eA||eA.scale<AXIS_MIN_PX){for(i=0;i<m;i++)out[i]=0;return out;}
+  if(!(TW_MATCH_AXIS||TW_MATCH_TURNING||TW_MATCH_GAP)||!eA||eA.scale<AXIS_MIN_PX){for(i=0;i<m;i++)out[i]=0;return out;}
   var mn=Infinity;
   for(i=0;i<m;i++){
     var eB=featsB[i].elong;
