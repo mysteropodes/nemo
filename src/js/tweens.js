@@ -377,6 +377,21 @@ function pointElongation(pts){
 // donc elles n'étaient pas visées : c'est le niveau absolu du coût qui
 // dérivait. Normalisé par ligne, il réordonne les candidats sans jamais
 // déplacer l'échelle du coût, donc sans toucher au taux de fondu.
+// Écart d'élongation d'UNE paire, en valeur absolue. Sert aux appels
+// DIRECTS à matchSc (acceptation d'une scission, passe d'ordre) : là il n'y
+// a pas de ligne de candidats à normaliser, la question est binaire
+// « cette paire est-elle acceptable », donc la charge absolue est la bonne
+// forme. RÉGRESSION RÉELLE ÉVITÉE ICI (2026-09-04) : en sortant le terme de
+// matchSc pour le mettre dans buildCost, je l'avais retiré de ces chemins —
+// resolveSplitMatches acceptait alors une scission (une patte coupée en
+// deux, dont une moitié étirée sur un long trait du corps) que le matcher
+// principal refusait, ce qui produisait une BOUCLE fermée au milieu de la
+// portée et deux traits partageant un strokeId dans la clé.
+function axisPenaltyPair(eA,eB){
+  if(!TW_MATCH_AXIS||!eA||!eB||eA.scale<AXIS_MIN_PX||eB.scale<AXIS_MIN_PX)return 0;
+  var em=Math.abs(Math.log(eA.e/eB.e));
+  return Math.min(1,Math.max(0,em-AXIS_FREE)/(AXIS_FULL-AXIS_FREE))*MATCH_AXIS_W;
+}
 function _axisPenaltyRow(eA,featsB,out){
   var m=featsB.length,i;
   if(!TW_MATCH_AXIS||!eA||eA.scale<AXIS_MIN_PX){for(i=0;i<m;i++)out[i]=0;return out;}
@@ -4240,7 +4255,8 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
         var piece=extractStrokePiece(sMerged[mi2],prevF,f1);prevF=f1;
         var pf=strokeFeat(piece);
         pf.relX=(pf.cx-mergedBounds.x)/mergedBounds.w;pf.relY=(pf.cy-mergedBounds.y)/mergedBounds.h;
-        var sc=mergedSide==='B'?matchSc(featParts[ordered[oi2].idx],pf,false):matchSc(pf,featParts[ordered[oi2].idx],false);
+        var sc=(mergedSide==='B'?matchSc(featParts[ordered[oi2].idx],pf,false):matchSc(pf,featParts[ordered[oi2].idx],false))
+              +axisPenaltyPair(featParts[ordered[oi2].idx].elong,pf.elong);
         pieces.push(piece);scores.push(sc);
         if(sc>0.48)ok=false;
         // Geometric self-consistency (2026-07, live-reported hooked/
@@ -4920,7 +4936,10 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
     var lenRatio=Math.max(fX.length,fY.length)/Math.max(1,Math.min(fX.length,fY.length));
     var typePenalty=fX.type!==fY.type?0.5:0;
     var colD=(colorDist(fX.strokeCol,fY.strokeCol)+colorDist(fX.fillCol,fY.fillCol))/2;
-    return cham+Math.max(0,lenRatio-1.3)*0.3+typePenalty+colD*0.3;
+    // même garde d'élongation que le matcher principal (axisPenaltyPair) :
+    // cette passe échange deux partenaires sur une comparaison de FORMES,
+    // elle doit voir qu'une boucle n'est pas un long trait.
+    return cham+Math.max(0,lenRatio-1.3)*0.3+typePenalty+colD*0.3+axisPenaltyPair(fX.elong,fY.elong);
   }
   var _ocCandidates=pairSpecs.filter(function(p){return!p.isPiece&&!p.forced;});
   var _ocFeatA={},_ocFeatB={};
@@ -5026,6 +5045,7 @@ function generateTweens(explicitRestrictTo,skipUndo){
         _spanField={ab:clampF(fab),ba:clampF(fba)};
       }
     }
+    var _usedPairIds={}; // voir l'unicité du pairId ci-dessous
     var pairs=pairSpecs.map(function(spec){
       var isVB=!!(spec.aData.isVectorBrush&&spec.bData.isVectorBrush);
       // Feature-aware (corner/cusp-biased) shared resampling — see
@@ -5095,6 +5115,20 @@ function generateTweens(explicitRestrictTo,skipUndo){
       // keyframe's own stored data, giving keyframe and every
       // interpolated frame in between the exact same identity.
       var pairId=spec.aData.strokeId||spec.bData.strokeId||('tw_'+fA+'_'+spec.mi);
+      // UNICITÉ (2026-09-04) — une scission 1→N (ou une fusion N→1) fait
+      // partager le MÊME aData (resp. bData) à plusieurs specs : la ligne
+      // ci-dessous estampillait alors le même strokeId sur N traits
+      // différents de la clé, et sur N traits de chaque image générée.
+      // Défaut PRÉEXISTANT (mesuré : le moteur d'avant #739 produit deux
+      // doublons sur ce même fichier), simplement masqué tant qu'aucune
+      // scission ne se déclenchait. Or tout ce qui est indexé par
+      // strokeId — continuité entre images, réassignation manuelle, arcs
+      // de mouvement, _dedupeFrameStrokeIds au tour suivant — prend alors
+      // le premier trait trouvé, ce qui change le résultat d'un run à
+      // l'autre. Un suffixe par morceau règle le problème pour toutes les
+      // configurations, pas seulement la mienne.
+      if(_usedPairIds[pairId]){var _k=1;while(_usedPairIds[pairId+'#'+_k])_k++;pairId=pairId+'#'+_k;}
+      _usedPairIds[pairId]=1;
       spec.aData.strokeId=pairId;spec.bData.strokeId=pairId;
       // _src set AFTER alignment: the wasm align path rebuilds its output
       // object from JSON, so a field attached to rb before the call would
