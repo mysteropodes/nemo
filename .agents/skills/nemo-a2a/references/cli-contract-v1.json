@@ -1,0 +1,115 @@
+{
+  "schema_version": "buzz.cli-contract.v1",
+  "event_schema_version": "buzz.jobs.v1",
+  "result_schema_version": "buzz.cli-result.v1",
+  "commands": [
+    {
+      "path": ["agents", "capabilities"],
+      "options": [
+        {"name": "--project-address", "value": "ADDRESS", "required": false}
+      ]
+    },
+    {
+      "path": ["jobs", "submit"],
+      "options": [
+        {"name": "--input", "value": "FILE|-", "required": true}
+      ]
+    },
+    {
+      "path": ["jobs", "list"],
+      "options": [
+        {"name": "--project-address", "value": "ADDRESS", "required": false},
+        {"name": "--recipient", "value": "PUBKEY|self", "required": false},
+        {"name": "--state", "value": "STATE", "required": false},
+        {"name": "--cursor", "value": "CURSOR", "required": false}
+      ]
+    },
+    {
+      "path": ["jobs", "get"],
+      "options": [
+        {"name": "--operation-id", "value": "UUID", "required": true}
+      ]
+    },
+    {
+      "path": ["jobs", "accept"],
+      "options": [
+        {"name": "--operation-id", "value": "UUID", "required": true},
+        {"name": "--input", "value": "FILE|-", "required": true}
+      ]
+    },
+    {
+      "path": ["jobs", "progress"],
+      "options": [
+        {"name": "--operation-id", "value": "UUID", "required": true},
+        {"name": "--input", "value": "FILE|-", "required": true}
+      ]
+    },
+    {
+      "path": ["jobs", "complete"],
+      "options": [
+        {"name": "--operation-id", "value": "UUID", "required": true},
+        {"name": "--input", "value": "FILE|-", "required": true}
+      ]
+    },
+    {
+      "path": ["jobs", "fail"],
+      "options": [
+        {"name": "--operation-id", "value": "UUID", "required": true},
+        {"name": "--input", "value": "FILE|-", "required": true}
+      ]
+    },
+    {
+      "path": ["jobs", "cancel"],
+      "options": [
+        {"name": "--operation-id", "value": "UUID", "required": true},
+        {"name": "--input", "value": "FILE|-", "required": true}
+      ]
+    },
+    {
+      "path": ["jobs", "release"],
+      "options": [
+        {"name": "--operation-id", "value": "UUID", "required": true},
+        {"name": "--input", "value": "FILE|-", "required": true}
+      ]
+    },
+    {
+      "path": ["jobs", "handoff"],
+      "options": [
+        {"name": "--operation-id", "value": "UUID", "required": true},
+        {"name": "--input", "value": "FILE|-", "required": true}
+      ]
+    }
+  ],
+  "forbidden": {
+    "command_paths": [["jobs", "control"]],
+    "options": ["--since"],
+    "result_paths": ["relay.status"]
+  },
+  "semantics": {
+    "accept_invocation": "one_claim_from_input",
+    "accept_claim_statuses": ["processed", "accepted"],
+    "cursor": "opaque_relay_history_cursor",
+    "control_commands": ["cancel", "release", "handoff"]
+  },
+  "write_result": {
+    "required_paths": [
+      "schema_version",
+      "operation_id",
+      "community.id",
+      "community.relay_url",
+      "relay.state",
+      "relay.event_id",
+      "lifecycle",
+      "replayed",
+      "event",
+      "authority"
+    ],
+    "relay_state": "stored",
+    "lifecycle": null,
+    "community_id": {
+      "source": "authenticated_relay_context",
+      "required": true,
+      "nullable": false
+    }
+  }
+}
