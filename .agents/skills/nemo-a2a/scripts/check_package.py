@@ -142,9 +142,13 @@ def check_buzz_preload_manifest() -> None:
     except (ValueError, json.JSONDecodeError) as error:
         fail(f"invalid or duplicate-key Buzz preload manifest: {error}")
     expected = {
-        "schema_version": "buzz.project-preload.v1",
+        "schema_version": "buzz.project-preload.v2",
         "repository": REPOSITORY,
         "skills": ["nemo-a2a"],
+        "policy_resources": [
+            ".agents/skills/nemo-a2a/references/protocol.md",
+            ".agents/skills/nemo-a2a/references/receiver-grants.md",
+        ],
     }
     if manifest != expected:
         fail(f"Buzz preload manifest drifted: expected {expected}, got {manifest}")
