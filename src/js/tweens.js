@@ -185,11 +185,48 @@ var MF_OUTLIER_K=3;        // graine rejetée si résidu > K × médiane
 // donc préserve l'orientation, alors que les confusions réelles (yeux G↔D,
 // moustaches, jambes) sont des inversions miroir. À passer à 0 en premier
 // si un cas réel régresse.
+var TW_CHIRALITY=true;
 var REL_CHIR=0.10,CHIR_SIN=0.30;
 // TW_MATCH_WIDTH — l'épaisseur n'entrait pas dans le descripteur. Même
 // rampe douce que lenT (ratio 1.5 → 2.5), même exemption des micro-traits.
 var TW_MATCH_WIDTH=true;
 var MATCH_WIDTH_W=0.10;
+// TW_MATCH_AXIS (2026-09-04, cas signalé par Cyril : « à la frame 7 la main
+// devient un bout du corps »). Diagnostic chiffré : la boucle de la patte
+// (49×34) était appariée à un long trait du corps (29×131) et TOUS les
+// termes de forme étaient d'accord — le descripteur de Fourier donnait 0.003
+// pour ce faux appariement contre 0.075 pour le bon. Cause : Fourier
+// normalise sa magnitude et jette la phase, le profil d'angles est
+// normalisé par sa longueur — les deux sont invariants à l'échelle ET à la
+// rotation par construction. Une petite boucle large et un long trait fin
+// leur sont littéralement IDENTIQUES. Aucun terme du coût ne regardait la
+// FORME GLOBALE du nuage de points ; szD compare des aires de boîte
+// (poids 0.06) et dirX/dirY, calculés dans strokeFeat, n'étaient jamais lus.
+// Signal ajouté : l'ÉLONGATION (rapport des valeurs propres de la matrice
+// de covariance des 16 échantillons). Mesuré sur ce fichier : les paires
+// légitimes sont à |log(eA/eB)| = 0.03..0.64, le faux appariement de la
+// patte à 3.01. L'ANGLE de l'axe principal, lui, est INUTILISABLE : de
+// bonnes paires y sont à 66°, 80°, 87° d'écart (le chat pivote entre les
+// clés) — d'où élongation seule, sans orientation.
+// L'élongation est plafonnée à AXIS_CAP : au-delà, un trait est « en gros
+// droit » et deux droits ne doivent pas se départager sur ce critère.
+// Quand la passe 2 fournit les points transportés, l'élongation de A est
+// mesurée SUR EUX : un trait réellement écrasé par la déformation n'est
+// donc pas puni pour l'avoir été.
+// Poids : 0.40. Compromis MESURÉ, à connaître avant d'y toucher — le cas
+// réel et le banc synthétique ne sont pas d'accord ici :
+//   terme éteint            2,13,24,0,5,13 (tot 57) — main → corps (le bug)
+//   W=0.25                  2,16,25,0,5,11 (tot 59) — main → corps encore
+//   W=0.40                  2,16,25,0,5,11 (tot 59) — main RÉPARÉE, et
+//                           l'orphelin parasite de B disparaît
+//   W=0.60                  2,16,33,0,5,11 (tot 67) — trop
+// Le banc perd 3 sur K0-moyen et en regagne 2 sur K6-redraw. Sa déformation
+// synthétique ne change quasiment PAS l'élongation d'un trait (écart médian
+// mesuré 0.03, max 0.83 au niveau redraw) : il ne peut donc pas récompenser
+// ce terme, alors que le cas réel signalé par Cyril en dépend entièrement.
+// Arbitré en faveur du cas réel, drapeau prévu pour revenir en arrière.
+var TW_MATCH_AXIS=true;
+var MATCH_AXIS_W=0.40,AXIS_CAP=8,AXIS_FREE=0.7,AXIS_FULL=2.0,AXIS_MIN_PX=6;
 // TW_MATCH_TOPOLOGY — « topologie floue » (FTP-SC 2018) : graphe de
 // contacts entre traits (extrémité posée sur un autre trait, à tolérance).
 // Une paire qui casse une jonction coûte, une paire qui la préserve gagne.
@@ -316,6 +353,44 @@ function fourierDescriptor(pts,cx,cy){
   var norm=Math.sqrt(mags.reduce(function(a,b){return a+b*b;},0))||1;
   return mags.map(function(v){return v/norm;});
 }
+// Élongation d'un nuage de points (TW_MATCH_AXIS) : racine du rapport des
+// valeurs propres de la covariance. 1 = isotrope (une boucle, un point),
+// grand = allongé (un trait droit). `scale` = étendue le long de l'axe
+// principal, sert à exempter les micro-traits dont l'élongation est du bruit.
+function pointElongation(pts){
+  var n=pts.length;if(n<3)return null;
+  var cx=0,cy=0;for(var i=0;i<n;i++){cx+=pts[i][0];cy+=pts[i][1];}cx/=n;cy/=n;
+  var sxx=0,syy=0,sxy=0;
+  for(var k=0;k<n;k++){var dx=pts[k][0]-cx,dy=pts[k][1]-cy;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;}
+  sxx/=n;syy/=n;sxy/=n;
+  var tr=sxx+syy,det=sxx*syy-sxy*sxy;
+  var disc=Math.sqrt(Math.max(0,tr*tr/4-det));
+  var l1=tr/2+disc,l2=Math.max(1e-9,tr/2-disc);
+  return{e:Math.min(AXIS_CAP,Math.sqrt(l1/l2)),scale:Math.sqrt(l1)};
+}
+// Pénalité d'élongation d'UN trait de A contre tous les candidats de B,
+// NORMALISÉE PAR LIGNE : le candidat le plus compatible ne paie rien, les
+// autres paient l'écart. Mesuré : ajouté en valeur absolue (première
+// version), le terme faisait passer des paires CORRECTES au-dessus du seuil
+// de fondu de 0.48 — le banc perdait 8 points, tous en « miss », alors que
+// l'écart d'élongation des paires vraies est de 0.00 à 0.41 (médiane 0.03),
+// donc elles n'étaient pas visées : c'est le niveau absolu du coût qui
+// dérivait. Normalisé par ligne, il réordonne les candidats sans jamais
+// déplacer l'échelle du coût, donc sans toucher au taux de fondu.
+function _axisPenaltyRow(eA,featsB,out){
+  var m=featsB.length,i;
+  if(!TW_MATCH_AXIS||!eA||eA.scale<AXIS_MIN_PX){for(i=0;i<m;i++)out[i]=0;return out;}
+  var mn=Infinity;
+  for(i=0;i<m;i++){
+    var eB=featsB[i].elong;
+    if(!eB||eB.scale<AXIS_MIN_PX){out[i]=0;mn=0;continue;}
+    var em=Math.abs(Math.log(eA.e/eB.e));
+    out[i]=Math.min(1,Math.max(0,em-AXIS_FREE)/(AXIS_FULL-AXIS_FREE))*MATCH_AXIS_W;
+    if(out[i]<mn)mn=out[i];
+  }
+  if(mn>0)for(i=0;i<m;i++)out[i]-=mn;
+  return out;
+}
 function fourierDist(a,b){
   if(!a||!b)return 0;
   var n=Math.min(a.length,b.length),s=0;
@@ -364,7 +439,8 @@ function strokeFeat(sd){var p=buildTPFeat(sd);var b=p.bounds,len=p.length;var cx
   // centerline point, everything else its strokeWidth
   var wid=sd.strokeWidth||3;
   if(usingCenterline){var ws=0,wc=0;for(var wi=0;wi<sd.centerSegments.length;wi++){var sw=sd.centerSegments[wi].width;if(typeof sw==='number'&&sw>0){ws+=sw;wc++;}}if(wc)wid=ws/wc;}
-  p.remove();return{cx:cx,cy:cy,length:len,dirX:dx,dirY:dy,bounds:{x:b.x,y:b.y,w:b.width,h:b.height},shape:shape,pts:pts,turn:turn,closed:isClosed,closedIsGuess:closedIsGuess,strokeCol:parseHexColor(realStrokeColor(sd)),fillCol:parseHexColor(sd.fillColor),type:strokeType(sd),fourier:fourier,wid:wid};}
+  var elong=pointElongation(pts); // TW_MATCH_AXIS
+  p.remove();return{cx:cx,cy:cy,length:len,dirX:dx,dirY:dy,bounds:{x:b.x,y:b.y,w:b.width,h:b.height},shape:shape,pts:pts,turn:turn,closed:isClosed,closedIsGuess:closedIsGuess,strokeCol:parseHexColor(realStrokeColor(sd)),fillCol:parseHexColor(sd.fillColor),type:strokeType(sd),fourier:fourier,wid:wid,elong:elong};}
 // Relative position (within the whole frame's own composition bbox) is what
 // actually distinguishes "left eye" from "right eye" — raw absolute centroid
 // distance breaks down whenever the whole drawing translates/scales between
@@ -489,6 +565,9 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
     var wr=Math.max(fA.wid,fB.wid)/Math.min(fA.wid,fB.wid);
     widT=Math.min(1,Math.max(0,Math.log(wr)-Math.log(1.5))/Math.log(2.5/1.5))*MATCH_WIDTH_W;
   }
+  // L'élongation (TW_MATCH_AXIS) n'est PAS ajoutée ici : c'est un
+  // DISCRIMINATEUR entre candidats, pas une charge absolue — voir
+  // _axisPenaltyRow, appliqué par buildCost après normalisation par ligne.
   return proxT*.48+alignT*.15+curveT*.12+fourD*.10+rel*.10+szD*.06+colD*.15+typePenalty+colorPenalty+ratioPen+lenT+closedPen+idxBonus+widT;
 }
 // "Force line" motion model: eyes, chin, and other small close-together
@@ -753,11 +832,16 @@ function _autoMatchJSCore(sA,sB,hist,pins){
   var FADE_COST=0.6;
   var n=sA.length,m=sB.length,N=n+m;
   function buildCost(ptsT){
-    var c=[];
+    var c=[],axis=new Array(m);
     for(var a=0;a<N;a++){
       var row=[];
+      // élongation : discriminateur normalisé par ligne (voir _axisPenaltyRow).
+      // Côté A on mesure sur les points TRANSPORTÉS quand la passe 2 en
+      // fournit, pour qu'un trait réellement écrasé par la déformation ne
+      // soit pas puni de l'avoir été.
+      if(a<n)_axisPenaltyRow((ptsT&&ptsT[a])?pointElongation(ptsT[a]):fA[a].elong,fB,axis);
       for(var b=0;b<N;b++){
-        if(a<n&&b<m)row.push(matchSc(fA[a],fB[b],a===b,ptsT?ptsT[a]:undefined));
+        if(a<n&&b<m)row.push(matchSc(fA[a],fB[b],a===b,ptsT?ptsT[a]:undefined)+axis[b]);
         else if(a>=n&&b>=m)row.push(0);
         else row.push(FADE_COST);
       }
@@ -905,11 +989,16 @@ function _autoMatchJSCore(sA,sB,hist,pins){
     var lim=Math.min(n,m);
     var hypCost=hyps.map(function(h){
       var bias=MM_BIAS+MM_BIAS_SUPPORT*(1-h.support/lim);
-      var mat=new Array(n);
+      var mat=new Array(n),hAxis=new Array(m);
       for(var ha=0;ha<n;ha++){
         var hpts=fA[ha].pts.map(function(p){var q=applySimilarityTransform(h.tf,p[0],p[1]);return[q.x,q.y];});
+        // Le terme d'élongation doit exister dans CHAQUE canal : cost2 prend
+        // le min sur les canaux, donc un canal d'hypothèse qui l'omettrait
+        // annulerait le terme pour toute paire qu'il explique (mesuré : le
+        // terme était silencieusement sans effet sur ces cellules).
+        _axisPenaltyRow(pointElongation(hpts),fB,hAxis);
         var row=new Array(m);
-        for(var hb=0;hb<m;hb++)row[hb]=matchSc(fA[ha],fB[hb],ha===hb,hpts)+bias;
+        for(var hb=0;hb<m;hb++)row[hb]=matchSc(fA[ha],fB[hb],ha===hb,hpts)+hAxis[hb]+bias;
         mat[ha]=row;
       }
       return mat;
