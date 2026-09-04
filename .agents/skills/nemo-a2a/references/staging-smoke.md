@@ -15,7 +15,7 @@ Project discovery disagrees:
 ```text
 project.address = 30621:1c7b17a0f192078060df6a59865f3610919b161d6c4743478ddd62a7ba1cbedf:nemo
 project.home_channel = 40bdd8ad-8cf1-4757-bf43-9c7b301a9b50
-repository.canonical = https://github.com/nemo-project/nemo
+repository.canonical = https://github.com/mysteropodes/nemo
 ```
 
 Run the following only after the owner authorizes the staging relay writes, identities,

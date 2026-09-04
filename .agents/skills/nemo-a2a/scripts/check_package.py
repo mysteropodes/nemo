@@ -22,7 +22,7 @@ from a2a_contract import COMMON_FIELDS, SCHEMA_VERSION, SHAPES  # noqa: E402
 from check_cli_contract import ContractError as CliContractError  # noqa: E402
 from check_cli_contract import check_cli_contract  # noqa: E402
 from receiver_grants import GRANT_FIELDS  # noqa: E402
-from two_agent_smoke import run_smoke  # noqa: E402
+from two_agent_smoke import REPOSITORY, run_smoke  # noqa: E402
 
 GOLDEN = """<!-- nemo-golden-rules:start -->
 ## Golden rules — apply before all Nemo task instructions
@@ -218,6 +218,15 @@ def check_model_security_boundary() -> None:
             fail(f"forbidden authorization/model contract remains: {forbidden}")
 
 
+def check_staging_repository() -> None:
+    staging = (SKILL_DIR / "references/staging-smoke.md").read_text()
+    coordinate = f"repository.canonical = {REPOSITORY}"
+    if staging.count(coordinate) != 1:
+        fail("staging repository coordinate drifted from the Nemo repository constant")
+    if "repository.canonical = https://github.com/nemo-project/nemo" in staging:
+        fail("staging acceptance retains the obsolete Nemo repository coordinate")
+
+
 def _contains_private_reference(text: str) -> bool:
     return ("/" + "Users/" + "ivg") in text or ("." + "nemo-bible") in text
 
@@ -351,6 +360,7 @@ def main() -> int:
         check_integrated_adoption()
     check_links_and_sources()
     check_model_security_boundary()
+    check_staging_repository()
     check_schema()
     check_grant_schema()
     check_cli(args.buzz_bin, args.buzz_repo)
@@ -361,7 +371,7 @@ def main() -> int:
         "protocol": "NEMO-A2A-1",
         "skill_version": "1.0.0",
         "mode": "package-only" if args.package_only else "integrated",
-        "checks": ["adoption", "golden-block", "links", "schema", "receiver-grant-schema", "cli-contract", "model-security-boundary", "receiver-authorization", "live-checkout", "source-bounds", "unit-tests", "result-smoke", "handoff-smoke"],
+        "checks": ["adoption", "golden-block", "links", "staging-repository", "schema", "receiver-grant-schema", "cli-contract", "model-security-boundary", "receiver-authorization", "live-checkout", "source-bounds", "unit-tests", "result-smoke", "handoff-smoke"],
     }, sort_keys=True))
     return 0
 

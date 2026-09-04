@@ -31,7 +31,7 @@ WORKER_B_SPONSOR = "77" * 32
 CREATED = int(dt.datetime(2030, 1, 1, tzinfo=dt.timezone.utc).timestamp())
 NOW = dt.datetime(2030, 1, 1, 0, 0, 10, tzinfo=dt.timezone.utc)
 EXPIRES = "2030-01-01T01:00:00Z"
-REPOSITORY = "https://github.com/nemo-project/nemo"
+REPOSITORY = "https://github.com/mysteropodes/nemo"
 BRANCH = "codex/a2a-local-smoke"
 WORKTREE_ID = "local-smoke-1"
 
@@ -72,7 +72,7 @@ def create_checkout(root: Path) -> CheckoutFixture:
 
 def authority() -> LocalAuthority:
     auth = LocalAuthority()
-    auth.add_project(COMMUNITY, PROJECT_ADDRESS, HOME_CHANNEL, "https://github.com/nemo-project/nemo")
+    auth.add_project(COMMUNITY, PROJECT_ADDRESS, HOME_CHANNEL, REPOSITORY)
     auth.add_agent(COMMUNITY, HOME_CHANNEL, REQUESTER, REQUESTER_SPONSOR)
     capability = {"nemo.a2a.smoke": [".agents/skills/nemo-a2a"]}
     auth.add_agent(COMMUNITY, HOME_CHANNEL, WORKER_A, WORKER_A_SPONSOR, capability)
@@ -140,12 +140,8 @@ def authorization_client(
         requester_owner_pubkey=REQUESTER_SPONSOR,
         recipient_owner_pubkey=recipient_owner,
         project_head_event_id=service.project_head(PROJECT_ADDRESS, HOME_CHANNEL),
-        repository_coordinate=service.repository_coordinate(
-            PROJECT_ADDRESS, "https://github.com/nemo-project/nemo"
-        ),
-        repository_announcement_event_id=service.repository_announcement(
-            "https://github.com/nemo-project/nemo"
-        ),
+        repository_coordinate=service.repository_coordinate(PROJECT_ADDRESS, REPOSITORY),
+        repository_announcement_event_id=service.repository_announcement(REPOSITORY),
     )
     return LocalAuthorizationClient(
         service,
