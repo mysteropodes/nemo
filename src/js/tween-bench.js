@@ -216,6 +216,34 @@
     if(window.view)view.update();
     return{pairs:r.pairs,unA:r.unA,unB:r.unB,ms:r.ms};
   };
+  // ---- FOLDS : auto-intersections inventées par l'interpolation ----
+  // Les clés font foi : si un trait ne se croise pas dans les deux clés et
+  // se croise dans une image générée, l'interpolation a replié le trait.
+  // C'est LA métrique qui isole le défaut « la shape se retourne ».
+  function _selfX(sd){
+    var s=(sd.centerSegments&&sd.centerSegments.length>1)?sd.centerSegments:sd.segments;
+    if(!s||s.length<4)return 0;
+    var P=s.map(function(q){return q.point;}),n=0;
+    function cr(o,p,q){return (p[0]-o[0])*(q[1]-o[1])-(p[1]-o[1])*(q[0]-o[0]);}
+    function it(a,b,c,d){var d1=cr(c,d,a),d2=cr(c,d,b),d3=cr(a,b,c),d4=cr(a,b,d);
+      return((d1>0&&d2<0)||(d1<0&&d2>0))&&((d3>0&&d4<0)||(d3<0&&d4>0));}
+    for(var i=0;i+1<P.length;i++)for(var j=i+2;j+1<P.length;j++){
+      if(i===0&&j+1===P.length-1)continue;
+      if(it(P[i],P[i+1],P[j],P[j+1]))n++;}
+    return n;
+  }
+  B.folds=function(li){
+    li=li===undefined?state.activeLayerIdx:li;
+    state.activeLayerIdx=li; generateTweens();
+    var ld=state.layers[li],keys=keysOf(li),out=[],total=0,keyX=0;
+    keys.forEach(function(k){ (ld.frames[k].strokes||[]).forEach(function(sd){keyX+=_selfX(sd);}); });
+    for(var f=0;f<state.totalFrames;f++){
+      var fr=ld.frames[f]; if(!fr||!fr.isInterpolated)continue;
+      var x=0;(fr.strokes||[]).forEach(function(sd){x+=_selfX(sd);});
+      if(x){out.push({frame:f,crossings:x});total+=x;}
+    }
+    return{keyCrossings:keyX, generatedFramesWithCrossings:out.length, totalCrossings:total, frames:out};
+  };
   B.snapshot=function(){var c=document.querySelector('#canvas')||document.querySelector('canvas');return c?c.toDataURL('image/png'):null;};
   window.__twBench=B;
 })();

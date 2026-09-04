@@ -31,6 +31,58 @@ var FOLDBACK_MIN=0.02;
 // _intrinsicSegs' `else` branch. Set false to restore forward-only
 // integration.
 var TW_INTRINSIC_ANCHOR=true;
+// TW_XING_LERP (2026-09-04) — l'allocation d'auto-intersections de
+// l'arbitrage suit A→B au lieu d'être le forfait constant max(xA,xB).
+// Voir le commentaire détaillé au point d'usage (xingA/xingB).
+var TW_XING_LERP=true;
+// TW_XING_AREA (2026-09-04) — l'arbitrage paie la SURFACE des boucles
+// d'auto-intersection, pas seulement leur nombre : une boucle visible et un
+// frisson de resample comptaient tous deux pour « 1 ». Voir
+// _segsSelfLoopArea. Poids : la boucle fautive couvre ~0,10 de la boîte du
+// trait et l'écart à battre entre candidats était de 1,9 point.
+var TW_XING_AREA=true,XING_AREA_W=60;
+// TW_ALIGN_WINDING (2026-09-04, « la main droite la shape se retourne »).
+// Le sens de parcours de B (direct ou inversé) était choisi sur la seule
+// distance centroïde-relative des points, aux DEUX endroits où il se
+// décide (orientation précoce dans resamplePairFeatureAware, puis
+// alignResampledPairJS). Or inverser un trait change le SIGNE de son
+// enroulement : mesuré sur la patte signalée (cats_anim.json, portée
+// 6→16), A est un C de −272° et B un U de −55° dans le sens direct — même
+// sens de courbure, la patte se DÉROULE. L'inversion gagnait pourtant à la
+// distance (25 039 contre 37 543 : les extrémités restent du même côté),
+// ce qui faisait passer B à +55° ; le mélange traverse alors une ligne
+// droite (image 7 quasi rectiligne) et se recourbe à l'envers — c'est le
+// retournement que voit l'utilisateur. Le terme de désaccord de virage
+// existant (moyenne des |Δ| par sommet) ne le voit pas : il vaut 12° en
+// direct contre 22° en inversé, l'écart de distance l'emporte. Règle :
+// quand les deux traits sont franchement courbes (enroulement ≥
+// WIND_MIN_DEG chacun), l'orientation qui CONSERVE le signe l'emporte,
+// sauf si son coût dépasse WIND_MAX_RATIO fois l'autre (formes trop
+// différentes pour que l'enroulement dise quelque chose). Une rotation
+// remplace le retournement ; l'autre cas (une main qui se retourne
+// vraiment, paume dessus/dessous) devient une rotation, jamais un
+// aplatissement en ligne.
+var TW_ALIGN_WINDING=true,WIND_MIN_DEG=40,WIND_MAX_RATIO=4;
+function _turningDeg(P){
+  var s=0,pv=null;
+  for(var i=1;i<P.length;i++){
+    var dx=P[i][0]-P[i-1][0],dy=P[i][1]-P[i-1][1];
+    if(dx*dx+dy*dy<1e-6)continue;
+    var t=Math.atan2(dy,dx);
+    if(pv!==null)s+=_wrapPI(t-pv);
+    pv=t;
+  }
+  return s*180/Math.PI;
+}
+// +1 : garder B direct ; −1 : inverser B ; 0 : pas d'avis (laisser la
+// distance décider). PA/PB = listes de [x,y] dans l'ordre de parcours.
+function _windingPref(PA,PB,costDirect,costRev){
+  if(!TW_ALIGN_WINDING)return 0;
+  var wA=_turningDeg(PA),wB=_turningDeg(PB);
+  if(Math.min(Math.abs(wA),Math.abs(wB))<WIND_MIN_DEG)return 0;
+  if((wA>0)===(wB>0))return costDirect<=costRev*WIND_MAX_RATIO?1:0;
+  return costRev<=costDirect*WIND_MAX_RATIO?-1:0;
+}
 // 2026-09 (tween audit) — two interpolation-QUALITY changes, each behind
 // its own flag so they can be A/B'd from the console and rolled back
 // independently (set to false, regenerate). Left for Cyril to judge on
@@ -2118,7 +2170,10 @@ function resamplePairFeatureAware(aData,bData,n,isVB){
       _cd+=(ax-bxD)*(ax-bxD)+(ay-byD)*(ay-byD);
       _cr+=(ax-bxR)*(ax-bxR)+(ay-byR)*(ay-byR);
     }
-    if(_cr<_cd){
+    // Conservation de l'enroulement (voir TW_ALIGN_WINDING) : prime sur la
+    // distance quand les deux traits sont franchement courbes.
+    var _wPref=_windingPref(_oPA.map(function(q){return[q.x,q.y];}),_oPB.map(function(q){return[q.x,q.y];}),_cd,_cr);
+    if(_wPref<0||(_wPref===0&&_cr<_cd)){
       bReversed=true;
       srcB=srcB.slice().reverse().map(function(s){return{point:s.point,handleIn:s.handleOut,handleOut:s.handleIn,width:s.width};});
       pB.remove();
@@ -2575,6 +2630,41 @@ function _segsSelfXCount(segs){
   }
   return c;
 }
+// SURFACE des boucles d'auto-intersection, relative à la boîte du trait
+// (2026-09-04, « la main droite la shape se retourne »). Le DÉCOMPTE
+// ci-dessus ne distingue pas une boucle visible d'un frisson de resample :
+// mesuré sur le cas signalé, la boucle fermée bien visible au milieu de la
+// portée couvre 9 à 11 % de la boîte du trait, tandis que les intersections
+// parasites en couvrent 0,1 % — et les DEUX comptent pour « 1 ». Pire, la
+// clé B resamplée porte une de ces intersections parasites, ce qui offrait
+// une intersection gratuite à toute la portée (voir xingA/xingB). La
+// surface sépare les deux d'un facteur 100 ; les clés de ce fichier, elles,
+// en ont exactement zéro.
+function _segsSelfLoopArea(segs){
+  var n=segs.length-1;
+  if(n<3)return 0;
+  var x1=Infinity,y1=Infinity,x2=-Infinity,y2=-Infinity,k;
+  for(k=0;k<segs.length;k++){
+    var px=segs[k].point[0],py=segs[k].point[1];
+    if(px<x1)x1=px;if(px>x2)x2=px;if(py<y1)y1=py;if(py>y2)y2=py;
+  }
+  var bbox=Math.max(1,(x2-x1)*(y2-y1));
+  var tot=0;
+  for(var i=0;i<n;i++){
+    var p1={x:segs[i].point[0],y:segs[i].point[1]},p2={x:segs[i+1].point[0],y:segs[i+1].point[1]};
+    for(var j=i+2;j<n;j++){
+      var p3={x:segs[j].point[0],y:segs[j].point[1]},p4={x:segs[j+1].point[0],y:segs[j+1].point[1]};
+      if(_nearPt(p1.x,p1.y,p3.x,p3.y)||_nearPt(p1.x,p1.y,p4.x,p4.y)||_nearPt(p2.x,p2.y,p3.x,p3.y)||_nearPt(p2.x,p2.y,p4.x,p4.y))continue;
+      if(!_segsIntersect(p1,p2,p3,p4))continue;
+      // aire du lacet fermé i+1..j (formule du lacet), en valeur absolue
+      var A=0;
+      for(var q=i+1;q<j;q++)A+=segs[q].point[0]*segs[q+1].point[1]-segs[q+1].point[0]*segs[q].point[1];
+      A+=segs[j].point[0]*segs[i+1].point[1]-segs[i+1].point[0]*segs[j].point[1];
+      tot+=Math.abs(A/2)/bbox;
+    }
+  }
+  return tot;
+}
 // `anchor` (optional) is the rigid-blend result for the SAME et — the
 // candidate the intrinsic reconstruction is an alternative to. When supplied,
 // an open stroke's walk has its span pinned to the anchor's span, with the
@@ -2898,6 +2988,38 @@ function _renderedRipple(segs,closed){
     if(Math.abs(h)>0.15)pr=h;
   }
   return(fl/L)*100;
+}
+// MICRO-BOUCLES DE POIGNÉES (2026-09-04). Sur la forme dense (50 points
+// avant réduction), une poignée vaut ~1/3 de sa corde. Quand deux points
+// du mélange convergent en bout de trait (cordes de 0,2 à 0,5 px mesurées
+// sur cats_anim.json, images 10 à 15), les poignées héritées par lerp des
+// clés restent à ~1 px : la cubique fait alors un lacet sous le pixel —
+// les 9 auto-intersections de Bézier qui restaient après le correctif
+// d'enroulement étaient TOUTES de cette nature (portées de 0 à 1 segment,
+// indices 42–48 ou 0–1). Invisible sur un trait fin, mais le ruban d'un
+// pinceau large y fait un nœud. Une cubique dont chaque poignée reste sous
+// HANDLE_MAX_RATIO fois sa corde ne peut pas se recroiser : on borne, sans
+// toucher aux poignées déjà saines (ratio ≤ 0,45), AVANT la réduction de
+// points (qui reconstruit ses propres poignées, légitimement plus longues
+// sur un maillage clairsemé).
+var TW_HANDLE_CLAMP=true,HANDLE_MAX_RATIO=0.45;
+function _clampHandles(segs){
+  if(!TW_HANDLE_CLAMP||!segs||segs.length<2)return segs;
+  var n=segs.length;
+  for(var i=0;i<n;i++){
+    var s=segs[i];
+    if(i<n-1&&s.handleOut){
+      var ex=segs[i+1].point[0]-s.point[0],ey=segs[i+1].point[1]-s.point[1];
+      var cap=Math.hypot(ex,ey)*HANDLE_MAX_RATIO,hl=Math.hypot(s.handleOut[0],s.handleOut[1]);
+      if(hl>cap&&hl>1e-9){var k=cap/hl;s.handleOut=[s.handleOut[0]*k,s.handleOut[1]*k];}
+    }
+    if(i>0&&s.handleIn){
+      var fx=segs[i-1].point[0]-s.point[0],fy=segs[i-1].point[1]-s.point[1];
+      var cap2=Math.hypot(fx,fy)*HANDLE_MAX_RATIO,hl2=Math.hypot(s.handleIn[0],s.handleIn[1]);
+      if(hl2>cap2&&hl2>1e-9){var k2=cap2/hl2;s.handleIn=[s.handleIn[0]*k2,s.handleIn[1]*k2];}
+    }
+  }
+  return segs;
 }
 function _reharmoniseHandles(segs,rA,rB,et){
   if(!TW_HANDLE_REHARMONISE)return segs;
@@ -3530,7 +3652,25 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
           }
           var iwPeak=iwP*rA._twTurnTrust;
           if(iwPeak>0.001){
-            var base=Math.max(_segsSelfXCount(rA.segments),_segsSelfXCount(rB.segments));
+            // ALLOCATION D'AUTO-INTERSECTIONS (2026-09-04, « la main droite
+            // la shape se retourne »). C'était `max(xA,xB)` : un FORFAIT
+            // constant sur toute la portée. Dès qu'UNE des deux clés a une
+            // auto-intersection — un crochet de main qui se recouvre
+            // légèrement, très courant en dessin à la main — chaque image
+            // intermédiaire avait droit à une intersection GRATUITE, où
+            // qu'elle soit et quelle que soit sa taille. Mesuré sur le cas
+            // signalé : xA=0, xB=1, donc la grosse boucle fermée du milieu
+            // coûtait 0 et le candidat linéaire gagnait (5.54 contre 7.44)
+            // en repliant le trait. Le nombre d'intersections doit ÉVOLUER
+            // de A vers B comme le reste : l'allocation est maintenant
+            // interpolée le long de la trajectoire (voir candScore). Un
+            // candidat qui conserve simplement l'intersection légitime de B
+            // paie la même chose dans les quatre candidats — c'est un
+            // décalage constant, sans effet sur le classement ; ce qui
+            // discrimine, c'est d'en inventer une de PLUS ou plus TÔT.
+            var xingA=_segsSelfXCount(rA.segments),xingB=_segsSelfXCount(rB.segments);
+            var base=Math.max(xingA,xingB);
+            var loopA=_segsSelfLoopArea(rA.segments),loopB=_segsSelfLoopArea(rB.segments);
             // Composite score, not crossings alone (2026-07, "des rotations
             // inattendues frame 21" — same-day follow-up): on an arm drawn
             // as an out-and-back contour (shoulder→hand→shoulder), the
@@ -3757,8 +3897,17 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
               return tot?fl/tot:0;
             }
             function candScore(traj){
-              var exX=0;
-              for(var st=1;st<traj.length-1;st++)exX+=Math.max(0,_segsSelfXCount(traj[st])-base);
+              var exX=0,exArea=0;
+              for(var st=1;st<traj.length-1;st++){
+                // allocation interpolée A→B (voir le commentaire de xingA) ;
+                // TW_XING_LERP=false restaure le forfait constant d'avant.
+                var allow=TW_XING_LERP?(xingA+(xingB-xingA)*ETS[st-1]):base;
+                exX+=Math.max(0,_segsSelfXCount(traj[st])-allow);
+                if(TW_XING_AREA){
+                  var allowAr=loopA+(loopB-loopA)*ETS[st-1];
+                  exArea+=Math.max(0,_segsSelfLoopArea(traj[st])-allowAr);
+                }
+              }
               var mid=traj[midIdx+1];
               var cd=Math.abs(_wrapPI(chord5(mid)-chordExp));
               var ld5=Lexp5>1e-6?Math.abs(_segPolyLen(mid)-Lexp5)/Lexp5:0;
@@ -3805,7 +3954,7 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
               // the least-folded still wins when every candidate folds.
               var fbFrac=foldBackFrac(mid);
               var fbPen=fbFrac>FOLDBACK_MIN?TW_FOLDBACK_W*(3+fbFrac*10):0;
-              return exX*10+cd/(Math.PI/6)+ld5*5+back/(n*0.8)+foldErr/(Math.PI/6)+ripExcess*0.15+fbPen;
+              return exX*10+exArea*XING_AREA_W+cd/(Math.PI/6)+ld5*5+back/(n*0.8)+foldErr/(Math.PI/6)+ripExcess*0.15+fbPen;
             }
             var scB5c=candScore(candTraj.b),scU5=candScore(candTraj.u),scL5=candScore(candTraj.l);
             var scM5=mlsPerV?candScore(candTraj.m):Infinity;
@@ -3819,6 +3968,16 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
             else if(scU5-best<0.05)rA._twLocalTrust=null;  // uniform intrinsic
             else if(scM5-best<0.05){rA._twIwProbe=0;rA._twUseMLS=mlsPerV;} // MLS local-rigid (standalone, no intrinsic layered on top — see "coupler" note on buildMLSSegs' own candidate)
             else rA._twIwProbe=0;                          // pure linear
+            // Crochet de débogage (2026-09-04) : window.__TW_FORCE_ENGINE =
+            // 'b'|'u'|'l'|'m' impose un moteur à toutes les paires pour
+            // mesurer chaque candidat sur un fichier réel. Inerte sinon.
+            if(window.__TW_FORCE_ENGINE){
+              var fe=window.__TW_FORCE_ENGINE;
+              rA._twUseMLS=null;rA._twIwProbe=iwPeak;
+              if(fe==='u')rA._twLocalTrust=null;
+              else if(fe==='l')rA._twIwProbe=0;
+              else if(fe==='m'){rA._twIwProbe=0;rA._twUseMLS=mlsPerV;}
+            }
           }
         }
       }
@@ -3883,6 +4042,7 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
   // Runs after EVERY pass that moves vertices, and before reduction (which
   // rebuilds handles for its own, sparser point set anyway).
   segs=_reharmoniseHandles(segs,rA,rB,et);
+  segs=_clampHandles(segs);
   if(!(rA.isVectorBrush&&rB.isVectorBrush))segs=_applyPointReduction(segs,rA,rB);
   if(rA.isVectorBrush&&rB.isVectorBrush){
     var widths=[];for(var w=0;w<n;w++)widths.push(lerp(rA.widths[w]||1,rB.widths[w]||1,et));
@@ -4116,7 +4276,11 @@ function alignResampledPairJS(a,b){
   var costFn=function(x,y){return baseFn(x,y)*(1+ALIGN_TURN_W*alignTurnDisagreement(x,y));};
   var best=b,bestC=costFn(a,b);
   var rev=reverseResampled(b);
-  var rc=costFn(a,rev);if(rc<bestC){bestC=rc;best=rev;}
+  var rc=costFn(a,rev);
+  // Conservation de l'enroulement (voir TW_ALIGN_WINDING), traits ouverts
+  // seulement — une boucle fermée passe par la recherche de rotation.
+  var wPref=closed?0:_windingPref(a.segments.map(function(sg){return sg.point;}),b.segments.map(function(sg){return sg.point;}),bestC,rc);
+  if(wPref<0||(wPref===0&&rc<bestC)){bestC=rc;best=rev;}
   if(closed){
     [b,rev].forEach(function(base){
       var n=base.segments.length;
