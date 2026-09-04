@@ -44,22 +44,33 @@ async function handleWebhook(request, env) {
 }
 
 async function handleReconcile(request, env) {
-  const config = readConfig(env);
-  authenticateReconciliation(request, env);
-  const bytes = await readBodyBounded(request, MAX_INTERNAL_BYTES);
-  const body = bytes.byteLength ? parseJsonBytes(bytes) : {};
-  const batch = await collectReconciliation(request, env, config.repository, body);
-  const response = await forward(ledgerStub(env, config), "/batch", { items: batch.items });
-  if (!response.ok) return response;
-  const result = await response.json();
-  return jsonResponse({
-    ok: true,
-    processed: result.results?.length || 0,
-    duplicates: result.results?.filter((item) => item.duplicate).length || 0,
-    source: batch.source,
-    page: batch.page,
-    possibleMore: batch.possibleMore,
-  });
+  let stage = "configuration";
+  try {
+    const config = readConfig(env);
+    stage = "authentication";
+    authenticateReconciliation(request, env);
+    stage = "request-body";
+    const bytes = await readBodyBounded(request, MAX_INTERNAL_BYTES);
+    const body = bytes.byteLength ? parseJsonBytes(bytes) : {};
+    stage = "github-read";
+    const batch = await collectReconciliation(request, env, config.repository, body);
+    stage = "delivery-ledger";
+    const response = await forward(ledgerStub(env, config), "/batch", { items: batch.items });
+    if (!response.ok) return response;
+    stage = "ledger-response";
+    const result = await response.json();
+    return jsonResponse({
+      ok: true,
+      processed: result.results?.length || 0,
+      duplicates: result.results?.filter((item) => item.duplicate).length || 0,
+      source: batch.source,
+      page: batch.page,
+      possibleMore: batch.possibleMore,
+    });
+  } catch (error) {
+    if (!(error instanceof HttpError)) console.error(`reconciliation failed at ${stage}`);
+    throw error;
+  }
 }
 
 export { GitHubBuzzDeliveryLedger };

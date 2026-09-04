@@ -47,7 +47,7 @@ test("reconciliation is authenticated, bounded, and normalizes each source", asy
   assert.deepEqual(normalized.map((item) => item.kind), ["issue", "pull_request", "workflow_run"]);
   assert.equal(normalized[2].state, "failure");
   assert.equal(calls.length, 3);
-  assert.equal(calls.every((call) => call.options.redirect === "error"), true);
+  assert.equal(calls.every((call) => call.options.redirect === "manual"), true);
   assert.equal(calls.every((call) => !call.options.headers.Authorization), true);
 });
 

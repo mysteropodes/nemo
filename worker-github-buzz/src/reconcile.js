@@ -46,7 +46,9 @@ async function githubJson(env, repository, path) {
   if (env.GITHUB_READ_TOKEN) headers.Authorization = `Bearer ${env.GITHUB_READ_TOKEN}`;
   const response = await fetch(`https://api.github.com/repos/${repository}${path}`, {
     headers,
-    redirect: "error",
+    // Workers supports manual redirect handling. Refuse the 3xx response below
+    // so an optional GitHub token is never forwarded to another origin.
+    redirect: "manual",
   });
   if (!response.ok) throw new HttpError(502, "GitHub reconciliation failed");
   const declared = Number(response.headers.get("content-length"));
