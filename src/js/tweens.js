@@ -277,8 +277,44 @@ var MATCH_WIDTH_W=0.10;
 // mesuré 0.03, max 0.83 au niveau redraw) : il ne peut donc pas récompenser
 // ce terme, alors que le cas réel signalé par Cyril en dépend entièrement.
 // Arbitré en faveur du cas réel, drapeau prévu pour revenir en arrière.
-var TW_MATCH_AXIS=true;
+// REMPLACÉ par TW_MATCH_TURNING (2026-09-04, « entre les clés 35 et 47
+// confusion sur le bras qui passe d'un côté à l'autre ») — gardé
+// désactivé pour comparaison. Mesuré sur cette portée : les lignes de bras
+// sont TOUTES à l'élongation plafond 8, le terme ne les départageait pas
+// directement ; il agissait par ricochet en interdisant au bras PLIÉ de A
+// (e = 1,6–2,0) de devenir le bras TENDU de B (e = 8, |log| = 1,4–1,6, au-
+// delà de la zone franche 0,7) — alors que c'est précisément le mouvement
+// dessiné, un membre qui se déplie. L'assignation globale se réarrangeait
+// alors : bras droit de A → bras tendu de B (traversée du corps), main →
+// ligne du corps. Ablation drapeau par drapeau : seul ce terme éteint
+// remettait les six traits du bon côté. Ce qui distingue vraiment la
+// patte en boucle (le cas d'origine) d'un bras plié, ce n'est pas
+// l'élongation mais l'ENROULEMENT TOTAL : ~300° contre ~90°, contre ~10°
+// pour une ligne. Un membre s'articule de ≤ 120° entre deux clés ; une
+// boucle ne se déroule pas en ligne.
+var TW_MATCH_AXIS=false;
 var MATCH_AXIS_W=0.40,AXIS_CAP=8,AXIS_FREE=0.7,AXIS_FULL=2.0,AXIS_MIN_PX=6;
+// TW_MATCH_TURNING — enroulement total SIGNÉ du trait (|Σ Δθ| sur les 16
+// échantillons, en radians), porté par le même objet `elong` que
+// l'élongation, donc même câblage (buildCost, canaux d'hypothèses,
+// appelants directs de matchSc) et même normalisation par ligne. Signé et
+// non en valeur absolue : le tremblement d'une droite dessinée à la main
+// se compense, une boucle non. Zone franche 120° (une articulation qui se
+// plie ou se déplie), plein tarif à 250° (une boucle contre une ligne).
+// Poids : 0,30 — FENÊTRE ÉTROITE, mesurée sur les deux cas réels de
+// cats_anim.json qui tirent en sens contraire (patte → patte sur 6→16,
+// bras du bon côté sur 34→46) :
+//   W ≤ 0,26   patte → corps (le bug d'origine revient)
+//   0,27–0,28  patte OK, bras 0 exact / 3 du bon côté
+//   0,29–0,35  patte OK, bras 5 exacts / 6 du bon côté   ← ici
+//   W ≥ 0,36   patte OK, bras 1 / 4
+// Non monotone : l'assignation bascule entre plusieurs optima globaux
+// presque égaux. Le banc synthétique dit 58 (contre 55 avec l'élongation
+// à 0,40, 64 sans rien) — il ne modélise pas un changement de structure de
+// dessin (trois courbes → deux lignes + une courbe), il ne peut pas
+// récompenser ce choix. Arbitré en faveur des deux cas réels.
+var TW_MATCH_TURNING=true;
+var MATCH_TURN_W=0.30,TURN_FREE=2.1,TURN_FULL=4.4;
 // TW_MATCH_TOPOLOGY — « topologie floue » (FTP-SC 2018) : graphe de
 // contacts entre traits (extrémité posée sur un autre trait, à tolérance).
 // Une paire qui casse une jonction coûte, une paire qui la préserve gagne.
@@ -418,7 +454,16 @@ function pointElongation(pts){
   var tr=sxx+syy,det=sxx*syy-sxy*sxy;
   var disc=Math.sqrt(Math.max(0,tr*tr/4-det));
   var l1=tr/2+disc,l2=Math.max(1e-9,tr/2-disc);
-  return{e:Math.min(AXIS_CAP,Math.sqrt(l1/l2)),scale:Math.sqrt(l1)};
+  // enroulement total signé (voir TW_MATCH_TURNING)
+  var T=0,pv=null;
+  for(var q=1;q<n;q++){
+    var ddx=pts[q][0]-pts[q-1][0],ddy=pts[q][1]-pts[q-1][1];
+    if(ddx*ddx+ddy*ddy<1e-6)continue;
+    var th=Math.atan2(ddy,ddx);
+    if(pv!==null)T+=_wrapPI(th-pv);
+    pv=th;
+  }
+  return{e:Math.min(AXIS_CAP,Math.sqrt(l1/l2)),scale:Math.sqrt(l1),T:Math.abs(T)};
 }
 // Pénalité d'élongation d'UN trait de A contre tous les candidats de B,
 // NORMALISÉE PAR LIGNE : le candidat le plus compatible ne paie rien, les
@@ -439,20 +484,33 @@ function pointElongation(pts){
 // deux, dont une moitié étirée sur un long trait du corps) que le matcher
 // principal refusait, ce qui produisait une BOUCLE fermée au milieu de la
 // portée et deux traits partageant un strokeId dans la clé.
+// Les deux termes de forme globale (élongation, enroulement total) vivent
+// ici, sur le même objet `elong` : un seul câblage pour les trois familles
+// d'appelants. Chacun est un drapeau ; voir TW_MATCH_AXIS / TW_MATCH_TURNING.
+function _shapePenalty(eA,eB){
+  var pen=0;
+  if(TW_MATCH_AXIS){
+    var em=Math.abs(Math.log(eA.e/eB.e));
+    pen+=Math.min(1,Math.max(0,em-AXIS_FREE)/(AXIS_FULL-AXIS_FREE))*MATCH_AXIS_W;
+  }
+  if(TW_MATCH_TURNING&&eA.T!==undefined&&eB.T!==undefined){
+    var dT=Math.abs(eA.T-eB.T);
+    pen+=Math.min(1,Math.max(0,dT-TURN_FREE)/(TURN_FULL-TURN_FREE))*MATCH_TURN_W;
+  }
+  return pen;
+}
 function axisPenaltyPair(eA,eB){
-  if(!TW_MATCH_AXIS||!eA||!eB||eA.scale<AXIS_MIN_PX||eB.scale<AXIS_MIN_PX)return 0;
-  var em=Math.abs(Math.log(eA.e/eB.e));
-  return Math.min(1,Math.max(0,em-AXIS_FREE)/(AXIS_FULL-AXIS_FREE))*MATCH_AXIS_W;
+  if(!(TW_MATCH_AXIS||TW_MATCH_TURNING)||!eA||!eB||eA.scale<AXIS_MIN_PX||eB.scale<AXIS_MIN_PX)return 0;
+  return _shapePenalty(eA,eB);
 }
 function _axisPenaltyRow(eA,featsB,out){
   var m=featsB.length,i;
-  if(!TW_MATCH_AXIS||!eA||eA.scale<AXIS_MIN_PX){for(i=0;i<m;i++)out[i]=0;return out;}
+  if(!(TW_MATCH_AXIS||TW_MATCH_TURNING)||!eA||eA.scale<AXIS_MIN_PX){for(i=0;i<m;i++)out[i]=0;return out;}
   var mn=Infinity;
   for(i=0;i<m;i++){
     var eB=featsB[i].elong;
     if(!eB||eB.scale<AXIS_MIN_PX){out[i]=0;mn=0;continue;}
-    var em=Math.abs(Math.log(eA.e/eB.e));
-    out[i]=Math.min(1,Math.max(0,em-AXIS_FREE)/(AXIS_FULL-AXIS_FREE))*MATCH_AXIS_W;
+    out[i]=_shapePenalty(eA,eB);
     if(out[i]<mn)mn=out[i];
   }
   if(mn>0)for(i=0;i<m;i++)out[i]-=mn;
