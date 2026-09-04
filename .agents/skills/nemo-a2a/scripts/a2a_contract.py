@@ -8,22 +8,19 @@ Live cryptographic and relay acceptance belongs to Buzz staging.
 
 from __future__ import annotations
 
-import argparse
 import collections
 import datetime as dt
 import hashlib
 import json
 import re
-import sqlite3
-import sys
+import unicodedata
 import uuid
-from contextlib import closing
-from pathlib import Path
 from urllib.parse import urlsplit
 
 SCHEMA_VERSION = "buzz.jobs.v1"
 PROTOCOL_VERSION = "NEMO-A2A-1"
 MAX_JOB_TTL_SECONDS = 604_800
+JOB_TERMINAL_AUDIT_GRACE_SECONDS = 86_400
 KINDS = {
     43001: "request",
     43002: "claim",
@@ -32,7 +29,6 @@ KINDS = {
     43005: "control",
     43006: "error",
 }
-TERMINAL_KINDS = {43004, 43005, 43006}
 COMMON_FIELDS = {
     "schema_version",
     "operation_id",
@@ -48,10 +44,7 @@ COMMON_FIELDS = {
 SHAPES = {
     43001: (COMMON_FIELDS | {"capability", "summary", "acceptance"}, {"supersedes_event_id"}),
     43002: (COMMON_FIELDS | {"request_event_id", "claim"}, {"prior_event_id"}),
-    43003: (
-        COMMON_FIELDS | {"request_event_id", "prior_event_id", "status", "message", "evidence"},
-        set(),
-    ),
+    43003: (COMMON_FIELDS | {"request_event_id", "prior_event_id", "status", "message", "evidence"}, set()),
     43004: (
         COMMON_FIELDS | {"request_event_id", "prior_event_id", "outcome", "artifacts", "evidence"},
         {"candidate_sha", "capabilities"},
@@ -64,11 +57,24 @@ SHAPES = {
 }
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 SHA = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
-PROJECT = re.compile(r"^30621:([0-9a-f]{64}):([^:]+)$")
+PROJECT = re.compile(r"^30621:([0-9a-f]{64}):([A-Za-z0-9._-]{1,512})$")
 WORKTREE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 IDEMPOTENCY = re.compile(r"^[!-~]{1,128}$")
-LOCAL_PATH = re.compile(r"(?:^|\s)(?:/Users/|/home/|/[A-Za-z0-9_.-]+/|~[/\\]|[A-Za-z]:[\\/]|file://)")
-SECRET = re.compile(r"(?:-----BEGIN [A-Z ]*PRIVATE KEY-----|github_pat_|ghp_[A-Za-z0-9]|sk-[A-Za-z0-9]{12}|Bearer\s+[A-Za-z0-9])")
+POSITIVE_DECIMAL = re.compile(r"^[1-9][0-9]{0,19}$")
+SECRET = re.compile(
+    r"(?:-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:github_pat_|ghp_|sk-)[A-Za-z0-9]{12})",
+    re.IGNORECASE,
+)
+SECRET_MARKERS = (
+    "token=",
+    "password=",
+    "secret=",
+    "authorization:",
+    "bearer ",
+    "begin private key",
+    "github_token",
+    "api_key",
+)
 
 
 class ContractError(ValueError):
@@ -115,8 +121,10 @@ def _no_null(value: object) -> None:
 
 
 def _no_secrets(value: object) -> None:
-    if isinstance(value, str) and SECRET.search(value):
-        raise ContractError("signed job content must not contain credential material")
+    if isinstance(value, str):
+        lower = value.lower()
+        if SECRET.search(value) or any(marker in lower for marker in SECRET_MARKERS):
+            raise ContractError("signed job content must not contain credential material")
     if isinstance(value, dict):
         for nested in value.values():
             _no_secrets(nested)
@@ -141,7 +149,9 @@ def _exact_keys(name: str, value: object, required: set[str], optional: set[str]
 def _text(name: str, value: object, maximum: int = 8192) -> str:
     if not isinstance(value, str) or not value or value.strip() != value:
         raise ContractError(f"{name} must be a non-empty trimmed string")
-    if len(value.encode()) > maximum or any(ord(ch) < 32 and ch not in "\n\t" for ch in value):
+    if len(value.encode()) > maximum or any(
+        unicodedata.category(ch) == "Cc" and ch not in "\n\t" for ch in value
+    ):
         raise ContractError(f"{name} exceeds its bound or contains control characters")
     return value
 
@@ -158,8 +168,8 @@ def _uuid(name: str, value: object) -> str:
         parsed = uuid.UUID(text)
     except ValueError as error:
         raise ContractError(f"{name} must be a UUID") from error
-    if str(parsed) != text:
-        raise ContractError(f"{name} must be canonical lowercase UUID text")
+    if parsed.int == 0 or str(parsed) != text:
+        raise ContractError(f"{name} must be canonical non-nil lowercase UUID text")
     return text
 
 
@@ -170,7 +180,7 @@ def _hex(name: str, value: object, pattern: re.Pattern[str] = HEX64) -> str:
     return text
 
 
-def _expiry(value: object) -> dt.datetime:
+def expiry(value: object) -> dt.datetime:
     text = _text("expires_at", value, 20)
     try:
         parsed = dt.datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.timezone.utc)
@@ -183,12 +193,16 @@ def github_slug(canonical: object) -> str:
     text = _text("repository.canonical", canonical, 512)
     parts = urlsplit(text)
     segments = parts.path.split("/")
+    try:
+        port = parts.port
+    except ValueError as error:
+        raise ContractError("repository.canonical contains an invalid port") from error
     if (
         parts.scheme != "https"
         or parts.netloc != "github.com"
         or parts.username
         or parts.password
-        or parts.port is not None
+        or port is not None
         or parts.query
         or parts.fragment
         or len(segments) != 3
@@ -198,25 +212,98 @@ def github_slug(canonical: object) -> str:
         or text != text.lower()
     ):
         raise ContractError("repository.canonical must be strict lowercase https://github.com/owner/repo")
-    if not all(re.fullmatch(r"[a-z0-9][a-z0-9._-]*", segment) for segment in segments[1:]):
+    if not all(re.fullmatch(r"[a-z0-9._-]+", segment) for segment in segments[1:]):
+        raise ContractError("repository.canonical contains a non-canonical owner or repository")
+    if any(segment in {".", ".."} for segment in segments[1:]):
         raise ContractError("repository.canonical contains a non-canonical owner or repository")
     return f"{segments[1]}/{segments[2]}"
 
 
-def _repo_path(value: str) -> None:
+def _branch(value: object) -> str:
+    text = _text("repository.branch", value, 512)
+    invalid = set("~^:?*[\\")
     if (
-        value.startswith(("/", "~"))
+        text == "@"
+        or text.startswith("/")
+        or text.endswith(("/", "."))
+        or "//" in text
+        or ".." in text
+        or "@{" in text
+        or any(ord(ch) <= 0x20 or ord(ch) == 0x7F or ch in invalid for ch in text)
+        or any(segment.startswith(".") or segment.endswith(".lock") for segment in text.split("/"))
+    ):
+        raise ContractError("repository.branch must be a conservative canonical git ref name")
+    return text
+
+
+def _repo_path(value: str) -> None:
+    parts = value.split("/")
+    if (
+        value.startswith("/")
         or "\\" in value
-        or "//" in value
-        or any(part in {"", ".", ".."} for part in value.rstrip("/").split("/"))
+        or any(part in {"", ".", ".."} for part in parts)
     ):
         raise ContractError(f"repository path must be normalized and repo-relative: {value}")
 
 
 def _portable_references(name: str, values: object) -> None:
     for value in _string_list(name, values):
-        if LOCAL_PATH.search(value):
+        lower = value.lower()
+        windows_absolute = (
+            len(value) > 1 and value[0].isascii() and value[0].isalpha() and value[1] == ":"
+        )
+        if (
+            value.startswith(("/", "~"))
+            or "\\" in value
+            or any(segment == ".." for segment in value.split("/"))
+            or lower.startswith("file:")
+            or "/users/" in lower
+            or "/home/" in lower
+            or SECRET.search(value)
+            or any(marker in lower for marker in SECRET_MARKERS)
+            or windows_absolute
+        ):
             raise ContractError(f"{name} must not contain a host-local path: {value}")
+        if value.startswith("git:"):
+            _hex(name, value[4:], SHA)
+            continue
+        if value.startswith("contract:"):
+            contract = value[9:]
+            if (
+                not re.fullmatch(r"[A-Za-z0-9._/-]{1,128}", contract)
+                or any(segment in {"", ".."} for segment in contract.split("/"))
+            ):
+                raise ContractError(f"{name} contract reference is not a portable identifier")
+            continue
+        if value.startswith("buzz:event:"):
+            _hex(name, value[11:])
+            continue
+        parsed = urlsplit(value)
+        try:
+            port = parsed.port
+        except ValueError as error:
+            raise ContractError(f"{name} reference is not portable") from error
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname != "github.com"
+            or parsed.username
+            or parsed.password
+            or port not in {None, 443}
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ContractError(
+                f"{name} must use git:/contract:/buzz:event: or credential-free GitHub HTTPS"
+            )
+
+
+def _contract_references(values: object) -> None:
+    _portable_references("repository.contracts", values)
+    for value in values:
+        if not value.startswith("contract:"):
+            raise ContractError(
+                "repository.contracts must contain only inert contract: coordinates"
+            )
 
 
 def validate_content(kind: int, content: object) -> dict[str, object]:
@@ -246,15 +333,18 @@ def validate_content(kind: int, content: object) -> dict[str, object]:
     )
     github_slug(repository["canonical"])
     _hex("repository.base_sha", repository["base_sha"], SHA)
-    _text("repository.branch", repository["branch"], 512)
+    _branch(repository["branch"])
     if not isinstance(repository["worktree_id"], str) or not WORKTREE.fullmatch(repository["worktree_id"]):
         raise ContractError("repository.worktree_id must be an opaque portable identifier")
     for path in _string_list("repository.paths", repository["paths"], required=True):
         _repo_path(path)
-    _portable_references("repository.contracts", repository["contracts"])
+    _contract_references(repository["contracts"])
     for field in ("github_issue", "github_pr", "github_run"):
         if field in repository:
-            _text(f"repository.{field}", repository[field], 512)
+            if not isinstance(repository[field], str) or not POSITIVE_DECIMAL.fullmatch(repository[field]):
+                raise ContractError(f"repository.{field} must be a canonical positive decimal ID")
+    if "github_issue" in repository and "github_pr" in repository:
+        raise ContractError("repository.github_issue and github_pr are mutually exclusive")
     _hex("sender_pubkey", body["sender_pubkey"])
     _hex("recipient_pubkey", body["recipient_pubkey"])
     if body["sender_pubkey"] == body["recipient_pubkey"]:
@@ -262,7 +352,7 @@ def validate_content(kind: int, content: object) -> dict[str, object]:
     sponsor = _exact_keys("sponsor", body["sponsor"], {"pubkey", "github_login"})
     _hex("sponsor.pubkey", sponsor["pubkey"])
     _text("sponsor.github_login", sponsor["github_login"], 512)
-    _expiry(body["expires_at"])
+    expiry(body["expires_at"])
 
     if kind == 43001:
         _text("capability", body["capability"], 512)
@@ -277,14 +367,24 @@ def validate_content(kind: int, content: object) -> dict[str, object]:
             if body["prior_event_id"] == body["request_event_id"]:
                 raise ContractError("prior_event_id must differ from request_event_id")
     if kind == 43002:
-        claim = _exact_keys("claim", body["claim"], {"status", "scope_digest"})
-        if claim["status"] not in {"processed", "accepted"}:
-            raise ContractError("claim.status must be processed or accepted")
+        claim = _exact_keys(
+            "claim", body["claim"], {"status", "scope_digest"}, {"reason"}
+        )
+        if claim["status"] not in {"processed", "accepted", "declined"}:
+            raise ContractError("claim.status must be processed, accepted, or declined")
         _hex("claim.scope_digest", claim["scope_digest"])
-        if claim["status"] == "processed" and "prior_event_id" in body:
-            raise ContractError("processed claim must not carry prior_event_id")
+        if claim["status"] in {"processed", "declined"} and "prior_event_id" in body:
+            raise ContractError(f"{claim['status']} claim must not carry prior_event_id")
         if claim["status"] == "accepted" and "prior_event_id" not in body:
             raise ContractError("accepted claim requires prior_event_id")
+        if claim["status"] == "declined":
+            reason = claim.get("reason")
+            if not isinstance(reason, str) or not re.fullmatch(
+                r"[a-z0-9][a-z0-9._-]{0,63}", reason
+            ):
+                raise ContractError("declined claim requires a 1-64 byte machine reason")
+        elif "reason" in claim:
+            raise ContractError("claim.reason is only valid for declined")
     elif kind == 43003:
         if body["status"] not in {"progress", "blocked"}:
             raise ContractError("progress status must be progress or blocked")
@@ -300,8 +400,8 @@ def validate_content(kind: int, content: object) -> dict[str, object]:
         if "capabilities" in body:
             _string_list("capabilities", body["capabilities"])
     elif kind == 43005:
-        if body["action"] not in {"cancel", "release", "handoff"}:
-            raise ContractError("control action must be cancel, release, or handoff")
+        if body["action"] not in {"cancel", "cancelled", "release", "handoff"}:
+            raise ContractError("control action must be cancel, cancelled, release, or handoff")
         _text("reason", body["reason"])
         if body["action"] == "handoff":
             if "handoff_to" not in body or "prior_event_id" not in body:
@@ -309,15 +409,17 @@ def validate_content(kind: int, content: object) -> dict[str, object]:
             _hex("handoff_to", body["handoff_to"])
         elif "handoff_to" in body:
             raise ContractError("handoff_to is only valid for handoff")
-        if body["action"] == "release" and "prior_event_id" not in body:
-            raise ContractError("release requires prior_event_id")
+        if body["action"] in {"cancelled", "release"} and "prior_event_id" not in body:
+            raise ContractError(f"{body['action']} requires prior_event_id")
     elif kind == 43006:
-        if body["outcome"] != "error":
-            raise ContractError("error outcome must be error")
+        if body["outcome"] not in {"failed", "indeterminate"}:
+            raise ContractError("error outcome must be failed or indeterminate")
         _text("code", body["code"], 512)
         _text("message", body["message"])
         if not isinstance(body["retryable"], bool):
             raise ContractError("retryable must be boolean")
+        if body["outcome"] == "indeterminate" and body["retryable"]:
+            raise ContractError("indeterminate outcome requires retryable=false")
     return body
 
 
@@ -380,6 +482,10 @@ def parse_event(frozen: str) -> dict[str, object]:
     actual = collections.Counter(tuple(tag) for tag in event["tags"])
     if actual != expected:
         raise ContractError("event tags must equal the closed canonical jobs.v1 tag set")
+    expected_e = [tag for tag in _expected_tags(event["kind"], content) if tag[0] == "e"]
+    actual_e = [tag for tag in event["tags"] if tag[0] == "e"]
+    if actual_e != expected_e:
+        raise ContractError("event lifecycle e tags must use canonical root/reply order")
     unsigned = {key: event[key] for key in ("kind", "pubkey", "created_at", "tags", "content")}
     if hashlib.sha256(canonical_json(unsigned).encode()).hexdigest() != event["id"]:
         raise ContractError("local event id does not match frozen event bytes")
@@ -387,245 +493,6 @@ def parse_event(frozen: str) -> dict[str, object]:
     return event
 
 
-class LocalAuthority:
-    """Trusted relay context; none of this state is selected by signed content."""
-
-    def __init__(self) -> None:
-        self.projects: dict[tuple[str, str], tuple[str, set[str]]] = {}
-        self.members: set[tuple[str, str, str]] = set()
-        self.sponsors: dict[tuple[str, str], str] = {}
-        self.capabilities: dict[tuple[str, str], dict[str, list[str]]] = {}
-
-    def add_project(self, community: str, address: str, channel: str, repository: str) -> None:
-        self.projects[(community, address)] = (channel, {repository})
-
-    def add_agent(
-        self,
-        community: str,
-        channel: str,
-        pubkey: str,
-        sponsor: str,
-        capabilities: dict[str, list[str]] | None = None,
-    ) -> None:
-        self.members.add((community, channel, pubkey))
-        self.sponsors[(community, pubkey)] = sponsor
-        self.capabilities[(community, pubkey)] = capabilities or {}
-
-    def authorize(self, community: str, route: str, event: dict[str, object]) -> None:
-        body = event["content_object"]
-        address, channel = body["project"]["address"], body["project"]["home_channel"]
-        project_scope = self.projects.get((community, address))
-        if not project_scope or project_scope[0] != channel or body["repository"]["canonical"] not in project_scope[1]:
-            raise ContractError("project address, home channel, and canonical repository are not allowlisted together")
-        sender, recipient = body["sender_pubkey"], body["recipient_pubkey"]
-        for role, pubkey in (("sender", sender), ("recipient", recipient)):
-            if (community, channel, pubkey) not in self.members:
-                raise ContractError(f"{role} must be a direct project-home-channel member")
-        if self.sponsors.get((community, sender)) != body["sponsor"]["pubkey"]:
-            raise ContractError("sponsor assertion does not match authoritative ownership")
-        if route == "dm":
-            if self.sponsors.get((community, sender)) != self.sponsors.get((community, recipient)):
-                raise ContractError("cross-owner DM is forbidden")
-        elif route != "project_channel":
-            raise ContractError("unknown trusted delivery route")
-        if event["kind"] == 43001:
-            grant = self.capabilities.get((community, recipient), {}).get(body["capability"])
-            if grant is None or any(not any(_path_within(path, prefix) for prefix in grant) for path in body["repository"]["paths"]):
-                raise ContractError("recipient capability does not cover the requested path scope")
-        if event["kind"] == 43005 and body["action"] == "handoff":
-            if (community, channel, body["handoff_to"]) not in self.members:
-                raise ContractError("handoff target must be a direct project-home-channel member")
-
-
-def _path_within(path: str, prefix: str) -> bool:
-    path, prefix = path.rstrip("/"), prefix.rstrip("/")
-    return prefix == "." or path == prefix or path.startswith(prefix + "/")
-
-
-class LocalRelay:
-    """SQLite event store with trusted community/route metadata and strict transitions."""
-
-    def __init__(self, path: Path, authority: LocalAuthority) -> None:
-        self.path = path
-        self.authority = authority
-        with closing(self._connect()) as db, db:
-            db.execute(
-                """CREATE TABLE IF NOT EXISTS events (
-                sequence INTEGER PRIMARY KEY AUTOINCREMENT, community TEXT NOT NULL,
-                route TEXT NOT NULL, event_id TEXT NOT NULL, kind INTEGER NOT NULL,
-                recipient TEXT NOT NULL, frozen TEXT NOT NULL,
-                UNIQUE(community, event_id))"""
-            )
-
-    def _connect(self) -> sqlite3.Connection:
-        db = sqlite3.connect(self.path)
-        db.row_factory = sqlite3.Row
-        return db
-
-    def publish(self, community: str, route: str, frozen: str, now: dt.datetime) -> dict[str, object]:
-        event = parse_event(frozen)
-        body = event["content_object"]
-        expiry = _expiry(body["expires_at"])
-        if expiry <= now:
-            raise ContractError("job event is expired")
-        if expiry > now + dt.timedelta(seconds=MAX_JOB_TTL_SECONDS):
-            raise ContractError("expires_at exceeds the server seven-day TTL cap")
-        created = dt.datetime.fromtimestamp(event["created_at"], dt.timezone.utc)
-        if created > expiry:
-            raise ContractError("event created_at is after expires_at")
-        if expiry > created + dt.timedelta(seconds=MAX_JOB_TTL_SECONDS):
-            raise ContractError("expires_at exceeds the event-created-at seven-day TTL cap")
-        self.authority.authorize(community, route, event)
-        with closing(self._connect()) as db, db:
-            prior = db.execute(
-                "SELECT frozen FROM events WHERE community=? AND event_id=?",
-                (community, event["id"]),
-            ).fetchone()
-            if prior:
-                if prior["frozen"] != frozen:
-                    raise ContractError("event id collision with changed frozen bytes")
-                return {"status": "already_stored", "event_id": event["id"], "lifecycle": None}
-            self._validate_chain(db, community, event)
-            db.execute(
-                "INSERT INTO events(community,route,event_id,kind,recipient,frozen) VALUES(?,?,?,?,?,?)",
-                (community, route, event["id"], event["kind"], body["recipient_pubkey"], frozen),
-            )
-        return {"status": "stored", "event_id": event["id"], "lifecycle": None}
-
-    def _event(self, db: sqlite3.Connection, community: str, event_id: str) -> dict[str, object]:
-        row = db.execute(
-            "SELECT frozen FROM events WHERE community=? AND event_id=?", (community, event_id)
-        ).fetchone()
-        if not row:
-            raise ContractError("referenced event was not found in this community")
-        return parse_event(row["frozen"])
-
-    def _validate_chain(self, db: sqlite3.Connection, community: str, event: dict[str, object]) -> None:
-        body, kind = event["content_object"], event["kind"]
-        if kind == 43001:
-            if "supersedes_event_id" in body:
-                self._validate_superseding_request(db, community, event)
-            return
-        request = self._event(db, community, body["request_event_id"])
-        if request["kind"] != 43001:
-            raise ContractError("request_event_id must reference kind 43001")
-        root = request["content_object"]
-        for field in ("operation_id", "idempotency_key", "coordinator_epoch", "project", "repository", "expires_at"):
-            if body[field] != root[field]:
-                raise ContractError(f"transition changed request field {field}")
-        worker_to_requester = body["sender_pubkey"] == root["recipient_pubkey"] and body["recipient_pubkey"] == root["sender_pubkey"]
-        requester_to_worker = body["sender_pubkey"] == root["sender_pubkey"] and body["recipient_pubkey"] == root["recipient_pubkey"]
-        if kind in {43002, 43003, 43004, 43006} and not worker_to_requester:
-            raise ContractError("only the addressed worker may author this transition")
-        if kind == 43005:
-            allowed = requester_to_worker if body["action"] == "cancel" else worker_to_requester
-            if not allowed:
-                raise ContractError("control action signer/addressee is not authorized")
-        related = self._related_events(db, community, body["request_event_id"])
-        if any(candidate["kind"] in TERMINAL_KINDS for candidate in related):
-            raise ContractError("job is terminal; lifecycle forks are forbidden")
-        if kind == 43002 and any(
-            candidate["kind"] == 43002
-            and candidate["content_object"]["claim"]["status"] == body["claim"]["status"]
-            for candidate in related
-        ):
-            raise ContractError(f"duplicate {body['claim']['status']} claim slot")
-        if kind == 43005 and body["action"] == "cancel" and "prior_event_id" not in body and related:
-            raise ContractError("root cancel is only valid before any lifecycle child")
-        if "prior_event_id" in body:
-            if any(
-                candidate["content_object"].get("prior_event_id") == body["prior_event_id"]
-                for candidate in related
-            ):
-                raise ContractError("prior event already has a lifecycle child")
-            prior = self._event(db, community, body["prior_event_id"])
-            prior_body = prior["content_object"]
-            if prior_body.get("request_event_id") != body["request_event_id"]:
-                raise ContractError("prior_event_id belongs to another request")
-            if kind == 43002 and body["claim"]["status"] == "accepted":
-                if prior["kind"] != 43002 or prior_body["claim"]["status"] != "processed":
-                    raise ContractError("accepted claim must follow processed claim")
-            elif not (
-                (prior["kind"] == 43002 and prior_body["claim"]["status"] == "accepted")
-                or prior["kind"] == 43003
-            ):
-                raise ContractError("lifecycle event must follow accepted or progress")
-
-    def _related_events(
-        self, db: sqlite3.Connection, community: str, request_id: str
-    ) -> list[dict[str, object]]:
-        rows = db.execute(
-            "SELECT frozen FROM events WHERE community=? AND kind != 43001", (community,)
-        )
-        return [
-            event for event in (parse_event(row["frozen"]) for row in rows)
-            if event["content_object"].get("request_event_id") == request_id
-        ]
-
-    def _validate_superseding_request(self, db: sqlite3.Connection, community: str, event: dict[str, object]) -> None:
-        body = event["content_object"]
-        handoff = self._event(db, community, body["supersedes_event_id"])
-        handoff_body = handoff["content_object"]
-        if handoff["kind"] != 43005 or handoff_body["action"] != "handoff":
-            raise ContractError("supersedes_event_id must reference terminal handoff")
-        old_request = self._event(db, community, handoff_body["request_event_id"])
-        old = old_request["content_object"]
-        if body["sender_pubkey"] != old["sender_pubkey"] or body["sponsor"] != old["sponsor"]:
-            raise ContractError("superseding request must be signed by the original coordinator")
-        if body["recipient_pubkey"] != handoff_body["handoff_to"]:
-            raise ContractError("superseding request recipient must equal handoff_to")
-        for field in (
-            "operation_id", "idempotency_key", "project", "repository", "sponsor", "expires_at",
-            "capability", "summary", "acceptance",
-        ):
-            if body[field] != old[field]:
-                raise ContractError(f"superseding request changed {field}")
-        if body["coordinator_epoch"] != old["coordinator_epoch"] + 1:
-            raise ContractError("superseding request requires exactly the next coordinator_epoch")
-
-    def requests(self, community: str, recipient: str, after: int = 0) -> list[tuple[int, str]]:
-        with closing(self._connect()) as db, db:
-            rows = db.execute(
-                "SELECT sequence,frozen FROM events WHERE community=? AND kind=43001 AND recipient=? AND sequence>? ORDER BY sequence",
-                (community, recipient, after),
-            ).fetchall()
-        return [(row["sequence"], row["frozen"]) for row in rows]
-
-    def frozen(self, community: str, event_id: str) -> str:
-        with closing(self._connect()) as db, db:
-            row = db.execute(
-                "SELECT frozen FROM events WHERE community=? AND event_id=?", (community, event_id)
-            ).fetchone()
-        if not row:
-            raise ContractError("event was not found in this community")
-        return row["frozen"]
-
-    def events(self, community: str) -> list[dict[str, object]]:
-        with closing(self._connect()) as db, db:
-            rows = db.execute("SELECT frozen FROM events WHERE community=? ORDER BY sequence", (community,)).fetchall()
-        return [parse_event(row["frozen"]) for row in rows]
-
-
-def _main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("validate-event", "digest-request"))
-    parser.add_argument("input", nargs="?", default="-")
-    args = parser.parse_args()
-    raw = sys.stdin.read() if args.input == "-" else Path(args.input).read_text()
-    try:
-        if args.command == "validate-event":
-            event = parse_event(raw)
-            output = {"ok": True, "kind": event["kind"], "event_id": event["id"]}
-        else:
-            content = loads_unique(raw)
-            validate_content(43001, content)
-            output = {"ok": True, "scope_digest": semantic_digest(content)}
-    except ContractError as error:
-        print(json.dumps({"ok": False, "error": str(error)}))
-        return 1
-    print(json.dumps(output, sort_keys=True))
-    return 0
-
-
 if __name__ == "__main__":
-    raise SystemExit(_main())
+    from contract_cli import main
+    raise SystemExit(main())

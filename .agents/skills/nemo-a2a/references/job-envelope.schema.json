@@ -17,8 +17,12 @@
     "expires_at"
   ],
   "properties": {
-    "schema_version": {"const": "buzz.jobs.v1"},
-    "operation_id": {"type": "string", "format": "uuid"},
+    "schema_version": {
+      "const": "buzz.jobs.v1"
+    },
+    "operation_id": {
+      "$ref": "#/$defs/uuid"
+    },
     "idempotency_key": {
       "type": "string",
       "minLength": 1,
@@ -30,45 +34,115 @@
       "minimum": 1,
       "maximum": 4294967295
     },
-    "project": {"$ref": "#/$defs/project"},
-    "repository": {"$ref": "#/$defs/repository"},
-    "sender_pubkey": {"$ref": "#/$defs/pubkey"},
-    "recipient_pubkey": {"$ref": "#/$defs/pubkey"},
-    "sponsor": {"$ref": "#/$defs/sponsor"},
+    "project": {
+      "$ref": "#/$defs/project"
+    },
+    "repository": {
+      "$ref": "#/$defs/repository"
+    },
+    "sender_pubkey": {
+      "$ref": "#/$defs/pubkey"
+    },
+    "recipient_pubkey": {
+      "$ref": "#/$defs/pubkey"
+    },
+    "sponsor": {
+      "$ref": "#/$defs/sponsor"
+    },
     "expires_at": {
       "type": "string",
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
     },
-    "request_event_id": {"$ref": "#/$defs/eventId"},
-    "prior_event_id": {"$ref": "#/$defs/eventId"},
-    "supersedes_event_id": {"$ref": "#/$defs/eventId"},
-    "capability": {"$ref": "#/$defs/shortText"},
-    "summary": {"$ref": "#/$defs/messageText"},
-    "acceptance": {"$ref": "#/$defs/requiredList"},
-    "claim": {"$ref": "#/$defs/claim"},
-    "status": {"enum": ["progress", "blocked"]},
-    "message": {"$ref": "#/$defs/messageText"},
-    "evidence": {"$ref": "#/$defs/portableList"},
-    "outcome": {"enum": ["success", "error"]},
+    "request_event_id": {
+      "$ref": "#/$defs/eventId"
+    },
+    "prior_event_id": {
+      "$ref": "#/$defs/eventId"
+    },
+    "supersedes_event_id": {
+      "$ref": "#/$defs/eventId"
+    },
+    "capability": {
+      "$ref": "#/$defs/shortText"
+    },
+    "summary": {
+      "$ref": "#/$defs/messageText"
+    },
+    "acceptance": {
+      "$ref": "#/$defs/requiredList"
+    },
+    "claim": {
+      "$ref": "#/$defs/claim"
+    },
+    "status": {
+      "enum": [
+        "progress",
+        "blocked"
+      ]
+    },
+    "message": {
+      "$ref": "#/$defs/messageText"
+    },
+    "evidence": {
+      "$ref": "#/$defs/portableList"
+    },
+    "outcome": {
+      "enum": [
+        "success",
+        "failed",
+        "indeterminate"
+      ]
+    },
     "candidate_sha": {
       "type": "string",
       "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
     },
-    "artifacts": {"$ref": "#/$defs/portableList"},
-    "capabilities": {"$ref": "#/$defs/list"},
-    "action": {"enum": ["cancel", "release", "handoff"]},
-    "reason": {"$ref": "#/$defs/messageText"},
-    "handoff_to": {"$ref": "#/$defs/pubkey"},
-    "code": {"$ref": "#/$defs/shortText"},
-    "retryable": {"type": "boolean"}
+    "artifacts": {
+      "$ref": "#/$defs/portableList"
+    },
+    "capabilities": {
+      "$ref": "#/$defs/list"
+    },
+    "action": {
+      "enum": [
+        "cancel",
+        "cancelled",
+        "release",
+        "handoff"
+      ]
+    },
+    "reason": {
+      "$ref": "#/$defs/messageText"
+    },
+    "handoff_to": {
+      "$ref": "#/$defs/pubkey"
+    },
+    "code": {
+      "$ref": "#/$defs/shortText"
+    },
+    "retryable": {
+      "type": "boolean"
+    }
   },
   "oneOf": [
-    {"$ref": "#/$defs/requestShape"},
-    {"$ref": "#/$defs/claimShape"},
-    {"$ref": "#/$defs/progressShape"},
-    {"$ref": "#/$defs/resultShape"},
-    {"$ref": "#/$defs/controlShape"},
-    {"$ref": "#/$defs/errorShape"}
+    {
+      "$ref": "#/$defs/requestShape"
+    },
+    {
+      "$ref": "#/$defs/claimShape"
+    },
+    {
+      "$ref": "#/$defs/progressShape"
+    },
+    {
+      "$ref": "#/$defs/resultShape"
+    },
+    {
+      "$ref": "#/$defs/controlShape"
+    },
+    {
+      "$ref": "#/$defs/errorShape"
+    }
   ],
   "$defs": {
     "commonNames": {
@@ -85,31 +159,67 @@
         "expires_at"
       ]
     },
-    "pubkey": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "eventId": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "shortText": {"type": "string", "minLength": 1, "maxLength": 512},
-    "messageText": {"type": "string", "minLength": 1, "maxLength": 8192},
+    "pubkey": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "eventId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "shortText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "description": "Non-empty, Unicode-trimmed text; at most 512 UTF-8 bytes; controls other than tab/newline are rejected by the normative validator."
+    },
+    "messageText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192,
+      "description": "Non-empty, Unicode-trimmed text; at most 8192 UTF-8 bytes; controls other than tab/newline are rejected by the normative validator."
+    },
     "list": {
       "type": "array",
       "maxItems": 256,
-      "items": {"$ref": "#/$defs/messageText"}
+      "items": {
+        "$ref": "#/$defs/messageText"
+      }
     },
     "requiredList": {
       "type": "array",
       "minItems": 1,
       "maxItems": 256,
-      "items": {"$ref": "#/$defs/messageText"}
+      "items": {
+        "$ref": "#/$defs/messageText"
+      }
     },
     "portableList": {
       "type": "array",
       "maxItems": 256,
       "items": {
         "allOf": [
-          {"$ref": "#/$defs/messageText"},
           {
-            "not": {
-              "pattern": "(?:^|\\s)(?:/Users/|/home/|~[/\\\\]|[A-Za-z]:[\\\\/]|file://)"
-            }
+            "$ref": "#/$defs/messageText"
+          },
+          {
+            "oneOf": [
+              {
+                "pattern": "^git:(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+              },
+              {
+                "pattern": "^contract:[A-Za-z0-9._/-]{1,128}$",
+                "not": {
+                  "pattern": "^contract:(?:/|.*//|\\.\\.(?:/|$)|.*\\/\\.\\.(?:/|$)|.*/$)"
+                }
+              },
+              {
+                "pattern": "^buzz:event:[0-9a-f]{64}$"
+              },
+              {
+                "pattern": "^[Hh][Tt][Tt][Pp][Ss]://[Gg][Ii][Tt][Hh][Uu][Bb]\\.[Cc][Oo][Mm](?::0*443)?(?:/[^?#\\\\]*)?$"
+              }
+            ]
           }
         ]
       }
@@ -117,36 +227,59 @@
     "project": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["address", "home_channel"],
+      "required": [
+        "address",
+        "home_channel"
+      ],
       "properties": {
         "address": {
           "type": "string",
-          "minLength": 1,
+          "minLength": 72,
           "maxLength": 512,
-          "pattern": "^30621:[0-9a-f]{64}:.+$"
+          "pattern": "^30621:[0-9a-f]{64}:[A-Za-z0-9._-]+$"
         },
-        "home_channel": {"type": "string", "format": "uuid"}
+        "home_channel": {
+          "$ref": "#/$defs/uuid"
+        }
       }
     },
     "repository": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["canonical", "base_sha", "branch", "worktree_id", "paths", "contracts"],
+      "required": [
+        "canonical",
+        "base_sha",
+        "branch",
+        "worktree_id",
+        "paths",
+        "contracts"
+      ],
       "properties": {
         "canonical": {
           "type": "string",
           "minLength": 22,
           "maxLength": 512,
-          "pattern": "^https://github\\.com/[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*$"
+          "pattern": "^https://github\\.com/[a-z0-9._-]+/[a-z0-9._-]+$",
+          "not": {
+            "pattern": "\\.git$"
+          }
         },
-        "github_issue": {"$ref": "#/$defs/shortText"},
-        "github_pr": {"$ref": "#/$defs/shortText"},
-        "github_run": {"$ref": "#/$defs/shortText"},
+        "github_issue": {
+          "$ref": "#/$defs/positiveDecimal"
+        },
+        "github_pr": {
+          "$ref": "#/$defs/positiveDecimal"
+        },
+        "github_run": {
+          "$ref": "#/$defs/positiveDecimal"
+        },
         "base_sha": {
           "type": "string",
           "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
         },
-        "branch": {"$ref": "#/$defs/shortText"},
+        "branch": {
+          "$ref": "#/$defs/branch"
+        },
         "worktree_id": {
           "type": "string",
           "minLength": 1,
@@ -161,109 +294,367 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 8192,
-            "pattern": "^(?!/|~)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*//).+$"
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*//)(?!.*\\s$)(?!\\s).+$",
+            "description": "Wire paths are normalized repo-relative names. Trusted receivers additionally reject .git and symlink escape before access."
           }
         },
-        "contracts": {"$ref": "#/$defs/portableList"}
+        "contracts": {
+          "$ref": "#/$defs/contractList"
+        }
+      },
+      "not": {
+        "required": [
+          "github_issue",
+          "github_pr"
+        ]
       }
+    },
+    "positiveDecimal": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,19}$"
     },
     "sponsor": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["pubkey", "github_login"],
+      "required": [
+        "pubkey",
+        "github_login"
+      ],
       "properties": {
-        "pubkey": {"$ref": "#/$defs/pubkey"},
-        "github_login": {"$ref": "#/$defs/shortText"}
+        "pubkey": {
+          "$ref": "#/$defs/pubkey"
+        },
+        "github_login": {
+          "$ref": "#/$defs/shortText"
+        }
       }
     },
     "claim": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "scope_digest"],
+      "required": [
+        "status",
+        "scope_digest"
+      ],
       "properties": {
-        "status": {"enum": ["processed", "accepted"]},
-        "scope_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        "status": {
+          "enum": [
+            "processed",
+            "accepted",
+            "declined"
+          ]
+        },
+        "scope_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        }
+      },
+      "if": {
+        "properties": {
+          "status": {
+            "const": "declined"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "reason"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "reason"
+          ]
+        }
       }
     },
     "requestShape": {
-      "required": ["capability", "summary", "acceptance"],
+      "required": [
+        "capability",
+        "summary",
+        "acceptance"
+      ],
       "propertyNames": {
         "enum": [
-          "schema_version", "operation_id", "idempotency_key", "coordinator_epoch",
-          "project", "repository", "sender_pubkey", "recipient_pubkey", "sponsor",
-          "expires_at", "capability", "summary", "acceptance", "supersedes_event_id"
+          "schema_version",
+          "operation_id",
+          "idempotency_key",
+          "coordinator_epoch",
+          "project",
+          "repository",
+          "sender_pubkey",
+          "recipient_pubkey",
+          "sponsor",
+          "expires_at",
+          "capability",
+          "summary",
+          "acceptance",
+          "supersedes_event_id"
         ]
       }
     },
     "claimShape": {
-      "required": ["request_event_id", "claim"],
+      "required": [
+        "request_event_id",
+        "claim"
+      ],
       "propertyNames": {
         "enum": [
-          "schema_version", "operation_id", "idempotency_key", "coordinator_epoch",
-          "project", "repository", "sender_pubkey", "recipient_pubkey", "sponsor",
-          "expires_at", "request_event_id", "prior_event_id", "claim"
+          "schema_version",
+          "operation_id",
+          "idempotency_key",
+          "coordinator_epoch",
+          "project",
+          "repository",
+          "sender_pubkey",
+          "recipient_pubkey",
+          "sponsor",
+          "expires_at",
+          "request_event_id",
+          "prior_event_id",
+          "claim"
         ]
       },
       "if": {
-        "properties": {"claim": {"properties": {"status": {"const": "accepted"}}}}
+        "properties": {
+          "claim": {
+            "properties": {
+              "status": {
+                "const": "accepted"
+              }
+            }
+          }
+        }
       },
-      "then": {"required": ["prior_event_id"]},
-      "else": {"not": {"required": ["prior_event_id"]}}
+      "then": {
+        "required": [
+          "prior_event_id"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "prior_event_id"
+          ]
+        }
+      }
     },
     "progressShape": {
-      "required": ["request_event_id", "prior_event_id", "status", "message", "evidence"],
+      "required": [
+        "request_event_id",
+        "prior_event_id",
+        "status",
+        "message",
+        "evidence"
+      ],
       "propertyNames": {
         "enum": [
-          "schema_version", "operation_id", "idempotency_key", "coordinator_epoch",
-          "project", "repository", "sender_pubkey", "recipient_pubkey", "sponsor",
-          "expires_at", "request_event_id", "prior_event_id", "status", "message", "evidence"
+          "schema_version",
+          "operation_id",
+          "idempotency_key",
+          "coordinator_epoch",
+          "project",
+          "repository",
+          "sender_pubkey",
+          "recipient_pubkey",
+          "sponsor",
+          "expires_at",
+          "request_event_id",
+          "prior_event_id",
+          "status",
+          "message",
+          "evidence"
         ]
       }
     },
     "resultShape": {
-      "required": ["request_event_id", "prior_event_id", "outcome", "artifacts", "evidence"],
-      "properties": {"outcome": {"const": "success"}},
+      "required": [
+        "request_event_id",
+        "prior_event_id",
+        "outcome",
+        "artifacts",
+        "evidence"
+      ],
+      "properties": {
+        "outcome": {
+          "const": "success"
+        }
+      },
       "propertyNames": {
         "enum": [
-          "schema_version", "operation_id", "idempotency_key", "coordinator_epoch",
-          "project", "repository", "sender_pubkey", "recipient_pubkey", "sponsor",
-          "expires_at", "request_event_id", "prior_event_id", "outcome", "candidate_sha",
-          "artifacts", "evidence", "capabilities"
+          "schema_version",
+          "operation_id",
+          "idempotency_key",
+          "coordinator_epoch",
+          "project",
+          "repository",
+          "sender_pubkey",
+          "recipient_pubkey",
+          "sponsor",
+          "expires_at",
+          "request_event_id",
+          "prior_event_id",
+          "outcome",
+          "candidate_sha",
+          "artifacts",
+          "evidence",
+          "capabilities"
         ]
       }
     },
     "controlShape": {
-      "required": ["request_event_id", "action", "reason"],
+      "required": [
+        "request_event_id",
+        "action",
+        "reason"
+      ],
       "propertyNames": {
         "enum": [
-          "schema_version", "operation_id", "idempotency_key", "coordinator_epoch",
-          "project", "repository", "sender_pubkey", "recipient_pubkey", "sponsor",
-          "expires_at", "request_event_id", "prior_event_id", "action", "reason", "handoff_to"
+          "schema_version",
+          "operation_id",
+          "idempotency_key",
+          "coordinator_epoch",
+          "project",
+          "repository",
+          "sender_pubkey",
+          "recipient_pubkey",
+          "sponsor",
+          "expires_at",
+          "request_event_id",
+          "prior_event_id",
+          "action",
+          "reason",
+          "handoff_to"
         ]
       },
       "allOf": [
         {
-          "if": {"properties": {"action": {"const": "handoff"}}},
-          "then": {"required": ["prior_event_id", "handoff_to"]},
-          "else": {"not": {"required": ["handoff_to"]}}
+          "if": {
+            "properties": {
+              "action": {
+                "const": "handoff"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "prior_event_id",
+              "handoff_to"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "handoff_to"
+              ]
+            }
+          }
         },
         {
-          "if": {"properties": {"action": {"const": "release"}}},
-          "then": {"required": ["prior_event_id"]}
+          "if": {
+            "properties": {
+              "action": {
+                "enum": [
+                  "cancelled",
+                  "release"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "prior_event_id"
+            ]
+          }
         }
       ]
     },
     "errorShape": {
       "required": [
-        "request_event_id", "prior_event_id", "outcome", "code", "message", "retryable"
+        "request_event_id",
+        "prior_event_id",
+        "outcome",
+        "code",
+        "message",
+        "retryable"
       ],
-      "properties": {"outcome": {"const": "error"}},
+      "properties": {
+        "outcome": {
+          "enum": [
+            "failed",
+            "indeterminate"
+          ]
+        }
+      },
       "propertyNames": {
         "enum": [
-          "schema_version", "operation_id", "idempotency_key", "coordinator_epoch",
-          "project", "repository", "sender_pubkey", "recipient_pubkey", "sponsor",
-          "expires_at", "request_event_id", "prior_event_id", "outcome", "code", "message",
+          "schema_version",
+          "operation_id",
+          "idempotency_key",
+          "coordinator_epoch",
+          "project",
+          "repository",
+          "sender_pubkey",
+          "recipient_pubkey",
+          "sponsor",
+          "expires_at",
+          "request_event_id",
+          "prior_event_id",
+          "outcome",
+          "code",
+          "message",
           "retryable"
+        ]
+      },
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "indeterminate"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "retryable": {
+            "const": false
+          }
+        }
+      }
+    },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "not": {
+        "const": "00000000-0000-0000-0000-000000000000"
+      }
+    },
+    "branch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!@$)(?!/)(?!.*(?:/$|\\.$|//|\\.\\.|@\\{|[~^:?*\\[\\\\\\u0000-\\u0020\\u007f]))(?!.*(?:^|/)\\.)(?!.*(?:^|/)[^/]*\\.lock(?:/|$)).+$"
+    },
+    "contractList": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/messageText"
+          },
+          {
+            "pattern": "^contract:[A-Za-z0-9._/-]{1,128}$",
+            "not": {
+              "pattern": "^contract:(?:/|.*//|\\.\\.(?:/|$)|.*\\/\\.\\.(?:/|$)|.*/$)"
+            }
+          }
         ]
       }
     }

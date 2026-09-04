@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -39,16 +40,23 @@ PACKAGE_REQUIRED = (
     SKILL_DIR / "VERSION",
     SKILL_DIR / "references/adoption.md",
     SKILL_DIR / "references/commands.md",
-    SKILL_DIR / "references/cli-contract-v1.json",
+    SKILL_DIR / "references/buzz-cli-contract-v1.json",
     SKILL_DIR / "references/job-envelope.schema.json",
     SKILL_DIR / "references/protocol.md",
     SKILL_DIR / "references/staging-smoke.md",
     SCRIPTS / "a2a_contract.py",
+    SCRIPTS / "authorization.py",
     SCRIPTS / "check_cli_contract.py",
+    SCRIPTS / "contract_cli.py",
     SCRIPTS / "executor.py",
+    SCRIPTS / "local_relay.py",
+    SCRIPTS / "receiver_runtime.py",
     SCRIPTS / "two_agent_smoke.py",
-    Path(__file__),
+    Path(__file__).resolve(),
     SKILL_DIR / "tests/test_a2a_contract.py",
+    SKILL_DIR / "tests/test_a2a_edges.py",
+    SKILL_DIR / "tests/test_authorization.py",
+    SKILL_DIR / "tests/fixtures/buzz-cli-help-v1.json",
     SKILL_DIR / "tests/fixtures/jobs-v1.json",
 )
 
@@ -129,8 +137,10 @@ def check_links_and_sources() -> None:
             fail(f"file exceeds 128 KiB: {relative(path)}")
         if path.suffix in {".md", ".py", ".json"}:
             text = path.read_text()
-            if len(text.splitlines()) > 650:
-                fail(f"file exceeds 650 lines: {relative(path)}")
+            if path.suffix == ".py":
+                limit = 600 if "tests" in path.parts else 500
+                if len(text.splitlines()) > limit:
+                    fail(f"Python source exceeds {limit} lines: {relative(path)}")
             if _contains_private_reference(text):
                 fail(f"private host/reference detail leaked into {relative(path)}")
         if path.suffix == ".py":
@@ -138,8 +148,10 @@ def check_links_and_sources() -> None:
                 compile(path.read_text(), str(path), "exec")
             except SyntaxError as error:
                 fail(f"Python syntax error in {relative(path)}: {error}")
-    if list(SKILL_DIR.rglob("__pycache__")):
-        fail("generated __pycache__ directory is present")
+    if list(SKILL_DIR.rglob("__pycache__")) or any(
+        path.suffix in {".pyc", ".pyo"} for path in SKILL_DIR.rglob("*")
+    ):
+        fail("generated Python bytecode is present")
     for markdown in SKILL_DIR.rglob("*.md"):
         text = markdown.read_text()
         for target in re.findall(r"\[[^]]*\]\(([^)]+)\)", text):
@@ -156,6 +168,44 @@ def check_links_and_sources() -> None:
         candidate = (REPO / script).resolve()
         if not candidate.is_file():
             fail(f"SKILL.md references missing script {script}")
+
+
+def check_model_security_boundary() -> None:
+    combined = "\n".join(
+        (SKILL_DIR / relative_path).read_text()
+        for relative_path in (
+            "SKILL.md",
+            "references/commands.md",
+            "references/protocol.md",
+            "references/staging-smoke.md",
+        )
+    )
+    for required in (
+        "buzz_chat_send",
+        "buzz_a2a_dispatch",
+        "buzz_a2a_inbox",
+        "buzz_a2a_status",
+        "buzz_a2a_cancel",
+        "buzz_a2a_handoff",
+        "operator/debug",
+        "not a generic signing proxy",
+        "POST /api/jobs/authorize",
+        "repository_announcement_event_id",
+        "process-wide receiver",
+        "frozen outbox",
+    ):
+        if required not in combined:
+            fail(f"model/receiver security contract omits {required!r}")
+    for forbidden in (
+        "grant_event_id",
+        "expected_relay_pubkey",
+        "Codex and Claude invoke it with JSON",
+        "BUZZ_PRIVATE_KEY",
+        "NOSTR_PRIVATE_KEY",
+        "BUZZ_AUTH_TAG",
+    ):
+        if forbidden in combined:
+            fail(f"forbidden authorization/model contract remains: {forbidden}")
 
 
 def _contains_private_reference(text: str) -> bool:
@@ -178,6 +228,22 @@ def check_schema() -> None:
         fail("schema common-field drift")
     if schema["properties"]["coordinator_epoch"].get("maximum") != 4_294_967_295:
         fail("coordinator_epoch is not u32-bounded")
+    definitions = schema.get("$defs", {})
+    repository = definitions.get("repository", {}).get("properties", {})
+    if repository.get("contracts") != {"$ref": "#/$defs/contractList"}:
+        fail("repository contracts are not contract-coordinate-only")
+    if repository.get("branch") != {"$ref": "#/$defs/branch"}:
+        fail("repository branch is not bound to the conservative ref schema")
+    path_pattern = repository.get("paths", {}).get("items", {}).get("pattern", "")
+    if ".git" in path_pattern.lower():
+        fail("wire path schema must defer .git rejection to trusted receiver access")
+    project_pattern = (
+        definitions.get("project", {}).get("properties", {}).get("address", {}).get("pattern")
+    )
+    if project_pattern != "^30621:[0-9a-f]{64}:[A-Za-z0-9._-]+$":
+        fail("project address portable identifier schema drift")
+    if schema["properties"].get("operation_id") != {"$ref": "#/$defs/uuid"}:
+        fail("operation UUID is not bound to the canonical non-nil schema")
     _resolve_refs(schema, schema)
 
 
@@ -214,9 +280,21 @@ def check_smokes() -> None:
             fail(f"{terminal} smoke failed: {result}")
 
 
-def check_cli(binary: Path | None) -> None:
+def check_tests() -> None:
+    result = subprocess.run(
+        [sys.executable, "-W", "error::ResourceWarning", "-m", "unittest", "discover", "-s", str(SKILL_DIR / "tests")],
+        cwd=REPO,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode:
+        fail(f"unit tests failed:\n{result.stdout}{result.stderr}")
+
+
+def check_cli(binary: Path | None, buzz_repo: Path | None) -> None:
     try:
-        check_cli_contract(binary)
+        check_cli_contract(binary, buzz_repo)
     except CliContractError as error:
         fail(str(error))
 
@@ -227,20 +305,23 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--package-only", action="store_true")
     parser.add_argument("--buzz-bin", type=Path)
+    parser.add_argument("--buzz-repo", type=Path)
     args = parser.parse_args()
     check_adoption()
     if not args.package_only:
         check_integrated_adoption()
     check_links_and_sources()
+    check_model_security_boundary()
     check_schema()
-    check_cli(args.buzz_bin)
+    check_cli(args.buzz_bin, args.buzz_repo)
+    check_tests()
     check_smokes()
     print(json.dumps({
         "ok": True,
         "protocol": "NEMO-A2A-1",
         "skill_version": "1.0.0",
         "mode": "package-only" if args.package_only else "integrated",
-        "checks": ["adoption", "golden-block", "links", "schema", "cli-contract", "source-bounds", "result-smoke", "handoff-smoke"],
+        "checks": ["adoption", "golden-block", "links", "schema", "cli-contract", "model-security-boundary", "receiver-authorization", "source-bounds", "unit-tests", "result-smoke", "handoff-smoke"],
     }, sort_keys=True))
     return 0
 

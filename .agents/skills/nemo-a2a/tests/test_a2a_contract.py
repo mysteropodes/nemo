@@ -4,6 +4,7 @@ import copy
 import datetime as dt
 import hashlib
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -16,7 +17,6 @@ from a2a_contract import (  # noqa: E402
     COMMON_FIELDS,
     ContractError,
     IdempotencyConflict,
-    LocalRelay,
     canonical_json,
     freeze_event,
     parse_event,
@@ -24,6 +24,7 @@ from a2a_contract import (  # noqa: E402
     validate_content,
 )
 from executor import Executor, ExecutorLedger, make_handler  # noqa: E402
+from local_relay import LocalRelay  # noqa: E402
 from two_agent_smoke import (  # noqa: E402
     COMMUNITY,
     CREATED,
@@ -35,6 +36,7 @@ from two_agent_smoke import (  # noqa: E402
     WORKER_A_SPONSOR,
     WORKER_B,
     WORKER_B_SPONSOR,
+    authorization_client,
     authority,
     request_content,
     run_smoke,
@@ -43,6 +45,18 @@ from two_agent_smoke import (  # noqa: E402
 
 
 class ContractTests(unittest.TestCase):
+    def test_contract_cli_entrypoint_remains_usable(self) -> None:
+        body = request_content()
+        result = subprocess.run(
+            [sys.executable, str(SCRIPTS / "a2a_contract.py"), "digest-request"],
+            input=canonical_json(body),
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["scope_digest"], semantic_digest(body))
+
     def test_result_smoke_is_exactly_once_after_reconnect(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             result = run_smoke(Path(directory), "result")
@@ -74,6 +88,10 @@ class ContractTests(unittest.TestCase):
                 })
                 if case["valid"]:
                     self.assertEqual(parse_event(frozen)["kind"], case["kind"])
+                    if "semantic_digest" in case:
+                        self.assertEqual(
+                            semantic_digest(case["content"]), case["semantic_digest"]
+                        )
                 else:
                     with self.assertRaises(ContractError) as raised:
                         parse_event(frozen)
@@ -96,6 +114,7 @@ class ContractTests(unittest.TestCase):
             ledger_a = ExecutorLedger(root / "a.sqlite3")
             worker_a = Executor(
                 "a", WORKER_A, WORKER_A_SPONSOR, "owner-a", ledger_a, relay,
+                authorization_client(relay),
                 make_handler(ledger_a, COMMUNITY, "a", "handoff", WORKER_B),
             )
             worker_a.drain(COMMUNITY, "project_channel", NOW)
@@ -104,6 +123,7 @@ class ContractTests(unittest.TestCase):
             ledger_b = ExecutorLedger(root / "b.sqlite3")
             worker_b = Executor(
                 "b", WORKER_B, WORKER_B_SPONSOR, "owner-b", ledger_b, relay,
+                authorization_client(relay, WORKER_B, WORKER_B_SPONSOR),
                 make_handler(ledger_b, COMMUNITY, "b", "result"),
             )
             self.assertEqual(worker_b.drain(COMMUNITY, "project_channel", NOW), [])
@@ -122,6 +142,7 @@ class ContractTests(unittest.TestCase):
             ledger = ExecutorLedger(root / "a.sqlite3")
             Executor(
                 "a", WORKER_A, WORKER_A_SPONSOR, "owner-a", ledger, relay,
+                authorization_client(relay),
                 make_handler(ledger, COMMUNITY, "a", "handoff", WORKER_B),
             ).drain(COMMUNITY, "project_channel", NOW)
             handoff = next(event for event in relay.events(COMMUNITY) if event["kind"] == 43005)
@@ -141,13 +162,13 @@ class ContractTests(unittest.TestCase):
             ledger = ExecutorLedger(root / "worker.sqlite3")
             worker = Executor(
                 "a", WORKER_A, WORKER_A_SPONSOR, "owner-a", ledger, relay,
+                authorization_client(relay),
                 make_handler(ledger, COMMUNITY, "a", "result"),
             )
             worker.drain(COMMUNITY, "project_channel", NOW)
             changed = request_content()
             changed["summary"] = "Changed semantics under the same retry key"
             changed_frozen = freeze_event(43001, REQUESTER, changed, CREATED + 4)
-            relay.publish(COMMUNITY, "project_channel", changed_frozen, NOW)
             with self.assertRaises(IdempotencyConflict):
                 worker.process(COMMUNITY, "project_channel", changed_frozen, NOW)
 
@@ -165,6 +186,20 @@ class ContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractError, "closed canonical"):
             parse_event(canonical_json(event))
 
+        result = self._result_content()
+        frozen = freeze_event(43004, WORKER_A, result, CREATED + 3)
+        event = json.loads(frozen)
+        e_indexes = [index for index, tag in enumerate(event["tags"]) if tag[0] == "e"]
+        event["tags"][e_indexes[0]], event["tags"][e_indexes[1]] = (
+            event["tags"][e_indexes[1]], event["tags"][e_indexes[0]]
+        )
+        unsigned = {
+            key: event[key] for key in ("kind", "pubkey", "created_at", "tags", "content")
+        }
+        event["id"] = hashlib.sha256(canonical_json(unsigned).encode()).hexdigest()
+        with self.assertRaisesRegex(ContractError, "canonical root/reply order"):
+            parse_event(canonical_json(event))
+
     def test_github_and_a_tags_are_exact_body_bindings(self) -> None:
         frozen = freeze_event(43001, REQUESTER, request_content(), CREATED)
         event = json.loads(frozen)
@@ -175,6 +210,90 @@ class ContractTests(unittest.TestCase):
         next(tag for tag in event["tags"] if tag[0] == "a")[1] = "30621:" + "aa" * 32 + ":other"
         with self.assertRaisesRegex(ContractError, "closed canonical"):
             parse_event(canonical_json(event))
+
+    def test_github_ids_are_positive_decimal_and_issue_pr_are_exclusive(self) -> None:
+        for invalid in ("0", "01", "-1", "one", "1" * 21):
+            body = request_content()
+            body["repository"]["github_issue"] = invalid
+            with self.subTest(identifier=invalid), self.assertRaisesRegex(
+                ContractError, "positive decimal"
+            ):
+                validate_content(43001, body)
+        body = request_content()
+        body["repository"]["github_pr"] = "2"
+        with self.assertRaisesRegex(ContractError, "mutually exclusive"):
+            validate_content(43001, body)
+
+    def test_wire_repository_fields_match_rust_contract(self) -> None:
+        for branch in ("codex/a2a", "release-1.0", "_portable/topic"):
+            body = request_content()
+            body["repository"]["branch"] = branch
+            validate_content(43001, body)
+        for branch in (
+            "@", "/topic", "topic/", "topic.", "a//b", "a..b", "a@{b",
+            "a~b", "a^b", "a:b", "a?b", "a*b", "a[b", "a\\b",
+            ".hidden", "a/.hidden", "a.lock", "a/a.lock", "a\x7f",
+        ):
+            body = request_content()
+            body["repository"]["branch"] = branch
+            with self.subTest(branch=branch), self.assertRaises(ContractError):
+                validate_content(43001, body)
+
+        body = request_content()
+        body["repository"]["paths"] = [".git/config", "~checkout/file"]
+        validate_content(43001, body)
+        for path in ("path/", "./path", "path/../escape"):
+            body = request_content()
+            body["repository"]["paths"] = [path]
+            with self.subTest(path=path), self.assertRaises(ContractError):
+                validate_content(43001, body)
+
+        for reference in (
+            "git:" + "a" * 40,
+            "buzz:event:" + "b" * 64,
+            "https://github.com/nemo-project/nemo/actions/runs/1",
+        ):
+            body = request_content()
+            body["repository"]["contracts"] = [reference]
+            with self.subTest(reference=reference), self.assertRaisesRegex(
+                ContractError, "only inert contract:"
+            ):
+                validate_content(43001, body)
+
+    def test_project_identifier_and_uuid_spelling_match_rust_contract(self) -> None:
+        for identifier in ("nemo", "project_1.0-beta"):
+            body = request_content()
+            owner = body["project"]["address"].split(":", 2)[1]
+            body["project"]["address"] = f"30621:{owner}:{identifier}"
+            validate_content(43001, body)
+        for identifier in ("with space", "nested/id", "colon:id", "emoji-🦆"):
+            body = request_content()
+            owner = body["project"]["address"].split(":", 2)[1]
+            body["project"]["address"] = f"30621:{owner}:{identifier}"
+            with self.subTest(identifier=identifier), self.assertRaises(ContractError):
+                validate_content(43001, body)
+        for field_path in ("operation_id", "project.home_channel"):
+            body = request_content()
+            if field_path == "operation_id":
+                body["operation_id"] = "00000000-0000-0000-0000-000000000000"
+            else:
+                body["project"]["home_channel"] = "00000000-0000-0000-0000-000000000000"
+            with self.subTest(field=field_path), self.assertRaisesRegex(
+                ContractError, "non-nil"
+            ):
+                validate_content(43001, body)
+
+    def test_rust_inert_github_url_semantics_are_mirrored(self) -> None:
+        result = self._result_content()
+        for reference in (
+            "https://github.com",
+            "https://github.com/",
+            "HTTPS://GITHUB.COM/Owner/Repo/Artifact",
+            "https://github.com:443/owner/repo",
+        ):
+            result["evidence"] = [reference]
+            with self.subTest(reference=reference):
+                validate_content(43004, result)
 
     def test_unsigned_authority_metadata_is_not_accepted_in_content(self) -> None:
         for field in ("community", "authorization", "route", "event_type", "protocol_version"):
@@ -269,7 +388,7 @@ class ContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractError, "host-local path"):
             validate_content(43001, request)
         request = request_content()
-        request["summary"] = "use token github_" + "pat_secretvalue"
+        request["summary"] = "use token github_" + "pat_secretvalue1"
         with self.assertRaisesRegex(ContractError, "credential material"):
             validate_content(43001, request)
 
@@ -292,6 +411,7 @@ class ContractTests(unittest.TestCase):
             ledger = ExecutorLedger(root / "worker.sqlite3")
             Executor(
                 "a", WORKER_A, WORKER_A_SPONSOR, "owner-a", ledger, relay,
+                authorization_client(relay),
                 make_handler(ledger, COMMUNITY, "a", "result"),
             ).drain(COMMUNITY, "project_channel", NOW)
             request = parse_event(request_frozen)
@@ -357,22 +477,6 @@ class ContractTests(unittest.TestCase):
                 relay.publish(
                     COMMUNITY, "project_channel",
                     freeze_event(43003, WORKER_A, sibling, CREATED + 4), NOW,
-                )
-
-    def test_root_cancel_is_only_valid_before_lifecycle_child(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            relay = LocalRelay(Path(directory) / "relay.sqlite3", authority())
-            request, _, _ = self._publish_claims(relay, accepted=False)
-            cancel = {
-                **{key: copy.deepcopy(request["content_object"][key]) for key in COMMON_FIELDS},
-                "request_event_id": request["id"],
-                "action": "cancel",
-                "reason": "Coordinator cancelled",
-            }
-            with self.assertRaisesRegex(ContractError, "before any lifecycle child"):
-                relay.publish(
-                    COMMUNITY, "project_channel",
-                    freeze_event(43005, REQUESTER, cancel, CREATED + 3), NOW,
                 )
 
     @staticmethod

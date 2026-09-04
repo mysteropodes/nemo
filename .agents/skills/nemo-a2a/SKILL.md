@@ -24,29 +24,45 @@ through Nemo's product Rust MCP.
 
 ## Required workflow
 
-1. Read [protocol.md](references/protocol.md) and validate the candidate agent's signed,
-   unexpired capability document before sending work.
+1. Read [protocol.md](references/protocol.md). Managed agents use only `buzz_chat_send` for
+   normal channel replies and the typed `buzz_a2a_dispatch`, `buzz_a2a_inbox`,
+   `buzz_a2a_status`, `buzz_a2a_cancel`, and `buzz_a2a_handoff` MCP tools for coordination.
+   The tools enforce the session's trusted identity, channel, Project, repository, peer,
+   capability, path, branch, and worktree grants.
 2. Pin the request to one Buzz community, Project address/home channel, canonical GitHub
    repository, base SHA, branch, logical worktree name, repository-relative path scope,
    acceptance checks, exact recipient, and expiry.
 3. Choose the route using the authorization rules in the protocol. Identity sponsorship is
    not authorization. Never send a cross-owner job by DM.
-4. Create a `buzz.jobs.v1` request with a fresh operation UUID and a stable, non-secret
-   idempotency key. Follow [commands.md](references/commands.md) for machine-readable CLI
-   I/O. Do not put credentials, private keys, provider tokens, or absolute local paths in an
-   event.
-5. Treat a relay acknowledgement only as relay storage/delivery. Wait for one signed
-   `processed` claim and one signed `accepted` claim from the exact recipient before treating
-   work as owned.
-6. On the executor, validate the signed author and exact `h`/`p`/`i`/`k` tags plus lifecycle
-   `e` tags before trusting content fields. Compute the request digest locally and atomically
-   claim the durable ledger before any side effect. Replay the frozen signed receipt bytes
-   for the same key and body; reject the same key with a changed body.
-7. Emit progress or blocked updates only as kind `43003`. End the current execution with
-   exactly one completed (`43004`), cancel/release/handoff (`43005`), or error (`43006`)
-   event. A handoff does not prove that the next agent accepted.
-8. After reconnect, resume from the durable cursor and ledger. Never infer completion from a
-   vanished connection or retry an already accepted operation automatically.
+4. Create a `buzz.jobs.v1` request through `buzz_a2a_dispatch` with a fresh operation UUID
+   and a stable, non-secret idempotency key. The trusted MCP retains signing authority and
+   enforces exact grants; it is not a generic signing proxy. The unrestricted
+   [Buzz CLI](references/commands.md) is for human operators and debugging only. A managed
+   agent must not invoke it through a shell or request raw signing, authentication,
+   job-control, or provider credentials. Never put a credential or host-local path in a
+   prompt, child environment, or signed event.
+5. Treat a relay acknowledgement only as storage by the relay, never delivery to the
+   recipient. Poll `buzz_a2a_status` for one signed `processed` claim and one signed
+   `accepted` claim from the exact recipient before treating work as owned. A signed
+   `declined` claim ends the request without work.
+6. The production ACP—not a model tool—owns inbound processed/accepted/progress/result
+   lifecycle publication. It validates the full signed request and exact tags, computes the
+   digest locally, obtains fresh fail-closed `POST /api/jobs/authorize` evidence, compares
+   every echoed/current binding to its local grant, and consumes it immediately in the
+   durable admission CAS before publishing `accepted` or causing a side effect. Accepted
+   ingest still receives the relay's full current-state validation. Replay frozen signed
+   outbox bytes for the same key/body; reject the same key with changed semantics.
+7. Emit progress or blocked updates only as kind `43003`. A requester `cancel` after any
+   claim is only `cancel_requested`; the worker must quiesce and publish `cancelled` before
+   cancellation is terminal. End owned work with exactly one completed (`43004`),
+   cancelled/release/handoff (`43005`), or failed/indeterminate (`43006`) event. A root
+   cancel before any processed receipt is the sole terminal-cancel exception. Never
+   automatically retry an indeterminate execution. A handoff does not prove that the next
+   agent accepted.
+8. Run exactly one process-wide receiver for each ledger. After reconnect, resume from the
+   durable cursor, ledger, and frozen outbox; retry transient acknowledgements with identical
+   signed bytes. Never infer completion from a vanished connection or automatically rerun an
+   accepted or indeterminate operation.
 
 Run the deterministic proof before changing the transport integration:
 

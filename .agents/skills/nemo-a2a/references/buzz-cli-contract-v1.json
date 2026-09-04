@@ -1,0 +1,172 @@
+{
+  "schema_version": "buzz.cli-contract.v1",
+  "job_schema_version": "buzz.jobs.v1",
+  "result_schema_version": "buzz.cli-result.v1",
+  "max_job_ttl_seconds": 604800,
+  "terminal_audit_grace_seconds": 86400,
+  "coordinator_epoch": {
+    "type": "u32",
+    "minimum": 1,
+    "maximum": 4294967295
+  },
+  "commands": [
+    {
+      "path": "buzz agents capabilities",
+      "required_options": ["--project-address <ADDRESS>"],
+      "stdout": "capabilities_result"
+    },
+    {
+      "path": "buzz jobs submit",
+      "required_options": ["--input <FILE|->"],
+      "stdout": "write_result"
+    },
+    {
+      "path": "buzz jobs list",
+      "options": [
+        "--project-address <ADDRESS>",
+        "--recipient <self|PUBKEY>",
+        "--state <STATE>",
+        "--cursor <OPAQUE>"
+      ],
+      "stdout": "list_result"
+    },
+    {
+      "path": "buzz jobs get",
+      "required_options": ["--operation-id <UUID>"],
+      "stdout": "get_result"
+    },
+    {
+      "path": "buzz jobs accept",
+      "required_options": ["--operation-id <UUID>", "--input <FILE|->"],
+      "stdout": "write_result"
+    },
+    {
+      "path": "buzz jobs progress",
+      "required_options": ["--operation-id <UUID>", "--input <FILE|->"],
+      "stdout": "write_result"
+    },
+    {
+      "path": "buzz jobs complete",
+      "required_options": ["--operation-id <UUID>", "--input <FILE|->"],
+      "stdout": "write_result"
+    },
+    {
+      "path": "buzz jobs fail",
+      "required_options": ["--operation-id <UUID>", "--input <FILE|->"],
+      "stdout": "write_result"
+    },
+    {
+      "path": "buzz jobs cancel",
+      "required_options": ["--operation-id <UUID>", "--input <FILE|->"],
+      "stdout": "write_result"
+    },
+    {
+      "path": "buzz jobs acknowledge-cancel",
+      "required_options": ["--operation-id <UUID>", "--input <FILE|->"],
+      "stdout": "write_result"
+    },
+    {
+      "path": "buzz jobs release",
+      "required_options": ["--operation-id <UUID>", "--input <FILE|->"],
+      "stdout": "write_result"
+    },
+    {
+      "path": "buzz jobs handoff",
+      "required_options": ["--operation-id <UUID>", "--input <FILE|->"],
+      "stdout": "write_result"
+    }
+  ],
+  "outputs": {
+    "community": {
+      "schema_version": "buzz.context.v1",
+      "community_id": "server-resolved UUID",
+      "host": "server-resolved host",
+      "pubkey": "authenticated lowercase hex public key"
+    },
+    "write_result": {
+      "schema_version": "buzz.cli-result.v1",
+      "community": "community",
+      "operation_id": "UUID",
+      "relay": {
+        "state": "stored",
+        "event_id": "lowercase hex event ID"
+      },
+      "lifecycle": null,
+      "replayed": "boolean",
+      "event": "verified signed Nostr event",
+      "authority": {
+        "repository_scope": "unverified",
+        "note": "relay storage does not authorize repository scope; receivers must allowlist project.address, project.home_channel, and repository.canonical"
+      }
+    },
+    "list_result": {
+      "schema_version": "buzz.cli-result.v1",
+      "community": "community",
+      "jobs": "job_projection[]",
+      "count": "integer",
+      "unchanged": "boolean",
+      "next_cursor": "opaque string",
+      "authority": {
+        "repository_scope": "unverified",
+        "note": "relay storage does not authorize repository scope; receivers must allowlist project.address, project.home_channel, and repository.canonical"
+      }
+    },
+    "get_result": {
+      "schema_version": "buzz.cli-result.v1",
+      "community": "community",
+      "job": "job_projection",
+      "authority": {
+        "repository_scope": "unverified",
+        "note": "relay storage does not authorize repository scope; receivers must allowlist project.address, project.home_channel, and repository.canonical"
+      }
+    },
+    "capabilities_result": {
+      "schema_version": "buzz.cli-result.v1",
+      "community": "community",
+      "agents": "historical capability_advertisement[]; every item has dispatch_eligible=false until a receiver performs a current authority check",
+      "authority": {
+        "repository_scope": "unverified",
+        "note": "relay storage does not authorize repository scope; receivers must allowlist project.address, project.home_channel, and repository.canonical"
+      }
+    },
+    "job_projection": {
+      "job_schema_version": "buzz.jobs.v1",
+      "operation_id": "UUID",
+      "coordinator_epoch": "u32",
+      "request_event_id": "lowercase hex event ID",
+      "project_address": "30621:<owner>:<d>",
+      "home_channel": "UUID",
+      "repository": "canonical GitHub URL",
+      "sender_pubkey": "lowercase hex public key",
+      "recipient_pubkey": "lowercase hex public key",
+      "relay": {
+        "state": "stored",
+        "event_id": "request event ID"
+      },
+      "lifecycle": {
+        "state": "requested|processed|accepted|declined|progress|blocked|cancel_requested|completed|failed|indeterminate|cancelled|release|handoff|conflict",
+        "processed": "milestone or omitted",
+        "accepted": "milestone or omitted",
+        "completed": "milestone or omitted",
+        "terminal": "milestone or omitted",
+        "conflict": "boolean",
+        "conflicts": "string[]"
+      },
+      "event_ids": "lowercase hex event ID[] in reducer order",
+      "events": "verified full signed Nostr event[] in the identical order"
+    }
+  },
+  "semantics": {
+    "json_stdout_is_default": true,
+    "relay_stored_is_not_recipient_delivery": true,
+    "relay_stored_is_not_execution_success": true,
+    "relay_stored_is_not_repository_authority": true,
+    "receiver_allowlist_key": [
+      "project.address",
+      "project.home_channel",
+      "repository.canonical"
+    ],
+    "capability_discovery_capability": "buzz.capabilities.discover",
+    "cursor": "opaque complete-history fingerprint; an unchanged cursor returns jobs=[] and unchanged=true"
+  }
+}

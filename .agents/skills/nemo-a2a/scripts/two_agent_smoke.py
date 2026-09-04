@@ -9,10 +9,13 @@ import json
 import tempfile
 from pathlib import Path
 
-from a2a_contract import LocalAuthority, LocalRelay, freeze_event, parse_event
+from a2a_contract import freeze_event, parse_event
+from authorization import LocalAuthorizationClient, LocalAuthorizationService, ReceiverGrant
 from executor import Executor, ExecutorLedger, make_handler
+from local_relay import LocalAuthority, LocalRelay
 
-COMMUNITY = "nemo-local-smoke"
+COMMUNITY = "99999999-1234-4234-8234-123456789abc"
+RELAY_HOST = "localhost"
 PROJECT_AUTHOR = "11" * 32
 PROJECT_ADDRESS = f"30621:{PROJECT_AUTHOR}:nemo"
 HOME_CHANNEL = "11111111-2222-4333-8444-555555555555"
@@ -25,6 +28,7 @@ WORKER_B_SPONSOR = "77" * 32
 CREATED = int(dt.datetime(2030, 1, 1, tzinfo=dt.timezone.utc).timestamp())
 NOW = dt.datetime(2030, 1, 1, 0, 0, 10, tzinfo=dt.timezone.utc)
 EXPIRES = "2030-01-01T01:00:00Z"
+CHECKOUT_ROOT = str(Path(__file__).resolve().parents[4])
 
 
 def authority() -> LocalAuthority:
@@ -46,12 +50,12 @@ def request_content(recipient: str = WORKER_A, epoch: int = 1) -> dict[str, obje
         "project": {"address": PROJECT_ADDRESS, "home_channel": HOME_CHANNEL},
         "repository": {
             "canonical": "https://github.com/nemo-project/nemo",
-            "github_issue": "SMOKE-1",
+            "github_issue": "1",
             "base_sha": "ab" * 20,
             "branch": "codex/a2a-local-smoke",
             "worktree_id": f"local-smoke-{epoch}",
             "paths": [".agents/skills/nemo-a2a"],
-            "contracts": ["python3 -m unittest discover"],
+            "contracts": ["contract:python-unittest"],
         },
         "sender_pubkey": REQUESTER,
         "recipient_pubkey": recipient,
@@ -61,6 +65,42 @@ def request_content(recipient: str = WORKER_A, epoch: int = 1) -> dict[str, obje
         "summary": "Prove one durable execution across a reconnect replay",
         "acceptance": ["exactly one accepted claim", "exactly one terminal disposition"],
     }
+
+
+def authorization_client(
+    relay: LocalRelay,
+    recipient: str = WORKER_A,
+    recipient_owner: str = WORKER_A_SPONSOR,
+) -> LocalAuthorizationClient:
+    service = LocalAuthorizationService(relay, COMMUNITY, RELAY_HOST)
+    grant = ReceiverGrant(
+        project_address=PROJECT_ADDRESS,
+        home_channel=HOME_CHANNEL,
+        repository_canonical="https://github.com/nemo-project/nemo",
+        base_sha="ab" * 20,
+        branch="codex/a2a-local-smoke",
+        worktree_id="local-smoke-1",
+        capability="nemo.a2a.smoke",
+        path_prefixes=(".agents/skills/nemo-a2a",),
+        requester_pubkeys=(REQUESTER,),
+        recipient_pubkey=recipient,
+        checkout_root=CHECKOUT_ROOT,
+        requester_owner_pubkey=REQUESTER_SPONSOR,
+        recipient_owner_pubkey=recipient_owner,
+        project_head_event_id=service.project_head(PROJECT_ADDRESS, HOME_CHANNEL),
+        repository_coordinate=service.repository_coordinate(
+            PROJECT_ADDRESS, "https://github.com/nemo-project/nemo"
+        ),
+        repository_announcement_event_id=service.repository_announcement(
+            "https://github.com/nemo-project/nemo"
+        ),
+    )
+    return LocalAuthorizationClient(
+        service,
+        "http://localhost/api/jobs/authorize",
+        grant,
+        dev_mode=True,
+    )
 
 
 def superseding_request(handoff: dict[str, object], epoch: int = 2) -> str:
@@ -106,6 +146,7 @@ def run_smoke(state_dir: Path, terminal: str) -> dict[str, object]:
         "worker-a-owner",
         ledger_a,
         relay,
+        authorization_client(relay),
         make_handler(ledger_a, COMMUNITY, "worker-a", terminal, WORKER_B),
     )
     first_results = first.drain(COMMUNITY, "project_channel", NOW, checkpoint=False)
@@ -120,6 +161,7 @@ def run_smoke(state_dir: Path, terminal: str) -> dict[str, object]:
         "worker-a-owner",
         reopened_ledger,
         relay,
+        authorization_client(relay),
         make_handler(reopened_ledger, COMMUNITY, "worker-a", terminal, WORKER_B),
     )
     replay_results = reconnect.drain(COMMUNITY, "project_channel", NOW, checkpoint=True)
@@ -140,7 +182,11 @@ def run_smoke(state_dir: Path, terminal: str) -> dict[str, object]:
     }
     if counts != expected:
         raise AssertionError(f"unexpected lifecycle counts: {counts}, expected {expected}")
-    if ledger_row["execution_count"] != 1 or reopened_ledger.effect_count() != 1:
+    if (
+        ledger_row["execution_count"] != 1
+        or reopened_ledger.effect_count() != 1
+        or reopened_ledger.admission_count() != 1
+    ):
         raise AssertionError("reconnect caused duplicate execution")
     if first_results[0]["disposition"] != "executed" or replay_results[0]["disposition"] != "replayed":
         raise AssertionError("expected one execution followed by one durable replay")
@@ -157,6 +203,7 @@ def run_smoke(state_dir: Path, terminal: str) -> dict[str, object]:
             "worker-b-owner",
             ledger_b,
             relay,
+            authorization_client(relay, WORKER_B, WORKER_B_SPONSOR),
             make_handler(ledger_b, COMMUNITY, "worker-b", "result"),
         )
         handoff_only = worker_b.drain(COMMUNITY, "project_channel", NOW)
@@ -172,6 +219,7 @@ def run_smoke(state_dir: Path, terminal: str) -> dict[str, object]:
         "relay_ack_lifecycle": relay_receipt["lifecycle"],
         "event_counts": counts,
         "execution_count": ledger_row["execution_count"],
+        "authorization_admission_count": reopened_ledger.admission_count(),
         "side_effect_count": reopened_ledger.effect_count(),
         "reconnect_disposition": replay_results[0]["disposition"],
         "frozen_receipt_bytes_replayed": frozen_match,

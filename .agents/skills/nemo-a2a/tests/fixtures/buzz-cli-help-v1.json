@@ -1,0 +1,125 @@
+{
+  "schema_version": "buzz.cli-help-fixture.v1",
+  "captures": [
+    {
+      "argv": [
+        "agents",
+        "capabilities",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Discover capabilities advertised by project agents\n\nUsage: buzz agents capabilities --project-address <PROJECT_ADDRESS>\n\nOptions:\n      --project-address <PROJECT_ADDRESS>  Exact NIP-33 project address (`30621:<pubkey>:<d>`)\n  -h, --help                               Print help\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "jobs",
+        "submit",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Submit a kind 43001 request from a strict JSON document\n\nUsage: buzz jobs submit --input <INPUT>\n\nOptions:\n      --input <INPUT>  JSON file, or '-' for stdin\n  -h, --help           Print help\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "jobs",
+        "list",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "List durable job projections visible after reconnect\n\nUsage: buzz jobs list [OPTIONS]\n\nOptions:\n      --project-address <PROJECT_ADDRESS>  Filter by exact NIP-33 project address\n      --recipient <RECIPIENT>              Filter by addressee pubkey, or 'self'\n      --state <STATE>                      Filter by projected lifecycle state\n      --cursor <CURSOR>                    Opaque cursor returned by an earlier list\n  -h, --help                               Print help\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "jobs",
+        "get",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Get one durable operation projection\n\nUsage: buzz jobs get --operation-id <OPERATION_ID>\n\nOptions:\n      --operation-id <OPERATION_ID>  Canonical operation UUID\n  -h, --help                         Print help\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "jobs",
+        "accept",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Publish a processed or accepted kind 43002 receipt\n\nUsage: buzz jobs accept --operation-id <OPERATION_ID> --input <INPUT>\n\nOptions:\n      --operation-id <OPERATION_ID>  Canonical operation UUID (must match the JSON body)\n      --input <INPUT>                JSON file, or '-' for stdin\n  -h, --help                         Print help\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "jobs",
+        "progress",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Publish a progress or blocked kind 43003 event\n\nUsage: buzz jobs progress --operation-id <OPERATION_ID> --input <INPUT>\n\nOptions:\n      --operation-id <OPERATION_ID>  Canonical operation UUID (must match the JSON body)\n      --input <INPUT>                JSON file, or '-' for stdin\n  -h, --help                         Print help\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "jobs",
+        "complete",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Publish a successful kind 43004 terminal result\n\nUsage: buzz jobs complete --operation-id <OPERATION_ID> --input <INPUT>\n\nOptions:\n      --operation-id <OPERATION_ID>  Canonical operation UUID (must match the JSON body)\n      --input <INPUT>                JSON file, or '-' for stdin\n  -h, --help                         Print help\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "jobs",
+        "fail",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Publish a kind 43006 terminal error\n\nUsage: buzz jobs fail --operation-id <OPERATION_ID> --input <INPUT>\n\nOptions:\n      --operation-id <OPERATION_ID>  Canonical operation UUID (must match the JSON body)\n      --input <INPUT>                JSON file, or '-' for stdin\n  -h, --help                         Print help\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "jobs",
+        "cancel",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Publish a requester-authored kind 43005 cancellation\n\nUsage: buzz jobs cancel --operation-id <OPERATION_ID> --input <INPUT>\n\nOptions:\n      --operation-id <OPERATION_ID>  Canonical operation UUID (must match the JSON body)\n      --input <INPUT>                JSON file, or '-' for stdin\n  -h, --help                         Print help\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "jobs",
+        "acknowledge-cancel",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Publish a worker-authored terminal acknowledgement of cancellation\n\nUsage: buzz jobs acknowledge-cancel --operation-id <OPERATION_ID> --input <INPUT>\n\nOptions:\n      --operation-id <OPERATION_ID>  Canonical operation UUID (must match the JSON body)\n      --input <INPUT>                JSON file, or '-' for stdin\n  -h, --help                         Print help\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "jobs",
+        "release",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Publish a worker-authored kind 43005 claim release\n\nUsage: buzz jobs release --operation-id <OPERATION_ID> --input <INPUT>\n\nOptions:\n      --operation-id <OPERATION_ID>  Canonical operation UUID (must match the JSON body)\n      --input <INPUT>                JSON file, or '-' for stdin\n  -h, --help                         Print help\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "jobs",
+        "handoff",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "Publish a terminal handoff request; the coordinator must supersede it\n\nUsage: buzz jobs handoff --operation-id <OPERATION_ID> --input <INPUT>\n\nOptions:\n      --operation-id <OPERATION_ID>  Canonical operation UUID (must match the JSON body)\n      --input <INPUT>                JSON file, or '-' for stdin\n  -h, --help                         Print help\n",
+      "stderr": ""
+    }
+  ]
+}

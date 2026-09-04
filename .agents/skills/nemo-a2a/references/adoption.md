@@ -18,9 +18,13 @@ After integration, verify adoption in fresh Codex and Claude sessions from the r
 root:
 
 1. Ask which skill governs Nemo agent delegation and require both sessions to name
-   `.agents/skills/nemo-a2a/SKILL.md`, `NEMO-A2A-1`, and the relay-ack boundary.
-2. Ask each session to prepare, but not publish, a request JSON. Validate it with
-   `a2a_contract.py validate-event` and confirm no secrets or absolute paths appear.
+   `.agents/skills/nemo-a2a/SKILL.md`, `NEMO-A2A-1`, the relay-ack boundary, and the
+   typed-MCP requirement.
+2. Ask each session to prepare, but not publish, a dispatch. Require it to select the typed
+   `buzz_a2a_dispatch` MCP tool, use `buzz_chat_send` only for normal channel replies, and
+   name `buzz_a2a_inbox`, `buzz_a2a_status`, `buzz_a2a_cancel`, and `buzz_a2a_handoff` as the
+   remaining coordination tools. Confirm no raw signing, authentication, or job-control
+   credential and no absolute path enters the model/child environment.
 3. Run `check_package.py` and both local smoke terminals.
 4. Only with explicit staging authorization, continue with `staging-smoke.md`.
 

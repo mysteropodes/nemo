@@ -7,20 +7,43 @@ import datetime as dt
 import json
 import sqlite3
 from contextlib import closing
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Callable
 
 from a2a_contract import (
     COMMON_FIELDS,
     ContractError,
     IdempotencyConflict,
-    LocalRelay,
     freeze_event,
     parse_event,
     semantic_digest,
 )
+from authorization import LocalAuthorizationClient
+from local_relay import LocalRelay
+from receiver_runtime import exclusive_receiver, publish_frozen_with_retry
 
 TerminalHandler = Callable[[dict[str, object]], tuple[int, dict[str, object]]]
+
+
+def resolve_repo_path(checkout: Path, repo_relative: str) -> Path:
+    """Resolve an authorized wire path without crossing checkout or Git metadata boundaries."""
+
+    path = PurePosixPath(repo_relative)
+    if (
+        not repo_relative
+        or path.is_absolute()
+        or "\\" in repo_relative
+        or "//" in repo_relative
+        or any(part in {"", ".", ".."} or part.casefold() == ".git" for part in path.parts)
+    ):
+        raise ContractError("repository path is not a safe normalized repo-relative path")
+    root = checkout.resolve(strict=True)
+    resolved = root.joinpath(*path.parts).resolve(strict=False)
+    try:
+        resolved.relative_to(root)
+    except ValueError as error:
+        raise ContractError("repository path escapes the authorized checkout") from error
+    return resolved
 
 
 class ExecutorLedger:
@@ -57,6 +80,13 @@ class ExecutorLedger:
                   worker_id TEXT NOT NULL,
                   PRIMARY KEY(operation_id, coordinator_epoch, worker_id)
                 );
+                CREATE TABLE IF NOT EXISTS admissions (
+                  authorization_id TEXT PRIMARY KEY,
+                  community TEXT NOT NULL,
+                  request_event_id TEXT NOT NULL,
+                  grant_digest TEXT NOT NULL,
+                  authorization_expires_at TEXT NOT NULL
+                );
                 """
             )
 
@@ -91,15 +121,53 @@ class ExecutorLedger:
             )
         return True
 
-    def claim(self, community: str, request: dict[str, object], accepted: str) -> bool:
+    def admit(
+        self,
+        community: str,
+        request: dict[str, object],
+        accepted: str,
+        authorization: dict[str, str],
+    ) -> bool:
+        """Consume fresh authorization in the same CAS that owns the frozen Accepted."""
+
         key = self._key(request, community)
         with closing(self._connect()) as db, db:
             db.execute("BEGIN IMMEDIATE")
             changed = db.execute(
-                """UPDATE jobs SET status='accepted',execution_count=1,accepted_frozen=?
+                """UPDATE jobs SET status='admitted',execution_count=1,accepted_frozen=?
                 WHERE community=? AND request_author=? AND idempotency_key=?
                 AND status='processed' AND execution_count=0""",
                 (accepted, *key),
+            ).rowcount
+            if changed:
+                try:
+                    db.execute(
+                        """INSERT INTO admissions(
+                        authorization_id,community,request_event_id,grant_digest,
+                        authorization_expires_at) VALUES(?,?,?,?,?)""",
+                        (
+                            authorization["authorization_id"],
+                            community,
+                            request["id"],
+                            authorization["grant_digest"],
+                            authorization["authorization_expires_at"],
+                        ),
+                    )
+                except sqlite3.IntegrityError as error:
+                    raise ContractError("authorization response was already consumed") from error
+        return changed == 1
+
+    def confirm_accepted(self, community: str, request: dict[str, object]) -> bool:
+        """Record that the relay durably ingested the full-reauthorized Accepted event."""
+
+        key = self._key(request, community)
+        with closing(self._connect()) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            changed = db.execute(
+                """UPDATE jobs SET status='accepted'
+                WHERE community=? AND request_author=? AND idempotency_key=?
+                AND status='admitted' AND execution_count=1""",
+                key,
             ).rowcount
         return changed == 1
 
@@ -160,6 +228,10 @@ class ExecutorLedger:
         with closing(self._connect()) as db, db:
             return db.execute("SELECT COUNT(*) AS count FROM effects").fetchone()["count"]
 
+    def admission_count(self) -> int:
+        with closing(self._connect()) as db, db:
+            return db.execute("SELECT COUNT(*) AS count FROM admissions").fetchone()["count"]
+
 
 class Executor:
     """Consumes addressed requests and freezes receipts before publication."""
@@ -172,6 +244,7 @@ class Executor:
         github_login: str,
         ledger: ExecutorLedger,
         relay: LocalRelay,
+        authorization: LocalAuthorizationClient,
         handler: TerminalHandler,
     ) -> None:
         self.worker_id = worker_id
@@ -179,6 +252,7 @@ class Executor:
         self.sponsor = {"pubkey": sponsor_pubkey, "github_login": github_login}
         self.ledger = ledger
         self.relay = relay
+        self.authorization = authorization
         self.handler = handler
 
     def _common_response(self, request: dict[str, object]) -> dict[str, object]:
@@ -212,7 +286,7 @@ class Executor:
         )
         is_new = self.ledger.observe(community, request, digest, processed)
         row = self.ledger.row(community, request)
-        self.relay.publish(community, route, row["processed_frozen"], now)
+        publish_frozen_with_retry(self.relay, community, route, row["processed_frozen"], now)
         processed_event = parse_event(row["processed_frozen"])
         accepted = self._receipt(
             request,
@@ -223,11 +297,21 @@ class Executor:
             },
             2,
         )
-        claimed = self.ledger.claim(community, request, accepted)
+        row = self.ledger.row(community, request)
+        if row["status"] == "processed":
+            authorization = self.authorization.preflight(request, now, route)
+            self.ledger.admit(community, request, accepted, authorization)
+        row = self.ledger.row(community, request)
+        if row["status"] == "admitted":
+            publish_frozen_with_retry(
+                self.relay, community, route, row["accepted_frozen"], now
+            )
+            claimed = self.ledger.confirm_accepted(community, request)
+        else:
+            claimed = False
         if claimed:
-            self.relay.publish(community, route, accepted, now)
             kind, fields = self.handler(request)
-            accepted_event = parse_event(accepted)
+            accepted_event = parse_event(row["accepted_frozen"])
             terminal = self._receipt(
                 request,
                 kind,
@@ -235,13 +319,17 @@ class Executor:
                 3,
             )
             self.ledger.finish(community, request, terminal)
-            self.relay.publish(community, route, terminal, now)
+            publish_frozen_with_retry(self.relay, community, route, terminal, now)
             return {"disposition": "executed", "request_event_id": request["id"]}
         row = self.ledger.row(community, request)
         if row["accepted_frozen"]:
-            self.relay.publish(community, route, row["accepted_frozen"], now)
+            publish_frozen_with_retry(
+                self.relay, community, route, row["accepted_frozen"], now
+            )
         if row["terminal_frozen"]:
-            self.relay.publish(community, route, row["terminal_frozen"], now)
+            publish_frozen_with_retry(
+                self.relay, community, route, row["terminal_frozen"], now
+            )
         return {
             "disposition": "replayed" if not is_new else "already_claimed",
             "request_event_id": request["id"],
@@ -254,13 +342,15 @@ class Executor:
         now: dt.datetime,
         checkpoint: bool = True,
     ) -> list[dict[str, object]]:
-        cursor = self.ledger.cursor(community, self.worker_id)
-        results = []
-        for sequence, frozen in self.relay.requests(community, self.pubkey, cursor):
-            results.append(self.process(community, route, frozen, now))
-            if checkpoint:
-                self.ledger.checkpoint(community, self.worker_id, sequence)
-        return results
+        lock_path = self.ledger.path.with_name(self.ledger.path.name + ".receiver.lock")
+        with exclusive_receiver(lock_path):
+            cursor = self.ledger.cursor(community, self.worker_id)
+            results = []
+            for sequence, frozen in self.relay.requests(community, self.pubkey, cursor):
+                results.append(self.process(community, route, frozen, now))
+                if checkpoint:
+                    self.ledger.checkpoint(community, self.worker_id, sequence)
+            return results
 
 
 def make_handler(
