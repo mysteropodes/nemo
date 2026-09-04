@@ -26,7 +26,9 @@ through Nemo's product Rust MCP.
 
 This section applies to every Nemo session, including work that does not need A2A. Use it
 when the requested change only publishes an already reviewed documentation package to a
-named repository path and the user has authorized the push.
+named repository path and the user has authorized the push. Its operation and decision-time
+limits do not apply to implementation, research, debugging, tests, builds, remediation, or
+long-running A2A jobs; those keep their task-specific budgets and milestone rules.
 
 1. Treat it as one local Git task. Do not delegate, dispatch A2A work, request a second
    opinion, or post coordination status unless a real file, branch, worktree, authority, or
