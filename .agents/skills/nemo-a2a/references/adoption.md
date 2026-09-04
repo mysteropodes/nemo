@@ -14,6 +14,16 @@ No global skill copy, symlink outside the repository, plugin installation, ident
 enrollment, or hosted configuration is required. A clone receives the same protocol and
 tests from Git.
 
+Buzz managed agents also load this package automatically for the Nemo Project. The tracked
+`.agents/buzz-preload.json` manifest opts the repository in once for every Codex and Claude
+agent. Before creating a Project session, Buzz matches the Project's authoritative repository
+announcement to the checkout's real Git `origin`, starts the session in that verified checkout,
+and injects the complete declared skill into its standing instructions. A checkout with a
+different origin is ignored, and a present malformed or cross-repository manifest fails closed.
+The operator only needs to make the Nemo checkout available in Buzz's project repository root;
+there is no per-agent skill setting. Restart an existing managed agent after adding or updating
+the manifest so its next Project session receives the current skill.
+
 Each receiver still needs its own untracked `.buzz/agent-job-grants.json`, because the
 absolute checkout root is local to that machine. Build it from
 [receiver-grants.md](receiver-grants.md) and validate the exact shape against

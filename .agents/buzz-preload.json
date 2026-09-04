@@ -1,0 +1,5 @@
+{
+  "schema_version": "buzz.project-preload.v1",
+  "repository": "https://github.com/mysteropodes/nemo",
+  "skills": ["nemo-a2a"]
+}

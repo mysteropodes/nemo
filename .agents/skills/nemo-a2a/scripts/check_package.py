@@ -38,6 +38,7 @@ PACKAGE_ENTRYPOINTS = (
 )
 PACKAGE_REQUIRED = (
     *PACKAGE_ENTRYPOINTS,
+    REPO / ".agents/buzz-preload.json",
     SKILL_DIR / "VERSION",
     SKILL_DIR / "references/adoption.md",
     SKILL_DIR / "references/commands.md",
@@ -132,6 +133,21 @@ def check_integrated_adoption() -> None:
         fail("integrated .gitignore lacks Python bytecode exclusions")
     if "/.buzz/" not in ignore:
         fail("integrated .gitignore does not protect receiver-local Buzz grants")
+
+
+def check_buzz_preload_manifest() -> None:
+    path = REPO / ".agents/buzz-preload.json"
+    try:
+        manifest = json.loads(path.read_text(), object_pairs_hook=_unique)
+    except (ValueError, json.JSONDecodeError) as error:
+        fail(f"invalid or duplicate-key Buzz preload manifest: {error}")
+    expected = {
+        "schema_version": "buzz.project-preload.v1",
+        "repository": REPOSITORY,
+        "skills": ["nemo-a2a"],
+    }
+    if manifest != expected:
+        fail(f"Buzz preload manifest drifted: expected {expected}, got {manifest}")
 
 
 def check_links_and_sources() -> None:
@@ -359,6 +375,7 @@ def main() -> int:
     if not args.package_only:
         check_integrated_adoption()
     check_links_and_sources()
+    check_buzz_preload_manifest()
     check_model_security_boundary()
     check_staging_repository()
     check_schema()
