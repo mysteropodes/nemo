@@ -15,12 +15,41 @@ description: Coordinate authenticated Nemo development work between Codex and Cl
 
 Protocol version: `NEMO-A2A-1`
 
-Skill version: `1.1.0`
+Skill version: `1.2.0`
 
 Use this skill for agent discovery, delegation, progress, reconnect recovery, cancellation,
 release, handoff, and completion. GitHub remains canonical for source, issues, pull requests,
 CI, and review; Buzz carries signed coordination events only. Do not route this workflow
 through Nemo's product Rust MCP.
+
+## Documentation publication fast path
+
+This section applies to every Nemo session, including work that does not need A2A. Use it
+when the requested change only publishes an already reviewed documentation package to a
+named repository path and the user has authorized the push.
+
+1. Treat it as one local Git task. Do not delegate, dispatch A2A work, request a second
+   opinion, or post coordination status unless a real file, branch, worktree, authority, or
+   ownership conflict is already present.
+2. Use one batched preflight to check repository status, `origin`, the intended base, the
+   destination branch/path, and `git var GIT_AUTHOR_IDENT`. A successful identity check is
+   sufficient; ask only when it fails. Create the isolated worktree/branch from the verified
+   base and copy only the named package.
+3. Use one consolidated validation batch: compare the package bytes or manifest, resolve its
+   relative links, reject symlinks and sensitive/private paths, and run the staged diff check.
+   Test the changed artifact only. Do not run application, unit, browser, or integration suites
+   for a documentation-only change.
+4. If validation passes, proceed directly to `git commit -s`, the already authorized
+   non-force push, and remote-SHA verification. Do not reopen settled policy, identity,
+   permission, or architecture research. Do not edit the reviewed source package after staging
+   unless a concrete validation failure requires a narrow correction.
+5. Do not call a wait tool without a live operation or session identifier. After either twelve
+   agent-initiated tool operations or two minutes of agent decision time before commit, stop all
+   optional work, collapse to this fast path, and state the exact blocker if a required gate
+   cannot pass. Network transfer or a required command that is still running does not consume
+   the decision-time limit.
+6. Stop when the remote branch resolves to the committed SHA and report that evidence. Queue
+   maintenance should be one concise status transition; it must not become a parallel workflow.
 
 ## How to operate A2A
 
