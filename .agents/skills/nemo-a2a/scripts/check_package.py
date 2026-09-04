@@ -96,7 +96,7 @@ def check_adoption() -> None:
         first_body_heading = text.find("# ", text.find("---", 3) + 3) if text.startswith("---") else text.find("# ")
         if match.start() > first_body_heading:
             fail(f"golden block is not the first body section in {relative(path)}")
-    if (SKILL_DIR / "VERSION").read_text().strip() != "1.0.0":
+    if (SKILL_DIR / "VERSION").read_text().strip() != "1.1.0":
         fail("unexpected skill VERSION")
     shim = (REPO / ".claude/skills/nemo-a2a/SKILL.md").read_text()
     shim_target = (REPO / ".claude/skills/nemo-a2a" / "../../../.agents/skills/nemo-a2a/SKILL.md").resolve()
@@ -386,7 +386,7 @@ def main() -> int:
     print(json.dumps({
         "ok": True,
         "protocol": "NEMO-A2A-1",
-        "skill_version": "1.0.0",
+        "skill_version": "1.1.0",
         "mode": "package-only" if args.package_only else "integrated",
         "checks": ["adoption", "golden-block", "links", "staging-repository", "schema", "receiver-grant-schema", "cli-contract", "model-security-boundary", "receiver-authorization", "live-checkout", "source-bounds", "unit-tests", "result-smoke", "handoff-smoke"],
     }, sort_keys=True))

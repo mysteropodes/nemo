@@ -15,4 +15,4 @@ description: Use the repository's canonical Nemo A2A collaboration protocol and 
 
 Read and follow `../../../.agents/skills/nemo-a2a/SKILL.md`. That tracked file and its
 references are the only canonical copy. Its protocol version is `NEMO-A2A-1` and its skill
-version is `1.0.0`; stop if either value disagrees with the canonical package.
+version is `1.1.0`; stop if either value disagrees with the canonical package.

@@ -15,12 +15,66 @@ description: Coordinate authenticated Nemo development work between Codex and Cl
 
 Protocol version: `NEMO-A2A-1`
 
-Skill version: `1.0.0`
+Skill version: `1.1.0`
 
 Use this skill for agent discovery, delegation, progress, reconnect recovery, cancellation,
 release, handoff, and completion. GitHub remains canonical for source, issues, pull requests,
 CI, and review; Buzz carries signed coordination events only. Do not route this workflow
 through Nemo's product Rust MCP.
+
+## How to operate A2A
+
+Choose the tool from the intent, then stay within its lifecycle:
+
+| Intent | Tool | Required model-supplied fields |
+| --- | --- | --- |
+| Reply in the current human conversation | `buzz_chat_send` | `content` |
+| Delegate one bounded job | `buzz_a2a_dispatch` | fresh `operation_id`; stable non-secret `idempotency_key`; exact `recipient_pubkey`, `capability`, `worktree_id`, repository-relative `paths`; concise `summary`; observable `acceptance`; optional inert `contracts` and GitHub coordinate; bounded `ttl_seconds` |
+| Discover addressed work | `buzz_a2a_inbox` | `limit` only; unavailable from a one-shot Job session |
+| Follow one request | `buzz_a2a_status` | exact `request_event_id` returned by dispatch/inbox |
+| Stop work you dispatched | `buzz_a2a_cancel` | exact `request_event_id` and concrete `reason` |
+| Transfer work you currently execute | `buzz_a2a_handoff` | exact `request_event_id`, authorized `handoff_to`, unchanged `worktree_id`, and concrete `reason` |
+
+Before dispatching:
+
+1. Check the active task queue and existing A2A status so two agents do not claim the same
+   outcome, files, branch, or worktree. Divide work into non-overlapping repository-relative
+   paths and acceptance checks. GitHub issue/PR state remains the public source of truth.
+2. Select a recipient already authorized for the exact Project, repository, capability,
+   paths, branch, base SHA, and worktree. Project membership and agent sponsorship are
+   prerequisites, but neither creates a checkout grant. Never invent or broaden a grant.
+3. Generate a new operation UUID. Reuse an idempotency key only for a byte-equivalent retry
+   of the same request; changed semantics require a new key. Start `coordinator_epoch` at 1.
+4. Put the intended result in `summary` and make every `acceptance` entry independently
+   checkable. Send only inert `contract:<id>` references. Paths are relative to the repository;
+   never include credentials, private keys, tokens, environment dumps, or host-local paths.
+
+After `buzz_a2a_dispatch`, save its `request_event_id` and inspect it with
+`buzz_a2a_status`. The publish result or relay acknowledgement proves only that the relay
+stored an event. Work is assigned only after the exact recipient publishes both `processed`
+and `accepted`. `processed` proves durable validation; `accepted` proves an atomic ownership
+claim before side effects. Neither proves completion, review, merge, or release. Continue
+status checks at useful milestones; do not busy-poll. A terminal `completed`, `failed`,
+`indeterminate`, `cancelled`, `release`, or `handoff` ends that executor's run.
+
+Cancellation is two-stage after a claim. The requester calls `buzz_a2a_cancel`, which produces
+`cancel_requested`; the worker must quiesce and publish `cancelled` before the task is terminal.
+Never infer cancellation from silence or disconnect. An `indeterminate` result requires human
+or coordinator reconciliation and must not be retried automatically.
+
+A handoff also needs two stages. The current worker calls `buzz_a2a_handoff`; that releases its
+ownership but does not assign the successor. The original requester/coordinator then calls
+`buzz_a2a_dispatch` with the same operation and request semantics, `coordinator_epoch` advanced
+by exactly one, the returned handoff event as `supersedes_event_id`, and the authorized new
+recipient. Wait again for that recipient's `processed` and `accepted` claims.
+
+Fail closed when a tool is unavailable, a recipient or grant is missing, Project assignment is
+ambiguous, the repository root/origin/branch/HEAD differs from the grant, a requested path
+escapes its prefixes, signatures or lifecycle tags disagree, authorization expires, or relay
+state cannot be established. Report the exact blocker through normal chat when a human must act.
+Do not substitute a shell command, unrestricted Buzz CLI, raw relay request, manual signature,
+or guessed credential. One-shot Job sessions may use native local subagents for bounded work,
+then return their exact outcome; they may not dispatch unrelated A2A jobs or browse the inbox.
 
 ## Required workflow
 
