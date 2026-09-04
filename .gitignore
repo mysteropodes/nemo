@@ -1,6 +1,9 @@
 node_modules/
 __pycache__/
 *.py[cod]
+
+# Receiver-local Buzz grants contain machine-specific checkout roots.
+/.buzz/
 .DS_Store
 **/.DS_Store
 src-tauri/target/

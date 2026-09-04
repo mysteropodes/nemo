@@ -14,6 +14,12 @@ No global skill copy, symlink outside the repository, plugin installation, ident
 enrollment, or hosted configuration is required. A clone receives the same protocol and
 tests from Git.
 
+Each receiver still needs its own untracked `.buzz/agent-job-grants.json`, because the
+absolute checkout root is local to that machine. Build it from
+[receiver-grants.md](receiver-grants.md) and validate the exact shape against
+[agent-job-grants.schema.json](agent-job-grants.schema.json). Update the scalar base SHA,
+branch, and worktree ID when the checkout deliberately advances; never commit this file.
+
 After integration, verify adoption in fresh Codex and Claude sessions from the repository
 root:
 
@@ -25,7 +31,8 @@ root:
    name `buzz_a2a_inbox`, `buzz_a2a_status`, `buzz_a2a_cancel`, and `buzz_a2a_handoff` as the
    remaining coordination tools. Confirm no raw signing, authentication, or job-control
    credential and no absolute path enters the model/child environment.
-3. Run `check_package.py` and both local smoke terminals.
+3. Run `check_package.py` and both local smoke terminals. Confirm a case-variant `.GiT`
+   request path and live checkout root/origin/branch/HEAD drift each fail closed.
 4. Only with explicit staging authorization, continue with `staging-smoke.md`.
 
 Current Codex skill-discovery guidance:

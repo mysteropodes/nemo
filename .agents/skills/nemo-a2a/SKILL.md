@@ -36,7 +36,9 @@ through Nemo's product Rust MCP.
    `buzz_a2a_handoff` to transfer ownership.
 2. Pin the request to one Buzz community, Project address/home channel, canonical GitHub
    repository, base SHA, branch, logical worktree name, repository-relative path scope,
-   acceptance checks, exact recipient, and expiry.
+   acceptance checks, exact recipient, and expiry. Before receiving work, configure the
+   matching local [checkout grant](references/receiver-grants.md): `path_prefixes` must be
+   nonempty and `checkout_root`, base SHA, branch, and worktree ID identify one live checkout.
 3. Choose the route using the authorization rules in the protocol. Identity sponsorship is
    not authorization. Never send a cross-owner job by DM.
 4. Create a `buzz.jobs.v1` request through `buzz_a2a_dispatch` with a fresh operation UUID
@@ -56,7 +58,9 @@ through Nemo's product Rust MCP.
    every echoed/current binding to its local grant, and consumes it immediately in the
    durable admission CAS before publishing `accepted` or causing a side effect. Accepted
    ingest still receives the relay's full current-state validation. Replay frozen signed
-   outbox bytes for the same key/body; reject the same key with changed semantics.
+   outbox bytes for the same key/body; reject the same key with changed semantics. Every
+   admission verifies `git rev-parse --show-toplevel`, `origin`, `git symbolic-ref`, and
+   `HEAD`; checkout drift fails closed.
 7. Emit progress or blocked updates only as kind `43003`. A requester `cancel` after any
    claim is only `cancel_requested`; the worker must quiesce and publish `cancelled` before
    cancellation is terminal. End owned work with exactly one completed (`43004`),

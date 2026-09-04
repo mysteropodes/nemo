@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nemo.invalid/schemas/agent-job-grants.v1.json",
+  "title": "Buzz receiver-local agent job grants v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "grants"],
+  "properties": {
+    "version": {"const": 1},
+    "grants": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {"$ref": "#/$defs/grant"}
+    }
+  },
+  "$defs": {
+    "grant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project_address",
+        "home_channel",
+        "repository",
+        "requester_pubkeys",
+        "capabilities",
+        "path_prefixes",
+        "base_sha",
+        "branch",
+        "worktree_id",
+        "checkout_root"
+      ],
+      "properties": {
+        "project_address": {
+          "type": "string",
+          "pattern": "^30621:[0-9a-f]{64}:.+$"
+        },
+        "home_channel": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "repository": {
+          "type": "string",
+          "pattern": "^https://github\\.com/[a-z0-9._-]+/[a-z0-9._-]+$",
+          "not": {"pattern": "\\.git$"}
+        },
+        "requester_pubkeys": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        },
+        "capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[!-~]+$"
+          }
+        },
+        "path_prefixes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/repositoryPath"}
+        },
+        "base_sha": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+        },
+        "branch": {"$ref": "#/$defs/token"},
+        "worktree_id": {"$ref": "#/$defs/token"},
+        "checkout_root": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?:/|[A-Za-z]:[\\\\/]|\\\\\\\\).+$",
+          "description": "Absolute native path to an existing receiver-local Git checkout. The runtime canonicalizes and revalidates it."
+        }
+      }
+    },
+    "token": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[!-~]+$"
+    },
+    "repositoryPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192,
+      "pattern": "^(?![.][gG][iI][tT](?:/|$))(?!.*\\/[.][gG][iI][tT](?:/|$))(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*//).+$"
+    }
+  }
+}

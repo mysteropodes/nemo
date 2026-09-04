@@ -138,7 +138,15 @@ field immediately, including the full repository, event IDs, owner identities, f
 nonce, request event, digest, community, host, requester, and recipient. It separately
 enforces its local grant over the exact Project, home channel, canonical repository, base
 SHA, branch, worktree ID, path prefixes, capability, allowed requester/recipient, and
-canonical checkout, and records its own local `grant_digest`.
+canonical checkout, and records its own local `grant_digest`. The receiver-local file and
+machine-readable schema are documented in [receiver-grants.md](receiver-grants.md). Each
+grant has required nonempty `path_prefixes` and scalar `base_sha`, `branch`, `worktree_id`,
+and absolute `checkout_root`; plural or wildcard checkout coordinates are invalid.
+Immediately before each admission, `git rev-parse --show-toplevel` must resolve to that
+canonical root, `origin` must normalize to the exact GitHub repository, `git symbolic-ref
+--quiet --short HEAD` must equal the branch, and `git rev-parse HEAD` must equal the base
+SHA. A detached head, remote change, branch change, new commit, Git warning, or ambiguous
+grant fails closed.
 The authorization ID is consumed once inside the same durable CAS that owns the frozen
 Accepted outbox record. A preflight token never bypasses full Accepted-event ingest
 revalidation; authority revocation between preflight and ingest must still fail closed.
@@ -177,10 +185,11 @@ contract references; map inert names to commands in trusted local config.
 
 Community/tenant identity is trusted relay context outside signed `buzz.jobs.v1` content; a
 caller-controlled content field must never select the ledger's authority domain. Wire paths
-forbid absolute paths, `..` traversal, backslashes, and empty or dot segments. Evidence and
+forbid absolute paths, `..` traversal, backslashes, empty or dot segments, and every
+case-variant of a `.git` segment. Evidence and
 artifact references must also omit host-local absolute paths. Before access, the receiver
 must resolve every path beneath the authorized canonical checkout and additionally reject
-`.git`, traversal, empty segments, and symlink escapes.
+traversal, empty segments, and symlink escapes.
 Keep machine-local absolute worktree paths in local ledgers or receipts, never signed events.
 The receiver must re-check every requested path against the selected capability's advertised
 path prefixes.

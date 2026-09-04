@@ -6,13 +6,16 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import subprocess
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 from a2a_contract import freeze_event, parse_event
-from authorization import LocalAuthorizationClient, LocalAuthorizationService, ReceiverGrant
+from authorization import AuthorityBindings, LocalAuthorizationClient, LocalAuthorizationService
 from executor import Executor, ExecutorLedger, make_handler
 from local_relay import LocalAuthority, LocalRelay
+from receiver_grants import ReceiverGrant
 
 COMMUNITY = "99999999-1234-4234-8234-123456789abc"
 RELAY_HOST = "localhost"
@@ -28,7 +31,43 @@ WORKER_B_SPONSOR = "77" * 32
 CREATED = int(dt.datetime(2030, 1, 1, tzinfo=dt.timezone.utc).timestamp())
 NOW = dt.datetime(2030, 1, 1, 0, 0, 10, tzinfo=dt.timezone.utc)
 EXPIRES = "2030-01-01T01:00:00Z"
-CHECKOUT_ROOT = str(Path(__file__).resolve().parents[4])
+REPOSITORY = "https://github.com/nemo-project/nemo"
+BRANCH = "codex/a2a-local-smoke"
+WORKTREE_ID = "local-smoke-1"
+
+
+@dataclass(frozen=True)
+class CheckoutFixture:
+    root: Path
+    repository: str
+    base_sha: str
+    branch: str
+    worktree_id: str
+
+
+def create_checkout(root: Path) -> CheckoutFixture:
+    root.mkdir(parents=True)
+
+    def git(*arguments: str) -> str:
+        result = subprocess.run(
+            ["git", "-C", str(root), *arguments],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        return result.stdout.strip()
+
+    git("init")
+    git("config", "user.name", "Nemo A2A Test")
+    git("config", "user.email", "nemo-a2a@example.invalid")
+    git("checkout", "-b", BRANCH)
+    target = root / ".agents/skills/nemo-a2a"
+    target.mkdir(parents=True)
+    (target / "smoke.txt").write_text("receiver checkout fixture\n")
+    git("add", ".agents/skills/nemo-a2a/smoke.txt")
+    git("commit", "-m", "test: create receiver checkout fixture")
+    git("remote", "add", "origin", REPOSITORY + ".git")
+    return CheckoutFixture(root.resolve(), REPOSITORY, git("rev-parse", "HEAD"), BRANCH, WORKTREE_ID)
 
 
 def authority() -> LocalAuthority:
@@ -41,7 +80,15 @@ def authority() -> LocalAuthority:
     return auth
 
 
-def request_content(recipient: str = WORKER_A, epoch: int = 1) -> dict[str, object]:
+def request_content(
+    recipient: str = WORKER_A,
+    epoch: int = 1,
+    checkout: CheckoutFixture | None = None,
+) -> dict[str, object]:
+    repository = checkout.repository if checkout else REPOSITORY
+    base_sha = checkout.base_sha if checkout else "ab" * 20
+    branch = checkout.branch if checkout else BRANCH
+    worktree_id = checkout.worktree_id if checkout else WORKTREE_ID
     return {
         "schema_version": "buzz.jobs.v1",
         "operation_id": "12345678-1234-4234-8234-123456789abc",
@@ -49,11 +96,11 @@ def request_content(recipient: str = WORKER_A, epoch: int = 1) -> dict[str, obje
         "coordinator_epoch": epoch,
         "project": {"address": PROJECT_ADDRESS, "home_channel": HOME_CHANNEL},
         "repository": {
-            "canonical": "https://github.com/nemo-project/nemo",
+            "canonical": repository,
             "github_issue": "1",
-            "base_sha": "ab" * 20,
-            "branch": "codex/a2a-local-smoke",
-            "worktree_id": f"local-smoke-{epoch}",
+            "base_sha": base_sha,
+            "branch": branch,
+            "worktree_id": worktree_id,
             "paths": [".agents/skills/nemo-a2a"],
             "contracts": ["contract:python-unittest"],
         },
@@ -69,22 +116,27 @@ def request_content(recipient: str = WORKER_A, epoch: int = 1) -> dict[str, obje
 
 def authorization_client(
     relay: LocalRelay,
+    checkout: CheckoutFixture,
     recipient: str = WORKER_A,
     recipient_owner: str = WORKER_A_SPONSOR,
 ) -> LocalAuthorizationClient:
     service = LocalAuthorizationService(relay, COMMUNITY, RELAY_HOST)
-    grant = ReceiverGrant(
-        project_address=PROJECT_ADDRESS,
-        home_channel=HOME_CHANNEL,
-        repository_canonical="https://github.com/nemo-project/nemo",
-        base_sha="ab" * 20,
-        branch="codex/a2a-local-smoke",
-        worktree_id="local-smoke-1",
-        capability="nemo.a2a.smoke",
-        path_prefixes=(".agents/skills/nemo-a2a",),
-        requester_pubkeys=(REQUESTER,),
+    grant = ReceiverGrant.from_value(
+        {
+            "project_address": PROJECT_ADDRESS,
+            "home_channel": HOME_CHANNEL,
+            "repository": checkout.repository,
+            "requester_pubkeys": [REQUESTER],
+            "capabilities": ["nemo.a2a.smoke"],
+            "path_prefixes": [".agents/skills/nemo-a2a"],
+            "base_sha": checkout.base_sha,
+            "branch": checkout.branch,
+            "worktree_id": checkout.worktree_id,
+            "checkout_root": str(checkout.root),
+        }
+    )
+    bindings = AuthorityBindings(
         recipient_pubkey=recipient,
-        checkout_root=CHECKOUT_ROOT,
         requester_owner_pubkey=REQUESTER_SPONSOR,
         recipient_owner_pubkey=recipient_owner,
         project_head_event_id=service.project_head(PROJECT_ADDRESS, HOME_CHANNEL),
@@ -99,13 +151,15 @@ def authorization_client(
         service,
         "http://localhost/api/jobs/authorize",
         grant,
+        bindings,
         dev_mode=True,
     )
 
 
-def superseding_request(handoff: dict[str, object], epoch: int = 2) -> str:
-    content = request_content(WORKER_B, epoch)
-    content["repository"]["worktree_id"] = "local-smoke-1"
+def superseding_request(
+    handoff: dict[str, object], checkout: CheckoutFixture, epoch: int = 2
+) -> str:
+    content = request_content(WORKER_B, epoch, checkout)
     content["supersedes_event_id"] = handoff["id"]
     return freeze_event(43001, REQUESTER, content, CREATED + 4)
 
@@ -131,9 +185,12 @@ def run_smoke(state_dir: Path, terminal: str) -> dict[str, object]:
     worker_b_path = state_dir / "worker-b.sqlite3"
     if any(path.exists() for path in (relay_path, worker_a_path, worker_b_path)):
         raise RuntimeError("--state-dir must not contain a prior smoke database")
+    checkout = create_checkout(state_dir / "checkout")
 
     relay = LocalRelay(relay_path, authority())
-    request_frozen = freeze_event(43001, REQUESTER, request_content(), CREATED)
+    request_frozen = freeze_event(
+        43001, REQUESTER, request_content(checkout=checkout), CREATED
+    )
     relay_receipt = relay.publish(COMMUNITY, "project_channel", request_frozen, NOW)
     if relay_receipt["lifecycle"] is not None:
         raise AssertionError("relay acknowledgement synthesized lifecycle acceptance")
@@ -146,7 +203,7 @@ def run_smoke(state_dir: Path, terminal: str) -> dict[str, object]:
         "worker-a-owner",
         ledger_a,
         relay,
-        authorization_client(relay),
+        authorization_client(relay, checkout),
         make_handler(ledger_a, COMMUNITY, "worker-a", terminal, WORKER_B),
     )
     first_results = first.drain(COMMUNITY, "project_channel", NOW, checkpoint=False)
@@ -161,7 +218,7 @@ def run_smoke(state_dir: Path, terminal: str) -> dict[str, object]:
         "worker-a-owner",
         reopened_ledger,
         relay,
-        authorization_client(relay),
+        authorization_client(relay, checkout),
         make_handler(reopened_ledger, COMMUNITY, "worker-a", terminal, WORKER_B),
     )
     replay_results = reconnect.drain(COMMUNITY, "project_channel", NOW, checkpoint=True)
@@ -203,7 +260,7 @@ def run_smoke(state_dir: Path, terminal: str) -> dict[str, object]:
             "worker-b-owner",
             ledger_b,
             relay,
-            authorization_client(relay, WORKER_B, WORKER_B_SPONSOR),
+            authorization_client(relay, checkout, WORKER_B, WORKER_B_SPONSOR),
             make_handler(ledger_b, COMMUNITY, "worker-b", "result"),
         )
         handoff_only = worker_b.drain(COMMUNITY, "project_channel", NOW)

@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 import datetime as dt
 import hashlib
+import json
+import subprocess
 import tempfile
 import unittest
 import uuid
@@ -31,6 +33,7 @@ from authorization import (  # noqa: E402
 )
 from executor import Executor, ExecutorLedger, make_handler  # noqa: E402
 from local_relay import LocalRelay  # noqa: E402
+from receiver_grants import ReceiverGrant, load_receiver_grants  # noqa: E402
 from receiver_runtime import exclusive_receiver, scrub_spawn_environment  # noqa: E402
 from two_agent_smoke import (  # noqa: E402
     COMMUNITY,
@@ -43,17 +46,22 @@ from two_agent_smoke import (  # noqa: E402
     REQUESTER_SPONSOR,
     WORKER_A,
     WORKER_A_SPONSOR,
+    CheckoutFixture,
     authorization_client,
     authority,
+    create_checkout,
     request_content,
 )
 
 
-def setup_request(root: Path) -> tuple[LocalRelay, dict[str, object]]:
+def setup_request(root: Path) -> tuple[LocalRelay, dict[str, object], CheckoutFixture]:
+    checkout = create_checkout(root / "checkout")
     relay = LocalRelay(root / "relay.sqlite3", authority())
-    frozen = freeze_event(43001, REQUESTER, request_content(), CREATED)
+    frozen = freeze_event(
+        43001, REQUESTER, request_content(checkout=checkout), CREATED
+    )
     relay.publish(COMMUNITY, "project_channel", frozen, NOW)
-    return relay, parse_event(frozen)
+    return relay, parse_event(frozen), checkout
 
 
 def payload(
@@ -92,6 +100,31 @@ def worker_common(request: dict[str, object]) -> dict[str, object]:
     return common
 
 
+def grant_value(checkout: CheckoutFixture) -> dict[str, object]:
+    return {
+        "project_address": PROJECT_ADDRESS,
+        "home_channel": HOME_CHANNEL,
+        "repository": checkout.repository,
+        "requester_pubkeys": [REQUESTER],
+        "capabilities": ["nemo.a2a.smoke"],
+        "path_prefixes": [".agents/skills/nemo-a2a"],
+        "base_sha": checkout.base_sha,
+        "branch": checkout.branch,
+        "worktree_id": checkout.worktree_id,
+        "checkout_root": str(checkout.root),
+    }
+
+
+def git(checkout: CheckoutFixture, *arguments: str) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(checkout.root), *arguments],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    return result.stdout.strip()
+
+
 class AuthorizationContractTests(unittest.TestCase):
     def test_endpoint_policy_is_https_or_explicit_exact_loopback(self) -> None:
         self.assertEqual(
@@ -118,7 +151,7 @@ class AuthorizationContractTests(unittest.TestCase):
 
     def test_fresh_response_has_exact_echo_and_no_signature(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            relay, request = setup_request(Path(directory))
+            relay, request, checkout = setup_request(Path(directory))
             service = LocalAuthorizationService(relay, COMMUNITY, RELAY_HOST)
             request_payload = payload(request)
             response = service.authorize(
@@ -146,7 +179,7 @@ class AuthorizationContractTests(unittest.TestCase):
 
     def test_stale_response_and_server_replays_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            relay, request = setup_request(Path(directory))
+            relay, request, checkout = setup_request(Path(directory))
             service = LocalAuthorizationService(relay, COMMUNITY, RELAY_HOST)
             first = payload(request)
             response = service.authorize(
@@ -191,7 +224,7 @@ class AuthorizationContractTests(unittest.TestCase):
             "recipient": ("recipient_pubkey", "b" * 64),
         }
         with tempfile.TemporaryDirectory() as directory:
-            relay, request = setup_request(Path(directory))
+            relay, request, checkout = setup_request(Path(directory))
             service = LocalAuthorizationService(relay, COMMUNITY, RELAY_HOST)
             for name, (field, value) in mutations.items():
                 changed = payload(request)
@@ -228,70 +261,179 @@ class AuthorizationContractTests(unittest.TestCase):
 
     def test_receiver_local_grant_checks_owner_event_scope_and_paths(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            relay, request = setup_request(Path(directory))
-            client = authorization_client(relay)
+            relay, request, checkout = setup_request(Path(directory))
+            client = authorization_client(relay, checkout)
             admission = client.preflight(request, NOW, "project_channel")
             self.assertRegex(admission["grant_digest"], r"^[0-9a-f]{64}$")
 
             bad_owner = LocalAuthorizationClient(
                 client.service,
                 "http://localhost/api/jobs/authorize",
-                replace(client.grant, recipient_owner_pubkey="a" * 64),
+                client.grant,
+                replace(client.authority, recipient_owner_pubkey="a" * 64),
                 dev_mode=True,
             )
-            with self.assertRaisesRegex(ContractError, "receiver-local grant"):
+            with self.assertRaisesRegex(ContractError, "receiver authority"):
                 bad_owner.preflight(request, NOW, "project_channel")
 
             bad_event = LocalAuthorizationClient(
                 client.service,
                 "http://localhost/api/jobs/authorize",
-                replace(client.grant, project_head_event_id="b" * 64),
+                client.grant,
+                replace(client.authority, project_head_event_id="b" * 64),
                 dev_mode=True,
             )
-            with self.assertRaisesRegex(ContractError, "receiver-local grant"):
+            with self.assertRaisesRegex(ContractError, "receiver authority"):
                 bad_event.preflight(request, NOW, "project_channel")
 
             bad_path = LocalAuthorizationClient(
                 client.service,
                 "http://localhost/api/jobs/authorize",
                 replace(client.grant, path_prefixes=("src",)),
+                client.authority,
                 dev_mode=True,
             )
-            with self.assertRaisesRegex(ContractError, "project/capability/path"):
+            with self.assertRaisesRegex(ContractError, "receiver-local grant"):
                 bad_path.preflight(request, NOW, "project_channel")
 
             bad_checkout_coordinate = LocalAuthorizationClient(
                 client.service,
                 "http://localhost/api/jobs/authorize",
                 replace(client.grant, branch="codex/not-authorized"),
+                client.authority,
                 dev_mode=True,
             )
-            with self.assertRaisesRegex(ContractError, "project/capability/path"):
+            with self.assertRaisesRegex(ContractError, "receiver-local grant"):
                 bad_checkout_coordinate.preflight(request, NOW, "project_channel")
+
+            ambiguous = LocalAuthorizationClient(
+                client.service,
+                "http://localhost/api/jobs/authorize",
+                (client.grant, client.grant),
+                client.authority,
+                dev_mode=True,
+            )
+            with self.assertRaisesRegex(ContractError, "exactly one"):
+                ambiguous.preflight(request, NOW, "project_channel")
 
     def test_receiver_grant_canonicalizes_an_absolute_checkout_alias(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            checkout = root / "private" / "tmp" / "checkout"
-            checkout.mkdir(parents=True)
+            relay, request, checkout = setup_request(root)
             alias = root / "tmp-checkout"
-            alias.symlink_to(checkout, target_is_directory=True)
+            alias.symlink_to(checkout.root, target_is_directory=True)
 
-            relay, request = setup_request(root)
-            baseline = authorization_client(relay)
+            baseline = authorization_client(relay, checkout)
+            value = {
+                "project_address": baseline.grant.project_address,
+                "home_channel": baseline.grant.home_channel,
+                "repository": baseline.grant.repository,
+                "requester_pubkeys": list(baseline.grant.requester_pubkeys),
+                "capabilities": list(baseline.grant.capabilities),
+                "path_prefixes": list(baseline.grant.path_prefixes),
+                "base_sha": baseline.grant.base_sha,
+                "branch": baseline.grant.branch,
+                "worktree_id": baseline.grant.worktree_id,
+                "checkout_root": str(alias),
+            }
+            canonical_grant = ReceiverGrant.from_value(value)
             client = LocalAuthorizationClient(
                 baseline.service,
                 "http://localhost/api/jobs/authorize",
-                replace(baseline.grant, checkout_root=str(alias)),
+                canonical_grant,
+                baseline.authority,
                 dev_mode=True,
             )
 
             admission = client.preflight(request, NOW, "project_channel")
+            self.assertEqual(canonical_grant.checkout_root, str(checkout.root))
             self.assertRegex(admission["grant_digest"], r"^[0-9a-f]{64}$")
+
+    def test_receiver_grant_document_requires_exact_scalar_checkout_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            checkout = create_checkout(Path(directory) / "checkout")
+            valid = grant_value(checkout)
+            loaded = load_receiver_grants(json.dumps({"version": 1, "grants": [valid]}))
+            self.assertEqual(loaded[0].base_sha, checkout.base_sha)
+            self.assertEqual(loaded[0].path_prefixes, (".agents/skills/nemo-a2a",))
+
+            invalid_values: list[dict[str, object]] = []
+            for missing in ("base_sha", "branch", "worktree_id", "checkout_root"):
+                candidate = copy.deepcopy(valid)
+                del candidate[missing]
+                invalid_values.append(candidate)
+            for scalar in ("base_sha", "branch", "worktree_id", "checkout_root"):
+                candidate = copy.deepcopy(valid)
+                candidate[scalar] = [candidate[scalar]]
+                invalid_values.append(candidate)
+            for prefixes in ([], ["src/.GiT/config"]):
+                candidate = copy.deepcopy(valid)
+                candidate["path_prefixes"] = prefixes
+                invalid_values.append(candidate)
+            relative = copy.deepcopy(valid)
+            relative["checkout_root"] = "checkout"
+            invalid_values.append(relative)
+            legacy = copy.deepcopy(valid)
+            legacy["branches"] = [legacy.pop("branch")]
+            invalid_values.append(legacy)
+
+            for candidate in invalid_values:
+                with self.subTest(candidate=candidate), self.assertRaises(ContractError):
+                    load_receiver_grants(
+                        json.dumps({"version": 1, "grants": [candidate]})
+                    )
+
+    def test_receiver_live_checkout_identity_is_revalidated_on_every_admission(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            relay, request, checkout = setup_request(Path(directory))
+
+            git(checkout, "checkout", "-b", "codex/drift")
+            with self.assertRaisesRegex(ContractError, "live checkout"):
+                authorization_client(relay, checkout).preflight(
+                    request, NOW, "project_channel"
+                )
+            git(checkout, "checkout", checkout.branch)
+
+            (checkout.root / "drift.txt").write_text("drift\n")
+            git(checkout, "add", "drift.txt")
+            git(checkout, "commit", "-m", "test: drift checkout head")
+            with self.assertRaisesRegex(ContractError, "live checkout"):
+                authorization_client(relay, checkout).preflight(
+                    request, NOW, "project_channel"
+                )
+            git(checkout, "reset", "--hard", checkout.base_sha)
+
+            git(checkout, "remote", "set-url", "origin", "https://github.com/block/buzz.git")
+            with self.assertRaisesRegex(ContractError, "live checkout"):
+                authorization_client(relay, checkout).preflight(
+                    request, NOW, "project_channel"
+                )
+            git(checkout, "remote", "set-url", "origin", checkout.repository + ".git")
+            authorization_client(relay, checkout).preflight(
+                request, NOW, "project_channel"
+            )
+
+    def test_receiver_rejects_checkout_subdirectory_as_root(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            relay, request, checkout = setup_request(Path(directory))
+            subdirectory = checkout.root / ".agents"
+            candidate = grant_value(checkout)
+            candidate["checkout_root"] = str(subdirectory)
+            grant = ReceiverGrant.from_value(candidate)
+            baseline = authorization_client(relay, checkout)
+            client = LocalAuthorizationClient(
+                baseline.service,
+                "http://localhost/api/jobs/authorize",
+                grant,
+                baseline.authority,
+                dev_mode=True,
+            )
+            with self.assertRaisesRegex(ContractError, "live checkout"):
+                client.preflight(request, NOW, "project_channel")
 
     def test_accepted_ingest_revalidates_after_preflight(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            relay, request = setup_request(Path(directory))
+            relay, request, checkout = setup_request(Path(directory))
             digest = semantic_digest(request["content_object"])
             processed_content = {
                 **worker_common(request),
@@ -300,7 +442,7 @@ class AuthorizationContractTests(unittest.TestCase):
             }
             processed_frozen = freeze_event(43002, WORKER_A, processed_content, CREATED + 1)
             relay.publish(COMMUNITY, "project_channel", processed_frozen, NOW)
-            authorization_client(relay).preflight(request, NOW, "project_channel")
+            authorization_client(relay, checkout).preflight(request, NOW, "project_channel")
 
             accepted_content = {
                 **worker_common(request),
@@ -320,8 +462,8 @@ class AuthorizationContractTests(unittest.TestCase):
     def test_authorization_id_is_consumed_once_inside_admission_cas(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            relay, request = setup_request(root)
-            admission = authorization_client(relay).preflight(
+            relay, request, checkout = setup_request(root)
+            admission = authorization_client(relay, checkout).preflight(
                 request, NOW, "project_channel"
             )
             ledger = ExecutorLedger(root / "worker.sqlite3")
@@ -331,7 +473,7 @@ class AuthorizationContractTests(unittest.TestCase):
                 ledger.admit(COMMUNITY, request, "accepted-a", admission)
             )
 
-            second_body = request_content()
+            second_body = request_content(checkout=checkout)
             second_body["operation_id"] = "22345678-1234-4234-8234-123456789abc"
             second_body["idempotency_key"] = "second-admission"
             second = parse_event(freeze_event(43001, REQUESTER, second_body, CREATED + 10))
@@ -368,7 +510,7 @@ class ReceiverRuntimeTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            relay, _ = setup_request(root)
+            relay, _, checkout = setup_request(root)
             lossy = LostAckRelay(relay)
             ledger = ExecutorLedger(root / "worker.sqlite3")
             worker = Executor(
@@ -378,7 +520,7 @@ class ReceiverRuntimeTests(unittest.TestCase):
                 "worker-a-owner",
                 ledger,
                 lossy,
-                authorization_client(relay),
+                authorization_client(relay, checkout),
                 make_handler(ledger, COMMUNITY, "worker-a", "result"),
             )
             result = worker.drain(COMMUNITY, "project_channel", NOW)

@@ -241,7 +241,7 @@ def _repo_path(value: str) -> None:
     if (
         value.startswith("/")
         or "\\" in value
-        or any(part in {"", ".", ".."} for part in parts)
+        or any(part in {"", ".", ".."} or part.casefold() == ".git" for part in parts)
     ):
         raise ContractError(f"repository path must be normalized and repo-relative: {value}")
 

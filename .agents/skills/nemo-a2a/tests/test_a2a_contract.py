@@ -38,6 +38,7 @@ from two_agent_smoke import (  # noqa: E402
     WORKER_B_SPONSOR,
     authorization_client,
     authority,
+    create_checkout,
     request_content,
     run_smoke,
     superseding_request,
@@ -108,13 +109,16 @@ class ContractTests(unittest.TestCase):
     def test_superseding_request_is_required_before_target_executes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            checkout = create_checkout(root / "checkout")
             relay = LocalRelay(root / "relay.sqlite3", authority())
-            request_frozen = freeze_event(43001, REQUESTER, request_content(), CREATED)
+            request_frozen = freeze_event(
+                43001, REQUESTER, request_content(checkout=checkout), CREATED
+            )
             relay.publish(COMMUNITY, "project_channel", request_frozen, NOW)
             ledger_a = ExecutorLedger(root / "a.sqlite3")
             worker_a = Executor(
                 "a", WORKER_A, WORKER_A_SPONSOR, "owner-a", ledger_a, relay,
-                authorization_client(relay),
+                authorization_client(relay, checkout),
                 make_handler(ledger_a, COMMUNITY, "a", "handoff", WORKER_B),
             )
             worker_a.drain(COMMUNITY, "project_channel", NOW)
@@ -123,12 +127,17 @@ class ContractTests(unittest.TestCase):
             ledger_b = ExecutorLedger(root / "b.sqlite3")
             worker_b = Executor(
                 "b", WORKER_B, WORKER_B_SPONSOR, "owner-b", ledger_b, relay,
-                authorization_client(relay, WORKER_B, WORKER_B_SPONSOR),
+                authorization_client(relay, checkout, WORKER_B, WORKER_B_SPONSOR),
                 make_handler(ledger_b, COMMUNITY, "b", "result"),
             )
             self.assertEqual(worker_b.drain(COMMUNITY, "project_channel", NOW), [])
             self.assertEqual(ledger_b.effect_count(), 0)
-            relay.publish(COMMUNITY, "project_channel", superseding_request(handoff), NOW)
+            relay.publish(
+                COMMUNITY,
+                "project_channel",
+                superseding_request(handoff, checkout),
+                NOW,
+            )
             result = worker_b.drain(COMMUNITY, "project_channel", NOW)
             self.assertEqual(result[0]["disposition"], "executed")
             self.assertEqual(ledger_b.effect_count(), 1)
@@ -136,18 +145,20 @@ class ContractTests(unittest.TestCase):
     def test_superseding_request_requires_exact_next_epoch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            checkout = create_checkout(root / "checkout")
             relay = LocalRelay(root / "relay.sqlite3", authority())
-            original = freeze_event(43001, REQUESTER, request_content(), CREATED)
+            original = freeze_event(
+                43001, REQUESTER, request_content(checkout=checkout), CREATED
+            )
             relay.publish(COMMUNITY, "project_channel", original, NOW)
             ledger = ExecutorLedger(root / "a.sqlite3")
             Executor(
                 "a", WORKER_A, WORKER_A_SPONSOR, "owner-a", ledger, relay,
-                authorization_client(relay),
+                authorization_client(relay, checkout),
                 make_handler(ledger, COMMUNITY, "a", "handoff", WORKER_B),
             ).drain(COMMUNITY, "project_channel", NOW)
             handoff = next(event for event in relay.events(COMMUNITY) if event["kind"] == 43005)
-            body = request_content(WORKER_B, 1)
-            body["repository"]["worktree_id"] = "local-smoke-1"
+            body = request_content(WORKER_B, 1, checkout)
             body["supersedes_event_id"] = handoff["id"]
             invalid = freeze_event(43001, REQUESTER, body, CREATED + 4)
             with self.assertRaisesRegex(ContractError, "next coordinator_epoch"):
@@ -156,17 +167,20 @@ class ContractTests(unittest.TestCase):
     def test_receiver_ledger_conflicts_on_same_key_changed_body(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            checkout = create_checkout(root / "checkout")
             relay = LocalRelay(root / "relay.sqlite3", authority())
-            original = freeze_event(43001, REQUESTER, request_content(), CREATED)
+            original = freeze_event(
+                43001, REQUESTER, request_content(checkout=checkout), CREATED
+            )
             relay.publish(COMMUNITY, "project_channel", original, NOW)
             ledger = ExecutorLedger(root / "worker.sqlite3")
             worker = Executor(
                 "a", WORKER_A, WORKER_A_SPONSOR, "owner-a", ledger, relay,
-                authorization_client(relay),
+                authorization_client(relay, checkout),
                 make_handler(ledger, COMMUNITY, "a", "result"),
             )
             worker.drain(COMMUNITY, "project_channel", NOW)
-            changed = request_content()
+            changed = request_content(checkout=checkout)
             changed["summary"] = "Changed semantics under the same retry key"
             changed_frozen = freeze_event(43001, REQUESTER, changed, CREATED + 4)
             with self.assertRaises(IdempotencyConflict):
@@ -240,9 +254,15 @@ class ContractTests(unittest.TestCase):
                 validate_content(43001, body)
 
         body = request_content()
-        body["repository"]["paths"] = [".git/config", "~checkout/file"]
+        body["repository"]["paths"] = ["~checkout/file"]
         validate_content(43001, body)
-        for path in ("path/", "./path", "path/../escape"):
+        for path in (
+            "path/",
+            "./path",
+            "path/../escape",
+            ".git/config",
+            "src/.GiT/config",
+        ):
             body = request_content()
             body["repository"]["paths"] = [path]
             with self.subTest(path=path), self.assertRaises(ContractError):
@@ -405,13 +425,16 @@ class ContractTests(unittest.TestCase):
     def test_lifecycle_fork_after_terminal_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            checkout = create_checkout(root / "checkout")
             relay = LocalRelay(root / "relay.sqlite3", authority())
-            request_frozen = freeze_event(43001, REQUESTER, request_content(), CREATED)
+            request_frozen = freeze_event(
+                43001, REQUESTER, request_content(checkout=checkout), CREATED
+            )
             relay.publish(COMMUNITY, "project_channel", request_frozen, NOW)
             ledger = ExecutorLedger(root / "worker.sqlite3")
             Executor(
                 "a", WORKER_A, WORKER_A_SPONSOR, "owner-a", ledger, relay,
-                authorization_client(relay),
+                authorization_client(relay, checkout),
                 make_handler(ledger, COMMUNITY, "a", "result"),
             ).drain(COMMUNITY, "project_channel", NOW)
             request = parse_event(request_frozen)

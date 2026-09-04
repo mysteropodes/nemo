@@ -21,6 +21,7 @@ sys.path.insert(0, str(SCRIPTS))
 from a2a_contract import COMMON_FIELDS, SCHEMA_VERSION, SHAPES  # noqa: E402
 from check_cli_contract import ContractError as CliContractError  # noqa: E402
 from check_cli_contract import check_cli_contract  # noqa: E402
+from receiver_grants import GRANT_FIELDS  # noqa: E402
 from two_agent_smoke import run_smoke  # noqa: E402
 
 GOLDEN = """<!-- nemo-golden-rules:start -->
@@ -41,8 +42,10 @@ PACKAGE_REQUIRED = (
     SKILL_DIR / "references/adoption.md",
     SKILL_DIR / "references/commands.md",
     SKILL_DIR / "references/buzz-cli-contract-v1.json",
+    SKILL_DIR / "references/agent-job-grants.schema.json",
     SKILL_DIR / "references/job-envelope.schema.json",
     SKILL_DIR / "references/protocol.md",
+    SKILL_DIR / "references/receiver-grants.md",
     SKILL_DIR / "references/staging-smoke.md",
     SCRIPTS / "a2a_contract.py",
     SCRIPTS / "authorization.py",
@@ -51,6 +54,7 @@ PACKAGE_REQUIRED = (
     SCRIPTS / "executor.py",
     SCRIPTS / "local_relay.py",
     SCRIPTS / "receiver_runtime.py",
+    SCRIPTS / "receiver_grants.py",
     SCRIPTS / "two_agent_smoke.py",
     Path(__file__).resolve(),
     SKILL_DIR / "tests/test_a2a_contract.py",
@@ -126,6 +130,8 @@ def check_integrated_adoption() -> None:
     ignore = ignore_path.read_text()
     if "__pycache__/" not in ignore or "*.py[cod]" not in ignore:
         fail("integrated .gitignore lacks Python bytecode exclusions")
+    if "/.buzz/" not in ignore:
+        fail("integrated .gitignore does not protect receiver-local Buzz grants")
 
 
 def check_links_and_sources() -> None:
@@ -193,6 +199,10 @@ def check_model_security_boundary() -> None:
         "repository_announcement_event_id",
         "process-wide receiver",
         "frozen outbox",
+        "checkout_root",
+        "path_prefixes",
+        "rev-parse --show-toplevel",
+        "symbolic-ref",
     ):
         if required not in combined:
             fail(f"model/receiver security contract omits {required!r}")
@@ -235,8 +245,8 @@ def check_schema() -> None:
     if repository.get("branch") != {"$ref": "#/$defs/branch"}:
         fail("repository branch is not bound to the conservative ref schema")
     path_pattern = repository.get("paths", {}).get("items", {}).get("pattern", "")
-    if ".git" in path_pattern.lower():
-        fail("wire path schema must defer .git rejection to trusted receiver access")
+    if "[gG][iI][tT]" not in path_pattern:
+        fail("wire path schema does not reject .git case-insensitively")
     project_pattern = (
         definitions.get("project", {}).get("properties", {}).get("address", {}).get("pattern")
     )
@@ -244,6 +254,35 @@ def check_schema() -> None:
         fail("project address portable identifier schema drift")
     if schema["properties"].get("operation_id") != {"$ref": "#/$defs/uuid"}:
         fail("operation UUID is not bound to the canonical non-nil schema")
+    _resolve_refs(schema, schema)
+
+
+def check_grant_schema() -> None:
+    schema_path = SKILL_DIR / "references/agent-job-grants.schema.json"
+    try:
+        schema = json.loads(schema_path.read_text(), object_pairs_hook=_unique)
+    except (ValueError, json.JSONDecodeError) as error:
+        fail(f"invalid or duplicate-key receiver grant schema JSON: {error}")
+    if set(schema.get("required", [])) != {"version", "grants"}:
+        fail("receiver grant document fields drifted")
+    grant = schema.get("$defs", {}).get("grant", {})
+    required = set(grant.get("required", []))
+    properties = grant.get("properties", {})
+    if required != GRANT_FIELDS or set(properties) != GRANT_FIELDS:
+        fail("receiver grant fields drifted from the runtime parser")
+    if properties.get("path_prefixes", {}).get("minItems") != 1:
+        fail("receiver path_prefixes must be required and nonempty")
+    for scalar in ("base_sha", "branch", "worktree_id", "checkout_root"):
+        if scalar not in required or properties.get(scalar, {}).get("type") == "array":
+            fail(f"receiver grant {scalar} must be a required scalar")
+    checkout_pattern = properties.get("checkout_root", {}).get("pattern", "")
+    if not checkout_pattern.startswith("^(?:/"):
+        fail("receiver checkout_root is not constrained to an absolute native path")
+    path_pattern = (
+        schema.get("$defs", {}).get("repositoryPath", {}).get("pattern", "")
+    )
+    if "[gG][iI][tT]" not in path_pattern:
+        fail("receiver path schema does not reject .git case-insensitively")
     _resolve_refs(schema, schema)
 
 
@@ -313,6 +352,7 @@ def main() -> int:
     check_links_and_sources()
     check_model_security_boundary()
     check_schema()
+    check_grant_schema()
     check_cli(args.buzz_bin, args.buzz_repo)
     check_tests()
     check_smokes()
@@ -321,7 +361,7 @@ def main() -> int:
         "protocol": "NEMO-A2A-1",
         "skill_version": "1.0.0",
         "mode": "package-only" if args.package_only else "integrated",
-        "checks": ["adoption", "golden-block", "links", "schema", "cli-contract", "model-security-boundary", "receiver-authorization", "source-bounds", "unit-tests", "result-smoke", "handoff-smoke"],
+        "checks": ["adoption", "golden-block", "links", "schema", "receiver-grant-schema", "cli-contract", "model-security-boundary", "receiver-authorization", "live-checkout", "source-bounds", "unit-tests", "result-smoke", "handoff-smoke"],
     }, sort_keys=True))
     return 0
 

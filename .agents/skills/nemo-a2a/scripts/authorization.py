@@ -14,18 +14,17 @@ import json
 import re
 import uuid
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from a2a_contract import (
     ContractError,
-    canonical_json,
     expiry,
     github_slug,
     parse_event,
     semantic_digest,
 )
+from receiver_grants import ReceiverGrant, authorize_receiver_request
 
 if TYPE_CHECKING:
     from local_relay import LocalRelay
@@ -212,103 +211,16 @@ def validate_response(
     return response
 
 
-def _within(path: str, prefix: str) -> bool:
-    path, prefix = path.rstrip("/"), prefix.rstrip("/")
-    return prefix == "." or path == prefix or path.startswith(prefix + "/")
-
-
 @dataclass(frozen=True)
-class ReceiverGrant:
-    """Receiver-local authority; it is never serialized into a signed job."""
+class AuthorityBindings:
+    """Expected relay-derived evidence kept separate from local checkout grants."""
 
-    project_address: str
-    home_channel: str
-    repository_canonical: str
-    base_sha: str
-    branch: str
-    worktree_id: str
-    capability: str
-    path_prefixes: tuple[str, ...]
-    requester_pubkeys: tuple[str, ...]
     recipient_pubkey: str
-    checkout_root: str
     requester_owner_pubkey: str
     recipient_owner_pubkey: str
     project_head_event_id: str
     repository_coordinate: str
     repository_announcement_event_id: str
-
-    @property
-    def grant_digest(self) -> str:
-        return hashlib.sha256(
-            canonical_json(
-                {
-                    "project_address": self.project_address,
-                    "home_channel": self.home_channel,
-                    "repository_canonical": self.repository_canonical,
-                    "base_sha": self.base_sha,
-                    "branch": self.branch,
-                    "worktree_id": self.worktree_id,
-                    "capability": self.capability,
-                    "path_prefixes": list(self.path_prefixes),
-                    "requester_pubkeys": list(self.requester_pubkeys),
-                    "recipient_pubkey": self.recipient_pubkey,
-                    "checkout_root": self.checkout_root,
-                    "requester_owner_pubkey": self.requester_owner_pubkey,
-                    "recipient_owner_pubkey": self.recipient_owner_pubkey,
-                    "project_head_event_id": self.project_head_event_id,
-                    "repository_coordinate": self.repository_coordinate,
-                    "repository_announcement_event_id": self.repository_announcement_event_id,
-                }
-            ).encode()
-        ).hexdigest()
-
-    def check(self, event: dict[str, object], response: dict[str, object]) -> None:
-        body = event["content_object"]
-        repository = body["repository"]
-        configured_checkout = Path(self.checkout_root)
-        checkout_valid = configured_checkout.is_absolute() and configured_checkout.exists()
-        checkout = (
-            configured_checkout.resolve(strict=True)
-            if checkout_valid
-            else configured_checkout
-        )
-        if (
-            body["project"]["address"] != self.project_address
-            or body["project"]["home_channel"] != self.home_channel
-            or repository["canonical"] != self.repository_canonical
-            or repository["base_sha"] != self.base_sha
-            or repository["branch"] != self.branch
-            or repository["worktree_id"] != self.worktree_id
-            or body["capability"] != self.capability
-            or body["sender_pubkey"] not in self.requester_pubkeys
-            or body["recipient_pubkey"] != self.recipient_pubkey
-            or not checkout_valid
-            or any(
-                not any(_within(path, prefix) for prefix in self.path_prefixes)
-                or not _inside_checkout(checkout, path)
-                for path in repository["paths"]
-            )
-        ):
-            raise ContractError("request is outside the receiver-local project/capability/path grant")
-        expected = {
-            "requester_owner_pubkey": self.requester_owner_pubkey,
-            "recipient_owner_pubkey": self.recipient_owner_pubkey,
-            "project_head_event_id": self.project_head_event_id,
-            "repository_coordinate": self.repository_coordinate,
-            "repository_announcement_event_id": self.repository_announcement_event_id,
-        }
-        if any(response[field] != value for field, value in expected.items()):
-            raise ContractError("authorization evidence does not match the receiver-local grant")
-
-
-def _inside_checkout(checkout: Path, repo_relative: str) -> bool:
-    path = PurePosixPath(repo_relative)
-    try:
-        checkout.joinpath(*path.parts).resolve(strict=False).relative_to(checkout)
-    except ValueError:
-        return False
-    return True
 
 
 class LocalAuthorizationService:
@@ -413,13 +325,16 @@ class LocalAuthorizationClient:
         self,
         service: LocalAuthorizationService,
         endpoint: str,
-        grant: ReceiverGrant,
+        grant: ReceiverGrant | tuple[ReceiverGrant, ...],
+        authority: AuthorityBindings,
         *,
         dev_mode: bool = False,
     ) -> None:
         self.service = service
         self.relay_host = validate_authorization_endpoint(endpoint, dev_mode)
-        self.grant = grant
+        self.grants = (grant,) if isinstance(grant, ReceiverGrant) else grant
+        self.grant = self.grants[0] if len(self.grants) == 1 else None
+        self.authority = authority
 
     def preflight(
         self,
@@ -428,6 +343,8 @@ class LocalAuthorizationClient:
         route: str,
     ) -> dict[str, str]:
         body = event["content_object"]
+        if body["recipient_pubkey"] != self.authority.recipient_pubkey:
+            raise ContractError("request recipient does not match receiver authority")
         nonce = str(uuid.uuid4())
         payload = {
             "schema_version": AUTH_SCHEMA_VERSION,
@@ -451,9 +368,19 @@ class LocalAuthorizationClient:
             route=route,
         )
         validate_response(response, payload, now)
-        self.grant.check(event, response)
+        expected = {
+            "requester_owner_pubkey": self.authority.requester_owner_pubkey,
+            "recipient_owner_pubkey": self.authority.recipient_owner_pubkey,
+            "project_head_event_id": self.authority.project_head_event_id,
+            "repository_coordinate": self.authority.repository_coordinate,
+            "repository_announcement_event_id": self.authority.repository_announcement_event_id,
+        }
+        if any(response[field] != value for field, value in expected.items()):
+            raise ContractError("authorization evidence does not match receiver authority")
+        grant, checkout = authorize_receiver_request(self.grants, event)
         return {
             "authorization_id": response["authorization_id"],
             "authorization_expires_at": response["expires_at"],
-            "grant_digest": self.grant.grant_digest,
+            "grant_digest": grant.grant_digest,
+            "checkout_root": str(checkout),
         }

@@ -294,8 +294,8 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 8192,
-            "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*//)(?!.*\\s$)(?!\\s).+$",
-            "description": "Wire paths are normalized repo-relative names. Trusted receivers additionally reject .git and symlink escape before access."
+            "pattern": "^(?![.][gG][iI][tT](?:/|$))(?!.*\\/[.][gG][iI][tT](?:/|$))(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)(?!.*//)(?!.*\\s$)(?!\\s).+$",
+            "description": "Wire paths are normalized repo-relative names, reject .git case-insensitively, and are checked again for symlink escape before receiver access."
           }
         },
         "contracts": {
