@@ -47,6 +47,17 @@ permissive and all redistributable inside a GPL-3.0-or-later work.
 Both `Cargo.toml` files declare `license = "GPL-3.0-or-later"` so tooling reports
 Nemo's own crates correctly instead of `N/A`.
 
+## GitHub to Buzz bridge dependencies (2026-09-03)
+
+The separately deployed `worker-github-buzz` Worker uses `nostr-tools` 2.25.1
+(Unlicense) to construct and verify signed Nostr events. Its locked runtime
+dependency set is `nostr-wasm` 0.1.0, `@scure/base` 2.0.0, `@scure/bip32`
+2.0.1, `@scure/bip39` 2.0.1, `@noble/curves` 2.0.1, `@noble/hashes` 2.0.1,
+and `@noble/ciphers` 2.1.1; all are MIT licensed. These permissive licenses are
+compatible with Nemo's GPL-3.0-or-later distribution. Wrangler is a development
+and deployment dependency under MIT OR Apache-2.0 and is not bundled into the
+deployed Worker.
+
 ## Removed during this audit
 
 | Component | Where | Why removed |

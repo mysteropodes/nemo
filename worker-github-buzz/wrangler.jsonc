@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "nemo-github-buzz-bridge",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-01",
+  "vars": {
+    "GITHUB_REPOSITORY": "mysteropodes/nemo"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "DELIVERY_LEDGER",
+        "class_name": "GitHubBuzzDeliveryLedger"
+      }
+    ]
+  },
+  "exports": {
+    "GitHubBuzzDeliveryLedger": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "nemo-github-buzz-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "check": "npm test && wrangler deploy --dry-run --outdir .wrangler/dry-run"
+  },
+  "dependencies": {
+    "nostr-tools": "2.25.1"
+  },
+  "devDependencies": {
+    "wrangler": "4.129.0"
+  }
+}

@@ -1,0 +1,36 @@
+name: Deploy GitHub to Buzz bridge
+
+# Runtime secrets are provisioned directly on the Worker. This workflow only
+# carries the Cloudflare deployment credentials already used by Nemo's other
+# Worker deployments. It cannot create or modify a GitHub webhook.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'worker-github-buzz/**'
+      - '.github/workflows/deploy-github-buzz-bridge.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker-github-buzz
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: worker-github-buzz/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - name: Publish to Cloudflare Workers
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy

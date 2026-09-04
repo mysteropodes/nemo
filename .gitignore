@@ -49,6 +49,7 @@ vectorize-wasm/target/
 /CODEX_HANDOFF.md
 
 .wrangler/
+.wrangler-dry-run/
 
 # Worktrees created by Claude Code background tasks — local scratch, never committed.
 .claude/worktrees/
