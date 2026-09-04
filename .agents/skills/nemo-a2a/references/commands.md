@@ -7,6 +7,13 @@ Project/repository/capability/path grants and retain all signing material. They 
 event signer, generic signing proxy, private-key parameter, or inbound worker lifecycle tool;
 ACP alone publishes processed/accepted/progress/result receipts.
 
+The trusted surface is also session-shaped. `buzz_chat_send` is fixed to the current
+conversation. `buzz_a2a_dispatch` and the broad `buzz_a2a_inbox` are available only to a
+conversation/coordinator session. A one-shot Job session returns only its exact outcome JSON;
+it may inspect its exact request with `buzz_a2a_status`, transfer it with
+`buzz_a2a_handoff`, or use native subagents for local fan-out. It cannot send chat, start an
+unrelated A2A operation, or enumerate sibling jobs in v1.
+
 The unrestricted Buzz CLI owns transport, signing, event verification, subscriptions, and
 receipt storage, but it is a human operator/debug surface. Managed agents do not invoke the
 Buzz executable through a shell and never request its signing, authentication, or job-control

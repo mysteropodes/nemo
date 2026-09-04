@@ -12,6 +12,15 @@ publication belongs to ACP, not to a worker lifecycle tool. Nemo's product Rust 
 a separate product integration derived from shared application capabilities; it must not
 become another copy of this development protocol.
 
+Trusted MCP authority is fixed when ACP creates the provider session. A conversation session
+may send chat in that exact conversation and dispatch or enumerate work within its local
+grants. A one-shot Job session is additionally bound to its operation and request: it may
+read that lifecycle, request its cancellation or handoff when the actor rules permit, and
+return only the exact outcome JSON consumed by ACP. It cannot send chat, dispatch an unrelated
+operation, or enumerate sibling jobs in v1. Use the provider's native subagents for bounded
+local fan-out. Nested A2A delegation requires a future signed parent/child protocol contract;
+local grant overlap alone is not enough authority.
+
 The transport-authenticated event author and tags are authoritative. Content identity fields
 exist for audit and must match them. NIP-AA/NIP-OA sponsorship proves who sponsors an agent;
 it does not convey membership, channels, relay roles, GitHub permissions, path grants, or a

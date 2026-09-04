@@ -28,7 +28,12 @@ through Nemo's product Rust MCP.
    normal channel replies and the typed `buzz_a2a_dispatch`, `buzz_a2a_inbox`,
    `buzz_a2a_status`, `buzz_a2a_cancel`, and `buzz_a2a_handoff` MCP tools for coordination.
    The tools enforce the session's trusted identity, channel, Project, repository, peer,
-   capability, path, branch, and worktree grants.
+   capability, path, branch, and worktree grants. `buzz_chat_send` replies only to the
+   current fixed conversation. Start direct agent work with `buzz_a2a_dispatch` from a
+   conversation/coordinator session. A one-shot Job session returns only its exact outcome
+   JSON; it cannot call chat, dispatch another A2A job, or read the broad inbox in v1. Use
+   native subagents for bounded local fan-out, `buzz_a2a_status` for the bound request, and
+   `buzz_a2a_handoff` to transfer ownership.
 2. Pin the request to one Buzz community, Project address/home channel, canonical GitHub
    repository, base SHA, branch, logical worktree name, repository-relative path scope,
    acceptance checks, exact recipient, and expiry.
