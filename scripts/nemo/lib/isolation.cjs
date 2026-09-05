@@ -13,6 +13,7 @@ const os = require('node:os');
 const net = require('node:net');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { isDeepStrictEqual } = require('node:util');
 const { exists, nowIso } = require('./util.cjs');
 const identity = require('./identity.cjs'); // property access below (identity.sourceIdentity()),
 // deliberately not destructured, so tests can substitute identity.sourceIdentity without editing this file.
@@ -28,12 +29,62 @@ const SLOTS_DIR = path.join(RUNTIME_ROOT, 'slots');
 // (1420) and anything Tauri/vite pick by default; arbitrary otherwise.
 const PORT_RANGE = { start: 41000, end: 45000 };
 
-function sanitize(id) {
-  return String(id).replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 120) || 'task';
+function validId(id) {
+  if (typeof id !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/.test(id)) {
+    throw new Error('invalid task/slot id: use 1-120 ASCII letters, digits, dot, underscore or hyphen, starting with a letter or digit');
+  }
+  return id;
+}
+
+// Preserve exact spelling on case-insensitive filesystems; never truncate entropy
+// or normalize two user IDs into the same name. Resource namespaces stay separate.
+function idKey(id) {
+  validId(id);
+  return crypto.createHash('sha256').update(id).digest('hex');
 }
 
 function safeSourceIdentity() {
-  try { return identity.sourceIdentity(); } catch { return {}; }
+  try { return identity.sourceIdentity(); } catch { return null; }
+}
+
+function completeSource(src) {
+  return src && typeof src.head === 'string' && !!src.head &&
+    typeof src.worktree === 'string' && !!src.worktree &&
+    typeof src.branch === 'string' && typeof src.dirty === 'boolean' &&
+    Object.hasOwn(src, 'dirtyDigest') && (!src.dirty || typeof src.dirtyDigest === 'string');
+}
+
+// Serialize all mutations of one resource, including stale-holder reclamation.
+// Guards are NEVER stolen automatically: a crash during mutation requires explicit
+// reconciliation. That fail-closed choice avoids deleting a successor's live lock.
+function mutate(kind, id, action) {
+  const dir = path.join(RUNTIME_ROOT, 'mutations');
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const guard = path.join(dir, `${kind}-${idKey(id)}`);
+  try { fs.mkdirSync(guard, { mode: 0o700 }); }
+  catch (err) {
+    if (err.code !== 'EEXIST') throw err;
+    const busy = new Error('resource mutation busy or interrupted; retry later or reconcile the guard');
+    busy.code = 'EBUSY';
+    throw busy;
+  }
+  try {
+    fs.writeFileSync(path.join(guard, 'owner.json'), JSON.stringify({ pid: process.pid, startedAt: nowIso() }), { mode: 0o600 });
+    return action();
+  } finally { fs.rmSync(guard, { recursive: true, force: true }); }
+}
+
+function writeRecord(file, record) {
+  const temporary = `${file}.${crypto.randomBytes(16).toString('hex')}.tmp`;
+  try {
+    fs.writeFileSync(temporary, JSON.stringify(record, null, 2), { flag: 'wx', mode: 0o600 });
+    fs.renameSync(temporary, file);
+  } finally { fs.rmSync(temporary, { force: true }); }
+}
+
+function validPid(pid) {
+  if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error('pid must be a positive integer');
+  return pid;
 }
 
 function safeReadJson(file) {
@@ -47,17 +98,17 @@ function safeReadJson(file) {
 // default; an explicit id is for a caller (e.g. a wrapper script) that wants
 // a stable, human-legible name across a task's lifetime.
 function resolveTaskId(explicit) {
-  if (explicit) return sanitize(explicit);
-  if (process.env.NEMO_TASK_ID) return sanitize(process.env.NEMO_TASK_ID);
+  if (explicit != null) return validId(explicit);
+  if (process.env.NEMO_TASK_ID != null) return validId(process.env.NEMO_TASK_ID);
   const src = safeSourceIdentity();
-  const worktree = src.worktree ? path.basename(src.worktree) : 'worktree';
+  const worktree = src && src.worktree ? path.basename(src.worktree).replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40) : 'worktree';
   const stamp = Date.now().toString(36);
   const rand = crypto.randomBytes(3).toString('hex');
-  return sanitize(`${worktree}-${process.pid}-${stamp}-${rand}`);
+  return validId(`task-${worktree}-${process.pid}-${stamp}-${rand}`);
 }
 
 function taskRoot(taskId) {
-  return path.join(RUNTIME_ROOT, sanitize(taskId));
+  return path.join(RUNTIME_ROOT, 'tasks', idKey(taskId));
 }
 
 // Every mutable root a task needs, created up front. `reports` is meant to be
@@ -130,126 +181,138 @@ function reservePort(taskId, opts = {}) {
   });
 }
 
-// ---- owner/source handshake --------------------------------------------
-// registerLauncher() is called by the process that "owns" a task instance
-// (a dev server, a spawned test runner, a sidecar). It records who it is
-// (pid + an unguessable owner token) and what it is (source identity from
-// R02's identity.cjs, read-only), so a caller can check both "is this the
-// process I started" and "is this the code I think it is" before trusting
-// or stopping it.
+// ---- local launcher ownership/source record -------------------------------
+// This is cooperative local process bookkeeping, not a challenge/response from
+// a running HTTP server. A launcher integration must still verify the served URL.
 function launcherFile(root) { return path.join(root, 'launcher.json'); }
 
 function registerLauncher(taskId, opts = {}) {
-  const { root } = taskRoots(taskId);
-  const ownerToken = opts.ownerToken || crypto.randomBytes(16).toString('hex');
-  const pid = opts.pid != null ? opts.pid : process.pid;
+  validId(taskId);
+  const pid = validPid(opts.pid != null ? opts.pid : process.pid);
+  if (!pidAlive(pid)) throw new Error('cannot register a launcher that is not running');
   const src = safeSourceIdentity();
-  const record = {
-    taskId,
-    pid,
-    ownerToken,
-    source: { head: src.head || null, branch: src.branch || null, dirty: !!src.dirty, dirtyDigest: src.dirtyDigest || null },
-    label: opts.label || null,
-    startedAt: nowIso(),
-  };
-  fs.writeFileSync(launcherFile(root), JSON.stringify(record, null, 2));
-  return record;
+  if (!completeSource(src)) throw new Error('source identity unavailable; launcher not registered');
+  return mutate('task', taskId, () => {
+    const { root } = taskRoots(taskId);
+    if (exists(launcherFile(root))) throw new Error('task already registered; stop/release its existing owner before reuse');
+    const record = {
+      taskId, pid, ownerToken: opts.ownerToken || crypto.randomBytes(16).toString('hex'),
+      source: src, label: opts.label || null, startedAt: nowIso(),
+    };
+    writeRecord(launcherFile(root), record);
+    return record;
+  });
 }
 
 function readLauncher(taskId) {
-  const file = launcherFile(taskRoot(taskId));
-  return exists(file) ? safeReadJson(file) : null;
+  return safeReadJson(launcherFile(taskRoot(taskId)));
 }
 
 function pidAlive(pid) {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return false;
   try { process.kill(pid, 0); return true; } catch (err) { return err.code === 'EPERM'; }
 }
 
-// ok only if: a launcher record exists, its pid is still running, the
-// caller's owner token matches (when supplied), and — with checkSource —
-// the source identity observed right now still matches what the launcher
-// recorded at start, catching a task id reused against a moved checkout.
 function verifyHandshake(taskId, opts = {}) {
   const rec = readLauncher(taskId);
   if (!rec) return { ok: false, reason: 'no launcher record for task' };
   if (!pidAlive(rec.pid)) return { ok: false, reason: `launcher pid ${rec.pid} is not running` };
-  if (opts.ownerToken != null && opts.ownerToken !== rec.ownerToken) return { ok: false, reason: 'owner token mismatch' };
+  if (!opts.ownerToken || opts.ownerToken !== rec.ownerToken) return { ok: false, reason: 'owner token mismatch' };
   if (opts.checkSource) {
     const now = safeSourceIdentity();
-    if (rec.source.head && now.head && rec.source.head !== now.head) {
-      return { ok: false, reason: `source moved: launcher started at ${rec.source.head}, now at ${now.head}` };
-    }
+    if (!completeSource(rec.source) || !completeSource(now)) return { ok: false, reason: 'source identity unavailable' };
+    if (!isDeepStrictEqual(rec.source, now)) return { ok: false, reason: 'source moved: recorded source identity differs from current checkout' };
   }
-  return { ok: true, reason: 'launcher alive and matches', launcher: rec };
+  return { ok: true, reason: 'local launcher record matches; served endpoint not verified', launcher: rec };
 }
 
-// Only the holder of the correct owner token may stop a task's launcher.
-// Everyone else gets a named refusal, never a silent no-op.
-function requestStop(taskId, ownerToken, opts = {}) {
-  const rec = readLauncher(taskId);
-  if (!rec) return { stopped: false, reason: 'no launcher record for task' };
-  if (ownerToken !== rec.ownerToken) return { stopped: false, reason: 'refused: caller is not the task owner (owner token mismatch)' };
-  if (!pidAlive(rec.pid)) {
-    cleanupLauncher(taskId);
-    return { stopped: true, reason: 'already exited', pid: rec.pid };
+// Await actual exit. A refused/ignored signal retains the record and owner token
+// so the owner can retry. Never equate sending a signal with completing stop.
+async function requestStop(taskId, ownerToken, opts = {}) {
+  const signal = opts.signal || 'SIGTERM';
+  const timeoutMs = opts.timeoutMs ?? 3000;
+  if (!['SIGTERM', 'SIGINT', 'SIGKILL'].includes(signal) || !Number.isFinite(timeoutMs) || timeoutMs < 0 || timeoutMs > 60000) {
+    return { stopped: false, reason: 'invalid termination signal or timeout' };
   }
+  let rec;
   try {
-    process.kill(rec.pid, opts.signal || 'SIGTERM');
-  } catch (err) {
-    return { stopped: false, reason: `kill failed: ${err.code || err.message}` };
-  }
-  cleanupLauncher(taskId);
-  return { stopped: true, reason: 'signaled', pid: rec.pid };
+    const refused = mutate('task', taskId, () => {
+      rec = readLauncher(taskId);
+      if (!rec) return { stopped: false, reason: 'no launcher record for task' };
+      if (!ownerToken || ownerToken !== rec.ownerToken) return { stopped: false, reason: 'refused: caller is not the task owner (owner token mismatch)' };
+      validPid(rec.pid);
+      if (pidAlive(rec.pid)) process.kill(rec.pid, signal);
+      return null;
+    });
+    if (refused) return refused;
+  } catch (err) { return { stopped: false, reason: err.message }; }
+  const deadline = Date.now() + timeoutMs;
+  while (pidAlive(rec.pid) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));
+  if (pidAlive(rec.pid)) return { stopped: false, signaled: true, reason: 'termination unconfirmed; owner record retained', pid: rec.pid };
+  try {
+    mutate('task', taskId, () => {
+      const current = readLauncher(taskId);
+      if (current && current.ownerToken === rec.ownerToken && current.pid === rec.pid) {
+        fs.unlinkSync(launcherFile(taskRoot(taskId)));
+      }
+    });
+  } catch (err) { return { stopped: true, reason: 'exited; owner record cleanup pending: ' + err.message, pid: rec.pid }; }
+  return { stopped: true, reason: 'exit confirmed', pid: rec.pid };
 }
 
-function cleanupLauncher(taskId) {
-  try { fs.unlinkSync(launcherFile(taskRoot(taskId))); } catch { /* already gone */ }
-}
-
-function releaseTask(taskId) {
-  fs.rmSync(taskRoot(taskId), { recursive: true, force: true });
+function releaseTask(taskId, ownerToken) {
+  return mutate('task', taskId, () => {
+    const file = launcherFile(taskRoot(taskId));
+    const rec = readLauncher(taskId);
+    if (exists(file) && !rec) return { released: false, reason: 'unreadable launcher record; reconcile before release' };
+    if (rec && (!ownerToken || ownerToken !== rec.ownerToken)) return { released: false, reason: 'refused: caller is not the task owner' };
+    if (rec && pidAlive(rec.pid)) return { released: false, reason: 'launcher still running; stop it before release' };
+    fs.rmSync(taskRoot(taskId), { recursive: true, force: true });
+    return { released: true, taskId };
+  });
 }
 
 // ---- exclusive slots ----------------------------------------------------
-// Generic mutual-exclusion primitive for a resource that isn't per-task by
-// nature — a shared physical desktop input, a GPU reference-benchmark slot.
-// Acquisition uses O_EXCL ('wx'): the filesystem itself refuses a second
-// create while the lock file exists, so this doesn't depend on us getting a
-// check-then-write race right. A lock left behind by a dead process is
-// reclaimed automatically (never by a live one, even if it's a different
-// task) so a crashed holder can't wedge the slot forever.
-function slotFile(slot) { return path.join(SLOTS_DIR, `${sanitize(slot)}.lock`); }
+function slotFile(slot) { return path.join(SLOTS_DIR, `${idKey(slot)}.lock`); }
 
 function acquireExclusiveSlot(slot, taskId, opts = {}) {
-  fs.mkdirSync(SLOTS_DIR, { recursive: true });
-  const file = slotFile(slot);
-  const ownerToken = opts.ownerToken || crypto.randomBytes(16).toString('hex');
-  const pid = opts.pid != null ? opts.pid : process.pid;
-  const record = { slot, taskId, pid, ownerToken, acquiredAt: nowIso() };
-  let fd;
+  validId(slot); validId(taskId);
+  const pid = validPid(opts.pid != null ? opts.pid : process.pid);
+  if (!pidAlive(pid)) throw new Error('cannot acquire a slot for a process that is not running');
   try {
-    fd = fs.openSync(file, 'wx');
+    return mutate('slot', slot, () => {
+      fs.mkdirSync(SLOTS_DIR, { recursive: true, mode: 0o700 });
+      const file = slotFile(slot);
+      const holder = safeReadJson(file);
+      if (exists(file) && (!holder || !Number.isSafeInteger(holder.pid) || holder.pid <= 0)) {
+        return { acquired: false, reason: 'unreadable slot record; reconcile before reuse' };
+      }
+      if (holder && pidAlive(holder.pid)) return { acquired: false, reason: 'slot held by another task', holder };
+      // Replacement is safe only inside the same guard used by every acquire/release.
+      const ownerToken = opts.ownerToken || crypto.randomBytes(16).toString('hex');
+      writeRecord(file, { slot, taskId, pid, ownerToken, acquiredAt: nowIso() });
+      return { acquired: true, ownerToken, taskId, slot, file, release: () => releaseExclusiveSlot(slot, ownerToken) };
+    });
   } catch (err) {
-    if (err.code !== 'EEXIST') throw err;
-    const holder = safeReadJson(file);
-    if (holder && !pidAlive(holder.pid)) {
-      fs.rmSync(file, { force: true }); // stale lock from a dead process
-      return acquireExclusiveSlot(slot, taskId, opts);
-    }
-    return { acquired: false, reason: 'slot held by another task', holder };
+    if (err.code === 'EBUSY') return { acquired: false, reason: err.message };
+    throw err;
   }
-  fs.writeSync(fd, JSON.stringify(record, null, 2));
-  fs.closeSync(fd);
-  return { acquired: true, ownerToken, taskId, slot, file, release: () => releaseExclusiveSlot(slot, ownerToken) };
 }
 
 function releaseExclusiveSlot(slot, ownerToken) {
-  const file = slotFile(slot);
-  const holder = safeReadJson(file);
-  if (!holder) return { released: false, reason: 'slot not held' };
-  if (holder.ownerToken !== ownerToken) return { released: false, reason: 'refused: caller is not the slot owner' };
-  fs.rmSync(file, { force: true });
-  return { released: true };
+  try {
+    return mutate('slot', slot, () => {
+      const file = slotFile(slot);
+      const holder = safeReadJson(file);
+      if (!holder) return { released: false, reason: 'slot not held or record unreadable' };
+      if (!ownerToken || holder.ownerToken !== ownerToken) return { released: false, reason: 'refused: caller is not the slot owner' };
+      fs.unlinkSync(file);
+      return { released: true };
+    });
+  } catch (err) {
+    if (err.code === 'EBUSY') return { released: false, reason: err.message };
+    throw err;
+  }
 }
 
 module.exports = {

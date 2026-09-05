@@ -35,9 +35,9 @@ function usage() {
     'commands:',
     '  alloc     [--task ID] [--label TEXT] [--pid N] [--port]   allocate roots (+ launcher, + a port if --port)',
     '  roots     --task ID                                       print the root paths for an existing/new task id',
-    '  handshake --task ID [--owner TOKEN] [--check-source]      verify a launcher is alive and matches',
-    '  stop      --task ID --owner TOKEN [--signal SIG]          stop a task; refused unless --owner matches',
-    '  release   --task ID [--owner TOKEN]                       remove a task\'s roots (refused if a live launcher has a different owner)',
+    '  handshake --task ID --owner TOKEN [--check-source]      verify a launcher is alive and matches',
+    '  stop      --task ID --owner TOKEN [--signal SIG] [--timeout-ms N] stop a task; refused unless --owner matches',
+    '  release   --task ID [--owner TOKEN]                       remove task roots only after exit; existing records require their owner',
     '  slot-acquire --slot NAME --task ID [--pid N]              acquire a named exclusive slot (desktop input, GPU bench, ...)',
     '  slot-release --slot NAME --owner TOKEN                    release a named exclusive slot',
   ].join('\n'));
@@ -95,20 +95,16 @@ async function main() {
 
   if (cmd === 'stop') {
     if (!args.task || !args.owner) { console.error('stop: --task and --owner are required'); process.exit(64); }
-    const result = iso.requestStop(args.task, args.owner, { signal: args.signal });
+    const result = await iso.requestStop(args.task, args.owner, { signal: args.signal, timeoutMs: args['timeout-ms'] === undefined ? undefined : Number(args['timeout-ms']) });
     printJson(result);
     process.exit(result.stopped ? 0 : 1);
   }
 
   if (cmd === 'release') {
     if (!args.task) { console.error('release: --task is required'); process.exit(64); }
-    const launcher = iso.readLauncher(args.task);
-    if (launcher && iso.pidAlive(launcher.pid) && launcher.ownerToken !== args.owner) {
-      printJson({ released: false, reason: 'refused: task has a live launcher owned by a different token; stop it first' });
-      process.exit(1);
-    }
-    iso.releaseTask(args.task);
-    printJson({ released: true, taskId: args.task });
+    const result = iso.releaseTask(args.task, args.owner);
+    printJson(result);
+    process.exit(result.released ? 0 : 1);
     return;
   }
 

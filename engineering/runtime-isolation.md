@@ -1,139 +1,115 @@
 # Task-runtime isolation (R06)
 
-Work package [R06 / #902](https://github.com/mysteropodes/nemo/issues/902):
-"Concurrent tasks cannot overwrite one another's source state, browser data,
-desktop data, ports, caches, builds, or reports." Depends on
-[R02](../scripts/nemo/README.md) for source/build identity and the receipt
-command surface.
+[R06 / #902](https://github.com/mysteropodes/nemo/issues/902) requires concurrent
+tasks to keep their source, browser/desktop state, ports, caches, builds and
+reports separate. This increment supplies a **local coordination library and
+debug CLI**, not an integrated application launcher. Full R06 acceptance remains
+open until the consumers listed below are implemented and exercised.
 
-This is a **first, reviewable increment**: a library (`scripts/nemo/lib/isolation.cjs`)
-and a debug CLI (`scripts/nemo/isolation.cjs`), with behavioral tests
-(`scripts/nemo/isolation.test.cjs`). It is intentionally scoped to what can be
-proven without editing any file outside those four — no changes to
-`package.json`, `scripts/nemo/lib/jobs.cjs`, Tauri config, R04 packaging, or
-R03 inventory. Where full isolation needs one of those, this document names
-the exact change required and leaves that part of the acceptance unmet rather
-than claiming it.
+## API and guarantees
 
-## What a "task" is here
+Use `scripts/nemo/lib/isolation.cjs` from a long-lived owning process. Its focused
+regressions live in `scripts/nemo/isolation.test.cjs`.
 
-A task instance is one invocation of work that needs its own mutable state —
-a dev server, a `verify`/`check` run, a future browser or desktop test
-harness. `resolveTaskId()` gives it an id: an explicit `--task`/`NEMO_TASK_ID`
-name if given, otherwise `<worktree>-<pid>-<timestamp>-<random>`, unique per
-process invocation with no coordination required. Two tasks started without
-talking to each other will not collide by construction.
+| Resource | Behavior |
+|---|---|
+| Task IDs and directories | Explicit IDs must contain 1–120 ASCII letters, digits, dots, underscores or hyphens, starting with a letter or digit. Invalid IDs are rejected, never silently normalized. Exact IDs map to SHA-256 directory names under `<runtime>/tasks/`, keeping case variants distinct on case-insensitive filesystems and separating task names from slot/guard namespaces. Generated IDs retain their random suffix even for long worktree names. |
+| Mutable roots | Each ID gets `tmp`, `cache`, `build`, `reports`, `browser-profile`, `tauri-data` and `ports` directories. Callers must actually configure their tools to use these paths. Reusing an explicit ID intentionally addresses the same roots. |
+| Ports | `reservePort()` holds a real TCP bind in the calling process. Simultaneous reservations cannot hold the same address/port. The caller must integrate the returned server/socket with its service; releasing it and rebinding elsewhere creates a reservation gap. |
+| Launcher ownership | `registerLauncher()` atomically refuses an already-registered task, including a stale or unreadable record. Concurrent registrations have one winner. Root release and launcher record changes use the same per-task mutation guard. |
+| Local owner/source check | `verifyHandshake()` requires the owner token and a live positive PID. With `checkSource:true`, it requires available source identity and compares the **complete R02 `sourceIdentity()` snapshot**, including HEAD, branch, worktree and dirty digest. Missing identity fails closed. |
+| Stop | `await requestStop(taskId, ownerToken, {signal, timeoutMs})` signals only an owner-matching record, then polls for exit. `stopped:true` means exit was observed. A timeout returns `stopped:false` and retains the owner record for a retry. Allowed signals are SIGTERM, SIGINT and SIGKILL; default timeout is 3 seconds, maximum 60 seconds. |
+| Root release | `releaseTask(taskId, ownerToken)` refuses a live launcher, including its owner, and refuses mismatched or unreadable records. It removes only that validated task's roots after exit. Release port reservations separately before removing their metadata. |
+| Exclusive resources | Slot acquire/release and stale-holder replacement all take the same atomic per-slot mutation guard. An ordinary record belonging to a dead PID can be replaced; two reclaimers cannot delete each other's live ownership. |
 
-## What is isolated, and how
+The default runtime root is `<os.tmpdir()>/nemo-runtime`; override it with
+`NEMO_ISOLATION_ROOT` **before importing the module**. Reports can use
+`NEMO_REPORT_DIR=taskRoots(taskId).reports`: R02's existing `receipt.cjs` and
+`jobBuildWasm()` already honor this root. No R02 files are changed here.
 
-| Resource | Mechanism | Proven by |
-|---|---|---|
-| temp / cache / build / report roots | `taskRoots(taskId)` creates `<NEMO_ISOLATION_ROOT>/<taskId>/{tmp,cache,build,reports,browser-profile,tauri-data,ports}` | `isolation.test.cjs`: two task ids produce disjoint, existing directory trees |
-| ports | `reservePort(taskId)` actually binds a TCP server; the kernel refuses a second bind on the same port (`EADDRINUSE`), so this can't be gotten wrong the way a lock-file convention could | `isolation.test.cjs`: two tasks get distinct, simultaneously-connectable ports; a same-task double reservation probes past the first; a released port becomes free again |
-| build / report roots, in practice | `taskRoots(taskId).reports` is meant to be exported as `NEMO_REPORT_DIR`, which `scripts/nemo/lib/receipt.cjs`'s `reportDir()` **already reads** (R02, unmodified), and `jobBuildWasm()` in `lib/jobs.cjs` already writes wasm build output under `ctx.reportDir/build-wasm`. So isolating reports isolates that build output too, with zero code changes to R02. | `isolation.test.cjs` calls `receipt.reportDir(receipt.create(...))` directly (R02, read-only) under two different `NEMO_REPORT_DIR` values and asserts the resulting paths are disjoint |
-| owner/source handshake | `registerLauncher(taskId, {pid, ownerToken?})` writes `launcher.json` (pid, an unguessable `ownerToken`, and the source identity from `identity.cjs` at start: head/branch/dirty). `verifyHandshake(taskId, {ownerToken, checkSource})` checks the pid is alive, the token matches, and — with `checkSource` — that HEAD hasn't moved since the launcher started. | `isolation.test.cjs`: correct token verifies; wrong token and unknown task are refused by name; a monkey-patched `identity.sourceIdentity()` proves the moved-source case is caught |
-| non-owner stop | `requestStop(taskId, ownerToken)` only signals the recorded pid if the token matches; otherwise it returns a named refusal and does nothing | `isolation.test.cjs` spawns a real child process, confirms a wrong-token stop leaves it running, and a correct-token stop actually terminates it |
-| shared exclusive resources (desktop input, GPU reference slot) | `acquireExclusiveSlot(slot, taskId)` / `releaseExclusiveSlot(slot, ownerToken)`: atomic `O_EXCL` file create, so only one task can hold a named slot at a time; a lock left by a dead process is reclaimed automatically (never a live one) | `isolation.test.cjs`: a second acquire is refused while the first holds it; a non-owner release is refused; a lock from a killed process is reclaimed |
+## Ownership limits and interrupted mutations
 
-`RUNTIME_ROOT` defaults to `<os.tmpdir()>/nemo-runtime`, not anything under
-the repo — this needs no `.gitignore` entry and needs nothing cleaned up by
-`git clean`. Override with `NEMO_ISOLATION_ROOT` (tests do this to run in a
-throwaway directory).
+These are cooperative local-process controls for tools using this library, not a
+security boundary against another process with access to the same user account.
+Owner tokens reside in local records. A live PID is not a process-birth identity;
+PID reuse and processes bypassing the library remain outside this increment's
+proof. The source comparison inherits R02's fingerprint definition, including
+its current limitation that untracked-file contents are not hashed separately.
 
-## Using it
+Despite its historical name, `verifyHandshake()` reads local launcher metadata;
+it does **not** challenge a running server or establish which checkout serves a
+URL. A real launcher still needs a served endpoint that returns its task, owner,
+source and build identity. Browser/Tauri acceptance must check that endpoint or
+equivalent process protocol before trusting the application instance.
 
-Library, from a long-lived owning process (a dev server bootstrap, a test
-runner):
+Each mutation creates an atomic directory under `<runtime>/mutations/`, with an
+`owner.json` identifying the mutating PID. Normal completion removes the guard.
+Contention returns a named busy refusal (registration/root release throw
+`EBUSY`; slot operations and stop return a refusal object). A caller may retry
+once the current operation finishes.
+
+If a process dies while holding a mutation guard, the guard is deliberately
+**not** stolen automatically. Stop dependent work, reconcile the affected
+launcher/slot and actual processes, then remove that exact abandoned guard when
+no operation can still own it. A missing `owner.json` is also an interrupted
+state requiring reconciliation. Do not delete guards based solely on age or
+rerun an indeterminate task blindly. This availability tradeoff prevents a
+stale reclaimer from deleting a successor's lock.
+
+## Use
 
 ```js
 const iso = require('./scripts/nemo/lib/isolation.cjs');
 const taskId = iso.resolveTaskId();
 const roots = iso.taskRoots(taskId);
-const port = await iso.reservePort(taskId);       // holds the bind for this process's lifetime
-const launcher = iso.registerLauncher(taskId, { label: 'dev-server' });
-process.env.NEMO_REPORT_DIR = roots.reports;       // isolates R02 receipts/build-wasm output
-// ... on shutdown: await port.release();
+const launcher = iso.registerLauncher(taskId, { label: 'test-runner' });
+process.env.NEMO_REPORT_DIR = roots.reports;
+const port = await iso.reservePort(taskId);
+// Integrate port.server with the service; release it during shutdown.
+await port.release();
 ```
 
-CLI, for debugging/scripting (see `node scripts/nemo/isolation.cjs` with no
-args for the full command list):
+From a separate controlling process, retain the returned owner token and owning
+PID. The one-shot CLI defaults `alloc` and `slot-acquire` to its parent PID;
+pass `--pid` explicitly when the actual task is a different process.
 
-```
+```sh
 node scripts/nemo/isolation.cjs alloc --task my-task --pid <owning-pid>
-node scripts/nemo/isolation.cjs handshake --task my-task --owner <token>
-node scripts/nemo/isolation.cjs stop --task my-task --owner <token>
+node scripts/nemo/isolation.cjs handshake --task my-task --owner <token> --check-source
+node scripts/nemo/isolation.cjs stop --task my-task --owner <token> --timeout-ms 3000
+node scripts/nemo/isolation.cjs release --task my-task
 ```
 
-**CLI caveat on ports:** `alloc --port` binds, records, and immediately
-releases a port from a short-lived CLI process — it tells you a port is free
-*right now*, it does not hold a standing reservation past the CLI's own exit
-(a process can't keep a socket bound after it exits). A real standing
-reservation requires calling `reservePort()` from inside the process that
-will actually use the port.
+`alloc --port` immediately releases its temporary bind before returning. It is
+a momentary availability probe, not a lasting reservation. The CLI exposes
+`slot-acquire` and `slot-release` for explicit resource coordination as well.
 
-## Verified
+## Validation and remaining integration
 
-`node --test scripts/nemo/isolation.test.cjs` — 13/13 passing, including:
+Run `node --test scripts/nemo/isolation.test.cjs`. The 20 behavioral tests cover
+two task roots and bound ports, R02 report routing, independent stop authority,
+invalid/case-sensitive IDs, long generated IDs, duplicate/concurrent launcher
+registration, full source mismatch and unavailable identity, ignored SIGTERM
+with a later successful owner retry, simultaneous stale-slot reclamation, and
+an interrupted guard refusing takeover. These exercise real spawned processes
+and sockets; they do not launch Nemo's browser or desktop application.
 
-- two full task instances allocated concurrently (roots, port, launcher) with
-  zero overlapping paths, independent owner tokens, cross-task stop attempts
-  refused, and one task's stop/release leaving the other's handshake intact;
-- a released port becoming connectable-false and then successfully reused by
-  a fresh reservation;
-- a stale exclusive-slot lock (owner process killed) being reclaimed by a new
-  task rather than wedging the slot forever.
+Still required for the full acceptance contract in
+[the parallel-work specification](remediation/07_GITHUB_PROJECT_AND_PARALLEL_WORK.md#isolation):
 
-Run against source `e1d2ea760a45d5dd2f587cc98d708326786a7d9d` on branch
-`codex/buzz-f8b4d83fa5d4` (worktree dirty from this increment's own new
-files; no tracked file was modified). Not run: native desktop or browser
-acceptance (see below — no such harness exists yet to exercise).
+- Wire these helpers into the actual launcher, including source/build endpoint
+  verification and tool environment/configuration for temp, cache and build paths.
+- Configure and exercise isolated browser profiles/origins. No browser harness is
+  integrated here; `test:browser` remains blocked in R02.
+- Configure and exercise isolated Tauri data/autosave paths. Merely creating a
+  `tauri-data` directory does not make the app use it. The platform owner must
+  implement and validate the actual runtime override; no untested Tauri launch
+  configuration is prescribed by this document.
+- Wire exclusive slots into desktop input and reference GPU benchmark consumers.
+- Isolate/serialize simultaneous desktop builds within one worktree. Separate
+  worktrees normally separate `src-tauri/target`; same-worktree builds still share it.
+- Include the focused suite in normal `npm test`, `check` or `verify` discovery.
+  The existing package test glob does not include `scripts/nemo/isolation.test.cjs`.
 
-## Explicitly not covered by this increment (blocked or deferred)
-
-Per the R06 acceptance ("browser, Tauri... state" and "GPU/desktop physical
-UI"), three rows of the isolation table in
-[07_GITHUB_PROJECT_AND_PARALLEL_WORK.md](remediation/07_GITHUB_PROJECT_AND_PARALLEL_WORK.md#isolation)
-need a change outside this increment's owned files:
-
-1. **Tauri app-data-dir isolation.** Tauri derives the OS app-data directory
-   from `identifier` in `src-tauri/tauri.conf.json`
-   (`~/Library/Application Support/<identifier>` on macOS); there is no
-   environment-variable override for it today. The Tauri v2 CLI does support
-   `-c/--config <json>` to merge extra configuration at launch, so the exact
-   integration patch is: the process that starts a task-scoped Tauri instance
-   passes `--config '{"identifier":"<base-identifier>.task-<taskId>"}'` (or
-   the packaged binary's equivalent env/arg, if the packaging owner adds one)
-   when launching `tauri dev` / the built app. `taskRoots(taskId).tauriDataDir`
-   is computed and ready to be handed to that launch step once it exists;
-   this increment does not touch `src-tauri/tauri.conf.json` or `lib.rs`
-   (out of scope: R04 packaging / Tauri config ownership). **Acceptance
-   blocked** on that patch landing.
-2. **Browser profile/context isolation.** `taskRoots(taskId).browserProfile`
-   is computed and directly usable as a Chromium/Playwright
-   `userDataDir`/persistent-context path, but there is no browser automation
-   dependency in this repo yet — `@playwright/test` is absent (`test:browser`
-   reports `blocked` in `scripts/nemo/lib/jobs.cjs`, and adding the dependency
-   is a `package.json` change owned by R03/R07, not this increment). **No
-   behavioral test exists for this row until that dependency lands.**
-3. **GPU reference-benchmark exclusivity.** `acquireExclusiveSlot()` is a
-   generic, already-tested primitive that a future GPU benchmark job could
-   call to serialize access to a shared reference machine, but no such job
-   exists yet (`npm run bench` is `not-run`, per R03/R19). The primitive is
-   ready; nothing in the codebase calls it for GPU yet, so there is no
-   consumer to integration-test against.
-
-`build:desktop` (packaged app build) writes into the worktree's own
-`src-tauri/target/<triple>/...`, which is already isolated *across*
-worktrees (each worktree/branch has its own checkout, per the parallel-work
-contract's "separate worktrees per writer" rule) — no change needed there.
-It is **not** isolated for two concurrent `build:desktop` runs *inside the
-same worktree* (they'd share one `target/` and `Cargo.lock` file lock);
-serializing that is a `cargo`/`CARGO_TARGET_DIR` concern that would touch the
-build job in `lib/jobs.cjs`, out of this increment's scope.
-
-Not wired into `npm test`, `npm run check`, or the `JOBS` registry in
-`scripts/nemo/lib/jobs.cjs` — those are all changes to files outside this
-increment's ownership (`package.json`'s `test` script only globs
-`tests/*.test.cjs`; `isolation.test.cjs` lives under `scripts/nemo/` on
-purpose, matching the path list this task packet was scoped to). Wiring it
-in is a small, mechanical follow-up for whoever owns those files.
+Those integrations require shared package/job/platform files beyond the four
+files owned by this increment. No browser, Tauri or GPU acceptance is claimed.
