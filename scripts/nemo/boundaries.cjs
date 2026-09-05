@@ -21,14 +21,24 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--json') out.json = true;
-    else if (a === '--root') out.root = argv[++i];
+    else if (a === '--root') {
+      if (!argv[i + 1] || argv[i + 1].startsWith('--')) throw new Error('--root requires a directory');
+      out.root = argv[++i];
+    } else if (a.startsWith('-')) throw new Error(`unknown option: ${a}`);
     else if (!out.profilePath) out.profilePath = a;
+    else throw new Error(`unexpected argument: ${a}`);
   }
   return out;
 }
 
 function main() {
-  const args = parseArgs(process.argv.slice(2));
+  let args;
+  try {
+    args = parseArgs(process.argv.slice(2));
+  } catch (err) {
+    console.error(`bad usage: ${err.message}`);
+    process.exit(2);
+  }
   if (!args.profilePath) {
     console.error('usage: node scripts/nemo/boundaries.cjs <profile.json> [--root <dir>] [--json]');
     process.exit(2);

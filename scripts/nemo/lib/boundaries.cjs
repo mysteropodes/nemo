@@ -25,44 +25,211 @@
 //                        the check's `now`; it stops shielding its rule and is
 //                        itself reported as a violation.
 //
-// Known limitations (v1, intentionally not solved here): import extraction is
-// regex-based (no real parser), so a specifier inside a comment or string
-// literal that happens to look like `require('x')` would be misread; bare
-// (non-relative) specifiers are treated as external and never checked. Both
-// are acceptable for a bounded, hand-authored profile and are expected to be
-// superseded once R01/R03 supply a real parsed inventory.
+// This bounded checker uses a lexical scanner, not a full JavaScript AST or
+// binding resolver. Unsupported dynamic loads fail explicitly; bare specifiers
+// and undeclared files remain outside the profile. See the README before adoption.
 
 const fs = require('node:fs');
 const path = require('node:path');
 
-const GLOBAL_SM_RE = /\bwindow\.(SM[A-Za-z0-9_]*)\b/g;
+const EXCEPTION_RULES = ['size', 'private-import', 'layer-violation', 'global-state', 'cycle'];
 
-// require('x') / require("x")
-const REQUIRE_RE = /require\(\s*(['"])([^'"]+)\1\s*\)/g;
-// import ... from 'x' (also matches multi-line named imports)
-const IMPORT_FROM_RE = /\bimport\s+[^'";]*?\sfrom\s+(['"])([^'"]+)\1/g;
-// import 'x' (side-effect only)
-const IMPORT_BARE_RE = /\bimport\s+(['"])([^'"]+)\1/g;
-// export ... from 'x'
-const EXPORT_FROM_RE = /\bexport\s+[^'";]*?\sfrom\s+(['"])([^'"]+)\1/g;
-// dynamic import('x')
-const DYNAMIC_IMPORT_RE = /\bimport\(\s*(['"])([^'"]+)\1\s*\)/g;
-
-function lineAt(text, index) {
-  let line = 1;
-  for (let i = 0; i < index && i < text.length; i++) if (text.charCodeAt(i) === 10) line++;
-  return line;
+/** Reject malformed policy before looking at source; comparisons must never see NaN/undefined. */
+function validateProfile(profile) {
+  const fail = (message) => { throw new Error(`invalid profile: ${message}`); };
+  const object = (value, keys, label) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`${label} must be an object`);
+    for (const key of Object.keys(value)) if (!keys.includes(key)) fail(`${label}: unknown field ${key}`);
+  };
+  const text = (value, label) => { if (typeof value !== 'string' || !value.trim()) fail(`${label} must be a nonempty string`); };
+  const list = (value, label) => {
+    if (!Array.isArray(value)) fail(`${label} must be an array`);
+    for (const item of value) text(item, label);
+    if (new Set(value).size !== value.length) fail(`${label} contains duplicates`);
+  };
+  const relative = (value, label, allowDot = false) => {
+    text(value, label);
+    if (allowDot && value === '.') return;
+    if (value.includes('\\') || path.posix.isAbsolute(value) || value.split('/').some((x) => !x || x === '.' || x === '..')) fail(`${label} must be a normalized relative path`);
+  };
+  const integer = (value, label) => { if (!Number.isSafeInteger(value) || value < 0) fail(`${label} must be a finite nonnegative integer`); };
+  object(profile, ['modules', 'sizeProfiles', 'layerRules', 'exceptions'], 'profile');
+  if (!Array.isArray(profile.modules) || !profile.modules.length) fail('modules must be a nonempty array');
+  if (!profile.sizeProfiles || typeof profile.sizeProfiles !== 'object' || Array.isArray(profile.sizeProfiles)) fail('sizeProfiles must be an object');
+  for (const [name, limits] of Object.entries(profile.sizeProfiles)) {
+    text(name, 'sizeProfile name');
+    object(limits, ['warn', 'hardMax'], `sizeProfiles.${name}`);
+    integer(limits.warn, `${name}.warn`); integer(limits.hardMax, `${name}.hardMax`);
+    if (limits.warn > limits.hardMax) fail(`${name}.warn exceeds hardMax`);
+  }
+  const ids = new Set(), files = new Map();
+  for (const m of profile.modules) {
+    object(m, ['id', 'layer', 'dir', 'files', 'publicApi', 'sizeProfile'], 'module');
+    text(m.id, 'module.id'); text(m.layer, 'module.layer'); text(m.sizeProfile, 'module.sizeProfile');
+    if (ids.has(m.id)) fail(`duplicate module id ${m.id}`);
+    ids.add(m.id);
+    relative(m.dir, `${m.id}.dir`, true);
+    list(m.files, `${m.id}.files`); list(m.publicApi, `${m.id}.publicApi`);
+    if (!m.files.length) fail(`${m.id}.files must not be empty`);
+    if (!Object.hasOwn(profile.sizeProfiles, m.sizeProfile)) fail(`unknown sizeProfile ${m.sizeProfile}`);
+    for (const f of m.files) {
+      relative(f, `${m.id}.files`);
+      const rel = path.posix.join(m.dir, f);
+      if (files.has(rel)) fail(`file ${rel} belongs to multiple modules`);
+      files.set(rel, m);
+    }
+    for (const f of m.publicApi) if (!m.files.includes(f)) fail(`${m.id}.publicApi contains unlisted file ${f}`);
+  }
+  if (profile.layerRules !== undefined) {
+    if (!profile.layerRules || typeof profile.layerRules !== 'object' || Array.isArray(profile.layerRules)) fail('layerRules must be an object');
+    for (const [name, rule] of Object.entries(profile.layerRules)) {
+      text(name, 'layer name'); object(rule, ['allowedLayers'], `layerRules.${name}`);
+      list(rule.allowedLayers, `${name}.allowedLayers`);
+    }
+  }
+  if (profile.exceptions !== undefined && !Array.isArray(profile.exceptions)) fail('exceptions must be an array');
+  const exceptions = new Set();
+  for (const e of profile.exceptions || []) {
+    object(e, ['path', 'rule', 'ceiling', 'owner', 'issue', 'expires', 'reason'], 'exception');
+    for (const key of ['path', 'rule', 'owner', 'issue', 'expires', 'reason']) text(e[key], `exception.${key}`);
+    if (!EXCEPTION_RULES.includes(e.rule)) fail(`unknown exception rule ${e.rule}`);
+    if (!files.has(e.path)) fail(`exception path ${e.path} is not a declared file`);
+    const key = `${e.path}:${e.rule}`;
+    if (exceptions.has(key)) fail(`duplicate exception ${key}`);
+    exceptions.add(key);
+    const date = new Date(e.expires);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(e.expires) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== e.expires) fail(`invalid exception expiry ${e.expires}`);
+    if (e.rule === 'size') {
+      integer(e.ceiling, 'size exception ceiling');
+      if (e.ceiling < profile.sizeProfiles[files.get(e.path).sizeProfile].hardMax) fail('size exception ceiling must not lower hardMax');
+    } else if (e.ceiling !== undefined) fail('ceiling is only valid for size exceptions');
+  }
 }
 
-/** Extract `{ specifier, line }` for every static/dynamic import-like reference. */
-function extractImports(source) {
-  const out = [];
-  for (const re of [REQUIRE_RE, IMPORT_FROM_RE, IMPORT_BARE_RE, EXPORT_FROM_RE, DYNAMIC_IMPORT_RE]) {
-    re.lastIndex = 0;
-    let m;
-    while ((m = re.exec(source))) out.push({ specifier: m[2], line: lineAt(source, m.index) });
+function lineAt(text, index) {
+  return text.slice(0, index).split('\n').length;
+}
+
+/** Small lexical scanner, not an AST/binding analyzer. Comments and literal text are opaque;
+ * template substitutions are scanned recursively so imports inside them stay in the graph. */
+function tokenize(source) {
+  const tokens = [];
+  let i = 0;
+  const add = (type, value, start) => tokens.push({ type, value, line: lineAt(source, start) });
+  function escape() {
+    const ch = source[i++];
+    const simple = { n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', v: '\v', '0': '\0', '\n': '', '\r': '' };
+    if (/[1-9]/.test(ch) || (ch === '0' && /[0-9]/.test(source[i] || ''))) throw new Error('legacy numeric string escapes are unsupported');
+    if (ch === 'u' || ch === 'x') {
+      let hex;
+      if (ch === 'u' && source[i] === '{') { const end = source.indexOf('}', ++i); hex = source.slice(i, end); i = end + 1; }
+      else { const length = ch === 'u' ? 4 : 2; hex = source.slice(i, i + length); i += length; }
+      if (!hex || !/^[0-9a-f]+$/i.test(hex)) throw new Error('unsupported invalid string escape');
+      return String.fromCodePoint(parseInt(hex, 16));
+    }
+    if (ch === '\r' && source[i] === '\n') i++;
+    return Object.hasOwn(simple, ch) ? simple[ch] : ch;
   }
-  return out;
+  function literal(quote, start) {
+    let value = '', interpolated = false;
+    const token = { type: 'string', value: '', line: lineAt(source, start) };
+    tokens.push(token);
+    while (i < source.length) {
+      const ch = source[i++];
+      if (ch === quote) { token.value = value; return; }
+      if (ch === '\\') value += escape();
+      else if (quote === '`' && ch === '$' && source[i] === '{') {
+        i++; interpolated = true; token.type = 'template';
+        scan(true); // consumes its matching closing brace, including nested objects/templates
+      } else value += ch;
+    }
+    throw new Error(`unterminated ${interpolated ? 'template' : 'string'} literal at line ${token.line}`);
+  }
+  function scan(substitution = false) {
+    let braces = 0;
+    while (i < source.length) {
+      const start = i, ch = source[i];
+      if (/\s/.test(ch)) { i++; continue; }
+      if (source.startsWith('//', i) || (i === 0 && source.startsWith('#!', i))) { while (i < source.length && source[i] !== '\n') i++; continue; }
+      if (source.startsWith('/*', i)) {
+        const end = source.indexOf('*/', i + 2);
+        if (end < 0) throw new Error('unterminated block comment');
+        i = end + 2; continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') { i++; literal(ch, start); continue; }
+      const previous = tokens.at(-1);
+      // A slash after these tokens needs statement/expression AST context.
+      // Refuse that ambiguity instead of potentially swallowing a real import as regex text.
+      if (ch === '/' && previous?.type === 'punct' && [')', '}'].includes(previous.value)) throw new Error(`ambiguous slash after ${previous.value} at line ${lineAt(source, start)}; requires an AST inventory`);
+      const expressionStart = !previous || (previous.type === 'name' && /^(return|throw|yield|case|delete|void|typeof|new|else|do)$/.test(previous.value)) || (previous.type === 'punct' && ![')', ']', '}', '++', '--'].includes(previous.value));
+      if (ch === '/' && expressionStart) {
+        i++; let bracket = false, closed = false;
+        while (i < source.length) {
+          const c = source[i++];
+          if (c === '\\') { i++; continue; }
+          if (c === '[') bracket = true;
+          if (c === ']') bracket = false;
+          if (c === '/' && !bracket) { closed = true; break; }
+          if (c === '\n') break;
+        }
+        if (!closed) throw new Error(`unsupported or unterminated regex at line ${lineAt(source, start)}`);
+        while (/[a-z]/i.test(source[i] || '') && i < source.length) i++;
+        add('regex', '', start); continue;
+      }
+      if (/[A-Za-z_$]/.test(ch)) {
+        i++; while (i < source.length && /[A-Za-z0-9_$]/.test(source[i])) i++;
+        add('name', source.slice(start, i), start); continue;
+      }
+      if (ch === '\\') throw new Error(`escaped identifiers are unsupported at line ${lineAt(source, start)}`);
+      if (/\d/.test(ch)) { i++; while (i < source.length && /[\w.]/.test(source[i])) i++; add('number', source.slice(start, i), start); continue; }
+      if (ch === '{') braces++;
+      if (ch === '}' && substitution && braces-- === 0) { i++; return; }
+      if (['?.', '++', '--'].includes(source.slice(i, i + 2))) i += 2;
+      else i++;
+      add('punct', source.slice(start, i), start);
+    }
+    if (substitution) throw new Error('unterminated template substitution');
+  }
+  scan();
+  return tokens;
+}
+
+function analyzeSource(source) {
+  const tokens = tokenize(source), imports = [], globals = [], unsupported = [];
+  const property = (i) => tokens[i - 1]?.type === 'punct' && ['.', '?.'].includes(tokens[i - 1].value);
+  const recordImport = (token, sourceToken) => {
+    if (token?.type === 'string') imports.push({ specifier: token.value, line: sourceToken.line });
+    else unsupported.push({ line: sourceToken.line, message: 'Import/require target must be a literal string; declare or rewrite dynamic loading before checking this profile' });
+  };
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i], next = tokens[i + 1];
+    if (token.type !== 'name' || property(i)) continue;
+    const callOffset = token.value === 'require' && next?.value === '?.' ? 2 : 1;
+    if ((token.value === 'require' || token.value === 'import') && tokens[i + callOffset]?.value === '(') {
+      const target = tokens[i + callOffset + 1], tail = tokens[i + callOffset + 2]?.value;
+      recordImport([')', ','].includes(tail) ? target : null, token);
+    } else if (token.value === 'import' && next?.type === 'string') recordImport(next, token);
+    else if (['import', 'export'].includes(token.value) && !['.', '('].includes(next?.value)) {
+      for (let j = i + 1; j < tokens.length && ![';', '='].includes(tokens[j].value); j++) {
+        if (tokens[j].value === 'from' && tokens[j + 1]?.type === 'string') { recordImport(tokens[j + 1], token); break; }
+        if (j > i + 1 && ['import', 'export', 'const', 'function', 'class'].includes(tokens[j].value)) break;
+      }
+    }
+    if (token.value === 'window') {
+      let j = i + 1, member;
+      if (tokens[j]?.value === '?.') j++;
+      if (tokens[j]?.value === '.') j++;
+      if (tokens[j]?.type === 'name' && ['.', '?.'].includes(tokens[j - 1]?.value)) member = tokens[j];
+      else if (tokens[j]?.value === '[' && tokens[j + 1]?.type === 'string' && tokens[j + 2]?.value === ']') member = tokens[j + 1];
+      else if (tokens[j]?.value === '[') unsupported.push({ rule: 'unsupported-global', line: token.line, message: 'Computed window access requires a literal property name in a reviewed profile' });
+      if (member && /^SM[A-Za-z0-9_]*$/.test(member.value)) globals.push({ name: member.value, line: token.line });
+    }
+  }
+  return { imports, globals, unsupported };
+}
+
+function extractImports(source) {
+  return analyzeSource(source).imports;
 }
 
 function countNonBlankLines(source) {
@@ -105,10 +272,6 @@ function buildFileIndex(profile, root) {
   return index;
 }
 
-function findException(profile, relPath, rule) {
-  return (profile.exceptions || []).find((e) => e.path === relPath && e.rule === rule);
-}
-
 /** Directed-graph cycle detection (DFS with a recursion stack). Returns one
  * reported cycle (list of module ids, first repeated at the end) per back-edge
  * found; the same simple cycle is not reported twice. */
@@ -142,13 +305,34 @@ function findCycles(edges) {
  * @param {Date}   [opts.now]  - clock used for exception expiry (default: real now)
  */
 function checkProfile(profile, opts = {}) {
+  validateProfile(profile);
   const root = opts.root || process.cwd();
   const now = opts.now || new Date();
+  if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new Error('invalid check clock');
   const fileIndex = buildFileIndex(profile, root);
   const violations = [];
   const warnings = [];
   const exceptionsApplied = [];
   const edges = new Map(profile.modules.map((m) => [m.id, new Set()]));
+  const edgeFiles = new Map();
+  const activeExceptions = new Map();
+  const applied = new Set();
+  const applyException = (exception, extra = {}) => {
+    if (!applied.has(exception)) exceptionsApplied.push({ ...exception, ...extra });
+    applied.add(exception);
+  };
+  for (const exception of profile.exceptions || []) {
+    if (new Date(exception.expires) <= now) {
+      violations.push({ rule: 'expired-exception', module: null, file: exception.path, line: null,
+        message: `Exception for "${exception.rule}" on ${exception.path} expired ${exception.expires}`,
+        detail: { exception } });
+    } else activeExceptions.set(`${exception.path}:${exception.rule}`, exception);
+  }
+  const reportViolation = (violation) => {
+    const exception = activeExceptions.get(`${violation.file}:${violation.rule}`);
+    if (exception && violation.rule !== 'size') applyException(exception);
+    else violations.push(violation);
+  };
 
   for (const m of profile.modules) {
     for (const f of m.files) {
@@ -162,26 +346,14 @@ function checkProfile(profile, opts = {}) {
       if (!sizeProfile) {
         throw new Error(`checkProfile: module "${m.id}" declares unknown sizeProfile "${m.sizeProfile}"`);
       }
-      const exception = findException(profile, relPath, 'size');
-      let shielded = false;
+      const exception = activeExceptions.get(`${relPath}:size`);
+      const shielded = Boolean(exception);
       if (exception) {
-        const expired = new Date(exception.expires) <= now;
-        if (expired) {
-          violations.push({
-            rule: 'expired-exception', module: m.id, file: relPath, line: null,
-            message: `Exception for "size" on ${relPath} expired ${exception.expires} and no longer applies`,
-            detail: { exception },
-          });
-        } else {
-          exceptionsApplied.push({ ...exception, actualLines: lines });
-          shielded = true;
-          if (lines > exception.ceiling) {
-            violations.push({
-              rule: 'size', module: m.id, file: relPath, line: null,
-              message: `${lines} nonblank lines exceeds excepted ceiling ${exception.ceiling}`,
-              detail: { lines, ceiling: exception.ceiling, exception: true },
-            });
-          }
+        applyException(exception, { actualLines: lines });
+        if (lines > exception.ceiling) {
+          violations.push({ rule: 'size', module: m.id, file: relPath, line: null,
+            message: `${lines} nonblank lines exceeds excepted ceiling ${exception.ceiling}`,
+            detail: { lines, ceiling: exception.ceiling, exception: true } });
         }
       }
       if (!shielded) {
@@ -200,32 +372,35 @@ function checkProfile(profile, opts = {}) {
         }
       }
 
-      // --- global-state ---
+      const analysis = analyzeSource(source);
+      for (const issue of analysis.unsupported) {
+        violations.push({ rule: 'unsupported-import', module: m.id, file: relPath, ...issue });
+      }
+      // Scan the same tokens used for dependencies, including literal bracket/optional access.
       if (m.layer !== 'adapters' && m.layer !== 'bootstrap') {
-        GLOBAL_SM_RE.lastIndex = 0;
         const seen = new Set();
-        let gm;
-        while ((gm = GLOBAL_SM_RE.exec(source))) {
-          if (seen.has(gm[1])) continue;
-          seen.add(gm[1]);
-          violations.push({
-            rule: 'global-state', module: m.id, file: relPath, line: lineAt(source, gm.index),
-            message: `Implicit global "window.${gm[1]}" accessed from layer "${m.layer}" (only adapters/bootstrap may)`,
-            detail: { global: `window.${gm[1]}` },
-          });
+        for (const global of analysis.globals) {
+          if (seen.has(global.name)) continue;
+          seen.add(global.name);
+          reportViolation({ rule: 'global-state', module: m.id, file: relPath, line: global.line,
+            message: `Implicit global "window.${global.name}" accessed from layer "${m.layer}" (only adapters/bootstrap may)`,
+            detail: { global: `window.${global.name}` } });
         }
       }
 
       // --- imports: private-import, layer-violation, cycle edges ---
-      for (const { specifier, line } of extractImports(source)) {
+      for (const { specifier, line } of analysis.imports) {
         const abs2 = resolveSpecifier(specifier, abs);
         if (!abs2) continue; // external or unresolved: not modeled in v1
         const target = fileIndex.get(abs2);
         if (!target || target.module.id === m.id) continue; // outside profile, or intra-module
         edges.get(m.id).add(target.module.id);
+        const edgeKey = JSON.stringify([m.id, target.module.id]);
+        if (!edgeFiles.has(edgeKey)) edgeFiles.set(edgeKey, new Set());
+        edgeFiles.get(edgeKey).add(relPath);
 
         if (!target.isPublic) {
-          violations.push({
+          reportViolation({
             rule: 'private-import', module: m.id, file: relPath, line,
             message: `${relPath} imports "${specifier}" (${target.relFile}), which module "${target.module.id}" does not list in publicApi`,
             detail: { specifier, targetModule: target.module.id, targetFile: target.relFile },
@@ -235,7 +410,7 @@ function checkProfile(profile, opts = {}) {
         const rule = profile.layerRules && profile.layerRules[m.layer];
         if (rule && Array.isArray(rule.allowedLayers) && !rule.allowedLayers.includes('*')) {
           if (!rule.allowedLayers.includes(target.module.layer)) {
-            violations.push({
+            reportViolation({
               rule: 'layer-violation', module: m.id, file: relPath, line,
               message: `Layer "${m.layer}" (module "${m.id}") may not depend on layer "${target.module.layer}" (module "${target.module.id}")`,
               detail: { fromLayer: m.layer, toLayer: target.module.layer, targetModule: target.module.id },
@@ -248,6 +423,9 @@ function checkProfile(profile, opts = {}) {
 
   // --- cycle ---
   for (const cyclePath of findCycles(edges)) {
+    const cycleFiles = cyclePath.slice(0, -1).flatMap((id, i) => [...edgeFiles.get(JSON.stringify([id, cyclePath[i + 1]]))]);
+    const exception = cycleFiles.map((file) => activeExceptions.get(`${file}:cycle`)).find(Boolean);
+    if (exception) { applyException(exception, { cycle: cyclePath }); continue; }
     violations.push({
       rule: 'cycle', module: cyclePath[0], file: null, line: null,
       message: `Import cycle: ${cyclePath.join(' -> ')}`,
@@ -266,6 +444,7 @@ function checkProfile(profile, opts = {}) {
 
 module.exports = {
   checkProfile,
+  validateProfile,
   extractImports,
   countNonBlankLines,
   resolveSpecifier,
