@@ -11,8 +11,10 @@ and [`scripts/nemo/boundaries-ratchet.test.cjs`](../../scripts/nemo/boundaries-r
 The library validates the profile before reading its sources; the CLI uses the same validation
 and exits 2 on malformed policy or baseline input.
 
-This is **not wired into `npm run check`/`verify`, `scripts/nemo/lib/jobs.cjs` or
-`package.json`** in this packet — see "What's pending" below.
+The behavioral suites run in normal `npm test` / `verify` through the
+`tests/nemo-boundaries*.test.cjs` entries. Production profile enforcement is
+**not wired into `npm run check`/`verify` or `scripts/nemo/lib/jobs.cjs`** — see
+"What's pending" below. Passing the regressions does not audit application source.
 
 ## What it checks
 
