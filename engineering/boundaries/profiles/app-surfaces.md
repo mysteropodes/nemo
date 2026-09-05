@@ -219,7 +219,12 @@ actually block growth, not just the illustrative fixture in `scripts-nemo.fixtur
 `{"ok": true, "baselinePathCount": 80, "candidatePathCount": 80, "violations": [], "reductions":
 [], "removals": []}` — self-consistent as the first checkpoint, independent of the ordinary
 check's `global-state`/`unsupported-import` findings above (ratchet only compares policy
-ceilings between the two profiles, not live source).
+ceilings between the two profiles, not live source). **This `{"ok": true}` is a new-seed
+self-comparison, not regression evidence against a protected branch**: `app-js.baseline.json`
+is a file this same packet introduces — neither this candidate's own parent commit nor
+`origin/main` contains a prior copy to diff against. The ratchet only starts doing its job
+(catching a *later* commit silently raising a ceiling) once that later commit is checked
+against this seed; it has not caught anything yet, and none is claimed here.
 
 ## Category 2 — Rust (`src-tauri/src/**`, `geometry-wasm/src/**`)
 
@@ -379,3 +384,57 @@ application source).
 - **No `CODEOWNERS`, no per-module reviewer sign-off tooling** exists in this repository —
   same fact as `scripts-nemo.md`; owner attribution above is the issue-level accountable owner,
   not a verified per-file reviewer.
+- **`app-js.baseline.json`'s ratchet `{"ok": true}` is a new-seed self-comparison, not
+  regression evidence against a protected branch** — see §1d. No prior commit on `origin/main`
+  or on this candidate's own parent contains this baseline file; the ratchet gate starts
+  protecting against silent ceiling growth only from the *next* commit checked against this
+  seed onward, not from this one.
+
+## Checker-implementation blockers (out of this packet's owned paths — not fixed here)
+
+An independent review of this PR's head reported four `scripts/nemo/lib/boundaries.cjs` defects
+beyond the already-documented "ambiguous slash" tokenizer cut (§1a). Each repro below was
+independently re-read against current source before being recorded here; none is fixed in this
+packet — `scripts/nemo/**` is not an owned path — and none is worked around by loosening
+`app-js.profile.json`'s rules or ceilings.
+
+1. **Parser — ordinary division after `)`/`}` is rejected, not just genuinely ambiguous slash.**
+   `boundaries.cjs:163`'s "ambiguous slash" guard fires on any `/` immediately following `)` or
+   `}`, which includes plain arithmetic division. Verified division-after-`)` in files already
+   excluded by §1a: `app.js` (`Math.round(v*1000)/1000`), `motion.js`
+   (`(next.x - prev.x) / 2`), `timeline.js` (`Math.floor((now-playClock)/frameMs)`), `tools.js`
+   (`Math.atan2(dy,dx)/step`), `camera.js` (division inside its bisection loop). Declaring any
+   of these files in a profile aborts the entire `checkProfile` run (uncaught throw inside the
+   per-file loop, `boundaries.cjs:388`) with no JSON report at all, not a per-file violation —
+   this is why §1a's 63 files cannot appear in `modules[].files` today and is the largest
+   concrete reason this profile has no size/global-state signal for most of application JS by
+   volume.
+2. **Global/dependency binding gaps.** `analyzeSource` (`boundaries.cjs:231-238` for globals,
+   `260-273`/`405-409` for imports) only recognizes the literal pattern `window.SM<Name>`: it
+   misses a bare `state` global (`src/js/feedback-bridge.js:73`, `src/js/transplant.js:221`,
+   both read `state.*` without a `window.` prefix), a non-`SM`-prefixed `window.*` assignment
+   (`window.GeometryWasm = {...}` at `src/js/geometry-wasm-loader.js:10`), and a bare-alias
+   *read* of a real `window.SM*` provider: `src/js/asset-tree.js:40` declares
+   `window.SMAssetTree = {...}` and `src/js/transplant.js:145-154` is a real consumer
+   (`SMAssetTree.folderGroup(...)`, `SMAssetTree.componentsLabel()`) written without the
+   `window.` prefix — a genuine provider/consumer coupling invisible to the scanner in either
+   direction. Any layer/dependency rule built on this scanner today would silently miss all of
+   the above.
+3. **Loader-resolution gaps.** `resolveSpecifier` (`boundaries.cjs:260-273`) only resolves a
+   literal relative specifier that exists verbatim on disk; a cache-busted specifier (e.g.
+   `import('./mod.js?v=1')`) or one pointing outside any declared module both silently resolve
+   to `null` ("external, or not found") and are dropped rather than reported as unresolved. This
+   document's own §1b/§4 already lean on that exact behavior to correctly treat
+   `psd-import-bridge.js:30`'s dynamic import as an intentionally-undeclared vendor reference —
+   the same mechanism means a genuinely forbidden cross-module import written with a
+   cache-busting suffix would pass silently today.
+4. **Baseline/CI adoption gap.** No CI lane currently runs `boundaries.cjs` against a
+   protected-branch baseline (see the ratchet-seed caveat above and in §1d). Until one exists,
+   raising both a candidate's and a baseline's ceiling together, renaming a source file out of a
+   profile instead of removing it, or extending an exception's `expires` date all pass the
+   ratchet comparator without any independent review gate — a process/CI gap, not something
+   `engineering/boundaries/profiles/**` content can close on its own.
+
+These are handed to the checker-owning lead as concrete, reproduced findings rather than
+summarized as "the checker has limitations" — per task instructions, checker fixes remain a
+separate lead action and are not represented as resolved or worked around here.
