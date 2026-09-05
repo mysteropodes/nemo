@@ -529,8 +529,22 @@ var TWIN_LEN_RATIO=1.6,TWIN_TURN_DEG=90,TWIN_GAP=0.35,TWIN_NEAR=3.0,TWIN_MAX=6,T
 // suffit pour le remesurer sur un fichier où le champ se tromperait.
 var TW_TEMPORAL_PRIOR=false;
 var TEMPORAL_BIAS=0.05,TEMPORAL_MAX_PREV=0.35;
-var TW_ARC_FROM_CHAIN=true;
-var ARC_TENSION=0.75,ARC_MAX_FRAC=0.6,ARC_REVERSAL_DEG=120,ARC_MIN_PX=4;
+// DÉSACTIVÉ (2026-09-05) après le retour de Cyril sur Untitled (4) : « les
+// deux traits du nez ont du retard par rapport au trait du nez et aux
+// yeux ». Mesuré, avancement le long de la corde de cinq traits du
+// visage, écart max entre traits par portée :
+//   sans arcs            0,1 %   1,3 %   0,3 %
+//   arcs par trait       ~9 %   (le nez, sans chaîne, restait droit)
+//   arcs lissés (région) 1,2 %  16,7 %  13,5 %
+// Quand la tête TOURNE, les cordes des traits d'une même région n'ont pas
+// la même longueur ; une courbure commune appliquée à des cordes
+// différentes désynchronise quand même. La courbure devrait porter sur le
+// mouvement rigide de la région (translation + rotation dans le temps),
+// pas sur le centre de chaque trait. Autre conception, pas un réglage.
+// Gain mesuré du dispositif : ≤ 13 px sur la patte de cats ; pas de quoi
+// justifier un visage qui se désynchronise. Code et lissage conservés.
+var TW_ARC_FROM_CHAIN=false;
+var ARC_TENSION=0.75,ARC_MAX_FRAC=0.6,ARC_REVERSAL_DEG=120,ARC_MIN_PX=4,ARC_COHERENCE_FRAC=0.12;
 var _chainArcs={};
 var TW_ORPHAN_FOLLOW=true;
 // ---- MATCHING ----
@@ -5847,6 +5861,8 @@ function generateTweens(explicitRestrictTo,skipUndo){
         });
       }
       var _ang=function(u,v){var lu=Math.hypot(u[0],u[1]),lv=Math.hypot(v[0],v[1]);if(lu<1e-6||lv<1e-6)return 0;return Math.acos(Math.max(-1,Math.min(1,(u[0]*v[0]+u[1]*v[1])/(lu*lv))))*180/Math.PI;};
+      // 1) tangentes brutes par paire, depuis la chaîne du trait
+      var raw=[];
       pairs.forEach(function(pr){
         var pA=pr.cA,pB=pr.cB;if(!pA||!pB)return;
         var base=(pr.aId||'').split('#')[0];
@@ -5856,13 +5872,34 @@ function generateTweens(explicitRestrictTo,skipUndo){
         var tA=null,tB=null;
         if(pP&&_ang([pA[0]-pP[0],pA[1]-pP[1]],dAB)<=ARC_REVERSAL_DEG)tA=[(pB[0]-pP[0])/2,(pB[1]-pP[1])/2];
         if(pN&&_ang(dAB,[pN[0]-pB[0],pN[1]-pB[1]])<=ARC_REVERSAL_DEG)tB=[(pN[0]-pA[0])/2,(pN[1]-pA[1])/2];
+        raw.push({pr:pr,pA:pA,pB:pB,dAB:dAB,L:L,tA:tA,tB:tB});
+      });
+      // 2) COHÉRENCE DE RÉGION (2026-09-05, Cyril sur Untitled (4) : « les deux
+      // traits du nez ont du retard par rapport au trait du nez et aux
+      // yeux »). Mesuré : sans arcs, nez, narines et yeux avancent EXACTEMENT
+      // en phase (11, 23, 35, 47 %…) ; avec les arcs par trait, le nez —
+      // dont l'identifiant change à la clé suivante, donc sans chaîne —
+      // restait droit pendant que narines et œil suivaient une courbe, et
+      // le visage se désynchronisait à mi-portée. Un arc est une propriété
+      // du mouvement d'une RÉGION, pas d'un trait : les tangentes sont
+      // lissées entre voisins (moyenne pondérée par la distance, rayon
+      // ARC_COHERENCE_FRAC × diagonale du dessin) et un trait sans chaîne
+      // hérite de celles de ses voisins. Une région rigide partage ainsi une
+      // seule courbure et ses traits restent en phase.
+      var R=Math.max(40,(typeof _matchNorm==='number'?_matchNorm:0)*ARC_COHERENCE_FRAC);
+      var smooth=function(field){return raw.map(function(ri){var sx=0,sy=0,sw=0;
+        raw.forEach(function(rj){var t=rj[field];if(!t)return;var d=Math.hypot(rj.pA[0]-ri.pA[0],rj.pA[1]-ri.pA[1]);if(d>R)return;var w=1/(1+d/R);sx+=t[0]*w;sy+=t[1]*w;sw+=w;});
+        return sw>0?[sx/sw,sy/sw]:null;});};
+      var tAs=smooth('tA'),tBs=smooth('tB');
+      raw.forEach(function(ri,k){
+        var tA=tAs[k],tB=tBs[k],dAB=ri.dAB,L=ri.L;
         if(!tA&&!tB)return;
         var out=tA?[tA[0]*ARC_TENSION/3,tA[1]*ARC_TENSION/3]:[dAB[0]/3,dAB[1]/3];
         var inn=tB?[-tB[0]*ARC_TENSION/3,-tB[1]*ARC_TENSION/3]:[-dAB[0]/3,-dAB[1]/3];
         var cap=ARC_MAX_FRAC*L,lo=Math.hypot(out[0],out[1]),lin=Math.hypot(inn[0],inn[1]);
         if(lo>cap){out[0]*=cap/lo;out[1]*=cap/lo;}
         if(lin>cap){inn[0]*=cap/lin;inn[1]*=cap/lin;}
-        _chainArcs[arcKey(fA,fB,pr.mi,li)]={out:out,'in':inn};
+        _chainArcs[arcKey(fA,fB,ri.pr.mi,li)]={out:out,'in':inn};
       });
     }
     var gap=fB-fA;

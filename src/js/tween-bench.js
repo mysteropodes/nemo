@@ -390,7 +390,7 @@
     for(var f=0;f<state.totalFrames;f++){var fr=ld.frames[f];if(!fr||!fr.isInterpolated)continue;
       (fr.strokes||[]).forEach(function(sd){var S=_segsOf(sd);if(S&&S.length>3&&_span2(S)>25&&_xings(_flatten(S,6)))n++;});}
     return n;}
-  B.FILES=['__tmp_cats.json','__tmp_untitled3.json','__tmp_totale.json','__tmp_traits.json','__tmp_b.json','__tmp_testanim.json'];
+  B.FILES=['__tmp_cats.json','__tmp_untitled3.json','__tmp_untitled4.json','__tmp_totale.json','__tmp_traits.json','__tmp_b.json','__tmp_testanim.json'];
   B.auditAll=async function(flags,opts){
     flags=flags||{};opts=opts||{};var li=0,out={};
     for(var fi=0;fi<B.FILES.length;fi++){
