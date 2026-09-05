@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # Nemo — guidelines pour éviter les bugs déjà rencontrés
 
 Tauri v2, hybride Paper.js (modèle de document, source de vérité) + Rust/vello WebGPU

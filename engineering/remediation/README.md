@@ -18,11 +18,11 @@ task packet and module documentation in addition to the repository's contributor
 2. Review and accept, amend or reject the proposed ADR-level decisions.
 3. Choose the tracked destination, for example `engineering/remediation/`, and move this
    directory as one unit so its internal links remain valid.
-4. Point the repository's Codex and Claude entry files at the adopted documents. Keep those
-   entry files short.
-5. During adoption, install or retain `.agents/skills/nemo-a2a/` as the canonical A2A skill;
-   this proposal package does not include that runtime skill. Test clean-clone discovery in
-   both clients.
+4. Keep the repository's Codex and Claude entry files short and point them at the adopted
+   documents.
+5. The dedicated Nemo workspace supplies its current A2A instructions at agent startup; do
+   not add a mandatory repository skill reference unless that skill is tracked in the same
+   candidate. Test clean-clone instruction discovery in both clients.
 6. Create the GitHub Project fields/views and real CI workflow before making their checks
    required.
 7. Open R00-R22 as parent/child issues only after current owners, dependencies and acceptance
