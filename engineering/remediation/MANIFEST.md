@@ -8,9 +8,9 @@
 
 # Nemo foundation remediation package
 
-Status: **proposal for maintainer review**<br>
+Status: **R01 adoption candidate for maintainer review**<br>
 Prepared: **2026-09-04**<br>
-Package version: **0.1.0**
+Package version: **0.2.0**
 Repository: <https://github.com/mysteropodes/nemo>
 
 This package is the portable starting point for Nemo's foundation remediation. It contains
@@ -48,3 +48,11 @@ The package deliberately separates:
 - **Proposed:** designed but not yet implemented or adopted.
 - **Gate:** evidence required before a proposal can be called delivered.
 - **Future:** product breadth beyond foundation remediation.
+
+## Migration note for 0.2.0
+
+The adoption candidate adds portable Codex and Claude entry points and aligns the handbook
+with the dedicated Nemo workspace contract: enrolled collaborators receive Project/repository
+participation and current A2A instructions from the runtime. Repository-relative task paths
+coordinate concurrent ownership; contributors do not configure manual path grants or revision
+pins. BZ0 transport acceptance and clean-clone Codex/Claude rehearsal remain required gates.

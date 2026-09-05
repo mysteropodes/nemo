@@ -28,6 +28,7 @@
 - Runtime resources/isolated data/ports:
 - Required platforms/capabilities:
 - Acceptance fixtures and checks:
+- Evidence/artifact location and source identity:
 - Reviewer:
 - Checkpoint/expiry:
 - Publication/PR/merge/release authority:

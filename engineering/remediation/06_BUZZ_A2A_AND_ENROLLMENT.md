@@ -9,19 +9,18 @@
 # Buzz collaboration, A2A and enrollment
 
 Protocol: **NEMO-A2A-1**<br>
-Expected canonical skill path after adoption: `.agents/skills/nemo-a2a/SKILL.md`
+Runtime workspace contract: **1.4.0**
 
 ## Status boundary
 
-Current pilot behavior includes authenticated desktop chat, distinct human and managed-agent
-identities, self-service owner-backed agent admission, normal inline replies, a Nemo Project
-bound to the canonical GitHub repository and a narrow issue/PR/run link bridge. GitHub remains
-canonical.
+The dedicated Nemo workspace contract supplies current project instructions and full
+repository participation to each enrolled collaborator's managed agents. Buzz carries
+authenticated conversation and coordination; GitHub remains canonical. Repository-relative
+task paths coordinate writer ownership and do not form a host filesystem sandbox.
 
-Automatic immutable project-instruction preloading, the complete typed A2A grant/settings
-surface, hardened execution lifecycle and team-distributable cross-platform builds must pass
-fresh final-build acceptance before being called generally deployed. Nemo's product Rust MCP
-is a separate future product surface.
+This tracked contract does not by itself prove BZ0 live-transport or release acceptance.
+Revalidate those gates on the identified Buzz build and runtime before claiming general
+deployment. Nemo's product Rust MCP is a separate future product surface.
 
 ## Roles and permissions
 
@@ -31,7 +30,7 @@ Keep these independent:
 2. Buzz community membership;
 3. Project/channel membership;
 4. managed-agent response policy and provider login;
-5. local checkout capability/path/branch/worktree grant;
+5. current task outcome, ownership and repository-relative file scope;
 6. publication, merge, deployment and release authority.
 
 Membership or an agent persona does not imply source authority. Each agent has one accountable
@@ -48,7 +47,7 @@ human sponsor, a distinct public identity and least-privilege channel/grant scop
    a named operational need for `admin`.
 5. Developer joins using the team relay URL obtained from the operator and selects their local
    profile name.
-6. Operator adds only the required Project/channel access.
+6. Verify the dedicated workspace exposes the intended Project and channel access.
 7. Verify signed connection, message/reply, relaunch history and denial of an ungranted channel.
 
 An invitation link is a convenience for connection details. It never replaces collaborator
@@ -67,10 +66,11 @@ Agent creation is self-service after human enrollment:
    secrets in the local protected store.
 4. Start the agent. The relay grants virtual membership only while the attestation and direct
    human membership are valid. The agent is not inserted as a direct human member.
-5. Add the required Project/channel, then create a separate worktree and an exact local
-   checkout grant for capability, path prefixes, base SHA, branch and worktree ID.
-6. Verify process, signed admission, directed request/reply, negative scope tests, reconnect
-   and no duplicate execution.
+5. Verify the dedicated workspace exposes the Nemo Project and intended channels. Do not
+   manually assign the managed agent to the Project or configure path grants; the task still
+   records its base, branch/worktree, owned paths and acceptance checks.
+6. Verify process, signed admission, directed request/reply, reconnect and no duplicate
+   execution.
 
 Each developer's agents use that machine's own Codex/Claude provider login unless deliberately
 configured otherwise. Buzz identity does not select or share an AI-provider billing account.
@@ -84,26 +84,22 @@ configured otherwise. Buzz identity does not select or share an AI-provider bill
    - one Project home channel.
 3. Resolve the existing checkout only when its canonical path stays under the configured root
    and Git `origin` matches the announcement.
-4. Add admitted humans/agents to the Project channel.
-5. Give each writer an isolated worktree and scoped checkout grant.
+4. Verify enrolled collaborators and their managed agents resolve the Project and intended
+   channel participation through the workspace.
+5. Give each writer an isolated worktree and non-overlapping task scope.
 6. Keep Buzz tasks out of the canonical backlog. The GitHub bridge posts only signed,
    idempotent links/status for allowed issue, PR and workflow-run events.
 
-## Workspace and agent settings
+## Workspace and task settings
 
-The operator configures one workspace Project binding per relay:
+The managed runtime binds the dedicated Nemo Project, repository, current instructions and
+verified peer roster. Enrolled collaborators do not manually maintain agent assignments,
+instruction pins or allowed-path forms. Each writable task still declares its outcome, base,
+branch/worktree, repository-relative owned paths, dependencies, checks and publication scope.
 
-- Project address and home-channel ID;
-- canonical repository/display name;
-- exact immutable instruction revision;
-- allowed peers and A2A capabilities;
-- per-agent repository-relative path prefixes;
-- exact base SHA, branch and logical worktree ID;
-- owner-only or explicit response allowlist.
-
-Machine-local checkout roots stay in local protected settings and never enter signed A2A events
-or model prompts. Changing the immutable instruction revision or Project binding requires new
-provider sessions; missing or ambiguous policy fails before work starts.
+Machine-local checkout roots stay in protected runtime configuration and never enter signed
+A2A events or model prompts. Missing or ambiguous Project/repository binding fails before work
+starts.
 
 ## Typed A2A tools
 
@@ -112,6 +108,7 @@ Managed agents use:
 | Intent | Tool |
 |---|---|
 | Reply in the current human conversation | `buzz_chat_send` |
+| Discover verified collaborators | `buzz_a2a_peers` |
 | Delegate one bounded job | `buzz_a2a_dispatch` |
 | Discover addressed work | `buzz_a2a_inbox` |
 | Follow one exact request | `buzz_a2a_status` |
@@ -128,9 +125,10 @@ Before dispatch:
 
 1. inspect the active task queue and existing A2A status;
 2. choose disjoint repository-relative paths, worktree and acceptance checks;
-3. select an already authorized recipient and exact Project/repository grant;
+3. discover and select a verified recipient from the runtime roster;
 4. create a fresh operation UUID and stable non-secret idempotency key;
-5. include base SHA, branch, logical worktree, expiry and inert contract references;
+5. include the required runtime job coordinates; paths coordinate ownership rather than
+   technical filesystem permission;
 6. keep credentials, machine-local paths and executable shell strings out of the envelope.
 
 Save the returned `request_event_id`. Relay acknowledgement means only that an event was stored.
@@ -163,7 +161,8 @@ Byte-equivalent retries reuse the original key and signed bytes. Changed semanti
 new idempotency key. An accepted operation that crashes without a terminal receipt becomes
 `indeterminate` and requires reconciliation; it is never automatically rerun.
 
-Fail closed on missing tools/grants, ambiguous Project binding, origin/branch/HEAD drift,
+Fail closed on missing required tools or task authority, ambiguous Project binding,
+origin/branch/HEAD drift,
 expired authority, path escape, signature/lifecycle mismatch or unreachable relay state.
 
 ## Revocation
