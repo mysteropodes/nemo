@@ -176,6 +176,10 @@ function jobBench() {
 }
 
 // ---- builds ------------------------------------------------------------
+// build:desktop passes --no-sign: a local verification build never has
+// TAURI_SIGNING_PRIVATE_KEY (personal secret, CLAUDE.md §9), and without the
+// flag tauri still tries to sign the updater artifact that
+// bundle.createUpdaterArtifacts requests, failing AFTER Nemo.app was built.
 function jobBuildWasm(ctx) {
   if (!which('wasm-pack')) return blocked('wasm-pack not found (release.yml installs it from rustwasm.github.io); the committed src/wasm bundle cannot be regenerated here');
   const targets = (ctx.receipt.capabilities || {}).rustTargets || [];
@@ -202,7 +206,7 @@ function jobBuildDesktop(ctx) {
   if (process.platform === 'darwin' && !which('xcode-select')) missing.push('Xcode command line tools');
   if (!which('python3')) missing.push('python3 (scripts/bundle-ffmpeg-dylibs.py)');
   if (missing.length) return blocked('missing: ' + missing.join(', '));
-  const r = run(tauri, ['build', '--target', triple, '-b', 'app'], { timeout: 2 * 60 * 60 * 1000 });
+  const r = run(tauri, ['build', '--target', triple, '-b', 'app', '--no-sign'], { timeout: 2 * 60 * 60 * 1000 });
   if (r.status !== 0) return fail(`tauri build exit ${r.status}`, { exitCode: r.status, log: logOf(r) });
   const app = path.join(ROOT, 'src-tauri', 'target', triple, 'release', 'bundle', 'macos', 'Nemo.app');
   if (process.platform !== 'darwin') return pass('tauri build ok (non-macOS: dylib bundling step not applicable)', { exitCode: 0, log: logOf(r) });
