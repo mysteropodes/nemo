@@ -10,6 +10,7 @@ const test = require('node:test');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { Script } = require('node:vm');
 const { checkProfile, extractImports, countNonBlankLines, validateProfile } = require('./lib/boundaries.cjs');
 
 const roots = new Set();
@@ -299,6 +300,7 @@ test('non-size exceptions apply only to their exact rule and file', () => {
 test('legal JS spelling variants enforce the same private import and layer edge', async (t) => {
   const variants = [
     "require ('../adapter/private.cjs');", "require /* comment */ ('../adapter/private.cjs');", "require?.('../adapter/private.cjs');",
+    "(left + right) / require('../adapter/private.cjs') / 2;", "ratio /= import('../adapter/private.cjs');",
     "const marker = '.'\nrequire('../adapter/private.cjs');",
     "import ('../adapter/private.cjs');", "import/*comment*/('../adapter/private.cjs');",
     "import{default as x}from '../adapter/private.cjs';", "export{default}from '../adapter/private.cjs';",
@@ -390,12 +392,98 @@ test('CLI rejects malformed profiles and unknown/trailing/missing arguments with
 });
 
 
-test('ambiguous lexical forms fail closed and computed globals are explicit', () => {
+test('unsupported lexical forms fail closed and computed globals are explicit', () => {
   const root = makeRoot(), p = fixtureProfile();
-  write(root, 'domain/a.cjs', 'if (ok) /pattern/.test(value);');
-  assert.throws(() => checkProfile(p, { root }), /ambiguous slash/);
   write(root, 'domain/a.cjs', 'window[member].run();');
   assert.equal(checkProfile(p, { root }).violations[0].rule, 'unsupported-global');
   write(root, 'domain/a.cjs', "require('\\056/hidden.cjs');");
   assert.throws(() => checkProfile(p, { root }), /numeric string escapes/);
+});
+
+test('real application division preserves following imports and global diagnostics', async (t) => {
+  // Exact counterexamples from the R05 application review at d499521.
+  const cases = {
+    'camera.js:59': 'u = (lo + hi) / 2;',
+    'app.js:599': 'function _r3(v){return isFinite(v)?Math.round(v*1000)/1000:0;}',
+    'motion.js:1182': 'var tx = (next.x - prev.x) / 2;',
+    'timeline.js:104': 'var steps=Math.floor((now-playClock)/frameMs);',
+    'tools.js:13': 'var step=Math.PI/4,angle=Math.round(Math.atan2(dy,dx)/step)*step;',
+  };
+  for (const [location, source] of Object.entries(cases)) await t.test(location, () => {
+    new Script(source); // Syntax validation only; never execute application code.
+    const root = makeRoot();
+    write(root, 'domain/a.cjs', `${source}\nwindow.SMReal.run();\nrequire(target);\nimport('./real.js');`);
+    assert.deepEqual(extractImports(fs.readFileSync(path.join(root, 'domain/a.cjs'), 'utf8')), [{ specifier: './real.js', line: 4 }]);
+    assert.deepEqual(checkProfile(fixtureProfile(), { root }).violations.map(v => [v.rule, v.line]), [
+      ['unsupported-import', 3], ['global-state', 2],
+    ]);
+  });
+});
+
+test('division and regex lexical goals retain real findings and keep regex text opaque', async (t) => {
+  const cases = [
+    '(a + b) / window.SMReal / 2;',
+    'fn() / window.SMReal / 2;',
+    'obj.if(value) / window.SMReal / 2;',
+    'obj.return / window.SMReal / 2;',
+    'value++ / window.SMReal / 2;',
+    '({ value: 1 }) / window.SMReal / 2;',
+    'if (ok) "value" / window.SMReal / 2;',
+    '"}" / window.SMReal / 2;',
+    '(function () {}) / window.SMReal / 2;',
+    '(class {}) / window.SMReal / 2;',
+    'const s = `${(a + b) / window.SMReal / 2}`;',
+    'const s = `${/window.SMPhantom/.source}`; window.SMReal;',
+    'if (ok) /window.SMPhantom/.test(value); window.SMReal;',
+    'if (ok) /require\\("phantom"\\)|window.SMPhantom/.test(value); window.SMReal;',
+    'while (ok) /window.SMPhantom/.test(value); window.SMReal;',
+    'for (; ok;) /window.SMPhantom/.test(value); window.SMReal;',
+    'async function f() { for await (const value of values) /window.SMPhantom/.test(value); } window.SMReal;',
+    'const f = () => /window.SMPhantom/; window.SMReal;',
+    'const r = /[\\/]/g; const value = 4 / /window.SMPhantom/.source.length; window.SMReal;',
+    'value /= /window.SMPhantom/.source.length; window.SMReal;',
+    'function f() { return ({}) / window.SMReal / 2; }',
+  ];
+  for (const source of cases) await t.test(source, () => {
+    new Script(source);
+    const root = makeRoot();
+    write(root, 'domain/a.cjs', `${source}\nimport('./real.js');`);
+    assert.deepEqual(extractImports(source + "\nimport('./real.js');").map(x => x.specifier), ['./real.js']);
+    const report = checkProfile(fixtureProfile(), { root });
+    assert.deepEqual(report.violations.map(v => [v.rule, v.detail?.global]), [['global-state', 'window.SMReal']]);
+  });
+});
+
+test('slash directly after a brace remains an explicit scope limitation', () => {
+  // These need block/object/function context beyond this control-parenthesis fix.
+  // Keep rejecting them rather than hiding real findings inside a guessed regex.
+  for (const source of [
+    'if (ok) {} /window.SMPhantom/.test(value);',
+    'function f() {} /window.SMPhantom/.test(value);',
+    'const f = function () {} / window.SMReal / 2;',
+    'const C = class {} / window.SMReal / 2;',
+    'function f() { return {} / window.SMReal / 2; }',
+  ]) {
+    new Script(source);
+    assert.throws(() => extractImports(source), /ambiguous slash after } at line/);
+  }
+});
+
+test('malformed slash literals and delimiter contexts remain rejected', async (t) => {
+  for (const source of [
+    'if (ok) /unterminated', 'const r = /[abc/;', 'const r = /(/;', 'const r = /x/gg;',
+    'const r = /x\\\n/;', 'const ratio = (a + b) /;', 'const ratio = (a + b) /',
+    'const ratio = (a + b] / 2;', 'const ratio = (a + b / 2;', 'const s = `value ${(a + b) / 2`;',
+  ]) await t.test(source, () => {
+    assert.throws(() => new Script(source), SyntaxError);
+    assert.throws(() => extractImports(source));
+  });
+});
+
+test('the actual application JS corpus scans, including previously omitted large files', () => {
+  const sourceRoot = path.resolve(__dirname, '../../src/js');
+  const files = fs.readdirSync(sourceRoot, { recursive: true }).filter(file => /\.m?js$/.test(file)).sort();
+  assert.ok(files.includes('camera.js') && files.includes('motion.js'));
+  // Include vendor files in this lexical regression too; scanning is not policy adoption.
+  for (const file of files) assert.doesNotThrow(() => extractImports(fs.readFileSync(path.join(sourceRoot, file), 'utf8')), file);
 });

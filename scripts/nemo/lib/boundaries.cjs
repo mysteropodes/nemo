@@ -106,16 +106,18 @@ function validateProfile(profile) {
   }
 }
 
-function lineAt(text, index) {
-  return text.slice(0, index).split('\n').length;
-}
-
 /** Small lexical scanner, not an AST/binding analyzer. Comments and literal text are opaque;
  * template substitutions are scanned recursively so imports inside them stay in the graph. */
 function tokenize(source) {
   const tokens = [];
-  let i = 0;
-  const add = (type, value, start) => tokens.push({ type, value, line: lineAt(source, start) });
+  let i = 0, line = 1, lineOffset = 0;
+  // Token starts advance monotonically, including template substitutions. Avoid
+  // repeatedly splitting whole prefixes of the large application source files.
+  const lineAt = (index) => {
+    while (lineOffset < index) if (source[lineOffset++] === '\n') line++;
+    return line;
+  };
+  const add = (type, value, start) => tokens.push({ type, value, line: lineAt(start) });
   function escape() {
     const ch = source[i++];
     const simple = { n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', v: '\v', '0': '\0', '\n': '', '\r': '' };
@@ -132,11 +134,11 @@ function tokenize(source) {
   }
   function literal(quote, start) {
     let value = '', interpolated = false;
-    const token = { type: 'string', value: '', line: lineAt(source, start) };
+    const token = { type: 'string', value: '', line: lineAt(start) };
     tokens.push(token);
     while (i < source.length) {
       const ch = source[i++];
-      if (ch === quote) { token.value = value; return; }
+      if (ch === quote) { token.value = value; if (interpolated) add('template-end', '', i - 1); return; }
       if (ch === '\\') value += escape();
       else if (quote === '`' && ch === '$' && source[i] === '{') {
         i++; interpolated = true; token.type = 'template';
@@ -146,7 +148,8 @@ function tokenize(source) {
     throw new Error(`unterminated ${interpolated ? 'template' : 'string'} literal at line ${token.line}`);
   }
   function scan(substitution = false) {
-    let braces = 0;
+    const firstToken = tokens.length, contexts = [];
+    let closedControl = false;
     while (i < source.length) {
       const start = i, ch = source[i];
       if (/\s/.test(ch)) { i++; continue; }
@@ -156,38 +159,51 @@ function tokenize(source) {
         if (end < 0) throw new Error('unterminated block comment');
         i = end + 2; continue;
       }
-      if (ch === '"' || ch === "'" || ch === '`') { i++; literal(ch, start); continue; }
-      const previous = tokens.at(-1);
-      // A slash after these tokens needs statement/expression AST context.
-      // Refuse that ambiguity instead of potentially swallowing a real import as regex text.
-      if (ch === '/' && previous?.type === 'punct' && [')', '}'].includes(previous.value)) throw new Error(`ambiguous slash after ${previous.value} at line ${lineAt(source, start)}; requires an AST inventory`);
-      const expressionStart = !previous || (previous.type === 'name' && /^(return|throw|yield|case|delete|void|typeof|new|else|do)$/.test(previous.value)) || (previous.type === 'punct' && ![')', ']', '}', '++', '--'].includes(previous.value));
+      if (ch === '"' || ch === "'" || ch === '`') { i++; literal(ch, start); closedControl = false; continue; }
+      const previous = tokens.length === firstToken ? null : tokens.at(-1);
+      // A control header starts a statement; a call/group closes an expression.
+      // Brace endings still need block/object/function context: do not guess.
+      if (ch === '/' && previous?.type === 'punct' && previous.value === '}') throw new Error(`ambiguous slash after } at line ${lineAt(start)}; requires an AST inventory`);
+      if (previous?.type === 'punct' && ['/', '/='].includes(previous.value) && ')}];,*%=&|<>?:'.includes(ch)) throw new Error(`missing division operand at line ${lineAt(start)}`);
+      const keyword = previous?.type === 'name' && !['.', '?.'].includes(tokens.at(-2)?.value);
+      const expressionStart = !previous || closedControl || (keyword && /^(return|throw|yield|await|case|delete|void|typeof|new|else|do|in|instanceof)$/.test(previous.value)) || (previous.type === 'punct' && ![')', ']', '}', '++', '--', '.', '?.'].includes(previous.value));
+      closedControl = false;
       if (ch === '/' && expressionStart) {
         i++; let bracket = false, closed = false;
         while (i < source.length) {
           const c = source[i++];
+          if (/[\n\r\u2028\u2029]/.test(c) || (c === '\\' && /[\n\r\u2028\u2029]/.test(source[i] || ''))) break;
           if (c === '\\') { i++; continue; }
           if (c === '[') bracket = true;
           if (c === ']') bracket = false;
           if (c === '/' && !bracket) { closed = true; break; }
-          if (c === '\n') break;
         }
-        if (!closed) throw new Error(`unsupported or unterminated regex at line ${lineAt(source, start)}`);
+        if (!closed) throw new Error(`unsupported or unterminated regex at line ${lineAt(start)}`);
+        const patternEnd = i - 1;
         while (/[a-z]/i.test(source[i] || '') && i < source.length) i++;
+        try { new RegExp(source.slice(start + 1, patternEnd), source.slice(patternEnd + 1, i)); }
+        catch { throw new Error(`invalid or unsupported regex at line ${lineAt(start)}`); }
         add('regex', '', start); continue;
       }
       if (/[A-Za-z_$]/.test(ch)) {
         i++; while (i < source.length && /[A-Za-z0-9_$]/.test(source[i])) i++;
         add('name', source.slice(start, i), start); continue;
       }
-      if (ch === '\\') throw new Error(`escaped identifiers are unsupported at line ${lineAt(source, start)}`);
+      if (ch === '\\') throw new Error(`escaped identifiers are unsupported at line ${lineAt(start)}`);
       if (/\d/.test(ch)) { i++; while (i < source.length && /[\w.]/.test(source[i])) i++; add('number', source.slice(start, i), start); continue; }
-      if (ch === '{') braces++;
-      if (ch === '}' && substitution && braces-- === 0) { i++; return; }
-      if (['?.', '++', '--'].includes(source.slice(i, i + 2))) i += 2;
+      if (ch === '}' && substitution && !contexts.length) { i++; return; }
+      if ('({['.includes(ch)) contexts.push({ open: ch, control: ch === '(' && keyword && (/^(if|while|for|with|switch|catch)$/.test(previous.value) || (previous.value === 'await' && tokens.at(-2)?.value === 'for')) });
+      if (')}]'.includes(ch)) {
+        const context = contexts.pop();
+        if (!context || context.open !== { ')': '(', '}': '{', ']': '[' }[ch]) throw new Error(`unmatched ${ch} at line ${lineAt(start)}`);
+        closedControl = context.control;
+      }
+      if (['?.', '++', '--', '/='].includes(source.slice(i, i + 2))) i += 2;
       else i++;
       add('punct', source.slice(start, i), start);
     }
+    if (tokens.at(-1)?.type === 'punct' && ['/', '/='].includes(tokens.at(-1).value)) throw new Error('missing division operand at end of source');
+    if (contexts.length) throw new Error('unterminated delimiter context');
     if (substitution) throw new Error('unterminated template substitution');
   }
   scan();
