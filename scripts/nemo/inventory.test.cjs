@@ -520,6 +520,52 @@ test('runtime follow-up: comma-separated lexical declarations keep each element 
   button.addEventListener('click', cb);`, { a: [], b: ['click'] });
 });
 
+for (const [name, declaration] of [
+  ['before initializer', 'const other\n = 1, button'],
+  ['after binary operator', 'const other = 1 +\n 2, button'],
+  ['before property access', 'const other = Math\n .PI, button'],
+  ['within middle initializer', 'const other = 1, middle = 1 +\n 2, button'],
+  ['before binary operator', 'const other = 1\n + 2, button'],
+  ['after keyword operator', 'const other = typeof\n Math, button'],
+  ['after binary keyword instanceof', 'const other = Math instanceof\n Object, button'],
+  ['after binary keyword in', "const key = 'PI', other = key in\n Math, button"],
+]) {
+  test(`runtime continuation: ${name} preserves later lexical owner`, () => {
+    compareRegistrations(`const button = document.getElementById('a');
+    { ${declaration} = document.getElementById('b'); button.addEventListener('input', cb); }
+    button.addEventListener('click', cb);`, { a: ['click'], b: ['input'] });
+  });
+}
+
+test('runtime continuation: real semicolon-free endings do not declare later assignments', () => {
+  for (const ending of ['let other = 1', 'let other', 'let other = /x/', 'let other = counter++',
+    'let other = counter--', 'let other = 1 /* newline\n */']) {
+    compareRegistrations(`let button = document.getElementById('a'), counter = 1;
+    { ${ending}\n counter = 2, button = document.getElementById('b') }
+    button.addEventListener('click', cb);`, { a: [], b: ['click'] });
+  }
+  for (const statement of ['let other\n +counter', 'let other\n ++counter',
+    'let other\n --counter', 'let other = 1\n ++counter', 'let other = 1\n --counter',
+    'let other = 1 /* newline\n */ counter = 2',
+    'let other = ({ typeof: 1 }). typeof\n counter = 2']) {
+    compareRegistrations(`let button = document.getElementById('a'), counter = 1;
+    { ${statement}, button = document.getElementById('b') }
+    button.addEventListener('click', cb);`, { a: [], b: ['click'] });
+  }
+});
+
+test('runtime continuation: continued declarations preserve block and function boundaries', () => {
+  compareRegistrations(`function el(id) {
+    { let other = 1 +\n 2, id = 'a'; [id] = ['b']; }
+    return document.getElementById(id);
+  }
+  el('a').addEventListener('click', cb);`, { a: ['click'], b: [] });
+  compareRegistrations(`let button = document.getElementById('a');
+  (function () { var other = 1 +\n 2, button = document.getElementById('b');
+    button.addEventListener('input', cb); })();
+  button.addEventListener('click', cb);`, { a: ['click'], b: ['input'] });
+});
+
 // ---------------------------------------------------------------------------
 // outputs and the staleness gate
 // ---------------------------------------------------------------------------
