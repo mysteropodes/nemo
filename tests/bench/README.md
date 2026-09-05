@@ -15,7 +15,7 @@ are R19's job and must be derived from receipts like these, not invented.
 
 | Workload | Backend | What is measured |
 |---|---|---|
-| `evaluation.valueAtFrame` | the real `motion.js`, loaded whole in a vm sandbox (`tests/fixtures/lib/sandbox.cjs`) | ns per property evaluation over the `keyed-props` fixture plus a 200-key synthetic track |
+| `evaluation.valueAtFrame` | the real `motion.js`, loaded whole in a vm sandbox (`tests/fixtures/lib/sandbox.cjs`) after the production modules `src/index.html` loads before it (`src/js/animation/curve.js`, the R08 easing kernel, when the tree has it); the `backend` string names every module that ran and `workload.evaluator` names the ease evaluator | ns per property evaluation over the `keyed-props` fixture plus a 200-key synthetic track |
 | `evaluation.evalCurvePoints` | same | ns per ease-curve evaluation on `DEFAULT_CURVE` |
 | `evaluation.expression` | same, with the shipped expression compiler | ns per evaluation of `frame * 3` and `[value[0] + frame * 2, value[1]]` over the `expression-props` fixture |
 | `copy.undoClone.<workload>` | the production `_cloneLayersForUndo` (`src/js/tweens.js`, lifted with `_walkStrokes` and app.js `_HEAVY_STROKE_FIELDS`) | ms for the real undo snapshot of the document's layers (heavy string fields detached, native clone, reattached — CLAUDE.md §5bis) |
