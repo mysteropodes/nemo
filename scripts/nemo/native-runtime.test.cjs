@@ -247,5 +247,12 @@ test('a missing build is a named blocker, and a bundle names its own executable'
   assert.throws(() => runtime.bundleExecutable(bundle), /bundle executable missing/);
   fs.writeFileSync(path.join(bundle, 'Contents', 'MacOS', 'renamed-binary'), '#!/bin/sh\n', { mode: 0o700 });
   assert.equal(runtime.bundleExecutable(bundle), path.join(bundle, 'Contents', 'MacOS', 'renamed-binary'));
+  // The real R04 package ships the ffmpeg sidecar next to the app binary, and
+  // readdir returns it FIRST there (observed: ['ffmpeg', 'nemo'] — and 'ffmpeg'
+  // also sorts before 'nemo', so sorting the scan would not save it either).
+  // Picking any executable found in Contents/MacOS therefore launches ffmpeg,
+  // not the app; only the declared CFBundleExecutable is right.
+  fs.writeFileSync(path.join(bundle, 'Contents', 'MacOS', 'ffmpeg'), '#!/bin/sh\n', { mode: 0o700 });
+  assert.equal(runtime.bundleExecutable(bundle), path.join(bundle, 'Contents', 'MacOS', 'renamed-binary'));
   assert.throws(() => runtime.bundleExecutable(path.join(scratch, 'Nope.app')), /no Contents\/Info\.plist/);
 });
