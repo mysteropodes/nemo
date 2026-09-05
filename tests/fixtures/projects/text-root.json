@@ -1,0 +1,408 @@
+{
+ "version": 13,
+ "totalFrames": 12,
+ "fps": 12,
+ "canvasW": 320,
+ "canvasH": 240,
+ "canvasBg": "#ffffff",
+ "waIn": 0,
+ "waOut": 11,
+ "mediaMode": "embedded",
+ "layers": [
+  {
+   "name": "Text",
+   "visible": true,
+   "locked": false,
+   "frames": [
+    {
+     "strokes": [
+      {
+       "segments": [
+        {
+         "point": [
+          40,
+          140
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": false,
+       "strokeColor": null,
+       "hasRealStroke": false,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "opacity": 1,
+       "isText": true,
+       "isTextRoot": true,
+       "text": "Nemo",
+       "vectorFont": "Roboto-Regular",
+       "textSize": 48,
+       "textColor": "#000000",
+       "textAlign": "left"
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          40,
+          100
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          64,
+          100
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          64,
+          140
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          40,
+          140
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": null,
+       "hasRealStroke": false,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "opacity": 1,
+       "fillColor": "#000000",
+       "isVectorText": true,
+       "vectorChar": "N",
+       "charIndex": 0,
+       "wordIndex": 0,
+       "lineIndex": 0
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          70,
+          100
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          94,
+          100
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          94,
+          140
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          70,
+          140
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": null,
+       "hasRealStroke": false,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "opacity": 1,
+       "fillColor": "#000000",
+       "isVectorText": true,
+       "vectorChar": "e",
+       "charIndex": 1,
+       "wordIndex": 0,
+       "lineIndex": 0
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          100,
+          100
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          124,
+          100
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          124,
+          140
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          100,
+          140
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": null,
+       "hasRealStroke": false,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "opacity": 1,
+       "fillColor": "#000000",
+       "isVectorText": true,
+       "vectorChar": "m",
+       "charIndex": 2,
+       "wordIndex": 0,
+       "lineIndex": 0
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          130,
+          100
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          154,
+          100
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          154,
+          140
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          130,
+          140
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": null,
+       "hasRealStroke": false,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "opacity": 1,
+       "fillColor": "#000000",
+       "isVectorText": true,
+       "vectorChar": "o",
+       "charIndex": 3,
+       "wordIndex": 0,
+       "lineIndex": 0
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    }
+   ],
+   "layerUid": "L-text",
+   "isTextLayer": true
+  }
+ ],
+ "symbols": {}
+}

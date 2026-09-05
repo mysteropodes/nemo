@@ -1,0 +1,94 @@
+{
+ "schema": "nemo.interaction/1",
+ "id": "pen-stroke",
+ "tool": "pen",
+ "canvas": {
+  "w": 320,
+  "h": 240
+ },
+ "layer": 0,
+ "frame": 0,
+ "pointer": [
+  {
+   "t": 0,
+   "type": "down",
+   "x": 40,
+   "y": 120,
+   "pressure": 0.5
+  },
+  {
+   "t": 16,
+   "type": "move",
+   "x": 65,
+   "y": 104.6926627053964,
+   "pressure": 0.6
+  },
+  {
+   "t": 32,
+   "type": "move",
+   "x": 90,
+   "y": 91.7157287525381,
+   "pressure": 0.6
+  },
+  {
+   "t": 48,
+   "type": "move",
+   "x": 115,
+   "y": 83.04481869954853,
+   "pressure": 0.6
+  },
+  {
+   "t": 64,
+   "type": "move",
+   "x": 140,
+   "y": 80,
+   "pressure": 0.6
+  },
+  {
+   "t": 80,
+   "type": "move",
+   "x": 165,
+   "y": 83.04481869954853,
+   "pressure": 0.6
+  },
+  {
+   "t": 96,
+   "type": "move",
+   "x": 190,
+   "y": 91.7157287525381,
+   "pressure": 0.6
+  },
+  {
+   "t": 112,
+   "type": "move",
+   "x": 215,
+   "y": 104.6926627053964,
+   "pressure": 0.6
+  },
+  {
+   "t": 128,
+   "type": "move",
+   "x": 240,
+   "y": 120,
+   "pressure": 0.6
+  },
+  {
+   "t": 160,
+   "type": "up",
+   "x": 240,
+   "y": 120,
+   "pressure": 0
+  }
+ ],
+ "expect": {
+  "strokesAdded": 1,
+  "minSegments": 3,
+  "boundsWithin": [
+   30,
+   70,
+   220,
+   60
+  ],
+  "undoRestoresStrokeCount": 0
+ }
+}

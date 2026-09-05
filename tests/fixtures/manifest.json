@@ -1,0 +1,1290 @@
+{
+  "schema": "nemo.fixtures/1",
+  "generator": "tests/fixtures/generate.cjs",
+  "generatorVersion": 1,
+  "note": "Generated; do not edit. `node tests/fixtures/generate.cjs --check` fails when a committed file differs from what the generator writes.",
+  "fixtures": [
+    {
+      "id": "static-shapes",
+      "kind": "project",
+      "file": "projects/static-shapes.json",
+      "schemaVersion": 13,
+      "areas": [
+        "drawing-selection",
+        "project-lifecycle-integrations"
+      ],
+      "features": [
+        "path",
+        "fill",
+        "stroke",
+        "bezier-handles",
+        "single-keyframe"
+      ],
+      "generation": {
+        "script": "tests/fixtures/generate.cjs",
+        "generatorVersion": 1,
+        "seed": 101
+      },
+      "sha256": "b434a5bac22c860c901705e84349956d6d39fe2a4aab0342b79161a5d999763e",
+      "bytes": 4406,
+      "capabilities": [
+        "node"
+      ],
+      "backend": "none",
+      "tolerance": {
+        "geometry": 0.001
+      },
+      "expectations": {
+        "canvas": [
+          320,
+          240
+        ],
+        "fps": 12,
+        "totalFrames": 12,
+        "keyframes": [
+          0
+        ],
+        "strokeCount": 3,
+        "shapes": [
+          {
+            "index": 0,
+            "kind": "rect",
+            "bounds": [
+              40,
+              40,
+              80,
+              60
+            ],
+            "fill": "#1d3557",
+            "stroked": false
+          },
+          {
+            "index": 1,
+            "kind": "circle",
+            "center": [
+              200,
+              120
+            ],
+            "radius": 40,
+            "bounds": [
+              160,
+              80,
+              80,
+              80
+            ],
+            "fill": "#e63946",
+            "stroked": true,
+            "strokeWidth": 2
+          },
+          {
+            "index": 2,
+            "kind": "triangle",
+            "bounds": [
+              94.019,
+              150,
+              51.962,
+              45
+            ],
+            "filled": false,
+            "stroked": true,
+            "strokeWidth": 4
+          }
+        ]
+      },
+      "consumers": [
+        "tests/nemo-fixtures.test.cjs",
+        "R12 render characterization"
+      ]
+    },
+    {
+      "id": "keyed-position-default-ease",
+      "kind": "project",
+      "file": "projects/keyed-position-default-ease.json",
+      "schemaVersion": 13,
+      "areas": [
+        "animation-rigs-expressions"
+      ],
+      "features": [
+        "motion.position",
+        "keyframes",
+        "default-ease",
+        "clamp-outside-keys"
+      ],
+      "generation": {
+        "script": "tests/fixtures/generate.cjs",
+        "generatorVersion": 1,
+        "seed": 102
+      },
+      "sha256": "f430a8e1319f5769fc9c1aa6b5e8ed334f6861f4ae47e3a43364affb37c3014b",
+      "bytes": 3990,
+      "capabilities": [
+        "node"
+      ],
+      "backend": "none",
+      "tolerance": {
+        "value": 0.000001
+      },
+      "expectations": {
+        "prop": "position",
+        "derivation": "DEFAULT_CURVE waypoints (0.25→0.156, 0.5→0.5, 0.75→0.844) on the on-curve-waypoint model; frames outside the key range clamp to the nearest key",
+        "at": {
+          "0": [
+            0,
+            0
+          ],
+          "6": [
+            37.44,
+            0
+          ],
+          "12": [
+            120,
+            0
+          ],
+          "18": [
+            202.56,
+            0
+          ],
+          "24": [
+            240,
+            0
+          ],
+          "30": [
+            240,
+            0
+          ],
+          "-5": [
+            0,
+            0
+          ]
+        },
+        "defaults": {
+          "rotation": [
+            0
+          ],
+          "scale": [
+            100,
+            100
+          ],
+          "opacity": [
+            100
+          ],
+          "anchor": [
+            0,
+            0
+          ]
+        }
+      },
+      "consumers": [
+        "tests/nemo-fixtures.test.cjs",
+        "tests/bench/run.cjs evaluation.rawValueAtFrame"
+      ]
+    },
+    {
+      "id": "keyed-position-linear",
+      "kind": "project",
+      "file": "projects/keyed-position-linear.json",
+      "schemaVersion": 13,
+      "areas": [
+        "animation-rigs-expressions"
+      ],
+      "features": [
+        "motion.position",
+        "keyframes",
+        "linear-curve"
+      ],
+      "generation": {
+        "script": "tests/fixtures/generate.cjs",
+        "generatorVersion": 1,
+        "seed": 103
+      },
+      "sha256": "8a651461080cc4c71f400ceadc198ce2b1fc15f47d8a35acd862a3f85e0a6893",
+      "bytes": 4311,
+      "capabilities": [
+        "node"
+      ],
+      "backend": "none",
+      "tolerance": {
+        "value": 0.000001
+      },
+      "expectations": {
+        "prop": "position",
+        "derivation": "five collinear curve waypoints define the identity ease, so the value is linear in frame",
+        "at": {
+          "0": [
+            0,
+            0
+          ],
+          "6": [
+            60,
+            0
+          ],
+          "9": [
+            90,
+            0
+          ],
+          "12": [
+            120,
+            0
+          ],
+          "18": [
+            180,
+            0
+          ],
+          "24": [
+            240,
+            0
+          ]
+        }
+      },
+      "consumers": [
+        "tests/nemo-fixtures.test.cjs"
+      ]
+    },
+    {
+      "id": "keyed-hold-and-static",
+      "kind": "project",
+      "file": "projects/keyed-hold-and-static.json",
+      "schemaVersion": 13,
+      "areas": [
+        "animation-rigs-expressions"
+      ],
+      "features": [
+        "motion.position",
+        "hold-key",
+        "motionStatic.opacity",
+        "property-defaults"
+      ],
+      "generation": {
+        "script": "tests/fixtures/generate.cjs",
+        "generatorVersion": 1,
+        "seed": 104
+      },
+      "sha256": "1aee364c2f0203f8dc28156cdc8361bfda53d335d35e22013c2cf6851a1effe0",
+      "bytes": 4251,
+      "capabilities": [
+        "node"
+      ],
+      "backend": "none",
+      "tolerance": {
+        "value": 0.000001
+      },
+      "expectations": {
+        "position": {
+          "derivation": "hold flag on the LEFT key pins the whole segment; the second segment uses the default ease",
+          "at": {
+            "0": [
+              0,
+              0
+            ],
+            "5": [
+              0,
+              0
+            ],
+            "11": [
+              0,
+              0
+            ],
+            "12": [
+              100,
+              0
+            ],
+            "18": [
+              150,
+              0
+            ],
+            "24": [
+              200,
+              0
+            ]
+          }
+        },
+        "opacity": {
+          "derivation": "static (unkeyed) value applies at every frame",
+          "at": {
+            "0": [
+              50
+            ],
+            "12": [
+              50
+            ],
+            "24": [
+              50
+            ]
+          }
+        },
+        "defaults": {
+          "rotation": [
+            0
+          ],
+          "scale": [
+            100,
+            100
+          ]
+        }
+      },
+      "consumers": [
+        "tests/nemo-fixtures.test.cjs"
+      ]
+    },
+    {
+      "id": "expression-rotation",
+      "kind": "project",
+      "file": "projects/expression-rotation.json",
+      "schemaVersion": 13,
+      "areas": [
+        "animation-rigs-expressions"
+      ],
+      "features": [
+        "expressions",
+        "frame-native-vocabulary",
+        "rotation"
+      ],
+      "generation": {
+        "script": "tests/fixtures/generate.cjs",
+        "generatorVersion": 1,
+        "seed": 105
+      },
+      "sha256": "69a222814247aabaca3d35fdb4a49f1c92b1822a09dfafb331cfd505fe5c1224",
+      "bytes": 3709,
+      "capabilities": [
+        "app-runtime"
+      ],
+      "backend": "expression-sandbox",
+      "tolerance": {
+        "value": 0.000001
+      },
+      "expectations": {
+        "prop": "rotation",
+        "derivation": "the expression reads the FRAME-native `frame` binding; 15 degrees per frame",
+        "at": {
+          "0": [
+            0
+          ],
+          "6": [
+            90
+          ],
+          "12": [
+            180
+          ],
+          "18": [
+            270
+          ],
+          "24": [
+            360
+          ]
+        },
+        "note": "evaluated only by the app runtime (expression sandbox); not runnable under Node"
+      },
+      "consumers": [
+        "R12/R13 characterization (test:browser)"
+      ]
+    },
+    {
+      "id": "held-frames-on-sixes",
+      "kind": "project",
+      "file": "projects/held-frames-on-sixes.json",
+      "schemaVersion": 13,
+      "areas": [
+        "timeline-layers-frames"
+      ],
+      "features": [
+        "2d-animation",
+        "keyframes-on-sixes",
+        "held-frames",
+        "keyframe-inheritance"
+      ],
+      "generation": {
+        "script": "tests/fixtures/generate.cjs",
+        "generatorVersion": 1,
+        "seed": 106
+      },
+      "sha256": "0cdf93722dd55c078511b43aa55d942f2f972eacbe3485dc983b106e93fcf8e4",
+      "bytes": 5641,
+      "capabilities": [
+        "node"
+      ],
+      "backend": "none",
+      "tolerance": {},
+      "expectations": {
+        "keyframes": [
+          0,
+          6,
+          12
+        ],
+        "derivation": "a non-key frame shows the nearest earlier keyframe",
+        "effectiveKeyframeByFrame": {
+          "0": 0,
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 0,
+          "5": 0,
+          "6": 6,
+          "7": 6,
+          "8": 6,
+          "9": 6,
+          "10": 6,
+          "11": 6,
+          "12": 12,
+          "13": 12,
+          "14": 12,
+          "15": 12,
+          "16": 12,
+          "17": 12,
+          "18": 12,
+          "19": 12,
+          "20": 12,
+          "21": 12,
+          "22": 12,
+          "23": 12
+        },
+        "rectXByKeyframe": {
+          "0": 20,
+          "6": 100,
+          "12": 180
+        },
+        "strokesPerEffectiveFrame": 1
+      },
+      "consumers": [
+        "tests/nemo-fixtures.test.cjs",
+        "R12 frame-load characterization"
+      ]
+    },
+    {
+      "id": "component-instances",
+      "kind": "project",
+      "file": "projects/component-instances.json",
+      "schemaVersion": 13,
+      "areas": [
+        "timeline-layers-frames",
+        "animation-rigs-expressions"
+      ],
+      "features": [
+        "symbols",
+        "component-instance",
+        "symPlacedAt",
+        "loop",
+        "pingpong",
+        "once",
+        "single"
+      ],
+      "generation": {
+        "script": "tests/fixtures/generate.cjs",
+        "generatorVersion": 1,
+        "seed": 107
+      },
+      "sha256": "b921835dbefb852e800a545c2f91c575375ae2813a60c839ac6e69a6e46d3639",
+      "bytes": 12876,
+      "capabilities": [
+        "node"
+      ],
+      "backend": "none",
+      "tolerance": {},
+      "expectations": {
+        "symbolTotalFrames": 6,
+        "derivation": "placement rule: elapsed = max(0, f - placedAt) * speed; loop = elapsed mod total; once = min(total-1, elapsed); pingpong over a (total-1)*2 cycle; single = symSingleFrame",
+        "instances": {
+          "L-loop-from-3": {
+            "playMode": "loop",
+            "placedAt": 3,
+            "componentFrameByMainFrame": [
+              0,
+              0,
+              0,
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              0,
+              1,
+              2
+            ]
+          },
+          "L-pingpong": {
+            "playMode": "pingpong",
+            "placedAt": 0,
+            "componentFrameByMainFrame": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              4,
+              3,
+              2,
+              1,
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              4,
+              3,
+              2,
+              1,
+              0,
+              1,
+              2,
+              3
+            ]
+          },
+          "L-once-from-2": {
+            "playMode": "once",
+            "placedAt": 2,
+            "componentFrameByMainFrame": [
+              0,
+              0,
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5
+            ]
+          },
+          "L-single-4": {
+            "playMode": "single",
+            "placedAt": 0,
+            "componentFrameByMainFrame": [
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4
+            ]
+          }
+        }
+      },
+      "consumers": [
+        "tests/nemo-fixtures.test.cjs",
+        "StoryBoard/Animation 2D characterization"
+      ]
+    },
+    {
+      "id": "matte-alpha",
+      "kind": "project",
+      "file": "projects/matte-alpha.json",
+      "schemaVersion": 13,
+      "areas": [
+        "effects-masks"
+      ],
+      "features": [
+        "track-matte",
+        "matteMode.alpha",
+        "matteSourceLayerUid",
+        "alpha-export"
+      ],
+      "generation": {
+        "script": "tests/fixtures/generate.cjs",
+        "generatorVersion": 1,
+        "seed": 108
+      },
+      "sha256": "672abbe8382bc97f1d827c7052188dc87ed1f347f371b1cecd3d523661e3c6b9",
+      "bytes": 4804,
+      "capabilities": [
+        "engine-webgpu"
+      ],
+      "backend": "engine",
+      "tolerance": {
+        "pixel": 0.00784313725490196
+      },
+      "expectations": {
+        "matteMode": "alpha",
+        "sourceLayerUid": "L-matte-shape",
+        "structural": {
+          "sourceResolves": true
+        },
+        "pixels": {
+          "derivation": "content is visible only where the matte shape has alpha",
+          "inside": {
+            "at": [
+              160,
+              120
+            ],
+            "color": "#2a9d8f"
+          },
+          "outside": {
+            "at": [
+              20,
+              20
+            ],
+            "color": "#ffffff"
+          }
+        },
+        "note": "pixel expectations are for the engine render / PNG export (R12/R21)"
+      },
+      "consumers": [
+        "R12 render characterization",
+        "R21 packaged export"
+      ]
+    },
+    {
+      "id": "text-root",
+      "kind": "project",
+      "file": "projects/text-root.json",
+      "schemaVersion": 13,
+      "areas": [
+        "drawing-selection"
+      ],
+      "features": [
+        "vector-text",
+        "isTextRoot",
+        "glyph-paths",
+        "isTextLayer"
+      ],
+      "generation": {
+        "script": "tests/fixtures/generate.cjs",
+        "generatorVersion": 1,
+        "seed": 109
+      },
+      "sha256": "c07f07d6b218a701739c0321d8571cf50a6d8424d1213ec23c165538fd7f6fa5",
+      "bytes": 6794,
+      "capabilities": [
+        "node"
+      ],
+      "backend": "none",
+      "tolerance": {},
+      "expectations": {
+        "text": "Nemo",
+        "font": "Roboto-Regular",
+        "size": 48,
+        "glyphCount": 4,
+        "chars": [
+          "N",
+          "e",
+          "m",
+          "o"
+        ],
+        "rootIsFirstStroke": true
+      },
+      "consumers": [
+        "tests/nemo-fixtures.test.cjs",
+        "R12 text characterization"
+      ]
+    },
+    {
+      "id": "image-mesh",
+      "kind": "project",
+      "file": "projects/image-mesh.json",
+      "schemaVersion": 13,
+      "areas": [
+        "media-import-export",
+        "animation-rigs-expressions"
+      ],
+      "features": [
+        "raster",
+        "image-mesh",
+        "meshId-on-all-frames",
+        "normalized-mesh-space",
+        "vertex-offset"
+      ],
+      "generation": {
+        "script": "tests/fixtures/generate.cjs",
+        "generatorVersion": 1,
+        "seed": 110
+      },
+      "sha256": "5155418bd15677232e25b833ea56ba3740b5d50f78eb728b0d9fb4aa66910c24",
+      "bytes": 13193,
+      "capabilities": [
+        "node"
+      ],
+      "backend": "none",
+      "tolerance": {
+        "geometry": 1e-9
+      },
+      "expectations": {
+        "meshId": "im_fixture",
+        "framesTagged": 24,
+        "outlineCount": 16,
+        "vertexCount": 25,
+        "triangleCount": 32,
+        "allVerticesNormalized": true,
+        "movedVertex": {
+          "index": 20,
+          "offset": [
+            0.2,
+            0
+          ],
+          "worldDisplacementPx": [
+            40,
+            0
+          ],
+          "derivation": "offset is a fraction of the raster display size (200×100)"
+        }
+      },
+      "consumers": [
+        "tests/nemo-fixtures.test.cjs",
+        "R12 mesh render characterization"
+      ]
+    },
+    {
+      "id": "media-raster",
+      "kind": "project",
+      "file": "projects/media-raster.json",
+      "schemaVersion": 13,
+      "areas": [
+        "media-import-export"
+      ],
+      "features": [
+        "raster",
+        "embedded-png",
+        "same-dict-every-frame"
+      ],
+      "generation": {
+        "script": "tests/fixtures/generate.cjs",
+        "generatorVersion": 1,
+        "seed": 111
+      },
+      "sha256": "2797ea95d9aa3b0cfb531ed98284fbe74ba14428510eb23aecae33013df56b44",
+      "bytes": 4951,
+      "capabilities": [
+        "node"
+      ],
+      "backend": "none",
+      "tolerance": {},
+      "expectations": {
+        "frames": 12,
+        "sameSourceEveryFrame": true,
+        "sourceSha256": "cf657e7ed19a6f61c475e8e6dddbff5b81a3f7aa10d22447a16500f5bd57eaaf",
+        "bounds": [
+          80,
+          40,
+          160,
+          160
+        ],
+        "sourceKind": "data:image/png"
+      },
+      "consumers": [
+        "tests/nemo-fixtures.test.cjs",
+        "R12/R21 media characterization"
+      ]
+    },
+    {
+      "id": "migration-legacy-frames-only",
+      "kind": "project",
+      "file": "projects/migration-legacy-frames-only.json",
+      "schemaVersion": null,
+      "areas": [
+        "project-lifecycle-integrations"
+      ],
+      "features": [
+        "legacy-schema",
+        "frames-without-layers",
+        "importJSON-defaults"
+      ],
+      "generation": {
+        "script": "tests/fixtures/generate.cjs",
+        "generatorVersion": 1,
+        "seed": 112
+      },
+      "sha256": "c9ba094aa68be9f519ea124c52feec3c69a4532a660f89f0b785fd29c12783f1",
+      "bytes": 1421,
+      "capabilities": [
+        "app-runtime"
+      ],
+      "backend": "none",
+      "tolerance": {},
+      "expectations": {
+        "legacyShape": "no version, no layers, frames at top level",
+        "afterImport": {
+          "layers": 1,
+          "layerName": "Layer 1",
+          "totalFrames": 6,
+          "fps": 12,
+          "canvasW": 1920,
+          "canvasH": 1080,
+          "canvasBg": "#ffffff",
+          "waIn": 0,
+          "waOut": 5
+        },
+        "derivation": "the defaults importJSON fills when a field is absent"
+      },
+      "consumers": [
+        "R12 load characterization (test:browser)"
+      ]
+    },
+    {
+      "id": "export-12f-320x240",
+      "kind": "project",
+      "file": "projects/export-12f-320x240.json",
+      "schemaVersion": 13,
+      "areas": [
+        "media-import-export",
+        "timeline-layers-frames"
+      ],
+      "features": [
+        "export",
+        "png-sequence",
+        "mp4",
+        "per-frame-content",
+        "known-fixture"
+      ],
+      "generation": {
+        "script": "tests/fixtures/generate.cjs",
+        "generatorVersion": 1,
+        "seed": 113
+      },
+      "sha256": "f79902af620add3209314154c6dcfca5f6ce4f8f44bbb4e37b666abbbceab684",
+      "bytes": 14259,
+      "capabilities": [
+        "desktop",
+        "engine-webgpu"
+      ],
+      "backend": "engine+ffmpeg-sidecar",
+      "tolerance": {
+        "pixel": 0.03137254901960784,
+        "note": "yuv420p chroma subsampling; probe pixels sit 20px inside edges"
+      },
+      "expectations": {
+        "frames": 12,
+        "width": 320,
+        "height": 240,
+        "fps": 12,
+        "perFrame": [
+          {
+            "frame": 0,
+            "squareBounds": [
+              0,
+              100,
+              40,
+              40
+            ],
+            "probeInside": {
+              "at": [
+                20,
+                120
+              ],
+              "color": "#e63946"
+            },
+            "probeOutside": {
+              "at": [
+                300,
+                20
+              ],
+              "color": "#ffffff"
+            }
+          },
+          {
+            "frame": 1,
+            "squareBounds": [
+              20,
+              100,
+              40,
+              40
+            ],
+            "probeInside": {
+              "at": [
+                40,
+                120
+              ],
+              "color": "#e63946"
+            },
+            "probeOutside": {
+              "at": [
+                300,
+                20
+              ],
+              "color": "#ffffff"
+            }
+          },
+          {
+            "frame": 2,
+            "squareBounds": [
+              40,
+              100,
+              40,
+              40
+            ],
+            "probeInside": {
+              "at": [
+                60,
+                120
+              ],
+              "color": "#e63946"
+            },
+            "probeOutside": {
+              "at": [
+                300,
+                20
+              ],
+              "color": "#ffffff"
+            }
+          },
+          {
+            "frame": 3,
+            "squareBounds": [
+              60,
+              100,
+              40,
+              40
+            ],
+            "probeInside": {
+              "at": [
+                80,
+                120
+              ],
+              "color": "#e63946"
+            },
+            "probeOutside": {
+              "at": [
+                300,
+                20
+              ],
+              "color": "#ffffff"
+            }
+          },
+          {
+            "frame": 4,
+            "squareBounds": [
+              80,
+              100,
+              40,
+              40
+            ],
+            "probeInside": {
+              "at": [
+                100,
+                120
+              ],
+              "color": "#e63946"
+            },
+            "probeOutside": {
+              "at": [
+                300,
+                20
+              ],
+              "color": "#ffffff"
+            }
+          },
+          {
+            "frame": 5,
+            "squareBounds": [
+              100,
+              100,
+              40,
+              40
+            ],
+            "probeInside": {
+              "at": [
+                120,
+                120
+              ],
+              "color": "#e63946"
+            },
+            "probeOutside": {
+              "at": [
+                300,
+                20
+              ],
+              "color": "#ffffff"
+            }
+          },
+          {
+            "frame": 6,
+            "squareBounds": [
+              120,
+              100,
+              40,
+              40
+            ],
+            "probeInside": {
+              "at": [
+                140,
+                120
+              ],
+              "color": "#e63946"
+            },
+            "probeOutside": {
+              "at": [
+                300,
+                20
+              ],
+              "color": "#ffffff"
+            }
+          },
+          {
+            "frame": 7,
+            "squareBounds": [
+              140,
+              100,
+              40,
+              40
+            ],
+            "probeInside": {
+              "at": [
+                160,
+                120
+              ],
+              "color": "#e63946"
+            },
+            "probeOutside": {
+              "at": [
+                300,
+                20
+              ],
+              "color": "#ffffff"
+            }
+          },
+          {
+            "frame": 8,
+            "squareBounds": [
+              160,
+              100,
+              40,
+              40
+            ],
+            "probeInside": {
+              "at": [
+                180,
+                120
+              ],
+              "color": "#e63946"
+            },
+            "probeOutside": {
+              "at": [
+                300,
+                20
+              ],
+              "color": "#ffffff"
+            }
+          },
+          {
+            "frame": 9,
+            "squareBounds": [
+              180,
+              100,
+              40,
+              40
+            ],
+            "probeInside": {
+              "at": [
+                200,
+                120
+              ],
+              "color": "#e63946"
+            },
+            "probeOutside": {
+              "at": [
+                300,
+                20
+              ],
+              "color": "#ffffff"
+            }
+          },
+          {
+            "frame": 10,
+            "squareBounds": [
+              200,
+              100,
+              40,
+              40
+            ],
+            "probeInside": {
+              "at": [
+                220,
+                120
+              ],
+              "color": "#e63946"
+            },
+            "probeOutside": {
+              "at": [
+                300,
+                20
+              ],
+              "color": "#ffffff"
+            }
+          },
+          {
+            "frame": 11,
+            "squareBounds": [
+              220,
+              100,
+              40,
+              40
+            ],
+            "probeInside": {
+              "at": [
+                240,
+                120
+              ],
+              "color": "#e63946"
+            },
+            "probeOutside": {
+              "at": [
+                300,
+                20
+              ],
+              "color": "#ffffff"
+            }
+          }
+        ],
+        "mp4": {
+          "codec": "h264",
+          "pixFmt": "yuv420p",
+          "frames": 12,
+          "durationSeconds": 1
+        },
+        "derivation": "the square advances 20px per frame; probes avoid edges by 20px"
+      },
+      "consumers": [
+        "R04/R21 packaged desktop export (the known fixture)",
+        "tests/bench/run.cjs render/export workloads (declared)"
+      ]
+    },
+    {
+      "id": "pen-stroke",
+      "kind": "interaction",
+      "file": "interaction/pen-stroke.json",
+      "schemaVersion": "nemo.interaction/1",
+      "areas": [
+        "drawing-selection"
+      ],
+      "features": [
+        "pen",
+        "pointer-script",
+        "undo"
+      ],
+      "generation": {
+        "script": "tests/fixtures/generate.cjs",
+        "generatorVersion": 1,
+        "seed": null
+      },
+      "sha256": "93e0f9509763cbb08258255d9682f4fb66f0b7bdd273e55186792512e418d792",
+      "bytes": 1224,
+      "capabilities": [
+        "browser-harness"
+      ],
+      "backend": "none",
+      "tolerance": {
+        "geometry": 2
+      },
+      "expectations": {
+        "strokesAdded": 1,
+        "minSegments": 3,
+        "boundsWithin": [
+          30,
+          70,
+          220,
+          60
+        ],
+        "undoRestoresStrokeCount": 0
+      },
+      "consumers": [
+        "R12/R13 browser harness (test:browser)"
+      ]
+    }
+  ],
+  "generated": [
+    {
+      "id": "scale-500",
+      "kind": "generated",
+      "committed": false,
+      "strokes": 500,
+      "canvas": [
+        1920,
+        1080
+      ],
+      "generation": {
+        "script": "tests/fixtures/lib.cjs scaleDocument",
+        "generatorVersion": 1,
+        "seed": 9001
+      },
+      "sha256": "e359c7c8abba1ab3794bc14bd2162a1093039f06c13737d8598734a2b474b7e1",
+      "bytes": 329706,
+      "consumers": [
+        "tests/bench/run.cjs copy.* and memory.* workloads"
+      ]
+    },
+    {
+      "id": "scale-2000",
+      "kind": "generated",
+      "committed": false,
+      "strokes": 2000,
+      "canvas": [
+        1920,
+        1080
+      ],
+      "generation": {
+        "script": "tests/fixtures/lib.cjs scaleDocument",
+        "generatorVersion": 1,
+        "seed": 9002
+      },
+      "sha256": "6bb0e4acbf95dee9a25994095c548a531f1093586d24f79022f95764a65d82ac",
+      "bytes": 1314435,
+      "consumers": [
+        "tests/bench/run.cjs copy.* and memory.* workloads"
+      ]
+    },
+    {
+      "id": "scale-4000",
+      "kind": "generated",
+      "committed": false,
+      "strokes": 4000,
+      "canvas": [
+        1920,
+        1080
+      ],
+      "generation": {
+        "script": "tests/fixtures/lib.cjs scaleDocument",
+        "generatorVersion": 1,
+        "seed": 9003
+      },
+      "sha256": "1071e617a501e10325f942e6693f2e0e7452d0ac64c1551480730f352107d9f8",
+      "bytes": 2625863,
+      "consumers": [
+        "tests/bench/run.cjs copy.* and memory.* workloads"
+      ]
+    }
+  ]
+}

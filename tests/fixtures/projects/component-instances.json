@@ -1,0 +1,727 @@
+{
+ "version": 13,
+ "totalFrames": 24,
+ "fps": 12,
+ "canvasW": 320,
+ "canvasH": 240,
+ "canvasBg": "#ffffff",
+ "waIn": 0,
+ "waOut": 23,
+ "mediaMode": "embedded",
+ "layers": [
+  {
+   "name": "Loop from 3",
+   "visible": true,
+   "locked": false,
+   "frames": [
+    {
+     "strokes": [],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    }
+   ],
+   "layerUid": "L-loop-from-3",
+   "symbolId": "sym_blink",
+   "symSpeed": 1,
+   "symPlacedAt": 3,
+   "symPlayMode": "loop"
+  },
+  {
+   "name": "PingPong",
+   "visible": true,
+   "locked": false,
+   "frames": [
+    {
+     "strokes": [],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    }
+   ],
+   "layerUid": "L-pingpong",
+   "symbolId": "sym_blink",
+   "symSpeed": 1,
+   "symPlacedAt": 0,
+   "symPlayMode": "pingpong"
+  },
+  {
+   "name": "Once from 2",
+   "visible": true,
+   "locked": false,
+   "frames": [
+    {
+     "strokes": [],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    }
+   ],
+   "layerUid": "L-once-from-2",
+   "symbolId": "sym_blink",
+   "symSpeed": 1,
+   "symPlacedAt": 2,
+   "symPlayMode": "once"
+  },
+  {
+   "name": "Single 4",
+   "visible": true,
+   "locked": false,
+   "frames": [
+    {
+     "strokes": [],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    }
+   ],
+   "layerUid": "L-single-4",
+   "symbolId": "sym_blink",
+   "symSpeed": 1,
+   "symPlacedAt": 0,
+   "symPlayMode": "single",
+   "symSingleFrame": 4
+  }
+ ],
+ "symbols": {
+  "sym_blink": {
+   "name": "Blink",
+   "totalFrames": 6,
+   "fps": 12,
+   "layers": [
+    {
+     "name": "Blink content",
+     "visible": true,
+     "locked": false,
+     "frames": [
+      {
+       "strokes": [
+        {
+         "segments": [
+          {
+           "point": [
+            160,
+            90
+           ],
+           "handleIn": [
+            -16.569,
+            0
+           ],
+           "handleOut": [
+            16.569,
+            0
+           ]
+          },
+          {
+           "point": [
+            190,
+            120
+           ],
+           "handleIn": [
+            0,
+            -16.569
+           ],
+           "handleOut": [
+            0,
+            16.569
+           ]
+          },
+          {
+           "point": [
+            160,
+            150
+           ],
+           "handleIn": [
+            16.569,
+            0
+           ],
+           "handleOut": [
+            -16.569,
+            0
+           ]
+          },
+          {
+           "point": [
+            130,
+            120
+           ],
+           "handleIn": [
+            0,
+            16.569
+           ],
+           "handleOut": [
+            0,
+            -16.569
+           ]
+          }
+         ],
+         "closed": true,
+         "strokeColor": null,
+         "hasRealStroke": false,
+         "strokeWidth": 2,
+         "strokeCap": "round",
+         "strokeJoin": "round",
+         "opacity": 1,
+         "fillColor": "#e63946"
+        }
+       ],
+       "isKeyframe": true,
+       "isInterpolated": false
+      },
+      {
+       "strokes": [],
+       "isKeyframe": false,
+       "isInterpolated": false
+      },
+      {
+       "strokes": [],
+       "isKeyframe": false,
+       "isInterpolated": false
+      },
+      {
+       "strokes": [
+        {
+         "segments": [
+          {
+           "point": [
+            160,
+            70
+           ],
+           "handleIn": [
+            -27.614,
+            0
+           ],
+           "handleOut": [
+            27.614,
+            0
+           ]
+          },
+          {
+           "point": [
+            210,
+            120
+           ],
+           "handleIn": [
+            0,
+            -27.614
+           ],
+           "handleOut": [
+            0,
+            27.614
+           ]
+          },
+          {
+           "point": [
+            160,
+            170
+           ],
+           "handleIn": [
+            27.614,
+            0
+           ],
+           "handleOut": [
+            -27.614,
+            0
+           ]
+          },
+          {
+           "point": [
+            110,
+            120
+           ],
+           "handleIn": [
+            0,
+            27.614
+           ],
+           "handleOut": [
+            0,
+            -27.614
+           ]
+          }
+         ],
+         "closed": true,
+         "strokeColor": null,
+         "hasRealStroke": false,
+         "strokeWidth": 2,
+         "strokeCap": "round",
+         "strokeJoin": "round",
+         "opacity": 1,
+         "fillColor": "#2a9d8f"
+        }
+       ],
+       "isKeyframe": true,
+       "isInterpolated": false
+      },
+      {
+       "strokes": [],
+       "isKeyframe": false,
+       "isInterpolated": false
+      },
+      {
+       "strokes": [],
+       "isKeyframe": false,
+       "isInterpolated": false
+      }
+     ],
+     "layerUid": "L-blink-content"
+    }
+   ]
+  }
+ }
+}
