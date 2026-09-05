@@ -1,4 +1,4 @@
-# Boundaries checker — R05 first increment
+# Boundaries checker — R05 bounded enforcement
 
 Implements the enforcement half of
 [`engineering/remediation/04_MODULARITY_POLICY.md`](../remediation/04_MODULARITY_POLICY.md)
@@ -7,8 +7,9 @@ application. Code lives in [`scripts/nemo/lib/boundaries.cjs`](../../scripts/nem
 (the checker, pure functions, no I/O beyond reading the files a profile names) and
 [`scripts/nemo/boundaries.cjs`](../../scripts/nemo/boundaries.cjs) (a standalone CLI). Behavioral
 tests are in [`scripts/nemo/boundaries.test.cjs`](../../scripts/nemo/boundaries.test.cjs)
-(`node --test scripts/nemo/boundaries.test.cjs`). The library validates the profile before
-reading its sources; the CLI uses the same validation and exits 2 on malformed policy.
+and [`scripts/nemo/boundaries-ratchet.test.cjs`](../../scripts/nemo/boundaries-ratchet.test.cjs).
+The library validates the profile before reading its sources; the CLI uses the same validation
+and exits 2 on malformed policy or baseline input.
 
 This is **not wired into `npm run check`/`verify`, `scripts/nemo/lib/jobs.cjs` or
 `package.json`** in this packet — see "What's pending" below.
@@ -36,11 +37,58 @@ imports, new cycles, ... or UI imports into domain."
 
 ```bash
 node scripts/nemo/boundaries.cjs <profile.json> [--root <dir>] [--json]
+node scripts/nemo/boundaries.cjs <profile.json> --baseline <prior-profile.json> [--root <dir>] [--json]
 ```
 
 Exit 0 = no violations, 1 = one or more, 2 = bad usage or a profile that could not run (e.g.
 an unknown `sizeProfile` key, malformed exception, missing file, or unsupported lexical syntax).
 Unknown flags, missing option values and extra positional arguments also exit 2.
+
+The second form enables the size-baseline ratchet. `<prior-profile.json>` must be the explicit,
+previously reviewed profile from the commit being compared; the checker does not guess a Git
+revision or silently fall back when that file is missing. The original invocation remains
+unchanged and runs the profile rules without a baseline comparison.
+
+`--baseline` is a caller-supplied trust boundary. Future CI must materialize this file from the
+protected base revision and pass that path to the checker; it must never accept a baseline from
+candidate-controlled contents. This CLI validates and compares the supplied document, but it
+cannot prove which Git revision supplied it.
+
+## Size-baseline ratchet
+
+[`scripts/nemo/lib/boundaries-ratchet.cjs`](../../scripts/nemo/lib/boundaries-ratchet.cjs)
+compares the prior and candidate profiles by normalized root-relative file path. Module IDs and
+`sizeProfile` names are metadata, not ratchet identity. For each exact path, the effective
+ceiling is its policy value: the size exception's `ceiling` when one exists, otherwise the
+assigned profile's `hardMax`.
+
+Baseline mode fails when:
+
+- a retained named size profile raises its ordinary `hardMax`, or a newly named profile exceeds
+  the largest ordinary hard maximum in the prior adopted policy;
+- a candidate effective ceiling exceeds the prior exact-path ceiling, including after a module
+  reassignment or `sizeProfile` rename;
+- a prior path still exists in the source tree but was deleted from the candidate profile;
+- a prior size exception is deleted while an ordinary profile preserves the same enlarged
+  allowance, which would discard its owner/issue/expiry accountability; or
+- a size exception appears on a path absent from the prior baseline, including an exception
+  moved or renamed onto a new source path.
+
+A lower effective ceiling is accepted and recorded in `ratchet.reductions` with its current
+nonblank line count. A prior profile entry whose source was actually removed is accepted and
+recorded in `ratchet.removals`. The ordinary candidate check still reads every declared source
+and rejects actual line count above the candidate ceiling; unchanged policy therefore cannot
+hide source growth above its committed ceiling. JSON output adds a `ratchet` object only when
+`--baseline` is supplied. Text output reports ratchet violations, reductions and removals.
+
+The ratchet is intentionally policy-to-policy. Source renames that do not carry a size
+exception are treated as retired and new paths, but the new path still cannot use an enlarged
+ordinary policy: same-budget profile renames and new files at or below the prior adopted maximum
+remain valid. Full source coverage and classification remain the R01/R03 inventory gate. Review
+the reported removals rather than treating them as proof that code was deleted intentionally.
+The comparator does not infer file types or detect content moves, and a new path may use any
+still-adopted ordinary profile. Reviewing each path's profile assignment and making baseline
+provenance immutable are responsibilities of the R01/R03 and CI adoption gate.
 
 ## Limitations (v1, deliberate scope cut)
 
@@ -91,9 +139,8 @@ An active exception for private imports, layer edges or globals applies only to 
 file/rule. A cycle exception removes only dependency contributions originating in its exact
 file; another file contributing the same module edge remains in the prohibited graph. Applied
 exceptions are recorded in the report. Unsupported-source diagnostics
-cannot be waived by an exception. This validation does not compare policy changes against an
-older Git baseline; preventing an authorized ceiling from being raised in a later revision
-still requires the R01/R03 baseline/CI adoption work.
+cannot be waived by an exception. Supplying `--baseline` compares the candidate against an
+explicitly selected older profile; the checker never infers which Git revision is authoritative.
 
 ## Integration contract for R01/R03 (pending)
 
@@ -133,6 +180,9 @@ contract:
 - No real, reviewed profile for any part of the actual `src/js` tree — only the illustrative
   fixtures inside `boundaries.test.cjs`. Producing one is R01/R03's job, not this checker's;
   fabricating a "reviewed" profile here would misrepresent unreviewed code as audited.
+- No canonical committed baseline yet. This increment supplies the comparison mechanism; R01/R03
+  still supply reviewed real profiles and a later integration packet must materialize the
+  protected-base copy in standard commands/CI.
 - `layer-violation` was implemented alongside the five rules the R05 acceptance criteria name
   (cycle, private-import, global-state, size, expired-exception) because it falls out of the
   same module graph at near-zero extra cost, and the policy explicitly calls out forbidden
