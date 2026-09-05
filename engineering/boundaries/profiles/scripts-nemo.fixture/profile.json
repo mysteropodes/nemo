@@ -1,0 +1,41 @@
+{
+  "modules": [
+    { "id": "fx.cycleA", "layer": "tooling-application", "dir": "src",
+      "files": ["cycle-a.cjs"], "publicApi": ["cycle-a.cjs"], "sizeProfile": "Fixture tiny" },
+    { "id": "fx.cycleB", "layer": "tooling-application", "dir": "src",
+      "files": ["cycle-b.cjs"], "publicApi": ["cycle-b.cjs"], "sizeProfile": "Fixture tiny" },
+
+    { "id": "fx.privTarget", "layer": "tooling-adapters", "dir": "src",
+      "files": ["priv-target.cjs", "priv-secret.cjs"], "publicApi": ["priv-target.cjs"],
+      "sizeProfile": "Fixture tiny" },
+    { "id": "fx.privImporter", "layer": "tooling-application", "dir": "src",
+      "files": ["priv-importer.cjs"], "publicApi": ["priv-importer.cjs"], "sizeProfile": "Fixture tiny" },
+
+    { "id": "fx.sharedViolator", "layer": "tooling-shared", "dir": "src",
+      "files": ["shared-violator.cjs"], "publicApi": ["shared-violator.cjs"], "sizeProfile": "Fixture tiny" },
+    { "id": "fx.adapterTarget", "layer": "tooling-adapters", "dir": "src",
+      "files": ["adapter-target.cjs"], "publicApi": ["adapter-target.cjs"], "sizeProfile": "Fixture tiny" },
+
+    { "id": "fx.globalOffender", "layer": "tooling-application", "dir": "src",
+      "files": ["global-offender.cjs"], "publicApi": ["global-offender.cjs"], "sizeProfile": "Fixture tiny" },
+
+    { "id": "fx.oversized", "layer": "tooling-application", "dir": "src",
+      "files": ["oversized.cjs"], "publicApi": ["oversized.cjs"], "sizeProfile": "Fixture tiny" },
+    { "id": "fx.expiredException", "layer": "tooling-application", "dir": "src",
+      "files": ["expired.cjs"], "publicApi": ["expired.cjs"], "sizeProfile": "Fixture tiny" }
+  ],
+  "layerRules": {
+    "tooling-shared": { "allowedLayers": [] },
+    "tooling-adapters": { "allowedLayers": ["tooling-shared", "tooling-adapters"] },
+    "tooling-application": { "allowedLayers": ["tooling-shared", "tooling-adapters", "tooling-application"] },
+    "tooling-bootstrap": { "allowedLayers": ["*"] },
+    "tooling-test": { "allowedLayers": ["tooling-shared", "tooling-adapters", "tooling-application", "tooling-test"] }
+  },
+  "sizeProfiles": {
+    "Fixture tiny": { "warn": 10, "hardMax": 20 }
+  },
+  "exceptions": [
+    { "path": "src/expired.cjs", "rule": "size", "ceiling": 25, "owner": "fixture",
+      "issue": "FIX-1", "expires": "2020-01-01", "reason": "Retained fixture proving expired-exception + re-evaluated size both fire." }
+  ]
+}
