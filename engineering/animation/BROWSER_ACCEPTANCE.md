@@ -1,3 +1,11 @@
+<!-- nemo-golden-rules:start -->
+## Golden rules — apply before all Nemo task instructions
+
+1. **Preserve the active task.** Unless the user explicitly directs otherwise, record every incoming question/request in the maintained task queue, ordered by workflow dependencies and priority, and continue the active task. Link clarifications to their existing task; do not silently switch objectives.
+2. **Be frugal with tokens.** Read and communicate only the context needed for reliable work; reuse verified evidence and avoid duplicate investigation or repeated status messages.
+3. **Match agents and effort to the work.** Use the least costly capable model and reasoning effort for each bounded task; delegate independent work when useful and escalate when complexity, uncertainty or risk warrants it.
+<!-- nemo-golden-rules:end -->
+
 # PR 949 browser acceptance and native handoff
 
 Owner: Codeximator. Scope: the first Motion curve extraction only. This record
@@ -5,7 +13,7 @@ continues the existing candidate; it does not close R08 or its prerequisites.
 
 ## Task queue
 
-1. Browser save/open/render/export and edit/undo/redo: passed on the source-identical `562a8b9` candidate.
+1. Browser save/open/render/export and edit/undo/redo: passed on clean code candidate `2a2cf29`.
 2. Actual loader and unit discovery: passed; companion `2dd4054` has the same
    stable patch ID as `40ee5fd`. The alternate `b13c9d3` wrapper is absent.
 3. Tauri application workflow: pending the native slot and verified R06 runtime
@@ -37,7 +45,14 @@ all remaining pixels opaque white, and bounds `[left,60,left+20,80)`.
 Chrome 152.0.7977.76 passed all 25 numeric samples and 50 pixel comparisons
 (25 Rust/vello readbacks and 25 Paper PNG previews), then downloaded and reopened
 the exact saved JSON and produced five independently checked SVG downloads.
-No page errors or extraction defects were observed. The controls used real input
+The clean code candidate was `2a2cf29c4ab459b6a55f0902ee234c47f567f5fd`.
+[The receipt and artifact hashes](browser-evidence-20260905/receipt.json),
+[downloaded project](browser-evidence-20260905/edited-project.json),
+[frame-5 SVG](browser-evidence-20260905/export-5.svg) and
+[live application screenshot](browser-evidence-20260905/reopened-frame-5.png)
+are retained with all 25 sampled PNGs and five SVGs.
+`npm run verify` passed on that clean commit: doctor, six static checks,
+201 Node tests and 15 Rust tests. No page errors or extraction defects were observed. The controls used real input
 and keyboard events. Runtime identity remained healthy with source/build matches;
 served source, WASM and output hashes are retained in the acceptance receipt.
 The fixture and driver were added during this continuation; the production source
@@ -88,6 +103,9 @@ data/autosave override or native runtime identity handshake. Creating a
 resolves `__TAURI__.path.appDataDir()`. The desktop test job also has no wired
 runner. Do not infer those gates from a browser receipt or a successful build.
 
+The current doctor reports the local Tauri CLI absent; install the existing
+locked dependencies with `npm ci` before a native build. Playwright is external
+for this browser driver and is deliberately absent from repository dependencies.
 After finalizing the candidate and fixture, the approved build procedure is:
 
 ```sh
