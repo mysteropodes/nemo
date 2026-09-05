@@ -2,9 +2,9 @@
 
 [R06 / #902](https://github.com/mysteropodes/nemo/issues/902) requires concurrent
 tasks to keep their source, browser/desktop state, ports, caches, builds and
-reports separate. This increment supplies a **local coordination library and
-debug CLI**, not an integrated application launcher. Full R06 acceptance remains
-open until the consumers listed below are implemented and exercised.
+reports separate. The coordination library and browser preview launcher provide
+local ownership checks, distinct task origins and a served source/build identity.
+Full R06 acceptance remains open for the desktop and remaining consumers below.
 
 ## API and guarantees
 
@@ -38,9 +38,8 @@ its current limitation that untracked-file contents are not hashed separately.
 
 Despite its historical name, `verifyHandshake()` reads local launcher metadata;
 it does **not** challenge a running server or establish which checkout serves a
-URL. A real launcher still needs a served endpoint that returns its task, owner,
-source and build identity. Browser/Tauri acceptance must check that endpoint or
-equivalent process protocol before trusting the application instance.
+URL. The browser launcher adds the served endpoint described below. Tauri still
+requires an equivalent runtime handshake before trusting its application instance.
 
 Each mutation creates an atomic directory under `<runtime>/mutations/`, with an
 `owner.json` identifying the mutating PID. Normal completion removes the guard.
@@ -84,6 +83,56 @@ node scripts/nemo/isolation.cjs release --task my-task
 a momentary availability probe, not a lasting reservation. The CLI exposes
 `slot-acquire` and `slot-release` for explicit resource coordination as well.
 
+## Browser preview launcher
+
+`node scripts/nemo/browser.cjs start --task preview-a` starts a long-lived HTTP
+server bound to loopback on an OS-assigned port. Its first stdout line is JSON
+with the actual origin, PID, task roots and owner token. Keep that token in the
+controlling process. Start a second task with a different ID to obtain a distinct
+origin and mutable roots; the server holds its listening socket until shutdown.
+
+The server serves this checkout's `src/` files with no-store responses and
+appropriate JavaScript/WASM MIME types. It rejects writes, traversal and symlinks
+that escape that source directory. It does not expose the rest of the checkout.
+
+Open the returned `identityUrl` (`/.well-known/nemo-runtime.json`) before using
+an instance. The response identifies task/PID/origin and compares startup and
+current R02 source/build snapshots. It never includes the owner token or Git
+origin URL. A changed source/build or invalid owner record returns HTTP 409;
+static requests also fail closed once the mismatch is observed. Static requests
+cache the check for up to one second; identity requests refresh it immediately.
+The source fingerprint retains R02's documented untracked-content limitation.
+
+Browser launch is explicit:
+
+```sh
+node scripts/nemo/browser.cjs start --task preview-a --browser auto
+node scripts/nemo/browser.cjs start --task preview-b --browser auto --headless
+```
+
+`--browser auto` finds an installed Chromium-family browser, or use an absolute
+executable path. The launched process receives this task's `--user-data-dir` and
+`--disk-cache-dir`, along with isolated temporary/cache/report environment paths.
+Without that option, only the server runs: opening its URL in an existing browser
+does not configure a separate profile. Inspect `browser.integrated`, `active`
+and `error` in the identity response; a healthy HTTP server alone does not prove
+that a browser started or that Nemo's application workflow passed.
+
+From a separate controlling process:
+
+```sh
+node scripts/nemo/browser.cjs status --task preview-a --owner <token>
+node scripts/nemo/browser.cjs stop --task preview-a --owner <token>
+```
+
+`status` checks local ownership/source metadata; use the served identity endpoint
+for the build and actual URL identity. `stop` refuses a mismatched owner, waits
+for its launcher to exit, then removes that task's mutable roots, including its
+browser profile. These are disposable task profiles: retain any wanted artifacts
+before stopping. Graceful launcher shutdown closes its browser and HTTP server;
+forced termination and interrupted records still require the reconciliation
+rules above. No unrelated browser or task is selected by name.
+
 ## Validation and remaining integration
 
 Run `node --test scripts/nemo/isolation.test.cjs`. The 20 behavioral tests cover
@@ -97,10 +146,10 @@ and sockets; they do not launch Nemo's browser or desktop application.
 Still required for the full acceptance contract in
 [the parallel-work specification](remediation/07_GITHUB_PROJECT_AND_PARALLEL_WORK.md#isolation):
 
-- Wire these helpers into the actual launcher, including source/build endpoint
-  verification and tool environment/configuration for temp, cache and build paths.
-- Configure and exercise isolated browser profiles/origins. No browser harness is
-  integrated here; `test:browser` remains blocked in R02.
+- Complete automated browser/application workflow coverage and standard harness
+  integration. The preview launcher supplies real origins, explicit Chromium
+  profiles and the served identity, while R02 `test:browser` still requires its
+  separate Playwright harness. A browser preview does not build WASM or the app.
 - Configure and exercise isolated Tauri data/autosave paths. Merely creating a
   `tauri-data` directory does not make the app use it. The platform owner must
   implement and validate the actual runtime override; no untested Tauri launch
@@ -111,5 +160,9 @@ Still required for the full acceptance contract in
 - Include the focused suite in normal `npm test`, `check` or `verify` discovery.
   The existing package test glob does not include `scripts/nemo/isolation.test.cjs`.
 
-Those integrations require shared package/job/platform files beyond the four
-files owned by this increment. No browser, Tauri or GPU acceptance is claimed.
+Those remaining integrations require shared package/job/platform files. The
+preview launcher is a bounded browser increment; it does not establish Tauri,
+GPU, export or complete R06 acceptance. Its focused tests are run with
+`node --test scripts/nemo/browser-runtime.test.cjs`. They exercise concurrent
+real servers, served source bytes and identities, source drift, ownership, stale
+process recovery, failed startup, duplicate launch and static path confinement.
