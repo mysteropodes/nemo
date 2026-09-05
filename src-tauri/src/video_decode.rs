@@ -1507,22 +1507,52 @@ mod tests {
     /// Generates a test video with the BUNDLED ffmpeg CLI binary (the
     /// exact same one this module pipes for decode AND probing — no
     /// separate "test-only" ffmpeg invocation path), cached by filename.
+    /// Fixtures are encoded with the committed LGPL sidecar, which ships no
+    /// libx264/libx265 since the 2026-08-18 rebuild (CLAUDE.md §7): H.264 and
+    /// H.265 fixtures go through Apple's VideoToolbox encoders instead — the
+    /// same encoders the app's own export uses. Both honor `-g` (verified:
+    /// 60 frames at `-g 15` yield 4 keyframes), which the seek/index tests
+    /// below depend on.
     fn gen_video(filename: &str, lavfi: &str, codec_args: &[&str]) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join("nemo-video-decode-test");
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join(filename);
-        if !path.exists() {
+        // Generation is serialized and atomic. `cargo test` runs these tests
+        // on every core; without the lock, two tests sharing a fixture name
+        // raced (one decoded a half-written file, the other re-encoded over
+        // it with `-y`), and VideoToolbox refused to open yet another
+        // hardware session under that load (`err=-12903`), leaving a 0-byte
+        // file that poisoned every later run. Encode to a `.part` sibling and
+        // rename, so a fixture either exists complete or not at all.
+        static GEN_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _guard = GEN_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let complete = path.metadata().map(|m| m.len() > 0).unwrap_or(false);
+        if !complete {
             let ffmpeg = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("binaries/ffmpeg-aarch64-apple-darwin");
+            let part = dir.join(format!("{filename}.part"));
+            let _ = std::fs::remove_file(&part);
             let mut args: Vec<&str> = vec!["-y", "-f", "lavfi", "-i", lavfi];
             args.extend_from_slice(codec_args);
-            let out = path.to_str().unwrap().to_string();
+            let out = part.to_str().unwrap().to_string();
+            // ffmpeg picks the muxer from the output extension; `.part` has
+            // none, so name the format from the fixture's own extension.
+            let fmt = match std::path::Path::new(filename).extension().and_then(|e| e.to_str()) {
+                Some("mp4") => "mp4",
+                Some("mov") => "mov",
+                Some("webm") => "webm",
+                Some("mjpeg") => "mjpeg",
+                Some(other) => other,
+                None => "mp4",
+            };
+            args.extend_from_slice(&["-f", fmt]);
             args.push(&out);
             let status = StdCommand::new(&ffmpeg)
                 .args(&args)
                 .status()
                 .expect("bundled ffmpeg binary must exist and run");
             assert!(status.success(), "test video generation failed: {filename}");
+            std::fs::rename(&part, &path).expect("fixture rename");
         }
         path
     }
@@ -1542,7 +1572,7 @@ mod tests {
         gen_video(
             "testsrc2_60f_30fps.mp4",
             "testsrc2=size=320x240:rate=30:duration=2",
-            &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15"],
+            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"],
         )
     }
 
@@ -1640,7 +1670,7 @@ mod tests {
         let p = gen_video(
             "hevc_320.mp4",
             "testsrc2=size=320x240:rate=30:duration=2",
-            &["-c:v", "libx265", "-pix_fmt", "yuv420p", "-g", "15", "-tag:v", "hvc1"],
+            &["-c:v", "hevc_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15", "-tag:v", "hvc1"],
         );
         assert_decodes_and_seeks(&p, 320, 240);
     }
@@ -1699,7 +1729,7 @@ mod tests {
         let p = gen_video(
             "odd_954x542.mp4",
             "testsrc2=size=954x542:rate=30:duration=1",
-            &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15"],
+            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"],
         );
         assert_decodes_and_seeks(&p, 954, 542);
     }
@@ -1709,7 +1739,7 @@ mod tests {
         let p = gen_video(
             "fps25_320.mp4",
             "testsrc2=size=320x240:rate=25:duration=2",
-            &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "12"],
+            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "12"],
         );
         let (mut s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
         assert!((s.fps - 25.0).abs() < 0.01, "fps was {}", s.fps);
@@ -1727,7 +1757,7 @@ mod tests {
         let pb = gen_video(
             "iso_b_160.mp4",
             "testsrc2=size=160x120:rate=30:duration=2",
-            &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15"],
+            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"],
         );
         let (mut a, _, _) = open_session_core_t(pa.to_str().unwrap()).unwrap();
         let (mut b, _, _) = open_session_core_t(pb.to_str().unwrap()).unwrap();
@@ -1778,7 +1808,7 @@ mod tests {
         let p = gen_video(
             "perf_1080p.mp4",
             "testsrc2=size=1920x1080:rate=30:duration=2",
-            &["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-g", "15"],
+            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"],
         );
         let (avg, p95) = measure_sequential_steady_state(&p, 30);
         eprintln!("[perf] 1080p sequential (steady-state): avg={avg:.1}ms p95={p95:.1}ms (budget 33.3ms)");
@@ -1790,7 +1820,7 @@ mod tests {
         let p = gen_video(
             "perf_4k.mp4",
             "testsrc2=size=3840x2160:rate=30:duration=1",
-            &["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-g", "15"],
+            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"],
         );
         let (avg, p95) = measure_sequential_steady_state(&p, 15);
         eprintln!("[perf] 4K sequential (steady-state): avg={avg:.1}ms p95={p95:.1}ms (budget 33.3ms)");
@@ -1808,7 +1838,7 @@ mod tests {
         let p = gen_video(
             "perf_4k.mp4",
             "testsrc2=size=3840x2160:rate=30:duration=1",
-            &["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-g", "15"],
+            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"],
         );
         let (mut s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
         let t0 = std::time::Instant::now();
@@ -1850,7 +1880,7 @@ mod tests {
         let p = gen_video(
             "h264_320_biggop.mp4",
             "testsrc2=size=320x240:rate=30:duration=3",
-            &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "60"],
+            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "60"],
         );
         let (mut s, _frame_count, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
 
@@ -1940,7 +1970,7 @@ mod tests {
     // spinning.
     #[test]
     fn readahead_backward_fill_does_not_fight_forward_playback() {
-        let p = gen_video("play_thrash.mp4", "testsrc2=size=320x240:rate=30:duration=4", &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15"]);
+        let p = gen_video("play_thrash.mp4", "testsrc2=size=320x240:rate=30:duration=4", &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"]);
         let (s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
         let arc = std::sync::Arc::new(Mutex::new(s));
 
@@ -1992,7 +2022,7 @@ mod tests {
     // idle instead of spinning.
     #[test]
     fn readahead_settles_even_when_cache_cannot_hold_the_full_window() {
-        let p = gen_video("thrash_1080p.mp4", "testsrc2=size=1920x1080:rate=30:duration=3", &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15"]);
+        let p = gen_video("thrash_1080p.mp4", "testsrc2=size=1920x1080:rate=30:duration=3", &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"]);
         let (s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
         let arc = std::sync::Arc::new(Mutex::new(s));
 
@@ -2173,7 +2203,7 @@ mod tests {
         let path_b = gen_video(
             "h264_320_concurrency_b.mp4",
             "testsrc2=size=320x240:rate=30:duration=3",
-            &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15"],
+            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"],
         );
 
         let sessions = StdArc::new(VideoSessions::default());
@@ -2220,8 +2250,8 @@ mod tests {
     #[test]
     fn three_simultaneous_sessions_playback_mostly_avoids_respawns() {
         let pa = make_test_video(); // 320x240, 60 frames
-        let pb = gen_video("play3_b.mp4", "testsrc2=size=320x240:rate=30:duration=3", &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15"]);
-        let pc = gen_video("play3_c.mp4", "testsrc2=size=320x240:rate=30:duration=3", &["-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15"]);
+        let pb = gen_video("play3_b.mp4", "testsrc2=size=320x240:rate=30:duration=3", &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"]);
+        let pc = gen_video("play3_c.mp4", "testsrc2=size=320x240:rate=30:duration=3", &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"]);
         let (sa, _, _) = open_session_core_t(pa.to_str().unwrap()).unwrap();
         let (sb, _, _) = open_session_core_t(pb.to_str().unwrap()).unwrap();
         let (sc, _, _) = open_session_core_t(pc.to_str().unwrap()).unwrap();

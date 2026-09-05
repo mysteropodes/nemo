@@ -489,7 +489,12 @@ Checklist avant `npm run build` :
    sans ses dylibs, crash à l'export sur une machine sans Homebrew) et à exécuter **après
    chaque `npm run build`**, obligatoire de nouveau, pas optionnel. La machine qui build (pas
    celle qui reçoit l'app) doit avoir les formules Homebrew listées en tête de
-   `rebuild-ffmpeg-lgpl.sh` installées.
+   `rebuild-ffmpeg-lgpl.sh` installées — **aux versions majeures contre lesquelles le
+   sidecar committé a été lié** (R04, 2026-09-05) : le binaire référence des noms versionnés
+   (`libvpx.12.dylib`, `libSvtAv1Enc.4.dylib`, `libtheoraenc.2.dylib`…) ; un `brew upgrade`
+   qui change un majeur casse à la fois `ffmpeg -version` (dyld) et `bundle-ffmpeg-dylibs.py`
+   (« dependency not resolvable »). Diagnostic : `npm run doctor` (ligne « sidecar dylibs »,
+   liste les manquants) ; remède : relancer `rebuild-ffmpeg-lgpl.sh` et committer le binaire.
    ⚠️ **H.264/H.265 restaurés SANS libx264/libx265, via VideoToolbox** (même 2026-08-18) :
    `--enable-videotoolbox` (framework système Apple, pas une dépendance Homebrew, pas GPL)
    expose `h264_videotoolbox`/`hevc_videotoolbox`/`prores_videotoolbox` — l'encodeur matériel
