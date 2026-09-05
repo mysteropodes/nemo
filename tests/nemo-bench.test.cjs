@@ -29,6 +29,16 @@ test('a quick run yields a receipt bound to source and hardware, with measured a
     if (w.status === 'ran') { assert.ok(Number.isFinite(w.stats.median) && w.stats.median >= 0 && w.stats.unit, w.id); assert.ok(w.backend, w.id); }
     else { assert.equal(w.status, 'not-run'); assert.match(w.reason, /WebGPU/); assert.equal(w.fixture, 'export'); }
   }
+  // The evaluation backend names the production modules the sandbox ran, in
+  // src/index.html order: the R08 easing kernel first when the tree has it.
+  const kernel = fs.existsSync(path.join(ROOT, 'src', 'js', 'animation', 'curve.js'));
+  const expectedBackend = bench.evaluationBackend({ modules: kernel ? ['animation/curve.js', 'motion.js'] : ['motion.js'] });
+  assert.equal(r.backends.evaluation, expectedBackend);
+  for (const w of r.workloads.filter((x) => x.kind === 'evaluation')) assert.equal(w.backend, expectedBackend, w.id);
+  for (const id of ['evaluation.valueAtFrame', 'evaluation.evalCurvePoints']) {
+    const w = r.workloads.find((x) => x.id === id);
+    assert.match(w.workload.evaluator, kernel ? /^SMAnimationCurve\.evalCurvePoints \(src\/js\/animation\/curve\.js\)$/ : /^evalCurvePoints declared in src\/js\/motion\.js$/, id);
+  }
   const undo = r.workloads.find((w) => w.id === 'copy.undoClone.' + Q);
   assert.match(undo.backend, /_cloneLayersForUndo/, 'the undo clone is the production function, not a JSON round trip');
   assert.deepEqual(undo.workload.heavyFieldsDetached, ['src', 'bitmapPressureProfile']);
