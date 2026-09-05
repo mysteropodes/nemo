@@ -431,6 +431,30 @@ var TW_PIN_IN_SOLVER=true;
 //     Écarter une portée ne force rien : le matcher tranche comme avant.
 var TW_ID_PINS=true;
 var ID_PIN_LEN_RATIO=2.0,ID_PIN_TRAVEL_K=3.0,ID_PIN_MIN=3,ID_PIN_SPAN_RATIO=1.6;
+// TW_ARC_FROM_CHAIN (2026-09-05, Cyril : « une main va parcourir un chemin
+// courbe, si on déduit la courbe par rapport à toutes les keyframes… on
+// n'aurait plus des tweens sur un chemin linéaire »). Le centroïde de
+// chaque paire suit DÉJÀ une Bézier cubique (getArcHandles), mais ses
+// poignées valent la ligne droite tant que l'utilisateur ne les tire pas.
+// Ici elles sont déduites de la CHAÎNE de clés : quand le même trait est
+// suivi dans la clé précédente et/ou la suivante (par strokeId, que la
+// construction des paires ré-estampille justement pour cette continuité),
+// la tangente en chaque clé est celle de Catmull-Rom, (P_suivant −
+// P_précédent)/2, convertie en poignées de Bézier (m/3). Trois gardes :
+//  - ARC_TENSION < 1 réduit le gonflement sur les mouvements courts ;
+//  - une poignée ne dépasse jamais ARC_MAX_FRAC × la longueur de la portée ;
+//  - un ALLER-RETOUR n'est pas un virage : si deux déplacements consécutifs
+//    font plus de ARC_REVERSAL_DEG entre eux, la tangente de ce côté reste
+//    droite (un arrêt, pas une courbe).
+// La clé suivante n'étant pas encore appariée quand on traite une portée,
+// un appariement d'anticipation est calculé sur une COPIE des deux clés
+// (même chemin que le banc), après le ré-estampillage, donc il voit
+// exactement ce que la portée suivante verra. Une poignée réglée à la
+// main (state.motionArcs) garde la priorité. L'easing qui dépasse 1
+// extrapole le long de la courbe : les deux se composent.
+var TW_ARC_FROM_CHAIN=true;
+var ARC_TENSION=0.75,ARC_MAX_FRAC=0.6,ARC_REVERSAL_DEG=120,ARC_MIN_PX=4;
+var _chainArcs={};
 var TW_ORPHAN_FOLLOW=true;
 // ---- MATCHING ----
 function buildTP(sd){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});return p;}
@@ -2637,6 +2661,7 @@ function arcKey(fA,fB,i,li){
 // two-handle shape from one point, and this is still ui-ux-experimental.
 function getArcHandles(fA,fB,i,ptA,ptB){
   var k=arcKey(fA,fB,i);var a=state.motionArcs[k];
+  if(!a&&TW_ARC_FROM_CHAIN)a=_chainArcs[k]; // déduit de la chaîne de clés
   var dx=ptB[0]-ptA[0],dy=ptB[1]-ptA[1];
   // Field names match setArcHandle's `which` values ('out'/'in') exactly —
   // confirmed live the hard way: an earlier version read a.hOut/a.hIn here
@@ -5419,6 +5444,7 @@ function generateTweens(explicitRestrictTo,skipUndo){
   saveAllLayerFrames();var li=state.activeLayerIdx;var ld=state.layers[li];
   var keys=[];for(var i=0;i<state.totalFrames;i++){if(ld.frames[i].isKeyframe&&ld.frames[i].strokes.length>0)keys.push(i);}
   if(keys.length<2){showToast(SM.t('toastNeedAtLeast2DrawnKeyframes'));return;}
+  _chainArcs={}; // les arcs de chaîne sont recalculés à chaque génération
   // A frame selection on this layer restricts regeneration to just those
   // keyframes' own span (start keyframe -> its next keyframe), instead of
   // silently redoing the whole layer — select the frame to fix, hit Tween,
@@ -5571,8 +5597,48 @@ function generateTweens(explicitRestrictTo,skipUndo){
         bOp:bBd?(bBd.opacity!==undefined?bBd.opacity:1):0,
       }:null;
       return{a:ra,b:rbAligned,mi:spec.mi,tex:tex,bmpTex:bmpTex,id:pairId,backdrop:backdrop,
-        aRank:spec.aIdx/Math.max(1,sA.length-1),bRank:spec.bIdx/Math.max(1,sB.length-1)};
+        aRank:spec.aIdx/Math.max(1,sA.length-1),bRank:spec.bIdx/Math.max(1,sB.length-1),
+        aId:spec.aData.strokeId,bId:spec.bData.strokeId,cA:_quickCentroid(spec.aData),cB:_quickCentroid(spec.bData)};
     });
+    // ---- ARCS DÉDUITS DE LA CHAÎNE DE CLÉS (voir TW_ARC_FROM_CHAIN) ----
+    if(TW_ARC_FROM_CHAIN){
+      var fPrev=ki>0?keys[ki-1]:-1,fNext=ki+2<keys.length?keys[ki+2]:-1;
+      var prevC={},nextC={};
+      if(fPrev>=0)ld.frames[fPrev].strokes.forEach(function(sd){
+        if(!sd.strokeId||prevC[sd.strokeId]!==undefined)return;
+        var c=_quickCentroid(sd);if(c)prevC[sd.strokeId]=c;
+      });
+      if(fNext>=0){
+        var ldLook={frames:{}};
+        ldLook.frames[fB]=JSON.parse(JSON.stringify(ld.frames[fB]));
+        ldLook.frames[fNext]=JSON.parse(JSON.stringify(ld.frames[fNext]));
+        var look=null;
+        try{look=_spanPairSpecs(ldLook,li,fB,fNext,ld.frames[fA].strokes);}catch(e){look=null;}
+        if(look)look.pairSpecs.forEach(function(sp){
+          if(sp.isPiece)return;
+          var id=sp.aData.strokeId,c=_quickCentroid(sp.bData);
+          if(id&&c&&nextC[id]===undefined)nextC[id]=c;
+        });
+      }
+      var _ang=function(u,v){var lu=Math.hypot(u[0],u[1]),lv=Math.hypot(v[0],v[1]);if(lu<1e-6||lv<1e-6)return 0;return Math.acos(Math.max(-1,Math.min(1,(u[0]*v[0]+u[1]*v[1])/(lu*lv))))*180/Math.PI;};
+      pairs.forEach(function(pr){
+        var pA=pr.cA,pB=pr.cB;if(!pA||!pB)return;
+        var base=(pr.aId||'').split('#')[0];
+        var pP=prevC[base]||null,pN=nextC[pr.bId]||nextC[base]||null;
+        var dAB=[pB[0]-pA[0],pB[1]-pA[1]],L=Math.hypot(dAB[0],dAB[1]);
+        if(L<ARC_MIN_PX)return;
+        var tA=null,tB=null;
+        if(pP&&_ang([pA[0]-pP[0],pA[1]-pP[1]],dAB)<=ARC_REVERSAL_DEG)tA=[(pB[0]-pP[0])/2,(pB[1]-pP[1])/2];
+        if(pN&&_ang(dAB,[pN[0]-pB[0],pN[1]-pB[1]])<=ARC_REVERSAL_DEG)tB=[(pN[0]-pA[0])/2,(pN[1]-pA[1])/2];
+        if(!tA&&!tB)return;
+        var out=tA?[tA[0]*ARC_TENSION/3,tA[1]*ARC_TENSION/3]:[dAB[0]/3,dAB[1]/3];
+        var inn=tB?[-tB[0]*ARC_TENSION/3,-tB[1]*ARC_TENSION/3]:[-dAB[0]/3,-dAB[1]/3];
+        var cap=ARC_MAX_FRAC*L,lo=Math.hypot(out[0],out[1]),lin=Math.hypot(inn[0],inn[1]);
+        if(lo>cap){out[0]*=cap/lo;out[1]*=cap/lo;}
+        if(lin>cap){inn[0]*=cap/lin;inn[1]*=cap/lin;}
+        _chainArcs[arcKey(fA,fB,pr.mi,li)]={out:out,'in':inn};
+      });
+    }
     var gap=fB-fA;
     for(var fi=fA+1;fi<fB;fi++){
       // A frame flagged isManualEdit was hand-corrected after a previous
