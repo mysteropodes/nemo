@@ -463,6 +463,72 @@ var ID_PIN_LEN_RATIO=2.0,ID_PIN_TRAVEL_K=3.0,ID_PIN_MIN=3,ID_PIN_SPAN_RATIO=1.6,
 // exactement ce que la portée suivante verra. Une poignée réglée à la
 // main (state.motionArcs) garde la priorité. L'easing qui dépasse 1
 // extrapole le long de la courbe : les deux se composent.
+// TW_TWIN_GROUPS (2026-09-05, Cyril : « tu identifies aussi les formes
+// répétitives afin de mieux identifier ? »). Non, jusqu'ici : trois
+// moustaches, quatre doigts, étaient trois ou quatre problèmes
+// indépendants, et l'assignation globale les mélangeait volontiers avec
+// leurs voisines (moustaches de la portée 35→47 : 3 sur 8 du bon côté).
+// Un GROUPE DE JUMEAUX = des traits de même type, de longueurs proches,
+// d'enroulement et de fermeture proches, et proches dans l'espace. La
+// bonne question pour un tel groupe est « où va le groupe, et dans quel
+// ordre à l'intérieur ». Passe en deux temps après la première
+// assignation : (1) le groupe de A est envoyé sur le groupe de B que ses
+// membres ont majoritairement choisi en première passe, à condition qu'il
+// ait la même taille ; (2) à l'intérieur, les membres sont appariés par
+// RANG le long de l'axe principal de chaque groupe, le sens de l'axe de B
+// étant celui qui s'accorde le mieux avec le vote. Le résultat est posé
+// en épingles et l'assignation est résolue à nouveau autour. Une épingle
+// déjà posée (consigne, provenance, identité) sur un membre exclut le
+// groupe : ces sources priment.
+// DÉSACTIVÉ après trois conceptions mesurées sur six fichiers + banc :
+//   v1 (transitif, rang partout)          banc 46 → 62, aucun effet réel
+//   v2 (intervention minimale)            banc 55, force des fondus (bras)
+//   v3 (cliques, petits traits seulement) banc 59, totale 2 → 6 croisements
+// Cause de fond : quand les groupes de A et de B n'ont pas exactement la
+// même composition (un trait de bord change de groupe sous la
+// déformation), la passe « corrige » une assignation juste. Et le cas
+// visé (moustaches contre traits du menton, 35→47) demande un échange de
+// GROUPE À GROUPE que seule l'assignation globale peut faire. Gardé pour
+// une prochaine idée ; ne pas réactiver sans le banc.
+var TW_TWIN_GROUPS=false;
+// Critères mesurés sur les moustaches de cats (35→47) : longueurs 33/23/26
+// (rapport 1,43), enroulements 95°/6°/84° — des « jumeaux » à la main sont
+// surtout de PETITS traits de tailles voisines et PROCHES ; la forme ne
+// doit être qu'un garde-fou large. Première version (1,4 / 45°) ne les
+// voyait pas, et remplaçait par un rang des paires déjà justes : banc
+// 46 → 62. Intervention minimale depuis : seuls les membres partis HORS
+// du groupe de B sont réassignés, aux places restées libres, par rang si
+// le groupe a un axe net (anisotropie ≥ TWIN_ANISO) et au plus proche
+// sinon. Une assignation déjà cohérente n'est jamais touchée.
+// Troisième version : regroupement par CLIQUES (chaque paire du groupe doit
+// être jumelle, pas de chaîne transitive — la version précédente reliait
+// dix traits de proche en proche sur la tête du chat, bras compris, et
+// forçait des fondus), petits traits seulement (longueur ≤ TWIN_MAX_FRAC ×
+// la diagonale du dessin : des moustaches, des doigts, pas des membres),
+// et au plus TWIN_MAX membres.
+var TWIN_LEN_RATIO=1.6,TWIN_TURN_DEG=90,TWIN_GAP=0.35,TWIN_NEAR=3.0,TWIN_MAX=6,TWIN_ANISO=3.0,TWIN_MAX_FRAC=0.12;
+// TW_TEMPORAL_PRIOR (2026-09-05, Cyril : « le rapport de mouvement entre
+// chaque keyframe… nous permet de mieux identifier »). Le moteur avait une
+// mémoire d'un pas au niveau des GROUPES (TW_MATCH_TRACKING : « même
+// déplacement encore » comme hypothèse), pas par trait. Ici, TROISIÈME
+// canal de position dans le coût unaire : un trait suivi depuis la clé
+// précédente (par strokeId) est aussi évalué à la position que sa vitesse
+// prédit (déplacement précédent reporté tel quel). Comme les deux canaux
+// existants (prédit par le champ, brut), chaque paire prend le moins cher,
+// avec un petit biais TEMPORAL_BIAS pour ne gagner qu'une égalité — le
+// canal ne peut qu'AJOUTER une explication plausible, jamais en retirer.
+// Pondération par la confiance : si la paire précédente de ce trait était
+// mauvaise (_prevPairScore > TEMPORAL_MAX_PREV, posé sur la clé B par la
+// construction des paires), sa vitesse ne vaut rien et le canal est ignoré.
+// Limites assumées : vitesse constante (pas de mise à l'échelle par la
+// durée des portées), et la première portée n'a rien.
+// DÉSACTIVÉ : mesuré strictement NEUTRE sur les six fichiers et le banc
+// (46 = 46, mêmes paires partout). Le canal reçoit bien ses vitesses (24 à
+// 26 traits par portée sur cats) mais ne gagne jamais le minimum : le champ
+// de mouvement de la passe 2 couvre déjà ces positions. Gardé, un drapeau
+// suffit pour le remesurer sur un fichier où le champ se tromperait.
+var TW_TEMPORAL_PRIOR=false;
+var TEMPORAL_BIAS=0.05,TEMPORAL_MAX_PREV=0.35;
 var TW_ARC_FROM_CHAIN=true;
 var ARC_TENSION=0.75,ARC_MAX_FRAC=0.6,ARC_REVERSAL_DEG=120,ARC_MIN_PX=4;
 var _chainArcs={};
@@ -1225,6 +1291,23 @@ function _autoMatchJSCore(sA,sB,hist,pins){
       if(rawC<cost2[ra2][rb2])cost2[ra2][rb2]=rawC;
     }
   }
+  // TROISIÈME CANAL : position prédite par la vitesse du trait (voir
+  // TW_TEMPORAL_PRIOR).
+  if(TW_TEMPORAL_PRIOR&&hist&&hist.vel){
+    var axisV=new Array(m);
+    for(var ta=0;ta<n;ta++){
+      var v=hist.vel[ta];if(!v)continue;
+      var prevSc=sA[ta]._prevPairScore;
+      if(prevSc!==undefined&&prevSc>TEMPORAL_MAX_PREV)continue;
+      if(Math.sqrt(v[0]*v[0]+v[1]*v[1])<2)continue; // immobile : le canal brut suffit
+      var ptsV=fA[ta].pts.map(function(pt){return[pt[0]+v[0],pt[1]+v[1]];});
+      _axisPenaltyRow(pointElongation(ptsV),fB,axisV);
+      for(var tb=0;tb<m;tb++){
+        var tC=matchSc(fA[ta],fB[tb],ta===tb,ptsV)+axisV[tb]+TEMPORAL_BIAS;
+        if(tC<cost2[ta][tb])cost2[ta][tb]=tC;
+      }
+    }
+  }
   _applyPins(cost2,pins,n,m);
   // MULTI-MOTION channels (see TW_MATCH_MULTI_MOTION): each hypothesis
   // re-scores every pairing at the position IT predicts; a pairing keeps
@@ -1332,7 +1415,8 @@ function _trackingHistory(sA,prevStrokes){
   var pieces=[],remap={};
   clusters.forEach(function(cl,ci){if(cl.members.length>=2){remap[ci]=pieces.length;pieces.push({members:cl.members,mx:cl.mx,my:cl.my});}});
   pieceOf=pieceOf.map(function(ci){return(ci<0||remap[ci]===undefined)?-1:remap[ci];});
-  if(!pieces.length)return null;
+  // vel est conservée même sans « pièce » : le prior temporel (par trait)
+  // n'a pas besoin de groupes.
   return{vel:vel,pieceOf:pieceOf,pieces:pieces};
 }
 function _tfDist(t1,t2,f){
@@ -5092,6 +5176,16 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
     });
     var pins=forcedPairs.filter(function(fp){return!fp.isPiece;}).map(function(fp){return{a:fp.aIdx,b:fp.bIdx};});
     var matches=autoMatch(sA,sB,hist,pins);if(!sA.length&&!sB.length&&!forcedPairs.length)return null;
+    // ---- GROUPES DE JUMEAUX (voir TW_TWIN_GROUPS) : vote de la première
+    // passe → épingles de groupe → seconde résolution autour d'elles.
+    if(TW_TWIN_GROUPS){
+      var twinPins=_twinGroupPins(sA,sB,matches,forcedAIdx,forcedBIdx);
+      if(twinPins.length){
+        twinPins.forEach(function(tp){forcedPairs.push({aIdx:tp.a,bIdx:tp.b,aData:sA[tp.a],bData:sB[tp.b],mi:-1-forcedPairs.length,score:0,forced:true,twin:true});});
+        pins=forcedPairs.filter(function(fp){return!fp.isPiece;}).map(function(fp){return{a:fp.aIdx,b:fp.bIdx};});
+        matches=autoMatch(sA,sB,hist,pins);
+      }
+    }
   // Only morph plausible pairs. A stroke whose best assignment still
   // scores badly (no real counterpart in the other key — count mismatch,
   // or a shape that genuinely appears/disappears) cross-fades in place
@@ -5456,6 +5550,90 @@ function _identityPins(sA,sB,forcedAIdx,forcedBIdx){
   });
   return out;
 }
+// Groupes de jumeaux — voir TW_TWIN_GROUPS.
+function _twinClusters(feats){
+  var n=feats.length,maxLen=(typeof _matchNorm==='number'?_matchNorm:0)*TWIN_MAX_FRAC;
+  function size(f){return Math.sqrt(f.bounds.w*f.bounds.w+f.bounds.h*f.bounds.h)+1;}
+  function twins(a,b){
+    var fa=feats[a],fb=feats[b];
+    if(fa.type!==fb.type||!fa.elong||!fb.elong)return false;
+    if(maxLen>0&&(fa.length>maxLen||fb.length>maxLen))return false;
+    var lr=Math.max(fa.length,fb.length)/Math.max(1,Math.min(fa.length,fb.length));
+    if(lr>TWIN_LEN_RATIO)return false;
+    if(Math.abs(fa.elong.T-fb.elong.T)*180/Math.PI>TWIN_TURN_DEG)return false;
+    if(Math.abs(fa.elong.gap-fb.elong.gap)>TWIN_GAP)return false;
+    var d=Math.sqrt((fa.cx-fb.cx)*(fa.cx-fb.cx)+(fa.cy-fb.cy)*(fa.cy-fb.cy));
+    return d<=TWIN_NEAR*Math.max(size(fa),size(fb));
+  }
+  // cliques gloutonnes : on part de chaque trait libre et on n'ajoute qu'un
+  // trait jumeau de TOUS les membres déjà présents.
+  var used={},out=[];
+  for(var a=0;a<n;a++){
+    if(used[a])continue;
+    var g=[a];
+    for(var b=a+1;b<n;b++){
+      if(used[b]||g.length>=TWIN_MAX)continue;
+      var ok=true;for(var k=0;k<g.length;k++)if(!twins(g[k],b)){ok=false;break;}
+      if(ok)g.push(b);
+    }
+    if(g.length>=2){g.forEach(function(i){used[i]=1;});out.push(g);}
+  }
+  return out;
+}
+function _twinAxis(feats,g){
+  var cx=0,cy=0;g.forEach(function(i){cx+=feats[i].cx;cy+=feats[i].cy;});cx/=g.length;cy/=g.length;
+  var sxx=0,syy=0,sxy=0;g.forEach(function(i){var dx=feats[i].cx-cx,dy=feats[i].cy-cy;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;});
+  var th=0.5*Math.atan2(2*sxy,sxx-syy);
+  var tr=sxx+syy,disc=Math.sqrt(Math.max(0,tr*tr/4-(sxx*syy-sxy*sxy)));
+  var l1=tr/2+disc,l2=Math.max(1e-9,tr/2-disc);
+  return{ux:Math.cos(th),uy:Math.sin(th),cx:cx,cy:cy,aniso:Math.sqrt(l1/l2)};
+}
+function _twinGroupPins(sA,sB,matches,forcedAIdx,forcedBIdx){
+  var out=[];
+  if(!TW_TWIN_GROUPS||sA.length<2||sB.length<2)return out;
+  var fA=sA.map(strokeFeat),fB=sB.map(strokeFeat);
+  var GA=_twinClusters(fA),GB=_twinClusters(fB);
+  if(!GA.length||!GB.length)return out;
+  var bGroupOf={};GB.forEach(function(g,gi){g.forEach(function(b){bGroupOf[b]=gi;});});
+  var partner={};matches.forEach(function(m){partner[m.a]=m.b;});
+  GA.forEach(function(ga){
+    if(ga.some(function(a){return forcedAIdx[a];}))return;
+    var votes={};ga.forEach(function(a){var b=partner[a];if(b===undefined)return;var gi=bGroupOf[b];if(gi===undefined)return;votes[gi]=(votes[gi]||0)+1;});
+    var best=-1,bv=0;Object.keys(votes).forEach(function(gi){if(votes[gi]>bv){bv=votes[gi];best=+gi;}});
+    if(best<0||bv<Math.max(2,Math.ceil(ga.length/2)))return;
+    var gb=GB[best];
+    if(gb.length!==ga.length)return;
+    if(gb.some(function(b){return forcedBIdx[b];}))return;
+    // membres déjà cohérents (partenaire dans le groupe de B) : gardés tels
+    // quels ; les autres ("égarés") reçoivent les places restées libres.
+    var inB={};gb.forEach(function(b){inB[b]=1;});
+    var taken={},keep=[],stray=[];
+    ga.forEach(function(a){var b=partner[a];if(b!==undefined&&inB[b]&&!taken[b]){keep.push({a:a,b:b});taken[b]=1;}else stray.push(a);});
+    if(!stray.length)return; // rien à corriger, on ne pose aucune épingle
+    var free=gb.filter(function(b){return!taken[b];});
+    if(free.length!==stray.length)return;
+    var axA=_twinAxis(fA,ga),axB=_twinAxis(fB,gb);
+    var pairsStray=[];
+    if(axA.aniso>=TWIN_ANISO&&axB.aniso>=TWIN_ANISO&&stray.length>1){
+      // groupe à axe net : rang le long de l'axe, sens de B accordé au vote
+      var projA=function(i){return (fA[i].cx-axA.cx)*axA.ux+(fA[i].cy-axA.cy)*axA.uy;};
+      var projB=function(i){return (fB[i].cx-axB.cx)*axB.ux+(fB[i].cy-axB.cy)*axB.uy;};
+      var agreeF=0,agreeR=0;
+      keep.forEach(function(kp){if((projA(kp.a)>0)===(projB(kp.b)>0))agreeF++;else agreeR++;});
+      var sgn=agreeR>agreeF?-1:(agreeR===agreeF&&(axA.ux*axB.ux+axA.uy*axB.uy)<0?-1:1);
+      var sA_=stray.slice().sort(function(i,j){return projA(i)-projA(j);});
+      var sB_=free.slice().sort(function(i,j){return sgn*(projB(i)-projB(j));});
+      sA_.forEach(function(a,r){pairsStray.push({a:a,b:sB_[r]});});
+    }else{
+      // pas d'axe fiable : au plus proche, glouton
+      var rem=free.slice();
+      stray.forEach(function(a){var bi=-1,bd=Infinity;rem.forEach(function(b,k){var d=(fB[b].cx-fA[a].cx)*(fB[b].cx-fA[a].cx)+(fB[b].cy-fA[a].cy)*(fB[b].cy-fA[a].cy);if(d<bd){bd=d;bi=k;}});
+        if(bi>=0){pairsStray.push({a:a,b:rem[bi]});rem.splice(bi,1);}});
+    }
+    keep.concat(pairsStray).forEach(function(pr){forcedAIdx[pr.a]=1;forcedBIdx[pr.b]=1;out.push(pr);});
+  });
+  return out;
+}
 function generateTweens(explicitRestrictTo,skipUndo){
   saveAllLayerFrames();var li=state.activeLayerIdx;var ld=state.layers[li];
   var keys=[];for(var i=0;i<state.totalFrames;i++){if(ld.frames[i].isKeyframe&&ld.frames[i].strokes.length>0)keys.push(i);}
@@ -5605,6 +5783,7 @@ function generateTweens(explicitRestrictTo,skipUndo){
       if(_usedPairIds[pairId]){var _k=1;while(_usedPairIds[pairId+'#'+_k])_k++;pairId=pairId+'#'+_k;}
       _usedPairIds[pairId]=1;
       spec.aData.strokeId=pairId;spec.bData.strokeId=pairId;
+      spec.bData._prevPairScore=spec.forced?0:spec.score; // lu par le prior temporel de la portée suivante (jamais sérialisé)
       // _src set AFTER alignment: the wasm align path rebuilds its output
       // object from JSON, so a field attached to rb before the call would
       // be silently dropped on exactly the (default) wasm path.

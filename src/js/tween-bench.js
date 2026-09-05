@@ -20,9 +20,9 @@
 (function(){
   if(typeof window==='undefined')return;
   var B={};
-  var FLAG_NAMES=['TW_MATCH_RELATIONAL','TW_MATCH_MULTI_MOTION','TW_REL_2OPT','TW_MATCH_TRACKING','TW_PIECE_COMPLETION','TW_MATCH_AXIS','TW_MATCH_TURNING','TW_MATCH_GAP','TW_REL_REVERSE','TW_OC_SIDE_GUARD','TW_ID_PINS','TW_ARC_FROM_CHAIN',
+  var FLAG_NAMES=['TW_MATCH_RELATIONAL','TW_MATCH_MULTI_MOTION','TW_REL_2OPT','TW_MATCH_TRACKING','TW_PIECE_COMPLETION','TW_MATCH_AXIS','TW_MATCH_TURNING','TW_MATCH_GAP','TW_REL_REVERSE','TW_OC_SIDE_GUARD','TW_ID_PINS','TW_ARC_FROM_CHAIN','TW_TWIN_GROUPS','TW_TEMPORAL_PRIOR',
     'TW_MOTION_FIELD','TW_CHIRALITY','TW_MATCH_WIDTH','TW_MATCH_TOPOLOGY','TW_MATCH_REGIONS','TW_PROVENANCE_PINS','TW_PIN_IN_SOLVER','TW_ORPHAN_FOLLOW'];
-  var NEW_FLAGS=['TW_MOTION_FIELD','TW_CHIRALITY','TW_MATCH_WIDTH','TW_MATCH_TOPOLOGY','TW_MATCH_REGIONS','TW_PROVENANCE_PINS','TW_PIN_IN_SOLVER','TW_ORPHAN_FOLLOW','TW_MATCH_AXIS','TW_MATCH_TURNING','TW_MATCH_GAP','TW_REL_REVERSE','TW_OC_SIDE_GUARD','TW_ID_PINS','TW_ARC_FROM_CHAIN'];
+  var NEW_FLAGS=['TW_MOTION_FIELD','TW_CHIRALITY','TW_MATCH_WIDTH','TW_MATCH_TOPOLOGY','TW_MATCH_REGIONS','TW_PROVENANCE_PINS','TW_PIN_IN_SOLVER','TW_ORPHAN_FOLLOW','TW_MATCH_AXIS','TW_MATCH_TURNING','TW_MATCH_GAP','TW_REL_REVERSE','TW_OC_SIDE_GUARD','TW_ID_PINS','TW_ARC_FROM_CHAIN','TW_TWIN_GROUPS','TW_TEMPORAL_PRIOR'];
   B.NEW_FLAGS=NEW_FLAGS;
   B.flags=function(){var o={};FLAG_NAMES.forEach(function(k){o[k]=window[k];});return o;};
   B.setFlags=function(obj){var prev={};Object.keys(obj||{}).forEach(function(k){prev[k]=window[k];window[k]=obj[k];});return prev;};
@@ -43,7 +43,7 @@
     var res=_spanPairSpecs(ldCopy,li,fA,fB,prev);
     var ms=performance.now()-t0;
     if(!res)return{empty:true,ms:ms};
-    var pairs=res.pairSpecs.map(function(ps){return{a:ps.aIdx,b:ps.bIdx,score:+ps.score.toFixed(3),forced:!!ps.forced,provenance:!!ps.provenance,piece:!!ps.isPiece,completion:!!ps.completion,identity:!!ps.identity};});
+    var pairs=res.pairSpecs.map(function(ps){return{a:ps.aIdx,b:ps.bIdx,score:+ps.score.toFixed(3),forced:!!ps.forced,provenance:!!ps.provenance,piece:!!ps.isPiece,completion:!!ps.completion,identity:!!ps.identity,twin:!!ps.twin};});
     pairs.sort(function(p,q){return p.a-q.a||p.b-q.b;});
     var sig=pairs.filter(function(p){return!p.piece;}).map(function(p){return p.a+'>'+p.b;}).join(' ');
     return{ms:ms,nA:res.sA.length,nB:res.sB.length,pairs:pairs,unA:res.unA.slice(),unB:res.unB.slice(),sig:sig,
@@ -362,6 +362,58 @@
         var q=_pathCentroid(sd),d=Math.hypot(q[0]-c[0],q[1]-c[1]);if(d>5)n++;if(d>mx)mx=d;});
       out.push({span:keys[k]+'>'+keys[k+1],deplaces:n,maxPx:Math.round(mx)});
     }
+    return out;
+  };
+  // ---- VÉRIFICATION COMPLÈTE EN UNE COMMANDE (2026-09-05) --------------
+  // Cyril : « vérifie à chaque fois sur plusieurs anim différentes ».
+  // Tout ce qui a servi de garde-fou dans la session, sur les six fichiers :
+  //  - accord avec l'identité des traits (copies fraîches, repère biaisé sur
+  //    un fichier déjà tweené : les ids y portent d'anciennes décisions),
+  //  - trajectoires croisées, sur le même sous-ensemble de paires,
+  //  - replis inventés et maintiens, sur la SORTIE réelle de generateTweens,
+  //  - les cas validés à l'œil sur cats (patte, moustaches, deux bras),
+  //  - le banc synthétique.
+  // `flags` : configuration à comparer à la courante (ex. {TW_X:false}).
+  function _truthOf(r){var cA={},cB={};
+    r.sA.forEach(function(sd){if(sd.strokeId)cA[sd.strokeId]=(cA[sd.strokeId]||0)+1;});
+    r.sB.forEach(function(sd){if(sd.strokeId)cB[sd.strokeId]=(cB[sd.strokeId]||0)+1;});
+    var t={};r.sA.forEach(function(sd,ai){var id=sd.strokeId;if(!id||cA[id]!==1||cB[id]!==1)return;
+      for(var bi=0;bi<r.sB.length;bi++)if(r.sB[bi].strokeId===id){t[ai]=bi;break;}});return t;}
+  function _segX(a,b,c,d){function cr(o,p,q){return (p[0]-o[0])*(q[1]-o[1])-(p[1]-o[1])*(q[0]-o[0]);}
+    var d1=cr(c,d,a),d2=cr(c,d,b),d3=cr(a,b,c),d4=cr(a,b,d);
+    return((d1>0&&d2<0)||(d1<0&&d2>0))&&((d3>0&&d4<0)||(d3<0&&d4>0));}
+  function _crossOf(r,as){var P=Object.keys(as).map(function(a){return{a:+a,b:as[a]};}),FA={},FB={};
+    P.forEach(function(p){FA[p.a]=FA[p.a]||strokeFeat(r.sA[p.a]);FB[p.b]=FB[p.b]||strokeFeat(r.sB[p.b]);});
+    var n=0;for(var i=0;i<P.length;i++)for(var j=i+1;j<P.length;j++){var a1=FA[P[i].a],b1=FB[P[i].b],a2=FA[P[j].a],b2=FB[P[j].b];
+      if(_segX([a1.cx,a1.cy],[b1.cx,b1.cy],[a2.cx,a2.cy],[b2.cx,b2.cy]))n++;}return n;}
+  function _foldsReal(li){var ld=state.layers[li],n=0;
+    for(var f=0;f<state.totalFrames;f++){var fr=ld.frames[f];if(!fr||!fr.isInterpolated)continue;
+      (fr.strokes||[]).forEach(function(sd){var S=_segsOf(sd);if(S&&S.length>3&&_span2(S)>25&&_xings(_flatten(S,6)))n++;});}
+    return n;}
+  B.FILES=['__tmp_cats.json','__tmp_untitled3.json','__tmp_totale.json','__tmp_traits.json','__tmp_b.json','__tmp_testanim.json'];
+  B.auditAll=async function(flags,opts){
+    flags=flags||{};opts=opts||{};var li=0,out={};
+    for(var fi=0;fi<B.FILES.length;fi++){
+      var file=B.FILES[fi],name=file.replace('__tmp_','').replace('.json','');
+      await B.load('/'+file);state.activeLayerIdx=li;
+      var keys=keysOf(li),cross=0,ag=0,tot=0,pins=0;
+      B.withFlags(flags,function(){for(var k=0;k+1<keys.length;k++){var r=B.span(li,keys[k],keys[k+1]);if(!r||r.empty)continue;
+        var t=_truthOf(r),eng={};r.pairs.forEach(function(p){if(p.piece)return;eng[p.a]=p.b;if(p.identity)pins++;});
+        var sub={};Object.keys(t).forEach(function(a){if(eng[a]!==undefined){sub[a]=eng[a];tot++;if(eng[a]===t[a])ag++;}});
+        cross+=_crossOf(r,sub);}});
+      await B.load('/'+file);state.activeLayerIdx=li;
+      var h=B.withFlags(flags,function(){return B.holds(li);});   // holds() appelle generateTweens
+      var folds=_foldsReal(li);
+      var hd=h.reduce(function(a,x){return a+x.deplaces;},0);
+      out[name]={accord:ag+'/'+tot,crois:cross,replis:folds,maintiensDeplaces:h.length?hd:'-'};
+    }
+    // cas validés à l'œil, cats
+    await B.load('/__tmp_cats.json');state.activeLayerIdx=li;
+    var chk=function(fA,fB,idx){var r=B.span(li,fA,fB);return idx.map(function(a){var p=null;for(var i=0;i<r.pairs.length;i++)if(r.pairs[i].a===a){p=r.pairs[i];break;}
+      if(!p)return a+'>fade';return a+'>'+p.b+(p.identity?'*':'')+(p.twin?'†':'');}).join(' ');};
+    out.controles=B.withFlags(flags,function(){return{patte_7_17:chk(6,16,[20]),moustaches_7_17:chk(6,16,[7,8,9]),moustaches_35_47:chk(34,46,[7,8,9,10,11,12]),bras_26_35:chk(25,34,[15,16]),bras_35_47:chk(34,46,[15,18,25])};});
+    if(!opts.noBench){var b0=B.withFlags(flags,function(){return B.suite(li,0,5);}),b6=B.withFlags(flags,function(){return B.suite(li,6,5);});
+      out.banc=b0.concat(b6).reduce(function(a,x){return a+x.errors_new;},0);}
     return out;
   };
   B.snapshot=function(){var c=document.querySelector('#canvas')||document.querySelector('canvas');return c?c.toDataURL('image/png'):null;};
