@@ -10,7 +10,7 @@
 
 Status: **R01 adoption candidate for maintainer review**<br>
 Prepared: **2026-09-04**<br>
-Package version: **0.2.0**
+Package version: **0.2.1**
 Repository: <https://github.com/mysteropodes/nemo>
 
 This package is the portable starting point for Nemo's foundation remediation. It contains
@@ -56,3 +56,10 @@ with the dedicated Nemo workspace contract: enrolled collaborators receive Proje
 participation and current A2A instructions from the runtime. Repository-relative task paths
 coordinate concurrent ownership; contributors do not configure manual path grants or revision
 pins. BZ0 transport acceptance and clean-clone Codex/Claude rehearsal remain required gates.
+
+## Migration note for 0.2.1
+
+Aligns the collaboration chapter with runtime contract 1.5.0: ordinary host tools in conversations
+and delegated jobs, existing automatic Project participation, thread-visible tasks and peer
+consultation, persistent following, timer delivery, and indeterminate-effect reconciliation.
+This documentation update does not itself establish installed behavior or release acceptance.
