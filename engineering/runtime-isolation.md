@@ -133,6 +133,58 @@ before stopping. Graceful launcher shutdown closes its browser and HTTP server;
 forced termination and interrupted records still require the reconciliation
 rules above. No unrelated browser or task is selected by name.
 
+## Desktop build launcher
+
+`node scripts/nemo/build.cjs start --task build-a` invokes the installed local
+Tauri CLI as `tauri build --target <host> -b app --no-sign`. It writes Cargo
+output under that task's `build/tauri-target`, routes temporary, cache and
+report paths through the task roots, and holds an exclusive slot derived from
+the exact worktree path until the complete owned build process group exits.
+Different worktrees have different slots. A second build in the same worktree
+is refused before it starts, avoiding concurrent writes by Tauri/Cargo to shared
+generated source. Direct build-leader exit does not establish group completion:
+remaining descendants are terminated and verified absent before slot release.
+If that cannot be established, the launcher and slot remain live with a
+`reconciliation-required` result.
+
+The first stdout line is JSON containing the task roots, owner token, source and
+build identities. Build stdout/stderr go to the reported log files. The launcher
+stays alive after success or failure so its ownership handshake and artifacts
+remain addressable; completion releases the build slot. Inspect or stop it from
+a separate controlling process:
+
+```sh
+node scripts/nemo/build.cjs status --task build-a --owner <token>
+node scripts/nemo/build.cjs stop --task build-a --owner <token>
+```
+
+`status` compares the current complete R02 source/build identity with startup
+and reports the child state and result. `stop` refuses a mismatched token,
+terminates an active build process group, waits for launcher exit and removes
+that task's disposable roots. Copy wanted artifacts before stopping. Forced or
+external launcher termination can still leave child processes or stale records
+that require the reconciliation procedure above.
+
+The native default currently supports macOS only. Other platforms are rejected
+before task roots, slots or launcher records are created because their bundle
+arguments and process-tree ownership have not been implemented or validated.
+
+This serializes same-worktree builds and isolates Cargo output; it does not make
+the checkout immutable. Tauri or its build scripts can still update generated
+files under `src-tauri/gen/`. Treat those as shared-writer paths: inspect the
+source diff after a real build and coordinate any expected regeneration with
+its owner. Actual paired native-build evidence and integration with the R02/R03
+`build:desktop` job remain separate work because that job surface is currently
+owned by R03/R04.
+
+The focused non-native regressions run with
+`node --test scripts/nemo/build-runtime.test.cjs`. They use executable stubs to
+cover disjoint paths, same-worktree slot refusal/release, nonzero build results,
+owner-only status/stop, active process-group reaping, leader-before-descendant
+exit and retained artifacts without starting a Tauri, desktop or GPU process.
+The core isolation suite already covers source-identity drift without adding a
+second concurrent worktree mutation to normal test discovery.
+
 ## Validation and remaining integration
 
 Run `node --test scripts/nemo/isolation.test.cjs`. The 20 behavioral tests cover
@@ -155,10 +207,14 @@ Still required for the full acceptance contract in
   implement and validate the actual runtime override; no untested Tauri launch
   configuration is prescribed by this document.
 - Wire exclusive slots into desktop input and reference GPU benchmark consumers.
-- Isolate/serialize simultaneous desktop builds within one worktree. Separate
-  worktrees normally separate `src-tauri/target`; same-worktree builds still share it.
-- Include the focused suite in normal `npm test`, `check` or `verify` discovery.
-  The existing package test glob does not include `scripts/nemo/isolation.test.cjs`.
+- Validate two real native builds through the standalone isolated launcher,
+  inspect their source diffs and then integrate it with the standard R02/R03
+  `build:desktop` job after that shared surface is available.
+- Production profile/launcher adoption remains separate from test discovery.
+  Normal `npm test`/`verify` discovery reaches the five focused suites through
+  isolated entry processes under `tests/nemo-{boundaries,boundaries-ratchet,
+  isolation,browser-runtime,build-runtime}.test.cjs`; each suite can still be
+  invoked directly while developing it.
 
 Those remaining integrations require shared package/job/platform files. The
 preview launcher is a bounded browser increment; it does not establish Tauri,
