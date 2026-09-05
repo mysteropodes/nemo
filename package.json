@@ -7,7 +7,17 @@
     "dev": "tauri dev",
     "build": "tauri build",
     "serve": "python3 -m http.server 1420 -d src",
-    "test": "node --test tests/*.test.cjs"
+    "doctor": "node scripts/nemo/doctor.cjs",
+    "check": "node scripts/nemo/check.cjs",
+    "test": "node --test tests/*.test.cjs",
+    "test:rust": "node scripts/nemo/job.cjs test:rust",
+    "test:integration": "node scripts/nemo/job.cjs test:integration",
+    "test:browser": "node scripts/nemo/job.cjs test:browser",
+    "test:desktop": "node scripts/nemo/job.cjs test:desktop",
+    "bench": "node scripts/nemo/job.cjs bench",
+    "build:wasm": "node scripts/nemo/job.cjs build:wasm",
+    "build:desktop": "node scripts/nemo/job.cjs build:desktop",
+    "verify": "node scripts/nemo/verify.cjs"
   },
   "keywords": [
     "motion-design",

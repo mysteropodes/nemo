@@ -36,6 +36,17 @@ npm run serve    # browser-only preview, no Tauri (python3 -m http.server on src
 Rust/wasm changes under `geometry-wasm/` need `wasm-pack build --target web`
 (see that directory) before they show up in either mode.
 
+Before opening a PR, run the named checks and keep the receipt:
+
+```bash
+npm run doctor   # read-only: toolchain, capabilities, source/build identity
+npm run check    # version sync, JSON, JS syntax, script refs, guards
+npm run verify   # doctor + check + npm test + cargo test, one receipt in reports/
+```
+
+Each job reports `pass`, `fail`, `blocked` or `not-run` with a reason; a missing tool is
+`blocked`, never a silent skip. See [scripts/nemo/README.md](scripts/nemo/README.md).
+
 ## Workflow
 
 - Branch per change (`your-topic`), PR against `main`. No direct pushes to
