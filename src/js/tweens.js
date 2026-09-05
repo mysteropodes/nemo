@@ -5464,12 +5464,19 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
 // ids (duplicated on either side) are left to the matcher.
 // Identifiant tel que le FICHIER le porte, avant tout ré-estampillage de
 // la génération en cours (voir _origId dans generateTweens).
-function _origIdOf(sd){return sd._origId!==undefined?sd._origId:sd.strokeId;}
+function _origIdOf(sd){
+  if(sd.origId!==undefined)return sd.origId;          // persistant (fichier)
+  if(sd._origId!==undefined)return sd._origId;        // instantané de début de génération
+  return sd.strokeId;
+}
+// Un identifiant fabriqué par le moteur (morceau de scission `twc_`,
+// dédoublonnage `twdup_`) n'est jamais une provenance d'artiste.
+function _engineMadeId(id){return !id||/^(twc_|twdup_)/.test(id);}
 function _provenancePins(sA,sB,forcedAIdx,forcedBIdx){
   var out=[];
   if(!TW_PROVENANCE_PINS)return out;
   var aById={},aDup={};
-  sA.forEach(function(sd,ii){var id=_origIdOf(sd);if(!id)return;if(aById[id]!==undefined)aDup[id]=1;else aById[id]=ii;});
+  sA.forEach(function(sd,ii){var id=_origIdOf(sd);if(_engineMadeId(id))return;if(aById[id]!==undefined)aDup[id]=1;else aById[id]=ii;});
   var bByDup={},bDupDup={};
   sB.forEach(function(sd,jj){if(!sd.dupOf)return;if(bByDup[sd.dupOf]!==undefined)bDupDup[sd.dupOf]=1;else bByDup[sd.dupOf]=jj;});
   Object.keys(bByDup).forEach(function(id){
@@ -5492,8 +5499,8 @@ function _identityPins(sA,sB,forcedAIdx,forcedBIdx){
   var out=[];
   if(!TW_ID_PINS)return out;
   var aById={},aDup={},bById={},bDup={};
-  sA.forEach(function(sd,ii){var id=_origIdOf(sd);if(!id)return;if(aById[id]!==undefined)aDup[id]=1;else aById[id]=ii;});
-  sB.forEach(function(sd,jj){var id=_origIdOf(sd);if(!id)return;if(bById[id]!==undefined)bDup[id]=1;else bById[id]=jj;});
+  sA.forEach(function(sd,ii){var id=_origIdOf(sd);if(_engineMadeId(id))return;if(aById[id]!==undefined)aDup[id]=1;else aById[id]=ii;});
+  sB.forEach(function(sd,jj){var id=_origIdOf(sd);if(_engineMadeId(id))return;if(bById[id]!==undefined)bDup[id]=1;else bById[id]=jj;});
   var cand=[];
   Object.keys(aById).forEach(function(id){
     if(aDup[id]||bDup[id]||bById[id]===undefined)return;
@@ -5651,7 +5658,7 @@ function generateTweens(explicitRestrictTo,skipUndo){
   // fraîches. Les épingles lisent maintenant l'identifiant tel qu'il était
   // au début de la génération (_origId, posé une fois, jamais sérialisé :
   // serP ne recopie que les champs qu'il connaît).
-  keys.forEach(function(kf){(ld.frames[kf].strokes||[]).forEach(function(sd){if(sd._origId===undefined)sd._origId=sd.strokeId;});});
+  keys.forEach(function(kf){(ld.frames[kf].strokes||[]).forEach(function(sd){if(sd._origId===undefined)sd._origId=(sd.origId!==undefined?sd.origId:sd.strokeId);});});
   // A frame selection on this layer restricts regeneration to just those
   // keyframes' own span (start keyframe -> its next keyframe), instead of
   // silently redoing the whole layer — select the frame to fix, hit Tween,
@@ -5782,6 +5789,17 @@ function generateTweens(explicitRestrictTo,skipUndo){
       // configurations, pas seulement la mienne.
       if(_usedPairIds[pairId]){var _k=1;while(_usedPairIds[pairId+'#'+_k])_k++;pairId=pairId+'#'+_k;}
       _usedPairIds[pairId]=1;
+      // PROVENANCE PERSISTANTE (2026-09-05, Cyril : « n'oublie pas d'enlever
+      // les anciens tweens ») : le ré-estampillage ci-dessous est nécessaire
+      // (Motion par élément, effets, binds du rig suivent un élément par son
+      // strokeId à travers les images), mais il écrasait l'identifiant que
+      // l'artiste avait donné — et un fichier sauvegardé après un tween
+      // portait ensuite les DÉCISIONS du moteur comme si c'était de la
+      // provenance (patte et corps de cats_anim sous le même id). L'id
+      // d'origine est conservé dans `origId`, sérialisé, posé UNE fois : les
+      // épingles ne lisent que lui.
+      if(spec.aData.strokeId!==pairId&&spec.aData.origId===undefined)spec.aData.origId=_origIdOf(spec.aData);
+      if(spec.bData.strokeId!==pairId&&spec.bData.origId===undefined)spec.bData.origId=_origIdOf(spec.bData);
       spec.aData.strokeId=pairId;spec.bData.strokeId=pairId;
       spec.bData._prevPairScore=spec.forced?0:spec.score; // lu par le prior temporel de la portée suivante (jamais sérialisé)
       // _src set AFTER alignment: the wasm align path rebuilds its output

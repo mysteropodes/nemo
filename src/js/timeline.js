@@ -1837,7 +1837,7 @@ window.SM={
       var pasted=JSON.parse(JSON.stringify(d.content));
       // provenance, same as duplicateKeyframe: a pasted stroke descends from
       // the stroke it was copied from (its id travelled in the clipboard)
-      if(pasted.strokes)pasted.strokes.forEach(function(sd){if(sd.strokeId&&!sd.isBrushTextureCopy)sd.dupOf=sd.strokeId;});
+      if(pasted.strokes)pasted.strokes.forEach(function(sd){if(sd.strokeId&&!sd.isBrushTextureCopy)sd.dupOf=sd.origId||sd.strokeId;});
       // A copied TWEEN frame (generated in-between) pastes as a normal
       // FULL keyframe — explicit request (2026-07-16, "un clé de tween
       // copier et collé ailleurs devient une keyframe pleine normal") :
@@ -2034,7 +2034,7 @@ window.SM={
     // exactly, for free; only strokes actually redrawn afterwards go
     // through matching. Source strokes get an id if they had none yet.
     _stampProvenance(strokes);
-    ld.frames[cf+1]={strokes:JSON.parse(JSON.stringify(strokes)).map(function(sd,i){if(strokes[i]&&strokes[i].strokeId&&!sd.isBrushTextureCopy)sd.dupOf=strokes[i].strokeId;return sd;}),isKeyframe:true,isInterpolated:false};
+    ld.frames[cf+1]={strokes:JSON.parse(JSON.stringify(strokes)).map(function(sd,i){if(strokes[i]&&strokes[i].strokeId&&!sd.isBrushTextureCopy)sd.dupOf=strokes[i].origId||strokes[i].strokeId;return sd;}),isKeyframe:true,isInterpolated:false};
     goToFrame(cf+1);showToast(SM.t('toastKeyframeDuplicated'));
   },
   extendExposure:function(n){
