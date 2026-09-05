@@ -5,16 +5,46 @@ const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const { after, test } = require('node:test');
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-browser-preview-test-'));
+after(() => fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 3 }));
 process.env.NEMO_ISOLATION_ROOT = path.join(scratch, 'runtime');
+const sourceRoot = path.resolve(__dirname, '..', '..');
+const repoRoot = runtimeSourceFixture(sourceRoot, path.join(scratch, 'source'));
 const isolation = require('./lib/isolation.cjs');
 const { browserLaunchConfig } = require('./lib/browser-runtime.cjs');
-const cli = path.join(__dirname, 'browser.cjs');
-const repoRoot = path.resolve(__dirname, '..', '..');
-after(() => fs.rmSync(scratch, { recursive: true, force: true }));
+const cli = path.join(repoRoot, 'scripts/nemo/browser.cjs');
+const buildCli = path.join(sourceRoot, 'scripts/nemo/build.cjs');
+
+// Runtime identity resolves its source root from the CLI's location. Copy the
+// actual runtime and served assets into a private Git root before mutating them.
+function runtimeSourceFixture(sourceRoot, root) {
+  const files = [
+    'scripts/nemo/browser.cjs', 'scripts/nemo/lib',
+    'package.json', 'src-tauri/tauri.conf.json',
+    'geometry-wasm/Cargo.toml', 'vectorize-wasm/Cargo.toml', 'src-tauri/Cargo.toml',
+    'src/index.html', 'src/wasm/geometry_wasm_bg.wasm',
+    'src/wasm-vectorize/vectorize_wasm_bg.wasm',
+  ];
+  for (const file of files) {
+    const target = path.join(root, file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.cpSync(path.join(sourceRoot, file), target, { recursive: true });
+  }
+  function git(args) {
+    const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr || String(result.error || 'Git fixture setup failed'));
+  }
+  git(['init', '-q']);
+  git(['config', 'maintenance.auto', 'false']);
+  git(['config', 'gc.auto', '0']);
+  git(['add', '.']);
+  git(['-c', 'user.name=Runtime fixture', '-c', 'user.email=runtime@example.invalid',
+    '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Runtime source fixture']);
+  return root;
+}
 
 function exited(child) {
   if (child.exitCode != null || child.signalCode != null) return Promise.resolve({ code: child.exitCode, signal: child.signalCode });
@@ -38,9 +68,9 @@ async function launch(task, extra = []) {
   return { child, info: JSON.parse(await firstLine(child)) };
 }
 
-function command(args) {
+function command(args, executable = cli) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [cli, ...args], { cwd: repoRoot, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, [executable, ...args], { cwd: repoRoot, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = ''; let stderr = '';
     child.stdout.on('data', (chunk) => { stdout += chunk; }); child.stderr.on('data', (chunk) => { stderr += chunk; });
     child.once('exit', (code, signal) => resolve({ code, signal, stdout, stderr }));
@@ -111,15 +141,32 @@ test('CLI status and stop enforce ownership and remove roots', async () => {
   assert.equal(fs.existsSync(instance.info.roots.root), false);
 });
 
-test('source change is reported and static content fails closed', async () => {
-  const instance = await launch(`preview-source-${process.pid}`);
+test('source change fails closed without invalidating a build in the original checkout', async () => {
+  const child = spawn(process.execPath, [buildCli, 'start', '--task', `preview-peer-build-${process.pid}`,
+    '--command', process.execPath, '--', '-e', 'process.exit(0)'], {
+    cwd: sourceRoot, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const peer = { child, info: JSON.parse(await firstLine(child)) };
+  let instance;
   const marker = path.join(repoRoot, `.browser-preview-source-change-${process.pid}`);
   try {
+    instance = await launch(`preview-source-${process.pid}`);
     fs.writeFileSync(marker, 'change');
     const response = await request(instance.info.identityUrl); const body = JSON.parse(response.body);
     assert.equal(response.status, 409); assert.equal(body.healthy, false); assert.equal(body.source.matches, false);
     assert.equal((await request(instance.info.url)).status, 409);
-  } finally { fs.rmSync(marker, { force: true }); await stopOwned(instance); }
+    // Keep the mutation present while the real source-checkout build checks its
+    // owner/source/build handshake: sharing repoRoot reproduced a status-1 race.
+    const status = await command(['status', '--task', peer.info.taskId, '--owner', peer.info.ownerToken], buildCli);
+    const build = JSON.parse(status.stdout);
+    assert.equal(status.code, 0, build.reason);
+    assert.equal(build.ok, true);
+    assert.equal(build.source.matches, true);
+    assert.equal(build.build.matches, true);
+  } finally {
+    fs.rmSync(marker, { force: true });
+    try { await stopOwned(instance); } finally { await stopOwned(peer); }
+  }
 });
 
 test('static server rejects writes, traversal and escaping symlinks', async () => {
