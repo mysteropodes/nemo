@@ -1,8 +1,7 @@
 'use strict';
 // Behavioral tests for R06 task-runtime isolation (scripts/nemo/lib/isolation.cjs).
-// Not wired into `npm test` (tests/*.test.cjs glob in package.json, out of
-// scope for this increment — see engineering/runtime-isolation.md). Run
-// directly:
+// Included in `npm test` / `verify` through tests/nemo-isolation.test.cjs.
+// Run this suite directly:
 //   node --test scripts/nemo/isolation.test.cjs
 //
 // NEMO_ISOLATION_ROOT is redirected to a throwaway tmp dir *before*
