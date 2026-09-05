@@ -1,0 +1,71 @@
+{
+  "modules": [
+    { "id": "nemo.lib.util", "layer": "tooling-shared", "dir": "scripts/nemo/lib",
+      "files": ["util.cjs"], "publicApi": ["util.cjs"], "sizeProfile": "Domain/application JS or TS" },
+
+    { "id": "nemo.lib.identity", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
+      "files": ["identity.cjs"], "publicApi": ["identity.cjs"], "sizeProfile": "Platform/engine adapter" },
+    { "id": "nemo.lib.capabilities", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
+      "files": ["capabilities.cjs"], "publicApi": ["capabilities.cjs"], "sizeProfile": "Platform/engine adapter" },
+    { "id": "nemo.lib.isolation", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
+      "files": ["isolation.cjs"], "publicApi": ["isolation.cjs"], "sizeProfile": "Platform/engine adapter" },
+    { "id": "nemo.lib.browserRuntime", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
+      "files": ["browser-runtime.cjs"], "publicApi": ["browser-runtime.cjs"], "sizeProfile": "Platform/engine adapter" },
+    { "id": "nemo.lib.buildRuntime", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
+      "files": ["build-runtime.cjs"], "publicApi": ["build-runtime.cjs"], "sizeProfile": "Platform/engine adapter" },
+    { "id": "nemo.lib.boundariesChecker", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
+      "files": ["boundaries.cjs"], "publicApi": ["boundaries.cjs"], "sizeProfile": "Platform/engine adapter" },
+
+    { "id": "nemo.lib.jobs", "layer": "tooling-application", "dir": "scripts/nemo/lib",
+      "files": ["jobs.cjs"], "publicApi": ["jobs.cjs"], "sizeProfile": "Domain/application JS or TS" },
+    { "id": "nemo.lib.cli", "layer": "tooling-application", "dir": "scripts/nemo/lib",
+      "files": ["cli.cjs"], "publicApi": ["cli.cjs"], "sizeProfile": "Domain/application JS or TS" },
+    { "id": "nemo.lib.boundariesRatchet", "layer": "tooling-application", "dir": "scripts/nemo/lib",
+      "files": ["boundaries-ratchet.cjs"], "publicApi": ["boundaries-ratchet.cjs"], "sizeProfile": "Domain/application JS or TS" },
+
+    { "id": "nemo.cli.boundaries", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
+      "files": ["boundaries.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
+    { "id": "nemo.cli.browser", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
+      "files": ["browser.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
+    { "id": "nemo.cli.build", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
+      "files": ["build.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
+    { "id": "nemo.cli.check", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
+      "files": ["check.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
+    { "id": "nemo.cli.doctor", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
+      "files": ["doctor.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
+    { "id": "nemo.cli.isolation", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
+      "files": ["isolation.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
+    { "id": "nemo.cli.job", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
+      "files": ["job.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
+    { "id": "nemo.cli.verify", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
+      "files": ["verify.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
+
+    { "id": "nemo.test.boundaries", "layer": "tooling-test", "dir": "scripts/nemo",
+      "files": ["boundaries.test.cjs"], "publicApi": [], "sizeProfile": "Test file" },
+    { "id": "nemo.test.boundariesRatchet", "layer": "tooling-test", "dir": "scripts/nemo",
+      "files": ["boundaries-ratchet.test.cjs"], "publicApi": [], "sizeProfile": "Test file" },
+    { "id": "nemo.test.browserRuntime", "layer": "tooling-test", "dir": "scripts/nemo",
+      "files": ["browser-runtime.test.cjs"], "publicApi": [], "sizeProfile": "Test file" },
+    { "id": "nemo.test.buildRuntime", "layer": "tooling-test", "dir": "scripts/nemo",
+      "files": ["build-runtime.test.cjs"], "publicApi": [], "sizeProfile": "Test file" },
+    { "id": "nemo.test.isolation", "layer": "tooling-test", "dir": "scripts/nemo",
+      "files": ["isolation.test.cjs"], "publicApi": [], "sizeProfile": "Test file" }
+  ],
+  "layerRules": {
+    "tooling-shared": { "allowedLayers": [] },
+    "tooling-adapters": { "allowedLayers": ["tooling-shared", "tooling-adapters"] },
+    "tooling-application": { "allowedLayers": ["tooling-shared", "tooling-adapters", "tooling-application"] },
+    "tooling-bootstrap": { "allowedLayers": ["*"] },
+    "tooling-test": { "allowedLayers": ["tooling-shared", "tooling-adapters", "tooling-application", "tooling-test"] }
+  },
+  "sizeProfiles": {
+    "Domain/application JS or TS": { "warn": 300, "hardMax": 400 },
+    "Feature UI JS or TS": { "warn": 350, "hardMax": 500 },
+    "Platform/engine adapter": { "warn": 300, "hardMax": 500 },
+    "Rust production module": { "warn": 350, "hardMax": 500 },
+    "Test file": { "warn": 450, "hardMax": 600 },
+    "Stylesheet": { "warn": 250, "hardMax": 350 },
+    "Handwritten config/bootstrap": { "warn": 150, "hardMax": 250 }
+  },
+  "exceptions": []
+}
