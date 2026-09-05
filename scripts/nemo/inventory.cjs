@@ -230,6 +230,27 @@ function indexBindingScopes(f) {
     if (f.kind[m.index] !== CODE) continue;
     const scope = f.scopes.find((s) => s.start <= m.index && m.index <= s.end && (m[1] !== 'var' || s.function));
     f.declarations.push({ name: m[2], scope });
+    if (m[1] === 'function') continue;
+    // Subsequent declarators share this owner. Ignore commas within an
+    // initializer's calls, arrays or objects; they do not start declarations.
+    for (let i = m.index + m[0].length; i < f.code.length; i++) {
+      if (f.kind[i] !== CODE) continue;
+      const c = f.code[i];
+      if (/[([{]/.test(c)) { i = matchClose(f, i); continue; }
+      if (/[;)}\]]/.test(c)) break;
+      if (c === '\n') {
+        const before = f.code.slice(m.index, i).trimEnd().slice(-1);
+        const after = f.code.slice(i + 1).trimStart()[0];
+        if (before !== '=' && after !== ',') break;
+      }
+      if (c !== ',') continue;
+      const next = /^\s*([A-Za-z_$][\w$]*)\s*(?==|,|;|$)/.exec(f.code.slice(i + 1));
+      if (!next) break; // unsupported binding pattern: do not guess a name
+      const at = i + 1 + next[0].indexOf(next[1]);
+      if (f.kind[at] !== CODE) break;
+      f.declarations.push({ name: next[1], scope });
+      i = at + next[1].length - 1;
+    }
   }
 }
 
@@ -546,12 +567,30 @@ function build(opts) {
   function parameterIntact(f, span, name, at) {
     const owner = bindingOwner(f, name, span.start);
     if (bindingOwner(f, name, at) !== owner) return false;
-    const re = new RegExp('(?:^|[^\\w$.])(' + esc(name) + ')\\s*(?:=(?!=|>)|[+*/%&|^?-]=|\\+\\+|--)|(?:\\+\\+|--)\\s*(' + esc(name) + ')(?![\\w$])', 'g');
+    const re = new RegExp('(?:^|[^\\w$.])(' + esc(name) + ')\\s*(?:=(?!=|>)|(?:&&|\\|\\||\\?\\?|\\*\\*|<<|>>>?|[+*/%&|^-])=|\\+\\+|--)|(?:\\+\\+|--)\\s*(' + esc(name) + ')(?![\\w$])', 'g');
     let m;
     const body = f.code.slice(span.start, at);
     while ((m = re.exec(body))) {
       const u = span.start + m.index + m[0].indexOf(name);
       if (f.kind[u] === CODE && bindingOwner(f, name, u) === owner) return false;
+    }
+    // Destructuring does not put '=' after the identifier. Conservatively
+    // reject a same-owner name in an assignment pattern; replacement values
+    // and complex target expressions are not propagated by this analyzer.
+    const patterns = /[\[{]/g;
+    while ((m = patterns.exec(body))) {
+      const open = span.start + m.index;
+      if (f.kind[open] !== CODE) continue;
+      const close = matchClose(f, open), after = skipWs(f, close + 1);
+      if (close >= at || f.code[after] !== '=' || /[=>]/.test(f.code[after + 1])) continue;
+      const names = new RegExp('(?:^|[^\\w$])(' + esc(name) + ')(?![\\w$])', 'g');
+      const pattern = f.code.slice(open + 1, close);
+      let target;
+      while ((target = names.exec(pattern))) {
+        const u = open + 1 + target.index + target[0].length - name.length;
+        if (f.kind[u] !== CODE || f.code[skipWs(f, u + name.length)] === ':') continue;
+        if (bindingOwner(f, name, u) === owner) return false;
+      }
     }
     return true;
   }
