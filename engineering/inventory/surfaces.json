@@ -1,10 +1,10 @@
 {
  "schema": "nemo.inventory/1",
  "generator": "scripts/nemo/inventory.cjs",
- "generatorVersion": 3,
+ "generatorVersion": 4,
  "source": {
-  "head": "075cac5b3ebc1b7f5af1130c2ba68611c846f54c",
-  "describe": "v0.7.0-alpha.4-35-g075cac5-dirty"
+  "head": "dd39e5215f000031c5f75821913cce2e6f971db9",
+  "describe": "v0.7.0-alpha.4-39-gdd39e52-dirty"
  },
  "inputsDigest": "cf5faf8460255998487b05fa35401a5c3a3258603f4f1bb368043cef202b8e7a",
  "states": [
@@ -7622,7 +7622,8 @@
     "functionsVisited": 14,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:7145 renderLipSyncPanel()"
+     "src/js/timeline.js:7145 renderLipSyncPanel()",
+     "src/js/timeline.js:11353 initLipSync()"
     ]
    }
   },
@@ -7662,7 +7663,8 @@
     "functionsVisited": 14,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:7148 renderLipSyncPanel()"
+     "src/js/timeline.js:7148 renderLipSyncPanel()",
+     "src/js/timeline.js:11355 initLipSync()"
     ]
    }
   },
@@ -7702,7 +7704,8 @@
     "functionsVisited": 14,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:7148 renderLipSyncPanel()"
+     "src/js/timeline.js:7148 renderLipSyncPanel()",
+     "src/js/timeline.js:11354 initLipSync()"
     ]
    }
   },
@@ -7742,7 +7745,8 @@
     "functionsVisited": 14,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:7145 renderLipSyncPanel()"
+     "src/js/timeline.js:7145 renderLipSyncPanel()",
+     "src/js/timeline.js:11352 initLipSync()"
     ]
    }
   },
