@@ -388,6 +388,49 @@ var TW_PIN_IN_SOLVER=true;
 // au-dessus de la tête). Il est maintenant transporté par le champ de
 // déformation de la portée (ajusté sur les paires retenues) pendant qu'il
 // fond ou se rétracte : il suit ses voisins.
+// TW_ID_PINS (2026-09-05, « test sur plusieurs anim ») — ÉPINGLES PAR
+// IDENTITÉ DE TRAIT. Un trait qui garde son `strokeId` d'une clé à l'autre
+// est le même objet dessiné ; c'est une correspondance connue, gratuite,
+// qu'aucun descripteur géométrique ne peut battre. Mesuré sur six fichiers :
+// le moteur est d'accord avec elle sur 267 paires sur 316, et là où il ne
+// l'est pas c'est presque toujours le même motif — des petits traits
+// parallèles (moustaches, doigts) dont l'ORDRE DANS LE TABLEAU a changé
+// entre les clés. Le moteur les apparie rang par rang et apparie donc une
+// moustache avec sa voisine : trajectoires croisées, 10 croisements contre
+// 5 pour l'identité sur la portée mesurée.
+//
+// MAIS elle n'est pas fiable brute : sur « confusion totale » elle propose
+// 338 px → 41 px et 116 px → 11 px. Trois filtres, tous mesurés :
+//  1. rapport de longueurs ≤ ID_PIN_LEN_RATIO — écarte les deux cas
+//     ci-dessus ;
+//  2. déplacement ≤ ID_PIN_TRAVEL_K × la MÉDIANE des déplacements des
+//     candidates elles-mêmes — estimation robuste du mouvement de la
+//     portée, sans rien connaître du dessin ;
+//  3. une épingle dont la trajectoire en croise une autre est écartée.
+//     Deux traits d'un même dessin qui échangent leur place est rare, et
+//     c'est exactement le cas du bras signalé par Cyril (portée 26→35), où
+//     l'identité veut échanger les deux contours et où l'œil dit le
+//     contraire. Écarter ne force RIEN : la paire retourne simplement au
+//     matcher, qui tranche comme avant.
+// Les épingles de provenance (dupOf) restent prioritaires.
+//  4. décision PAR PORTÉE : l'identité décrit le mouvement de cette portée,
+//     ou elle ne le décrit pas. Critère : le déplacement TOTAL qu'elle
+//     impose, rapporté à celui du partenaire le plus proche de forme
+//     comparable pour chaque trait. Un rapport proche de 1 veut dire que
+//     l'identité ne fait que départager des ambiguïtés locales ; un rapport
+//     élevé veut dire qu'elle veut déplacer des traits à travers le dessin.
+//     Mesuré sur les dix portées des fichiers de test :
+//       cats 0→6 1,15 | 6→16 1,36 | 16→25 0 | 25→34 1,47 | 34→46 1,69
+//       Untitled(3) 0→6 1,14 | 6→16 1,40
+//       totale 0→6 1,43 | 6→15 1,93 | traits 0→12 1,55 | b 0 et 0
+//     La seule portée qu'il FAUT écarter est cats 34→46 (1,69) : c'est le
+//     « bras qui passe d'un côté à l'autre » signalé par Cyril, où
+//     l'identité fait voyager deux traits de 246 px et 207 px alors qu'un
+//     partenaire les attend à 117 px et 50 px. Seuil à 1,6. La marge avec
+//     traits (1,55) est mince et assumée ; le drapeau est là pour ça.
+//     Écarter une portée ne force rien : le matcher tranche comme avant.
+var TW_ID_PINS=true;
+var ID_PIN_LEN_RATIO=2.0,ID_PIN_TRAVEL_K=3.0,ID_PIN_MIN=3,ID_PIN_SPAN_RATIO=1.6;
 var TW_ORPHAN_FOLLOW=true;
 // ---- MATCHING ----
 function buildTP(sd){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});return p;}
@@ -5008,6 +5051,9 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
     _provenancePins(sA,sB,forcedAIdx,forcedBIdx).forEach(function(pp){
       forcedPairs.push({aIdx:pp.a,bIdx:pp.b,aData:sA[pp.a],bData:sB[pp.b],mi:-1-forcedPairs.length,score:0,forced:true,provenance:true});
     });
+    _identityPins(sA,sB,forcedAIdx,forcedBIdx).forEach(function(pp){
+      forcedPairs.push({aIdx:pp.a,bIdx:pp.b,aData:sA[pp.a],bData:sB[pp.b],mi:-1-forcedPairs.length,score:0,forced:true,identity:true});
+    });
     var pins=forcedPairs.filter(function(fp){return!fp.isPiece;}).map(function(fp){return{a:fp.aIdx,b:fp.bIdx};});
     var matches=autoMatch(sA,sB,hist,pins);if(!sA.length&&!sB.length&&!forcedPairs.length)return null;
   // Only morph plausible pairs. A stroke whose best assignment still
@@ -5303,6 +5349,69 @@ function _provenancePins(sA,sB,forcedAIdx,forcedBIdx){
     if(clash)return;
     forcedAIdx[ai]=1;forcedBIdx[bi]=1;
     out.push({a:ai,b:bi});
+  });
+  return out;
+}
+// Épingles par identité de trait — voir TW_ID_PINS pour le raisonnement et
+// les mesures. Appelée APRÈS _provenancePins, donc elle ne voit que ce que
+// la provenance n'a pas déjà pris.
+function _identityPins(sA,sB,forcedAIdx,forcedBIdx){
+  var out=[];
+  if(!TW_ID_PINS)return out;
+  var aById={},aDup={},bById={},bDup={};
+  sA.forEach(function(sd,ii){var id=sd.strokeId;if(!id)return;if(aById[id]!==undefined)aDup[id]=1;else aById[id]=ii;});
+  sB.forEach(function(sd,jj){var id=sd.strokeId;if(!id)return;if(bById[id]!==undefined)bDup[id]=1;else bById[id]=jj;});
+  var cand=[];
+  Object.keys(aById).forEach(function(id){
+    if(aDup[id]||bDup[id]||bById[id]===undefined)return;
+    var ai=aById[id],bi=bById[id];
+    if(forcedAIdx[ai]||forcedBIdx[bi])return;
+    var fa=strokeFeat(sA[ai]),fb=strokeFeat(sB[bi]);
+    if(fa.type!==fb.type)return;
+    if((fa.fillCol&&fb.fillCol&&colorDist(fa.fillCol,fb.fillCol)>0.35)||
+       (fa.strokeCol&&fb.strokeCol&&colorDist(fa.strokeCol,fb.strokeCol)>0.35))return;
+    // filtre 1 : longueurs
+    var lr=Math.max(fa.length,fb.length)/Math.max(1,Math.min(fa.length,fb.length));
+    if(lr>ID_PIN_LEN_RATIO)return;
+    cand.push({a:ai,b:bi,ax:fa.cx,ay:fa.cy,bx:fb.cx,by:fb.cy,
+               d:Math.sqrt((fb.cx-fa.cx)*(fb.cx-fa.cx)+(fb.cy-fa.cy)*(fb.cy-fa.cy))});
+  });
+  if(cand.length<ID_PIN_MIN)return out;
+  // filtre 4 : tout ou rien sur la portée (voir ID_PIN_SPAN_RATIO)
+  var featB=sB.map(function(sd){return strokeFeat(sd);});
+  var sumPin=0,sumNear=0;
+  cand.forEach(function(c){
+    var fa=strokeFeat(sA[c.a]),best=Infinity;
+    for(var j=0;j<featB.length;j++){
+      var fb=featB[j];
+      if(fb.type!==fa.type)continue;
+      var lr2=Math.max(fa.length,fb.length)/Math.max(1,Math.min(fa.length,fb.length));
+      if(lr2>ID_PIN_LEN_RATIO)continue;
+      var dj=Math.sqrt((fb.cx-fa.cx)*(fb.cx-fa.cx)+(fb.cy-fa.cy)*(fb.cy-fa.cy));
+      if(dj<best)best=dj;
+    }
+    if(!isFinite(best))best=c.d;
+    sumPin+=c.d;sumNear+=Math.max(best,8);
+  });
+  if(sumPin>ID_PIN_SPAN_RATIO*Math.max(1,sumNear))return out;
+  // filtre 2 : déplacement aberrant vs la médiane des candidates
+  var ds=cand.map(function(c){return c.d;}).sort(function(x,y){return x-y;});
+  var med=ds[Math.floor(ds.length/2)];
+  var lim=Math.max(med*ID_PIN_TRAVEL_K,med+20);
+  cand=cand.filter(function(c){return c.d<=lim;});
+  // filtre 3 : une épingle qui croise une autre épingle est écartée
+  var keep=cand.map(function(){return true;});
+  for(var i=0;i<cand.length;i++)for(var j=i+1;j<cand.length;j++){
+    var p=cand[i],q=cand[j];
+    if(_segsIntersect({x:p.ax,y:p.ay},{x:p.bx,y:p.by},{x:q.ax,y:q.ay},{x:q.bx,y:q.by})){
+      keep[i]=false;keep[j]=false;
+    }
+  }
+  cand.forEach(function(c,k){
+    if(!keep[k])return;
+    if(forcedAIdx[c.a]||forcedBIdx[c.b])return;
+    forcedAIdx[c.a]=1;forcedBIdx[c.b]=1;
+    out.push({a:c.a,b:c.b});
   });
   return out;
 }
@@ -5704,6 +5813,7 @@ function computeArcMatchBase(){
   // same provenance pins + solver pins as _spanPairSpecs, so the arcs and
   // the reassign badge show exactly what generation will do
   _provenancePins(sA,sB,forcedAIdx,forcedBIdx).forEach(function(pp){forcedPairs.push({a:pp.a,b:pp.b,mi:-1-forcedPairs.length,provenance:true});});
+  _identityPins(sA,sB,forcedAIdx,forcedBIdx).forEach(function(pp){forcedPairs.push({a:pp.a,b:pp.b,mi:-1-forcedPairs.length,identity:true});});
   var pins=forcedPairs.map(function(fp){return{a:fp.a,b:fp.b};});
   var matches=autoMatch(sA,sB,null,pins);if(!matches.length&&!forcedPairs.length)return null;
   return {fA:fA,fB:fB,sA:sA,sB:sB,spA:spA,spB:spB,matches:matches,forcedAIdx:forcedAIdx,forcedBIdx:forcedBIdx,forcedPairs:forcedPairs};

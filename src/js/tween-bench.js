@@ -20,9 +20,9 @@
 (function(){
   if(typeof window==='undefined')return;
   var B={};
-  var FLAG_NAMES=['TW_MATCH_RELATIONAL','TW_MATCH_MULTI_MOTION','TW_REL_2OPT','TW_MATCH_TRACKING','TW_PIECE_COMPLETION','TW_MATCH_AXIS','TW_MATCH_TURNING','TW_MATCH_GAP','TW_REL_REVERSE','TW_OC_SIDE_GUARD',
+  var FLAG_NAMES=['TW_MATCH_RELATIONAL','TW_MATCH_MULTI_MOTION','TW_REL_2OPT','TW_MATCH_TRACKING','TW_PIECE_COMPLETION','TW_MATCH_AXIS','TW_MATCH_TURNING','TW_MATCH_GAP','TW_REL_REVERSE','TW_OC_SIDE_GUARD','TW_ID_PINS',
     'TW_MOTION_FIELD','TW_CHIRALITY','TW_MATCH_WIDTH','TW_MATCH_TOPOLOGY','TW_MATCH_REGIONS','TW_PROVENANCE_PINS','TW_PIN_IN_SOLVER','TW_ORPHAN_FOLLOW'];
-  var NEW_FLAGS=['TW_MOTION_FIELD','TW_CHIRALITY','TW_MATCH_WIDTH','TW_MATCH_TOPOLOGY','TW_MATCH_REGIONS','TW_PROVENANCE_PINS','TW_PIN_IN_SOLVER','TW_ORPHAN_FOLLOW','TW_MATCH_AXIS','TW_MATCH_TURNING','TW_MATCH_GAP','TW_REL_REVERSE','TW_OC_SIDE_GUARD'];
+  var NEW_FLAGS=['TW_MOTION_FIELD','TW_CHIRALITY','TW_MATCH_WIDTH','TW_MATCH_TOPOLOGY','TW_MATCH_REGIONS','TW_PROVENANCE_PINS','TW_PIN_IN_SOLVER','TW_ORPHAN_FOLLOW','TW_MATCH_AXIS','TW_MATCH_TURNING','TW_MATCH_GAP','TW_REL_REVERSE','TW_OC_SIDE_GUARD','TW_ID_PINS'];
   B.NEW_FLAGS=NEW_FLAGS;
   B.flags=function(){var o={};FLAG_NAMES.forEach(function(k){o[k]=window[k];});return o;};
   B.setFlags=function(obj){var prev={};Object.keys(obj||{}).forEach(function(k){prev[k]=window[k];window[k]=obj[k];});return prev;};
@@ -43,7 +43,7 @@
     var res=_spanPairSpecs(ldCopy,li,fA,fB,prev);
     var ms=performance.now()-t0;
     if(!res)return{empty:true,ms:ms};
-    var pairs=res.pairSpecs.map(function(ps){return{a:ps.aIdx,b:ps.bIdx,score:+ps.score.toFixed(3),forced:!!ps.forced,provenance:!!ps.provenance,piece:!!ps.isPiece,completion:!!ps.completion};});
+    var pairs=res.pairSpecs.map(function(ps){return{a:ps.aIdx,b:ps.bIdx,score:+ps.score.toFixed(3),forced:!!ps.forced,provenance:!!ps.provenance,piece:!!ps.isPiece,completion:!!ps.completion,identity:!!ps.identity};});
     pairs.sort(function(p,q){return p.a-q.a||p.b-q.b;});
     var sig=pairs.filter(function(p){return!p.piece;}).map(function(p){return p.a+'>'+p.b;}).join(' ');
     return{ms:ms,nA:res.sA.length,nB:res.sB.length,pairs:pairs,unA:res.unA.slice(),unB:res.unB.slice(),sig:sig,
