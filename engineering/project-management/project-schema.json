@@ -1,0 +1,309 @@
+{
+  "title": "Nemo Foundation Remediation",
+  "repository": "mysteropodes/nemo",
+  "native_fields": [
+    "Title",
+    "Assignees",
+    "Labels",
+    "Linked pull requests",
+    "Milestone",
+    "Repository",
+    "Reviewers",
+    "Parent issue",
+    "Sub-issues progress",
+    "Created",
+    "Updated",
+    "Closed"
+  ],
+  "custom_fields": [
+    {
+      "name": "Status",
+      "type": "SINGLE_SELECT",
+      "description": "Ready requires a named human owner, scope, resolved dependencies and observable acceptance. Done requires accepted integrated evidence.",
+      "options": [
+        "Inbox",
+        "Ready",
+        "In progress",
+        "Review",
+        "Validate",
+        "Blocked",
+        "Done"
+      ]
+    },
+    {
+      "name": "Priority",
+      "type": "SINGLE_SELECT",
+      "description": "Triage importance: P0 stop-ship or foundation blocker; P1 high; P2 normal; P3 low.",
+      "options": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ]
+    },
+    {
+      "name": "Area",
+      "type": "SINGLE_SELECT",
+      "description": "Primary affected subsystem.",
+      "options": [
+        "Document",
+        "Animation",
+        "UI",
+        "Renderer",
+        "Media",
+        "Platform",
+        "DevEx"
+      ]
+    },
+    {
+      "name": "Goal",
+      "type": "SINGLE_SELECT",
+      "description": "Outcome the work advances.",
+      "options": [
+        "Reliable alpha",
+        "Modular core",
+        "Measured performance",
+        "Reproducible desktop"
+      ]
+    },
+    {
+      "name": "Size",
+      "type": "SINGLE_SELECT",
+      "description": "Relative scope; split L before concurrent implementation.",
+      "options": [
+        "S",
+        "M",
+        "L"
+      ]
+    },
+    {
+      "name": "Phase",
+      "type": "SINGLE_SELECT",
+      "description": "Dependency gate in the remediation program; BZ is the collaboration track.",
+      "options": [
+        "F0",
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5",
+        "F6",
+        "BZ",
+        "Existing backlog"
+      ]
+    },
+    {
+      "name": "Program",
+      "type": "SINGLE_SELECT",
+      "description": "Lead program; this does not assign a person.",
+      "options": [
+        "Core",
+        "Editor",
+        "Platform",
+        "Collaboration"
+      ]
+    },
+    {
+      "name": "Kind",
+      "type": "SINGLE_SELECT",
+      "description": "Planning classification for user-owned repository issues.",
+      "options": [
+        "Epic",
+        "Task",
+        "Bug",
+        "Feature"
+      ]
+    },
+    {
+      "name": "Work package",
+      "type": "TEXT",
+      "description": "Stable proposal identifier (R00-R22, R18.1-R18.6, BZ0-BZ6 or existing issue)."
+    },
+    {
+      "name": "Planning window",
+      "type": "SINGLE_SELECT",
+      "description": "Proposed relative window; no calendar commitment until kickoff.",
+      "options": [
+        "H0-H4",
+        "H4-H12",
+        "H12-H24",
+        "Days 2-4",
+        "Days 5-10",
+        "Days 11-14",
+        "Unscheduled"
+      ]
+    },
+    {
+      "name": "Start date",
+      "type": "DATE",
+      "description": "Scheduled start; Schedule basis identifies forecast, committed or actual timing."
+    },
+    {
+      "name": "Target date",
+      "type": "DATE",
+      "description": "Scheduled finish/checkpoint; Schedule basis identifies forecast, committed or actual timing."
+    },
+    {
+      "name": "Triage date",
+      "type": "DATE",
+      "description": "Date the disposition and priority were reviewed."
+    },
+    {
+      "name": "Risk",
+      "type": "SINGLE_SELECT",
+      "description": "Delivery/behavior risk of the work, separate from importance.",
+      "options": [
+        "Low",
+        "Medium",
+        "High"
+      ]
+    },
+    {
+      "name": "Validation",
+      "type": "SINGLE_SELECT",
+      "description": "Evidence state; claimed fixes remain visible until their acceptance is established.",
+      "options": [
+        "Planned",
+        "Needs reproduction",
+        "Needs validation",
+        "Accepted"
+      ]
+    },
+    {
+      "name": "Surface",
+      "type": "SINGLE_SELECT",
+      "description": "Required acceptance surface; detailed matrix lives in the issue.",
+      "options": [
+        "Repository",
+        "Browser",
+        "Desktop",
+        "Browser and desktop",
+        "Collaboration"
+      ]
+    },
+    {
+      "name": "Estimate days",
+      "type": "NUMBER",
+      "description": "Owner estimate in working days; empty until estimated, never zero for unknown."
+    },
+    {
+      "name": "Validation owner",
+      "type": "TEXT",
+      "description": "Accountable reviewer GitHub login; distinct from issue assignee and PR-native reviewers."
+    },
+    {
+      "name": "References",
+      "type": "TEXT",
+      "description": "Canonical plan, evidence and related issue links; detailed receipt remains in the issue."
+    },
+    {
+      "name": "Exception expiry",
+      "type": "DATE",
+      "description": "Required expiry for any explicitly accepted migration exception."
+    },
+    {
+      "name": "Schedule basis",
+      "type": "SINGLE_SELECT",
+      "description": "Forecast is a planning date; Committed is an owner-agreed deadline; Actual is observed timing.",
+      "options": [
+        "Forecast",
+        "Committed",
+        "Actual"
+      ]
+    }
+  ],
+  "views": [
+    {
+      "name": "Open work",
+      "layout": "TABLE_LAYOUT",
+      "filter": "is:open",
+      "show_hierarchy": false
+    },
+    {
+      "name": "Delivery board",
+      "layout": "BOARD_LAYOUT",
+      "filter": "is:open -kind:Epic",
+      "sort": {
+        "field": "Priority",
+        "direction": "ascending"
+      },
+      "column_by": "Status"
+    },
+    {
+      "name": "Triage and validation",
+      "layout": "TABLE_LAYOUT",
+      "filter": "is:open status:Inbox,Validate"
+    },
+    {
+      "name": "Ready by priority",
+      "layout": "TABLE_LAYOUT",
+      "filter": "is:open status:Ready",
+      "sort": {
+        "field": "Priority",
+        "direction": "ascending"
+      }
+    },
+    {
+      "name": "Active assignments",
+      "layout": "BOARD_LAYOUT",
+      "filter": "is:open status:\"In progress\",Review"
+    },
+    {
+      "name": "Blocked and dependencies",
+      "layout": "TABLE_LAYOUT",
+      "filter": "is:open status:Blocked"
+    },
+    {
+      "name": "Phase roadmap",
+      "layout": "ROADMAP_LAYOUT",
+      "filter": "is:open kind:Epic",
+      "date_fields": {
+        "start": "Start date",
+        "target": "Target date"
+      }
+    },
+    {
+      "name": "Collaboration acceptance",
+      "layout": "TABLE_LAYOUT",
+      "filter": "is:open program:Collaboration"
+    },
+    {
+      "name": "Unassigned work",
+      "layout": "TABLE_LAYOUT",
+      "filter": "is:open no:assignee"
+    },
+    {
+      "name": "Task timeline",
+      "layout": "ROADMAP_LAYOUT",
+      "filter": "is:open label:remediation",
+      "date_fields": {
+        "start": "Start date",
+        "target": "Target date"
+      },
+      "number": 10,
+      "id": "PVTV_lAHOAqBX8s4Bif5lzgLjC5M"
+    }
+  ],
+  "dependencies": "Native blocked-by relationships plus linked acceptance prerequisites in issue bodies",
+  "date_policy": "User selected September 4, 2026 (America/New_York) as forecast start. Hour-offset planning uses 20:00 EDT as T0. H24 is Sep 5, H240 is Sep 14, and H336 contingency is Sep 18. These dates do not launch implementation or assert committed staffing.",
+  "assignment_policy": "Preserve existing assignees. Unassigned work remains Inbox or Blocked. One real human owner per claimed task; agent/session/worktree details belong in receipts.",
+  "automation_policy": "Native auto-add sub-issues is enabled. Other automatic status/closure rules are disabled. Closed issues leave all active views through is:open filtering; merge does not automatically imply runtime acceptance.",
+  "project_url": "https://github.com/users/ivg-design/projects/8",
+  "owner": "ivg-design",
+  "default_repository": "mysteropodes/nemo",
+  "repository_projects_tab_link": "Unavailable across different owners; canonical issues and default issue repository are configured.",
+  "collaborators": [
+    {
+      "login": "mysteropodes",
+      "role": "Admin"
+    },
+    {
+      "login": "pencilpark",
+      "role": "Admin"
+    },
+    {
+      "login": "byyourself22",
+      "role": "Write"
+    }
+  ]
+}
