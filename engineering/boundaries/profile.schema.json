@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "nemo.boundaries.profile/1",
+  "title": "Nemo boundaries profile (R05 first increment, candidate)",
+  "description": "Input shape for scripts/nemo/lib/boundaries.cjs#checkProfile. Describes a BOUNDED set of modules under review, not the whole application — see README.md for the integration contract with the future R01/R03 inventory, which is expected to generate this shape rather than have it hand-authored long-term. Runtime validation additionally checks unique module/file ownership, publicApi subsets, known size profiles, threshold order, real dates and declared exception paths.",
+  "type": "object",
+  "required": ["modules", "sizeProfiles"],
+  "additionalProperties": false,
+  "properties": {
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/module" }
+    },
+    "layerRules": {
+      "type": "object",
+      "description": "Keyed by layer name (engineering/remediation/04_MODULARITY_POLICY.md's 'Logical layers'). A layer with no entry is treated permissively (no layer-violation is ever raised for imports it makes) — declare every layer you want enforced.",
+      "additionalProperties": { "$ref": "#/definitions/layerRule" }
+    },
+    "sizeProfiles": {
+      "type": "object",
+      "description": "Keyed by the sizeProfile name modules reference. Real usage should copy the 'Initial size profiles' table from 04_MODULARITY_POLICY.md; tests may use smaller synthetic values.",
+      "additionalProperties": { "$ref": "#/definitions/sizeProfile" }
+    },
+    "exceptions": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/exception" }
+    }
+  },
+  "definitions": {
+    "module": {
+      "type": "object",
+      "required": ["id", "layer", "dir", "files", "publicApi", "sizeProfile"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Unique, stable module id, e.g. \"domain.track\". Used in violation reports and as the cycle-graph node." },
+        "layer": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "One of the logical layers from 04_MODULARITY_POLICY.md (domain, application, features, ports, adapters, bootstrap, shared) or a project-specific extension." },
+        "dir": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Path to the module's directory, relative to the profile run's --root (normally the repo root)." },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "pattern": "\\S" },
+          "description": "Every file belonging to this module, relative to `dir`. Files not listed here are invisible to the checker even if they exist on disk (v1 does not walk the filesystem — see README limitations)."
+        },
+        "publicApi": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "pattern": "\\S" },
+          "description": "Subset of `files` other modules may import. Reaching any file in `files` that is not also in `publicApi` from outside the module is a private-import violation."
+        },
+        "sizeProfile": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Key into the top-level `sizeProfiles` map. Applied per-file, not summed across the module." }
+      }
+    },
+    "layerRule": {
+      "type": "object",
+      "required": ["allowedLayers"],
+      "additionalProperties": false,
+      "properties": {
+        "allowedLayers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "pattern": "\\S" },
+          "description": "Layers this layer's modules may import from. \"*\" disables the check entirely for this layer (use for bootstrap, which composes everything)."
+        }
+      }
+    },
+    "sizeProfile": {
+      "type": "object",
+      "required": ["warn", "hardMax"],
+      "additionalProperties": false,
+      "properties": {
+        "warn": { "type": "integer", "minimum": 0 },
+        "hardMax": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "exception": {
+      "type": "object",
+      "required": ["path", "rule", "owner", "issue", "expires", "reason"],
+      "allOf": [{ "if": { "properties": { "rule": { "const": "size" } } }, "then": { "required": ["ceiling"] }, "else": { "not": { "required": ["ceiling"] } } }],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Repo/root-relative file path, exactly as `dir`/file join produces it (posix separators). Must name a declared file; a cycle exception requires an edge originating in this exact file." },
+        "rule": { "type": "string", "enum": ["size", "private-import", "layer-violation", "global-state", "cycle"] },
+        "ceiling": { "type": "integer", "minimum": 0, "description": "Only meaningful for rule \"size\": the raised hard maximum this exception grants. Exceeding the ceiling itself still fails." },
+        "owner": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Accountable human owner, per 04_MODULARITY_POLICY.md's Exceptions section." },
+        "issue": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Tracking issue number/id." },
+        "expires": { "type": "string", "format": "date", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "ISO date. On/after this date the exception stops shielding its rule and is itself reported as an expired-exception violation." },
+        "reason": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      }
+    }
+  }
+}
