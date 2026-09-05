@@ -1,0 +1,482 @@
+{
+ "schema": "nemo.fixture-expectations/1",
+ "fixture": "static-props",
+ "reference": "tests/fixtures/lib/reference.cjs",
+ "checks": [
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "position",
+   "frame": 0,
+   "expect": [
+    10,
+    20
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "position",
+   "frame": 0,
+   "expect": [
+    0,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "position",
+   "frame": 7,
+   "expect": [
+    10,
+    20
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "position",
+   "frame": 7,
+   "expect": [
+    0,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "position",
+   "frame": 23,
+   "expect": [
+    10,
+    20
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "position",
+   "frame": 23,
+   "expect": [
+    0,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "anchor",
+   "frame": 0,
+   "expect": [
+    5,
+    -5
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "anchor",
+   "frame": 0,
+   "expect": [
+    0,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "anchor",
+   "frame": 7,
+   "expect": [
+    5,
+    -5
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "anchor",
+   "frame": 7,
+   "expect": [
+    0,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "anchor",
+   "frame": 23,
+   "expect": [
+    5,
+    -5
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "anchor",
+   "frame": 23,
+   "expect": [
+    0,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "rotation",
+   "frame": 0,
+   "expect": [
+    15
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "rotation",
+   "frame": 0,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "rotation",
+   "frame": 7,
+   "expect": [
+    15
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "rotation",
+   "frame": 7,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "rotation",
+   "frame": 23,
+   "expect": [
+    15
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "rotation",
+   "frame": 23,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "scale",
+   "frame": 0,
+   "expect": [
+    150,
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "scale",
+   "frame": 0,
+   "expect": [
+    100,
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "scale",
+   "frame": 7,
+   "expect": [
+    150,
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "scale",
+   "frame": 7,
+   "expect": [
+    100,
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "scale",
+   "frame": 23,
+   "expect": [
+    150,
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "scale",
+   "frame": 23,
+   "expect": [
+    100,
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "opacity",
+   "frame": 0,
+   "expect": [
+    50
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "opacity",
+   "frame": 0,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "opacity",
+   "frame": 7,
+   "expect": [
+    50
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "opacity",
+   "frame": 7,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "opacity",
+   "frame": 23,
+   "expect": [
+    50
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "opacity",
+   "frame": 23,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "order",
+   "frame": 0,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "order",
+   "frame": 0,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "order",
+   "frame": 7,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "order",
+   "frame": 7,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_0",
+   "prop": "order",
+   "frame": 23,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "static value is frame-independent"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_static_1",
+   "prop": "order",
+   "frame": 23,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "no track and no static value → documented default"
+  },
+  {
+   "kind": "document",
+   "path": "layers[0].frames[0].strokes[0].hasRealStroke",
+   "expect": false,
+   "verify": "node",
+   "note": "fill-only path: hasRealStroke is authoritative"
+  },
+  {
+   "kind": "document",
+   "path": "layers[0].frames[0].strokes[1].closed",
+   "expect": false,
+   "verify": "node"
+  },
+  {
+   "kind": "bounds",
+   "layerUid": "ly_static_0",
+   "strokeId": "s_static_1",
+   "expect": {
+    "x": 350,
+    "y": 120,
+    "width": 150,
+    "height": 120
+   },
+   "verify": "node"
+  }
+ ]
+}
