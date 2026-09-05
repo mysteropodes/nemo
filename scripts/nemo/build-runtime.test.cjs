@@ -170,7 +170,7 @@ test('status and stop require the owner and preserve peer launchers', async () =
     assert.equal(isolation.pidAlive(instance.child.pid), true);
     const goodStatus = await command(['status', '--task', instance.info.taskId, '--owner', instance.info.ownerToken]);
     const body = JSON.parse(goodStatus.stdout);
-    assert.equal(goodStatus.code, 0);
+    assert.equal(goodStatus.code, 0, body.reason);
     assert.equal(body.ok, true);
     assert.equal(body.runtime.state, 'completed');
     await stopOwned(instance);
