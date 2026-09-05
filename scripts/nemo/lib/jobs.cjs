@@ -217,9 +217,25 @@ function jobBuildDesktop(ctx) {
 }
 
 // ---- registry ----------------------------------------------------------
+// ---- inventory (R03) -------------------------------------------------------
+// engineering/inventory/{surfaces.json,surfaces.csv,SURFACES.md} are generated
+// from src/ by scripts/nemo/inventory.cjs. This job is the staleness gate
+// (`--check`, ~3 s, no network); `npm run inventory` regenerates. It is in
+// every verify profile so a UI or handler change cannot land with an
+// out-of-date inventory.
+function jobInventory() {
+  const script = path.join(ROOT, 'scripts', 'nemo', 'inventory.cjs');
+  if (!exists(script)) return blocked('scripts/nemo/inventory.cjs is missing');
+  const r = run(process.execPath, [script, '--check'], { timeout: 5 * 60 * 1000 });
+  const artifacts = ['surfaces.json', 'surfaces.csv', 'SURFACES.md'].map((f) => ({ path: 'engineering/inventory/' + f }));
+  const last = (r.stdout + r.stderr).trim().split('\n').filter(Boolean).pop() || `exit ${r.status}`;
+  return (r.status === 0 ? pass : fail)(last, { exitCode: r.status, log: logOf(r), artifacts });
+}
+
 const JOBS = {
   doctor: { run: jobDoctor, required: true },
   check: { run: jobCheck, required: true },
+  inventory: { run: jobInventory, required: true },
   'test:unit': { run: jobTestUnit, required: true },
   'test:rust': { run: (ctx) => jobTestRust(ctx, 'geometry-wasm', 'geometry-wasm'), required: true },
   'test:rust-tauri': { run: (ctx) => jobTestRust(ctx, 'src-tauri', 'src-tauri'), required: false },
@@ -232,8 +248,8 @@ const JOBS = {
 };
 
 const PROFILES = {
-  quick: ['doctor', 'check', 'test:unit', 'test:rust'],
-  full: ['doctor', 'check', 'test:unit', 'test:rust', 'test:rust-tauri', 'test:integration', 'build:wasm', 'test:browser', 'bench', 'build:desktop', 'test:desktop'],
+  quick: ['doctor', 'check', 'inventory', 'test:unit', 'test:rust'],
+  full: ['doctor', 'check', 'inventory', 'test:unit', 'test:rust', 'test:rust-tauri', 'test:integration', 'build:wasm', 'test:browser', 'bench', 'build:desktop', 'test:desktop'],
 };
 
 function execute(name, ctx) {
