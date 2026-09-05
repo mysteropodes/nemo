@@ -1,0 +1,159 @@
+{
+ "schema": "nemo.fixture-expectations/1",
+ "fixture": "migration",
+ "reference": "tests/fixtures/lib/reference.cjs",
+ "checks": [
+  {
+   "kind": "migration",
+   "op": "legacyCurve",
+   "layerUid": "ly_mig_curve",
+   "expect": {
+    "key0": [
+     {
+      "x": 0,
+      "y": 0
+     },
+     {
+      "x": 0.25,
+      "y": 0.156
+     },
+     {
+      "x": 0.5,
+      "y": 0.5
+     },
+     {
+      "x": 0.75,
+      "y": 0.844
+     },
+     {
+      "x": 1,
+      "y": 1
+     }
+    ],
+    "key1": [
+     {
+      "x": 0,
+      "y": 0
+     },
+     {
+      "x": 0.4,
+      "y": 0.1,
+      "tx": 0.2
+     },
+     {
+      "x": 1,
+      "y": 1
+     }
+    ],
+    "migratedCount": 1
+   },
+   "verify": "node",
+   "note": "only the untouched legacy default is replaced"
+  },
+  {
+   "kind": "migration",
+   "op": "timeLinkOffsets",
+   "layerUid": "ly_mig_timelink",
+   "expect": {
+    "timeLinkInOffset": [
+     3
+    ],
+    "timeLinkOutOffset": [
+     -2
+    ]
+   },
+   "verify": "node"
+  },
+  {
+   "kind": "migration",
+   "op": "effectorChannels",
+   "layerUid": "ly_mig_dup",
+   "expect": [
+    {
+     "prop": "position",
+     "value": [
+      10,
+      0
+     ]
+    },
+    {
+     "prop": "rotation",
+     "value": [
+      5
+     ]
+    }
+   ],
+   "verify": "node"
+  },
+  {
+   "kind": "migration",
+   "op": "matteSourceUid",
+   "layerUid": "ly_mig_matte",
+   "expect": "ly_mig_above",
+   "verify": "gate",
+   "gate": "R12 document contract (importJSON)",
+   "note": "matte without a source uid binds to the layer directly above"
+  },
+  {
+   "kind": "migration",
+   "op": "easingCurveDefault",
+   "expect": [
+    {
+     "x": 0,
+     "y": 0
+    },
+    {
+     "x": 0.3,
+     "y": 0.05
+    },
+    {
+     "x": 0.7,
+     "y": 0.95
+    },
+    {
+     "x": 1,
+     "y": 1
+    }
+   ],
+   "verify": "gate",
+   "gate": "R12 document contract (importJSON)"
+  },
+  {
+   "kind": "migration",
+   "op": "legacyStrokeFallback",
+   "layerUid": "ly_mig_matte",
+   "strokeId": "s_mig_4",
+   "expect": {
+    "strokeColor": "#fff"
+   },
+   "verify": "gate",
+   "gate": "R12 document contract (desP)",
+   "note": "a fill without hasRealStroke keeps the historical white fallback"
+  },
+  {
+   "kind": "migration",
+   "op": "tweenSpanKey",
+   "expect": "ly_mig_curve:0-6",
+   "verify": "gate",
+   "gate": "R12 document contract (importJSON)"
+  },
+  {
+   "kind": "migration",
+   "op": "framePadding",
+   "layerUid": "ly_mig_short",
+   "expect": {
+    "frames": 24,
+    "isInterpolated": false
+   },
+   "verify": "gate",
+   "gate": "R12 document contract (importJSON)"
+  },
+  {
+   "kind": "document",
+   "path": "version",
+   "expect": 12,
+   "verify": "node",
+   "note": "older format version loads with defaults"
+  }
+ ]
+}

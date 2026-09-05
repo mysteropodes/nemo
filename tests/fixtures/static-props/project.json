@@ -1,0 +1,596 @@
+{
+ "version": 13,
+ "totalFrames": 24,
+ "fps": 24,
+ "canvasW": 640,
+ "canvasH": 360,
+ "canvasBg": "#ffffff",
+ "waIn": 0,
+ "waOut": 23,
+ "mediaMode": "embedded",
+ "layers": [
+  {
+   "name": "Static shapes",
+   "visible": true,
+   "locked": false,
+   "frames": [
+    {
+     "strokes": [
+      {
+       "segments": [
+        {
+         "point": [
+          200,
+          100
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          300,
+          100
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          300,
+          200
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          200,
+          200
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#ffffff",
+       "hasRealStroke": false,
+       "strokeWidth": 3,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#ff3b30",
+       "opacity": 1,
+       "strokeId": "s_static_0"
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          350,
+          120
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          420,
+          240
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          500,
+          140
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": false,
+       "strokeColor": "#1c7ed6",
+       "hasRealStroke": true,
+       "strokeWidth": 6,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": null,
+       "opacity": 1,
+       "strokeId": "s_static_1"
+      },
+      {
+       "segments": [
+        {
+         "point": [
+          60,
+          300
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          160,
+          300
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          110,
+          220
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#000000",
+       "hasRealStroke": true,
+       "strokeWidth": 2,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#34c759",
+       "opacity": 1,
+       "strokeId": "s_static_2"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    }
+   ],
+   "color": "#4a9eff",
+   "effects": [],
+   "layerUid": "ly_static_0",
+   "parentLayerUid": null,
+   "motionStatic": {
+    "position": [
+     10,
+     20
+    ],
+    "anchor": [
+     5,
+     -5
+    ],
+    "rotation": [
+     15
+    ],
+    "scale": [
+     150,
+     100
+    ],
+    "opacity": [
+     50
+    ]
+   }
+  },
+  {
+   "name": "Unanimated defaults",
+   "visible": true,
+   "locked": false,
+   "frames": [
+    {
+     "strokes": [
+      {
+       "segments": [
+        {
+         "point": [
+          20,
+          20
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          60,
+          20
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          60,
+          60
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        },
+        {
+         "point": [
+          20,
+          60
+         ],
+         "handleIn": [
+          0,
+          0
+         ],
+         "handleOut": [
+          0,
+          0
+         ]
+        }
+       ],
+       "closed": true,
+       "strokeColor": "#ffffff",
+       "hasRealStroke": false,
+       "strokeWidth": 3,
+       "strokeCap": "round",
+       "strokeJoin": "round",
+       "fillColor": "#8e8e93",
+       "opacity": 1,
+       "strokeId": "s_static_3"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [],
+     "isKeyframe": false,
+     "isInterpolated": false
+    }
+   ],
+   "color": "#4a9eff",
+   "effects": [],
+   "layerUid": "ly_static_1",
+   "parentLayerUid": null
+  }
+ ],
+ "layerFolders": {},
+ "layerLinkGroups": {},
+ "storyboard": null,
+ "symbols": {},
+ "customEffects": [],
+ "audioTracks": [],
+ "refMedia": null,
+ "mediaLibrary": [],
+ "motionArcs": {},
+ "easingCurve": {
+  "points": [
+   {
+    "x": 0,
+    "y": 0
+   },
+   {
+    "x": 0.3,
+    "y": 0.05
+   },
+   {
+    "x": 0.7,
+    "y": 0.95
+   },
+   {
+    "x": 1,
+    "y": 1
+   }
+  ]
+ },
+ "resamplePts": 50,
+ "tweenStep": 1,
+ "tweenOverrides": {},
+ "tweenEasing": {},
+ "comments": [],
+ "cameraKeys": [],
+ "cameraLayerOn": false,
+ "markers": [],
+ "shyEnabled": false,
+ "trackRoles": {},
+ "imageMeshes": {},
+ "bpm": 120,
+ "bpmOffset": 0,
+ "bpmShow": false,
+ "motionBlurOn": false,
+ "motionBlurSamples": 6,
+ "motionBlurShutter": 0.5,
+ "guides": {
+  "h": [],
+  "v": []
+ },
+ "exprGlobals": ""
+}
