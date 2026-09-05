@@ -139,9 +139,13 @@ rules above. No unrelated browser or task is selected by name.
 Tauri CLI as `tauri build --target <host> -b app --no-sign`. It writes Cargo
 output under that task's `build/tauri-target`, routes temporary, cache and
 report paths through the task roots, and holds an exclusive slot derived from
-the exact worktree path while the build child is active. Different worktrees
-have different slots. A second build in the same worktree is refused before it
-starts, avoiding concurrent writes by Tauri/Cargo to shared generated source.
+the exact worktree path until the complete owned build process group exits.
+Different worktrees have different slots. A second build in the same worktree
+is refused before it starts, avoiding concurrent writes by Tauri/Cargo to shared
+generated source. Direct build-leader exit does not establish group completion:
+remaining descendants are terminated and verified absent before slot release.
+If that cannot be established, the launcher and slot remain live with a
+`reconciliation-required` result.
 
 The first stdout line is JSON containing the task roots, owner token, source and
 build identities. Build stdout/stderr go to the reported log files. The launcher
@@ -161,6 +165,10 @@ that task's disposable roots. Copy wanted artifacts before stopping. Forced or
 external launcher termination can still leave child processes or stale records
 that require the reconciliation procedure above.
 
+The native default currently supports macOS only. Other platforms are rejected
+before task roots, slots or launcher records are created because their bundle
+arguments and process-tree ownership have not been implemented or validated.
+
 This serializes same-worktree builds and isolates Cargo output; it does not make
 the checkout immutable. Tauri or its build scripts can still update generated
 files under `src-tauri/gen/`. Treat those as shared-writer paths: inspect the
@@ -172,10 +180,10 @@ owned by R03/R04.
 The focused non-native regressions run with
 `node --test scripts/nemo/build-runtime.test.cjs`. They use executable stubs to
 cover disjoint paths, same-worktree slot refusal/release, nonzero build results,
-owner-only status/stop, active process-group reaping and retained artifacts
-without starting a Tauri, desktop or GPU process. The core isolation suite
-already covers source-identity drift without adding a second concurrent
-worktree mutation to normal test discovery.
+owner-only status/stop, active process-group reaping, leader-before-descendant
+exit and retained artifacts without starting a Tauri, desktop or GPU process.
+The core isolation suite already covers source-identity drift without adding a
+second concurrent worktree mutation to normal test discovery.
 
 ## Validation and remaining integration
 

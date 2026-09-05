@@ -37,6 +37,20 @@ process.on('SIGTERM', () => {});
 setInterval(() => {}, 1000);
 `, { mode: 0o700 });
 
+const orphaningStub = path.join(scratch, 'orphaning-build-stub');
+fs.writeFileSync(orphaningStub, `#!${process.execPath}\n` + String.raw`
+const fs = require('node:fs');
+const { spawn } = require('node:child_process');
+const descendant = spawn(process.execPath, ['-e', "process.on('SIGTERM',()=>{});process.send('ready');setInterval(()=>{},1000)"], {
+  stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+});
+descendant.once('message', () => {
+  fs.writeFileSync(process.argv[2], String(descendant.pid));
+  descendant.unref();
+  process.exit(0);
+});
+`, { mode: 0o700 });
+
 after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
 function exited(child) {
@@ -54,8 +68,9 @@ function firstLine(child) {
   });
 }
 
-async function launch(task, capture, delay = 200, exitCode = 0) {
-  const child = spawn(process.execPath, [cli, 'start', '--task', task, '--command', stub, '--', capture, String(delay), String(exitCode)], {
+async function launch(task, capture, delay = 200, exitCode = 0, executable = stub) {
+  const args = executable === stub ? [capture, String(delay), String(exitCode)] : [capture];
+  const child = spawn(process.execPath, [cli, 'start', '--task', task, '--command', executable, '--', ...args], {
     cwd: repoRoot,
     env: { ...process.env },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -74,13 +89,18 @@ function command(args) {
 }
 
 async function waitForState(task, state, timeoutMs = 5000) {
+  return waitForStates(task, [state], timeoutMs);
+}
+
+async function waitForStates(task, states, timeoutMs = 5000) {
   const deadline = Date.now() + timeoutMs;
+  let value = null;
   while (Date.now() < deadline) {
-    const value = runtime.readBuildStatus(task);
-    if (value && value.state === state) return value;
+    value = runtime.readBuildStatus(task);
+    if (value && states.includes(value.state)) return value;
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
-  throw new Error(`timed out waiting for ${task} state ${state}`);
+  throw new Error(`timed out waiting for ${task} state ${states.join(' or ')}; last status ${JSON.stringify(value)}`);
 }
 
 async function stopOwned(instance) {
@@ -105,6 +125,8 @@ test('launch plans isolate mutable build paths and serialize only the same workt
     'build', '--target', 'aarch64-test-host', '-b', 'app', '--no-sign',
   ]);
   assert.throws(() => runtime.tauriBuildArgs(null), /host triple unavailable/);
+  assert.throws(() => runtime.assertNativePlatform('win32'), /supports macOS only/);
+  assert.throws(() => runtime.assertNativePlatform('linux'), /supports macOS only/);
 });
 
 test('active build holds the worktree slot, completion releases it, and artifacts remain owner-addressable', async () => {
@@ -182,6 +204,34 @@ test('owner stop reaps an active stubborn build group before releasing roots', {
   } finally {
     if (isolation.pidAlive(child.pid)) await stopOwned(instance);
   }
+});
+
+test('leader exit cannot release the slot while its stubborn descendant remains', {
+  skip: process.platform === 'win32' ? 'POSIX process-group termination coverage' : false,
+}, async () => {
+  const capture = path.join(scratch, 'capture-descendant.pid');
+  const orphaning = await launch(`build-orphan-${process.pid}`, capture, 0, 0, orphaningStub);
+  try {
+    for (let i = 0; i < 100 && !fs.existsSync(capture); i++) await new Promise((resolve) => setTimeout(resolve, 10));
+    const descendantPid = Number(fs.readFileSync(capture, 'utf8'));
+    const status = await waitForStates(orphaning.info.taskId, ['failed', 'reconciliation-required'], 8000);
+    assert.equal(status.exitCode, 0);
+    assert.equal(status.processTree.forced, true);
+    if (status.state === 'failed') {
+      assert.equal(status.slotRelease.released, true);
+      assert.equal(isolation.pidAlive(descendantPid), false);
+    } else {
+      assert.equal(status.slotRelease, undefined);
+      const refused = await command(['start', '--task', `build-orphan-peer-${process.pid}`, '--command', stub, '--', path.join(scratch, 'capture-orphan-peer'), '1', '0']);
+      assert.equal(refused.code, 1);
+      assert.match(refused.stderr, /same-worktree desktop build unavailable/);
+      const deadline = Date.now() + 5000;
+      while (runtime.buildProcessTreeAlive({ pid: status.childPid }) && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      assert.equal(runtime.buildProcessTreeAlive({ pid: status.childPid }), false);
+    }
+  } finally { await stopOwned(orphaning); }
 });
 
 test('nonzero child result remains inspectable until owner cleanup', async () => {

@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
+const { finished } = require('node:stream/promises');
 const { isDeepStrictEqual } = require('node:util');
 const isolation = require('./isolation.cjs');
 const identity = require('./identity.cjs');
@@ -31,7 +32,14 @@ function tauriBuildArgs(hostTriple) {
   return ['build', '--target', hostTriple, '-b', 'app', '--no-sign'];
 }
 
+function assertNativePlatform(platform = process.platform) {
+  if (platform !== 'darwin') {
+    throw new Error('native desktop build launcher currently supports macOS only; platform bundle arguments and process-tree ownership are not validated here');
+  }
+}
+
 function buildLaunchConfig(taskId, options = {}) {
+  if (!options.command) assertNativePlatform();
   const executable = options.command ? path.resolve(options.command) : localTauriExecutable();
   if (!exists(executable)) throw new Error(`build command not found: ${executable}`);
   if (process.platform !== 'win32') fs.accessSync(executable, fs.constants.X_OK);
@@ -100,25 +108,44 @@ function waitForExit(child) {
   return new Promise((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
 }
 
-function signalBuild(child, signal) {
-  if (!child || child.exitCode != null || child.signalCode != null) return;
+function buildProcessTreeAlive(child) {
+  if (!child || !Number.isSafeInteger(child.pid) || child.pid <= 0) return false;
   if (process.platform !== 'win32') {
-    try { process.kill(-child.pid, signal); return; } catch (err) { if (err.code !== 'ESRCH') throw err; }
+    try { process.kill(-child.pid, 0); return true; }
+    catch (err) { if (err.code === 'ESRCH') return false; return err.code === 'EPERM'; }
   }
-  try { child.kill(signal); } catch (err) { if (err.code !== 'ESRCH') throw err; }
+  return child.exitCode == null && child.signalCode == null;
+}
+
+function signalBuild(child, signal) {
+  if (!child || !Number.isSafeInteger(child.pid) || child.pid <= 0) return;
+  if (process.platform !== 'win32') {
+    try { process.kill(-child.pid, signal); return; } catch (err) { if (err.code !== 'ESRCH') throw err; return; }
+  }
+  if (child.exitCode == null && child.signalCode == null) {
+    try { child.kill(signal); } catch (err) { if (err.code !== 'ESRCH') throw err; }
+  }
+}
+
+async function waitForBuildProcessTree(child, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (buildProcessTreeAlive(child) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  return !buildProcessTreeAlive(child);
 }
 
 async function stopBuild(child, graceMs = 1500) {
-  if (!child || child.exitCode != null || child.signalCode != null) return;
-  const exited = waitForExit(child);
+  if (!buildProcessTreeAlive(child)) return { stopped: true, forced: false, reason: 'owned build process tree already exited' };
   signalBuild(child, 'SIGTERM');
-  let timer;
-  await Promise.race([exited, new Promise((resolve) => { timer = setTimeout(resolve, graceMs); })]);
-  clearTimeout(timer);
-  if (child.exitCode == null && child.signalCode == null) {
-    signalBuild(child, 'SIGKILL');
-    await exited;
+  if (await waitForBuildProcessTree(child, graceMs)) {
+    return { stopped: true, forced: false, reason: 'owned build process tree exited after SIGTERM' };
   }
+  signalBuild(child, 'SIGKILL');
+  if (await waitForBuildProcessTree(child, 2000)) {
+    return { stopped: true, forced: true, reason: 'owned build process tree required SIGKILL' };
+  }
+  return { stopped: false, forced: true, reason: 'owned build process tree still exists after SIGKILL; reconciliation required' };
 }
 
 function spawnBuild(config) {
@@ -135,7 +162,13 @@ function spawnBuild(config) {
   });
   child.stdout.pipe(stdout);
   child.stderr.pipe(stderr);
-  return { child, stdout, stderr };
+  const closed = new Promise((resolve) => child.once('close', (code, signal) => resolve({ code, signal })));
+  const logsDone = Promise.all([finished(stdout), finished(stderr)]);
+  const drained = Promise.all([closed, logsDone]);
+  // A later await handles the result; attach now so an early stream error is
+  // never reported as an unhandled rejection while the leader is still live.
+  drained.catch(() => {});
+  return { child, stdout, stderr, closed, logsDone, drained };
 }
 
 function buildHandshake(taskId, ownerToken) {
@@ -229,17 +262,30 @@ async function runBuildLauncher(taskId, options = {}, emit = () => {}) {
   const shutdown = async (signal) => {
     if (closing) return;
     closing = true;
-    await stopBuild(processInfo && processInfo.child).catch(() => {});
-    const slotRelease = releaseSlot();
-    save({ state: 'stopped', finishedAt: nowIso(), signal: signal || 'SIGTERM', slotRelease });
-    if (processInfo) {
-      processInfo.stdout.end();
-      processInfo.stderr.end();
+    let tree;
+    try { tree = await stopBuild(processInfo && processInfo.child); }
+    catch (err) { tree = { stopped: false, forced: false, reason: err.message }; }
+    if (!tree.stopped) {
+      save({ state: 'reconciliation-required', finishedAt: nowIso(), signal: signal || 'SIGTERM', processTree: tree });
+      closing = false;
+      return;
     }
+    if (processInfo) {
+      await processInfo.closed.catch(() => {});
+      await processInfo.logsDone.catch(() => {});
+    }
+    const slotRelease = releaseSlot();
+    save({ state: 'stopped', finishedAt: nowIso(), signal: signal || 'SIGTERM', processTree: tree, slotRelease });
     process.exit(0);
   };
-  process.once('SIGTERM', () => shutdown('SIGTERM'));
-  process.once('SIGINT', () => shutdown('SIGINT'));
+  // Retain cooperative handlers after an unproved cleanup so the owner can
+  // retry instead of turning the next stop request into an unhandled exit.
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  // Ownership must remain live on every post-registration return path. In
+  // particular, reconciliation-required must not degrade into a reclaimable
+  // dead-holder slot merely because the direct child and its pipes exited.
+  setInterval(() => {}, 60_000);
 
   try {
     processInfo = spawnBuild(config);
@@ -251,28 +297,53 @@ async function runBuildLauncher(taskId, options = {}, emit = () => {}) {
     });
     save({ state: 'active', childPid: processInfo.child.pid });
     const result = await waitForExit(processInfo.child);
-    processInfo.stdout.end();
-    processInfo.stderr.end();
+    // Let normal leader teardown and pipe closure settle before probing its
+    // process group. If descendants inherited the pipes this stays pending,
+    // and the group probe below remains authoritative.
+    await Promise.race([
+      processInfo.drained.catch(() => {}),
+      new Promise((resolve) => setTimeout(resolve, 100)),
+    ]);
+    let tree;
+    try { tree = await stopBuild(processInfo.child); }
+    catch (err) { tree = { stopped: false, forced: false, reason: err.message }; }
+    if (closing) return;
+    if (!tree.stopped) {
+      save({
+        state: 'reconciliation-required',
+        finishedAt: nowIso(),
+        exitCode: result.code,
+        signal: result.signal,
+        processTree: tree,
+      });
+      return;
+    }
+    await processInfo.closed;
+    await processInfo.logsDone;
     const slotRelease = releaseSlot();
     save({
-      state: result.code === 0 ? 'completed' : 'failed',
+      state: result.code === 0 && !tree.forced ? 'completed' : 'failed',
       finishedAt: nowIso(),
       exitCode: result.code,
       signal: result.signal,
+      error: tree.forced ? 'build leader exited while descendants remained; owned process group required forced cleanup' : undefined,
+      processTree: tree,
       slotRelease,
     });
   } catch (err) {
+    let tree = { stopped: true, forced: false, reason: 'build process was not spawned' };
     if (processInfo) {
-      processInfo.stdout.end();
-      processInfo.stderr.end();
+      try { tree = await stopBuild(processInfo.child); }
+      catch (stopErr) { tree = { stopped: false, forced: false, reason: stopErr.message }; }
     }
+    if (!tree.stopped) {
+      save({ state: 'reconciliation-required', finishedAt: nowIso(), error: err.message, processTree: tree });
+      return;
+    }
+    if (processInfo) await processInfo.logsDone.catch(() => {});
     const slotRelease = releaseSlot();
-    save({ state: 'failed', finishedAt: nowIso(), error: err.message, slotRelease });
+    save({ state: 'failed', finishedAt: nowIso(), error: err.message, processTree: tree, slotRelease });
   }
-
-  // Keep the ownership record live so status remains trustworthy and build
-  // artifacts stay available. The owner copies artifacts, then calls stop.
-  setInterval(() => {}, 60_000);
 }
 
 module.exports = {
@@ -281,9 +352,11 @@ module.exports = {
   worktreeBuildSlot,
   localTauriExecutable,
   tauriBuildArgs,
+  assertNativePlatform,
   buildLaunchConfig,
   readBuildStatus,
   buildHandshake,
+  buildProcessTreeAlive,
   stopBuild,
   runBuildLauncher,
 };
