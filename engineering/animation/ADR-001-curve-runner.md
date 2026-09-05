@@ -2,7 +2,8 @@
 
 Status: **review candidate**, 2026-09-05. Related: [R08](https://github.com/mysteropodes/nemo/issues/904).
 Implementation owner: Codeximator. Integration/behavior reviewer: Codexitron and the maintainer.
-R03/R05/R06 final acceptance and the full application workflow remain pending.
+R03/R05/R06 final acceptance and the native workflow remain pending.
+The controlled browser workflow passed; see [browser acceptance](BROWSER_ACCEPTANCE.md).
 
 ## Decision and production contract
 
@@ -129,6 +130,7 @@ are absent. That is no observed effect at those coordinates, not proof of no eff
 elsewhere. This new candidate does not replay or close that operation.
 
 Review the bounded facade/global boundary with R05, complete applicable R03/R06
-evidence, and exercise create/edit/key/undo/redo/save/reopen/render/export in the
-real browser and Tauri before production merge or full R08 acceptance. No issue
+evidence, and execute the documented native edit/undo/redo/save/reopen/render/export
+procedure before production merge or full R08 acceptance. The controlled browser
+workflow is now observed in [the acceptance record](BROWSER_ACCEPTANCE.md). No issue
 closure, release or merge is part of this candidate.
