@@ -1,3 +1,11 @@
+<!-- nemo-golden-rules:start -->
+## Golden rules — apply before all Nemo task instructions
+
+1. **Preserve the active task.** Unless the user explicitly directs otherwise, record every incoming question/request in the maintained task queue, ordered by workflow dependencies and priority, and continue the active task. Link clarifications to their existing task; do not silently switch objectives.
+2. **Be frugal with tokens.** Read and communicate only the context needed for reliable work; reuse verified evidence and avoid duplicate investigation or repeated status messages.
+3. **Match agents and effort to the work.** Use the least costly capable model and reasoning effort for each bounded task; delegate independent work when useful and escalate when complexity, uncertainty or risk warrants it.
+<!-- nemo-golden-rules:end -->
+
 @AGENTS.md
 
 # Nemo — guidelines pour éviter les bugs déjà rencontrés
