@@ -15,6 +15,7 @@ const test = require('node:test');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const vm = require('node:vm');
 const { spawnSync } = require('node:child_process');
 
 const inventory = require('./inventory.cjs');
@@ -376,6 +377,97 @@ test('class selectors, forEach callbacks, scoped selectors and ancestor delegati
   assert.equal(r.length, 1);
   bound(r[0], ['click'], /^callback r$/);
   bound(srow('dom:#lnk-docs'), ['click'], /^href$/);
+});
+
+// ---------------------------------------------------------------------------
+// Independent runtime registrations for the five second-review failures.
+// A deliberately unsupported flow may lose a binding, but may never invent
+// one. Each allowed omission below names the exact reason and target.
+// ---------------------------------------------------------------------------
+function compareRegistrations(code, expected, omissions = {}) {
+  const actual = { a: [], b: [] };
+  const elements = Object.fromEntries(Object.keys(actual).map((id) => [id, {
+    addEventListener(event) { actual[id].push(event); },
+  }]));
+  vm.runInNewContext(code, { document: { getElementById: (id) => elements[id] }, cb() {} }, { timeout: 1000 });
+  assert.deepEqual(actual, expected, 'fixture must reproduce the actual runtime target');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-inventory-runtime-'));
+  try {
+    fs.mkdirSync(path.join(dir, 'src/js'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'src/index.html'), '<button id="a">A</button><button id="b">B</button>');
+    fs.writeFileSync(path.join(dir, 'src/js/app.js'), code);
+    const result = inventory.build({ root: dir });
+    for (const [id, events] of Object.entries(actual)) {
+      const row = result.rows.find((r) => r.id === 'dom:#' + id);
+      if (omissions[id]) {
+        assert.ok(omissions[id].length > 20, 'document the unsupported flow');
+        assert.equal(row.status, 'unmapped', omissions[id]);
+        assert.deepEqual(row.events, [], omissions[id]);
+        assert.deepEqual(row.handler, [], omissions[id]);
+        assert.match(row.nextGate, /R03 follow-up/);
+      } else {
+        assert.deepEqual(row.events, events, id + ': inventory must match registrations');
+        assert.equal(row.status, events.length ? 'inventoried' : 'unmapped', id);
+        assert.equal(row.handler.length > 0, events.length > 0, id);
+      }
+    }
+    return result;
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+
+test('runtime: quoted return text cannot override the real returned element', () => {
+  compareRegistrations(`function getButton() { const example="return document.getElementById('a')"; return document.getElementById('b'); }
+getButton().addEventListener('click', cb);`, { a: [], b: ['click'] });
+});
+
+test('runtime: reassigned helper IDs are not bound to the original argument', () => {
+  const result = compareRegistrations(`function wire(id) { id = 'b'; document.getElementById(id).addEventListener('click', cb); }
+wire('a');`, { a: [], b: ['click'] }, { b: 'The replacement ID is dynamic at the lookup; constant propagation is unsupported.' });
+  assert.match(result.rows.find((r) => r.id === 'dom:#a').nextGate, /referenced without an event registration/);
+  assert.match(result.rows.find((r) => r.id === 'dom:#a').reason, /reassignment, shadowing or unsupported return flow/);
+});
+
+test('runtime: anonymous callback parameters cannot bind an outer same-name variable', () => {
+  for (const callback of ['function(button) { button.addEventListener("click", cb); }',
+    '(button) => { button.addEventListener("click", cb); }', 'button => button.addEventListener("click", cb)']) {
+    compareRegistrations(`var button = document.getElementById('a');
+[document.getElementById('b')].forEach(${callback});`, { a: [], b: ['click'] }, {
+      b: 'An array of element expressions is not a proved NodeList or literal ID table.',
+    });
+  }
+});
+
+test('runtime: block-scoped variables retain separate registrations and ownership', () => {
+  compareRegistrations(`const button = document.getElementById('a');
+{ const button = document.getElementById('b'); button.addEventListener('input', cb); }
+button.addEventListener('click', cb);`, { a: ['click'], b: ['input'] });
+  compareRegistrations(`var button = document.getElementById('a');
+{ var button = document.getElementById('b'); }
+button.addEventListener('click', cb);`, { a: [], b: ['click'] });
+});
+
+test('runtime: same-name element helpers resolve in the lexical scope of each call', () => {
+  compareRegistrations(`function outer1() { function wire(button) { button.addEventListener('click', cb); } wire(document.getElementById('b')); }
+function outer2() { function wire(button) { button.disabled = true; } wire(document.getElementById('a')); }
+outer1(); outer2();`, { a: [], b: ['click'] });
+});
+
+test('runtime: ID and returning helpers also resolve by lexical identity', () => {
+  compareRegistrations(`function outer1() { function wire(id) { document.getElementById(id).addEventListener('click', cb); } wire('b'); }
+function outer2() { function wire(id) { document.getElementById(id).disabled = true; } wire('a'); }
+outer1(); outer2();`, { a: [], b: ['click'] });
+  compareRegistrations(`function outer1() { function button() { return document.getElementById('b'); } button().addEventListener('click', cb); }
+function outer2() { function button() { return document.getElementById('a'); } button().disabled = true; }
+outer1(); outer2();`, { a: [], b: ['click'] });
+});
+
+test('runtime: quoted helper lookup text and reassigned transparent IDs never fabricate bindings', () => {
+  compareRegistrations(`function wire(id) { const example="document.getElementById(id).addEventListener('click', cb)"; }
+wire('a');`, { a: [], b: [] });
+  compareRegistrations(`function el(id) { id = 'b'; return document.getElementById(id); }
+el('a').addEventListener('click', cb);`, { a: [], b: ['click'] }, {
+    b: 'A reassigned ID-returning helper is not transparent; replacement value propagation is unsupported.',
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -183,7 +183,59 @@ function indexFile(file) {
     const params = paren >= 0 && paren < body.start ? code.slice(paren + 1, matchClose(f, paren)).split(',').map((x) => x.trim().replace(/=[\s\S]*$/, '').trim()).filter(Boolean) : [];
     f.fns.push({ name, params, start: body.start, end: body.end, line: lineOf(code, at), declStart: m.index });
   }
+  indexBindingScopes(f);
   return f;
+}
+
+// Binding ownership only, not a general JavaScript parser. Braces delimit
+// lexical declarations; function/arrow parameters and `var` belong to their
+// function. Keep anonymous scopes separate from the named reporting index.
+function indexBindingScopes(f) {
+  f.rootScope = { start: 0, end: f.code.length, function: true, params: [] };
+  f.scopes = [f.rootScope];
+  const stack = [];
+  for (let i = 0; i < f.code.length; i++) {
+    if (f.kind[i] !== CODE) continue;
+    if (f.code[i] === '{') stack.push(i);
+    else if (f.code[i] === '}' && stack.length) f.scopes.push({ start: stack.pop(), end: i });
+  }
+  const functions = /\bfunction\s*(?:[A-Za-z_$][\w$]*\s*)?\(([^()]*)\)|(?:\(([^()]*)\)|\b([A-Za-z_$][\w$]*))\s*=>/g;
+  let m;
+  while ((m = functions.exec(f.code))) {
+    if (f.kind[m.index] !== CODE) continue;
+    let start = m.index + m[0].length;
+    while (/\s/.test(f.code[start] || '') && start < f.code.length) start++;
+    let scope = f.scopes.find((s) => s.start === start && s !== f.rootScope);
+    if (!scope && m[1] === undefined) {
+      // Concise arrow body: stop at its containing delimiter, not the next `{`.
+      let end = start;
+      for (; end < f.code.length; end++) {
+        if (f.kind[end] !== CODE) continue;
+        if (/[([{]/.test(f.code[end])) end = matchClose(f, end);
+        else if (/[),;\]}\n]/.test(f.code[end])) break;
+      }
+      scope = { start, end: end - 1 };
+      f.scopes.push(scope);
+    }
+    if (scope) {
+      scope.function = true;
+      scope.params = (m[1] ?? m[2] ?? m[3] ?? '').split(',').map((p) => p.trim().replace(/=[\s\S]*$/, '').trim());
+    }
+  }
+  f.scopes.sort((a, b) => (a.end - a.start) - (b.end - b.start));
+  f.declarations = [];
+  for (const scope of f.scopes) for (const name of scope.params || []) f.declarations.push({ name, scope });
+  const decl = /\b(var|let|const|function)\s+([A-Za-z_$][\w$]*)/g;
+  while ((m = decl.exec(f.code))) {
+    if (f.kind[m.index] !== CODE) continue;
+    const scope = f.scopes.find((s) => s.start <= m.index && m.index <= s.end && (m[1] !== 'var' || s.function));
+    f.declarations.push({ name: m[2], scope });
+  }
+}
+
+function bindingOwner(f, name, at) {
+  const owners = f.declarations.filter((d) => d.name === name && d.scope.start <= at && at <= d.scope.end).map((d) => d.scope);
+  return owners.sort((a, b) => (a.end - a.start) - (b.end - b.start))[0] || f.rootScope;
 }
 
 function enclosingFunction(f, offset) {
@@ -352,20 +404,29 @@ function build(opts) {
   const byFile = new Map(idx.map((f) => [f.file, f]));
 
   // global function index (first definition wins; classic scripts share one scope)
-  const fnEntry = (f, fn) => ({ file: f.file, f, name: fn.name, body: f.code.slice(fn.start, fn.end + 1), line: fn.line, params: fn.params, start: fn.start, end: fn.end });
+  const fnEntry = (f, fn) => ({ file: f.file, f, name: fn.name, body: f.code.slice(fn.start, fn.end + 1), line: fn.line, params: fn.params, start: fn.start, end: fn.end, owner: bindingOwner(f, fn.name, fn.declStart + 1) });
+  const allFns = idx.flatMap((f) => f.fns.map((fn) => fnEntry(f, fn)));
   const fnIndex = new Map();
-  for (const f of idx) for (const fn of f.fns) if (!fnIndex.has(fn.name)) fnIndex.set(fn.name, fnEntry(f, fn));
-  // a same-file definition beats the global one (a local `wire()` next to its callers)
-  const resolveFn = (f, name) => { const local = f.fns.find((x) => x.name === name); return local ? fnEntry(f, local) : (fnIndex.get(name) || null); };
+  for (const fn of allFns) if (!fnIndex.has(fn.name)) fnIndex.set(fn.name, fn);
+  // Resolve at the call site. A same-name helper in a sibling function is not
+  // visible; ambiguous global definitions are deliberately not guessed.
+  const resolveFn = (f, name, at) => {
+    const owner = bindingOwner(f, name, at);
+    const local = allFns.filter((fn) => fn.f === f && fn.name === name && fn.owner === owner);
+    if (local.length) return local.length === 1 ? local[0] : null;
+    if (owner !== f.rootScope || f.declarations.some((d) => d.name === name && d.scope === owner)) return null;
+    const global = allFns.filter((fn) => fn.name === name && fn.owner === fn.f.rootScope);
+    return global.length === 1 ? global[0] : null;
+  };
 
   // Functions that take an element id as a parameter (`function el(id){return document.getElementById(id)}`,
   // `wireBoolBtn(id, op)`): a call `name('literal')` is a lookup of that id.
   const paramLookupRe = (prm) => new RegExp("getElementById\\(\\s*" + esc(prm) + "\\s*\\)|querySelector\\(\\s*'#'\\s*\\+\\s*" + esc(prm) + "(?![\\w$])");
-  const idTakers = new Map(); // name -> {fn, index}
-  for (const [name, fn] of fnIndex) {
+  const idTakers = new Map(); // lexical function entry -> parameter index
+  for (const fn of allFns) {
     fn.params.forEach((prm, i) => {
-      if (idTakers.has(name) || !/^[A-Za-z_$][\w$]*$/.test(prm)) return;
-      if (paramLookupRe(prm).test(fn.body)) idTakers.set(name, { fn, index: i });
+      if (idTakers.has(fn) || !/^[A-Za-z_$][\w$]*$/.test(prm)) return;
+      if (paramLookups(fn.f, fn, prm).length) idTakers.set(fn, i);
     });
   }
   // Calls of known id-takers inside [span] of `f` that pass `prm` at the taker's id position.
@@ -375,36 +436,40 @@ function build(opts) {
     const body = f.code.slice(span.start, span.end + 1);
     let m;
     while ((m = re.exec(body))) {
-      const t = idTakers.get(m[1]);
-      if (!t || m[1] === selfName) continue;
+      const at = span.start + m.index + m[0].indexOf(m[1]);
+      const fn = resolveFn(f, m[1], at);
+      if (!idTakers.has(fn) || fn === selfName) continue;
       const open = span.start + m.index + m[0].length - 1;
       if (f.kind[open] !== CODE) continue;
       const { args, close } = argsOf(f, open);
-      const a = args[t.index];
-      if (a && a.text === prm) out.push({ name: m[1], at: span.start + m.index + m[0].indexOf(m[1]), close });
+      const a = args[idTakers.get(fn)];
+      if (a && a.text === prm && parameterIntact(f, span, prm, a.start)) out.push({ fn, at, close });
     }
     return out;
   }
   // A helper that forwards its parameter to an id-taker (`bindWidgetField(id, apply)` → `el(id)`) is one too.
   for (let round = 0; round < 4; round++) {
     let added = 0;
-    for (const [name, fn] of fnIndex) {
-      if (idTakers.has(name)) continue;
+    for (const fn of allFns) {
+      if (idTakers.has(fn)) continue;
       fn.params.forEach((prm, i) => {
-        if (idTakers.has(name) || !/^[A-Za-z_$][\w$]*$/.test(prm)) return;
-        if (takerCallsWithParam(fn.f, { start: fn.start, end: fn.end }, prm, name).length) { idTakers.set(name, { fn, index: i }); added++; }
+        if (idTakers.has(fn) || !/^[A-Za-z_$][\w$]*$/.test(prm)) return;
+        if (takerCallsWithParam(fn.f, fn, prm, fn).length) { idTakers.set(fn, i); added++; }
       });
     }
     if (!added) break;
   }
   // Zero-argument helpers that return a fixed element (`function macBtn() { return document.getElementById('mac-update-btn'); }`):
   // a call `macBtn()` is a lookup of that id.
-  const returners = new Map(); // name -> id
-  const RETURN_RE = /\breturn\s+(?:window\.)?document\.getElementById\(\s*(['"])([^'"]+)\1\s*\)/;
-  for (const [name, fn] of fnIndex) {
+  const returners = new Map(); // lexical function entry -> id
+  for (const fn of allFns) {
     if (fn.params.length) continue;
-    const m = RETURN_RE.exec(fn.body);
-    if (m) returners.set(name, m[2]);
+    const returns = returnsOf(fn);
+    const ids = returns.map((r) => {
+      const m = /^return\s+(?:window\.)?document\.getElementById\(\s*(['"])([^'"]+)\1\s*\)\s*$/.exec(r.text);
+      return m ? m[2] : null;
+    });
+    if (ids.length && ids.every((id) => id && id === ids[0])) returners.set(fn, ids[0]);
   }
 
   function reach(bodyText, depth) {
@@ -478,8 +543,40 @@ function build(opts) {
     }
     return f.code.length;
   }
-  const scopeOf = (f, at) => { const fn = enclosingFunction(f, at); return fn ? { start: fn.start, end: fn.end } : { start: 0, end: f.code.length - 1 }; };
-  const declares = (f, fn, name) => fn.params.includes(name) || new RegExp('(?:^|[^\\w$.])(?:var|let|const|function)\\s+' + esc(name) + '(?![\\w$])').test(f.code.slice(fn.start, fn.end + 1));
+  function parameterIntact(f, span, name, at) {
+    const owner = bindingOwner(f, name, span.start);
+    if (bindingOwner(f, name, at) !== owner) return false;
+    const re = new RegExp('(?:^|[^\\w$.])(' + esc(name) + ')\\s*(?:=(?!=|>)|[+*/%&|^?-]=|\\+\\+|--)|(?:\\+\\+|--)\\s*(' + esc(name) + ')(?![\\w$])', 'g');
+    let m;
+    const body = f.code.slice(span.start, at);
+    while ((m = re.exec(body))) {
+      const u = span.start + m.index + m[0].indexOf(name);
+      if (f.kind[u] === CODE && bindingOwner(f, name, u) === owner) return false;
+    }
+    return true;
+  }
+  function paramLookups(f, span, prm) {
+    const re = new RegExp(paramLookupRe(prm).source, 'g');
+    const out = [];
+    let m;
+    while ((m = re.exec(f.code.slice(span.start, span.end + 1)))) {
+      const at = span.start + m.index;
+      if (f.kind[at] === CODE && bindingOwner(f, prm, at) === bindingOwner(f, prm, span.start)) out.push(at);
+    }
+    return out;
+  }
+  function returnsOf(fn) {
+    const out = [], re = /\breturn\b/g;
+    let m;
+    while ((m = re.exec(fn.body))) {
+      const at = fn.start + m.index;
+      if (fn.f.kind[at] !== CODE) continue;
+      const scope = fn.f.scopes.find((s) => s.function && s.start <= at && at <= s.end);
+      if (!scope || scope.start !== fn.start) continue;
+      out.push({ at, text: fn.f.code.slice(at, statementEnd(fn.f, at)).trim() });
+    }
+    return out;
+  }
   const subjectStartAt = (f, at) => { let s = at; if (f.code.slice(s - 9, s) === 'document.') { s -= 9; if (f.code.slice(s - 7, s) === 'window.') s -= 7; } return s; };
 
   // The function an event is bound to: inline (body span) or by name.
@@ -498,7 +595,7 @@ function build(opts) {
       return { f, body: f.code.slice(k, arg.end), param0, span: { start: k, end: arg.end - 1 } };
     }
     if ((m = /^([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*(?:\.bind\([\s\S]*\))?$/.exec(t))) {
-      const fn = resolveFn(f, m[1].split('.').pop());
+      const fn = resolveFn(f, m[1].split('.').pop(), arg.start);
       if (fn) return { f: fn.f, body: fn.body, param0: fn.params[0] || null, span: { start: fn.start, end: fn.end } };
     }
     return none;
@@ -546,22 +643,20 @@ function build(opts) {
     const re = new RegExp('(?:^|[^\\w$.])(' + esc(name) + ')(?![\\w$])', 'g');
     const slice = code.slice(scope.start, scope.end + 1);
     const assigns = [], uses = [];
+    const home = bindingOwner(f, name, ctx.declAt !== undefined ? ctx.declAt : scope.start);
     let m;
     while ((m = re.exec(slice))) {
       const u = scope.start + m.index + (m[0].length - m[1].length);
-      if (f.kind[u] !== CODE) continue;
+      if (f.kind[u] !== CODE || bindingOwner(f, name, u) !== home) continue;
       const after = skipWs(f, u + name.length);
       if (code[after] === '=' && code[after + 1] !== '=' && code[after + 1] !== '>') { assigns.push(u); continue; }
       uses.push({ u, after });
     }
-    const home = enclosingFunction(f, ctx.declAt !== undefined ? ctx.declAt : scope.start);
     const own = ctx.assignAt === undefined ? undefined : assigns.filter((a) => a < ctx.assignAt).pop();
     for (const { u, after } of uses) {
       if (ctx.assignAt !== undefined && u < ctx.assignAt) continue;
       const last = assigns.filter((a) => a < u).pop();
       if (ctx.assignAt === undefined ? last !== undefined : last !== own) continue;
-      const g = enclosingFunction(f, u);
-      if (g && g !== home && g.start >= scope.start && declares(f, g, name)) continue;
       if (code[after] === '.' || (code[after] === '?' && code[after + 1] === '.')) merge(out, analyzeMember(f, after, Object.assign({}, ctx, { subjectStart: u })));
       else merge(out, analyzeArgument(f, u, u + name.length, ctx));
     }
@@ -601,7 +696,7 @@ function build(opts) {
       return out;
     }
     if (/(?:^|\.)(?:slice\.call|Array\.from|from)$/.test(callee) && argIndex === 0) return merge(out, analyzeSubject(f, s + 1, close + 1, Object.assign({}, ctx, { multi: true, depth: ctx.depth + 1 })));
-    const fn = resolveFn(f, callee.split('.').pop());
+    const fn = resolveFn(f, callee.split('.').pop(), s + 1);
     if (fn && fn.params[argIndex] && ctx.depth < 3) merge(out, analyzeVariable(fn.f, fn.params[argIndex], { start: fn.start, end: fn.end }, Object.assign({}, ctx, { depth: ctx.depth + 1, assignAt: undefined, declAt: fn.start, via: 'helper ' + fn.name + '()' })));
     return out;
   }
@@ -614,7 +709,7 @@ function build(opts) {
     if (f.code[i] === '.' || (f.code[i] === '?' && f.code[i + 1] === '.')) return merge(out, analyzeMember(f, i, Object.assign({}, ctx, { subjectStart: start, via: ctx.via || 'chain' })));
     const prefix = f.code.slice(statementStart(f, start), start);
     const asg = /(?:^|[\s;,({[])(?:var|let|const)?\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*=\s*(?:[^=;]*?(?:\|\||\?\?)\s*)?$/.exec(prefix);
-    if (asg) return merge(out, analyzeVariable(f, asg[1], scopeOf(f, start), Object.assign({}, ctx, { assignAt: start, declAt: start, via: 'variable ' + asg[1] })));
+    if (asg) return merge(out, analyzeVariable(f, asg[1], bindingOwner(f, asg[1], start), Object.assign({}, ctx, { assignAt: start, declAt: start, via: 'variable ' + asg[1] })));
     return merge(out, analyzeArgument(f, start, end, ctx));
   }
 
@@ -669,31 +764,36 @@ function build(opts) {
   // its direct lookup (`getElementById(prm)`) and every id-taker it is passed to.
   function bindingsForParam(f, span, prm, via, selfName) {
     const res = EMPTY();
-    const m = paramLookupRe(prm).exec(f.code.slice(span.start, span.end + 1));
-    if (m) {
-      const at = span.start + m.index, open = f.code.indexOf('(', at);
+    for (const at of paramLookups(f, span, prm)) {
+      if (!parameterIntact(f, span, prm, at)) continue;
+      const open = f.code.indexOf('(', at);
       merge(res, resolveLookup(f, subjectStartAt(f, at), matchClose(f, open) + 1, Object.assign(newCtx(false, via), { depth: 1 })));
     }
     for (const call of takerCallsWithParam(f, span, prm, selfName)) {
-      const tb = takerBinding(call.name);
+      const tb = takerBinding(call.fn);
       if (tb && tb.bindings.length) merge(res, tb);
-      else merge(res, resolveLookup(f, call.at, call.close + 1, Object.assign(newCtx(false, via), { depth: 1 })));
+      if (tb && tb.transparent) merge(res, resolveLookup(f, call.at, call.close + 1, Object.assign(newCtx(false, via), { depth: 1 })));
     }
     return res;
   }
   const takerCache = new Map();
-  function takerBinding(name) {
-    if (takerCache.has(name)) return takerCache.get(name);
-    takerCache.set(name, null);
-    const { fn, index } = idTakers.get(name);
-    const res = bindingsForParam(fn.f, { start: fn.start, end: fn.end }, fn.params[index], 'helper ' + name + '()', name);
-    takerCache.set(name, res);
+  function takerBinding(fn) {
+    if (takerCache.has(fn)) return takerCache.get(fn);
+    takerCache.set(fn, null);
+    const prm = fn.params[idTakers.get(fn)];
+    const res = bindingsForParam(fn.f, fn, prm, 'helper ' + fn.name + '()', fn);
+    const returns = returnsOf(fn);
+    res.transparent = returns.length > 0 && returns.every((r) => {
+      if (!parameterIntact(fn.f, fn, prm, r.at)) return false;
+      return new RegExp('^return\\s+(?:window\\.)?document\\.(?:' + paramLookupRe(prm).source + ')\\s*$').test(r.text);
+    });
+    takerCache.set(fn, res);
     return res;
   }
 
   // DOM lookups: getElementById / querySelector(All) with a literal argument,
   // and calls of id-taking helpers with a literal argument.
-  const takerNames = Array.from(idTakers.keys()).filter((n) => n.length > 1 || n === '$');
+  const takerNames = uniq(Array.from(idTakers.keys(), (fn) => fn.name)).filter((n) => n.length > 1 || n === '$');
   const LOOKUP_RE = new RegExp("((?:window\\.)?document\\.)?\\b(getElementById|querySelectorAll|querySelector)\\s*\\(\\s*(['\"])([^'\"]+)\\3\\s*(\\)|\\+)" + (takerNames.length ? "|(?:^|[^\\w$.])(" + takerNames.map(esc).join('|') + ")\\s*\\(" : ''), 'g');
   for (const f of idx) {
     LOOKUP_RE.lastIndex = 0;
@@ -713,28 +813,38 @@ function build(opts) {
         if (f.kind[nameAt] !== CODE) continue;
         const open = m.index + m[0].length - 1;
         const { args, close } = argsOf(f, open);
-        const a = args[idTakers.get(m[6]).index];
+        const fn = resolveFn(f, m[6], nameAt);
+        if (!idTakers.has(fn)) continue;
+        const a = args[idTakers.get(fn)];
         if (!a) continue;
         const lit = stringLiteral(a.text);
         const pre = lit === null ? /^(['"])([^'"]+)\1\s*\+/.exec(a.text) : null;
         if (lit === null && !pre) continue;
         const via = 'helper ' + m[6] + '()';
-        const tb = takerBinding(m[6]);
+        const tb = takerBinding(fn);
         if (tb && tb.bindings.length) { const rec = recFrom(f, nameAt, tb, via); if (lit !== null) addRec(bindings, lit, rec); else prefixBindings.push({ prefix: pre[2], rec }); }
-        else if (lit !== null) record(f, nameAt, nameAt, close + 1, { id: lit }, false, via);
-        else record(f, nameAt, nameAt, close + 1, { prefix: pre[2] }, false, via);
+        else if (tb && tb.transparent) {
+          if (lit !== null) record(f, nameAt, nameAt, close + 1, { id: lit }, false, via);
+          else record(f, nameAt, nameAt, close + 1, { prefix: pre[2] }, false, via);
+        } else {
+          const rec = recFrom(f, nameAt, EMPTY(), via);
+          rec.limit = 'helper parameter has no proved registration or unchanged returned lookup (reassignment, shadowing or unsupported return flow)';
+          if (lit !== null) addRec(bindings, lit, rec);
+          else prefixBindings.push({ prefix: pre[2], rec });
+        }
       }
     }
   }
   if (returners.size) {
-    const RETURNER_CALL_RE = new RegExp('(?:^|[^\\w$.])(' + Array.from(returners.keys()).map(esc).join('|') + ')\\s*\\(\\s*\\)', 'g');
+    const RETURNER_CALL_RE = new RegExp('(?:^|[^\\w$.])(' + uniq(Array.from(returners.keys(), (fn) => fn.name)).map(esc).join('|') + ')\\s*\\(\\s*\\)', 'g');
     for (const f of idx) {
       RETURNER_CALL_RE.lastIndex = 0;
       let m;
       while ((m = RETURNER_CALL_RE.exec(f.code))) {
         const nameAt = m.index + m[0].indexOf(m[1]);
         if (f.kind[nameAt] !== CODE || /function\s*$/.test(f.code.slice(Math.max(0, nameAt - 12), nameAt))) continue; // the definition itself
-        record(f, nameAt, nameAt, m.index + m[0].length, { id: returners.get(m[1]) }, false, 'helper ' + m[1] + '()');
+        const fn = resolveFn(f, m[1], nameAt);
+        if (returners.has(fn)) record(f, nameAt, nameAt, m.index + m[0].length, { id: returners.get(fn) }, false, 'helper ' + m[1] + '()');
       }
     }
   }
@@ -919,7 +1029,7 @@ function build(opts) {
       events: uniq(recs.flatMap((x) => x.events)),
       exposure, mcp: 'none (R14)', sdk: 'none',
       consumers, platforms: platformFor(recs, consumers), status,
-      reason: placeholder ? placeholder.reason : undefined,
+      reason: placeholder ? placeholder.reason : status === 'unmapped' ? uniq(own.map((x) => x.limit).filter(Boolean)).join('; ') || undefined : undefined,
       nextGate: status === 'unmapped' ? 'R03 follow-up: bind a handler or record unavailable-with-reason' + (references.length ? ' (referenced without an event registration at ' + references[0] + ')' : '') : status === 'unavailable-with-reason' ? 'none for the static markup; characterize the runtime-built controls through ' + placeholder.builder : 'R12/R13: characterize against a fixture and diagnostics',
       source: 'src/index.html:' + r.line,
       meta: { data: r.data, i18n: r.i18n, container: r.container, modal: r.modal, hiddenAtLoad: r.hiddenAtLoad, functionsVisited: visited, via: via || (recs[0] && recs[0].via) || undefined, references },
