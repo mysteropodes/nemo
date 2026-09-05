@@ -14,7 +14,7 @@ function receipt(jobs = [{ name: 'test:browser', status: 'pass', exitCode: 0 }])
 }
 function scratch(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo ci test '));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
   return dir;
 }
 function git(root, args) {
@@ -72,6 +72,8 @@ test('baseline is materialized from the explicit base commit, never candidate po
   git(root, ['init', '-q']);
   git(root, ['config', 'user.name', 'CI fixture']);
   git(root, ['config', 'user.email', 'ci@example.invalid']);
+  git(root, ['config', 'maintenance.auto', 'false']);
+  git(root, ['config', 'gc.auto', '0']);
   const policy = path.join(root, ci.PROFILE);
   fs.mkdirSync(path.dirname(policy), { recursive: true });
   fs.writeFileSync(policy, '{"protected":true}\n');
