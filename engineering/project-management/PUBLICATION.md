@@ -20,6 +20,16 @@ GitHub API verification passed after triage and scheduling on September 4, 2026 
 
 The forecast starts September 4, targets the first foundation increment September 5 and working completion September 14, with acceptance buffer through September 18. Implementation and maintainer acceptance remain pending. Artifact checks cover JSON consistency, task dependencies, source/relative links, private-data markers, symlinks and the staged diff. Application tests are not part of this board/documentation change.
 
+## Mirror verification (September 5, 2026)
+
+The repository-listed [Nemo Feature Roadmap](https://github.com/users/mysteropodes/projects/2) received the 22 custom program fields (triage status as `Remediation status`; all other names and options identical) and all 58 open canonical issues.
+
+- 58 Issue items on the mirror match the 58 open repository issues; 21 were added in this pass, 37 were already present.
+- 969 field values copied from project 8 and re-read from the mirror: 0 mismatches. Remediation status: 51 Inbox, 7 Validate. 43 items carry Start date and Target date.
+- Triage ledger re-audited against live GitHub for all 262 rows: 0 mismatches in state, close reason and labels. Repository totals remain 58 open, 247 closed.
+- Eight milestone due dates match the schedule manifest forecast finishes.
+- Saved views on the mirror are not created (no API); the origin board keeps its ten views.
+
 ## Canonical task registry
 
 | Package | Issue |

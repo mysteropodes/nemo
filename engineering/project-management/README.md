@@ -12,6 +12,20 @@ The [Nemo Foundation Remediation project](https://github.com/users/ivg-design/pr
 
 The board is owned by `ivg-design`, as approved after GitHub rejected creation under `mysteropodes`. Existing repository administrators `mysteropodes` and `pencilpark` have Project Admin access; repository contributor `byyourself22` has write access. GitHub prohibits linking a user project to a repository owned by a different user through the repository Projects tab. The board instead contains the canonical Nemo issues, uses `mysteropodes/nemo` as its default repository for new issues, and links directly to the repository; those issues link back to the project. The [existing feature roadmap](https://github.com/users/mysteropodes/projects/2) remains separate.
 
+## Mirror on the repository-listed project
+
+Since September 5, 2026 the same program is also carried by the repository-listed [Nemo Feature Roadmap](https://github.com/users/mysteropodes/projects/2) (owner `mysteropodes`), so it is reachable from the repository's Projects tab. Project 8 remains the origin board; the mirror was written from its field values and verified value-for-value.
+
+| Origin field (project 8) | Mirror field (project 2) | Note |
+|---|---|---|
+| Status | **Remediation status** | Same seven options. The roadmap keeps its own `Status`, `Board Status` and `Category` for draft roadmap items. |
+| Priority, Area, Goal, Size, Phase, Program, Kind, Planning window, Risk, Validation, Surface, Schedule basis | Same name | Identical options. |
+| Work package, References, Validation owner | Same name | Text. |
+| Start date, Target date, Triage date, Exception expiry | Same name | Date. |
+| Estimate days | Same name | Number. |
+
+All 58 open canonical issues are items on the mirror: the 43 remediation items carry forecast Start date and Target date, the 15 historical issues remain unscheduled. Saved views cannot be created through the API; a project admin adds a delivery board grouped by Remediation status and a roadmap on Start date / Target date in the UI. The mirror's readme records the same mapping.
+
 ## Contents
 
 - [Project schema](project-schema.json): 33 total fields, including native fields, and ten saved active views.
