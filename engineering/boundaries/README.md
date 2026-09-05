@@ -47,8 +47,11 @@ Unknown flags, missing option values and extra positional arguments also exit 2.
 - **Lexical JS scanning, not AST or binding analysis.** Literal `require` calls (including
   optional calls), static imports/re-exports and dynamic `import()` accept whitespace and
   comments between tokens. Quoted/no-substitution template targets and ordinary string
-  escapes are decoded. Comments, string text and ordinary regex literals are opaque;
-  template substitutions are scanned. Nonliteral loads fail with `unsupported-import`.
+  escapes are decoded. Object method declarations named `require` with their body opener on
+  the closing-parameter line are not loader calls; separating that brace remains outside this
+  lexical subset because automatic semicolon insertion can make the same tokens a real call
+  followed by a block. Comments, string text and ordinary regex literals are opaque; template
+  substitutions are scanned. Nonliteral loads fail with `unsupported-import`.
 - **Deliberately unsupported lexical ambiguity fails the run (exit 2).** A slash after `)`
   or `}` requires statement/expression context to distinguish regex from division; escaped
   identifiers and legacy numeric string escapes also require a fuller parser. This can
@@ -85,8 +88,9 @@ ceiling still fails. Other rules cannot carry a size ceiling. All expired entrie
 when the associated source has no current violation; expired exceptions never suppress rules.
 
 An active exception for private imports, layer edges or globals applies only to its exact
-file/rule. A cycle exception applies only to a cycle with an import edge originating in its
-exact file. Applied exceptions are recorded in the report. Unsupported-source diagnostics
+file/rule. A cycle exception removes only dependency contributions originating in its exact
+file; another file contributing the same module edge remains in the prohibited graph. Applied
+exceptions are recorded in the report. Unsupported-source diagnostics
 cannot be waived by an exception. This validation does not compare policy changes against an
 older Git baseline; preventing an authorized ceiling from being raised in a later revision
 still requires the R01/R03 baseline/CI adoption work.

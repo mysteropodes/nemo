@@ -326,6 +326,21 @@ test('cycle edges survive whitespace and export syntax; a cycle exception has ex
   assert.equal(report.ok, true); assert.equal(report.exceptionsApplied[0].rule, 'cycle');
 });
 
+test('a cycle exception removes only the matching source file contribution', () => {
+  const root = makeRoot(), p = fixtureProfile();
+  p.modules[0].files.push('a2.cjs'); p.modules[0].publicApi.push('a2.cjs');
+  p.modules.push({ ...p.modules[0], id: 'b', dir: 'other', files: ['b.cjs'], publicApi: ['b.cjs'] });
+  p.exceptions = [{ ...sizeException(), rule: 'cycle' }]; delete p.exceptions[0].ceiling;
+  write(root, 'domain/a.cjs', "require('../other/b.cjs');");
+  write(root, 'domain/a2.cjs', "require('../other/b.cjs');");
+  write(root, 'other/b.cjs', "require('../domain/a2.cjs');");
+
+  const report = checkProfile(p, { root });
+  assert.equal(report.ok, false);
+  assert.ok(report.violations.some((v) => v.rule === 'cycle'));
+  assert.deepEqual(report.exceptionsApplied.map((e) => e.path), ['domain/a.cjs']);
+});
+
 test('global access variants cannot bypass the domain rule', async (t) => {
   for (const source of ['window . SMProject.run();', "window['SMProject'].run();", 'window?.SMProject.run();', "window?.['SMProject'].run();", 'window[`SMProject`].run();']) await t.test(source, () => {
     const root = makeRoot(); write(root, 'domain/a.cjs', source);
@@ -343,6 +358,15 @@ test('comments, strings, template text and ordinary regex literals do not invent
     'const r = /window.SMProject/;',
   ].join('\n'));
   assert.equal(checkProfile(fixtureProfile(), { root }).ok, true);
+});
+
+test('object method declarations named require are clean while loader calls still fail', () => {
+  const root = makeRoot();
+  write(root, 'domain/a.cjs', 'const obj = { require(value) { return value; } };');
+  assert.equal(checkProfile(fixtureProfile(), { root }).ok, true);
+
+  write(root, 'domain/a.cjs', 'const obj = { require(value) { return value; } }; require(value);');
+  assert.equal(checkProfile(fixtureProfile(), { root }).violations[0].rule, 'unsupported-import');
 });
 
 test('nonliteral imports fail explicitly instead of silently leaving the graph', () => {

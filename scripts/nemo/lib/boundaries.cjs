@@ -197,6 +197,18 @@ function tokenize(source) {
 function analyzeSource(source) {
   const tokens = tokenize(source), imports = [], globals = [], unsupported = [];
   const property = (i) => tokens[i - 1]?.type === 'punct' && ['.', '?.'].includes(tokens[i - 1].value);
+  const methodDeclaration = (i, openIndex) => {
+    if (tokens[i - 1]?.value !== '{' && tokens[i - 1]?.value !== ',') return false;
+    let depth = 0;
+    for (let j = openIndex; j < tokens.length; j++) {
+      if (tokens[j].value === '(') depth++;
+      else if (tokens[j].value === ')' && --depth === 0) {
+        // A newline could instead terminate a real call before a standalone block.
+        return tokens[j + 1]?.value === '{' && tokens[j + 1].line === tokens[j].line;
+      }
+    }
+    return false;
+  };
   const recordImport = (token, sourceToken) => {
     if (token?.type === 'string') imports.push({ specifier: token.value, line: sourceToken.line });
     else unsupported.push({ line: sourceToken.line, message: 'Import/require target must be a literal string; declare or rewrite dynamic loading before checking this profile' });
@@ -206,6 +218,7 @@ function analyzeSource(source) {
     if (token.type !== 'name' || property(i)) continue;
     const callOffset = token.value === 'require' && next?.value === '?.' ? 2 : 1;
     if ((token.value === 'require' || token.value === 'import') && tokens[i + callOffset]?.value === '(') {
+      if (token.value === 'require' && callOffset === 1 && methodDeclaration(i, i + callOffset)) continue;
       const target = tokens[i + callOffset + 1], tail = tokens[i + callOffset + 2]?.value;
       recordImport([')', ','].includes(tail) ? target : null, token);
     } else if (token.value === 'import' && next?.type === 'string') recordImport(next, token);
@@ -422,10 +435,22 @@ function checkProfile(profile, opts = {}) {
   }
 
   // --- cycle ---
+  // A cycle exception removes only dependency contributions originating in its
+  // exact file. Keep a module edge when any unexcepted file still contributes it.
+  const cycleEdges = new Map(profile.modules.map((m) => [m.id, new Set()]));
+  for (const [edgeKey, contributors] of edgeFiles) {
+    const [from, to] = JSON.parse(edgeKey);
+    if ([...contributors].some((file) => !activeExceptions.has(`${file}:cycle`))) cycleEdges.get(from).add(to);
+  }
   for (const cyclePath of findCycles(edges)) {
-    const cycleFiles = cyclePath.slice(0, -1).flatMap((id, i) => [...edgeFiles.get(JSON.stringify([id, cyclePath[i + 1]]))]);
-    const exception = cycleFiles.map((file) => activeExceptions.get(`${file}:cycle`)).find(Boolean);
-    if (exception) { applyException(exception, { cycle: cyclePath }); continue; }
+    cyclePath.slice(0, -1).forEach((id, i) => {
+      for (const file of edgeFiles.get(JSON.stringify([id, cyclePath[i + 1]])) || []) {
+        const exception = activeExceptions.get(`${file}:cycle`);
+        if (exception) applyException(exception, { cycle: cyclePath });
+      }
+    });
+  }
+  for (const cyclePath of findCycles(cycleEdges)) {
     violations.push({
       rule: 'cycle', module: cyclePath[0], file: null, line: null,
       message: `Import cycle: ${cyclePath.join(' -> ')}`,
