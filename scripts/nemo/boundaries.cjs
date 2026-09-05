@@ -43,11 +43,11 @@ function main() {
     args = parseArgs(process.argv.slice(2));
   } catch (err) {
     console.error(`bad usage: ${err.message}`);
-    process.exit(2);
+    return 2;
   }
   if (!args.profilePath) {
     console.error('usage: node scripts/nemo/boundaries.cjs <profile.json> [--baseline <prior-profile.json>] [--root <dir>] [--json]');
-    process.exit(2);
+    return 2;
   }
 
   let profile;
@@ -55,7 +55,7 @@ function main() {
     profile = JSON.parse(fs.readFileSync(path.resolve(args.profilePath), 'utf8'));
   } catch (err) {
     console.error(`could not read/parse profile "${args.profilePath}": ${err.message}`);
-    process.exit(2);
+    return 2;
   }
 
   let report;
@@ -63,7 +63,7 @@ function main() {
     report = checkProfile(profile, { root: path.resolve(args.root) });
   } catch (err) {
     console.error(`boundaries check could not run: ${err.message}`);
-    process.exit(2);
+    return 2;
   }
 
   if (args.baselinePath) {
@@ -72,14 +72,14 @@ function main() {
       baseline = JSON.parse(fs.readFileSync(path.resolve(args.baselinePath), 'utf8'));
     } catch (err) {
       console.error(`could not read/parse baseline "${args.baselinePath}": ${err.message}`);
-      process.exit(2);
+      return 2;
     }
     try {
       const ratchet = compareSizeBaseline(baseline, profile, { root: path.resolve(args.root) });
       report = { ...report, ok: report.ok && ratchet.ok, ratchet };
     } catch (err) {
       console.error(`baseline comparison could not run: ${err.message}`);
-      process.exit(2);
+      return 2;
     }
   }
 
@@ -106,7 +106,8 @@ function main() {
       }
     }
   }
-  process.exit(report.ok ? 0 : 1);
+  return report.ok ? 0 : 1;
 }
 
-main();
+// Let pending stdout/stderr writes drain, including when either stream is piped.
+process.exitCode = main();
