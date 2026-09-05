@@ -1,0 +1,547 @@
+{
+  "schema_version": "1.0",
+  "source_manifest": "engineering/project-management/remediation-tasks.json",
+  "time_basis": "Elapsed forecast hours from 2026-09-04 20:00 America/New_York (EDT, UTC-04:00)",
+  "status": "forecast",
+  "assumptions": [
+    "The user selected September 4 as the forecast start; 20:00 EDT is the planning reference. Actual kickoff still requires owners, accounts, machines and working capacity.",
+    "The forecast assumes three full lead teams with disjoint writers, prompt reviews, and 2-4 hour integration checkpoints.",
+    "Start and end hours are planning offsets, not commitments or evidence that work is unimplemented, active, or complete.",
+    "Concrete task dependencies are finish-to-start. Phase-epic dependencies are completion gates while independent child preparation may overlap.",
+    "Buzz offsets represent remaining runtime validation and receipts from the current pilot state; final distributed-build acceptance stays with the release-owning session."
+  ],
+  "targets": {
+    "first_foundation_increment_hour": 24,
+    "working_completion_target_hour": 240,
+    "acceptance_buffer": {
+      "start_hour": 240,
+      "end_hour": 336,
+      "purpose": "Reserved for discovered defects, native-environment issues, final distributed-build receipts, and acceptance reruns."
+    }
+  },
+  "confidence_scale": {
+    "high": "The sequence is largely procedural and uses already-defined inputs.",
+    "medium": "The sequence is plausible with the assumed teams and prompt owner decisions.",
+    "low": "Native, cross-machine, broad migration, or integrated acceptance variance can move the finish."
+  },
+  "critical_path": {
+    "task_keys": [
+      "BZ0",
+      "R01",
+      "R05",
+      "R09",
+      "R11",
+      "R12",
+      "R13",
+      "R18.1",
+      "R18.2",
+      "R18.4",
+      "R18.6",
+      "R20",
+      "R21",
+      "R22"
+    ],
+    "parallel_convergence": "R00 -> R03 also converges at R05; R14 -> R15 constrains R18 coordination acceptance but does not block R18.1 document work.",
+    "forecast_finish_hour": 240,
+    "risk": "The path is dominated by authoritative document migration and downstream editor/platform validation; delayed owner decisions, native machines, or integration repair consume the H240-H336 buffer."
+  },
+  "preparation_overlaps": [
+    {
+      "epic": "F1",
+      "overlap": "Starts at H2 before F0 rolls up at H8 because R01/R05 preparation does not depend on conditional R04 native packaging acceptance."
+    },
+    {
+      "epic": "F2",
+      "overlap": "Starts at H7 before F1 rolls up at H12 because R08/R09 have their concrete prerequisites while R07 continues independently."
+    },
+    {
+      "epic": "F3",
+      "overlap": "Starts at H16 before all F2 work ends at H18 because R13 does not depend on the R10 native feasibility lane."
+    },
+    {
+      "epic": "R18",
+      "overlap": "Rollup starts with R18.1 at H20; R18 coordination cannot be accepted until R15 ends at H36, while the document family has already satisfied its own dependencies."
+    },
+    {
+      "epic": "F5",
+      "overlap": "R19 measurement starts at H16 from R03/R12 and continues through migration; final F5 acceptance still waits for R20/R21."
+    }
+  ],
+  "schedule": {
+    "F0": {
+      "start_hour": 0,
+      "end_hour": 8,
+      "rationale": "Rolls up R00/R02/R03 and conditional R04 baseline work.",
+      "confidence": "medium",
+      "start_at": "2026-09-04T20:00:00-04:00",
+      "start_date": "2026-09-04",
+      "target_at": "2026-09-05T04:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "F1": {
+      "start_hour": 2,
+      "end_hour": 12,
+      "rationale": "Rolls up portable rules, module gates, isolation, and CI preparation; independent prep overlaps F0.",
+      "confidence": "medium",
+      "start_at": "2026-09-04T22:00:00-04:00",
+      "start_date": "2026-09-04",
+      "target_at": "2026-09-05T08:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "F2": {
+      "start_hour": 7,
+      "end_hour": 18,
+      "rationale": "Rolls up extraction, contracts, commands, diagnostics, and native feasibility after their task prerequisites.",
+      "confidence": "medium",
+      "start_at": "2026-09-05T03:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-05T14:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "F3": {
+      "start_hour": 16,
+      "end_hour": 52,
+      "rationale": "Initial property and MCP proof reach H24; gesture, color, and real native effect continue afterward.",
+      "confidence": "low",
+      "start_at": "2026-09-05T12:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-07T00:00:00-04:00",
+      "target_date": "2026-09-07",
+      "basis": "Forecast"
+    },
+    "F4": {
+      "start_hour": 20,
+      "end_hour": 176,
+      "rationale": "Rolls up the six R18 families as accepted interfaces make each family ready.",
+      "confidence": "low",
+      "start_at": "2026-09-05T16:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-12T04:00:00-04:00",
+      "target_date": "2026-09-12",
+      "basis": "Forecast"
+    },
+    "F5": {
+      "start_hour": 16,
+      "end_hour": 208,
+      "rationale": "Continuous measurement begins early; recovery and packaged validation finish after migrations converge.",
+      "confidence": "low",
+      "start_at": "2026-09-05T12:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-13T12:00:00-04:00",
+      "target_date": "2026-09-13",
+      "basis": "Forecast"
+    },
+    "F6": {
+      "start_hour": 208,
+      "end_hour": 336,
+      "rationale": "R22 targets H240; the phase remains open through the explicit H240-H336 acceptance buffer.",
+      "confidence": "low",
+      "start_at": "2026-09-13T12:00:00-04:00",
+      "start_date": "2026-09-13",
+      "target_at": "2026-09-18T20:00:00-04:00",
+      "target_date": "2026-09-18",
+      "basis": "Forecast"
+    },
+    "R00": {
+      "start_hour": 0,
+      "end_hour": 1,
+      "rationale": "Resolve current source, active work, ownership decisions, and collisions before dependent tasks.",
+      "confidence": "medium",
+      "start_at": "2026-09-04T20:00:00-04:00",
+      "start_date": "2026-09-04",
+      "target_at": "2026-09-04T21:00:00-04:00",
+      "target_date": "2026-09-04",
+      "basis": "Forecast"
+    },
+    "R01": {
+      "start_hour": 2,
+      "end_hour": 4,
+      "rationale": "Begins after R00 and BZ0 establish the current authority contract.",
+      "confidence": "medium",
+      "start_at": "2026-09-04T22:00:00-04:00",
+      "start_date": "2026-09-04",
+      "target_at": "2026-09-05T00:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "R02": {
+      "start_hour": 1,
+      "end_hour": 4,
+      "rationale": "Baseline commands and receipts proceed immediately after the source is selected.",
+      "confidence": "medium",
+      "start_at": "2026-09-04T21:00:00-04:00",
+      "start_date": "2026-09-04",
+      "target_at": "2026-09-05T00:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "R03": {
+      "start_hour": 1,
+      "end_hour": 4,
+      "rationale": "Surface inventory and initial fixtures run in parallel with baseline command work.",
+      "confidence": "medium",
+      "start_at": "2026-09-04T21:00:00-04:00",
+      "start_date": "2026-09-04",
+      "target_at": "2026-09-05T00:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "R04": {
+      "start_hour": 4,
+      "end_hour": 8,
+      "rationale": "Conditional slot for a blocker reproduced by R02; non-reproduction yields evidence rather than repair work.",
+      "confidence": "low",
+      "start_at": "2026-09-05T00:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-05T04:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "R05": {
+      "start_hour": 4,
+      "end_hour": 7,
+      "rationale": "Portable rules and the surface inventory provide the inputs for enforceable profiles.",
+      "confidence": "medium",
+      "start_at": "2026-09-05T00:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-05T03:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "R06": {
+      "start_hour": 4,
+      "end_hour": 7,
+      "rationale": "Starts when R02 has named commands and source/build identities to isolate.",
+      "confidence": "medium",
+      "start_at": "2026-09-05T00:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-05T03:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "R07": {
+      "start_hour": 7,
+      "end_hour": 12,
+      "rationale": "CI gates start after commands, module checks, and isolation are executable.",
+      "confidence": "medium",
+      "start_at": "2026-09-05T03:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-05T08:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "R08": {
+      "start_hour": 7,
+      "end_hour": 11,
+      "rationale": "The characterized surface, profiles, and isolated runner allow a bounded extraction trial.",
+      "confidence": "medium",
+      "start_at": "2026-09-05T03:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-05T07:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "R09": {
+      "start_hour": 7,
+      "end_hour": 10,
+      "rationale": "Foundational contracts start when rules, inventory, and architecture gates converge.",
+      "confidence": "medium",
+      "start_at": "2026-09-05T03:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-05T06:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "R10": {
+      "start_hour": 10,
+      "end_hour": 18,
+      "rationale": "Native feasibility waits for R04 evidence and R09 image/parameter contracts.",
+      "confidence": "low",
+      "start_at": "2026-09-05T06:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-05T14:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "R11": {
+      "start_hour": 10,
+      "end_hour": 13,
+      "rationale": "Dispatcher and history work begins after the ownership contracts land.",
+      "confidence": "medium",
+      "start_at": "2026-09-05T06:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-05T09:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "R12": {
+      "start_hour": 13,
+      "end_hour": 16,
+      "rationale": "Deterministic diagnostics require isolation, contracts, and a real command/history path.",
+      "confidence": "medium",
+      "start_at": "2026-09-05T09:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-05T12:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "R13": {
+      "start_hour": 16,
+      "end_hour": 20,
+      "rationale": "The first property slice starts after extraction, commands, and replay diagnostics finish.",
+      "confidence": "low",
+      "start_at": "2026-09-05T12:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-05T16:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "R14": {
+      "start_hour": 20,
+      "end_hour": 24,
+      "rationale": "Initial Rust MCP and two-client proof consumes the completed property and shared services.",
+      "confidence": "low",
+      "start_at": "2026-09-05T16:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-05T20:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "R15": {
+      "start_hour": 24,
+      "end_hour": 36,
+      "rationale": "The second command shape follows accepted property and MCP seams.",
+      "confidence": "low",
+      "start_at": "2026-09-05T20:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-06T08:00:00-04:00",
+      "target_date": "2026-09-06",
+      "basis": "Forecast"
+    },
+    "R16": {
+      "start_hour": 32,
+      "end_hour": 52,
+      "rationale": "Real effect integration starts after feasibility, property/MCP, and R17 color contracts; full plugin proof is post-H24.",
+      "confidence": "low",
+      "start_at": "2026-09-06T04:00:00-04:00",
+      "start_date": "2026-09-06",
+      "target_at": "2026-09-07T00:00:00-04:00",
+      "target_date": "2026-09-07",
+      "basis": "Forecast"
+    },
+    "R17": {
+      "start_hour": 18,
+      "end_hour": 32,
+      "rationale": "Color, precision, EXR, and OTIO proof begins after R09 and R10 and lands before R16.",
+      "confidence": "low",
+      "start_at": "2026-09-05T14:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-06T04:00:00-04:00",
+      "target_date": "2026-09-06",
+      "basis": "Forecast"
+    },
+    "R18": {
+      "start_hour": 20,
+      "end_hour": 176,
+      "rationale": "Rolls up R18.1-R18.6; H20-H36 is justified family prep before the R15 coordination acceptance dependency clears.",
+      "confidence": "low",
+      "start_at": "2026-09-05T16:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-12T04:00:00-04:00",
+      "target_date": "2026-09-12",
+      "basis": "Forecast"
+    },
+    "R18.1": {
+      "start_hour": 20,
+      "end_hour": 56,
+      "rationale": "Document migration can begin after R09/R11/R13 without waiting for unrelated gesture or native-effect work.",
+      "confidence": "low",
+      "start_at": "2026-09-05T16:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-07T04:00:00-04:00",
+      "target_date": "2026-09-07",
+      "basis": "Forecast"
+    },
+    "R18.2": {
+      "start_hour": 56,
+      "end_hour": 92,
+      "rationale": "Animation/timeline migration waits for the document identity/history family.",
+      "confidence": "low",
+      "start_at": "2026-09-07T04:00:00-04:00",
+      "start_date": "2026-09-07",
+      "target_at": "2026-09-08T16:00:00-04:00",
+      "target_date": "2026-09-08",
+      "basis": "Forecast"
+    },
+    "R18.3": {
+      "start_hour": 56,
+      "end_hour": 104,
+      "rationale": "Renderer migration runs beside R18.2 after document and color prerequisites land.",
+      "confidence": "low",
+      "start_at": "2026-09-07T04:00:00-04:00",
+      "start_date": "2026-09-07",
+      "target_at": "2026-09-09T04:00:00-04:00",
+      "target_date": "2026-09-09",
+      "basis": "Forecast"
+    },
+    "R18.4": {
+      "start_hour": 92,
+      "end_hour": 140,
+      "rationale": "Editor tools follow gesture, document, and animation/timeline foundations.",
+      "confidence": "low",
+      "start_at": "2026-09-08T16:00:00-04:00",
+      "start_date": "2026-09-08",
+      "target_at": "2026-09-10T16:00:00-04:00",
+      "target_date": "2026-09-10",
+      "basis": "Forecast"
+    },
+    "R18.5": {
+      "start_hour": 104,
+      "end_hour": 152,
+      "rationale": "Media/export/native adapters follow the real effect, color, document, and renderer families.",
+      "confidence": "low",
+      "start_at": "2026-09-09T04:00:00-04:00",
+      "start_date": "2026-09-09",
+      "target_at": "2026-09-11T04:00:00-04:00",
+      "target_date": "2026-09-11",
+      "basis": "Forecast"
+    },
+    "R18.6": {
+      "start_hour": 140,
+      "end_hour": 176,
+      "rationale": "Preferences, dynamic controls, diagnostics, and Labs follow the migrated editor-control family.",
+      "confidence": "low",
+      "start_at": "2026-09-10T16:00:00-04:00",
+      "start_date": "2026-09-10",
+      "target_at": "2026-09-12T04:00:00-04:00",
+      "target_date": "2026-09-12",
+      "basis": "Forecast"
+    },
+    "R19": {
+      "start_hour": 16,
+      "end_hour": 176,
+      "rationale": "Measurement starts from R03/R12 and expands continuously as migration candidates integrate.",
+      "confidence": "low",
+      "start_at": "2026-09-05T12:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-12T04:00:00-04:00",
+      "target_date": "2026-09-12",
+      "basis": "Forecast"
+    },
+    "R20": {
+      "start_hour": 176,
+      "end_hour": 192,
+      "rationale": "Full recovery/fault acceptance starts when all named migration-family dependencies finish.",
+      "confidence": "low",
+      "start_at": "2026-09-12T04:00:00-04:00",
+      "start_date": "2026-09-12",
+      "target_at": "2026-09-12T20:00:00-04:00",
+      "target_date": "2026-09-12",
+      "basis": "Forecast"
+    },
+    "R21": {
+      "start_hour": 192,
+      "end_hour": 208,
+      "rationale": "Packaged/browser/OS validation follows native, media, performance, and recovery evidence.",
+      "confidence": "low",
+      "start_at": "2026-09-12T20:00:00-04:00",
+      "start_date": "2026-09-12",
+      "target_at": "2026-09-13T12:00:00-04:00",
+      "target_date": "2026-09-13",
+      "basis": "Forecast"
+    },
+    "R22": {
+      "start_hour": 208,
+      "end_hour": 240,
+      "rationale": "Inventory reconciliation and maintainer acceptance target day 10 after all explicit predecessors finish.",
+      "confidence": "low",
+      "start_at": "2026-09-13T12:00:00-04:00",
+      "start_date": "2026-09-13",
+      "target_at": "2026-09-14T20:00:00-04:00",
+      "target_date": "2026-09-14",
+      "basis": "Forecast"
+    },
+    "BZ0": {
+      "start_hour": 0,
+      "end_hour": 2,
+      "rationale": "Confirm the current collaboration authority and continuity contract at kickoff.",
+      "confidence": "medium",
+      "start_at": "2026-09-04T20:00:00-04:00",
+      "start_date": "2026-09-04",
+      "target_at": "2026-09-04T22:00:00-04:00",
+      "target_date": "2026-09-04",
+      "basis": "Forecast"
+    },
+    "BZ1": {
+      "start_hour": 2,
+      "end_hour": 8,
+      "rationale": "Remaining desktop onboarding and owner-backed agent checks follow BZ0.",
+      "confidence": "medium",
+      "start_at": "2026-09-04T22:00:00-04:00",
+      "start_date": "2026-09-04",
+      "target_at": "2026-09-05T04:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "BZ2": {
+      "start_hour": 2,
+      "end_hour": 6,
+      "rationale": "Verify the existing Nemo Project/repository binding and automatic workspace access after BZ0.",
+      "confidence": "medium",
+      "start_at": "2026-09-04T22:00:00-04:00",
+      "start_date": "2026-09-04",
+      "target_at": "2026-09-05T02:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "BZ3": {
+      "start_hour": 8,
+      "end_hour": 16,
+      "rationale": "Run remaining lifecycle, reconnect, handoff, cancellation, and revocation acceptance after onboarding/binding evidence.",
+      "confidence": "low",
+      "start_at": "2026-09-05T04:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-05T12:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "BZ4": {
+      "start_hour": 16,
+      "end_hour": 24,
+      "rationale": "GitHub link validation waits for BZ3 and executable R07 gates.",
+      "confidence": "medium",
+      "start_at": "2026-09-05T12:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-05T20:00:00-04:00",
+      "target_date": "2026-09-05",
+      "basis": "Forecast"
+    },
+    "BZ5": {
+      "start_hour": 24,
+      "end_hour": 48,
+      "rationale": "CI and product-MCP receipt linking follows BZ3, R07, R12, and the H24 R14 proof.",
+      "confidence": "low",
+      "start_at": "2026-09-05T20:00:00-04:00",
+      "start_date": "2026-09-05",
+      "target_at": "2026-09-06T20:00:00-04:00",
+      "target_date": "2026-09-06",
+      "basis": "Forecast"
+    },
+    "BZ6": {
+      "start_hour": 48,
+      "end_hour": 208,
+      "rationale": "Remaining backup/restore, upgrades, monitoring, support, and offboarding receipts run through the integrated-build period.",
+      "confidence": "low",
+      "start_at": "2026-09-06T20:00:00-04:00",
+      "start_date": "2026-09-06",
+      "target_at": "2026-09-13T12:00:00-04:00",
+      "target_date": "2026-09-13",
+      "basis": "Forecast"
+    }
+  },
+  "anchor": "2026-09-04T20:00:00-04:00",
+  "timezone": "America/New_York"
+}

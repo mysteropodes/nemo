@@ -1,0 +1,1751 @@
+{
+  "schema_version": "1.0",
+  "source_commit": "2ec97e2440708fae783babc4d9c9e777b520fb04",
+  "status": "published; implementation kickoff pending",
+  "planning_note": "Calendar forecasts use the user-selected September 4 start and a 20:00 EDT planning reference. Original planning_window values preserve the proposal; schedule dates and elapsed hours are the reviewed forecast. Human assignments and actual kickoff remain unconfirmed.",
+  "tasks": [
+    {
+      "key": "F0",
+      "title": "Current reproducible baseline",
+      "kind": "Epic",
+      "phase": "F0",
+      "program": "Core",
+      "area": "DevEx",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Reproducible desktop",
+      "parent": null,
+      "dependencies": [],
+      "planning_window": "H0-H4",
+      "outcome": "An identified current source can be reproduced, inspected, and measured without changing user projects.",
+      "scope": "Coordinate R00, R02, R03, and conditional R04; retain failures and unavailable native capabilities as explicit evidence.",
+      "acceptance": [
+        "Fresh-checkout CPU checks and named baseline commands run against an identified source revision.",
+        "Native, browser, and packaged-desktop results are reported separately as pass, fail, blocked, or not run.",
+        "The baseline records source, build, fixture, platform, and limitation evidence without treating historical counts as current proof."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f0--current-reproducible-baseline"
+      ],
+      "issue_number": 888,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/888",
+      "schedule": {
+        "start_hour": 0,
+        "end_hour": 8,
+        "rationale": "Rolls up R00/R02/R03 and conditional R04 baseline work.",
+        "confidence": "medium",
+        "start_at": "2026-09-04T20:00:00-04:00",
+        "start_date": "2026-09-04",
+        "target_at": "2026-09-05T04:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "F1",
+      "title": "Portable rules and enforceable boundaries",
+      "kind": "Epic",
+      "phase": "F1",
+      "program": "Platform",
+      "area": "DevEx",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Modular core",
+      "parent": null,
+      "dependencies": [
+        "F0"
+      ],
+      "planning_window": "H4-H12",
+      "outcome": "Contributors share enforceable architecture, isolation, task, and CI rules from a clean clone.",
+      "scope": "Coordinate R01 and R05-R07, including instruction portability, module policies, isolated execution, and real gate preparation.",
+      "acceptance": [
+        "A clean clone finds the adopted instructions and task/receipt contract.",
+        "Deliberate dependency, size, schema, and isolation violations fail with useful diagnostics.",
+        "Required-check configuration is proposed only after the named workflows exist and report missing required jobs as failures."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f1--portable-rules-and-enforceable-boundaries"
+      ],
+      "issue_number": 889,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/889",
+      "schedule": {
+        "start_hour": 2,
+        "end_hour": 12,
+        "rationale": "Rolls up portable rules, module gates, isolation, and CI preparation; independent prep overlaps F0.",
+        "confidence": "medium",
+        "start_at": "2026-09-04T22:00:00-04:00",
+        "start_date": "2026-09-04",
+        "target_at": "2026-09-05T08:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "F2",
+      "title": "Contracts, first extraction, and diagnostics",
+      "kind": "Epic",
+      "phase": "F2",
+      "program": "Core",
+      "area": "Document",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Modular core",
+      "parent": null,
+      "dependencies": [
+        "F1"
+      ],
+      "planning_window": "H12-H24",
+      "outcome": "One migrated aggregate has explicit ownership, commands, history, diagnostics, and independently checked replay.",
+      "scope": "Coordinate R08-R12 across animation extraction, foundational contracts, native feasibility, transactions, and deterministic diagnostics.",
+      "acceptance": [
+        "One aggregate has one writable authority and a documented cutover and rollback path.",
+        "One gesture produces one undo action; stale and duplicate writes fail according to declared semantics.",
+        "A real application caller uses the extracted seam and deterministic replay matches an independent expectation."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f2--contracts-first-extraction-and-diagnostics"
+      ],
+      "issue_number": 890,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/890",
+      "schedule": {
+        "start_hour": 7,
+        "end_hour": 18,
+        "rationale": "Rolls up extraction, contracts, commands, diagnostics, and native feasibility after their task prerequisites.",
+        "confidence": "medium",
+        "start_at": "2026-09-05T03:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-05T14:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "F3",
+      "title": "Complete slice, Rust MCP, and native effect",
+      "kind": "Epic",
+      "phase": "F3",
+      "program": "Editor",
+      "area": "Animation",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Reliable alpha",
+      "parent": null,
+      "dependencies": [
+        "F2"
+      ],
+      "planning_window": "Days 2-4",
+      "outcome": "A representative property, second command shape, Rust MCP path, native effect, and precision boundary work through shared services.",
+      "scope": "Coordinate R13-R17 while preserving one state authority and explicit native/browser capability differences.",
+      "acceptance": [
+        "UI, SDK, direct API, and both MCP clients reach equivalent accepted outcomes on identified builds.",
+        "The property and plugin survive relevant keying, undo/redo, save/reload, render/export, cancellation, absence, and fault cases.",
+        "Browser and packaged-desktop evidence are separate, and native support is established only on the packaged artifact."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f3--complete-slice-rust-mcp-and-real-native-effect"
+      ],
+      "issue_number": 891,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/891",
+      "schedule": {
+        "start_hour": 16,
+        "end_hour": 52,
+        "rationale": "Initial property and MCP proof reach H24; gesture, color, and real native effect continue afterward.",
+        "confidence": "low",
+        "start_at": "2026-09-05T12:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-07T00:00:00-04:00",
+        "target_date": "2026-09-07",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "F4",
+      "title": "All shipped subsystem migrations",
+      "kind": "Epic",
+      "phase": "F4",
+      "program": "Editor",
+      "area": "UI",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Modular core",
+      "parent": null,
+      "dependencies": [
+        "F3"
+      ],
+      "planning_window": "Days 5-10",
+      "outcome": "Every shipped subsystem is migrated through bounded family issues or carries an explicit maintainer-approved exception.",
+      "scope": "Coordinate the R18 epic and its six dependency-ordered families; keep inventory, capability, consumer, evidence, and legacy-retirement state visible.",
+      "acceptance": [
+        "Every shipped actionable surface is mapped to a capability and handler or an explicit owned exception.",
+        "Persistent state covers document, save/load, undo/redo, selection, animation, render, export, and native bridges wherever applicable.",
+        "Each family has independent behavior evidence; generated coverage and file-size reduction are supporting evidence only."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f4--all-shipped-subsystem-migrations"
+      ],
+      "issue_number": 892,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/892",
+      "schedule": {
+        "start_hour": 20,
+        "end_hour": 176,
+        "rationale": "Rolls up the six R18 families as accepted interfaces make each family ready.",
+        "confidence": "low",
+        "start_at": "2026-09-05T16:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-12T04:00:00-04:00",
+        "target_date": "2026-09-12",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "F5",
+      "title": "Performance, resilience, and distribution",
+      "kind": "Epic",
+      "phase": "F5",
+      "program": "Platform",
+      "area": "Platform",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Measured performance",
+      "parent": null,
+      "dependencies": [
+        "F4"
+      ],
+      "planning_window": "Days 5-10",
+      "outcome": "Measured workloads, recovery cases, and supported distribution paths pass on identified artifacts.",
+      "scope": "Coordinate R19-R21 across controlled performance, fault recovery, generated artifacts, sidecars, media, plugins, desktop packages, and supported operating systems.",
+      "acceptance": [
+        "Budgets derive from controlled product fixtures and include output-equivalence checks.",
+        "Required recovery and interruption cases pass or remain visible blockers with owners and next actions.",
+        "Browser, packaged desktop, media/export, native plugin, and supported-OS evidence identify exact bytes and do not substitute for one another."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f5--performance-resilience-and-distribution"
+      ],
+      "issue_number": 893,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/893",
+      "schedule": {
+        "start_hour": 16,
+        "end_hour": 208,
+        "rationale": "Continuous measurement begins early; recovery and packaged validation finish after migrations converge.",
+        "confidence": "low",
+        "start_at": "2026-09-05T12:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-13T12:00:00-04:00",
+        "target_date": "2026-09-13",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "F6",
+      "title": "Close foundation remediation",
+      "kind": "Epic",
+      "phase": "F6",
+      "program": "Core",
+      "area": "DevEx",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Reliable alpha",
+      "parent": null,
+      "dependencies": [
+        "F5"
+      ],
+      "planning_window": "Days 11-14",
+      "outcome": "The identified integrated candidate satisfies the full foundation close gate and receives maintainer acceptance.",
+      "scope": "Coordinate R22 inventory reconciliation, bypass retirement, clean-clone and fresh-agent rehearsal, current browser/desktop evidence, and final acceptance.",
+      "acceptance": [
+        "No shipped actionable surface, persistent-data consumer, or writable bypass remains unowned or silently unmapped.",
+        "Clean-clone Codex and Claude sessions use the same adopted instructions and complete a bounded task through the current protocol.",
+        "The maintainer accepts the identified candidate and artifacts; merged code, green unit tests, or agent receipts alone do not close the epic."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f6--close-foundation-remediation"
+      ],
+      "issue_number": 894,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/894",
+      "schedule": {
+        "start_hour": 208,
+        "end_hour": 336,
+        "rationale": "R22 targets H240; the phase remains open through the explicit H240-H336 acceptance buffer.",
+        "confidence": "low",
+        "start_at": "2026-09-13T12:00:00-04:00",
+        "start_date": "2026-09-13",
+        "target_at": "2026-09-18T20:00:00-04:00",
+        "target_date": "2026-09-18",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R00",
+      "title": "Resolve kickoff baseline and active work",
+      "kind": "Task",
+      "phase": "F0",
+      "program": "Core",
+      "area": "DevEx",
+      "priority": "P0",
+      "size": "S",
+      "goal": "Reliable alpha",
+      "parent": "F0",
+      "dependencies": [],
+      "planning_window": "H0-H4",
+      "outcome": "Kickoff has one current base, reconciled active work, explicit supported-platform candidates, and no conflicting writer scopes.",
+      "scope": "Refresh main and open work; collect branches, heads, dirty/unpushed state, paths, contracts, sessions, and next checkpoints; identify the integration-owner and backup decisions still required.",
+      "acceptance": [
+        "Current main, active PRs, local work, and collision candidates are recorded from a fresh read.",
+        "Every proposed writer scope has a base, branch/worktree, exact paths, dependencies, and next checkpoint.",
+        "No assignment, platform commitment, or authority is inferred where the maintainer has not supplied it."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#immediate-kickoff"
+      ],
+      "issue_number": 895,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/895",
+      "schedule": {
+        "start_hour": 0,
+        "end_hour": 1,
+        "rationale": "Resolve current source, active work, ownership decisions, and collisions before dependent tasks.",
+        "confidence": "medium",
+        "start_at": "2026-09-04T20:00:00-04:00",
+        "start_date": "2026-09-04",
+        "target_at": "2026-09-04T21:00:00-04:00",
+        "target_date": "2026-09-04",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R01",
+      "title": "Adopt portable handbook and work tracking",
+      "kind": "Task",
+      "phase": "F1",
+      "program": "Platform",
+      "area": "DevEx",
+      "priority": "P0",
+      "size": "M",
+      "goal": "Modular core",
+      "parent": "F1",
+      "dependencies": [
+        "R00",
+        "BZ0"
+      ],
+      "planning_window": "H0-H4",
+      "outcome": "A clean clone exposes concise shared rules, task packets, receipts, and canonical work tracking without private local context.",
+      "scope": "Adopt the reviewed handbook, short Codex/Claude entry points, issue/receipt templates, GitHub Project proposal, and current dedicated-workspace collaboration contract.",
+      "acceptance": [
+        "A fresh contributor can locate the same architecture, quality, authority, and task instructions.",
+        "Ready-item bodies carry outcome, scope, dependencies, acceptance, base/worktree, evidence, and authority fields.",
+        "Private local notes, credentials, machine paths, and obsolete manual-grant onboarding are absent from shared guidance."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/07_GITHUB_PROJECT_AND_PARALLEL_WORK.md#project",
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/templates/TASK_PACKET.md#task-packet"
+      ],
+      "issue_number": 897,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/897",
+      "schedule": {
+        "start_hour": 2,
+        "end_hour": 4,
+        "rationale": "Begins after R00 and BZ0 establish the current authority contract.",
+        "confidence": "medium",
+        "start_at": "2026-09-04T22:00:00-04:00",
+        "start_date": "2026-09-04",
+        "target_at": "2026-09-05T00:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R02",
+      "title": "Add reproducible commands, doctor, and receipts",
+      "kind": "Task",
+      "phase": "F0",
+      "program": "Platform",
+      "area": "DevEx",
+      "priority": "P0",
+      "size": "M",
+      "goal": "Reproducible desktop",
+      "parent": "F0",
+      "dependencies": [
+        "R00"
+      ],
+      "planning_window": "H0-H4",
+      "outcome": "Developers can identify source/build state, inspect prerequisites, and run named checks that emit structured results.",
+      "scope": "Add read-only doctor behavior, source/build identity, named check/test/browser/desktop/build/package commands, and per-run receipts with explicit unavailable states.",
+      "acceptance": [
+        "Doctor reports prerequisites and capabilities without mutating the workstation or project.",
+        "Commands record source, build, platform, fixture, pass/fail/blocked/not-run, artifacts, and limitations.",
+        "A missing native or GPU environment remains blocked and cannot be converted to a passing skip."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/03_TESTING_AND_DEBUGGING.md#one-command-surface"
+      ],
+      "issue_number": 898,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/898",
+      "schedule": {
+        "start_hour": 1,
+        "end_hour": 4,
+        "rationale": "Baseline commands and receipts proceed immediately after the source is selected.",
+        "confidence": "medium",
+        "start_at": "2026-09-04T21:00:00-04:00",
+        "start_date": "2026-09-04",
+        "target_at": "2026-09-05T00:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R03",
+      "title": "Inventory surfaces, consumers, fixtures, and workloads",
+      "kind": "Task",
+      "phase": "F0",
+      "program": "Editor",
+      "area": "UI",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Reliable alpha",
+      "parent": "F0",
+      "dependencies": [
+        "R00"
+      ],
+      "planning_window": "H0-H4",
+      "outcome": "Nemo has an actionable surface-to-capability inventory, deterministic fixture corpus, and initial measured workloads.",
+      "scope": "Catalog visible, contextual, dynamic, modal, canvas, plugin, preference, and external-service operations plus every applicable document, save/load, undo/redo, selection, animation, render, export, and native-bridge consumer.",
+      "acceptance": [
+        "Each inventory row maps surface, capability, handler, UI/SDK/MCP exposure, consumers, fixtures, platforms, status, and next gate.",
+        "Fixtures cover static/keyed/expression properties, held frames, components, masks/alpha, text, mesh, media, migration, interaction, and export with independent expectations.",
+        "Initial evaluation, render, copy, memory, and export measurements identify workload, hardware, backend, and source revision without inventing budgets."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/05_CAPABILITIES_MCP_AND_STANDARDS.md#complete-surface-inventory",
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/03_TESTING_AND_DEBUGGING.md#fixture-and-regression-rules"
+      ],
+      "issue_number": 899,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/899",
+      "schedule": {
+        "start_hour": 1,
+        "end_hour": 4,
+        "rationale": "Surface inventory and initial fixtures run in parallel with baseline command work.",
+        "confidence": "medium",
+        "start_at": "2026-09-04T21:00:00-04:00",
+        "start_date": "2026-09-04",
+        "target_at": "2026-09-05T00:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R04",
+      "title": "Repair reproduced native sidecar packaging blockers",
+      "kind": "Task",
+      "phase": "F0",
+      "program": "Platform",
+      "area": "Platform",
+      "priority": "P0",
+      "size": "M",
+      "goal": "Reproducible desktop",
+      "parent": "F0",
+      "dependencies": [
+        "R02"
+      ],
+      "planning_window": "H4-H12",
+      "outcome": "Any native or sidecar blocker reproduced on the selected base is repaired and packaged reproducibly, or the conditional task closes with non-reproduction evidence.",
+      "scope": "Reproduce current FFmpeg/Theora and sidecar prerequisites on the selected base; repair only confirmed blockers while preserving codec, dependency, and distribution policy.",
+      "acceptance": [
+        "The blocker is reproduced on an identified base and packaged build before implementation, or non-reproduction is documented with environment evidence.",
+        "The packaged artifact includes or locates the approved dependency without relying on an undocumented workstation installation.",
+        "Actual packaged-desktop launch and affected media/export behavior pass; browser checks are recorded separately."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f0--current-reproducible-baseline"
+      ],
+      "issue_number": 900,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/900",
+      "schedule": {
+        "start_hour": 4,
+        "end_hour": 8,
+        "rationale": "Conditional slot for a blocker reproduced by R02; non-reproduction yields evidence rather than repair work.",
+        "confidence": "low",
+        "start_at": "2026-09-05T00:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-05T04:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R05",
+      "title": "Enforce module profiles and dependency boundaries",
+      "kind": "Task",
+      "phase": "F1",
+      "program": "Core",
+      "area": "DevEx",
+      "priority": "P0",
+      "size": "M",
+      "goal": "Modular core",
+      "parent": "F1",
+      "dependencies": [
+        "R01",
+        "R03"
+      ],
+      "planning_window": "H0-H4",
+      "outcome": "Architecture checks prevent new cycles, forbidden edges, implicit globals, unreviewed size growth, and stale exceptions.",
+      "scope": "Profile every source file; define public API, owner, lifecycle, dependencies, fixtures, and performance invariants; install exact-path debt and exception checks.",
+      "acceptance": [
+        "Every handwritten source file has a reviewed profile or explicit generated/vendor/data policy.",
+        "Deliberate cycle, private import, global-state, size, and exception violations fail the same checks used by CI.",
+        "Legacy ceilings can shrink but cannot silently grow; exceptions name path, rule, reason, owner, issue, and review point."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/04_MODULARITY_POLICY.md#enforcement"
+      ],
+      "issue_number": 901,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/901",
+      "schedule": {
+        "start_hour": 4,
+        "end_hour": 7,
+        "rationale": "Portable rules and the surface inventory provide the inputs for enforceable profiles.",
+        "confidence": "medium",
+        "start_at": "2026-09-05T00:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-05T03:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R06",
+      "title": "Isolate task runtimes and mutable artifacts",
+      "kind": "Task",
+      "phase": "F1",
+      "program": "Platform",
+      "area": "DevEx",
+      "priority": "P0",
+      "size": "M",
+      "goal": "Reproducible desktop",
+      "parent": "F1",
+      "dependencies": [
+        "R02"
+      ],
+      "planning_window": "H0-H4",
+      "outcome": "Concurrent tasks cannot overwrite one another's source state, browser data, desktop data, ports, caches, builds, or reports.",
+      "scope": "Provide task-specific worktrees, launcher identity, ports, browser contexts/origins, Tauri data roots, temp/cache/output paths, build products, reports, and serialized desktop/GPU slots.",
+      "acceptance": [
+        "Two task instances run concurrently with distinct browser, Tauri, temp, cache, build, and report state.",
+        "Each process exposes a source/build handshake and only its owner can stop it.",
+        "Shared desktop input and reference GPU measurements use explicit exclusive reservations."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/07_GITHUB_PROJECT_AND_PARALLEL_WORK.md#isolation"
+      ],
+      "issue_number": 902,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/902",
+      "schedule": {
+        "start_hour": 4,
+        "end_hour": 7,
+        "rationale": "Starts when R02 has named commands and source/build identities to isolate.",
+        "confidence": "medium",
+        "start_at": "2026-09-05T00:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-05T03:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R07",
+      "title": "Install real PR and CI gates",
+      "kind": "Task",
+      "phase": "F1",
+      "program": "Platform",
+      "area": "DevEx",
+      "priority": "P0",
+      "size": "M",
+      "goal": "Reliable alpha",
+      "parent": "F1",
+      "dependencies": [
+        "R02",
+        "R05",
+        "R06"
+      ],
+      "planning_window": "H4-H12",
+      "outcome": "Candidate changes run reproducible static, behavior, browser, native, and build gates appropriate to their affected surfaces.",
+      "scope": "Create actual workflows and stable aggregate reporting; validate names and failure semantics before an authorized owner configures required checks and review policy.",
+      "acceptance": [
+        "The candidate runs static/architecture, CPU, document-contract, affected-browser, and required native/build jobs through the same scripts used locally.",
+        "Missing, cancelled, or unavailable required work reports failure or blocked status rather than success.",
+        "Credentialed Project/repository settings remain separate from untrusted pull-request execution and are changed only by authorized owners."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/03_TESTING_AND_DEBUGGING.md#ci-design"
+      ],
+      "issue_number": 903,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/903",
+      "schedule": {
+        "start_hour": 7,
+        "end_hour": 12,
+        "rationale": "CI gates start after commands, module checks, and isolation are executable.",
+        "confidence": "medium",
+        "start_at": "2026-09-05T03:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-05T08:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R08",
+      "title": "Extract a pure animation seam and select a runner",
+      "kind": "Task",
+      "phase": "F2",
+      "program": "Editor",
+      "area": "Animation",
+      "priority": "P0",
+      "size": "M",
+      "goal": "Modular core",
+      "parent": "F2",
+      "dependencies": [
+        "R03",
+        "R05",
+        "R06"
+      ],
+      "planning_window": "H4-H12",
+      "outcome": "One pure animation/easing module runs through a compatibility facade in production, with an evidence-based Node-or-Vitest decision.",
+      "scope": "Characterize and extract one easing/interpolation seam; compare Node and Vitest on the same pure unit, stateful behavior, browser control, source maps, setup, speed, and worktree isolation.",
+      "acceptance": [
+        "The real application imports the extracted module through a bounded facade and preserves characterized output.",
+        "Node and Vitest exercise the same meaningful expectations; duplicated long-term suites are not retained.",
+        "An ADR records the selected runner, type-check boundary, diagnostics, performance, and rejected alternatives."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/03_TESTING_AND_DEBUGGING.md#runner-decision"
+      ],
+      "issue_number": 904,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/904",
+      "schedule": {
+        "start_hour": 7,
+        "end_hour": 11,
+        "rationale": "The characterized surface, profiles, and isolated runner allow a bounded extraction trial.",
+        "confidence": "medium",
+        "start_at": "2026-09-05T03:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-05T07:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R09",
+      "title": "Define foundational ownership and data contracts",
+      "kind": "Task",
+      "phase": "F2",
+      "program": "Core",
+      "area": "Document",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Modular core",
+      "parent": "F2",
+      "dependencies": [
+        "R01",
+        "R03",
+        "R05"
+      ],
+      "planning_window": "H0-H4",
+      "outcome": "Stable IDs, state authority, time, persistence, image/color, platform capability, and dependency direction are versioned contracts with generated boundary types.",
+      "scope": "Define persistent versus transient and derived state, exact ownership transitions, precise time, image precision/color/alpha, schema compatibility, platform availability, and native/WASM ports.",
+      "acceptance": [
+        "Each migrated aggregate names one writer, all read/write paths, serialization/history ownership, cutover, rollback, and unknown-data policy.",
+        "Stable IDs and supported fields survive create/edit/key/undo/redo/reorder/duplicate/save/load and relevant selection, animation, render, export, and native consumers.",
+        "Generated Rust/TypeScript/schema artifacts are versioned and drift checks fail when source contracts disagree."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/05_CAPABILITIES_MCP_AND_STANDARDS.md#application-command-contract",
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/01_CURRENT_AND_TARGET.md#target"
+      ],
+      "issue_number": 905,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/905",
+      "schedule": {
+        "start_hour": 7,
+        "end_hour": 10,
+        "rationale": "Foundational contracts start when rules, inventory, and architecture gates converge.",
+        "confidence": "medium",
+        "start_at": "2026-09-05T03:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-05T06:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R10",
+      "title": "Prove native OpenFX feasibility",
+      "kind": "Task",
+      "phase": "F2",
+      "program": "Platform",
+      "area": "Media",
+      "priority": "P1",
+      "size": "M",
+      "goal": "Reliable alpha",
+      "parent": "F2",
+      "dependencies": [
+        "R04",
+        "R09"
+      ],
+      "planning_window": "H4-H12",
+      "outcome": "A disposable prototype proves or falsifies the selected native OpenFX load, describe, and CPU float-render boundary.",
+      "scope": "Use the accepted image/parameter port to test plugin discovery, describe, buffer ownership, render, lifecycle, licensing, and platform prerequisites without creating a second product backend.",
+      "acceptance": [
+        "A redistributable test plugin loads, describes supported parameters, and renders a known float fixture on an identified native environment.",
+        "Buffer ownership, precision, lifecycle, failure mode, and distribution constraints are recorded.",
+        "The prototype is either integrated through the accepted contracts or explicitly retired after the decision."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f2--contracts-first-extraction-and-diagnostics"
+      ],
+      "issue_number": 906,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/906",
+      "schedule": {
+        "start_hour": 10,
+        "end_hour": 18,
+        "rationale": "Native feasibility waits for R04 evidence and R09 image/parameter contracts.",
+        "confidence": "low",
+        "start_at": "2026-09-05T06:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-05T14:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R11",
+      "title": "Implement commands, transactions, history, and authority cutover",
+      "kind": "Task",
+      "phase": "F2",
+      "program": "Core",
+      "area": "Document",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Modular core",
+      "parent": "F2",
+      "dependencies": [
+        "R09"
+      ],
+      "planning_window": "H4-H12",
+      "outcome": "One aggregate mutates through shared queries, commands, transactions, gesture lifecycle, history, revision checks, and invalidation.",
+      "scope": "Add begin/update/commit/cancel, atomic batch semantics, stable request/document/object IDs, optimistic revisions, idempotency, cancellation, and feature registration without a hand-edited central switch.",
+      "acceptance": [
+        "One gesture commits one undo entry; cancel restores declared state; undo/redo and missing-object cases match independent expectations.",
+        "Stale revisions and duplicate requests cannot silently overwrite or double-apply persistent state.",
+        "All write paths for the migrated aggregate route through one authority, including UI, history, persistence, animation, render/export, and native adapters where applicable."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/05_CAPABILITIES_MCP_AND_STANDARDS.md#application-command-contract"
+      ],
+      "issue_number": 907,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/907",
+      "schedule": {
+        "start_hour": 10,
+        "end_hour": 13,
+        "rationale": "Dispatcher and history work begins after the ownership contracts land.",
+        "confidence": "medium",
+        "start_at": "2026-09-05T06:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-05T09:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R12",
+      "title": "Add structured diagnostics and deterministic replay",
+      "kind": "Task",
+      "phase": "F2",
+      "program": "Platform",
+      "area": "DevEx",
+      "priority": "P0",
+      "size": "M",
+      "goal": "Reliable alpha",
+      "parent": "F2",
+      "dependencies": [
+        "R06",
+        "R09",
+        "R11"
+      ],
+      "planning_window": "H4-H12",
+      "outcome": "The application, CLI, tests, and future MCP adapter share bounded diagnostics and deterministic fixture record/replay.",
+      "scope": "Emit structured source/build/operation/revision IDs, capability state, timings, resource counters, trace bundles, seeds, replay operations, and redaction/size limits.",
+      "acceptance": [
+        "A retained fixture and operation sequence replay to an independently checked result on the identified build.",
+        "Diagnostics expose availability, errors, timings, resource state, and artifact references without credentials or unbounded data.",
+        "Enabling diagnostics uses the product execution path and does not hide release-only failures."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/03_TESTING_AND_DEBUGGING.md#built-in-diagnostics-surface"
+      ],
+      "issue_number": 908,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/908",
+      "schedule": {
+        "start_hour": 13,
+        "end_hour": 16,
+        "rationale": "Deterministic diagnostics require isolation, contracts, and a real command/history path.",
+        "confidence": "medium",
+        "start_at": "2026-09-05T09:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-05T12:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R13",
+      "title": "Migrate one complete animated property",
+      "kind": "Task",
+      "phase": "F3",
+      "program": "Editor",
+      "area": "Animation",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Reliable alpha",
+      "parent": "F3",
+      "dependencies": [
+        "R08",
+        "R11",
+        "R12"
+      ],
+      "planning_window": "H12-H24",
+      "outcome": "A characterized animated property uses one shared handler across inspector, timeline, SDK, persistence, evaluation, and output.",
+      "scope": "Use opacity or another approved representative property; preserve static/keyed/expression/nested-context semantics and units while removing direct mutation bypasses for that surface.",
+      "acceptance": [
+        "Create/edit/key/frame-change/undo/redo/save/reopen and nested-context behavior match declared expectations.",
+        "Selection and animation state remain correct, and browser render plus export output are checked independently.",
+        "UI, SDK, and direct API reach the same command result with one writable authority and no remaining surface-specific setter."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f3--complete-slice-rust-mcp-and-real-native-effect"
+      ],
+      "issue_number": 909,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/909",
+      "schedule": {
+        "start_hour": 16,
+        "end_hour": 20,
+        "rationale": "The first property slice starts after extraction, commands, and replay diagnostics finish.",
+        "confidence": "low",
+        "start_at": "2026-09-05T12:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-05T16:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R14",
+      "title": "Add Rust MCP adapter and two-client parity",
+      "kind": "Task",
+      "phase": "F3",
+      "program": "Core",
+      "area": "Platform",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Modular core",
+      "parent": "F3",
+      "dependencies": [
+        "R11",
+        "R12",
+        "R13"
+      ],
+      "planning_window": "H12-H24",
+      "outcome": "A thin Rust MCP adapter exposes shared discovery, queries, commands, jobs, and diagnostics to Codex and Claude.",
+      "scope": "Keep transport outside domain/application modules; pin protocol behavior; identify instance/build/document/revision/request/job; support runtime, diagnostic, and explicitly enabled developer-workspace modes.",
+      "acceptance": [
+        "Codex and Claude discover the same capabilities and produce outcomes equivalent to direct application API calls.",
+        "Reconnect, cancellation, stale-write, idempotency, pagination/list-change, and intended-instance attachment cases pass.",
+        "Pixels and geometry do not travel through command JSON, and release runtime authority is distinct from source-workspace authority."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/05_CAPABILITIES_MCP_AND_STANDARDS.md#rust-mcp-adapter"
+      ],
+      "issue_number": 910,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/910",
+      "schedule": {
+        "start_hour": 20,
+        "end_hour": 24,
+        "rationale": "Initial Rust MCP and two-client proof consumes the completed property and shared services.",
+        "confidence": "low",
+        "start_at": "2026-09-05T16:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-05T20:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R15",
+      "title": "Prove a gesture or asynchronous job slice",
+      "kind": "Task",
+      "phase": "F3",
+      "program": "Editor",
+      "area": "UI",
+      "priority": "P0",
+      "size": "M",
+      "goal": "Reliable alpha",
+      "parent": "F3",
+      "dependencies": [
+        "R13",
+        "R14"
+      ],
+      "planning_window": "Days 2-4",
+      "outcome": "The shared contract handles a non-scalar interaction through a geometric gesture or asynchronous export job.",
+      "scope": "Implement begin/update/commit/cancel with coordinate/sample semantics, or a progress/cancel export job with immutable input revision and artifact result; route UI/API/MCP consumers.",
+      "acceptance": [
+        "Commit creates one history action and cancel restores state, or the job reports progress and cancellation without publishing a partial result as complete.",
+        "Stale revisions, late results, disconnects, and retries follow declared behavior.",
+        "The actual UI interaction and direct API/MCP paths are each exercised; correct core logic cannot mask broken bindings."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/05_CAPABILITIES_MCP_AND_STANDARDS.md#application-command-contract"
+      ],
+      "issue_number": 911,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/911",
+      "schedule": {
+        "start_hour": 24,
+        "end_hour": 36,
+        "rationale": "The second command shape follows accepted property and MCP seams.",
+        "confidence": "low",
+        "start_at": "2026-09-05T20:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-06T08:00:00-04:00",
+        "target_date": "2026-09-06",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R16",
+      "title": "Integrate one redistributable OpenFX effect",
+      "kind": "Task",
+      "phase": "F3",
+      "program": "Platform",
+      "area": "Media",
+      "priority": "P1",
+      "size": "L",
+      "goal": "Reliable alpha",
+      "parent": "F3",
+      "dependencies": [
+        "R10",
+        "R13",
+        "R14",
+        "R17"
+      ],
+      "planning_window": "Days 2-4",
+      "outcome": "One real redistributable OpenFX effect works through the registry, UI, application API, and MCP on supported native builds.",
+      "scope": "Implement descriptor mapping, keyable parameters, thread-safety, temporal dependencies, cache invalidation, process lifecycle, cancellation, timeouts, missing-plugin persistence, and host-fault containment.",
+      "acceptance": [
+        "The effect can be add/edit/key/undo/redo/save/reload/rendered through UI and MCP with known-frame output checks.",
+        "Missing plugin, cancellation, timeout, and host crash preserve document IDs and parameters and do not corrupt the project.",
+        "Packaged native evidence records supported suites, contexts, platforms, and limits; browser reports unavailable or explicitly baked behavior."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f3--complete-slice-rust-mcp-and-real-native-effect"
+      ],
+      "issue_number": 913,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/913",
+      "schedule": {
+        "start_hour": 32,
+        "end_hour": 52,
+        "rationale": "Real effect integration starts after feasibility, property/MCP, and R17 color contracts; full plugin proof is post-H24.",
+        "confidence": "low",
+        "start_at": "2026-09-06T04:00:00-04:00",
+        "start_date": "2026-09-06",
+        "target_at": "2026-09-07T00:00:00-04:00",
+        "target_date": "2026-09-07",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R17",
+      "title": "Prove color, precision, EXR, and OTIO boundaries",
+      "kind": "Task",
+      "phase": "F3",
+      "program": "Core",
+      "area": "Renderer",
+      "priority": "P1",
+      "size": "L",
+      "goal": "Reliable alpha",
+      "parent": "F3",
+      "dependencies": [
+        "R09",
+        "R10"
+      ],
+      "planning_window": "Days 2-4",
+      "outcome": "Color transforms, half/float image handling, EXR fixtures, and an explicit OTIO subset/loss contract establish the native image boundary.",
+      "scope": "Define precision, alpha, color space, transforms, buffer ownership, native document-format preservation, and precise time/media-reference interchange without silently clamping to RGBA8.",
+      "acceptance": [
+        "Small OCIO/EXR fixtures demonstrate declared transforms, alpha, precision, and round-trip limits.",
+        "OTIO import/export reports the supported subset and every lossy or unsupported construct explicitly.",
+        "Browser and desktop capability differences are explicit, and shared image contracts land before R16 consumers depend on them."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/05_CAPABILITIES_MCP_AND_STANDARDS.md#open-standards-from-the-foundation"
+      ],
+      "issue_number": 912,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/912",
+      "schedule": {
+        "start_hour": 18,
+        "end_hour": 32,
+        "rationale": "Color, precision, EXR, and OTIO proof begins after R09 and R10 and lands before R16.",
+        "confidence": "low",
+        "start_at": "2026-09-05T14:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-06T04:00:00-04:00",
+        "target_date": "2026-09-06",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R18",
+      "title": "Coordinate all shipped subsystem migrations",
+      "kind": "Epic",
+      "phase": "F4",
+      "program": "Editor",
+      "area": "UI",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Modular core",
+      "parent": "F4",
+      "dependencies": [
+        "R07",
+        "R13",
+        "R14",
+        "R15"
+      ],
+      "planning_window": "Days 5-10",
+      "outcome": "Six bounded migration families retire legacy writers while preserving every shipped surface and relevant consumer.",
+      "scope": "Maintain the capability/module inventory and coordinate R18.1-R18.6 through characterize, facade, consumer routing, behavior proof, integration, old-writer removal, and documentation updates.",
+      "acceptance": [
+        "Each child family reaches migrated and validated state or records an explicit maintainer-approved exception.",
+        "No family closes on registry counts, generated tests, or line counts without direct behavior and data-preservation evidence.",
+        "The integrated inventory identifies authority, readers/writers, fixtures, platforms, MCP exposure, debt, and next gate for every row."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f4--all-shipped-subsystem-migrations"
+      ],
+      "issue_number": 914,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/914",
+      "schedule": {
+        "start_hour": 20,
+        "end_hour": 176,
+        "rationale": "Rolls up R18.1-R18.6; H20-H36 is justified family prep before the R15 coordination acceptance dependency clears.",
+        "confidence": "low",
+        "start_at": "2026-09-05T16:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-12T04:00:00-04:00",
+        "target_date": "2026-09-12",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R18.1",
+      "title": "Migrate document identity, codecs, recovery, components, and history",
+      "kind": "Task",
+      "phase": "F4",
+      "program": "Core",
+      "area": "Document",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Modular core",
+      "parent": "R18",
+      "dependencies": [
+        "R09",
+        "R11",
+        "R13"
+      ],
+      "planning_window": "Days 2-4",
+      "outcome": "Document identity, serialization, recovery, components, and history use one authority and preserve supported project data.",
+      "scope": "Migrate stable IDs, format codecs/migrations, unknown fields, linked/embedded assets, component scope, atomic save/recovery, transactions, and undo/redo behind compatible facades.",
+      "acceptance": [
+        "Create/edit/key/reorder/duplicate/group/undo/redo/save/load and recovery preserve stable IDs, supported fields, assets, components, and unknown-data policy.",
+        "Selection, animation evaluation, render/export, and native bridges consume the same document identity and revision rules where applicable.",
+        "Old/current/damaged/newer-schema fixtures prove explicit migration, recovery, refusal, or loss-report behavior before the old writer is removed."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f4--all-shipped-subsystem-migrations"
+      ],
+      "issue_number": 915,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/915",
+      "schedule": {
+        "start_hour": 20,
+        "end_hour": 56,
+        "rationale": "Document migration can begin after R09/R11/R13 without waiting for unrelated gesture or native-effect work.",
+        "confidence": "low",
+        "start_at": "2026-09-05T16:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-07T04:00:00-04:00",
+        "target_date": "2026-09-07",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R18.2",
+      "title": "Migrate time, tracks, easing, expressions, parenting, and timeline",
+      "kind": "Task",
+      "phase": "F4",
+      "program": "Editor",
+      "area": "Animation",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Modular core",
+      "parent": "R18",
+      "dependencies": [
+        "R08",
+        "R09",
+        "R11",
+        "R18.1"
+      ],
+      "planning_window": "Days 2-4",
+      "outcome": "Animation and timeline semantics use precise shared time and deterministic evaluation across nested contexts.",
+      "scope": "Migrate tracks, keyed/held frames, easing, expressions, parenting, component timing, dependency/cycle policy, deterministic randomness, timeline model, play/pause, and scrub behavior.",
+      "acceptance": [
+        "Static/keyed/held/expression/parented/nested fixtures match independent expectations across edit, undo/redo, save/load, and frame evaluation.",
+        "Selection and playhead are not mutated by headless evaluation; render/export sample the same declared time semantics.",
+        "UI/API/MCP timeline operations reach shared handlers, and legacy animation writers are retired after parity evidence."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f4--all-shipped-subsystem-migrations"
+      ],
+      "issue_number": 916,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/916",
+      "schedule": {
+        "start_hour": 56,
+        "end_hour": 92,
+        "rationale": "Animation/timeline migration waits for the document identity/history family.",
+        "confidence": "low",
+        "start_at": "2026-09-07T04:00:00-04:00",
+        "start_date": "2026-09-07",
+        "target_at": "2026-09-08T16:00:00-04:00",
+        "target_date": "2026-09-08",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R18.3",
+      "title": "Migrate render graph, masks, effects, color resources, caches, and scheduler",
+      "kind": "Task",
+      "phase": "F4",
+      "program": "Core",
+      "area": "Renderer",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Measured performance",
+      "parent": "R18",
+      "dependencies": [
+        "R09",
+        "R12",
+        "R17",
+        "R18.1"
+      ],
+      "planning_window": "Days 2-4",
+      "outcome": "Rendering evaluates immutable revisions through explicit graph, resource, cache, and scheduling contracts.",
+      "scope": "Migrate render graph, masks/effects, retained IDs, typed bulk data, precision/alpha/color resources, cache keys/invalidation, scheduling, device loss, and native/WASM adapters.",
+      "acceptance": [
+        "Representative masks, alpha, effects, text, mesh, temporal, and nested fixtures match declared output across browser render and export.",
+        "Edits, keying, undo/redo, save/load, and selection invalidation reach the same revision-based render inputs without mutating live Paper state.",
+        "Native/WASM parity and differences are fixture-backed; device loss, cache invalidation, and resource ownership have explicit recovery behavior."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f4--all-shipped-subsystem-migrations"
+      ],
+      "issue_number": 917,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/917",
+      "schedule": {
+        "start_hour": 56,
+        "end_hour": 104,
+        "rationale": "Renderer migration runs beside R18.2 after document and color prerequisites land.",
+        "confidence": "low",
+        "start_at": "2026-09-07T04:00:00-04:00",
+        "start_date": "2026-09-07",
+        "target_at": "2026-09-09T04:00:00-04:00",
+        "target_date": "2026-09-09",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R18.4",
+      "title": "Migrate drawing, selection, gestures, inspectors, timeline UI, text, rig, and mesh",
+      "kind": "Task",
+      "phase": "F4",
+      "program": "Editor",
+      "area": "UI",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Reliable alpha",
+      "parent": "R18",
+      "dependencies": [
+        "R13",
+        "R15",
+        "R18.1",
+        "R18.2"
+      ],
+      "planning_window": "Days 5-10",
+      "outcome": "Editor tools and controls use shared capabilities and gesture semantics without direct persistent-state mutation.",
+      "scope": "Migrate drawing, hit testing, selection, geometric gestures, inspector, graph/timeline controls, text, rig, mesh, contextual controls, workspaces, and native dialog/job counterparts.",
+      "acceptance": [
+        "Representative create/select/edit/drag/key/undo/redo/save/reload workflows preserve selection, document, animation, and history semantics.",
+        "Browser interactions and packaged-desktop/native-dialog paths are exercised separately where each exists.",
+        "UI, SDK, and MCP capability mappings cover visible, contextual, modal, and dynamic controls; presentation-only state is explicitly classified."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f4--all-shipped-subsystem-migrations"
+      ],
+      "issue_number": 918,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/918",
+      "schedule": {
+        "start_hour": 92,
+        "end_hour": 140,
+        "rationale": "Editor tools follow gesture, document, and animation/timeline foundations.",
+        "confidence": "low",
+        "start_at": "2026-09-08T16:00:00-04:00",
+        "start_date": "2026-09-08",
+        "target_at": "2026-09-10T16:00:00-04:00",
+        "target_date": "2026-09-10",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R18.5",
+      "title": "Migrate media, import/export, OpenFX, extensions, and service adapters",
+      "kind": "Task",
+      "phase": "F4",
+      "program": "Platform",
+      "area": "Media",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Reproducible desktop",
+      "parent": "R18",
+      "dependencies": [
+        "R16",
+        "R17",
+        "R18.1",
+        "R18.3"
+      ],
+      "planning_window": "Days 5-10",
+      "outcome": "Media, interchange, plugins, extensions, and external services use explicit ports, capabilities, persistence, and fault boundaries.",
+      "scope": "Migrate media/proxies/audio as supported, asset references, import/export, codecs, OpenFX/extensions, external authentication adapters, cancellation, and packaged sidecars.",
+      "acceptance": [
+        "Import/edit/key/undo/redo/save/reload/render/export/reimport preserve supported media, effect parameters, IDs, references, and declared loss behavior.",
+        "Missing assets/plugins, auth denial, cancellation, timeout, and host/worker failure preserve the document and report actionable diagnostics.",
+        "Actual packaged desktop proves native plugin/media paths; browser behavior reports explicit availability or baked fallback and is validated separately."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f4--all-shipped-subsystem-migrations"
+      ],
+      "issue_number": 919,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/919",
+      "schedule": {
+        "start_hour": 104,
+        "end_hour": 152,
+        "rationale": "Media/export/native adapters follow the real effect, color, document, and renderer families.",
+        "confidence": "low",
+        "start_at": "2026-09-09T04:00:00-04:00",
+        "start_date": "2026-09-09",
+        "target_at": "2026-09-11T04:00:00-04:00",
+        "target_date": "2026-09-11",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R18.6",
+      "title": "Migrate preferences, shortcuts, dynamic controls, diagnostics, and Labs",
+      "kind": "Task",
+      "phase": "F4",
+      "program": "Editor",
+      "area": "DevEx",
+      "priority": "P1",
+      "size": "L",
+      "goal": "Reliable alpha",
+      "parent": "R18",
+      "dependencies": [
+        "R01",
+        "R11",
+        "R12",
+        "R18.4"
+      ],
+      "planning_window": "Days 5-10",
+      "outcome": "Application settings, shortcuts, dynamic surfaces, diagnostics, and experimental features have explicit ownership and disposition.",
+      "scope": "Migrate preference and UI-state persistence, shortcut dispatch, contextual/dynamic registry controls, diagnostics surfaces, workspaces, and Labs items with promote, retain-experimental, or retire decisions.",
+      "acceptance": [
+        "Preference and UI-session operations declare persistence and undo semantics separately from document commands.",
+        "Shortcut, contextual, and dynamic plugin controls map to shared handlers or explicit presentation-only/unavailable states across UI/API/MCP.",
+        "Every Labs surface has a maintainer-approved disposition and evidence; clean restart and packaged-desktop behavior are checked where applicable."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f4--all-shipped-subsystem-migrations"
+      ],
+      "issue_number": 920,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/920",
+      "schedule": {
+        "start_hour": 140,
+        "end_hour": 176,
+        "rationale": "Preferences, dynamic controls, diagnostics, and Labs follow the migrated editor-control family.",
+        "confidence": "low",
+        "start_at": "2026-09-10T16:00:00-04:00",
+        "start_date": "2026-09-10",
+        "target_at": "2026-09-12T04:00:00-04:00",
+        "target_date": "2026-09-12",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R19",
+      "title": "Set workload budgets and run performance/soak regressions",
+      "kind": "Task",
+      "phase": "F5",
+      "program": "Platform",
+      "area": "Renderer",
+      "priority": "P1",
+      "size": "L",
+      "goal": "Measured performance",
+      "parent": "F5",
+      "dependencies": [
+        "R03",
+        "R12"
+      ],
+      "planning_window": "Days 5-10",
+      "outcome": "Agreed latency, throughput, memory, cache, copy, export, and soak budgets are enforced against representative fixtures.",
+      "scope": "Expand baseline workloads to complex scenes, temporal effects, large media, long sessions, and export; measure p50/p95/p99, CPU/GPU completion, memory plateau, cache pressure, copies, cancellation, and throughput.",
+      "acceptance": [
+        "Budgets identify fixture, source/artifact, hardware, backend/driver, warm/cold state, repetitions, and statistical summary.",
+        "Performance comparisons also verify declared visual/numeric output equivalence.",
+        "Regressions fail with retained evidence; missing reference hardware remains visible rather than becoming a passing claim."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/02_REMEDIATION_PLAN.md#f5--performance-resilience-and-distribution"
+      ],
+      "issue_number": 921,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/921",
+      "schedule": {
+        "start_hour": 16,
+        "end_hour": 176,
+        "rationale": "Measurement starts from R03/R12 and expands continuously as migration candidates integrate.",
+        "confidence": "low",
+        "start_at": "2026-09-05T12:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-12T04:00:00-04:00",
+        "target_date": "2026-09-12",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R20",
+      "title": "Exercise recovery, fault, and migration behavior",
+      "kind": "Task",
+      "phase": "F5",
+      "program": "Core",
+      "area": "Document",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Reliable alpha",
+      "parent": "F5",
+      "dependencies": [
+        "R12",
+        "R18.1",
+        "R18.3",
+        "R18.5",
+        "R18.6"
+      ],
+      "planning_window": "Days 5-10",
+      "outcome": "Document and job state recover predictably from interruption, damage, missing dependencies, crashes, device loss, stale sessions, disconnects, and disk failures.",
+      "scope": "Run fault scenarios for save/load/migration, assets/plugins, worker/host/device/process failure, job cancellation/reconnect, disk exhaustion, and restart; preserve minimized seeds and recovery artifacts.",
+      "acceptance": [
+        "Interrupted saves and old/damaged/newer documents preserve prior recoverable data and follow explicit migration, refusal, or recovery policy.",
+        "Missing assets/plugins, crashes, device loss, stale clients, disconnects, and disk failure cannot apply late or duplicate writes to a newer revision.",
+        "Recovered documents retain IDs, fields, selection-relevant identity, animation data, render/export inputs, and native references where applicable."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/03_TESTING_AND_DEBUGGING.md#test-layers"
+      ],
+      "issue_number": 922,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/922",
+      "schedule": {
+        "start_hour": 176,
+        "end_hour": 192,
+        "rationale": "Full recovery/fault acceptance starts when all named migration-family dependencies finish.",
+        "confidence": "low",
+        "start_at": "2026-09-12T04:00:00-04:00",
+        "start_date": "2026-09-12",
+        "target_at": "2026-09-12T20:00:00-04:00",
+        "target_date": "2026-09-12",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R21",
+      "title": "Validate generated, native, browser, and packaged distribution",
+      "kind": "Task",
+      "phase": "F5",
+      "program": "Platform",
+      "area": "Platform",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Reproducible desktop",
+      "parent": "F5",
+      "dependencies": [
+        "R04",
+        "R16",
+        "R17",
+        "R18.5",
+        "R19",
+        "R20"
+      ],
+      "planning_window": "Days 5-10",
+      "outcome": "Generated WASM, sidecars, plugins, media export/reimport, installed desktop artifacts, and each claimed operating system are validated on identified bytes.",
+      "scope": "Regenerate and serve WASM, reproduce sidecars, load plugins, export/reimport representative media, launch installed packages, and run support-matrix checks through the reviewed signing/update path.",
+      "acceptance": [
+        "The served browser build proves browser behavior and capability reporting on its own artifact.",
+        "The installed packaged desktop proves native sidecar, plugin, filesystem, media/export, and recovery paths on its own artifact.",
+        "Unsupported or untested operating systems remain explicit blockers to only the corresponding support claim."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/08_ACCEPTANCE_AND_MAINTENANCE.md#foundation-close-gate"
+      ],
+      "issue_number": 923,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/923",
+      "schedule": {
+        "start_hour": 192,
+        "end_hour": 208,
+        "rationale": "Packaged/browser/OS validation follows native, media, performance, and recovery evidence.",
+        "confidence": "low",
+        "start_at": "2026-09-12T20:00:00-04:00",
+        "start_date": "2026-09-12",
+        "target_at": "2026-09-13T12:00:00-04:00",
+        "target_date": "2026-09-13",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "R22",
+      "title": "Reconcile inventory and obtain foundation acceptance",
+      "kind": "Task",
+      "phase": "F6",
+      "program": "Core",
+      "area": "DevEx",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Reliable alpha",
+      "parent": "F6",
+      "dependencies": [
+        "R18.1",
+        "R18.2",
+        "R18.3",
+        "R18.4",
+        "R18.5",
+        "R18.6",
+        "R19",
+        "R20",
+        "R21",
+        "BZ6"
+      ],
+      "planning_window": "Days 11-14",
+      "outcome": "The full shipped surface inventory, architecture, evidence, onboarding, and release path agree with an accepted integrated candidate.",
+      "scope": "Reconcile capability coverage, retire obsolete globals/adapters/flags, enforce boundaries, run clean-clone and fresh-agent rehearsals, validate both clients and platforms, update public guidance, and request maintainer acceptance.",
+      "acceptance": [
+        "Every actionable surface and persistent consumer is migrated, explicitly unavailable, or covered by an owned maintainer-approved exception; no writable bypass remains.",
+        "Current browser and packaged-desktop artifacts pass applicable UI/API/SDK/MCP, save/load, undo/redo, animation, render/export, performance, recovery, and support-matrix gates.",
+        "Fresh Codex and Claude sessions complete a bounded task from adopted instructions, and the maintainer accepts the exact candidate/artifacts."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/08_ACCEPTANCE_AND_MAINTENANCE.md#foundation-close-gate"
+      ],
+      "issue_number": 930,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/930",
+      "schedule": {
+        "start_hour": 208,
+        "end_hour": 240,
+        "rationale": "Inventory reconciliation and maintainer acceptance target day 10 after all explicit predecessors finish.",
+        "confidence": "low",
+        "start_at": "2026-09-13T12:00:00-04:00",
+        "start_date": "2026-09-13",
+        "target_at": "2026-09-14T20:00:00-04:00",
+        "target_date": "2026-09-14",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "BZ0",
+      "title": "Adopt collaboration authority and continuity contract",
+      "kind": "Task",
+      "phase": "BZ",
+      "program": "Collaboration",
+      "area": "DevEx",
+      "priority": "P0",
+      "size": "S",
+      "goal": "Reliable alpha",
+      "parent": null,
+      "dependencies": [],
+      "planning_window": "H0-H4",
+      "outcome": "Nemo collaboration uses one current authority, identity, task-continuity, and evidence contract.",
+      "scope": "Adopt NEMO-A2A-1, GitHub canonical status, verified identities, sole coordination sequencing, explicit publication/release boundaries, and task preservation; replace obsolete manual-grant assumptions with mandatory automatic dedicated-workspace access.",
+      "acceptance": [
+        "All current instructions describe the dedicated Nemo workspace as automatically supplying project repository access to enrolled collaborators and managed agents.",
+        "GitHub remains canonical for source, issues, PRs, CI, and review; Buzz carries conversation and coordination.",
+        "Relay storage, processed, accepted, completed, reviewed, merged, deployed, released, and maintainer-accepted states remain distinct."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/06_BUZZ_A2A_AND_ENROLLMENT.md#status-boundary"
+      ],
+      "issue_number": 896,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/896",
+      "schedule": {
+        "start_hour": 0,
+        "end_hour": 2,
+        "rationale": "Confirm the current collaboration authority and continuity contract at kickoff.",
+        "confidence": "medium",
+        "start_at": "2026-09-04T20:00:00-04:00",
+        "start_date": "2026-09-04",
+        "target_at": "2026-09-04T22:00:00-04:00",
+        "target_date": "2026-09-04",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "BZ1",
+      "title": "Verify authenticated desktop onboarding and self-service agents",
+      "kind": "Task",
+      "phase": "BZ",
+      "program": "Collaboration",
+      "area": "Platform",
+      "priority": "P0",
+      "size": "M",
+      "goal": "Reproducible desktop",
+      "parent": null,
+      "dependencies": [
+        "BZ0"
+      ],
+      "planning_window": "H4-H12",
+      "outcome": "Eligible collaborators join authenticated Buzz Desktop and create owner-backed agents through a one-step self-service flow.",
+      "scope": "Verify identity backup, collaborator eligibility, member admission, desktop connection/history, owner-backed agent creation, provider separation, directed response policy, and denial outside authorized channels.",
+      "acceptance": [
+        "A new eligible collaborator connects in the desktop app, sends/replies, relaunches with history, and cannot access an unauthorized channel.",
+        "The collaborator creates a distinct owner-backed managed agent without sharing provider credentials or private keys.",
+        "Agent response, reconnect, and duplicate-execution checks pass under the automatically supplied dedicated-workspace project access."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/06_BUZZ_A2A_AND_ENROLLMENT.md#create-and-authorize-a-developer-owned-agent"
+      ],
+      "issue_number": 924,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/924",
+      "schedule": {
+        "start_hour": 2,
+        "end_hour": 8,
+        "rationale": "Remaining desktop onboarding and owner-backed agent checks follow BZ0.",
+        "confidence": "medium",
+        "start_at": "2026-09-04T22:00:00-04:00",
+        "start_date": "2026-09-04",
+        "target_at": "2026-09-05T04:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "BZ2",
+      "title": "Bind one Nemo Project to the canonical repository",
+      "kind": "Task",
+      "phase": "BZ",
+      "program": "Collaboration",
+      "area": "DevEx",
+      "priority": "P0",
+      "size": "M",
+      "goal": "Reproducible desktop",
+      "parent": null,
+      "dependencies": [
+        "BZ0"
+      ],
+      "planning_window": "H0-H4",
+      "outcome": "One Buzz Project resolves the canonical Nemo GitHub repository and local checkout consistently for enrolled collaborators and managed agents.",
+      "scope": "Bind repository identity, origin, home channel, immutable instruction revision, and workspace checkout discovery; rely on the dedicated workspace's automatic full repository access rather than user-maintained peer/path grant forms.",
+      "acceptance": [
+        "Project repository identity and Git origin match https://github.com/mysteropodes/nemo.git on every tested workspace.",
+        "Enrolled managed sessions receive the current project instructions and can read/write the Project checkout under ordinary repository protections.",
+        "Machine-local roots and credentials remain out of signed events, issue bodies, evidence, and model prompts."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/06_BUZZ_A2A_AND_ENROLLMENT.md#attach-nemo-as-a-buzz-project"
+      ],
+      "issue_number": 925,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/925",
+      "schedule": {
+        "start_hour": 2,
+        "end_hour": 6,
+        "rationale": "Verify the existing Nemo Project/repository binding and automatic workspace access after BZ0.",
+        "confidence": "medium",
+        "start_at": "2026-09-04T22:00:00-04:00",
+        "start_date": "2026-09-04",
+        "target_at": "2026-09-05T02:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "BZ3",
+      "title": "Validate typed A2A lifecycle, reconnect, handoff, and revocation",
+      "kind": "Task",
+      "phase": "BZ",
+      "program": "Collaboration",
+      "area": "Platform",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Reliable alpha",
+      "parent": null,
+      "dependencies": [
+        "BZ1",
+        "BZ2"
+      ],
+      "planning_window": "H4-H12",
+      "outcome": "Typed A2A jobs fail closed and preserve exactly-once ownership semantics across retry, reconnect, cancellation, handoff, revocation, and indeterminate recovery.",
+      "scope": "Validate peer discovery, dispatch, processed/accepted ownership, progress/terminal receipts, byte-equivalent retry, cancellation acknowledgement, epoch-based handoff, reconnect reconciliation, and identity revocation using trusted tools.",
+      "acceptance": [
+        "Relay acknowledgement alone cannot claim ownership or completion; processed and accepted receipts precede side effects.",
+        "Byte-equivalent retries do not execute twice; changed work uses a new request; crashes without terminal receipt become indeterminate for reconciliation.",
+        "Cancellation completes only on cancelled acknowledgement, handoff requires successor acceptance, and revocation denies fresh job and protected-resource access."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/06_BUZZ_A2A_AND_ENROLLMENT.md#lifecycle-cancellation-and-handoff"
+      ],
+      "issue_number": 926,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/926",
+      "schedule": {
+        "start_hour": 8,
+        "end_hour": 16,
+        "rationale": "Run remaining lifecycle, reconnect, handoff, cancellation, and revocation acceptance after onboarding/binding evidence.",
+        "confidence": "low",
+        "start_at": "2026-09-05T04:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-05T12:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "BZ4",
+      "title": "Link GitHub issues, PRs, and runs idempotently",
+      "kind": "Task",
+      "phase": "BZ",
+      "program": "Collaboration",
+      "area": "DevEx",
+      "priority": "P1",
+      "size": "M",
+      "goal": "Reliable alpha",
+      "parent": null,
+      "dependencies": [
+        "BZ2",
+        "BZ3",
+        "R07"
+      ],
+      "planning_window": "H12-H24",
+      "outcome": "Buzz coordination links canonical GitHub issues, PRs, reviews, and workflow runs without creating a competing backlog or duplicate effects.",
+      "scope": "Implement signed, idempotent allowed-event links and status updates; preserve GitHub canonical records, credential separation, one coordinator for status changes, and Validate state after merge where runtime evidence remains.",
+      "acceptance": [
+        "Replayed GitHub events do not duplicate Project items, links, comments, or status transitions.",
+        "Only intentionally triaged items enter the Project, and merged work moves to Validate when desktop/export/runtime evidence remains.",
+        "Credentialed GitHub writes are isolated from untrusted pull-request code and retain canonical issue/PR/run identifiers."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/07_GITHUB_PROJECT_AND_PARALLEL_WORK.md#minimal-automation"
+      ],
+      "issue_number": 927,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/927",
+      "schedule": {
+        "start_hour": 16,
+        "end_hour": 24,
+        "rationale": "GitHub link validation waits for BZ3 and executable R07 gates.",
+        "confidence": "medium",
+        "start_at": "2026-09-05T12:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-05T20:00:00-04:00",
+        "target_date": "2026-09-05",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "BZ5",
+      "title": "Carry CI and product-MCP diagnostic receipts",
+      "kind": "Task",
+      "phase": "BZ",
+      "program": "Collaboration",
+      "area": "DevEx",
+      "priority": "P1",
+      "size": "M",
+      "goal": "Reliable alpha",
+      "parent": null,
+      "dependencies": [
+        "BZ3",
+        "R07",
+        "R12",
+        "R14"
+      ],
+      "planning_window": "Days 2-4",
+      "outcome": "Buzz task state carries tamper-evident links to CI and Nemo product-MCP diagnostic evidence as those capabilities become available.",
+      "scope": "Associate source/base/candidate/build IDs, command or interaction, fixture/seed, platform, artifact hashes, result state, limitations, and direct API/MCP parity without embedding large or sensitive artifacts.",
+      "acceptance": [
+        "Receipts distinguish pass, fail, blocked, not run, implemented, observed, and accepted states on exact source/build identities.",
+        "CI and product-MCP references resolve to bounded artifacts with hashes and redaction limits; missing required evidence remains visible.",
+        "An agent completion message, relay receipt, source change, or historical test count cannot advance the item to Done by itself."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/08_ACCEPTANCE_AND_MAINTENANCE.md#evidence-vocabulary",
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/templates/HANDOFF_RECEIPT.md#verification"
+      ],
+      "issue_number": 928,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/928",
+      "schedule": {
+        "start_hour": 24,
+        "end_hour": 48,
+        "rationale": "CI and product-MCP receipt linking follows BZ3, R07, R12, and the H24 R14 proof.",
+        "confidence": "low",
+        "start_at": "2026-09-05T20:00:00-04:00",
+        "start_date": "2026-09-05",
+        "target_at": "2026-09-06T20:00:00-04:00",
+        "target_date": "2026-09-06",
+        "basis": "Forecast"
+      }
+    },
+    {
+      "key": "BZ6",
+      "title": "Prove backup, restore, offboarding, upgrades, and support ownership",
+      "kind": "Task",
+      "phase": "BZ",
+      "program": "Collaboration",
+      "area": "Platform",
+      "priority": "P0",
+      "size": "L",
+      "goal": "Reproducible desktop",
+      "parent": null,
+      "dependencies": [
+        "BZ3",
+        "BZ4",
+        "BZ5"
+      ],
+      "planning_window": "Days 5-10",
+      "outcome": "Private Buzz collaboration can be backed up, restored, upgraded, monitored, supported, and safely offboarded on identified distributed builds.",
+      "scope": "Exercise identity/config/data backup and restore, service and desktop upgrades, monitoring, incident/support ownership, agent and human offboarding, grant reconciliation, and preserved work evidence.",
+      "acceptance": [
+        "A documented restore on an identified build recovers required history, Project bindings, and operational state without exposing credentials.",
+        "Offboarding revokes sponsored agents before the human, denies fresh WebSocket/protected HTTP/media/job access, and preserves work/evidence for reconciliation.",
+        "Final distributed-build live acceptance and release decisions remain with the release-owning session and designated human authority."
+      ],
+      "source_refs": [
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/06_BUZZ_A2A_AND_ENROLLMENT.md#revocation",
+        "https://github.com/mysteropodes/nemo/blob/2ec97e2440708fae783babc4d9c9e777b520fb04/engineering/remediation/08_ACCEPTANCE_AND_MAINTENANCE.md#required-maintenance-cadence"
+      ],
+      "issue_number": 929,
+      "issue_url": "https://github.com/mysteropodes/nemo/issues/929",
+      "schedule": {
+        "start_hour": 48,
+        "end_hour": 208,
+        "rationale": "Remaining backup/restore, upgrades, monitoring, support, and offboarding receipts run through the integrated-build period.",
+        "confidence": "low",
+        "start_at": "2026-09-06T20:00:00-04:00",
+        "start_date": "2026-09-06",
+        "target_at": "2026-09-13T12:00:00-04:00",
+        "target_date": "2026-09-13",
+        "basis": "Forecast"
+      }
+    }
+  ]
+}
