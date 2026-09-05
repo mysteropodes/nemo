@@ -15,7 +15,7 @@ const cli = path.join(__dirname, 'build.cjs');
 const repoRoot = path.resolve(__dirname, '..', '..');
 
 const stub = path.join(scratch, 'build-stub');
-fs.writeFileSync(stub, `#!${process.execPath}\n` + String.raw`
+fs.writeFileSync(stub, `#!/usr/bin/env node\n` + String.raw`
 const fs = require('node:fs');
 const [capture, delay, exitCode] = process.argv.slice(2);
 fs.writeFileSync(capture, JSON.stringify({
@@ -30,7 +30,7 @@ setTimeout(() => process.exit(Number(exitCode || 0)), Number(delay || 0));
 `, { mode: 0o700 });
 
 const stubbornStub = path.join(scratch, 'stubborn-build-stub');
-fs.writeFileSync(stubbornStub, `#!${process.execPath}\n` + String.raw`
+fs.writeFileSync(stubbornStub, `#!/usr/bin/env node\n` + String.raw`
 const fs = require('node:fs');
 fs.writeFileSync(process.argv[2], String(process.pid));
 process.on('SIGTERM', () => {});
@@ -38,7 +38,7 @@ setInterval(() => {}, 1000);
 `, { mode: 0o700 });
 
 const orphaningStub = path.join(scratch, 'orphaning-build-stub');
-fs.writeFileSync(orphaningStub, `#!${process.execPath}\n` + String.raw`
+fs.writeFileSync(orphaningStub, `#!/usr/bin/env node\n` + String.raw`
 const fs = require('node:fs');
 const { spawn } = require('node:child_process');
 const descendant = spawn(process.execPath, ['-e', "process.on('SIGTERM',()=>{});process.send('ready');setInterval(()=>{},1000)"], {
