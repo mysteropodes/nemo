@@ -190,6 +190,26 @@ function indexFile(file) {
 // Binding ownership only, not a general JavaScript parser. Braces delimit
 // lexical declarations; function/arrow parameters and `var` belong to their
 // function. Keep anonymous scopes separate from the named reporting index.
+function declarationContinuesAt(f, start, newline, initialized) {
+  const before = f.code.slice(start, newline).trimEnd();
+  const after = f.code.slice(newline + 1).trimStart();
+  // An uninitialized declarator can continue only into its initializer or
+  // another declarator: `let n\n +value` starts a separate expression.
+  if (/^[=,]/.test(after)) return true;
+  if (!initialized) return false;
+  const last = start + before.length - 1;
+  if (f.kind[last] === CODE) {
+    if (/[=+*/%&|^!~?:.<>-]$/.test(before) && !/(?:\+\+|--)$/.test(before)) return true;
+    const keyword = /\b(?:new|delete|void|typeof|in|instanceof)$/.exec(before);
+    // Exclude property names and $-prefixed identifiers, not a binary
+    // operator's identifier operand (`value instanceof\n Constructor`).
+    if (keyword && before[keyword.index - 1] !== '$' && !/\.$/.test(before.slice(0, keyword.index).trimEnd())) return true;
+  }
+  // A complete initializer may continue with an access, call or operator.
+  // Prefix ++/-- have a restricted line break and start a new statement.
+  return !/^(?:\+\+|--)/.test(after) && /^(?:[([.?+*/%&|^<>:-]|`|(?:in|instanceof)\b)/.test(after);
+}
+
 function indexBindingScopes(f) {
   f.rootScope = { start: 0, end: f.code.length, function: true, params: [] };
   f.scopes = [f.rootScope];
@@ -233,22 +253,21 @@ function indexBindingScopes(f) {
     if (m[1] === 'function') continue;
     // Subsequent declarators share this owner. Ignore commas within an
     // initializer's calls, arrays or objects; they do not start declarations.
+    let initialized = false;
     for (let i = m.index + m[0].length; i < f.code.length; i++) {
-      if (f.kind[i] !== CODE) continue;
       const c = f.code[i];
+      if (f.kind[i] !== CODE && !(f.kind[i] === COMMENT && c === '\n')) continue;
       if (/[([{]/.test(c)) { i = matchClose(f, i); continue; }
       if (/[;)}\]]/.test(c)) break;
-      if (c === '\n') {
-        const before = f.code.slice(m.index, i).trimEnd().slice(-1);
-        const after = f.code.slice(i + 1).trimStart()[0];
-        if (before !== '=' && after !== ',') break;
-      }
+      if (c === '\n' && !declarationContinuesAt(f, m.index, i, initialized)) break;
+      if (c === '=') initialized = true;
       if (c !== ',') continue;
       const next = /^\s*([A-Za-z_$][\w$]*)\s*(?==|,|;|$)/.exec(f.code.slice(i + 1));
       if (!next) break; // unsupported binding pattern: do not guess a name
       const at = i + 1 + next[0].indexOf(next[1]);
       if (f.kind[at] !== CODE) break;
       f.declarations.push({ name: next[1], scope });
+      initialized = false;
       i = at + next[1].length - 1;
     }
   }
