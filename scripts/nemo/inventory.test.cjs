@@ -116,7 +116,7 @@ test('rendered outputs list unmapped rows and placeholders explicitly', () => {
   assert.ok(out['SURFACES.md'].includes('## Unmapped surfaces (' + n + ')'));
   assert.ok(out['SURFACES.md'].includes('## Static placeholders (' + p + ')'));
   const header = out['surfaces.csv'].split('\n')[0];
-  assert.equal(header, 'id,kind,area,surface,capability,handler,events,exposure,sdk,mcp,consumers,platforms,status,nextGate,source,reason');
+  assert.equal(header, 'id,kind,area,surface,capability,handler,events,exposure,sdk,mcp,consumers,fixtures,platforms,status,nextGate,source,reason');
   assert.equal(out['surfaces.csv'].trim().split('\n').length, rows().length + 1);
   assert.equal(JSON.parse(out['surfaces.json']).rows.length, rows().length);
 });

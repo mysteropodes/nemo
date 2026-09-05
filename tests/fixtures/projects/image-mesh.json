@@ -1,0 +1,780 @@
+{
+ "version": 13,
+ "totalFrames": 24,
+ "fps": 12,
+ "canvasW": 320,
+ "canvasH": 240,
+ "canvasBg": "#ffffff",
+ "waIn": 0,
+ "waOut": 23,
+ "mediaMode": "embedded",
+ "layers": [
+  {
+   "name": "Photo",
+   "visible": true,
+   "locked": false,
+   "frames": [
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/AOY5Rv/mOUb/AOY5Rv/mOUb/VXIJkSg8L5cAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 200,
+       "height": 100,
+       "opacity": 1,
+       "meshId": "im_fixture"
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    }
+   ],
+   "layerUid": "L-photo"
+  }
+ ],
+ "symbols": {},
+ "imageMeshes": {
+  "im_fixture": {
+   "outline": [
+    [
+     0,
+     0
+    ],
+    [
+     0.25,
+     0
+    ],
+    [
+     0.5,
+     0
+    ],
+    [
+     0.75,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     1,
+     0.25
+    ],
+    [
+     1,
+     0.5
+    ],
+    [
+     1,
+     0.75
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     0.75,
+     1
+    ],
+    [
+     0.5,
+     1
+    ],
+    [
+     0.25,
+     1
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     0,
+     0.75
+    ],
+    [
+     0,
+     0.5
+    ],
+    [
+     0,
+     0.25
+    ]
+   ],
+   "cols": 4,
+   "rows": 4,
+   "verts": [
+    [
+     0,
+     0
+    ],
+    [
+     0.25,
+     0
+    ],
+    [
+     0.5,
+     0
+    ],
+    [
+     0.75,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     1,
+     0.25
+    ],
+    [
+     1,
+     0.5
+    ],
+    [
+     1,
+     0.75
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     0.75,
+     1
+    ],
+    [
+     0.5,
+     1
+    ],
+    [
+     0.25,
+     1
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     0,
+     0.75
+    ],
+    [
+     0,
+     0.5
+    ],
+    [
+     0,
+     0.25
+    ],
+    [
+     0.25,
+     0.25
+    ],
+    [
+     0.5,
+     0.25
+    ],
+    [
+     0.75,
+     0.25
+    ],
+    [
+     0.25,
+     0.5
+    ],
+    [
+     0.5,
+     0.5
+    ],
+    [
+     0.75,
+     0.5
+    ],
+    [
+     0.25,
+     0.75
+    ],
+    [
+     0.5,
+     0.75
+    ],
+    [
+     0.75,
+     0.75
+    ]
+   ],
+   "tris": [
+    20,
+    17,
+    16,
+    16,
+    19,
+    20,
+    16,
+    14,
+    19,
+    17,
+    2,
+    16,
+    19,
+    23,
+    20,
+    22,
+    23,
+    19,
+    14,
+    22,
+    19,
+    23,
+    21,
+    20,
+    20,
+    21,
+    17,
+    17,
+    18,
+    2,
+    21,
+    18,
+    17,
+    1,
+    15,
+    16,
+    16,
+    15,
+    14,
+    2,
+    1,
+    16,
+    1,
+    0,
+    15,
+    23,
+    24,
+    21,
+    14,
+    13,
+    22,
+    18,
+    3,
+    2,
+    22,
+    11,
+    23,
+    23,
+    10,
+    24,
+    13,
+    11,
+    22,
+    11,
+    10,
+    23,
+    21,
+    6,
+    18,
+    18,
+    5,
+    3,
+    24,
+    6,
+    21,
+    6,
+    5,
+    18,
+    10,
+    9,
+    24,
+    24,
+    7,
+    6,
+    9,
+    7,
+    24,
+    5,
+    4,
+    3,
+    13,
+    12,
+    11,
+    9,
+    8,
+    7
+   ],
+   "offsets": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0.2,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     0
+    ]
+   ]
+  }
+ }
+}

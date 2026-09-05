@@ -169,10 +169,18 @@ function jobTestDesktop() {
   return notRun('tests/desktop exists but no runner is wired for it yet');
 }
 
-function jobBench() {
-  const dir = path.join(ROOT, 'tests', 'bench');
-  if (!exists(dir)) return notRun('no tests/bench workloads defined yet (R03 initial workloads, R19 budgets)');
-  return notRun('tests/bench exists but no runner is wired for it yet');
+function jobBench(ctx) {
+  const runner = path.join(ROOT, 'tests', 'bench', 'run.cjs');
+  if (!exists(runner)) return notRun('no tests/bench/run.cjs (R03 initial workloads, R19 budgets)');
+  fs.mkdirSync(ctx.reportDir, { recursive: true });
+  const out = path.join(ctx.reportDir, 'bench.json');
+  const r = run(process.execPath, ['--expose-gc', runner, '--out', out], { timeout: 30 * 60 * 1000 });
+  if (r.status !== 0 || !exists(out)) return fail(`bench runner exit ${r.status}`, { exitCode: r.status, log: logOf(r) });
+  const b = readJson(out);
+  const ran = b.workloads.filter((w) => w.status === 'ran');
+  const skipped = b.workloads.filter((w) => w.status !== 'ran');
+  const details = Object.fromEntries(b.workloads.map((w) => [w.id, w.status === 'ran' ? { median: w.stats.median, p90: w.stats.p90, unit: w.stats.unit } : { status: w.status, reason: w.reason }]));
+  return pass(`${ran.length} workloads measured, ${skipped.length} not-run (no render backend); budgets: none (R19)`, { exitCode: 0, log: logOf(r), details, artifacts: [{ path: path.relative(ROOT, out) }], limitations: skipped.map((w) => `${w.id}: ${w.reason}`) });
 }
 
 // ---- builds ------------------------------------------------------------

@@ -14,7 +14,7 @@ implemented with Node only (no new dependencies). Work package R02.
 | `npm run test:integration` | `tests/integration` when it exists; `not-run` until R12/R13 define it. | 0/1/2 |
 | `npm run test:browser` | Playwright specs under `tests/browser`; `blocked` while `@playwright/test` is absent. | 0/1/2 |
 | `npm run test:desktop` | Packaged-app harness under `tests/desktop`; `blocked` without a built `Nemo.app`. | 0/1/2 |
-| `npm run bench` | `tests/bench` workloads; `not-run` until R03/R19 define them. | 0/1/2 |
+| `npm run bench` | `tests/bench/run.cjs` (R03): evaluation (the real Motion evaluator), copy and memory workloads over generated scale documents, plus render/export workloads declared with their fixture and recorded `not-run` without a WebGPU backend. Writes `bench.json` next to the receipt; records source, hardware and backend, sets no budget (R19). | 0/1/2 |
 | `npm run build:wasm` | `wasm-pack build` into the run directory and compare with the committed `src/wasm`; `blocked` without wasm-pack. | 0/1/2 |
 | `npm run build:desktop` | `tauri build -b app` for the host triple, then `scripts/bundle-ffmpeg-dylibs.py`. Local, unsigned. | 0/1/2 |
 | `npm run verify` | Runs a profile (`--profile quick` default: doctor, check, test:unit, test:rust; `--profile full` adds the rest) or `--jobs a,b,c`, and emits **one receipt**. | 0 pass / 1 any fail / 2 required job blocked |

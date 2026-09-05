@@ -1,0 +1,202 @@
+{
+ "version": 13,
+ "totalFrames": 12,
+ "fps": 12,
+ "canvasW": 320,
+ "canvasH": 240,
+ "canvasBg": "#ffffff",
+ "waIn": 0,
+ "waOut": 11,
+ "mediaMode": "embedded",
+ "layers": [
+  {
+   "name": "Image",
+   "visible": true,
+   "locked": false,
+   "frames": [
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/ACqdj/8qnY//ACqdj/8qnY//TyQJVQPGUCAAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 160,
+       "height": 160,
+       "opacity": 1
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/ACqdj/8qnY//ACqdj/8qnY//TyQJVQPGUCAAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 160,
+       "height": 160,
+       "opacity": 1
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/ACqdj/8qnY//ACqdj/8qnY//TyQJVQPGUCAAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 160,
+       "height": 160,
+       "opacity": 1
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/ACqdj/8qnY//ACqdj/8qnY//TyQJVQPGUCAAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 160,
+       "height": 160,
+       "opacity": 1
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/ACqdj/8qnY//ACqdj/8qnY//TyQJVQPGUCAAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 160,
+       "height": 160,
+       "opacity": 1
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/ACqdj/8qnY//ACqdj/8qnY//TyQJVQPGUCAAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 160,
+       "height": 160,
+       "opacity": 1
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/ACqdj/8qnY//ACqdj/8qnY//TyQJVQPGUCAAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 160,
+       "height": 160,
+       "opacity": 1
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/ACqdj/8qnY//ACqdj/8qnY//TyQJVQPGUCAAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 160,
+       "height": 160,
+       "opacity": 1
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/ACqdj/8qnY//ACqdj/8qnY//TyQJVQPGUCAAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 160,
+       "height": 160,
+       "opacity": 1
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/ACqdj/8qnY//ACqdj/8qnY//TyQJVQPGUCAAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 160,
+       "height": 160,
+       "opacity": 1
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/ACqdj/8qnY//ACqdj/8qnY//TyQJVQPGUCAAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 160,
+       "height": 160,
+       "opacity": 1
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    },
+    {
+     "strokes": [
+      {
+       "isRaster": true,
+       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAHUlEQVR4AQESAO3/ACqdj/8qnY//ACqdj/8qnY//TyQJVQPGUCAAAAAASUVORK5CYII=",
+       "x": 160,
+       "y": 120,
+       "width": 160,
+       "height": 160,
+       "opacity": 1
+      }
+     ],
+     "isKeyframe": true,
+     "isInterpolated": false
+    }
+   ],
+   "layerUid": "L-image"
+  }
+ ],
+ "symbols": {}
+}
