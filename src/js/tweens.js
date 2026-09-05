@@ -429,8 +429,19 @@ var TW_PIN_IN_SOLVER=true;
 //     partenaire les attend à 117 px et 50 px. Seuil à 1,6. La marge avec
 //     traits (1,55) est mince et assumée ; le drapeau est là pour ça.
 //     Écarter une portée ne force rien : le matcher tranche comme avant.
+//  0. (ajouté en dernier, 2026-09-05) garde de FORME : un identifiant peut
+//     avoir été écrit par un ANCIEN tween et non par l'artiste — rien ne
+//     les distingue. Dans cats_anim.json, la patte de la clé 7 et une ligne
+//     du corps de la clé 17 portent le même identifiant : c'est l'erreur du
+//     moteur d'origine, sauvegardée dans le fichier. Une épingle dont la
+//     pénalité de forme (enroulement + fermeture, axisPenaltyPair) dépasse
+//     ID_PIN_SHAPE_MAX est refusée. Mesuré sur 299 candidates de six
+//     fichiers : 277 à 0, aucune entre 0,40 et 0,67, puis 0,67 / 0,69 /
+//     0,80 — les deux patte → corps et un cas où le moteur choisit pareil.
+//     Le seuil 0,5 est dans ce trou. Il vaut ~60 % de la pénalité maximale
+//     (0,30 + 0,50) : à revoir si ces poids changent.
 var TW_ID_PINS=true;
-var ID_PIN_LEN_RATIO=2.0,ID_PIN_TRAVEL_K=3.0,ID_PIN_MIN=3,ID_PIN_SPAN_RATIO=1.6;
+var ID_PIN_LEN_RATIO=2.0,ID_PIN_TRAVEL_K=3.0,ID_PIN_MIN=3,ID_PIN_SPAN_RATIO=1.6,ID_PIN_SHAPE_MAX=0.5;
 // TW_ARC_FROM_CHAIN (2026-09-05, Cyril : « une main va parcourir un chemin
 // courbe, si on déduit la courbe par rapport à toutes les keyframes… on
 // n'aurait plus des tweens sur un chemin linéaire »). Le centroïde de
@@ -5357,11 +5368,14 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
 // exactly one A stroke descends from it (duplicated/pasted key). Paired
 // outright under the same identity gates the rescue pass uses; ambiguous
 // ids (duplicated on either side) are left to the matcher.
+// Identifiant tel que le FICHIER le porte, avant tout ré-estampillage de
+// la génération en cours (voir _origId dans generateTweens).
+function _origIdOf(sd){return sd._origId!==undefined?sd._origId:sd.strokeId;}
 function _provenancePins(sA,sB,forcedAIdx,forcedBIdx){
   var out=[];
   if(!TW_PROVENANCE_PINS)return out;
   var aById={},aDup={};
-  sA.forEach(function(sd,ii){if(!sd.strokeId)return;if(aById[sd.strokeId]!==undefined)aDup[sd.strokeId]=1;else aById[sd.strokeId]=ii;});
+  sA.forEach(function(sd,ii){var id=_origIdOf(sd);if(!id)return;if(aById[id]!==undefined)aDup[id]=1;else aById[id]=ii;});
   var bByDup={},bDupDup={};
   sB.forEach(function(sd,jj){if(!sd.dupOf)return;if(bByDup[sd.dupOf]!==undefined)bDupDup[sd.dupOf]=1;else bByDup[sd.dupOf]=jj;});
   Object.keys(bByDup).forEach(function(id){
@@ -5384,8 +5398,8 @@ function _identityPins(sA,sB,forcedAIdx,forcedBIdx){
   var out=[];
   if(!TW_ID_PINS)return out;
   var aById={},aDup={},bById={},bDup={};
-  sA.forEach(function(sd,ii){var id=sd.strokeId;if(!id)return;if(aById[id]!==undefined)aDup[id]=1;else aById[id]=ii;});
-  sB.forEach(function(sd,jj){var id=sd.strokeId;if(!id)return;if(bById[id]!==undefined)bDup[id]=1;else bById[id]=jj;});
+  sA.forEach(function(sd,ii){var id=_origIdOf(sd);if(!id)return;if(aById[id]!==undefined)aDup[id]=1;else aById[id]=ii;});
+  sB.forEach(function(sd,jj){var id=_origIdOf(sd);if(!id)return;if(bById[id]!==undefined)bDup[id]=1;else bById[id]=jj;});
   var cand=[];
   Object.keys(aById).forEach(function(id){
     if(aDup[id]||bDup[id]||bById[id]===undefined)return;
@@ -5398,6 +5412,8 @@ function _identityPins(sA,sB,forcedAIdx,forcedBIdx){
     // filtre 1 : longueurs
     var lr=Math.max(fa.length,fb.length)/Math.max(1,Math.min(fa.length,fb.length));
     if(lr>ID_PIN_LEN_RATIO)return;
+    // filtre 0 : forme (voir ID_PIN_SHAPE_MAX)
+    if(axisPenaltyPair(fa.elong,fb.elong)>ID_PIN_SHAPE_MAX)return;
     cand.push({a:ai,b:bi,ax:fa.cx,ay:fa.cy,bx:fb.cx,by:fb.cy,
                d:Math.sqrt((fb.cx-fa.cx)*(fb.cx-fa.cx)+(fb.cy-fa.cy)*(fb.cy-fa.cy))});
   });
@@ -5445,6 +5461,19 @@ function generateTweens(explicitRestrictTo,skipUndo){
   var keys=[];for(var i=0;i<state.totalFrames;i++){if(ld.frames[i].isKeyframe&&ld.frames[i].strokes.length>0)keys.push(i);}
   if(keys.length<2){showToast(SM.t('toastNeedAtLeast2DrawnKeyframes'));return;}
   _chainArcs={}; // les arcs de chaîne sont recalculés à chaque génération
+  // IDENTIFIANT D'ORIGINE (2026-09-05, régression trouvée sur un MAINTIEN :
+  // clés 17 et 26 identiques, 5 traits déplacés jusqu'à 57 px). La
+  // construction des paires ré-estampille le strokeId des CLÉS (B prend
+  // l'id de A, pour la continuité des images générées). Dans une même
+  // génération, la portée k+1 lit donc des identifiants réécrits par la
+  // portée k : les épingles de provenance (dupOf → id de A) et d'identité
+  // (même id des deux côtés) se posaient alors sur le mauvais trait, pour
+  // exactement les traits dont l'appariement précédent n'était pas
+  // l'identité. Le banc ne pouvait pas le voir : il apparie sur des données
+  // fraîches. Les épingles lisent maintenant l'identifiant tel qu'il était
+  // au début de la génération (_origId, posé une fois, jamais sérialisé :
+  // serP ne recopie que les champs qu'il connaît).
+  keys.forEach(function(kf){(ld.frames[kf].strokes||[]).forEach(function(sd){if(sd._origId===undefined)sd._origId=sd.strokeId;});});
   // A frame selection on this layer restricts regeneration to just those
   // keyframes' own span (start keyframe -> its next keyframe), instead of
   // silently redoing the whole layer — select the frame to fix, hit Tween,

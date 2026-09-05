@@ -338,6 +338,32 @@
       travelDetail:cur.travel.slice(0,8),lenDetail:cur.lenRatio.slice(0,8),
       travelRef:base.travel.slice(0,8)};
   };
+  // ---- MAINTIENS (2026-09-05) ----------------------------------------
+  // Un maintien = deux clés consécutives identiques. Tout trait généré qui
+  // s'en éloigne est une erreur certaine, sans vérité terrain. C'est ce
+  // test qui a révélé la régression des épingles lisant des identifiants
+  // réécrits par la génération en cours — invisible pour `span()`, qui
+  // apparie sur des données fraîches. À passer sur la SORTIE de
+  // generateTweens, jamais sur une copie.
+  function _pathCentroid(sd){var f=strokeFeat(sd);return[f.cx,f.cy];}
+  B.holds=function(li){
+    li=li===undefined?state.activeLayerIdx:li;state.activeLayerIdx=li;
+    generateTweens();
+    var ld=state.layers[li],keys=keysOf(li),out=[];
+    for(var k=0;k+1<keys.length;k++){
+      var A=ld.frames[keys[k]].strokes||[],Bs=ld.frames[keys[k+1]].strokes||[];
+      if(A.length!==Bs.length||!A.length)continue;
+      var same=A.every(function(s,i){var b=Bs[i];if(!b)return false;var p=_pathCentroid(s),q=_pathCentroid(b);return Math.abs(p[0]-q[0])<0.5&&Math.abs(p[1]-q[1])<0.5;});
+      if(!same)continue;
+      var byId={};A.forEach(function(s){var id=(s.strokeId||'').split('#')[0];if(id&&!byId[id])byId[id]=_pathCentroid(s);});
+      var mx=0,n=0;
+      for(var f=keys[k]+1;f<keys[k+1];f++)(ld.frames[f].strokes||[]).forEach(function(sd){
+        var c=byId[(sd.strokeId||'').split('#')[0]];if(!c)return;
+        var q=_pathCentroid(sd),d=Math.hypot(q[0]-c[0],q[1]-c[1]);if(d>5)n++;if(d>mx)mx=d;});
+      out.push({span:keys[k]+'>'+keys[k+1],deplaces:n,maxPx:Math.round(mx)});
+    }
+    return out;
+  };
   B.snapshot=function(){var c=document.querySelector('#canvas')||document.querySelector('canvas');return c?c.toDataURL('image/png'):null;};
   window.__twBench=B;
 })();
