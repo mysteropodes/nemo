@@ -107,17 +107,19 @@ the Paper/vello document model `CLAUDE.md` §1 governs). Persisted state lives i
 **different real owners/readers per path** — `lib/isolation.cjs` does not own everything under
 `RUNTIME_ROOT`, only the directory lifecycle:
 
-- Job-run receipts (`lib/receipt.cjs` — excluded, see below) are written and read only by
-  `receipt.cjs` itself, called from `jobs.cjs`/`cli.cjs`.
+- Job-run receipts are written by `lib/receipt.cjs` (excluded, see below), called from
+  `jobs.cjs`/`cli.cjs`. `cli.cjs` also reads the written JSON file directly when emitting
+  `--json` output (`lib/cli.cjs:34-36`).
 - `lib/isolation.cjs`'s `taskRoots()` creates the per-task directory tree
   (`temp/cache/build/reports/browser-profile/tauri-data/ports`) and owns its *lifecycle* (create
   in `taskRoots`, reap in `releaseTask`) plus `ports/` and `launcher.json` directly — but it is
   **not** the sole writer/reader of every path under that tree:
-  - `cache/` and `build/` are written by the **launched browser/build subprocesses**, not by
-    `isolation.cjs` or the two `*-runtime.cjs` modules: `browser-runtime.cjs` points the spawned
-    browser's own disk cache at `cache/browser` (`--disk-cache-dir`, `XDG_CACHE_HOME`);
-    `build-runtime.cjs` points the spawned Tauri build's target dir at `build/tauri-target` and
-    also sets `XDG_CACHE_HOME=roots.cache` for that subprocess.
+  - The runtime modules prepare directories before launching their subprocesses:
+    `browser-runtime.cjs:71-72` creates `cache/browser`, and `build-runtime.cjs:151-153`
+    creates the build target and reports directories. The launched browser writes its cache
+    into `cache/browser` (`--disk-cache-dir`, `XDG_CACHE_HOME`); the Tauri build writes its
+    artifacts into `build/tauri-target`. `build-runtime.cjs` also sets
+    `XDG_CACHE_HOME=roots.cache` for that subprocess.
   - `reports/` holds `build-runtime.cjs`'s own `build-runtime.json` status file and
     `desktop-build.{stdout,stderr}.log`, written directly by `buildRuntime` — plus whatever the
     launched browser process writes there via the `NEMO_REPORT_DIR` env var `browser-runtime.cjs`
