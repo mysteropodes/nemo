@@ -46,6 +46,8 @@ function applicability(files) {
   // Unknown files, executable docs, dependency/build changes and app tests require all surfaces.
   const exempt = (file) => /^(?:docs|engineering)\/.*\.md$/.test(file)
     || /^engineering\/boundaries\/.*\.json$/.test(file)
+    || file.startsWith('engineering/boundaries/profiles/scripts-nemo.fixture/')
+    || file === 'scripts/nemo/README.md'
     || /^(?:README|CONTRIBUTING|CLAUDE|AGENTS|THIRD_PARTY_NOTICES)\.md$/.test(file)
     || file === 'LICENSE' || file === '.github/workflows/nemo-validation.yml'
     || /^scripts\/nemo\/(?:ci|boundaries|boundaries-ratchet)(?:\.test)?\.cjs$/.test(file)

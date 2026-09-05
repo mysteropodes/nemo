@@ -44,8 +44,9 @@ runner or killed process cannot pass. This does not change local optional-job se
 ## Applicability and remaining acceptance
 
 Quick and the adopted boundary profile run on every PR, including documentation changes.
-Only explicit Markdown documentation paths, boundary policy JSON, the CI workflow/runner,
-and boundary checker/tests are exempt from runtime jobs. See `applicability()` in
+Only explicit Markdown documentation paths (including `scripts/nemo/README.md`), boundary
+policy JSON, the isolated `engineering/boundaries/profiles/scripts-nemo.fixture/` subtree,
+the CI workflow/runner, and boundary checker/tests are exempt from runtime jobs. See `applicability()` in
 [ci.cjs](../../scripts/nemo/ci.cjs) for the exact allowlist. Runtime launcher changes,
 package/lockfiles, application source, native/WASM source, application tests, and unknown
 paths conservatively require **all** runtime jobs. Renames are considered as deletion

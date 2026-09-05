@@ -67,6 +67,50 @@ test('surface applicability exempts explicit tooling/docs only and treats unknow
   }
 });
 
+const benignPaths = ['scripts/nemo/README.md',
+  'engineering/boundaries/profiles/scripts-nemo.fixture/src/cycle-a.cjs'];
+for (const file of benignPaths) {
+  test(`benign-only ${file} does not require runtime jobs; mixed application changes still do`, () => {
+    assert.deepEqual(ci.applicability([file]).required, []);
+    assert.deepEqual(ci.applicability([file]).affected, []);
+    const mixed = ci.applicability([file, 'src/js/app.js']);
+    assert.deepEqual(mixed.required, ci.SURFACES);
+    assert.deepEqual(mixed.affected, ['src/js/app.js']);
+  });
+}
+
+test('renames into and out of exempt command docs and boundary fixtures retain both endpoints', (t) => {
+  const root = scratch(t);
+  git(root, ['init', '-q']);
+  git(root, ['config', 'user.name', 'CI fixture']);
+  git(root, ['config', 'user.email', 'ci@example.invalid']);
+  git(root, ['config', 'maintenance.auto', 'false']);
+  git(root, ['config', 'gc.auto', '0']);
+  const appPaths = ['src/js/app.js', 'src/js/other.js'];
+  fs.mkdirSync(path.join(root, 'src/js'), { recursive: true });
+  for (const file of appPaths) fs.writeFileSync(path.join(root, file), `// ${file}\n`);
+  git(root, ['add', '.']);
+  git(root, ['-c', 'commit.gpgsign=false', 'commit', '-qm', 'application sources']);
+  for (const [from, to] of [[appPaths, benignPaths], [benignPaths, appPaths]]) {
+    const base = git(root, ['rev-parse', 'HEAD']);
+    for (let i = 0; i < from.length; i++) {
+      fs.mkdirSync(path.dirname(path.join(root, to[i])), { recursive: true });
+      git(root, ['mv', from[i], to[i]]);
+    }
+    git(root, ['-c', 'commit.gpgsign=false', 'commit', '-qm', 'rename sources']);
+    const files = ci.changedFiles(base, root);
+    assert.deepEqual(files.sort(), [...appPaths, ...benignPaths].sort());
+    const selection = ci.applicability(files);
+    assert.deepEqual(selection.required, ci.SURFACES);
+    assert.deepEqual(selection.affected.sort(), appPaths);
+  }
+  for (const file of ['scripts/nemo/README.cjs',
+    'engineering/boundaries/profiles/scripts-nemo.fixture-other/src/cycle-a.cjs',
+    'engineering/boundaries/profiles/other.fixture/src/cycle-a.cjs']) {
+    assert.deepEqual(ci.applicability([file]).required, ci.SURFACES, file);
+  }
+});
+
 test('baseline is materialized from the explicit base commit, never candidate policy or a moving branch', (t) => {
   const root = scratch(t);
   git(root, ['init', '-q']);
