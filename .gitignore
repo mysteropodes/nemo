@@ -52,3 +52,6 @@ vectorize-wasm/target/
 
 # Worktrees created by Claude Code background tasks — local scratch, never committed.
 .claude/worktrees/
+
+# Per-run receipts and logs from `npm run verify` / doctor / check (scripts/nemo). Local evidence, never committed.
+/reports/
