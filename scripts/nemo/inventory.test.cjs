@@ -470,6 +470,56 @@ el('a').addEventListener('click', cb);`, { a: [], b: ['click'] }, {
   });
 });
 
+for (const [shape, write] of [
+  ['logical-and', "id &&= 'b';"],
+  ['array destructuring', "[id] = ['b'];"],
+  ['object destructuring', "({ id } = { id: 'b' });"],
+  ['nested destructuring', "({ value: [id] } = { value: ['b'] });"],
+]) {
+  for (const returning of [false, true]) {
+    test(`runtime follow-up: ${shape} ID write invalidates ${returning ? 'returning' : 'binding'} helper`, () => {
+      const lookup = 'document.getElementById(id)';
+      const code = returning
+        ? `function el(id) { ${write} return ${lookup}; } el('a').addEventListener('click', cb);`
+        : `function wire(id) { ${write} ${lookup}.addEventListener('click', cb); } wire('a');`;
+      const result = compareRegistrations(code, { a: [], b: ['click'] }, {
+        b: 'The replacement ID needs value propagation; this helper is conservatively not bound.',
+      });
+      const original = result.rows.find((r) => r.id === 'dom:#a');
+      assert.ok(original.meta.references.length, 'keep the original argument as an unmapped reference');
+      assert.match(original.reason, /reassignment, shadowing or unsupported return flow/);
+    });
+  }
+}
+
+test('runtime follow-up: ID writes in a different lexical owner preserve the outer helper', () => {
+  for (const write of ["id &&= 'b';", "[id] = ['b'];", "({ id } = { id: 'b' });"]) {
+    compareRegistrations(`function el(id) {
+      { let other = 0, id = 'a'; ${write} }
+      return document.getElementById(id);
+    }
+    el('a').addEventListener('click', cb);`, { a: ['click'], b: [] });
+    compareRegistrations(`function wire(id) {
+      (function(id) { ${write} })('a');
+      document.getElementById(id).addEventListener('click', cb);
+    }
+    wire('a');`, { a: ['click'], b: [] });
+  }
+});
+
+test('runtime follow-up: comma-separated lexical declarations keep each element owner', () => {
+  for (const declaration of ['const other = 1, button', 'let other, button',
+    'const other =\n 1\n , button',
+    'const other = [1, 2], middle = { values: [3, 4] },\n button']) {
+    compareRegistrations(`const button = document.getElementById('a');
+    { ${declaration} = document.getElementById('b'); button.addEventListener('input', cb); }
+    button.addEventListener('click', cb);`, { a: ['click'], b: ['input'] });
+  }
+  compareRegistrations(`var button = document.getElementById('a');
+  { var other = 1, button = document.getElementById('b'); }
+  button.addEventListener('click', cb);`, { a: [], b: ['click'] });
+});
+
 // ---------------------------------------------------------------------------
 // outputs and the staleness gate
 // ---------------------------------------------------------------------------
