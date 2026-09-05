@@ -1,0 +1,1160 @@
+{
+  "schema": "nemo.r08.browser-acceptance.v1",
+  "status": "pass",
+  "head": "2a2cf29c4ab459b6a55f0902ee234c47f567f5fd",
+  "fixtureSha256": "dceb05d13576a4dda0eb1a1a9d8c0184e8617e9a3a2662150ee54f4badedf08d",
+  "sourceHashes": {
+    "src/index.html": "2d938b9154e214e07864903e23e2036e617dea180e857be95a8a258ee3185fd1",
+    "src/js/motion.js": "17c5a14994f26f0bfa48337ee4d452fe9584f7fbc14207d38f53a0bd4df0d510",
+    "src/js/animation/curve.js": "d6c70a8848a8475f9d7ec62ce62127748e0938f3058dae40a8154a82389534c7",
+    "src/wasm/geometry_wasm.js": "3ac8f3b4df2cf8ab52c4abcb16591660b72cc19c77f3323046833b8d0309c2bf",
+    "src/wasm/geometry_wasm_bg.wasm": "c35ad2045f183c69c6fec40721886cc48c14f9e7b05cf127192f4739d15fd3d5"
+  },
+  "artifacts": [
+    {
+      "name": "before-0.png",
+      "bytes": 1960,
+      "sha256": "ab1532c7128de6ed45e82120b344d2978f857f297c7c2c0ebb94300ddc79d9d5"
+    },
+    {
+      "name": "before-5.png",
+      "bytes": 1955,
+      "sha256": "6c696d1413247ca7941e3ed3f67b89f23cedd3d1464a980a4cb4d2d658cc8497"
+    },
+    {
+      "name": "before-10.png",
+      "bytes": 1962,
+      "sha256": "5957c2ff4418688cf009efba0141ccdb0c56f2235dacb0ec6b194d01f7861334"
+    },
+    {
+      "name": "before-15.png",
+      "bytes": 1957,
+      "sha256": "098c4fc5e7eef96d5d2bb21958ea42ff78a8947838bf056ddae691df814d1bfe"
+    },
+    {
+      "name": "before-20.png",
+      "bytes": 1957,
+      "sha256": "3363ed52c28e785f758cc9c5f84682e2eb7bf37fdc1f81dac804f0745df54399"
+    },
+    {
+      "name": "edited-0.png",
+      "bytes": 1962,
+      "sha256": "5957c2ff4418688cf009efba0141ccdb0c56f2235dacb0ec6b194d01f7861334"
+    },
+    {
+      "name": "edited-5.png",
+      "bytes": 1963,
+      "sha256": "e4f7e4deb2ffbd9dcbbbe24da9b3573f69d7ba4dd3abcd09004553ac3d336147"
+    },
+    {
+      "name": "edited-10.png",
+      "bytes": 1957,
+      "sha256": "cb0d3ab67e2f86fa5c3d4e505765822b4232b4e5531b917027ce7040081732bc"
+    },
+    {
+      "name": "edited-15.png",
+      "bytes": 1958,
+      "sha256": "4f052e0a46a5140a633006e0f55f0b508f143db8fb4f1b4bf4963f4e7f84205d"
+    },
+    {
+      "name": "edited-20.png",
+      "bytes": 1957,
+      "sha256": "3363ed52c28e785f758cc9c5f84682e2eb7bf37fdc1f81dac804f0745df54399"
+    },
+    {
+      "name": "undo-0.png",
+      "bytes": 1960,
+      "sha256": "ab1532c7128de6ed45e82120b344d2978f857f297c7c2c0ebb94300ddc79d9d5"
+    },
+    {
+      "name": "undo-5.png",
+      "bytes": 1955,
+      "sha256": "6c696d1413247ca7941e3ed3f67b89f23cedd3d1464a980a4cb4d2d658cc8497"
+    },
+    {
+      "name": "undo-10.png",
+      "bytes": 1962,
+      "sha256": "5957c2ff4418688cf009efba0141ccdb0c56f2235dacb0ec6b194d01f7861334"
+    },
+    {
+      "name": "undo-15.png",
+      "bytes": 1957,
+      "sha256": "098c4fc5e7eef96d5d2bb21958ea42ff78a8947838bf056ddae691df814d1bfe"
+    },
+    {
+      "name": "undo-20.png",
+      "bytes": 1957,
+      "sha256": "3363ed52c28e785f758cc9c5f84682e2eb7bf37fdc1f81dac804f0745df54399"
+    },
+    {
+      "name": "redo-0.png",
+      "bytes": 1962,
+      "sha256": "5957c2ff4418688cf009efba0141ccdb0c56f2235dacb0ec6b194d01f7861334"
+    },
+    {
+      "name": "redo-5.png",
+      "bytes": 1963,
+      "sha256": "e4f7e4deb2ffbd9dcbbbe24da9b3573f69d7ba4dd3abcd09004553ac3d336147"
+    },
+    {
+      "name": "redo-10.png",
+      "bytes": 1957,
+      "sha256": "cb0d3ab67e2f86fa5c3d4e505765822b4232b4e5531b917027ce7040081732bc"
+    },
+    {
+      "name": "redo-15.png",
+      "bytes": 1958,
+      "sha256": "4f052e0a46a5140a633006e0f55f0b508f143db8fb4f1b4bf4963f4e7f84205d"
+    },
+    {
+      "name": "redo-20.png",
+      "bytes": 1957,
+      "sha256": "3363ed52c28e785f758cc9c5f84682e2eb7bf37fdc1f81dac804f0745df54399"
+    },
+    {
+      "name": "edited-project.json",
+      "bytes": 9661,
+      "sha256": "82e1af41888b3439c037fa1b54821e099c19e267d2b653205efdcaa5b92878ac"
+    },
+    {
+      "name": "reopened-0.png",
+      "bytes": 1962,
+      "sha256": "5957c2ff4418688cf009efba0141ccdb0c56f2235dacb0ec6b194d01f7861334"
+    },
+    {
+      "name": "reopened-5.png",
+      "bytes": 1963,
+      "sha256": "e4f7e4deb2ffbd9dcbbbe24da9b3573f69d7ba4dd3abcd09004553ac3d336147"
+    },
+    {
+      "name": "reopened-10.png",
+      "bytes": 1957,
+      "sha256": "cb0d3ab67e2f86fa5c3d4e505765822b4232b4e5531b917027ce7040081732bc"
+    },
+    {
+      "name": "reopened-15.png",
+      "bytes": 1958,
+      "sha256": "4f052e0a46a5140a633006e0f55f0b508f143db8fb4f1b4bf4963f4e7f84205d"
+    },
+    {
+      "name": "reopened-20.png",
+      "bytes": 1957,
+      "sha256": "3363ed52c28e785f758cc9c5f84682e2eb7bf37fdc1f81dac804f0745df54399"
+    },
+    {
+      "name": "export-0.svg",
+      "bytes": 663,
+      "sha256": "eda2c4091c8ca6c30c3b9e8e5289a3c1346db737d71a6a496d413a2259837a88"
+    },
+    {
+      "name": "export-5.svg",
+      "bytes": 663,
+      "sha256": "ae1da1efbedfb87fe8b5c0c470fb519ab613f7ff85a51f10a388d644c4b7895f"
+    },
+    {
+      "name": "export-10.svg",
+      "bytes": 664,
+      "sha256": "1d55bca560d288f28865ed90c7b00da0b884aec3427638f80b5376683a3f1541"
+    },
+    {
+      "name": "export-15.svg",
+      "bytes": 664,
+      "sha256": "b8ece0c09300c6b862d0681c485cee504dcb478cbb40bba8e2263ef8335fdf24"
+    },
+    {
+      "name": "export-20.svg",
+      "bytes": 664,
+      "sha256": "5863d5f9d5bba01f551de7af4f437e76e03e55a8e6ba650d37b0b31a3c1d0e33"
+    },
+    {
+      "name": "reopened-frame-5.png",
+      "bytes": 89902,
+      "sha256": "1981902d5b08fdf544fba5aa4c943b98c25bd0fd9e9e304c1ef34608b904a588"
+    }
+  ],
+  "phases": [
+    {
+      "name": "before",
+      "edited": false,
+      "samples": [
+        {
+          "frame": 0,
+          "positionX": 0,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              20,
+              60,
+              40,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              20,
+              60,
+              40,
+              80
+            ]
+          },
+          "pngSha256": "ab1532c7128de6ed45e82120b344d2978f857f297c7c2c0ebb94300ddc79d9d5"
+        },
+        {
+          "frame": 5,
+          "positionX": 20,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              40,
+              60,
+              60,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              40,
+              60,
+              60,
+              80
+            ]
+          },
+          "pngSha256": "6c696d1413247ca7941e3ed3f67b89f23cedd3d1464a980a4cb4d2d658cc8497"
+        },
+        {
+          "frame": 10,
+          "positionX": 64,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              84,
+              60,
+              104,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              84,
+              60,
+              104,
+              80
+            ]
+          },
+          "pngSha256": "5957c2ff4418688cf009efba0141ccdb0c56f2235dacb0ec6b194d01f7861334"
+        },
+        {
+          "frame": 15,
+          "positionX": 108,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              128,
+              60,
+              148,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              128,
+              60,
+              148,
+              80
+            ]
+          },
+          "pngSha256": "098c4fc5e7eef96d5d2bb21958ea42ff78a8947838bf056ddae691df814d1bfe"
+        },
+        {
+          "frame": 20,
+          "positionX": 128,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              148,
+              60,
+              168,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              148,
+              60,
+              168,
+              80
+            ]
+          },
+          "pngSha256": "3363ed52c28e785f758cc9c5f84682e2eb7bf37fdc1f81dac804f0745df54399"
+        }
+      ],
+      "storedLayersUnchanged": true
+    },
+    {
+      "name": "edited",
+      "edited": true,
+      "samples": [
+        {
+          "frame": 0,
+          "positionX": 64,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              84,
+              60,
+              104,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              84,
+              60,
+              104,
+              80
+            ]
+          },
+          "pngSha256": "5957c2ff4418688cf009efba0141ccdb0c56f2235dacb0ec6b194d01f7861334"
+        },
+        {
+          "frame": 5,
+          "positionX": 74,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              94,
+              60,
+              114,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              94,
+              60,
+              114,
+              80
+            ]
+          },
+          "pngSha256": "e4f7e4deb2ffbd9dcbbbe24da9b3573f69d7ba4dd3abcd09004553ac3d336147"
+        },
+        {
+          "frame": 10,
+          "positionX": 96,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              116,
+              60,
+              136,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              116,
+              60,
+              136,
+              80
+            ]
+          },
+          "pngSha256": "cb0d3ab67e2f86fa5c3d4e505765822b4232b4e5531b917027ce7040081732bc"
+        },
+        {
+          "frame": 15,
+          "positionX": 118,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              138,
+              60,
+              158,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              138,
+              60,
+              158,
+              80
+            ]
+          },
+          "pngSha256": "4f052e0a46a5140a633006e0f55f0b508f143db8fb4f1b4bf4963f4e7f84205d"
+        },
+        {
+          "frame": 20,
+          "positionX": 128,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              148,
+              60,
+              168,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              148,
+              60,
+              168,
+              80
+            ]
+          },
+          "pngSha256": "3363ed52c28e785f758cc9c5f84682e2eb7bf37fdc1f81dac804f0745df54399"
+        }
+      ],
+      "storedLayersUnchanged": true
+    },
+    {
+      "name": "undo",
+      "edited": false,
+      "samples": [
+        {
+          "frame": 0,
+          "positionX": 0,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              20,
+              60,
+              40,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              20,
+              60,
+              40,
+              80
+            ]
+          },
+          "pngSha256": "ab1532c7128de6ed45e82120b344d2978f857f297c7c2c0ebb94300ddc79d9d5"
+        },
+        {
+          "frame": 5,
+          "positionX": 20,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              40,
+              60,
+              60,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              40,
+              60,
+              60,
+              80
+            ]
+          },
+          "pngSha256": "6c696d1413247ca7941e3ed3f67b89f23cedd3d1464a980a4cb4d2d658cc8497"
+        },
+        {
+          "frame": 10,
+          "positionX": 64,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              84,
+              60,
+              104,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              84,
+              60,
+              104,
+              80
+            ]
+          },
+          "pngSha256": "5957c2ff4418688cf009efba0141ccdb0c56f2235dacb0ec6b194d01f7861334"
+        },
+        {
+          "frame": 15,
+          "positionX": 108,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              128,
+              60,
+              148,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              128,
+              60,
+              148,
+              80
+            ]
+          },
+          "pngSha256": "098c4fc5e7eef96d5d2bb21958ea42ff78a8947838bf056ddae691df814d1bfe"
+        },
+        {
+          "frame": 20,
+          "positionX": 128,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              148,
+              60,
+              168,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              148,
+              60,
+              168,
+              80
+            ]
+          },
+          "pngSha256": "3363ed52c28e785f758cc9c5f84682e2eb7bf37fdc1f81dac804f0745df54399"
+        }
+      ],
+      "storedLayersUnchanged": true
+    },
+    {
+      "name": "redo",
+      "edited": true,
+      "samples": [
+        {
+          "frame": 0,
+          "positionX": 64,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              84,
+              60,
+              104,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              84,
+              60,
+              104,
+              80
+            ]
+          },
+          "pngSha256": "5957c2ff4418688cf009efba0141ccdb0c56f2235dacb0ec6b194d01f7861334"
+        },
+        {
+          "frame": 5,
+          "positionX": 74,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              94,
+              60,
+              114,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              94,
+              60,
+              114,
+              80
+            ]
+          },
+          "pngSha256": "e4f7e4deb2ffbd9dcbbbe24da9b3573f69d7ba4dd3abcd09004553ac3d336147"
+        },
+        {
+          "frame": 10,
+          "positionX": 96,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              116,
+              60,
+              136,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              116,
+              60,
+              136,
+              80
+            ]
+          },
+          "pngSha256": "cb0d3ab67e2f86fa5c3d4e505765822b4232b4e5531b917027ce7040081732bc"
+        },
+        {
+          "frame": 15,
+          "positionX": 118,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              138,
+              60,
+              158,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              138,
+              60,
+              158,
+              80
+            ]
+          },
+          "pngSha256": "4f052e0a46a5140a633006e0f55f0b508f143db8fb4f1b4bf4963f4e7f84205d"
+        },
+        {
+          "frame": 20,
+          "positionX": 128,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              148,
+              60,
+              168,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              148,
+              60,
+              168,
+              80
+            ]
+          },
+          "pngSha256": "3363ed52c28e785f758cc9c5f84682e2eb7bf37fdc1f81dac804f0745df54399"
+        }
+      ],
+      "storedLayersUnchanged": true
+    },
+    {
+      "name": "reopened",
+      "edited": true,
+      "samples": [
+        {
+          "frame": 0,
+          "positionX": 64,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              84,
+              60,
+              104,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              84,
+              60,
+              104,
+              80
+            ]
+          },
+          "pngSha256": "5957c2ff4418688cf009efba0141ccdb0c56f2235dacb0ec6b194d01f7861334"
+        },
+        {
+          "frame": 5,
+          "positionX": 74,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              94,
+              60,
+              114,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              94,
+              60,
+              114,
+              80
+            ]
+          },
+          "pngSha256": "e4f7e4deb2ffbd9dcbbbe24da9b3573f69d7ba4dd3abcd09004553ac3d336147"
+        },
+        {
+          "frame": 10,
+          "positionX": 96,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              116,
+              60,
+              136,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              116,
+              60,
+              136,
+              80
+            ]
+          },
+          "pngSha256": "cb0d3ab67e2f86fa5c3d4e505765822b4232b4e5531b917027ce7040081732bc"
+        },
+        {
+          "frame": 15,
+          "positionX": 118,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              138,
+              60,
+              158,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              138,
+              60,
+              158,
+              80
+            ]
+          },
+          "pngSha256": "4f052e0a46a5140a633006e0f55f0b508f143db8fb4f1b4bf4963f4e7f84205d"
+        },
+        {
+          "frame": 20,
+          "positionX": 128,
+          "rustPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              148,
+              60,
+              168,
+              80
+            ]
+          },
+          "paperPixels": {
+            "width": 320,
+            "height": 180,
+            "red": 400,
+            "other": 0,
+            "bounds": [
+              148,
+              60,
+              168,
+              80
+            ]
+          },
+          "pngSha256": "3363ed52c28e785f758cc9c5f84682e2eb7bf37fdc1f81dac804f0745df54399"
+        }
+      ],
+      "storedLayersUnchanged": true
+    }
+  ],
+  "errors": [],
+  "limits": [
+    "Controlled synthetic fixture; not the R03 production corpus.",
+    "Fixture supplies initial geometry and keys; value edit, undo/redo, save/open and SVG export use real DOM controls.",
+    "Rust readback and Paper PNG preview use production APIs. No Tauri, native dialogs, hardware GPU or video acceptance."
+  ],
+  "browser": "152.0.7977.76",
+  "adapter": {
+    "vendor": "google",
+    "architecture": "swiftshader",
+    "isFallbackAdapter": true
+  },
+  "save": {
+    "suggestedFilename": "Untitled.json",
+    "storedLayersEqual": true,
+    "keys": [
+      {
+        "frame": 0,
+        "v": [
+          64,
+          0
+        ],
+        "curvePoints": [
+          {
+            "x": 0,
+            "y": 0,
+            "tx": 1,
+            "ty": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "tx": 1,
+            "ty": 0
+          }
+        ],
+        "hOut": [
+          0,
+          0
+        ],
+        "hIn": [
+          0,
+          0
+        ]
+      },
+      {
+        "frame": 20,
+        "v": [
+          128,
+          0
+        ],
+        "curvePoints": [
+          {
+            "x": 0,
+            "y": 0,
+            "tx": 1,
+            "ty": 0
+          },
+          {
+            "x": 1,
+            "y": 1,
+            "tx": 1,
+            "ty": 0
+          }
+        ],
+        "hOut": [
+          0,
+          0
+        ],
+        "hIn": [
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "reopen": {
+    "freshBrowserContext": true,
+    "autosaveNotShared": true,
+    "storedLayersEqual": true
+  },
+  "svg": [
+    {
+      "frame": 0,
+      "pixels": {
+        "width": 320,
+        "height": 180,
+        "red": 400,
+        "other": 0,
+        "bounds": [
+          84,
+          60,
+          104,
+          80
+        ]
+      },
+      "name": "export-0.svg",
+      "bytes": 663,
+      "sha256": "eda2c4091c8ca6c30c3b9e8e5289a3c1346db737d71a6a496d413a2259837a88"
+    },
+    {
+      "frame": 5,
+      "pixels": {
+        "width": 320,
+        "height": 180,
+        "red": 400,
+        "other": 0,
+        "bounds": [
+          94,
+          60,
+          114,
+          80
+        ]
+      },
+      "name": "export-5.svg",
+      "bytes": 663,
+      "sha256": "ae1da1efbedfb87fe8b5c0c470fb519ab613f7ff85a51f10a388d644c4b7895f"
+    },
+    {
+      "frame": 10,
+      "pixels": {
+        "width": 320,
+        "height": 180,
+        "red": 400,
+        "other": 0,
+        "bounds": [
+          116,
+          60,
+          136,
+          80
+        ]
+      },
+      "name": "export-10.svg",
+      "bytes": 664,
+      "sha256": "1d55bca560d288f28865ed90c7b00da0b884aec3427638f80b5376683a3f1541"
+    },
+    {
+      "frame": 15,
+      "pixels": {
+        "width": 320,
+        "height": 180,
+        "red": 400,
+        "other": 0,
+        "bounds": [
+          138,
+          60,
+          158,
+          80
+        ]
+      },
+      "name": "export-15.svg",
+      "bytes": 664,
+      "sha256": "b8ece0c09300c6b862d0681c485cee504dcb478cbb40bba8e2263ef8335fdf24"
+    },
+    {
+      "frame": 20,
+      "pixels": {
+        "width": 320,
+        "height": 180,
+        "red": 400,
+        "other": 0,
+        "bounds": [
+          148,
+          60,
+          168,
+          80
+        ]
+      },
+      "name": "export-20.svg",
+      "bytes": 664,
+      "sha256": "5863d5f9d5bba01f551de7af4f437e76e03e55a8e6ba650d37b0b31a3c1d0e33"
+    }
+  ],
+  "pngSequenceBrowser": {
+    "ok": false,
+    "error": "Disponible uniquement dans l'app Nemo (pas en preview navigateur)."
+  },
+  "identity": {
+    "healthyBefore": true,
+    "healthyAfter": true,
+    "sourceMatches": true,
+    "buildMatches": true
+  },
+  "driverSha256": "121fe8c2de3662ccac63bb368aa59c92a75855897ec10824ee649ade72bd2148",
+  "verification": {
+    "head": "2a2cf29c4ab459b6a55f0902ee234c47f567f5fd",
+    "clean": true,
+    "command": "npm run verify",
+    "profile": "quick",
+    "runId": "20260905T221645Z-2a2cf29",
+    "jobs": [
+      {
+        "name": "doctor",
+        "status": "pass",
+        "reason": "probed 16 tools, 3 absent (wasm-pack, tauri-cli, playwright)"
+      },
+      {
+        "name": "check",
+        "status": "pass",
+        "reason": "6 checks pass"
+      },
+      {
+        "name": "test:unit",
+        "status": "pass",
+        "reason": "node --test: 201 tests, 201 pass, 0 fail"
+      },
+      {
+        "name": "test:rust",
+        "status": "pass",
+        "reason": "cargo test geometry-wasm: 4 binaries, 15 passed, 0 failed"
+      }
+    ]
+  },
+  "discovery": {
+    "companion": "2dd4054352bdb12e5323a7ae8d716e17b372a4b4",
+    "matchesPatch": "40ee5fd91ab5ddf57cf86ec93e562accea0fabf2",
+    "alternateWrapperPresent": false,
+    "curveLoads": 1,
+    "motionLoads": 1,
+    "curveImmediatelyBeforeMotion": true,
+    "animationTests": 16,
+    "executionsPerTest": 1
+  }
+}
