@@ -49,12 +49,22 @@ claim to.
 ## Category 1 — Application JS (`src/js/**`)
 
 143 `.js` files (105 at `src/js/*.js`, 38 at `src/js/labs/*.js`), counted by `find src/js -name
-'*.js' | wc -l`. Every application file uses classic global `<script>` tags (132 of them in
-`src/index.html`), not `import`/`require` — confirmed by
-`grep -l "^import \|require(" src/js/*.js src/js/labs/*.js` matching only one file
-(`opentype.min.js`, vendor, itself excluded below), and by `04_MODULARITY_POLICY.md`'s own
-"Legacy migration" step 4 ("Migrate from classic global script order toward ESM..."), which is
-still open work, not done. This has a direct, measured consequence for every rule below.
+'*.js' | wc -l`. **140 of these 143** load as classic global `<script>` tags (of the 132
+`<script>` tags in `src/index.html`, 130 point at a `src/js/**` file; the other 2 are an inline
+script and `paper-full.min.js`) — confirmed by `grep -l "^import \|require(" src/js/*.js
+src/js/labs/*.js` matching only one file (`opentype.min.js`, vendor, itself excluded below) for
+*lexical* `import`/`require` syntax, and by `04_MODULARITY_POLICY.md`'s own "Legacy migration"
+step 4 ("Migrate from classic global script order toward ESM..."), which is still open work, not
+done. **The other 3 are an execution-mode exception the lexical grep above cannot see**:
+`geometry-wasm-loader.js` and `vectorize-wasm-loader.js` load via `<script type="module"
+src="js/...">` (`src/index.html:2429–2430`), and `vectorize-worker.js` is not a `<script>` tag at
+all — `vectorize-wasm-loader.js:29` spawns it as a module Web Worker (`new Worker(new
+URL('vectorize-worker.js', import.meta.url), { type: 'module' })`). Neither loader matches the
+grep above because both reach the network via a dynamic `import()` call inside module scope, not
+a static top-of-file `import` statement — lexical import/require syntax and script execution mode
+are two different axes, and "every application file uses classic `<script>` tags" is the
+inaccurate conflation of the two this packet is correcting here. This has a direct, measured
+consequence for every rule below.
 
 ### 1a. Lexically unsupported — 63 of 143 files, excluded from the candidate profile
 
@@ -87,7 +97,20 @@ central application files (`motion.js` 13,897 lines, `timeline.js` 11,870, `tool
 `app.js` 5,401, `tweens.js` 5,270, `engine-bridge.js` 4,670). A profile built only from the
 files the checker can currently parse covers **less than a quarter of application JS by volume**
 and misses the files most likely to carry real cycles or forbidden edges if this codebase ever
-adopts ESM. Closing this gap requires either an AST-based inventory (the checker's own
+adopts ESM.
+
+**Two populations are in play here and should not be read as one**: the 63/80,688/105,591 figures
+above count all 143 `.js` files, including the 3 vendored files already named for exclusion on
+provenance grounds in Category 4 (`delaunator.vendor.js`, `mp4box.all.min.js`, `opentype.min.js`
+— 736 nonblank lines combined, `wc -l` per file after stripping blanks). Restricting to the
+**140 handwritten files** this packet actually owns review of, the same gap is **60 files /
+79,952 of 104,855 nonblank lines — still 76%** omitted. The vendor files were never candidates
+for the lexical parse regardless of the tokenizer bug (Category 4 excludes them on provenance,
+not on parse failure), so their presence in the all-`.js` count above should not be read as the
+tokenizer gap being larger than it is; both figures are reported so neither population is
+implied by the other.
+
+Closing this gap requires either an AST-based inventory (the checker's own
 `README.md` already says so — "Use a parsed R03 inventory before broader adoption") or
 extending the tokenizer past its documented v1 cut; both are checker-implementation changes
 explicitly out of this packet's owned paths (`engineering/boundaries/**`, not
@@ -102,7 +125,13 @@ The remaining 80 files (24,903 nonblank lines) parse without error. For these, r
 `require`/`import` edges are near-zero — `extractImports` finds **exactly one** local edge in
 the entire 80-file set (`src/js/psd-import-bridge.js:30`, a dynamic `import('./ag-psd.vendor.mjs')`
 to an un-declared vendor `.mjs` file, correctly left as an unresolved relative reference per
-the checker's own documented scope). This is not a modeling gap this packet introduced — it is
+the checker's own documented scope). That target is itself a two-hop chain, not a leaf: the
+esm.sh-bundled `ag-psd.vendor.mjs` has its own static import at line 2,
+`import { Buffer as __Buffer$ } from "./node-buffer-shim.vendor.mjs"` — so the real edge is
+`psd-import-bridge.js:30 → ag-psd.vendor.mjs → node-buffer-shim.vendor.mjs`. Both targets are
+`.mjs`, not `.js`, so neither was ever inside the 143-file population §1/§1a count — they are
+named explicitly in Category 4 below so this chain is not a silent omission. This is not a
+modeling gap this packet introduced — it is
 the accurate, mechanical shape of an app built on global `<script>` load order: **cycle,
 private-import and layer-violation are structurally vacuous here because there is close to no
 static import graph to violate**, not because the code is clean of coupling (CLAUDE.md's own
@@ -156,14 +185,23 @@ cycle / 0 private-import / 0 layer-violation (vacuous per 1b) / 0 size violation
 absorb today's count) / 7 size warnings** (files between 350–500 lines) **/ 2 `unsupported-import`
 violations** (`geometry-wasm-loader.js:23`, `vectorize-worker.js:18` — both a non-literal
 `import()`/`require()` target, reported per-rule rather than crashing the run) **/ 161
-`global-state` violations across 71 of the 80 modules** (every `window.SM*` access, since
-`app-legacy` is not the checker's hardcoded `"adapters"`/`"bootstrap"` exemption — the same
-naming-mismatch limitation `scripts-nemo.md` already flagged, but with real teeth here: it is
-not overridden by fabricating a layer named `adapters`, since that would misrepresent every one
-of these files as an adapter). **161 is a lower bound, not the real count** — the six largest
-files in 1a (`motion.js`, `timeline.js`, `tools.js`, `app.js`, `engine-bridge.js`,
+`global-state` violations across 71 of the 80 modules** (one diagnostic per **distinct**
+`window.SM*` global accessed per module, not one per raw access — verified directly:
+`ae-camera-export.js` has 5 raw `window\.SM[A-Za-z]` occurrences across 3 distinct globals
+(`SMKitsu`, `SMCamera`, `SMExport`) and the checker reports exactly 3 violations for it, one per
+global, each pointing at that global's first accessed line. `app-legacy` is not the checker's
+hardcoded `"adapters"`/`"bootstrap"` exemption — the same naming-mismatch limitation
+`scripts-nemo.md` already flagged, but with real teeth here: it is not overridden by fabricating
+a layer named `adapters`, since that would misrepresent every one of these files as an adapter).
+**161 is a lower bound on two independent axes, not the real count or the real access volume**:
+it already excludes the 63 files in §1a entirely, and even within these 80 files it is
+deduplicated per distinct-global-per-module rather than counting every raw access (above) — the
+six largest files in 1a (`motion.js`, `timeline.js`, `tools.js`, `app.js`, `engine-bridge.js`,
 `select-bridge.js`) are exactly the ones a `grep -c "window\.SM[A-Za-z]"` shows access it most
 (117, 101, 53, and more occurrences respectively) and none of them are visible to this profile.
+161 should therefore be read as "at least 71 modules touch at least one undeclared global each,"
+not as an inventory of every `window.SM*` access or as any kind of reviewed architectural-debt
+allowance — it is a raw, mechanical diagnostic count.
 This packet does not add 71 fabricated per-occurrence exceptions to force a clean run — per
 `README.md`, an active exception "applies only to its exact file/rule," and manufacturing 161 of
 them for intentional, undocumented-by-R01 architecture would be exactly the "blanket
@@ -229,8 +267,8 @@ committed key is the public half, not a secret.
 **Excluded entirely — neither HTML nor CSS is JS.** `boundaries.cjs` tokenizes JS import syntax;
 it has no HTML tag parser and no CSS `@import` grammar. `src/index.html` (2,455 lines) is this
 codebase's literal bootstrap: it is not just markup, it is the ordered list of 132 `<script>`
-tags that IS the application's real load-order dependency graph (per Category 1's "classic
-global script order" finding) — but that graph lives in HTML attribute order, a shape this
+tags (130 classic, 2 `type="module"` — see Category 1) that IS the application's real
+load-order dependency graph — but that graph lives in HTML attribute order, a shape this
 checker's `resolveSpecifier` has no concept of. `src/css/style.css` (2,850 lines) and
 `src/css/tutorial.css` (169 lines) are stylesheets; `04_MODULARITY_POLICY.md` already names a
 dedicated "Stylesheet" size profile (250/350 — both files already exceed it, `style.css` by a
@@ -250,7 +288,7 @@ provenance and integrity policy; do not split a shader catalog or translation ta
 satisfy an application-code line budget." None of the paths below get a `boundaries.cjs` module
 entry; each is named with its exclusion reason so none is a silent omission.
 
-**Vendor (third-party JS, unmodified upstream, not owned/authored here):**
+**Vendor (third-party JS/ESM, unmodified upstream, not owned/authored here):**
 
 | Path | Reason |
 |---|---|
@@ -258,6 +296,8 @@ entry; each is named with its exclusion reason so none is a silent omission.
 | `src/js/delaunator.vendor.js` | vendored (filename says so), also in the §1a lexical-failure list |
 | `src/js/mp4box.all.min.js` | vendored, minified, also in the §1a lexical-failure list |
 | `src/js/opentype.min.js` | vendored, minified, also in the §1a lexical-failure list |
+| `src/js/ag-psd.vendor.mjs` | vendored esm.sh bundle (`ag-psd@31.0.2`), `.mjs` — outside the 143 `.js`-file count in Category 1; reached only via `psd-import-bridge.js:30`'s dynamic `import()` (§1b) |
+| `src/js/node-buffer-shim.vendor.mjs` | vendored Node `Buffer` shim, `.mjs` — outside the 143 `.js`-file count; reached only via `ag-psd.vendor.mjs:2`'s static `import`, not referenced directly by any application file (§1b) |
 
 **Generated (wasm-bindgen output from the Rust crates in Category 2, not hand-edited):**
 
@@ -306,9 +346,10 @@ application source).
 - Deliberate-violation scratch test in §1d: two forced-growth cases (`abr-import.js` past
   hard max, `i18n.js` past its exact-path exception ceiling) each produce exactly the expected
   new `size` violation and nothing else changes.
-- All counts above (143/63/80/24,903/80,688/105,591 lines; 16 Rust files; 6 shaders; 10
-  generated; 4 vendor JS) are reproducible directly from the commands quoted inline in each
-  section — none are asserted without a command.
+- All counts above (143/63/80/24,903/80,688/105,591 lines, 140/60 handwritten-only per §1a; 16
+  Rust files; 6 shaders; 10 generated; 4 vendor `.js` + 2 vendor `.mjs`) are reproducible
+  directly from the commands quoted inline in each section — none are asserted without a
+  command.
 
 ## Coverage limits (explicit, per task instructions)
 
