@@ -15,6 +15,8 @@
       "files": ["build-runtime.cjs"], "publicApi": ["build-runtime.cjs"], "sizeProfile": "Platform/engine adapter" },
     { "id": "nemo.lib.boundariesChecker", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
       "files": ["boundaries.cjs"], "publicApi": ["boundaries.cjs"], "sizeProfile": "Platform/engine adapter" },
+    { "id": "nemo.cli.nativeRuntime", "layer": "tooling-adapters", "dir": "scripts/nemo",
+      "files": ["native-runtime.cjs"], "publicApi": ["native-runtime.cjs"], "sizeProfile": "Platform/engine adapter" },
 
     { "id": "nemo.lib.jobs", "layer": "tooling-application", "dir": "scripts/nemo/lib",
       "files": ["jobs.cjs"], "publicApi": ["jobs.cjs"], "sizeProfile": "Domain/application JS or TS" },
@@ -49,7 +51,9 @@
     { "id": "nemo.test.buildRuntime", "layer": "tooling-test", "dir": "scripts/nemo",
       "files": ["build-runtime.test.cjs"], "publicApi": ["build-runtime.test.cjs"], "sizeProfile": "Test file" },
     { "id": "nemo.test.isolation", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["isolation.test.cjs"], "publicApi": ["isolation.test.cjs"], "sizeProfile": "Test file" }
+      "files": ["isolation.test.cjs"], "publicApi": ["isolation.test.cjs"], "sizeProfile": "Test file" },
+    { "id": "nemo.test.nativeRuntime", "layer": "tooling-test", "dir": "scripts/nemo",
+      "files": ["native-runtime.test.cjs"], "publicApi": ["native-runtime.test.cjs"], "sizeProfile": "Test file" }
   ],
   "layerRules": {
     "tooling-shared": { "allowedLayers": [] },
