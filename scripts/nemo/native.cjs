@@ -8,7 +8,9 @@
 const isolation = require('./lib/isolation.cjs');
 const {
   nativeHandshake,
+  readAppManifest,
   readNativeStatus,
+  releaseNativeState,
   runNativeLauncher,
 } = require('./lib/native-runtime.cjs');
 
@@ -55,12 +57,27 @@ function status(args) {
 
 async function stop(args) {
   if (!args.task || !args.owner) throw new Error('stop requires --task ID and --owner TOKEN');
+  // Read the app's own manifest BEFORE stopping: it names the directories the
+  // instance actually resolved, and it lives in the tauri-data root that the
+  // release below removes.
+  const disclosed = readAppManifest(args.task);
+  const statusBeforeStop = readNativeStatus(args.task);
   const stopped = await isolation.requestStop(args.task, args.owner, {
     timeoutMs: args['timeout-ms'] == null ? 10_000 : Number(args['timeout-ms']),
   });
-  const statusBeforeRelease = readNativeStatus(args.task);
+  const statusBeforeRelease = readNativeStatus(args.task) || statusBeforeStop;
+  // The isolated app directories are outside the task root, so releaseTask
+  // alone would leave them behind on every run. Ownership was proved by the
+  // stop above; eligibility is bound to this task's own derivation.
+  const appState = stopped.stopped
+    ? releaseNativeState(
+      args.task,
+      disclosed && disclosed.valid ? disclosed.manifest : null,
+      statusBeforeRelease && statusBeforeRelease.app ? statusBeforeRelease.app.bundle : null,
+    )
+    : null;
   const released = stopped.stopped ? isolation.releaseTask(args.task, args.owner) : null;
-  output({ ...stopped, runtime: statusBeforeRelease, released });
+  output({ ...stopped, runtime: statusBeforeRelease, appState, released });
   process.exit(stopped.stopped && released && released.released ? 0 : 1);
 }
 

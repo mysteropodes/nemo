@@ -12,6 +12,7 @@
 // build launcher already documents; the process-group primitives are imported
 // from it rather than written a second time.
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
@@ -48,6 +49,17 @@ function bundleExecutable(bundle) {
   const executable = path.join(bundle, 'Contents', 'MacOS', match[1]);
   if (!exists(executable)) throw new Error(`bundle executable missing: ${executable}`);
   return executable;
+}
+
+// The WebKit store lives under the BUNDLE identifier from Info.plist, not the
+// per-task runtime identifier: macOS keys the container by bundle and the store
+// by its UUID inside it. Observed on macOS 26.6 as
+// ~/Library/WebKit/<bundle id>/WebsiteDataStore/<uuid>.
+function bundleIdentifier(bundle) {
+  const plist = path.join(bundle, 'Contents', 'Info.plist');
+  if (!exists(plist)) return null;
+  const match = /<key>CFBundleIdentifier<\/key>\s*<string>([^<]+)<\/string>/.exec(fs.readFileSync(plist, 'utf8'));
+  return match ? match[1] : null;
 }
 
 function firstAppBundle(dir) {
@@ -212,6 +224,70 @@ function spawnApp(config) {
   return { child, closed, logsDone, drained };
 }
 
+// ---- releasing the state that lives OUTSIDE the task root ------------------
+// The isolated app directories are `<platform dir>/<identifier>`, so they are
+// NOT under the task root and `isolation.releaseTask` never sees them. Found by
+// running it: two stopped instances left their Application Support, Caches and
+// Logs directories behind for good.
+//
+// Cleanup is bound to THIS task's own derivation, never to whatever a manifest
+// claims: only a directory whose last component carries this task's identifier
+// suffix is eligible. A corrupted or hostile manifest naming the production
+// `com.strokemotion.app` directory is refused by name instead of deleted.
+function taskIdentifierSuffix(taskId) {
+  return `.nemo-task-${isolation.idKey(taskId).slice(0, 16)}`;
+}
+
+// 32 hex characters as WebKit writes them: 8-4-4-4-12.
+function dataStoreUuid(taskId) {
+  const key = isolation.idKey(taskId).slice(0, 32);
+  return [key.slice(0, 8), key.slice(8, 12), key.slice(12, 16), key.slice(16, 20), key.slice(20, 32)].join('-');
+}
+
+function webkitStoreDir(bundle, taskId) {
+  const identifier = bundle ? bundleIdentifier(bundle) : null;
+  if (!identifier) return null;
+  return path.join(os.homedir(), 'Library', 'WebKit', identifier, 'WebsiteDataStore', dataStoreUuid(taskId));
+}
+
+function nativeStateTargets(taskId, manifest, bundle) {
+  const suffix = taskIdentifierSuffix(taskId);
+  const uuid = dataStoreUuid(taskId);
+  const dirs = manifest && manifest.dirs && typeof manifest.dirs === 'object' ? manifest.dirs : {};
+  const seen = new Set();
+  const targets = [];
+  const refused = [];
+  for (const [name, value] of Object.entries(dirs)) {
+    if (typeof value !== 'string' || !path.isAbsolute(value)) {
+      refused.push({ name, value, reason: 'not an absolute path' });
+      continue;
+    }
+    const dir = path.resolve(value);
+    if (!path.basename(dir).endsWith(suffix)) {
+      refused.push({ name, value: dir, reason: `does not carry this task's identifier suffix ${suffix}` });
+      continue;
+    }
+    if (seen.has(dir)) continue;
+    seen.add(dir);
+    targets.push({ name, dir });
+  }
+  const store = webkitStoreDir(bundle, taskId);
+  // Exact name match, so this can only ever address this task's own store.
+  if (store && path.basename(store) === uuid && !seen.has(store)) targets.push({ name: 'webkitStore', dir: store });
+  return { targets, refused };
+}
+
+function releaseNativeState(taskId, manifest, bundle) {
+  const { targets, refused } = nativeStateTargets(taskId, manifest, bundle);
+  const removed = [];
+  for (const target of targets) {
+    if (!exists(target.dir)) { removed.push({ ...target, removed: false, reason: 'already absent' }); continue; }
+    try { fs.rmSync(target.dir, { recursive: true, force: true }); removed.push({ ...target, removed: true }); }
+    catch (err) { removed.push({ ...target, removed: false, reason: err.message }); }
+  }
+  return { removed, refused };
+}
+
 // Source and build identity of the checkout, plus what the app itself
 // disclosed. `ok` requires all three: owner, unchanged source/build, and a
 // live app manifest that names this task.
@@ -247,11 +323,13 @@ function nativeHandshake(taskId, ownerToken) {
 async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
   const config = nativeLaunchConfig(taskId, options);
   let startupBuild;
+  // A start that fails must NOT call isolation.releaseTask: task ids are reused
+  // across restarts (that is what makes an instance's state survive a stop), and
+  // releasing here deleted the roots of a previous, legitimately stopped
+  // instance that this launch never owned. Found by running it — a refused
+  // reservation wiped the earlier run's records.
   try { startupBuild = identity.buildIdentity(); }
-  catch (err) {
-    isolation.releaseTask(taskId);
-    throw new Error(`build identity unavailable: ${err.message}`);
-  }
+  catch (err) { throw new Error(`build identity unavailable: ${err.message}`); }
   // Shared exclusive resources are reserved BEFORE the app starts and only when
   // asked for. Two isolated instances are meant to run at the same time; it is
   // driving the one keyboard/mouse, or measuring the one GPU, that has to be
@@ -261,7 +339,6 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
     const acquired = isolation.acquireExclusiveSlot(slot, taskId, { pid: process.pid });
     if (!acquired.acquired) {
       for (const held of reservations) held.release();
-      isolation.releaseTask(taskId);
       throw new Error(`exclusive resource "${slot}" unavailable: ${acquired.reason}`);
     }
     reservations.push(acquired);
@@ -406,6 +483,11 @@ module.exports = {
   APP_MANIFEST_SCHEMA,
   assertNativePlatform,
   bundleExecutable,
+  bundleIdentifier,
+  taskIdentifierSuffix,
+  dataStoreUuid,
+  nativeStateTargets,
+  releaseNativeState,
   resolveApp,
   nativeLaunchConfig,
   readNativeStatus,

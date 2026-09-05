@@ -247,8 +247,20 @@ node scripts/nemo/native.cjs stop --task app-a --owner <token>
 build identities, and a live app manifest naming this task agree. A manifest
 left by an earlier or different run is reported as such, never accepted as this
 instance's identity. `stop` refuses a mismatched owner, terminates the owned
-process group, waits for launcher exit and then removes that task's roots,
-including its `tauri-data`. Copy wanted artifacts first.
+process group, waits for launcher exit and then removes that task's roots.
+Copy wanted artifacts first.
+
+Removing the task root is not enough on its own: the isolated app directories
+are `<platform dir>/<identifier>`, so they live outside it and
+`isolation.releaseTask` never sees them, as does the WebKit store under
+`~/Library/WebKit/<bundle identifier>/WebsiteDataStore/<uuid>`. `stop` therefore
+reads the manifest the instance wrote, and removes each directory **whose last
+component carries this task's own identifier suffix** — recomputed locally from
+the task id, never trusted from the manifest. A manifest naming the shared
+`com.strokemotion.app` directory, another task's directory or a relative path is
+refused by name and reported in `appState.refused`. A start that fails does not
+release anything it did not acquire: task ids are reused across restarts, which
+is what lets an instance's state survive a stop.
 
 `--reserve` takes the shared resources this instance needs exclusively, before
 it starts: `desktop-input` for a run that drives the one keyboard and mouse,
@@ -263,8 +275,10 @@ use an executable stub that reproduces only the app's observable contract (the
 environment it is handed, the manifest it writes), so they cover two concurrent
 instances on disjoint roots, per-task keys, handshake refusal for a silent or
 foreign manifest, owner-only stop with root removal, explicit reservation
-refusal and release, and the missing-build blocker — without a desktop, a GPU or
-a window. The environment contract itself is asserted against
+refusal and release, the missing-build blocker, derivation-bound removal of the
+isolated app directories (refusing the production directory, another task's
+directory and a relative path), and a refused start leaving an earlier
+instance's state intact — without a desktop, a GPU or a window. The environment contract itself is asserted against
 `src-tauri/src/task_runtime.rs`, so renaming a variable on one side only fails
 the suite instead of silently returning the app to shared state. The native
 resolution rules (activation, fail-closed refusals, identifier and data-store
@@ -288,12 +302,20 @@ Still required for the full acceptance contract in
   integration. The preview launcher supplies real origins, explicit Chromium
   profiles and the served identity, while R02 `test:browser` still requires its
   separate Playwright harness. A browser preview does not build WASM or the app.
-- Run two real packaged instances at once and prove the isolated Tauri roots on
-  the live desktop: the identifier, data store and app-directory overrides above
-  are implemented and unit-proved, and the launcher's environment contract is
-  proved against an app stub, but no evidence here comes from two actual Nemo
-  windows saving and reloading a project side by side. That validation needs the
-  exclusive desktop slot and is the remaining half of this bullet.
+- Two real packaged instances were run at once on 2026-09-05 and the isolated
+  roots hold on the live desktop. Both apps reported distinct identifiers and
+  app directories from Tauri's own path resolver; WebKit materialised two
+  separate stores (`~/Library/WebKit/com.strokemotion.app/WebsiteDataStore/
+  99377ca9-…` and `80a136b6-…`); both autosaved real project JSON into their own
+  `history/untitled-autosave` directory with **zero shared filenames** (9 files
+  against 24); one instance was driven through its real UI (New Project dialog,
+  named project, Create) through the accessibility tree; and the shared
+  production state was byte-for-byte untouched — `com.strokemotion.app` stayed at
+  25 files / 464K with its newest mtime predating the run, and the production
+  WebKit and Caches directories likewise. A stopped instance's state survived
+  its app exit. Still open: a restart of the same task id reading back its own
+  saved document through the UI, which was interrupted when a parallel session
+  took the `desktop-input` slot.
 - `--reserve` gives desktop input and reference GPU measurements an explicit
   exclusive reservation with a real consumer. Benchmark and input-driving
   harnesses still have to ask for those slots from their own entry points.

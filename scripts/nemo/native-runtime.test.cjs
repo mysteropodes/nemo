@@ -23,7 +23,7 @@ const appStub = path.join(scratch, 'app-stub');
 fs.writeFileSync(appStub, '#!/usr/bin/env node\n' + String.raw`
 const fs = require('node:fs');
 const path = require('node:path');
-const [capture, mode = 'manifest'] = process.argv.slice(2);
+const [capture, mode = 'manifest', appDirBase = ''] = process.argv.slice(2);
 const seen = {
   pid: process.pid,
   taskId: process.env.NEMO_TASK_ID,
@@ -37,8 +37,21 @@ const seen = {
 fs.writeFileSync(capture, JSON.stringify(seen));
 if (mode !== 'no-manifest') {
   const key = String(seen.taskKey || '');
+  let dirs = {};
+  if (appDirBase) {
+    const suffix = '.nemo-task-' + key.slice(0, 16);
+    const mine = path.join(appDirBase, 'AppSupport', 'com.strokemotion.app' + suffix);
+    const production = path.join(appDirBase, 'AppSupport', 'com.strokemotion.app');
+    const other = path.join(appDirBase, 'AppSupport', 'com.strokemotion.app.nemo-task-0123456789abcdef');
+    for (const d of [mine, production, other]) {
+      fs.mkdirSync(d, { recursive: true });
+      fs.writeFileSync(path.join(d, 'history.json'), '{}');
+    }
+    dirs = { appData: mine, appLocalData: mine, appLog: production, appCache: other, appConfig: 'relative/path' };
+  }
   const manifest = {
     schema: 'nemo.native-runtime/1',
+    dirs,
     isolated: true,
     state: 'active',
     taskId: mode === 'foreign-manifest' ? 'another-task' : seen.taskId,
@@ -73,10 +86,10 @@ function firstLine(child) {
   });
 }
 
-async function launch(task, capture, { mode = 'manifest', reserve = null } = {}) {
+async function launch(task, capture, { mode = 'manifest', reserve = null, appDirBase = '' } = {}) {
   const args = [cli, 'start', '--task', task, '--executable', appStub];
   if (reserve) args.push('--reserve', reserve);
-  args.push('--manifest-timeout-ms', '5000', '--', capture, mode);
+  args.push('--manifest-timeout-ms', '5000', '--', capture, mode, appDirBase);
   const child = spawn(process.execPath, args, {
     cwd: repoRoot,
     env: { ...process.env },
@@ -255,4 +268,75 @@ test('a missing build is a named blocker, and a bundle names its own executable'
   fs.writeFileSync(path.join(bundle, 'Contents', 'MacOS', 'ffmpeg'), '#!/bin/sh\n', { mode: 0o700 });
   assert.equal(runtime.bundleExecutable(bundle), path.join(bundle, 'Contents', 'MacOS', 'renamed-binary'));
   assert.throws(() => runtime.bundleExecutable(path.join(scratch, 'Nope.app')), /no Contents\/Info\.plist/);
+});
+
+test('stopping removes the isolated app directories and refuses everything else', async () => {
+  // The isolated app directories are `<platform dir>/<identifier>`, so they sit
+  // OUTSIDE the task root and isolation.releaseTask never sees them. Found by
+  // running two real instances: both left their Application Support, Caches and
+  // Logs directories behind after a clean stop.
+  const base = fs.mkdtempSync(path.join(scratch, 'appdirs-'));
+  const task = `native-appstate-${process.pid}`;
+  const instance = await launch(task, path.join(scratch, 'capture-appstate.json'), { appDirBase: base });
+  const suffix = runtime.taskIdentifierSuffix(task);
+  const mine = path.join(base, 'AppSupport', `com.strokemotion.app${suffix}`);
+  const production = path.join(base, 'AppSupport', 'com.strokemotion.app');
+  const other = path.join(base, 'AppSupport', 'com.strokemotion.app.nemo-task-0123456789abcdef');
+  await waitFor(() => fs.existsSync(mine), 'app directories');
+
+  const stopped = await command(['stop', '--task', task, '--owner', instance.info.ownerToken]);
+  assert.equal(stopped.code, 0, stopped.stderr || stopped.stdout);
+  await exited(instance.child);
+  const result = JSON.parse(stopped.stdout.trim().split('\n').pop());
+
+  assert.equal(fs.existsSync(mine), false, 'this task\'s own directory is removed');
+  assert.equal(fs.existsSync(production), true, 'the shared production directory is never touched');
+  assert.equal(fs.existsSync(other), true, "another task's directory is never touched");
+  const refusedNames = result.appState.refused.map((entry) => entry.name).sort();
+  assert.deepEqual(refusedNames, ['appCache', 'appConfig', 'appLog']);
+  assert.ok(result.appState.removed.some((entry) => entry.dir === mine && entry.removed === true));
+});
+
+test('cleanup eligibility is bound to the task derivation, not to what a manifest claims', () => {
+  const task = `native-targets-${process.pid}`;
+  const suffix = runtime.taskIdentifierSuffix(task);
+  const { targets, refused } = runtime.nativeStateTargets(task, {
+    dirs: {
+      appData: `/tmp/Application Support/com.strokemotion.app${suffix}`,
+      appLocalData: `/tmp/Application Support/com.strokemotion.app${suffix}`,
+      appLog: '/tmp/Application Support/com.strokemotion.app',
+      appCache: '/tmp/Application Support/com.strokemotion.app.nemo-task-0123456789abcdef',
+      appConfig: 'not/absolute',
+      appTray: 42,
+    },
+  }, null);
+  assert.deepEqual(targets.map((t) => t.name), ['appData']);
+  assert.deepEqual(refused.map((r) => r.name).sort(), ['appCache', 'appConfig', 'appLog', 'appTray']);
+  assert.match(runtime.dataStoreUuid(task), /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+});
+
+test('a refused start leaves an existing task instance state intact', async () => {
+  // Task ids are reused across restarts — that is what makes an instance's
+  // state survive a stop. A start that never took ownership must not release
+  // the roots of the run before it; releasing here destroyed a stopped
+  // instance's records during the live paired run.
+  const slot = `desktop-input-retain-${process.pid}`;
+  const task = `native-retain-${process.pid}`;
+  const roots = isolation.taskRoots(task);
+  const keepsake = path.join(roots.tauriDataDir, 'retained.json');
+  fs.writeFileSync(keepsake, '{"kept":true}');
+  const holder = isolation.acquireExclusiveSlot(slot, `native-retain-holder-${process.pid}`);
+  assert.equal(holder.acquired, true, holder.reason);
+  try {
+    const refused = await command([
+      'start', '--task', task, '--executable', appStub, '--reserve', slot,
+      '--', path.join(scratch, 'capture-retain.json'), 'manifest', '',
+    ]);
+    assert.equal(refused.code, 1);
+    assert.match(refused.stderr, /exclusive resource/);
+    assert.equal(fs.existsSync(keepsake), true, 'the earlier instance state survives a refused start');
+  } finally {
+    isolation.releaseExclusiveSlot(slot, holder.ownerToken);
+    fs.rmSync(roots.root, { recursive: true, force: true });
+  }
 });
