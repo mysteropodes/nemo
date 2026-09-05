@@ -181,7 +181,7 @@ node scripts/nemo/native-runtime.cjs input-release  --owner <slot-token>
   ids, nil/short/non-hex UUID). Plus owner-only release, a refused release
   leaving state intact, a tokenless instance refusing every release, and
   re-validation before deletion.
-- `node --test scripts/nemo/native-runtime.test.cjs` — 13 tests: disjoint roots
+- `node --test scripts/nemo/native-runtime.test.cjs` — 14 tests: disjoint roots
   and distinct website-data identities, the emitted environment satisfying the
   app-side rules, valid non-nil v4 UUIDs, `.app` bundle resolution, two live
   concurrent instances each writing their record into their own root only,
@@ -189,18 +189,50 @@ node scripts/nemo/native-runtime.cjs input-release  --owner <slot-token>
   state untouched, an unconfirmed-isolation handshake, the input slot, one
   website-data identity per task across relaunches (and a fresh one after a
   release), and a release that removes exactly this instance's store while a
-  peer task's store survives.
+  peer task's store survives, and a bundle resolving to its declared
+  `CFBundleExecutable` rather than to the sidecar that sorts before it.
 
 Both suites reach normal discovery through `tests/nemo-native-runtime.test.cjs`
 and `npm run test:rust`.
 
+## The paired two-instance desktop run (2026-09-05)
+
+Run against `Nemo.app` built from this branch by `npm run build:desktop`
+(receipt `reports/20260905T220451Z-30d3492`; bundle `Nemo` sha256
+`e5447b39565a5ca6850fb99eca3a8b6d36c932a8209fd4bca8de8f8991d0cf43`, bundled
+`ffmpeg` sha256 `91566ff440e785f3f8e7799eb2d5f346c8b3e62ba8c3290f57d8edbf1fbb98e1`),
+macOS 15 (Darwin 25.6.0), holding the `desktop-input` slot. Both instances were
+driven by real keyboard and pointer input through System Events, never by
+calling into the app.
+
+| Observation | Result |
+|---|---|
+| Instances | `r06-paired-a` pid 90343 and `r06-paired-b` pid 90640, concurrent, each with its own root and website-data UUID (`39590131-…`, `ef9a6ee4-…`). |
+| Instance record | Each app wrote `instance.json` into **its own** root, naming its task, pid, `com.strokemotion.app` and its UUID. |
+| Distinct state | A set to 47 frames / 12 fps, B to 83 frames, by typing into the timeline fields. Their 30-second autosaves landed as version history under each task's own `data/history/untitled-autosave/` — A `fps 12, totalFrames 47`, B `fps 24, totalFrames 83`. |
+| WebKit on disk | Two stores, `~/Library/WebKit/com.strokemotion.app/WebsiteDataStore/<uuid>/`, one per instance. Both apps' first launch showed a start screen with **no** Resume card, i.e. each began on an empty `localStorage`. |
+| Reload | A quit with ⌘Q, relaunched with the same task id: same root, **same** website-data UUID, and the start screen now offered *Resume Last Session*, which restored 47 frames / 12 fps. |
+| Independent cleanup | `stop` on A removed its roots (0 files left) and exactly its own store directory; B stayed running with its state, and then B — relaunched after A's store was deleted — still resumed its own 83 frames. `stop` on B removed B's store; no store from this run was left behind. |
+| Shared install | `~/Library/Application Support/com.strokemotion.app` was byte-for-byte identical before and after, by mtime/size of every entry: neither instance wrote into the real user profile. |
+
+Two defects were found by this run and by preparing for it, both fixed here:
+the per-launch website-data identity described above, and `resolveExecutable`
+taking the first executable in `Contents/MacOS` — which is the **ffmpeg
+sidecar**, not the app. Both launches exited 1 on ffmpeg's usage message while
+every launcher record still read as a started isolated instance. The bundle's
+`CFBundleExecutable` now selects the binary, and a bundle that declares none is
+refused rather than guessed.
+
 ## Limitations and open gates
 
-- **The paired two-instance desktop run is the remaining gate.** Everything
-  above is pure-logic and launcher-level. That a *real* Nemo resolves these
-  roots, and that two WKWebView website-data stores are genuinely separate on
-  disk, needs a built app, two launched instances and the exclusive input slot.
-  Browser evidence cannot substitute for it.
+- `isolation.taskRoots()` re-creates the directory skeleton when it is *read*,
+  so a check made after a release finds an empty tree rather than nothing. The
+  claim to verify after cleanup is "no files under the root", not "no root".
+- Driving real input on a shared desktop is not hermetic: another application
+  can take focus between raising a window and clicking it. Each action here
+  raises its target and acts inside one AppleScript call for that reason, and
+  every step was confirmed by a screenshot rather than by the absence of an
+  error.
 - `data_store_identifier` needs **macOS ≥ 14**, and Tauri returns no result for
   it. `webDataStore.applied` therefore means "the webview was built with this
   identity", not "WebKit accepted it". `observedPaths` is the only app-side

@@ -151,11 +151,17 @@ test('a .app bundle resolves to its inner executable and bad targets are named',
   fs.mkdirSync(macos, { recursive: true });
   const binary = path.join(macos, 'Fixture');
   fs.writeFileSync(binary, '#!/bin/sh\nexit 0\n', { mode: 0o700 });
+  // The bundle's own declaration is what selects the binary; see the sidecar
+  // regression below for why the first executable on disk is not it.
+  fs.writeFileSync(path.join(bundle, 'Contents', 'Info.plist'), `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>CFBundleExecutable</key><string>Fixture</string></dict></plist>
+`);
   assert.equal(runtime.resolveExecutable(bundle), binary);
 
   const empty = path.join(scratch, 'Empty.app');
   fs.mkdirSync(path.join(empty, 'Contents', 'MacOS'), { recursive: true });
-  assert.throws(() => runtime.resolveExecutable(empty), /no executable inside/);
+  assert.throws(() => runtime.resolveExecutable(empty), /declares no CFBundleExecutable/);
   assert.throws(() => runtime.resolveExecutable(path.join(scratch, 'Absent.app')), /app not found/);
 });
 
@@ -346,4 +352,31 @@ test('releasing a task removes exactly its own website-data store and nothing el
   assert.deepEqual(runtime.webDataStoreDirs(identifier, '00000000-0000-0000-0000-000000000000', home), []);
   assert.match(runtime.removeWebDataStore('', mine, home).reason, /no bundle identifier/);
   assert.match(runtime.removeWebDataStore(identifier, 'not-a-uuid', home).reason, /no valid website-data identity/);
+});
+
+// Nemo.app ships the ffmpeg sidecar next to the app binary, and readdir
+// returns `ffmpeg` first. Taking the first executable entry launched the
+// SIDECAR — it exits 1 on its usage message while the launcher record still
+// claimed an isolated instance had started. Found by the paired desktop run.
+test('a bundle resolves to its declared CFBundleExecutable, not the first sidecar on disk', () => {
+  const app = path.join(scratch, 'Sidecar.app');
+  const macos = path.join(app, 'Contents', 'MacOS');
+  fs.mkdirSync(macos, { recursive: true });
+  // Written in the order readdir returns them: the sidecar sorts first.
+  for (const name of ['ffmpeg', 'nemo']) fs.writeFileSync(path.join(macos, name), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  const plist = (executable) => `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>CFBundleExecutable</key><string>${executable}</string></dict></plist>
+`;
+  fs.writeFileSync(path.join(app, 'Contents', 'Info.plist'), plist('nemo'));
+  assert.equal(fs.readdirSync(macos)[0], 'ffmpeg', 'the sidecar must sort first for this test to mean anything');
+  assert.equal(runtime.bundleExecutableName(app), 'nemo');
+  assert.equal(runtime.resolveExecutable(app), path.join(macos, 'nemo'));
+
+  // Refusals are named rather than guessed: a wrong guess here starts the
+  // wrong process under a record that says the app is running isolated.
+  fs.writeFileSync(path.join(app, 'Contents', 'Info.plist'), plist('does-not-exist'));
+  assert.throws(() => runtime.resolveExecutable(app), /CFBundleExecutable "does-not-exist", which is missing/);
+  fs.rmSync(path.join(app, 'Contents', 'Info.plist'));
+  assert.throws(() => runtime.resolveExecutable(app), /declares no CFBundleExecutable; refusing to guess/);
 });

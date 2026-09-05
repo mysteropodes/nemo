@@ -19,7 +19,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const { isDeepStrictEqual } = require('node:util');
 const isolation = require('./lib/isolation.cjs');
 const identity = require('./lib/identity.cjs');
@@ -105,6 +105,22 @@ function removeWebDataStore(identifier, uuid, home = process.env.HOME) {
   };
 }
 
+// The bundle's OWN answer to "which of these is the app". Nemo.app ships the
+// ffmpeg sidecar next to the app binary in Contents/MacOS, and readdir returns
+// `ffmpeg` first: taking the first executable entry launched the sidecar,
+// which exits 1 on its usage message while every launcher record still said
+// "isolated instance started". Info.plist is the only authority here, and
+// plutil reads both the XML and the binary form.
+function bundleExecutableName(appPath) {
+  const plist = path.join(appPath, 'Contents', 'Info.plist');
+  if (!exists(plist)) return null;
+  const r = spawnSync('/usr/bin/plutil', ['-extract', 'CFBundleExecutable', 'raw', '-o', '-', plist], { encoding: 'utf8' });
+  if (r.status !== 0) return null;
+  const name = String(r.stdout || '').trim();
+  // A name with a separator would escape Contents/MacOS entirely.
+  return name && !name.includes('/') && name !== '.' && name !== '..' ? name : null;
+}
+
 // Accepts a bundle or a bare executable. A `.app` is a directory; spawning it
 // directly fails with EACCES, which reads as a permissions problem rather
 // than "you passed a bundle", so resolve it here.
@@ -113,12 +129,14 @@ function resolveExecutable(target) {
   if (!exists(resolved)) throw new Error(`app not found: ${resolved}`);
   if (resolved.endsWith('.app')) {
     const macos = path.join(resolved, 'Contents', 'MacOS');
-    const entries = fs.existsSync(macos) ? fs.readdirSync(macos) : [];
-    const binary = entries.find((name) => {
-      try { fs.accessSync(path.join(macos, name), fs.constants.X_OK); return true; } catch { return false; }
-    });
-    if (!binary) throw new Error(`no executable inside ${macos}; build the app first`);
-    return path.join(macos, binary);
+    const declared = bundleExecutableName(resolved);
+    if (!declared) {
+      throw new Error(`${resolved} declares no CFBundleExecutable; refusing to guess which binary in ${macos} is the app (it also ships sidecars)`);
+    }
+    const binary = path.join(macos, declared);
+    if (!exists(binary)) throw new Error(`${resolved} declares CFBundleExecutable "${declared}", which is missing from ${macos}; rebuild the app`);
+    fs.accessSync(binary, fs.constants.X_OK);
+    return binary;
   }
   fs.accessSync(resolved, fs.constants.X_OK);
   return resolved;
@@ -409,7 +427,7 @@ async function main() {
 
 module.exports = {
   SCHEMA, STATUS_FILE, INSTANCE_FILE, INPUT_SLOT,
-  assertNativePlatform, webDataUuid, taskWebDataUuid, validWebDataUuid,
+  assertNativePlatform, webDataUuid, taskWebDataUuid, validWebDataUuid, bundleExecutableName,
   webDataStoreDirs, removeWebDataStore, resolveExecutable, defaultAppPath,
   launchConfig, readNativeStatus, readInstanceRecord, nativeHandshake,
   stopApp, runNativeLauncher,
