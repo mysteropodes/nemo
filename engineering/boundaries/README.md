@@ -97,63 +97,6 @@ The comparator does not infer file types or detect content moves, and a new path
 still-adopted ordinary profile. Reviewing each path's profile assignment and making baseline
 provenance immutable are responsibilities of the R01/R03 and CI adoption gate.
 
-## Profiles authored against this checker (status, not adoption)
-
-Two profiles exist under [`profiles/`](./profiles); neither is wired into `npm run
-check`/`verify` or `scripts/nemo/lib/jobs.cjs` (see "What's pending" below for both):
-
-| Profile | Scope | Modules | Real result |
-|---|---|---:|---|
-| [`scripts-nemo.profile.json`](./profiles/scripts-nemo.profile.json) / [`.baseline.json`](./profiles/scripts-nemo.baseline.json), doc [`scripts-nemo.md`](./profiles/scripts-nemo.md) | `scripts/nemo/**` | 23 | 0 violations, 3 warnings, ratchet ok |
-| [`app-js.profile.json`](./profiles/app-js.profile.json) / [`.baseline.json`](./profiles/app-js.baseline.json), doc [`app-surfaces.md`](./profiles/app-surfaces.md) | `src/js/**` (candidate) | 140 | 437 `global-state` + 2 `unsupported-import` + 4 `unsupported-global` violations, 18 warnings, ratchet ok |
-
-`app-js.profile.json` is a **candidate migration inventory, not a reviewed or adopted
-profile** — see `app-surfaces.md` for the full per-category classification narrative (Rust,
-UI/style/bootstrap, generated/vendor/shader/translation exclusions, and the R01/R03
-integration contract). This increment expands it from the 80 of 140 handwritten `src/js`/
-`src/js/labs` files the checker's tokenizer could parse to **all 140**, now that the
-"ambiguous slash after `)`/`}`" division bug the prior 60-file gap depended on is fixed
-(tokenizer fix, not owned by this profile's paths). The previously-excluded 60 files —
-including the six largest, most-central application systems (`motion.js`, `timeline.js`,
-`tools.js`, `app.js`, `tweens.js`, `engine-bridge.js`) — now each get one module entry
-(`app-legacy` layer, `publicApi` = own basename, same as the original 80) and, where their
-nonblank line count exceeds the shared `"App JS unclassified (pre-R01)"` hard maximum (500),
-one exact-path size exception (owner `ivg-design`, issue `901`, expiry `2026-12-05`, ceiling
-= exact current count — 25 new exceptions, 36 total with the original 11). No exception
-raises a ceiling above what the file already measures today; none permits growth.
-
-The 437/2/4 real violations above are reported **as-is, not fixed or excepted** — manufacturing
-per-occurrence exceptions for undocumented `window.SM*` coupling, unresolved dynamic imports, or
-computed `window[...]` access would be exactly the blanket-grandfathering this checker's own
-policy forbids. `cycle`/`private-import`/`layer-violation` remain structurally vacuous for all
-140 files (near-zero static import graph in a codebase built on classic `<script>`-tag load
-order — see `app-surfaces.md` §1b), not passing.
-
-**Explicit remaining gates, none closed by this expansion:**
-
-- **R01 layer assignment** (`#897`, open) — `app-legacy` is one honest flat non-claim layer;
-  no file above has a real domain/application/features/ports/adapters/shared classification.
-- **Bare/non-`SM`-global scanner blind spots** — `analyzeSource`'s global rule only recognizes
-  the literal pattern `window.SM<Name>`; a bare `state.*` access, a non-`SM`-prefixed
-  `window.*` assignment, and a bare-alias *consumer* of a real `window.SM*` provider (written
-  without the `window.` prefix) are all invisible to it in either direction. Reported to the
-  checker-owning lead in `app-surfaces.md`'s "Checker-implementation blockers" #2; not fixed
-  here (`scripts/nemo/**` is not this profile's owned path).
-- **Import/loader-resolution gaps** — `resolveSpecifier` only resolves a literal relative
-  specifier that exists verbatim on disk; a cache-busted specifier (e.g. `import('./mod.js?v=1')`)
-  silently resolves to "external, or not found" rather than being reported as unresolved.
-  Same blockers doc, #3; not fixed here.
-- **No protected-baseline/CI adoption** — no CI lane runs this checker against a
-  protected-branch baseline for either profile above; `app-js.baseline.json`'s ratchet
-  `{"ok": true, "baselinePathCount": 140, "candidatePathCount": 140}` is a **new-seed
-  self-comparison against a file this same change introduces**, not regression evidence
-  against a protected branch. Same blockers doc, #4.
-- **Tokenizer scope remains v1** — the division/control-header-regex fix closed the specific
-  60-file gap named above; the documented remaining lexical cuts (escaped identifiers, legacy
-  numeric string escapes, a slash immediately after a bare `}` in ambiguous block/object/
-  function contexts) are unchanged and still fail the run if a file hits them (none in the
-  current 140-file corpus).
-
 ## Limitations (v1, deliberate scope cut)
 
 - **Lexical JS scanning, not AST or binding analysis.** Literal `require` calls (including
@@ -288,22 +231,14 @@ contract:
 
 ## What's pending after this increment
 
-This section records the state at the checker-implementation packet that introduced this
-file; "Profiles authored against this checker" above records what later profile-authoring
-increments (`scripts-nemo`, `app-js`) actually added against it — read both, not just this one.
-
 - No `package.json` script, no `scripts/nemo/lib/jobs.cjs` job registration (explicitly out of
   scope for this packet).
-- No real, reviewed profile for any part of the actual `src/js` tree at the time this checker
-  itself was built — only the illustrative fixtures inside `boundaries.test.cjs`. A later
-  increment (`app-js.profile.json`, see above) does now exist for `src/js/**`, but it is a
-  candidate/provisional migration inventory, not a reviewed or adopted one — real per-file
-  layer review is still R01/R03's job, not this checker's; fabricating a "reviewed" profile
-  would misrepresent unreviewed code as audited.
-- No canonical committed baseline yet at that time. Later increments do commit
-  `*.baseline.json` self-seeds (see above) as the comparison mechanism; R01/R03 still supply
-  reviewed real profiles and a later integration packet must materialize the protected-base
-  copy in standard commands/CI.
+- No real, reviewed profile for any part of the actual `src/js` tree — only the illustrative
+  fixtures inside `boundaries.test.cjs`. Producing one is R01/R03's job, not this checker's;
+  fabricating a "reviewed" profile here would misrepresent unreviewed code as audited.
+- No canonical committed baseline yet. This increment supplies the comparison mechanism; R01/R03
+  still supply reviewed real profiles and a later integration packet must materialize the
+  protected-base copy in standard commands/CI.
 - `layer-violation` was implemented alongside the five rules the R05 acceptance criteria name
   (cycle, private-import, global-state, size, expired-exception) because it falls out of the
   same module graph at near-zero extra cost, and the policy explicitly calls out forbidden

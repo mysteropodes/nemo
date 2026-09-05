@@ -1,12 +1,12 @@
 # Application-surface source classification (R05 adoption increment)
 
 Status: **coverage classification + one candidate legacy-size profile**, not an R05-closing
-adoption and not a claim that any application file has been architecturally reviewed. Produced
-against `scripts/nemo/lib/boundaries.cjs`/`boundaries-ratchet.cjs` as they exist on `origin/main`
-(commit `35f0f5f`, the merge of #943), without modifying that checker, `scripts/nemo/lib/jobs.cjs`,
-`package.json`, or `engineering/inventory/**` (R03's generated inventory, PR #944, still open —
-used here only as read-only context, never edited, and never waited on: see "Relationship to
-R03 #944" below).
+adoption or a claim that application files have been architecturally reviewed. The original
+80-file classification was authored against `35f0f5f` (#943). Candidate `c9ab634` combines
+that profile work from #948 with the #957 tokenizer correction (`d677989`) and expands the
+profile to all **140 handwritten `src/js/**` files**. This documentation correction preserves
+both JSON artifacts from `c9ab634` exactly; it changes no checker, application source,
+`scripts/nemo/lib/jobs.cjs`, `package.json`, or `engineering/inventory/**` content.
 
 Scope: the application source the previous `scripts/nemo/**` increment
 ([`scripts-nemo.md`](./scripts-nemo.md)) explicitly excluded — `src/**`, `src-tauri/src/**`,
@@ -48,183 +48,135 @@ claim to.
 
 ## Category 1 — Application JS (`src/js/**`)
 
-143 `.js` files (105 at `src/js/*.js`, 38 at `src/js/labs/*.js`), counted by `find src/js -name
-'*.js' | wc -l`. **140 of these 143** load as classic global `<script>` tags (of the 132
-`<script>` tags in `src/index.html`, 130 point at a `src/js/**` file; the other 2 are an inline
-script and `paper-full.min.js`) — confirmed by `grep -l "^import \|require(" src/js/*.js
-src/js/labs/*.js` matching only one file (`opentype.min.js`, vendor, itself excluded below) for
-*lexical* `import`/`require` syntax, and by `04_MODULARITY_POLICY.md`'s own "Legacy migration"
-step 4 ("Migrate from classic global script order toward ESM..."), which is still open work, not
-done. **The other 3 are an execution-mode exception the lexical grep above cannot see**:
-`geometry-wasm-loader.js` and `vectorize-wasm-loader.js` load via `<script type="module"
-src="js/...">` (`src/index.html:2429–2430`), and `vectorize-worker.js` is not a `<script>` tag at
-all — `vectorize-wasm-loader.js:29` spawns it as a module Web Worker (`new Worker(new
-URL('vectorize-worker.js', import.meta.url), { type: 'module' })`). Neither loader matches the
-grep above because both reach the network via a dynamic `import()` call inside module scope, not
-a static top-of-file `import` statement — lexical import/require syntax and script execution mode
-are two different axes, and "every application file uses classic `<script>` tags" is the
-inaccurate conflation of the two this packet is correcting here. This has a direct, measured
-consequence for every rule below.
+There are **143 `.js` files** (105 directly in `src/js/`, 38 in `src/js/labs/`): **140
+handwritten files** with 104,855 nonblank lines, plus three vendored `.js` files excluded on
+provenance grounds (Category 4). File membership and execution mode are different counts.
+The 143-file population divides as follows in the source at `c9ab634`:
 
-### 1a. Lexically unsupported — 63 of 143 files, excluded from the candidate profile
+| Execution/source population | Files | Evidence |
+|---|---:|---|
+| Classic startup script tags pointing into `src/js/**` | 128 | `src/index.html`; includes the three vendor `.js` files, so 125 are handwritten |
+| Module startup scripts | 2 | `geometry-wasm-loader.js`, `vectorize-wasm-loader.js`, both `type="module"` |
+| Module worker, with no startup script tag | 1 | `vectorize-worker.js`, constructed by the vectorize launcher |
+| Labs files with no startup script tag | 12 | Exact filenames below; tag absence alone does not establish runtime reachability |
 
-Running the checker's own `extractImports` (unmodified, read-only) against every file found
-**63 files (44%) throw the documented "ambiguous slash after `)`" tokenizer failure**
-(`scripts/nemo/lib/boundaries.cjs`'s literal v1 scope cut, same failure mode already recorded
-for `scripts/nemo/lib/receipt.cjs` in `scripts-nemo.md`'s "Coverage limits") — a run-level
-failure (exit 2 per `README.md`), not a per-file violation, so any file in this list **must** be
-left out of `modules[].files` entirely or the checker cannot run at all:
+`src/index.html` has **132 script tags** altogether: the 130 file tags into `src/js/**`
+above, one inline script, and `paper-full.min.js`. It therefore does not load all 140
+handwritten files as classic scripts. The twelve Labs files without startup tags are
+`src/js/labs/{auto-actions.js,clip-mask-bake.js,command-palette.js,layer-effects-bake.js,
+lipsync-assistant.js,oca-export.js,rig-deform.js,screentone-bake.js,shader-effects-bake.js,
+storyboard-mode.js,timelapse.js,timeline-zoom.js}`.
 
-- `src/js/app.js`, `audio-bridge.js`, `bitmap-brush.js`, `bpm-grid.js`, `brush-editor.js`,
-  `brush-menu-bridge.js`, `camera.js`, `color-picker.js`, `draw-bridge.js`, `effects-panel.js`,
-  `engine-bridge.js`, `eraser-bridge.js`, `export.js`, `expr-bake.js`, `figma-import.js`,
-  `gradient-bridge.js`, `image-mesh.js`, `images.js`, `layer-inout.js`, `lipsync.js`,
-  `lottie-preview.js`, `markers.js`, `motion-graph.js`, `motion.js`, `native-video-bridge.js`,
-  `path-fx.js`, `project.js`, `reference-bridge.js`, `render-manager.js`, `rig-bridge.js`,
-  `rig-widget.js`, `rulers-bridge.js`, `second-viewer.js`, `select-bridge.js`, `shape-bridge.js`,
-  `shapes-panel.js`, `storyboard.js`, `stroke-modeler.js`, `symmetry-bridge.js`,
-  `text-animator.js`, `text-selector.js`, `timeline-zoom.js`, `timeline.js`, `tools.js`,
-  `tracker-panel.js`, `tracker.js`, `tweens.js`, `ui.js`, `vector-text-bridge.js`,
-  `vectorize-bridge.js`, `viewtools-bridge.js`
-- `src/js/labs/canvas-grid.js`, `french-curve.js`, `predictive-stroke.js`, `reference-3d.js`,
-  `rig-deform.js`, `speed-lines.js`, `storyboard-mode.js`, `timelapse.js`, `vector-sculpt.js`
-- `src/js/delaunator.vendor.js`, `mp4box.all.min.js`, `opentype.min.js` (also vendor — see
-  Category 4; excluded twice-over)
+The module paths have different responsibilities:
 
-**This is the concrete checker gap this packet reports to root**: the excluded 63 files carry
-**80,688 of the tree's 105,591 nonblank lines (76%)** — including the six largest and most
-central application files (`motion.js` 13,897 lines, `timeline.js` 11,870, `tools.js` 8,618,
-`app.js` 5,401, `tweens.js` 5,270, `engine-bridge.js` 4,670). A profile built only from the
-files the checker can currently parse covers **less than a quarter of application JS by volume**
-and misses the files most likely to carry real cycles or forbidden edges if this codebase ever
-adopts ESM.
+- [`geometry-wasm-loader.js`](../../../src/js/geometry-wasm-loader.js) dynamically imports
+  the generated geometry glue (`../wasm/geometry_wasm.js?v=` plus its cache token).
+- [`vectorize-wasm-loader.js`](../../../src/js/vectorize-wasm-loader.js) constructs
+  `new Worker(new URL('vectorize-worker.js', import.meta.url), { type: 'module' })` on demand.
+  The launcher does **not** dynamically import the vectorize WASM glue.
+- [`vectorize-worker.js`](../../../src/js/vectorize-worker.js) performs that dynamic import
+  inside the worker (`../wasm-vectorize/vectorize_wasm.js?v=` plus its cache token).
 
-**Two populations are in play here and should not be read as one**: the 63/80,688/105,591 figures
-above count all 143 `.js` files, including the 3 vendored files already named for exclusion on
-provenance grounds in Category 4 (`delaunator.vendor.js`, `mp4box.all.min.js`, `opentype.min.js`
-— 736 nonblank lines combined, `wc -l` per file after stripping blanks). Restricting to the
-**140 handwritten files** this packet actually owns review of, the same gap is **60 files /
-79,952 of 104,855 nonblank lines — still 76%** omitted. The vendor files were never candidates
-for the lexical parse regardless of the tokenizer bug (Category 4 excludes them on provenance,
-not on parse failure), so their presence in the all-`.js` count above should not be read as the
-tokenizer gap being larger than it is; both figures are reported so neither population is
-implied by the other.
+Static top-level import syntax, dynamic imports, script-tag mode, and worker construction are
+separate source facts; searching only for top-level `import`/`require` cannot classify them.
 
-Closing this gap requires either an AST-based inventory (the checker's own
-`README.md` already says so — "Use a parsed R03 inventory before broader adoption") or
-extending the tokenizer past its documented v1 cut; both are checker-implementation changes
-explicitly out of this packet's owned paths (`engineering/boundaries/**`, not
-`scripts/nemo/**`). Reproduce (both directories, 63 lines of output): `node -e "const
-b=require('./scripts/nemo/lib/boundaries.cjs'); const fs=require('fs'); for (const d of
-['src/js','src/js/labs']) fs.readdirSync(d).filter(f=>f.endsWith('.js')).forEach(f=>{try{
-b.extractImports(fs.readFileSync(d+'/'+f,'utf8'))}catch(e){console.log(d+'/'+f, e.message)}})"`.
+### 1a. Lexical coverage — the former 60-file handwritten gap is closed on this candidate
 
-### 1b. Candidate profile — 80 files, [`app-js.profile.json`](./app-js.profile.json)
+Before #957, the tokenizer rejected ordinary division after `)`/`}`. The original candidate
+could therefore declare only 80 handwritten files (24,903 nonblank lines), omitting 60
+handwritten files (79,952 lines). Counting the three vendor `.js` files as well gave the older
+63-of-143 / 80,688-of-105,591-line figures. Those were two different populations and are now
+**historical exclusion counts**, not the current profile's coverage.
 
-The remaining 80 files (24,903 nonblank lines) parse without error. For these, real
-`require`/`import` edges are near-zero — `extractImports` finds **exactly one** local edge in
-the entire 80-file set (`src/js/psd-import-bridge.js:30`, a dynamic `import('./ag-psd.vendor.mjs')`
-to an un-declared vendor `.mjs` file, correctly left as an unresolved relative reference per
-the checker's own documented scope). That target is itself a two-hop chain, not a leaf: the
-esm.sh-bundled `ag-psd.vendor.mjs` has its own static import at line 2,
-`import { Buffer as __Buffer$ } from "./node-buffer-shim.vendor.mjs"` — so the real edge is
-`psd-import-bridge.js:30 → ag-psd.vendor.mjs → node-buffer-shim.vendor.mjs`. Both targets are
-`.mjs`, not `.js`, so neither was ever inside the 143-file population §1/§1a count — they are
-named explicitly in Category 4 below so this chain is not a silent omission. This is not a
-modeling gap this packet introduced — it is
-the accurate, mechanical shape of an app built on global `<script>` load order: **cycle,
-private-import and layer-violation are structurally vacuous here because there is close to no
-static import graph to violate**, not because the code is clean of coupling (CLAUDE.md's own
-`window.SM*` bridge pattern is exactly the real, unmodeled coupling — see 1c).
+The tokenizer correction in `d677989` closes that specific division/control-header-regex
+failure. `c9ab634` adds the previously omitted 60 handwritten files, including `motion.js`,
+`timeline.js`, `tools.js`, `app.js`, `tweens.js`, and `engine-bridge.js`. All 140 handwritten
+files now have one module entry each. The three vendored `.js` files and two vendored `.mjs`
+files remain excluded for provenance, regardless of whether the tokenizer can parse them.
 
-Given that, and given R01 has not assigned real layers to application files, `app-js.profile.json`
-declares:
+This is lexical and per-path coverage. It does not supply reviewed layers, a complete
+provider/consumer graph, or runtime acceptance. The tokenizer remains a lexical scanner;
+remaining unsupported forms such as escaped identifiers, legacy numeric string escapes, and
+ambiguous bare-`}` slash contexts remain outside its documented scope.
 
-- **One flat, honestly-named layer, `app-legacy`**, `allowedLayers: ["app-legacy"]` (permissive
-  only to itself) — not a claim that these 80 files share one real architectural layer, a
-  disclosure that no real layer classification exists yet for them.
-- **`publicApi` = the file's own basename** for every module — not a claim that every export is
-  intentionally public, a disclosure that no per-file API review has happened, so nothing is
-  asserted private (asserting privacy without review would fabricate `private-import` findings
-  no one has verified).
-- **One size profile, `"App JS unclassified (pre-R01)"` (warn 350 / hard max 500)** — the more
-  permissive of `04_MODULARITY_POLICY.md`'s two applicable JS rows ("Feature UI JS or TS"),
-  chosen because these files are predominantly UI-facing (`*-panel.js`, `*-bridge.js` naming
-  throughout), used uniformly rather than guessing per-file which of "Domain/application" or
-  "Feature UI" each belongs to — that split is R01's job.
-- **11 exact-path size exceptions** (owner `ivg-design`, issue `901`, expiry `2026-12-05` as a
-  review checkpoint, not a remediation deadline) for the 11 files already over 500 nonblank
-  lines, each ceiling set to the file's exact current count — the "exact-path legacy no-growth
-  ceiling" the task names: `feedback-bridge.js` (581), `group-bridge.js` (842), `i18n.js`
-  (4241 — see 1c below for why this one gets a distinct reason), `linked-media.js` (748),
-  `media-library.js` (884), `nemo-script.js` (667), `rive-export.js` (963),
-  `shader-effects-library.js` (1312), `subselect-bridge.js` (539), `tutorial.js` (1864),
-  `labs/labs-float-panel.js` (607). None of these ceilings permit growth beyond today's
-  measured count; they only prevent an immediate false failure on files nobody has reviewed yet.
+### 1b. Candidate profile — 140 files, [`app-js.profile.json`](./app-js.profile.json)
 
-[`app-js.baseline.json`](./app-js.baseline.json) is a byte-identical copy of the candidate,
-checked in as the first ratchet checkpoint (no prior reviewed application-JS profile exists to
-diff against) — same convention as `scripts-nemo.baseline.json`.
+The expanded candidate retains the original provisional policy:
+
+- **One flat layer, `app-legacy`**, with `allowedLayers: ["app-legacy"]`. This records that
+  real domain/application/features/ports/adapters/shared assignments remain unreviewed.
+- **`publicApi` = the file's own basename** for every module. This exposes the mechanical
+  inventory without pretending that per-file public/private API review has occurred.
+- **One size profile, `"App JS unclassified (pre-R01)"`**, warn 350 / hard maximum 500.
+  It uses the policy's Feature UI ceiling provisionally rather than guessing each real layer.
+- **36 exact-path size exceptions**, comprising the original 11 plus 25 for newly covered
+  files. Each names owner `ivg-design`, issue `901`, expiry `2026-12-05` as a review checkpoint,
+  and the file's current nonblank line count as its ceiling. The JSON enumerates every path;
+  none of these ceilings permits growth beyond the measured source.
+
+The import-only graph still cannot describe the application's coupling. For example,
+`psd-import-bridge.js:30` dynamically imports `./ag-psd.vendor.mjs`, whose line 2 statically
+imports `./node-buffer-shim.vendor.mjs`. Both targets are vendor `.mjs` files outside the
+143-file `.js` count and outside this profile. The current checker drops such resolved targets
+outside its declared modules; it does not validate that vendor dependency. The two generated
+WASM imports above have computed targets and are reported as unsupported imports. Worker
+construction and HTML startup order are not import edges modeled by this checker.
+
+**Zero cycle/private-import/layer-violation findings are structurally vacuous for this
+140-file candidate, not evidence of clean coupling.** Meaningful checks require reviewed
+per-file layers/APIs and dependency evidence. ESM migration can provide explicit import
+edges, but it is **not a prerequisite** to modeling existing classic scripts: a reviewed
+global/provider-consumer inventory, reconciled with startup and worker relationships, can
+also supply those edges. That route remains to be designed, reviewed, and integrated; this
+profile does not implement it or equate R03's UI-surface rows with module dependencies.
+
+[`app-js.baseline.json`](./app-js.baseline.json) remains byte-identical to the candidate.
+The expansion updates both files together as a **provisional self-seed**, not a protected-base
+ratchet result or architecture adoption.
 
 ### 1c. `i18n.js` — translation table, not logic (4,241 nonblank lines)
 
-`src/js/i18n.js` is the one file in this set whose bulk is data, not control flow — a
-translation table embedded in hand-written JS (there is no separate locale-data format in this
-codebase; confirmed `find . -iname '*locale*' -o -iname '*i18n*'` matches only this one file).
-`04_MODULARITY_POLICY.md`'s Exceptions section says explicitly: "do not split a shader catalog
-or translation table merely to satisfy an application-code line budget." Its exception above
-carries that distinct reason rather than the generic "legacy pre-R01" text used for the other
-ten, so a future reviewer does not mistake a translation table for an oversized logic file that
-needs decomposing.
+`src/js/i18n.js` embeds a translation table in handwritten JS. It remains in the 140-file
+profile with a distinct size-exception reason. `04_MODULARITY_POLICY.md` explicitly excludes
+splitting translation tables merely to satisfy an application-code line budget. The other
+35 size exceptions retain their own exact paths and legacy rationale; this classification
+does not approve decomposition or exempt any file from future ownership review.
 
-### 1d. Real signal the candidate profile already finds
+### 1d. Recorded signal from the expanded candidate
 
-Running `node scripts/nemo/boundaries.cjs engineering/boundaries/profiles/app-js.profile.json
---json` against the real, unmodified tree (validated on this branch): **exit 1, 80 modules, 0
-cycle / 0 private-import / 0 layer-violation (vacuous per 1b) / 0 size violations (11 ceilings
-absorb today's count) / 7 size warnings** (files between 350–500 lines) **/ 2 `unsupported-import`
-violations** (`geometry-wasm-loader.js:23`, `vectorize-worker.js:18` — both a non-literal
-`import()`/`require()` target, reported per-rule rather than crashing the run) **/ 161
-`global-state` violations across 71 of the 80 modules** (one diagnostic per **distinct**
-`window.SM*` global accessed per module, not one per raw access — verified directly:
-`ae-camera-export.js` has 5 raw `window\.SM[A-Za-z]` occurrences across 3 distinct globals
-(`SMKitsu`, `SMCamera`, `SMExport`) and the checker reports exactly 3 violations for it, one per
-global, each pointing at that global's first accessed line. `app-legacy` is not the checker's
-hardcoded `"adapters"`/`"bootstrap"` exemption — the same naming-mismatch limitation
-`scripts-nemo.md` already flagged, but with real teeth here: it is not overridden by fabricating
-a layer named `adapters`, since that would misrepresent every one of these files as an adapter).
-**161 is a lower bound on two independent axes, not the real count or the real access volume**:
-it already excludes the 63 files in §1a entirely, and even within these 80 files it is
-deduplicated per distinct-global-per-module rather than counting every raw access (above) — the
-six largest files in 1a (`motion.js`, `timeline.js`, `tools.js`, `app.js`, `engine-bridge.js`,
-`select-bridge.js`) are exactly the ones a `grep -c "window\.SM[A-Za-z]"` shows access it most
-(117, 101, 53, and more occurrences respectively) and none of them are visible to this profile.
-161 should therefore be read as "at least 71 modules touch at least one undeclared global each,"
-not as an inventory of every `window.SM*` access or as any kind of reviewed architectural-debt
-allowance — it is a raw, mechanical diagnostic count.
-This packet does not add 71 fabricated per-occurrence exceptions to force a clean run — per
-`README.md`, an active exception "applies only to its exact file/rule," and manufacturing 161 of
-them for intentional, undocumented-by-R01 architecture would be exactly the "blanket
-grandfathering" acceptance criterion 1 forbids. The candidate is reported here as a true,
-reproducible, currently-failing result — not something this packet is scoped to turn green.
+The `c9ab634` commit records this command against its unmodified source:
 
-**Deliberate-violation evidence** (temporary scratch copy, not committed, reproducible): copying
-`src/js/` to a scratch root, appending 250 lines to `abr-import.js` (no existing exception, 278 →
-528 nonblank lines) and one line to `i18n.js` (past its 4241-line exception ceiling) and
-re-running against `--root <scratch>` produces exactly two new `size` violations —
-`"528 nonblank lines exceeds hard maximum 500"` and `"4242 nonblank lines exceeds excepted
-ceiling 4241"` — confirming both the ordinary hard-max path and the exact-path exception ceiling
-actually block growth, not just the illustrative fixture in `scripts-nemo.fixture/`. The
-`--baseline app-js.baseline.json` ratchet checkpoint against the real tree reports
-`{"ok": true, "baselinePathCount": 80, "candidatePathCount": 80, "violations": [], "reductions":
-[], "removals": []}` — self-consistent as the first checkpoint, independent of the ordinary
-check's `global-state`/`unsupported-import` findings above (ratchet only compares policy
-ceilings between the two profiles, not live source). **This `{"ok": true}` is a new-seed
-self-comparison, not regression evidence against a protected branch**: `app-js.baseline.json`
-is a file this same packet introduces — neither this candidate's own parent commit nor
-`origin/main` contains a prior copy to diff against. The ratchet only starts doing its job
-(catching a *later* commit silently raising a ceiling) once that later commit is checked
-against this seed; it has not caught anything yet, and none is claimed here.
+```sh
+node scripts/nemo/boundaries.cjs engineering/boundaries/profiles/app-js.profile.json --baseline engineering/boundaries/profiles/app-js.baseline.json --json
+```
+
+Its recorded result is **exit 1, 140 modules, 437 `global-state` violations, 2
+`unsupported-import` violations, 4 `unsupported-global` violations, 18 size warnings,
+0 size violations, and 36 applied size exceptions**. The two unsupported imports are the
+computed generated-glue imports in `geometry-wasm-loader.js:23` and `vectorize-worker.js:18`.
+The four unsupported globals are computed `window[...]` accesses. These diagnostics are
+retained as reported findings; none is fixed or excepted by the profile expansion or this
+documentation correction.
+
+The global count is deduplicated by distinct recognized `window.SM*` property per module,
+not by raw access. It also misses bare globals, non-`SM` window properties, and bare-alias
+consumers (see the remaining blockers below). It is therefore a mechanical diagnostic count,
+not a complete coupling inventory or an accepted debt allowance. No adapter-layer fiction
+or blanket global exception is used to manufacture a passing result.
+
+The recorded ratchet result is `{"ok": true, "baselinePathCount": 140,
+"candidatePathCount": 140, "violations": [], "reductions": [], "removals": []}`. This compares
+the expanded candidate to its own updated seed. The parent contains the earlier 80-file
+baseline; this result does **not** compare against that parent or a protected-branch baseline.
+Protection against later silent growth still requires an independently selected, immutable
+baseline and standard-command/CI adoption.
+
+The original 80-file packet separately recorded two scratch size-growth failures:
+`abr-import.js` grew from 278 to 528 nonblank lines (hard maximum 500), and `i18n.js` from
+4241 to 4242 (exception ceiling 4241). That historical evidence covers those two retained
+paths; it is not a fresh validation of every new exception. This documentation-only pass
+checks artifact/source consistency and preserves the JSON bytes; it does not rerun application
+tests or promote the recorded candidate results to full R05 acceptance.
 
 ## Category 2 — Rust (`src-tauri/src/**`, `geometry-wasm/src/**`)
 
@@ -272,9 +224,10 @@ committed key is the public half, not a secret.
 **Excluded entirely — neither HTML nor CSS is JS.** `boundaries.cjs` tokenizes JS import syntax;
 it has no HTML tag parser and no CSS `@import` grammar. `src/index.html` (2,455 lines) is this
 codebase's literal bootstrap: it is not just markup, it is the ordered list of 132 `<script>`
-tags (130 classic, 2 `type="module"` — see Category 1) that IS the application's real
-load-order dependency graph — but that graph lives in HTML attribute order, a shape this
-checker's `resolveSpecifier` has no concept of. `src/css/style.css` (2,850 lines) and
+tags: 128 classic file tags into `src/js/**`, 2 module file tags, one inline script, and
+`paper-full.min.js` (Category 1). Their ordering records startup relationships, but cannot
+by itself describe every global/provider-consumer or worker edge. The checker does not parse
+that HTML order. `src/css/style.css` (2,850 lines) and
 `src/css/tutorial.css` (169 lines) are stylesheets; `04_MODULARITY_POLICY.md` already names a
 dedicated "Stylesheet" size profile (250/350 — both files already exceed it, `style.css` by a
 wide margin), reserved for whatever future dedicated tool actually parses CSS; not retrofitted
@@ -282,7 +235,7 @@ onto a JS-lexical checker here.
 
 | Path | Lines | Note |
 |---|---:|---|
-| `src/index.html` | 2455 | 132 `<script>` tags = real load-order graph, unparsed by this tool |
+| `src/index.html` | 2455 | 132 script tags; startup order is unparsed by this tool |
 | `src/css/style.css` | 2850 | exceeds policy's Stylesheet hard max (350) today |
 | `src/css/tutorial.css` | 169 | within policy's Stylesheet hard max |
 
@@ -298,9 +251,9 @@ entry; each is named with its exclusion reason so none is a silent omission.
 | Path | Reason |
 |---|---|
 | `src/paper-full.min.js` | Paper.js build, minified; also unparseable (single-line minified body) |
-| `src/js/delaunator.vendor.js` | vendored (filename says so), also in the §1a lexical-failure list |
-| `src/js/mp4box.all.min.js` | vendored, minified, also in the §1a lexical-failure list |
-| `src/js/opentype.min.js` | vendored, minified, also in the §1a lexical-failure list |
+| `src/js/delaunator.vendor.js` | vendored; excluded on provenance, independent of lexical support |
+| `src/js/mp4box.all.min.js` | vendored, minified; excluded on provenance |
+| `src/js/opentype.min.js` | vendored, minified; excluded on provenance |
 | `src/js/ag-psd.vendor.mjs` | vendored esm.sh bundle (`ag-psd@31.0.2`), `.mjs` — outside the 143 `.js`-file count in Category 1; reached only via `psd-import-bridge.js:30`'s dynamic `import()` (§1b) |
 | `src/js/node-buffer-shim.vendor.mjs` | vendored Node `Buffer` shim, `.mjs` — outside the 143 `.js`-file count; reached only via `ag-psd.vendor.mjs:2`'s static `import`, not referenced directly by any application file (§1b) |
 
@@ -333,108 +286,76 @@ application source).
 
 ## Validation evidence
 
-- `node scripts/nemo/boundaries.cjs engineering/boundaries/profiles/scripts-nemo.profile.json`
-  and `... --baseline engineering/boundaries/profiles/scripts-nemo.baseline.json --json` —
-  re-run unmodified on the rebased branch (`35f0f5f` base) to confirm the prior accepted
-  increment still holds: exit 0, `23 module(s), 0 violation(s), 3 warning(s)`; ratchet
-  `{"ok": true, "baselinePathCount": 23, "candidatePathCount": 23}` — unchanged from
-  `scripts-nemo.md`'s own recorded evidence, confirming no regression from the rebase onto
-  `#943`/`#901`'s merged correction.
-- `node scripts/nemo/boundaries.cjs engineering/boundaries/profiles/app-js.profile.json --json`
-  → exit 1 (real findings, not a crash) — see §1d for the full breakdown.
-- `node scripts/nemo/boundaries.cjs engineering/boundaries/profiles/app-js.profile.json
-  --baseline engineering/boundaries/profiles/app-js.baseline.json --json` → ratchet
-  `{"ok": true, "baselinePathCount": 80, "candidatePathCount": 80, "violations": [], "reductions":
-  [], "removals": []}`.
-- `validateProfile` (invoked internally before any source read) accepts both
-  `app-js.profile.json` and `app-js.baseline.json` without error.
-- Deliberate-violation scratch test in §1d: two forced-growth cases (`abr-import.js` past
-  hard max, `i18n.js` past its exact-path exception ceiling) each produce exactly the expected
-  new `size` violation and nothing else changes.
-- All counts above (143/63/80/24,903/80,688/105,591 lines, 140/60 handwritten-only per §1a; 16
-  Rust files; 6 shaders; 10 generated; 4 vendor `.js` + 2 vendor `.mjs`) are reproducible
-  directly from the commands quoted inline in each section — none are asserted without a
-  command.
+- **Source/artifact consistency:** direct `.js` enumeration and HTML script-attribute parsing
+  reproduce Category 1's 143 total / 140 handwritten files, 104,855 handwritten nonblank
+  lines, 128 classic startup file tags, 2 module file tags, 1 module worker, and 12 Labs files
+  without startup tags. Reading the loader/worker source confirms who constructs the worker
+  and who imports each generated WASM glue module.
+- **Preserved candidate:** both app-js JSON artifacts remain exactly as committed in `c9ab634`,
+  each declaring 140 modules and 36 exact-path size exceptions; their bytes are identical to
+  each other. The recorded checker and self-seed comparison results are in §1d. This pass
+  does not independently rerun those checks or claim an application/CI pass.
+- **Prior tooling profile:** `c9ab634` records the unchanged `scripts-nemo` result as 23
+  modules, 0 violations, 3 warnings, and a passing self-seed comparison. Neither tooling
+  profile artifact is modified here.
+- **Documentation correction:** relative links and the two-document diff are checked. The
+  accidental `c9ab634` change to `engineering/boundaries/README.md` is removed exactly;
+  its profile-specific narrative belongs in this document. Other checker-owner changes stay
+  on their separate branch.
 
 ## Coverage limits (explicit, per task instructions)
 
-- **This is not a reviewed architecture profile.** `app-legacy` is one honest, flat,
-  non-claim layer. No file above has been assigned its real domain/application/features/ports/
-  adapters/shared layer — that is R01/#897's job, still open. Treat `app-js.profile.json` as a
-  size + global-state instrument only, not evidence any file's coupling has been reviewed.
-- **`private-import`/`cycle`/`layer-violation` are vacuous for the 80-file candidate today**,
-  not passing — there is close to no static import graph in this codebase to check (§1b). This
-  will only become a meaningful check once ESM migration (`04_MODULARITY_POLICY.md`'s own
-  pending "Legacy migration" step 4) gives these files real edges to model.
-- **76% of application JS by volume (63 files, 80,688 lines) is entirely outside this or any
-  boundaries profile** because the checker's tokenizer cannot parse it — see §1a for the exact
-  list and the reproduction command. This is the single largest concrete gap this packet found;
-  it is a checker-implementation limitation, not something a profile author can work around
-  from `engineering/boundaries/**` alone.
-- **161 real `global-state` violations are reported, not fixed or excepted** — see §1d. Fixing
-  application source is explicitly out of this packet's owned paths.
-- **No `package.json` script, no `scripts/nemo/lib/jobs.cjs` registration, no CI wiring** for
-  either `app-js.profile.json` or the Category 2–4 classifications above — matching this
-  packet's task framing ("adoption increment, not R05 closure") and `scripts-nemo.md`'s own
-  precedent. The remaining adoption gate is explicit: R01 must assign real layers before
-  `layer-violation`/`private-import` mean anything for application code; the 63-file lexical gap
-  must close (checker change, not owned here) before any profile can claim to cover application
-  JS by volume, not just by file count; and CI/`jobs.cjs` wiring for any of this remains a
-  separate, later packet exactly as `scripts-nemo.md` deferred it for tooling.
-- **No `CODEOWNERS`, no per-module reviewer sign-off tooling** exists in this repository —
-  same fact as `scripts-nemo.md`; owner attribution above is the issue-level accountable owner,
-  not a verified per-file reviewer.
-- **`app-js.baseline.json`'s ratchet `{"ok": true}` is a new-seed self-comparison, not
-  regression evidence against a protected branch** — see §1d. No prior commit on `origin/main`
-  or on this candidate's own parent contains this baseline file; the ratchet gate starts
-  protecting against silent ceiling growth only from the *next* commit checked against this
-  seed onward, not from this one.
+- **No reviewed architecture profile.** `app-legacy` remains a flat provisional layer, and
+  each own-basename public API remains unreviewed. R01/#897 layer assignment and the reviewed
+  module/provider-consumer inventory are still required.
+- **Lexical coverage is not graph coverage.** All 140 handwritten files are declared, but
+  the zero import-graph findings do not establish absence of cycles, private access, or
+  forbidden layer edges. Reviewed global/provider-consumer modeling is a valid route for
+  current classic scripts; ESM migration is another route, not the sole prerequisite.
+- **437 global-state, 2 unsupported-import, and 4 unsupported-global findings remain.**
+  Neither profile content nor this documentation fixes source or checker behavior.
+- **No app-profile standard-command/CI adoption.** This candidate does not add a
+  `package.json` script or `scripts/nemo/lib/jobs.cjs` job for the app profile, or wire its
+  protected baseline into CI. Rust and UI/style/generated classifications also remain
+  separate from JS checker enforcement. Integration remains a separate owned packet.
+- **No per-file reviewer sign-off.** The issue's accountable human owner does not establish
+  an architecture review of every file or the provisional size exceptions.
+- **The baseline is a provisional self-seed.** Updating candidate and baseline together to
+  140 files establishes internal agreement only. A protected-base baseline and independent
+  change review are still needed before claiming a regression gate.
 
-## Checker-implementation blockers (out of this packet's owned paths — not fixed here)
+## Checker findings and remaining adoption gates
 
-An independent review of this PR's head reported four `scripts/nemo/lib/boundaries.cjs` defects
-beyond the already-documented "ambiguous slash" tokenizer cut (§1a). Each repro below was
-independently re-read against current source before being recorded here; none is fixed in this
-packet — `scripts/nemo/**` is not an owned path — and none is worked around by loosening
-`app-js.profile.json`'s rules or ceilings.
+The original #948 review recorded four findings. The selected `c9ab634` tree includes the
+separate #957 correction for the first; the other limitations below remain in that exact
+candidate. This documentation pass changes no `scripts/nemo/**` file and does not adopt later
+checker-owner work merely because it exists on another branch.
 
-1. **Parser — ordinary division after `)`/`}` is rejected, not just genuinely ambiguous slash.**
-   `boundaries.cjs:163`'s "ambiguous slash" guard fires on any `/` immediately following `)` or
-   `}`, which includes plain arithmetic division. Verified division-after-`)` in files already
-   excluded by §1a: `app.js` (`Math.round(v*1000)/1000`), `motion.js`
-   (`(next.x - prev.x) / 2`), `timeline.js` (`Math.floor((now-playClock)/frameMs)`), `tools.js`
-   (`Math.atan2(dy,dx)/step`), `camera.js` (division inside its bisection loop). Declaring any
-   of these files in a profile aborts the entire `checkProfile` run (uncaught throw inside the
-   per-file loop, `boundaries.cjs:388`) with no JSON report at all, not a per-file violation —
-   this is why §1a's 63 files cannot appear in `modules[].files` today and is the largest
-   concrete reason this profile has no size/global-state signal for most of application JS by
-   volume.
-2. **Global/dependency binding gaps.** `analyzeSource` (`boundaries.cjs:231-238` for globals,
-   `260-273`/`405-409` for imports) only recognizes the literal pattern `window.SM<Name>`: it
-   misses a bare `state` global (`src/js/feedback-bridge.js:73`, `src/js/transplant.js:221`,
-   both read `state.*` without a `window.` prefix), a non-`SM`-prefixed `window.*` assignment
-   (`window.GeometryWasm = {...}` at `src/js/geometry-wasm-loader.js:10`), and a bare-alias
-   *read* of a real `window.SM*` provider: `src/js/asset-tree.js:40` declares
-   `window.SMAssetTree = {...}` and `src/js/transplant.js:145-154` is a real consumer
-   (`SMAssetTree.folderGroup(...)`, `SMAssetTree.componentsLabel()`) written without the
-   `window.` prefix — a genuine provider/consumer coupling invisible to the scanner in either
-   direction. Any layer/dependency rule built on this scanner today would silently miss all of
-   the above.
-3. **Loader-resolution gaps.** `resolveSpecifier` (`boundaries.cjs:260-273`) only resolves a
-   literal relative specifier that exists verbatim on disk; a cache-busted specifier (e.g.
-   `import('./mod.js?v=1')`) or one pointing outside any declared module both silently resolve
-   to `null` ("external, or not found") and are dropped rather than reported as unresolved. This
-   document's own §1b/§4 already lean on that exact behavior to correctly treat
-   `psd-import-bridge.js:30`'s dynamic import as an intentionally-undeclared vendor reference —
-   the same mechanism means a genuinely forbidden cross-module import written with a
-   cache-busting suffix would pass silently today.
-4. **Baseline/CI adoption gap.** No CI lane currently runs `boundaries.cjs` against a
-   protected-branch baseline (see the ratchet-seed caveat above and in §1d). Until one exists,
-   raising both a candidate's and a baseline's ceiling together, renaming a source file out of a
-   profile instead of removing it, or extending an exception's `expires` date all pass the
-   ratchet comparator without any independent review gate — a process/CI gap, not something
-   `engineering/boundaries/profiles/**` content can close on its own.
+1. **Original division-parser gap corrected in the selected candidate.** #957 (`d677989`)
+   removes the division/control-header-regex failure that excluded the 60 handwritten files.
+   Its remaining documented lexical cuts are still limits; 140-file profile coverage does
+   not make this an AST or binding-aware scanner.
+2. **Global/provider-consumer binding gaps remain.** `analyzeSource` recognizes qualified
+   `window.SM*` properties, including supported literal-bracket/optional forms, but does not
+   resolve bare globals or identify complete provider/consumer relationships. Examples in
+   the selected source are bare `state.*` reads (`feedback-bridge.js:73`, `transplant.js:221`),
+   the non-`SM` provider `window.GeometryWasm` (`geometry-wasm-loader.js:10`), and
+   `window.SMAssetTree` (`asset-tree.js:40`) consumed through bare `SMAssetTree` calls
+   (`transplant.js:147–154`). Detecting a nearby qualified guard does not model those bare
+   calls or prove the dependency's direction. A reviewed global/provider-consumer graph can
+   address this without requiring ESM conversion; it is not implemented by this profile.
+3. **Import/loader-resolution gaps remain in this tree.** `resolveSpecifier` tries relative
+   or absolute paths with supported extension/index fallbacks, but does not normalize a
+   cache-busting suffix such as `import('./mod.js?v=1')`. Unresolved paths are dropped, and
+   `checkProfile` also drops resolved targets outside declared modules. That includes the
+   deliberately excluded PSD vendor chain (§1b/Category 4), but could also hide an unintended
+   missing dependency. Worker construction and HTML order are unmodeled. These are checker
+   and inventory integration responsibilities, not grounds for claiming a clean graph.
+4. **Protected-baseline/CI adoption remains open.** The reported passing ratchet compares
+   two files updated together. Changing both sides, moving source out of a profile, or
+   extending an exception's expiry is not independently reviewed by that self-comparison.
+   The integration owner must select the protected baseline and wire the reviewed profile
+   into the ordinary checks before claiming enforcement.
 
-These are handed to the checker-owning lead as concrete, reproduced findings rather than
-summarized as "the checker has limitations" — per task instructions, checker fixes remain a
-separate lead action and are not represented as resolved or worked around here.
+These findings preserve the remaining checker, R01, global-modeling, and CI gates. The expanded
+profile is a reviewable coverage candidate, not full R05 adoption or product acceptance.
