@@ -57,10 +57,13 @@ function sourceState(root, file) {
     if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
       return { rule: 'coverage-outside-root', message: 'Source resolves outside the repository root' };
     }
-    if (!fs.statSync(physical).isFile()) {
+    const stat = fs.statSync(physical, { bigint: true });
+    if (!stat.isFile()) {
       return { rule: 'coverage-not-file', message: 'Source path is not a regular file' };
     }
-    return { physical };
+    // Hard links have distinct realpaths; device/inode identifies the file.
+    // BigInt preserves identity without rounding large filesystem values.
+    return { physical: `${stat.dev}:${stat.ino}` };
   } catch (error) {
     if (['ENOENT', 'ENOTDIR'].includes(error.code)) {
       return { rule: 'coverage-missing-file', message: 'Source path does not exist' };

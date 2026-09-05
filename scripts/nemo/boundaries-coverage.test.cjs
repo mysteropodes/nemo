@@ -239,6 +239,61 @@ test('symlink aliases are not extra physical sources or transferable exclusions'
   assert.deepEqual(diagnostics(declared), [['coverage-aliased-source', 'src/js/app.js']]);
 });
 
+test('hard-link declarations fail with deterministic physical-alias diagnostics', (t) => {
+  const root = makeRoot(t);
+  const files = ['src/js/a.js', 'src/js/b.js'];
+  write(root, files[0]);
+  const [first, second] = files.map((file) => path.join(root, file));
+  fs.linkSync(first, second);
+  // Real hard links share file identity but retain distinct canonical paths.
+  const [a, b] = [first, second].map((file) => fs.statSync(file, { bigint: true }));
+  assert.equal(a.dev, b.dev);
+  assert.equal(a.ino, b.ino);
+  assert.notEqual(fs.realpathSync(first), fs.realpathSync(second));
+
+  const candidate = profile(files);
+  const sourcePaths = selectSources(root);
+  const report = checkSourceCoverage(candidate, { root, sourcePaths });
+  assert.deepEqual(report, {
+    ok: false, sourcePathCount: 2, declaredPathCount: 2, excludedPathCount: 0,
+    violations: [{
+      rule: 'coverage-aliased-source', module: 'source.0', file: files[0], line: null,
+      message: 'Multiple paths resolve to the same physical source', detail: { paths: files },
+    }],
+  });
+  candidate.modules.reverse();
+  assert.deepEqual(checkSourceCoverage(candidate, { root, sourcePaths: [...sourcePaths].reverse() }), report);
+});
+
+test('hard-link exclusions do not transfer and mixed aliases form one diagnostic group', (t) => {
+  const root = makeRoot(t);
+  write(root, 'src/js/app.js');
+  fs.linkSync(path.join(root, 'src/js/app.js'), path.join(root, 'src/js/reviewed.vendor.js'));
+  fs.symlinkSync('reviewed.vendor.js', path.join(root, 'src/js/vendor-alias.js'));
+  const report = checkSourceCoverage(profile([]), {
+    root, sourcePaths: selectSources(root), exclusions: ['src/js/reviewed.vendor.js', 'src/js/vendor-alias.js'],
+  });
+  assert.equal(report.ok, false);
+  assert.deepEqual(diagnostics(report), [
+    ['coverage-aliased-source', 'src/js/app.js'], ['coverage-unprofiled-source', 'src/js/app.js'],
+  ]);
+  assert.deepEqual(report.violations[0].detail.paths, [
+    'src/js/app.js', 'src/js/reviewed.vendor.js', 'src/js/vendor-alias.js',
+  ]);
+});
+
+test('distinct physical files with identical content remain valid declarations', (t) => {
+  const root = makeRoot(t);
+  const files = ['src/js/a.js', 'src/js/b.js'];
+  for (const file of files) write(root, file);
+  const [a, b] = files.map((file) => fs.statSync(path.join(root, file), { bigint: true }));
+  assert.equal(a.dev, b.dev);
+  assert.notEqual(a.ino, b.ino);
+  assert.deepEqual(checkSourceCoverage(profile(files), { root, sourcePaths: selectSources(root) }), {
+    ok: true, sourcePathCount: 2, declaredPathCount: 2, excludedPathCount: 0, violations: [],
+  });
+});
+
 test('symlink traversal outside root fails with only repository-relative diagnostics', (t) => {
   const root = makeRoot(t);
   const outside = makeRoot(t);
