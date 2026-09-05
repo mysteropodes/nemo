@@ -157,3 +157,36 @@ test('duplicate startup preserves the first owner and browser profiles require e
     assert.ok(config.args.includes('--headless=new'));
   } finally { await stopOwned(first); }
 });
+
+
+test('an exited requested browser is reported and shutdown waits for a stubborn browser', {
+  skip: process.platform === 'win32' ? 'POSIX signal and executable fixtures require a Unix host' : false,
+}, async () => {
+  const failedBrowser = path.join(scratch, 'browser-exits');
+  fs.writeFileSync(failedBrowser, '#!/bin/sh\nexit 23\n', { mode: 0o700 });
+  const failed = await launch(`preview-browser-exits-${process.pid}`, ['--browser', failedBrowser]);
+  try {
+    let body;
+    for (let i = 0; i < 100; i++) {
+      body = JSON.parse((await request(failed.info.identityUrl)).body);
+      if (body.browser.error) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(body.browser.integrated, false);
+    assert.equal(body.browser.active, false);
+    assert.match(body.browser.error, /code 23/);
+  } finally { await stopOwned(failed); }
+  const stubborn = path.join(scratch, 'browser-stubborn');
+  const ready = path.join(scratch, 'stubborn-ready');
+  fs.writeFileSync(stubborn, `#!${process.execPath}\nprocess.on('SIGTERM', () => {});\nrequire('node:fs').writeFileSync(${JSON.stringify(ready)}, 'ready');\nsetInterval(() => {}, 1000);\n`, { mode: 0o700 });
+  const instance = await launch(`preview-browser-stubborn-${process.pid}`, ['--browser', stubborn]);
+  try {
+    for (let i = 0; i < 100 && !fs.existsSync(ready); i++) await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(fs.existsSync(ready), true);
+    const pid = instance.info.browser.pid;
+    assert.equal(isolation.pidAlive(pid), true);
+    await stopOwned(instance);
+    assert.equal(isolation.pidAlive(pid), false);
+    assert.equal(fs.existsSync(instance.info.roots.root), false);
+  } finally { if (isolation.pidAlive(instance.child.pid)) await stopOwned(instance); }
+});

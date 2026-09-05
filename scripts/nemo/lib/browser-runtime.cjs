@@ -100,12 +100,16 @@ function spawnBrowser(config) {
 
 async function stopBrowser(child) {
   if (!child || child.exitCode != null || child.signalCode != null) return;
+  const exited = new Promise((resolve) => child.once('exit', resolve));
+  let timer;
+  const grace = new Promise((resolve) => { timer = setTimeout(resolve, 2000); });
   child.kill('SIGTERM');
-  await Promise.race([
-    new Promise((resolve) => child.once('exit', resolve)),
-    new Promise((resolve) => setTimeout(resolve, 2000)),
-  ]);
-  if (child.exitCode == null && child.signalCode == null) child.kill('SIGKILL');
+  await Promise.race([exited, grace]);
+  clearTimeout(timer);
+  if (child.exitCode == null && child.signalCode == null) {
+    child.kill('SIGKILL');
+    await exited;
+  }
 }
 
 function json(res, status, value, headOnly) {
@@ -162,8 +166,10 @@ function listen(server, host, port) {
 
 function closeServer(server) {
   if (!server.listening) return Promise.resolve();
-  if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
-  return new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+  return new Promise((resolve, reject) => {
+    server.close((err) => err ? reject(err) : resolve());
+    if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
+  });
 }
 
 async function startBrowserRuntime(options = {}) {
@@ -217,7 +223,7 @@ async function startBrowserRuntime(options = {}) {
           NEMO_BROWSER_PROFILE: process.env.NEMO_BROWSER_PROFILE,
         },
         browser: {
-          requested: !!options.browser, integrated: !!browserChild, active: browserActive,
+          requested: !!options.browser, integrated: browserActive, active: browserActive,
           pid: browserChild ? browserChild.pid : null, profileDir: roots.browserProfile,
           error: browserError,
         },
@@ -248,7 +254,12 @@ async function startBrowserRuntime(options = {}) {
       : null;
     launcher = isolation.registerLauncher(taskId, { pid: process.pid, label: 'browser-preview' });
     if (options.browser) {
-      try { browserChild = await spawnBrowser(browserConfig); }
+      try {
+        browserChild = await spawnBrowser(browserConfig);
+        browserChild.once('exit', (code, signal) => {
+          browserError = `browser exited (${signal || `code ${code}`})`;
+        });
+      }
       catch (err) { browserError = err.message; }
     }
     runtime = {
