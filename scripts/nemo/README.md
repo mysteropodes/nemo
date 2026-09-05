@@ -8,6 +8,7 @@ implemented with Node only (no new dependencies). Work package R02.
 |---|---|---|
 | `npm run doctor` | Read-only: source identity (HEAD, branch, dirty digest), build identity (versions, wasm/sidecar hashes), platform, tool prerequisites, capabilities. Never installs or writes outside `reports/`. | always 0 |
 | `npm run check` | Static integrity: version strings in sync (package.json, tauri.conf.json, index.html fallback), JSON validity, `src/js` syntax (ES modules checked as such), `index.html` script references resolve, private-labs guard, committed artifacts present. | 0 pass / 1 fail / 2 blocked |
+| `npm run inventory` | Regenerates `engineering/inventory/{surfaces.json,surfaces.csv,SURFACES.md}` from `src/` (R03): every actionable control, shortcut, menu item, Labs prototype and script API member, bound to its handler and the document consumers it reaches, with unbound controls kept as explicit `unmapped` rows. The `inventory` job runs `npm run inventory -- --check` and fails when the committed files are stale; it is in both verify profiles. | 0/1 |
 | `npm test` | Existing Node unit tests (`tests/*.test.cjs`). Unchanged. | node |
 | `npm run test:rust` | `cargo test` for `geometry-wasm` (CPU, native host). | 0/1/2 |
 | `npm run test:integration` | `tests/integration` when it exists; `not-run` until R12/R13 define it. | 0/1/2 |
