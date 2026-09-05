@@ -3,9 +3,10 @@
 // Regenerates the R03 fixture corpus and its manifest.
 //
 //   node tests/fixtures/generate.cjs            write tests/fixtures/<id>/… and manifest.json
-//   node tests/fixtures/generate.cjs --check    regenerate into a scratch dir and compare byte-for-byte
+//   node tests/fixtures/generate.cjs --check    render in memory and compare byte-for-byte
 //
-// Everything written here is deterministic for a given generator version:
+// Everything written here is deterministic for a given generator version and
+// supported zlib build (see README.md, Generator runtime):
 // documents come from tests/fixtures/lib/corpus.cjs, expectations from
 // tests/fixtures/lib/reference.cjs, assets from the dependency-free PNG
 // encoder. The manifest pins each committed file by SHA-256, so
@@ -19,12 +20,29 @@ const corpus = require('./lib/corpus.cjs');
 const { seedFrom } = require('./lib/rng.cjs');
 
 const GENERATOR_VERSION = 1;
+// Pin the compression builds verified to reproduce the version-1 corpus. A
+// Node major alone is insufficient: distributors may link a different zlib.
+// Keep this independent of the committed manifest so corruption cannot redefine
+// the generation contract. Admit another build only after exact-byte validation.
+const GENERATOR_ZLIB_BUILDS = new Set([
+  '1.3.0.1-motley-209717d',
+  '1.3.0.1-motley-71660e1',
+  '1.3.0.1-motley-780819f',
+  '1.3.0.1-motley-82a5fec',
+  '1.3.1-e00f703',
+  '1.3.2.1-motley-42c2f19',
+]);
 const DIR = __dirname;
 const REL = (p) => path.relative(path.resolve(DIR, '..', '..'), p).split(path.sep).join('/');
 
 function sha256(buf) { return crypto.createHash('sha256').update(buf).digest('hex'); }
 
 function render() {
+  if (!GENERATOR_ZLIB_BUILDS.has(process.versions.zlib)) {
+    const error = new Error(`incompatible fixture generator runtime: Node ${process.version}, zlib ${process.versions.zlib}; use the official Node 20.19.4 build (zlib 1.3.0.1-motley-82a5fec) or a verified build listed in tests/fixtures/README.md. Do not regenerate assets to resolve runtime drift.`);
+    error.code = 'ERR_FIXTURE_GENERATOR_RUNTIME';
+    throw error;
+  }
   const files = {}; // relative path (from tests/fixtures) → Buffer
   const entries = [];
   for (const build of corpus.FIXTURES) {
@@ -133,5 +151,11 @@ function main() {
   console.log(`fixtures: ${manifest.fixtures.length} fixtures, ${manifest.workloads.length} workload documents, ${Object.keys(files).length} files, ${bytes} bytes -> ${REL(out)}/`);
 }
 
-if (require.main === module) main();
+if (require.main === module) {
+  try { main(); } catch (error) {
+    if (error.code !== 'ERR_FIXTURE_GENERATOR_RUNTIME') throw error;
+    console.error(error.message);
+    process.exitCode = 2;
+  }
+}
 module.exports = { render, check, WORKLOAD_DOCS, CHECK_KINDS, GENERATOR_VERSION };

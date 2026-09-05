@@ -12,6 +12,44 @@ node tests/fixtures/generate.cjs --check     # exit 1 when a committed file diff
 node --test tests/fixtures/fixtures.test.cjs # verify (also reached by npm test through tests/nemo-fixtures.test.cjs)
 ```
 
+## Generator runtime
+
+Generator version 1 pins **zlib builds**, because `lib/png.cjs` uses the host
+`deflateSync` with level 9 and filter-0 scanlines. Node's version alone does not
+identify the compressor: a distributor can link a system zlib. Use the official
+Node **20.19.4** distribution (`process.versions.zlib` =
+`1.3.0.1-motley-82a5fec`) as the reference generation runtime. The following
+available builds also reproduced all 41 committed files byte-for-byte:
+
+| Node version(s) | `process.versions.zlib` |
+|---|---|
+| 20.19.0, 20.19.4, 22.13.0, 22.13.1 | `1.3.0.1-motley-82a5fec` |
+| 22.5.0 | `1.3.0.1-motley-209717d` |
+| 22.12.0 | `1.3.0.1-motley-71660e1` |
+| 22.17.1 | `1.3.0.1-motley-780819f` |
+| 24.18.0 | `1.3.1-e00f703` |
+| 24.20.0 | `1.3.2.1-motley-42c2f19` |
+
+`render()`, generation (including `--out`), and `--check` reject unverified zlib
+builds before generating or writing anything. The CLI exits **2** with the actual
+Node/zlib identity and a compatible runtime; stale artifacts still exit **1** on
+a supported runtime. Fixture verification and consumers can read the committed
+assets on other runtimes: the generation pin does not disable their hash, pixel,
+structure, or production-behavior checks. Before admitting a new zlib build, use
+an isolated candidate to extend the list and verify **every byte** with `--check`;
+do not regenerate the corpus to make a runtime qualify.
+
+The original mismatch was reproduced with Homebrew Node 25.9.0 and 24.19.0,
+both reporting zlib `1.2.12`: all 12 export PNGs differed, and consequently their
+manifest hashes differed. All PNG chunk CRCs were valid; IHDR/IEND, dimensions
+(320 × 240), inflated filter-0 scanlines, and every decoded RGBA pixel matched.
+Only the IDAT compression bytes and corresponding CRCs differed. The three
+smaller media/mesh PNGs and every other generated file matched. For example,
+frame 1 was 743 bytes in both builds but had SHA-256 `7f0a02dc964504fdbb202cb9bb710e51c24b5b268cfdc15ad29770172f0b10fd`
+in the committed/bundled-zlib output versus `abff1715a2fc3f4ca0814d1798578d902c25371169e99f1a5abbcde09a25b1bb`
+with zlib 1.2.12. This is compression drift, not a reason to replace reference
+pixels or weaken exact asset/manifest comparisons.
+
 ## Layout
 
 | Path | Content |

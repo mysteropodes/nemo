@@ -40,6 +40,28 @@ function near(actual, expect, tol, msg) {
 function layerIndex(project, uid) { const i = project.layers.findIndex((l) => l.layerUid === uid); assert.notEqual(i, -1, 'layer ' + uid); return i; }
 function strokeIds(strokes) { return Array.from(strokes, (s) => s.strokeId || (s.isRaster ? 'raster' : '?')); }
 
+// Exercise the public CLI in a fresh process: an incompatible compression build
+// must not rewrite assets/manifest or misdiagnose runtime drift as stale fixtures.
+test('fixtures generator: incompatible zlib fails before writing or checking assets', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-fixture-runtime-'));
+  try {
+    const preload = path.join(tmp, 'runtime.cjs');
+    fs.writeFileSync(preload, "Object.defineProperty(process.versions, 'zlib', { value: '1.2.12' });\n");
+    const out = path.join(tmp, 'output');
+    for (const args of [['--out', out], ['--check']]) {
+      const r = spawnSync(process.execPath, ['--require', preload, path.join(DIR, 'generate.cjs'), ...args], { encoding: 'utf8' });
+      assert.equal(r.status, 2, r.stdout + r.stderr);
+      assert.match(r.stderr, /incompatible fixture generator runtime/);
+      assert.match(r.stderr, /Node .*zlib 1\.2\.12/);
+      assert.match(r.stderr, /20\.19\.4/);
+      assert.doesNotMatch(r.stderr, /fixtures stale|run `npm run fixtures`/);
+      assert.equal(fs.existsSync(out), false, 'runtime rejection wrote fixture files');
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 // ---- manifest ----------------------------------------------------------------
 
 test('fixtures manifest: schema, unique ids, required coverage', () => {
