@@ -244,6 +244,100 @@
     }
     return{keyCrossings:keyX, generatedFramesWithCrossings:out.length, totalCrossings:total, frames:out};
   };
+  // ---- AUDIT MULTI-FICHIERS (2026-09-05) ----------------------------
+  // Cyril : « as-tu testé sur mes autres anims ? ». Métriques SANS vérité
+  // terrain, donc applicables à n'importe quel fichier : elles ne disent
+  // pas « c'est faux », elles DÉSIGNENT LES SUSPECTS à regarder à l'œil.
+  //  - travel   : un trait dont le centroïde parcourt beaucoup plus que la
+  //               médiane de la portée ET une part notable du dessin ;
+  //               c'est la signature d'un trait qui traverse le dessin.
+  //  - lenRatio : une paire dont les longueurs sont dans un rapport > 2.
+  //  - folds    : traits (> 25 px) qui s'auto-intersectent en Bézier dans
+  //               une image générée alors que les clés ne le font pas.
+  //  - fades    : traits laissés en fondu de chaque côté.
+  function _flatten(S,k){
+    var P=[],i,s2;
+    for(i=0;i+1<S.length;i++){
+      var a=S[i],b=S[i+1],p0=a.point,p3=b.point;
+      var p1=[p0[0]+(a.handleOut?a.handleOut[0]:0),p0[1]+(a.handleOut?a.handleOut[1]:0)];
+      var p2=[p3[0]+(b.handleIn?b.handleIn[0]:0),p3[1]+(b.handleIn?b.handleIn[1]:0)];
+      for(s2=0;s2<k;s2++){var t=s2/k,u=1-t;
+        P.push([u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0],
+                u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1]]);}
+    }
+    P.push(S[S.length-1].point);return P;
+  }
+  function _xings(P){
+    function cr(o,p,q){return (p[0]-o[0])*(q[1]-o[1])-(p[1]-o[1])*(q[0]-o[0]);}
+    function it(a,b,c,d){var d1=cr(c,d,a),d2=cr(c,d,b),d3=cr(a,b,c),d4=cr(a,b,d);
+      return((d1>0&&d2<0)||(d1<0&&d2>0))&&((d3>0&&d4<0)||(d3<0&&d4>0));}
+    var n=0,i,j;
+    for(i=0;i+1<P.length;i++)for(j=i+2;j+1<P.length;j++)if(it(P[i],P[i+1],P[j],P[j+1]))n++;
+    return n;
+  }
+  function _segsOf(sd){return (sd.centerSegments&&sd.centerSegments.length>1)?sd.centerSegments:sd.segments;}
+  function _span2(S){var x1=1/0,y1=1/0,x2=-1/0,y2=-1/0;S.forEach(function(s){
+    if(s.point[0]<x1)x1=s.point[0];if(s.point[0]>x2)x2=s.point[0];
+    if(s.point[1]<y1)y1=s.point[1];if(s.point[1]>y2)y2=s.point[1];});
+    return Math.max(x2-x1,y2-y1);}
+  B.suspects=function(li){
+    li=li===undefined?state.activeLayerIdx:li;
+    state.activeLayerIdx=li;
+    var ld=state.layers[li],keys=keysOf(li);
+    // --- appariement, portée par portée
+    var travel=[],lenR=[],fades=0,pairs=0;
+    for(var k=0;k<keys.length-1;k++){
+      var r=B.span(li,keys[k],keys[k+1]);
+      if(!r||r.empty)continue;
+      var sA=ld.frames[keys[k]].strokes||[],sB=ld.frames[keys[k+1]].strokes||[];
+      var bx1=1/0,by1=1/0,bx2=-1/0,by2=-1/0;
+      [sA,sB].forEach(function(L){L.forEach(function(sd){var S=_segsOf(sd);if(!S)return;
+        S.forEach(function(s){if(s.point[0]<bx1)bx1=s.point[0];if(s.point[0]>bx2)bx2=s.point[0];
+          if(s.point[1]<by1)by1=s.point[1];if(s.point[1]>by2)by2=s.point[1];});});});
+      var diag=Math.hypot(bx2-bx1,by2-by1)||1;
+      var ds=[],specs=[];
+      r.pairs.forEach(function(p){
+        var a=sA[p.a],b=sB[p.b];if(!a||!b)return;
+        var fa=strokeFeat(a),fb=strokeFeat(b);
+        var d=Math.hypot(fb.cx-fa.cx,fb.cy-fa.cy);
+        ds.push(d);specs.push({a:p.a,b:p.b,d:d,la:fa.length,lb:fb.length});
+      });
+      pairs+=specs.length;fades+=(r.unA?r.unA.length:0)+(r.unB?r.unB.length:0);
+      var med=ds.slice().sort(function(x,y){return x-y;})[Math.floor(ds.length/2)]||1;
+      specs.forEach(function(sp){
+        if(sp.d>Math.max(3*med,0.12*diag)&&sp.d>30)
+          travel.push({span:keys[k]+'>'+keys[k+1],a:sp.a,b:sp.b,px:Math.round(sp.d),medPx:Math.round(med)});
+        var lr=Math.max(sp.la,sp.lb)/Math.max(1,Math.min(sp.la,sp.lb));
+        if(lr>2&&Math.min(sp.la,sp.lb)>20)
+          lenR.push({span:keys[k]+'>'+keys[k+1],a:sp.a,b:sp.b,ratio:+lr.toFixed(1)});
+      });
+    }
+    // --- replis dans les images générées
+    generateTweens();
+    var keyX=0,folds=[];
+    keys.forEach(function(kf){(ld.frames[kf].strokes||[]).forEach(function(sd){
+      var S=_segsOf(sd);if(S&&S.length>3&&_span2(S)>25&&_xings(_flatten(S,6)))keyX++;});});
+    for(var f=0;f<state.totalFrames;f++){
+      var fr=ld.frames[f];if(!fr||!fr.isInterpolated)continue;
+      var c=0;(fr.strokes||[]).forEach(function(sd){
+        var S=_segsOf(sd);if(S&&S.length>3&&_span2(S)>25&&_xings(_flatten(S,6)))c++;});
+      if(c)folds.push({frame:f,n:c});
+    }
+    return{pairs:pairs,fades:fades,keyCrossings:keyX,
+      folds:folds.reduce(function(a,x){return a+x.n;},0),foldFrames:folds.length,
+      travel:travel,lenRatio:lenR};
+  };
+  // Compare la config courante à une config de référence sur le MÊME fichier.
+  B.auditFile=function(li,baseFlags){
+    var cur=B.suspects(li);
+    var base=B.withFlags(baseFlags,function(){return B.suspects(li);});
+    function sum(x){return{pairs:x.pairs,fades:x.fades,folds:x.folds,
+      travel:x.travel.length,lenRatio:x.lenRatio.length};}
+    return{courant:sum(cur),reference:sum(base),
+      keyCrossings:cur.keyCrossings,
+      travelDetail:cur.travel.slice(0,8),lenDetail:cur.lenRatio.slice(0,8),
+      travelRef:base.travel.slice(0,8)};
+  };
   B.snapshot=function(){var c=document.querySelector('#canvas')||document.querySelector('canvas');return c?c.toDataURL('image/png'):null;};
   window.__twBench=B;
 })();
