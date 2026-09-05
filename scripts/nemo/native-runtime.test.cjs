@@ -202,7 +202,11 @@ test('two concurrent instances keep separate roots, records and stop authority',
   assert.equal(recordA.taskId, 'native-live-a');
   assert.equal(recordB.taskId, 'native-live-b');
   assert.equal(recordA.webDataUuid, a.info.webDataUuid);
-  assert.equal(fs.readdirSync(path.dirname(a.info.instanceFile)).length, 1);
+  assert.deepEqual(
+    fs.readdirSync(path.dirname(a.info.instanceFile)).sort(),
+    ['instance.json', 'webkit'],
+    "the root holds this instance's own record and its own website-data identity, nothing else",
+  );
 
   // The handshake only reports ok once the app itself confirmed the root.
   const statusA = await cliRun(['status', '--task', 'native-live-a', '--owner', a.info.ownerToken]);
@@ -295,4 +299,51 @@ test('non-macOS launches are refused before any task state is created', () => {
   assert.throws(() => runtime.assertNativePlatform('linux'), /macOS only/);
   assert.throws(() => runtime.assertNativePlatform('win32'), /macOS only/);
   assert.doesNotThrow(() => runtime.assertNativePlatform('darwin'));
+});
+
+// The identity a relaunch of the same task instance must keep. `localStorage`
+// (autosave 'nemo-auto', recents, sync folder, feedback fallback) lives in the
+// WKWebView store this UUID names: a fresh one per launch would hand the same
+// task an empty store every time while its on-disk history was still there.
+test('a task keeps one website-data identity across relaunches and never inherits a released one', () => {
+  const first = runtime.launchConfig('web-identity-a', { command: appStub });
+  const second = runtime.launchConfig('web-identity-a', { command: appStub });
+  assert.equal(second.webDataUuid, first.webDataUuid, 'relaunching the same task must reuse its store');
+  assert.equal(runtime.validWebDataUuid(first.webDataUuid), true);
+
+  const other = runtime.launchConfig('web-identity-b', { command: appStub });
+  assert.notEqual(other.webDataUuid, first.webDataUuid, 'two tasks must never share one store');
+
+  const recorded = JSON.parse(fs.readFileSync(path.join(first.dataRoot, 'webkit', 'identity.json'), 'utf8'));
+  assert.equal(recorded.webDataUuid, first.webDataUuid);
+
+  // The identity lives inside the task roots, so releasing them takes it with
+  // it and the next tenant of that task id starts on a store of its own.
+  fs.rmSync(first.roots.root, { recursive: true, force: true });
+  const afterRelease = runtime.launchConfig('web-identity-a', { command: appStub });
+  assert.notEqual(afterRelease.webDataUuid, first.webDataUuid);
+});
+
+test('releasing a task removes exactly its own website-data store and nothing else', () => {
+  const home = fs.mkdtempSync(path.join(scratch, 'home-'));
+  const identifier = 'com.strokemotion.app';
+  const mine = runtime.launchConfig('web-store-mine', { command: appStub }).webDataUuid;
+  const peer = runtime.launchConfig('web-store-peer', { command: appStub }).webDataUuid;
+  const dirFor = (uuid, kind) => path.join(home, 'Library', 'WebKit', identifier, kind, uuid);
+  for (const dir of [dirFor(mine, 'WebsiteDataStore'), dirFor(mine, 'CustomWebsiteData'), dirFor(peer, 'WebsiteDataStore')]) {
+    fs.mkdirSync(path.join(dir, 'LocalStorage'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'LocalStorage', 'localstorage.sqlite3'), 'x');
+  }
+
+  const result = runtime.removeWebDataStore(identifier, mine, home);
+  assert.equal(result.removed.length, 2, result.reason);
+  assert.equal(fs.existsSync(dirFor(mine, 'WebsiteDataStore')), false);
+  assert.equal(fs.existsSync(dirFor(mine, 'CustomWebsiteData')), false);
+  assert.equal(fs.existsSync(dirFor(peer, 'WebsiteDataStore')), true, "another task's store must survive");
+
+  // Refusals are named, and nothing outside the identity is ever a candidate.
+  assert.deepEqual(runtime.webDataStoreDirs(identifier, 'not-a-uuid', home), []);
+  assert.deepEqual(runtime.webDataStoreDirs(identifier, '00000000-0000-0000-0000-000000000000', home), []);
+  assert.match(runtime.removeWebDataStore('', mine, home).reason, /no bundle identifier/);
+  assert.match(runtime.removeWebDataStore(identifier, 'not-a-uuid', home).reason, /no valid website-data identity/);
 });

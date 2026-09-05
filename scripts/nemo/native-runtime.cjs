@@ -50,6 +50,61 @@ function webDataUuid(bytes = crypto.randomBytes(16)) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+// A website-data identity belongs to the TASK, not to one launch of it.
+// `localStorage` is where the app keeps `nemo-auto`, recents, the sync-folder
+// setting and the feedback fallback; a fresh UUID per launch would give the
+// same task a brand-new empty WKWebView store every time it is relaunched, so
+// its own autosave would be invisible to it while its on-disk history was
+// still there. Allocated once, next to the state it identifies (the app-side
+// `webkit/` root exists for exactly this), and removed with the task roots on
+// release — a task that has been released must never inherit the previous
+// tenant's website data.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+const WEB_DATA_IDENTITY_FILE = path.join('webkit', 'identity.json');
+
+function validWebDataUuid(value) {
+  return typeof value === 'string' && UUID_RE.test(value) && value !== NIL_UUID;
+}
+
+function taskWebDataUuid(dataRoot, generate = webDataUuid) {
+  const file = path.join(dataRoot, WEB_DATA_IDENTITY_FILE);
+  const existing = readJsonOrNull(file);
+  if (existing && validWebDataUuid(existing.webDataUuid)) return existing.webDataUuid;
+  const uuid = generate();
+  if (!validWebDataUuid(uuid)) throw new Error(`refusing an invalid website-data identity: ${uuid}`);
+  atomicWriteJson(file, { schema: SCHEMA, webDataUuid: uuid, createdAt: nowIso() });
+  return uuid;
+}
+
+// The OS-side half of a released task. `releaseTask` removes the task roots;
+// WebKit's own store for this identity lives in the user profile and would
+// otherwise outlive every task that ever ran, holding that task's
+// localStorage and IndexedDB. Only a directory whose FINAL component is
+// exactly this UUID, directly under a known per-identifier website-data
+// parent, is ever removed.
+function webDataStoreDirs(identifier, uuid, home = process.env.HOME) {
+  if (!home || typeof identifier !== 'string' || !identifier || !validWebDataUuid(uuid)) return [];
+  return ['WebsiteDataStore', 'CustomWebsiteData']
+    .map((kind) => path.join(home, 'Library', 'WebKit', identifier, kind, uuid))
+    .filter((dir) => path.basename(dir) === uuid && exists(dir));
+}
+
+function removeWebDataStore(identifier, uuid, home = process.env.HOME) {
+  if (!validWebDataUuid(uuid)) return { removed: [], reason: 'no valid website-data identity recorded for this task' };
+  if (!identifier) return { removed: [], reason: 'the app wrote no bundle identifier; its website-data store was left in place' };
+  const dirs = webDataStoreDirs(identifier, uuid, home);
+  const removed = [];
+  for (const dir of dirs) {
+    try { fs.rmSync(dir, { recursive: true, force: true }); removed.push(dir); } catch { /* reported as not removed */ }
+  }
+  return {
+    removed,
+    reason: removed.length ? 'website-data store removed with the task roots'
+      : 'no website-data directory carrying this identity was found under this HOME',
+  };
+}
+
 // Accepts a bundle or a bare executable. A `.app` is a directory; spawning it
 // directly fails with EACCES, which reads as a permissions problem rather
 // than "you passed a bundle", so resolve it here.
@@ -95,7 +150,7 @@ function launchConfig(taskId, options = {}) {
   // Reuse the `tauri-data` root lib/isolation.cjs already creates and already
   // reaps in releaseTask(); this adds no second lifecycle to reconcile.
   const dataRoot = roots.tauriDataDir;
-  const uuid = options.webDataUuid || webDataUuid();
+  const uuid = options.webDataUuid || taskWebDataUuid(dataRoot);
   let source = null;
   try { source = identity.sourceIdentity(); } catch { source = null; }
   const declaredSource = source ? { ...source, originUrl: undefined } : null;
@@ -325,7 +380,15 @@ async function main() {
     const before = readNativeStatus(args.task);
     const instance = readInstanceRecord(args.task);
     const released = stopped.stopped ? isolation.releaseTask(args.task, args.owner) : null;
-    output({ ...stopped, runtime: before, instance, released });
+    // The task roots are gone; WebKit's own store for this instance lives in
+    // the user profile and has to be removed by identity or a released task
+    // leaves its localStorage and IndexedDB behind. `instance` was read above,
+    // before the roots were removed — it is the only record of the bundle
+    // identifier the app actually ran under.
+    const webData = released && released.released
+      ? removeWebDataStore(instance && instance.identifier, before && before.webDataUuid)
+      : { removed: [], reason: 'task not released; its website-data store was left in place' };
+    output({ ...stopped, runtime: before, instance, released, webData });
     return process.exit(stopped.stopped && released && released.released ? 0 : 1);
   }
   // Exclusive human input, for a paired two-instance validation run.
@@ -346,7 +409,8 @@ async function main() {
 
 module.exports = {
   SCHEMA, STATUS_FILE, INSTANCE_FILE, INPUT_SLOT,
-  assertNativePlatform, webDataUuid, resolveExecutable, defaultAppPath,
+  assertNativePlatform, webDataUuid, taskWebDataUuid, validWebDataUuid,
+  webDataStoreDirs, removeWebDataStore, resolveExecutable, defaultAppPath,
   launchConfig, readNativeStatus, readInstanceRecord, nativeHandshake,
   stopApp, runNativeLauncher,
 };

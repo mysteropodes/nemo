@@ -115,7 +115,30 @@ assumed: removing a store the running webview still holds is not something this
 code can prove.
 
 From the launcher side, `stop` refuses a mismatched owner, waits for the app to
-exit, then hands the root to `isolation.releaseTask`.
+exit, then hands the root to `isolation.releaseTask` and removes the OS-side
+website-data store for this instance's identity.
+
+### The website-data identity belongs to the task, not to one launch
+
+`<task-root>/tauri-data/webkit/identity.json` holds the UUID, allocated once per
+task and reused by every later launch of it. The first version generated a fresh
+UUID per launch, which is wrong for the reason the WebKit half exists at all:
+`nemo-auto`, `nemo-recents`, the sync folder and the feedback fallback live in
+`localStorage`, so a new store per launch hands a relaunched task an *empty*
+`localStorage` while its on-disk history is still there — its own autosave
+becomes invisible to it, and every relaunch leaves another orphan store in the
+user profile. Confirmed by launching the same task id twice and comparing the
+two configs, before any GUI was involved.
+
+The identity file lives *inside* the task roots, so `releaseTask` takes it with
+them: a task id reused after a release starts on a store of its own rather than
+inheriting the previous tenant's website data. The store WebKit itself keeps —
+`~/Library/WebKit/<bundle-identifier>/WebsiteDataStore/<uuid>/`, observed on
+macOS 15 — is removed by `stop` after the app has exited, using the bundle
+identifier from the instance record the app wrote. Only a directory whose final
+component is exactly that UUID, directly under a known per-identifier parent, is
+ever a candidate; a missing identifier or an invalid identity is reported as a
+named refusal and removes nothing.
 
 ## Use
 
@@ -158,12 +181,15 @@ node scripts/nemo/native-runtime.cjs input-release  --owner <slot-token>
   ids, nil/short/non-hex UUID). Plus owner-only release, a refused release
   leaving state intact, a tokenless instance refusing every release, and
   re-validation before deletion.
-- `node --test scripts/nemo/native-runtime.test.cjs` — 11 tests: disjoint roots
+- `node --test scripts/nemo/native-runtime.test.cjs` — 13 tests: disjoint roots
   and distinct website-data identities, the emitted environment satisfying the
   app-side rules, valid non-nil v4 UUIDs, `.app` bundle resolution, two live
   concurrent instances each writing their record into their own root only,
   independent stop authority, owner-refused status/stop leaving the app and its
-  state untouched, an unconfirmed-isolation handshake, and the input slot.
+  state untouched, an unconfirmed-isolation handshake, the input slot, one
+  website-data identity per task across relaunches (and a fresh one after a
+  release), and a release that removes exactly this instance's store while a
+  peer task's store survives.
 
 Both suites reach normal discovery through `tests/nemo-native-runtime.test.cjs`
 and `npm run test:rust`.
