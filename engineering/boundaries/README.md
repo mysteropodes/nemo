@@ -4,7 +4,9 @@ Implements the enforcement half of
 [`engineering/remediation/04_MODULARITY_POLICY.md`](../remediation/04_MODULARITY_POLICY.md)
 for a **bounded, explicitly declared set of modules** — a *profile* — not the whole
 application. Code lives in [`scripts/nemo/lib/boundaries.cjs`](../../scripts/nemo/lib/boundaries.cjs)
-(the checker, pure functions, no I/O beyond reading the files a profile names) and
+(the parser and graph checks),
+[`scripts/nemo/lib/boundaries-resolver.cjs`](../../scripts/nemo/lib/boundaries-resolver.cjs)
+(local resolution, including filesystem and Node package metadata reads), and
 [`scripts/nemo/boundaries.cjs`](../../scripts/nemo/boundaries.cjs) (a standalone CLI). Behavioral
 tests are in [`scripts/nemo/boundaries.test.cjs`](../../scripts/nemo/boundaries.test.cjs)
 and [`scripts/nemo/boundaries-ratchet.test.cjs`](../../scripts/nemo/boundaries-ratchet.test.cjs).
@@ -29,11 +31,14 @@ file every declared module lists:
 | `global-state` | `window.SM*` is accessed from a layer other than `adapters`/`bootstrap`. |
 | `size` | A file's nonblank physical line count exceeds its `sizeProfile`'s `hardMax`, and no non-expired exception raises the ceiling far enough. |
 | `unsupported-import` / `unsupported-global` | A dynamic load or computed `window` member cannot be determined from literal tokens. |
+| `unresolved-local-import` | A literal local dependency cannot be resolved to an existing file. |
+| `unprofiled-local-import` | A literal local dependency resolves to a file absent from the profile, including an undeclared file in the importer's own directory. |
+| `unsupported-local-import` | A literal target requires unmodeled URL, alias, asset or runtime behavior, or local resolution fails in an unsupported way. |
 | `expired-exception` | An exception's `expires` date is on/before the check's clock; it stops shielding its rule (which is then re-evaluated and may itself fail) and is reported by itself too. |
 
-Intra-module imports (a file importing another file of the *same* module) are never flagged —
-only cross-module edges are checked, matching the policy's "no private cross-module deep
-imports, new cycles, ... or UI imports into domain."
+Declared intra-module imports need no private/layer/cycle check. Every recognized literal
+local dependency must still resolve to a declared file; directory membership alone does not
+declare a file. Local coverage diagnostics cannot be waived by an exception.
 
 ## Usage
 
@@ -102,8 +107,8 @@ provenance immutable are responsibilities of the R01/R03 and CI adoption gate.
   lexical subset because automatic semicolon insertion can make the same tokens a real call
   followed by a block. Comments, string text and ordinary regex literals are opaque; template
   substitutions are scanned. Nonliteral loads fail with `unsupported-import`.
-- **Deliberately unsupported lexical ambiguity fails the run (exit 2).** A slash after `)`
-  or `}` requires statement/expression context to distinguish regex from division; escaped
+- **Deliberately unsupported lexical ambiguity fails the run (exit 2).** A slash directly
+  after `}` requires additional statement/expression context to distinguish regex from division; escaped
   identifiers and legacy numeric string escapes also require a fuller parser. This can
   reject otherwise valid JS. Use a parsed R03 inventory before broader adoption.
 - **Global rule covers direct `window.SM*` access**, including whitespace, optional chaining
@@ -111,18 +116,67 @@ provenance immutable are responsibilities of the R01/R03 and CI adoption gate.
   Binding aliases, destructuring, `globalThis`/`self`, indirect loaders such as `module.require`
   or `eval`, and function-local shadowing are not resolved. Hand-review these in the bounded
   profile; this checker does not certify the absence of every implicit global or dependency.
-- **No filesystem walking.** A module's `files` list is authoritative; a file that exists on
-  disk but isn't listed is invisible to the checker. This is intentional for this increment —
-  see the inventory contract below for where that changes.
-- **Bare (non-relative) specifiers are external and unchecked** — no alias resolution,
-  `node:`/npm packages are always ignored for cycle/private/layer purposes. Unresolved
-  relative references (including URL query/hash suffixes) are also outside this graph;
-  extension inference is limited to `.cjs`, `.js`, `.mjs` and their directory indexes.
-  Review unresolved/indirect edges before using any profile as an adoption gate.
+- **No filesystem walking.** Only declared source files are scanned. Their recognized local
+  dependencies are checked for existence and profile membership, but other unreferenced files
+  remain outside this run. Full source inventory remains a separate gate.
+- **External resolution is unchecked.** Builtins, bare package specifiers and `http:`, `https:`
+  or `data:` targets stay outside the local graph. This does not prove those imports load in
+  the caller's runtime. Bare aliases, package self-references and import-map remapping require
+  hand-review; no package dependency traversal, network fetching or inline-data scanning occurs.
 - **A layer with no `layerRules` entry is permissive** — declare every layer whose outbound
   imports you want enforced.
 - `size` is measured **per file**, not summed per module, matching the policy's per-file line
   budgets.
+
+## Local dependency resolution
+
+The scanner retains whether each target came from `require` or ESM (`import`, `import()` or
+re-export). Loader semantics follow the syntax, including dynamic ESM imports inside a CommonJS
+file; the file extension alone does not select the resolver.
+
+- **Relative literal ESM JavaScript paths use URL semantics.** Query/fragment suffixes are
+  excluded from the filesystem lookup; pathname escapes are decoded. For example,
+  `import('../wasm/geometry_wasm.js?v=123#module')` reaches the declared
+  `geometry_wasm.js` file and still receives private/layer/cycle checks. These URL rules match
+  [browser module resolution](https://html.spec.whatwg.org/multipage/webappapis.html#resolving-a-module-specifier)
+  and [Node ESM resolution](https://nodejs.org/api/esm.html#urls). Only explicit `.js`, `.mjs`
+  and `.cjs` targets are modeled; no extension or directory-index inference occurs for ESM.
+  Other target types and malformed pathname encodings fail explicitly. Asset transforms are
+  not modeled; resolving a source path does not certify its MIME type, exports or execution.
+- **Node `require` keeps its filename semantics.** The host's `createRequire(...).resolve()`
+  handles local paths, extension ordering and directory/package-main lookup without evaluating
+  the dependency. In `require('./module.js?v=1')`, the suffix remains part of the filename;
+  having only `module.js` on disk produces `unresolved-local-import`. This follows
+  [Node's CommonJS resolver](https://nodejs.org/api/modules.html#all-together). Runtime loader
+  hooks and browser shims of `require` are not modeled.
+- **Ambiguous roots and aliases fail explicitly.** ESM root-relative paths, `file:` URLs,
+  protocol-relative URLs, `#` package aliases, query-only references, unsupported schemes,
+  backslash/control-character paths and empty targets require additional runtime information.
+  The profile's filesystem root is not assumed to be a browser URL root. Node absolute local
+  `require` paths can be checked against the declared files.
+- **Graph identity is physical source identity.** Resolved paths and declared files are
+  canonicalized to catch symlink imports into private or undeclared files. Multiple profile
+  entries for the same physical file fail validation. Node `require` uses the physical
+  importer's directory; symlinked ESM importers fail explicitly because their URL base can
+  differ between browser and Node. Different URL cache instances of the
+  same source contribute to the same module-level dependency graph; runtime instance cycles
+  and browser/Node cache behavior are not simulated.
+
+Nemo currently serves `src` directly (`package.json`'s `serve`, Tauri's `frontendDist`), with
+module entries in `src/index.html`. Its `geometry-wasm-loader.js` and `vectorize-worker.js`
+concatenate timestamp suffixes: those actual nonliteral expressions still report
+`unsupported-import`. The literal cases above are source-inspired regressions, not a claim
+that those loaders now pass. `psd-import-bridge.js`'s literal `./ag-psd.vendor.mjs` dependency
+reports an unprofiled edge if that vendor file is excluded. Worker constructors and
+`new URL(..., import.meta.url)` asset references are not import calls and remain outside
+this bounded scanner.
+
+The exported `extractImports` keeps its `{ specifier, line }` result shape. The exported
+`resolveSpecifier` remains a path-or-null convenience lookup, with an optional loader kind
+(`require` by default, or `import`). `checkProfile` uses the resolver's structured result so
+unresolved, unsupported and undeclared local dependencies cannot silently produce a pass.
+Adding the resolver helper also adds a dependency that existing tooling profiles must declare;
+profile/baseline integration belongs to the profile owner, not this checker correction.
 
 ## Profile and exception validation
 

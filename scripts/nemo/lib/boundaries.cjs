@@ -26,11 +26,12 @@
 //                        itself reported as a violation.
 //
 // This bounded checker uses a lexical scanner, not a full JavaScript AST or
-// binding resolver. Unsupported dynamic loads fail explicitly; bare specifiers
-// and undeclared files remain outside the profile. See the README before adoption.
+// binding resolver. Unsupported dynamic loads and local coverage gaps fail explicitly;
+// bare external specifiers remain outside the graph. See the README before adoption.
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { resolveImport, resolveSpecifier } = require('./boundaries-resolver.cjs');
 
 const EXCEPTION_RULES = ['size', 'private-import', 'layer-violation', 'global-state', 'cycle'];
 
@@ -226,7 +227,7 @@ function analyzeSource(source) {
     return false;
   };
   const recordImport = (token, sourceToken) => {
-    if (token?.type === 'string') imports.push({ specifier: token.value, line: sourceToken.line });
+    if (token?.type === 'string') imports.push({ specifier: token.value, line: sourceToken.line, kind: sourceToken.value === 'require' ? 'require' : 'import' });
     else unsupported.push({ line: sourceToken.line, message: 'Import/require target must be a literal string; declare or rewrite dynamic loading before checking this profile' });
   };
   for (let i = 0; i < tokens.length; i++) {
@@ -258,7 +259,7 @@ function analyzeSource(source) {
 }
 
 function extractImports(source) {
-  return analyzeSource(source).imports;
+  return analyzeSource(source).imports.map(({ specifier, line }) => ({ specifier, line }));
 }
 
 function countNonBlankLines(source) {
@@ -271,30 +272,13 @@ function toPosix(p) {
   return p.split(path.sep).join('/');
 }
 
-/** Resolve a relative specifier against the file that imported it. Returns an
- * absolute path that exists on disk, or null (external, or not found). */
-function resolveSpecifier(specifier, fromFile) {
-  if (!specifier.startsWith('.') && !specifier.startsWith('/')) return null;
-  const base = path.resolve(path.dirname(fromFile), specifier);
-  const candidates = [
-    base,
-    `${base}.cjs`, `${base}.js`, `${base}.mjs`,
-    path.join(base, 'index.cjs'), path.join(base, 'index.js'), path.join(base, 'index.mjs'),
-  ];
-  for (const c of candidates) {
-    try {
-      if (fs.statSync(c).isFile()) return c;
-    } catch { /* try next candidate */ }
-  }
-  return null;
-}
-
 /** Build absPath -> { module, relFile, isPublic } for every file every module declares. */
 function buildFileIndex(profile, root) {
   const index = new Map();
   for (const m of profile.modules) {
     for (const f of m.files) {
-      const abs = path.resolve(root, m.dir, f);
+      const abs = fs.realpathSync(path.resolve(root, m.dir, f));
+      if (index.has(abs)) throw new Error('invalid profile: multiple files refer to the same physical source');
       index.set(abs, { module: m, relFile: toPosix(path.join(m.dir, f)), isPublic: (m.publicApi || []).includes(f) });
     }
   }
@@ -335,7 +319,7 @@ function findCycles(edges) {
  */
 function checkProfile(profile, opts = {}) {
   validateProfile(profile);
-  const root = opts.root || process.cwd();
+  const root = fs.realpathSync(opts.root || process.cwd());
   const now = opts.now || new Date();
   if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new Error('invalid check clock');
   const fileIndex = buildFileIndex(profile, root);
@@ -418,11 +402,18 @@ function checkProfile(profile, opts = {}) {
       }
 
       // --- imports: private-import, layer-violation, cycle edges ---
-      for (const { specifier, line } of analysis.imports) {
-        const abs2 = resolveSpecifier(specifier, abs);
-        if (!abs2) continue; // external or unresolved: not modeled in v1
-        const target = fileIndex.get(abs2);
-        if (!target || target.module.id === m.id) continue; // outside profile, or intra-module
+      for (const { specifier, line, kind } of analysis.imports) {
+        const resolution = resolveImport(specifier, abs, kind);
+        if (resolution.external) continue;
+        const target = fileIndex.get(resolution.path);
+        if (resolution.rule || !target) {
+          violations.push({ rule: resolution.rule || 'unprofiled-local-import', module: m.id, file: relPath, line,
+            message: resolution.message || `Local ${kind} target ${JSON.stringify(specifier)} exists but is not declared in this profile`,
+            detail: { specifier, kind, ...(resolution.path ? { targetFile: toPosix(path.relative(root, resolution.path)) } : {}) },
+          });
+          continue;
+        }
+        if (target.module.id === m.id) continue; // Declared intra-module dependencies need no boundary checks.
         edges.get(m.id).add(target.module.id);
         const edgeKey = JSON.stringify([m.id, target.module.id]);
         if (!edgeFiles.has(edgeKey)) edgeFiles.set(edgeKey, new Set());
