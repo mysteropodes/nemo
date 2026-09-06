@@ -572,6 +572,22 @@ var TW_PIVOT=true,PIVOT_MODE='end',PIVOT_MIN_DEG=10,PIVOT_REACH=1.5,PIVOT_END_RA
 // du raccourcissement. Laissé désactivé.
 var TW_XING_HAIRLINE=true,XING_HAIRLINE_AREA=4,XING_HAIRLINE_W=2;
 var TW_CAND_ENDS=false,CAND_END_TOL=6,CAND_END_W=0.15;
+// TW_CAND_EDGE — compression LOCALE d'arêtes dans l'arbitrage. Cas mesuré (brasG,
+// « rétractation du poignet ») : mélange 5,83 contre linéaire 5,84, égalité
+// tranchée pour le mélange par la règle des 0,05 — mais le mélange compresse les
+// arêtes 101–108 (le poignet) à 69 % de leur longueur de clé et fait traîner le
+// poignet à 28 % de progression à mi-parcours quand l'avant-bras est à 52 %.
+// ld5 ne voit rien : la longueur TOTALE est à 1 %. Terme : pour chaque arête,
+// si la longueur au milieu tombe sous CAND_EDGE_FLOOR × min(longueur A,
+// longueur B), on facture l'écart × CAND_EDGE_W. Une arête qui raccourcit
+// légitimement d'une clé à l'autre n'est jamais sous le plus court des deux.
+// MESURE (2026-09-06, easing neutralisé, 8 fichiers, poids 0,25 / 0,5 / 1 tous
+// équivalents) : six fichiers strictement identiques ; untitled4 1,63→1,61 de
+// déviation, 28→23 px de longueur perdue ; brasG : compression locale 46→0,
+// longueur perdue 268→0, mais déviation latérale de l'épaule 1,70→4,80 et cinq
+// micro-rebroussements (le linéaire remplace le mélange). Vérifié à l'image : le
+// poignet ne se rétracte plus, l'épaule ne bouge pas visiblement. Actif.
+var TW_CAND_EDGE=true,CAND_EDGE_FLOOR=0.8,CAND_EDGE_W=0.5;
 function _segsCentroidXY(segs){var x=0,y=0,n=segs.length;for(var i=0;i<n;i++){x+=segs[i].point[0];y+=segs[i].point[1];}return[x/n,y/n];}
 // TW_ARC_FROM_CHAIN (2026-09-05, Cyril : « une main va parcourir un chemin
 // courbe, si on déduit la courbe par rapport à toutes les keyframes… on
@@ -4465,7 +4481,19 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
                   for(var kk=0;kk<2;kk++){var k=kk?n-1:0;var lx=rA.segments[k].point[0]+(rB.segments[k].point[0]-rA.segments[k].point[0])*ee,ly=rA.segments[k].point[1]+(rB.segments[k].point[1]-rA.segments[k].point[1])*ee;var dd=Math.hypot(traj[se][k].point[0]-lx,traj[se][k].point[1]-ly);if(dd>exEnd)exEnd=dd;}}
                 endPen=Math.max(0,exEnd-CAND_END_TOL)*CAND_END_W;
               }
-              return exX*xW+exArea*XING_AREA_W+cd/(Math.PI/6)+ld5*5+back/(n*0.8)+foldErr/(Math.PI/6)+ripExcess*0.15+fbPen+endPen;
+              var edgePen=0;
+              if(TW_CAND_EDGE){
+                var esum=0;
+                for(var ei=0;ei<n-1;ei++){
+                  var la_=Math.hypot(rA.segments[ei+1].point[0]-rA.segments[ei].point[0],rA.segments[ei+1].point[1]-rA.segments[ei].point[1]);
+                  var lb_=Math.hypot(rB.segments[ei+1].point[0]-rB.segments[ei].point[0],rB.segments[ei+1].point[1]-rB.segments[ei].point[1]);
+                  var lmn=Math.min(la_,lb_);if(lmn<0.5)continue;
+                  var lm_=Math.hypot(mid[ei+1].point[0]-mid[ei].point[0],mid[ei+1].point[1]-mid[ei].point[1]);
+                  var rr=lm_/lmn;if(rr<CAND_EDGE_FLOOR)esum+=CAND_EDGE_FLOOR-rr;
+                }
+                edgePen=esum*CAND_EDGE_W;
+              }
+              return exX*xW+exArea*XING_AREA_W+cd/(Math.PI/6)+ld5*5+back/(n*0.8)+foldErr/(Math.PI/6)+ripExcess*0.15+fbPen+endPen+edgePen;
             }
             var scB5c=candScore(candTraj.b),scU5=candScore(candTraj.u),scL5=candScore(candTraj.l);
             var scM5=mlsPerV?candScore(candTraj.m):Infinity;
