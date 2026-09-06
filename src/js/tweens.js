@@ -1256,6 +1256,72 @@ function _strokeInJson(sd){
   // same input, purely depending on which one happened to run.
   return{segments:sd.segments||[],centerSegments:sd.centerSegments,strokeColor:realStrokeColor(sd)||null,fillColor:sd.fillColor||null,isVectorBrush:!!sd.isVectorBrush,closed:!!sd.closed};
 }
+// ---- MARGE ET ACCORD MUTUEL (plan 2026-09, chantier 1.1) ----
+// Idée reprise d'AnimeInbet (accord mutuel A→B et B→A) et de l'audit (marge
+// entre la solution et sa meilleure alternative). Pour une paire (a,b) d'une
+// matrice de coût : `mutuel` = b est le minimum de la ligne a ET a le minimum
+// de la colonne b ; `marge` = min(meilleure alternative sur la ligne, sur la
+// colonne) − coût. Deux usages, deux drapeaux, mesurés séparément.
+// TW_MARGIN_SEEDS — les graines du champ de mouvement sont les paires
+// MUTUELLES à marge ≥ MARGIN_SEED_MIN de la passe 1, au lieu de la « meilleure
+// moitié » par coût. Le journal sur cats 6→16 montrait la moitié embarquer
+// deux paires fausses à marge ~0 (l'échange 6_862295↔4_829755). Repli sur
+// l'ancienne règle quand moins de MARGIN_SEED_MINCOUNT paires passent.
+// TW_MARGIN_GUARD — la passe d'ordre (croisement de trajectoires) ne peut
+// échanger que si l'une des deux paires est faible (marge < MARGIN_GUARD_MIN
+// en passe 2). Généralise les correctifs e2f30f8 et cd3647f.
+// MESURÉ (2026-09-06, 7 fichiers, 350 paires dont 293 à identifiant identique
+// dans les deux clés — l'oracle de ces fichiers, clés dupliquées puis
+// retouchées) : TW_MARGIN_SEEDS ne gagne jamais. Mutuel seul 284, marge 0,03
+// 287, 0,05 286, 0,10 287, 0,05 avec 8 graines minimum 292 (une seule portée
+// touchée, untitled4 20→32, et c'est une perte). Les paires brisées sont des
+// identités : brasG _7_25294 (64→28 px, retouché, rattrapé à 0,722 par la
+// base), cats 9_190529 et 9_436397, untitled4 1_830364. Vérité terrain par
+// clés retirées strictement identique (les portées K1→K3 ne bougent pas).
+// Le champ robuste rejette déjà les mauvaises graines ; les filtrer en amont
+// n'apporte rien et retire des témoins utiles. DÉSACTIVÉ, code conservé.
+// TW_MARGIN_GUARD : strictement NEUTRE sur les 9 fichiers — les gardes de
+// côté et d'identité de la passe d'ordre bloquent déjà toutes les tentatives
+// (8 sur cats 6→16, toutes refusées). DÉSACTIVÉ, code conservé.
+var TW_MARGIN_SEEDS=false,MARGIN_SEED_MIN=0.03,MARGIN_SEED_MINCOUNT=4;
+var TW_MARGIN_GUARD=false,MARGIN_GUARD_MIN=0.10;
+// TW_ID_BONUS — l'identité comme BONUS de coût plutôt que comme épingle. Un
+// même identifiant d'origine dans les deux clés (clé dupliquée puis
+// retouchée) qui passe les filtres par paire de _identityCandidates voit son
+// coût baissé de ID_BONUS dans les deux passes et dans chaque canal
+// d'hypothèse. À la différence des épingles (tout-ou-rien par portée,
+// désactivées sur cats 6→16 dès qu'une identité échoue la géométrie), le
+// bonus agit paire par paire et ne fait que départager : une forme vraiment
+// différente garde un coût supérieur. Mesure de départ : B.identite — cats
+// 24 paires « croisées » (les deux ids existent en face, pas appariés
+// ensemble), totale 8.
+// MESURÉ (2026-09-06, chemin réel via B.diffReal, 9 fichiers, bonus 0,10 avec
+// la garde par le champ) : NÉGATIF. Ne change que cats 6→16 (trois tics du
+// visage) et 34→46 (quatre), à chaque fois en suivant les identifiants du
+// fichier — or ces identifiants sont un ANCIEN ré-estampillage (pairId = id
+// de A posé sur B par une génération passée, sans origId dans ce fichier),
+// pas l'identité dessinée ; à l'image, la base garde l'ordre des tics et le
+// bonus les fait se croiser. Sans garde, le bonus échangeait aussi les deux
+// bras (cats 34→46). Une identité appliquée à moitié (la garde n'en laisse
+// passer qu'une sur trois) déséquilibre un arbitrage serré : même leçon que
+// TW_ID_PIN_ALL_OR_NONE. Vérité terrain par clés retirées identique. Un
+// même strokeId dans deux clés n'est un oracle QUE dans les fichiers écrits
+// avec origId ou dupOf (untitled4 clés 20/32). DÉSACTIVÉ, code conservé.
+var TW_ID_BONUS=false,ID_BONUS=0.10,ID_BONUS_RESID_F=0.35,ID_BONUS_RESID_PX=15;
+function _matchMargins(cost,matches,n,m){
+  var colMin=new Array(m),colArg=new Array(m);
+  for(var j0=0;j0<m;j0++){colMin[j0]=Infinity;colArg[j0]=-1;}
+  for(var i=0;i<n;i++){var r=cost[i];for(var j=0;j<m;j++){var c=r[j];if(c<colMin[j]){colMin[j]=c;colArg[j]=i;}}}
+  matches.forEach(function(mm){
+    if(mm.a<0||mm.a>=n||mm.b<0||mm.b>=m)return;
+    var row=cost[mm.a],b=mm.b,c=row[b],rowMin=Infinity,rowArg=-1,altL=Infinity;
+    for(var j2=0;j2<m;j2++){var v=row[j2];if(v<rowMin){rowMin=v;rowArg=j2;}if(j2!==b&&v<altL)altL=v;}
+    var altC=Infinity;for(var i2=0;i2<n;i2++){if(i2!==mm.a&&cost[i2][b]<altC)altC=cost[i2][b];}
+    mm.mutuel=(rowArg===b&&colArg[b]===mm.a);
+    var mg=Math.min(altL,altC)-c;mm.marge=isFinite(mg)?mg:1;
+  });
+  return matches;
+}
 // ---- JOURNAL DE DÉCISION DE L'APPARIEMENT (plan 2026-09, chantier 0.3) ----
 // window.__TW_DEBUG_MATCH=true avant generateTweens : chaque portée pousse une
 // entrée dans window.__twMatchLog. Par paire et par passe : coût, meilleure
@@ -1267,7 +1333,10 @@ function _strokeInJson(sd){
 // effet quand le drapeau est éteint : _twML reste null et chaque point de
 // journalisation revient immédiatement. Lecture : B.journal() dans le banc.
 var _twML=null;
-function _mlShort(sd){var id=sd&&sd.strokeId;if(id===undefined||id===null)return '?';id=String(id);return id.length>8?id.slice(-8):id;}
+// Identifiant d'ORIGINE (origId / _origId, sinon strokeId) : le strokeId d'une
+// clé B est ré-estampillé par la génération selon l'appariement, il change
+// donc d'une exécution à l'autre ; l'identité d'origine, elle, est stable.
+function _mlShort(sd){if(!sd)return '?';var id=(typeof _origIdOf==='function')?_origIdOf(sd):sd.strokeId;if(id===undefined||id===null)return '?';id=String(id);return id.length>8?id.slice(-8):id;}
 function _mlBegin(fA,fB,sA,sB){
   _twML=null;
   if(typeof window==='undefined'||!window.__TW_DEBUG_MATCH)return;
@@ -1410,6 +1479,29 @@ function _autoMatchJSCore(sA,sB,hist,pins,seedOverride){
   // was stolen by a neighbor and it got stuck with garbage.
   var FADE_COST=0.6;
   var n=sA.length,m=sB.length,N=n+m;
+  var idPair=null;
+  if(TW_ID_BONUS){
+    idPair=new Array(n);var icb=_identityCandidates(sA,sB,null,null);
+    icb.cand.forEach(function(c){idPair[c.a]=c.b;});
+    _mlNote('bonus d\'identité',{candidates:icb.cand.length,bonus:ID_BONUS,rejetsGeometrie:icb.rejets.length});
+  }
+  // GARDE PAR LE CHAMP (cats 34→46, vu à l'image) : l'artiste réutilise les
+  // traits d'un bras pour dessiner l'autre et les moustaches changent de côté ;
+  // l'identité y est trompeuse, et une garde par déplacement absolu ne peut
+  // rien (le chat entier marche de 207 px). Le bonus n'est accordé qu'en
+  // passe 2 (et dans chaque canal d'hypothèse), quand la position PRÉDITE du
+  // trait par le modèle de mouvement tombe près de son partenaire d'identité :
+  // même règle de témoin que le rattrapage (résidu ≤ 0,35 × déplacement + 15).
+  var _idBonusGiven=0,_idBonusDenied=[];
+  function idBonusFor(a,b,pts){
+    if(!idPair||idPair[a]!==b||!pts||!pts.length)return 0;
+    var cx=0,cy=0;for(var i=0;i<pts.length;i++){cx+=pts[i][0];cy+=pts[i][1];}cx/=pts.length;cy/=pts.length;
+    var ax=fA[a].cx,ay=fA[a].cy,bx=fB[b].cx,by=fB[b].cy;
+    var disp=Math.hypot(bx-ax,by-ay),pred=Math.hypot(cx-ax,cy-ay),resid=Math.hypot(bx-cx,by-cy);
+    if(resid<=ID_BONUS_RESID_F*Math.max(disp,pred)+ID_BONUS_RESID_PX){_idBonusGiven++;return ID_BONUS;}
+    _idBonusDenied.push(_mlIdA(a)+' (résidu '+Math.round(resid)+' px, déplacement '+Math.round(disp)+')');
+    return 0;
+  }
   function buildCost(ptsT){
     var c=[],axis=new Array(m);
     for(var a=0;a<N;a++){
@@ -1420,7 +1512,7 @@ function _autoMatchJSCore(sA,sB,hist,pins,seedOverride){
       // soit pas puni de l'avoir été.
       if(a<n)_axisPenaltyRow((ptsT&&ptsT[a])?pointElongation(ptsT[a]):fA[a].elong,fB,axis);
       for(var b=0;b<N;b++){
-        if(a<n&&b<m)row.push(matchSc(fA[a],fB[b],a===b,ptsT?ptsT[a]:undefined)+axis[b]);
+        if(a<n&&b<m)row.push(matchSc(fA[a],fB[b],a===b,ptsT?ptsT[a]:undefined)+axis[b]-idBonusFor(a,b,ptsT?ptsT[a]:null));
         else if(a>=n&&b>=m)row.push(0);
         else row.push(FADE_COST);
       }
@@ -1446,6 +1538,12 @@ function _autoMatchJSCore(sA,sB,hist,pins,seedOverride){
   var seeds=seedSrc.slice().sort(function(x,y){return x.score-y.score;});
   var seedCount=Math.max(2,Math.ceil(seeds.length*0.5));
   seeds=seeds.slice(0,seedCount);
+  if(TW_MARGIN_SEEDS&&!seedOverride){
+    _matchMargins(cost,matches,n,m);
+    var confident=matches.filter(function(mm){return mm.mutuel&&mm.marge>=MARGIN_SEED_MIN;}).sort(function(x,y){return x.score-y.score;});
+    if(confident.length>=MARGIN_SEED_MINCOUNT)seeds=confident;
+    _mlNote('graines par marge',{retenues:confident.length,seuil:MARGIN_SEED_MIN,applique:confident.length>=MARGIN_SEED_MINCOUNT});
+  }
   _mlNote('graines du champ',{n:seeds.length,paires:seeds.map(function(s){return{a:s.a,b:s.b,idA:_mlIdA(s.a),idB:_mlIdB(s.b),score:+s.score.toFixed(3)};})});
   var ptsA=seeds.map(function(s){return{x:fA[s.a].cx,y:fA[s.a].cy};});
   var ptsB=seeds.map(function(s){return{x:fB[s.b].cx,y:fB[s.b].cy};});
@@ -1532,6 +1630,7 @@ function _autoMatchJSCore(sA,sB,hist,pins,seedOverride){
     return f.pts.map(function(pt){var q=applySimilarityTransform(tf,pt[0],pt[1]);return[q.x,q.y];});
   });
   var cost2=buildCost(ptsT);
+  if(idPair)_mlNote('bonus d\'identité en passe 2',{accordes:_idBonusGiven,refuses:_idBonusDenied.slice()});
   // TWO-CHANNEL UNARY (2026-09, with TW_MATCH_RELATIONAL — Cyril's
   // "confusion des 2 yeux" on a turning face): pass 2 used to score every
   // pairing ONLY at the motion-predicted position. When the local motion
@@ -1600,7 +1699,7 @@ function _autoMatchJSCore(sA,sB,hist,pins,seedOverride){
         // terme était silencieusement sans effet sur ces cellules).
         _axisPenaltyRow(pointElongation(hpts),fB,hAxis);
         var row=new Array(m);
-        for(var hb=0;hb<m;hb++)row[hb]=matchSc(fA[ha],fB[hb],ha===hb,hpts)+hAxis[hb]+bias;
+        for(var hb=0;hb<m;hb++)row[hb]=matchSc(fA[ha],fB[hb],ha===hb,hpts)+hAxis[hb]+bias-idBonusFor(ha,hb,hpts);
         mat[ha]=row;
       }
       return mat;
@@ -1630,16 +1729,16 @@ function _autoMatchJSCore(sA,sB,hist,pins,seedOverride){
       matches2.forEach(function(mm3){var h5=hypOf[mm3.a*m+mm3.b];if(h5!==undefined)adopters[h5]++;});
       var dropped=false;
       for(var di=0;di<hyps.length;di++)if(alive[di]&&adopters[di]<(hyps[di].minAdopt||MM_MIN_SUPPORT)){alive[di]=false;dropped=true;_mlNote('hypothèse abandonnée',{h:di,adoptants:adopters[di],minimum:(hyps[di].minAdopt||MM_MIN_SUPPORT)});}
-      if(!dropped)return matches2;
+      if(!dropped)return _matchMargins(cost2,matches2,n,m);
     }
-    return matches2;
+    return _matchMargins(cost2,matches2,n,m);
   }else{
     assign2=hungarian(cost2);
     for(var a4=0;a4<n;a4++){var b4=assign2[a4];if(b4!==undefined&&b4>=0&&b4<m)matches2.push({a:a4,b:b4,score:cost2[a4][b4]});}
     _mlAssign('passe 2 (transport)',cost2,matches2,n,m);
   }
-  if(TW_MATCH_RELATIONAL){var _mlR=relationalRefine(matches2,fA,fB,cost2,localTfs,n,m,FADE_COST);_mlDiff('relationnel',matches2,_mlR,'voisinage, structure, 2-opt');return _mlR;}
-  return uncrossMatches(matches2,fA,fB);
+  if(TW_MATCH_RELATIONAL){var _mlR=relationalRefine(matches2,fA,fB,cost2,localTfs,n,m,FADE_COST);_mlDiff('relationnel',matches2,_mlR,'voisinage, structure, 2-opt');return _matchMargins(cost2,_mlR,n,m);}
+  return _matchMargins(cost2,uncrossMatches(matches2,fA,fB),n,m);
 }
 // ---- MULTI-MOTION hypotheses (see TW_MATCH_MULTI_MOTION) ----
 function _quickCentroid(sd){
@@ -5577,7 +5676,7 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
   forcedPairs.forEach(function(fp){pairSpecs.push(fp);aMatched[fp.aIdx]=1;bMatched[fp.bIdx]=1;});
   matches.forEach(function(m){
     if(forcedAIdx[m.a]||forcedBIdx[m.b])return; // conflicts with a manual override — drop the auto guess
-    if(m.score<=MATCH_TH){pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;}
+    if(m.score<=MATCH_TH){pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score,marge:m.marge,mutuel:m.mutuel});aMatched[m.a]=1;bMatched[m.b]=1;}
     else _mlNote('seuil',{a:m.a,b:m.b,score:+m.score.toFixed(3),seuil:MATCH_TH,verdict:'au-dessus du seuil, candidat au rattrapage'});
   });
   // Second chance for mutually-leftover Hungarian pairs (see comment above).
@@ -5640,7 +5739,7 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
       }
     }
     _mlNote('rattrapage',{a:m.a,b:m.b,score:+m.score.toFixed(3),verdict:'rattrapé'});
-    pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;
+    pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score,marge:m.marge,mutuel:m.mutuel});aMatched[m.a]=1;bMatched[m.b]=1;
   });
   var unA=[],unB=[];
   for(var ai=0;ai<sA.length;ai++)if(!aMatched[ai])unA.push(ai);
@@ -5800,6 +5899,7 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
         var rla=Math.sqrt(rAx*rAx+rAy*rAy),rlb=Math.sqrt(rBx*rBx+rBy*rBy);
         if(rla>1e-6&&rlb>1e-6&&(rAx*rBx+rAy*rBy)/(rla*rlb)>0.3){_mlNote('passe d\'ordre',{a1:ocP.aIdx,a2:ocQ.aIdx,verdict:'garde de côté : arrangement conservé, rien'});continue;}
       }
+      if(TW_MARGIN_GUARD&&typeof ocP.marge==='number'&&typeof ocQ.marge==='number'&&ocP.marge>=MARGIN_GUARD_MIN&&ocQ.marge>=MARGIN_GUARD_MIN){_mlNote('passe d\'ordre',{a1:ocP.aIdx,a2:ocQ.aIdx,marges:[+ocP.marge.toFixed(3),+ocQ.marge.toFixed(3)],verdict:'garde de marge : deux paires sûres, rien'});continue;}
       var curCost=_ocCost(_ocFeatA[oc1],_ocFeatB[oc1])+_ocCost(_ocFeatA[oc2],_ocFeatB[oc2]);
       var swapCost=_ocCost(_ocFeatA[oc1],_ocFeatB[oc2])+_ocCost(_ocFeatA[oc2],_ocFeatB[oc1]);
       if(swapCost>curCost+0.15){_mlNote('passe d\'ordre',{a1:ocP.aIdx,a2:ocQ.aIdx,cout:+curCost.toFixed(3),coutEchange:+swapCost.toFixed(3),verdict:'échange plus cher : croisement voulu, rien'});continue;} // meaningfully worse — likely a real intended crossing, leave it
@@ -5859,33 +5959,43 @@ function _provenancePins(sA,sB,forcedAIdx,forcedBIdx){
 // Épingles par identité de trait — voir TW_ID_PINS pour le raisonnement et
 // les mesures. Appelée APRÈS _provenancePins, donc elle ne voit que ce que
 // la provenance n'a pas déjà pris.
-function _identityPins(sA,sB,forcedAIdx,forcedBIdx){
-  var out=[];
-  if(!TW_ID_PINS)return out;
+// Candidats d'identité, filtres PAR PAIRE seulement (type, couleur, rapport
+// de longueurs, forme) : partagés par les épingles (_identityPins, qui ajoute
+// ses filtres de portée) et par le bonus de coût (TW_ID_BONUS).
+function _identityCandidates(sA,sB,forcedAIdx,forcedBIdx){
   var aById={},aDup={},bById={},bDup={};
   sA.forEach(function(sd,ii){var id=_origIdOf(sd);if(_engineMadeId(id))return;if(aById[id]!==undefined)aDup[id]=1;else aById[id]=ii;});
   sB.forEach(function(sd,jj){var id=_origIdOf(sd);if(_engineMadeId(id))return;if(bById[id]!==undefined)bDup[id]=1;else bById[id]=jj;});
-  var cand=[],geomRejected=0;
+  var cand=[],geomRejected=0,rejets=[];
   Object.keys(aById).forEach(function(id){
     if(aDup[id]||bDup[id]||bById[id]===undefined)return;
     var ai=aById[id],bi=bById[id];
-    if(forcedAIdx[ai]||forcedBIdx[bi])return;
+    if(forcedAIdx&&forcedBIdx&&(forcedAIdx[ai]||forcedBIdx[bi]))return;
     var fa=strokeFeat(sA[ai]),fb=strokeFeat(sB[bi]);
-    if(fa.type!==fb.type)return;
+    if(fa.type!==fb.type){rejets.push({a:ai,b:bi,motif:'type'});return;}
     if((fa.fillCol&&fb.fillCol&&colorDist(fa.fillCol,fb.fillCol)>0.35)||
-       (fa.strokeCol&&fb.strokeCol&&colorDist(fa.strokeCol,fb.strokeCol)>0.35))return;
+       (fa.strokeCol&&fb.strokeCol&&colorDist(fa.strokeCol,fb.strokeCol)>0.35)){rejets.push({a:ai,b:bi,motif:'couleur'});return;}
     // filtre 1 : longueurs
     var lr=Math.max(fa.length,fb.length)/Math.max(1,Math.min(fa.length,fb.length));
-    if(lr>ID_PIN_LEN_RATIO){geomRejected++;return;}
+    if(lr>ID_PIN_LEN_RATIO){geomRejected++;rejets.push({a:ai,b:bi,motif:'longueurs '+lr.toFixed(2)});return;}
     // filtre 0 : forme (voir ID_PIN_SHAPE_MAX)
-    if(axisPenaltyPair(fa.elong,fb.elong)>ID_PIN_SHAPE_MAX){geomRejected++;return;}
+    var shp=axisPenaltyPair(fa.elong,fb.elong);
+    if(shp>ID_PIN_SHAPE_MAX){geomRejected++;rejets.push({a:ai,b:bi,motif:'forme '+shp.toFixed(2)});return;}
     cand.push({a:ai,b:bi,ax:fa.cx,ay:fa.cy,bx:fb.cx,by:fb.cy,
                d:Math.sqrt((fb.cx-fa.cx)*(fb.cx-fa.cx)+(fb.cy-fa.cy)*(fb.cy-fa.cy))});
   });
+  return{cand:cand,geomRejected:geomRejected,rejets:rejets};
+}
+function _identityPins(sA,sB,forcedAIdx,forcedBIdx){
+  var out=[];
+  if(!TW_ID_PINS)return out;
+  var ic=_identityCandidates(sA,sB,forcedAIdx,forcedBIdx);
+  var cand=ic.cand,geomRejected=ic.geomRejected;
+  _mlNote('épingles d\'identité',{candidates:cand.length,rejetsGeometrie:geomRejected,rejets:ic.rejets.map(function(r){return _mlIdA(r.a)+'→'+_mlIdB(r.b)+' ('+r.motif+')';})});
   // voir TW_ID_PIN_ALL_OR_NONE : une identité vraie écartée par la géométrie
   // invalide toute la portée, sinon on applique une identité à moitié.
-  if(TW_ID_PIN_ALL_OR_NONE&&geomRejected>0)return out;
-  if(cand.length<ID_PIN_MIN)return out;
+  if(TW_ID_PIN_ALL_OR_NONE&&geomRejected>0){_mlNote('épingles d\'identité',{verdict:'tout-ou-rien : une identité rejetée par la géométrie, aucune épingle'});return out;}
+  if(cand.length<ID_PIN_MIN){_mlNote('épingles d\'identité',{verdict:'moins de '+ID_PIN_MIN+' candidates, aucune épingle'});return out;}
   // filtre 4 : tout ou rien sur la portée (voir ID_PIN_SPAN_RATIO)
   var featB=sB.map(function(sd){return strokeFeat(sd);});
   var sumPin=0,sumNear=0;

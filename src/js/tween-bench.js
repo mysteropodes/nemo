@@ -17,6 +17,8 @@
 //   __twBench.holdout(li,k1,k2,k3)       vérité terrain : clé k2 retirée, générée, comparée (Chamfer px)
 //   __twBench.holdoutAll(li)              tous les triplets de clés consécutives
 //   __twBench.journal(fA,fB)              journal de décision de l'appariement (__TW_DEBUG_MATCH)
+//   __twBench.identite(li)                paires à même strokeId / croisées / redessinées (clés dupliquées)
+//   __twBench.corpusReal() / diffReal({...})  paires de la génération RÉELLE (journal), pas des copies
 //
 // The overlay lives in the Paper canvas: visible only while the Rust engine
 // is OFF (a fresh preview tab), see CLAUDE.md §4.
@@ -24,7 +26,7 @@
   if(typeof window==='undefined')return;
   var B={};
   var FLAG_NAMES=['TW_MATCH_RELATIONAL','TW_MATCH_MULTI_MOTION','TW_REL_2OPT','TW_MATCH_TRACKING','TW_PIECE_COMPLETION','TW_MATCH_AXIS','TW_MATCH_TURNING','TW_MATCH_GAP','TW_REL_REVERSE','TW_OC_SIDE_GUARD','TW_ID_PINS','TW_ARC_FROM_CHAIN','TW_TWIN_GROUPS','TW_TEMPORAL_PRIOR',
-    'TW_MOTION_FIELD','TW_CHIRALITY','TW_MATCH_WIDTH','TW_MATCH_TOPOLOGY','TW_MATCH_REGIONS','TW_PROVENANCE_PINS','TW_PIN_IN_SOLVER','TW_ORPHAN_FOLLOW'];
+    'TW_MOTION_FIELD','TW_CHIRALITY','TW_MATCH_WIDTH','TW_MATCH_TOPOLOGY','TW_MATCH_REGIONS','TW_PROVENANCE_PINS','TW_PIN_IN_SOLVER','TW_ORPHAN_FOLLOW','TW_MARGIN_SEEDS','TW_MARGIN_GUARD','TW_ID_BONUS','TW_ID_PINS'];
   var NEW_FLAGS=['TW_MOTION_FIELD','TW_CHIRALITY','TW_MATCH_WIDTH','TW_MATCH_TOPOLOGY','TW_MATCH_REGIONS','TW_PROVENANCE_PINS','TW_PIN_IN_SOLVER','TW_ORPHAN_FOLLOW','TW_MATCH_AXIS','TW_MATCH_TURNING','TW_MATCH_GAP','TW_REL_REVERSE','TW_OC_SIDE_GUARD','TW_ID_PINS','TW_ARC_FROM_CHAIN','TW_TWIN_GROUPS','TW_TEMPORAL_PRIOR'];
   B.NEW_FLAGS=NEW_FLAGS;
   B.flags=function(){var o={};FLAG_NAMES.forEach(function(k){o[k]=window[k];});return o;};
@@ -512,6 +514,54 @@
     var tot=rows.length?+(rows.reduce(function(t,x){return t+x.chamfer;},0)/rows.length).toFixed(2):null;
     var totBR=rows.length?+(rows.reduce(function(t,x){return t+parseFloat(x.meilleurRang);},0)/rows.length).toFixed(2):null;
     return{triplets:rows,chamferMoyen:tot,chamferMeilleurRangMoyen:totBR,egares:rows.reduce(function(t,x){return t+x.egares;},0),manques:rows.reduce(function(t,x){return t+x.manques;},0)};
+  };
+
+  // ---- identité (2026-09-06) : l'oracle des clés dupliquées ----
+  // Quand une clé a été dupliquée puis retouchée, un même strokeId dans les
+  // deux clés désigne le même trait. B.identite(li) compte, sur toutes les
+  // portées : paires (hors pièces), paires à même id, paires « croisées » (les
+  // deux ids existent en face mais ne sont pas appariés ensemble — signal
+  // d'erreur fort), paires « redessinées » (l'un des ids n'existe pas en face,
+  // légitime), et fondus. Sans ids partagés (testanim), mêmeId vaut 0 et la
+  // mesure ne dit rien.
+  B.identite=function(li){
+    li=li===undefined?state.activeLayerIdx:li;
+    var keys=keysOf(li),tot={paires:0,memeId:0,croisees:0,redessinees:0,fondus:0,portees:[]};
+    for(var i=0;i<keys.length-1;i++){
+      var r=B.span(li,keys[i],keys[i+1]);if(r.empty)continue;
+      var idsA={},idsB={};r.sA.forEach(function(s){if(s.strokeId)idsA[s.strokeId]=1;});r.sB.forEach(function(s){if(s.strokeId)idsB[s.strokeId]=1;});
+      var row={fA:keys[i],fB:keys[i+1],paires:0,memeId:0,croisees:[],redessinees:0,fondus:r.unA.length+r.unB.length};
+      r.pairs.forEach(function(p){if(p.piece)return;row.paires++;var ia=r.sA[p.a].strokeId,ib=r.sB[p.b].strokeId;
+        if(ia&&ib&&ia===ib){row.memeId++;return;}
+        if(ia&&ib&&idsB[ia]&&idsA[ib])row.croisees.push(String(ia).slice(-8)+'→'+String(ib).slice(-8));else row.redessinees++;});
+      tot.paires+=row.paires;tot.memeId+=row.memeId;tot.croisees+=row.croisees.length;tot.redessinees+=row.redessinees;tot.fondus+=row.fondus;tot.portees.push(row);
+    }
+    return tot;
+  };
+
+  // ---- corpus sur le CHEMIN RÉEL (2026-09-06) ----
+  // B.span travaille sur des copies fraîches : sans le ré-estampillage des
+  // identifiants ni l'historique de suivi que la génération réelle produit
+  // portée après portée, ses paires peuvent différer de celles de
+  // generateTweens (vu sur cats 6→16). B.corpusReal() génère réellement avec
+  // le journal allumé et relève le bilan de chaque portée (ids d'origine) ;
+  // B.diffReal({FLAG:true}) compare deux générations réelles. L'easing est
+  // neutralisé pendant la génération, puis remis ; le document est régénéré.
+  B.corpusReal=async function(){
+    var eas=neutralEasing(),prevDbg=window.__TW_DEBUG_MATCH,prevLog=window.__twMatchLog;
+    window.__TW_DEBUG_MATCH=true;window.__twMatchLog=[];
+    try{await window.generateTweens(undefined,true);}finally{restoreEasing(eas);}
+    var L=window.__twMatchLog||[];window.__TW_DEBUG_MATCH=prevDbg;window.__twMatchLog=prevLog;
+    return L.map(function(J){var pairs=(J.final||[]).filter(function(f){return f.source!=='scission';}).map(function(f){return f.idA+'>'+f.idB;}).sort();
+      return{fA:J.fA,fB:J.fB,n:J.n,m:J.m,pairs:pairs,sig:pairs.join(' '),fadeA:(J.fondusA||[]).map(function(x){return x.idA;}),fadeB:(J.fondusB||[]).map(function(x){return x.idB;}),final:J.final};});
+  };
+  B.diffReal=async function(flagsB){
+    var a=await B.corpusReal();var prev=B.setFlags(flagsB);var b;
+    try{b=await B.corpusReal();}finally{B.setFlags(prev);}
+    var out=[];a.forEach(function(sa,i){var sb=b[i];if(!sb||sa.sig===sb.sig)return;var A=sa.pairs,Bs=sb.pairs;
+      out.push({fA:sa.fA,fB:sa.fB,onlyCurrent:A.filter(function(x){return Bs.indexOf(x)<0;}),onlyOther:Bs.filter(function(x){return A.indexOf(x)<0;}),fadesCurrent:sa.fadeA.length+sa.fadeB.length,fadesOther:sb.fadeA.length+sb.fadeB.length});});
+    await window.generateTweens(undefined,true);
+    return{spans:a.length,changed:out.length,details:out};
   };
 
   // ---- journal d'appariement (chantier 0.3) : lecture humaine ----
