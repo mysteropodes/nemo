@@ -10,6 +10,40 @@
 // misdirects the warping path more often than it helps. Off by default,
 // left in for Cyril to flip on and compare — see the flag comment below.
 var TW_CURVATURE_DTW=false;
+// TW_DTW_SIGN (2026-09-06, testC/brasG 0→14, « l'index devient le pouce ») :
+// le coût du DTW ne regarde que la position prédite et l'angle de tangente,
+// jamais le SENS d'un coin. Sur la main droite, le chemin envoyait un creux
+// entre deux doigts de A (+154°) sur une pointe de doigt de B (−134°) et une
+// pointe de A sur un plat de B : à l'image, un doigt glisse d'un rang. Ici :
+// un coin franc (|virage| ≥ DTW_SIGN_MIN sur deux pas de grille, hors
+// rebroussements quasi complets ≥ DTW_SIGN_CUSP) ne peut s'apparier à un coin
+// franc de signe opposé qu'au prix de DTW_SIGN_W — de l'ordre du terme de
+// position à un quart de longueur de trait. window.__TW_DEBUG_DTW=true
+// compte les conflits de signe restants sur le chemin (window.__twDtwLog).
+// MESURÉ (2026-09-06, dix fichiers, 1 433 coins francs) : conflits de signe sur
+// le chemin retenu 50 → 13 (brasG 3→0, testB 10→0, testC 3→0, testD 11→0, cats
+// 12→6) ; extrémités et vérité terrain par clés retirées neutres. Mais la
+// pénalité de signe seule laisse la main droite glisser d'un doigt entier
+// (signes cohérents) : voir DTW_LOST_W ci-dessous, qui règle ce cas. Actif.
+var TW_DTW_SIGN=true,DTW_SIGN_MIN=0.6,DTW_SIGN_CUSP=2.6,DTW_SIGN_W=0.6;
+// DTW_SIGN_REWARD : variante à mesurer — deux coins francs de MÊME signe se
+// paient moins cher (coût − REWARD), pour attirer une pointe sur une pointe et
+// pas seulement interdire pointe↔creux. 0 = désactivé.
+var DTW_SIGN_REWARD=0;
+// DTW_LOST_W : un coin franc d'un côté posé sur un PLAT de l'autre (|virage| <
+// DTW_FLAT) coûte DTW_LOST_W. Sans cela, la main droite de testC glisse d'un
+// doigt entier : la pointe 1 de A est absorbée par le plat du poignet de B, la
+// pointe 4 de B par le plat après la main de A, et entre les deux chaque doigt
+// se pose sur son voisin — signes cohérents, donc invisible pour la pénalité de
+// signe seule. 0 = désactivé.
+// MESURÉ avec la pénalité de signe (2026-09-06) : coins perdus 373 → 265 à
+// 0,3 (219 à 0,6, mais les conflits de signe remontent 13→22 : les deux
+// termes se disputent). À 0,3 la main droite de testC/brasG s'aligne
+// pointe 1→pointe 1 … pointe 4→pointe 4, creux sur creux ; compression
+// locale (B.bouts) brasG 1,1→0,1, testB 5,2→2,9, testC 1,2→0,2 ; écart
+// latéral neutre (testD 11,0→12,3, le seul mouvement) ; vérité terrain par
+// clés retirées identique sur cinq fichiers. Actif à 0,3.
+var DTW_LOST_W=0.3,DTW_FLAT=0.3;
 var TW_CORRECTION_PASS=true;
 var TW_POINT_REDUCTION=true;
 var TW_HANDLE_REHARMONISE=true;
@@ -2603,16 +2637,18 @@ function _dtwCorrespondence(pA,lenA,pB,lenB,n){
   // lenB/(gK-1)), so normalizing by it makes the signal comparable
   // between two shapes even if their raw sampling density differs.
   var dsA=lenA/(gK-1),dsB=lenB/(gK-1);
-  var curvA=new Array(gK),curvB=new Array(gK);
+  var curvA=new Array(gK),curvB=new Array(gK),turnA=new Array(gK),turnB=new Array(gK);
   for(var ka=0;ka<gK;ka++){
     var prevA=tanA[ka>0?ka-1:ka],nextA=tanA[ka<gK-1?ka+1:ka];
     var spanA=(ka>0&&ka<gK-1)?2*dsA:dsA;
-    curvA[ka]=_wrapPI(nextA-prevA)/Math.max(1e-6,spanA);
+    turnA[ka]=_wrapPI(nextA-prevA);
+    curvA[ka]=turnA[ka]/Math.max(1e-6,spanA);
   }
   for(var kb=0;kb<gK;kb++){
     var prevB=tanB[kb>0?kb-1:kb],nextB=tanB[kb<gK-1?kb+1:kb];
     var spanB=(kb>0&&kb<gK-1)?2*dsB:dsB;
-    curvB[kb]=_wrapPI(nextB-prevB)/Math.max(1e-6,spanB);
+    turnB[kb]=_wrapPI(nextB-prevB);
+    curvB[kb]=turnB[kb]/Math.max(1e-6,spanB);
   }
   // Rigid motion the correspondence should agree with — same 32-probe
   // whole-stroke fit _matchLandmarks seeds from (already order-consistent:
@@ -2642,7 +2678,13 @@ function _dtwCorrespondence(pA,lenA,pB,lenB,n){
     // the "noodle ballooning" failure this file's own history note above
     // already warns a curvature-only cost falls into.
     var cc=TW_CURVATURE_DTW?Math.min(1,Math.abs(curvA[i]-curvB[j])*normScale):0;
-    return posC+0.35*ad+0.08*cc;
+    var sg=0;
+    if(TW_DTW_SIGN){
+      var ta=turnA[i],tb=turnB[j],aa=Math.abs(ta),ab=Math.abs(tb);
+      if(aa>=DTW_SIGN_MIN&&ab>=DTW_SIGN_MIN&&aa<DTW_SIGN_CUSP&&ab<DTW_SIGN_CUSP){if(ta*tb<0)sg=DTW_SIGN_W;else sg=-DTW_SIGN_REWARD;}
+      else if(DTW_LOST_W>0&&((aa>=DTW_SIGN_MIN&&aa<DTW_SIGN_CUSP&&ab<DTW_FLAT)||(ab>=DTW_SIGN_MIN&&ab<DTW_SIGN_CUSP&&aa<DTW_FLAT)))sg=DTW_LOST_W;
+    }
+    return posC+0.35*ad+0.08*cc+sg;
   }
   // Classic DTW DP: monotonic path from (0,0) to (gK-1,gK-1), each step
   // advances i, j, or both — a plateau (several j's per i or vice versa)
@@ -2674,6 +2716,18 @@ function _dtwCorrespondence(pA,lenA,pB,lenB,n){
     path.push([pi,pj]);
   }
   path.reverse();
+  if(typeof window!=='undefined'&&window.__TW_DEBUG_DTW){
+    var _clash=0,_strong=0,_lost=0,_seenA={};
+    path.forEach(function(pr){var ta2=turnA[pr[0]],tb2=turnB[pr[1]],a2=Math.abs(ta2),b2=Math.abs(tb2);
+      if(a2>=DTW_SIGN_MIN&&a2<DTW_SIGN_CUSP){
+        if(!_seenA[pr[0]]){_seenA[pr[0]]=1;_strong++;}
+        if(b2>=DTW_SIGN_MIN&&b2<DTW_SIGN_CUSP&&ta2*tb2<0)_clash++;
+      }});
+    // coins francs de A dont AUCUN partenaire sur le chemin n'est un coin (|virage| < 0,3) : pointe posée sur un plat
+    var _partners={};path.forEach(function(pr){(_partners[pr[0]]||(_partners[pr[0]]=[])).push(pr[1]);});
+    Object.keys(_seenA).forEach(function(ia){var js=_partners[ia]||[];var okc=js.some(function(j){return Math.abs(turnB[j])>=0.3;});if(!okc)_lost++;});
+    window.__twDtwLog=window.__twDtwLog||[];window.__twDtwLog.push({lenA:Math.round(lenA),lenB:Math.round(lenB),coinsFrancsA:_strong,conflitsSigne:_clash,coinsPerdus:_lost,pas:path.length});
+  }
   var prog=path.map(function(pr){return (pr[0]/(gK-1)+pr[1]/(gK-1))/2;});
   var fracA=[0],fracB=[0];
   var pk=0;
