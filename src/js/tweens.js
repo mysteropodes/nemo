@@ -705,6 +705,40 @@ var TW_SPLIT_JUNCTION_CUT=true,SPLIT_JUNCTION_MAX=24;
 // au lieu de 110 px le long du menton. Onze autres fichiers identiques,
 // vérité terrain et extrémités inchangées. Actif, évalué en premier.
 var TW_SPLIT_DTW_CUT=true;
+// ---- SCISSION : SOUS-ENSEMBLES DE CANDIDATS (« la bouche vient de nulle part ») ----
+// Clé 24 de la tête : le trait nez-bouche (461 px) doit se couper en nez
+// (227) + bouche (104). Un troisième trait sans rapport (une mèche de 150 px
+// dont la boîte chevauche) entre dans les candidats, la scission n'essaie que
+// les trois ensemble, un morceau tombe sur la mèche avec un score > 0,48 et
+// TOUT est refusé : la bouche arrive en fondu. Ici, avec trois candidats, on
+// évalue aussi chaque paire, et on garde le meilleur découpage accepté.
+// Et l'ORDRE des parties : il vient de la projection de leur centre sur le
+// trait fusionné, qui n'a plus de sens quand la tête a bougé (nez et bouche
+// projetaient tous deux sur le bout du trait, à égalité). Avec le drapeau, on
+// essaie aussi les autres ordres (au plus six pour trois parties) et chaque
+// ordre est jugé par ses morceaux.
+// Et la CONTIGUÏTÉ : les parties d'un trait coupé viennent d'un seul tracé,
+// deux parties consécutives doivent donc rester proches en B. Sans cela, la
+// mèche à 200 px du nez entrait dans un découpage à trois (nez, bouche, mèche)
+// accepté sur ses seuls scores de forme. Écart maximal entre parties
+// consécutives : SPLIT_PART_GAP × longueur du trait fusionné, plancher 40 px.
+// Et la POSITION PRÉDITE : la contiguïté seule ne sépare pas la mèche (119 px
+// du nez) de la bouche (80 px, un vrai écart dessiné). Le trait fusionné est
+// transporté par le mouvement de la portée (similitude ajustée sur les
+// centres des paires retenues, au moins trois) ; une partie candidate doit
+// avoir son centre à ≤ SPLIT_PRED_TOL × longueur du trait (plancher 40 px) de
+// ce tracé prédit. Le nez et la bouche y sont, la mèche est 150 px à côté.
+// MESURÉ (2026-09-06, quatorze fichiers) : tête clé 24, nez-bouche (461 px)
+// → nez (227) + bouche (104) en deux morceaux, la mèche redevient un fondu ;
+// à SPLIT_PART_GAP 0,3 la mèche entrait (nez–mèche 119 px ≤ 144), à 0,15 la
+// scission se perdait (nez–bouche 80 px > 72) ; 0,2 retenu. La position
+// prédite n'a PAS tranché ici (mouvement global de la tête : la mèche à 24 px
+// du tracé prédit, la bouche à 94 — le nez a bougé plus que le contour) mais
+// reste comme garde. Vérité terrain, sous-ensembles et ordres compris : cats
+// 0→6→16 18,7→18,5, untitled4 0→15→20 16,6→15,8, totale 40,9→38,5 (meilleur
+// rang 32,5→29,9), souris 18,1→17,8, tête 10→17→24 19,1→18,5 ; testB écart
+// latéral 6,5→2,0 ; testC, testD, brasG identiques. Actif.
+var TW_SPLIT_SUBSETS=true,SPLIT_PART_GAP=0.2,SPLIT_PRED_TOL=0.25;
 // Retour en arrière d'un trait, mesuré sur sa COURBE échantillonnée (60 points
 // sur le chemin Paper), pas sur ses ancres : un menton à 4 ancres ne revient
 // jamais en arrière par ses ancres, alors que sa courbe si — et le morceau
@@ -5282,6 +5316,12 @@ function boundsOverlapLoose(b1,b2){
 }
 function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
   var featA=sA.map(strokeFeat),featB=sB.map(strokeFeat);
+  // voir TW_SPLIT_SUBSETS : similitude A→B de la portée, pour prédire où un trait fusionné de A se trouve en B (et inversement)
+  var spanTfAB=null,spanTfBA=null;
+  if(TW_SPLIT_SUBSETS){
+    var scA=[],scB=[];pairSpecs.forEach(function(ps){if(ps.isPiece)return;var ca=_quickCentroid(ps.aData),cb=_quickCentroid(ps.bData);if(ca&&cb){scA.push({x:ca[0],y:ca[1]});scB.push({x:cb[0],y:cb[1]});}});
+    if(scA.length>=3){spanTfAB=fitSimilarityTransform(scA,scB);spanTfBA=fitSimilarityTransform(scB,scA);}
+  }
   var bA=unionBounds(featA),bB=unionBounds(featB);
   featA.forEach(function(f){f.relX=(f.cx-bA.x)/bA.w;f.relY=(f.cy-bA.y)/bA.h;});
   featB.forEach(function(f){f.relX=(f.cx-bB.x)/bB.w;f.relY=(f.cy-bB.y)/bB.h;});
@@ -5316,7 +5356,28 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
         var curFeat=featParts[curIdx];
         if(curFeat.type!=='fill'&&!curFeat.closed)cand=cand.concat([curIdx]);
       }
+      if(TW_SPLIT_SUBSETS&&cand.length>=2){
+        var tfP=mergedSide==='B'?spanTfBA:spanTfAB; // le trait fusionné vers le côté des parties
+        if(tfP){
+          var mpP=buildTPFeat(sMerged[mi2]),lenP=mpP.length,predPts=[];
+          for(var kp=0;kp<=40;kp++){var qp=mpP.getPointAt(lenP*kp/40);if(qp){var tq=applySimilarityTransform(tfP,qp.x,qp.y);predPts.push([tq.x,tq.y]);}}
+          mpP.remove();
+          if(predPts.length>=2){
+            var predPath=new Path({insert:false});predPts.forEach(function(q){predPath.add(new Point(q[0],q[1]));});
+            var tolP=Math.max(40,SPLIT_PRED_TOL*fm.length),kept=[],rejetes=[];
+            cand.forEach(function(i){var fp2=featParts[i];var lp=predPath.getNearestLocation(new Point(fp2.cx,fp2.cy));var dP=lp?lp.distance:Infinity;if(dP<=tolP)kept.push(i);else rejetes.push(_mlIdB(i)+' ('+Math.round(dP)+' px)');});
+            predPath.remove();
+            if(rejetes.length)_mlNote('scission : parties hors position prédite',{ecartees:rejetes,tolerance:Math.round(tolP)});
+            cand=kept;
+          }
+        }
+      }
       if(cand.length<2||cand.length>3)continue;
+      var candFull=cand,subsets=[candFull];
+      if(TW_SPLIT_SUBSETS&&candFull.length===3){subsets.push([candFull[0],candFull[1]],[candFull[0],candFull[2]],[candFull[1],candFull[2]]);}
+      var bestSub=null;
+      for(var su=0;su<subsets.length;su++){
+      cand=subsets[su];
       var sumLen=0;cand.forEach(function(i){sumLen+=featParts[i].length;});
       if(sumLen<fm.length*0.55||sumLen>fm.length*1.7)continue;
       // order the part strokes by where they attach along the merged stroke
@@ -5326,6 +5387,30 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
         return{idx:i,off:loc?loc.offset:0};
       }).sort(function(x,y){return x.off-y.off;});
       mp.remove();
+      var orders=[ordered];
+      if(TW_SPLIT_SUBSETS){
+        var permute=function(arr){if(arr.length<=1)return[arr];var outp=[];for(var pi2=0;pi2<arr.length;pi2++){var rest=arr.slice(0,pi2).concat(arr.slice(pi2+1));permute(rest).forEach(function(r){outp.push([arr[pi2]].concat(r));});}return outp;};
+        var baseSig=ordered.map(function(o){return o.idx;}).join(',');
+        permute(cand).forEach(function(perm){if(perm.join(',')===baseSig)return;orders.push(perm.map(function(i,k){return{idx:i,off:k};}));});
+      }
+      for(var po=0;po<orders.length;po++){
+      ordered=orders[po];
+      if(TW_SPLIT_SUBSETS){
+        // contiguïté des parties consécutives en B (extrémité de l'une au tracé de l'autre)
+        var gapOk=true,gapMax=Math.max(40,SPLIT_PART_GAP*fm.length);
+        for(var og=0;og<ordered.length-1&&gapOk;og++){
+          var Pg=sParts[ordered[og].idx],Qg=sParts[ordered[og+1].idx];
+          var pathPg=buildTPFeat(Pg),pathQg=buildTPFeat(Qg),gp=(Pg.isVectorBrush&&Pg.centerSegments&&Pg.centerSegments.length>1)?Pg.centerSegments:Pg.segments,gq=(Qg.isVectorBrush&&Qg.centerSegments&&Qg.centerSegments.length>1)?Qg.centerSegments:Qg.segments;
+          var dmin=Infinity;
+          if(gp&&gp.length&&gq&&gq.length){
+            [gp[0].point,gp[gp.length-1].point].forEach(function(e){var l=pathQg.getNearestLocation(new Point(e[0],e[1]));if(l&&l.distance<dmin)dmin=l.distance;});
+            [gq[0].point,gq[gq.length-1].point].forEach(function(e){var l=pathPg.getNearestLocation(new Point(e[0],e[1]));if(l&&l.distance<dmin)dmin=l.distance;});
+          }
+          pathPg.remove();pathQg.remove();
+          if(!(dmin<=gapMax))gapOk=false;
+        }
+        if(!gapOk)continue;
+      }
       // cut fractions = cumulative length share of the ordered parts
       var fr=[],acc=0;
       for(var oi=0;oi<ordered.length-1;oi++){acc+=featParts[ordered[oi].idx].length;fr.push(Math.min(0.95,Math.max(0.05,acc/sumLen)));}
@@ -5449,11 +5534,16 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
       if(!bestEval||avgC<bestEval.avg)bestEval={pieces:pieces,scores:scores,avg:avgC,coupe:coupeNom,fr:frC.map(function(x){return +x.toFixed(3);})};
       }
       if(!bestEval)continue;
+      var baselineS=cand.map(function(i){return(curPair&&(mergedSide==='B'?curPair.aIdx:curPair.bIdx)===i)?curPair.score:0.95;});
+      var baseAvgS=baselineS.reduce(function(a,b){return a+b;},0)/baselineS.length;
+      if(bestEval.avg>=baseAvgS-0.03)continue;
+      if(!bestSub||bestEval.avg<bestSub.avg)bestSub={eval:bestEval,cand:cand,ordered:ordered,cutSets:cutSets.length,ordre:po};
+      }
+      }
+      if(!bestSub)continue;
+      cand=bestSub.cand;ordered=bestSub.ordered;bestEval=bestSub.eval;
       var pieces=bestEval.pieces,scores=bestEval.scores,avg=bestEval.avg;
-      _mlNote('scission : coupe retenue',{coupe:bestEval.coupe,fractions:bestEval.fr,scores:scores.map(function(x){return +x.toFixed(3);}),candidats:cutSets.length});
-      var baseline=cand.map(function(i){return(curPair&&(mergedSide==='B'?curPair.aIdx:curPair.bIdx)===i)?curPair.score:0.95;});
-      var baseAvg=baseline.reduce(function(a,b){return a+b;},0)/baseline.length;
-      if(avg>=baseAvg-0.03)continue;
+      _mlNote('scission : coupe retenue',{coupe:bestEval.coupe,fractions:bestEval.fr,scores:scores.map(function(x){return +x.toFixed(3);}),candidats:bestSub.cutSets,parties:cand.length+'/'+candFull.length,ordre:bestSub.ordre});
       // accept the split
       if(curPair)pairSpecs.splice(pairSpecs.indexOf(curPair),1);
       ordered.forEach(function(o,k){
