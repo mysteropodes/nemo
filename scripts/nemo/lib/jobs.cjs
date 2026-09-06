@@ -166,7 +166,7 @@ function jobTestDesktop(ctx) {
   if (!app) missing.push('no packaged app found (src-tauri/target/*/release/bundle/macos/Nemo.app or NEMO_DESKTOP_APP)');
   if (!files.length) missing.push('no tests/desktop/*.test.cjs harness defined');
   if (!app) return blocked(missing.join('; '));
-  if (!files.length) return notRun(missing.join('; '), { artifacts: [{ path: path.relative(ROOT, app) }] });
+  if (!files.length) return blocked(missing.join('; '), { artifacts: [{ path: path.relative(ROOT, app) }] });
   const r = run(process.execPath, ['--test', '--test-reporter=tap', '--test-concurrency=1'].concat(files.map((name) => 'tests/desktop/' + name)), {
     timeout: 30 * 60 * 1000,
     env: { NEMO_DESKTOP_APP: path.resolve(app), NEMO_DESKTOP_REPORT_DIR: ctx.reportDir, NODE_TEST_CONTEXT: undefined },
@@ -175,10 +175,17 @@ function jobTestDesktop(ctx) {
     const match = r.stdout.match(new RegExp(`^# ${name} (\\d+)$`, 'm'));
     return [name, match ? Number(match[1]) : null];
   }));
-  const complete = counts.tests > 0 && counts.pass === counts.tests
+  // Node synthesizes a passing file-level test for an empty/comment-only file.
+  const syntheticNames = new Set(files.flatMap(name => {
+    const relative = 'tests/desktop/' + name; const absolute = path.join(ROOT, relative);
+    return [relative, absolute, fs.realpathSync(absolute)];
+  }));
+  const emptyFiles = [...r.stdout.matchAll(/^# Subtest: (.+)$/gm)]
+    .map(match => match[1]).filter(name => syntheticNames.has(name));
+  const complete = emptyFiles.length === 0 && counts.tests > 0 && counts.pass === counts.tests
     && ['fail', 'cancelled', 'skipped', 'todo'].every((name) => counts[name] === 0);
   return (r.status === 0 && complete ? pass : fail)(`packaged-native Node harness: exit ${r.status}, ${counts.pass}/${counts.tests} passing`, {
-    exitCode: r.status === 0 && !complete ? 1 : r.status, log: logOf(r), details: { files, counts },
+    exitCode: r.status === 0 && !complete ? 1 : r.status, log: logOf(r), details: { files, counts, emptyFiles },
     artifacts: [{ path: path.relative(ROOT, app) }],
     limitations: ['Native process and storage-isolation checks do not establish UI save/reload, rendering, or release acceptance.'],
   });
@@ -244,7 +251,7 @@ const JOBS = {
   'test:rust-tauri': { run: (ctx) => jobTestRust(ctx, 'src-tauri', 'src-tauri'), required: false },
   'test:integration': { run: jobTestIntegration, required: false },
   'test:browser': { run: jobTestBrowser, required: false },
-  'test:desktop': { run: jobTestDesktop, required: false },
+  'test:desktop': { run: jobTestDesktop, required: true },
   bench: { run: jobBench, required: false },
   'build:wasm': { run: jobBuildWasm, required: false },
   'build:desktop': { run: jobBuildDesktop, required: false },
