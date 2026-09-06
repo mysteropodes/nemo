@@ -14,6 +14,9 @@
 //   __twBench.overlay(li,fA,fB)           draw A (red), B (blue), pairs (green) in a temp layer
 //   __twBench.clearOverlay()
 //   __twBench.flags() / setFlags({...})   read / set the TW_* switches (tweens.js globals)
+//   __twBench.holdout(li,k1,k2,k3)       vérité terrain : clé k2 retirée, générée, comparée (Chamfer px)
+//   __twBench.holdoutAll(li)              tous les triplets de clés consécutives
+//   __twBench.journal(fA,fB)              journal de décision de l'appariement (__TW_DEBUG_MATCH)
 //
 // The overlay lives in the Paper canvas: visible only while the Rust engine
 // is OFF (a fresh preview tab), see CLAUDE.md §4.
@@ -416,6 +419,101 @@
       out.banc=b0.concat(b6).reduce(function(a,x){return a+x.errors_new;},0);}
     return out;
   };
+  // ---- vérité terrain par clés retirées (plan 2026-09, chantier 0.1) ----
+  // B.holdout(li,k1,k2,k3) : retire la clé dessinée k2, génère k1→k3, compare
+  // l'image générée au rang k2 avec la clé dessinée, remet la clé. Mesures :
+  // distance de Chamfer symétrique en px (échantillonnage à `step` px, défaut
+  // 4), médiane / p90 / moyenne dans les deux sens, traits générés « égarés »
+  // (plus de la moitié de leurs points à plus de `tol` px du dessin, défaut
+  // 8) et traits dessinés « manqués » (réciproque). L'easing du fichier est
+  // neutralisé pendant la mesure (le temps de k2 est pris linéaire), sauf
+  // opts.keepEasing. B.holdoutAll(li) enchaîne tous les triplets de clés
+  // consécutives et régénère le document à la fin.
+  function sampleStroke(sd,step){
+    var vb=!!(sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>1);
+    var segs=vb?sd.centerSegments:sd.segments;if(!segs||segs.length<2)return[];
+    var closed=!vb&&!!sd.closed,n=segs.length,last=closed?n:n-1,out=[];
+    for(var i=0;i<last;i++){
+      var a=segs[i],b=segs[(i+1)%n],p0=a.point,p3=b.point,ho=a.handleOut||[0,0],hi=b.handleIn||[0,0];
+      var p1=[p0[0]+ho[0],p0[1]+ho[1]],p2=[p3[0]+hi[0],p3[1]+hi[1]];
+      var poly=Math.hypot(p1[0]-p0[0],p1[1]-p0[1])+Math.hypot(p2[0]-p1[0],p2[1]-p1[1])+Math.hypot(p3[0]-p2[0],p3[1]-p2[1]);
+      var len=(Math.hypot(p3[0]-p0[0],p3[1]-p0[1])+poly)/2,k=Math.max(1,Math.ceil(len/step));
+      for(var j=0;j<k;j++){var t=j/k,u=1-t;out.push([u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0],u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1]]);}
+    }
+    if(!closed){var e=segs[n-1].point;out.push([e[0],e[1]]);}
+    return out;
+  }
+  function mkGrid(pts,cell){var g={};pts.forEach(function(p,i){var k=Math.floor(p[0]/cell)+','+Math.floor(p[1]/cell);(g[k]||(g[k]=[])).push(i);});return{g:g,cell:cell,pts:pts};}
+  function nearestDist(G,p,cap){
+    var cx=Math.floor(p[0]/G.cell),cy=Math.floor(p[1]/G.cell),best=Infinity,R=Math.ceil(cap/G.cell)+1;
+    for(var r=0;r<=R;r++){
+      for(var dx=-r;dx<=r;dx++)for(var dy=-r;dy<=r;dy++){
+        if(Math.max(Math.abs(dx),Math.abs(dy))!==r)continue;
+        var b=G.g[(cx+dx)+','+(cy+dy)];if(!b)continue;
+        for(var i=0;i<b.length;i++){var q=G.pts[b[i]];var d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<best)best=d;}
+      }
+      if(best<=r*G.cell)break;   // tout point non encore visité est à ≥ r·cell
+    }
+    return Math.min(best,cap);
+  }
+  function distStats(a){if(!a.length)return null;var s=a.slice().sort(function(x,y){return x-y;});var mean=s.reduce(function(t,x){return t+x;},0)/s.length;return{n:s.length,mediane:+s[Math.floor(s.length/2)].toFixed(2),p90:+s[Math.floor(s.length*0.9)].toFixed(2),moyenne:+mean.toFixed(2)};}
+  function neutralEasing(){var prev={curve:state.easingCurve,tw:state.tweenEasing};state.easingCurve={points:[{x:0,y:0},{x:1,y:1}]};state.tweenEasing={};return prev;}
+  function restoreEasing(prev){state.easingCurve=prev.curve;state.tweenEasing=prev.tw;}
+  B.holdout=async function(li,k1,k2,k3,opts){
+    li=li===undefined?state.activeLayerIdx:li;opts=opts||{};
+    var step=opts.step||4,tol=opts.tol||8,cap=opts.cap||128;
+    var ld=state.layers[li];var refF=ld.frames[k2];
+    if(!refF||!refF.isKeyframe||!refF.strokes.length)throw new Error('la clé '+k2+' n\'est pas une clé dessinée');
+    var ref=JSON.parse(JSON.stringify(refF));
+    var eas=opts.keepEasing?null:neutralEasing();
+    ld.frames[k2]={strokes:[],isInterpolated:false,isKeyframe:false};
+    try{
+      await window.generateTweens(undefined,true);
+      var gen=ld.frames[k2]||{strokes:[]};
+      var G=[],Rp=[],gs=[],rs=[];
+      (gen.strokes||[]).forEach(function(sd){var p=sampleStroke(sd,step);gs.push({id:sd.strokeId,pts:p});p.forEach(function(q){G.push(q);});});
+      ref.strokes.forEach(function(sd){var p=sampleStroke(sd,step);rs.push({id:sd.strokeId,pts:p});p.forEach(function(q){Rp.push(q);});});
+      var GR=mkGrid(Rp,16),GG=mkGrid(G,16);
+      var dG=G.map(function(p){return nearestDist(GR,p,cap);}),dR=Rp.map(function(p){return nearestDist(GG,p,cap);});
+      var egares=gs.filter(function(g){if(!g.pts.length)return false;var far=0;g.pts.forEach(function(p){if(nearestDist(GR,p,cap)>tol)far++;});return far>g.pts.length/2;}).map(function(g){return g.id;});
+      var manques=rs.filter(function(g){if(!g.pts.length)return false;var far=0;g.pts.forEach(function(p){if(nearestDist(GG,p,cap)>tol)far++;});return far>g.pts.length/2;}).map(function(g){return g.id;});
+      var sG=distStats(dG),sR=distStats(dR);
+      // Variante insensible au timing : la clé dessinée contre CHAQUE image
+      // générée de la portée, on garde le rang le plus proche. Sépare « la
+      // pose existe à un autre moment » de « la pose n'existe jamais ».
+      var bestRank=k2,bestCh=Infinity;
+      for(var fr=k1+1;fr<k3;fr++){
+        var F=ld.frames[fr];if(!F||!F.strokes||!F.strokes.length)continue;
+        var Gf=[];F.strokes.forEach(function(sd){sampleStroke(sd,step).forEach(function(q){Gf.push(q);});});
+        if(!Gf.length)continue;
+        var GGf=mkGrid(Gf,16);
+        var m1=0,m2=0;for(var i1=0;i1<Gf.length;i1++)m1+=nearestDist(GR,Gf[i1],cap);m1/=Gf.length;
+        for(var i2=0;i2<Rp.length;i2++)m2+=nearestDist(GGf,Rp[i2],cap);m2/=Rp.length;
+        var ch=(m1+m2)/2;if(ch<bestCh){bestCh=ch;bestRank=fr;}
+      }
+      return{li:li,k1:k1,k2:k2,k3:k3,chamfer:+(((sG?sG.moyenne:0)+(sR?sR.moyenne:0))/2).toFixed(2),
+        chamferMeilleurRang:isFinite(bestCh)?+bestCh.toFixed(2):null,meilleurRang:bestRank,
+        genVersDessin:sG,dessinVersGen:sR,traitsGen:gs.length,traitsDessin:rs.length,egares:egares,manques:manques};
+    }finally{
+      ld.frames[k2]=ref;
+      if(eas)restoreEasing(eas);
+      if(!opts.noRegen)await window.generateTweens(undefined,true);
+    }
+  };
+  B.holdoutAll=async function(li,opts){
+    li=li===undefined?state.activeLayerIdx:li;opts=opts||{};
+    var keys=keysOf(li),rows=[];
+    for(var i=0;i+2<keys.length;i++){
+      var o=Object.assign({},opts,{noRegen:true});
+      var r=await B.holdout(li,keys[i],keys[i+1],keys[i+2],o);
+      rows.push({triplet:keys[i]+'→'+keys[i+1]+'→'+keys[i+2],chamfer:r.chamfer,meilleurRang:r.chamferMeilleurRang+' @'+r.meilleurRang,medG:r.genVersDessin?r.genVersDessin.mediane:null,p90G:r.genVersDessin?r.genVersDessin.p90:null,medR:r.dessinVersGen?r.dessinVersGen.mediane:null,p90R:r.dessinVersGen?r.dessinVersGen.p90:null,egares:r.egares.length,manques:r.manques.length,traits:r.traitsGen+'/'+r.traitsDessin});
+    }
+    if(!opts.noRegen)await window.generateTweens(undefined,true);
+    var tot=rows.length?+(rows.reduce(function(t,x){return t+x.chamfer;},0)/rows.length).toFixed(2):null;
+    var totBR=rows.length?+(rows.reduce(function(t,x){return t+parseFloat(x.meilleurRang);},0)/rows.length).toFixed(2):null;
+    return{triplets:rows,chamferMoyen:tot,chamferMeilleurRangMoyen:totBR,egares:rows.reduce(function(t,x){return t+x.egares;},0),manques:rows.reduce(function(t,x){return t+x.manques;},0)};
+  };
+
   // ---- journal d'appariement (chantier 0.3) : lecture humaine ----
   // window.__TW_DEBUG_MATCH=true ; générer ; B.journal() = dernière portée,
   // B.journal(k) = k-ième, B.journal(fA,fB) = la portée fA→fB. Renvoie un
