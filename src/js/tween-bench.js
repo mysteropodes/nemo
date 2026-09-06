@@ -19,6 +19,7 @@
 //   __twBench.journal(fA,fB)              journal de décision de l'appariement (__TW_DEBUG_MATCH)
 //   __twBench.identite(li)                paires à même strokeId / croisées / redessinées (clés dupliquées)
 //   __twBench.corpusReal() / diffReal({...})  paires de la génération RÉELLE (journal), pas des copies
+//   __twBench.bouts(li)                   rebroussements / écart latéral de l'extrémité fixe, compression locale
 //
 // The overlay lives in the Paper canvas: visible only while the Rust engine
 // is OFF (a fresh preview tab), see CLAUDE.md §4.
@@ -562,6 +563,46 @@
       out.push({fA:sa.fA,fB:sa.fB,onlyCurrent:A.filter(function(x){return Bs.indexOf(x)<0;}),onlyOther:Bs.filter(function(x){return A.indexOf(x)<0;}),fadesCurrent:sa.fadeA.length+sa.fadeB.length,fadesOther:sb.fadeA.length+sb.fadeB.length});});
     await window.generateTweens(undefined,true);
     return{spans:a.length,changed:out.length,details:out};
+  };
+
+  // ---- extrémités (2026-09-06, « les épaules font des aller-retours ») ----
+  // B.bouts(li) : génère (easing neutralisé), suit chaque trait par strokeId
+  // sur les intermédiaires, prend l'extrémité qui bouge le moins entre les
+  // deux clés (l'« épaule ») et mesure, par portée : rebroussements (la
+  // projection sur la corde repart en arrière de plus de 0,5 px), écart
+  // latéral maximal moyen à la corde, compression locale d'arêtes au milieu
+  // de la portée (somme des 0,8 − ratio sous 0,8), et les pires traits.
+  // C'est la mesure qui a montré l'épaule de brasG à 5→0→37 px.
+  B.bouts=async function(li,opts){
+    li=li===undefined?state.activeLayerIdx:li;opts=opts||{};
+    var eas=opts.keepEasing?null:neutralEasing();
+    try{await window.generateTweens(undefined,true);}finally{if(eas)restoreEasing(eas);}
+    var F=state.layers[li].frames,keys=keysOf(li),rows=[],tot={traits:0,rebroussements:0,lat:0,compression:0};
+    function P(s){var g=(s.isVectorBrush&&s.centerSegments&&s.centerSegments.length)?s.centerSegments:s.segments;return g?g.map(function(q){return q.point;}):null;}
+    for(var k=0;k<keys.length-1;k++){
+      var fA=keys[k],fB=keys[k+1];if(fB-fA<3)continue;
+      var row={fA:fA,fB:fB,traits:0,rebroussements:0,lat:0,compression:0,pires:[]};
+      F[fA].strokes.forEach(function(sa){
+        var id=sa.strokeId;if(!id)return;var path=[];
+        for(var f=fA;f<=fB;f++){var s=null,fs=F[f].strokes||[];for(var i=0;i<fs.length;i++)if(fs[i].strokeId===id){s=fs[i];break;}if(!s)break;var p=P(s);if(!p||p.length<2)break;path.push(p);}
+        if(path.length<fB-fA+1)return;
+        var e0=path.map(function(p){return p[0];}),e1=path.map(function(p){return p[p.length-1];});
+        var d0=Math.hypot(e0[e0.length-1][0]-e0[0][0],e0[e0.length-1][1]-e0[0][1]),d1=Math.hypot(e1[e1.length-1][0]-e1[0][0],e1[e1.length-1][1]-e1[0][1]);
+        var Q=d0<=d1?e0:e1,a=Q[0],b=Q[Q.length-1],L=Math.hypot(b[0]-a[0],b[1]-a[1]);
+        var r=0,maxLat=0,prevT=null,prevD=null;
+        for(var i2=0;i2<Q.length;i2++){var vx=Q[i2][0]-a[0],vy=Q[i2][1]-a[1];var t=L>1e-6?(vx*(b[0]-a[0])+vy*(b[1]-a[1]))/L:0;var l=L>1e-6?Math.abs(vx*(b[1]-a[1])-vy*(b[0]-a[0]))/L:Math.hypot(vx,vy);if(l>maxLat)maxLat=l;
+          if(prevT!==null){var d=t-prevT;if(prevD!==null&&Math.abs(d)>0.5&&Math.abs(prevD)>0.5&&Math.sign(d)!==Math.sign(prevD))r++;prevD=d;}prevT=t;}
+        var comp=0,mid=path[Math.floor(path.length/2)],p1=path[1],pN=path[path.length-2];
+        if(mid.length===p1.length&&mid.length===pN.length){for(var j=1;j<mid.length;j++){var lm=Math.hypot(mid[j][0]-mid[j-1][0],mid[j][1]-mid[j-1][1]),l1=Math.hypot(p1[j][0]-p1[j-1][0],p1[j][1]-p1[j-1][1]),lN=Math.hypot(pN[j][0]-pN[j-1][0],pN[j][1]-pN[j-1][1]);var mn=Math.min(l1,lN);if(mn>=0.5){var rr=lm/mn;if(rr<0.8)comp+=0.8-rr;}}}
+        row.traits++;row.rebroussements+=r;row.lat+=maxLat;row.compression+=comp;
+        if(r>0||maxLat>8)row.pires.push({id:String(id).slice(-8),rebroussements:r,lat:+maxLat.toFixed(1),course:Math.round(L)});
+      });
+      row.latMoy=row.traits?+(row.lat/row.traits).toFixed(1):0;row.compression=+row.compression.toFixed(1);delete row.lat;
+      row.pires.sort(function(x,y){return y.lat-x.lat;});row.pires=row.pires.slice(0,6);
+      tot.traits+=row.traits;tot.rebroussements+=row.rebroussements;tot.lat+=row.latMoy*row.traits;tot.compression+=row.compression;rows.push(row);
+    }
+    tot.latMoy=tot.traits?+(tot.lat/tot.traits).toFixed(1):0;delete tot.lat;tot.compression=+tot.compression.toFixed(1);
+    return{portees:rows,total:tot};
   };
 
   // ---- journal d'appariement (chantier 0.3) : lecture humaine ----
