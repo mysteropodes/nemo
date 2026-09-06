@@ -569,3 +569,26 @@ test('handshake requires current launcher and app agreement while preserving ide
     await stopOwned(instance);
   }
 });
+
+test('natural app exit releases its managed reservation before task cleanup', async () => {
+  const task = `native-natural-exit-${process.pid}`;
+  const slot = `native-natural-exit-slot-${process.pid}`;
+  let instance;
+  try {
+    instance = await launch(task, path.join(scratch, 'natural-exit.json'), { reserve: slot });
+    const status = await waitFor(() => {
+      const value = runtime.readNativeStatus(task);
+      return value && value.state === 'active' && value.childPid ? value : null;
+    }, 'native app active');
+    process.kill(status.childPid, 'SIGTERM');
+    await waitFor(() => !isolation.pidAlive(instance.child.pid), 'launcher natural exit');
+    const successor = isolation.acquireExclusiveSlot(slot, 'natural-exit-successor');
+    assert.equal(successor.acquired, true, 'confirmed app-group exit releases the slot without a later stop command');
+    successor.release();
+  } finally {
+    if (instance) {
+      await stopOwned(instance);
+      await command(['stop', '--task', task, '--owner', instance.info.ownerToken]);
+    }
+  }
+});

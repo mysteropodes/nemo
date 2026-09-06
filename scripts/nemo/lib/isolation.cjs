@@ -276,7 +276,10 @@ function releaseTask(taskId, ownerToken, opts = {}) {
     }
     // Native callers retain the record through stop and verify the app group
     // here. The same task guard prevents cleanup racing a successor launch.
-    if (opts.beforeRelease) opts.beforeRelease(rec);
+    const lifetimeVerified = opts.beforeRelease && opts.beforeRelease(rec);
+    if (opts.releaseManagedSlots && lifetimeVerified !== true) {
+      return { released: false, reason: 'managed resource lifetime was not confirmed' };
+    }
     // Slot records live in SLOTS_DIR, outside every task root, so the rmSync
     // below cannot reach them. Reconcile first: reconcileTaskSlots never throws,
     // and doing it before the tree is gone keeps a retried release idempotent.
@@ -319,7 +322,7 @@ function acquireExclusiveSlot(slot, taskId, opts = {}) {
       // Replacement is safe only inside the same guard used by every acquire/release.
       const ownerToken = opts.ownerToken || crypto.randomBytes(16).toString('hex');
       writeRecord(file, { slot, taskId, pid, ownerToken, releasePolicy, acquiredAt: nowIso() });
-      return { acquired: true, ownerToken, taskId, slot, file, release: () => releaseExclusiveSlot(slot, ownerToken) };
+      return { acquired: true, ownerToken, taskId, slot, file, release: (options) => releaseExclusiveSlot(slot, ownerToken, options) };
     });
   } catch (err) {
     if (err.code === 'EBUSY') return { acquired: false, reason: err.message };
@@ -327,13 +330,19 @@ function acquireExclusiveSlot(slot, taskId, opts = {}) {
   }
 }
 
-function releaseExclusiveSlot(slot, ownerToken) {
+function releaseExclusiveSlot(slot, ownerToken, opts = {}) {
   try {
     return mutate('slot', slot, () => {
       const file = slotFile(slot);
       const holder = safeReadJson(file);
       if (!holder) return { released: false, reason: 'slot not held or record unreadable' };
       if (!ownerToken || holder.ownerToken !== ownerToken) return { released: false, reason: 'refused: caller is not the slot owner' };
+      if (holder.releasePolicy !== undefined && holder.releasePolicy !== 'process-exit') {
+        let verified = false;
+        try { verified = holder.releasePolicy === 'owner-confirmed' && typeof opts.verifyRelease === 'function' && opts.verifyRelease() === true; }
+        catch { /* An uncertain lifetime must remain held. */ }
+        if (!verified) return { released: false, reason: 'resource lifetime unconfirmed; use the owning consumer release path' };
+      }
       fs.unlinkSync(file);
       return { released: true };
     });

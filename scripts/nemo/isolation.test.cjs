@@ -547,11 +547,17 @@ test('owner-confirmed slots survive holder exit until a verified owned release',
   const held = iso.acquireExclusiveSlot(slot, task, { pid: child.pid, releasePolicy: 'owner-confirmed' });
   try {
     await reap(child);
+    assert.equal(iso.releaseExclusiveSlot(slot, held.ownerToken).released, false);
+    assert.equal(held.release({ verifyRelease: () => false }).released, false);
+    assert.equal(held.release({ verifyRelease() { throw new Error('unavailable'); } }).released, false);
     assert.equal(iso.acquireExclusiveSlot(slot, 'contender').acquired, false);
     assert.equal(iso.releaseTask(task, launcher.ownerToken).released, false);
     assert.ok(fs.existsSync(iso.taskRoots(task).root));
     assert.ok(iso.readLauncher(task), 'an unverified release preserves ownership');
     assert.equal(iso.releaseTask(task, launcher.ownerToken, { releaseManagedSlots: true }).released, false);
+    assert.equal(iso.releaseTask(task, launcher.ownerToken, {
+      releaseManagedSlots: true, beforeRelease: () => false,
+    }).released, false);
     assert.throws(() => iso.releaseTask(task, launcher.ownerToken, {
       releaseManagedSlots: true, beforeRelease() { throw new Error('lifetime still active'); },
     }), /lifetime still active/);
@@ -560,12 +566,12 @@ test('owner-confirmed slots survive holder exit until a verified owned release',
     fs.writeFileSync(held.file, JSON.stringify({ ...record, releasePolicy: 'future-policy' }));
     assert.equal(iso.acquireExclusiveSlot(slot, 'contender').acquired, false);
     assert.equal(iso.releaseTask(task, launcher.ownerToken, {
-      releaseManagedSlots: true, beforeRelease() {},
+      releaseManagedSlots: true, beforeRelease: () => true,
     }).released, false, 'an unknown lifetime policy requires reconciliation');
     fs.writeFileSync(held.file, JSON.stringify(record));
     let verified = false;
     const result = iso.releaseTask(task, launcher.ownerToken, {
-      releaseManagedSlots: true, beforeRelease() { verified = true; },
+      releaseManagedSlots: true, beforeRelease() { verified = true; return true; },
     });
     assert.equal(verified, true);
     assert.equal(result.released, true);
@@ -581,4 +587,7 @@ test('owner-confirmed slots survive holder exit until a verified owned release',
 
 test('unknown slot release policies cannot silently gain automatic reclamation', () => {
   assert.throws(() => iso.acquireExclusiveSlot('bad-policy', 'bad-policy', { releasePolicy: 'unknown' }), /release policy/);
+  const held = iso.acquireExclusiveSlot('verified-direct', 'verified-direct', { releasePolicy: 'owner-confirmed' });
+  assert.equal(held.release().released, false);
+  assert.equal(held.release({ verifyRelease: () => true }).released, true);
 });

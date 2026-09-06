@@ -284,7 +284,9 @@ Normal launcher cleanup releases them only after confirming process-group exit.
 After a crash, the owner's native `stop` verifies that same exit condition under
 the task guard before requesting managed-slot release. A live or unknown group
 retains the reservation and task records for reconciliation. Generic task release
-cannot remove those records without the consumer's explicit lifetime verifier.
+cannot remove those records without the consumer's lifetime verifier returning
+`true`. Direct managed-slot release likewise requires `verifyRelease()` to confirm
+exit under the slot guard; the generic `slot-release` CLI cannot bypass that check.
 
 Focused regressions run with `node --test scripts/nemo/native-runtime.test.cjs`
 and reach normal discovery through `tests/nemo-native-runtime.test.cjs`. They

@@ -24,7 +24,7 @@ const identity = require('./identity.cjs');
 const buildRuntime = require('./build-runtime.cjs');
 const { ROOT, exists, nowIso } = require('./util.cjs');
 
-const { SCHEMA, launcherProcessIdentity } = require('./native-process.cjs');
+const { SCHEMA, launcherProcessIdentity, nativeProcessTreeStopped } = require('./native-process.cjs');
 const STATUS_FILE = 'native-launcher.json';
 // Written by the app itself (src-tauri/src/task_runtime.rs) into the task's
 // tauri-data root. This file, not our own bookkeeping, is what proves which
@@ -353,7 +353,7 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
   for (const slot of config.reserve) {
     const acquired = isolation.acquireExclusiveSlot(slot, taskId, { pid: process.pid, releasePolicy: 'owner-confirmed' });
     if (!acquired.acquired) {
-      for (const held of reservations) held.release();
+      for (const held of reservations) held.release({ verifyRelease: () => true });
       throw new Error(`exclusive resource "${slot}" unavailable: ${acquired.reason}`);
     }
     reservations.push(acquired);
@@ -366,7 +366,7 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
       label: 'native-app',
     });
   } catch (err) {
-    for (const held of reservations) held.release();
+    for (const held of reservations) held.release({ verifyRelease: () => true });
     throw err;
   }
 
@@ -394,10 +394,12 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
     atomicWriteJson(config.statusFile, status);
   };
   let released = false;
-  const releaseReservations = () => {
+  const releaseReservations = (tree) => {
     if (released) return [];
     released = true;
-    return reservations.map((held) => ({ slot: held.slot, ...held.release() }));
+    return reservations.map((held) => ({ slot: held.slot, ...held.release({
+      verifyRelease: () => !!(tree && tree.stopped) && (status.childPid === null || nativeProcessTreeStopped(taskId, launcher, status).stopped),
+    }) }));
   };
   try {
     save({});
@@ -405,7 +407,7 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
     // Failure must leave retained user data intact and release our reservations.
     fs.rmSync(config.manifestFile, { force: true });
   } catch (err) {
-    const slotRelease = releaseReservations();
+    const slotRelease = releaseReservations({ stopped: true }); // failure before spawnApp
     save({ state: 'failed', finishedAt: nowIso(), error: err.message,
       processTree: { stopped: true, forced: false, reason: 'app process was not spawned' }, slotRelease });
     throw err;
@@ -441,7 +443,7 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
       await processInfo.closed.catch(() => {});
       await processInfo.logsDone.catch(() => {});
     }
-    save({ state: 'stopped', finishedAt: nowIso(), signal: signal || 'SIGTERM', processTree: tree, slotRelease: releaseReservations() });
+    save({ state: 'stopped', finishedAt: nowIso(), signal: signal || 'SIGTERM', processTree: tree, slotRelease: releaseReservations(tree) });
     process.exit(0);
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
@@ -484,7 +486,7 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
       exitCode: result.code,
       signal: result.signal,
       processTree: tree,
-      slotRelease: releaseReservations(),
+      slotRelease: releaseReservations(tree),
     });
     clearInterval(keepAlive);
   } catch (err) {
@@ -498,7 +500,7 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
       return;
     }
     if (processInfo) await processInfo.logsDone.catch(() => {});
-    save({ state: 'failed', finishedAt: nowIso(), error: err.message, processTree: tree, slotRelease: releaseReservations() });
+    save({ state: 'failed', finishedAt: nowIso(), error: err.message, processTree: tree, slotRelease: releaseReservations(tree) });
     clearInterval(keepAlive);
   }
 }

@@ -83,12 +83,13 @@ async function stop(args) {
         beforeRelease: (record) => {
           processTree = nativeProcessTreeStopped(args.task, record, statusBeforeRelease);
           if (!processTree.stopped) throw new Error(processTree.reason);
-          if (retainedData) return;
+          if (retainedData) return true;
           appState = releaseNativeState(args.task, disclosed && disclosed.valid ? disclosed.manifest : null,
             statusBeforeRelease && statusBeforeRelease.app ? statusBeforeRelease.app.bundle : null);
           if (appState.removed.some((item) => !item.removed && item.reason !== 'already absent')) {
             throw new Error('app state cleanup incomplete; ownership and task records retained for retry');
           }
+          return true;
         },
       });
     } catch (err) { released = { released: false, reason: err.message }; }
