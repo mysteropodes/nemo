@@ -23,6 +23,13 @@ had been chosen yet — that was true when it was written and is not any more.)
 
 ## Rust dependencies (2026-08-30)
 
+The bundled `nemo-mcp` transport adds the official Model Context Protocol Rust
+SDK [`rmcp` 3.2.0](https://github.com/modelcontextprotocol/rust-sdk), licensed
+under Apache-2.0. Its exact dependency versions are retained in
+`nemo-mcp/Cargo.lock`; the Tauri application also links the shared transport
+crate through `src-tauri/Cargo.lock`. These additions are later than the original
+license inventory below.
+
 `cargo license --avoid-dev-deps` run against both Rust crates. Full raw output is
 committed beside this file so the claim can be checked without re-running anything:
 [THIRD_PARTY_LICENSES_RUST_TAURI.txt](THIRD_PARTY_LICENSES_RUST_TAURI.txt) (511 crate

@@ -25,6 +25,9 @@ crate-type = ["lib", "cdylib", "staticlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+nemo-mcp = { path = "../nemo-mcp" }
+tokio = { version = "1", features = ["net", "time", "sync", "io-util"] }
+uuid = { version = "1", features = ["v4"] }
 tauri = { version = "2", features = ["devtools"] }
 tauri-plugin-shell = "2"
 tauri-plugin-updater = "2"

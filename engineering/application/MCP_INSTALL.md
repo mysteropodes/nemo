@@ -3,13 +3,12 @@
 The packaged desktop application contains one production Rust executable,
 `nemo-mcp`, beside the application executable. Tauri selects the target named
 binary from `src-tauri/binaries/nemo-mcp-<target-triple>` (and the `.exe`
-suffix on Windows) during the build; the application then invokes that bundled
-executable. The build script uses the existing `src-tauri/nemo-mcp` crate and
+suffix on Windows) during the build; MCP clients invoke that bundled
+executable. The build script uses the `nemo-mcp` crate and
 `cargo build --locked`, so an installed client has no Node, Python, download,
 or source checkout dependency.
 
-Codex and Claude should each register the installed executable using their
-normal MCP command configuration, for example:
+Claude's JSON MCP configuration can point directly at the installed executable:
 
 ```json
 {
@@ -21,10 +20,15 @@ normal MCP command configuration, for example:
 }
 ```
 
-Use the corresponding installed application path on Windows or Linux. Keep
-the `nemo` registry entry local to each client; do not share or overwrite the
-other client's registry. This package does not edit either user's Codex or
-Claude configuration.
+Use the corresponding installed application path on Windows or Linux. Configure
+Codex with the same executable in its native MCP configuration format. This
+package does not edit either user's client configuration.
+
+Nemo and the MCP executable discover each other through per-user local application
+data under `com.strokemotion.app/mcp`. To validate an isolated candidate, set
+`NEMO_MCP_REGISTRY` to the same dedicated directory for that app and both clients.
+Do not share its connection records; they contain local attachment secrets.
+Queries return instance/build/document/revision identity without those secrets.
 
 Validation of the builder and its controlled fixtures only proves target naming,
 locked Cargo invocation, stale-artifact cleanup, and Tauri wiring. A future

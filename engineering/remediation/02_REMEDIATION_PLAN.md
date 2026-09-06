@@ -54,6 +54,36 @@ describe a source-complete packet as deployed until its runtime gate passes.
 
 ## Phase sequence
 
+### Current execution order — September 6, 2026
+
+The accepted F0 comparison is PR #983, merge `cf22365f909069e232a6b6bf992a272e4bd96ff3`.
+Preserve its known native timing failure and unrun/blocked platform cases. Reuse
+unchanged evidence; repeat checks only for changed inputs, concrete defects or a
+required acceptance gate. Unrelated feature development is paused.
+
+Refactoring monolithic files, modular application services, permanent unit/regression
+tests and the bundled plug-and-play Rust MCP are one production task. First integrate
+the retained R08 extraction and compatibility work (PR #986, selected Node runner),
+then deliver layer Motion opacity through R09/R11/R12/R13/R14 together: one command
+and history authority, UI/timeline, persistence, render/export, minimal replay and the
+compiled Rust adapter. Codexitron owns integration and the MCP implementation;
+Codeximator owns the bounded application-handler extraction. Develop adapter and
+packaging alongside handlers once their shared contract is agreed.
+
+Each extraction requires its concrete R03 characterization, applicable R05 size and
+dependency enforcement, and R06 resource isolation. Whole-project R03/R05/R06 closure
+is not a prerequisite to starting it. New/migrated modules obey real limits; existing
+legacy ceilings remain explicit. All remaining obligations stay open.
+
+Add R15's gesture/job shape, then migrate R18's subsystem families in dependency order.
+Complete R03 and R05 coverage alongside each family. R10 starts at the native host/image
+contract; R16 consumes that proof and the shared property/job services; R17 starts at
+the image/color/time contracts. Accumulate R19/R20/R21 evidence during migration and
+finish R22 acceptance. The phase gates below remain final acceptance obligations.
+Installed bundled executable and actual Codex/Claude discovery, editing, history,
+persistence, render/export, reconnect, cancellation and stale-write behavior are
+required for the property/MCP slice. Workflows remain manual-only.
+
 ### F0 — current reproducible baseline
 
 **R00** Resolve current main, active PRs, dirty work, owners and supported platforms.<br>
@@ -147,12 +177,12 @@ consumer; no unowned bypass remains; browser and packaged desktop evidence is cu
 
 ## Parallel work during the program
 
-There is no repository-wide freeze. Reserve only the exact shared scaffold, contract or whole
+Unrelated feature work is paused during this production sequence. Reserve the exact shared scaffold, contract or whole
 legacy file under active extraction. Typical reservation windows are 1-4 hours for shared
 configuration and 2-6 hours for a legacy extraction, with review at checkpoints. A timebox is
 not automatic reassignment.
 
-Continue unrelated work under four rules:
+Resume unrelated work only after the production owner releases that pause, under four rules:
 
 - untouched legacy area: scoped feature/fix plus regression fixture, with no added global debt;
 - reserved area: coordinate with its owner or work on independent fixtures/leaves;
