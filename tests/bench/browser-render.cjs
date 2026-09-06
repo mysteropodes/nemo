@@ -134,9 +134,13 @@ async function instrumentRenderer(page) {
       try { return Reflect.apply(original, this, args); }
       finally { call.cpuMs = performance.now() - call.started; probe.calls.push(call); probe.active = null; }
     };
-    SMEngineBridge.suspend();
-    SMEngineBridge.setPreviewRenderScale(1);
-    await probe.drain(probe.queues);
+    try {
+      SMEngineBridge.suspend();
+      SMEngineBridge.setPreviewRenderScale(1);
+      await probe.drain(probe.queues);
+    } catch (error) {
+      return { unavailable: `Initial production GPU setup failed: ${error.name}: ${error.message}` };
+    }
     return { modulePath: new URL(urls[0]).pathname, ready: GeometryWasm.ready,
       enabled: SMEngineBridge.isEnabled() };
   });
@@ -237,6 +241,7 @@ async function main() {
       await page.evaluate(async () => { await SMEngineBridge.setEnabled(true); });
     } catch { blocked('Production Rust/WebGPU engine did not initialize; no fallback benchmark was run'); }
     report.backend.runtime = await instrumentRenderer(page);
+    if (report.backend.runtime.unavailable) blocked(report.backend.runtime.unavailable);
     const imported = await page.evaluate(json => {
       SM.importJSON(json, true);
       if (window.SMProject && SMProject.hideStartScreen) SMProject.hideStartScreen();
