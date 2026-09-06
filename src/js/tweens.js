@@ -566,12 +566,24 @@ var TW_PIVOT=true,PIVOT_MODE='end',PIVOT_MIN_DEG=10,PIVOT_REACH=1.5,PIVOT_END_RA
 // visibles » en plus sont les boucles des doigts du poing, 14 à 28 px², présentes
 // dans les clés elles-mêmes. Les replis en cheveu montent de 2 à 3 par fichier :
 // c'est le prix assumé, ils ne se voient pas. Actif par défaut.
-// TW_CAND_ENDS, mesuré seul et combiné : améliore la déviation latérale (cats
-// 3,20→3,07, untitled3 2,13→1,78) mais AGGRAVE la longueur perdue de ~49 px sur
-// ces deux fichiers — il pousse vers des candidats qui tiennent les bouts au prix
-// du raccourcissement. Laissé désactivé.
+// TW_CAND_ENDS, mesuré seul et combiné (matin) : améliore la déviation latérale
+// (cats 3,20→3,07, untitled3 2,13→1,78) mais AGGRAVE la longueur perdue de ~49 px
+// sur ces deux fichiers — il pousse vers des candidats qui tiennent les bouts au
+// prix du raccourcissement. Laissé désactivé à ce moment-là.
+// RÉACTIVÉ (2026-09-06 après-midi, « les épaules font des aller-retours ») : avec
+// TW_CAND_EDGE actif, l'arbitrage de brasG 9_864309 (trait d'épaule) bascule sur
+// l'intrinsèque uniforme (0,99 contre linéaire 1,48) dont l'extrémité fixe
+// avance de 5 px, RECULE à 0, puis saute à 37 px, avec 29 px d'écart latéral :
+// un vrai aller-retour d'épaule, visible. Le terme d'extrémités le sanctionne.
+// Mesuré, arêtes + bouts contre arêtes seul, easing neutralisé :
+//   brasG  rebroussements 1→0, écart latéral 4,8→1,7, poignet inchangé
+//          (ratio d'arêtes 1,05, progression 0,49/0,49)
+//   testC  1→0, 2,0→0,8 (même trait d'épaule)     testB  latéral 8,6→6,3
+//   testD, testG, untitled4, totale, traits, b, testanim : neutres
+//   cats   rebroussements 82→80, latéral 4,2 égal
+//   vérité terrain par clés retirées : strictement identique partout.
 var TW_XING_HAIRLINE=true,XING_HAIRLINE_AREA=4,XING_HAIRLINE_W=2;
-var TW_CAND_ENDS=false,CAND_END_TOL=6,CAND_END_W=0.15;
+var TW_CAND_ENDS=true,CAND_END_TOL=6,CAND_END_W=0.15;
 // TW_CAND_EDGE — compression LOCALE d'arêtes dans l'arbitrage. Cas mesuré (brasG,
 // « rétractation du poignet ») : mélange 5,83 contre linéaire 5,84, égalité
 // tranchée pour le mélange par la règle des 0,05 — mais le mélange compresse les
