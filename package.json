@@ -32,6 +32,7 @@
   "license": "GPL-3.0-or-later",
   "type": "commonjs",
   "devDependencies": {
-    "@tauri-apps/cli": "^2.11.4"
+    "@tauri-apps/cli": "^2.11.4",
+    "parse5": "8.0.1"
   }
 }
