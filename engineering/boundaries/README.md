@@ -203,7 +203,7 @@ explicitly selected older profile; the checker never infers which Git revision i
 
 ## Adopted application coverage and size gate
 
-[`app-js.profile.json`](./profiles/app-js.profile.json) declares all 140 reviewed handwritten
+[`app-js.profile.json`](./profiles/app-js.profile.json) declares all 141 reviewed handwritten
 application sources. [`app-js.coverage.json`](./profiles/app-js.coverage.json) records the 12
 exact vendor/generated exclusions and their provenance. The application gate composes
 [`boundaries-discovery.cjs`](../../scripts/nemo/lib/boundaries-discovery.cjs),
@@ -219,9 +219,15 @@ new, aliased, duplicated or reclassified sources; stale source-tree, bootstrap, 
 exclusion-support, exclusion-file and inventory-digest pins fail the lane. Current source line
 counts and exception expiry are checked independently of the policy-to-policy ratchet.
 
-The application profile deliberately labels every retained file `app-legacy`. Its current
+The application profile labels the 140 retained legacy files `app-legacy`. Their current
 architecture-wide global and dependency findings are evidence for R01/R03 classification,
 not accepted exceptions, so the standard gate does not suppress or falsely certify them.
 The adopted gate enforces source coverage and no-growth size ceilings now. Reviewed target
 layers, public APIs, provider/consumer boundaries and parsed bootstrap/runtime readiness remain
 the explicit follow-up before the full graph rules can be enabled for application source.
+
+The extracted `src/js/animation/curve.js` is a `domain` module with a 300-line hard
+limit and no legacy exception. The normal animation test entry runs the full import,
+global-state and size checker on this kernel, using its declaration in the application
+profile. Its classic-script facade remains loaded before Motion; fixture and benchmark
+VMs load the same production module. Whole-application graph adoption remains separate.
