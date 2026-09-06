@@ -39,7 +39,7 @@ function fixture() {
   f.contract.uses.push(use(f, 'SMCurve', 'motion.js'));
   f.contract.loaders.push({ id: 'vm', kind: 'vm', ...anchor(f, 'load.cjs', source(f, 'load.cjs').trim()), occurrences: [{ id: 'curve', file: 'curve.js', realm: 'page' }, { id: 'motion', file: 'motion.js', realm: 'page' }], order: ['curve', 'motion'], readiness: [] });
   f.profile = { modules: [moduleRecord('curve', 'curve.js'), moduleRecord('motion', 'motion.js', 'application')], sizeProfiles: { test: { warn: 300, hardMax: 400 } }, layerRules: { application: { allowedLayers: ['domain'] }, domain: { allowedLayers: ['domain', 'application'] } } };
-  f.requiredScope = structuredClone(f.contract.scope);
+  f.requiredScope = { ...structuredClone(f.contract.scope), applicability: [{ loader: 'vm', use: 'motion.js.SMCurve', realm: 'page' }] };
   return f;
 }
 const check = (f, extra = {}) => checkClassicScripts(f.contract, { root: f.root, profile: f.profile, requiredScope: f.requiredScope, ...extra });
@@ -51,7 +51,8 @@ function replace(f, file, before, after) { write(f, file, source(f, file).replac
 function htmlFixture() {
   const f = fixture();
   write(f, 'index.html', '<script src="curve.js"></script><script src="motion.js"></script>');
-  f.contract.scope.loaders = ['html']; f.requiredScope = structuredClone(f.contract.scope);
+  f.contract.scope.loaders = ['html'];
+  f.requiredScope = { ...structuredClone(f.contract.scope), applicability: [{ loader: 'html', use: 'motion.js.SMCurve', realm: 'html' }] };
   f.contract.loaders = [{ id: 'html', kind: 'html', sourceRoot: 'src', ...anchor(f, 'index.html', '<script src="curve.js"></script>'), readiness: [] }];
   return f;
 }
@@ -73,7 +74,7 @@ test('valid dependency points consumer to provider and order points provider to 
 });
 test('missing providers and deleted use declarations fail despite unchanged valid source', () => {
   const f = fixture(); f.contract.providers = []; rejects(f, 'missing-provider');
-  const g = fixture(); g.contract.uses = []; rejects(g, 'unmodeled-global-use');
+  const g = fixture(); g.contract.uses = []; rejects(g, 'invalid-classic-contract');
 });
 test('private member cannot be exposed by file-level publicApi', () => {
   const f = fixture(); replace(f, 'motion.js', 'SMCurve.run', 'SMCurve.privateHelper');
@@ -102,7 +103,7 @@ test('comments, strings, and regular expressions do not become dependencies', ()
   f.contract.uses = [use(f, 'SMCurve', 'motion.js')]; assert.deepEqual(check(f).violations, []);
 });
 test('template substitutions remain visible', () => {
-  const f = fixture(); write(f, 'motion.js', 'const text = `literal SMCurve.fake ${SMCurve.run()}`;'); f.contract.uses = []; rejects(f, 'unmodeled-global-use');
+  const f = fixture(); write(f, 'motion.js', source(f, 'motion.js') + 'const text = `literal SMCurve.fake ${SMCurve.privateHelper()}`;'); rejects(f, 'unmodeled-global-use');
 });
 test('additional window.SM access retains global-state control', () => {
   const f = fixture(); write(f, 'motion.js', source(f, 'motion.js') + 'window.SMSecret.run();\n');
@@ -128,11 +129,73 @@ test('loaders cannot borrow providers across loaders or realms', () => {
   const f = fixture(); f.contract.loaders[0].occurrences[0].realm = 'other'; rejects(f, 'missing-loader-provider');
   const g = fixture(), second = structuredClone(g.contract.loaders[0]); second.id = 'second';
   g.contract.loaders.push(second); g.contract.scope.loaders.push('second'); g.requiredScope.loaders.push('second');
+  g.requiredScope.applicability.push({ loader: 'second', use: 'motion.js.SMCurve', realm: 'page' });
   second.occurrences.shift(); second.order.shift(); rejects(g, 'missing-loader-provider');
 });
 test('repeated provider occurrences and omitted consumer applicability fail', () => {
   const f = fixture(), l = f.contract.loaders[0]; l.occurrences.push({ ...l.occurrences[0], id: 'again' }); l.order.push('again'); rejects(f, 'duplicate-provider-installation');
   const g = fixture(); g.contract.loaders[0].occurrences.pop(); g.contract.loaders[0].order.pop(); rejects(g, 'missing-loader-consumer');
+});
+test('a first VM loader cannot mask an omitted consumer in a second required loader', () => {
+  const f = fixture(), second = structuredClone(f.contract.loaders[0]);
+  write(f, 'second.cjs', source(f, 'load.cjs'));
+  Object.assign(second, { id: 'second' }, anchor(f, 'second.cjs', source(f, 'second.cjs').trim()));
+  f.contract.loaders.push(second); f.contract.scope.loaders.push('second'); f.requiredScope.loaders.push('second');
+  f.requiredScope.applicability.push({ loader: 'second', use: 'motion.js.SMCurve', realm: 'page' });
+  const adopted = structuredClone(f.requiredScope);
+  assert.equal(check(f).ok, true);
+  second.occurrences.pop(); second.order.pop();
+  const omitted = rejects(f, 'missing-loader-consumer');
+  assert.ok(omitted.violations.some((v) => v.detail.loader === 'second' && v.detail.realm === 'page'));
+  assert.equal(omitted.classicOk, false);
+  write(f, 'second.cjs', "for (const file of ['motion.js', 'curve.js']) execute(file);\n");
+  Object.assign(second, anchor(f, 'second.cjs', source(f, 'second.cjs').trim()));
+  rejects(f, 'missing-loader-consumer');
+  const context = vm.createContext({});
+  assert.throws(() => vm.runInNewContext(source(f, 'second.cjs'), {
+    execute(file) { vm.runInContext(source(f, file), context); },
+  }), { name: 'ReferenceError' });
+  assert.deepEqual(f.requiredScope, adopted, 'independent applicability was retained across source/list changes');
+});
+test('each adopted realm retains its own consumer obligation', () => {
+  const f = fixture(), loader = f.contract.loaders[0];
+  loader.occurrences.push({ id: 'other.curve', file: 'curve.js', realm: 'other' }, { id: 'other.motion', file: 'motion.js', realm: 'other' });
+  loader.order.push('other.curve', 'other.motion');
+  f.requiredScope.applicability.push({ loader: 'vm', use: 'motion.js.SMCurve', realm: 'other' });
+  assert.equal(check(f).ok, true);
+  loader.occurrences.pop(); loader.order.pop();
+  const r = rejects(f, 'missing-loader-consumer');
+  assert.ok(r.violations.some((v) => v.detail.realm === 'other'));
+});
+test('observed consumer realms cannot silently broaden adopted applicability', () => {
+  const f = fixture(), loader = f.contract.loaders[0];
+  loader.occurrences.push({ id: 'other.curve', file: 'curve.js', realm: 'other' }, { id: 'other.motion', file: 'motion.js', realm: 'other' });
+  loader.order.push('other.curve', 'other.motion'); rejects(f, 'unadopted-loader-consumer');
+});
+test('disjoint loader use obligations do not require every use in every loader', () => {
+  const f = fixture(); write(f, 'preview.js', 'var preview = SMCurve.run;\n');
+  write(f, 'preview.cjs', "for (const file of ['curve.js', 'preview.js']) execute(file);\n");
+  f.profile.modules.push(moduleRecord('preview', 'preview.js'));
+  f.contract.uses.push(use(f, 'SMCurve', 'preview.js'));
+  f.contract.scope.loaders.push('preview'); f.requiredScope.loaders.push('preview');
+  f.requiredScope.applicability.push({ loader: 'preview', use: 'preview.js.SMCurve', realm: 'preview' });
+  f.contract.loaders.push({ id: 'preview', kind: 'vm', ...anchor(f, 'preview.cjs', source(f, 'preview.cjs').trim()),
+    occurrences: [{ id: 'curve', file: 'curve.js', realm: 'preview' }, { id: 'preview', file: 'preview.js', realm: 'preview' }], order: ['curve', 'preview'], readiness: [] });
+  const r = check(f); assert.equal(r.ok, true, JSON.stringify(r.violations)); assert.equal(r.requirements.length, 2);
+});
+test('applicability does not collapse repeated consumer order checks', () => {
+  const f = fixture(), loader = f.contract.loaders[0];
+  loader.occurrences.push({ id: 'early', file: 'motion.js', realm: 'page' }); loader.order.unshift('early');
+  const r = rejects(f, 'load-order'); assert.equal(r.requirements.length, 2);
+});
+test('missing, malformed, duplicate and incomplete adoption fail closed', () => {
+  for (const applicability of [undefined, [], [null], [{ loader: 'vm', use: 'motion.js.SMCurve', realm: '' }],
+    [{ loader: 'absent', use: 'motion.js.SMCurve', realm: 'page' }], [{ loader: 'vm', use: 'absent', realm: 'page' }]]) {
+    const f = fixture(); f.requiredScope.applicability = applicability; rejects(f, 'invalid-classic-contract');
+  }
+  const f = fixture(); f.requiredScope.applicability.push({ ...f.requiredScope.applicability[0] }); rejects(f, 'invalid-classic-contract');
+  const g = fixture(); write(g, 'preview.js', 'var preview = SMCurve.run;'); g.contract.uses.push(use(g, 'SMCurve', 'preview.js'));
+  rejects(g, 'invalid-classic-contract');
 });
 test('call-phase dependency requires source-pinned invocation readiness', () => {
   const f = fixture(); f.contract.uses[0].phase = 'call'; rejects(f, 'unknown-readiness');
@@ -146,6 +209,7 @@ test('call-phase cycles fail even with reviewed readiness and no reversed load d
   f.contract.scope.symbols.push('SMMotion'); f.requiredScope.symbols.push('SMMotion');
   f.contract.providers.push(provider(f, 'SMMotion', 'motion.js'));
   f.contract.uses = [use(f, 'SMCurve', 'motion.js', 'call'), use(f, 'SMMotion', 'curve.js', 'call')];
+  f.requiredScope.applicability.push({ loader: 'vm', use: 'curve.js.SMMotion', realm: 'page' });
   write(f, 'load.cjs', source(f, 'load.cjs') + 'invokeAfterLoading();\n');
   f.contract.loaders[0].readiness = f.contract.uses.map((u) => ({ use: u.id, after: ['curve', 'motion'], ...anchor(f, 'load.cjs', 'invokeAfterLoading();') }));
   const r = rejects(f, 'cycle'); assert.equal(r.violations.some((v) => v.rule === 'load-order' || v.rule === 'unknown-readiness'), false);
@@ -199,7 +263,10 @@ function production() {
   // Use the adopted source owners/layers without relabeling legacy globals.
   const app = require('../../engineering/boundaries/profiles/app-js.profile.json');
   f.profile = { ...app, modules: app.modules.filter((m) => ['app.animation.curve', 'app.motion'].includes(m.id)), exceptions: app.exceptions.filter((e) => e.path === consumerFile || e.path === providerFile) };
-  f.requiredScope = structuredClone(f.contract.scope);
+  f.requiredScope = { ...structuredClone(f.contract.scope), applicability: [
+    { loader: 'animation', use: 'motion.curve.capture', realm: 'animation' },
+    { loader: 'fixtures', use: 'motion.curve.capture', realm: 'fixtures' },
+  ] };
   return f;
 }
 test('exact production Curve/Motion bytes pass both reviewed VM loader contracts', () => {
@@ -225,6 +292,7 @@ if (process.env.NEMO_CLASSIC_HTML_HELPER || process.env.NEMO_CLASSIC_PARSE5) {
     const inventoryHTML = (html, opts) => inventoryHtmlScripts(html, { ...opts, parseHTML: parse });
     const f = production(); f.contract.sources['src/index.html'] = '5176c7a71ce55a95ce55697c05ca65895be36cb8';
     f.contract.scope.loaders.push('app'); f.requiredScope.loaders.push('app');
+    f.requiredScope.applicability.push({ loader: 'app', use: 'motion.curve.capture', realm: 'app' });
     f.contract.loaders.push({ id: 'app', kind: 'html', sourceRoot: 'src', ...anchor(f, 'src/index.html', '<script src="js/animation/curve.js"></script>'), readiness: [] });
     const r = check(f, { inventoryHTML }); assert.equal(r.classicOk, true, JSON.stringify(r.violations)); assert.equal(r.ok, false);
     assert.ok(r.violations.every((v) => v.rule === 'global-state')); assert.equal(r.requirements.length, 3);

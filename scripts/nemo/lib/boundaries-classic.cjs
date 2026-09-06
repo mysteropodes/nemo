@@ -1,8 +1,10 @@
 'use strict';
 // Bounded, source-pinned classic-script dependency analysis; no product execution.
 // checkClassicScripts(contract, {root, profile, requiredScope, inventoryHTML}).
-// requiredScope is independently adopted {symbols, loaders}; never derive it from
-// an untrusted contract. inventoryHTML is the synchronous script-order helper
+// requiredScope is independently adopted {symbols, loaders, applicability}, with
+// applicability: [{loader, use, realm}]. Retain these obligations independently
+// of the contract's mutable occurrence lists; never infer them from those lists.
+// inventoryHTML is the synchronous script-order helper
 // with parse5 already injected. Missing evidence fails closed. VM order/readiness
 // are reviewed facts pinned to complete loader sources, not inferred execution.
 // classicOk isolates this contract from retained legacy global-state violations;
@@ -131,10 +133,10 @@ function validate(contract, options) {
   const text = (v) => need(typeof v === 'string' && v.trim().length > 0, 'expected nonempty string');
   const list = (v) => { need(Array.isArray(v), 'expected array'); v.forEach(text); need(new Set(v).size === v.length, 'duplicate value'); };
   const relative = (v) => { text(v); need(!/[\\\x00-\x1f:]/.test(v) && !path.posix.isAbsolute(v) && v.split('/').every((s) => s && s !== '.' && s !== '..'), 'invalid relative path'); };
-  const scope = (v) => { object(v, ['symbols', 'loaders']); list(v.symbols); list(v.loaders); need(v.symbols.length && v.loaders.length, 'empty scope'); };
+  const scope = (v, adopted = false) => { object(v, ['symbols', 'loaders'].concat(adopted ? ['applicability'] : [])); list(v.symbols); list(v.loaders); need(v.symbols.length && v.loaders.length, 'empty scope'); };
   const anchor = (v) => { relative(v.file); need(Number.isSafeInteger(v.line) && v.line > 0, 'invalid line'); text(v.anchor); need(Object.hasOwn(contract.sources, v.file), 'missing source pin'); };
   object(contract, ['version', 'scope', 'sources', 'providers', 'uses', 'loaders']);
-  need(contract.version === 1, 'unsupported version'); scope(contract.scope); scope(options.requiredScope);
+  need(contract.version === 1, 'unsupported version'); scope(contract.scope); scope(options.requiredScope, true);
   for (const key of ['symbols', 'loaders']) need(JSON.stringify([...contract.scope[key]].sort()) === JSON.stringify([...options.requiredScope[key]].sort()), 'adopted scope changed');
   need(contract.scope.symbols.every((s) => /^[A-Za-z_$][\w$]*$/.test(s)), 'invalid global symbol');
   need(contract.sources && typeof contract.sources === 'object' && !Array.isArray(contract.sources), 'missing sources');
@@ -167,6 +169,15 @@ function validate(contract, options) {
     }
   }
   need(contract.loaders.length === contract.scope.loaders.length && contract.loaders.every((l) => contract.scope.loaders.includes(l.id)), 'required loader missing');
+  const required = options.requiredScope.applicability, applications = new Set();
+  need(Array.isArray(required) && required.length > 0, 'independently adopted applicability is required');
+  for (const r of required) {
+    object(r, ['loader', 'use', 'realm']); text(r.loader); text(r.use); text(r.realm);
+    need(contract.scope.loaders.includes(r.loader) && contract.uses.some((u) => u.id === r.use), 'unknown applicability loader/use');
+    const key = JSON.stringify([r.loader, r.use, r.realm]);
+    need(!applications.has(key), 'duplicate applicability'); applications.add(key);
+  }
+  need(contract.uses.every((u) => required.some((r) => r.use === u.id)), 'use lacks adopted applicability');
   validateProfile(options.profile);
 }
 
@@ -321,7 +332,6 @@ function checkClassicScripts(contract, options = {}) {
     } catch (error) { issue('unsupported-import', { file }, error.message); }
   }
   for (const cycle of findCycles(edges)) issue('cycle', null, 'Dependency cycle', { path: cycle });
-  const applicable = new Set();
   for (const loader of contract.loaders) {
     anchored(loader);
     let occurrences, order;
@@ -339,6 +349,13 @@ function checkClassicScripts(contract, options = {}) {
       } else { occurrences = loader.occurrences.map((o) => ({ ...o, ready: true })); order = loader.order; }
       if (new Set(occurrences.map((o) => o.id)).size !== occurrences.length || new Set(order).size !== order.length || order.some((id) => !occurrences.some((o) => o.id === id))) throw new Error('invalid occurrence identity/order');
     } catch (error) { issue('loader-unavailable', loader, error.message); continue; }
+    const required = options.requiredScope.applicability.filter((r) => r.loader === loader.id);
+    for (const r of required) {
+      const use = contract.uses.find((u) => u.id === r.use);
+      if (!occurrences.some((o) => o.file === use.file && o.realm === r.realm)) {
+        issue('missing-loader-consumer', loader, 'Adopted use must execute in this loader and realm', r);
+      }
+    }
     for (const p of providers.values()) for (const realm of new Set(occurrences.map((o) => o.realm))) {
       if (occurrences.filter((o) => o.realm === realm && o.file === p.file).length > 1) issue('duplicate-provider-installation', loader, 'Provider loaded twice in one realm', { symbol: p.symbol, realm });
     }
@@ -347,7 +364,9 @@ function checkClassicScripts(contract, options = {}) {
       if (!contract.uses.some((u) => u.id === fact.use && u.phase === 'call') || fact.after.some((id) => !occurrences.some((o) => o.id === id))) issue('invalid-readiness', loader, 'Readiness must identify a call use and loader occurrences');
     }
     for (const use of contract.uses) for (const consumer of occurrences.filter((o) => o.file === use.file)) {
-      applicable.add(use.id);
+      if (!required.some((r) => r.use === use.id && r.realm === consumer.realm)) {
+        issue('unadopted-loader-consumer', loader, 'Consumer realm lacks adopted applicability', { loader: loader.id, use: use.id, realm: consumer.realm, consumer: consumer.id });
+      }
       const provider = providers.get(use.symbol);
       const candidates = occurrences.filter((o) => o.file === provider?.file && o.realm === consumer.realm);
       if (candidates.length !== 1) { issue('missing-loader-provider', loader, 'Consumer needs exactly one provider in its realm', { use: use.id, consumer: consumer.id }); continue; }
@@ -359,7 +378,6 @@ function checkClassicScripts(contract, options = {}) {
       else if (use.phase === 'call' && !loader.readiness.some((f) => f.use === use.id && f.after.includes(before.id) && f.after.includes(consumer.id))) issue('unknown-readiness', loader, 'Call use needs reviewed invocation-boundary evidence', requirement);
     }
   }
-  for (const use of contract.uses) if (!applicable.has(use.id)) issue('missing-loader-consumer', use, 'No required loader executes this consumer');
   return report();
 }
 
