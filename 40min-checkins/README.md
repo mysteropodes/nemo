@@ -6,6 +6,7 @@ The permanent home for Codexitron's every-fifth-check-in reports is this directo
 
 | Check-in | Date (UTC) | Reporting window (UTC) | Report |
 | --- | --- | --- | --- |
+| 75 | 2026-09-06 | Checks 71–75; scheduled 23:32:15 UTC with continuation | [Seventy-fifth check-in](2026-09-06-checkin-75.md) |
 | 65 | 2026-09-06 | Checks 61–65; continuation through 21:39 UTC | [Sixty-fifth check-in](2026-09-06-checkin-65.md) |
 | 55 | 2026-09-06 | 14:41:56–15:29:57 | [Fifty-fifth check-in](2026-09-06-checkin-55.md) |
 | 50 | 2026-09-06 | 14:02:05–14:41:56 | [Fiftieth check-in](2026-09-06-checkin-50.md) |
