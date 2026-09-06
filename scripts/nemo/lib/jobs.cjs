@@ -132,7 +132,21 @@ function jobTestRust(ctx, crateDir, label) {
   if (!which('cargo')) return blocked('cargo not found');
   const manifest = path.join(ROOT, crateDir, 'Cargo.toml');
   if (!exists(manifest)) return blocked(`${crateDir}/Cargo.toml missing`);
-  const r = run('cargo', ['test', '--manifest-path', manifest], { timeout: 60 * 60 * 1000 });
+  if (crateDir === 'src-tauri') {
+    const sidecar = caps.nativeFixtureSidecarProbe();
+    if (!sidecar.runs) return blocked(`native fixture sidecar unavailable (${sidecar.source}): ${sidecar.path}: ${sidecar.failure}`, {
+      details: { nativeFixtureSidecar: sidecar },
+    });
+  }
+  const args = ['test'];
+  // The Tauri crate includes wall-clock decoder regression tests. Running
+  // those through an unoptimized test binary or beside dozens of other
+  // FFmpeg processes measures the harness, not production decoder latency.
+  // Keep every assertion and threshold, but exercise optimized code serially.
+  if (crateDir === 'src-tauri') args.push('--release');
+  args.push('--manifest-path', manifest);
+  if (crateDir === 'src-tauri') args.push('--', '--test-threads=1');
+  const r = run('cargo', args, { timeout: 60 * 60 * 1000 });
   const results = [...r.stdout.matchAll(/^test result: (\w+)\. (\d+) passed; (\d+) failed/gm)];
   const passed = results.reduce((a, m) => a + Number(m[2]), 0), failed = results.reduce((a, m) => a + Number(m[3]), 0);
   const summary = results.length ? `${results.length} binaries, ${passed} passed, ${failed} failed` : `exit ${r.status}`;
@@ -148,25 +162,50 @@ function jobTestIntegration() {
   return (r.status === 0 ? pass : fail)(`node --test tests/integration: exit ${r.status}`, { exitCode: r.status, log: logOf(r) });
 }
 
-function jobTestBrowser() {
+function jobTestBrowser(ctx) {
   const runner = caps.resolvable('@playwright/test');
   if (!runner) return blocked('@playwright/test is not installed (not in devDependencies); browser workflows cannot run', { limitations: ['install is a dependency change owned by R07/R03, not done implicitly here'] });
   const dir = path.join(ROOT, 'tests', 'browser');
   if (!exists(dir) || !fs.readdirSync(dir).some((f) => /\.spec\.(c?js|mjs|ts)$/.test(f))) return notRun('runner present but no tests/browser/*.spec.* defined yet (R03 fixtures / R07 gates)');
   const bin = caps.localBin('playwright');
-  const r = run(bin || process.execPath, bin ? ['test', 'tests/browser'] : [runner, 'test', 'tests/browser'], { timeout: 60 * 60 * 1000 });
+  const output = path.join(ctx.reportDir, 'playwright-results');
+  const r = run(bin || process.execPath,
+    bin ? ['test', 'tests/browser', '--output', output] : [runner, 'test', 'tests/browser', '--output', output],
+    { timeout: 60 * 60 * 1000 });
   return (r.status === 0 ? pass : fail)(`playwright test tests/browser: exit ${r.status}`, { exitCode: r.status, log: logOf(r) });
 }
 
-function jobTestDesktop() {
+function jobTestDesktop(ctx) {
   const app = caps.findBuiltApp();
-  const harness = exists(path.join(ROOT, 'tests', 'desktop'));
+  const directory = path.join(ROOT, 'tests', 'desktop');
+  const files = exists(directory) ? fs.readdirSync(directory).filter((name) => name.endsWith('.test.cjs')).sort() : [];
   const missing = [];
   if (!app) missing.push('no packaged app found (src-tauri/target/*/release/bundle/macos/Nemo.app or NEMO_DESKTOP_APP)');
-  if (!harness) missing.push('no tests/desktop harness defined yet (R06 isolated data roots, R21 installed-artifact validation)');
+  if (!files.length) missing.push('no tests/desktop/*.test.cjs harness defined');
   if (!app) return blocked(missing.join('; '));
-  if (!harness) return notRun(missing.join('; '), { artifacts: [{ path: path.relative(ROOT, app) }] });
-  return notRun('tests/desktop exists but no runner is wired for it yet');
+  if (!files.length) return blocked(missing.join('; '), { artifacts: [{ path: path.relative(ROOT, app) }] });
+  const r = run(process.execPath, ['--test', '--test-reporter=tap', '--test-concurrency=1'].concat(files.map((name) => 'tests/desktop/' + name)), {
+    timeout: 30 * 60 * 1000,
+    env: { NEMO_DESKTOP_APP: path.resolve(app), NEMO_DESKTOP_REPORT_DIR: ctx.reportDir, NODE_TEST_CONTEXT: undefined },
+  });
+  const counts = Object.fromEntries(['tests', 'pass', 'fail', 'cancelled', 'skipped', 'todo'].map((name) => {
+    const match = r.stdout.match(new RegExp(`^# ${name} (\\d+)$`, 'm'));
+    return [name, match ? Number(match[1]) : null];
+  }));
+  // Node synthesizes a passing file-level test for an empty/comment-only file.
+  const syntheticNames = new Set(files.flatMap(name => {
+    const relative = 'tests/desktop/' + name; const absolute = path.join(ROOT, relative);
+    return [relative, absolute, fs.realpathSync(absolute)];
+  }));
+  const emptyFiles = [...r.stdout.matchAll(/^# Subtest: (.+)$/gm)]
+    .map(match => match[1]).filter(name => syntheticNames.has(name));
+  const complete = emptyFiles.length === 0 && counts.tests > 0 && counts.pass === counts.tests
+    && ['fail', 'cancelled', 'skipped', 'todo'].every((name) => counts[name] === 0);
+  return (r.status === 0 && complete ? pass : fail)(`packaged-native Node harness: exit ${r.status}, ${counts.pass}/${counts.tests} passing`, {
+    exitCode: r.status === 0 && !complete ? 1 : r.status, log: logOf(r), details: { files, counts, emptyFiles },
+    artifacts: [{ path: path.relative(ROOT, app) }],
+    limitations: ['Native process and storage-isolation checks do not establish UI save/reload, rendering, or release acceptance.'],
+  });
 }
 
 function jobBench(ctx) {
@@ -209,23 +248,31 @@ function jobBuildDesktop(ctx) {
   const missing = [];
   if (!tauri) missing.push('node_modules/.bin/tauri (run npm ci)');
   if (!which('cargo')) missing.push('cargo');
-  const triple = ctx.receipt.build.hostTriple;
-  if (!triple) missing.push('rustc host triple');
-  if (process.platform === 'darwin' && !which('xcode-select')) missing.push('Xcode command line tools');
+  if (!ctx.receipt.build.hostTriple) missing.push('rustc host triple');
   if (!which('python3')) missing.push('python3 (scripts/bundle-ffmpeg-dylibs.py)');
+  if (process.platform !== 'darwin') missing.push('macOS (isolated desktop build is not validated on this platform)');
+  else if (!which('xcode-select')) missing.push('Xcode command line tools');
   if (missing.length) return blocked('missing: ' + missing.join(', '));
-  const r = run(tauri, ['build', '--target', triple, '-b', 'app', '--no-sign'], { timeout: 2 * 60 * 60 * 1000 });
-  if (r.status !== 0) return fail(`tauri build exit ${r.status}`, { exitCode: r.status, log: logOf(r) });
-  const app = path.join(ROOT, 'src-tauri', 'target', triple, 'release', 'bundle', 'macos', 'Nemo.app');
-  if (process.platform !== 'darwin') return pass('tauri build ok (non-macOS: dylib bundling step not applicable)', { exitCode: 0, log: logOf(r) });
-  if (!exists(app)) return fail('tauri build reported success but Nemo.app not found at ' + path.relative(ROOT, app), { log: logOf(r) });
-  const d = run('python3', ['scripts/bundle-ffmpeg-dylibs.py', app], { timeout: 10 * 60 * 1000 });
-  const log = logOf(r) + '\n' + logOf(d);
-  if (d.status !== 0) return fail(`bundle-ffmpeg-dylibs.py exit ${d.status}`, { exitCode: d.status, log });
-  const mainBin = fileInfo(path.join(app, 'Contents', 'MacOS', 'Nemo'));
-  const sidecar = fileInfo(path.join(app, 'Contents', 'MacOS', 'ffmpeg'));
-  return pass('tauri build + ffmpeg dylib bundling ok', { exitCode: 0, log, artifacts: [{ path: path.relative(ROOT, app) }, mainBin, sidecar],
-    limitations: ['unsigned, un-notarized local build; not the release pipeline artifact'] });
+  // The controller owns build/copy/finalization deadlines and cleanup.
+  // Await its receipt so an outer timer cannot strand the owned launcher.
+  const r = run(process.execPath, ['scripts/nemo/build-job.cjs', ctx.reportDir]);
+  let result;
+  try { result = JSON.parse(r.stdout); } catch { return fail('isolated desktop build controller returned no valid receipt', { exitCode: 1, log: r.stderr }); }
+  const expectedExit = result.status === 'pass' ? 0 : result.status === 'blocked' ? 2 : 1;
+  if (result.schema !== 'nemo.build-job/1' || !['pass', 'fail', 'blocked'].includes(result.status) || r.status !== expectedExit) {
+    return fail('isolated desktop build controller receipt and exit disagree', { exitCode: 1, log: r.stderr });
+  }
+  if (result.status === 'pass') {
+    const app = Array.isArray(result.artifacts) && result.artifacts.find(item => typeof item.path === 'string' && item.path.endsWith('.app'));
+    if (!app || !result.details || !result.details.cleanup || !result.details.cleanup.released || !exists(path.resolve(ROOT, app.path))) {
+      return fail('isolated desktop build did not preserve a released package', { exitCode: 1 });
+    }
+    // A later test:desktop in this same job runner must consume this package,
+    // not an older shared-target artifact. This does not change the caller's shell.
+    process.env.NEMO_DESKTOP_APP = path.resolve(ROOT, app.path);
+  }
+  const { schema: _schema, ...job } = result;
+  return job;
 }
 
 // ---- registry ----------------------------------------------------------
@@ -253,10 +300,10 @@ const JOBS = {
   'test:rust-tauri': { run: (ctx) => jobTestRust(ctx, 'src-tauri', 'src-tauri'), required: false },
   'test:integration': { run: jobTestIntegration, required: false },
   'test:browser': { run: jobTestBrowser, required: false },
-  'test:desktop': { run: jobTestDesktop, required: false },
+  'test:desktop': { run: jobTestDesktop, required: true },
   bench: { run: jobBench, required: false },
   'build:wasm': { run: jobBuildWasm, required: false },
-  'build:desktop': { run: jobBuildDesktop, required: false },
+  'build:desktop': { run: jobBuildDesktop, required: true },
 };
 
 const PROFILES = {

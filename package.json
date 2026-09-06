@@ -16,6 +16,7 @@
     "test:integration": "node scripts/nemo/job.cjs test:integration",
     "test:browser": "node scripts/nemo/job.cjs test:browser",
     "test:desktop": "node scripts/nemo/job.cjs test:desktop",
+    "native": "node scripts/nemo/native.cjs",
     "bench": "node scripts/nemo/job.cjs bench",
     "build:wasm": "node scripts/nemo/job.cjs build:wasm",
     "build:desktop": "node scripts/nemo/job.cjs build:desktop",
@@ -34,6 +35,7 @@
   "license": "GPL-3.0-or-later",
   "type": "commonjs",
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tauri-apps/cli": "^2.11.4"
   }
 }
