@@ -217,11 +217,12 @@ function spawnApp(config) {
   });
   child.stdout.pipe(stdout);
   child.stderr.pipe(stderr);
+  const exited = new Promise((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
   const closed = new Promise((resolve) => child.once('close', (code, signal) => resolve({ code, signal })));
   const logsDone = Promise.all([finished(stdout), finished(stderr)]);
   const drained = Promise.all([closed, logsDone]);
   drained.catch(() => {});
-  return { child, closed, logsDone, drained };
+  return { child, exited, closed, logsDone, drained };
 }
 
 // ---- releasing the state that lives OUTSIDE the task root ------------------
@@ -444,9 +445,9 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
-  // Keep the owning process alive for as long as the instance is addressable,
-  // exactly as the build launcher does.
-  setInterval(() => {}, 60_000);
+  // Retain the owner while cleanup is pending or requires reconciliation.
+  // Successful cleanup releases this hold so natural app exit ends the launcher.
+  const keepAlive = setInterval(() => {}, 60_000);
 
   try {
     processInfo = spawnApp(config);
@@ -460,22 +461,26 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
     const manifest = await waitForAppManifest(
       taskId,
       config.manifestTimeoutMs,
-      () => buildRuntime.buildProcessTreeAlive(processInfo.child),
+      () => processInfo.child.exitCode == null && processInfo.child.signalCode == null,
     );
     save(manifest.valid
       ? { appRuntime: manifest.manifest }
       : { appRuntime: null, appRuntimeError: manifest.reason });
     emit({ appRuntime: manifest.valid ? manifest.manifest : null, appRuntimeError: manifest.valid ? null : manifest.reason });
 
-    const result = await processInfo.closed;
+    // Helpers may retain the app's pipes after its leader exits. Stop the owned
+    // group on 'exit' before waiting for 'close' or log drainage.
+    const result = await processInfo.exited;
     if (closing) return;
     let tree;
     try { tree = await buildRuntime.stopBuild(processInfo.child); }
     catch (err) { tree = { stopped: false, forced: false, reason: err.message }; }
+    if (closing) return;
     if (!tree.stopped) {
       save({ state: 'reconciliation-required', finishedAt: nowIso(), exitCode: result.code, signal: result.signal, processTree: tree });
       return;
     }
+    await processInfo.closed;
     await processInfo.logsDone.catch(() => {});
     save({
       state: result.code === 0 ? 'exited' : 'failed',
@@ -485,6 +490,7 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
       processTree: tree,
       slotRelease: releaseReservations(),
     });
+    clearInterval(keepAlive);
   } catch (err) {
     let tree = { stopped: true, forced: false, reason: 'app process was not spawned' };
     if (processInfo) {
@@ -497,6 +503,7 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
     }
     if (processInfo) await processInfo.logsDone.catch(() => {});
     save({ state: 'failed', finishedAt: nowIso(), error: err.message, processTree: tree, slotRelease: releaseReservations() });
+    clearInterval(keepAlive);
   }
 }
 
