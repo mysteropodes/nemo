@@ -616,6 +616,50 @@ var TW_PIVOT=true,PIVOT_MODE='end',PIVOT_MIN_DEG=10,PIVOT_REACH=1.5,PIVOT_END_RA
 //   testD, testG, untitled4, totale, traits, b, testanim : neutres
 //   cats   rebroussements 82→80, latéral 4,2 égal
 //   vérité terrain par clés retirées : strictement identique partout.
+// ---- MOUVEMENT RIGIDE PAR GROUPE (plan 2026-09, chantier 2.1) ----
+// Les traits qui se touchent en A et dont les centroïdes suivent UNE même
+// similitude A→B (rotation + échelle, résidu de témoin ≤ 0,35 × déplacement
+// + 15 px) forment un groupe rigide : tête + oreilles + yeux, bras + main.
+// Chaque membre reçoit alors la rotation, l'échelle et le PIVOT du groupe
+// (point fixe de la similitude s'il est à portée, sinon le centre du groupe)
+// à la place de sa propre similitude : les traits d'une même région tournent
+// ensemble autour du même point, au lieu que chacun tourne autour de son
+// propre centre (ce qui désynchronisait le visage de cats, voir
+// TW_ORPHAN_FOLLOW : « la courbure devrait porter sur le mouvement rigide
+// de la région »). Le trait garde sa propre déformation par-dessus.
+// Groupe retenu à partir de GROUP_MIN_MEMBERS membres et GROUP_MIN_DEG de
+// rotation (en dessous, la rampe par trait suffit). Mesure : B.groupes(),
+// window.__twGroupStats. Mise en garde de Cyril : « j'ai peur que ça ne
+// fonctionne pas mais on essaye » — d'où le drapeau.
+// MESURÉ (2026-09-06, onze fichiers) : les groupes sont trouvés là où on les
+// attend (cats 34→46 : tête 6 traits à 49°, visage 7 traits, bras 3 ; souris
+// 5→16 : un groupe de 3 ; brasG/testB/testC/testD : aucun, un bras est un seul
+// trait). Effet : NEUTRE à l'image (tête du chat et souris identiques éteint /
+// allumé), vérité terrain par clés retirées ±0,05, extrémités neutres sauf
+// compression locale cats 2,6→6,4. La synchronisation qu'il devait apporter
+// existait déjà : fraction de rotation accomplie au milieu de la portée, écart
+// entre membres d'un groupe 0,01–0,10 éteint comme allumé — la
+// désynchronisation décrite sous TW_ORPHAN_FOLLOW venait des ARCS, éteints
+// depuis. DÉSACTIVÉ, code conservé (Cyril : « j'ai peur que ça ne fonctionne
+// pas » — il avait raison).
+var TW_GROUP_RIGID=false,GROUP_MIN_MEMBERS=3,GROUP_MIN_DEG=6,GROUP_REACH=1.5,GROUP_CONTACT_TOL=14,GROUP_RESID_F=0.35,GROUP_RESID_PX=15;
+// ---- FONDU DES PAIRES DOUTEUSES SUR UNE PORTÉE DOUTEUSE (souris 5→16) ----
+// Sur un tournant (3/4 → dos), le moteur préfère un mouvement à un fondu
+// (rattrapage, plafond 0,78) et morphe une oreille en dessus de crâne. Ici :
+// quand l'indice de confiance de la portée (2 × score moyen + part de paires
+// > 0,3 + part hors appariement direct) dépasse DOUBT_INDICE, les paires non
+// forcées dont le score dépasse DOUBT_SCORE sont rendues au fondu / retrait,
+// comme si elles n'avaient jamais été appariées. Une portée normale (indice
+// 0,7–0,9) n'est jamais touchée. À juger à l'image : forme perdue contre
+// fondu franc.
+// MESURÉ (2026-09-06) : à 1,2 seules cats 34→46 (7 paires rendues) et totale
+// 6→15 (7) déclenchent ; à 1,1 cats 25→34 s'ajoute ; souris 5→16 ne déclenche
+// pas (l'indice calculé ici, avant scissions et complétions, vaut ~1,05 contre
+// 1,38 après). Vérité terrain : cats identique, totale 40,9→41,0 mais meilleur
+// rang 32,5→30,6. À l'image (cats 34→46) : il rend aussi des paires JUSTES
+// (les contours du bras) et les remplace par des retraits ; pas convaincant.
+// DÉSACTIVÉ, à essayer sur un tournant via window.TW_DOUBT_FADE=true.
+var TW_DOUBT_FADE=false,DOUBT_INDICE=1.2,DOUBT_SCORE=0.4;
 var TW_XING_HAIRLINE=true,XING_HAIRLINE_AREA=4,XING_HAIRLINE_W=2;
 var TW_CAND_ENDS=true,CAND_END_TOL=6,CAND_END_W=0.15;
 // TW_CAND_EDGE — compression LOCALE d'arêtes dans l'arbitrage. Cas mesuré (brasG,
@@ -4131,6 +4175,11 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
         // full rotation kept below a 0.6x size:separation ratio, fully
         // suppressed above 2x (falls back to the straight lerp path,
         // still shape-correct via the intrinsic correction above).
+        // voir TW_GROUP_RIGID : le groupe impose rotation, échelle et pivot
+        if(TW_GROUP_RIGID&&rA._group&&!userArc){
+          var gr_=rA._group;theta=gr_.theta;scaleF=gr_.scale;
+          pivot={mobile:true,ax:gr_.pAx,ay:gr_.pAy,bx:gr_.pBx,by:gr_.pBy};
+        }
         var avgR=0;for(var ri=0;ri<n;ri++)avgR+=(Math.hypot(loA[ri].x,loA[ri].y)+Math.hypot(loB[ri].x,loB[ri].y))/2;avgR/=n;
         var centroidDist=Math.hypot(cxB-cxA,cyB-cyA);
         var sepRatio=centroidDist/Math.max(1,avgR);
@@ -5807,6 +5856,19 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
     _mlNote('rattrapage',{a:m.a,b:m.b,score:+m.score.toFixed(3),verdict:'rattrapé'});
     pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score,marge:m.marge,mutuel:m.mutuel});aMatched[m.a]=1;bMatched[m.b]=1;
   });
+  // voir TW_DOUBT_FADE : sur une portée douteuse, les paires mauvaises redeviennent des fondus
+  if(TW_DOUBT_FADE&&pairSpecs.length){
+    var _dsc=[],_dnh=0;pairSpecs.forEach(function(sp){if(typeof sp.score!=='number')return;_dsc.push(sp.score);if(sp.forced||sp.isPiece||sp.completion||sp.score>MATCH_TH)_dnh++;});
+    if(_dsc.length){
+      var _dmean=_dsc.reduce(function(a,b){return a+b;},0)/_dsc.length,_ddbt=_dsc.filter(function(x){return x>0.3;}).length;
+      var _dind=2*_dmean+_ddbt/_dsc.length+_dnh/_dsc.length;
+      if(_dind>=DOUBT_INDICE){
+        var _kept=[],_dropped=[];
+        pairSpecs.forEach(function(sp){if(!sp.forced&&!sp.isPiece&&typeof sp.score==='number'&&sp.score>DOUBT_SCORE){_dropped.push(sp);aMatched[sp.aIdx]=0;bMatched[sp.bIdx]=0;}else _kept.push(sp);});
+        if(_dropped.length){pairSpecs=_kept;_mlNote('fondu des paires douteuses',{indice:+_dind.toFixed(2),seuil:DOUBT_SCORE,rendues:_dropped.map(function(sp){return _mlIdA(sp.aIdx)+'→'+_mlIdB(sp.bIdx)+' ('+sp.score.toFixed(3)+')';})});}
+      }
+    }
+  }
   var unA=[],unB=[];
   for(var ai=0;ai<sA.length;ai++)if(!aMatched[ai])unA.push(ai);
   for(var bi2=0;bi2<sB.length;bi2++)if(!bMatched[bi2])unB.push(bi2);
@@ -6184,6 +6246,7 @@ function _twinGroupPins(sA,sB,matches,forcedAIdx,forcedBIdx){
   });
   return out;
 }
+var MATCH_TH_CONF=0.48;
 function generateTweens(explicitRestrictTo,skipUndo){
   saveAllLayerFrames();var li=state.activeLayerIdx;var ld=state.layers[li];
   var keys=[];for(var i=0;i<state.totalFrames;i++){if(ld.frames[i].isKeyframe&&ld.frames[i].strokes.length>0)keys.push(i);}
@@ -6225,6 +6288,7 @@ function generateTweens(explicitRestrictTo,skipUndo){
   // the layer reorder.
   if(!skipUndo)pushUndoLayers();
   var resN=state.resamplePts;var step=state.tweenStep;var total=0;
+  if(typeof window!=='undefined'){window.__twSpanConfidence={};window.__twGroupStats=[];}
   for(var ki=0;ki<keys.length-1;ki++){
     var fA=keys[ki],fB=keys[ki+1];
     if(restrictTo&&!restrictTo[fA])continue;
@@ -6369,6 +6433,62 @@ function generateTweens(explicitRestrictTo,skipUndo){
         aRank:spec.aIdx/Math.max(1,sA.length-1),bRank:spec.bIdx/Math.max(1,sB.length-1),
         aId:spec.aData.strokeId,bId:spec.bData.strokeId,cA:_quickCentroid(spec.aData),cB:_quickCentroid(spec.bData)};
     });
+    // ---- CONFIANCE DE PORTÉE (2026-09-06, souris) : indice = 2 × score
+    // moyen + part de paires douteuses (> 0,3) + part de paires hors
+    // appariement direct. Classe les portées que l'œil trouve mauvaises
+    // (cats 34→46 1,56, souris 5→16 1,38) au-dessus des faciles (0,7–0,9).
+    // Lecture : window.__twSpanConfidence, B.confiance() dans le banc.
+    (function(){
+      var sc=[],nonH=0;
+      pairSpecs.forEach(function(sp){if(typeof sp.score!=='number')return;sc.push(sp.score);if(sp.forced||sp.isPiece||sp.completion||sp.score>MATCH_TH_CONF)nonH++;});
+      if(!sc.length)return;
+      var mean=sc.reduce(function(a,b){return a+b;},0)/sc.length,dbt=sc.filter(function(x){return x>0.3;}).length;
+      var conf={fA:fA,fB:fB,paires:sc.length,moyenne:+mean.toFixed(3),douteuses:dbt,horsDirect:nonH,fondus:fadeOutA.length+fadeInB.length,indice:+(2*mean+dbt/sc.length+nonH/sc.length).toFixed(2)};
+      window.__twSpanConfidence=window.__twSpanConfidence||{};window.__twSpanConfidence[tweenSpanKey(li,fA,fB)]=conf;
+      _mlNote('confiance de portée',conf);
+    })();
+    // ---- GROUPES RIGIDES (voir TW_GROUP_RIGID) ----
+    if(TW_GROUP_RIGID&&pairs.length>=GROUP_MIN_MEMBERS){
+      var gmem=[];
+      pairs.forEach(function(pr,i){
+        var sp=pairSpecs[i];if(!sp||sp.isPiece||!pr.cA||!pr.cB||!pr.a||!pr.a.segments||pr.a.segments.length<2)return;
+        gmem.push({i:i,pr:pr,pts:pr.a.segments.map(function(s){return s.point;}),closed:!!pr.a.closed,cA:pr.cA,cB:pr.cB});
+      });
+      if(gmem.length>=GROUP_MIN_MEMBERS){
+        // contacts en A : extrémité (ou tout point d'une boucle) à ≤ tol d'un point de l'autre
+        var cell=32,grids=gmem.map(function(m){var g={};m.pts.forEach(function(p){var k=Math.floor(p[0]/cell)+','+Math.floor(p[1]/cell);(g[k]||(g[k]=[])).push(p);});return g;});
+        function nearGrid(g,p,tol){var cx=Math.floor(p[0]/cell),cy=Math.floor(p[1]/cell);for(var dx=-1;dx<=1;dx++)for(var dy=-1;dy<=1;dy++){var b=g[(cx+dx)+','+(cy+dy)];if(!b)continue;for(var q=0;q<b.length;q++){if(Math.hypot(b[q][0]-p[0],b[q][1]-p[1])<=tol)return true;}}return false;}
+        function touches(a,b){var pa=gmem[a].closed?gmem[a].pts:[gmem[a].pts[0],gmem[a].pts[gmem[a].pts.length-1]];for(var k=0;k<pa.length;k++){if(nearGrid(grids[b],pa[k],GROUP_CONTACT_TOL))return true;}return false;}
+        var parent=gmem.map(function(_,i){return i;});function find(x){while(parent[x]!==x){parent[x]=parent[parent[x]];x=parent[x];}return x;}
+        for(var ga=0;ga<gmem.length;ga++)for(var gb=ga+1;gb<gmem.length;gb++){if(touches(ga,gb)||touches(gb,ga)){var ra_=find(ga),rb_=find(gb);if(ra_!==rb_)parent[ra_]=rb_;}}
+        var comps={};gmem.forEach(function(m,i){var r=find(i);(comps[r]||(comps[r]=[])).push(m);});
+        var gstats=[];var gid=0;
+        Object.keys(comps).forEach(function(k){
+          var mem=comps[k];if(mem.length<GROUP_MIN_MEMBERS)return;
+          var keep=mem.slice(),tf=null;
+          for(var it=0;it<3;it++){
+            if(keep.length<GROUP_MIN_MEMBERS){tf=null;break;}
+            tf=fitSimilarityTransform(keep.map(function(m){return{x:m.cA[0],y:m.cA[1]};}),keep.map(function(m){return{x:m.cB[0],y:m.cB[1]};}));
+            if(!tf)break;
+            var next=keep.filter(function(m){var q=applySimilarityTransform(tf,m.cA[0],m.cA[1]);var resid=Math.hypot(q.x-m.cB[0],q.y-m.cB[1]),disp=Math.hypot(m.cB[0]-m.cA[0],m.cB[1]-m.cA[1]),pred=Math.hypot(q.x-m.cA[0],q.y-m.cA[1]);return resid<=GROUP_RESID_F*Math.max(disp,pred)+GROUP_RESID_PX;});
+            if(next.length===keep.length)break;keep=next;
+          }
+          if(!tf||keep.length<GROUP_MIN_MEMBERS)return;
+          var mag=Math.hypot(tf.wRe,tf.wIm),th=Math.atan2(tf.wIm,tf.wRe);
+          if(mag<0.5||mag>2||Math.abs(th)<GROUP_MIN_DEG*Math.PI/180)return;
+          // point fixe p = (cb − w·ca)/(1 − w) en complexe
+          var wr=tf.wRe,wi=tf.wIm,ar=tf.ca.x,ai=tf.ca.y,br=tf.cb.x,bi=tf.cb.y;
+          var nr=br-(wr*ar-wi*ai),ni=bi-(wr*ai+wi*ar),dr=1-wr,di=-wi,dd=dr*dr+di*di;
+          var ext=0;keep.forEach(function(m){m.pts.forEach(function(p){var d=Math.hypot(p[0]-ar,p[1]-ai);if(d>ext)ext=d;});});
+          var pAx=ar,pAy=ai,pBx=br,pBy=bi,fixed=false;
+          if(dd>1e-9){var px=(nr*dr+ni*di)/dd,py=(ni*dr-nr*di)/dd;if(Math.hypot(px-ar,py-ai)<=GROUP_REACH*Math.max(1,ext)){pAx=pBx=px;pAy=pBy=py;fixed=true;}}
+          gid++;var g={id:gid,theta:th,scale:Math.min(3,Math.max(0.33,mag)),pAx:pAx,pAy:pAy,pBx:pBx,pBy:pBy,n:keep.length};
+          keep.forEach(function(m){m.pr.a._group=g;});
+          gstats.push({n:keep.length,de:mem.length,deg:Math.round(th*180/Math.PI),echelle:+mag.toFixed(2),pivotFixe:fixed,membres:keep.map(function(m){return String(_origIdOf(m.pr.a._src||{})||m.pr.aId).slice(-8);})});
+        });
+        if(gstats.length){window.__twGroupStats=window.__twGroupStats||[];window.__twGroupStats.push({fA:fA,fB:fB,groupes:gstats});_mlNote('groupes rigides',{groupes:gstats});}
+      }
+    }
     // ---- ARCS DÉDUITS DE LA CHAÎNE DE CLÉS (voir TW_ARC_FROM_CHAIN) ----
     if(TW_ARC_FROM_CHAIN){
       var fPrev=ki>0?keys[ki-1]:-1,fNext=ki+2<keys.length?keys[ki+2]:-1;

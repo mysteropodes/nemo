@@ -20,6 +20,7 @@
 //   __twBench.identite(li)                paires à même strokeId / croisées / redessinées (clés dupliquées)
 //   __twBench.corpusReal() / diffReal({...})  paires de la génération RÉELLE (journal), pas des copies
 //   __twBench.bouts(li)                   rebroussements / écart latéral de l'extrémité fixe, compression locale
+//   __twBench.confiance() / groupes()    indice de confiance par portée ; groupes rigides retenus (TW_GROUP_RIGID)
 //
 // The overlay lives in the Paper canvas: visible only while the Rust engine
 // is OFF (a fresh preview tab), see CLAUDE.md §4.
@@ -27,7 +28,7 @@
   if(typeof window==='undefined')return;
   var B={};
   var FLAG_NAMES=['TW_MATCH_RELATIONAL','TW_MATCH_MULTI_MOTION','TW_REL_2OPT','TW_MATCH_TRACKING','TW_PIECE_COMPLETION','TW_MATCH_AXIS','TW_MATCH_TURNING','TW_MATCH_GAP','TW_REL_REVERSE','TW_OC_SIDE_GUARD','TW_ID_PINS','TW_ARC_FROM_CHAIN','TW_TWIN_GROUPS','TW_TEMPORAL_PRIOR',
-    'TW_MOTION_FIELD','TW_CHIRALITY','TW_MATCH_WIDTH','TW_MATCH_TOPOLOGY','TW_MATCH_REGIONS','TW_PROVENANCE_PINS','TW_PIN_IN_SOLVER','TW_ORPHAN_FOLLOW','TW_MARGIN_SEEDS','TW_MARGIN_GUARD','TW_ID_BONUS','TW_ID_PINS','TW_DTW_SIGN'];
+    'TW_MOTION_FIELD','TW_CHIRALITY','TW_MATCH_WIDTH','TW_MATCH_TOPOLOGY','TW_MATCH_REGIONS','TW_PROVENANCE_PINS','TW_PIN_IN_SOLVER','TW_ORPHAN_FOLLOW','TW_MARGIN_SEEDS','TW_MARGIN_GUARD','TW_ID_BONUS','TW_ID_PINS','TW_DTW_SIGN','TW_GROUP_RIGID','TW_DOUBT_FADE'];
   var NEW_FLAGS=['TW_MOTION_FIELD','TW_CHIRALITY','TW_MATCH_WIDTH','TW_MATCH_TOPOLOGY','TW_MATCH_REGIONS','TW_PROVENANCE_PINS','TW_PIN_IN_SOLVER','TW_ORPHAN_FOLLOW','TW_MATCH_AXIS','TW_MATCH_TURNING','TW_MATCH_GAP','TW_REL_REVERSE','TW_OC_SIDE_GUARD','TW_ID_PINS','TW_ARC_FROM_CHAIN','TW_TWIN_GROUPS','TW_TEMPORAL_PRIOR'];
   B.NEW_FLAGS=NEW_FLAGS;
   B.flags=function(){var o={};FLAG_NAMES.forEach(function(k){o[k]=window[k];});return o;};
@@ -611,6 +612,10 @@
     tot.latMoy=tot.traits?+(tot.lat/tot.traits).toFixed(1):0;delete tot.lat;tot.compression=+tot.compression.toFixed(1);
     return{portees:rows,total:tot};
   };
+
+  // ---- confiance de portée et groupes rigides (2026-09-06) ----
+  B.confiance=function(){var C=window.__twSpanConfidence||{};var rows=Object.keys(C).map(function(k){return C[k];}).sort(function(a,b){return b.indice-a.indice;});return rows.map(function(c){return c.fA+'→'+c.fB+' : indice '+c.indice+' (moyenne '+c.moyenne+', douteuses '+c.douteuses+'/'+c.paires+', hors direct '+c.horsDirect+', fondus '+c.fondus+')';});};
+  B.groupes=function(){return (window.__twGroupStats||[]).map(function(g){return g.fA+'→'+g.fB+' : '+g.groupes.map(function(x){return x.n+'/'+x.de+' traits, '+x.deg+'°, échelle '+x.echelle+(x.pivotFixe?', pivot fixe':', pivot centre')+' ['+x.membres.join(' ')+']';}).join(' | ');});};
 
   // ---- journal d'appariement (chantier 0.3) : lecture humaine ----
   // window.__TW_DEBUG_MATCH=true ; générer ; B.journal() = dernière portée,
