@@ -1,0 +1,95 @@
+{
+ "schema": "nemo.fixture-expectations/1",
+ "fixture": "media",
+ "reference": "tests/fixtures/lib/reference.cjs",
+ "checks": [
+  {
+   "kind": "document",
+   "path": "layers[0].frames[0].strokes[0].isRaster",
+   "expect": true,
+   "verify": "node"
+  },
+  {
+   "kind": "document",
+   "path": "layers[1].frames[0].strokes[0].linked",
+   "expect": true,
+   "verify": "node"
+  },
+  {
+   "kind": "document",
+   "path": "layers[1].frames[0].strokes[0].src",
+   "verify": "node",
+   "note": "a linked raster never embeds bytes"
+  },
+  {
+   "kind": "data-url-asset",
+   "layerUid": "ly_media_embedded",
+   "asset": "assets/embedded.png",
+   "verify": "node",
+   "note": "embedded data URL bytes equal the committed asset"
+  },
+  {
+   "kind": "image-size",
+   "asset": "assets/embedded.png",
+   "expect": {
+    "width": 64,
+    "height": 48
+   },
+   "verify": "node"
+  },
+  {
+   "kind": "image-size",
+   "asset": "assets/linked.png",
+   "expect": {
+    "width": 32,
+    "height": 24
+   },
+   "verify": "node"
+  },
+  {
+   "kind": "pixel",
+   "frame": 0,
+   "x": 170,
+   "y": 150,
+   "rgb": [
+    220,
+    30,
+    30
+   ],
+   "tolerance": 2,
+   "verify": "gate",
+   "gate": "R13 render/export harness",
+   "note": "embedded image left half (2× display scale)"
+  },
+  {
+   "kind": "pixel",
+   "frame": 0,
+   "x": 230,
+   "y": 150,
+   "rgb": [
+    30,
+    60,
+    220
+   ],
+   "tolerance": 2,
+   "verify": "gate",
+   "gate": "R13 render/export harness",
+   "note": "embedded image right half"
+  },
+  {
+   "kind": "pixel",
+   "frame": 0,
+   "x": 450,
+   "y": 150,
+   "rgb": [
+    255,
+    255,
+    255
+   ],
+   "tolerance": 2,
+   "verify": "gate",
+   "gate": "R13 render/export harness",
+   "note": "linked image unresolved in a harness without the file → placeholder draws nothing"
+  }
+ ]
+}

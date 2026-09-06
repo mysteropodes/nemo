@@ -71,8 +71,8 @@ test('tooling coverage profiles every current scripts/nemo CommonJS source', () 
   const profile = JSON.parse(fs.readFileSync(path.join(ROOT, ci.PROFILE), 'utf8'));
   const result = ci.toolingCoverage(profile, ROOT);
   assert.equal(result.ok, true);
-  assert.equal(result.sourcePathCount, 34);
-  assert.equal(result.declaredPathCount, 34);
+  assert.equal(result.sourcePathCount, 41);
+  assert.equal(result.declaredPathCount, 41);
   const incomplete = structuredClone(profile);
   incomplete.modules = incomplete.modules.filter((module) => module.id !== 'nemo.lib.boundariesApplication');
   const rejected = ci.toolingCoverage(incomplete, ROOT);

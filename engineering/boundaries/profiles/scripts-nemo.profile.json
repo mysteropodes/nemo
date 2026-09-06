@@ -1,5 +1,10 @@
 {
   "modules": [
+    { "id": "nemo.lib.inventoryLexer", "layer": "tooling-shared", "dir": "scripts/nemo/lib",
+      "files": ["inventory-lexer.cjs"], "publicApi": ["inventory-lexer.cjs"], "sizeProfile": "Domain/application JS or TS" },
+    { "id": "nemo.lib.inventoryRender", "layer": "tooling-shared", "dir": "scripts/nemo/lib",
+      "files": ["inventory-render.cjs"], "publicApi": ["inventory-render.cjs"], "sizeProfile": "Domain/application JS or TS" },
+
     { "id": "nemo.lib.util", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
       "files": ["util.cjs"], "publicApi": ["util.cjs"], "sizeProfile": "Platform/engine adapter" },
 
@@ -23,6 +28,14 @@
       "files": ["boundaries-discovery.cjs"], "publicApi": ["boundaries-discovery.cjs"], "sizeProfile": "Platform/engine adapter" },
     { "id": "nemo.lib.receipt", "layer": "tooling-application", "dir": "scripts/nemo/lib",
       "files": ["receipt.cjs"], "publicApi": ["receipt.cjs"], "sizeProfile": "Domain/application JS or TS" },
+    { "id": "nemo.lib.inventoryBindings", "layer": "tooling-application", "dir": "scripts/nemo/lib",
+      "files": ["inventory-bindings.cjs"], "publicApi": ["inventory-bindings.cjs"], "sizeProfile": "Domain/application JS or TS" },
+    { "id": "nemo.lib.inventoryRecords", "layer": "tooling-application", "dir": "scripts/nemo/lib",
+      "files": ["inventory-records.cjs"], "publicApi": ["inventory-records.cjs"], "sizeProfile": "Domain/application JS or TS" },
+    { "id": "nemo.lib.inventorySurfaces", "layer": "tooling-application", "dir": "scripts/nemo/lib",
+      "files": ["inventory-surfaces.cjs"], "publicApi": ["inventory-surfaces.cjs"], "sizeProfile": "Domain/application JS or TS" },
+    { "id": "nemo.inventory", "layer": "tooling-application", "dir": "scripts/nemo",
+      "files": ["inventory.cjs"], "publicApi": ["inventory.cjs"], "sizeProfile": "Domain/application JS or TS" },
 
     { "id": "nemo.lib.jobs", "layer": "tooling-application", "dir": "scripts/nemo/lib",
       "files": ["jobs.cjs"], "publicApi": ["jobs.cjs"], "sizeProfile": "Domain/application JS or TS" },
@@ -54,6 +67,8 @@
 
     { "id": "nemo.test.boundaries", "layer": "tooling-test", "dir": "scripts/nemo",
       "files": ["boundaries.test.cjs"], "publicApi": ["boundaries.test.cjs"], "sizeProfile": "Test file" },
+    { "id": "nemo.test.inventory", "layer": "tooling-test", "dir": "scripts/nemo",
+      "files": ["inventory.test.cjs"], "publicApi": ["inventory.test.cjs"], "sizeProfile": "Test file" },
     { "id": "nemo.test.boundariesRatchet", "layer": "tooling-test", "dir": "scripts/nemo",
       "files": ["boundaries-ratchet.test.cjs"], "publicApi": ["boundaries-ratchet.test.cjs"], "sizeProfile": "Test file" },
     { "id": "nemo.test.boundariesApplication", "layer": "tooling-test", "dir": "scripts/nemo",

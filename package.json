@@ -9,6 +9,8 @@
     "serve": "python3 -m http.server 1420 -d src",
     "doctor": "node scripts/nemo/doctor.cjs",
     "check": "node scripts/nemo/check.cjs",
+    "inventory": "node scripts/nemo/inventory.cjs",
+    "fixtures": "node tests/fixtures/generate.cjs",
     "test": "node --test tests/*.test.cjs",
     "test:rust": "node scripts/nemo/job.cjs test:rust",
     "test:integration": "node scripts/nemo/job.cjs test:integration",

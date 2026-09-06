@@ -1,0 +1,135 @@
+{
+ "schema": "nemo.fixture-expectations/1",
+ "fixture": "masks-alpha",
+ "reference": "tests/fixtures/lib/reference.cjs",
+ "checks": [
+  {
+   "kind": "pixel",
+   "frame": 0,
+   "x": 320,
+   "y": 180,
+   "rgb": [
+    0,
+    200,
+    83
+   ],
+   "tolerance": 2,
+   "verify": "gate",
+   "gate": "R13 render/export harness",
+   "note": "inside the alpha matte: content shows"
+  },
+  {
+   "kind": "pixel",
+   "frame": 0,
+   "x": 100,
+   "y": 180,
+   "rgb": [
+    255,
+    255,
+    255
+   ],
+   "tolerance": 2,
+   "verify": "gate",
+   "gate": "R13 render/export harness",
+   "note": "outside the matte: content clipped, matte source not drawn"
+  },
+  {
+   "kind": "pixel",
+   "frame": 0,
+   "x": 90,
+   "y": 90,
+   "rgb": [
+    255,
+    127,
+    127
+   ],
+   "tolerance": 2,
+   "verify": "gate",
+   "gate": "R13 render/export harness",
+   "note": "50% alpha red over white"
+  },
+  {
+   "kind": "pixel",
+   "frame": 0,
+   "x": 550,
+   "y": 90,
+   "rgb": [
+    128,
+    128,
+    255
+   ],
+   "tolerance": 2,
+   "verify": "gate",
+   "gate": "R13 render/export harness",
+   "note": "layer opacity 50% over white"
+  },
+  {
+   "kind": "pixel",
+   "frame": 0,
+   "x": 190,
+   "y": 270,
+   "rgb": [
+    255,
+    149,
+    0
+   ],
+   "tolerance": 2,
+   "verify": "gate",
+   "gate": "R13 render/export harness",
+   "note": "inside the add mask: orange visible"
+  },
+  {
+   "kind": "pixel",
+   "frame": 0,
+   "x": 90,
+   "y": 270,
+   "rgb": [
+    255,
+    255,
+    255
+   ],
+   "tolerance": 2,
+   "verify": "gate",
+   "gate": "R13 render/export harness",
+   "note": "outside the add mask: clipped"
+  },
+  {
+   "kind": "document",
+   "path": "layers[0].matteMode",
+   "expect": "alpha",
+   "verify": "node"
+  },
+  {
+   "kind": "document",
+   "path": "layers[0].matteSourceLayerUid",
+   "expect": "ly_mask_source",
+   "verify": "node",
+   "note": "matte references its source by uid"
+  },
+  {
+   "kind": "document",
+   "path": "layers[2].frames[0].strokes[0].fillColor",
+   "expect": "#ff000080",
+   "verify": "node",
+   "note": "hex8 alpha survives in the document"
+  },
+  {
+   "kind": "document",
+   "path": "layers[4].frames[0].strokes[1].isMask",
+   "expect": true,
+   "verify": "node"
+  },
+  {
+   "kind": "alpha",
+   "hex": "#ff000080",
+   "expect": [
+    255,
+    0,
+    0,
+    0.5019607843137255
+   ],
+   "verify": "node",
+   "note": "reference hex8 parse"
+  }
+ ]
+}
