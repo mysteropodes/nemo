@@ -37,7 +37,9 @@ function usage() {
     '  roots     --task ID                                       print the root paths for an existing/new task id',
     '  handshake --task ID --owner TOKEN [--check-source]      verify a launcher is alive and matches',
     '  stop      --task ID --owner TOKEN [--signal SIG] [--timeout-ms N] stop a task; refused unless --owner matches',
-    '  release   --task ID [--owner TOKEN]                       remove task roots only after exit; existing records require their owner',
+    '  release   --task ID [--owner TOKEN]                       remove task roots only after exit; existing records require their owner.',
+    '                                                            An owner-verified release also reports `slots`: this task\'s verifiably-dead',
+    '                                                            slot reservations reconciled, and every record left as found with the reason.',
     '  slot-acquire --slot NAME --task ID [--pid N]              acquire a named exclusive slot (desktop input, GPU bench, ...)',
     '  slot-release --slot NAME --owner TOKEN                    release a named exclusive slot',
   ].join('\n'));
