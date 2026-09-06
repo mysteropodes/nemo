@@ -29,6 +29,24 @@ and [render workload](../../tests/bench/BROWSER_RENDER.md) document their extern
 Playwright dependency and exact commands. Neither installs dependencies or changes
 user projects. Missing platform capabilities must remain explicit in the receipt.
 
+## Standard verification
+
+Clean candidate `74a2b0059e74bb0321e388650aabc9172d2f9144` passed `npm run verify`:
+all six static checks, the current 902-row inventory, 416 Node tests (zero failures,
+one filesystem skip), and 15 geometry Rust tests. The actual boundary lane against
+protected base `b86c69dda2a061ef551fc522dd96327a5b9a4f66` also passed, with all 41
+handwritten tooling files declared and no exclusions.
+
+The inventory now identifies the exported color-swatch wrapper's real click
+registration while preserving the paired input's own input event. Its status totals
+are 875 inventoried, 26 explicitly unmapped, and one unavailable with reason.
+Sixteen permanent swatch/record-identity controls pass, including local receiver
+shadowing, named and inline export replacements, member writes, and list reassignment.
+No application source change or new policy exception is needed.
+
+Quick receipt SHA-256:
+`d487251f9815dbc554dafc5bae44629c088ce3634f81a1f9b37de2d0979f60cd`.
+
 ## CPU workload evidence
 
 The retained CPU runner measured all 15 evaluation, copy, serialization, and memory
@@ -73,7 +91,6 @@ Retained receipt SHA-256 values:
 
 ## Remaining acceptance
 
-Inventory and final CPU validation must be recorded on the completed correction.
 Browser document round trips do not exercise browser Save/download UI. Software
 rendering does not establish fixture pixel equality, native GPU behavior, or the
 application's complete export pipeline. The CPU benchmark keeps unavailable
