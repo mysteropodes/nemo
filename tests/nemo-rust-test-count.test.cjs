@@ -32,6 +32,7 @@ function fixture(t, stdout, exitCode) {
 
 const zero = 'test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n';
 const real = 'test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n';
+const failed = 'test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out\n';
 const cases = [
   { name: 'zero tests', stdout: zero, status: 'fail', exitCode: 1 },
   { name: 'missing result summaries', stdout: 'Finished test profile\n', status: 'fail', exitCode: 1 },
@@ -39,6 +40,10 @@ const cases = [
   { name: 'ignored and filtered tests only', stdout: zero.replace('0 ignored', '2 ignored').replace('0 filtered', '5 filtered'), status: 'fail', exitCode: 1 },
   { name: 'real tests plus zero doctests', stdout: real + zero, status: 'pass', exitCode: 0 },
   { name: 'empty binary before real tests', stdout: zero + real + real, status: 'pass', exitCode: 0 },
+  { name: 'failed summary with successful Cargo exit', stdout: failed, status: 'fail', exitCode: 1, reason: /unsuccessful test results/i },
+  { name: 'failed count despite ok label', stdout: failed.replace('FAILED', 'ok'), status: 'fail', exitCode: 1, reason: /unsuccessful test results/i },
+  { name: 'FAILED label despite zero failures', stdout: real.replace('ok', 'FAILED'), status: 'fail', exitCode: 1, reason: /unsuccessful test results/i },
+  { name: 'failed binary among passing tests and empty doctests', stdout: real + failed + zero, status: 'fail', exitCode: 1, reason: /unsuccessful test results/i },
   { name: 'Cargo failure after passing tests', stdout: real, cargoExit: 101, status: 'fail', exitCode: 101 },
   { name: 'Cargo failure without summaries', stdout: '', cargoExit: 101, status: 'fail', exitCode: 101 },
 ];
@@ -61,7 +66,7 @@ for (const name of ['test:rust', 'test:rust-tauri']) {
       assert.equal(receipt.summary.overall, scenario.status);
       assert.equal(receipt.summary.exitCode, scenario.status === 'pass' ? 0 : 1);
       assert.ok(result.log.includes(scenario.stdout), 'original Cargo output is retained');
-      if (scenario.status === 'fail' && !scenario.cargoExit) assert.match(result.reason, /no executed tests/i);
+      if (scenario.status === 'fail' && !scenario.cargoExit) assert.match(result.reason, scenario.reason || /no executed tests/i);
       const native = name === 'test:rust-tauri';
       assert.deepEqual(JSON.parse(fs.readFileSync(marker)), [
         'test', ...(native ? ['--release'] : []),

@@ -155,6 +155,9 @@ function jobTestRust(ctx, crateDir, label) {
   if (r.status === 0 && passed + failed === 0) {
     return fail(`cargo test ${label}: no executed tests reported (${summary})`, { exitCode: 1, log: logOf(r) });
   }
+  if (r.status === 0 && (failed > 0 || results.some(m => m[1] !== 'ok'))) {
+    return fail(`cargo test ${label}: unsuccessful test results (${summary})`, { exitCode: 1, log: logOf(r) });
+  }
   return (r.status === 0 ? pass : fail)(`cargo test ${label}: ${summary}`, { exitCode: r.status, log: logOf(r) });
 }
 
