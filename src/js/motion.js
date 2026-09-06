@@ -12,9 +12,8 @@
 // model (Catmull-Rom tangents), not camera.js's simpler 2-handle bezier —
 // explicit request to reuse the SAME curve widget/math the Tween panel
 // already has, just scoped PER SEGMENT (key.curvePoints) instead of one
-// curve applying globally. evalCurvePoints below is a deliberate small copy
-// of ui.js's evalPointsCurve (CLAUDE.md §3's "small stable pure-math pairs
-// that must stay in sync" pattern), not a shared import.
+// curve applying globally. animation/curve.js owns Motion's pure evaluator;
+// ui.js retains its editor evaluator. Both use the same waypoint semantics.
 //
 // CRITICAL save-safety constraint (CLAUDE.md's "family of bug #1" — a new
 // per-frame effect that mutates the LIVE Paper.js layer would get baked
@@ -903,13 +902,12 @@
       'Aucun calque n\u2019utilise de matte');
   }
 
-  // ---- easing math: N-point on-curve-waypoint model, deliberate copy of
-  // ui.js's shared curve editor (Catmull-Rom tangents -> per-segment cubic
-  // Bezier, Newton-with-bisection-fallback solve) — 2026-07, switched from
+  // ---- easing: N-point on-curve-waypoint model from ui.js's curve editor
+  // (limited tangents -> per-segment cubic Bezier, bounded Newton solve).
+  // Pure evaluation now lives in animation/curve.js. In 2026-07 we switched from
   // the earlier 2-handle bezier per explicit request to reuse the SAME
   // widget/model the Tween feature already has, just scoped per motion
-  // segment instead of one curve applying everywhere. See CLAUDE.md §3 on
-  // why this stays a small separate copy rather than a shared import. ----
+  // segment instead of one curve applying everywhere. ----
   // Every motion keyframe's default ease. These are ON-CURVE WAYPOINTS (the
   // model this file and ui.js share — see MOTION_DEFAULT_CURVE's comment
   // there), NOT bezier control handles.
@@ -1170,48 +1168,9 @@
   // handles in the shared curve editor, ui.js) — stripping them here
   // reset hand-tuned tangents on every key clone.
   function cloneCurvePts(pts) { return pts.map(function (p) { var o = { x: p.x, y: p.y }; if (typeof p.tx === 'number') { o.tx = p.tx; o.ty = p.ty || 0; } return o; }); }
-  function curveCubicAt(t, a, b, c, d) { var u = 1 - t; return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d; }
-  function curveCubicDerivAt(t, a, b, c, d) { var u = 1 - t; return 3 * u * u * (b - a) + 6 * u * t * (c - b) + 3 * t * t * (d - c); }
-  // Manual tangent override (tx/ty) or derived monotone-limited tangent —
-  // duplicated from ui.js's tangentAt (CLAUDE.md §3 pure-math pair, keep
-  // in sync — see that copy's comment for the Fritsch–Carlson rationale).
-  function curveTangentAt(pts, i) {
-    var p = pts[i];
-    if (typeof p.tx === 'number') return { x: p.tx, y: p.ty || 0 };
-    var prev = pts[i - 1] || p, next = pts[i + 1] || p;
-    var tx = (next.x - prev.x) / 2;
-    var dx0 = p.x - prev.x, dx1 = next.x - p.x;
-    var s0 = dx0 > 1e-9 ? (p.y - prev.y) / dx0 : 0, s1 = dx1 > 1e-9 ? (next.y - p.y) / dx1 : 0;
-    var m;
-    if (prev === p) m = s1;
-    else if (next === p) m = s0;
-    else if (s0 * s1 <= 0) m = 0;
-    else {
-      m = (s0 + s1) / 2;
-      var lim = 3 * Math.min(Math.abs(s0), Math.abs(s1));
-      if (Math.abs(m) > lim) m = (m > 0 ? 1 : -1) * lim;
-    }
-    return { x: tx, y: m * tx };
-  }
-  function curveSegCtrl(pts, i) {
-    var p0 = pts[i], p3 = pts[i + 1];
-    var t1 = curveTangentAt(pts, i), t2 = curveTangentAt(pts, i + 1);
-    return { c1: { x: p0.x + t1.x / 3, y: p0.y + t1.y / 3 }, c2: { x: p3.x - t2.x / 3, y: p3.y - t2.y / 3 } };
-  }
-  function curveSegFor(pts, x) { var i = 0; while (i < pts.length - 2 && pts[i + 1].x < x) i++; return i; }
-  function evalCurvePoints(pts, x) {
-    if (!pts || pts.length < 2) return x;
-    x = Math.max(0, Math.min(1, x));
-    var i = curveSegFor(pts, x), p0 = pts[i], p3 = pts[i + 1], ctrl = curveSegCtrl(pts, i);
-    var span = p3.x - p0.x, t = span > 1e-6 ? (x - p0.x) / span : 0;
-    for (var k = 0; k < 8; k++) {
-      var ex = curveCubicAt(t, p0.x, ctrl.c1.x, ctrl.c2.x, p3.x) - x;
-      var dx = curveCubicDerivAt(t, p0.x, ctrl.c1.x, ctrl.c2.x, p3.x);
-      if (Math.abs(dx) < 1e-6) break;
-      t -= ex / dx; t = Math.max(0, Math.min(1, t));
-    }
-    return curveCubicAt(t, p0.y, ctrl.c1.y, ctrl.c2.y, p3.y);
-  }
+  // Existing callers, including SMMotion.evalCurvePoints, keep this facade.
+  // The classic-script loader installs the pure kernel before Motion starts.
+  var evalCurvePoints = SMAnimationCurve.evalCurvePoints;
 
   // ---- data model: state.layers[i].motion = {position:{keys:[...]}, ...},
   // state.layers[i].motionStatic = {position:[x,y], ...} for a property

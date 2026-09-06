@@ -121,7 +121,10 @@ function jobCheck(ctx) {
 // ---- tests -------------------------------------------------------------
 function jobTestUnit() {
   const files = fs.readdirSync(path.join(ROOT, 'tests')).filter((f) => f.endsWith('.test.cjs'));
-  if (!files.length) return notRun('no tests/*.test.cjs files');
+  const animationDir = path.join(ROOT, 'tests', 'animation');
+  if (exists(animationDir)) files.push(...fs.readdirSync(animationDir)
+    .filter((f) => f.endsWith('.test.cjs')).map((f) => 'animation/' + f));
+  if (!files.length) return notRun('no tests/*.test.cjs or tests/animation/*.test.cjs files');
   const r = run(process.execPath, ['--test'].concat(files.map((f) => 'tests/' + f)), { timeout: 10 * 60 * 1000 });
   const m = r.stdout.match(/^ℹ pass (\d+)/m), mf = r.stdout.match(/^ℹ fail (\d+)/m), mt = r.stdout.match(/^ℹ tests (\d+)/m);
   const summary = mt ? `${mt[1]} tests, ${m ? m[1] : '?'} pass, ${mf ? mf[1] : '?'} fail` : `exit ${r.status}`;

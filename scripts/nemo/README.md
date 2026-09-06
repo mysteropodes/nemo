@@ -8,7 +8,7 @@ implemented with Node only (no new dependencies). Work package R02.
 |---|---|---|
 | `npm run doctor` | Read-only: source identity (HEAD, branch, dirty digest), build identity (versions, wasm/sidecar hashes), platform, tool prerequisites, capabilities. Never installs or writes outside `reports/`. | always 0 |
 | `npm run check` | Static integrity: version strings in sync (package.json, tauri.conf.json, index.html fallback), JSON validity, `src/js` syntax (ES modules checked as such), `index.html` script references resolve, private-labs guard, committed artifacts present. | 0 pass / 1 fail / 2 blocked |
-| `npm test` | Existing Node unit tests (`tests/*.test.cjs`). Unchanged. | node |
+| `npm test` | Node unit tests in `tests/*.test.cjs` and `tests/animation/*.test.cjs`; the named `test:unit` job uses the same scope. | node |
 | `npm run test:rust` | `cargo test` for `geometry-wasm` (CPU, native host). | 0/1/2 |
 | `npm run test:integration` | `tests/integration` when it exists; `not-run` until R12/R13 define it. | 0/1/2 |
 | `npm run test:browser` | Playwright specs under `tests/browser`; `blocked` while `@playwright/test` is absent. | 0/1/2 |
