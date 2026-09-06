@@ -13,6 +13,9 @@ const { startBrowserRuntime, IDENTITY_PATH } = require('../../scripts/nemo/lib/b
 
 const root = path.resolve(__dirname, '../..');
 const output = path.resolve(process.argv[2] || path.join(os.tmpdir(), `nemo-r03-browser-acceptance-${process.pid}`));
+const negativeControls = process.argv[3] === '--negative-controls';
+assert.ok(process.argv[3] === undefined || negativeControls, 'unknown option');
+const contexts = new Set();
 const manifestPath = path.join(__dirname, 'manifest.json');
 const fixtures = {
   migration: {
@@ -59,6 +62,7 @@ const report = {
   fixtures: {},
   expectationIds: [],
   executions: [],
+  negativeControls: [],
   artifacts: [],
   pageErrors: [],
   cleanup: { contextsClosed: 0, browserClosed: false, runtimeClosed: false, runtimeRootsRemoved: false },
@@ -147,15 +151,21 @@ function verifyMigration(project, checks, stage) {
   }
 }
 
-function pointBounds(item) {
-  const points = item.segments.map(segment => segment.point);
-  const xs = points.map(point => point[0]);
-  const ys = points.map(point => point[1]);
-  const x = Math.min(...xs), y = Math.min(...ys);
-  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
+async function textBounds(page, checks) {
+  // Read the actual loaded curves, including handles, rather than the anchors'
+  // bounding box. Expected bounds still come only from text/expected.json.
+  const boundsChecks = checks.filter(check => check.kind === 'bounds');
+  return page.evaluate(checks => Object.fromEntries(checks.map(check => {
+    const index = state.layers.findIndex(layer => layer.layerUid === check.layerUid);
+    const owner = userLayers[index];
+    const item = owner && owner.children.find(item => item.data.strokeId === check.strokeId);
+    if (!item || item.parent !== owner) throw new Error(`missing inserted glyph ${check.strokeId}`);
+    const { x, y, width, height } = item.bounds;
+    return [check.strokeId, { x, y, width, height }];
+  })), boundsChecks);
 }
 
-function verifyText(project, checks, stage) {
+function verifyText(project, checks, stage, bounds) {
   for (const check of checks) {
     const id = expectationId('text', check);
     let actual;
@@ -165,7 +175,8 @@ function verifyText(project, checks, stage) {
         assert.deepEqual(actual, check.expect, id);
         break;
       case 'bounds':
-        actual = pointBounds(stroke(project, check.layerUid, check.strokeId));
+        stroke(project, check.layerUid, check.strokeId);
+        actual = bounds[check.strokeId];
         assert.deepEqual(actual, check.expect, id);
         break;
       case 'text-units':
@@ -198,6 +209,7 @@ async function until(page, predicate, message, timeout = 30000, argument) {
 
 async function openProject(browser, origin, filename, firstLayerName, stage) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  contexts.add(context);
   const page = await context.newPage();
   page.setDefaultTimeout(30000);
   page.on('pageerror', error => report.pageErrors.push({ stage, message: error.message }));
@@ -212,13 +224,57 @@ async function openProject(browser, origin, filename, firstLayerName, stage) {
   assert.equal(await page.evaluate(() => state.layers[0].name), firstLayerName);
   const json = await page.evaluate(() => window.SM.exportJSON());
   assert.equal(typeof json, 'string');
-  return { context, json };
+  return { context, page, json };
 }
 
 async function closeContext(context) {
   if (!context) return;
   await context.close();
+  contexts.delete(context);
   report.cleanup.contextsClosed += 1;
+}
+
+async function verifyNegativeControls(browser, origin, checks) {
+  const check = checks.find(check => check.kind === 'bounds' && check.strokeId === 's_text_2');
+  assert.ok(check, 'negative controls require the committed glyph bounds expectation');
+  const id = expectationId('text', check);
+  for (const mode of ['curve', 'translate']) {
+    let opened = await openProject(browser, origin, fixtures.text.project, 'Vector text', `control.${mode}.import`);
+    const before = (await textBounds(opened.page, checks))[check.strokeId];
+    assert.deepEqual(before, check.expect, `${mode}: unmodified glyph bounds`);
+    await opened.page.evaluate(({ mode, check }) => {
+      const index = state.layers.findIndex(layer => layer.layerUid === check.layerUid);
+      const owner = userLayers[index];
+      const target = owner.children.find(item => item.data.strokeId === check.strokeId);
+      if (!target || target.parent !== owner) throw new Error('control requires an inserted glyph');
+      if (mode === 'curve') target.segments[0].handleOut = new paper.Point(0, -100);
+      else target.translate(new paper.Point(1, 0));
+    }, { mode, check });
+    const json = await opened.page.evaluate(() => window.SM.exportJSON());
+    const saved = stroke(JSON.parse(json), check.layerUid, check.strokeId);
+    if (mode === 'curve') assert.deepEqual(saved.segments[0].handleOut, [0, -100], 'handle persisted by exportJSON');
+    else assert.deepEqual(saved.segments[0].point, [181, 100], 'translation persisted by exportJSON');
+    const file = artifact(`control-${mode}-roundtrip.json`, json);
+    const after = (await textBounds(opened.page, checks))[check.strokeId];
+    await closeContext(opened.context);
+
+    opened = await openProject(browser, origin, path.join(output, file.name), 'Vector text', `control.${mode}.reopen`);
+    const reopened = stroke(JSON.parse(opened.json), check.layerUid, check.strokeId);
+    assert.deepEqual(reopened.segments, saved.segments, `${mode}: all segments survived fresh reopen`);
+    assert.equal(reopened.closed, saved.closed, `${mode}: topology survived fresh reopen`);
+    artifact(`control-${mode}-reopened.json`, opened.json);
+    const bounds = await textBounds(opened.page, checks);
+    assert.deepEqual(bounds[check.strokeId], after, `${mode}: loaded curve bounds survived reopen`);
+    // Exercise the same geometry assertion as baseline acceptance. An unrelated
+    // exception or a missing glyph must not count as a successful rejection.
+    assert.throws(() => verifyText(JSON.parse(opened.json), [check], `control.${mode}.reopen`, bounds),
+      error => error.code === 'ERR_ASSERTION' && error.message.startsWith(id)
+        && JSON.stringify(error.actual) === JSON.stringify(after)
+        && JSON.stringify(error.expected) === JSON.stringify(check.expect),
+      `${mode}: persisted corruption must fail the geometry assertion`);
+    report.negativeControls.push({ mode, id, result: 'rejected', before, after, reopened: bounds[check.strokeId], artifact: file.name });
+    await closeContext(opened.context);
+  }
 }
 
 async function main() {
@@ -288,14 +344,16 @@ async function main() {
 
     opened = await openProject(browser, runtime.origin, fixtures.text.project, 'Vector text', 'text.initial-import');
     let textProject = JSON.parse(opened.json);
-    verifyText(textProject, textChecks, 'text.initial-import');
+    verifyText(textProject, textChecks, 'text.initial-import', await textBounds(opened.page, textChecks));
     const textArtifact = artifact('text-roundtrip.json', opened.json);
     await closeContext(opened.context);
 
     opened = await openProject(browser, runtime.origin, path.join(output, textArtifact.name), 'Vector text', 'text.roundtrip-reopen');
     textProject = JSON.parse(opened.json);
-    verifyText(textProject, textChecks, 'text.roundtrip-reopen');
+    verifyText(textProject, textChecks, 'text.roundtrip-reopen', await textBounds(opened.page, textChecks));
     await closeContext(opened.context);
+
+    if (negativeControls) await verifyNegativeControls(browser, runtime.origin, textChecks);
 
     const identityAfter = await fetch(runtime.origin + IDENTITY_PATH).then(response => response.json());
     assert.equal(identityAfter.healthy, true, 'runtime identity healthy after acceptance');
@@ -307,12 +365,13 @@ async function main() {
       sourceMatches: identityAfter.source.matches,
       buildMatches: identityAfter.build.matches,
       isolatedOrigin: true,
-      isolatedContexts: 4,
+      isolatedContexts: report.cleanup.contextsClosed,
     };
     assert.deepEqual(report.pageErrors, [], 'application page errors');
     report.status = 'pass';
   } finally {
     if (browser) {
+      for (const context of contexts) await closeContext(context);
       await browser.close();
       report.cleanup.browserClosed = true;
     }
