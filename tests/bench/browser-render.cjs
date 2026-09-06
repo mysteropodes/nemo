@@ -139,6 +139,7 @@ async function instrumentRenderer(page) {
       SMEngineBridge.setPreviewRenderScale(1);
       await probe.drain(probe.queues);
     } catch (error) {
+      if (error.name !== 'OperationError' && error.message !== 'GPU completion timed out') throw error;
       return { unavailable: `Initial production GPU setup failed: ${error.name}: ${error.message}` };
     }
     return { modulePath: new URL(urls[0]).pathname, ready: GeometryWasm.ready,
