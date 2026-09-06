@@ -1,0 +1,669 @@
+{
+ "schema": "nemo.fixture-expectations/1",
+ "fixture": "expression-props",
+ "reference": "tests/fixtures/lib/reference.cjs",
+ "checks": [
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "rotation",
+   "frame": 0,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "frame * 3"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "position",
+   "frame": 0,
+   "expect": [
+    50,
+    60
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "value is the static position"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "opacity",
+   "frame": 0,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "time = frame / fps"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_x",
+   "prop": "rotation",
+   "frame": 0,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cross-layer read by name"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_u",
+   "prop": "rotation",
+   "frame": 0,
+   "expect": [
+    1
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cross-layer read by layerUid"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_c",
+   "prop": "rotation",
+   "frame": 0,
+   "expect": [
+    18
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "control(\"Amount\") reads the xc_ track"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_b",
+   "prop": "rotation",
+   "frame": 0,
+   "expect": [
+    7
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "syntax error → raw value, error recorded"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_d",
+   "prop": "rotation",
+   "frame": 0,
+   "expect": [
+    11
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "disabled expression → raw value"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "rotation",
+   "frame": 1,
+   "expect": [
+    3
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "frame * 3"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "position",
+   "frame": 1,
+   "expect": [
+    52,
+    60
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "value is the static position"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "opacity",
+   "frame": 1,
+   "expect": [
+    4.166666666666666
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "time = frame / fps"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_x",
+   "prop": "rotation",
+   "frame": 1,
+   "expect": [
+    6
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cross-layer read by name"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_u",
+   "prop": "rotation",
+   "frame": 1,
+   "expect": [
+    4
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cross-layer read by layerUid"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_c",
+   "prop": "rotation",
+   "frame": 1,
+   "expect": [
+    18
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "control(\"Amount\") reads the xc_ track"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_b",
+   "prop": "rotation",
+   "frame": 1,
+   "expect": [
+    7
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "syntax error → raw value, error recorded"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_d",
+   "prop": "rotation",
+   "frame": 1,
+   "expect": [
+    11
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "disabled expression → raw value"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "rotation",
+   "frame": 5,
+   "expect": [
+    15
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "frame * 3"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "position",
+   "frame": 5,
+   "expect": [
+    60,
+    60
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "value is the static position"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "opacity",
+   "frame": 5,
+   "expect": [
+    20.833333333333336
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "time = frame / fps"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_x",
+   "prop": "rotation",
+   "frame": 5,
+   "expect": [
+    30
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cross-layer read by name"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_u",
+   "prop": "rotation",
+   "frame": 5,
+   "expect": [
+    16
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cross-layer read by layerUid"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_c",
+   "prop": "rotation",
+   "frame": 5,
+   "expect": [
+    18
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "control(\"Amount\") reads the xc_ track"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_b",
+   "prop": "rotation",
+   "frame": 5,
+   "expect": [
+    7
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "syntax error → raw value, error recorded"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_d",
+   "prop": "rotation",
+   "frame": 5,
+   "expect": [
+    11
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "disabled expression → raw value"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "rotation",
+   "frame": 12,
+   "expect": [
+    36
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "frame * 3"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "position",
+   "frame": 12,
+   "expect": [
+    74,
+    60
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "value is the static position"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "opacity",
+   "frame": 12,
+   "expect": [
+    50
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "time = frame / fps"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_x",
+   "prop": "rotation",
+   "frame": 12,
+   "expect": [
+    72
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cross-layer read by name"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_u",
+   "prop": "rotation",
+   "frame": 12,
+   "expect": [
+    37
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cross-layer read by layerUid"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_c",
+   "prop": "rotation",
+   "frame": 12,
+   "expect": [
+    18
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "control(\"Amount\") reads the xc_ track"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_b",
+   "prop": "rotation",
+   "frame": 12,
+   "expect": [
+    7
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "syntax error → raw value, error recorded"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_d",
+   "prop": "rotation",
+   "frame": 12,
+   "expect": [
+    11
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "disabled expression → raw value"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "rotation",
+   "frame": 20,
+   "expect": [
+    60
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "frame * 3"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "position",
+   "frame": 20,
+   "expect": [
+    90,
+    60
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "value is the static position"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "opacity",
+   "frame": 20,
+   "expect": [
+    83.33333333333334
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "time = frame / fps"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_x",
+   "prop": "rotation",
+   "frame": 20,
+   "expect": [
+    120
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cross-layer read by name"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_u",
+   "prop": "rotation",
+   "frame": 20,
+   "expect": [
+    61
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cross-layer read by layerUid"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_c",
+   "prop": "rotation",
+   "frame": 20,
+   "expect": [
+    18
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "control(\"Amount\") reads the xc_ track"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_b",
+   "prop": "rotation",
+   "frame": 20,
+   "expect": [
+    7
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "syntax error → raw value, error recorded"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_d",
+   "prop": "rotation",
+   "frame": 20,
+   "expect": [
+    11
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "disabled expression → raw value"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "rotation",
+   "frame": 23,
+   "expect": [
+    69
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "frame * 3"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "position",
+   "frame": 23,
+   "expect": [
+    96,
+    60
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "value is the static position"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "opacity",
+   "frame": 23,
+   "expect": [
+    95.83333333333334
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "time = frame / fps"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_x",
+   "prop": "rotation",
+   "frame": 23,
+   "expect": [
+    138
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cross-layer read by name"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_u",
+   "prop": "rotation",
+   "frame": 23,
+   "expect": [
+    70
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cross-layer read by layerUid"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_c",
+   "prop": "rotation",
+   "frame": 23,
+   "expect": [
+    18
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "control(\"Amount\") reads the xc_ track"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_b",
+   "prop": "rotation",
+   "frame": 23,
+   "expect": [
+    7
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "syntax error → raw value, error recorded"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_d",
+   "prop": "rotation",
+   "frame": 23,
+   "expect": [
+    11
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "disabled expression → raw value"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "scale",
+   "frame": 0,
+   "expect": [
+    200,
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "`value` is the keyed raw value at the frame"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "scale",
+   "frame": 5,
+   "expect": [
+    187.52,
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "`value` is the keyed raw value at the frame"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "scale",
+   "frame": 10,
+   "expect": [
+    160,
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "`value` is the keyed raw value at the frame"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "scale",
+   "frame": 15,
+   "expect": [
+    132.48000000000002,
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "`value` is the keyed raw value at the frame"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_expr_e",
+   "prop": "scale",
+   "frame": 20,
+   "expect": [
+    120,
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "`value` is the keyed raw value at the frame"
+  },
+  {
+   "kind": "expression-error",
+   "layerUid": "ly_expr_b",
+   "prop": "rotation",
+   "expectError": true,
+   "verify": "node",
+   "note": "lastError is set after evaluation"
+  },
+  {
+   "kind": "expression-error",
+   "layerUid": "ly_expr_e",
+   "prop": "rotation",
+   "expectError": false,
+   "verify": "node"
+  }
+ ]
+}
