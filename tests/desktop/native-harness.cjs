@@ -72,9 +72,12 @@ function launchProcess(cli, args, options) {
 
 function createController({ root, app, env = process.env, timeout = 30_000, cli = path.join(root, 'scripts/nemo/native.cjs') }) {
   const instances = [];
+  const commands = new Set();
   const options = { root, env };
   async function command(args) {
     const state = launchProcess(cli, args, options);
+    commands.add(state); // A timeout signals the helper; only close proves it exited.
+    state.child.once('close', () => commands.delete(state));
     try { await until(() => state.finished, 'native command timed out', timeout); }
     catch (error) { state.child.kill('SIGTERM'); throw error; }
     requireCheck(!state.spawnError && !state.malformed && !state.overflow, 'native command returned an invalid response');
@@ -118,8 +121,25 @@ function createController({ root, app, env = process.env, timeout = 30_000, cli 
     if (!retain) for (const previous of instances) if (previous.task === instance.task) previous.retained = false;
     return result.value;
   }
-  async function cleanup() {
+  async function cleanupCommands() {
     let failed = false;
+    for (const state of [...commands]) {
+      try {
+        const exited = () => state.finished && !alive(state.child.pid);
+        if (exited()) continue;
+        // Escalate only this exact spawned helper, never a launcher or app group.
+        state.child.kill('SIGTERM');
+        try { await until(exited, 'native command helper did not exit', 1000); }
+        catch {
+          state.child.kill('SIGKILL');
+          await until(exited, 'native command helper did not exit', timeout);
+        }
+      } catch { failed = true; }
+    }
+    return failed;
+  }
+  async function cleanup() {
+    let failed = await cleanupCommands();
     for (const instance of [...instances].reverse()) {
       if (instance.stopped) continue;
       instance.info ||= instance.process.frames.find(frame => frame.started === true);
@@ -133,7 +153,9 @@ function createController({ root, app, env = process.env, timeout = 30_000, cli 
         }
       } catch { failed = true; }
     }
-    requireCheck(!failed && !instances.some(instance => instance.retained), 'native harness cleanup incomplete; reconcile this run before retrying');
+    // Owner-stop attempts above can themselves time out and leave helpers running.
+    if (await cleanupCommands()) failed = true;
+    requireCheck(!failed && commands.size === 0 && !instances.some(instance => instance.retained), 'native harness cleanup incomplete; reconcile this run before retrying');
   }
   return { instances, command, start, status, stop, cleanup };
 }

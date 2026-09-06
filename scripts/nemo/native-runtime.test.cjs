@@ -167,6 +167,9 @@ test('two instances run concurrently on disjoint native state', async () => {
     // from on the native side, so distinct keys are the isolation claim here.
     assert.notEqual(seenA.taskKey.slice(0, 16), seenB.taskKey.slice(0, 16));
 
+    for (const instance of [a, b]) {
+      await waitFor(() => runtime.readNativeStatus(instance.info.taskId).appRuntime, 'claimed app manifest');
+    }
     const handshakeA = runtime.nativeHandshake(a.info.taskId, a.info.ownerToken);
     assert.equal(handshakeA.ok, true, handshakeA.reason);
     assert.equal(handshakeA.app.taskId, a.info.taskId);
@@ -188,6 +191,7 @@ test('an instance is only accepted when the app itself disclosed this task', asy
     assert.match(quiet.reason, /runtime manifest/);
 
     b = await launch(`native-foreign-${process.pid}`, foreign, { mode: 'foreign-manifest' });
+    await waitFor(() => runtime.readAppManifest(b.info.taskId), 'foreign app manifest');
     const mismatched = runtime.nativeHandshake(b.info.taskId, b.info.ownerToken);
     assert.equal(mismatched.ok, false);
     assert.match(mismatched.reason, /belongs to task another-task/);
@@ -419,6 +423,8 @@ test('retained stop releases ownership and reservations while same-task relaunch
       const current = runtime.readAppManifest(task);
       return current && current.valid && current.manifest.pid !== originalPid;
     }, 'fresh restarted app manifest');
+    const handshake = runtime.nativeHandshake(task, instance.info.ownerToken);
+    assert.equal(handshake.ok, true, handshake.reason);
     for (const dir of dirs) assert.equal(fs.readFileSync(path.join(dir, 'persisted-sentinel.json'), 'utf8'), '{"saved":42}');
   } finally { await stopOwned(instance); }
 });
@@ -456,5 +462,110 @@ test('a recorded PID with changed process identity is never signaled', async () 
   } finally {
     unrelated.kill('SIGKILL'); await exited(unrelated);
     isolation.releaseTask(task, record.ownerToken);
+  }
+});
+
+test('failed retained-manifest invalidation never exposes readiness or an accepted handshake', async () => {
+  const task = `native-unlink-failed-${process.pid}`;
+  const slot = `native-unlink-slot-${process.pid}`;
+  const capture = path.join(scratch, 'capture-unlink-new.json');
+  const instance = await launch(task, path.join(scratch, 'capture-unlink-old.json'));
+  const roots = isolation.taskRoots(task);
+  const manifestFile = path.join(roots.tauriDataDir, runtime.APP_MANIFEST_FILE);
+  const sentinel = path.join(roots.tauriDataDir, 'saved-project.json');
+  let child;
+  try {
+    await waitFor(() => runtime.readAppManifest(task), 'retained app manifest');
+    fs.writeFileSync(sentinel, '{"saved":42}');
+    const stopped = await command(['stop', '--task', task, '--owner', instance.info.ownerToken, '--retain-data']);
+    assert.equal(stopped.code, 0, stopped.stdout || stopped.stderr);
+    await exited(instance.child);
+    const retained = fs.readFileSync(manifestFile, 'utf8');
+    fs.chmodSync(roots.tauriDataDir, 0o500);
+    assert.throws(() => fs.unlinkSync(manifestFile), /EACCES|EPERM/, 'fixture must actually refuse unlink');
+    child = spawn(process.execPath, [cli, 'start', '--task', task, '--executable', appStub,
+      '--reserve', slot, '--', capture, 'no-manifest'],
+    { cwd: repoRoot, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = ''; let stderr = '';
+    child.stdout.on('data', chunk => { stdout += chunk; });
+    child.stderr.on('data', chunk => { stderr += chunk; });
+    const failed = await waitFor(() => {
+      const status = runtime.readNativeStatus(task);
+      return status && status.state === 'failed' && status;
+    }, 'failed manifest invalidation');
+    const owner = isolation.readLauncher(task).ownerToken;
+    assert.equal(failed.childPid, null);
+    assert.match(failed.error, /EACCES|EPERM/);
+    assert.equal(fs.existsSync(capture), false, 'no app was spawned');
+    assert.equal(fs.readFileSync(sentinel, 'utf8'), '{"saved":42}');
+    assert.equal(fs.readFileSync(manifestFile, 'utf8'), retained);
+    const contender = isolation.acquireExclusiveSlot(slot, 'unlink-contender');
+    assert.equal(contender.acquired, true, 'failed start releases its reservation');
+    contender.release();
+    assert.deepEqual({ ready: stdout.includes('"started":true'), handshakeOk: runtime.nativeHandshake(task, owner).ok },
+      { ready: false, handshakeOk: false });
+    await exited(child);
+    assert.equal(child.exitCode, 1, stderr);
+    assert.equal(stdout, '');
+    const released = await command(['stop', '--task', task, '--owner', owner, '--retain-data']);
+    assert.equal(released.code, 0, released.stdout || released.stderr);
+    assert.equal(isolation.readLauncher(task), null, 'owner can reconcile the failed start');
+    assert.equal(fs.readFileSync(sentinel, 'utf8'), '{"saved":42}');
+    assert.equal(fs.readFileSync(manifestFile, 'utf8'), retained);
+  } finally {
+    fs.chmodSync(roots.tauriDataDir, 0o700);
+    const record = isolation.readLauncher(task);
+    if (record) {
+      await command(['stop', '--task', task, '--owner', record.ownerToken, '--retain-data']);
+    }
+    if (child && isolation.pidAlive(child.pid)) { child.kill('SIGKILL'); await exited(child); }
+    await stopOwned(instance);
+  }
+});
+
+test('handshake requires current launcher and app agreement while preserving identity guards', async () => {
+  const task = `native-current-handshake-${process.pid}`;
+  const instance = await launch(task, path.join(scratch, 'capture-current.json'));
+  const roots = isolation.taskRoots(task);
+  const statusFile = path.join(roots.reports, runtime.STATUS_FILE);
+  const manifestFile = path.join(roots.tauriDataDir, runtime.APP_MANIFEST_FILE);
+  const launcherFile = path.join(roots.root, 'launcher.json');
+  let status; let manifest; let launcher;
+  try {
+    await waitFor(() => runtime.readNativeStatus(task).appRuntime, 'claimed app manifest');
+    status = fs.readFileSync(statusFile, 'utf8');
+    manifest = fs.readFileSync(manifestFile, 'utf8');
+    launcher = fs.readFileSync(launcherFile, 'utf8');
+    const check = () => runtime.nativeHandshake(task, instance.info.ownerToken);
+    assert.equal(check().ok, true);
+    for (const change of [
+      { state: 'failed' }, { state: 'starting' }, { childPid: null },
+      { launcherPid: process.pid }, { launcherIdentity: 'stale launcher identity' },
+      { taskId: 'another-task' }, { schema: 'unknown' },
+    ]) {
+      fs.writeFileSync(statusFile, JSON.stringify({ ...JSON.parse(status), ...change }));
+      assert.equal(check().ok, false, JSON.stringify(change));
+    }
+    fs.writeFileSync(statusFile, status);
+    fs.writeFileSync(manifestFile, JSON.stringify({ ...JSON.parse(manifest), pid: process.pid }));
+    assert.equal(check().ok, false, 'another live process cannot stand in for the app');
+    fs.writeFileSync(manifestFile, manifest);
+    assert.match(runtime.nativeHandshake(task, 'wrong-owner').reason, /owner token mismatch/);
+    const changedBuild = JSON.parse(status);
+    changedBuild.build.startup.packageVersion = 'different-build';
+    fs.writeFileSync(statusFile, JSON.stringify(changedBuild));
+    assert.match(check().reason, /build identity changed/);
+    fs.writeFileSync(statusFile, status);
+    const changedSource = JSON.parse(launcher);
+    changedSource.source.head = '0'.repeat(40);
+    fs.writeFileSync(launcherFile, JSON.stringify(changedSource));
+    assert.match(check().reason, /source moved/);
+    fs.writeFileSync(launcherFile, launcher);
+    assert.equal(check().ok, true, 'restoring current identities restores acceptance');
+  } finally {
+    if (status) fs.writeFileSync(statusFile, status);
+    if (manifest) fs.writeFileSync(manifestFile, manifest);
+    if (launcher) fs.writeFileSync(launcherFile, launcher);
+    await stopOwned(instance);
   }
 });

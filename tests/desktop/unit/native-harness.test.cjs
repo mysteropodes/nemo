@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { test } = require('node:test');
-const { packagedApp, createController, alive, disjoint, validateSnapshot } = require('../native-harness.cjs');
+const { packagedApp, createController, alive, until, disjoint, validateSnapshot } = require('../native-harness.cjs');
 
 // A Node-only transport fixture, never a .app or a native-runtime launcher.
 // Its processes, task files and fake ownership tokens stay in one scratch root.
@@ -18,7 +18,16 @@ const get = key => args[args.indexOf(key) + 1];
 const task = get('--task');
 const file = path.join(process.env.FIXTURE_ROOT, task + '.json');
 const emit = value => process.stdout.write(JSON.stringify(value) + '\n');
-if (args[0] === 'start') {
+const helpers = path.join(process.env.FIXTURE_ROOT, 'helpers.json');
+const mode = process.env.FIXTURE_MODE;
+const resistant = mode === args[0] + '-resistant' ||
+  (mode === args[0] + '-resistant-once' && !fs.existsSync(helpers));
+if (resistant && !fs.existsSync(path.join(process.env.FIXTURE_ROOT, 'allow-helpers'))) {
+  process.on('SIGTERM', () => fs.writeFileSync(path.join(process.env.FIXTURE_ROOT, process.pid + '.sigterm'), 'received'));
+  const pids = fs.existsSync(helpers) ? JSON.parse(fs.readFileSync(helpers)) : [];
+  fs.writeFileSync(helpers, JSON.stringify([...pids, process.pid]));
+  setInterval(() => {}, 1000);
+} else if (args[0] === 'start') {
   const value = { started: true, taskId: task, pid: process.pid, ownerToken: 'private-fixture-token' };
   fs.writeFileSync(file, JSON.stringify(value));
   process.stderr.write('/private/fixture/path private-fixture-token\n');
@@ -46,11 +55,23 @@ function setup(t, mode = 'ready') {
   fs.writeFileSync(cli, fixture);
   const controller = createController({ root, cli, app: 'unused', timeout: 1500,
     env: { ...process.env, FIXTURE_ROOT: root, FIXTURE_MODE: mode } });
+  const helperPids = () => {
+    const file = path.join(root, 'helpers.json');
+    return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file)) : [];
+  };
   t.after(async () => {
-    try { await controller.cleanup(); }
+    try {
+      // Fail-safe teardown also runs against the unfixed harness after an assertion fails.
+      fs.writeFileSync(path.join(root, 'allow-helpers'), '');
+      const pids = helperPids();
+      for (const pid of pids) if (alive(pid)) process.kill(pid, 'SIGKILL');
+      await until(() => pids.every(pid => !alive(pid)), 'fixture helper teardown incomplete', 1500);
+      await controller.cleanup();
+      assert.equal(controller.instances.some(instance => alive(instance.process.child.pid)), false);
+    }
     finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
-  return controller;
+  return { controller, root, helperPids };
 }
 
 test('missing bundle and unsupported platform fail rather than skip', () => {
@@ -71,7 +92,7 @@ test('packaged gate rejects executable scripts disguised as an app binary', t =>
 });
 
 test('transport keeps owner output private and stops only its owned fixture', async t => {
-  const controller = setup(t);
+  const { controller } = setup(t);
   const a = await controller.start('a');
   const b = await controller.start('b');
   assert.equal((await controller.status(a)).value.ok, true);
@@ -85,7 +106,7 @@ test('transport keeps owner output private and stops only its owned fixture', as
 
 for (const mode of ['malformed', 'invalid-manifest', 'silent']) {
   test(`a ${mode} app response fails and cleans a partial start`, async t => {
-    const controller = setup(t, mode);
+    const { controller } = setup(t, mode);
     await assert.rejects(controller.start('partial'), error => {
       assert.doesNotMatch(error.message, /private-fixture-token|\/private\/fixture/);
       return /native/.test(error.message);
@@ -95,6 +116,36 @@ for (const mode of ['malformed', 'invalid-manifest', 'silent']) {
     assert.equal(alive(pid), false);
   });
 }
+
+for (const action of ['command', 'status', 'stop']) {
+  test(`cleanup reaps a timed-out SIGTERM-resistant ${action} helper`, async t => {
+    const mode = action === 'stop' ? 'stop-resistant-once' : action + '-resistant';
+    const { controller, root, helperPids } = setup(t, mode);
+    const instance = action === 'command' ? null : await controller.start('owned');
+    const operation = action === 'command'
+      ? controller.command(['command', '--task', 'unused']) : controller[action](instance);
+    await assert.rejects(operation, { message: 'native command timed out' });
+    const pids = helperPids();
+    assert.equal(pids.length, 1);
+    await until(() => fs.existsSync(path.join(root, pids[0] + '.sigterm')), 'fixture did not receive SIGTERM', 1500);
+    assert.equal(alive(pids[0]), true, 'fixture must survive the timeout SIGTERM');
+    await controller.cleanup();
+    assert.equal(pids.some(pid => alive(pid)), false, 'successful cleanup must prove helper exit');
+    if (instance) assert.equal(alive(instance.info.pid), false);
+  });
+}
+
+test('cleanup reaps its own timed-out stop helper but rejects an incomplete owner stop', async t => {
+  const { controller, helperPids } = setup(t, 'stop-resistant');
+  const instance = await controller.start('owned');
+  await assert.rejects(controller.stop(instance), { message: 'native command timed out' });
+  await assert.rejects(controller.cleanup(), { message: 'native harness cleanup incomplete; reconcile this run before retrying' });
+  const pids = helperPids();
+  assert.equal(pids.length, 2, 'include the stop helper spawned during cleanup');
+  assert.equal(pids.some(pid => alive(pid)), false, 'failed cleanup must still reap its command helpers');
+  assert.equal(instance.stopped, false);
+  assert.equal(alive(instance.info.pid), true, 'a failed owner stop must not force-kill the launcher');
+});
 
 test('source or task mismatch cannot pass merely because ok was supplied', () => {
   const context = { source: { head: 'expected' } };

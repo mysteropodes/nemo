@@ -298,7 +298,12 @@ function nativeHandshake(taskId, ownerToken) {
   const app = readAppManifest(taskId);
   let currentBuild = null;
   try { currentBuild = identity.buildIdentity(); } catch { /* fail closed below */ }
-  const buildMatches = !!status && isDeepStrictEqual(status.build.startup, currentBuild);
+  const buildMatches = !!(status && status.build) && isDeepStrictEqual(status.build.startup, currentBuild);
+  const launcherOk = !!(launcher && status && status.schema === SCHEMA && status.taskId === taskId
+    && status.launcherPid === launcher.pid && status.launcherIdentity
+    && status.launcherIdentity === launcherProcessIdentity(launcher.pid) && status.state === 'active');
+  const appMatches = !!(app && app.valid && status && Number.isSafeInteger(status.childPid)
+    && status.childPid > 0 && app.manifest.pid === status.childPid && isolation.pidAlive(status.childPid));
   const appOk = !!(app && app.valid && app.manifest.isolated && app.manifest.state === 'active');
   let reason = 'task owner, source and build identities match, and the app disclosed this task\'s isolated runtime';
   if (!local.ok) reason = local.reason;
@@ -308,13 +313,15 @@ function nativeHandshake(taskId, ownerToken) {
   else if (!app.valid) reason = app.reason;
   else if (!app.manifest.isolated) reason = 'app is running on the shared application state, not this task\'s roots';
   else if (app.manifest.state !== 'active') reason = `app runtime state is ${app.manifest.state}`;
+  else if (!launcherOk) reason = 'current native launcher identity or active state does not match';
+  else if (!appMatches) reason = 'app manifest does not name the current live launcher child';
   return {
-    ok: local.ok && buildMatches && appOk,
+    ok: local.ok && buildMatches && appOk && launcherOk && appMatches,
     reason,
     taskId,
     pid: launcher ? launcher.pid : null,
     source: launcher ? { startup: publicSource(launcher.source), matches: local.ok } : null,
-    build: status ? { startup: status.build.startup, current: currentBuild, matches: buildMatches } : null,
+    build: status && status.build ? { startup: status.build.startup, current: currentBuild, matches: buildMatches } : null,
     app: app && app.valid ? app.manifest : app,
     runtime: status,
   };
@@ -384,7 +391,23 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
     status = { ...status, ...change };
     atomicWriteJson(config.statusFile, status);
   };
-  save({});
+  let released = false;
+  const releaseReservations = () => {
+    if (released) return [];
+    released = true;
+    return reservations.map((held) => ({ slot: held.slot, ...held.release() }));
+  };
+  try {
+    save({});
+    // Invalidate only the prior handshake, after ownership but before readiness.
+    // Failure must leave retained user data intact and release our reservations.
+    fs.rmSync(config.manifestFile, { force: true });
+  } catch (err) {
+    const slotRelease = releaseReservations();
+    save({ state: 'failed', finishedAt: nowIso(), error: err.message,
+      processTree: { stopped: true, forced: false, reason: 'app process was not spawned' }, slotRelease });
+    throw err;
+  }
   emit({
     started: true,
     taskId,
@@ -400,12 +423,6 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
   });
 
   let processInfo = null;
-  let released = false;
-  const releaseReservations = () => {
-    if (released) return [];
-    released = true;
-    return reservations.map((held) => ({ slot: held.slot, ...held.release() }));
-  };
   let closing = false;
   const shutdown = async (signal) => {
     if (closing) return;
@@ -432,9 +449,6 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
   setInterval(() => {}, 60_000);
 
   try {
-    // Ownership is now acquired. Discard only the previous run's handshake,
-    // so retained data cannot masquerade as a newly started app's disclosure.
-    fs.rmSync(config.manifestFile, { force: true });
     processInfo = spawnApp(config);
     await new Promise((resolve, reject) => {
       const failed = (err) => { processInfo.child.off('spawn', ready); reject(err); };
