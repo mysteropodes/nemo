@@ -5,6 +5,8 @@ use tauri_plugin_shell::ShellExt;
 // EXPERIMENTAL (experimental/native-video-decode) — see the module header.
 mod video_decode;
 mod vectorize;
+// Per-task isolation of the app's native mutable state (R06, #902).
+mod task_runtime;
 
 #[tauri::command]
 async fn run_ffmpeg(app: tauri::AppHandle, window: tauri::Window, args: Vec<String>) -> Result<i32, String> {
@@ -173,6 +175,21 @@ fn start_tablet_pressure_monitor(app: tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let mut ctx = tauri::generate_context!();
+    // R06 (#902): opt-in per-task isolation of every mutable native root.
+    // Without NEMO_TAURI_DATA_DIR this is None and not one resolved path below
+    // changes; with it, an invalid request aborts instead of quietly falling
+    // back to the shared production identifier. See src/task_runtime.rs.
+    let task_runtime = match task_runtime::TaskRuntime::from_env() {
+        Ok(runtime) => runtime,
+        Err(err) => {
+            eprintln!("nemo: refusing to start an isolated task runtime: {err}");
+            std::process::exit(2);
+        }
+    };
+    if let Some(runtime) = &task_runtime {
+        runtime.apply_to_config(ctx.config_mut());
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         // The update channel is the public `nemo` repo's GitHub Releases —
@@ -204,7 +221,9 @@ pub fn run() {
             video_decode::autobench_report,
             video_decode::optimized_media_target,
             video_decode::create_optimized_media,
-            vectorize::vectorize_image
+            vectorize::vectorize_image,
+            task_runtime::nemo_task_runtime,
+            task_runtime::nemo_task_runtime_release
         ])
         // "Vérifier les mises à jour…" in the app (StrokeMotion) menu — same
         // check the Réglages button and the silent startup check already
@@ -221,7 +240,11 @@ pub fn run() {
                 let _ = app.emit("menu-check-update", ());
             }
         })
-        .setup(|app| {
+        .setup(move |app| {
+            // First: in the isolated path the configured windows are created
+            // here (with their own WebKit data store) instead of by Tauri, so
+            // this has to run before anything resolves the "main" window.
+            task_runtime::start(app, task_runtime)?;
             #[cfg(debug_assertions)]
             {
                 let window = app.get_webview_window("main").unwrap();
@@ -249,6 +272,6 @@ pub fn run() {
             let _ = app;
             Ok(())
         })
-        .run(tauri::generate_context!())
+        .run(ctx)
         .expect("error while running tauri application");
 }

@@ -193,6 +193,15 @@
     catch(e){showToast(SM.t('toastSaveFailedSuffix')+(e&&e.message||e));throw e;}
     showToast('Saved');
   }
+  function repaintProjectEntry(){
+    // Native Open/Resume can restore live paths while the canvas stays blank
+    // until an explicit render. Paint after the entry UI has been shown;
+    // keep the viewport and stored document exactly as the import left them.
+    requestAnimationFrame(function(){
+      if(window.SMEngineBridge&&SMEngineBridge.isEnabled())SMEngineBridge.renderNow();
+      else if(typeof view!=='undefined'&&view)view.update();
+    });
+  }
   async function openPath(path){
     if(!tauriOk())return;
     try{
@@ -209,6 +218,7 @@
       renderRecents();
       hideStartScreen();
       ensureInitialTab();
+      repaintProjectEntry();
       showToast('Opened: '+currentName);
     }catch(e){
       showToast('Could not open file — it may have moved or been deleted');
@@ -691,7 +701,7 @@
           catch(e){showToast(SM.t('toastCannotResumeSessionCorrupt'));}
         }
         currentPath=null;currentName='Untitled';updateCurrentLabel();
-        hideStartScreen();ensureInitialTab();showToast('Session resumed');
+        hideStartScreen();ensureInitialTab();repaintProjectEntry();showToast('Session resumed');
       };
       if(auto)applyAuto(auto);
       else if(window.SMIdb)window.SMIdb.get('nemo-auto').then(applyAuto).catch(function(){applyAuto(null);});
