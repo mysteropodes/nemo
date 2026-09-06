@@ -72,8 +72,12 @@ jobs:
           targets: wasm32-unknown-unknown
       - name: Install locked Node dependencies
         run: npm ci
+      - name: Install the locked Playwright browser
+        run: npx playwright install chromium
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Refresh Homebrew formula metadata
+        run: brew update
       - name: Install the packaged sidecar's runtime dylibs
         run: |
           brew install nasm libvmaf openjpeg opus lame libvpx webp libass \
