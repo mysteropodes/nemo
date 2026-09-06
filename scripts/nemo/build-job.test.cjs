@@ -226,6 +226,58 @@ test('the actual named CLI exits blocked when a required build prerequisite is a
   assert.equal(fs.existsSync(path.join(f.dir, 'observed-build.json')), false);
 });
 
+for (const phase of ['copy', 'finalization']) {
+  test(`the named build awaits ${phase} timeout cleanup instead of killing its controller`, t => {
+    const f = fixture(t);
+    const bin = path.join(f.dir, 'node_modules/.bin');
+    fs.mkdirSync(bin, { recursive: true });
+    fs.writeFileSync(path.join(bin, 'tauri'), '#!/usr/bin/env node\n' +
+      "process.env.NEMO_FIXTURE_TRIPLE=process.argv[process.argv.indexOf('--target')+1];require('../../builder.cjs');\n", { mode: 0o700 });
+    fs.writeFileSync(path.join(f.dir, 'scripts/bundle-ffmpeg-dylibs.py'), 'import time\ntime.sleep(3)\n');
+    const preload = path.join(f.dir, 'scripts/nemo/scaled-deadlines.cjs');
+    fs.writeFileSync(preload, `
+      const util=require('./lib/util.cjs'),run=util.run;
+      util.run=(command,args,options={})=>{
+        // Scale a controller-killing outer timer below the legitimate inner
+        // phase deadline. With no outer timer, its cleanup receipt can return.
+        if(args[0]==='scripts/nemo/build-job.cjs'&&options.timeout)options={...options,timeout:700};
+        if(command==='/usr/bin/ditto'&&process.env.NEMO_FIXTURE_PHASE==='copy'){
+          return run(process.execPath,['-e','setTimeout(()=>{},3000)'],{
+            ...options,timeout:options.timeout?1100:0});
+        }
+        if(args[0]==='scripts/bundle-ffmpeg-dylibs.py'&&options.timeout)options={...options,timeout:1100};
+        return run(command,args,options);
+      };
+    `);
+    const run = spawnSync(process.execPath, ['-e', `
+      const jobs=require('./scripts/nemo/lib/jobs.cjs'),identity=require('./scripts/nemo/lib/identity.cjs');
+      const ctx={reportDir:process.env.NEMO_FIXTURE_REPORTS,receipt:{jobs:[],build:identity.buildIdentity()}};
+      console.log(JSON.stringify(jobs.execute('build:desktop',ctx)));
+    `], { cwd: f.dir, encoding: 'utf8', timeout: 30_000, env: { ...process.env,
+      NODE_OPTIONS: (process.env.NODE_OPTIONS || '') + ' --require ' + JSON.stringify(preload),
+      NEMO_ISOLATION_ROOT: f.runtime, NEMO_FIXTURE_REPORTS: f.reports, NEMO_FIXTURE_PHASE: phase } });
+    assert.equal(run.status, 0, run.stderr);
+    const result = JSON.parse(run.stdout);
+    if (process.platform !== 'darwin') {
+      assert.equal(result.status, 'blocked'); assert.match(result.reason, /macOS/); return;
+    }
+    assert.equal(result.status, 'fail'); assert.equal(result.exitCode, 1);
+    assert.match(result.reason, phase === 'copy' ? /app preservation timed out/ : /bundle-ffmpeg-dylibs.py timed out/);
+    assert.ok(result.details.taskId);
+    assert.equal(result.details.cleanup.stopped, true);
+    assert.equal(result.details.cleanup.released, phase === 'finalization');
+    const logs = absolute(f, result.artifacts.find(a => a.path.endsWith('build-logs')));
+    const status = JSON.parse(fs.readFileSync(path.join(logs, 'build-runtime.json')));
+    assert.equal(alive(status.launcherPid), false);
+    assert.equal(alive(status.childPid), false);
+    assert.equal(status.processTree.stopped, true);
+    const proof = JSON.parse(fs.readFileSync(absolute(f, result.artifacts.find(a => a.path.endsWith('build-proof.json')))));
+    assert.equal(proof.status, 'fail'); assert.equal(proof.details.taskId, result.details.taskId);
+    assert.deepEqual(proof.details.cleanup, result.details.cleanup);
+    assert.doesNotMatch(run.stdout, /ownerToken/);
+  });
+}
+
 function alive(pid) {
   try { process.kill(pid, 0); return true; } catch (error) { return error.code !== 'ESRCH'; }
 }

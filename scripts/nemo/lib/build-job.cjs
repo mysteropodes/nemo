@@ -109,8 +109,8 @@ function preservePackage(status, directory, hostTriple) {
   const destination = path.join(directory, names[0]);
   if (exists(destination)) throw new Error('preserved app destination already exists');
   if (process.platform === 'darwin') {
-    const copied = run('/usr/bin/ditto', [source, destination]);
-    if (copied.status !== 0) throw new Error(`app preservation failed (${copied.status})`);
+    const copied = run('/usr/bin/ditto', [source, destination], { timeout: 10 * 60 * 1000 });
+    if (copied.status !== 0) throw new Error(copied.error === 'ETIMEDOUT' ? 'app preservation timed out' : `app preservation failed (${copied.status})`);
   } else fs.cpSync(source, destination, { recursive: true, force: false, errorOnExist: true, preserveTimestamps: true, verbatimSymlinks: true });
   if (fileInfo(executable).sha256 !== fileInfo(bundleExecutable(destination)).sha256) throw new Error('preserved executable differs from the isolated build');
   return destination;
@@ -161,7 +161,7 @@ async function runBuildJob(options = {}) {
       const finalized = (options.finalizePackage || finalizePackage)(app);
       outcome.log = (finalized.stdout || '') + (finalized.stderr || '');
       outcome.artifacts = packageArtifacts(app);
-      if (finalized.status !== 0) throw new Error(`bundle-ffmpeg-dylibs.py failed (${finalized.status})`);
+      if (finalized.status !== 0) throw new Error(finalized.error === 'ETIMEDOUT' ? 'bundle-ffmpeg-dylibs.py timed out' : `bundle-ffmpeg-dylibs.py failed (${finalized.status})`);
       const finalHandshake = build.buildHandshake(taskId, control.ownerToken);
       if (!finalHandshake.ok) throw new Error(finalHandshake.reason);
     }

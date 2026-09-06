@@ -228,7 +228,9 @@ function jobBuildDesktop(ctx) {
   if (process.platform !== 'darwin') missing.push('macOS (isolated desktop build is not validated on this platform)');
   else if (!which('xcode-select')) missing.push('Xcode command line tools');
   if (missing.length) return blocked('missing: ' + missing.join(', '));
-  const r = run(process.execPath, ['scripts/nemo/build-job.cjs', ctx.reportDir], { timeout: 2 * 60 * 60 * 1000 + 120_000 });
+  // The controller owns build/copy/finalization deadlines and cleanup.
+  // Await its receipt so an outer timer cannot strand the owned launcher.
+  const r = run(process.execPath, ['scripts/nemo/build-job.cjs', ctx.reportDir]);
   let result;
   try { result = JSON.parse(r.stdout); } catch { return fail('isolated desktop build controller returned no valid receipt', { exitCode: 1, log: r.stderr }); }
   const expectedExit = result.status === 'pass' ? 0 : result.status === 'blocked' ? 2 : 1;
