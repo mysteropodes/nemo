@@ -20,6 +20,7 @@
 - Base SHA:
 - Branch:
 - Worktree ID:
+- Worktree owner, purpose, checkout paths (sparse/full) and cleanup trigger:
 - Repository-relative writable paths:
 - Read-only context paths:
 - Public contract/schema versions:

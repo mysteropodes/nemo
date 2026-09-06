@@ -40,6 +40,8 @@
 ## Ownership
 
 - Working state preserved at:
+- Worktree disposition: removed / retained (owner, concrete reason and next cleanup trigger):
+- Cleanup evidence: preserved commit/artifacts; worker/process settlement; directory and registration removal verified:
 - Grant disposition requested:
 - Handoff recipient, if any:
 - Exact next action:
