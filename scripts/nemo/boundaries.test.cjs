@@ -10,6 +10,10 @@ const test = require('node:test');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { Script } = require('node:vm');
+const { createRequire } = require('node:module');
+const { pathToFileURL } = require('node:url');
+const { spawnSync } = require('node:child_process');
 const { checkProfile, extractImports, countNonBlankLines, validateProfile } = require('./lib/boundaries.cjs');
 
 const roots = new Set();
@@ -299,6 +303,7 @@ test('non-size exceptions apply only to their exact rule and file', () => {
 test('legal JS spelling variants enforce the same private import and layer edge', async (t) => {
   const variants = [
     "require ('../adapter/private.cjs');", "require /* comment */ ('../adapter/private.cjs');", "require?.('../adapter/private.cjs');",
+    "(left + right) / require('../adapter/private.cjs') / 2;", "ratio /= import('../adapter/private.cjs');",
     "const marker = '.'\nrequire('../adapter/private.cjs');",
     "import ('../adapter/private.cjs');", "import/*comment*/('../adapter/private.cjs');",
     "import{default as x}from '../adapter/private.cjs';", "export{default}from '../adapter/private.cjs';",
@@ -390,12 +395,241 @@ test('CLI rejects malformed profiles and unknown/trailing/missing arguments with
 });
 
 
-test('ambiguous lexical forms fail closed and computed globals are explicit', () => {
+test('unsupported lexical forms fail closed and computed globals are explicit', () => {
   const root = makeRoot(), p = fixtureProfile();
-  write(root, 'domain/a.cjs', 'if (ok) /pattern/.test(value);');
-  assert.throws(() => checkProfile(p, { root }), /ambiguous slash/);
   write(root, 'domain/a.cjs', 'window[member].run();');
   assert.equal(checkProfile(p, { root }).violations[0].rule, 'unsupported-global');
   write(root, 'domain/a.cjs', "require('\\056/hidden.cjs');");
   assert.throws(() => checkProfile(p, { root }), /numeric string escapes/);
+});
+
+test('real application division preserves following imports and global diagnostics', async (t) => {
+  // Exact counterexamples from the R05 application review at d499521.
+  const cases = {
+    'camera.js:59': 'u = (lo + hi) / 2;',
+    'app.js:599': 'function _r3(v){return isFinite(v)?Math.round(v*1000)/1000:0;}',
+    'motion.js:1182': 'var tx = (next.x - prev.x) / 2;',
+    'timeline.js:104': 'var steps=Math.floor((now-playClock)/frameMs);',
+    'tools.js:13': 'var step=Math.PI/4,angle=Math.round(Math.atan2(dy,dx)/step)*step;',
+  };
+  for (const [location, source] of Object.entries(cases)) await t.test(location, () => {
+    new Script(source); // Syntax validation only; never execute application code.
+    const root = makeRoot(), profile = fixtureProfile();
+    profile.modules[0].files.push('real.js');
+    write(root, 'domain/real.js', 'export const value = 1;');
+    write(root, 'domain/a.cjs', `${source}\nwindow.SMReal.run();\nrequire(target);\nimport('./real.js');`);
+    assert.deepEqual(extractImports(fs.readFileSync(path.join(root, 'domain/a.cjs'), 'utf8')), [{ specifier: './real.js', line: 4 }]);
+    assert.deepEqual(checkProfile(profile, { root }).violations.map(v => [v.rule, v.line]), [
+      ['unsupported-import', 3], ['global-state', 2],
+    ]);
+  });
+});
+
+test('division and regex lexical goals retain real findings and keep regex text opaque', async (t) => {
+  const cases = [
+    '(a + b) / window.SMReal / 2;',
+    'fn() / window.SMReal / 2;',
+    'obj.if(value) / window.SMReal / 2;',
+    'obj.return / window.SMReal / 2;',
+    'value++ / window.SMReal / 2;',
+    '({ value: 1 }) / window.SMReal / 2;',
+    'if (ok) "value" / window.SMReal / 2;',
+    '"}" / window.SMReal / 2;',
+    '(function () {}) / window.SMReal / 2;',
+    '(class {}) / window.SMReal / 2;',
+    'const s = `${(a + b) / window.SMReal / 2}`;',
+    'const s = `${/window.SMPhantom/.source}`; window.SMReal;',
+    'if (ok) /window.SMPhantom/.test(value); window.SMReal;',
+    'if (ok) /require\\("phantom"\\)|window.SMPhantom/.test(value); window.SMReal;',
+    'while (ok) /window.SMPhantom/.test(value); window.SMReal;',
+    'for (; ok;) /window.SMPhantom/.test(value); window.SMReal;',
+    'async function f() { for await (const value of values) /window.SMPhantom/.test(value); } window.SMReal;',
+    'const f = () => /window.SMPhantom/; window.SMReal;',
+    'const r = /[\\/]/g; const value = 4 / /window.SMPhantom/.source.length; window.SMReal;',
+    'value /= /window.SMPhantom/.source.length; window.SMReal;',
+    'function f() { return ({}) / window.SMReal / 2; }',
+  ];
+  for (const source of cases) await t.test(source, () => {
+    new Script(source);
+    const root = makeRoot(), profile = fixtureProfile();
+    profile.modules[0].files.push('real.js');
+    write(root, 'domain/real.js', 'export const value = 1;');
+    write(root, 'domain/a.cjs', `${source}\nimport('./real.js');`);
+    assert.deepEqual(extractImports(source + "\nimport('./real.js');").map(x => x.specifier), ['./real.js']);
+    const report = checkProfile(profile, { root });
+    assert.deepEqual(report.violations.map(v => [v.rule, v.detail?.global]), [['global-state', 'window.SMReal']]);
+  });
+});
+
+test('slash directly after a brace remains an explicit scope limitation', () => {
+  // These need block/object/function context beyond this control-parenthesis fix.
+  // Keep rejecting them rather than hiding real findings inside a guessed regex.
+  for (const source of [
+    'if (ok) {} /window.SMPhantom/.test(value);',
+    'function f() {} /window.SMPhantom/.test(value);',
+    'const f = function () {} / window.SMReal / 2;',
+    'const C = class {} / window.SMReal / 2;',
+    'function f() { return {} / window.SMReal / 2; }',
+  ]) {
+    new Script(source);
+    assert.throws(() => extractImports(source), /ambiguous slash after } at line/);
+  }
+});
+
+test('malformed slash literals and delimiter contexts remain rejected', async (t) => {
+  for (const source of [
+    'if (ok) /unterminated', 'const r = /[abc/;', 'const r = /(/;', 'const r = /x/gg;',
+    'const r = /x\\\n/;', 'const ratio = (a + b) /;', 'const ratio = (a + b) /',
+    'const ratio = (a + b] / 2;', 'const ratio = (a + b / 2;', 'const s = `value ${(a + b) / 2`;',
+  ]) await t.test(source, () => {
+    assert.throws(() => new Script(source), SyntaxError);
+    assert.throws(() => extractImports(source));
+  });
+});
+
+test('the actual application JS corpus scans, including previously omitted large files', () => {
+  const sourceRoot = path.resolve(__dirname, '../../src/js');
+  const files = fs.readdirSync(sourceRoot, { recursive: true }).filter(file => /\.m?js$/.test(file)).sort();
+  assert.ok(files.includes('camera.js') && files.includes('motion.js'));
+  // Include vendor files in this lexical regression too; scanning is not policy adoption.
+  for (const file of files) assert.doesNotThrow(() => extractImports(fs.readFileSync(path.join(sourceRoot, file), 'utf8')), file);
+});
+
+function localImportFixture(source) {
+  const root = makeRoot(), profile = fixtureProfile();
+  profile.modules[0] = { ...profile.modules[0], dir: 'src/js', files: ['loader.js'], publicApi: ['loader.js'] };
+  profile.modules.push({ id: 'wasm', layer: 'adapters', dir: 'src/wasm', files: ['geometry_wasm.js'], publicApi: [], sizeProfile: 'small' });
+  write(root, 'src/js/loader.js', source);
+  write(root, 'src/wasm/geometry_wasm.js', 'export const value = 1;');
+  return { root, profile };
+}
+
+test('literal browser cache URLs retain private, layer and cycle edges', async (t) => {
+  // Literal forms of geometry-wasm-loader.js:23 and vectorize-worker.js:18.
+  for (const source of [
+    "import('../wasm/geometry_wasm.js?v=123#module');",
+    "import '../wasm/geometry_wasm.js#module?v=123';",
+    "export { value } from '../wasm/geometry_wasm.js?v=123';",
+    "import { value } from '../wasm/%67eometry_wasm.js?v=123';",
+    "import(`../wasm/geometry_wasm.js?v=123`);",
+  ]) await t.test(source, () => {
+    const { root, profile } = localImportFixture(source);
+    const report = checkProfile(profile, { root });
+    assert.deepEqual(report.violations.map(v => v.rule), ['private-import', 'layer-violation']);
+    assert.equal(report.violations[0].detail.targetFile, 'src/wasm/geometry_wasm.js');
+    write(root, 'src/wasm/geometry_wasm.js', "export * from '../js/loader.js#back';");
+    assert.ok(checkProfile(profile, { root }).violations.some(v => v.rule === 'cycle'));
+    profile.modules[1].publicApi = ['geometry_wasm.js'];
+    profile.modules[0].layer = 'application';
+    profile.modules[1].layer = 'shared';
+    write(root, 'src/wasm/geometry_wasm.js', 'export const value = 1;');
+    assert.equal(checkProfile(profile, { root }).ok, true);
+  });
+});
+
+test('local coverage gaps fail with source, line and specifier diagnostics', async (t) => {
+  for (const [specifier, rule] of [
+    ['../wasm/missing.js?v=1', 'unresolved-local-import'],
+    ['./ag-psd.vendor.mjs', 'unprofiled-local-import'], // psd-import-bridge.js:30
+    ['../unlisted.js#module', 'unprofiled-local-import'],
+    ['../unlisted.js?v=1#module', 'unprofiled-local-import'],
+    ['../wasm/geometry_wasm?v=1', 'unsupported-local-import'],
+    ['../wasm/index-dir?v=1', 'unsupported-local-import'],
+    ['../wasm/geometry_wasm.wasm?v=1', 'unsupported-local-import'],
+    ['/js/loader.js?v=1', 'unsupported-local-import'],
+    ['file:///js/loader.js', 'unsupported-local-import'],
+    ['#local-alias', 'unsupported-local-import'],
+    ['?v=1', 'unsupported-local-import'],
+    ['../wasm/%2fgeometry_wasm.js', 'unsupported-local-import'],
+    ['../wasm/%zz.js', 'unsupported-local-import'],
+    ['', 'unsupported-local-import'],
+  ]) await t.test(specifier || 'empty specifier', () => {
+    const { root, profile } = localImportFixture(`\nimport(${JSON.stringify(specifier)});`);
+    write(root, 'src/js/ag-psd.vendor.mjs', 'export const value = 1;');
+    write(root, 'src/unlisted.js', 'export const value = 1;');
+    write(root, 'src/wasm/index-dir/index.js', 'export const value = 1;');
+    write(root, 'src/wasm/geometry_wasm.wasm', 'not JavaScript');
+    const report = checkProfile(profile, { root });
+    assert.equal(report.ok, false);
+    assert.deepEqual(report.violations.map(v => [v.rule, v.file, v.line, v.detail.specifier]),
+      [[rule, 'src/js/loader.js', 2, specifier]]);
+  });
+});
+
+test('Node require preserves literal suffixes and uses Node extension and package resolution', () => {
+  const { root, profile } = localImportFixture("require('../wasm/geometry_wasm.js?v=1#literal');");
+  const requireFrom = createRequire(path.join(root, 'src/js/loader.js'));
+  assert.throws(() => requireFrom.resolve('../wasm/geometry_wasm.js?v=1#literal'), { code: 'MODULE_NOT_FOUND' });
+  assert.deepEqual(checkProfile(profile, { root }).violations.map(v => v.rule), ['unresolved-local-import']);
+  const target = 'geometry_wasm.js?v=1#literal';
+  write(root, `src/wasm/${target}`, 'module.exports = 1;');
+  profile.modules[1].files.push(target);
+  assert.equal(path.basename(requireFrom.resolve(`../wasm/${target}`)), target);
+  assert.equal(checkProfile(profile, { root }).violations[0].detail.targetFile, `src/wasm/${target}`);
+  write(root, 'src/wasm/geometry_wasm.cjs', 'module.exports = 1;');
+  write(root, 'src/js/loader.js', "require('../wasm/geometry_wasm');");
+  assert.equal(path.basename(requireFrom.resolve('../wasm/geometry_wasm')), 'geometry_wasm.js');
+  assert.equal(checkProfile(profile, { root }).violations[0].detail.targetFile, 'src/wasm/geometry_wasm.js');
+  write(root, 'src/wasm/package.json', '{"main":"geometry_wasm.js"}');
+  write(root, 'src/js/loader.js', "require('../wasm');");
+  assert.equal(checkProfile(profile, { root }).violations[0].detail.targetFile, 'src/wasm/geometry_wasm.js');
+  for (const [specifier, file] of [['../wasm/only', 'only.mjs'], ['../wasm/directory', 'directory/index.cjs']]) {
+    write(root, `src/wasm/${file}`, 'module.exports = 1;');
+    profile.modules[1].files.push(file);
+    write(root, 'src/js/loader.js', `require(${JSON.stringify(specifier)});`);
+    assert.throws(() => requireFrom.resolve(specifier), { code: 'MODULE_NOT_FOUND' });
+    assert.deepEqual(checkProfile(profile, { root }).violations.map(v => v.rule), ['unresolved-local-import']);
+  }
+  write(root, 'src/js/loader.js', "require('../wasm');");
+  profile.modules.pop();
+  assert.deepEqual(checkProfile(profile, { root }).violations.map(v => v.rule), ['unprofiled-local-import']);
+});
+
+test('ESM suffix resolution agrees with a real Node import and never infers extensions', () => {
+  const { root, profile } = localImportFixture("import('../wasm/geometry_wasm.js?v=123#module');");
+  const url = new URL('../wasm/geometry_wasm.js?v=123#module', pathToFileURL(path.join(root, 'src/js/loader.js')));
+  const run = (specifier) => spawnSync(process.execPath, ['--input-type=module', '-e',
+    `import { value } from ${JSON.stringify(specifier)}; process.stdout.write(String(value));`], { encoding: 'utf8' });
+  const loaded = run(url.href);
+  assert.equal(loaded.status, 0, loaded.stderr);
+  assert.equal(loaded.stdout, '1');
+  assert.equal(checkProfile(profile, { root }).violations[0].detail.targetFile, 'src/wasm/geometry_wasm.js');
+  const missing = run(url.href.replace('.js?', '?'));
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /ERR_MODULE_NOT_FOUND/);
+});
+
+test('symlinks cannot hide private targets or duplicate physical profile ownership', () => {
+  const { root, profile } = localImportFixture("import('../alias.js?v=1');");
+  fs.symlinkSync('wasm/geometry_wasm.js', path.join(root, 'src/alias.js'));
+  assert.equal(checkProfile(profile, { root }).violations[0].detail.targetFile, 'src/wasm/geometry_wasm.js');
+  profile.modules.push({ ...profile.modules[1], id: 'alias', dir: 'src', files: ['alias.js'] });
+  assert.throws(() => checkProfile(profile, { root }), /same physical source/);
+  profile.modules.pop();
+  fs.unlinkSync(path.join(root, 'src/js/loader.js'));
+  write(root, 'src/actual.js', "import('./alias.js?v=1');");
+  fs.symlinkSync('../actual.js', path.join(root, 'src/js/loader.js'));
+  assert.deepEqual(checkProfile(profile, { root }).violations.map(v => v.rule), ['unsupported-local-import']);
+  write(root, 'src/actual.js', "require('./alias.js');");
+  assert.equal(checkProfile(profile, { root }).violations[0].detail.targetFile, 'src/wasm/geometry_wasm.js');
+});
+
+test('external dependencies stay outside the local graph and actual dynamic loaders still fail closed', async (t) => {
+  for (const source of [
+    "require('node:fs'); require('path'); require('@scope/package');",
+    "import('https://example.org/module.js?v=1'); import 'data:text/javascript,export default 1';",
+    "// import('../missing.js?v=1');\nconst text = `import('../missing.js?v=1')`;",
+  ]) await t.test(source, () => {
+    const { root, profile } = localImportFixture(source);
+    assert.equal(checkProfile(profile, { root }).ok, true);
+  });
+  for (const source of [
+    "import('../wasm/geometry_wasm.js?v=' + wasmBust);",
+    "import('../wasm-vectorize/vectorize_wasm.js?v=' + bust);",
+    "import(`../wasm/geometry_wasm.js?v=${Date.now()}`);",
+    "require('../wasm/' + name);",
+  ]) await t.test(source, () => {
+    const { root, profile } = localImportFixture(source);
+    assert.deepEqual(checkProfile(profile, { root }).violations.map(v => v.rule), ['unsupported-import']);
+  });
 });

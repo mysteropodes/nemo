@@ -15,6 +15,10 @@
       "files": ["build-runtime.cjs"], "publicApi": ["build-runtime.cjs"], "sizeProfile": "Platform/engine adapter" },
     { "id": "nemo.lib.boundariesChecker", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
       "files": ["boundaries.cjs"], "publicApi": ["boundaries.cjs"], "sizeProfile": "Platform/engine adapter" },
+    { "id": "nemo.lib.boundariesResolver", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
+      "files": ["boundaries-resolver.cjs"], "publicApi": ["boundaries-resolver.cjs"], "sizeProfile": "Platform/engine adapter" },
+    { "id": "nemo.lib.receipt", "layer": "tooling-application", "dir": "scripts/nemo/lib",
+      "files": ["receipt.cjs"], "publicApi": ["receipt.cjs"], "sizeProfile": "Domain/application JS or TS" },
 
     { "id": "nemo.lib.jobs", "layer": "tooling-application", "dir": "scripts/nemo/lib",
       "files": ["jobs.cjs"], "publicApi": ["jobs.cjs"], "sizeProfile": "Domain/application JS or TS" },

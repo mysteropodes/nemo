@@ -1,0 +1,2488 @@
+{
+  "schemaVersion": 1,
+  "policyId": "nemo.app-js.coverage",
+  "status": "adopted",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for the 140-file legacy application profile. Reviewed architecture boundaries remain a separate gate.",
+  "scope": {
+    "sourceRoot": "src",
+    "profileSourceRoot": "src/js",
+    "sourceKinds": [
+      ".js",
+      ".mjs",
+      ".cjs",
+      ".ts"
+    ],
+    "selection": "Recursively enumerate committed paths beneath sourceRoot independently of profiles and this artifact, selecting exact case-sensitive suffixes in sourceKinds. Include .d.ts under .ts. Require regular files and reject aliases/symlinks rather than silently skipping them.",
+    "pathConvention": "Normalized repository-relative POSIX paths. Exact case-sensitive exclusions only: no globs, directory exemptions or inferred vendor/minified/generated exclusions.",
+    "typeScript": "The four current .ts matches are generated .d.ts declarations, each explicitly excluded. TS selection declares coverage responsibility, not checker parser support.",
+    "outsideSelection": "HTML is pinned as bootstrap evidence, including its inline script. CSS, JSON/package metadata, WASM binaries, other assets, Rust and sources outside src are outside this JS-family inventory. Imported network/plugin payloads are not committed source files."
+  },
+  "provenance": {
+    "repository": "https://github.com/mysteropodes/nemo",
+    "candidateCommit": "ed52541bb1baa678212c3755f350e91f945ace2c",
+    "sourceRootTree": "48e591dd184ca24466c8bf8cc558d730a1f9dbbb",
+    "applicationTree": {
+      "path": "src/js",
+      "gitTree": "b20d4f7c86ae20e23756a0504d4e9f5643239e0b",
+      "lastChangedCommit": "c15b51d72ab6d85d0010d8e24555f0c3e59d7cdf"
+    },
+    "bootstrap": {
+      "path": "src/index.html",
+      "gitBlob": "8710bb135ae1b624320d56ba26159ab0dee2eedb",
+      "sha256": "e773466ad9859e63b6c748f409f0bf0c49c2c77297755e22a89815e76132eb96",
+      "lastChangedCommit": "e4c571688a2f8258e77f1e85be9083b78c2f4a06"
+    },
+    "inventoryDigest": {
+      "algorithm": "sha256",
+      "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
+      "value": "1fe95c287324efabf6e691081897c40e1561e1be5085a0fd1d0241ffff8099a9"
+    },
+    "profiles": [
+      {
+        "path": "engineering/boundaries/profiles/app-js.profile.json",
+        "gitBlob": "3528d014efcbcc5c5e8bf4fbe61f1786b6e80dc8",
+        "sha256": "c4ae82a1eb45afbdeb148c12d3b1e2f32777cb505f5deed81ddcc1c7ba831312",
+        "moduleCount": 140,
+        "preservedFromCommit": "c9ab6342abf62dd8d012c51258556e5123b13756"
+      },
+      {
+        "path": "engineering/boundaries/profiles/app-js.baseline.json",
+        "gitBlob": "3528d014efcbcc5c5e8bf4fbe61f1786b6e80dc8",
+        "sha256": "c4ae82a1eb45afbdeb148c12d3b1e2f32777cb505f5deed81ddcc1c7ba831312",
+        "moduleCount": 140,
+        "preservedFromCommit": "c9ab6342abf62dd8d012c51258556e5123b13756"
+      }
+    ],
+    "exclusionSupport": [
+      {
+        "path": ".gitignore",
+        "gitBlob": "36273bdc819159f7f0aeed42851ebf2f74098347",
+        "sha256": "095b4d4bc2cc85bead977c11a52d9aa3f68011f56396154ee7b75fd37e430b15"
+      },
+      {
+        "path": "THIRD_PARTY_NOTICES.md",
+        "gitBlob": "3d00e38b4485e2771873d84f745b9ac526026f66",
+        "sha256": "0a46adb978e07aae2dac2ffaa782a26b3576b540435d48ce448c363c412b1a7d"
+      },
+      {
+        "path": "src/wasm/package.json",
+        "gitBlob": "9c998153a604cd422ddfdd0a1477313c548852e3",
+        "sha256": "a8faa8c15ba6e2c9cedf8b05ce429bb0357a1c60e068db969c1d1be310d6fa8c"
+      },
+      {
+        "path": "src/wasm-vectorize/package.json",
+        "gitBlob": "1816fd719c45949bab901e5d1923d48f81c3e61a",
+        "sha256": "b507d1add980d8cfb227771e62f4548d662b72c7ef2a4435f98d465ea3e3397c"
+      },
+      {
+        "path": "geometry-wasm/Cargo.toml",
+        "gitBlob": "f99894b42cf3d775f456e56e5482bfa96fc9fe48",
+        "sha256": "995db7110257137e02e625e5c924c5a02258faed759324385382652898949f78"
+      },
+      {
+        "path": "vectorize-wasm/Cargo.toml",
+        "gitBlob": "75b5d5312a62d8f20114cc801f2063799949fd15",
+        "sha256": "ec898471fa3c562ac3a50c6b280a340e60ae5914f81f4f5a55bfa358d8c6ad5e"
+      }
+    ]
+  },
+  "executionClasses": {
+    "document-classic": {
+      "format": "classic",
+      "context": "window",
+      "timing": "Parser-blocking tag without async/defer, evaluated in document order if reached. Script evaluation does not imply synchronous completion of callbacks, dynamic imports or initialization."
+    },
+    "document-module": {
+      "format": "esm",
+      "context": "window",
+      "timing": "type=module without async: deferred evaluation, not a synchronous barrier before later classic scripts. Async initialization completes separately."
+    },
+    "module-worker": {
+      "format": "esm",
+      "context": "dedicated-worker",
+      "timing": "On-demand Worker construction with type=module, outside document parser order."
+    },
+    "classic-without-load-site": {
+      "format": "classic",
+      "context": "window-intended",
+      "timing": "Browser IIFE/Labs registration source retained for coverage. No committed bootstrap/import/worker load site found; no current execution claimed. Conditional feature behavior requires explicit loading and registration."
+    },
+    "imported-module": {
+      "format": "esm",
+      "context": "specified per source",
+      "timing": "Static or dynamic imported helper, with importer/activation recorded per path; not an HTML classic-script entry."
+    },
+    "type-declaration": {
+      "format": "typescript-declaration",
+      "context": "none",
+      "timing": "Non-executable generated declarations; no runtime load site."
+    }
+  },
+  "bootstrapObservations": {
+    "path": "src/index.html",
+    "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
+    "totalScriptTags": 132,
+    "externalClassicTags": 129,
+    "externalModuleTags": 2,
+    "inlineClassicTags": 1,
+    "retainedClassicTags": 125,
+    "retainedModuleTags": 2,
+    "classicTagsUnderSrcJsIncludingVendors": 128,
+    "inlineScripts": [
+      {
+        "path": "src/index.html",
+        "line": 2297,
+        "scriptOrdinal": 3
+      }
+    ],
+    "orderingLimit": "Module tags 108 and 109 do not establish synchronous readiness before classic engine-bridge.js at tag 110. HTML order is not a complete global provider/consumer graph.",
+    "runtimeLimit": "Source-declared sites, not observed successful execution: gpu-gate.js may stop boot. No browser/Tauri/runtime acceptance is claimed.",
+    "noLoadSiteAudit": {
+      "scope": "All committed HTML and src JS-family sources at candidateCommit: local script URLs, imports, worker constructors and script injection inspected; Node test consumers are separate evidence.",
+      "paths": 12,
+      "labsRegistry": {
+        "path": "src/js/labs/labs-core.js",
+        "line": 18
+      },
+      "note": "Labs manages registered prototypes and flags, not discovery/loading of omitted files. The stale HTML comment about reference-3d.js is superseded by its actual script tag."
+    }
+  },
+  "loaderRelationships": [
+    {
+      "from": "src/js/geometry-wasm-loader.js",
+      "to": "src/wasm/geometry_wasm.js",
+      "kind": "dynamic-import",
+      "site": {
+        "path": "src/js/geometry-wasm-loader.js",
+        "line": 23
+      },
+      "specifierExpression": "'../wasm/geometry_wasm.js?v=' + wasmBust",
+      "activation": "document module evaluation"
+    },
+    {
+      "from": "src/js/vectorize-wasm-loader.js",
+      "to": "src/js/vectorize-worker.js",
+      "kind": "module-worker",
+      "site": {
+        "path": "src/js/vectorize-wasm-loader.js",
+        "line": 29
+      },
+      "specifierExpression": "new URL('vectorize-worker.js', import.meta.url)",
+      "activation": "vectorize() calls ensureWorker(); on demand"
+    },
+    {
+      "from": "src/js/vectorize-worker.js",
+      "to": "src/wasm-vectorize/vectorize_wasm.js",
+      "kind": "dynamic-import",
+      "site": {
+        "path": "src/js/vectorize-worker.js",
+        "line": 18
+      },
+      "specifierExpression": "'../wasm-vectorize/vectorize_wasm.js?v=' + bust",
+      "activation": "worker module evaluation"
+    },
+    {
+      "from": "src/js/psd-import-bridge.js",
+      "to": "src/js/ag-psd.vendor.mjs",
+      "kind": "dynamic-import",
+      "site": {
+        "path": "src/js/psd-import-bridge.js",
+        "line": 30
+      },
+      "specifierExpression": "'./ag-psd.vendor.mjs'",
+      "activation": "prewarmed by loadModule() at line 36 during classic startup; cached for later PSD requests"
+    },
+    {
+      "from": "src/js/ag-psd.vendor.mjs",
+      "to": "src/js/node-buffer-shim.vendor.mjs",
+      "kind": "static-import",
+      "site": {
+        "path": "src/js/ag-psd.vendor.mjs",
+        "line": 2
+      },
+      "specifierExpression": "\"./node-buffer-shim.vendor.mjs\"",
+      "activation": "dependency evaluation of imported ag-psd bundle"
+    }
+  ],
+  "retainedSources": [
+    {
+      "path": "src/js/abr-import.js",
+      "moduleId": "app.abr.import",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2438,
+          "scriptOrdinal": 117
+        }
+      ]
+    },
+    {
+      "path": "src/js/ae-camera-export.js",
+      "moduleId": "app.ae.camera.export",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2312,
+          "scriptOrdinal": 18
+        }
+      ]
+    },
+    {
+      "path": "src/js/app.js",
+      "moduleId": "app.app",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2300,
+          "scriptOrdinal": 6
+        }
+      ]
+    },
+    {
+      "path": "src/js/asset-tree.js",
+      "moduleId": "app.asset.tree",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2424,
+          "scriptOrdinal": 103
+        }
+      ]
+    },
+    {
+      "path": "src/js/assets-panel.js",
+      "moduleId": "app.assets.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2428,
+          "scriptOrdinal": 107
+        }
+      ]
+    },
+    {
+      "path": "src/js/audio-bridge.js",
+      "moduleId": "app.audio.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2388,
+          "scriptOrdinal": 73
+        }
+      ]
+    },
+    {
+      "path": "src/js/bitmap-brush.js",
+      "moduleId": "app.bitmap.brush",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2439,
+          "scriptOrdinal": 118
+        }
+      ]
+    },
+    {
+      "path": "src/js/bitmap-tip-picker.js",
+      "moduleId": "app.bitmap.tip.picker",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2440,
+          "scriptOrdinal": 119
+        }
+      ]
+    },
+    {
+      "path": "src/js/bpm-grid.js",
+      "moduleId": "app.bpm.grid",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2385,
+          "scriptOrdinal": 70
+        }
+      ]
+    },
+    {
+      "path": "src/js/brush-editor.js",
+      "moduleId": "app.brush.editor",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2308,
+          "scriptOrdinal": 14
+        }
+      ]
+    },
+    {
+      "path": "src/js/brush-menu-bridge.js",
+      "moduleId": "app.brush.menu.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2441,
+          "scriptOrdinal": 120
+        }
+      ]
+    },
+    {
+      "path": "src/js/brush-preset-picker.js",
+      "moduleId": "app.brush.preset.picker",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2306,
+          "scriptOrdinal": 12
+        }
+      ]
+    },
+    {
+      "path": "src/js/brush-tool-presets.js",
+      "moduleId": "app.brush.tool.presets",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2307,
+          "scriptOrdinal": 13
+        }
+      ]
+    },
+    {
+      "path": "src/js/camera.js",
+      "moduleId": "app.camera",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2356,
+          "scriptOrdinal": 53
+        }
+      ]
+    },
+    {
+      "path": "src/js/color-manager.js",
+      "moduleId": "app.color.manager",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2398,
+          "scriptOrdinal": 80
+        }
+      ]
+    },
+    {
+      "path": "src/js/color-picker.js",
+      "moduleId": "app.color.picker",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2299,
+          "scriptOrdinal": 5
+        }
+      ]
+    },
+    {
+      "path": "src/js/comp-preview.js",
+      "moduleId": "app.comp.preview",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2403,
+          "scriptOrdinal": 85
+        }
+      ]
+    },
+    {
+      "path": "src/js/custom-effects.js",
+      "moduleId": "app.custom.effects",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2406,
+          "scriptOrdinal": 88
+        }
+      ]
+    },
+    {
+      "path": "src/js/draw-bridge.js",
+      "moduleId": "app.draw.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2443,
+          "scriptOrdinal": 122
+        }
+      ]
+    },
+    {
+      "path": "src/js/drop-import.js",
+      "moduleId": "app.drop.import",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2396,
+          "scriptOrdinal": 78
+        }
+      ]
+    },
+    {
+      "path": "src/js/effector-layer.js",
+      "moduleId": "app.effector.layer",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2375,
+          "scriptOrdinal": 60
+        }
+      ]
+    },
+    {
+      "path": "src/js/effects-panel.js",
+      "moduleId": "app.effects.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2399,
+          "scriptOrdinal": 81
+        }
+      ]
+    },
+    {
+      "path": "src/js/engine-bridge.js",
+      "moduleId": "app.engine.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2431,
+          "scriptOrdinal": 110
+        }
+      ]
+    },
+    {
+      "path": "src/js/eraser-bridge.js",
+      "moduleId": "app.eraser.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2448,
+          "scriptOrdinal": 127
+        }
+      ]
+    },
+    {
+      "path": "src/js/export.js",
+      "moduleId": "app.export",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2309,
+          "scriptOrdinal": 15
+        }
+      ]
+    },
+    {
+      "path": "src/js/expr-bake.js",
+      "moduleId": "app.expr.bake",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2372,
+          "scriptOrdinal": 59
+        }
+      ],
+      "additionalContexts": [
+        {
+          "format": "commonjs",
+          "context": "node-test",
+          "exportSite": {
+            "path": "src/js/expr-bake.js",
+            "line": 338
+          },
+          "importSite": {
+            "path": "tests/expr-bake.test.cjs",
+            "line": 12
+          },
+          "note": "Guarded CommonJS export consumed by committed tests; production entry remains a classic document script."
+        }
+      ]
+    },
+    {
+      "path": "src/js/expr-code-panel.js",
+      "moduleId": "app.expr.code.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2367,
+          "scriptOrdinal": 58
+        }
+      ]
+    },
+    {
+      "path": "src/js/expr-examples.js",
+      "moduleId": "app.expr.examples",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2362,
+          "scriptOrdinal": 56
+        }
+      ]
+    },
+    {
+      "path": "src/js/expr-functions.js",
+      "moduleId": "app.expr.functions",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2363,
+          "scriptOrdinal": 57
+        }
+      ]
+    },
+    {
+      "path": "src/js/feedback-bridge.js",
+      "moduleId": "app.feedback.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2409,
+          "scriptOrdinal": 91
+        }
+      ]
+    },
+    {
+      "path": "src/js/figma-import.js",
+      "moduleId": "app.figma.import",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2423,
+          "scriptOrdinal": 102
+        }
+      ]
+    },
+    {
+      "path": "src/js/fill-bridge.js",
+      "moduleId": "app.fill.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2450,
+          "scriptOrdinal": 129
+        }
+      ]
+    },
+    {
+      "path": "src/js/geometry-wasm-loader.js",
+      "moduleId": "app.geometry.wasm.loader",
+      "executionClass": "document-module",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2429,
+          "scriptOrdinal": 108
+        }
+      ]
+    },
+    {
+      "path": "src/js/gpu-gate.js",
+      "moduleId": "app.gpu.gate",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 9,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
+      "path": "src/js/gradient-bridge.js",
+      "moduleId": "app.gradient.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2436,
+          "scriptOrdinal": 115
+        }
+      ]
+    },
+    {
+      "path": "src/js/group-bridge.js",
+      "moduleId": "app.group.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2444,
+          "scriptOrdinal": 123
+        }
+      ]
+    },
+    {
+      "path": "src/js/history-panel.js",
+      "moduleId": "app.history.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2410,
+          "scriptOrdinal": 92
+        }
+      ]
+    },
+    {
+      "path": "src/js/i18n.js",
+      "moduleId": "app.i18n",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2353,
+          "scriptOrdinal": 50
+        }
+      ]
+    },
+    {
+      "path": "src/js/idb-store.js",
+      "moduleId": "app.idb.store",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2350,
+          "scriptOrdinal": 47
+        }
+      ]
+    },
+    {
+      "path": "src/js/image-mesh-bridge.js",
+      "moduleId": "app.image.mesh.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2419,
+          "scriptOrdinal": 98
+        }
+      ]
+    },
+    {
+      "path": "src/js/image-mesh.js",
+      "moduleId": "app.image.mesh",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2418,
+          "scriptOrdinal": 97
+        }
+      ]
+    },
+    {
+      "path": "src/js/images.js",
+      "moduleId": "app.images",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2413,
+          "scriptOrdinal": 95
+        }
+      ]
+    },
+    {
+      "path": "src/js/kitsu.js",
+      "moduleId": "app.kitsu",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2412,
+          "scriptOrdinal": 94
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/auto-actions.js",
+      "moduleId": "app.labs.auto.actions",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/auto-actions.js",
+          "line": 20,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/auto-actions.js",
+          "line": 98,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/boil-effect.js",
+      "moduleId": "app.labs.boil.effect",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2342,
+          "scriptOrdinal": 39
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/canvas-grid.js",
+      "moduleId": "app.labs.canvas.grid",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2328,
+          "scriptOrdinal": 25
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/clip-mask-bake.js",
+      "moduleId": "app.labs.clip.mask.bake",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/clip-mask-bake.js",
+          "line": 23,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/clip-mask-bake.js",
+          "line": 86,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/command-palette.js",
+      "moduleId": "app.labs.command.palette",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/command-palette.js",
+          "line": 10,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/command-palette.js",
+          "line": 111,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/flip-roll.js",
+      "moduleId": "app.labs.flip.roll",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2330,
+          "scriptOrdinal": 27
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/follow-path.js",
+      "moduleId": "app.labs.follow.path",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2343,
+          "scriptOrdinal": 40
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/french-curve.js",
+      "moduleId": "app.labs.french.curve",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2345,
+          "scriptOrdinal": 42
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/interval-assistant.js",
+      "moduleId": "app.labs.interval.assistant",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2332,
+          "scriptOrdinal": 29
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/labs-core.js",
+      "moduleId": "app.labs.labs.core",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2322,
+          "scriptOrdinal": 19
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/labs-float-panel.js",
+      "moduleId": "app.labs.labs.float.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2347,
+          "scriptOrdinal": 44
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/labs-panel.js",
+      "moduleId": "app.labs.labs.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2346,
+          "scriptOrdinal": 43
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/lagoon-menu.js",
+      "moduleId": "app.labs.lagoon.menu",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2325,
+          "scriptOrdinal": 22
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/layer-effects-bake.js",
+      "moduleId": "app.labs.layer.effects.bake",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/layer-effects-bake.js",
+          "line": 21,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/layer-effects-bake.js",
+          "line": 91,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/lipsync-assistant.js",
+      "moduleId": "app.labs.lipsync.assistant",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/lipsync-assistant.js",
+          "line": 23,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/lipsync-assistant.js",
+          "line": 75,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/mirror-check.js",
+      "moduleId": "app.labs.mirror.check",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2335,
+          "scriptOrdinal": 32
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/move-to-layer.js",
+      "moduleId": "app.labs.move.to.layer",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2327,
+          "scriptOrdinal": 24
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/multiframe-draw.js",
+      "moduleId": "app.labs.multiframe.draw",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2324,
+          "scriptOrdinal": 21
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/oca-export.js",
+      "moduleId": "app.labs.oca.export",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/oca-export.js",
+          "line": 19,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/oca-export.js",
+          "line": 175,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/out-of-pegs.js",
+      "moduleId": "app.labs.out.of.pegs",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2334,
+          "scriptOrdinal": 31
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/pingpong-cycle.js",
+      "moduleId": "app.labs.pingpong.cycle",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2326,
+          "scriptOrdinal": 23
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/pose-library.js",
+      "moduleId": "app.labs.pose.library",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2340,
+          "scriptOrdinal": 37
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/predictive-stroke.js",
+      "moduleId": "app.labs.predictive.stroke",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2323,
+          "scriptOrdinal": 20
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/reference-3d.js",
+      "moduleId": "app.labs.reference.3d",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2341,
+          "scriptOrdinal": 38
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/reference-fill.js",
+      "moduleId": "app.labs.reference.fill",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2339,
+          "scriptOrdinal": 36
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/retime-exposure.js",
+      "moduleId": "app.labs.retime.exposure",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2331,
+          "scriptOrdinal": 28
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/rig-deform.js",
+      "moduleId": "app.labs.rig.deform",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/rig-deform.js",
+          "line": 41,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/rig-deform.js",
+          "line": 254,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/screentone-bake.js",
+      "moduleId": "app.labs.screentone.bake",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/screentone-bake.js",
+          "line": 22,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/screentone-bake.js",
+          "line": 160,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/shader-effects-bake.js",
+      "moduleId": "app.labs.shader.effects.bake",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/shader-effects-bake.js",
+          "line": 29,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/shader-effects-bake.js",
+          "line": 306,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/speed-lines.js",
+      "moduleId": "app.labs.speed.lines",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2338,
+          "scriptOrdinal": 35
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/storyboard-mode.js",
+      "moduleId": "app.labs.storyboard.mode",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/storyboard-mode.js",
+          "line": 39,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/storyboard-mode.js",
+          "line": 354,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/timelapse.js",
+      "moduleId": "app.labs.timelapse",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/timelapse.js",
+          "line": 13,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/timelapse.js",
+          "line": 81,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/timeline-markers.js",
+      "moduleId": "app.labs.timeline.markers",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2329,
+          "scriptOrdinal": 26
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/timeline-zoom.js",
+      "moduleId": "app.labs.timeline.zoom",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/timeline-zoom.js",
+          "line": 38,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/timeline-zoom.js",
+          "line": 220,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/vector-sculpt.js",
+      "moduleId": "app.labs.vector.sculpt",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2344,
+          "scriptOrdinal": 41
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/vector-trim.js",
+      "moduleId": "app.labs.vector.trim",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2336,
+          "scriptOrdinal": 33
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/view-filter.js",
+      "moduleId": "app.labs.view.filter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2337,
+          "scriptOrdinal": 34
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/xsheet-panel.js",
+      "moduleId": "app.labs.xsheet.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2333,
+          "scriptOrdinal": 30
+        }
+      ]
+    },
+    {
+      "path": "src/js/layer-inout.js",
+      "moduleId": "app.layer.inout",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2382,
+          "scriptOrdinal": 67
+        }
+      ]
+    },
+    {
+      "path": "src/js/layer-kind.js",
+      "moduleId": "app.layer.kind",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2354,
+          "scriptOrdinal": 51
+        }
+      ]
+    },
+    {
+      "path": "src/js/layer-scroll-sync.js",
+      "moduleId": "app.layer.scroll.sync",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2383,
+          "scriptOrdinal": 68
+        }
+      ]
+    },
+    {
+      "path": "src/js/linked-media.js",
+      "moduleId": "app.linked.media",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2351,
+          "scriptOrdinal": 48
+        }
+      ]
+    },
+    {
+      "path": "src/js/lipsync.js",
+      "moduleId": "app.lipsync",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2402,
+          "scriptOrdinal": 84
+        }
+      ]
+    },
+    {
+      "path": "src/js/lottie-preview.js",
+      "moduleId": "app.lottie.preview",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2349,
+          "scriptOrdinal": 46
+        }
+      ]
+    },
+    {
+      "path": "src/js/markers.js",
+      "moduleId": "app.markers",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2384,
+          "scriptOrdinal": 69
+        }
+      ]
+    },
+    {
+      "path": "src/js/media-library.js",
+      "moduleId": "app.media.library",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2425,
+          "scriptOrdinal": 104
+        }
+      ]
+    },
+    {
+      "path": "src/js/motion-graph.js",
+      "moduleId": "app.motion.graph",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2378,
+          "scriptOrdinal": 63
+        }
+      ]
+    },
+    {
+      "path": "src/js/motion-preset-picker.js",
+      "moduleId": "app.motion.preset.picker",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2427,
+          "scriptOrdinal": 106
+        }
+      ]
+    },
+    {
+      "path": "src/js/motion.js",
+      "moduleId": "app.motion",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2358,
+          "scriptOrdinal": 55
+        }
+      ]
+    },
+    {
+      "path": "src/js/native-video-bridge.js",
+      "moduleId": "app.native.video.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2394,
+          "scriptOrdinal": 76
+        }
+      ]
+    },
+    {
+      "path": "src/js/nemo-panel.js",
+      "moduleId": "app.nemo.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2379,
+          "scriptOrdinal": 64
+        }
+      ]
+    },
+    {
+      "path": "src/js/nemo-plugin.js",
+      "moduleId": "app.nemo.plugin",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2381,
+          "scriptOrdinal": 66
+        }
+      ]
+    },
+    {
+      "path": "src/js/nemo-script.js",
+      "moduleId": "app.nemo.script",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2380,
+          "scriptOrdinal": 65
+        }
+      ]
+    },
+    {
+      "path": "src/js/p2p-contacts.js",
+      "moduleId": "app.p2p.contacts",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2387,
+          "scriptOrdinal": 72
+        }
+      ]
+    },
+    {
+      "path": "src/js/palette-panel.js",
+      "moduleId": "app.palette.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2397,
+          "scriptOrdinal": 79
+        }
+      ]
+    },
+    {
+      "path": "src/js/path-fx.js",
+      "moduleId": "app.path.fx",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2401,
+          "scriptOrdinal": 83
+        }
+      ]
+    },
+    {
+      "path": "src/js/pen-bridge.js",
+      "moduleId": "app.pen.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2451,
+          "scriptOrdinal": 130
+        }
+      ]
+    },
+    {
+      "path": "src/js/perspective-bridge.js",
+      "moduleId": "app.perspective.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2434,
+          "scriptOrdinal": 113
+        }
+      ]
+    },
+    {
+      "path": "src/js/playback-cache.js",
+      "moduleId": "app.playback.cache",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2433,
+          "scriptOrdinal": 112
+        }
+      ]
+    },
+    {
+      "path": "src/js/project.js",
+      "moduleId": "app.project",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2408,
+          "scriptOrdinal": 90
+        }
+      ]
+    },
+    {
+      "path": "src/js/psd-import-bridge.js",
+      "moduleId": "app.psd.import.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2422,
+          "scriptOrdinal": 101
+        }
+      ]
+    },
+    {
+      "path": "src/js/reference-bridge.js",
+      "moduleId": "app.reference.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2389,
+          "scriptOrdinal": 74
+        }
+      ]
+    },
+    {
+      "path": "src/js/render-manager.js",
+      "moduleId": "app.render.manager",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2310,
+          "scriptOrdinal": 16
+        }
+      ]
+    },
+    {
+      "path": "src/js/rig-bridge.js",
+      "moduleId": "app.rig.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2452,
+          "scriptOrdinal": 131
+        }
+      ]
+    },
+    {
+      "path": "src/js/rig-widget.js",
+      "moduleId": "app.rig.widget",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2420,
+          "scriptOrdinal": 99
+        }
+      ]
+    },
+    {
+      "path": "src/js/rive-export.js",
+      "moduleId": "app.rive.export",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2311,
+          "scriptOrdinal": 17
+        }
+      ]
+    },
+    {
+      "path": "src/js/rulers-bridge.js",
+      "moduleId": "app.rulers.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2449,
+          "scriptOrdinal": 128
+        }
+      ]
+    },
+    {
+      "path": "src/js/second-viewer.js",
+      "moduleId": "app.second.viewer",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2432,
+          "scriptOrdinal": 111
+        }
+      ]
+    },
+    {
+      "path": "src/js/select-bridge.js",
+      "moduleId": "app.select.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2445,
+          "scriptOrdinal": 124
+        }
+      ]
+    },
+    {
+      "path": "src/js/shader-effects-library.js",
+      "moduleId": "app.shader.effects.library",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2400,
+          "scriptOrdinal": 82
+        }
+      ]
+    },
+    {
+      "path": "src/js/shadow-brush-bridge.js",
+      "moduleId": "app.shadow.brush.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2442,
+          "scriptOrdinal": 121
+        }
+      ]
+    },
+    {
+      "path": "src/js/shape-bridge.js",
+      "moduleId": "app.shape.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2447,
+          "scriptOrdinal": 126
+        }
+      ]
+    },
+    {
+      "path": "src/js/shapes-panel.js",
+      "moduleId": "app.shapes.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2376,
+          "scriptOrdinal": 61
+        }
+      ]
+    },
+    {
+      "path": "src/js/storyboard.js",
+      "moduleId": "app.storyboard",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2395,
+          "scriptOrdinal": 77
+        }
+      ]
+    },
+    {
+      "path": "src/js/stroke-modeler.js",
+      "moduleId": "app.stroke.modeler",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2302,
+          "scriptOrdinal": 8
+        }
+      ]
+    },
+    {
+      "path": "src/js/subselect-bridge.js",
+      "moduleId": "app.subselect.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2446,
+          "scriptOrdinal": 125
+        }
+      ]
+    },
+    {
+      "path": "src/js/svg-import.js",
+      "moduleId": "app.svg.import",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2355,
+          "scriptOrdinal": 52
+        }
+      ]
+    },
+    {
+      "path": "src/js/symmetry-bridge.js",
+      "moduleId": "app.symmetry.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2435,
+          "scriptOrdinal": 114
+        }
+      ]
+    },
+    {
+      "path": "src/js/text-animator-panel.js",
+      "moduleId": "app.text.animator.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2421,
+          "scriptOrdinal": 100
+        }
+      ]
+    },
+    {
+      "path": "src/js/text-animator.js",
+      "moduleId": "app.text.animator",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2377,
+          "scriptOrdinal": 62
+        }
+      ]
+    },
+    {
+      "path": "src/js/text-selector.js",
+      "moduleId": "app.text.selector",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2357,
+          "scriptOrdinal": 54
+        }
+      ],
+      "additionalContexts": [
+        {
+          "format": "commonjs",
+          "context": "node-test",
+          "exportSite": {
+            "path": "src/js/text-selector.js",
+            "line": 229
+          },
+          "importSite": {
+            "path": "tests/text-selector.test.cjs",
+            "line": 12
+          },
+          "note": "Guarded CommonJS export consumed by committed tests; production entry remains a classic document script."
+        }
+      ]
+    },
+    {
+      "path": "src/js/timeline-zoom.js",
+      "moduleId": "app.timeline.zoom",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2386,
+          "scriptOrdinal": 71
+        }
+      ]
+    },
+    {
+      "path": "src/js/timeline.js",
+      "moduleId": "app.timeline",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2352,
+          "scriptOrdinal": 49
+        }
+      ]
+    },
+    {
+      "path": "src/js/tools-panel-dock.js",
+      "moduleId": "app.tools.panel.dock",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2348,
+          "scriptOrdinal": 45
+        }
+      ]
+    },
+    {
+      "path": "src/js/tools.js",
+      "moduleId": "app.tools",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2303,
+          "scriptOrdinal": 9
+        }
+      ]
+    },
+    {
+      "path": "src/js/tracker-panel.js",
+      "moduleId": "app.tracker.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2405,
+          "scriptOrdinal": 87
+        }
+      ]
+    },
+    {
+      "path": "src/js/tracker.js",
+      "moduleId": "app.tracker",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2404,
+          "scriptOrdinal": 86
+        }
+      ]
+    },
+    {
+      "path": "src/js/transplant.js",
+      "moduleId": "app.transplant",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2426,
+          "scriptOrdinal": 105
+        }
+      ]
+    },
+    {
+      "path": "src/js/tutorial.js",
+      "moduleId": "app.tutorial",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2453,
+          "scriptOrdinal": 132
+        }
+      ]
+    },
+    {
+      "path": "src/js/tweens.js",
+      "moduleId": "app.tweens",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2301,
+          "scriptOrdinal": 7
+        }
+      ]
+    },
+    {
+      "path": "src/js/ui.js",
+      "moduleId": "app.ui",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2298,
+          "scriptOrdinal": 4
+        }
+      ]
+    },
+    {
+      "path": "src/js/updater-bridge.js",
+      "moduleId": "app.updater.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2411,
+          "scriptOrdinal": 93
+        }
+      ]
+    },
+    {
+      "path": "src/js/vector-text-bridge.js",
+      "moduleId": "app.vector.text.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2305,
+          "scriptOrdinal": 11
+        }
+      ]
+    },
+    {
+      "path": "src/js/vectorize-bridge.js",
+      "moduleId": "app.vectorize.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2407,
+          "scriptOrdinal": 89
+        }
+      ]
+    },
+    {
+      "path": "src/js/vectorize-wasm-loader.js",
+      "moduleId": "app.vectorize.wasm.loader",
+      "executionClass": "document-module",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2430,
+          "scriptOrdinal": 109
+        }
+      ]
+    },
+    {
+      "path": "src/js/vectorize-worker.js",
+      "moduleId": "app.vectorize.worker",
+      "executionClass": "module-worker",
+      "loadSites": [
+        {
+          "path": "src/js/vectorize-wasm-loader.js",
+          "line": 29
+        }
+      ]
+    },
+    {
+      "path": "src/js/viewtools-bridge.js",
+      "moduleId": "app.viewtools.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2437,
+          "scriptOrdinal": 116
+        }
+      ]
+    }
+  ],
+  "exclusions": [
+    {
+      "path": "src/js/ag-psd.vendor.mjs",
+      "category": "vendor",
+      "provenance": {
+        "gitBlob": "f25b6a64352a1f556440f030feada980e3075aca",
+        "sha256": "62b9689c83a3f70480a9c52c9ccf68f13339c2a3f841f1c86b0449cfca031c9b",
+        "lastChangedCommit": "46fab90c180f42df73843a9204b479454691de5e",
+        "importCommit": "c5365806a8bbd4705b547c21d5e8127c939a9ed0"
+      },
+      "component": "ag-psd 31.0.2 (esm.sh bundle)",
+      "reason": "Vendored PSD parser bundle, not handwritten application code. The Buffer import was patched to a local shim and a dangling source-map comment was later removed. No blanket exemption for .mjs or upstream byte equality is asserted.",
+      "evidence": [
+        {
+          "path": "src/js/ag-psd.vendor.mjs",
+          "line": 1,
+          "role": "package/version header"
+        },
+        {
+          "path": "src/js/ag-psd.vendor.mjs",
+          "line": 2,
+          "role": "patched local import"
+        }
+      ],
+      "executionClass": "imported-module",
+      "context": "window",
+      "loadSites": [
+        {
+          "path": "src/js/psd-import-bridge.js",
+          "line": 30
+        }
+      ],
+      "activation": "Dynamic import prewarmed by loadModule() at psd-import-bridge.js:36 during classic startup; reused for PSD requests."
+    },
+    {
+      "path": "src/js/delaunator.vendor.js",
+      "category": "vendor",
+      "provenance": {
+        "gitBlob": "5579d52527bce6460f791aae91fec515c52546d9",
+        "sha256": "51d9b219877ce99908ba5e2bf4b7429932419d5ce3f00c26d2a011e582be73be",
+        "lastChangedCommit": "1ef0290a03e552de31b6303290a23640fd5a27a8"
+      },
+      "component": "Delaunator 5.0.1 including bundled robust-predicates 3.0.2",
+      "reason": "Vendored UMD triangulation bundle identified by the header and notices; upstream bundle code is outside handwritten application budgets. The local attribution header is retained.",
+      "evidence": [
+        {
+          "path": "src/js/delaunator.vendor.js",
+          "line": 2
+        },
+        {
+          "path": "THIRD_PARTY_NOTICES.md",
+          "line": 22
+        }
+      ],
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2417,
+          "scriptOrdinal": 96
+        }
+      ]
+    },
+    {
+      "path": "src/js/mp4box.all.min.js",
+      "category": "vendor",
+      "provenance": {
+        "gitBlob": "7e31a44b6235c4f80c3a42512291eb5a81c3e784",
+        "sha256": "3d6bc70a484291d1474fde834205f84336a52b6aa1e63b1c4b6423f71d19dd80",
+        "lastChangedCommit": "dc2e2b3923abd53248843dfd07702355a2c70ff4"
+      },
+      "component": "MP4Box.js 0.5.2",
+      "reason": "Vendored minified MP4/MOV demuxer identified by its local attribution header; excluded on third-party provenance regardless of lexical parse support.",
+      "evidence": [
+        {
+          "path": "src/js/mp4box.all.min.js",
+          "line": 2
+        },
+        {
+          "path": "src/js/mp4box.all.min.js",
+          "line": 5
+        }
+      ],
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2393,
+          "scriptOrdinal": 75
+        }
+      ]
+    },
+    {
+      "path": "src/js/node-buffer-shim.vendor.mjs",
+      "category": "vendor",
+      "provenance": {
+        "gitBlob": "860121fd97c37e806e3004260e0daa98faf3a894",
+        "sha256": "64fb61aa5f48644d685f9ceabedba60ea6b5d6ce03dac1943e863d00d9e574f3",
+        "lastChangedCommit": "c5365806a8bbd4705b547c21d5e8127c939a9ed0",
+        "importCommit": "c5365806a8bbd4705b547c21d5e8127c939a9ed0"
+      },
+      "component": "Bundled unenv browser Buffer shim; upstream version not recorded in this file",
+      "reason": "Vendored Buffer polyfill imported by ag-psd. The introduction commit records the bundle origin, and the file carries unenv/ieee754/buffer attribution. No unrecorded upstream version or upstream byte equality is asserted.",
+      "evidence": [
+        {
+          "path": "src/js/ag-psd.vendor.mjs",
+          "line": 2
+        },
+        {
+          "path": "src/js/node-buffer-shim.vendor.mjs",
+          "line": 2,
+          "role": "bundled license information"
+        }
+      ],
+      "executionClass": "imported-module",
+      "context": "window",
+      "loadSites": [
+        {
+          "path": "src/js/ag-psd.vendor.mjs",
+          "line": 2
+        }
+      ],
+      "activation": "Static ESM dependency of the dynamically imported, prewarmed ag-psd bundle."
+    },
+    {
+      "path": "src/js/opentype.min.js",
+      "category": "vendor",
+      "provenance": {
+        "gitBlob": "5dbd60aac7ea3015fa16d8018101b68f1c77fa6d",
+        "sha256": "1f6cce0f0185f553121f116d2d0df3e1768934a725c0abf0700ef9419af5e031",
+        "lastChangedCommit": "dc2e2b3923abd53248843dfd07702355a2c70ff4"
+      },
+      "component": "opentype.js; no version inferred",
+      "reason": "Vendored minified font parser identified by its local attribution header and notices, outside handwritten application budgets.",
+      "evidence": [
+        {
+          "path": "src/js/opentype.min.js",
+          "line": 2
+        },
+        {
+          "path": "THIRD_PARTY_NOTICES.md",
+          "line": 20
+        }
+      ],
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2304,
+          "scriptOrdinal": 10
+        }
+      ]
+    },
+    {
+      "path": "src/paper-full.min.js",
+      "category": "vendor",
+      "provenance": {
+        "gitBlob": "11a760c45796d402a191f1a9cf8c650130699fcb",
+        "sha256": "13526b252be3856db63b096ca282270454a3bb4567943e137875d9ced54ce9ba",
+        "lastChangedCommit": "1ceff28c082582d4864e4a40adf3f0218f613e2a"
+      },
+      "component": "Paper.js minified build",
+      "reason": "Vendored minified Paper.js runtime identified by the repository notices. It is outside src/js but inside the selected src root, requiring this explicit exclusion.",
+      "evidence": [
+        {
+          "path": "THIRD_PARTY_NOTICES.md",
+          "line": 19
+        }
+      ],
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 10,
+          "scriptOrdinal": 2
+        }
+      ]
+    },
+    {
+      "path": "src/wasm-vectorize/vectorize_wasm.d.ts",
+      "category": "generated",
+      "provenance": {
+        "gitBlob": "bdba3f6316bef758e5cbfdfdf33dc76aca2b610a",
+        "sha256": "f9d82247bcb1244b69bad8dcc6e8ac66cf89ecaea98196aaa04ec789ca85015e",
+        "lastChangedCommit": "5950e23f7039bfd02cb31ec356ba5a1381250f63",
+        "crateManifest": "vectorize-wasm/Cargo.toml",
+        "sourceDirectories": [
+          "vectorize-wasm/src",
+          "vectorize-core/src"
+        ],
+        "documentedBuild": {
+          "directory": "vectorize-wasm",
+          "argv": [
+            "wasm-pack",
+            "build",
+            "--target",
+            "web",
+            "--out-dir",
+            "../src/wasm-vectorize"
+          ]
+        },
+        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
+      },
+      "component": "vectorize-wasm wasm-pack / wasm-bindgen output",
+      "reason": "Generated TypeScript declaration (non-executable) for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
+      "evidence": [
+        {
+          "path": ".gitignore",
+          "line": 24
+        },
+        {
+          "path": "src/wasm-vectorize/package.json",
+          "line": 1
+        },
+        {
+          "path": "src/wasm-vectorize/vectorize_wasm.d.ts",
+          "line": 1
+        }
+      ],
+      "executionClass": "type-declaration",
+      "loadSites": [],
+      "describes": "src/wasm-vectorize/vectorize_wasm.js"
+    },
+    {
+      "path": "src/wasm-vectorize/vectorize_wasm.js",
+      "category": "generated",
+      "provenance": {
+        "gitBlob": "55731085adcef264dffe00831e0a2a6a677382b8",
+        "sha256": "26fa557b6acbc54f2f3428aeffead49cdffc31604292f4d32ccb65b0019584b7",
+        "lastChangedCommit": "5950e23f7039bfd02cb31ec356ba5a1381250f63",
+        "crateManifest": "vectorize-wasm/Cargo.toml",
+        "sourceDirectories": [
+          "vectorize-wasm/src",
+          "vectorize-core/src"
+        ],
+        "documentedBuild": {
+          "directory": "vectorize-wasm",
+          "argv": [
+            "wasm-pack",
+            "build",
+            "--target",
+            "web",
+            "--out-dir",
+            "../src/wasm-vectorize"
+          ]
+        },
+        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
+      },
+      "component": "vectorize-wasm wasm-pack / wasm-bindgen output",
+      "reason": "Generated ES module glue for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
+      "evidence": [
+        {
+          "path": ".gitignore",
+          "line": 24
+        },
+        {
+          "path": "src/wasm-vectorize/package.json",
+          "line": 1
+        },
+        {
+          "path": "src/wasm-vectorize/vectorize_wasm.js",
+          "line": 1
+        }
+      ],
+      "executionClass": "imported-module",
+      "context": "dedicated-worker",
+      "loadSites": [
+        {
+          "path": "src/js/vectorize-worker.js",
+          "line": 18
+        }
+      ],
+      "activation": "Dynamic import on module worker startup; computed ?v= token does not change repository identity."
+    },
+    {
+      "path": "src/wasm-vectorize/vectorize_wasm_bg.wasm.d.ts",
+      "category": "generated",
+      "provenance": {
+        "gitBlob": "dc7defdc4820e2513d3ecd4f78c83bdbf559c1c3",
+        "sha256": "863a11c0a343bf3a271a3999f4b11e4417623c7dc6657e2425d17382b3c51c16",
+        "lastChangedCommit": "5950e23f7039bfd02cb31ec356ba5a1381250f63",
+        "crateManifest": "vectorize-wasm/Cargo.toml",
+        "sourceDirectories": [
+          "vectorize-wasm/src",
+          "vectorize-core/src"
+        ],
+        "documentedBuild": {
+          "directory": "vectorize-wasm",
+          "argv": [
+            "wasm-pack",
+            "build",
+            "--target",
+            "web",
+            "--out-dir",
+            "../src/wasm-vectorize"
+          ]
+        },
+        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
+      },
+      "component": "vectorize-wasm wasm-pack / wasm-bindgen output",
+      "reason": "Generated TypeScript declaration (non-executable) for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
+      "evidence": [
+        {
+          "path": ".gitignore",
+          "line": 24
+        },
+        {
+          "path": "src/wasm-vectorize/package.json",
+          "line": 1
+        },
+        {
+          "path": "src/wasm-vectorize/vectorize_wasm_bg.wasm.d.ts",
+          "line": 1
+        }
+      ],
+      "executionClass": "type-declaration",
+      "loadSites": [],
+      "describes": "src/wasm-vectorize/vectorize_wasm_bg.wasm"
+    },
+    {
+      "path": "src/wasm/geometry_wasm.d.ts",
+      "category": "generated",
+      "provenance": {
+        "gitBlob": "54c5d49890672ee40ee088671282a25fac39a31e",
+        "sha256": "57d12763a2f0e0141baa97b9f456a19a29b93c02a2628c69956a7cbe848382d4",
+        "lastChangedCommit": "19743ef8954e6211f2577de5debe0803ee08de21",
+        "crateManifest": "geometry-wasm/Cargo.toml",
+        "sourceDirectories": [
+          "geometry-wasm/src"
+        ],
+        "documentedBuild": {
+          "directory": "geometry-wasm",
+          "argv": [
+            "wasm-pack",
+            "build",
+            "--target",
+            "web",
+            "--out-dir",
+            "../src/wasm"
+          ]
+        },
+        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
+      },
+      "component": "geometry-wasm wasm-pack / wasm-bindgen output",
+      "reason": "Generated TypeScript declaration (non-executable) for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
+      "evidence": [
+        {
+          "path": ".gitignore",
+          "line": 16
+        },
+        {
+          "path": "src/wasm/package.json",
+          "line": 1
+        },
+        {
+          "path": "src/wasm/geometry_wasm.d.ts",
+          "line": 1
+        }
+      ],
+      "executionClass": "type-declaration",
+      "loadSites": [],
+      "describes": "src/wasm/geometry_wasm.js"
+    },
+    {
+      "path": "src/wasm/geometry_wasm.js",
+      "category": "generated",
+      "provenance": {
+        "gitBlob": "7c52450ebf4cfccc5061430589b31a639ca35991",
+        "sha256": "3ac8f3b4df2cf8ab52c4abcb16591660b72cc19c77f3323046833b8d0309c2bf",
+        "lastChangedCommit": "19743ef8954e6211f2577de5debe0803ee08de21",
+        "crateManifest": "geometry-wasm/Cargo.toml",
+        "sourceDirectories": [
+          "geometry-wasm/src"
+        ],
+        "documentedBuild": {
+          "directory": "geometry-wasm",
+          "argv": [
+            "wasm-pack",
+            "build",
+            "--target",
+            "web",
+            "--out-dir",
+            "../src/wasm"
+          ]
+        },
+        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
+      },
+      "component": "geometry-wasm wasm-pack / wasm-bindgen output",
+      "reason": "Generated ES module glue for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
+      "evidence": [
+        {
+          "path": ".gitignore",
+          "line": 16
+        },
+        {
+          "path": "src/wasm/package.json",
+          "line": 1
+        },
+        {
+          "path": "src/wasm/geometry_wasm.js",
+          "line": 1
+        }
+      ],
+      "executionClass": "imported-module",
+      "context": "window",
+      "loadSites": [
+        {
+          "path": "src/js/geometry-wasm-loader.js",
+          "line": 23
+        }
+      ],
+      "activation": "Dynamic import on document module evaluation; computed ?v= token does not change repository identity."
+    },
+    {
+      "path": "src/wasm/geometry_wasm_bg.wasm.d.ts",
+      "category": "generated",
+      "provenance": {
+        "gitBlob": "515ca538d29e43fa9b677ab73fb948c0df71e300",
+        "sha256": "b6f256fcee16108988ad2fc6754d406538b8aad77cabe221eeaecf9668efc3c9",
+        "lastChangedCommit": "19743ef8954e6211f2577de5debe0803ee08de21",
+        "crateManifest": "geometry-wasm/Cargo.toml",
+        "sourceDirectories": [
+          "geometry-wasm/src"
+        ],
+        "documentedBuild": {
+          "directory": "geometry-wasm",
+          "argv": [
+            "wasm-pack",
+            "build",
+            "--target",
+            "web",
+            "--out-dir",
+            "../src/wasm"
+          ]
+        },
+        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
+      },
+      "component": "geometry-wasm wasm-pack / wasm-bindgen output",
+      "reason": "Generated TypeScript declaration (non-executable) for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
+      "evidence": [
+        {
+          "path": ".gitignore",
+          "line": 16
+        },
+        {
+          "path": "src/wasm/package.json",
+          "line": 1
+        },
+        {
+          "path": "src/wasm/geometry_wasm_bg.wasm.d.ts",
+          "line": 1
+        }
+      ],
+      "executionClass": "type-declaration",
+      "loadSites": [],
+      "describes": "src/wasm/geometry_wasm_bg.wasm"
+    }
+  ],
+  "snapshotCounts": {
+    "selectedSources": 152,
+    "bySourceKind": {
+      ".js": 146,
+      ".mjs": 2,
+      ".cjs": 0,
+      ".ts": 4
+    },
+    "retainedSources": 140,
+    "exclusions": 12,
+    "vendorExclusions": 6,
+    "generatedExclusions": 6,
+    "retainedExecutionClasses": {
+      "classic-without-load-site": 12,
+      "document-classic": 125,
+      "document-module": 2,
+      "module-worker": 1
+    }
+  },
+  "integration": {
+    "coverageHelper": {
+      "candidateCommit": "ad88e76122e09340e10fd746e24c2015efba5b44",
+      "path": "scripts/nemo/lib/boundaries-coverage.cjs",
+      "export": "checkSourceCoverage",
+      "sourcePaths": "Independently rediscover all selected committed candidate paths from scope, including exclusions. Never seed discovery from retainedSources, a profile or a baseline.",
+      "exclusions": "Project policy.exclusions to an exact string[] of record.path values.",
+      "options": "Only root, sourcePaths and exclusions are helper options. Validate policy version, provenance and execution metadata outside the helper."
+    },
+    "scriptOrderHelper": "Use pinned HTML bytes and actual tag attributes. retainedSources[].loadSites records scriptOrdinal only for actual document entries. Worker/import edges and additional Node test contexts are separate from document parser order.",
+    "requiredChecks": [
+      "Fresh committed inventory equals the disjoint union of retainedSources paths and exact exclusions, each occurring once. Reject new, missing, aliased or duplicate sources.",
+      "Retained paths and module IDs equal unchanged profile membership exactly.",
+      "Every exclusion exists as a selected regular source and retains justified provenance; verify artifact hashes and review changes.",
+      "Reconcile source/index/profile provenance and loader evidence on the actual integration candidate; snapshot counts do not replace fresh discovery."
+    ],
+    "openGates": [
+      "Reviewed architecture layers/APIs and complete global provider/consumer boundaries.",
+      "Parsed bootstrap-order evidence and runtime readiness remain separate from source coverage and size enforcement."
+    ]
+  }
+}
