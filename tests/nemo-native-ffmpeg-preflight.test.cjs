@@ -68,7 +68,7 @@ test('explicit hosted FFmpeg is preflighted and inherited by Cargo', t => {
   const cargo = JSON.parse(fs.readFileSync(f.marker));
   assert.equal(cargo.override, ffmpeg);
   assert.deepEqual(cargo.args, [
-    'test', '--manifest-path', path.resolve('src-tauri/Cargo.toml'),
+    'test', '--release', '--manifest-path', path.resolve('src-tauri/Cargo.toml'),
     '--', '--test-threads=1',
   ]);
 });
