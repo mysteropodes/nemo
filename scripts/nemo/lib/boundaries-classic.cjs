@@ -6,11 +6,13 @@
 // of the contract's mutable occurrence lists; never infer them from those lists.
 // inventoryHTML is the synchronous script-order helper
 // with parse5 already injected. Missing evidence fails closed. VM order/readiness
-// are reviewed facts pinned to complete loader sources, not inferred execution.
+// remain caller-reviewed facts; source pins/anchors alone do not prove execution.
 // classicOk isolates this contract from retained legacy global-state violations;
 // ok remains false for either. CI must require ok AND existing checkProfile gates.
 // Supported binding form: unconditional var IIFE, literal named-function API,
 // bare direct member capture/call. Other forms fail explicitly, including writes.
+// Call phase requires a named-function body in a single pure provider IIFE.
+// Other consumer shapes need an AST/control-flow inventory; reject their claims.
 // Static ordering is conditional on successful execution without DOM mutation.
 const fs = require('node:fs');
 const path = require('node:path');
@@ -234,7 +236,7 @@ function checkClassicScripts(contract, options = {}) {
     if (claimed.has(key)) issue('conflicting-binding', r, 'Binding claimed twice');
     claimed.set(key, r.id); return { tokens, index: tokens.indexOf(token), token };
   };
-  const providers = new Map();
+  const providers = new Map(), deferredBodies = new Map();
   for (const p of contract.providers) {
     if (providers.has(p.symbol)) issue('conflicting-provider', p, 'Multiple provider declarations');
     providers.set(p.symbol, p);
@@ -261,6 +263,12 @@ function checkClassicScripts(contract, options = {}) {
         }
         const bodyStart = close.get(j + 2) + 1, bodyEnd = close.get(bodyStart);
         if (t[bodyStart]?.value !== '{' || bodyEnd === undefined) { issue('unsupported-binding', p, 'Unsupported provider function'); break; }
+        // No surrounding script may invoke this function during installation.
+        // The provider checks above also reject effects inside the IIFE setup.
+        if (i === 1 && end + 5 === t.length) {
+          if (!deferredBodies.has(p.file)) deferredBodies.set(p.file, []);
+          deferredBodies.get(p.file).push([bodyStart, bodyEnd]);
+        }
         j = bodyEnd + 1;
       }
     }
@@ -299,6 +307,9 @@ function checkClassicScripts(contract, options = {}) {
     const p = providers.get(use.symbol), binding = claim(use, use.symbol);
     if (binding) {
       const { tokens: t, index: i } = binding, tail = t[i + 3]?.value;
+      if (use.phase === 'call' && !deferredBodies.get(use.file)?.some(([start, end]) => start < i && i < end)) {
+        issue('unsupported-call-phase', use, 'Call phase requires a named-function body in a single pure provider IIFE; readiness anchors cannot prove deferral');
+      }
       if (t[i - 1]?.value === '.' || t[i + 1]?.value !== '.' || t[i + 2]?.type !== 'name' || t[i + 2].value !== use.member || ![';', '('].includes(tail)) issue('unsupported-binding', use, 'Only direct bare-global member access is supported');
       const writes = ['?', '<', '>', '=', '++', '--', '+', '-', '*', '/', '/=', '%', '&', '|', '^'].includes(tail) || ['delete', '++', '--'].includes(t[i - 1]?.value);
       if (writes || use.access === 'write') issue('unauthorized-global-write', use, 'Production consumers cannot modify scoped globals');

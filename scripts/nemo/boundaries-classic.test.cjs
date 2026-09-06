@@ -197,11 +197,75 @@ test('missing, malformed, duplicate and incomplete adoption fail closed', () => 
   const g = fixture(); write(g, 'preview.js', 'var preview = SMCurve.run;'); g.contract.uses.push(use(g, 'SMCurve', 'preview.js'));
   rejects(g, 'invalid-classic-contract');
 });
-test('call-phase dependency requires source-pinned invocation readiness', () => {
-  const f = fixture(); f.contract.uses[0].phase = 'call'; rejects(f, 'unknown-readiness');
+test('eager capture cannot become a call use through pinned comment readiness', () => {
+  const f = fixture(), loader = f.contract.loaders[0];
+  write(f, 'load.cjs', "for (const file of ['motion.js', 'curve.js']) execute(file);\n// calls after both installations\n");
+  Object.assign(loader, anchor(f, 'load.cjs', "for (const file of ['motion.js', 'curve.js']) execute(file);"));
+  loader.order.reverse(); loader.occurrences.reverse();
+  f.contract.uses[0].phase = 'call';
+  loader.readiness = [{ use: f.contract.uses[0].id, after: ['curve', 'motion'], ...anchor(f, 'load.cjs', '// calls after both installations') }];
+  const context = vm.createContext({});
+  assert.throws(() => vm.runInNewContext(source(f, 'load.cjs'), {
+    execute(file) { vm.runInContext(source(f, file), context); },
+  }), { name: 'ReferenceError', message: 'SMCurve is not defined' });
+  const r = rejects(f, 'unsupported-call-phase'); assert.equal(r.classicOk, false);
+});
+test('unsupported eager and deferred syntax cannot assert call readiness', () => {
+  for (const code of [
+    'SMCurve.run();',
+    '{ var captured = SMCurve.run; }',
+    '(function () { var captured = SMCurve.run; })();',
+    '(function eager() { return SMCurve.run(); })();',
+    '(() => { return SMCurve.run(); })();',
+    'class Eager { static { SMCurve.run(); } }',
+    'function later() { return SMCurve.run(); } later();',
+    'function later() { return SMCurve.run(); }',
+    'var later = () => { return SMCurve.run(); };',
+  ]) {
+    const f = fixture(); write(f, 'motion.js', code);
+    f.contract.uses = [use(f, 'SMCurve', 'motion.js', 'call')];
+    f.contract.loaders[0].readiness = [{ use: f.contract.uses[0].id, after: ['curve', 'motion'], ...anchor(f, 'load.cjs', source(f, 'load.cjs').trim()) }];
+    rejects(f, 'unsupported-call-phase');
+  }
+});
+function deferredFixture() {
+  const f = fixture();
+  write(f, 'motion.js', 'var SMMotion = (function () {\n function run() { return SMCurve.run(); }\n return { run: run };\n})();\n');
+  f.contract.scope.symbols.push('SMMotion'); f.requiredScope.symbols.push('SMMotion');
+  f.contract.providers.push(provider(f, 'SMMotion', 'motion.js'));
+  f.contract.uses = [use(f, 'SMCurve', 'motion.js', 'call')];
+  return f;
+}
+test('provider function parameters are outside supported call-body evidence', () => {
+  const f = deferredFixture();
+  write(f, 'motion.js', 'var SMMotion = (function () {\n function run(value = SMCurve.run()) { return value; }\n return { run: run };\n})();\n');
+  f.contract.loaders[0].readiness = [{ use: f.contract.uses[0].id, after: ['curve', 'motion'], ...anchor(f, 'load.cjs', source(f, 'load.cjs').trim()) }];
+  rejects(f, 'unsupported-call-phase');
+});
+test('supported deferred call requires reviewed invocation readiness', () => {
+  const f = deferredFixture(); rejects(f, 'unknown-readiness');
+  replace(f, 'load.cjs', "['curve.js', 'motion.js']", "['motion.js', 'curve.js']");
+  Object.assign(f.contract.loaders[0], anchor(f, 'load.cjs', source(f, 'load.cjs').trim()));
+  f.contract.loaders[0].order.reverse(); f.contract.loaders[0].occurrences.reverse();
   write(f, 'load.cjs', source(f, 'load.cjs') + 'invokeAfterLoading();\n');
   f.contract.loaders[0].readiness.push({ use: f.contract.uses[0].id, after: ['curve', 'motion'], ...anchor(f, 'load.cjs', 'invokeAfterLoading();') });
-  assert.equal(check(f).ok, true); f.contract.loaders[0].readiness[0].after.pop(); rejects(f, 'unknown-readiness');
+  assert.equal(check(f).ok, true);
+  const context = vm.createContext({});
+  vm.runInNewContext(source(f, 'load.cjs'), {
+    execute(file) { vm.runInContext(source(f, file), context); },
+    invokeAfterLoading() { assert.equal(context.SMMotion.run(), 7); },
+  });
+  f.contract.loaders[0].readiness[0].after.pop(); rejects(f, 'unknown-readiness');
+});
+test('a supported function body cannot hide eager execution outside its provider', () => {
+  const f = deferredFixture(); write(f, 'motion.js', source(f, 'motion.js') + 'SMMotion.run();\n');
+  f.contract.uses.push(use(f, 'SMMotion', 'motion.js', 'call'));
+  f.requiredScope.applicability.push({ loader: 'vm', use: 'motion.js.SMMotion', realm: 'page' });
+  f.contract.loaders[0].readiness = f.contract.uses.map((u) => ({ use: u.id, after: ['curve', 'motion'], ...anchor(f, 'load.cjs', source(f, 'load.cjs').trim()) }));
+  const r = rejects(f, 'unsupported-call-phase');
+  assert.ok(r.violations.some((v) => v.rule === 'unsupported-call-phase' && v.line === 2));
+  const context = vm.createContext({});
+  assert.throws(() => vm.runInContext(source(f, 'motion.js'), context), { name: 'ReferenceError' });
 });
 test('call-phase cycles fail even with reviewed readiness and no reversed load dependency', () => {
   const f = fixture(); write(f, 'motion.js', 'var SMMotion = (function () {\n function run() { return SMCurve.run(); }\n return { run: run };\n})();\n');
@@ -274,6 +338,7 @@ test('exact production Curve/Motion bytes pass both reviewed VM loader contracts
   assert.ok(r.violations.every((v) => v.rule === 'global-state')); assert.equal(r.requirements.length, 2);
   const baseline = require('./lib/boundaries.cjs').checkProfile(f.profile, { root: ROOT });
   const names = (report) => report.violations.filter((v) => v.rule === 'global-state').map((v) => v.detail.global).sort();
+  assert.equal(names(r).length, 17);
   assert.deepEqual(names(r), names(baseline), 'all preexisting global diagnostics remain visible');
   const sb = require('../../tests/fixtures/lib/sandbox.cjs').loadMotion();
   assert.equal(sb.SMMotion.evalCurvePoints, sb.SMAnimationCurve.evalCurvePoints);
