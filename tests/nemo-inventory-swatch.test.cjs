@@ -53,7 +53,7 @@ function runtime(moduleSource, callSource, ids = ['pm-stroke', 'pm-stroke-c']) {
 function rowFor(inventory, id) {
   const row = inventory.rows.find(row => row.id === 'dom:#' + id);
   assert.ok(row, 'inventory must contain ' + id);
-  return { events: row.events, status: row.status };
+  return { events: row.events, status: row.status, handler: row.handler };
 }
 
 function fixture(t, moduleSource, callSource, fixtureHtml = html) {
@@ -73,32 +73,47 @@ test('swatch inventory: production helper registers pm-stroke click at runtime',
   assert.equal(observed.elements.get('pm-stroke-c').style.pointerEvents, 'none');
 });
 
+// Share the expensive full-source build, while keeping the paired-input check
+// independent: it must still run when the known wrapper omission fails.
+let productionInventory;
+function fullInventory() {
+  return productionInventory || (productionInventory = build({ root }));
+}
+
 test('swatch inventory: production pm-stroke registration is inventoried', () => {
   // Use all actual production inputs: no copied generator or special ID mapping.
-  assert.deepEqual(rowFor(build({ root }), 'pm-stroke'), {
-    events: ['click'], status: 'inventoried',
-  });
+  const { handler, ...registration } = rowFor(fullInventory(), 'pm-stroke');
+  assert.deepEqual(registration, { events: ['click'], status: 'inventoried' });
+  assert.ok(handler.length > 0, 'wrapper must have handler evidence');
+  assert.ok(handler.some(site => /^src\/js\/color-picker\.js:\d+\b/.test(site)),
+    'wrapper handler must cite the production color-picker.js source');
+});
+
+test('swatch inventory: generated paired input does not acquire wrapper click', () => {
+  const input = rowFor(fullInventory(), 'pm-stroke-c');
+  assert.ok(!input.events.includes('click'), 'paired input must not inherit wrapper click');
 });
 
 test('swatch inventory: independent direct registration is inventoried', t => {
   const call = "document.getElementById('direct-swatch').addEventListener('click', function () {});";
   assert.deepEqual(runtime('', call, ['direct-swatch']).events('direct-swatch'), ['click']);
-  assert.deepEqual(rowFor(fixture(t, '', call, '<button id="direct-swatch">Color</button>'), 'direct-swatch'), {
-    events: ['click'], status: 'inventoried',
-  });
+  const { handler, ...registration } = rowFor(
+    fixture(t, '', call, '<button id="direct-swatch">Color</button>'), 'direct-swatch');
+  assert.deepEqual(registration, { events: ['click'], status: 'inventoried' });
+  assert.ok(handler.some(site => /^src\/js\/swatch-call\.js:\d+\b/.test(site)));
 });
 
 test('swatch inventory: same-name no-op helper does not invent registration', t => {
   const noop = 'window.ColorPicker = { wireColorSwatches: function (pairs) {} };';
   const call = productionCall();
   assert.deepEqual(runtime(noop, call).events('pm-stroke'), []);
-  assert.deepEqual(rowFor(fixture(t, noop, call), 'pm-stroke'), { events: [], status: 'unmapped' });
+  assert.deepEqual(rowFor(fixture(t, noop, call), 'pm-stroke'), { events: [], status: 'unmapped', handler: [] });
 });
 
 test('swatch inventory: commented production call does not activate helper', t => {
   const call = productionCall().split('\n').map(line => '// ' + line).join('\n');
   assert.deepEqual(runtime(helper, call).events('pm-stroke'), []);
-  assert.deepEqual(rowFor(fixture(t, helper, call), 'pm-stroke'), { events: [], status: 'unmapped' });
+  assert.deepEqual(rowFor(fixture(t, helper, call), 'pm-stroke'), { events: [], status: 'unmapped', handler: [] });
 });
 
 const lookupOnly = `window.ColorPicker = { wireColorSwatches: function (pairs) {
@@ -111,12 +126,12 @@ const lookupOnly = `window.ColorPicker = { wireColorSwatches: function (pairs) {
 test('swatch inventory: lookup-only helper does not invent registration', t => {
   const call = productionCall();
   assert.deepEqual(runtime(lookupOnly, call).events('pm-stroke'), []);
-  assert.deepEqual(rowFor(fixture(t, lookupOnly, call), 'pm-stroke'), { events: [], status: 'unmapped' });
+  assert.deepEqual(rowFor(fixture(t, lookupOnly, call), 'pm-stroke'), { events: [], status: 'unmapped', handler: [] });
 });
 
 test('swatch inventory: listener comment does not invent registration', t => {
   const commented = lookupOnly.replace("if (wrap)", "// wrap.addEventListener('click', function () {});\n    if (wrap)");
   const call = productionCall();
   assert.deepEqual(runtime(commented, call).events('pm-stroke'), []);
-  assert.deepEqual(rowFor(fixture(t, commented, call), 'pm-stroke'), { events: [], status: 'unmapped' });
+  assert.deepEqual(rowFor(fixture(t, commented, call), 'pm-stroke'), { events: [], status: 'unmapped', handler: [] });
 });
