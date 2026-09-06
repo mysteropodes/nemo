@@ -739,6 +739,46 @@ var TW_SPLIT_DTW_CUT=true;
 // rang 32,5→29,9), souris 18,1→17,8, tête 10→17→24 19,1→18,5 ; testB écart
 // latéral 6,5→2,0 ; testC, testD, brasG identiques. Actif.
 var TW_SPLIT_SUBSETS=true,SPLIT_PART_GAP=0.2,SPLIT_PRED_TOL=0.25;
+// ---- MORCEAUX : HÉRITAGE DE LA TEXTURE (loup, 2026-09-06) ----
+// extractStrokePiece ne recopiait pas le préréglage de pinceau : un morceau
+// de scission ou de retrait sur un trait de craie n'avait de texture que
+// « d'un côté », et la génération l'estompait sur la portée — un membre en
+// craie coupé en deux devenait invisible. Avec le drapeau, le morceau hérite
+// des champs de texture de son trait d'origine.
+// MESURÉ (loup, 2026-09-06) : sans le drapeau, les morceaux de la scission
+// du visage (19→30) avaient leurs touches à 0,19 d'opacité à l'image 22
+// (fondu depuis zéro, le trait entier de l'autre clé portant seul la
+// texture) et la main rendue au bras (TW_LIMB_FOLLOW) perdait ses touches
+// à l'image 28 (0,29 → 0,10 → plus rien). Avec : 0,50 constant, comme tous
+// les autres groupes. Aucune paire changée sur les 16 fichiers du corpus
+// (diffReal), holdout et bouts inchangés. → ALLUMÉ.
+var TW_PIECE_TEXTURE=true;
+// ---- MEMBRE QUI SE LÈVE (loup 19→30, 2026-09-06) ----
+// Un trait de B sans partenaire, long (≥ LIMB_MIN_LEN), attaché à un trait de
+// B apparié dont le partenaire de A a beaucoup bougé (≥ LIMB_MOVE_MIN) : c'est
+// l'avant-bras et la main d'un bras qui se lève. Dans A, la petite extrémité
+// attachée à ce même trait (la main à la hanche) a été appariée à un trait
+// immobile qui traîne à sa place (la ligne de hanche) — la position brute a
+// gagné sur la cohérence. La passe rend l'extrémité à sa fenêtre du trait
+// orphelin (meilleure fenêtre à l'extrémité libre, score ≤ LIMB_SCORE_MAX), et
+// le reste du trait orphelin apparaît comme une paire dont le côté A est un
+// point à l'attache : il se déploie depuis le coude.
+// Les scores se calculent depuis la position PRÉDITE de l'extrémité (bloc
+// rigide du membre A→B appliqué à ses échantillons) : en position brute, la
+// ligne de hanche gagnait (0,25 contre 0,47) ; en position prédite la
+// fenêtre gagne (0,255 contre 0,387). Une simple translation ne suffisait
+// pas (l'avant-bras tourne). Tous les candidats d'un même orphelin sont
+// notés, le meilleur seul est appliqué (9_296665 à 0,337 perdait contre la
+// main à 0,255).
+// MESURÉ (2026-09-06) : loup 19→30, la main 1_700745 quitte la ligne de
+// hanche 3_412070 pour la fenêtre 0,37 de l'avant-bras 53_25412, qui se
+// déploie depuis le coude au lieu d'apparaître par fondu (planche
+// loup_membre2) ; la hanche devient un fondu. Compression 2,5 → 1,1, latMoy
+// 15,7 → 16,5, rebroussements 1 → 1, holdout identique. Sur les 15 autres
+// fichiers du corpus la passe n'atteint même pas un candidat (diffReal :
+// zéro portée changée). Nécessite TW_PIECE_TEXTURE sinon la main rendue
+// perd ses touches. → ALLUMÉ.
+var TW_LIMB_FOLLOW=true,LIMB_MIN_LEN=120,LIMB_MOVE_MIN=60,LIMB_SCORE_MAX=0.48;
 // Retour en arrière d'un trait, mesuré sur sa COURBE échantillonnée (60 points
 // sur le chemin Paper), pas sur ses ancres : un menton à 4 ancres ne revient
 // jamais en arrière par ses ancres, alors que sa courbe si — et le morceau
@@ -5278,8 +5318,10 @@ function extractStrokePiece(sd,f0,f1,nOverride){
     segs.push(seg);
   }
   p.remove();
-  if(isVB)return{segments:[],isVectorBrush:true,centerSegments:segs,strokeColor:null,fillColor:sd.fillColor||null,opacity:sd.opacity!==undefined?sd.opacity:1};
-  return{segments:segs,strokeColor:sd.strokeColor,strokeWidth:sd.strokeWidth,strokeCap:sd.strokeCap,strokeJoin:sd.strokeJoin,fillColor:null,opacity:sd.opacity!==undefined?sd.opacity:1};
+  var outPiece=isVB?{segments:[],isVectorBrush:true,centerSegments:segs,strokeColor:null,fillColor:sd.fillColor||null,opacity:sd.opacity!==undefined?sd.opacity:1}
+                   :{segments:segs,strokeColor:sd.strokeColor,strokeWidth:sd.strokeWidth,strokeCap:sd.strokeCap,strokeJoin:sd.strokeJoin,fillColor:null,opacity:sd.opacity!==undefined?sd.opacity:1};
+  if(TW_PIECE_TEXTURE)['brushTexturePreset','preTextureStroke','preTextureOpacity','brushGroupId','bitmapBrushSpec','bitmapPressureProfile','strokeWidth','hasRealStroke'].forEach(function(k){if(sd[k]!==undefined&&outPiece[k]===undefined)outPiece[k]=sd[k];});
+  return outPiece;
 }
 // Manual counterpart to resolveSplitMatches' own tryDirection('B') piece-
 // cutting (same extractStrokePiece-at-cumulative-length-fractions recipe),
@@ -5313,6 +5355,93 @@ function splitMergedIntoOrderedPieces(mergedData,partsData){
 function boundsOverlapLoose(b1,b2){
   var m=Math.max(20,Math.min(Math.max(b1.w,b1.h),Math.max(b2.w,b2.h))*0.3);
   return b1.x-m<b2.x+b2.w&&b2.x-m<b1.x+b1.w&&b1.y-m<b2.y+b2.h&&b2.y-m<b1.y+b1.h;
+}
+function _limbFollow(sA,sB,pairSpecs,unA,unB){
+  var featA=sA.map(strokeFeat),featB=sB.map(strokeFeat);
+  var bA=unionBounds(featA),bB=unionBounds(featB);
+  featA.forEach(function(f){f.relX=(f.cx-bA.x)/bA.w;f.relY=(f.cy-bA.y)/bA.h;});
+  featB.forEach(function(f){f.relX=(f.cx-bB.x)/bB.w;f.relY=(f.cy-bB.y)/bB.h;});
+  var contA=_contactGraph(featA),contB=_contactGraph(featB);
+  function tA(i,j){return i!==j&&contA.d[i][j]<=contA.tol[i][j];}
+  function tB(i,j){return i!==j&&contB.d[i][j]<=contB.tol[i][j];}
+  function segsOf(sd){return(sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>1)?sd.centerSegments:sd.segments;}
+  // similitude rigide du membre A → membre B (ordre des échantillons choisi
+  // par le meilleur alignement), appliquée ensuite à l'extrémité : « où
+  // serait la main si elle avait suivi le bras d'un bloc ». La position
+  // brute est justement ce qui a fait gagner la ligne de hanche ; une simple
+  // translation ne suffit pas (l'avant-bras tourne quand le bras se lève).
+  function limbTransform(fa,fb){
+    var K=Math.min(fa.pts.length,fb.pts.length),fwd=0,rev=0;
+    for(var k=0;k<K;k++){fwd+=Math.hypot(fa.pts[k][0]-fb.pts[k][0],fa.pts[k][1]-fb.pts[k][1]);rev+=Math.hypot(fa.pts[k][0]-fb.pts[K-1-k][0],fa.pts[k][1]-fb.pts[K-1-k][1]);}
+    var pa=[],pb=[];for(var k2=0;k2<K;k2++){pa.push({x:fa.pts[k2][0],y:fa.pts[k2][1]});var q=fb.pts[fwd<=rev?k2:K-1-k2];pb.push({x:q[0],y:q[1]});}
+    var tf=fitSimilarityTransform(pa,pb);if(!tf)return null;
+    return function(x,y){var ax=x-tf.ca.x,ay=y-tf.ca.y;return[tf.cb.x+tf.wRe*ax-tf.wIm*ay,tf.cb.y+tf.wIm*ax+tf.wRe*ay];};
+  }
+  var byA={},byB={};pairSpecs.forEach(function(ps){if(ps.isPiece)return;byA[ps.aIdx]=ps;byB[ps.bIdx]=ps;});
+  var candB=unB.slice();
+  candB.forEach(function(b){
+    var fb=featB[b];if(fb.type==='fill'||fb.closed||fb.length<LIMB_MIN_LEN)return;
+    var done=false;
+    for(var t=0;t<sB.length&&!done;t++){
+      var tp=byB[t];if(!tp||!tB(b,t))continue;
+      var ta=tp.aIdx,fta=featA[ta],ftb=featB[t];
+      var moveT=Math.hypot(ftb.cx-fta.cx,ftb.cy-fta.cy);if(moveT<LIMB_MOVE_MIN)continue;
+      var T=limbTransform(fta,ftb);if(!T)continue;
+      // quelle extrémité du trait orphelin touche le membre ? la main est à l'autre bout
+      var gb=segsOf(sB[b]);var pathT=buildTPFeat(sB[t]);var e0=gb[0].point,e1=gb[gb.length-1].point;
+      var l0=pathT.getNearestLocation(new Point(e0[0],e0[1])),l1=pathT.getNearestLocation(new Point(e1[0],e1[1]));pathT.remove();
+      var d0=l0?l0.distance:Infinity,d1=l1?l1.distance:Infinity;var handAtEnd=d0<=d1; // attache au début → main à la fin
+      var cands=[];
+      for(var h=0;h<sA.length;h++){
+        if(h===ta||!tA(h,ta))continue;
+        var fh=featA[h];if(fh.type==='fill'||fh.closed||fh.length>=fb.length*0.8||fh.length<15)continue;
+        var hp=byA[h];
+        if(hp){if(hp.forced||hp.provenance||hp.identity)continue;var u=hp.bIdx,fu=featB[u];
+          if(tB(u,t))continue; // son partenaire touche encore le membre : rien à faire
+          // l'extrémité a suivi son partenaire (elle a bougé autant que le membre) : ce n'est pas le cas visé
+          if(Math.hypot(fu.cx-fh.cx,fu.cy-fh.cy)>=moveT*0.5)continue;
+        }
+        // position prédite de l'extrémité : le bloc rigide du membre
+        var ptsP=fh.pts.map(function(q){return T(q[0],q[1]);});var cP=T(fh.cx,fh.cy);
+        var fhP=Object.assign({},fh);fhP.cx=cP[0];fhP.cy=cP[1];fhP.relX=(cP[0]-bB.x)/bB.w;fhP.relY=(cP[1]-bB.y)/bB.h;
+        var best=null;
+        [0.8,1.0,1.3].forEach(function(k){
+          var w=Math.max(0.2,Math.min(0.8,fh.length*k/Math.max(1,fb.length)));
+          var f0=handAtEnd?1-w:0,f1=handAtEnd?1:w;
+          var piece=extractStrokePiece(sB[b],f0,f1);var pf=strokeFeat(piece);pf.relX=(pf.cx-bB.x)/bB.w;pf.relY=(pf.cy-bB.y)/bB.h;
+          var sc=matchSc(fhP,pf,false,ptsP)+axisPenaltyPair(fh.elong,pf.elong);
+          if(!best||sc<best.sc)best={sc:sc,w:w,f0:f0,f1:f1,piece:piece};
+        });
+        // le partenaire actuel, jugé depuis la même position prédite : la fenêtre doit faire mieux
+        var scU=hp?matchSc(fhP,featB[hp.bIdx],false,ptsP)+axisPenaltyPair(fh.elong,featB[hp.bIdx].elong):Infinity;
+        var ok=best.sc<=LIMB_SCORE_MAX&&best.sc<scU;
+        _mlNote('membre qui se lève',{orphelin:_mlIdB(b),membre:_mlIdB(t),extremite:_mlIdA(h),partenaireActuel:hp?_mlIdB(hp.bIdx):'aucun',deplacementMembre:Math.round(moveT),fenetre:+best.w.toFixed(2),score:+best.sc.toFixed(3),scorePartenaireActuel:isFinite(scU)?+scU.toFixed(3):null,verdict:ok?'candidat':(best.sc>LIMB_SCORE_MAX?'refusé (score)':'refusé (partenaire actuel meilleur)')});
+        if(ok)cands.push({h:h,hp:hp,best:best,fh:fh});
+      }
+      if(!cands.length)continue;
+      cands.sort(function(x,y){return x.best.sc-y.best.sc;});var c=cands[0],h2=c.h,hp2=c.hp,best2=c.best,fh2=c.fh;
+      _mlNote('membre qui se lève',{orphelin:_mlIdB(b),retenu:_mlIdA(h2),score:+best2.sc.toFixed(3),candidats:cands.length});
+      // appliquer : l'extrémité quitte son partenaire immobile
+      if(hp2){pairSpecs.splice(pairSpecs.indexOf(hp2),1);delete byA[h2];delete byB[hp2.bIdx];if(unB.indexOf(hp2.bIdx)<0)unB.push(hp2.bIdx);}
+      else{var ia=unA.indexOf(h2);if(ia>=0)unA.splice(ia,1);}
+      pairSpecs.push({aIdx:h2,bIdx:b,aData:sA[h2],bData:best2.piece,mi:9800+b*10,score:best2.sc,isPiece:true,limb:true});
+      // le reste se déploie depuis l'attache : côté A, un point à l'endroit où l'extrémité touchait le membre
+      var rest=extractStrokePiece(sB[b],handAtEnd?0:best2.w,handAtEnd?1-best2.w:1);
+      var pathTA=buildTPFeat(sA[ta]);var gh=segsOf(sA[h2]);
+      var att=null,attD=Infinity;[gh[0].point,gh[gh.length-1].point].forEach(function(e){var l=pathTA.getNearestLocation(new Point(e[0],e[1]));if(l&&l.distance<attD){attD=l.distance;att=[l.point.x,l.point.y];}});pathTA.remove();
+      if(!att)att=[fh2.cx,fh2.cy];
+      var rc=segsOf(rest);
+      var dirx=fh2.cx-att[0],diry=fh2.cy-att[1],dl=Math.hypot(dirx,diry)||1;dirx/=dl;diry/=dl;
+      var stubA=JSON.parse(JSON.stringify(rest));
+      var mk=function(x,y,wd){return{point:[x,y],handleIn:[0,0],handleOut:[0,0],width:wd};};
+      var wd0=(rc[0]&&rc[0].width)||sB[b].strokeWidth||4;
+      var tiny=[mk(att[0],att[1],wd0),mk(att[0]+dirx*4,att[1]+diry*4,wd0)];
+      if(stubA.isVectorBrush){stubA.centerSegments=tiny;stubA.segments=[];}else{stubA.segments=tiny;}
+      pairSpecs.push({aIdx:h2,bIdx:b,aData:stubA,bData:rest,mi:9800+b*10+1,score:best2.sc,isPiece:true,limb:true,stub:true});
+      var ib=unB.indexOf(b);if(ib>=0)unB.splice(ib,1);
+      done=true;
+    }
+  });
 }
 function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
   var featA=sA.map(strokeFeat),featB=sB.map(strokeFeat);
@@ -6110,6 +6239,7 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
   var _mlS1=_mlSpecs(pairSpecs);
   if(unA.length||unB.length)resolveSplitMatches(sA,sB,pairSpecs,unA,unB);
   _mlDiff('scission N:1',_mlS1,_mlSpecs(pairSpecs),'trait fusionné découpé en morceaux');
+  if(TW_LIMB_FOLLOW&&unB.length){var _mlS2=_mlSpecs(pairSpecs);_limbFollow(sA,sB,pairSpecs,unA,unB);_mlDiff('membre qui se lève',_mlS2,_mlSpecs(pairSpecs),'extrémité rendue au trait orphelin, reste déployé depuis l\'attache');}
   var fadeOutA=unA.map(function(i){return sA[i];}),fadeInB=unB.map(function(i){return sB[i];});
   // Identity-COLLISION guard (2026-07, live-reported: 2 real frames
   // showed a duplicate strokeId on two visually unrelated strokes). A
