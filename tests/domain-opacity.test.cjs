@@ -44,9 +44,13 @@ test('domain keeps stable layer lookup and snapshots read-only', () => {
 test('opacity writes preserve key shape, curves, cloning and holder separation', () => {
   const ctx = load(8), motion = ctx.SMMotion, domain = ctx.NemoOpacityDomain;
   const layer = {}, element = {};
+  const productionDefaultCurve = motion.DEFAULT_CURVE;
+  let defaultCurveReads = 0;
+  motion.DEFAULT_CURVE = () => { defaultCurveReads++; return productionDefaultCurve(); };
   const custom = [{ x: 0, y: 0, tx: 0.3, ty: 0.2 }, { x: 1, y: 1 }];
   const first = motion.setKeyAtFrame(layer, 'opacity', 12, [30], custom);
   const second = motion.setKeyAtFrame(layer, 'opacity', 0, [90]);
+  assert.equal(defaultCurveReads, 1);
   assert.equal(first.curvePoints, custom);
   assert.deepEqual(JSON.parse(JSON.stringify(second.curvePoints)), JSON.parse(JSON.stringify(motion.DEFAULT_CURVE())));
   assert.notEqual(second.curvePoints, domain.defaultCurve());

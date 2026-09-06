@@ -2709,11 +2709,14 @@
     return null;
   }
   function opacityDomain() { return window.NemoOpacityDomain; }
+  // Keep the migrated writer on Motion's production curve source. The domain
+  // accepts this as a port so it stays usable without this browser facade.
+  var OPACITY_DEFAULTS = { defaultCurve: function () { return window.SMMotion.DEFAULT_CURVE(); } };
   function setKeyAtCurrentFrame(ld, prop, values) {
     if (prop === 'opacity') {
       var legacy = opacityLegacy('key-current', ld, values, state.currentFrame);
       if (legacy !== null) return legacy;
-      return opacityDomain().setKeyAtFrame(ld, state.currentFrame, values);
+      return opacityDomain().setKeyAtFrame(ld, state.currentFrame, values, null, OPACITY_DEFAULTS);
     }
     var track = ensureTrack(ld, prop);
     var k = keyAt(track, state.currentFrame);
@@ -2732,7 +2735,7 @@
     if (prop === 'opacity') {
       var legacy = opacityLegacy('key-frame', holder, values, frame, curvePoints);
       if (legacy !== null) return legacy;
-      return opacityDomain().setKeyAtFrame(holder, frame, values, curvePoints);
+      return opacityDomain().setKeyAtFrame(holder, frame, values, curvePoints, OPACITY_DEFAULTS);
     }
     var track = ensureTrack(holder, prop);
     var k = keyAt(track, frame);
@@ -2783,7 +2786,7 @@
       var animated = !isAnimated(ld, prop), effectiveValue = valueAtFrame(ld, prop, state.currentFrame);
       var legacy = opacityLegacy('animated', ld, animated, state.currentFrame, effectiveValue);
       if (legacy !== null) return legacy;
-      return opacityDomain().setAnimated(ld, animated, state.currentFrame, effectiveValue);
+      return opacityDomain().setAnimated(ld, animated, state.currentFrame, effectiveValue, OPACITY_DEFAULTS);
     }
     // The Time Remap row's stopwatch IS the remap switch (AE behavior) —
     // there is no "static timeRemap" fallback to freeze into, the feature
@@ -2838,7 +2841,7 @@
     if (prop === 'opacity') {
       var legacy = opacityLegacy('set', ld, values, state.currentFrame);
       if (legacy !== null) return legacy;
-      return opacityDomain().setValue(ld, values, state.currentFrame);
+      return opacityDomain().setValue(ld, values, state.currentFrame, OPACITY_DEFAULTS);
     }
     selectLayerForEdit(ld);
     if (isAnimated(ld, prop)) setKeyAtCurrentFrame(ld, prop, values);
