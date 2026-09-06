@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { checkProfile } = require('./boundaries.cjs');
+const { checkSourceSizes } = require('./boundaries-size.cjs');
 const { checkSourceCoverage } = require('./boundaries-coverage.cjs');
 const { discoverSourcePaths } = require('./boundaries-discovery.cjs');
 
@@ -82,7 +82,7 @@ function checkApplicationPolicy(profile, policy, opts = {}) {
     if (typeof record.component !== 'string' || !record.component.trim()) invalid(`exclusion ${record.path} component is missing`);
     if (typeof record.reason !== 'string' || !record.reason.trim()) invalid(`exclusion ${record.path} reason is missing`);
     if (!Array.isArray(record.evidence) || !record.evidence.length) invalid(`exclusion ${record.path} evidence is missing`);
-    verifyPinnedFile(root, { path: record.path, ...(record.provenance || {}) }, 'exclusion');
+    verifyPinnedFile(root, { ...(record.provenance || {}), path: record.path }, 'exclusion');
   }
 
   const inventory = sourcePaths.map((file) => `${file}\0${git(root, ['hash-object', '--', file])}\n`).join('');
@@ -95,11 +95,7 @@ function checkApplicationPolicy(profile, policy, opts = {}) {
 }
 
 function checkApplicationSize(profile, opts = {}) {
-  const report = checkProfile(profile, opts);
-  const violations = report.violations.filter((violation) => ['size', 'expired-exception'].includes(violation.rule));
-  return { ok: violations.length === 0, violations,
-    warnings: report.warnings.filter((warning) => warning.rule === 'size'),
-    exceptionsApplied: report.exceptionsApplied.filter((exception) => exception.rule === 'size') };
+  return checkSourceSizes(profile, opts);
 }
 
 module.exports = { checkApplicationPolicy, checkApplicationSize };
