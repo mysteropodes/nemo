@@ -389,7 +389,7 @@ function compareRegistrations(code, expected, omissions = {}) {
   const elements = Object.fromEntries(Object.keys(actual).map((id) => [id, {
     addEventListener(event) { actual[id].push(event); },
   }]));
-  vm.runInNewContext(code, { document: { getElementById: (id) => elements[id] }, cb() {} }, { timeout: 1000 });
+  vm.runInNewContext(code, { window: {}, document: { getElementById: (id) => elements[id] }, cb() {} }, { timeout: 1000 });
   assert.deepEqual(actual, expected, 'fixture must reproduce the actual runtime target');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-inventory-runtime-'));
   try {
@@ -414,6 +414,17 @@ function compareRegistrations(code, expected, omissions = {}) {
     return result;
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
+
+test('runtime: a window-exported record-array helper binds only its literal wrap field', () => {
+  compareRegistrations(`function wireColorSwatches(pairs) {
+  pairs.forEach(function (pair) {
+    var wrap = document.getElementById(pair.wrap);
+    wrap.addEventListener('click', cb);
+  });
+}
+window.ColorPicker = { wireColorSwatches: wireColorSwatches };
+window.ColorPicker.wireColorSwatches([{ wrap: 'a', input: 'b' }]);`, { a: ['click'], b: [] });
+});
 
 test('runtime: quoted return text cannot override the real returned element', () => {
   compareRegistrations(`function getButton() { const example="return document.getElementById('a')"; return document.getElementById('b'); }
