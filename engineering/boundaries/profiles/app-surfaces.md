@@ -1,12 +1,12 @@
 # Application-surface source classification (R05 adoption increment)
 
-Status: **coverage classification + one candidate legacy-size profile**, not an R05-closing
-adoption or a claim that application files have been architecturally reviewed. The original
+Status: **adopted source coverage + legacy no-growth size profile**, not a claim that
+application files have been assigned reviewed target layers or public APIs. The original
 80-file classification was authored against `35f0f5f` (#943). Candidate `c9ab634` combines
 that profile work from #948 with the #957 tokenizer correction (`d677989`) and expands the
-profile to all **140 handwritten `src/js/**` files**. This documentation correction preserves
-both JSON artifacts from `c9ab634` exactly; it changes no checker, application source,
-`scripts/nemo/lib/jobs.cjs`, `package.json`, or `engineering/inventory/**` content.
+profile to all **140 handwritten `src/js/**` files**. The R05 integration adopts those
+reviewed profile bytes and the exact 12-file vendor/generated policy in the standard boundary
+lane. It changes no application source or `engineering/inventory/**` content.
 
 Scope: the application source the previous `scripts/nemo/**` increment
 ([`scripts-nemo.md`](./scripts-nemo.md)) explicitly excluded — `src/**`, `src-tauri/src/**`,
@@ -19,16 +19,14 @@ named, not summarized away.
 Owner/reviewer: no per-path `CODEOWNERS` exists in this repository (same fact recorded in
 `scripts-nemo.md`). Accountable human owner for all paths below is Ilya (`ivg-design`), per
 issue [#901](https://github.com/mysteropodes/nemo/issues/901)'s "Accountable human / integration
-owner" field. Reviewer of this classification: the agent session that authored it, pending
-maintainer/integration review (Codexitron, per this packet's task thread).
+owner" field. The adopted mechanical classification remains distinct from the outstanding
+maintainer review of target layers, public APIs and provider/consumer boundaries.
 
 ## Relationship to R01/#897 and R03/#944
 
-`README.md`'s "Integration contract for R01/R03 (pending)" states application-wide adoption
-needs R01 (real domain/application/features/ports/adapters/shared layer assignment per file)
-and R03 (a reviewed module inventory with real public APIs). Neither has landed for
-application source: R01/#897 has not produced a layer assignment for `src/js/**`, and R03's
-first reviewable increment (#944, open, unmerged) inventories **UI surfaces** (DOM controls,
+R01/#897 adopted the remediation handbook but did not produce a real
+domain/application/features/ports/adapters/shared layer assignment for `src/js/**`. R03's
+reviewable increment (#944, open at this adoption) inventories **UI surfaces** (DOM controls,
 menu items, shortcuts, Labs registrations, the scripting/plugin API — `engineering/inventory/
 surfaces.json`), not a module/dependency graph with per-file public APIs. It cannot supply this
 packet's `modules[]`/`layerRules` even once merged — it answers "what user-facing capability
@@ -99,9 +97,9 @@ provider/consumer graph, or runtime acceptance. The tokenizer remains a lexical 
 remaining unsupported forms such as escaped identifiers, legacy numeric string escapes, and
 ambiguous bare-`}` slash contexts remain outside its documented scope.
 
-### 1b. Candidate profile — 140 files, [`app-js.profile.json`](./app-js.profile.json)
+### 1b. Adopted legacy profile — 140 files, [`app-js.profile.json`](./app-js.profile.json)
 
-The expanded candidate retains the original provisional policy:
+The adopted profile retains the deliberately conservative legacy policy:
 
 - **One flat layer, `app-legacy`**, with `allowedLayers: ["app-legacy"]`. This records that
   real domain/application/features/ports/adapters/shared assignments remain unreviewed.
@@ -117,10 +115,11 @@ The expanded candidate retains the original provisional policy:
 The import-only graph still cannot describe the application's coupling. For example,
 `psd-import-bridge.js:30` dynamically imports `./ag-psd.vendor.mjs`, whose line 2 statically
 imports `./node-buffer-shim.vendor.mjs`. Both targets are vendor `.mjs` files outside the
-143-file `.js` count and outside this profile. The current checker drops such resolved targets
-outside its declared modules; it does not validate that vendor dependency. The two generated
-WASM imports above have computed targets and are reported as unsupported imports. Worker
-construction and HTML startup order are not import edges modeled by this checker.
+143-file `.js` count and outside this profile. The integrated checker reports that edge as an
+`unprofiled-local-import`; the coverage policy separately verifies the excluded vendor bytes
+and provenance. The two generated WASM imports above have computed targets and are reported as
+unsupported imports. Worker construction and HTML startup order are not import edges modeled
+by this checker.
 
 **Zero cycle/private-import/layer-violation findings are structurally vacuous for this
 140-file candidate, not evidence of clean coupling.** Meaningful checks require reviewed
@@ -130,9 +129,10 @@ global/provider-consumer inventory, reconciled with startup and worker relations
 also supply those edges. That route remains to be designed, reviewed, and integrated; this
 profile does not implement it or equate R03's UI-surface rows with module dependencies.
 
-[`app-js.baseline.json`](./app-js.baseline.json) remains byte-identical to the candidate.
-The expansion updates both files together as a **provisional self-seed**, not a protected-base
-ratchet result or architecture adoption.
+[`app-js.baseline.json`](./app-js.baseline.json) remains byte-identical to the candidate as the
+reviewed first-adoption seed. The standard CI lane requires that byte identity only while the
+protected base lacks an application profile. After adoption, it materializes the prior profile
+from the protected base commit and rejects ceiling growth independently of this seed.
 
 ### 1c. `i18n.js` — translation table, not logic (4,241 nonblank lines)
 
@@ -168,8 +168,8 @@ The recorded ratchet result is `{"ok": true, "baselinePathCount": 140,
 "candidatePathCount": 140, "violations": [], "reductions": [], "removals": []}`. This compares
 the expanded candidate to its own updated seed. The parent contains the earlier 80-file
 baseline; this result does **not** compare against that parent or a protected-branch baseline.
-Protection against later silent growth still requires an independently selected, immutable
-baseline and standard-command/CI adoption.
+That result supplied first-adoption evidence only. The integrated standard lane now protects
+later changes with the application profile materialized from the pull request's base commit.
 
 The original 80-file packet separately recorded two scratch size-growth failures:
 `abr-import.js` grew from 278 to 528 nonblank lines (hard maximum 500), and `i18n.js` from
@@ -291,17 +291,15 @@ application source).
   lines, 128 classic startup file tags, 2 module file tags, 1 module worker, and 12 Labs files
   without startup tags. Reading the loader/worker source confirms who constructs the worker
   and who imports each generated WASM glue module.
-- **Preserved candidate:** both app-js JSON artifacts remain exactly as committed in `c9ab634`,
+- **Adopted profile bytes:** both app-js JSON artifacts remain exactly as committed in `c9ab634`,
   each declaring 140 modules and 36 exact-path size exceptions; their bytes are identical to
-  each other. The recorded checker and self-seed comparison results are in §1d. This pass
-  does not independently rerun those checks or claim an application/CI pass.
-- **Prior tooling profile:** `c9ab634` records the unchanged `scripts-nemo` result as 23
-  modules, 0 violations, 3 warnings, and a passing self-seed comparison. Neither tooling
-  profile artifact is modified here.
-- **Documentation correction:** relative links and the two-document diff are checked. The
-  accidental `c9ab634` change to `engineering/boundaries/README.md` is removed exactly;
-  its profile-specific narrative belongs in this document. Other checker-owner changes stay
-  on their separate branch.
+  each other. The recorded full-checker signal remains in §1d; the integrated lane freshly
+  reruns source coverage, current size/expiry enforcement and protected-base ceiling comparison.
+- **Integrated tooling profile:** every current `scripts/nemo/**/*.cjs` file is declared and
+  fresh discovery rejects an unprofiled addition. Its protected-base ratchet preserves all
+  prior ceilings while allowing newly reviewed modules within existing size profiles.
+- **Documentation reconciliation:** the profile history remains here while the boundary README
+  describes the integrated command and enforcement contract.
 
 ## Coverage limits (explicit, per task instructions)
 
@@ -312,24 +310,24 @@ application source).
   the zero import-graph findings do not establish absence of cycles, private access, or
   forbidden layer edges. Reviewed global/provider-consumer modeling is a valid route for
   current classic scripts; ESM migration is another route, not the sole prerequisite.
-- **437 global-state, 2 unsupported-import, and 4 unsupported-global findings remain.**
-  Neither profile content nor this documentation fixes source or checker behavior.
-- **No app-profile standard-command/CI adoption.** This candidate does not add a
-  `package.json` script or `scripts/nemo/lib/jobs.cjs` job for the app profile, or wire its
-  protected baseline into CI. Rust and UI/style/generated classifications also remain
-  separate from JS checker enforcement. Integration remains a separate owned packet.
-- **No per-file reviewer sign-off.** The issue's accountable human owner does not establish
-  an architecture review of every file or the provisional size exceptions.
-- **The baseline is a provisional self-seed.** Updating candidate and baseline together to
-  140 files establishes internal agreement only. A protected-base baseline and independent
-  change review are still needed before claiming a regression gate.
+- **437 global-state, 2 unsupported-import, 4 unsupported-global, and 1 expected
+  unprofiled-vendor-import finding remain.** Neither the flat profile nor this documentation
+  treats those diagnostics as an accepted clean graph.
+- **Application graph rules remain gated.** The standard boundary lane enforces exact source
+  coverage, exclusion provenance and protected-base size ceilings. It does not run the flat
+  legacy profile as proof of clean cycles, private imports, layers or globals; the recorded
+  findings above remain unresolved evidence for the architecture review.
+- **No per-file architecture sign-off.** The reviewed mechanical profile and its exact
+  no-growth ceilings do not establish target-layer, public-API or dependency ownership.
+- **The committed baseline is the first-adoption seed.** On later changes, the CI gate ignores
+  candidate-controlled seed updates and reads the prior application profile from the protected
+  base commit.
 
 ## Checker findings and remaining adoption gates
 
-The original #948 review recorded four findings. The selected `c9ab634` tree includes the
-separate #957 correction for the first; the other limitations below remain in that exact
-candidate. This documentation pass changes no `scripts/nemo/**` file and does not adopt later
-checker-owner work merely because it exists on another branch.
+The original #948 review recorded four findings. The integrated candidate includes the parser,
+resolver, source-discovery, coverage and protected-baseline corrections described below while
+preserving the unresolved architecture limits explicitly.
 
 1. **Original division-parser gap corrected in the selected candidate.** #957 (`d677989`)
    removes the division/control-header-regex failure that excluded the 60 handwritten files.
@@ -344,18 +342,15 @@ checker-owner work merely because it exists on another branch.
    (`transplant.js:147–154`). Detecting a nearby qualified guard does not model those bare
    calls or prove the dependency's direction. A reviewed global/provider-consumer graph can
    address this without requiring ESM conversion; it is not implemented by this profile.
-3. **Import/loader-resolution gaps remain in this tree.** `resolveSpecifier` tries relative
-   or absolute paths with supported extension/index fallbacks, but does not normalize a
-   cache-busting suffix such as `import('./mod.js?v=1')`. Unresolved paths are dropped, and
-   `checkProfile` also drops resolved targets outside declared modules. That includes the
-   deliberately excluded PSD vendor chain (§1b/Category 4), but could also hide an unintended
-   missing dependency. Worker construction and HTML order are unmodeled. These are checker
-   and inventory integration responsibilities, not grounds for claiming a clean graph.
-4. **Protected-baseline/CI adoption remains open.** The reported passing ratchet compares
-   two files updated together. Changing both sides, moving source out of a profile, or
-   extending an exception's expiry is not independently reviewed by that self-comparison.
-   The integration owner must select the protected baseline and wire the reviewed profile
-   into the ordinary checks before claiming enforcement.
+3. **Literal local resolution is integrated; runtime relationships remain open.** The checker
+   now resolves literal ESM query/fragment URLs and Node `require` targets and fails unresolved,
+   unsupported or unprofiled local dependencies explicitly. The application's actual computed
+   WASM imports, worker construction, classic global providers/consumers and HTML readiness
+   order still require parsed inventory and runtime evidence.
+4. **Protected source-coverage and size adoption is integrated.** The standard boundary lane
+   independently discovers application sources, validates exact exclusion provenance, and
+   compares candidate ceilings with the application profile from the protected base commit.
 
-These findings preserve the remaining checker, R01, global-modeling, and CI gates. The expanded
-profile is a reviewable coverage candidate, not full R05 adoption or product acceptance.
+These findings preserve the remaining target-layer, public-API, global-modeling and runtime
+readiness gates. Source coverage and size enforcement are adopted; they do not establish a
+clean application graph or product acceptance.

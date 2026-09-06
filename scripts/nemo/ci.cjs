@@ -7,7 +7,9 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const { compareSizeBaseline } = require('./lib/boundaries-ratchet.cjs');
-const { checkApplicationPolicy } = require('./lib/boundaries-application.cjs');
+const { checkApplicationPolicy, checkApplicationSize } = require('./lib/boundaries-application.cjs');
+const { checkSourceCoverage } = require('./lib/boundaries-coverage.cjs');
+const { discoverSourcePaths } = require('./lib/boundaries-discovery.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const PROFILE = 'engineering/boundaries/profiles/scripts-nemo.profile.json';
@@ -124,8 +126,14 @@ function applicationBoundaries(base, scratch, root = ROOT) {
   const prior = JSON.parse(fs.readFileSync(baseline.file, 'utf8'));
   const policy = JSON.parse(fs.readFileSync(path.join(root, APPLICATION_POLICY), 'utf8'));
   const coverage = checkApplicationPolicy(candidate, policy, { root });
+  const size = checkApplicationSize(candidate, { root });
   const ratchet = compareSizeBaseline(prior, candidate, { root });
-  return { ok: coverage.ok && ratchet.ok, baseline, coverage, ratchet };
+  return { ok: coverage.ok && size.ok && ratchet.ok, baseline, coverage, size, ratchet };
+}
+
+function toolingCoverage(profile, root = ROOT) {
+  const sourcePaths = discoverSourcePaths({ root, sourceRoots: ['scripts/nemo'], extensions: ['.cjs'] });
+  return checkSourceCoverage(profile, { root, sourcePaths, exclusions: [] });
 }
 
 function verify(required, root = ROOT) {
@@ -146,12 +154,15 @@ function boundaries(base, root = ROOT) {
       '--baseline', baseline.file, '--root', root, '--json'], root);
     let report;
     try { report = JSON.parse(result.stdout); } catch { /* rejected below */ }
-    const toolingOk = result.status === 0 && report?.ok === true && report?.ratchet?.ok === true;
+    const toolingProfile = JSON.parse(fs.readFileSync(path.join(root, PROFILE), 'utf8'));
+    const toolingSourceCoverage = toolingCoverage(toolingProfile, root);
+    const toolingOk = result.status === 0 && report?.ok === true && report?.ratchet?.ok === true
+      && toolingSourceCoverage.ok;
     const application = applicationBoundaries(base, scratch, root);
     const ok = toolingOk && (!application || application.ok);
-    return { ok, problems: ok ? [] : ['boundary checker or required baseline ratchet did not pass'],
+    return { ok, problems: ok ? [] : ['boundary checker, source coverage, current size, or protected baseline ratchet did not pass'],
       baseline: { base: baseline.base, sourcePath: baseline.sourcePath, sha256: baseline.sha256 },
-      report: report || null, application, stderr: result.stderr || null };
+      report: report || null, toolingSourceCoverage, application, stderr: result.stderr || null };
   } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 }
 
@@ -182,4 +193,4 @@ if (require.main === module) {
 }
 module.exports = { LANES, QUICK, SURFACES, PROFILE, APPLICATION_PROFILE, APPLICATION_SEED,
   APPLICATION_POLICY, aggregate, validateReceipt, applicability, changedFiles, materializeBaseline,
-  existsAtRevision, applicationBoundaries, verify, boundaries, main };
+  existsAtRevision, applicationBoundaries, toolingCoverage, verify, boundaries, main };

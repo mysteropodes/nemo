@@ -67,6 +67,20 @@ test('surface applicability exempts explicit tooling/docs only and treats unknow
   }
 });
 
+test('tooling coverage profiles every current scripts/nemo CommonJS source', () => {
+  const profile = JSON.parse(fs.readFileSync(path.join(ROOT, ci.PROFILE), 'utf8'));
+  const result = ci.toolingCoverage(profile, ROOT);
+  assert.equal(result.ok, true);
+  assert.equal(result.sourcePathCount, 34);
+  assert.equal(result.declaredPathCount, 34);
+  const incomplete = structuredClone(profile);
+  incomplete.modules = incomplete.modules.filter((module) => module.id !== 'nemo.lib.boundariesApplication');
+  const rejected = ci.toolingCoverage(incomplete, ROOT);
+  assert.equal(rejected.ok, false);
+  assert.equal(rejected.violations.some((violation) => violation.rule === 'coverage-unprofiled-source'
+    && violation.file === 'scripts/nemo/lib/boundaries-application.cjs'), true);
+});
+
 const benignPaths = ['scripts/nemo/README.md',
   'engineering/boundaries/profiles/scripts-nemo.fixture/src/cycle-a.cjs'];
 for (const file of benignPaths) {
@@ -136,8 +150,36 @@ test('baseline is materialized from the explicit base commit, never candidate po
   assert.equal(materialized.base, base);
   assert.match(materialized.sha256, /^[a-f0-9]{64}$/);
   assert.deepEqual(ci.applicability(ci.changedFiles(base, root)).required, ci.SURFACES);
-  fs.mkdirSync(path.join(root, 'scripts/nemo'), { recursive: true });
+  for (const invalid of [undefined, 'origin/main', '--help', '0'.repeat(40)]) {
+    assert.throws(() => ci.materializeBaseline(invalid, scratch(t), root));
+  }
+  fs.rmSync(policy);
+  git(root, ['add', '.']);
+  git(root, ['-c', 'commit.gpgsign=false', 'commit', '-qm', 'remove profile']);
+  assert.throws(() => ci.materializeBaseline(git(root, ['rev-parse', 'HEAD']), scratch(t), root));
+});
+
+test('boundary lane requires a successful checker ratchet and complete tooling coverage', (t) => {
+  const root = scratch(t);
+  git(root, ['init', '-q']);
+  git(root, ['config', 'user.name', 'CI fixture']);
+  git(root, ['config', 'user.email', 'ci@example.invalid']);
+  const policy = path.join(root, ci.PROFILE);
   const checker = path.join(root, 'scripts/nemo/boundaries.cjs');
+  fs.mkdirSync(path.dirname(policy), { recursive: true });
+  fs.mkdirSync(path.dirname(checker), { recursive: true });
+  const profile = {
+    modules: [{ id: 'fixture.checker', layer: 'tooling-bootstrap', dir: 'scripts/nemo',
+      files: ['boundaries.cjs'], publicApi: [], sizeProfile: 'Handwritten config/bootstrap' }],
+    layerRules: { 'tooling-bootstrap': { allowedLayers: ['*'] } },
+    sizeProfiles: { 'Handwritten config/bootstrap': { warn: 150, hardMax: 250 } },
+    exceptions: [],
+  };
+  fs.writeFileSync(policy, JSON.stringify(profile));
+  fs.writeFileSync(checker, '// base checker\n');
+  git(root, ['add', '.']);
+  git(root, ['-c', 'commit.gpgsign=false', 'commit', '-qm', 'base']);
+  const base = git(root, ['rev-parse', 'HEAD']);
   for (const [report, ok] of [[{ ok: true }, false], [{ ok: true, ratchet: { ok: false } }, false],
     [{ ok: false, ratchet: { ok: true } }, false], [{ ok: true, ratchet: { ok: true } }, true]]) {
     fs.writeFileSync(checker, `const fs = require('node:fs');
@@ -149,16 +191,11 @@ console.log(${JSON.stringify(JSON.stringify(report))});`);
     const invocation = JSON.parse(fs.readFileSync(path.join(root, 'boundary-invocation.json')));
     assert.equal(invocation.args[0], ci.PROFILE);
     assert.deepEqual(invocation.args.slice(3), ['--root', root, '--json']);
-    assert.deepEqual(invocation.baseline, { protected: true });
+    assert.deepEqual(invocation.baseline, profile);
     assert.equal(fs.existsSync(invocation.args[2]), false, 'temporary baseline removed after checker');
   }
-  for (const invalid of [undefined, 'origin/main', '--help', '0'.repeat(40)]) {
-    assert.throws(() => ci.materializeBaseline(invalid, scratch(t), root));
-  }
-  fs.rmSync(policy);
-  git(root, ['add', '.']);
-  git(root, ['-c', 'commit.gpgsign=false', 'commit', '-qm', 'remove profile']);
-  assert.throws(() => ci.materializeBaseline(git(root, ['rev-parse', 'HEAD']), scratch(t), root));
+  fs.writeFileSync(path.join(root, 'scripts/nemo/unprofiled.cjs'), '// new tooling source\n');
+  assert.equal(ci.boundaries(base, root).ok, false);
 });
 
 test('CI invokes established verify with explicit jobs and rejects a real zero-exit blocked receipt', (t) => {

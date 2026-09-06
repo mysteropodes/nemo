@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
+const { checkProfile } = require('./boundaries.cjs');
 const { checkSourceCoverage } = require('./boundaries-coverage.cjs');
 const { discoverSourcePaths } = require('./boundaries-discovery.cjs');
 
@@ -35,11 +36,14 @@ function assertUnique(records, label) {
 }
 
 function verifyPinnedFile(root, record, label) {
+  if (!record || typeof record.path !== 'string' || !record.path) invalid(`${label} path is missing`);
+  if (typeof record.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(record.sha256)) invalid(`${label} ${record.path} SHA-256 pin is missing`);
+  if (typeof record.gitBlob !== 'string' || !/^[a-f0-9]{40}$/.test(record.gitBlob)) invalid(`${label} ${record.path} Git blob pin is missing`);
   const absolute = path.join(root, record.path);
   let bytes;
   try { bytes = fs.readFileSync(absolute); } catch (error) { invalid(`${label} ${record.path} is unavailable (${error.code || 'read error'})`); }
-  if (record.sha256 && sha256(bytes) !== record.sha256) invalid(`${label} ${record.path} SHA-256 changed`);
-  if (record.gitBlob && git(root, ['hash-object', '--', record.path]) !== record.gitBlob) invalid(`${label} ${record.path} Git blob changed`);
+  if (sha256(bytes) !== record.sha256) invalid(`${label} ${record.path} SHA-256 changed`);
+  if (git(root, ['hash-object', '--', record.path]) !== record.gitBlob) invalid(`${label} ${record.path} Git blob changed`);
 }
 
 function checkApplicationPolicy(profile, policy, opts = {}) {
@@ -73,7 +77,13 @@ function checkApplicationPolicy(profile, policy, opts = {}) {
   verifyPinnedFile(root, provenance.bootstrap || {}, 'bootstrap');
   for (const record of provenance.profiles || []) verifyPinnedFile(root, record, 'profile');
   for (const record of provenance.exclusionSupport || []) verifyPinnedFile(root, record, 'exclusion support');
-  for (const record of policy.exclusions) verifyPinnedFile(root, record, 'exclusion');
+  for (const record of policy.exclusions) {
+    if (!['vendor', 'generated'].includes(record.category)) invalid(`exclusion ${record.path} has unsupported category`);
+    if (typeof record.component !== 'string' || !record.component.trim()) invalid(`exclusion ${record.path} component is missing`);
+    if (typeof record.reason !== 'string' || !record.reason.trim()) invalid(`exclusion ${record.path} reason is missing`);
+    if (!Array.isArray(record.evidence) || !record.evidence.length) invalid(`exclusion ${record.path} evidence is missing`);
+    verifyPinnedFile(root, { path: record.path, ...(record.provenance || {}) }, 'exclusion');
+  }
 
   const inventory = sourcePaths.map((file) => `${file}\0${git(root, ['hash-object', '--', file])}\n`).join('');
   if (provenance.inventoryDigest?.algorithm !== 'sha256' || sha256(inventory) !== provenance.inventoryDigest.value) {
@@ -84,4 +94,12 @@ function checkApplicationPolicy(profile, policy, opts = {}) {
     retainedPathCount: retained.length, excludedPathCount: exclusions.length, coverage };
 }
 
-module.exports = { checkApplicationPolicy };
+function checkApplicationSize(profile, opts = {}) {
+  const report = checkProfile(profile, opts);
+  const violations = report.violations.filter((violation) => ['size', 'expired-exception'].includes(violation.rule));
+  return { ok: violations.length === 0, violations,
+    warnings: report.warnings.filter((warning) => warning.rule === 'size'),
+    exceptionsApplied: report.exceptionsApplied.filter((exception) => exception.rule === 'size') };
+}
+
+module.exports = { checkApplicationPolicy, checkApplicationSize };

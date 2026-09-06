@@ -8,16 +8,17 @@ application. Code lives in [`scripts/nemo/lib/boundaries.cjs`](../../scripts/nem
 [`scripts/nemo/lib/boundaries-resolver.cjs`](../../scripts/nemo/lib/boundaries-resolver.cjs)
 (local resolution, including filesystem and Node package metadata reads), and
 [`scripts/nemo/boundaries.cjs`](../../scripts/nemo/boundaries.cjs) (a standalone CLI). Behavioral
-tests are in [`scripts/nemo/boundaries.test.cjs`](../../scripts/nemo/boundaries.test.cjs)
-and [`scripts/nemo/boundaries-ratchet.test.cjs`](../../scripts/nemo/boundaries-ratchet.test.cjs).
+tests are in the `scripts/nemo/boundaries*.test.cjs` suites.
 The library validates the profile before reading its sources; the CLI uses the same validation
 and exits 2 on malformed policy or baseline input.
 
-The core checker and ratchet suites run in normal `npm test` / `verify` through the existing
-`tests/nemo-boundaries*.test.cjs` entries. Pull-request validation runs the standard
-`scripts/nemo/ci.cjs boundaries` lane. That lane enforces the tooling profile's dependency
-rules and size ratchet, then enforces the adopted application profile's protected-base size
-ratchet, fresh source discovery, exact retained/excluded coverage, and provenance pins.
+The checker, ratchet, CLI, discovery, coverage and application-policy suites run in normal
+`npm test` / `verify` through the existing `tests/nemo-boundaries*.test.cjs` entries.
+Pull-request validation runs the standard `scripts/nemo/ci.cjs boundaries` lane. That lane
+requires every current `scripts/nemo/**/*.cjs` source in the tooling profile, enforces its
+dependency rules and protected-base size ratchet, then enforces the adopted application
+profile's protected-base size ratchet, fresh source discovery, exact retained/excluded
+coverage, and provenance pins.
 
 ## What it checks
 
@@ -92,11 +93,12 @@ hide source growth above its committed ceiling. JSON output adds a `ratchet` obj
 The ratchet is intentionally policy-to-policy. Source renames that do not carry a size
 exception are treated as retired and new paths, but the new path still cannot use an enlarged
 ordinary policy: same-budget profile renames and new files at or below the prior adopted maximum
-remain valid. Full source coverage and classification remain the R01/R03 inventory gate. Review
-the reported removals rather than treating them as proof that code was deleted intentionally.
+remain valid. Fresh source coverage is enforced separately; reviewed target-layer and public-API
+classification remain the R01/R03 inventory gate. Review the reported removals rather than
+treating them as proof that code was deleted intentionally.
 The comparator does not infer file types or detect content moves, and a new path may use any
-still-adopted ordinary profile. Reviewing each path's profile assignment and making baseline
-provenance immutable are responsibilities of the R01/R03 and CI adoption gate.
+still-adopted ordinary profile. Reviewing each path's profile assignment remains an R01/R03
+responsibility; the CI caller supplies protected-base provenance.
 
 ## Limitations (v1, deliberate scope cut)
 
@@ -214,7 +216,8 @@ reviewed `app-js.baseline.json` seed. After adoption, CI always materializes the
 baseline from the protected base commit, so changing the candidate profile and its committed
 seed together cannot raise an exact-path ceiling. Fresh validation also rejects missing,
 new, aliased, duplicated or reclassified sources; stale source-tree, bootstrap, profile,
-exclusion-support, exclusion-file and inventory-digest pins fail the lane.
+exclusion-support, exclusion-file and inventory-digest pins fail the lane. Current source line
+counts and exception expiry are checked independently of the policy-to-policy ratchet.
 
 The application profile deliberately labels every retained file `app-legacy`. Its current
 architecture-wide global and dependency findings are evidence for R01/R03 classification,
