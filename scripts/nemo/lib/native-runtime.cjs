@@ -23,7 +23,7 @@ const identity = require('./identity.cjs');
 const buildRuntime = require('./build-runtime.cjs');
 const { ROOT, exists, nowIso } = require('./util.cjs');
 
-const SCHEMA = 'nemo.native-launcher/1';
+const { SCHEMA, launcherProcessIdentity } = require('./native-process.cjs');
 const STATUS_FILE = 'native-launcher.json';
 // Written by the app itself (src-tauri/src/task_runtime.rs) into the task's
 // tauri-data root. This file, not our own bookkeeping, is what proves which
@@ -322,6 +322,12 @@ function nativeHandshake(taskId, ownerToken) {
 
 async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
   const config = nativeLaunchConfig(taskId, options);
+  // A fresh public nonce in the OS-visible title distinguishes PID reuse even
+  // when an identical Node command starts within the same clock second.
+  const launcherTitle = `nemo-native-${crypto.randomBytes(16).toString('hex')}`;
+  process.title = launcherTitle;
+  const launcherIdentity = launcherProcessIdentity(process.pid);
+  if (!launcherIdentity || !launcherIdentity.endsWith(launcherTitle)) throw new Error('launcher process identity unavailable');
   let startupBuild;
   // A start that fails must NOT call isolation.releaseTask: task ids are reused
   // across restarts (that is what makes an instance's state survive a stop), and
@@ -359,6 +365,7 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
     schema: SCHEMA,
     taskId,
     launcherPid: process.pid,
+    launcherIdentity,
     childPid: null,
     state: 'starting',
     startedAt: nowIso(),
@@ -425,6 +432,9 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
   setInterval(() => {}, 60_000);
 
   try {
+    // Ownership is now acquired. Discard only the previous run's handshake,
+    // so retained data cannot masquerade as a newly started app's disclosure.
+    fs.rmSync(config.manifestFile, { force: true });
     processInfo = spawnApp(config);
     await new Promise((resolve, reject) => {
       const failed = (err) => { processInfo.child.off('spawn', ready); reject(err); };

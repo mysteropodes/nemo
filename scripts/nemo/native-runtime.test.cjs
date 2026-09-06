@@ -154,6 +154,9 @@ test('two instances run concurrently on disjoint native state', async () => {
     const seenB = JSON.parse(await waitFor(() => fs.existsSync(captureB) && fs.readFileSync(captureB, 'utf8'), 'instance B environment'));
 
     assert.ok(isolation.pidAlive(a.child.pid) && isolation.pidAlive(b.child.pid), 'both launchers stay live');
+    const identities = [a, b].map((instance) => runtime.readNativeStatus(instance.info.taskId).launcherIdentity);
+    for (const identity of identities) assert.match(identity, /nemo-native-[0-9a-f]{32}$/);
+    assert.notEqual(identities[0], identities[1], 'same-command launchers have distinct OS process identities');
     for (const field of ['taskId', 'taskKey', 'dataDir', 'reports', 'temp', 'cache']) {
       assert.notEqual(seenA[field], seenB[field], `${field} must differ between instances`);
     }
@@ -338,5 +341,120 @@ test('a refused start leaves an existing task instance state intact', async () =
   } finally {
     isolation.releaseExclusiveSlot(slot, holder.ownerToken);
     fs.rmSync(roots.root, { recursive: true, force: true });
+  }
+});
+
+test('a killed launcher cannot delete a live app state; later release reconciles its dead slot', async () => {
+  const task = `native-orphan-${process.pid}`;
+  const slot = `native-orphan-slot-${process.pid}`;
+  const instance = await launch(task, path.join(scratch, 'capture-orphan.json'), {
+    reserve: slot, appDirBase: path.join(scratch, 'orphan-appdirs'),
+  });
+  let appPid;
+  try {
+    const app = await waitFor(() => runtime.readAppManifest(task), 'orphan manifest');
+    appPid = app.manifest.pid;
+    const appDir = app.manifest.dirs.appData;
+    const slotFile = path.join(isolation.RUNTIME_ROOT, 'slots', isolation.idKey(slot) + '.lock');
+    instance.child.kill('SIGKILL'); await exited(instance.child);
+    assert.ok(isolation.pidAlive(appPid), 'the detached app survives its launcher crash');
+
+    const refused = await command(['stop', '--task', task, '--owner', instance.info.ownerToken]);
+    assert.equal(refused.code, 1, refused.stdout || refused.stderr);
+    assert.match(refused.stdout, /app process group is still live/);
+    assert.ok(isolation.pidAlive(appPid), 'stop never signals an orphan by its stale PID');
+    assert.ok(fs.existsSync(appDir) && fs.existsSync(slotFile), 'live app state and slot evidence remain');
+    assert.equal(isolation.readLauncher(task).ownerToken, instance.info.ownerToken);
+
+    // Explicit test-owned reconciliation, after proving this is our stub.
+    process.kill(-appPid, 'SIGKILL');
+    await waitFor(() => !isolation.pidAlive(appPid), 'orphan app exit');
+    const statusFile = path.join(isolation.taskRoots(task).reports, runtime.STATUS_FILE);
+    const statusBytes = fs.readFileSync(statusFile);
+    fs.writeFileSync(statusFile, JSON.stringify({ ...JSON.parse(statusBytes), childPid: null }));
+    const unknown = await command(['stop', '--task', task, '--owner', instance.info.ownerToken]);
+    assert.equal(unknown.code, 1);
+    assert.match(unknown.stdout, /app process group is unknown/);
+    assert.ok(fs.existsSync(appDir) && fs.existsSync(slotFile), 'uncertain process evidence keeps data and reservations');
+    fs.writeFileSync(statusFile, statusBytes);
+    const stopped = await command(['stop', '--task', task, '--owner', instance.info.ownerToken]);
+    assert.equal(stopped.code, 0, stopped.stdout || stopped.stderr);
+    const result = JSON.parse(stopped.stdout.trim());
+    assert.deepEqual(result.released.slots.reconciled, [slot]);
+    assert.equal(fs.existsSync(slotFile), false);
+    assert.equal(fs.existsSync(appDir), false);
+    assert.equal(fs.existsSync(isolation.taskRoot(task)), false);
+  } finally {
+    if (appPid && isolation.pidAlive(appPid)) process.kill(-appPid, 'SIGKILL');
+    await stopOwned(instance);
+  }
+});
+
+test('retained stop releases ownership and reservations while same-task relaunch keeps saved state', async () => {
+  const task = `native-restart-${process.pid}`;
+  const slot = `native-restart-slot-${process.pid}`;
+  const base = path.join(scratch, 'restart-appdirs');
+  let instance = await launch(task, path.join(scratch, 'capture-restart.json'), { reserve: slot, appDirBase: base });
+  try {
+    const app = await waitFor(() => runtime.readAppManifest(task), 'restart manifest');
+    const roots = isolation.taskRoots(task);
+    const dirs = [roots.temp, roots.cache, roots.reports, roots.tauriDataDir, app.manifest.dirs.appData];
+    for (const dir of dirs) fs.writeFileSync(path.join(dir, 'persisted-sentinel.json'), '{"saved":42}');
+    const stopped = await command(['stop', '--task', task, '--owner', instance.info.ownerToken, '--retain-data']);
+    assert.equal(stopped.code, 0, stopped.stdout || stopped.stderr);
+    await exited(instance.child);
+    const result = JSON.parse(stopped.stdout.trim());
+    assert.equal(result.stopped, true);
+    assert.equal(result.retainedData, true);
+    assert.equal(result.released.retainedData, true);
+    assert.equal(result.appState, null);
+    assert.equal(isolation.pidAlive(app.manifest.pid), false);
+    assert.equal(isolation.readLauncher(task), null, 'same-task registration is available again');
+    const reservation = isolation.acquireExclusiveSlot(slot, 'restart-contender');
+    assert.equal(reservation.acquired, true); reservation.release();
+
+    const originalPid = app.manifest.pid;
+    instance = await launch(task, path.join(scratch, 'capture-restarted.json'), { reserve: slot, appDirBase: base });
+    await waitFor(() => {
+      const current = runtime.readAppManifest(task);
+      return current && current.valid && current.manifest.pid !== originalPid;
+    }, 'fresh restarted app manifest');
+    for (const dir of dirs) assert.equal(fs.readFileSync(path.join(dir, 'persisted-sentinel.json'), 'utf8'), '{"saved":42}');
+  } finally { await stopOwned(instance); }
+});
+
+test('retained handshake cannot satisfy a new silent app instance', async () => {
+  const task = `native-stale-handshake-${process.pid}`;
+  let instance = await launch(task, path.join(scratch, 'capture-handshake-old.json'));
+  try {
+    await waitFor(() => runtime.readAppManifest(task), 'old manifest');
+    const stopped = await command(['stop', '--task', task, '--owner', instance.info.ownerToken, '--retain-data']);
+    assert.equal(stopped.code, 0, stopped.stdout || stopped.stderr);
+    await exited(instance.child);
+    instance = await launch(task, path.join(scratch, 'capture-handshake-new.json'), { mode: 'no-manifest' });
+    await waitFor(() => fs.existsSync(path.join(scratch, 'capture-handshake-new.json')), 'silent app startup');
+    assert.equal(runtime.nativeHandshake(task, instance.info.ownerToken).ok, false);
+    assert.equal(runtime.readAppManifest(task), null);
+  } finally { await stopOwned(instance); }
+});
+
+test('a recorded PID with changed process identity is never signaled', async () => {
+  const task = `native-reused-pid-${process.pid}`;
+  const unrelated = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+  const record = isolation.registerLauncher(task, { pid: unrelated.pid });
+  const roots = isolation.taskRoots(task);
+  fs.writeFileSync(path.join(roots.reports, runtime.STATUS_FILE), JSON.stringify({
+    schema: runtime.SCHEMA, taskId: task, launcherPid: unrelated.pid,
+    launcherIdentity: 'a previous process birth and command', childPid: null,
+  }));
+  try {
+    const stopped = await command(['stop', '--task', task, '--owner', record.ownerToken]);
+    assert.equal(stopped.code, 1);
+    assert.match(stopped.stdout, /launcher process identity changed or unavailable/);
+    assert.ok(isolation.pidAlive(unrelated.pid), 'the unrelated live process is untouched');
+    assert.equal(isolation.readLauncher(task).ownerToken, record.ownerToken);
+  } finally {
+    unrelated.kill('SIGKILL'); await exited(unrelated);
+    isolation.releaseTask(task, record.ownerToken);
   }
 });

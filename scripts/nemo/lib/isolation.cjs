@@ -241,7 +241,10 @@ async function requestStop(taskId, ownerToken, opts = {}) {
       if (!rec) return { stopped: false, reason: 'no launcher record for task' };
       if (!ownerToken || ownerToken !== rec.ownerToken) return { stopped: false, reason: 'refused: caller is not the task owner (owner token mismatch)' };
       validPid(rec.pid);
-      if (pidAlive(rec.pid)) process.kill(rec.pid, signal);
+      if (pidAlive(rec.pid)) {
+        if (opts.verifyProcess && !opts.verifyProcess(rec)) return { stopped: false, reason: 'launcher process identity changed or unavailable; explicit reconciliation required' };
+        process.kill(rec.pid, signal);
+      }
       return null;
     });
     if (refused) return refused;
@@ -252,7 +255,7 @@ async function requestStop(taskId, ownerToken, opts = {}) {
   try {
     mutate('task', taskId, () => {
       const current = readLauncher(taskId);
-      if (current && current.ownerToken === rec.ownerToken && current.pid === rec.pid) {
+      if (!opts.retainRecord && current && current.ownerToken === rec.ownerToken && current.pid === rec.pid) {
         fs.unlinkSync(launcherFile(taskRoot(taskId)));
       }
     });
@@ -260,13 +263,17 @@ async function requestStop(taskId, ownerToken, opts = {}) {
   return { stopped: true, reason: 'exit confirmed', pid: rec.pid };
 }
 
-function releaseTask(taskId, ownerToken) {
+function releaseTask(taskId, ownerToken, opts = {}) {
   return mutate('task', taskId, () => {
     const file = launcherFile(taskRoot(taskId));
     const rec = readLauncher(taskId);
+    if (opts.requireOwner && !rec) return { released: false, reason: 'no launcher record to prove ownership' };
     if (exists(file) && !rec) return { released: false, reason: 'unreadable launcher record; reconcile before release' };
     if (rec && (!ownerToken || ownerToken !== rec.ownerToken)) return { released: false, reason: 'refused: caller is not the task owner' };
     if (rec && pidAlive(rec.pid)) return { released: false, reason: 'launcher still running; stop it before release' };
+    // Native callers retain the record through stop and verify the app group
+    // here. The same task guard prevents cleanup racing a successor launch.
+    if (opts.beforeRelease) opts.beforeRelease(rec);
     // Slot records live in SLOTS_DIR, outside every task root, so the rmSync
     // below cannot reach them. Reconcile first: reconcileTaskSlots never throws,
     // and doing it before the tree is gone keeps a retried release idempotent.
@@ -275,8 +282,10 @@ function releaseTask(taskId, ownerToken) {
     // this task's own tree.
     const slots = rec ? reconcileTaskSlots(taskId)
       : { scanned: 0, reconciled: [], retained: [{ reason: 'no launcher record to prove ownership; slot records left untouched' }], otherTasks: 0, truncated: false };
-    fs.rmSync(taskRoot(taskId), { recursive: true, force: true });
-    return { released: true, taskId, slots };
+    if (opts.retainData) {
+      if (rec) fs.unlinkSync(file);
+    } else fs.rmSync(taskRoot(taskId), { recursive: true, force: true });
+    return { released: true, taskId, slots, ...(opts.retainData ? { retainedData: true } : {}) };
   });
 }
 

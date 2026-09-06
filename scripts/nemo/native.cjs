@@ -13,6 +13,7 @@ const {
   releaseNativeState,
   runNativeLauncher,
 } = require('./lib/native-runtime.cjs');
+const { launcherProcessIdentity, nativeProcessTreeStopped } = require('./lib/native-process.cjs');
 
 function parse(argv) {
   const out = { _: [], passthrough: [] };
@@ -57,6 +58,9 @@ function status(args) {
 
 async function stop(args) {
   if (!args.task || !args.owner) throw new Error('stop requires --task ID and --owner TOKEN');
+  if (Object.hasOwn(args, 'retain-data') && args['retain-data'] !== true) {
+    throw new Error('--retain-data is a flag and takes no value');
+  }
   // Read the app's own manifest BEFORE stopping: it names the directories the
   // instance actually resolved, and it lives in the tauri-data root that the
   // release below removes.
@@ -64,21 +68,35 @@ async function stop(args) {
   const statusBeforeStop = readNativeStatus(args.task);
   const stopped = await isolation.requestStop(args.task, args.owner, {
     timeoutMs: args['timeout-ms'] == null ? 10_000 : Number(args['timeout-ms']),
+    retainRecord: true,
+    verifyProcess: (record) => statusBeforeStop && statusBeforeStop.taskId === args.task
+      && statusBeforeStop.launcherPid === record.pid && !!statusBeforeStop.launcherIdentity
+      && statusBeforeStop.launcherIdentity === launcherProcessIdentity(record.pid),
   });
   const statusBeforeRelease = readNativeStatus(args.task) || statusBeforeStop;
-  // The isolated app directories are outside the task root, so releaseTask
-  // alone would leave them behind on every run. Ownership was proved by the
-  // stop above; eligibility is bound to this task's own derivation.
-  const appState = stopped.stopped
-    ? releaseNativeState(
-      args.task,
-      disclosed && disclosed.valid ? disclosed.manifest : null,
-      statusBeforeRelease && statusBeforeRelease.app ? statusBeforeRelease.app.bundle : null,
-    )
-    : null;
-  const released = stopped.stopped ? isolation.releaseTask(args.task, args.owner) : null;
-  output({ ...stopped, runtime: statusBeforeRelease, appState, released });
-  process.exit(stopped.stopped && released && released.released ? 0 : 1);
+  const retainedData = args['retain-data'] === true;
+  let appState = null; let released = null; let processTree = null;
+  if (stopped.stopped) {
+    try {
+      released = isolation.releaseTask(args.task, args.owner, {
+        requireOwner: true, retainData: retainedData,
+        beforeRelease: (record) => {
+          processTree = nativeProcessTreeStopped(args.task, record, statusBeforeRelease);
+          if (!processTree.stopped) throw new Error(processTree.reason);
+          if (retainedData) return;
+          appState = releaseNativeState(args.task, disclosed && disclosed.valid ? disclosed.manifest : null,
+            statusBeforeRelease && statusBeforeRelease.app ? statusBeforeRelease.app.bundle : null);
+          if (appState.removed.some((item) => !item.removed && item.reason !== 'already absent')) {
+            throw new Error('app state cleanup incomplete; ownership and task records retained for retry');
+          }
+        },
+      });
+    } catch (err) { released = { released: false, reason: err.message }; }
+  }
+  const ok = stopped.stopped && released && released.released;
+  output({ ...stopped, stopped: !!ok, reason: ok ? stopped.reason : (released ? released.reason : stopped.reason),
+    runtime: statusBeforeRelease, processTree, retainedData: !!ok && retainedData, appState, released });
+  process.exit(ok ? 0 : 1);
 }
 
 async function main() {
@@ -87,7 +105,7 @@ async function main() {
   if (command === 'start') return start(args);
   if (command === 'status') return status(args);
   if (command === 'stop') return stop(args);
-  throw new Error('usage: native.cjs start [--task ID] [--app /path/Nemo.app | --executable /absolute/path] [--reserve desktop-input,gpu-reference] [--manifest-timeout-ms N] [-- args...] | status --task ID --owner TOKEN | stop --task ID --owner TOKEN [--timeout-ms N]');
+  throw new Error('usage: native.cjs start [--task ID] [--app /path/Nemo.app | --executable /absolute/path] [--reserve desktop-input,gpu-reference] [--manifest-timeout-ms N] [-- args...] | status --task ID --owner TOKEN | stop --task ID --owner TOKEN [--timeout-ms N] [--retain-data]');
 }
 
 main().catch((err) => { process.stderr.write((err.stack || String(err)) + '\n'); process.exit(1); });
