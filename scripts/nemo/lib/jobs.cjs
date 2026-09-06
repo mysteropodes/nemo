@@ -138,7 +138,13 @@ function jobTestRust(ctx, crateDir, label) {
       details: { nativeFixtureSidecar: sidecar },
     });
   }
-  const r = run('cargo', ['test', '--manifest-path', manifest], { timeout: 60 * 60 * 1000 });
+  const args = ['test', '--manifest-path', manifest];
+  // The Tauri crate includes wall-clock decoder regression tests. Running
+  // those beside dozens of other FFmpeg processes measures test contention,
+  // not decoder latency, so keep this binary serial without changing any
+  // asserted threshold or excluding a test.
+  if (crateDir === 'src-tauri') args.push('--', '--test-threads=1');
+  const r = run('cargo', args, { timeout: 60 * 60 * 1000 });
   const results = [...r.stdout.matchAll(/^test result: (\w+)\. (\d+) passed; (\d+) failed/gm)];
   const passed = results.reduce((a, m) => a + Number(m[2]), 0), failed = results.reduce((a, m) => a + Number(m[3]), 0);
   const summary = results.length ? `${results.length} binaries, ${passed} passed, ${failed} failed` : `exit ${r.status}`;

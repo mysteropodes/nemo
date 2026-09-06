@@ -67,7 +67,10 @@ test('explicit hosted FFmpeg is preflighted and inherited by Cargo', t => {
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.dir, 'ffmpeg-called.json'))), ['-hide_banner', '-version']);
   const cargo = JSON.parse(fs.readFileSync(f.marker));
   assert.equal(cargo.override, ffmpeg);
-  assert.deepEqual(cargo.args, ['test', '--manifest-path', path.resolve('src-tauri/Cargo.toml')]);
+  assert.deepEqual(cargo.args, [
+    'test', '--manifest-path', path.resolve('src-tauri/Cargo.toml'),
+    '--', '--test-threads=1',
+  ]);
 });
 
 test('bad explicit FFmpeg blocks before Cargo without PATH or bundle fallback', t => {
