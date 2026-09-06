@@ -225,3 +225,76 @@ test('the actual named CLI exits blocked when a required build prerequisite is a
   assert.match(receipt.jobs[0].reason, /node_modules\/\.bin\/tauri/);
   assert.equal(fs.existsSync(path.join(f.dir, 'observed-build.json')), false);
 });
+
+function alive(pid) {
+  try { process.kill(pid, 0); return true; } catch (error) { return error.code !== 'ESRCH'; }
+}
+
+test('a silent startup helper that ignores SIGTERM is reaped instead of returning a false blocked result', t => {
+  const f = fixture(t);
+  fs.writeFileSync(path.join(f.dir, 'scripts/nemo/build.cjs'), `
+    const fs=require('node:fs');
+    fs.writeFileSync('observed-build.json',JSON.stringify({pid:process.pid}));
+    process.on('SIGTERM',()=>{});setInterval(()=>{},1000);setTimeout(()=>process.exit(0),5000);
+  `);
+  const { result } = execute(f, 'success', { readyTimeoutMs: 300, startupStopTimeoutMs: 100 });
+  const helper = JSON.parse(fs.readFileSync(path.join(f.dir, 'observed-build.json')));
+  assert.equal(result.status, 'fail'); assert.equal(result.exitCode, 1);
+  assert.match(result.reason, /readiness timed out/);
+  assert.equal(result.details.cleanup.helperStopped, true);
+  assert.equal(alive(helper.pid), false, 'only the controller-created helper was forcibly reaped');
+});
+
+test('missing ready output recovers only its exact late owner and uses owned group cleanup with retained data', t => {
+  const f = fixture(t);
+  fs.writeFileSync(path.join(f.dir, 'scripts/nemo/build.cjs'), `
+    const task=process.argv[process.argv.indexOf('--task')+1];
+    setTimeout(()=>process.exit(0),8000);
+    require('./lib/build-runtime.cjs').runBuildLauncher(task,{
+      command:process.execPath,args:[require('node:path').resolve('builder.cjs')],hostTriple:'fixture-target'
+    },()=>{}).catch(error=>{console.error(error.message);process.exit(1)});
+  `);
+  const { result, stdout } = execute(f, 'success', { readyTimeoutMs: 1200, startupStopTimeoutMs: 100 });
+  assert.equal(result.status, 'fail'); assert.match(result.reason, /readiness timed out/);
+  assert.equal(result.details.recoveredStartup, true);
+  assert.equal(result.details.cleanup.stopped, true);
+  assert.equal(result.details.cleanup.released, true);
+  assert.equal(result.details.cleanup.retainedData, true);
+  const key = require('node:crypto').createHash('sha256').update('controlled-build').digest('hex');
+  const root = path.join(f.runtime, 'tasks', key);
+  const status = JSON.parse(fs.readFileSync(path.join(root, 'reports/build-runtime.json')));
+  assert.equal(alive(status.launcherPid), false);
+  assert.equal(alive(status.childPid), false);
+  assert.equal(status.processTree.stopped, true);
+  assert.equal(fs.existsSync(path.join(root, 'launcher.json')), false);
+  assert.ok(fs.existsSync(path.join(root, 'build')), 'startup-failure artifacts remain inspectable');
+  assert.doesNotMatch(stdout, /ownerToken/);
+});
+
+test('startup reconciliation never adopts a foreign PID record or removes its data', async t => {
+  const f = fixture(t);
+  const foreign = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { stdio: 'ignore' });
+  try {
+    fs.writeFileSync(path.join(f.dir, 'scripts/nemo/build.cjs'), `
+      const fs=require('node:fs'),path=require('node:path');
+      const task=process.argv[process.argv.indexOf('--task')+1];
+      const root=require('./lib/isolation.cjs').taskRoots(task).root;
+      fs.writeFileSync(path.join(root,'launcher.json'),JSON.stringify({taskId:task,pid:${foreign.pid},ownerToken:'foreign-owner-token'}));
+      fs.writeFileSync(path.join(root,'retained.txt'),'foreign state');
+      fs.writeFileSync('observed-build.json',JSON.stringify({pid:process.pid,root}));
+      process.on('SIGTERM',()=>{});setInterval(()=>{},1000);setTimeout(()=>process.exit(0),5000);
+    `);
+    const { result, stdout } = execute(f, 'success', { readyTimeoutMs: 300, startupStopTimeoutMs: 100 });
+    const helper = JSON.parse(fs.readFileSync(path.join(f.dir, 'observed-build.json')));
+    assert.equal(result.status, 'fail'); assert.match(result.reason, /cleanup incomplete/);
+    assert.equal(result.details.cleanup.helperStopped, true);
+    assert.equal(result.details.cleanup.released, false);
+    assert.equal(result.details.cleanup.taskId, 'controlled-build');
+    assert.equal(alive(helper.pid), false); assert.equal(alive(foreign.pid), true);
+    assert.equal(fs.readFileSync(path.join(helper.root, 'retained.txt'), 'utf8'), 'foreign state');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(helper.root, 'launcher.json'))).pid, foreign.pid);
+    assert.equal(stdout.includes('foreign-owner-token'), false);
+  } finally {
+    if (foreign.exitCode === null && foreign.signalCode === null) { foreign.kill('SIGKILL'); await once(foreign, 'exit'); }
+  }
+});

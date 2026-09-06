@@ -24,7 +24,7 @@ function launch(taskId, options) {
   let stderr = ''; let stdout = '';
   child.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-32_768); });
   const ready = new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('build launcher readiness timed out')), 30_000);
+    const timer = setTimeout(() => reject(new Error('build launcher readiness timed out')), options.readyTimeoutMs || 30_000);
     const fail = error => { clearTimeout(timer); reject(error); };
     child.once('error', fail);
     child.once('exit', code => fail(new Error(`build launcher refused startup (${code}): ${stderr.trim()}`)));
@@ -44,6 +44,44 @@ function launch(taskId, options) {
     });
   });
   return { child, ready };
+}
+
+function helperExited(child) {
+  return !Number.isSafeInteger(child.pid) || child.exitCode !== null || child.signalCode !== null;
+}
+
+function lateControl(taskId, child) {
+  const record = isolation.readLauncher(taskId);
+  return record && record.taskId === taskId && Number.isSafeInteger(child.pid) && record.pid === child.pid
+    && typeof record.ownerToken === 'string' && record.ownerToken ? record : null;
+}
+
+async function reconcileStartup(taskId, child, graceMs) {
+  const wasLive = !helperExited(child);
+  // A rejected control line does not prove no ownership was acquired. Recover
+  // only this invocation's task record and exact spawned helper PID; otherwise
+  // signal that ChildProcess handle alone, never a record's PID or app group.
+  for (const signal of ['SIGTERM', 'SIGKILL']) {
+    const control = lateControl(taskId, child);
+    if (control) return { control };
+    if (helperExited(child)) break;
+    try { child.kill(signal); } catch { /* report an unconfirmed exit below */ }
+    const deadline = Date.now() + graceMs;
+    while (!helperExited(child) && Date.now() < deadline) {
+      const acquired = lateControl(taskId, child);
+      if (acquired) return { control: acquired };
+      await delay(20);
+    }
+  }
+  const control = lateControl(taskId, child);
+  if (control) return { control };
+  const stopped = helperExited(child);
+  const retained = exists(isolation.taskRoot(taskId));
+  return { failed: wasLive || retained || !stopped,
+    cleanup: { stopped: stopped && !retained, helperStopped: stopped, released: stopped && !retained, taskId },
+    reason: !stopped ? 'spawned helper exit unconfirmed; task retained for reconciliation'
+      : retained ? 'task ownership could not be proved; existing data retained for reconciliation'
+        : 'unregistered spawned helper exited; no task runtime remains' };
 }
 
 async function completed(taskId, control, child, timeoutMs) {
@@ -105,7 +143,7 @@ async function runBuildJob(options = {}) {
   }
   const directory = path.join(reportDir, taskId);
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
-  let processInfo; let control; let status; let outcome; let packagePreserved = false;
+  let processInfo; let control; let status; let outcome; let packagePreserved = false; let recoveredStartup = false;
   try {
     processInfo = launch(taskId, options);
     control = await processInfo.ready;
@@ -132,6 +170,18 @@ async function runBuildJob(options = {}) {
       { status: control ? 'fail' : 'blocked', reason: error.message, exitCode: control ? 1 : 2 });
   }
   outcome.details.taskId = taskId;
+  if (!control && processInfo) {
+    const recovered = await reconcileStartup(taskId, processInfo.child, options.startupStopTimeoutMs || 1000);
+    if (recovered.control) {
+      control = recovered.control; recoveredStartup = true;
+      outcome.status = 'fail'; outcome.exitCode = 1;
+      outcome.details.recoveredStartup = true;
+    } else {
+      outcome.details.cleanup = recovered.cleanup;
+      if (recovered.failed) { outcome.status = 'fail'; outcome.exitCode = 1; }
+      if (!recovered.cleanup.released) outcome.reason += `; cleanup incomplete: ${recovered.reason}`;
+    }
+  }
   if (control) {
     let launcherStopped = false;
     try {
@@ -146,18 +196,23 @@ async function runBuildJob(options = {}) {
       fs.cpSync(path.join(root, 'reports'), reports, { recursive: true, errorOnExist: true, force: false });
       outcome.details.finalState = finalStatus && finalStatus.state;
       outcome.artifacts.push({ path: path.relative(ROOT, reports) });
-      if (status && status.state === 'completed' && !packagePreserved) throw new Error('completed build output was not preserved; task retained for inspection');
-      const released = isolation.releaseTask(taskId, control.ownerToken, { requireOwner: true, beforeRelease(record) {
+      if (!recoveredStartup && status && status.state === 'completed' && !packagePreserved) throw new Error('completed build output was not preserved; task retained for inspection');
+      const released = isolation.releaseTask(taskId, control.ownerToken, { requireOwner: true, retainData: recoveredStartup, beforeRelease(record) {
         if (record.pid !== processInfo.child.pid || !finalStatus || !finalStatus.processTree || !finalStatus.processTree.stopped
           || build.buildProcessTreeAlive({ pid: finalStatus.childPid })) throw new Error('build process group exit unconfirmed; task retained for reconciliation');
       } });
       if (!released.released) throw new Error(released.reason);
-      outcome.details.cleanup = { stopped: true, released: true, slots: released.slots };
+      outcome.details.cleanup = { stopped: true, released: true, retainedData: recoveredStartup, slots: released.slots };
     } catch (error) {
       outcome.status = 'fail'; outcome.exitCode = 1;
       outcome.reason += `; cleanup incomplete: ${error.message}`;
       outcome.details.cleanup = { stopped: launcherStopped, released: false, taskId };
     }
+  }
+  if (processInfo && !helperExited(processInfo.child)) {
+    // An unreconciled helper must not keep an embedding job runner hung after
+    // its explicit failure receipt. Its identified state remains inspectable.
+    processInfo.child.unref(); processInfo.child.stdout.destroy(); processInfo.child.stderr.destroy();
   }
   const proof = path.join(directory, 'build-proof.json');
   fs.writeFileSync(proof, JSON.stringify(outcome, null, 2));
