@@ -5,7 +5,7 @@
   "build": {
     "frontendDist": "../src",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "python3 scripts/assert-no-private-labs.py"
+    "beforeBuildCommand": "python3 scripts/assert-no-private-labs.py && node scripts/build-mcp-sidecar.cjs"
   },
   "app": {
     "withGlobalTauri": true,
@@ -39,7 +39,8 @@
     ],
     "createUpdaterArtifacts": true,
     "externalBin": [
-      "binaries/ffmpeg"
+      "binaries/ffmpeg",
+      "binaries/nemo-mcp"
     ]
   },
   "plugins": {
