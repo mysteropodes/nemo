@@ -498,6 +498,48 @@ var TW_ID_PIN_ALL_OR_NONE=true;
 // La question ouverte sur 34→46 est en amont : ces six traits ont-ils seulement
 // un partenaire, ou le dessin change-t-il de topologie entre les deux clés ?
 var TW_FIELD_ITER=0;
+
+// TW_PIVOT — pivot de la rampe rigide au POINT FIXE du mouvement, pas au centre.
+// La rampe rigide faisait tourner chaque trait autour de son centroïde pendant
+// que ce centroïde glissait en ligne droite de A vers B. Pour un membre qui
+// pivote à l'épaule c'est faux par construction : le vrai centroïde décrit un
+// arc, et l'extrémité côté épaule — celle qui ne devrait pas bouger — se
+// déporte au milieu puis revient (Cyril : « l'épaule fait des aller-retour »).
+// Le bon pivot est le point invariant de la similitude fittée entre A et B :
+// (I − sR)·p* = cB − sR·cA. Quand il existe et qu'il est à portée du trait
+// (≤ PIVOT_REACH × étendue), fwd ET bwd tournent autour de LUI — ce sont alors
+// le même arc, et l'amortissement par écart des centroïdes (rotTrust), qui ne
+// servait qu'à masquer le conflit entre deux pivots différents, est levé.
+// Sinon (translation pure, pivot trop loin, arc de mouvement posé à la main),
+// comportement d'avant, bit pour bit.
+// MESURE du mode 'fixed' (2026-09-06, easing neutralisé, 5 fichiers) : le pivot
+// s'applique sur ~1/3 des paires qui tournent, mais il tombe typiquement à une
+// étendue du trait, loin des deux bouts (méd. bout 0,8–1,1 ; centre 1,0–1,4) —
+// ce n'est PAS une articulation. La similitude fittée sur un trait qui change de
+// forme n'a pas de point fixe fiable. Déviation latérale de l'extrémité-
+// articulation : cats 3,39→3,30, untitled3 2,10→1,86, untitled4 1,70→1,76,
+// testanim 0,34→0,68 ; élargir la portée (2,5 ; 4) dégrade partout ; les pires
+// cas (66 px) ne bougent pas. Verdict : neutre à négatif. D'où le mode 'end'.
+// Mode 'end' : le pivot est l'extrémité qui voyage le moins entre A et B (si
+// elle voyage nettement moins que l'autre, rapport < PIVOT_END_RATIO), et il se
+// DÉPLACE le long de sa propre corde — l'épaule suit le corps, le reste du
+// trait tourne autour d'elle. Aucun fit, aucune sensibilité numérique.
+// MESURE du mode 'end' (2026-09-06, easing neutralisé, 7 fichiers ; déviation
+// latérale moyenne/max de l'extrémité-articulation, replis, longueur perdue
+// sous min(LA,LB) en px cumulés) :
+//   cats      pivots 16/68  3,39/66 → 3,20/66   replis 43=43   raccourci 205 → 148
+//   untitled3 pivots  5/35  2,10/21 → 2,13/21   replis 15=15   raccourci   9 =   9
+//   untitled4 pivots 10/27  1,70/29 → 1,63/29   replis 16=16   raccourci  28 =  28
+//   traits    pivots  3/6   0,59/2  → 0,31/1    replis  0= 0   raccourci   0 =   0
+//   testanim  pivots  1/5   0,34/1  → 0,31/1    replis 22=22   raccourci  21 =  21
+//   b, totale : 0 et 4 pivots, tout identique.
+// Amélioration petite mais cohérente sur 4 fichiers, une variation de 0,03 sur
+// untitled3, aucun repli en plus nulle part, +8 aller-retours sur 360 sur cats.
+// Vérifié à l'image sur le bras du chat 34→46 : le bras se déplie autour de
+// l'épaule sans artefact. Actif par défaut. Les pires cas (66 px) ne sont pas
+// touchés : ils ne sont pas des rotations de membre, c'est un autre sujet.
+var TW_PIVOT=true,PIVOT_MODE='end',PIVOT_MIN_DEG=10,PIVOT_REACH=1.5,PIVOT_END_RATIO=0.5;
+function _segsCentroidXY(segs){var x=0,y=0,n=segs.length;for(var i=0;i<n;i++){x+=segs[i].point[0];y+=segs[i].point[1];}return[x/n,y/n];}
 // TW_ARC_FROM_CHAIN (2026-09-05, Cyril : « une main va parcourir un chemin
 // courbe, si on déduit la courbe par rapport à toutes les keyframes… on
 // n'aurait plus des tweens sur un chemin linéaire »). Le centroïde de
@@ -3695,7 +3737,8 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
   // theta avoids introducing visible spurious spin on ordinary shape
   // morphs where the least-squares fit finds SOME best-fit rotation just
   // by chance even though the two shapes aren't really related by a turn.
-  var theta=0,scaleF=1;
+  var theta=0,scaleF=1,pivot=null;
+  var userArc=!!(state.motionArcs&&state.motionArcs[arcKey(fA,fB,mIdx)]);
   if(n>=2){
     var loA=[],loB=[];
     for(var li=0;li<n;li++){loA.push({x:rA.segments[li].point[0]-cxA,y:rA.segments[li].point[1]-cyA});loB.push({x:rB.segments[li].point[0]-cxB,y:rB.segments[li].point[1]-cyB});}
@@ -3735,6 +3778,34 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
         }
         if(Math.abs(th)>=0.06)theta=th; // ~3.4° dead-zone
         scaleF=Math.min(3,Math.max(0.33,mag));
+        // voir TW_PIVOT
+        if(TW_PIVOT&&PIVOT_MODE==='end'&&theta!==0&&!userArc&&Math.abs(theta)>=PIVOT_MIN_DEG*Math.PI/180){
+          var e0A=rA.segments[0].point,e0B=rB.segments[0].point,e1A=rA.segments[n-1].point,e1B=rB.segments[n-1].point;
+          var t0_=Math.hypot(e0B[0]-e0A[0],e0B[1]-e0A[1]),t1_=Math.hypot(e1B[0]-e1A[0],e1B[1]-e1A[1]);
+          var jo=t0_<=t1_?0:n-1,tmin=Math.min(t0_,t1_),tmax=Math.max(t0_,t1_);
+          if(tmin<PIVOT_END_RATIO*Math.max(1,tmax)){
+            var jA=rA.segments[jo].point,jB=rB.segments[jo].point;
+            pivot={mobile:true,ax:jA[0],ay:jA[1],bx:jB[0],by:jB[1]};
+            if(window.__twPivotStats&&rA._twPivotCounted===undefined){rA._twPivotCounted=1;var se_=window.__twPivotStats;se_.rot=(se_.rot||0)+1;se_.used=(se_.used||0)+1;se_.pos=(se_.pos||[]);se_.pos.push({bout:0,ratio:+(tmin/Math.max(1,tmax)).toFixed(2),deg:Math.round(theta*180/Math.PI)});}
+          }else if(window.__twPivotStats&&rA._twPivotCounted===undefined){rA._twPivotCounted=1;var sf_=window.__twPivotStats;sf_.rot=(sf_.rot||0)+1;sf_.far=(sf_.far||0)+1;}
+        }
+        if(TW_PIVOT&&PIVOT_MODE==='fixed'&&theta!==0&&!userArc&&Math.abs(theta)>=PIVOT_MIN_DEG*Math.PI/180){
+          var pa_=scaleF*Math.cos(theta),pb_=scaleF*Math.sin(theta);
+          var pdet=(1-pa_)*(1-pa_)+pb_*pb_;
+          if(pdet>1e-6){
+            var pvx=cxB-(pa_*cxA-pb_*cyA),pvy=cyB-(pb_*cxA+pa_*cyA);
+            var ppx=((1-pa_)*pvx-pb_*pvy)/pdet,ppy=(pb_*pvx+(1-pa_)*pvy)/pdet;
+            var pext=0,pdmin=Infinity;
+            for(var pi_=0;pi_<n;pi_++){
+              pext+=Math.hypot(loA[pi_].x,loA[pi_].y);
+              var pd_=Math.hypot(rA.segments[pi_].point[0]-ppx,rA.segments[pi_].point[1]-ppy);if(pd_<pdmin)pdmin=pd_;
+            }
+            pext=2*pext/n;
+            if(pdmin<=PIVOT_REACH*Math.max(1,pext))pivot=[ppx,ppy];
+            // sonde de mesure (banc) : compte les paires où le pivot s'applique / est refusé
+            if(window.__twPivotStats&&rA._twPivotCounted===undefined){rA._twPivotCounted=1;var st_=window.__twPivotStats;st_.rot=(st_.rot||0)+1;if(pivot){st_.used=(st_.used||0)+1;var pe0=Math.hypot(rA.segments[0].point[0]-ppx,rA.segments[0].point[1]-ppy),pe1=Math.hypot(rA.segments[n-1].point[0]-ppx,rA.segments[n-1].point[1]-ppy),pcd=Math.hypot(cxA-ppx,cyA-ppy);st_.pos=(st_.pos||[]);st_.pos.push({bout:+(Math.min(pe0,pe1)/Math.max(1,pext)).toFixed(2),centre:+(pcd/Math.max(1,pext)).toFixed(2),deg:Math.round(theta*180/Math.PI)});}else{st_.far=(st_.far||0)+1;st_.farRatio=(st_.farRatio||[]);st_.farRatio.push(+(pdmin/Math.max(1,pext)).toFixed(2));}}
+          }
+        }
         // Damp the rotation when the two centroids sit far apart relative
         // to the shape's own size (2026-07, "des lignes de force font des
         // aller-retour" — part of the same fix as the iw-probe stabilizer
@@ -3760,7 +3831,7 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
         var centroidDist=Math.hypot(cxB-cxA,cyB-cyA);
         var sepRatio=centroidDist/Math.max(1,avgR);
         var rotTrust=Math.max(0,Math.min(1,1-(sepRatio-0.6)/1.4));
-        theta*=rotTrust;
+        if(!pivot)theta*=rotTrust; // TW_PIVOT : un seul pivot, plus de conflit entre deux arcs à amortir
         // EMPIRICAL rotation-crossing check (2026-07, closed-shape tangle
         // — a re-drawn hand pair measured 13 self-crossings across the
         // span with no safety net catching it): the geometric damping
@@ -3788,6 +3859,13 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
                 var cxx=cxA+(cxB-cxA)*etv,cyy=cyA+(cyB-cyA)*etv;
                 var o=[];
                 for(var bi5=0;bi5<n;bi5++){
+                  if(pivot){
+                    var pA5=pivot.mobile?[pivot.ax,pivot.ay]:pivot,pB5=pivot.mobile?[pivot.bx,pivot.by]:pivot,pT5=[lerp(pA5[0],pB5[0],etv),lerp(pA5[1],pB5[1],etv)];
+                    var fp5=rotScalePt(rA.segments[bi5].point[0]-pA5[0],rA.segments[bi5].point[1]-pA5[1],thT2,scT2);
+                    var bp5=rotScalePt(rB.segments[bi5].point[0]-pB5[0],rB.segments[bi5].point[1]-pB5[1],thB2,scB2);
+                    o.push({point:[pT5[0]+lerp(fp5[0],bp5[0],etv),pT5[1]+lerp(fp5[1],bp5[1],etv)]});
+                    continue;
+                  }
                   var fwd5=rotScalePt(rA.segments[bi5].point[0]-cxA,rA.segments[bi5].point[1]-cyA,thT2,scT2);
                   var bwd5=rotScalePt(rB.segments[bi5].point[0]-cxB,rB.segments[bi5].point[1]-cyB,thB2,scB2);
                   o.push({point:[cxx+lerp(fwd5[0],bwd5[0],etv),cyy+lerp(fwd5[1],bwd5[1],etv)]});
@@ -3817,15 +3895,26 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
   function buildLinearSegs(etv,thT,scT,thB,scB,cxx,cyy){
     var o=[];
     for(var i2=0;i2<n;i2++){var sA=rA.segments[i2],sB=rB.segments[i2];
-      var fwd=rotScalePt(sA.point[0]-cxA,sA.point[1]-cyA,thT,scT);
-      var bwd=rotScalePt(sB.point[0]-cxB,sB.point[1]-cyB,thB,scB);
+      var fwd,bwd,ptx,pty;
+      if(pivot){
+        var pA_=pivot.mobile?[pivot.ax,pivot.ay]:pivot,pB_=pivot.mobile?[pivot.bx,pivot.by]:pivot;
+        var pTx=lerp(pA_[0],pB_[0],etv),pTy=lerp(pA_[1],pB_[1],etv);
+        fwd=rotScalePt(sA.point[0]-pA_[0],sA.point[1]-pA_[1],thT,scT);
+        bwd=rotScalePt(sB.point[0]-pB_[0],sB.point[1]-pB_[1],thB,scB);
+        ptx=pTx+lerp(fwd[0],bwd[0],etv);pty=pTy+lerp(fwd[1],bwd[1],etv);
+      }else{
+        fwd=rotScalePt(sA.point[0]-cxA,sA.point[1]-cyA,thT,scT);
+        bwd=rotScalePt(sB.point[0]-cxB,sB.point[1]-cyB,thB,scB);
+        ptx=cxx+lerp(fwd[0],bwd[0],etv);pty=cyy+lerp(fwd[1],bwd[1],etv);
+      }
       var hiF=rotScalePt(sA.handleIn[0],sA.handleIn[1],thT,scT),hiB=rotScalePt(sB.handleIn[0],sB.handleIn[1],thB,scB);
       var hoF=rotScalePt(sA.handleOut[0],sA.handleOut[1],thT,scT),hoB=rotScalePt(sB.handleOut[0],sB.handleOut[1],thB,scB);
-      o.push({point:[cxx+lerp(fwd[0],bwd[0],etv),cyy+lerp(fwd[1],bwd[1],etv)],handleIn:[lerp(hiF[0],hiB[0],etv),lerp(hiF[1],hiB[1],etv)],handleOut:[lerp(hoF[0],hoB[0],etv),lerp(hoF[1],hoB[1],etv)]});
+      o.push({point:[ptx,pty],handleIn:[lerp(hiF[0],hiB[0],etv),lerp(hiF[1],hiB[1],etv)],handleOut:[lerp(hoF[0],hoB[0],etv),lerp(hoF[1],hoB[1],etv)]});
     }
     return o;
   }
   segs=buildLinearSegs(et,thetaT,scaleT,thetaB,scaleB,cx2,cy2);
+  if(pivot){var _pc=_segsCentroidXY(segs);cx2=_pc[0];cy2=_pc[1];} // TW_PIVOT : l'intrinsèque se recentre sur le chemin réel
   // ---- intrinsic correction (see _intrinsicSegs) ----
   // Gate 1 (graduated): arc-length deficit of the linear result vs the
   // lerped keyframe lengths — 0 below 2% (translations, rigid rotations
@@ -4109,6 +4198,7 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
               var thTs=theta*ets_,scTs=lerp(1,scaleF,ets_),thBs=thTs-theta,scBs=lerp(scaleF>1e-6?1/scaleF:1,1,ets_);
               var cxs=cxA+(cxB-cxA)*ets_,cys=cyA+(cyB-cyA)*ets_;
               var linS=buildLinearSegs(ets_,thTs,scTs,thBs,scBs,cxs,cys);
+              if(pivot){var _pcs=_segsCentroidXY(linS);cxs=_pcs[0];cys=_pcs[1];}
               var intrS=_intrinsicSegs(rA,rB,ets_,cxs,cys,ets_<.5?!!rA.closed:!!rB.closed,linS);
               var iwS=iwPeak*Math.sin(Math.PI*ets_);
               function mixS(w){
