@@ -731,10 +731,10 @@
     if(histClose)histClose.addEventListener('click',function(){document.getElementById('history-modal').style.display='none';});
     var histModal=document.getElementById('history-modal');
     if(histModal)histModal.addEventListener('click',function(e){if(e.target===histModal)histModal.style.display='none';});
-    // legacy fallback for non-Tauri (plain browser) testing: upload/download
     document.getElementById('file-input').addEventListener('change',function(e){
       var f=e.target.files[0];if(!f)return;
-      var r=new FileReader();r.onload=function(ev){window.SM.importJSON(ev.target.result);hideStartScreen();};
+      var r=new FileReader();r.onload=function(ev){try{window.SM.importJSON(ev.target.result,true);markSaved(window.SM.exportJSON());currentPath=null;currentName=baseName(f.name)||'Untitled';updateCurrentLabel();hideStartScreen();ensureInitialTab();showToast('Opened: '+currentName);}catch(err){showToast('Could not open file — it may be invalid or corrupted');}};
+      r.onerror=function(){showToast('Could not open file — it may be invalid or corrupted');};
       r.readAsText(f);e.target.value='';
     });
 
