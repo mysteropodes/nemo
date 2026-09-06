@@ -132,6 +132,12 @@ function jobTestRust(ctx, crateDir, label) {
   if (!which('cargo')) return blocked('cargo not found');
   const manifest = path.join(ROOT, crateDir, 'Cargo.toml');
   if (!exists(manifest)) return blocked(`${crateDir}/Cargo.toml missing`);
+  if (crateDir === 'src-tauri') {
+    const sidecar = caps.nativeFixtureSidecarProbe();
+    if (!sidecar.runs) return blocked(`native fixture sidecar unavailable (${sidecar.source}): ${sidecar.path}: ${sidecar.failure}`, {
+      details: { nativeFixtureSidecar: sidecar },
+    });
+  }
   const r = run('cargo', ['test', '--manifest-path', manifest], { timeout: 60 * 60 * 1000 });
   const results = [...r.stdout.matchAll(/^test result: (\w+)\. (\d+) passed; (\d+) failed/gm)];
   const passed = results.reduce((a, m) => a + Number(m[2]), 0), failed = results.reduce((a, m) => a + Number(m[3]), 0);

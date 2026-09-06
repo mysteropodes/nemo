@@ -6,6 +6,7 @@
 // instead of guessing.
 const path = require('node:path');
 const fs = require('node:fs');
+const { spawnSync } = require('node:child_process');
 const { ROOT, run, which, probeTool, exists } = require('./util.cjs');
 
 function localBin(name) {
@@ -48,6 +49,44 @@ function sidecarProbe(build) {
       out.dynamicLibs = { total: libs.length, external: external.map((l) => ({ path: l, present: exists(l) })) };
       out.externalDylibsMissing = out.dynamicLibs.external.filter((e) => !e.present).length;
     }
+  }
+  return out;
+}
+
+// Match checked_test_ffmpeg in src-tauri/src/video_decode.rs: only an absent
+// override selects the bundle. Cargo runs tests from the package directory.
+function nativeFixtureSidecarProbe({ root = ROOT, timeout = 20000 } = {}) {
+  const relative = 'src-tauri/binaries/ffmpeg-aarch64-apple-darwin';
+  const override = process.env.NEMO_TEST_FFMPEG_PATH;
+  const cwd = path.join(root, 'src-tauri');
+  const selected = override === undefined ? path.join(root, relative) : override;
+  const out = { path: override === undefined ? relative : override,
+    source: override === undefined ? 'bundled' : 'NEMO_TEST_FFMPEG_PATH',
+    present: false, runs: false, exitCode: null };
+  if (selected === '') return { ...out, failure: 'explicit override is empty' };
+  let absolute;
+  try {
+    // Preserve symlink/.. traversal until native canonicalization, as Rust does.
+    absolute = fs.realpathSync.native(path.isAbsolute(selected) ? selected : cwd + path.sep + selected);
+    if (!fs.statSync(absolute).isFile()) return { ...out, failure: 'not a regular file' };
+    out.present = true;
+  } catch (error) {
+    return { ...out, error: error.code, failure: `file unavailable (${error.code})` };
+  }
+  const result = spawnSync(absolute, ['-hide_banner', '-version'], {
+    cwd, shell: false, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    timeout, killSignal: 'SIGKILL', maxBuffer: 64 * 1024,
+  });
+  out.exitCode = result.status;
+  out.signal = result.signal || null;
+  out.error = result.error?.code || null;
+  const banner = (result.stdout || '').startsWith('ffmpeg version ');
+  out.runs = result.status === 0 && !out.error && !out.signal && banner;
+  if (!out.runs) {
+    const diagnostic = (result.stderr || result.stdout || '').trim()
+      .split(/\r?\n/).filter(Boolean).slice(0, 4).join(' | ').slice(0, 2048);
+    out.failure = [out.error, `exit ${out.exitCode}`, out.signal,
+      !banner && 'missing FFmpeg version banner', diagnostic].filter(Boolean).join('; ');
   }
   return out;
 }
@@ -127,4 +166,4 @@ function findBuiltApp() {
   return candidates[0] || null;
 }
 
-module.exports = { collect, findBuiltApp, resolvable, localBin };
+module.exports = { nativeFixtureSidecarProbe, collect, findBuiltApp, resolvable, localBin };

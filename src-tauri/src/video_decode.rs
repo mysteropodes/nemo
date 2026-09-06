@@ -82,6 +82,7 @@ static NEXT_SESSION_ID: AtomicU32 = AtomicU32::new(1);
 /// `-<target-triple>` suffix `tauri.conf.json`'s `binaries/ffmpeg-*`
 /// source file carries. No `tauri::AppHandle` needed — every caller here
 /// is deep in per-frame session logic, far from any command's handle.
+#[cfg(not(test))]
 fn ffmpeg_path() -> std::path::PathBuf {
     // Test override: `cargo test`'s current_exe() is a `target/*/deps/
     // nemo_lib-<hash>` test binary, whose parent dir has no sidecar next
@@ -99,6 +100,12 @@ fn ffmpeg_path() -> std::path::PathBuf {
         p.set_extension("exe");
     }
     p
+}
+
+// Fixture generation, probing, and decoding share one immutable test selection.
+#[cfg(test)]
+fn ffmpeg_path() -> std::path::PathBuf {
+    tests::test_ffmpeg_path().clone()
 }
 
 /// One running (or just-spawned) ffmpeg decode process for a session.
@@ -1504,18 +1511,88 @@ mod tests {
 
     use std::process::Command as StdCommand;
 
-    /// Generates a test video with the BUNDLED ffmpeg CLI binary (the
-    /// exact same one this module pipes for decode AND probing — no
-    /// separate "test-only" ffmpeg invocation path), cached by filename.
-    /// Fixtures are encoded with the committed LGPL sidecar, which ships no
-    /// libx264/libx265 since the 2026-08-18 rebuild (CLAUDE.md §7): H.264 and
-    /// H.265 fixtures go through Apple's VideoToolbox encoders instead — the
-    /// same encoders the app's own export uses. Both honor `-g` (verified:
-    /// 60 frames at `-g 15` yield 4 keyframes), which the seek/index tests
-    /// below depend on.
+    // Read the override once, before any native work. Never mutate the shared
+    // process environment: parallel tests and decode threads use this same path.
+    pub(super) fn test_ffmpeg_path() -> &'static std::path::PathBuf {
+        static FFMPEG: std::sync::OnceLock<Result<std::path::PathBuf, String>> =
+            std::sync::OnceLock::new();
+        FFMPEG.get_or_init(|| {
+            checked_test_ffmpeg(
+                std::env::var_os("NEMO_TEST_FFMPEG_PATH"),
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("binaries/ffmpeg-aarch64-apple-darwin"),
+            )
+        }).as_ref().unwrap_or_else(|error| panic!("{error}"))
+    }
+
+    fn checked_test_ffmpeg(
+        override_path: Option<std::ffi::OsString>,
+        bundled: std::path::PathBuf,
+    ) -> Result<std::path::PathBuf, String> {
+        // An explicitly empty/missing path is an error, never a bundled fallback.
+        let selected = override_path.map(std::path::PathBuf::from).unwrap_or(bundled);
+        let prerequisite = format!("native video test FFmpeg prerequisite ({})", selected.display());
+        let ffmpeg = selected.canonicalize().map_err(|error| format!("{prerequisite}: {error}"))?;
+        if !ffmpeg.is_file() {
+            return Err(format!("{prerequisite}: executable path is not a file"));
+        }
+        let output = StdCommand::new(&ffmpeg)
+            .args(["-hide_banner", "-version"])
+            .stdin(std::process::Stdio::null())
+            .output()
+            .map_err(|error| format!("{prerequisite}: cannot launch: {error}"))?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if !output.status.success() || !stdout.starts_with("ffmpeg version ") {
+            return Err(format!(
+                "{prerequisite}: -version failed ({}); stdout: {}; stderr: {}",
+                output.status, stdout.trim(), String::from_utf8_lossy(&output.stderr).trim(),
+            ));
+        }
+        eprintln!("[native video tests] {}: {}", ffmpeg.display(), stdout.lines().next().unwrap());
+        Ok(ffmpeg)
+    }
+
+    fn test_fixture_dir() -> &'static std::path::PathBuf {
+        static DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+        test_ffmpeg_path(); // Preflight even if a caller would otherwise reuse a fixture.
+        DIR.get_or_init(|| {
+            // Fresh for every process/run: old fixtures cannot hide a broken encoder
+            // or come from another executable, worktree, or concurrent cargo process.
+            let nonce = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+            let dir = std::env::temp_dir().join(format!(
+                "nemo-video-decode-test-{}-{nonce}", std::process::id(),
+            ));
+            std::fs::create_dir(&dir).expect("create isolated video test fixture directory");
+            dir
+        })
+    }
+
+    fn h264_fixture_encoder() -> &'static str {
+        static ENCODER: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+        ENCODER.get_or_init(|| {
+            std::env::var("NEMO_TEST_H264_ENCODER")
+                .unwrap_or_else(|_| "h264_videotoolbox".to_string())
+        })
+    }
+
+    fn hevc_fixture_encoder() -> &'static str {
+        static ENCODER: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+        ENCODER.get_or_init(|| {
+            std::env::var("NEMO_TEST_HEVC_ENCODER")
+                .unwrap_or_else(|_| "hevc_videotoolbox".to_string())
+        })
+    }
+
+    /// Generates fixtures with the same checked executable used for decode/probe,
+    /// cached by filename within this test process. The bundled LGPL sidecar is
+    /// the default; NEMO_TEST_FFMPEG_PATH may select an explicit executable path
+    /// before the test process starts. Hosted CI also selects software H.264/
+    /// HEVC encoders because its VM cannot create VideoToolbox sessions. Every
+    /// fixture codec, filter, and decoder assertion remains required.
     fn gen_video(filename: &str, lavfi: &str, codec_args: &[&str]) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join("nemo-video-decode-test");
-        std::fs::create_dir_all(&dir).unwrap();
+        let ffmpeg = test_ffmpeg_path();
+        let dir = test_fixture_dir();
         let path = dir.join(filename);
         // Generation is serialized and atomic. `cargo test` runs these tests
         // on every core; without the lock, two tests sharing a fixture name
@@ -1528,8 +1605,6 @@ mod tests {
         let _guard = GEN_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let complete = path.metadata().map(|m| m.len() > 0).unwrap_or(false);
         if !complete {
-            let ffmpeg = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("binaries/ffmpeg-aarch64-apple-darwin");
             let part = dir.join(format!("{filename}.part"));
             let _ = std::fs::remove_file(&part);
             let mut args: Vec<&str> = vec!["-y", "-f", "lavfi", "-i", lavfi];
@@ -1547,39 +1622,29 @@ mod tests {
             };
             args.extend_from_slice(&["-f", fmt]);
             args.push(&out);
-            let status = StdCommand::new(&ffmpeg)
+            let output = StdCommand::new(ffmpeg)
                 .args(&args)
-                .status()
-                .expect("bundled ffmpeg binary must exist and run");
-            assert!(status.success(), "test video generation failed: {filename}");
+                .stdin(std::process::Stdio::null())
+                .output()
+                .unwrap_or_else(|error| panic!("test fixture FFmpeg {} cannot launch: {error}", ffmpeg.display()));
+            assert!(output.status.success(),
+                "test video generation failed: {filename}; FFmpeg {}; {}; stderr: {}",
+                ffmpeg.display(), output.status, String::from_utf8_lossy(&output.stderr));
             std::fs::rename(&part, &path).expect("fixture rename");
         }
         path
-    }
-
-    /// The production code resolves ffmpeg via current_exe() (correct at
-    /// app runtime — confirmed empirically against the real dev/release
-    /// build layout). `cargo test`'s current_exe() is a deps/ test binary
-    /// with no sidecar next to it, so tests point decode/probe at the
-    /// bundled binary directly via an env var override, read once here.
-    fn test_ffmpeg_override() {
-        let ffmpeg = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("binaries/ffmpeg-aarch64-apple-darwin");
-        std::env::set_var("NEMO_TEST_FFMPEG_PATH", ffmpeg);
     }
 
     fn make_test_video() -> std::path::PathBuf {
         gen_video(
             "testsrc2_60f_30fps.mp4",
             "testsrc2=size=320x240:rate=30:duration=2",
-            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"],
+            &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"],
         )
     }
 
-    // ---- ffmpeg-path override plumbing for tests only, wired through a
-    // OnceLock so open_session_core/spawn_at pick it up transparently ----
+    // Test ffmpeg_path() routes all decode/probe calls to the checked selection.
     fn open_session_core_t(path: &str) -> Result<(VideoSession, u64, f64), String> {
-        test_ffmpeg_override();
         open_session_core(path)
     }
 
@@ -1670,7 +1735,7 @@ mod tests {
         let p = gen_video(
             "hevc_320.mp4",
             "testsrc2=size=320x240:rate=30:duration=2",
-            &["-c:v", "hevc_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15", "-tag:v", "hvc1"],
+            &["-c:v", hevc_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15", "-tag:v", "hvc1"],
         );
         assert_decodes_and_seeks(&p, 320, 240);
     }
@@ -1729,7 +1794,7 @@ mod tests {
         let p = gen_video(
             "odd_954x542.mp4",
             "testsrc2=size=954x542:rate=30:duration=1",
-            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"],
+            &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"],
         );
         assert_decodes_and_seeks(&p, 954, 542);
     }
@@ -1739,7 +1804,7 @@ mod tests {
         let p = gen_video(
             "fps25_320.mp4",
             "testsrc2=size=320x240:rate=25:duration=2",
-            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "12"],
+            &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "12"],
         );
         let (mut s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
         assert!((s.fps - 25.0).abs() < 0.01, "fps was {}", s.fps);
@@ -1757,7 +1822,7 @@ mod tests {
         let pb = gen_video(
             "iso_b_160.mp4",
             "testsrc2=size=160x120:rate=30:duration=2",
-            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"],
+            &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"],
         );
         let (mut a, _, _) = open_session_core_t(pa.to_str().unwrap()).unwrap();
         let (mut b, _, _) = open_session_core_t(pb.to_str().unwrap()).unwrap();
@@ -1808,7 +1873,7 @@ mod tests {
         let p = gen_video(
             "perf_1080p.mp4",
             "testsrc2=size=1920x1080:rate=30:duration=2",
-            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"],
+            &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"],
         );
         let (avg, p95) = measure_sequential_steady_state(&p, 30);
         eprintln!("[perf] 1080p sequential (steady-state): avg={avg:.1}ms p95={p95:.1}ms (budget 33.3ms)");
@@ -1820,7 +1885,7 @@ mod tests {
         let p = gen_video(
             "perf_4k.mp4",
             "testsrc2=size=3840x2160:rate=30:duration=1",
-            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"],
+            &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"],
         );
         let (avg, p95) = measure_sequential_steady_state(&p, 15);
         eprintln!("[perf] 4K sequential (steady-state): avg={avg:.1}ms p95={p95:.1}ms (budget 33.3ms)");
@@ -1838,7 +1903,7 @@ mod tests {
         let p = gen_video(
             "perf_4k.mp4",
             "testsrc2=size=3840x2160:rate=30:duration=1",
-            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"],
+            &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"],
         );
         let (mut s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
         let t0 = std::time::Instant::now();
@@ -1880,7 +1945,7 @@ mod tests {
         let p = gen_video(
             "h264_320_biggop.mp4",
             "testsrc2=size=320x240:rate=30:duration=3",
-            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "60"],
+            &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "60"],
         );
         let (mut s, _frame_count, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
 
@@ -1970,7 +2035,7 @@ mod tests {
     // spinning.
     #[test]
     fn readahead_backward_fill_does_not_fight_forward_playback() {
-        let p = gen_video("play_thrash.mp4", "testsrc2=size=320x240:rate=30:duration=4", &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"]);
+        let p = gen_video("play_thrash.mp4", "testsrc2=size=320x240:rate=30:duration=4", &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"]);
         let (s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
         let arc = std::sync::Arc::new(Mutex::new(s));
 
@@ -2022,7 +2087,7 @@ mod tests {
     // idle instead of spinning.
     #[test]
     fn readahead_settles_even_when_cache_cannot_hold_the_full_window() {
-        let p = gen_video("thrash_1080p.mp4", "testsrc2=size=1920x1080:rate=30:duration=3", &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"]);
+        let p = gen_video("thrash_1080p.mp4", "testsrc2=size=1920x1080:rate=30:duration=3", &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"]);
         let (s, _, _) = open_session_core_t(p.to_str().unwrap()).unwrap();
         let arc = std::sync::Arc::new(Mutex::new(s));
 
@@ -2084,15 +2149,16 @@ mod tests {
     // ---- indexed optimized media (the "scrub parfait" pipeline) ----
 
     fn make_indexed_media() -> String {
-        test_ffmpeg_override();
-        let src = make_test_video(); // 320x240, 60 frames, 30fps
-        let dir = std::env::temp_dir().join("nemo-video-decode-test");
-        let target = dir.join("optimized_indexed.mjpeg");
-        let target_s = target.to_str().unwrap().to_string();
-        if !target.exists() || !std::path::Path::new(&format!("{target_s}.idx")).exists() {
+        // All indexed tests share one complete transcode and its index. OnceLock
+        // serializes initialization, just as GEN_LOCK protects source fixtures.
+        static INDEXED: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+        INDEXED.get_or_init(|| {
+            let src = make_test_video(); // 320x240, 60 frames, 30fps
+            let target = test_fixture_dir().join("optimized_indexed.mjpeg");
+            let target_s = target.to_str().unwrap().to_string();
             create_optimized_media_core(src.to_str().unwrap(), &target_s).unwrap();
-        }
-        target_s
+            target_s
+        }).clone()
     }
 
     #[test]
@@ -2162,7 +2228,7 @@ mod tests {
     #[test]
     fn stale_index_is_rejected_not_misread() {
         let target = make_indexed_media();
-        let stale = std::env::temp_dir().join("nemo-video-decode-test").join("stale_copy.mjpeg");
+        let stale = test_fixture_dir().join("stale_copy.mjpeg");
         let stale_s = stale.to_str().unwrap().to_string();
         std::fs::copy(&target, &stale).unwrap();
         std::fs::copy(format!("{target}.idx"), format!("{stale_s}.idx")).unwrap();
@@ -2203,7 +2269,7 @@ mod tests {
         let path_b = gen_video(
             "h264_320_concurrency_b.mp4",
             "testsrc2=size=320x240:rate=30:duration=3",
-            &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"],
+            &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"],
         );
 
         let sessions = StdArc::new(VideoSessions::default());
@@ -2250,8 +2316,8 @@ mod tests {
     #[test]
     fn three_simultaneous_sessions_playback_mostly_avoids_respawns() {
         let pa = make_test_video(); // 320x240, 60 frames
-        let pb = gen_video("play3_b.mp4", "testsrc2=size=320x240:rate=30:duration=3", &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"]);
-        let pc = gen_video("play3_c.mp4", "testsrc2=size=320x240:rate=30:duration=3", &["-c:v", "h264_videotoolbox", "-pix_fmt", "yuv420p", "-g", "15"]);
+        let pb = gen_video("play3_b.mp4", "testsrc2=size=320x240:rate=30:duration=3", &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"]);
+        let pc = gen_video("play3_c.mp4", "testsrc2=size=320x240:rate=30:duration=3", &["-c:v", h264_fixture_encoder(), "-pix_fmt", "yuv420p", "-g", "15"]);
         let (sa, _, _) = open_session_core_t(pa.to_str().unwrap()).unwrap();
         let (sb, _, _) = open_session_core_t(pb.to_str().unwrap()).unwrap();
         let (sc, _, _) = open_session_core_t(pc.to_str().unwrap()).unwrap();
