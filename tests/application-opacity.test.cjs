@@ -29,7 +29,7 @@ test('opacity command uses stable layer ids, revision guards, and retained retry
   assert.equal(api.handle({ ...set, requestId: 'stale', expectedRevision: 0 }).error.code, 'stale_revision');
   assert.equal(api.handle({ ...request(ctx, 'cancel', 'property.set', { layerId: 'a', property: 'opacity', value: 9 }), cancelled: true }).error.code, 'cancelled');
 });
-test('key and animation commands share the opacity writer and trace is bounded', () => {
+test('key commands use the opacity writer and record trace entries', () => {
   const ctx = app(), api = ctx.NemoApplication;
   assert.equal(api.handle(request(ctx, 'key', 'property.key.set', { layerId: 'a', property: 'opacity', frame: 8, value: 12 })).ok, true);
   assert.equal(ctx.state.layers[0].motion.opacity.keys[0].v[0], 12);
