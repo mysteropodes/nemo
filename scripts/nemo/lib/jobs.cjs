@@ -150,6 +150,11 @@ function jobTestRust(ctx, crateDir, label) {
   const results = [...r.stdout.matchAll(/^test result: (\w+)\. (\d+) passed; (\d+) failed/gm)];
   const passed = results.reduce((a, m) => a + Number(m[2]), 0), failed = results.reduce((a, m) => a + Number(m[3]), 0);
   const summary = results.length ? `${results.length} binaries, ${passed} passed, ${failed} failed` : `exit ${r.status}`;
+  // Cargo can exit successfully without executing tests. Count across binaries
+  // so an empty doctest suite does not invalidate a real test run.
+  if (r.status === 0 && passed + failed === 0) {
+    return fail(`cargo test ${label}: no executed tests reported (${summary})`, { exitCode: 1, log: logOf(r) });
+  }
   return (r.status === 0 ? pass : fail)(`cargo test ${label}: ${summary}`, { exitCode: r.status, log: logOf(r) });
 }
 
