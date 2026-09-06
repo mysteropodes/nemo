@@ -2703,8 +2703,18 @@
     if (window._curveEditor) window._curveEditor.editMotionSeg(seg, PROP_LABEL[prop] + ' : clé ' + (seg.frame + 1) + ' → ' + (next.frame + 1));
   }
 
-  function setKeyAtCurrentFrame(ld, prop, values, bypassOpacityApplication) {
-    if (prop === 'opacity' && !bypassOpacityApplication && window.NemoOpacityApplication && !window.NemoOpacityApplication.isDispatching()) return window.NemoOpacityApplication.legacy('key-current', ld, values);
+  function opacityLegacy(kind, holder, values, frame, curvePoints) {
+    var application = window.NemoOpacityApplication;
+    if (application && typeof application.legacy === 'function') return application.legacy(kind, holder, values, frame, curvePoints);
+    return null;
+  }
+  function opacityDomain() { return window.NemoOpacityDomain; }
+  function setKeyAtCurrentFrame(ld, prop, values) {
+    if (prop === 'opacity') {
+      var legacy = opacityLegacy('key-current', ld, values, state.currentFrame);
+      if (legacy !== null) return legacy;
+      return opacityDomain().setKeyAtFrame(ld, state.currentFrame, values);
+    }
     var track = ensureTrack(ld, prop);
     var k = keyAt(track, state.currentFrame);
     if (k) { k.v = values.slice(); }
@@ -2718,8 +2728,12 @@
   // build several keys across a range in one pass (Text Animator, below)
   // rather than reacting to the playhead one commit at a time. Same key
   // shape, curvePoints defaulting to DEFAULT_CURVE when omitted.
-  function setKeyAtFrame(holder, prop, frame, values, curvePoints, bypassOpacityApplication) {
-    if (prop === 'opacity' && !bypassOpacityApplication && window.NemoOpacityApplication && !window.NemoOpacityApplication.isDispatching()) return window.NemoOpacityApplication.legacy('key-frame', holder, values, frame);
+  function setKeyAtFrame(holder, prop, frame, values, curvePoints) {
+    if (prop === 'opacity') {
+      var legacy = opacityLegacy('key-frame', holder, values, frame, curvePoints);
+      if (legacy !== null) return legacy;
+      return opacityDomain().setKeyAtFrame(holder, frame, values, curvePoints);
+    }
     var track = ensureTrack(holder, prop);
     var k = keyAt(track, frame);
     if (k) { k.v = values.slice(); if (curvePoints) k.curvePoints = curvePoints; }
@@ -2729,8 +2743,12 @@
     }
     return keyAt(track, frame);
   }
-  function removeKeyAtCurrentFrame(ld, prop, bypassOpacityApplication) {
-    if (prop === 'opacity' && !bypassOpacityApplication && window.NemoOpacityApplication && !window.NemoOpacityApplication.isDispatching()) return window.NemoOpacityApplication.legacy('remove', ld, null, state.currentFrame);
+  function removeKeyAtCurrentFrame(ld, prop) {
+    if (prop === 'opacity') {
+      var legacy = opacityLegacy('remove', ld, null, state.currentFrame);
+      if (legacy !== null) return legacy;
+      return opacityDomain().removeKeyAtFrame(ld, state.currentFrame);
+    }
     var track = trackFor(ld, prop);
     if (!track) return;
     var i = track.keys.findIndex(function (k) { return k.frame === state.currentFrame; });
@@ -2760,8 +2778,13 @@
   // this only removes the SILENT trigger from toggleAnimated/setValue
   // below, so keying a plain layer's Position/Rotation/etc. now just
   // keys it, no surprise conversion.
-  function toggleAnimated(ld, prop, bypassOpacityApplication) {
-    if (prop === 'opacity' && !bypassOpacityApplication && window.NemoOpacityApplication && !window.NemoOpacityApplication.isDispatching()) return window.NemoOpacityApplication.legacy('animated', ld, !isAnimated(ld, prop));
+  function toggleAnimated(ld, prop) {
+    if (prop === 'opacity') {
+      var animated = !isAnimated(ld, prop), effectiveValue = valueAtFrame(ld, prop, state.currentFrame);
+      var legacy = opacityLegacy('animated', ld, animated, state.currentFrame, effectiveValue);
+      if (legacy !== null) return legacy;
+      return opacityDomain().setAnimated(ld, animated, state.currentFrame, effectiveValue);
+    }
     // The Time Remap row's stopwatch IS the remap switch (AE behavior) —
     // there is no "static timeRemap" fallback to freeze into, the feature
     // is either on (track exists) or off (field deleted, default playback).
@@ -2811,8 +2834,12 @@
     window.SM.setActiveLayer(li, true);
     renderLayerList(); renderTimeline();
   }
-  function setValue(ld, prop, values, bypassOpacityApplication) {
-    if (prop === 'opacity' && !bypassOpacityApplication && window.NemoOpacityApplication && !window.NemoOpacityApplication.isDispatching()) return window.NemoOpacityApplication.legacy('set', ld, values);
+  function setValue(ld, prop, values) {
+    if (prop === 'opacity') {
+      var legacy = opacityLegacy('set', ld, values, state.currentFrame);
+      if (legacy !== null) return legacy;
+      return opacityDomain().setValue(ld, values, state.currentFrame);
+    }
     selectLayerForEdit(ld);
     if (isAnimated(ld, prop)) setKeyAtCurrentFrame(ld, prop, values);
     else { if (!ld.motionStatic) ld.motionStatic = {}; ld.motionStatic[prop] = values.slice(); }
@@ -13364,13 +13391,6 @@
     // which a non-layer holder (audio-bridge.js's own track objects) isn't.
     toggleAnimated: toggleAnimated,
     setValue: setValue,
-    _opacityDirect: {
-      setValue: function (ld, values) { return setValue(ld, 'opacity', values, true); },
-      setKeyAtCurrentFrame: function (ld, values) { return setKeyAtCurrentFrame(ld, 'opacity', values, true); },
-      setKeyAtFrame: function (ld, frame, values) { return setKeyAtFrame(ld, 'opacity', frame, values, null, true); },
-      removeKeyAtFrame: function (ld, frame) { var old = state.currentFrame; state.currentFrame = frame; try { return removeKeyAtCurrentFrame(ld, 'opacity', true); } finally { state.currentFrame = old; } },
-      setAnimated: function (ld, animated) { if (isAnimated(ld, 'opacity') !== animated) return toggleAnimated(ld, 'opacity', true); }
-    },
     trackFor: trackFor,
     keyAt: keyAt,
     stopwatchTitle: stopwatchTitle,
