@@ -5710,7 +5710,7 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
   // scores badly (no real counterpart in the other key — count mismatch,
   // or a shape that genuinely appears/disappears) cross-fades in place
   // instead of scaling/warping toward an unrelated stroke.
-  var MATCH_TH=0.48;
+  var MATCH_TH=(typeof window!=='undefined'&&typeof window.__TW_MATCH_TH==='number')?window.__TW_MATCH_TH:0.48; // surcharge de débogage (banc), défaut 0,48
   // Bug found by stress-testing (2026-07-17): matchSc's dominant terms
   // (proxT 0.48 + alignT 0.15) are ABSOLUTE-position Chamfer/ordered
   // distance, normalized by the strokes' own size — so a single shape
