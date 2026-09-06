@@ -318,6 +318,11 @@ function releaseExclusiveSlot(slot, ownerToken) {
 module.exports = {
   RUNTIME_ROOT,
   PORT_RANGE,
+  // Exported so a consumer that must name this task's resources OUTSIDE these
+  // roots (the native app launcher derives its bundle identifier and WebKit
+  // data store from it) uses this exact derivation instead of writing a second
+  // one that has to stay identical by hand.
+  idKey,
   resolveTaskId,
   taskRoot,
   taskRoots,
