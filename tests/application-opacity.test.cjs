@@ -5,20 +5,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 function app() {
-  const context = { state: { currentFrame: 0, layers: [{ layerUid: 'a', name: 'A', motionStatic: { opacity: [100] } }] }, window: null, pushUndo() { context.pushes++; }, pushes: 0 };
+  let identity = 0;
+  const context = { crypto: { randomUUID: () => `test-${++identity}` }, state: { currentFrame: 0, totalFrames: 24, layers: [{ layerUid: 'a', name: 'A', motionStatic: { opacity: [100] } }] }, window: null, pushUndo() { context.pushes++; }, pushes: 0 };
   context.window = context;
   context.SMMotion = {
     valueAtFrame(layer) { return layer.motionStatic.opacity; },
-    _opacityDirect: {
-      setValue(layer, values) { layer.motionStatic.opacity = values.slice(); },
-      setKeyAtFrame(layer, frame, values) { layer.motion = { opacity: { keys: [{ frame, v: values.slice() }] } }; },
-      setKeyAtCurrentFrame(layer, values) { this.setKeyAtFrame(layer, context.state.currentFrame, values); },
-      removeKeyAtFrame(layer) { layer.motion.opacity.keys = []; },
-      setAnimated(layer, on) { if (on) layer.motion = { opacity: { keys: [{ frame: 0, v: layer.motionStatic.opacity.slice() }] } }; else layer.motion = { opacity: { keys: [] } }; }
-    }
+    ensureLayerUid(layer) { return layer.layerUid; }
   };
   vm.createContext(context);
-  for (const f of ['src/js/domain/animation/opacity.js', 'src/js/application/opacity-application.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), context, { filename: f });
+  for (const f of ['src/js/domain/animation/opacity.js', 'src/js/application/opacity-application.js', 'src/js/bootstrap/opacity-application.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), context, { filename: f });
   return context;
 }
 function request(ctx, id, operation, payload) { const m = ctx.NemoOpacityApplication.meta(); return { apiVersion: 1, requestId: id, instanceId: m.instanceId, documentId: m.documentId, expectedRevision: m.revision, operation, payload: payload || {} }; }
