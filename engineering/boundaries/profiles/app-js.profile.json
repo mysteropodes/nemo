@@ -1,0 +1,2023 @@
+{
+  "modules": [
+    {
+      "id": "app.abr.import",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "abr-import.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "abr-import.js"
+      ]
+    },
+    {
+      "id": "app.ae.camera.export",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "ae-camera-export.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "ae-camera-export.js"
+      ]
+    },
+    {
+      "id": "app.asset.tree",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "asset-tree.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "asset-tree.js"
+      ]
+    },
+    {
+      "id": "app.assets.panel",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "assets-panel.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "assets-panel.js"
+      ]
+    },
+    {
+      "id": "app.bitmap.tip.picker",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "bitmap-tip-picker.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "bitmap-tip-picker.js"
+      ]
+    },
+    {
+      "id": "app.brush.preset.picker",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "brush-preset-picker.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "brush-preset-picker.js"
+      ]
+    },
+    {
+      "id": "app.brush.tool.presets",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "brush-tool-presets.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "brush-tool-presets.js"
+      ]
+    },
+    {
+      "id": "app.color.manager",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "color-manager.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "color-manager.js"
+      ]
+    },
+    {
+      "id": "app.comp.preview",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "comp-preview.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "comp-preview.js"
+      ]
+    },
+    {
+      "id": "app.custom.effects",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "custom-effects.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "custom-effects.js"
+      ]
+    },
+    {
+      "id": "app.drop.import",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "drop-import.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "drop-import.js"
+      ]
+    },
+    {
+      "id": "app.effector.layer",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "effector-layer.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "effector-layer.js"
+      ]
+    },
+    {
+      "id": "app.expr.code.panel",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "expr-code-panel.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "expr-code-panel.js"
+      ]
+    },
+    {
+      "id": "app.expr.examples",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "expr-examples.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "expr-examples.js"
+      ]
+    },
+    {
+      "id": "app.expr.functions",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "expr-functions.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "expr-functions.js"
+      ]
+    },
+    {
+      "id": "app.feedback.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "feedback-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "feedback-bridge.js"
+      ]
+    },
+    {
+      "id": "app.fill.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "fill-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "fill-bridge.js"
+      ]
+    },
+    {
+      "id": "app.geometry.wasm.loader",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "geometry-wasm-loader.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "geometry-wasm-loader.js"
+      ]
+    },
+    {
+      "id": "app.gpu.gate",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "gpu-gate.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "gpu-gate.js"
+      ]
+    },
+    {
+      "id": "app.group.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "group-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "group-bridge.js"
+      ]
+    },
+    {
+      "id": "app.history.panel",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "history-panel.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "history-panel.js"
+      ]
+    },
+    {
+      "id": "app.i18n",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "i18n.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "i18n.js"
+      ]
+    },
+    {
+      "id": "app.idb.store",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "idb-store.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "idb-store.js"
+      ]
+    },
+    {
+      "id": "app.image.mesh.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "image-mesh-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "image-mesh-bridge.js"
+      ]
+    },
+    {
+      "id": "app.kitsu",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "kitsu.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "kitsu.js"
+      ]
+    },
+    {
+      "id": "app.layer.kind",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "layer-kind.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "layer-kind.js"
+      ]
+    },
+    {
+      "id": "app.layer.scroll.sync",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "layer-scroll-sync.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "layer-scroll-sync.js"
+      ]
+    },
+    {
+      "id": "app.linked.media",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "linked-media.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "linked-media.js"
+      ]
+    },
+    {
+      "id": "app.media.library",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "media-library.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "media-library.js"
+      ]
+    },
+    {
+      "id": "app.motion.preset.picker",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "motion-preset-picker.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "motion-preset-picker.js"
+      ]
+    },
+    {
+      "id": "app.nemo.panel",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "nemo-panel.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "nemo-panel.js"
+      ]
+    },
+    {
+      "id": "app.nemo.plugin",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "nemo-plugin.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "nemo-plugin.js"
+      ]
+    },
+    {
+      "id": "app.nemo.script",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "nemo-script.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "nemo-script.js"
+      ]
+    },
+    {
+      "id": "app.p2p.contacts",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "p2p-contacts.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "p2p-contacts.js"
+      ]
+    },
+    {
+      "id": "app.palette.panel",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "palette-panel.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "palette-panel.js"
+      ]
+    },
+    {
+      "id": "app.pen.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "pen-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "pen-bridge.js"
+      ]
+    },
+    {
+      "id": "app.perspective.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "perspective-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "perspective-bridge.js"
+      ]
+    },
+    {
+      "id": "app.playback.cache",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "playback-cache.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "playback-cache.js"
+      ]
+    },
+    {
+      "id": "app.psd.import.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "psd-import-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "psd-import-bridge.js"
+      ]
+    },
+    {
+      "id": "app.rive.export",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "rive-export.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "rive-export.js"
+      ]
+    },
+    {
+      "id": "app.shader.effects.library",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "shader-effects-library.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "shader-effects-library.js"
+      ]
+    },
+    {
+      "id": "app.shadow.brush.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "shadow-brush-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "shadow-brush-bridge.js"
+      ]
+    },
+    {
+      "id": "app.subselect.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "subselect-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "subselect-bridge.js"
+      ]
+    },
+    {
+      "id": "app.svg.import",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "svg-import.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "svg-import.js"
+      ]
+    },
+    {
+      "id": "app.text.animator.panel",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "text-animator-panel.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "text-animator-panel.js"
+      ]
+    },
+    {
+      "id": "app.tools.panel.dock",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "tools-panel-dock.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "tools-panel-dock.js"
+      ]
+    },
+    {
+      "id": "app.transplant",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "transplant.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "transplant.js"
+      ]
+    },
+    {
+      "id": "app.tutorial",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "tutorial.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "tutorial.js"
+      ]
+    },
+    {
+      "id": "app.updater.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "updater-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "updater-bridge.js"
+      ]
+    },
+    {
+      "id": "app.vectorize.wasm.loader",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "vectorize-wasm-loader.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "vectorize-wasm-loader.js"
+      ]
+    },
+    {
+      "id": "app.vectorize.worker",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "vectorize-worker.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "vectorize-worker.js"
+      ]
+    },
+    {
+      "id": "app.labs.auto.actions",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "auto-actions.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "auto-actions.js"
+      ]
+    },
+    {
+      "id": "app.labs.boil.effect",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "boil-effect.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "boil-effect.js"
+      ]
+    },
+    {
+      "id": "app.labs.clip.mask.bake",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "clip-mask-bake.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "clip-mask-bake.js"
+      ]
+    },
+    {
+      "id": "app.labs.command.palette",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "command-palette.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "command-palette.js"
+      ]
+    },
+    {
+      "id": "app.labs.flip.roll",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "flip-roll.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "flip-roll.js"
+      ]
+    },
+    {
+      "id": "app.labs.follow.path",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "follow-path.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "follow-path.js"
+      ]
+    },
+    {
+      "id": "app.labs.interval.assistant",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "interval-assistant.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "interval-assistant.js"
+      ]
+    },
+    {
+      "id": "app.labs.labs.core",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "labs-core.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "labs-core.js"
+      ]
+    },
+    {
+      "id": "app.labs.labs.float.panel",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "labs-float-panel.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "labs-float-panel.js"
+      ]
+    },
+    {
+      "id": "app.labs.labs.panel",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "labs-panel.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "labs-panel.js"
+      ]
+    },
+    {
+      "id": "app.labs.lagoon.menu",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "lagoon-menu.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "lagoon-menu.js"
+      ]
+    },
+    {
+      "id": "app.labs.layer.effects.bake",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "layer-effects-bake.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "layer-effects-bake.js"
+      ]
+    },
+    {
+      "id": "app.labs.lipsync.assistant",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "lipsync-assistant.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "lipsync-assistant.js"
+      ]
+    },
+    {
+      "id": "app.labs.mirror.check",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "mirror-check.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "mirror-check.js"
+      ]
+    },
+    {
+      "id": "app.labs.move.to.layer",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "move-to-layer.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "move-to-layer.js"
+      ]
+    },
+    {
+      "id": "app.labs.multiframe.draw",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "multiframe-draw.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "multiframe-draw.js"
+      ]
+    },
+    {
+      "id": "app.labs.oca.export",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "oca-export.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "oca-export.js"
+      ]
+    },
+    {
+      "id": "app.labs.out.of.pegs",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "out-of-pegs.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "out-of-pegs.js"
+      ]
+    },
+    {
+      "id": "app.labs.pingpong.cycle",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "pingpong-cycle.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "pingpong-cycle.js"
+      ]
+    },
+    {
+      "id": "app.labs.pose.library",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "pose-library.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "pose-library.js"
+      ]
+    },
+    {
+      "id": "app.labs.reference.fill",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "reference-fill.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "reference-fill.js"
+      ]
+    },
+    {
+      "id": "app.labs.retime.exposure",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "retime-exposure.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "retime-exposure.js"
+      ]
+    },
+    {
+      "id": "app.labs.screentone.bake",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "screentone-bake.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "screentone-bake.js"
+      ]
+    },
+    {
+      "id": "app.labs.shader.effects.bake",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "shader-effects-bake.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "shader-effects-bake.js"
+      ]
+    },
+    {
+      "id": "app.labs.timeline.markers",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "timeline-markers.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "timeline-markers.js"
+      ]
+    },
+    {
+      "id": "app.labs.timeline.zoom",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "timeline-zoom.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "timeline-zoom.js"
+      ]
+    },
+    {
+      "id": "app.labs.vector.trim",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "vector-trim.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "vector-trim.js"
+      ]
+    },
+    {
+      "id": "app.labs.view.filter",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "view-filter.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "view-filter.js"
+      ]
+    },
+    {
+      "id": "app.labs.xsheet.panel",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "xsheet-panel.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "xsheet-panel.js"
+      ]
+    },
+    {
+      "id": "app.app",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "app.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "app.js"
+      ]
+    },
+    {
+      "id": "app.audio.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "audio-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "audio-bridge.js"
+      ]
+    },
+    {
+      "id": "app.bitmap.brush",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "bitmap-brush.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "bitmap-brush.js"
+      ]
+    },
+    {
+      "id": "app.bpm.grid",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "bpm-grid.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "bpm-grid.js"
+      ]
+    },
+    {
+      "id": "app.brush.editor",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "brush-editor.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "brush-editor.js"
+      ]
+    },
+    {
+      "id": "app.brush.menu.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "brush-menu-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "brush-menu-bridge.js"
+      ]
+    },
+    {
+      "id": "app.camera",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "camera.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "camera.js"
+      ]
+    },
+    {
+      "id": "app.color.picker",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "color-picker.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "color-picker.js"
+      ]
+    },
+    {
+      "id": "app.draw.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "draw-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "draw-bridge.js"
+      ]
+    },
+    {
+      "id": "app.effects.panel",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "effects-panel.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "effects-panel.js"
+      ]
+    },
+    {
+      "id": "app.engine.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "engine-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "engine-bridge.js"
+      ]
+    },
+    {
+      "id": "app.eraser.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "eraser-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "eraser-bridge.js"
+      ]
+    },
+    {
+      "id": "app.export",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "export.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "export.js"
+      ]
+    },
+    {
+      "id": "app.expr.bake",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "expr-bake.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "expr-bake.js"
+      ]
+    },
+    {
+      "id": "app.figma.import",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "figma-import.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "figma-import.js"
+      ]
+    },
+    {
+      "id": "app.gradient.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "gradient-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "gradient-bridge.js"
+      ]
+    },
+    {
+      "id": "app.image.mesh",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "image-mesh.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "image-mesh.js"
+      ]
+    },
+    {
+      "id": "app.images",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "images.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "images.js"
+      ]
+    },
+    {
+      "id": "app.layer.inout",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "layer-inout.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "layer-inout.js"
+      ]
+    },
+    {
+      "id": "app.lipsync",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "lipsync.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "lipsync.js"
+      ]
+    },
+    {
+      "id": "app.lottie.preview",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "lottie-preview.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "lottie-preview.js"
+      ]
+    },
+    {
+      "id": "app.markers",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "markers.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "markers.js"
+      ]
+    },
+    {
+      "id": "app.motion.graph",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "motion-graph.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "motion-graph.js"
+      ]
+    },
+    {
+      "id": "app.motion",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "motion.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "motion.js"
+      ]
+    },
+    {
+      "id": "app.native.video.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "native-video-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "native-video-bridge.js"
+      ]
+    },
+    {
+      "id": "app.path.fx",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "path-fx.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "path-fx.js"
+      ]
+    },
+    {
+      "id": "app.project",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "project.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "project.js"
+      ]
+    },
+    {
+      "id": "app.reference.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "reference-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "reference-bridge.js"
+      ]
+    },
+    {
+      "id": "app.render.manager",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "render-manager.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "render-manager.js"
+      ]
+    },
+    {
+      "id": "app.rig.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "rig-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "rig-bridge.js"
+      ]
+    },
+    {
+      "id": "app.rig.widget",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "rig-widget.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "rig-widget.js"
+      ]
+    },
+    {
+      "id": "app.rulers.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "rulers-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "rulers-bridge.js"
+      ]
+    },
+    {
+      "id": "app.second.viewer",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "second-viewer.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "second-viewer.js"
+      ]
+    },
+    {
+      "id": "app.select.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "select-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "select-bridge.js"
+      ]
+    },
+    {
+      "id": "app.shape.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "shape-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "shape-bridge.js"
+      ]
+    },
+    {
+      "id": "app.shapes.panel",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "shapes-panel.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "shapes-panel.js"
+      ]
+    },
+    {
+      "id": "app.storyboard",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "storyboard.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "storyboard.js"
+      ]
+    },
+    {
+      "id": "app.stroke.modeler",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "stroke-modeler.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "stroke-modeler.js"
+      ]
+    },
+    {
+      "id": "app.symmetry.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "symmetry-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "symmetry-bridge.js"
+      ]
+    },
+    {
+      "id": "app.text.animator",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "text-animator.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "text-animator.js"
+      ]
+    },
+    {
+      "id": "app.text.selector",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "text-selector.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "text-selector.js"
+      ]
+    },
+    {
+      "id": "app.timeline.zoom",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "timeline-zoom.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "timeline-zoom.js"
+      ]
+    },
+    {
+      "id": "app.timeline",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "timeline.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "timeline.js"
+      ]
+    },
+    {
+      "id": "app.tools",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "tools.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "tools.js"
+      ]
+    },
+    {
+      "id": "app.tracker.panel",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "tracker-panel.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "tracker-panel.js"
+      ]
+    },
+    {
+      "id": "app.tracker",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "tracker.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "tracker.js"
+      ]
+    },
+    {
+      "id": "app.tweens",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "tweens.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "tweens.js"
+      ]
+    },
+    {
+      "id": "app.ui",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "ui.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "ui.js"
+      ]
+    },
+    {
+      "id": "app.vector.text.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "vector-text-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "vector-text-bridge.js"
+      ]
+    },
+    {
+      "id": "app.vectorize.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "vectorize-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "vectorize-bridge.js"
+      ]
+    },
+    {
+      "id": "app.viewtools.bridge",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "viewtools-bridge.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "viewtools-bridge.js"
+      ]
+    },
+    {
+      "id": "app.labs.canvas.grid",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "canvas-grid.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "canvas-grid.js"
+      ]
+    },
+    {
+      "id": "app.labs.french.curve",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "french-curve.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "french-curve.js"
+      ]
+    },
+    {
+      "id": "app.labs.predictive.stroke",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "predictive-stroke.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "predictive-stroke.js"
+      ]
+    },
+    {
+      "id": "app.labs.reference.3d",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "reference-3d.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "reference-3d.js"
+      ]
+    },
+    {
+      "id": "app.labs.rig.deform",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "rig-deform.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "rig-deform.js"
+      ]
+    },
+    {
+      "id": "app.labs.speed.lines",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "speed-lines.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "speed-lines.js"
+      ]
+    },
+    {
+      "id": "app.labs.storyboard.mode",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "storyboard-mode.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "storyboard-mode.js"
+      ]
+    },
+    {
+      "id": "app.labs.timelapse",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "timelapse.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "timelapse.js"
+      ]
+    },
+    {
+      "id": "app.labs.vector.sculpt",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "vector-sculpt.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "vector-sculpt.js"
+      ]
+    }
+  ],
+  "layerRules": {
+    "app-legacy": {
+      "allowedLayers": [
+        "app-legacy"
+      ]
+    }
+  },
+  "sizeProfiles": {
+    "App JS unclassified (pre-R01)": {
+      "warn": 350,
+      "hardMax": 500
+    }
+  },
+  "exceptions": [
+    {
+      "path": "src/js/feedback-bridge.js",
+      "rule": "size",
+      "ceiling": 581,
+      "owner": "ivg-design",
+      "issue": "901",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "src/js/group-bridge.js",
+      "rule": "size",
+      "ceiling": 842,
+      "owner": "ivg-design",
+      "issue": "901",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "src/js/i18n.js",
+      "rule": "size",
+      "ceiling": 4241,
+      "owner": "ivg-design",
+      "issue": "901",
+      "reason": "Translation table embedded in hand-written JS (04_MODULARITY_POLICY.md: 'do not split a shader catalog or translation table merely to satisfy an application-code line budget'); ceiling captured as an exact no-growth baseline, not an application-code review.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "src/js/linked-media.js",
+      "rule": "size",
+      "ceiling": 748,
+      "owner": "ivg-design",
+      "issue": "901",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "src/js/media-library.js",
+      "rule": "size",
+      "ceiling": 884,
+      "owner": "ivg-design",
+      "issue": "901",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "src/js/nemo-script.js",
+      "rule": "size",
+      "ceiling": 667,
+      "owner": "ivg-design",
+      "issue": "901",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "src/js/rive-export.js",
+      "rule": "size",
+      "ceiling": 963,
+      "owner": "ivg-design",
+      "issue": "901",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "src/js/shader-effects-library.js",
+      "rule": "size",
+      "ceiling": 1312,
+      "owner": "ivg-design",
+      "issue": "901",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "src/js/subselect-bridge.js",
+      "rule": "size",
+      "ceiling": 539,
+      "owner": "ivg-design",
+      "issue": "901",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "src/js/tutorial.js",
+      "rule": "size",
+      "ceiling": 1864,
+      "owner": "ivg-design",
+      "issue": "901",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "src/js/labs/labs-float-panel.js",
+      "rule": "size",
+      "ceiling": 607,
+      "owner": "ivg-design",
+      "issue": "901",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "src/js/app.js",
+      "rule": "size",
+      "ceiling": 5401,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (§3/§5 hybrid Paper.js/Rust pipeline notes) — ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
+    },
+    {
+      "path": "src/js/audio-bridge.js",
+      "rule": "size",
+      "ceiling": 619,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/bitmap-brush.js",
+      "rule": "size",
+      "ceiling": 873,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/camera.js",
+      "rule": "size",
+      "ceiling": 658,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/draw-bridge.js",
+      "rule": "size",
+      "ceiling": 1089,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/effects-panel.js",
+      "rule": "size",
+      "ceiling": 871,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/engine-bridge.js",
+      "rule": "size",
+      "ceiling": 4670,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (§3/§5 hybrid Paper.js/Rust pipeline notes) — ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
+    },
+    {
+      "path": "src/js/export.js",
+      "rule": "size",
+      "ceiling": 1365,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/figma-import.js",
+      "rule": "size",
+      "ceiling": 571,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/image-mesh.js",
+      "rule": "size",
+      "ceiling": 584,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/images.js",
+      "rule": "size",
+      "ceiling": 769,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/layer-inout.js",
+      "rule": "size",
+      "ceiling": 1649,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/motion.js",
+      "rule": "size",
+      "ceiling": 13897,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (§3/§5 hybrid Paper.js/Rust pipeline notes) — ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
+    },
+    {
+      "path": "src/js/native-video-bridge.js",
+      "rule": "size",
+      "ceiling": 1479,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/project.js",
+      "rule": "size",
+      "ceiling": 728,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/rig-bridge.js",
+      "rule": "size",
+      "ceiling": 674,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/rig-widget.js",
+      "rule": "size",
+      "ceiling": 695,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/select-bridge.js",
+      "rule": "size",
+      "ceiling": 3598,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/shapes-panel.js",
+      "rule": "size",
+      "ceiling": 906,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/storyboard.js",
+      "rule": "size",
+      "ceiling": 1292,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/timeline.js",
+      "rule": "size",
+      "ceiling": 11870,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (§3/§5 hybrid Paper.js/Rust pipeline notes) — ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
+    },
+    {
+      "path": "src/js/tools.js",
+      "rule": "size",
+      "ceiling": 8618,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (§3/§5 hybrid Paper.js/Rust pipeline notes) — ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
+    },
+    {
+      "path": "src/js/tweens.js",
+      "rule": "size",
+      "ceiling": 5270,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (§3/§5 hybrid Paper.js/Rust pipeline notes) — ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
+    },
+    {
+      "path": "src/js/ui.js",
+      "rule": "size",
+      "ceiling": 1414,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    },
+    {
+      "path": "src/js/vectorize-bridge.js",
+      "rule": "size",
+      "ceiling": 577,
+      "owner": "ivg-design",
+      "issue": "901",
+      "expires": "2026-12-05",
+      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) — not an architectural review of this file's content."
+    }
+  ]
+}

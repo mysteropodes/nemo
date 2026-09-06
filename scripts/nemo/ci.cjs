@@ -6,9 +6,16 @@ const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
+const { compareSizeBaseline } = require('./lib/boundaries-ratchet.cjs');
+const { checkApplicationPolicy, checkApplicationSize } = require('./lib/boundaries-application.cjs');
+const { checkSourceCoverage } = require('./lib/boundaries-coverage.cjs');
+const { discoverSourcePaths } = require('./lib/boundaries-discovery.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const PROFILE = 'engineering/boundaries/profiles/scripts-nemo.profile.json';
+const APPLICATION_PROFILE = 'engineering/boundaries/profiles/app-js.profile.json';
+const APPLICATION_SEED = 'engineering/boundaries/profiles/app-js.baseline.json';
+const APPLICATION_POLICY = 'engineering/boundaries/profiles/app-js.coverage.json';
 const LANES = ['quick', 'boundaries', 'surfaces'];
 const QUICK = ['doctor', 'check', 'test:unit', 'test:rust'];
 const SURFACES = ['test:integration', 'test:browser', 'test:rust-tauri', 'build:wasm', 'build:desktop', 'test:desktop'];
@@ -50,8 +57,8 @@ function applicability(files) {
     || file === 'scripts/nemo/README.md'
     || /^(?:README|CONTRIBUTING|CLAUDE|AGENTS|THIRD_PARTY_NOTICES)\.md$/.test(file)
     || file === 'LICENSE' || file === '.github/workflows/nemo-validation.yml'
-    || /^scripts\/nemo\/(?:ci|boundaries|boundaries-ratchet)(?:\.test)?\.cjs$/.test(file)
-    || /^scripts\/nemo\/lib\/boundaries(?:-ratchet)?\.cjs$/.test(file)
+    || /^scripts\/nemo\/(?:ci|boundaries(?:-[a-z-]+)?)(?:\.test)?\.cjs$/.test(file)
+    || /^scripts\/nemo\/lib\/boundaries(?:-[a-z-]+)?\.cjs$/.test(file)
     || /^tests\/nemo-(?:ci|boundaries|boundaries-ratchet)\.test\.cjs$/.test(file);
   const affected = files.filter((file) => !exempt(file));
   return { required: affected.length ? [...SURFACES] : [], affected,
@@ -82,13 +89,51 @@ function changedFiles(base, root = ROOT) {
   return git(['diff', '--name-only', '--no-renames', '-z', base, 'HEAD', '--'], root).split('\0').filter(Boolean);
 }
 
-function materializeBaseline(base, directory, root = ROOT) {
+function materializeBaseline(base, directory, root = ROOT, sourcePath = PROFILE, filename = 'protected-base-profile.json') {
   checkedBase(base, root);
-  const content = git(['show', `${base}:${PROFILE}`], root);
+  const content = git(['show', `${base}:${sourcePath}`], root);
   JSON.parse(content); // malformed/missing policy fails before calling the checker
-  const file = path.join(directory, 'protected-base-profile.json');
+  const file = path.join(directory, filename);
   fs.writeFileSync(file, content, { flag: 'wx' });
-  return { file, base, sourcePath: PROFILE, sha256: crypto.createHash('sha256').update(content).digest('hex') };
+  return { file, base, sourcePath, sha256: crypto.createHash('sha256').update(content).digest('hex') };
+}
+
+function existsAtRevision(base, sourcePath, root = ROOT) {
+  checkedBase(base, root);
+  const result = command('git', ['cat-file', '-e', `${base}:${sourcePath}`], root);
+  return result.status === 0;
+}
+
+function applicationBoundaries(base, scratch, root = ROOT) {
+  const candidatePath = path.join(root, APPLICATION_PROFILE);
+  const baseHasProfile = existsAtRevision(base, APPLICATION_PROFILE, root);
+  if (!fs.existsSync(candidatePath)) {
+    if (baseHasProfile) throw new Error(`${APPLICATION_PROFILE} was removed from the candidate`);
+    return null;
+  }
+  let baseline;
+  if (baseHasProfile) {
+    baseline = materializeBaseline(base, scratch, root, APPLICATION_PROFILE, 'protected-base-app-profile.json');
+  } else {
+    const seed = path.join(root, APPLICATION_SEED);
+    if (!fs.existsSync(seed) || fs.readFileSync(seed, 'utf8') !== fs.readFileSync(candidatePath, 'utf8')) {
+      throw new Error('initial application profile must exactly match its reviewed seed baseline');
+    }
+    baseline = { file: seed, base: null, sourcePath: APPLICATION_SEED,
+      sha256: crypto.createHash('sha256').update(fs.readFileSync(seed)).digest('hex'), bootstrap: true };
+  }
+  const candidate = JSON.parse(fs.readFileSync(candidatePath, 'utf8'));
+  const prior = JSON.parse(fs.readFileSync(baseline.file, 'utf8'));
+  const policy = JSON.parse(fs.readFileSync(path.join(root, APPLICATION_POLICY), 'utf8'));
+  const coverage = checkApplicationPolicy(candidate, policy, { root });
+  const size = checkApplicationSize(candidate, { root });
+  const ratchet = compareSizeBaseline(prior, candidate, { root });
+  return { ok: coverage.ok && size.ok && ratchet.ok, baseline, coverage, size, ratchet };
+}
+
+function toolingCoverage(profile, root = ROOT) {
+  const sourcePaths = discoverSourcePaths({ root, sourceRoots: ['scripts/nemo'], extensions: ['.cjs'] });
+  return checkSourceCoverage(profile, { root, sourcePaths, exclusions: [] });
 }
 
 function verify(required, root = ROOT) {
@@ -109,10 +154,15 @@ function boundaries(base, root = ROOT) {
       '--baseline', baseline.file, '--root', root, '--json'], root);
     let report;
     try { report = JSON.parse(result.stdout); } catch { /* rejected below */ }
-    const ok = result.status === 0 && report?.ok === true && report?.ratchet?.ok === true;
-    return { ok, problems: ok ? [] : ['boundary checker or required baseline ratchet did not pass'],
+    const toolingProfile = JSON.parse(fs.readFileSync(path.join(root, PROFILE), 'utf8'));
+    const toolingSourceCoverage = toolingCoverage(toolingProfile, root);
+    const toolingOk = result.status === 0 && report?.ok === true && report?.ratchet?.ok === true
+      && toolingSourceCoverage.ok;
+    const application = applicationBoundaries(base, scratch, root);
+    const ok = toolingOk && (!application || application.ok);
+    return { ok, problems: ok ? [] : ['boundary checker, source coverage, current size, or protected baseline ratchet did not pass'],
       baseline: { base: baseline.base, sourcePath: baseline.sourcePath, sha256: baseline.sha256 },
-      report: report || null, stderr: result.stderr || null };
+      report: report || null, toolingSourceCoverage, application, stderr: result.stderr || null };
   } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 }
 
@@ -141,5 +191,6 @@ if (require.main === module) {
   try { process.exitCode = main(); }
   catch (err) { console.error(`CI blocked: ${err.message}`); process.exitCode = 1; }
 }
-module.exports = { LANES, QUICK, SURFACES, PROFILE, aggregate, validateReceipt, applicability,
-  changedFiles, materializeBaseline, verify, boundaries, main };
+module.exports = { LANES, QUICK, SURFACES, PROFILE, APPLICATION_PROFILE, APPLICATION_SEED,
+  APPLICATION_POLICY, aggregate, validateReceipt, applicability, changedFiles, materializeBaseline,
+  existsAtRevision, applicationBoundaries, toolingCoverage, verify, boundaries, main };
