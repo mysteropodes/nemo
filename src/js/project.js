@@ -197,7 +197,7 @@
     if(!tauriOk())return;
     try{
       var json=await window.__TAURI__.fs.readTextFile(path);
-      window.SM.importJSON(json,true);
+      if(!window.SM.importJSON(json,true))throw new Error('Invalid project');
       // Re-export rather than keeping the file's own text: importJSON
       // normalizes (fills defaults, pads frames), so the round-tripped
       // form is what future exportJSON calls will actually produce —
@@ -733,7 +733,7 @@
     if(histModal)histModal.addEventListener('click',function(e){if(e.target===histModal)histModal.style.display='none';});
     document.getElementById('file-input').addEventListener('change',function(e){
       var f=e.target.files[0];if(!f)return;
-      var r=new FileReader();r.onload=function(ev){try{window.SM.importJSON(ev.target.result,true);markSaved(window.SM.exportJSON());currentPath=null;currentName=baseName(f.name)||'Untitled';updateCurrentLabel();hideStartScreen();ensureInitialTab();showToast('Opened: '+currentName);}catch(err){showToast('Could not open file — it may be invalid or corrupted');}};
+      var r=new FileReader();r.onload=function(ev){try{if(!window.SM.importJSON(ev.target.result,true))throw new Error('Invalid project');markSaved(window.SM.exportJSON());currentPath=null;currentName=baseName(f.name)||'Untitled';updateCurrentLabel();hideStartScreen();ensureInitialTab();showToast('Opened: '+currentName);}catch(err){showToast('Could not open file — it may be invalid or corrupted');}};
       r.onerror=function(){showToast('Could not open file — it may be invalid or corrupted');};
       r.readAsText(f);e.target.value='';
     });
