@@ -29,6 +29,10 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
 
 ## Work safely
 
+- Run builds and validation locally. Do not enable, dispatch, rerun, or add automatic
+  GitHub Actions builds without an explicit human request for that specific hosted run.
+  Commits, pushes, PRs, merges, tags, and routine acceptance work are not that request.
+  See [the CI policy](engineering/ci/README.md); preserve normal PR review protections.
 - Read `CONTRIBUTING.md`, inspect current source, related branches and existing ownership,
   then use a dedicated branch and isolated worktree for tracked changes.
 - Record the outcome, scope, dependencies, base, branch/worktree, acceptance checks,

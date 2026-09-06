@@ -20,18 +20,20 @@ name: Deploy feedback Worker to Cloudflare
 # FEEDBACK_WORKER_URL are both checked in (wrangler.jsonc `vars`, and the
 # bridge source respectively) — no manual dashboard step needed anymore.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'worker-feedback/**'
-      - '.github/workflows/deploy-feedback-worker.yml'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      allow_hosted_build:
+        description: 'Explicitly approve this requested hosted Worker build and deployment (normally local)'
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch' && inputs.allow_hosted_build == true
     runs-on: ubuntu-latest
     defaults:
       run:

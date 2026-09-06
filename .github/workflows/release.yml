@@ -1,7 +1,8 @@
 name: Release
 
-# Builds the desktop app on a tag and publishes it as a GitHub Release,
-# updater manifest included.
+# Builds the desktop app for an existing tag only on an explicitly requested
+# manual run, then creates a draft GitHub Release with its updater manifest.
+# Tag pushes do not trigger builds. Local builds are the default.
 #
 # It produces the public binaries and, via includeUpdaterJson, the latest.json
 # the auto-updater will read. Pointing the app AT it is a deliberate follow-up:
@@ -28,12 +29,16 @@ name: Release
 # a choice -- see the `matrix` comment below before adding a platform.
 
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
     inputs:
+      allow_hosted_build:
+        description: 'Explicitly approve this requested hosted release build (normally local)'
+        type: boolean
+        required: true
+        default: false
       tag:
         description: 'Tag to build (must already exist)'
+        type: string
         required: true
 
 permissions:
@@ -41,6 +46,7 @@ permissions:
 
 jobs:
   release:
+    if: github.event_name == 'workflow_dispatch' && inputs.allow_hosted_build == true
     strategy:
       fail-fast: false
       matrix:
@@ -69,7 +75,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: refs/tags/${{ inputs.tag }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -139,7 +145,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.event.inputs.tag || github.ref_name }}
+          tagName: ${{ inputs.tag }}
           releaseName: 'Nemo __VERSION__'
           releaseBody: |
             Nemo __VERSION__ — early alpha.

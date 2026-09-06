@@ -116,7 +116,11 @@ where applicable. Stale responses cannot update a later document.
 
 ## CI design
 
-Run static architecture, fast CPU, document-contract, browser and required native/build jobs
+**Current execution policy (2026-09-06): builds and validation run locally.** Hosted
+Actions builds require an explicit human request for the specific run; commits, pushes,
+PRs, merges and tags do not authorize one. See [the CI policy](../ci/README.md).
+
+Run static architecture, fast CPU, document-contract, browser and required native/build jobs locally
 according to changed modules and reverse dependencies. Until global coupling is retired,
 selection stays conservative. Required aggregate checks fail if a required child fails,
 cancels or is missing. Expensive GPU/native checks use trusted runners or an explicit

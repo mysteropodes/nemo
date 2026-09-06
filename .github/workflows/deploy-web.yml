@@ -21,15 +21,20 @@ name: Deploy web beta to Cloudflare Workers
 #      the dashboard (Workers & Pages > nemo-editor > Settings > Domains &
 #      Routes > Add > Custom Domain).
 on:
-  push:
-    branches: [main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      allow_hosted_build:
+        description: 'Explicitly approve this requested hosted build and deployment (normally local)'
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch' && inputs.allow_hosted_build == true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,8 +61,8 @@ jobs:
         with:
           node-version: 20
 
-      # Production (push to main) deploys as "nemo-editor" (wrangler.jsonc's
-      # name); anything else (manual dispatch from a non-main ref) deploys
+      # An explicitly requested manual run from main deploys as "nemo-editor"
+      # (wrangler.jsonc's name); a manual run from a non-main ref deploys
       # under "nemo-dev" via --name override — same stable/dev split
       # Graphite uses for editor.graphite.art/dev.graphite.art, just on
       # Worker names instead of Pages project names.

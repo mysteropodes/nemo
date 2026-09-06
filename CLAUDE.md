@@ -458,6 +458,11 @@ silencieusement.
 
 ## 7. Avant chaque build : synchroniser le numéro de version partout
 
+**Builds et validation en local par défaut.** Aucun commit, push, PR, merge ou tag ne
+doit lancer un build GitHub Actions. Ne pas activer, déclencher ni relancer un workflow
+hébergé sans demande humaine explicite pour cette exécution précise. Voir la
+[politique CI](engineering/ci/README.md) ; conserver les protections de revue des PR.
+
 Trois fichiers portent le numéro de version et doivent rester identiques à chaque bump :
 `package.json`, `src-tauri/tauri.conf.json`. L'affichage à l'écran (titre de fenêtre, barre
 de statut en bas, Réglages → "Mises à jour de l'app") est lu dynamiquement via
@@ -509,9 +514,10 @@ Checklist avant `npm run build` :
    l'instant — réimplémentation clean-room de RDD-36 (spec SMPTE publiée), aucun pool de
    brevets public connu contrairement à AVC/HEVC, risque plus faible mais pas fermé ;
    `prores_videotoolbox` (ci-dessus) le fermerait si besoin un jour.
-4. Si c'est un vrai changement fonctionnel (pas juste un patch de bug) : pousser un tag
-   `v<version>` déclenche `.github/workflows/release.yml`, qui build, signe et publie une
-   Release GitHub en **draft** (le vrai verrou manuel : rien n'est visible tant qu'elle n'est
+4. Un tag `v<version>` ne déclenche plus de build. Construire en local par défaut.
+   Seulement sur demande humaine explicite, `.github/workflows/release.yml` peut être
+   lancé manuellement pour un tag existant avec `allow_hosted_build: true` ; il build,
+   signe et crée une Release GitHub en **draft** (rien n'est visible tant qu'elle n'est
    pas publiée à la main sur GitHub) — la publier la rend visible à l'updater intégré, qui lit
    `releases/latest/download/latest.json` sur le repo public `mysteropodes/nemo` (aucun token,
    endpoint dans `tauri.conf.json`). L'ancien script `publish-update.sh` (repo privé
