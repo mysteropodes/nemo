@@ -248,7 +248,13 @@ build identities, and a live app manifest naming this task agree. A manifest
 left by an earlier or different run is reported as such, never accepted as this
 instance's identity. `stop` refuses a mismatched owner, terminates the owned
 process group, waits for launcher exit and then removes that task's roots.
-Copy wanted artifacts first.
+Copy wanted artifacts first. `stop --retain-data` instead releases the launcher
+registration and reservations while preserving task roots, app directories and
+the WebKit store for a later launch with the same task id. Both modes require
+confirmed app-process-group exit before releasing ownership; an orphan whose
+process identity or group exit cannot be proved retains its state and reports
+that explicit reconciliation is required. A stale manifest cannot satisfy a
+new launch.
 
 Removing the task root is not enough on its own: the isolated app directories
 are `<platform dir>/<identifier>`, so they live outside it and
@@ -259,8 +265,8 @@ component carries this task's own identifier suffix** — recomputed locally fro
 the task id, never trusted from the manifest. A manifest naming the shared
 `com.strokemotion.app` directory, another task's directory or a relative path is
 refused by name and reported in `appState.refused`. A start that fails does not
-release anything it did not acquire: task ids are reused across restarts, which
-is what lets an instance's state survive a stop.
+release anything it did not acquire. Reuse the task id after an explicit
+`--retain-data` stop to read its saved state; the default stop removes it.
 
 `--reserve` takes the shared resources this instance needs exclusively, before
 it starts: `desktop-input` for a run that drives the one keyboard and mouse,

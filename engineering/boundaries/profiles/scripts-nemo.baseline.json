@@ -13,6 +13,8 @@
       "files": ["browser-runtime.cjs"], "publicApi": ["browser-runtime.cjs"], "sizeProfile": "Platform/engine adapter" },
     { "id": "nemo.lib.buildRuntime", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
       "files": ["build-runtime.cjs"], "publicApi": ["build-runtime.cjs"], "sizeProfile": "Platform/engine adapter" },
+    { "id": "nemo.lib.nativeProcess", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
+      "files": ["native-process.cjs"], "publicApi": ["native-process.cjs"], "sizeProfile": "Platform/engine adapter" },
     { "id": "nemo.lib.nativeRuntime", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
       "files": ["native-runtime.cjs"], "publicApi": ["native-runtime.cjs"], "sizeProfile": "Platform/engine adapter" },
     { "id": "nemo.lib.boundariesChecker", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
