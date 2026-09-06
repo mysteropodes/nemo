@@ -3,8 +3,8 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "9684a101a520eddf63db88fa2b8fe0d3ba42570a",
-  "describe": "v0.7.0-alpha.4-80-g9684a10-dirty"
+  "head": "24836ce8f1ae4d6b4fb4ffdd61da99b0ede0fdfb",
+  "describe": "v0.7.0-alpha.4-96-g24836ce-dirty"
  },
  "inputsDigest": "b0fbf431a2d51b06bfea974f573f4175cc56c84ba6e009c7fd7b72cae87f011c",
  "states": [
@@ -35,18 +35,18 @@
    "shortcut": 50
   },
   "byStatus": {
-   "inventoried": 874,
-   "unmapped": 27,
+   "inventoried": 875,
+   "unmapped": 26,
    "unavailable-with-reason": 1
   },
   "byArea": {
    "project-lifecycle-integrations": 120,
-   "drawing-selection": 262,
+   "drawing-selection": 263,
    "media-import-export": 52,
    "timeline-layers-frames": 175,
    "animation-rigs-expressions": 160,
    "effects-masks": 10,
-   "preferences-workspace": 40,
+   "preferences-workspace": 39,
    "unclassified": 6,
    "labs": 60,
    "storyboard": 17
@@ -14179,10 +14179,12 @@
    "capability": "Click to pick a color, double-click to toggle fill on/off",
    "area": "drawing-selection",
    "handler": [
-    "src/js/ui.js:1125"
+    "src/js/ui.js:1125",
+    "src/js/color-picker.js:264 wireColorSwatches()"
    ],
    "events": [
-    "dblclick"
+    "dblclick",
+    "click"
    ],
    "exposure": [
     "UI"
@@ -14279,8 +14281,12 @@
    "surface": "stroke-sec > div#pm-stroke",
    "capability": "pm stroke",
    "area": "drawing-selection",
-   "handler": [],
-   "events": [],
+   "handler": [
+    "src/js/color-picker.js:264 wireColorSwatches()"
+   ],
+   "events": [
+    "click"
+   ],
    "exposure": [
     "UI"
    ],
@@ -14288,8 +14294,8 @@
    "sdk": "none",
    "consumers": {},
    "platforms": "browser and desktop",
-   "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:3800 updateFsSelPanel())",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:926",
    "meta": {
     "data": {},
@@ -14297,7 +14303,8 @@
     "container": "stroke-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 0,
+    "functionsVisited": 46,
+    "via": "exported ColorPicker.wireColorSwatches()",
     "references": [
      "src/js/timeline.js:3800 updateFsSelPanel()",
      "src/js/timeline.js:6231 paintStrokeSwatches()",
@@ -14410,9 +14417,9 @@
    "kind": "dom",
    "surface": "settings-modal > div#profile-color-well",
    "capability": "profile color well",
-   "area": "preferences-workspace",
+   "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:9033 initSettingsModal()"
+    "src/js/color-picker.js:264 wireColorSwatches()"
    ],
    "events": [
     "click"
@@ -14433,14 +14440,19 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 0,
-    "via": "container delegation #settings-modal",
+    "functionsVisited": 46,
+    "via": "exported ColorPicker.wireColorSwatches()",
     "references": [
      "src/js/timeline.js:9046 syncProfileFields()",
      "src/js/timeline.js:9072 initProfileFields()"
     ]
    },
-   "fixtures": []
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
   },
   {
    "id": "dom:#profile-email",

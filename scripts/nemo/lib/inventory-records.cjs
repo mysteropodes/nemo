@@ -27,14 +27,20 @@ function recordExportedRecordArrayBindings(context) {
     return true;
   }
   function exportedMember(objectName, memberName) {
-    const re = new RegExp('\\bwindow\\.' + esc(objectName) + '\\s*=\\s*\\{', 'g');
+    const re = new RegExp('\\bwindow\\.' + esc(objectName) + '\\s*=(?!=)\\s*', 'g');
     let found = null;
+    let objectWrites = 0;
     for (const exportFile of idx) {
       re.lastIndex = 0;
       let m;
       while ((m = re.exec(exportFile.code))) {
-        const open = exportFile.code.indexOf('{', m.index);
-        if (!rootedWindow(exportFile, m.index) || exportFile.kind[m.index] !== CODE || open < 0 || exportFile.kind[open] !== CODE) continue;
+        if (!rootedWindow(exportFile, m.index) || exportFile.kind[m.index] !== CODE) continue;
+        // Every replacement competes with the selected export, including an
+        // object whose member is inline or absent, and non-object assignments.
+        // Counting only resolvable member identifiers would miss those writes.
+        if (++objectWrites > 1) return null;
+        const open = m.index + m[0].length;
+        if (exportFile.code[open] !== '{' || exportFile.kind[open] !== CODE) return null;
         for (const prop of argsOf(exportFile, open).args) {
           const value = new RegExp('^' + esc(memberName) + '\\s*:\\s*([A-Za-z_$][\\w$]*)\\s*$').exec(prop.text);
           if (!value) continue;
