@@ -539,6 +539,39 @@ var TW_FIELD_ITER=0;
 // l'épaule sans artefact. Actif par défaut. Les pires cas (66 px) ne sont pas
 // touchés : ils ne sont pas des rotations de membre, c'est un autre sujet.
 var TW_PIVOT=true,PIVOT_MODE='end',PIVOT_MIN_DEG=10,PIVOT_REACH=1.5,PIVOT_END_RATIO=0.5;
+
+// Arbitrage entre moteurs (candScore) — deux corrections de pondération.
+// Cas mesuré (brasG.json, bras gauche, 150 points) : les moteurs linéaire, blend
+// et MLS ont 2,5 auto-croisements de plus que la tolérance sur les 5 échantillons,
+// facturés 25 points — mais leur aire de boucle EXCÉDENTAIRE est nulle : ce sont
+// des croisements en cheveu dans les doigts, invisibles. L'intrinsèque uniforme
+// n'en a que 0,5 (5 points) et gagne à 12 contre 26, alors qu'il traîne une
+// excursion d'extrémité de 59 px et un rebroussement de 5,4 : à l'image, le bras
+// s'écrase à mi-parcours puis se redéploie. Un croisement invisible pesait dix
+// fois un bras qui s'écrase.
+// TW_XING_HAIRLINE : quand l'aire excédentaire par croisement est sous
+// XING_HAIRLINE_AREA px², le croisement n'est pas visible et ne coûte que
+// XING_HAIRLINE_W au lieu de 10. Un vrai repli (aire réelle) garde ses 10.
+// TW_CAND_ENDS : les extrémités sont des sommets appariés ; leur position
+// attendue est le lerp A→B. Au-delà de CAND_END_TOL px d'écart maximal sur les
+// échantillons, chaque pixel coûte CAND_END_W.
+// MESURE (2026-09-06, easing neutralisé, 8 fichiers ; déviation latérale de
+// l'articulation · replis total/visibles(>4 px²) · aller-retours · longueur
+// perdue · excursion max des bouts) — TW_XING_HAIRLINE seul :
+//   brasG     4,16 · 12/10 ·  4 · 449 px · 59  ->  1,70 · 13/13 · 0 · 268 px · 20
+//   cats      3,20 · 43/6  · 368 · 148 px      ->  3,17 · 46/5  · 368 · 143 px
+//   untitled3 2,13 · 15/6  · 155 ·   9 px      ->  2,04 · 17/5  · 155 ·   4 px
+//   untitled4, traits, b, testanim, totale : strictement identiques.
+// Sur brasG le bras ne s'écrase plus (vérifié à l'image) ; les trois « replis
+// visibles » en plus sont les boucles des doigts du poing, 14 à 28 px², présentes
+// dans les clés elles-mêmes. Les replis en cheveu montent de 2 à 3 par fichier :
+// c'est le prix assumé, ils ne se voient pas. Actif par défaut.
+// TW_CAND_ENDS, mesuré seul et combiné : améliore la déviation latérale (cats
+// 3,20→3,07, untitled3 2,13→1,78) mais AGGRAVE la longueur perdue de ~49 px sur
+// ces deux fichiers — il pousse vers des candidats qui tiennent les bouts au prix
+// du raccourcissement. Laissé désactivé.
+var TW_XING_HAIRLINE=true,XING_HAIRLINE_AREA=4,XING_HAIRLINE_W=2;
+var TW_CAND_ENDS=false,CAND_END_TOL=6,CAND_END_W=0.15;
 function _segsCentroidXY(segs){var x=0,y=0,n=segs.length;for(var i=0;i<n;i++){x+=segs[i].point[0];y+=segs[i].point[1];}return[x/n,y/n];}
 // TW_ARC_FROM_CHAIN (2026-09-05, Cyril : « une main va parcourir un chemin
 // courbe, si on déduit la courbe par rapport à toutes les keyframes… on
@@ -4422,10 +4455,34 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
               // the least-folded still wins when every candidate folds.
               var fbFrac=foldBackFrac(mid);
               var fbPen=fbFrac>FOLDBACK_MIN?TW_FOLDBACK_W*(3+fbFrac*10):0;
-              return exX*10+exArea*XING_AREA_W+cd/(Math.PI/6)+ld5*5+back/(n*0.8)+foldErr/(Math.PI/6)+ripExcess*0.15+fbPen;
+              // voir TW_XING_HAIRLINE / TW_CAND_ENDS
+              var xW=10;
+              if(TW_XING_HAIRLINE&&exX>0&&exArea<XING_HAIRLINE_AREA*exX)xW=XING_HAIRLINE_W;
+              var endPen=0;
+              if(TW_CAND_ENDS){
+                var exEnd=0;
+                for(var se=1;se<traj.length-1;se++){var ee=ETS[se-1];
+                  for(var kk=0;kk<2;kk++){var k=kk?n-1:0;var lx=rA.segments[k].point[0]+(rB.segments[k].point[0]-rA.segments[k].point[0])*ee,ly=rA.segments[k].point[1]+(rB.segments[k].point[1]-rA.segments[k].point[1])*ee;var dd=Math.hypot(traj[se][k].point[0]-lx,traj[se][k].point[1]-ly);if(dd>exEnd)exEnd=dd;}}
+                endPen=Math.max(0,exEnd-CAND_END_TOL)*CAND_END_W;
+              }
+              return exX*xW+exArea*XING_AREA_W+cd/(Math.PI/6)+ld5*5+back/(n*0.8)+foldErr/(Math.PI/6)+ripExcess*0.15+fbPen+endPen;
             }
             var scB5c=candScore(candTraj.b),scU5=candScore(candTraj.u),scL5=candScore(candTraj.l);
             var scM5=mlsPerV?candScore(candTraj.m):Infinity;
+            if(window.__TW_DEBUG_SCORES){
+              function candTerms(traj){
+                var exX=0,exArea=0;
+                for(var st=1;st<traj.length-1;st++){var allow=TW_XING_LERP?(xingA+(xingB-xingA)*ETS[st-1]):base;exX+=Math.max(0,_segsSelfXCount(traj[st])-allow);if(TW_XING_AREA){var allowAr=loopA+(loopB-loopA)*ETS[st-1];exArea+=Math.max(0,_segsSelfLoopArea(traj[st])-allowAr);}}
+                var mid=traj[midIdx+1];var cd=Math.abs(_wrapPI(chord5(mid)-chordExp));var ld5=Lexp5>1e-6?Math.abs(_segPolyLen(mid)-Lexp5)/Lexp5:0;
+                var back=0;for(var pi5=0;pi5<n;pi5++){for(var st2=1;st2<traj.length-1;st2++){var p0=traj[st2-1][pi5].point,p1=traj[st2][pi5].point,p2=traj[st2+1][pi5].point;var v1x=p1[0]-p0[0],v1y=p1[1]-p0[1],v2x=p2[0]-p1[0],v2y=p2[1]-p1[1];var l1=Math.hypot(v1x,v1y),l2=Math.hypot(v2x,v2y);if(l1<0.3||l2<0.3)continue;if((v1x*v2x+v1y*v2y)/(l1*l2)<-0.3)back+=l2;}}
+                var fbFrac=foldBackFrac(mid);
+                // excursion des extrémités par rapport à leur trajet lerp (diagnostic)
+                var exEnd=0;for(var st3=1;st3<traj.length-1;st3++){var e=ETS[st3-1];[0,n-1].forEach(function(k){var lx=rA.segments[k].point[0]+(rB.segments[k].point[0]-rA.segments[k].point[0])*e,ly=rA.segments[k].point[1]+(rB.segments[k].point[1]-rA.segments[k].point[1])*e;exEnd=Math.max(exEnd,Math.hypot(traj[st3][k].point[0]-lx,traj[st3][k].point[1]-ly));});}
+                return {exX:+(exX*10).toFixed(2),exArea:+(exArea*XING_AREA_W).toFixed(2),cd:+(cd/(Math.PI/6)).toFixed(2),ld5:+(ld5*5).toFixed(2),back:+(back/(n*0.8)).toFixed(2),fold:+(foldAngleErr(mid)/(Math.PI/6)).toFixed(2),rip:+(Math.max(0,ripPoly(mid)-ripAllow)*0.15).toFixed(2),fb:+(fbFrac>FOLDBACK_MIN?TW_FOLDBACK_W*(3+fbFrac*10):0).toFixed(2),exEnd:Math.round(exEnd)};
+              }
+              window.__twScoresLog=window.__twScoresLog||[];
+              window.__twScoresLog.push({id:(rA._src&&rA._src.strokeId)?String(rA._src.strokeId).slice(-8):'?',n:n,scores:{b:+scB5c.toFixed(2),u:+scU5.toFixed(2),l:+scL5.toFixed(2),m:isFinite(scM5)?+scM5.toFixed(2):null},termes:{b:candTerms(candTraj.b),u:candTerms(candTraj.u),l:candTerms(candTraj.l),m:mlsPerV?candTerms(candTraj.m):null}});
+            }
             if(window.__TW_DEBUG_SCORES)rA._twDbgScores={
               b:scB5c,u:scU5,l:scL5,m:scM5,
               fb:{b:foldBackFrac(candTraj.b[midIdx+1]),u:foldBackFrac(candTraj.u[midIdx+1]),
