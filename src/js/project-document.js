@@ -15,5 +15,9 @@
     });
     return d;
   }
-  window.SMProjectDocument={parse:parse};
+  function baseName(path){
+    var parts=path.split(/[\\/]/);var f=parts[parts.length-1]||path;
+    return f.replace(/\.json$/i,'');
+  }
+  window.SMProjectDocument={parse:parse,baseName:baseName};
 })();

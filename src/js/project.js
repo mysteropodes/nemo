@@ -49,10 +49,6 @@
     return currentPath?(currentName+' — '+currentPath):(currentName+' (not saved)');
   }
 
-  function baseName(path){
-    var parts=path.split(/[\\/]/);var f=parts[parts.length-1]||path;
-    return f.replace(/\.json$/i,'');
-  }
 
   // ---- New / Open / Save (native fs, real files on disk) ----
   function newProject(cfg){
@@ -140,7 +136,7 @@
       try{await window.__TAURI__.fs.remove(tmp);}catch(_e){}
       await window.__TAURI__.fs.writeTextFile(path,json);
     }
-    currentPath=path;currentName=baseName(path);updateCurrentLabel();
+    currentPath=path;currentName=window.SMProjectDocument.baseName(path);updateCurrentLabel();
     touchRecent(path,currentName,{canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps});
     renderRecents();
     markSaved(json);
@@ -183,7 +179,7 @@
     // permissions, network volume gone...).
     try{await writeProjectTo(path);}
     catch(e){showToast(SM.t('toastSaveFailedSuffix')+(e&&e.message||e));throw e;}
-    showToast('Saved: '+baseName(path));
+    showToast('Saved: '+window.SMProjectDocument.baseName(path));
   }
   async function save(){
     if(!tauriOk()){saveAsDownload();return;}
@@ -204,7 +200,7 @@
       // comparing against the raw file text would flag a just-opened
       // untouched project as dirty forever.
       try{markSaved(window.SM.exportJSON());}catch(e){}
-      currentPath=path;currentName=baseName(path);updateCurrentLabel();
+      currentPath=path;currentName=window.SMProjectDocument.baseName(path);updateCurrentLabel();
       touchRecent(path,currentName,{canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps});
       renderRecents();
       hideStartScreen();ensureInitialTab();SMProjectEntry.repaint();
@@ -230,7 +226,7 @@
   // from 11 min ago", not just "whatever was last written".
   var HISTORY_MAX=120; // 60 min of history at the existing 30s cadence
   function simpleHash(s){var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return (h>>>0).toString(36);}
-  function historyKey(){return currentPath?(baseName(currentPath).replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'-'+simpleHash(currentPath)):'untitled-autosave';}
+  function historyKey(){return currentPath?(window.SMProjectDocument.baseName(currentPath).replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'-'+simpleHash(currentPath)):'untitled-autosave';}
   async function historyDir(){
     var base=await window.__TAURI__.path.appDataDir();
     return base.replace(/[\\/]+$/,'')+'/history/'+historyKey();
@@ -261,18 +257,21 @@
     }catch(e){return [];}
   }
   async function restoreVersion(path){
-    saveAllLayerFrames();
     // Snapshot the CURRENT state into history before overwriting it with
     // the old version — otherwise "restore from 10 min ago" silently
     // discards up to 30s of work since the last autosave tick, and worse,
     // makes the restore itself irreversible: the pre-restore state was
     // never captured anywhere. With this, a restore is always undoable by
     // restoring the snapshot taken right here.
-    try{await pushVersionSnapshot(window.SM.exportJSON());}catch(e){console.warn('[history] pre-restore snapshot failed',e);}
     var json=await window.__TAURI__.fs.readTextFile(path);
-    window.SM.importJSON(json,true);
+    try{window.SMProjectDocument.parse(json);}catch(e){return false;}
+    saveAllLayerFrames();
+    var previousJson=window.SM.exportJSON();
+    if(!window.SM.importJSON(json,true))return false;
+    try{await pushVersionSnapshot(previousJson);}catch(e){console.warn('[history] pre-restore snapshot failed',e);}
     ensureInitialTab();
     showToast(SM.t('toastVersionRestored'));
+    return true;
   }
 
   function relTime(ts){
@@ -305,7 +304,7 @@
       btn.addEventListener('click',function(e){
         e.stopPropagation();
         if(!confirm('Restaurer cette version ? Le document actuel non sauvegardé sera remplacé.'))return;
-        restoreVersion(v.path).then(function(){modal.style.display='none';});
+        restoreVersion(v.path).then(function(restored){if(restored)modal.style.display='none';});
       });
       row.appendChild(btn);
       list.appendChild(row);
@@ -535,9 +534,9 @@
     if(id===activeTabId)return;
     var target=tabs.find(function(t){return t.id===id;});if(!target)return;
     snapshotActiveIntoTab();
-    activeTabId=id;
     if(target.json){
-      window.SM.importJSON(target.json,true);
+      if(!window.SM.importJSON(target.json,true))return;
+      activeTabId=id;
       // importJSON normalizes (fills defaults, pads frames — same trap
       // openPath's own comment already documents), so a fresh exportJSON()
       // right after this import can differ textually from target.json even
@@ -553,7 +552,7 @@
       // so that sentinel specifically can't be null).
       lastSavedJson=target.dirty?'':window.SM.exportJSON();
     }
-    else newProject({w:1920,h:1080,fps:24,name:target.name}); // stamps lastSavedJson/tab.dirty itself via markSaved
+    else {activeTabId=id;newProject({w:1920,h:1080,fps:24,name:target.name});} // markSaved belongs to the new tab
     currentPath=target.path||null;currentName=target.name;updateCurrentLabel();
     renderTabBar();
   }
@@ -571,17 +570,17 @@
     var idx=tabs.findIndex(function(t){return t.id===id;});if(idx<0)return;
     if(tabs.length===1){showToast(SM.t('hsCannotCloseLastTab'));return;}
     var wasActive=id===activeTabId;
-    tabs.splice(idx,1);
     if(wasActive){
-      var next=tabs[Math.max(0,idx-1)];
-      activeTabId=next.id; // switchToTab no-ops on equal id, so load directly
+      var next=tabs[idx>0?idx-1:1];
       if(next.json){
-        window.SM.importJSON(next.json,true);
+        if(!window.SM.importJSON(next.json,true))return;
+        activeTabId=next.id;
         lastSavedJson=next.dirty?'':window.SM.exportJSON(); // see switchToTab's comment for why
       }
-      else newProject({w:1920,h:1080,fps:24,name:next.name});
+      else {activeTabId=next.id;newProject({w:1920,h:1080,fps:24,name:next.name});}
       currentPath=next.path||null;currentName=next.name;updateCurrentLabel();
     }
+    tabs.splice(idx,1);
     renderTabBar();
   }
   function startTabRename(id){
@@ -686,8 +685,8 @@
       try{auto=localStorage.getItem('nemo-auto');}catch(e){}
       var applyAuto=function(auto){
         if(auto){
-          try{window.SM.importJSON(auto,true);}
-          catch(e){showToast(SM.t('toastCannotResumeSessionCorrupt'));}
+          try{if(!window.SM.importJSON(auto,true)){showToast(SM.t('toastCannotResumeSessionCorrupt'));return;}}
+          catch(e){showToast(SM.t('toastCannotResumeSessionCorrupt'));return;}
         }
         currentPath=null;currentName='Untitled';updateCurrentLabel();
         hideStartScreen();ensureInitialTab();SMProjectEntry.repaint();showToast('Session resumed');
@@ -733,7 +732,7 @@
     if(histModal)histModal.addEventListener('click',function(e){if(e.target===histModal)histModal.style.display='none';});
     document.getElementById('file-input').addEventListener('change',function(e){
       var f=e.target.files[0];if(!f)return;
-      var r=new FileReader();r.onload=function(ev){try{if(!window.SM.importJSON(ev.target.result,true))throw new Error('Invalid project');markSaved(window.SM.exportJSON());currentPath=null;currentName=baseName(f.name)||'Untitled';updateCurrentLabel();hideStartScreen();ensureInitialTab();showToast('Opened: '+currentName);}catch(err){showToast('Could not open file — it may be invalid or corrupted');}};
+      var r=new FileReader();r.onload=function(ev){try{if(!window.SM.importJSON(ev.target.result,true))throw new Error('Invalid project');markSaved(window.SM.exportJSON());currentPath=null;currentName=window.SMProjectDocument.baseName(f.name)||'Untitled';updateCurrentLabel();hideStartScreen();ensureInitialTab();SMProjectEntry.repaint();showToast('Opened: '+currentName);}catch(err){showToast('Could not open file — it may be invalid or corrupted');}};
       r.onerror=function(){showToast('Could not open file — it may be invalid or corrupted');};
       r.readAsText(f);e.target.value='';
     });
