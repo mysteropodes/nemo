@@ -1,0 +1,1122 @@
+{
+ "schema": "nemo.interaction/1",
+ "fixture": "interaction",
+ "canvas": {
+  "width": 640,
+  "height": 360,
+  "zoom": 1,
+  "pan": [
+   0,
+   0
+  ]
+ },
+ "seed": 2050902347,
+ "steps": [
+  {
+   "step": "draw",
+   "tool": "pen",
+   "settings": {
+    "strokeWidth": 6,
+    "strokeColor": "#1c7ed6",
+    "smoothing": "default"
+   },
+   "layerUid": "ly_int_0",
+   "frame": 0,
+   "events": [
+    {
+     "t": 0,
+     "type": "pointerdown",
+     "x": 120,
+     "y": 180.37,
+     "pressure": 0.3,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 4.17,
+     "type": "pointermove",
+     "x": 123.33,
+     "y": 183.84,
+     "pressure": 0.32,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 8.33,
+     "type": "pointermove",
+     "x": 126.67,
+     "y": 188.12,
+     "pressure": 0.33,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 12.5,
+     "type": "pointermove",
+     "x": 130,
+     "y": 192.96,
+     "pressure": 0.35,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 16.67,
+     "type": "pointermove",
+     "x": 133.33,
+     "y": 196.16,
+     "pressure": 0.36,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 20.83,
+     "type": "pointermove",
+     "x": 136.67,
+     "y": 201.2,
+     "pressure": 0.38,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 25,
+     "type": "pointermove",
+     "x": 140,
+     "y": 204.63,
+     "pressure": 0.39,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 29.17,
+     "type": "pointermove",
+     "x": 143.33,
+     "y": 208.99,
+     "pressure": 0.41,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 33.33,
+     "type": "pointermove",
+     "x": 146.67,
+     "y": 212.18,
+     "pressure": 0.42,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 37.5,
+     "type": "pointermove",
+     "x": 150,
+     "y": 216.66,
+     "pressure": 0.44,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 41.67,
+     "type": "pointermove",
+     "x": 153.33,
+     "y": 220.05,
+     "pressure": 0.46,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 45.83,
+     "type": "pointermove",
+     "x": 156.67,
+     "y": 223.17,
+     "pressure": 0.47,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 50,
+     "type": "pointermove",
+     "x": 160,
+     "y": 227.32,
+     "pressure": 0.49,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 54.17,
+     "type": "pointermove",
+     "x": 163.33,
+     "y": 230.43,
+     "pressure": 0.5,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 58.33,
+     "type": "pointermove",
+     "x": 166.67,
+     "y": 233.56,
+     "pressure": 0.52,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 62.5,
+     "type": "pointermove",
+     "x": 170,
+     "y": 236.48,
+     "pressure": 0.53,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 66.67,
+     "type": "pointermove",
+     "x": 173.33,
+     "y": 239.9,
+     "pressure": 0.54,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 70.83,
+     "type": "pointermove",
+     "x": 176.67,
+     "y": 241.8,
+     "pressure": 0.56,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 75,
+     "type": "pointermove",
+     "x": 180,
+     "y": 244.68,
+     "pressure": 0.57,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 79.17,
+     "type": "pointermove",
+     "x": 183.33,
+     "y": 246.87,
+     "pressure": 0.59,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 83.33,
+     "type": "pointermove",
+     "x": 186.67,
+     "y": 249.07,
+     "pressure": 0.6,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 87.5,
+     "type": "pointermove",
+     "x": 190,
+     "y": 251.46,
+     "pressure": 0.61,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 91.67,
+     "type": "pointermove",
+     "x": 193.33,
+     "y": 252.6,
+     "pressure": 0.63,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 95.83,
+     "type": "pointermove",
+     "x": 196.67,
+     "y": 254.36,
+     "pressure": 0.64,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 100,
+     "type": "pointermove",
+     "x": 200,
+     "y": 256.49,
+     "pressure": 0.65,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 104.17,
+     "type": "pointermove",
+     "x": 203.33,
+     "y": 257.55,
+     "pressure": 0.67,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 108.33,
+     "type": "pointermove",
+     "x": 206.67,
+     "y": 257.97,
+     "pressure": 0.68,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 112.5,
+     "type": "pointermove",
+     "x": 210,
+     "y": 259.4,
+     "pressure": 0.69,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 116.67,
+     "type": "pointermove",
+     "x": 213.33,
+     "y": 259.67,
+     "pressure": 0.7,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 120.83,
+     "type": "pointermove",
+     "x": 216.67,
+     "y": 259.54,
+     "pressure": 0.71,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 125,
+     "type": "pointermove",
+     "x": 220,
+     "y": 259.94,
+     "pressure": 0.72,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 129.17,
+     "type": "pointermove",
+     "x": 223.33,
+     "y": 260.1,
+     "pressure": 0.74,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 133.33,
+     "type": "pointermove",
+     "x": 226.67,
+     "y": 259.9,
+     "pressure": 0.75,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 137.5,
+     "type": "pointermove",
+     "x": 230,
+     "y": 258.54,
+     "pressure": 0.76,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 141.67,
+     "type": "pointermove",
+     "x": 233.33,
+     "y": 257.88,
+     "pressure": 0.77,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 145.83,
+     "type": "pointermove",
+     "x": 236.67,
+     "y": 257.26,
+     "pressure": 0.78,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 150,
+     "type": "pointermove",
+     "x": 240,
+     "y": 256.53,
+     "pressure": 0.79,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 154.17,
+     "type": "pointermove",
+     "x": 243.33,
+     "y": 254.44,
+     "pressure": 0.79,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 158.33,
+     "type": "pointermove",
+     "x": 246.67,
+     "y": 252.68,
+     "pressure": 0.8,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 162.5,
+     "type": "pointermove",
+     "x": 250,
+     "y": 251.67,
+     "pressure": 0.81,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 166.67,
+     "type": "pointermove",
+     "x": 253.33,
+     "y": 249.31,
+     "pressure": 0.82,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 170.83,
+     "type": "pointermove",
+     "x": 256.67,
+     "y": 247.05,
+     "pressure": 0.83,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 175,
+     "type": "pointermove",
+     "x": 260,
+     "y": 244.33,
+     "pressure": 0.83,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 179.17,
+     "type": "pointermove",
+     "x": 263.33,
+     "y": 242.38,
+     "pressure": 0.84,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 183.33,
+     "type": "pointermove",
+     "x": 266.67,
+     "y": 239.76,
+     "pressure": 0.85,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 187.5,
+     "type": "pointermove",
+     "x": 270,
+     "y": 236.1,
+     "pressure": 0.85,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 191.67,
+     "type": "pointermove",
+     "x": 273.33,
+     "y": 233.68,
+     "pressure": 0.86,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 195.83,
+     "type": "pointermove",
+     "x": 276.67,
+     "y": 230.13,
+     "pressure": 0.87,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 200,
+     "type": "pointermove",
+     "x": 280,
+     "y": 227.34,
+     "pressure": 0.87,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 204.17,
+     "type": "pointermove",
+     "x": 283.33,
+     "y": 223.71,
+     "pressure": 0.88,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 208.33,
+     "type": "pointermove",
+     "x": 286.67,
+     "y": 220.27,
+     "pressure": 0.88,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 212.5,
+     "type": "pointermove",
+     "x": 290,
+     "y": 216.64,
+     "pressure": 0.88,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 216.67,
+     "type": "pointermove",
+     "x": 293.33,
+     "y": 212.5,
+     "pressure": 0.89,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 220.83,
+     "type": "pointermove",
+     "x": 296.67,
+     "y": 208.28,
+     "pressure": 0.89,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 225,
+     "type": "pointermove",
+     "x": 300,
+     "y": 204.35,
+     "pressure": 0.89,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 229.17,
+     "type": "pointermove",
+     "x": 303.33,
+     "y": 200.34,
+     "pressure": 0.89,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 233.33,
+     "type": "pointermove",
+     "x": 306.67,
+     "y": 196.29,
+     "pressure": 0.9,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 237.5,
+     "type": "pointermove",
+     "x": 310,
+     "y": 192.13,
+     "pressure": 0.9,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 241.67,
+     "type": "pointermove",
+     "x": 313.33,
+     "y": 188.13,
+     "pressure": 0.9,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 245.83,
+     "type": "pointermove",
+     "x": 316.67,
+     "y": 183.75,
+     "pressure": 0.9,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 250,
+     "type": "pointermove",
+     "x": 320,
+     "y": 179.67,
+     "pressure": 0.9,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 254.17,
+     "type": "pointermove",
+     "x": 323.33,
+     "y": 175.87,
+     "pressure": 0.9,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 258.33,
+     "type": "pointermove",
+     "x": 326.67,
+     "y": 172.02,
+     "pressure": 0.9,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 262.5,
+     "type": "pointermove",
+     "x": 330,
+     "y": 167.66,
+     "pressure": 0.9,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 266.67,
+     "type": "pointermove",
+     "x": 333.33,
+     "y": 162.99,
+     "pressure": 0.9,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 270.83,
+     "type": "pointermove",
+     "x": 336.67,
+     "y": 159.65,
+     "pressure": 0.89,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 275,
+     "type": "pointermove",
+     "x": 340,
+     "y": 154.87,
+     "pressure": 0.89,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 279.17,
+     "type": "pointermove",
+     "x": 343.33,
+     "y": 151.35,
+     "pressure": 0.89,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 283.33,
+     "type": "pointermove",
+     "x": 346.67,
+     "y": 147.96,
+     "pressure": 0.89,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 287.5,
+     "type": "pointermove",
+     "x": 350,
+     "y": 143.97,
+     "pressure": 0.88,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 291.67,
+     "type": "pointermove",
+     "x": 353.33,
+     "y": 139.96,
+     "pressure": 0.88,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 295.83,
+     "type": "pointermove",
+     "x": 356.67,
+     "y": 136.1,
+     "pressure": 0.88,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 300,
+     "type": "pointermove",
+     "x": 360,
+     "y": 132.97,
+     "pressure": 0.87,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 304.17,
+     "type": "pointermove",
+     "x": 363.33,
+     "y": 130.03,
+     "pressure": 0.87,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 308.33,
+     "type": "pointermove",
+     "x": 366.67,
+     "y": 126.94,
+     "pressure": 0.86,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 312.5,
+     "type": "pointermove",
+     "x": 370,
+     "y": 123.08,
+     "pressure": 0.85,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 316.67,
+     "type": "pointermove",
+     "x": 373.33,
+     "y": 120.13,
+     "pressure": 0.85,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 320.83,
+     "type": "pointermove",
+     "x": 376.67,
+     "y": 118.11,
+     "pressure": 0.84,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 325,
+     "type": "pointermove",
+     "x": 380,
+     "y": 115.46,
+     "pressure": 0.83,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 329.17,
+     "type": "pointermove",
+     "x": 383.33,
+     "y": 112.7,
+     "pressure": 0.83,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 333.33,
+     "type": "pointermove",
+     "x": 386.67,
+     "y": 111.01,
+     "pressure": 0.82,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 337.5,
+     "type": "pointermove",
+     "x": 390,
+     "y": 109.02,
+     "pressure": 0.81,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 341.67,
+     "type": "pointermove",
+     "x": 393.33,
+     "y": 106.94,
+     "pressure": 0.8,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 345.83,
+     "type": "pointermove",
+     "x": 396.67,
+     "y": 105.73,
+     "pressure": 0.79,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 350,
+     "type": "pointermove",
+     "x": 400,
+     "y": 104.24,
+     "pressure": 0.79,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 354.17,
+     "type": "pointermove",
+     "x": 403.33,
+     "y": 102.23,
+     "pressure": 0.78,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 358.33,
+     "type": "pointermove",
+     "x": 406.67,
+     "y": 101.63,
+     "pressure": 0.77,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 362.5,
+     "type": "pointermove",
+     "x": 410,
+     "y": 101.03,
+     "pressure": 0.76,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 366.67,
+     "type": "pointermove",
+     "x": 413.33,
+     "y": 100.08,
+     "pressure": 0.75,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 370.83,
+     "type": "pointermove",
+     "x": 416.67,
+     "y": 100.58,
+     "pressure": 0.74,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 375,
+     "type": "pointermove",
+     "x": 420,
+     "y": 99.91,
+     "pressure": 0.72,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 379.17,
+     "type": "pointermove",
+     "x": 423.33,
+     "y": 100.33,
+     "pressure": 0.71,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 383.33,
+     "type": "pointermove",
+     "x": 426.67,
+     "y": 100.36,
+     "pressure": 0.7,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 387.5,
+     "type": "pointermove",
+     "x": 430,
+     "y": 101.48,
+     "pressure": 0.69,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 391.67,
+     "type": "pointermove",
+     "x": 433.33,
+     "y": 101.92,
+     "pressure": 0.68,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 395.83,
+     "type": "pointermove",
+     "x": 436.67,
+     "y": 102.34,
+     "pressure": 0.67,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 400,
+     "type": "pointermove",
+     "x": 440,
+     "y": 103.88,
+     "pressure": 0.65,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 404.17,
+     "type": "pointermove",
+     "x": 443.33,
+     "y": 105.65,
+     "pressure": 0.64,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 408.33,
+     "type": "pointermove",
+     "x": 446.67,
+     "y": 106.86,
+     "pressure": 0.63,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 412.5,
+     "type": "pointermove",
+     "x": 450,
+     "y": 108.45,
+     "pressure": 0.61,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 416.67,
+     "type": "pointermove",
+     "x": 453.33,
+     "y": 110.38,
+     "pressure": 0.6,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 420.83,
+     "type": "pointermove",
+     "x": 456.67,
+     "y": 112.5,
+     "pressure": 0.59,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 425,
+     "type": "pointermove",
+     "x": 460,
+     "y": 115.13,
+     "pressure": 0.57,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 429.17,
+     "type": "pointermove",
+     "x": 463.33,
+     "y": 118.16,
+     "pressure": 0.56,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 433.33,
+     "type": "pointermove",
+     "x": 466.67,
+     "y": 120.11,
+     "pressure": 0.54,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 437.5,
+     "type": "pointermove",
+     "x": 470,
+     "y": 123,
+     "pressure": 0.53,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 441.67,
+     "type": "pointermove",
+     "x": 473.33,
+     "y": 126.13,
+     "pressure": 0.52,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 445.83,
+     "type": "pointermove",
+     "x": 476.67,
+     "y": 130.04,
+     "pressure": 0.5,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 450,
+     "type": "pointermove",
+     "x": 480,
+     "y": 132.76,
+     "pressure": 0.49,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 454.17,
+     "type": "pointermove",
+     "x": 483.33,
+     "y": 136.89,
+     "pressure": 0.47,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 458.33,
+     "type": "pointermove",
+     "x": 486.67,
+     "y": 140.09,
+     "pressure": 0.46,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 462.5,
+     "type": "pointermove",
+     "x": 490,
+     "y": 143.26,
+     "pressure": 0.44,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 466.67,
+     "type": "pointermove",
+     "x": 493.33,
+     "y": 147.94,
+     "pressure": 0.42,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 470.83,
+     "type": "pointermove",
+     "x": 496.67,
+     "y": 151.11,
+     "pressure": 0.41,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 475,
+     "type": "pointermove",
+     "x": 500,
+     "y": 155.37,
+     "pressure": 0.39,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 479.17,
+     "type": "pointermove",
+     "x": 503.33,
+     "y": 159.02,
+     "pressure": 0.38,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 483.33,
+     "type": "pointermove",
+     "x": 506.67,
+     "y": 163.59,
+     "pressure": 0.36,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 487.5,
+     "type": "pointermove",
+     "x": 510,
+     "y": 167.49,
+     "pressure": 0.35,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 491.67,
+     "type": "pointermove",
+     "x": 513.33,
+     "y": 171.71,
+     "pressure": 0.33,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 495.83,
+     "type": "pointermove",
+     "x": 516.67,
+     "y": 175.68,
+     "pressure": 0.32,
+     "pointerType": "pen",
+     "buttons": 1
+    },
+    {
+     "t": 500,
+     "type": "pointerup",
+     "x": 520,
+     "y": 179.91,
+     "pressure": 0,
+     "pointerType": "pen",
+     "buttons": 0
+    }
+   ]
+  },
+  {
+   "step": "command",
+   "name": "undo"
+  }
+ ]
+}

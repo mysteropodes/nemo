@@ -121,7 +121,10 @@ function jobCheck(ctx) {
 // ---- tests -------------------------------------------------------------
 function jobTestUnit() {
   const files = fs.readdirSync(path.join(ROOT, 'tests')).filter((f) => f.endsWith('.test.cjs'));
-  if (!files.length) return notRun('no tests/*.test.cjs files');
+  const animationDir = path.join(ROOT, 'tests', 'animation');
+  if (exists(animationDir)) files.push(...fs.readdirSync(animationDir)
+    .filter((f) => f.endsWith('.test.cjs')).map((f) => 'animation/' + f));
+  if (!files.length) return notRun('no tests/*.test.cjs or tests/animation/*.test.cjs files');
   const r = run(process.execPath, ['--test'].concat(files.map((f) => 'tests/' + f)), { timeout: 10 * 60 * 1000 });
   const m = r.stdout.match(/^ℹ pass (\d+)/m), mf = r.stdout.match(/^ℹ fail (\d+)/m), mt = r.stdout.match(/^ℹ tests (\d+)/m);
   const summary = mt ? `${mt[1]} tests, ${m ? m[1] : '?'} pass, ${mf ? mf[1] : '?'} fail` : `exit ${r.status}`;
@@ -169,10 +172,18 @@ function jobTestDesktop() {
   return notRun('tests/desktop exists but no runner is wired for it yet');
 }
 
-function jobBench() {
-  const dir = path.join(ROOT, 'tests', 'bench');
-  if (!exists(dir)) return notRun('no tests/bench workloads defined yet (R03 initial workloads, R19 budgets)');
-  return notRun('tests/bench exists but no runner is wired for it yet');
+function jobBench(ctx) {
+  const runner = path.join(ROOT, 'tests', 'bench', 'run.cjs');
+  if (!exists(runner)) return notRun('no tests/bench/run.cjs (R03 initial workloads, R19 budgets)');
+  fs.mkdirSync(ctx.reportDir, { recursive: true });
+  const out = path.join(ctx.reportDir, 'bench.json');
+  const r = run(process.execPath, ['--expose-gc', runner, '--out', out], { timeout: 30 * 60 * 1000 });
+  if (r.status !== 0 || !exists(out)) return fail(`bench runner exit ${r.status}`, { exitCode: r.status, log: logOf(r) });
+  const b = readJson(out);
+  const ran = b.workloads.filter((w) => w.status === 'ran');
+  const skipped = b.workloads.filter((w) => w.status !== 'ran');
+  const details = Object.fromEntries(b.workloads.map((w) => [w.id, w.status === 'ran' ? { median: w.stats.median, p90: w.stats.p90, unit: w.stats.unit } : { status: w.status, reason: w.reason }]));
+  return pass(`${ran.length} workloads measured, ${skipped.length} not-run (no render backend); budgets: none (R19)`, { exitCode: 0, log: logOf(r), details, artifacts: [{ path: path.relative(ROOT, out) }], limitations: skipped.map((w) => `${w.id}: ${w.reason}`) });
 }
 
 // ---- builds ------------------------------------------------------------
@@ -221,9 +232,25 @@ function jobBuildDesktop(ctx) {
 }
 
 // ---- registry ----------------------------------------------------------
+// ---- inventory (R03) -------------------------------------------------------
+// engineering/inventory/{surfaces.json,surfaces.csv,SURFACES.md} are generated
+// from src/ by scripts/nemo/inventory.cjs. This job is the staleness gate
+// (`--check`, ~3 s, no network); `npm run inventory` regenerates. It is in
+// every verify profile so a UI or handler change cannot land with an
+// out-of-date inventory.
+function jobInventory() {
+  const script = path.join(ROOT, 'scripts', 'nemo', 'inventory.cjs');
+  if (!exists(script)) return blocked('scripts/nemo/inventory.cjs is missing');
+  const r = run(process.execPath, [script, '--check'], { timeout: 5 * 60 * 1000 });
+  const artifacts = ['surfaces.json', 'surfaces.csv', 'SURFACES.md'].map((f) => ({ path: 'engineering/inventory/' + f }));
+  const last = (r.stdout + r.stderr).trim().split('\n').filter(Boolean).pop() || `exit ${r.status}`;
+  return (r.status === 0 ? pass : fail)(last, { exitCode: r.status, log: logOf(r), artifacts });
+}
+
 const JOBS = {
   doctor: { run: jobDoctor, required: true },
   check: { run: jobCheck, required: true },
+  inventory: { run: jobInventory, required: true },
   'test:unit': { run: jobTestUnit, required: true },
   'test:rust': { run: (ctx) => jobTestRust(ctx, 'geometry-wasm', 'geometry-wasm'), required: true },
   'test:rust-tauri': { run: (ctx) => jobTestRust(ctx, 'src-tauri', 'src-tauri'), required: false },
@@ -236,8 +263,8 @@ const JOBS = {
 };
 
 const PROFILES = {
-  quick: ['doctor', 'check', 'test:unit', 'test:rust'],
-  full: ['doctor', 'check', 'test:unit', 'test:rust', 'test:rust-tauri', 'test:integration', 'build:wasm', 'test:browser', 'bench', 'build:desktop', 'test:desktop'],
+  quick: ['doctor', 'check', 'inventory', 'test:unit', 'test:rust'],
+  full: ['doctor', 'check', 'inventory', 'test:unit', 'test:rust', 'test:rust-tauri', 'test:integration', 'build:wasm', 'test:browser', 'bench', 'build:desktop', 'test:desktop'],
 };
 
 function execute(name, ctx) {

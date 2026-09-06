@@ -4,7 +4,7 @@
 // context and none of them tested until now:
 //   - camera.js  bezierEase()      — Newton, then bisection as a fallback
 //   - text-selector.js bezierEaser()— pure bisection (24 steps)
-//   - motion.js  evalCurvePoints() — the ease-curve editor's multi-point
+//   - animation/curve.js evalCurvePoints() — the ease-curve editor's multi-point
 //                                    spline, which reduces to a plain cubic
 //                                    bezier when the two ends carry explicit
 //                                    tangents
@@ -24,7 +24,7 @@ const vm = require('node:vm');
 
 const root = path.join(__dirname, '..');
 
-// ---- the three implementations, pulled out of their modules ----------------
+// ---- production solvers (legacy extraction until their modules export) -----
 function extract(file, startMarker, exportName, extraMarkers) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
   const pieces = [];
@@ -44,12 +44,7 @@ function extract(file, startMarker, exportName, extraMarkers) {
 
 const bezierEase = extract('src/js/camera.js', 'function bezierEase(', 'bezierEase');
 const bezierEaser = extract('src/js/text-selector.js', 'function bezierEaser(', 'bezierEaser');
-const evalCurvePoints = extract(
-  'src/js/motion.js',
-  'function evalCurvePoints(',
-  'evalCurvePoints',
-  ['function curveCubicAt(', 'function curveCubicDerivAt(', 'function curveTangentAt(', 'function curveSegCtrl(', 'function curveSegFor('],
-);
+const { evalCurvePoints } = require('../src/js/animation/curve.js');
 
 // ---- independent reference ------------------------------------------------
 // CSS cubic-bezier(x1,y1,x2,y2): P0=(0,0), P3=(1,1), solve x(t)=input, return y(t).
@@ -119,7 +114,7 @@ test('text-selector.js bezierEaser matches the CSS cubic-bezier reference', () =
   }
 });
 
-test('motion.js evalCurvePoints matches the reference on a single-segment curve', () => {
+test('animation/curve.js evalCurvePoints matches the reference on a single-segment curve', () => {
   for (const c of CASES) {
     const ref = reference(...c.h);
     const pts = curvePointsFor(...c.h);

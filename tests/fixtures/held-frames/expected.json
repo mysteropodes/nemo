@@ -1,0 +1,962 @@
+{
+ "schema": "nemo.fixture-expectations/1",
+ "fixture": "held-frames",
+ "reference": "tests/fixtures/lib/reference.cjs",
+ "checks": [
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 0,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 0,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 0,
+   "expectKeyframe": null,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 0,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 1,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 1,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 1,
+   "expectKeyframe": null,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 1,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 2,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 2,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 2,
+   "expectKeyframe": null,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 2,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 3,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 3,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 3,
+   "expectKeyframe": null,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 3,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 4,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 4,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 4,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 4,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 5,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 5,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 5,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 5,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 6,
+   "expectKeyframe": 6,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 6,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 6,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 6,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 7,
+   "expectKeyframe": 6,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 7,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 7,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 7,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 8,
+   "expectKeyframe": 6,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 8,
+   "expectKeyframe": 8,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 8,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 8,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 9,
+   "expectKeyframe": 6,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 9,
+   "expectKeyframe": 8,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 9,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 9,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 10,
+   "expectKeyframe": 6,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 10,
+   "expectKeyframe": 8,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 10,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 10,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 11,
+   "expectKeyframe": 6,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 11,
+   "expectKeyframe": 8,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 11,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 11,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 12,
+   "expectKeyframe": 12,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 12,
+   "expectKeyframe": 8,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 12,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 12,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 13,
+   "expectKeyframe": 12,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 13,
+   "expectKeyframe": 8,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 13,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 13,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 14,
+   "expectKeyframe": 12,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 14,
+   "expectKeyframe": 8,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 14,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 14,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 15,
+   "expectKeyframe": 12,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 15,
+   "expectKeyframe": 8,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 15,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 15,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 16,
+   "expectKeyframe": 12,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 16,
+   "expectKeyframe": 16,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 16,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 16,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 17,
+   "expectKeyframe": 12,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 17,
+   "expectKeyframe": 16,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 17,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 17,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 18,
+   "expectKeyframe": 18,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 18,
+   "expectKeyframe": 16,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 18,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 18,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 19,
+   "expectKeyframe": 18,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 19,
+   "expectKeyframe": 16,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 19,
+   "expectKeyframe": 0,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 19,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 20,
+   "expectKeyframe": 18,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 20,
+   "expectKeyframe": 16,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 20,
+   "expectKeyframe": null,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 20,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 21,
+   "expectKeyframe": 18,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 21,
+   "expectKeyframe": 16,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 21,
+   "expectKeyframe": null,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 21,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 22,
+   "expectKeyframe": 18,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 22,
+   "expectKeyframe": 16,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 22,
+   "expectKeyframe": null,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 22,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_0",
+   "frame": 23,
+   "expectKeyframe": 18,
+   "verify": "node",
+   "note": "last keyframe at or before the frame"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_1",
+   "frame": 23,
+   "expectKeyframe": 16,
+   "verify": "node",
+   "note": "blank keyframes hold emptiness"
+  },
+  {
+   "kind": "effective-keyframe",
+   "layerUid": "ly_held_2",
+   "frame": 23,
+   "expectKeyframe": null,
+   "verify": "node",
+   "note": "outside [inPoint,outPoint] a layer shows nothing"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "opacity",
+   "frame": 23,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold keys step"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "position",
+   "frame": 0,
+   "expect": [
+    0,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold then eased segment"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "position",
+   "frame": 3,
+   "expect": [
+    0,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold then eased segment"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "position",
+   "frame": 5,
+   "expect": [
+    0,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold then eased segment"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "position",
+   "frame": 6,
+   "expect": [
+    50,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold then eased segment"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "position",
+   "frame": 9,
+   "expect": [
+    75,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold then eased segment"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "position",
+   "frame": 12,
+   "expect": [
+    100,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold then eased segment"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_held_3",
+   "prop": "position",
+   "frame": 20,
+   "expect": [
+    100,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "hold then eased segment"
+  }
+ ]
+}

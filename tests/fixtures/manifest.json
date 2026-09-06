@@ -1,0 +1,839 @@
+{
+ "schema": "nemo.fixtures/1",
+ "generator": {
+  "script": "tests/fixtures/generate.cjs",
+  "version": 1
+ },
+ "formatVersion": 13,
+ "requiredCoverage": [
+  "static",
+  "keyed",
+  "expression",
+  "held-frames",
+  "components",
+  "masks-alpha",
+  "text",
+  "mesh",
+  "media",
+  "migration",
+  "interaction",
+  "export"
+ ],
+ "checkKinds": {
+  "motion-value": "SMMotion.valueAtFrame(layer, prop, frame) equals expect within tolerance",
+  "expression-error": "after evaluation, expressions[prop].lastError is set (true) or null (false)",
+  "effective-keyframe": "getEffectiveStrokes(layer, frame) returns the strokes of frames[expectKeyframe] (or nothing)",
+  "symbol-frame": "resolveSymbolFrameIdx gives expectInternalFrame and getEffectiveStrokes returns expectStrokeIds",
+  "migration": "the named migration helper produces expect (verify=node) or is recorded for the importJSON contract gate",
+  "bounds": "the stroke's segment points span expect",
+  "document": "the JSON at path equals expect",
+  "alpha": "reference hex8 parse",
+  "mesh": "topology invariants of imageMeshes[meshId]",
+  "mesh-vertex-world": "vertex index maps to expectRest / expectDeformed in world space over rect",
+  "mesh-propagated": "every frame's raster carries meshId",
+  "text-units": "text-selector unitIndexOf returns the stamped char indices",
+  "text-group": "vectorTextGroupMembers(root) over the desP-restored data returns expectMembers, rootStrokeId first",
+  "data-url-asset": "the embedded data URL decodes to the committed asset bytes",
+  "image-size": "the committed asset decodes to expect",
+  "frame-pixels": "the committed frame decodes to the sampled colours",
+  "interaction-schema": "gesture.json is well formed",
+  "interaction": "document effect of a replayed gesture (R12 gate)",
+  "pixel": "rendered pixel colour at (x, y) on frame within tolerance (R13 gate)",
+  "encode": "ffmpeg with the recorded arguments produces the probed stream (when a runnable sidecar is present)",
+  "decode-sample": "a decoded frame of the encoded output matches the samples (when available)"
+ },
+ "fixtures": [
+  {
+   "id": "static-props",
+   "title": "Static transform properties on a plain layer",
+   "coverage": [
+    "static"
+   ],
+   "areas": [
+    "animation-rigs-expressions",
+    "drawing-selection"
+   ],
+   "backend": "document",
+   "requiredCapabilities": [],
+   "tolerance": 1e-9,
+   "invariants": [
+    "motionStatic values are returned unchanged at every frame",
+    "a property with neither track nor static value returns its documented default",
+    "fill-only paths keep hasRealStroke=false"
+   ],
+   "verification": {
+    "node": "SMMotion.valueAtFrame (src/js/motion.js, unmodified) against motionStatic and PROP_DEFAULT",
+    "gate": null
+   },
+   "seed": 2159953736,
+   "generation": {
+    "generator": "tests/fixtures/generate.cjs",
+    "version": 1,
+    "builder": "tests/fixtures/lib/corpus.cjs#staticProps",
+    "formatVersion": 13
+   },
+   "files": {
+    "project": "static-props/project.json",
+    "expected": "static-props/expected.json",
+    "assets": []
+   },
+   "sha256": {
+    "static-props/project.json": "abdcd98d85a6ebfff71f1cdb2dc9a1aead75b34845871bb4ebbc9a0f3bb66031",
+    "static-props/expected.json": "e7451aca2b804c41b5d69d2053d642675e5dd8a279162ed16e2104c42eeacd92"
+   },
+   "checks": {
+    "total": 39,
+    "node": 39,
+    "nodeWhenAvailable": 0,
+    "gate": 0
+   },
+   "document": {
+    "layers": 2,
+    "totalFrames": 24,
+    "fps": 24,
+    "canvas": [
+     640,
+     360
+    ],
+    "bytes": 9806
+   }
+  },
+  {
+   "id": "keyed-props",
+   "title": "Keyframed transform properties: default ease, linear curve, spatial bezier, multi-segment",
+   "coverage": [
+    "keyed"
+   ],
+   "areas": [
+    "animation-rigs-expressions",
+    "timeline-layers-frames"
+   ],
+   "backend": "document",
+   "requiredCapabilities": [],
+   "tolerance": 1e-9,
+   "invariants": [
+    "values at keyframes equal the key values",
+    "the default ease passes through its documented waypoints",
+    "a two-point curve interpolates linearly",
+    "position handles form a cubic bezier",
+    "values clamp outside the key range"
+   ],
+   "verification": {
+    "node": "SMMotion.valueAtFrame against reference.trackValueAt / spatialPositionAt",
+    "gate": null
+   },
+   "seed": 2332214726,
+   "generation": {
+    "generator": "tests/fixtures/generate.cjs",
+    "version": 1,
+    "builder": "tests/fixtures/lib/corpus.cjs#keyedProps",
+    "formatVersion": 13
+   },
+   "files": {
+    "project": "keyed-props/project.json",
+    "expected": "keyed-props/expected.json",
+    "assets": []
+   },
+   "sha256": {
+    "keyed-props/project.json": "002042e3b16a3dced2d0ccd772e5fa10d44c87c4819d9a61edf9256c6cf3374e",
+    "keyed-props/expected.json": "bc55a6cf4b1d067e1aa78e5ceac31c97efbbece577a5c6938055ae69b60868c7"
+   },
+   "checks": {
+    "total": 67,
+    "node": 67,
+    "nodeWhenAvailable": 0,
+    "gate": 0
+   },
+   "document": {
+    "layers": 4,
+    "totalFrames": 24,
+    "fps": 24,
+    "canvas": [
+     640,
+     360
+    ],
+    "bytes": 16465
+   }
+  },
+  {
+   "id": "expression-props",
+   "title": "Expressions: arithmetic, time, keyed value, cross-layer, controls, error fallback",
+   "coverage": [
+    "expression"
+   ],
+   "areas": [
+    "animation-rigs-expressions"
+   ],
+   "backend": "document",
+   "requiredCapabilities": [],
+   "tolerance": 1e-9,
+   "invariants": [
+    "an expression result replaces the raw value",
+    "time equals frame / fps",
+    "a syntax error leaves the raw value and records lastError",
+    "a disabled expression is ignored",
+    "random vocabulary (wiggle/random) is deliberately absent: its seed is session state, not document state"
+   ],
+   "verification": {
+    "node": "SMMotion.valueAtFrame with the shipped expression compiler",
+    "gate": null
+   },
+   "seed": 2035298168,
+   "generation": {
+    "generator": "tests/fixtures/generate.cjs",
+    "version": 1,
+    "builder": "tests/fixtures/lib/corpus.cjs#expressionProps",
+    "formatVersion": 13
+   },
+   "files": {
+    "project": "expression-props/project.json",
+    "expected": "expression-props/expected.json",
+    "assets": []
+   },
+   "sha256": {
+    "expression-props/project.json": "eaed97b35536aa24344123d70a8cdb9d24b9ad2b204a35fddae51523e3d932b8",
+    "expression-props/expected.json": "348ae8e11456b444d39c0e31dde8726743a8de015e77ac32193ffa3b2b58b503"
+   },
+   "checks": {
+    "total": 55,
+    "node": 55,
+    "nodeWhenAvailable": 0,
+    "gate": 0
+   },
+   "document": {
+    "layers": 6,
+    "totalFrames": 24,
+    "fps": 24,
+    "canvas": [
+     640,
+     360
+    ],
+    "bytes": 22965
+   }
+  },
+  {
+   "id": "held-frames",
+   "title": "Held drawing keyframes, blank holds, in/out gating, hold keys",
+   "coverage": [
+    "held-frames"
+   ],
+   "areas": [
+    "timeline-layers-frames",
+    "animation-rigs-expressions"
+   ],
+   "backend": "document",
+   "requiredCapabilities": [],
+   "tolerance": 1e-9,
+   "invariants": [
+    "a non-keyframe shows the nearest earlier keyframe",
+    "an empty keyframe holds emptiness",
+    "frames outside in/out show nothing",
+    "a hold key pins its value until the next key"
+   ],
+   "verification": {
+    "node": "getEffectiveStrokes (src/js/app.js, lifted) and SMMotion.valueAtFrame",
+    "gate": null
+   },
+   "seed": 3312972267,
+   "generation": {
+    "generator": "tests/fixtures/generate.cjs",
+    "version": 1,
+    "builder": "tests/fixtures/lib/corpus.cjs#heldFrames",
+    "formatVersion": 13
+   },
+   "files": {
+    "project": "held-frames/project.json",
+    "expected": "held-frames/expected.json",
+    "assets": []
+   },
+   "sha256": {
+    "held-frames/project.json": "d720b44456b396ce8fcbfe02ac9fc72cb73003f4296cb95df8aea72c51dcd49c",
+    "held-frames/expected.json": "94d05b190d88eedd186004454653dfa5440f552c826ab191add51d00a0a1dff8"
+   },
+   "checks": {
+    "total": 103,
+    "node": 103,
+    "nodeWhenAvailable": 0,
+    "gate": 0
+   },
+   "document": {
+    "layers": 4,
+    "totalFrames": 24,
+    "fps": 24,
+    "canvas": [
+     640,
+     360
+    ],
+    "bytes": 18602
+   }
+  },
+  {
+   "id": "components",
+   "title": "Component instances: loop/once/pingpong/single, placement, speed, held internal frame, blank override",
+   "coverage": [
+    "components"
+   ],
+   "areas": [
+    "timeline-layers-frames",
+    "storyboard"
+   ],
+   "backend": "document",
+   "requiredCapabilities": [],
+   "tolerance": 1e-9,
+   "invariants": [
+    "every visible sub-layer of the component composites",
+    "play mode formulas match resolveSymbolFrameIdx's documented behaviour",
+    "componentFrame and blankOverride on outer keyframes are honoured"
+   ],
+   "verification": {
+    "node": "getEffectiveStrokes + resolveSymbolFrameIdx (src/js/app.js, lifted) against reference.symbolFrameAt",
+    "gate": null
+   },
+   "seed": 469045609,
+   "generation": {
+    "generator": "tests/fixtures/generate.cjs",
+    "version": 1,
+    "builder": "tests/fixtures/lib/corpus.cjs#components",
+    "formatVersion": 13
+   },
+   "files": {
+    "project": "components/project.json",
+    "expected": "components/expected.json",
+    "assets": []
+   },
+   "sha256": {
+    "components/project.json": "266a1b5c941bf3ab66f2f2fa793bb17efc26be08fb6038ce96137d4d29340942",
+    "components/expected.json": "62962b5e284d242ca4074b2d549e285d2ac4c62046d824ac8d353965f0e3fd8a"
+   },
+   "checks": {
+    "total": 168,
+    "node": 168,
+    "nodeWhenAvailable": 0,
+    "gate": 0
+   },
+   "document": {
+    "layers": 7,
+    "totalFrames": 24,
+    "fps": 24,
+    "canvas": [
+     640,
+     360
+    ],
+    "bytes": 37013
+   }
+  },
+  {
+   "id": "masks-alpha",
+   "title": "Alpha track matte, hex8 fill alpha, layer opacity, in-layer add mask",
+   "coverage": [
+    "masks-alpha"
+   ],
+   "areas": [
+    "effects-masks",
+    "drawing-selection"
+   ],
+   "backend": "engine",
+   "requiredCapabilities": [
+    "webgpu"
+   ],
+   "tolerance": 2,
+   "invariants": [
+    "a matte clips its content to the source alpha and the source itself is not drawn",
+    "an 8-digit hex fill keeps its alpha through save/load",
+    "layer opacity multiplies item alpha",
+    "a path tagged isMask never renders as content"
+   ],
+   "verification": {
+    "node": "document fields and reference colour maths",
+    "gate": "R13: render each pixel check on the engine and compare within tolerance"
+   },
+   "seed": 1986130191,
+   "generation": {
+    "generator": "tests/fixtures/generate.cjs",
+    "version": 1,
+    "builder": "tests/fixtures/lib/corpus.cjs#masksAlpha",
+    "formatVersion": 13
+   },
+   "files": {
+    "project": "masks-alpha/project.json",
+    "expected": "masks-alpha/expected.json",
+    "assets": []
+   },
+   "sha256": {
+    "masks-alpha/project.json": "34851e2062f5dc60f09c34adc4c6071280e69aba7858c55646dd46e9aa607ed8",
+    "masks-alpha/expected.json": "5ede50a5a47c9cbf26df0748539528dc37935421480c03eccded5dc09835dba7"
+   },
+   "checks": {
+    "total": 11,
+    "node": 5,
+    "nodeWhenAvailable": 0,
+    "gate": 6
+   },
+   "document": {
+    "layers": 5,
+    "totalFrames": 24,
+    "fps": 24,
+    "canvas": [
+     640,
+     360
+    ],
+    "bytes": 19326
+   }
+  },
+  {
+   "id": "text",
+   "title": "Vector text run with a range animator and a raster text item",
+   "coverage": [
+    "text"
+   ],
+   "areas": [
+    "drawing-selection",
+    "animation-rigs-expressions"
+   ],
+   "backend": "document",
+   "requiredCapabilities": [],
+   "tolerance": 1e-9,
+   "invariants": [
+    "text root fields round-trip",
+    "per-glyph char/word/line indices round-trip",
+    "every glyph shares the persisted groupId and the first glyph is the root, so production regroups the block",
+    "animator declarations persist on the layer"
+   ],
+   "verification": {
+    "node": "document fields, bounds, text-selector unit indices",
+    "gate": "R13: animator weights and rendered glyph placement (glyph outlines here are boxes standing in for font geometry; no visual oracle is invented for real fonts)"
+   },
+   "seed": 3185987134,
+   "generation": {
+    "generator": "tests/fixtures/generate.cjs",
+    "version": 1,
+    "builder": "tests/fixtures/lib/corpus.cjs#text",
+    "formatVersion": 13
+   },
+   "files": {
+    "project": "text/project.json",
+    "expected": "text/expected.json",
+    "assets": []
+   },
+   "sha256": {
+    "text/project.json": "f028abd33c1a77e37450b1e6bc9501d5a45f2ca5336b2dc8b3367938d108e00b",
+    "text/expected.json": "1e977bcf17505bf5bdfee39dd27d950d491de33673bb26261405a3d0469dc972"
+   },
+   "checks": {
+    "total": 12,
+    "node": 11,
+    "nodeWhenAvailable": 0,
+    "gate": 1
+   },
+   "document": {
+    "layers": 2,
+    "totalFrames": 24,
+    "fps": 24,
+    "canvas": [
+     640,
+     360
+    ],
+    "bytes": 10623
+   }
+  },
+  {
+   "id": "mesh",
+   "title": "Image mesh: rectangular outline, 2×2 grid, static centre offset",
+   "coverage": [
+    "mesh",
+    "media"
+   ],
+   "areas": [
+    "media-import-export",
+    "effects-masks"
+   ],
+   "backend": "engine",
+   "requiredCapabilities": [
+    "webgpu"
+   ],
+   "tolerance": 2,
+   "invariants": [
+    "verts[0..outline.length) are the outline points in order",
+    "triangle indices are in range and centroids lie inside the outline",
+    "the mesh is normalised over the display rect"
+   ],
+   "verification": {
+    "node": "topology invariants with reference.pointInPolygon and meshVertexWorld; SMImageMesh.load (src/js/image-mesh.js) accepts the entry",
+    "gate": "R13: pixel checks on the engine's draw_image_mesh path"
+   },
+   "assets": [
+    "assets/image.png"
+   ],
+   "seed": 2701180604,
+   "generation": {
+    "generator": "tests/fixtures/generate.cjs",
+    "version": 1,
+    "builder": "tests/fixtures/lib/corpus.cjs#mesh",
+    "formatVersion": 13
+   },
+   "files": {
+    "project": "mesh/project.json",
+    "expected": "mesh/expected.json",
+    "assets": [
+     "mesh/assets/image.png"
+    ]
+   },
+   "sha256": {
+    "mesh/project.json": "544fd726ddf5af098f77dd2717da0d9e91060a0a7e5d65eb58d0b44f9feba73a",
+    "mesh/expected.json": "3d7548c4df594bfafea17a5d6d7add913d3ea2e9c01fa82550b98c59fa63ff9e",
+    "mesh/assets/image.png": "c83c320612b05eec2e2d34b652fb9dc878128880982fcc4a2e178a687f8a8200"
+   },
+   "checks": {
+    "total": 6,
+    "node": 3,
+    "nodeWhenAvailable": 0,
+    "gate": 3
+   },
+   "document": {
+    "layers": 1,
+    "totalFrames": 24,
+    "fps": 24,
+    "canvas": [
+     640,
+     360
+    ],
+    "bytes": 14586
+   }
+  },
+  {
+   "id": "media",
+   "title": "Embedded raster and linked raster with media library entries",
+   "coverage": [
+    "media"
+   ],
+   "areas": [
+    "media-import-export",
+    "project-lifecycle-integrations"
+   ],
+   "backend": "engine",
+   "requiredCapabilities": [
+    "webgpu"
+   ],
+   "tolerance": 2,
+   "invariants": [
+    "an embedded raster carries its bytes as a data URL",
+    "a linked raster carries a reference and no bytes",
+    "the media library mirrors both"
+   ],
+   "verification": {
+    "node": "document fields, asset hashes, decoded image sizes",
+    "gate": "R13: engine pixel checks; R20: missing-asset behaviour for the linked entry"
+   },
+   "assets": [
+    "assets/embedded.png",
+    "assets/linked.png"
+   ],
+   "seed": 4238008067,
+   "generation": {
+    "generator": "tests/fixtures/generate.cjs",
+    "version": 1,
+    "builder": "tests/fixtures/lib/corpus.cjs#media",
+    "formatVersion": 13
+   },
+   "files": {
+    "project": "media/project.json",
+    "expected": "media/expected.json",
+    "assets": [
+     "media/assets/embedded.png",
+     "media/assets/linked.png"
+    ]
+   },
+   "sha256": {
+    "media/project.json": "9e29bf1e0081f230eee8372b68a4783fdbe611675e16963f4e6bd676a78b9223",
+    "media/expected.json": "1b4ac2c9f2ae8e357637336be0ff24bde24e1c13d25ecc0f13a8d10477c436b2",
+    "media/assets/embedded.png": "e4266137fe4f8b7f7e750c579da49f92d520ef072e984b4e52a839cc78a102af",
+    "media/assets/linked.png": "0f2c7e71933653c9fffa4e705d65af1196f63456d1265d8368589fadff5767c7"
+   },
+   "checks": {
+    "total": 9,
+    "node": 6,
+    "nodeWhenAvailable": 0,
+    "gate": 3
+   },
+   "document": {
+    "layers": 2,
+    "totalFrames": 24,
+    "fps": 24,
+    "canvas": [
+     640,
+     360
+    ],
+    "bytes": 6798
+   }
+  },
+  {
+   "id": "migration",
+   "title": "Older-schema document: legacy curve, time link offsets, legacy effector, matte without uid, old easing default, frame padding",
+   "coverage": [
+    "migration"
+   ],
+   "areas": [
+    "project-lifecycle-integrations",
+    "animation-rigs-expressions"
+   ],
+   "backend": "document",
+   "requiredCapabilities": [],
+   "tolerance": 1e-9,
+   "invariants": [
+    "a hand-edited curve is never rewritten",
+    "legacy fields fold into their current representation exactly once",
+    "a shorter frame list is padded to totalFrames"
+   ],
+   "verification": {
+    "node": "SMMotion.migrateLegacyCurves, migrateTimeLinkOffsets, effectorChannels (unmodified production code)",
+    "gate": "R12: full importJSON contract for the gated checks"
+   },
+   "seed": 722179627,
+   "generation": {
+    "generator": "tests/fixtures/generate.cjs",
+    "version": 1,
+    "builder": "tests/fixtures/lib/corpus.cjs#migration",
+    "formatVersion": 12
+   },
+   "files": {
+    "project": "migration/project.json",
+    "expected": "migration/expected.json",
+    "assets": []
+   },
+   "sha256": {
+    "migration/project.json": "90b6c525a6936a2d635046682ebc5c68148f65969c6af7fd315a1eb77cc2aa31",
+    "migration/expected.json": "d05b9129c2e7a4283bae5588b156e532243344b299ffcfaa1644a7aedb160db3"
+   },
+   "checks": {
+    "total": 9,
+    "node": 4,
+    "nodeWhenAvailable": 0,
+    "gate": 5
+   },
+   "document": {
+    "layers": 7,
+    "totalFrames": 24,
+    "fps": 24,
+    "canvas": [
+     640,
+     360
+    ],
+    "bytes": 25063
+   }
+  },
+  {
+   "id": "interaction",
+   "title": "Recorded pen gesture (240 Hz, pressure ramp) followed by undo",
+   "coverage": [
+    "interaction"
+   ],
+   "areas": [
+    "drawing-selection"
+   ],
+   "backend": "browser",
+   "requiredCapabilities": [
+    "browser-harness"
+   ],
+   "tolerance": 4,
+   "invariants": [
+    "one gesture creates exactly one stroke",
+    "the stroke stays within the gesture bounds plus half the stroke width",
+    "undo removes it"
+   ],
+   "verification": {
+    "node": "gesture schema and consistency with the recorded bounds",
+    "gate": "R12: replay through the real pointer handlers (test:browser)"
+   },
+   "assets": [
+    "gesture.json"
+   ],
+   "seed": 2050902347,
+   "generation": {
+    "generator": "tests/fixtures/generate.cjs",
+    "version": 1,
+    "builder": "tests/fixtures/lib/corpus.cjs#interaction",
+    "formatVersion": 13
+   },
+   "files": {
+    "project": "interaction/project.json",
+    "expected": "interaction/expected.json",
+    "assets": [
+     "interaction/gesture.json"
+    ]
+   },
+   "sha256": {
+    "interaction/project.json": "de654838cd221b6db3a90732f151c92be55a0013b554a037ec4ab075d7a61269",
+    "interaction/expected.json": "50a2b7f84a0163c3d9a839ff8e5f1a50c0685cb02735e0a4603dfec51443223b",
+    "interaction/gesture.json": "9bb135b7a591a1320d1d25854a86b6124506a3b710691475f3340dd76aaa87da"
+   },
+   "checks": {
+    "total": 3,
+    "node": 1,
+    "nodeWhenAvailable": 0,
+    "gate": 2
+   },
+   "document": {
+    "layers": 1,
+    "totalFrames": 24,
+    "fps": 24,
+    "canvas": [
+     640,
+     360
+    ],
+    "bytes": 3242
+   }
+  },
+  {
+   "id": "export",
+   "title": "Twelve-frame PNG sequence encoded with the exact export.js argument lists",
+   "coverage": [
+    "export"
+   ],
+   "areas": [
+    "media-import-export"
+   ],
+   "backend": "sidecar",
+   "requiredCapabilities": [
+    "ffmpeg-sidecar",
+    "videotoolbox"
+   ],
+   "tolerance": 24,
+   "invariants": [
+    "frame count, size, codec and pixel format of each output follow from the input and the argument list",
+    "the encoded first frame still shows the painted square"
+   ],
+   "verification": {
+    "node": "frame decode now; encode + ffprobe + decode sample when a runnable ffmpeg is available (committed sidecar, or NEMO_FFMPEG for an explicit binary whose identity is recorded)",
+    "gate": "R13/R21: the same checks driven through the packaged UI export"
+   },
+   "assets": [
+    "assets/frames/frame_0001.png",
+    "assets/frames/frame_0002.png",
+    "assets/frames/frame_0003.png",
+    "assets/frames/frame_0004.png",
+    "assets/frames/frame_0005.png",
+    "assets/frames/frame_0006.png",
+    "assets/frames/frame_0007.png",
+    "assets/frames/frame_0008.png",
+    "assets/frames/frame_0009.png",
+    "assets/frames/frame_0010.png",
+    "assets/frames/frame_0011.png",
+    "assets/frames/frame_0012.png"
+   ],
+   "seed": 4211608755,
+   "generation": {
+    "generator": "tests/fixtures/generate.cjs",
+    "version": 1,
+    "builder": "tests/fixtures/lib/corpus.cjs#exportFixture",
+    "formatVersion": 13
+   },
+   "files": {
+    "project": "export/project.json",
+    "expected": "export/expected.json",
+    "assets": [
+     "export/assets/frames/frame_0001.png",
+     "export/assets/frames/frame_0002.png",
+     "export/assets/frames/frame_0003.png",
+     "export/assets/frames/frame_0004.png",
+     "export/assets/frames/frame_0005.png",
+     "export/assets/frames/frame_0006.png",
+     "export/assets/frames/frame_0007.png",
+     "export/assets/frames/frame_0008.png",
+     "export/assets/frames/frame_0009.png",
+     "export/assets/frames/frame_0010.png",
+     "export/assets/frames/frame_0011.png",
+     "export/assets/frames/frame_0012.png"
+    ]
+   },
+   "sha256": {
+    "export/project.json": "f6b1590ef29a501959f5a526b30ccddfc2d8db9a6cc7e08fd10a3422be2e7349",
+    "export/expected.json": "95f13ebb69661d54584d591dccd6f93c46672bfa2a190de88a98380b8e5b47e7",
+    "export/assets/frames/frame_0001.png": "7f0a02dc964504fdbb202cb9bb710e51c24b5b268cfdc15ad29770172f0b10fd",
+    "export/assets/frames/frame_0002.png": "81802ecded85d95f1dbb38745f3ee1fc789e8c1e00c1ff18fe465b55328557dc",
+    "export/assets/frames/frame_0003.png": "08303f4cf525c287071b66e1b26ea0df6be0613209ad24b170664ec077615627",
+    "export/assets/frames/frame_0004.png": "bdf763474f963a5cf86e1138039a7ca547c8522264fc94a9d7f4dc01ae69c11e",
+    "export/assets/frames/frame_0005.png": "f492419ac8a291c51a82327743aebe4d9b5ab5342b4fdc587d1913b52d3bef8e",
+    "export/assets/frames/frame_0006.png": "89e898bac53cf7062032c46ee02a02b71b768edafff96b30f3035e9c5c388bea",
+    "export/assets/frames/frame_0007.png": "48b3ab945552f8bdf8445059b31df8b59cd7069ac6c0b3c81a6fc398c494d0fe",
+    "export/assets/frames/frame_0008.png": "2dff77e60eba04c56fa7651167b10363fd62afbce2f07899d3587b51d3424682",
+    "export/assets/frames/frame_0009.png": "ca21a54c521c516d33d2cec0ebbcc8b3233fcea683cae6f58a248a84697365d2",
+    "export/assets/frames/frame_0010.png": "7aa0fa4488e24d85486c7abdfcdda243778ff7764790be0025fcdc0b7dd533a0",
+    "export/assets/frames/frame_0011.png": "2efc3415759866168de6c1567c070a14547afa796f429713167d1913e82e4d67",
+    "export/assets/frames/frame_0012.png": "907aff957b667b2d5c275072e851138e07a7ec8c3e9b272c9744860137ee6c8c"
+   },
+   "checks": {
+    "total": 6,
+    "node": 1,
+    "nodeWhenAvailable": 5,
+    "gate": 0
+   },
+   "document": {
+    "layers": 1,
+    "totalFrames": 12,
+    "fps": 24,
+    "canvas": [
+     320,
+     240
+    ],
+    "bytes": 28868
+   }
+  }
+ ],
+ "workloads": [
+  {
+   "id": "bench-vectors-40x24",
+   "committed": false,
+   "generator": "tests/fixtures/lib/corpus.cjs#benchDocument",
+   "params": {
+    "layers": 40,
+    "total": 24,
+    "keyEvery": 6,
+    "strokesPerKey": 50,
+    "seed": 4150573367
+   },
+   "seed": 4150573367,
+   "sha256": "13807dc8a6c579cd53376fe6f5081ba70805229c614ea7bda116aa8b0175fd9c",
+   "bytes": 8294444,
+   "layers": 40,
+   "totalFrames": 24,
+   "itemsPerKeyframe": 2000
+  },
+  {
+   "id": "bench-vectors-8x24",
+   "committed": false,
+   "generator": "tests/fixtures/lib/corpus.cjs#benchDocument",
+   "params": {
+    "layers": 8,
+    "total": 24,
+    "keyEvery": 6,
+    "strokesPerKey": 25,
+    "seed": 1113248609
+   },
+   "seed": 1113248609,
+   "sha256": "e7bb306ce728eb5102de3da0c9af07a17c6bc5a26c2bbad4f0a232995361367d",
+   "bytes": 826677,
+   "layers": 8,
+   "totalFrames": 24,
+   "itemsPerKeyframe": 200
+  },
+  {
+   "id": "bench-images-20x24",
+   "committed": false,
+   "generator": "tests/fixtures/lib/corpus.cjs#benchDocument",
+   "params": {
+    "layers": 20,
+    "total": 24,
+    "keyEvery": 6,
+    "strokesPerKey": 5,
+    "withImages": 20,
+    "seed": 3241335623
+   },
+   "seed": 3241335623,
+   "sha256": "a942d357c5dacbf0eac893fbd3a48542bcdc9ba0647cbe216439a476470997e5",
+   "bytes": 566364,
+   "layers": 20,
+   "totalFrames": 24,
+   "itemsPerKeyframe": 100
+  }
+ ]
+}

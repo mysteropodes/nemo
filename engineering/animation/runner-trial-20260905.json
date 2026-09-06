@@ -1,0 +1,111 @@
+{
+  "schema": "nemo.r08.runner-trial.v1",
+  "trialOnly": true,
+  "repositoryWrittenByLane": false,
+  "snapshotCommit": "2dd4054352bdb12e5323a7ae8d716e17b372a4b4",
+  "environment": {
+    "os": "macOS 26.6 (25G72)",
+    "arch": "arm64",
+    "node": "25.9.0",
+    "npm": "11.12.1",
+    "chrome": "152.0.7977.76"
+  },
+  "dependencies": {
+    "vitest": "4.1.0",
+    "playwright": "1.61.0",
+    "typescript": "5.9.3",
+    "@types/node": "25.3.0",
+    "installedPackageCount": 49
+  },
+  "setup": {
+    "initialDefaultCacheFailureSeconds": 3.437634165864438,
+    "privateCacheInstallSeconds": 5.51,
+    "totalKiB": 245936,
+    "nodeModulesKiB": 78276,
+    "npmCacheKiB": 167568
+  },
+  "runtimeSuite": {
+    "tests": 16,
+    "node": {
+      "coldSeconds": 0.17,
+      "warmSeconds": [
+        0.16,
+        0.16,
+        0.17
+      ],
+      "warmMedianSeconds": 0.16,
+      "status": "pass"
+    },
+    "vitest": {
+      "coldSeconds": 0.41,
+      "warmSeconds": [
+        0.41,
+        0.41,
+        0.42
+      ],
+      "warmMedianSeconds": 0.41,
+      "status": "pass"
+    }
+  },
+  "diagnosticProbe": {
+    "intentionalMismatch": "17 !== 18",
+    "line": 11,
+    "nodeExit": 1,
+    "vitestExit": 1
+  },
+  "typecheck": {
+    "productionStrictCheckJs": "pass",
+    "mismatchProbe": "expected-fail",
+    "mismatchExit": 2,
+    "diagnostic": "TS2345 at 4:51"
+  },
+  "browserControl": {
+    "driver": "same Playwright API under both runners",
+    "vitestBrowserMode": false,
+    "node": {
+      "tests": 1,
+      "status": "pass",
+      "wallSeconds": 1.3
+    },
+    "vitest": {
+      "tests": 1,
+      "status": "pass",
+      "wallSeconds": 1.42
+    },
+    "concurrentIsolatedProcesses": "pass",
+    "scope": "synthetic browser-control integration over shipped motion facade"
+  },
+  "recommendation": "Retain one Node test suite; keep strict TypeScript and Playwright browser controls as independent gates.",
+  "sourceHashes": {
+    "src/js/animation/curve.js": "d6c70a8848a8475f9d7ec62ce62127748e0938f3058dae40a8154a82389534c7",
+    "src/js/motion.js": "17c5a14994f26f0bfa48337ee4d452fe9584f7fbc14207d38f53a0bd4df0d510"
+  },
+  "applicationSmoke": {
+    "result": {
+      "mode": "motion",
+      "same": true,
+      "initial": 15.625,
+      "edited": 49.375,
+      "undone": 15.625,
+      "redone": 49.375
+    },
+    "errors": [],
+    "steps": [
+      "native New Project click",
+      "native Create click",
+      "native Motion mode click",
+      "production key writer, pushUndo, undo and redo through CDP"
+    ],
+    "limits": [
+      "key/history checks call production APIs directly",
+      "no save/reopen, pixel/render/export or Tauri acceptance"
+    ]
+  },
+  "acceptanceLimits": [
+    "R03/R05/R06 final acceptance pending",
+    "Original R08 cancellation has no terminal acknowledgement",
+    "Full browser save/reopen/render/export and Tauri workflow acceptance pending",
+    "Vitest Browser Mode and watch-mode reruns not compared",
+    "Type checking measured separately; no new dependency or CI type gate installed"
+  ]
+}

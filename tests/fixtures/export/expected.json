@@ -1,0 +1,215 @@
+{
+ "schema": "nemo.fixture-expectations/1",
+ "fixture": "export",
+ "reference": "tests/fixtures/lib/reference.cjs",
+ "checks": [
+  {
+   "kind": "frame-pixels",
+   "frame": 1,
+   "asset": "assets/frames/frame_0001.png",
+   "samples": [
+    {
+     "x": 40,
+     "y": 120,
+     "rgb": [
+      220,
+      30,
+      30
+     ]
+    },
+    {
+     "x": 100,
+     "y": 120,
+     "rgb": [
+      255,
+      255,
+      255
+     ]
+    },
+    {
+     "x": 10,
+     "y": 236,
+     "rgb": [
+      0,
+      0,
+      0
+     ]
+    }
+   ],
+   "verify": "node",
+   "note": "committed frames decode to the painted pixels"
+  },
+  {
+   "kind": "encode",
+   "encoder": "mp4-h264-videotoolbox",
+   "args": [
+    "-y",
+    "-framerate",
+    "{fps}",
+    "-i",
+    "{frames}/frame_%04d.png",
+    "-c:v",
+    "h264_videotoolbox",
+    "-pix_fmt",
+    "yuv420p",
+    "-q:v",
+    "65",
+    "-profile:v",
+    "high",
+    "{out}.mp4"
+   ],
+   "fps": 24,
+   "frames": 12,
+   "probe": {
+    "codec_name": "h264",
+    "profile": "High",
+    "pix_fmt": "yuv420p",
+    "width": 320,
+    "height": 240,
+    "nb_frames": 12
+   },
+   "files": null,
+   "requires": [
+    "videotoolbox"
+   ],
+   "source": "src/js/export.js exportMP4ToPath (quality high → -q:v 65)",
+   "verify": "node-when-available",
+   "requiredCapabilities": [
+    "ffmpeg-sidecar",
+    "videotoolbox"
+   ],
+   "note": "exact export.js argument list; skipped with reason when no runnable sidecar or ffprobe is present"
+  },
+  {
+   "kind": "encode",
+   "encoder": "mov-prores-4444",
+   "args": [
+    "-y",
+    "-framerate",
+    "{fps}",
+    "-i",
+    "{frames}/frame_%04d.png",
+    "-c:v",
+    "prores_ks",
+    "-profile:v",
+    "4",
+    "-pix_fmt",
+    "yuva444p10le",
+    "{out}.mov"
+   ],
+   "fps": 24,
+   "frames": 12,
+   "probe": {
+    "codec_name": "prores",
+    "profile": "4444",
+    "pix_fmt": {
+     "oneOf": [
+      "yuva444p12le",
+      "yuva444p10le"
+     ]
+    },
+    "width": 320,
+    "height": 240,
+    "nb_frames": 12
+   },
+   "files": null,
+   "requires": [],
+   "source": "src/js/export.js exportProResToPath (alpha)",
+   "verify": "node-when-available",
+   "requiredCapabilities": [
+    "ffmpeg-sidecar"
+   ],
+   "note": "exact export.js argument list; skipped with reason when no runnable sidecar or ffprobe is present"
+  },
+  {
+   "kind": "encode",
+   "encoder": "mov-prores-422",
+   "args": [
+    "-y",
+    "-framerate",
+    "{fps}",
+    "-i",
+    "{frames}/frame_%04d.png",
+    "-c:v",
+    "prores_ks",
+    "-profile:v",
+    "3",
+    "-pix_fmt",
+    "yuv422p10le",
+    "{out}.mov"
+   ],
+   "fps": 24,
+   "frames": 12,
+   "probe": {
+    "codec_name": "prores",
+    "profile": "HQ",
+    "pix_fmt": "yuv422p10le",
+    "width": 320,
+    "height": 240,
+    "nb_frames": 12
+   },
+   "files": null,
+   "requires": [],
+   "source": "src/js/export.js exportProResToPath (no alpha)",
+   "verify": "node-when-available",
+   "requiredCapabilities": [
+    "ffmpeg-sidecar"
+   ],
+   "note": "exact export.js argument list; skipped with reason when no runnable sidecar or ffprobe is present"
+  },
+  {
+   "kind": "encode",
+   "encoder": "tif-sequence",
+   "args": [
+    "-y",
+    "-start_number",
+    "1",
+    "-i",
+    "{frames}/frame_%04d.png",
+    "-start_number",
+    "1",
+    "{out}/frame_%04d.tif"
+   ],
+   "fps": 24,
+   "frames": 12,
+   "probe": null,
+   "files": 12,
+   "requires": [],
+   "source": "src/js/export.js exportTIFSequence",
+   "verify": "node-when-available",
+   "requiredCapabilities": [
+    "ffmpeg-sidecar"
+   ],
+   "note": "exact export.js argument list; skipped with reason when no runnable sidecar or ffprobe is present"
+  },
+  {
+   "kind": "decode-sample",
+   "encoder": "mp4-h264-videotoolbox",
+   "frame": 1,
+   "samples": [
+    {
+     "x": 40,
+     "y": 120,
+     "rgb": [
+      220,
+      30,
+      30
+     ],
+     "tolerance": 24
+    },
+    {
+     "x": 160,
+     "y": 60,
+     "rgb": [
+      255,
+      255,
+      255
+     ],
+     "tolerance": 8
+    }
+   ],
+   "verify": "node-when-available",
+   "note": "lossy 4:2:0 encode: wide tolerance on the coloured sample"
+  }
+ ]
+}

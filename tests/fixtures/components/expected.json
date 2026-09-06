@@ -1,0 +1,1987 @@
+{
+ "schema": "nemo.fixture-expectations/1",
+ "fixture": "components",
+ "reference": "tests/fixtures/lib/reference.cjs",
+ "checks": [
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 0,
+   "expectInternalFrame": 0,
+   "expectStrokeIds": [
+    "s_comp_a_0",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 0,
+   "expectInternalFrame": 0,
+   "expectStrokeIds": [
+    "s_comp_a_0",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 0,
+   "expectInternalFrame": 0,
+   "expectStrokeIds": [
+    "s_comp_a_0",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 0,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 0,
+   "expectInternalFrame": 0,
+   "expectStrokeIds": [
+    "s_comp_a_0",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 0,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 0,
+   "expectInternalFrame": 0,
+   "expectStrokeIds": [
+    "s_comp_a_0",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 1,
+   "expectInternalFrame": 0,
+   "expectStrokeIds": [
+    "s_comp_a_0",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 1,
+   "expectInternalFrame": 1,
+   "expectStrokeIds": [
+    "s_comp_a_1",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 1,
+   "expectInternalFrame": 1,
+   "expectStrokeIds": [
+    "s_comp_a_1",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 1,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 1,
+   "expectInternalFrame": 2,
+   "expectStrokeIds": [
+    "s_comp_a_2",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 1,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 1,
+   "expectInternalFrame": 1,
+   "expectStrokeIds": [
+    "s_comp_a_1",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 2,
+   "expectInternalFrame": 0,
+   "expectStrokeIds": [
+    "s_comp_a_0",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 2,
+   "expectInternalFrame": 2,
+   "expectStrokeIds": [
+    "s_comp_a_2",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 2,
+   "expectInternalFrame": 2,
+   "expectStrokeIds": [
+    "s_comp_a_2",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 2,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 2,
+   "expectInternalFrame": 4,
+   "expectStrokeIds": [
+    "s_comp_a_4",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 2,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 2,
+   "expectInternalFrame": 2,
+   "expectStrokeIds": [
+    "s_comp_a_2",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 3,
+   "expectInternalFrame": 0,
+   "expectStrokeIds": [
+    "s_comp_a_0",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 3,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 3,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 3,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 3,
+   "expectInternalFrame": 6,
+   "expectStrokeIds": [
+    "s_comp_a_6",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 3,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 3,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 4,
+   "expectInternalFrame": 0,
+   "expectStrokeIds": [
+    "s_comp_a_0",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 4,
+   "expectInternalFrame": 4,
+   "expectStrokeIds": [
+    "s_comp_a_4",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 4,
+   "expectInternalFrame": 4,
+   "expectStrokeIds": [
+    "s_comp_a_4",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 4,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 4,
+   "expectInternalFrame": 8,
+   "expectStrokeIds": [
+    "s_comp_a_8",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 4,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 4,
+   "expectInternalFrame": 4,
+   "expectStrokeIds": [
+    "s_comp_a_4",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 5,
+   "expectInternalFrame": 1,
+   "expectStrokeIds": [
+    "s_comp_a_1",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 5,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 5,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 5,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 5,
+   "expectInternalFrame": 10,
+   "expectStrokeIds": [
+    "s_comp_a_10",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 5,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 5,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 6,
+   "expectInternalFrame": 2,
+   "expectStrokeIds": [
+    "s_comp_a_2",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 6,
+   "expectInternalFrame": 6,
+   "expectStrokeIds": [
+    "s_comp_a_6",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 6,
+   "expectInternalFrame": 6,
+   "expectStrokeIds": [
+    "s_comp_a_6",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 6,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 6,
+   "expectInternalFrame": 0,
+   "expectStrokeIds": [
+    "s_comp_a_0",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 6,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 6,
+   "expectInternalFrame": 6,
+   "expectStrokeIds": [
+    "s_comp_a_6",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 7,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 7,
+   "expectInternalFrame": 7,
+   "expectStrokeIds": [
+    "s_comp_a_7",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 7,
+   "expectInternalFrame": 7,
+   "expectStrokeIds": [
+    "s_comp_a_7",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 7,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 7,
+   "expectInternalFrame": 2,
+   "expectStrokeIds": [
+    "s_comp_a_2",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 7,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 7,
+   "expectInternalFrame": 7,
+   "expectStrokeIds": [
+    "s_comp_a_7",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 8,
+   "expectInternalFrame": 4,
+   "expectStrokeIds": [
+    "s_comp_a_4",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 8,
+   "expectInternalFrame": 8,
+   "expectStrokeIds": [
+    "s_comp_a_8",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 8,
+   "expectInternalFrame": 8,
+   "expectStrokeIds": [
+    "s_comp_a_8",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 8,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 8,
+   "expectInternalFrame": 4,
+   "expectStrokeIds": [
+    "s_comp_a_4",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 8,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 8,
+   "expectInternalFrame": 8,
+   "expectStrokeIds": [
+    "s_comp_a_8",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 9,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 9,
+   "expectInternalFrame": 9,
+   "expectStrokeIds": [
+    "s_comp_a_9",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 9,
+   "expectInternalFrame": 9,
+   "expectStrokeIds": [
+    "s_comp_a_9",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 9,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 9,
+   "expectInternalFrame": 6,
+   "expectStrokeIds": [
+    "s_comp_a_6",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 9,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 9,
+   "expectInternalFrame": 9,
+   "expectStrokeIds": [
+    "s_comp_a_9",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 10,
+   "expectInternalFrame": 6,
+   "expectStrokeIds": [
+    "s_comp_a_6",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 10,
+   "expectInternalFrame": 10,
+   "expectStrokeIds": [
+    "s_comp_a_10",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 10,
+   "expectInternalFrame": 10,
+   "expectStrokeIds": [
+    "s_comp_a_10",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 10,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 10,
+   "expectInternalFrame": 8,
+   "expectStrokeIds": [
+    "s_comp_a_8",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 10,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 10,
+   "expectInternalFrame": 10,
+   "expectStrokeIds": [
+    "s_comp_a_10",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 11,
+   "expectInternalFrame": 7,
+   "expectStrokeIds": [
+    "s_comp_a_7",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 11,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 11,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 11,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 11,
+   "expectInternalFrame": 10,
+   "expectStrokeIds": [
+    "s_comp_a_10",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 11,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 11,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 12,
+   "expectInternalFrame": 8,
+   "expectStrokeIds": [
+    "s_comp_a_8",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 12,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 12,
+   "expectInternalFrame": 10,
+   "expectStrokeIds": [
+    "s_comp_a_10",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 12,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 12,
+   "expectInternalFrame": 0,
+   "expectStrokeIds": [
+    "s_comp_a_0",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 12,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 12,
+   "expectInternalFrame": null,
+   "expectStrokeIds": [],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 13,
+   "expectInternalFrame": 9,
+   "expectStrokeIds": [
+    "s_comp_a_9",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 13,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 13,
+   "expectInternalFrame": 9,
+   "expectStrokeIds": [
+    "s_comp_a_9",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 13,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 13,
+   "expectInternalFrame": 2,
+   "expectStrokeIds": [
+    "s_comp_a_2",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 13,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 13,
+   "expectInternalFrame": null,
+   "expectStrokeIds": [],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 14,
+   "expectInternalFrame": 10,
+   "expectStrokeIds": [
+    "s_comp_a_10",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 14,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 14,
+   "expectInternalFrame": 8,
+   "expectStrokeIds": [
+    "s_comp_a_8",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 14,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 14,
+   "expectInternalFrame": 4,
+   "expectStrokeIds": [
+    "s_comp_a_4",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 14,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 14,
+   "expectInternalFrame": null,
+   "expectStrokeIds": [],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 15,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 15,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 15,
+   "expectInternalFrame": 7,
+   "expectStrokeIds": [
+    "s_comp_a_7",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 15,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 15,
+   "expectInternalFrame": 6,
+   "expectStrokeIds": [
+    "s_comp_a_6",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 15,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 15,
+   "expectInternalFrame": null,
+   "expectStrokeIds": [],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 16,
+   "expectInternalFrame": 0,
+   "expectStrokeIds": [
+    "s_comp_a_0",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 16,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 16,
+   "expectInternalFrame": 6,
+   "expectStrokeIds": [
+    "s_comp_a_6",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 16,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 16,
+   "expectInternalFrame": 8,
+   "expectStrokeIds": [
+    "s_comp_a_8",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 16,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 16,
+   "expectInternalFrame": null,
+   "expectStrokeIds": [],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 17,
+   "expectInternalFrame": 1,
+   "expectStrokeIds": [
+    "s_comp_a_1",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 17,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 17,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 17,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 17,
+   "expectInternalFrame": 10,
+   "expectStrokeIds": [
+    "s_comp_a_10",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 17,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 17,
+   "expectInternalFrame": null,
+   "expectStrokeIds": [],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 18,
+   "expectInternalFrame": 2,
+   "expectStrokeIds": [
+    "s_comp_a_2",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 18,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 18,
+   "expectInternalFrame": 4,
+   "expectStrokeIds": [
+    "s_comp_a_4",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 18,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 18,
+   "expectInternalFrame": 0,
+   "expectStrokeIds": [
+    "s_comp_a_0",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 18,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 18,
+   "expectInternalFrame": null,
+   "expectStrokeIds": [],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 19,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 19,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 19,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 19,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 19,
+   "expectInternalFrame": 2,
+   "expectStrokeIds": [
+    "s_comp_a_2",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 19,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 19,
+   "expectInternalFrame": null,
+   "expectStrokeIds": [],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 20,
+   "expectInternalFrame": 4,
+   "expectStrokeIds": [
+    "s_comp_a_4",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 20,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 20,
+   "expectInternalFrame": 2,
+   "expectStrokeIds": [
+    "s_comp_a_2",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 20,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 20,
+   "expectInternalFrame": 4,
+   "expectStrokeIds": [
+    "s_comp_a_4",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 20,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 20,
+   "expectInternalFrame": null,
+   "expectStrokeIds": [],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 21,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 21,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 21,
+   "expectInternalFrame": 1,
+   "expectStrokeIds": [
+    "s_comp_a_1",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 21,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 21,
+   "expectInternalFrame": 6,
+   "expectStrokeIds": [
+    "s_comp_a_6",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 21,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 21,
+   "expectInternalFrame": null,
+   "expectStrokeIds": [],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 22,
+   "expectInternalFrame": 6,
+   "expectStrokeIds": [
+    "s_comp_a_6",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 22,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 22,
+   "expectInternalFrame": 0,
+   "expectStrokeIds": [
+    "s_comp_a_0",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 22,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 22,
+   "expectInternalFrame": 8,
+   "expectStrokeIds": [
+    "s_comp_a_8",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 22,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 22,
+   "expectInternalFrame": null,
+   "expectStrokeIds": [],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_loop",
+   "frame": 23,
+   "expectInternalFrame": 7,
+   "expectStrokeIds": [
+    "s_comp_a_7",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_once",
+   "frame": 23,
+   "expectInternalFrame": 11,
+   "expectStrokeIds": [
+    "s_comp_a_11",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "once play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_ping",
+   "frame": 23,
+   "expectInternalFrame": 1,
+   "expectStrokeIds": [
+    "s_comp_a_1",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "pingpong play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_single",
+   "frame": 23,
+   "expectInternalFrame": 5,
+   "expectStrokeIds": [
+    "s_comp_a_5",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "single play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_speed",
+   "frame": 23,
+   "expectInternalFrame": 10,
+   "expectStrokeIds": [
+    "s_comp_a_10",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "loop play mode"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_hold",
+   "frame": 23,
+   "expectInternalFrame": 3,
+   "expectStrokeIds": [
+    "s_comp_a_3",
+    "s_comp_b_0"
+   ],
+   "verify": "node",
+   "note": "componentFrame on the outer keyframe pins the internal frame"
+  },
+  {
+   "kind": "symbol-frame",
+   "layerUid": "ly_comp_blank",
+   "frame": 23,
+   "expectInternalFrame": null,
+   "expectStrokeIds": [],
+   "verify": "node",
+   "note": "blankOverride keyframe hides the instance for its span"
+  }
+ ]
+}

@@ -1,0 +1,44 @@
+{
+ "schema": "nemo.fixture-expectations/1",
+ "fixture": "interaction",
+ "reference": "tests/fixtures/lib/reference.cjs",
+ "checks": [
+  {
+   "kind": "interaction-schema",
+   "file": "gesture.json",
+   "expectEvents": 121,
+   "verify": "node",
+   "note": "timestamps monotonic, coordinates inside the canvas"
+  },
+  {
+   "kind": "interaction",
+   "after": "draw",
+   "layerUid": "ly_int_0",
+   "frame": 0,
+   "expect": {
+    "strokesAdded": 1,
+    "minSegments": 8,
+    "boundsWithin": {
+     "x": 116,
+     "y": 95.91,
+     "width": 408,
+     "height": 168.19000000000003
+    }
+   },
+   "verify": "gate",
+   "gate": "R12 record/replay harness",
+   "note": "bounds derive from the recorded events, not from the smoother"
+  },
+  {
+   "kind": "interaction",
+   "after": "undo",
+   "layerUid": "ly_int_0",
+   "frame": 0,
+   "expect": {
+    "strokes": 0
+   },
+   "verify": "gate",
+   "gate": "R12 record/replay harness"
+  }
+ ]
+}

@@ -1,0 +1,88 @@
+{
+ "schema": "nemo.fixture-expectations/1",
+ "fixture": "mesh",
+ "reference": "tests/fixtures/lib/reference.cjs",
+ "checks": [
+  {
+   "kind": "mesh",
+   "meshId": "im_1",
+   "outlineCount": 8,
+   "vertexCount": 9,
+   "triangleCount": 8,
+   "verify": "node",
+   "note": "outline prefix, valid indices, centroids inside the outline, offsets aligned with verts"
+  },
+  {
+   "kind": "mesh-vertex-world",
+   "meshId": "im_1",
+   "index": 8,
+   "rect": {
+    "x": 320,
+    "y": 180,
+    "width": 200,
+    "height": 200
+   },
+   "expectRest": [
+    320,
+    180
+   ],
+   "expectDeformed": [
+    340,
+    180
+   ],
+   "verify": "node"
+  },
+  {
+   "kind": "mesh-propagated",
+   "layerUid": "ly_mesh_0",
+   "meshId": "im_1",
+   "verify": "node",
+   "note": "meshId must be on the raster of EVERY frame (CLAUDE.md §12)"
+  },
+  {
+   "kind": "pixel",
+   "frame": 0,
+   "x": 240,
+   "y": 180,
+   "rgb": [
+    220,
+    30,
+    30
+   ],
+   "tolerance": 2,
+   "verify": "gate",
+   "gate": "R13 render/export harness",
+   "note": "far left of the image: red half, unaffected by the centre offset"
+  },
+  {
+   "kind": "pixel",
+   "frame": 0,
+   "x": 400,
+   "y": 180,
+   "rgb": [
+    30,
+    60,
+    220
+   ],
+   "tolerance": 2,
+   "verify": "gate",
+   "gate": "R13 render/export harness",
+   "note": "far right: blue half"
+  },
+  {
+   "kind": "pixel",
+   "frame": 0,
+   "x": 150,
+   "y": 180,
+   "rgb": [
+    255,
+    255,
+    255
+   ],
+   "tolerance": 2,
+   "verify": "gate",
+   "gate": "R13 render/export harness",
+   "note": "outside the outline: masked"
+  }
+ ]
+}

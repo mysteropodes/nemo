@@ -1,0 +1,838 @@
+{
+ "schema": "nemo.fixture-expectations/1",
+ "fixture": "keyed-props",
+ "reference": "tests/fixtures/lib/reference.cjs",
+ "checks": [
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "position",
+   "frame": 0,
+   "expect": [
+    100,
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "position",
+   "frame": 5,
+   "expect": [
+    131.2,
+    115.6
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "position",
+   "frame": 10,
+   "expect": [
+    200,
+    150
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "position",
+   "frame": 15,
+   "expect": [
+    268.79999999999995,
+    184.39999999999998
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "position",
+   "frame": 20,
+   "expect": [
+    300,
+    200
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "position",
+   "frame": 23,
+   "expect": [
+    300,
+    200
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "rotation",
+   "frame": 0,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "rotation",
+   "frame": 5,
+   "expect": [
+    14.04
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "rotation",
+   "frame": 10,
+   "expect": [
+    45
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "rotation",
+   "frame": 15,
+   "expect": [
+    75.96
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "rotation",
+   "frame": 20,
+   "expect": [
+    90
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "rotation",
+   "frame": 23,
+   "expect": [
+    90
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "scale",
+   "frame": 0,
+   "expect": [
+    100,
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "scale",
+   "frame": 5,
+   "expect": [
+    115.6,
+    92.2
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "scale",
+   "frame": 10,
+   "expect": [
+    150,
+    75
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "scale",
+   "frame": 15,
+   "expect": [
+    184.39999999999998,
+    57.800000000000004
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "scale",
+   "frame": 20,
+   "expect": [
+    200,
+    50
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "scale",
+   "frame": 23,
+   "expect": [
+    200,
+    50
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "default ease at its on-curve waypoints (t = 0, ¼, ½, ¾, 1); 23 clamps to the last key"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "opacity",
+   "frame": 0,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two segments, waypoints of each"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "opacity",
+   "frame": 2,
+   "expect": [
+    84.4
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two segments, waypoints of each"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "opacity",
+   "frame": 4,
+   "expect": [
+    50
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two segments, waypoints of each"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "opacity",
+   "frame": 6,
+   "expect": [
+    15.600000000000009
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two segments, waypoints of each"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "opacity",
+   "frame": 8,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two segments, waypoints of each"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "opacity",
+   "frame": 10,
+   "expect": [
+    15.6
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two segments, waypoints of each"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "opacity",
+   "frame": 12,
+   "expect": [
+    50
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two segments, waypoints of each"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "opacity",
+   "frame": 14,
+   "expect": [
+    84.39999999999999
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two segments, waypoints of each"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "opacity",
+   "frame": 16,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two segments, waypoints of each"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_a",
+   "prop": "opacity",
+   "frame": 20,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two segments, waypoints of each"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 0,
+   "expect": [
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 1,
+   "expect": [
+    5
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 2,
+   "expect": [
+    10
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 3,
+   "expect": [
+    15
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 4,
+   "expect": [
+    20
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 5,
+   "expect": [
+    25
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 6,
+   "expect": [
+    30
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 7,
+   "expect": [
+    35
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 8,
+   "expect": [
+    40
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 9,
+   "expect": [
+    45
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 10,
+   "expect": [
+    50
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 11,
+   "expect": [
+    55.00000000000001
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 12,
+   "expect": [
+    60
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 13,
+   "expect": [
+    65
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 14,
+   "expect": [
+    70
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 15,
+   "expect": [
+    75
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 16,
+   "expect": [
+    80
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 17,
+   "expect": [
+    85
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 18,
+   "expect": [
+    90
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 19,
+   "expect": [
+    95
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 20,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 21,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 22,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_b",
+   "prop": "rotation",
+   "frame": 23,
+   "expect": [
+    100
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "two-point curve is the identity ease"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_c",
+   "prop": "position",
+   "frame": 0,
+   "expect": [
+    0,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cubic through hOut/hIn at the eased fraction"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_c",
+   "prop": "position",
+   "frame": 5,
+   "expect": [
+    92.8407168,
+    7.3008
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cubic through hOut/hIn at the eased fraction"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_c",
+   "prop": "position",
+   "frame": 10,
+   "expect": [
+    275,
+    75
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cubic through hOut/hIn at the eased fraction"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_c",
+   "prop": "position",
+   "frame": 15,
+   "expect": [
+    386.1576832,
+    213.7008
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cubic through hOut/hIn at the eased fraction"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_c",
+   "prop": "position",
+   "frame": 20,
+   "expect": [
+    400,
+    300
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "cubic through hOut/hIn at the eased fraction"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_d",
+   "prop": "position",
+   "frame": 0,
+   "expect": [
+    0,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "each segment eases independently"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_d",
+   "prop": "position",
+   "frame": 2,
+   "expect": [
+    12.48,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "each segment eases independently"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_d",
+   "prop": "position",
+   "frame": 4,
+   "expect": [
+    40,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "each segment eases independently"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_d",
+   "prop": "position",
+   "frame": 6,
+   "expect": [
+    67.52,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "each segment eases independently"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_d",
+   "prop": "position",
+   "frame": 8,
+   "expect": [
+    80,
+    0
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "each segment eases independently"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_d",
+   "prop": "position",
+   "frame": 10,
+   "expect": [
+    80,
+    12.48
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "each segment eases independently"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_d",
+   "prop": "position",
+   "frame": 12,
+   "expect": [
+    80,
+    40
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "each segment eases independently"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_d",
+   "prop": "position",
+   "frame": 14,
+   "expect": [
+    80,
+    67.52
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "each segment eases independently"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_d",
+   "prop": "position",
+   "frame": 16,
+   "expect": [
+    80,
+    80
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "each segment eases independently"
+  },
+  {
+   "kind": "motion-value",
+   "layerUid": "ly_keyed_d",
+   "prop": "position",
+   "frame": 23,
+   "expect": [
+    80,
+    80
+   ],
+   "tolerance": 1e-9,
+   "verify": "node",
+   "note": "each segment eases independently"
+  }
+ ]
+}

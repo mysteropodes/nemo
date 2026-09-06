@@ -1,0 +1,108 @@
+{
+ "schema": "nemo.fixture-expectations/1",
+ "fixture": "text",
+ "reference": "tests/fixtures/lib/reference.cjs",
+ "checks": [
+  {
+   "kind": "document",
+   "path": "layers[0].isTextLayer",
+   "expect": true,
+   "verify": "node"
+  },
+  {
+   "kind": "document",
+   "path": "layers[0].frames[0].strokes[0].isTextRoot",
+   "expect": true,
+   "verify": "node"
+  },
+  {
+   "kind": "document",
+   "path": "layers[0].frames[0].strokes[0].text",
+   "expect": "NEM",
+   "verify": "node"
+  },
+  {
+   "kind": "document",
+   "path": "layers[0].frames[0].strokes[2].vectorChar",
+   "expect": "M",
+   "verify": "node"
+  },
+  {
+   "kind": "document",
+   "path": "layers[0].frames[0].strokes[2].charIndex",
+   "expect": 2,
+   "verify": "node"
+  },
+  {
+   "kind": "document",
+   "path": "layers[0].textAnimators[0].props.position",
+   "expect": [
+    0,
+    -20
+   ],
+   "verify": "node"
+  },
+  {
+   "kind": "document",
+   "path": "layers[1].frames[0].strokes[0].text",
+   "expect": "Nemo",
+   "verify": "node"
+  },
+  {
+   "kind": "document",
+   "path": "layers[1].frames[0].strokes[0].size",
+   "expect": 40,
+   "verify": "node"
+  },
+  {
+   "kind": "bounds",
+   "layerUid": "ly_text_vec",
+   "strokeId": "s_text_2",
+   "expect": {
+    "x": 180,
+    "y": 100,
+    "width": 30,
+    "height": 48
+   },
+   "verify": "node"
+  },
+  {
+   "kind": "text-units",
+   "layerUid": "ly_text_vec",
+   "expectCharIndices": [
+    0,
+    1,
+    2
+   ],
+   "verify": "node",
+   "note": "unitIndexOf (src/js/text-selector.js) returns the stamped char index"
+  },
+  {
+   "kind": "text-group",
+   "layerUid": "ly_text_vec",
+   "rootStrokeId": "s_text_0",
+   "expectMembers": [
+    "s_text_0",
+    "s_text_1",
+    "s_text_2"
+   ],
+   "verify": "node",
+   "note": "after the desP field mapping, vectorTextGroupMembers(root) (src/js/vector-text-bridge.js, lifted) returns the whole block and the root is its first glyph"
+  },
+  {
+   "kind": "pixel",
+   "frame": 0,
+   "x": 115,
+   "y": 124,
+   "rgb": [
+    34,
+    34,
+    34
+   ],
+   "tolerance": 2,
+   "verify": "gate",
+   "gate": "R13 render/export harness",
+   "note": "glyph N box is filled #222222 before animators move it"
+  }
+ ]
+}
