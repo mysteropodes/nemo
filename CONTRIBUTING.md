@@ -27,6 +27,12 @@ say so in the PR before it's merged, not after.
 
 ## Building locally
 
+Builds and validation run locally by default. Commits, pushes, pull requests, merges,
+and version tags must not start GitHub Actions builds. Hosted validation, web/Worker
+deployment, and release builds are manual exceptions requiring an explicit human request
+for that specific run; do not automatically dispatch or rerun them to satisfy a PR check.
+Keep local receipts with the PR. See [the CI policy](engineering/ci/README.md).
+
 ```bash
 npm install
 npm run dev      # tauri dev — desktop build with hot reload

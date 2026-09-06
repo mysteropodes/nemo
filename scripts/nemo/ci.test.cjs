@@ -216,13 +216,38 @@ console.log(${JSON.stringify(JSON.stringify(receipt([{ name: 'test:browser', sta
   assert.equal(ci.verify(['test:browser'], root).ok, false);
 });
 
-test('workflow invokes each CLI lane and always aggregates exact dependencies without PR privileges', (t) => {
+test('all hosted workflows require manual dispatch and explicit build approval before allocating a runner', () => {
+  const directory = path.join(ROOT, '.github/workflows');
+  const files = fs.readdirSync(directory).filter((file) => /\.ya?ml$/.test(file));
+  assert.ok(files.length > 0);
+  for (const file of files) {
+    const workflow = fs.readFileSync(path.join(directory, file), 'utf8');
+    const triggerBlock = workflow.match(/^on:\n((?:[ \t].*\n|#.*\n|\n)*)/m)?.[1];
+    assert.ok(triggerBlock, `${file}: expected a block-form trigger declaration`);
+    assert.deepEqual([...triggerBlock.matchAll(/^  ([\w]+):/gm)].map((match) => match[1]),
+      ['workflow_dispatch'], `${file}: automatic triggers are forbidden`);
+    assert.match(triggerBlock, /allow_hosted_build:\n\s+description: [^\n]+\n\s+type: boolean\n\s+required: true\n\s+default: false/);
+    const jobs = workflow.split(/^jobs:\n/m)[1];
+    assert.ok(jobs, `${file}: expected jobs`);
+    const jobCount = [...jobs.matchAll(/^  [\w-]+:\s*$/gm)].length;
+    const guards = [...jobs.matchAll(/^    if: (.+)$/gm)].map((match) => match[1]);
+    assert.ok(jobCount > 0);
+    assert.equal(guards.length, jobCount, `${file}: every job needs an approval guard`);
+    for (const guard of guards) assert.match(guard,
+      /^(?:always\(\) && )?github\.event_name == 'workflow_dispatch' && inputs\.allow_hosted_build == true$/);
+  }
+});
+
+test('manual validation invokes each CLI lane and aggregates exact dependencies without PR privileges', (t) => {
   const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/nemo-validation.yml'), 'utf8');
   const invocations = [...workflow.matchAll(/^\s+- run: node scripts\/nemo\/ci.cjs (\w+)$/gm)].map((m) => m[1]);
   assert.deepEqual(invocations, [...ci.LANES, 'aggregate']);
-  assert.match(workflow, /aggregate:\n\s+name: Nemo \/ required\n\s+if: always\(\)\n\s+needs: \[quick, boundaries, surfaces\]/);
+  assert.match(workflow, /aggregate:\n\s+name: Nemo \/ required\n\s+if: always\(\) && github.event_name == 'workflow_dispatch' && inputs.allow_hosted_build == true\n\s+needs: \[quick, boundaries, surfaces\]/);
   assert.match(workflow, /NEMO_CI_NEEDS: \$\{\{ toJSON\(needs\) \}\}/);
-  assert.match(workflow, /NEMO_CI_BASE_SHA: \$\{\{ github.event.pull_request.base.sha \}\}/);
+  assert.match(workflow, /NEMO_CI_BASE_SHA: \$\{\{ inputs.base_sha \}\}/);
+  assert.match(workflow, /base_sha:\n\s+description: [^\n]+\n\s+type: string\n\s+required: true/);
+  assert.match(workflow, /group: nemo-validation-\$\{\{ github.ref \}\}/);
+  assert.doesNotMatch(workflow, /github.event.pull_request/);
   assert.doesNotMatch(workflow, /pull_request_target|secrets\.|self-hosted|contents: write|continue-on-error|paths-ignore:|paths:/);
   assert.equal((workflow.match(/uses: actions\/checkout@/g) || []).length,
     (workflow.match(/persist-credentials: false/g) || []).length);
