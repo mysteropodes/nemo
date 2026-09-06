@@ -204,6 +204,46 @@ var TW_ALIGN_HAIRPIN=true;
 // the globally consistent story. JS-only, wasm auto_match bypassed.
 var TW_MATCH_MULTI_MOTION=true;
 var MM_MIN_SUPPORT=3,MM_SHAPE_TH=0.5,MM_BIAS=0.04,MM_BIAS_SUPPORT=0.08,MM_MAX_HYPS=6;
+// ---- ZOOM (loup 47→57, 2026-09-06) ----
+// La clé 57 est un gros plan de la tête : chaque trait de tête y est 1,7 à
+// 2,2 fois plus long et l'ensemble s'écarte (les oreilles ×3). Aucun canal
+// ne modélise un changement d'échelle : les candidats des hypothèses de
+// mouvement comparent les formes à l'échelle 1 (Chamfer normalisé par la
+// taille des deux traits, pénalités de longueur dès 1,3×), le regroupement
+// se fait par vecteur de déplacement (un zoom diverge) et l'ajustement
+// refuse une échelle hors [0,5 ; 2]. Résultat mesuré : les traits du corps
+// rattrapés vers les lignes de la grosse tête (7 rattrapages à 0,49–0,69,
+// jambe → mâchoire, queue → oreille). Avec le drapeau : candidats à échelle
+// normalisée (longueur B / longueur A, forme de A mise à cette échelle,
+// pénalités de longueur, d'aire et de position relatives à l'échelle —
+// matchSc opts), RANSAC sur deux candidats → similitude, support = les
+// candidats cohérents (position prédite à ZOOM_TOL près, échelle propre à
+// ZOOM_LEN_TOL près en log), ≥ ZOOM_MIN_SUPPORT traits distincts. Canal
+// d'hypothèse comme les autres (adoption ≥ MM_MIN_SUPPORT), noté avec
+// l'échelle. Un zoom réel seulement : |log échelle| ≥ ZOOM_MIN_LOG, les
+// déplacements à échelle 1 restent aux hypothèses existantes.
+// MESURÉ (2026-09-06, loup2 = loup + clés 35/39/47/57 de Cyril) : 47→57,
+// zoom ×1,68 à 8 membres adopté par 10 paires ; oreilles → oreilles,
+// mâchoires → mâchoires, museau → museau, poing → main ; jambes, queue,
+// torse, bras levé fondus (15 → 19 fondus). Bouts 47→57 : compression
+// 12,9 → 0, latéral 15,5 → 3,1, rebroussements 2 → 1 ; holdout 39→47→57
+// 21,7 → 20,2. Corpus (17 fichiers) : aucune autre portée changée. Réglage :
+// ZOOM_LEN_TOL 0,6 et ZOOM_MIN_LOG 0,25 laissaient passer des zooms ×0,77 à
+// 8–13 membres partout (abandonnés, mais souris 5→16 changeait de 3 paires,
+// neutre à l'œil et au holdout) ; à 0,4 / 0,35 / support 5, seul 47→57
+// bouge. Reste connu : l'oreille droite (9_373438 → 3_387278, 0,435) fond au
+// tour relationnel — les oreilles s'écartent ×3 quand la tête ne grandit
+// que ×1,7, une similitude ne le prédit pas ; elle apparaît en fondu.
+// → ALLUMÉ.
+var TW_MM_ZOOM=true,ZOOM_SCALE_MIN=0.3,ZOOM_SCALE_MAX=3.5,ZOOM_MIN_LOG=0.35,ZOOM_LEN_TOL=0.4,ZOOM_MAX_ROT=0.6,ZOOM_MIN_SUPPORT=5,ZOOM_MAX_CANDS=60,ZOOM_MAX_HYPS=2;
+// ZOOM DOMINANT : quand une hypothèse de zoom est adoptée par au moins
+// ZOOM_DOMINANT_FRAC des paires possibles, la caméra a zoomé ; un trait de A
+// que le zoom envoie hors des bornes de B (à ZOOM_TOL près) est sorti du
+// cadre. Sans cela, une jambe (prédite 300 px sous le cadre) s'apparie par
+// proximité brute avec la main de B, et le bras avec le museau (0,24–0,25,
+// sous le seuil). Chaque appariement d'un tel trait hors du canal zoom coûte
+// ZOOM_OFFSCREEN_PEN de plus, puis un tour de plus d'affectation.
+var ZOOM_DOMINANT_FRAC=0.5,ZOOM_OFFSCREEN_PEN=0.35;
 // TW_REL_2OPT: exact-objective pairwise swap pass at the end of
 // relationalRefine (see its comment). Same PR; separately flippable.
 var TW_REL_2OPT=true;
@@ -1159,8 +1199,12 @@ function unionBounds(feats){
   return{x:x1,y:y1,w:Math.max(1,x2-x1),h:Math.max(1,y2-y1)};
 }
 var _matchNorm=0;
-function matchSc(fA,fB,sameIndex,aPtsOverride){
+function matchSc(fA,fB,sameIndex,aPtsOverride,opts){
   var pts=aPtsOverride||fA.pts;var K=Math.min(pts.length,fB.pts.length);
+  // opts (TW_MM_ZOOM) : {scale, rel} — le trait A est jugé comme s'il était
+  // à l'échelle `scale` (longueur, aire, diagonale) et à la position relative
+  // `rel` dans les bornes de B. Sans opts, arithmétique strictement identique.
+  var sH=(opts&&opts.scale)||1;var lenA=fA.length*sH;
   // 1. PROXIMITY (dominant): symmetric Chamfer distance — for each sample
   // of one line, distance to the nearest sample of the other. Start-point
   // and direction invariant; directly answers "do these two lines lie in
@@ -1187,7 +1231,7 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
     var dxr=pts[k][0]-fB.pts[K-1-k][0],dyr=pts[k][1]-fB.pts[K-1-k][1];rev+=Math.sqrt(dxr*dxr+dyr*dyr);
   }
   var alg=Math.min(fwd,rev)/K;
-  var da=Math.sqrt(fA.bounds.w*fA.bounds.w+fA.bounds.h*fA.bounds.h);
+  var da=Math.sqrt(fA.bounds.w*fA.bounds.w+fA.bounds.h*fA.bounds.h)*sH;
   var db=Math.sqrt(fB.bounds.w*fB.bounds.w+fB.bounds.h*fB.bounds.h);
   var scaleAB=(da+db)/2+(typeof _matchNorm==='number'?_matchNorm*0.04:0)+1;
   var proxT=cham/(cham+scaleAB*0.5);
@@ -1208,8 +1252,9 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   // linework of the same underlying shape, not just within one style.
   var fourD=fourierDist(fA.fourier,fB.fourier);
   // 4. secondary cues & hard penalties
-  var rdx=fA.relX-fB.relX,rdy=fA.relY-fB.relY;var rel=Math.min(1,Math.sqrt(rdx*rdx+rdy*rdy));
-  var lenRatio=Math.max(fA.length,fB.length)/Math.max(1,Math.min(fA.length,fB.length));
+  var rAx=(opts&&opts.rel)?opts.rel[0]:fA.relX,rAy=(opts&&opts.rel)?opts.rel[1]:fA.relY;
+  var rdx=rAx-fB.relX,rdy=rAy-fB.relY;var rel=Math.min(1,Math.sqrt(rdx*rdx+rdy*rdy));
+  var lenRatio=Math.max(lenA,fB.length)/Math.max(1,Math.min(lenA,fB.length));
   // Arc-length identity penalty, recalibrated 2026-07 (testB, the mouth
   // "X" artifact): a 28px neck tick stole the 57px mouth's match (ratio
   // 2.05) from the true 52px mouth (ratio 1.10) on proximity alone — the
@@ -1219,7 +1264,7 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   // difference gate (>15px) keeps micro-strokes exempt: two hand-drawn
   // eye dots measured 7px vs 15px (ratio 2.04!) — at that size the ratio
   // is pure pen noise, and cel features that small legitimately jitter.
-  var ratioPen=(lenRatio>1.6&&Math.abs(fA.length-fB.length)>15)?Math.min(0.7,(lenRatio-1.6)*0.5):0;
+  var ratioPen=(lenRatio>1.6&&Math.abs(lenA-fB.length)>15)?Math.min(0.7,(lenRatio-1.6)*0.5):0;
   // Smooth length-identity term (2026-09, with TW_MATCH_RELATIONAL —
   // Cyril's turning face, "grosse confusion des traits"): the eye cluster
   // dropped 130 px while the rest of the face barely moved, so proximity
@@ -1234,7 +1279,7 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   // chain 0.13 short; 0.35 flipped it but pushed a legitimately-redrawn
   // lip (155 → 82 px, ratio 1.9) over the fade threshold. Same
   // micro-stroke exemption as ratioPen.
-  var lenT=(TW_MATCH_RELATIONAL&&Math.abs(fA.length-fB.length)>15)?Math.min(1,Math.max(0,Math.log(lenRatio)-Math.log(1.3))/Math.log(2))*MATCH_LEN_W:0;
+  var lenT=(TW_MATCH_RELATIONAL&&Math.abs(lenA-fB.length)>15)?Math.min(1,Math.max(0,Math.log(lenRatio)-Math.log(1.3))/Math.log(2))*MATCH_LEN_W:0;
   // 0.35 only when BOTH closed flags are ground truth. When either side is
   // a heuristic guess (vector-brush centerline — see strokeFeat's
   // closedIsGuess), a disagreement is as likely a drawing accident as a
@@ -1243,7 +1288,7 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   // from this penalty, so the limb faded/trimmed as two unrelated strokes
   // instead of swinging. Mirrored in tweenmatch.rs (closed_pen).
   var closedPen=fA.closed!==fB.closed?((fA.closedIsGuess||fB.closedIsGuess)?0.12:0.35):0;
-  var aArea=fA.bounds.w*fA.bounds.h,bArea=fB.bounds.w*fB.bounds.h;
+  var aArea=fA.bounds.w*fA.bounds.h*sH*sH,bArea=fB.bounds.w*fB.bounds.h;
   var szD=Math.abs(aArea-bArea)/Math.max(1,Math.max(aArea,bArea));
   var colD=(colorDist(fA.strokeCol,fB.strokeCol)+colorDist(fA.fillCol,fB.fillCol))/2;
   var typePenalty=fA.type!==fB.type?0.5:0;
@@ -1899,6 +1944,7 @@ function _autoMatchJSCore(sA,sB,hist,pins,seedOverride){
   // stroke's local model for the relational pass.
   var hypOf=null,hyps=null,assign2,matches2=[];
   if(TW_MATCH_RELATIONAL&&TW_MATCH_MULTI_MOTION)hyps=multiMotionHypotheses(fA,fB,n,m,hist);
+  if(TW_MATCH_RELATIONAL&&TW_MM_ZOOM){var zh=zoomHypotheses(fA,fB,n,m);if(zh.length)hyps=(hyps||[]).concat(zh);}
   if(hyps&&hyps.length){
     _mlNote('hypothèses de mouvement',{n:hyps.length,supports:hyps.map(function(h){return h.support;})});
     // Pre-score every pairing under every hypothesis once; then solve,
@@ -1921,14 +1967,16 @@ function _autoMatchJSCore(sA,sB,hist,pins,seedOverride){
         // annulerait le terme pour toute paire qu'il explique (mesuré : le
         // terme était silencieusement sans effet sur ces cellules).
         _axisPenaltyRow(pointElongation(hpts),fB,hAxis);
-        var row=new Array(m);
-        for(var hb=0;hb<m;hb++)row[hb]=matchSc(fA[ha],fB[hb],ha===hb,hpts)+hAxis[hb]+bias-idBonusFor(ha,hb,hpts);
+        var row=new Array(m),zo=null;
+        if(h.zoom){var zc=applySimilarityTransform(h.tf,fA[ha].cx,fA[ha].cy);zo={scale:h.scale,rel:[(zc.x-bB.x)/bB.w,(zc.y-bB.y)/bB.h]};}
+        for(var hb=0;hb<m;hb++)row[hb]=matchSc(fA[ha],fB[hb],ha===hb,hpts,zo)+hAxis[hb]+bias-idBonusFor(ha,hb,hpts);
         mat[ha]=row;
       }
       return mat;
     });
     var alive=hyps.map(function(){return true;});
-    for(var round=0;round<=hyps.length;round++){
+    var zoomPenApplied=false;
+    for(var round=0;round<=hyps.length+1;round++){
       hypOf=new Array(n*m);
       for(var ra=0;ra<n;ra++)for(var rb=0;rb<m;rb++){
         var best=base2[ra][rb],bh=undefined;
@@ -1952,6 +2000,24 @@ function _autoMatchJSCore(sA,sB,hist,pins,seedOverride){
       matches2.forEach(function(mm3){var h5=hypOf[mm3.a*m+mm3.b];if(h5!==undefined)adopters[h5]++;});
       var dropped=false;
       for(var di=0;di<hyps.length;di++)if(alive[di]&&adopters[di]<(hyps[di].minAdopt||MM_MIN_SUPPORT)){alive[di]=false;dropped=true;_mlNote('hypothèse abandonnée',{h:di,adoptants:adopters[di],minimum:(hyps[di].minAdopt||MM_MIN_SUPPORT)});}
+      if(!dropped&&!zoomPenApplied&&TW_MM_ZOOM){
+        // zoom dominant → pénalité hors-cadre (voir ZOOM_DOMINANT_FRAC)
+        var zi=-1,zAd=0;
+        for(var zk=0;zk<hyps.length;zk++)if(alive[zk]&&hyps[zk].zoom&&adopters[zk]>zAd){zAd=adopters[zk];zi=zk;}
+        if(zi>=0&&zAd>=Math.max(MM_MIN_SUPPORT,Math.ceil(ZOOM_DOMINANT_FRAC*lim))){
+          var zt=Math.max(40,_matchNorm*0.08),hors=[];
+          for(var za=0;za<n;za++){
+            var zq=applySimilarityTransform(hyps[zi].tf,fA[za].cx,fA[za].cy);
+            if(zq.x<bB.x-zt||zq.x>bB.x+bB.w+zt||zq.y<bB.y-zt||zq.y>bB.y+bB.h+zt){
+              hors.push(_mlIdA(za));
+              for(var zb=0;zb<m;zb++){base2[za][zb]+=ZOOM_OFFSCREEN_PEN;for(var zh2=0;zh2<hyps.length;zh2++)if(zh2!==zi)hypCost[zh2][za][zb]+=ZOOM_OFFSCREEN_PEN;}
+            }
+          }
+          zoomPenApplied=true;
+          _mlNote('zoom dominant',{h:zi,adoptants:zAd,echelle:+hyps[zi].scale.toFixed(2),horsCadre:hors});
+          if(hors.length)continue;
+        }
+      }
       if(!dropped)return _matchMargins(cost2,matches2,n,m);
     }
     return _matchMargins(cost2,matches2,n,m);
@@ -2015,6 +2081,73 @@ function _tfDist(t1,t2,f){
     d=Math.max(d,Math.hypot(q1.x-q2.x,q1.y-q2.y));
   });
   return d;
+}
+// Voir TW_MM_ZOOM. Retourne des hypothèses {tf, support, scale, zoom:true}.
+function zoomHypotheses(fA,fB,n,m){
+  if(n<ZOOM_MIN_SUPPORT||m<ZOOM_MIN_SUPPORT)return[];
+  var tol=Math.max(40,_matchNorm*0.08);
+  var cands=[];
+  for(var a=0;a<n;a++)for(var b=0;b<m;b++){
+    var fa=fA[a],fb=fB[b];if(fa.type!==fb.type||fa.length<15||fb.length<15)continue;
+    var s=fb.length/Math.max(1,fa.length);if(s<ZOOM_SCALE_MIN||s>ZOOM_SCALE_MAX)continue;
+    var pts=fa.pts.map(function(p){return[fb.cx+(p[0]-fa.cx)*s,fb.cy+(p[1]-fa.cy)*s];});
+    var sc=matchSc(fa,fb,false,pts,{scale:s,rel:[fb.relX,fb.relY]});
+    if(sc<MM_SHAPE_TH)cands.push({a:a,b:b,s:s,sc:sc});
+  }
+  if(cands.length<ZOOM_MIN_SUPPORT)return[];
+  cands.sort(function(p,q){return p.sc-q.sc;});cands=cands.slice(0,ZOOM_MAX_CANDS);
+  function distinct(members){
+    var byA={},byB={};
+    members.forEach(function(c){if(!byA[c.a]||c.sc<byA[c.a].sc)byA[c.a]=c;});
+    Object.keys(byA).forEach(function(k){var c=byA[k];if(!byB[c.b]||c.sc<byB[c.b].sc)byB[c.b]=c;});
+    return Object.keys(byB).map(function(k){return byB[k];});
+  }
+  function supportOf(tf,s){
+    return distinct(cands.filter(function(c){
+      if(Math.abs(Math.log(c.s/s))>ZOOM_LEN_TOL)return false;
+      var q=applySimilarityTransform(tf,fA[c.a].cx,fA[c.a].cy);
+      return Math.hypot(q.x-fB[c.b].cx,q.y-fB[c.b].cy)<tol;
+    }));
+  }
+  function fitOn(uniq){
+    var pa=uniq.map(function(c){return{x:fA[c.a].cx,y:fA[c.a].cy};}),pb=uniq.map(function(c){return{x:fB[c.b].cx,y:fB[c.b].cy};});
+    var tf=fitSimilarityTransform(pa,pb);if(!tf)return null;
+    var mag=Math.sqrt(tf.wRe*tf.wRe+tf.wIm*tf.wIm);
+    // un zoom réel seulement, aussi APRÈS ré-ajustement : mesuré, sans cette
+    // garde l'absorption dérivait vers une échelle 1 sur tout le corpus
+    // (×1,01 à 13 membres sur loup 0→8), doublon des hypothèses existantes
+    if(mag<ZOOM_SCALE_MIN||mag>ZOOM_SCALE_MAX||Math.abs(Math.log(mag))<ZOOM_MIN_LOG)return null;
+    return{tf:tf,mag:mag};
+  }
+  var hyps=[];
+  for(var i=0;i<cands.length;i++)for(var j=i+1;j<cands.length;j++){
+    var ci=cands[i],cj=cands[j];if(ci.a===cj.a||ci.b===cj.b)continue;
+    var dAx=fA[cj.a].cx-fA[ci.a].cx,dAy=fA[cj.a].cy-fA[ci.a].cy,dBx=fB[cj.b].cx-fB[ci.b].cx,dBy=fB[cj.b].cy-fB[ci.b].cy;
+    var dA=Math.hypot(dAx,dAy),dB=Math.hypot(dBx,dBy);if(dA<25||dB<25)continue;
+    var s=dB/dA;if(s<ZOOM_SCALE_MIN||s>ZOOM_SCALE_MAX||Math.abs(Math.log(s))<ZOOM_MIN_LOG)continue;
+    if(Math.abs(Math.log(ci.s/s))>ZOOM_LEN_TOL||Math.abs(Math.log(cj.s/s))>ZOOM_LEN_TOL)continue;
+    var rot=Math.atan2(dBy,dBx)-Math.atan2(dAy,dAx);while(rot>Math.PI)rot-=2*Math.PI;while(rot<-Math.PI)rot+=2*Math.PI;
+    if(Math.abs(rot)>ZOOM_MAX_ROT)continue;
+    var tf0=fitSimilarityTransform([{x:fA[ci.a].cx,y:fA[ci.a].cy},{x:fA[cj.a].cx,y:fA[cj.a].cy}],[{x:fB[ci.b].cx,y:fB[ci.b].cy},{x:fB[cj.b].cx,y:fB[cj.b].cy}]);
+    if(!tf0)continue;
+    var sup=supportOf(tf0,s);if(sup.length<ZOOM_MIN_SUPPORT)continue;
+    hyps.push({tf:tf0,support:sup.length,members:sup,scale:s});
+  }
+  if(!hyps.length)return[];
+  hyps.sort(function(p,q){return q.support-p.support||0;});
+  var ub=unionBounds(fA),kept=[];
+  hyps.forEach(function(h){
+    if(kept.length>=ZOOM_MAX_HYPS)return;
+    // ré-ajustement sur les membres, puis absorption des candidats que la
+    // similitude ajustée prédit, un seul tour
+    var f1=fitOn(h.members);if(!f1)return;
+    var sup2=supportOf(f1.tf,f1.mag);var tf=f1.tf,mag=f1.mag,members=h.members;
+    if(sup2.length>=members.length){var f2=fitOn(sup2);if(f2){tf=f2.tf;mag=f2.mag;members=sup2;}}
+    if(kept.some(function(k){return _tfDist(tf,k.tf,ub)<tol;}))return;
+    kept.push({tf:tf,support:members.length,scale:mag,zoom:true,minAdopt:MM_MIN_SUPPORT,members:members});
+  });
+  _mlNote('hypothèses de zoom',{candidats:cands.length,brutes:hyps.length,retenues:kept.map(function(k){return{echelle:+k.scale.toFixed(2),support:k.support,membres:k.members.map(function(c){return _mlIdA(c.a)+'→'+_mlIdB(c.b);})};})});
+  return kept;
 }
 function multiMotionHypotheses(fA,fB,n,m,hist){
   if(n<6||m<6)return[];
