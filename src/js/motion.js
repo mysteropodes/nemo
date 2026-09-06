@@ -2849,6 +2849,13 @@
     renderLayerList(); renderTimeline();
   }
   function setValue(ld, prop, values) {
+    // Opacity v1 has one application write path. The legacy controls retain
+    // their existing pre-write history gesture, then hand their final value
+    // to the dispatcher; API-originated writes set the re-entrancy guard and
+    // land back here as the same Motion mutation.
+    if (prop === 'opacity' && window.SMApplication && !window.SMApplication.isDispatching()) {
+      return window.SMApplication.applyUiOpacity(ld, values);
+    }
     selectLayerForEdit(ld);
     if (isAnimated(ld, prop)) setKeyAtCurrentFrame(ld, prop, values);
     else { if (!ld.motionStatic) ld.motionStatic = {}; ld.motionStatic[prop] = values.slice(); }
@@ -13404,6 +13411,10 @@
     keyAt: keyAt,
     stopwatchTitle: stopwatchTitle,
     setKeyAtCurrentFrame: setKeyAtCurrentFrame,
+    // Application v1 needs the same key replacement/default-easing writer as
+    // the Motion UI, but at a caller-supplied frame. Keeping this export
+    // narrow prevents the application adapter from reconstructing tracks.
+    setKeyAtFrame: setKeyAtFrame,
     removeKeyAtCurrentFrame: removeKeyAtCurrentFrame,
     // The PRE-expression value of a property — the keyframed/static curve
     // an expression is overriding. The graph editor plots both (see
