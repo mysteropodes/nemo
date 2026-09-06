@@ -16,6 +16,7 @@ const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
+const { once } = require('node:events');
 const { finished } = require('node:stream/promises');
 const { isDeepStrictEqual } = require('node:util');
 const isolation = require('./isolation.cjs');
@@ -451,12 +452,7 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
 
   try {
     processInfo = spawnApp(config);
-    await new Promise((resolve, reject) => {
-      const failed = (err) => { processInfo.child.off('spawn', ready); reject(err); };
-      const ready = () => { processInfo.child.off('error', failed); resolve(); };
-      processInfo.child.once('error', failed);
-      processInfo.child.once('spawn', ready);
-    });
+    await once(processInfo.child, 'spawn');
     save({ state: 'active', childPid: processInfo.child.pid });
     const manifest = await waitForAppManifest(
       taskId,
