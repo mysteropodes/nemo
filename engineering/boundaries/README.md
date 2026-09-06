@@ -203,7 +203,7 @@ explicitly selected older profile; the checker never infers which Git revision i
 
 ## Adopted application coverage and size gate
 
-[`app-js.profile.json`](./profiles/app-js.profile.json) declares all 140 reviewed handwritten
+[`app-js.profile.json`](./profiles/app-js.profile.json) declares all 141 reviewed handwritten
 application sources. [`app-js.coverage.json`](./profiles/app-js.coverage.json) records the 12
 exact vendor/generated exclusions and their provenance. The application gate composes
 [`boundaries-discovery.cjs`](../../scripts/nemo/lib/boundaries-discovery.cjs),
@@ -225,3 +225,23 @@ not accepted exceptions, so the standard gate does not suppress or falsely certi
 The adopted gate enforces source coverage and no-growth size ceilings now. Reviewed target
 layers, public APIs, provider/consumer boundaries and parsed bootstrap/runtime readiness remain
 the explicit follow-up before the full graph rules can be enabled for application source.
+
+The R03 curve adoption adds `src/js/animation/curve.js` exactly once under the existing
+ordinary `App JS unclassified (pre-R01)` policy; it adds no size exception or exclusion.
+The original 140-source `app-js.baseline.json` seed and all existing ceilings remain unchanged.
+Coverage now contains 153 selected sources: 141 retained and the same 12 exclusions.
+
+Coverage provenance identifies the source snapshot used for derivation in `candidateCommit`;
+it is not a self-reference to the later metadata commit. Regenerate from that snapshot's
+independently enumerated JS-family paths, hash each path's actual bytes and Git blob, and
+hash the documented inventory serialization. Recompute source trees, bootstrap/profile pins,
+module and execution counts, and HTML load-site lines/ordinals from the same snapshot.
+Parse HTML script elements (including inline and vendor entries) in document order; the
+curve classic script precedes Motion. Keep CommonJS test contexts separate from document
+load sites. Preserve exclusion decisions/support pins and existing profile policies while
+refreshing derived values. The bounded derivation script and validation receipts are retained
+as ignored local evidence in `reports/r03-r05-coverage/`; they are not distributed source.
+
+This adoption remains a coverage and size gate. It does not establish target-layer/API
+classification, complete provider/consumer analysis, module readiness, or browser/Tauri
+workflow acceptance.

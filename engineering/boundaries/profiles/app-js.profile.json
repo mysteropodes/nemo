@@ -25,6 +25,18 @@
       ]
     },
     {
+      "id": "app.animation.curve",
+      "layer": "app-legacy",
+      "dir": "src/js/animation",
+      "files": [
+        "curve.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "curve.js"
+      ]
+    },
+    {
       "id": "app.asset.tree",
       "layer": "app-legacy",
       "dir": "src/js",
