@@ -460,8 +460,15 @@
     return Math.min(best,cap);
   }
   function distStats(a){if(!a.length)return null;var s=a.slice().sort(function(x,y){return x-y;});var mean=s.reduce(function(t,x){return t+x;},0)/s.length;return{n:s.length,mediane:+s[Math.floor(s.length/2)].toFixed(2),p90:+s[Math.floor(s.length*0.9)].toFixed(2),moyenne:+mean.toFixed(2)};}
-  function neutralEasing(){var prev={curve:state.easingCurve,tw:state.tweenEasing};state.easingCurve={points:[{x:0,y:0},{x:1,y:1}]};state.tweenEasing={};return prev;}
-  function restoreEasing(prev){state.easingCurve=prev.curve;state.tweenEasing=prev.tw;}
+  // Le moteur lit la courbe globale via window._curveEditor.evalCurve
+  // (getEasing dans tweens.js), PAS via state.easingCurve : neutraliser
+  // state.easingCurve seul ne change rien aux fichiers sans easing par
+  // portée (constaté le 2026-09-06 : les mesures « easing neutralisé »
+  // d'avant tournaient avec la courbe du fichier — comparaisons avant/après
+  // valables, lectures absolues de timing à reprendre). On remplace donc
+  // aussi evalCurve par l'identité, et on remet tout après.
+  function neutralEasing(){var ce=window._curveEditor;var prev={curve:state.easingCurve,tw:state.tweenEasing,ev:ce?ce.evalCurve:null};state.easingCurve={points:[{x:0,y:0},{x:1,y:1}]};state.tweenEasing={};if(ce)ce.evalCurve=function(t){return t;};return prev;}
+  function restoreEasing(prev){state.easingCurve=prev.curve;state.tweenEasing=prev.tw;if(window._curveEditor&&prev.ev)window._curveEditor.evalCurve=prev.ev;}
   B.holdout=async function(li,k1,k2,k3,opts){
     li=li===undefined?state.activeLayerIdx:li;opts=opts||{};
     var step=opts.step||4,tol=opts.tol||8,cap=opts.cap||128;
