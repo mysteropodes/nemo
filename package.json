@@ -33,6 +33,7 @@
   "license": "GPL-3.0-or-later",
   "type": "commonjs",
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tauri-apps/cli": "^2.11.4"
   }
 }

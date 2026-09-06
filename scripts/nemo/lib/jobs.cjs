@@ -154,13 +154,16 @@ function jobTestIntegration() {
   return (r.status === 0 ? pass : fail)(`node --test tests/integration: exit ${r.status}`, { exitCode: r.status, log: logOf(r) });
 }
 
-function jobTestBrowser() {
+function jobTestBrowser(ctx) {
   const runner = caps.resolvable('@playwright/test');
   if (!runner) return blocked('@playwright/test is not installed (not in devDependencies); browser workflows cannot run', { limitations: ['install is a dependency change owned by R07/R03, not done implicitly here'] });
   const dir = path.join(ROOT, 'tests', 'browser');
   if (!exists(dir) || !fs.readdirSync(dir).some((f) => /\.spec\.(c?js|mjs|ts)$/.test(f))) return notRun('runner present but no tests/browser/*.spec.* defined yet (R03 fixtures / R07 gates)');
   const bin = caps.localBin('playwright');
-  const r = run(bin || process.execPath, bin ? ['test', 'tests/browser'] : [runner, 'test', 'tests/browser'], { timeout: 60 * 60 * 1000 });
+  const output = path.join(ctx.reportDir, 'playwright-results');
+  const r = run(bin || process.execPath,
+    bin ? ['test', 'tests/browser', '--output', output] : [runner, 'test', 'tests/browser', '--output', output],
+    { timeout: 60 * 60 * 1000 });
   return (r.status === 0 ? pass : fail)(`playwright test tests/browser: exit ${r.status}`, { exitCode: r.status, log: logOf(r) });
 }
 
