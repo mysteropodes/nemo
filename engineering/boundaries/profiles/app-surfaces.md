@@ -8,6 +8,19 @@ profile to all **140 handwritten `src/js/**` files**. The R05 integration adopts
 reviewed profile bytes and the exact 12-file vendor/generated policy in the standard boundary
 lane. It changes no application source or `engineering/inventory/**` content.
 
+
+Current R06 integration adds two handwritten modules: the pure project validation
+helper [`project-document.js`](../../../src/js/project-document.js), loaded before
+`timeline.js`, and the presentation adapter
+[`project-entry.js`](../../../src/js/project-entry.js), loaded before `project.js`.
+The validator preserves the existing frame-only migration and rejects malformed
+layer/frame structures before document replacement. The adapter schedules Open/Resume
+repaint after canvas resize, with native-renderer and Paper fallbacks. Both enter the
+142-file profile with ordinary 400/500-line budgets; existing legacy ceilings remain
+unchanged. The counts and file table below are historical evidence for `c9ab634`.
+Current membership and bootstrap pins are in `app-js.coverage.json`; complete
+application architecture enforcement remains open.
+
 Scope: the application source the previous `scripts/nemo/**` increment
 ([`scripts-nemo.md`](./scripts-nemo.md)) explicitly excluded — `src/**`, `src-tauri/src/**`,
 `geometry-wasm/src/**`. This packet classifies every file in that scope into one of four

@@ -13,10 +13,11 @@ implemented with Node only (no new dependencies). Work package R02.
 | `npm run test:rust` | `cargo test` for `geometry-wasm` (CPU, native host). | 0/1/2 |
 | `npm run test:integration` | `tests/integration` when it exists; `not-run` until R12/R13 define it. | 0/1/2 |
 | `npm run test:browser` | Playwright specs under `tests/browser`; `blocked` while `@playwright/test` is absent. | 0/1/2 |
-| `npm run test:desktop` | Packaged-app harness under `tests/desktop`; `blocked` without a built `Nemo.app`. | 0/1/2 |
+| `npm run test:desktop` | Runs `tests/desktop/*.test.cjs` serially against `NEMO_DESKTOP_APP` or the local packaged app; required `blocked` without a package or harness; empty files and skipped tests fail. Native process/storage checks are separate from UI workflow acceptance. | 0/1/2 |
+| `npm run native -- start/status/stop ...` | Owner-controlled isolated native launcher. See [runtime isolation](../../engineering/runtime-isolation.md#native-app-launcher). | 0/1 |
 | `npm run bench` | `tests/bench/run.cjs` (R03): evaluation workloads on the real `motion.js` loaded whole in a vm sandbox, copy and memory workloads over the workload documents the fixture corpus generates (`tests/fixtures/lib/corpus.cjs`, hashes pinned in `tests/fixtures/manifest.json`), plus render/export workloads declared with the `export` fixture and recorded `not-run` without a WebGPU backend. Writes `bench.json` next to the receipt; records source, hardware and backend, sets no budget (R19). | 0/1/2 |
 | `npm run build:wasm` | `wasm-pack build` into the run directory and compare with the committed `src/wasm`; `blocked` without wasm-pack. | 0/1/2 |
-| `npm run build:desktop` | `tauri build -b app` for the host triple, then `scripts/bundle-ffmpeg-dylibs.py`. Local, unsigned. | 0/1/2 |
+| `npm run build:desktop` | Isolated Tauri build under a task/worktree reservation; preserves its exact package and logs in the report directory, bundles ffmpeg dylibs, then performs owned cleanup. Local, unsigned. | 0/1/2 |
 | `npm run verify` | Runs a profile (`--profile quick` default: doctor, check, inventory, test:unit, test:rust; `--profile full` adds the rest) or `--jobs a,b,c`, and emits **one receipt**. | 0 pass / 1 any fail / 2 required job blocked |
 
 Any job can be run alone: `node scripts/nemo/job.cjs test:rust,build:wasm`. Add `--json` to
@@ -57,7 +58,9 @@ sha256), `limitations[]`, `details`, and `summary` (`overall`, `exitCode`, `coun
   workstation or a user project.
 - Missing environment is `blocked` with the missing thing named. Nothing converts it to
   `pass`.
-- Builds write into the run directory (`build:wasm`) or the worktree's own `src-tauri/target`
-  (`build:desktop`); they never overwrite the committed `src/wasm` bundle.
+- Builds write into the run directory (`build:wasm`) or a fresh task's isolated Cargo
+  target (`build:desktop`); they never overwrite the committed `src/wasm` bundle.
+  A successful desktop build passes its preserved package to later desktop tests
+  in the same runner. Desktop build and test prerequisites are required when selected.
 - Historical counts are never treated as current proof: every receipt is bound to the SHA
   and dirty digest it was measured on.

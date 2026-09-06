@@ -412,6 +412,115 @@ test('simultaneous launcher registrations have exactly one persistent owner', as
   }
 });
 
+// ---- dead-task slot residue (slot records live outside every task root) ----
+
+// SIGKILL and wait until the pid is really gone, so a record naming it is
+// unambiguously dead rather than merely unresponsive.
+async function reap(child) {
+  child.kill('SIGKILL');
+  await waitForExit(child, 5000);
+  const deadline = Date.now() + 2000;
+  while (iso.pidAlive(child.pid) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(iso.pidAlive(child.pid), false);
+}
+
+// Take the slot legitimately (acquire refuses a dead pid, by design), then kill
+// the holder: the residue an interrupted run actually leaves behind.
+async function slotHeldByDeadPid(slot, task) {
+  const child = spawnDummyProcess();
+  const held = iso.acquireExclusiveSlot(slot, task, { pid: child.pid });
+  assert.equal(held.acquired, true);
+  await reap(child);
+  return held;
+}
+
+// A launcher registered against a process that is then killed: the "killed
+// launcher" state an authorized release has to clean up after.
+async function killedLauncher(task) {
+  const child = spawnDummyProcess();
+  const launcher = iso.registerLauncher(task, { pid: child.pid, label: 'killed-launcher' });
+  await reap(child);
+  return launcher;
+}
+
+test('killed launcher: the rightful owner reclaims its own dead slots and no one else\'s', async () => {
+  const task = 'slot-residue-own';
+  const launcher = await killedLauncher(task);
+  const mine = await slotHeldByDeadPid('residue-mine', task);
+  const theirs = await slotHeldByDeadPid('residue-theirs', 'slot-residue-other');
+
+  const released = iso.releaseTask(task, launcher.ownerToken);
+  assert.equal(released.released, true);
+  assert.deepEqual(released.slots.reconciled, ['residue-mine']);
+  assert.deepEqual(released.slots.retained, []);
+  assert.ok(released.slots.otherTasks >= 1, 'the other task\'s record must be counted, never inspected further');
+  assert.equal(fs.existsSync(mine.file), false, 'the dead task\'s own slot record must be gone');
+  assert.equal(fs.existsSync(theirs.file), true, 'another task\'s record must survive untouched');
+  assert.equal(JSON.parse(fs.readFileSync(theirs.file, 'utf8')).taskId, 'slot-residue-other');
+});
+
+test('release leaves live, malformed and self-inconsistent slot records exactly as found', async () => {
+  const task = 'slot-residue-retain';
+  const launcher = await killedLauncher(task);
+  const live = spawnDummyProcess();
+  try {
+    const held = iso.acquireExclusiveSlot('retain-live', task, { pid: live.pid });
+    const bad = await slotHeldByDeadPid('retain-malformed', task);
+    const wrongName = await slotHeldByDeadPid('retain-mismatch', task);
+    fs.writeFileSync(bad.file, JSON.stringify({ ...JSON.parse(fs.readFileSync(bad.file, 'utf8')), pid: 'not-a-pid' }));
+    fs.writeFileSync(wrongName.file, JSON.stringify({ ...JSON.parse(fs.readFileSync(wrongName.file, 'utf8')), slot: 'some-other-slot' }));
+
+    const released = iso.releaseTask(task, launcher.ownerToken);
+    assert.equal(released.released, true);
+    assert.deepEqual(released.slots.reconciled, []);
+    assert.equal(released.slots.retained.length, 3);
+    assert.match(released.slots.retained.map((r) => r.reason).join('|'), /holder still running/);
+    assert.match(released.slots.retained.map((r) => r.reason).join('|'), /malformed holder pid/);
+    assert.match(released.slots.retained.map((r) => r.reason).join('|'), /does not match its own filename/);
+    for (const file of [held.file, bad.file, wrongName.file]) assert.equal(fs.existsSync(file), true);
+    assert.equal(iso.acquireExclusiveSlot('retain-live', 'someone-else').acquired, false, 'a live holder keeps its slot');
+  } finally { live.kill('SIGKILL'); await waitForExit(live, 5000); }
+});
+
+test('a refused release reconciles nothing', async () => {
+  const task = 'slot-residue-refused';
+  const launcher = await killedLauncher(task);
+  const slot = await slotHeldByDeadPid('refused-slot', task);
+
+  const nonOwner = iso.releaseTask(task, 'not-the-owner-token');
+  assert.equal(nonOwner.released, false);
+  assert.equal(nonOwner.slots, undefined);
+  assert.equal(fs.existsSync(slot.file), true, 'a non-owner must not reclaim the task\'s slots');
+
+  assert.deepEqual(iso.releaseTask(task, launcher.ownerToken).slots.reconciled, ['refused-slot']);
+});
+
+test('reconciliation never bypasses an interrupted slot mutation guard', async () => {
+  const task = 'slot-residue-guarded';
+  const launcher = await killedLauncher(task);
+  const slot = await slotHeldByDeadPid('guarded-slot', task);
+
+  // Leave that one slot's guard behind exactly as a crashed mutation would.
+  const code = String.raw`
+    const fs = require('node:fs'); const write = fs.writeFileSync;
+    fs.writeFileSync = function(file, ...args) {
+      const result = write.call(this, file, ...args);
+      if (String(file).endsWith('owner.json')) { process.send('guard-held'); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 4000); }
+      return result;
+    };
+    require(process.argv[1]).acquireExclusiveSlot('guarded-slot', 'contender');
+  `;
+  const child = worker(code, [require.resolve('./lib/isolation.cjs')]);
+  try { assert.equal(await message(child), 'guard-held'); }
+  finally { child.kill('SIGKILL'); await waitForExit(child, 5000); }
+
+  const released = iso.releaseTask(task, launcher.ownerToken);
+  assert.equal(released.released, true, 'a wedged slot guard must not block releasing the task itself');
+  assert.deepEqual(released.slots.reconciled, []);
+  assert.deepEqual(released.slots.retained, [{ slot: 'guarded-slot', reason: 'slot mutation busy or interrupted; left for explicit reconciliation' }]);
+  assert.equal(fs.existsSync(slot.file), true);
+});
+
 test('an interrupted mutation stays closed until explicit reconciliation', async () => {
   const code = String.raw`
     const fs = require('node:fs'); const write = fs.writeFileSync;
@@ -428,4 +537,57 @@ test('an interrupted mutation stays closed until explicit reconciliation', async
   const attempt = iso.acquireExclusiveSlot('interrupted-slot', 'next');
   assert.equal(attempt.acquired, false);
   assert.match(attempt.reason, /busy or interrupted/);
+});
+
+test('owner-confirmed slots survive holder exit until a verified owned release', async () => {
+  const child = spawnDummyProcess();
+  const task = 'owner-confirmed-release';
+  const slot = 'owner-confirmed-slot';
+  const launcher = iso.registerLauncher(task, { pid: child.pid });
+  const held = iso.acquireExclusiveSlot(slot, task, { pid: child.pid, releasePolicy: 'owner-confirmed' });
+  try {
+    await reap(child);
+    assert.equal(iso.releaseExclusiveSlot(slot, held.ownerToken).released, false);
+    assert.equal(held.release({ verifyRelease: () => false }).released, false);
+    assert.equal(held.release({ verifyRelease() { throw new Error('unavailable'); } }).released, false);
+    assert.equal(iso.acquireExclusiveSlot(slot, 'contender').acquired, false);
+    assert.equal(iso.releaseTask(task, launcher.ownerToken).released, false);
+    assert.ok(fs.existsSync(iso.taskRoots(task).root));
+    assert.ok(iso.readLauncher(task), 'an unverified release preserves ownership');
+    assert.equal(iso.releaseTask(task, launcher.ownerToken, { releaseManagedSlots: true }).released, false);
+    assert.equal(iso.releaseTask(task, launcher.ownerToken, {
+      releaseManagedSlots: true, beforeRelease: () => false,
+    }).released, false);
+    assert.throws(() => iso.releaseTask(task, launcher.ownerToken, {
+      releaseManagedSlots: true, beforeRelease() { throw new Error('lifetime still active'); },
+    }), /lifetime still active/);
+    assert.equal(iso.acquireExclusiveSlot(slot, 'contender').acquired, false);
+    const record = JSON.parse(fs.readFileSync(held.file));
+    fs.writeFileSync(held.file, JSON.stringify({ ...record, releasePolicy: 'future-policy' }));
+    assert.equal(iso.acquireExclusiveSlot(slot, 'contender').acquired, false);
+    assert.equal(iso.releaseTask(task, launcher.ownerToken, {
+      releaseManagedSlots: true, beforeRelease: () => true,
+    }).released, false, 'an unknown lifetime policy requires reconciliation');
+    fs.writeFileSync(held.file, JSON.stringify(record));
+    let verified = false;
+    const result = iso.releaseTask(task, launcher.ownerToken, {
+      releaseManagedSlots: true, beforeRelease() { verified = true; return true; },
+    });
+    assert.equal(verified, true);
+    assert.equal(result.released, true);
+    assert.deepEqual(result.slots.reconciled, [slot]);
+    const successor = iso.acquireExclusiveSlot(slot, 'successor');
+    assert.equal(successor.acquired, true);
+    successor.release();
+  } finally {
+    await reap(child);
+    held.release();
+  }
+});
+
+test('unknown slot release policies cannot silently gain automatic reclamation', () => {
+  assert.throws(() => iso.acquireExclusiveSlot('bad-policy', 'bad-policy', { releasePolicy: 'unknown' }), /release policy/);
+  const held = iso.acquireExclusiveSlot('verified-direct', 'verified-direct', { releasePolicy: 'owner-confirmed' });
+  assert.equal(held.release().released, false);
+  assert.equal(held.release({ verifyRelease: () => true }).released, true);
 });

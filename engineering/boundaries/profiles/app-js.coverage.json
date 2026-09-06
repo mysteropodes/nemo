@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy sources and the extracted animation domain kernel. Whole-application graph adoption remains separate.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files and a project-document validator and project-entry presentation adapter. Complete architecture boundaries remain a separate gate.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -19,30 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "e5d2868ee3dec628ce48a300fd1afb2349445deb",
-    "sourceRootTree": "45e0fb59566f352f2101cabc158921d9defe916b",
+    "candidateCommit": "b4a1b3ca81ab997d0d582dcfbfcbfbad5af8059d",
+    "sourceRootTree": "cd7230618d16d751063fd771aaa01ce6245bd3d7",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "104fa8337ee52ec5b38717151556e3ce446e5680",
-      "lastChangedCommit": "cf4a5731cec716674f1a3c21fbab5808cb251311"
+      "gitTree": "facbe03a23588fa1834674b037706afc82221a45",
+      "lastChangedCommit": "b4a1b3ca81ab997d0d582dcfbfcbfbad5af8059d"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "5176c7a71ce55a95ce55697c05ca65895be36cb8",
-      "sha256": "2d938b9154e214e07864903e23e2036e617dea180e857be95a8a258ee3185fd1",
-      "lastChangedCommit": "2fa4f0595303dcf9d850e8bc4efbb8093aa56048"
+      "gitBlob": "674599af5b3b28d04e0adb2df40a6c1c1e93912b",
+      "sha256": "f430737e5e2310c46b41703980200215ef563a078f0c771a77d4c934088cd98d",
+      "lastChangedCommit": "455d44fafe0cccaa12f14ff01481d119d523c2d2"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "2b9d4834d61297770c420c8e3625c8481d5a56734448a51c8f594792ae99709d"
+      "value": "a440f2018c58d0f4f0059404e245f77b95c745bb40aa9d134c9ba2059fb2270f"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "49115d324f8adbfa3c52cf8b8e98ff06cf50f90b",
-        "sha256": "9437672f6b7b187b77c3ecdf03675cf0e119fb38ce826f0cc5053624f9eb1481",
-        "moduleCount": 141
+        "gitBlob": "45dc4863ed1f2d5adff44e69ae548a4624a5fee1",
+        "sha256": "c469ee0a51eea2d4c9a49442ff8bfff1c97fb5baf293ba38b3359ed392cd5657",
+        "moduleCount": 142,
+        "basedOnCommit": "6ca24e4bd7060c2806519358da6c4754b3f7e640"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -120,13 +121,13 @@
   "bootstrapObservations": {
     "path": "src/index.html",
     "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
-    "totalScriptTags": 132,
-    "externalClassicTags": 129,
+    "totalScriptTags": 134,
+    "externalClassicTags": 131,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 125,
+    "retainedClassicTags": 127,
     "retainedModuleTags": 2,
-    "classicTagsUnderSrcJsIncludingVendors": 128,
+    "classicTagsUnderSrcJsIncludingVendors": 130,
     "inlineScripts": [
       {
         "path": "src/index.html",
@@ -134,7 +135,7 @@
         "scriptOrdinal": 3
       }
     ],
-    "orderingLimit": "Module tags 108 and 109 do not establish synchronous readiness before classic engine-bridge.js at tag 110. HTML order is not a complete global provider/consumer graph.",
+    "orderingLimit": "Module tags do not establish synchronous readiness before the later classic engine-bridge.js tag. HTML order is not a complete global provider/consumer graph.",
     "runtimeLimit": "Source-declared sites, not observed successful execution: gpu-gate.js may stop boot. No browser/Tauri/runtime acceptance is claimed.",
     "noLoadSiteAudit": {
       "scope": "All committed HTML and src JS-family sources at candidateCommit: local script URLs, imports, worker constructors and script injection inspected; Node test consumers are separate evidence.",
@@ -211,8 +212,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2439,
-          "scriptOrdinal": 118
+          "line": 2440,
+          "scriptOrdinal": 119
         }
       ]
     },
@@ -225,18 +226,6 @@
           "path": "src/index.html",
           "line": 2312,
           "scriptOrdinal": 18
-        }
-      ]
-    },
-    {
-      "path": "src/js/animation/curve.js",
-      "moduleId": "app.animation.curve",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2358,
-          "scriptOrdinal": 55
         }
       ]
     },
@@ -259,8 +248,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2425,
-          "scriptOrdinal": 104
+          "line": 2426,
+          "scriptOrdinal": 105
         }
       ]
     },
@@ -271,8 +260,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2429,
-          "scriptOrdinal": 108
+          "line": 2430,
+          "scriptOrdinal": 109
         }
       ]
     },
@@ -295,8 +284,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2440,
-          "scriptOrdinal": 119
+          "line": 2441,
+          "scriptOrdinal": 120
         }
       ]
     },
@@ -307,8 +296,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2441,
-          "scriptOrdinal": 120
+          "line": 2442,
+          "scriptOrdinal": 121
         }
       ]
     },
@@ -343,8 +332,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2442,
-          "scriptOrdinal": 121
+          "line": 2443,
+          "scriptOrdinal": 122
         }
       ]
     },
@@ -379,8 +368,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2356,
-          "scriptOrdinal": 53
+          "line": 2357,
+          "scriptOrdinal": 54
         }
       ]
     },
@@ -439,8 +428,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2444,
-          "scriptOrdinal": 123
+          "line": 2445,
+          "scriptOrdinal": 124
         }
       ]
     },
@@ -487,8 +476,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2432,
-          "scriptOrdinal": 111
+          "line": 2433,
+          "scriptOrdinal": 112
         }
       ]
     },
@@ -499,8 +488,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2449,
-          "scriptOrdinal": 128
+          "line": 2450,
+          "scriptOrdinal": 129
         }
       ]
     },
@@ -586,8 +575,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2410,
-          "scriptOrdinal": 92
+          "line": 2411,
+          "scriptOrdinal": 93
         }
       ]
     },
@@ -598,8 +587,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2424,
-          "scriptOrdinal": 103
+          "line": 2425,
+          "scriptOrdinal": 104
         }
       ]
     },
@@ -610,8 +599,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2451,
-          "scriptOrdinal": 130
+          "line": 2452,
+          "scriptOrdinal": 131
         }
       ]
     },
@@ -622,8 +611,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2430,
-          "scriptOrdinal": 109
+          "line": 2431,
+          "scriptOrdinal": 110
         }
       ]
     },
@@ -646,8 +635,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2437,
-          "scriptOrdinal": 116
+          "line": 2438,
+          "scriptOrdinal": 117
         }
       ]
     },
@@ -658,8 +647,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2445,
-          "scriptOrdinal": 124
+          "line": 2446,
+          "scriptOrdinal": 125
         }
       ]
     },
@@ -670,8 +659,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2411,
-          "scriptOrdinal": 93
+          "line": 2412,
+          "scriptOrdinal": 94
         }
       ]
     },
@@ -682,8 +671,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2353,
-          "scriptOrdinal": 50
+          "line": 2354,
+          "scriptOrdinal": 51
         }
       ]
     },
@@ -706,8 +695,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2420,
-          "scriptOrdinal": 99
+          "line": 2421,
+          "scriptOrdinal": 100
         }
       ]
     },
@@ -718,8 +707,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2419,
-          "scriptOrdinal": 98
+          "line": 2420,
+          "scriptOrdinal": 99
         }
       ]
     },
@@ -730,8 +719,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2414,
-          "scriptOrdinal": 96
+          "line": 2415,
+          "scriptOrdinal": 97
         }
       ]
     },
@@ -742,8 +731,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2413,
-          "scriptOrdinal": 95
+          "line": 2414,
+          "scriptOrdinal": 96
         }
       ]
     },
@@ -1294,8 +1283,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2354,
-          "scriptOrdinal": 51
+          "line": 2355,
+          "scriptOrdinal": 52
         }
       ]
     },
@@ -1366,8 +1355,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2426,
-          "scriptOrdinal": 105
+          "line": 2427,
+          "scriptOrdinal": 106
         }
       ]
     },
@@ -1390,8 +1379,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2428,
-          "scriptOrdinal": 107
+          "line": 2429,
+          "scriptOrdinal": 108
         }
       ]
     },
@@ -1498,8 +1487,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2452,
-          "scriptOrdinal": 131
+          "line": 2453,
+          "scriptOrdinal": 132
         }
       ]
     },
@@ -1510,8 +1499,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2435,
-          "scriptOrdinal": 114
+          "line": 2436,
+          "scriptOrdinal": 115
         }
       ]
     },
@@ -1522,8 +1511,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2434,
-          "scriptOrdinal": 113
+          "line": 2435,
+          "scriptOrdinal": 114
         }
       ]
     },
@@ -1534,8 +1523,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2409,
-          "scriptOrdinal": 91
+          "line": 2410,
+          "scriptOrdinal": 92
         }
       ]
     },
@@ -1546,8 +1535,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2423,
-          "scriptOrdinal": 102
+          "line": 2424,
+          "scriptOrdinal": 103
         }
       ]
     },
@@ -1582,8 +1571,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2453,
-          "scriptOrdinal": 132
+          "line": 2454,
+          "scriptOrdinal": 133
         }
       ]
     },
@@ -1594,8 +1583,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2421,
-          "scriptOrdinal": 100
+          "line": 2422,
+          "scriptOrdinal": 101
         }
       ]
     },
@@ -1618,8 +1607,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2450,
-          "scriptOrdinal": 129
+          "line": 2451,
+          "scriptOrdinal": 130
         }
       ]
     },
@@ -1630,8 +1619,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2433,
-          "scriptOrdinal": 112
+          "line": 2434,
+          "scriptOrdinal": 113
         }
       ]
     },
@@ -1642,8 +1631,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2446,
-          "scriptOrdinal": 125
+          "line": 2447,
+          "scriptOrdinal": 126
         }
       ]
     },
@@ -1666,8 +1655,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2443,
-          "scriptOrdinal": 122
+          "line": 2444,
+          "scriptOrdinal": 123
         }
       ]
     },
@@ -1678,8 +1667,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2448,
-          "scriptOrdinal": 127
+          "line": 2449,
+          "scriptOrdinal": 128
         }
       ]
     },
@@ -1726,8 +1715,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2447,
-          "scriptOrdinal": 126
+          "line": 2448,
+          "scriptOrdinal": 127
         }
       ]
     },
@@ -1738,8 +1727,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2355,
-          "scriptOrdinal": 52
+          "line": 2356,
+          "scriptOrdinal": 53
         }
       ]
     },
@@ -1750,8 +1739,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2436,
-          "scriptOrdinal": 115
+          "line": 2437,
+          "scriptOrdinal": 116
         }
       ]
     },
@@ -1762,8 +1751,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2422,
-          "scriptOrdinal": 101
+          "line": 2423,
+          "scriptOrdinal": 102
         }
       ]
     },
@@ -1786,8 +1775,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2357,
-          "scriptOrdinal": 54
+          "line": 2358,
+          "scriptOrdinal": 55
         }
       ],
       "additionalContexts": [
@@ -1825,8 +1814,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2352,
-          "scriptOrdinal": 49
+          "line": 2353,
+          "scriptOrdinal": 50
         }
       ]
     },
@@ -1885,8 +1874,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2427,
-          "scriptOrdinal": 106
+          "line": 2428,
+          "scriptOrdinal": 107
         }
       ]
     },
@@ -1897,8 +1886,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2454,
-          "scriptOrdinal": 133
+          "line": 2455,
+          "scriptOrdinal": 134
         }
       ]
     },
@@ -1933,8 +1922,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2412,
-          "scriptOrdinal": 94
+          "line": 2413,
+          "scriptOrdinal": 95
         }
       ]
     },
@@ -1969,8 +1958,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2431,
-          "scriptOrdinal": 110
+          "line": 2432,
+          "scriptOrdinal": 111
         }
       ]
     },
@@ -1992,8 +1981,32 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2438,
-          "scriptOrdinal": 117
+          "line": 2439,
+          "scriptOrdinal": 118
+        }
+      ]
+    },
+    {
+      "path": "src/js/project-entry.js",
+      "moduleId": "app.project.entry",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2409,
+          "scriptOrdinal": 91
+        }
+      ]
+    },
+    {
+      "path": "src/js/project-document.js",
+      "moduleId": "app.project.document",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2352,
+          "scriptOrdinal": 49
         }
       ]
     }
@@ -2056,8 +2069,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2417,
-          "scriptOrdinal": 96
+          "line": 2419,
+          "scriptOrdinal": 98
         }
       ]
     },
@@ -2085,8 +2098,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2393,
-          "scriptOrdinal": 75
+          "line": 2394,
+          "scriptOrdinal": 76
         }
       ]
     },
@@ -2457,21 +2470,21 @@
     }
   ],
   "snapshotCounts": {
-    "selectedSources": 153,
+    "selectedSources": 154,
     "bySourceKind": {
-      ".js": 147,
+      ".js": 148,
       ".mjs": 2,
       ".cjs": 0,
       ".ts": 4
     },
-    "retainedSources": 141,
+    "retainedSources": 142,
     "exclusions": 12,
     "vendorExclusions": 6,
     "generatedExclusions": 6,
     "retainedExecutionClasses": {
-      "classic-without-load-site": 12,
-      "document-classic": 126,
+      "document-classic": 127,
       "document-module": 2,
+      "classic-without-load-site": 12,
       "module-worker": 1
     }
   },
@@ -2487,7 +2500,7 @@
     "scriptOrderHelper": "Use pinned HTML bytes and actual tag attributes. retainedSources[].loadSites records scriptOrdinal only for actual document entries. Worker/import edges and additional Node test contexts are separate from document parser order.",
     "requiredChecks": [
       "Fresh committed inventory equals the disjoint union of retainedSources paths and exact exclusions, each occurring once. Reject new, missing, aliased or duplicate sources.",
-      "Retained paths and module IDs equal unchanged profile membership exactly.",
+      "Retained paths and module IDs equal reviewed profile membership exactly.",
       "Every exclusion exists as a selected regular source and retains justified provenance; verify artifact hashes and review changes.",
       "Reconcile source/index/profile provenance and loader evidence on the actual integration candidate; snapshot counts do not replace fresh discovery."
     ],

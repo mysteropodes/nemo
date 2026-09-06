@@ -80,6 +80,97 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install locked Node dependencies
+        run: npm ci
+      - name: Install the locked Playwright browser
+        run: npx playwright install chromium
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Refresh Homebrew formula metadata
+        run: brew update
+      - name: Install the packaged sidecar's runtime dylibs
+        run: |
+          brew install nasm libvmaf openjpeg opus lame libvpx webp libass \
+            freetype fontconfig theora libvorbis snappy aom zimg svt-av1 harfbuzz
+      - name: Provision FFmpeg for native tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Match the shipped sidecar's FFmpeg major while using a Sonoma
+          # bottle whose dylibs and deployment target belong to this runner.
+          brew install ffmpeg@8
+          ffmpeg_path="$(brew --prefix ffmpeg@8)/bin/ffmpeg"
+          if [[ ! -x "$ffmpeg_path" ]]; then
+            echo "::error::ffmpeg@8 did not provide an executable at $ffmpeg_path"
+            exit 1
+          fi
+          "$ffmpeg_path" -hide_banner -version
+
+          encoders="$("$ffmpeg_path" -hide_banner -encoders 2>/dev/null)"
+          decoders="$("$ffmpeg_path" -hide_banner -decoders 2>/dev/null)"
+          filters="$("$ffmpeg_path" -hide_banner -filters 2>/dev/null)"
+          require_capability() {
+            local kind="$1" name="$2" inventory="$3"
+            if ! awk -v name="$name" '$2 == name { found = 1 } END { exit !found }' <<<"$inventory"; then
+              echo "::error::FFmpeg is missing required $kind: $name"
+              exit 1
+            fi
+          }
+          # The hosted macOS VM exposes VideoToolbox encoder names but cannot
+          # create their hardware sessions. Keep the H.264/HEVC decode matrix
+          # deterministic there with this test-only GPL Homebrew executable;
+          # the shipped LGPL sidecar and export policy are not replaced.
+          for encoder in libx264 libx265 libvpx-vp9 prores_ks mjpeg rawvideo; do
+            require_capability encoder "$encoder" "$encoders"
+          done
+          for decoder in h264 hevc vp9 prores mjpeg rawvideo; do
+            require_capability decoder "$decoder" "$decoders"
+          done
+          for filter in testsrc2 format colorchannelmixer scale; do
+            require_capability filter "$filter" "$filters"
+          done
+
+          # Listing an encoder does not prove that its runtime is usable on
+          # this hosted machine. Exercise the fixture formats before Cargo so
+          # missing frameworks, dylibs, or encoders fail at this named step.
+          smoke_dir="$(mktemp -d)"
+          trap 'rm -rf "$smoke_dir"' EXIT
+          smoke_codec() {
+            local output="$1" input="$2"
+            shift 2
+            "$ffmpeg_path" -y -v error \
+              -f lavfi -i "$input" \
+              -frames:v 1 "$@" "$smoke_dir/$output"
+            "$ffmpeg_path" -y -v error -i "$smoke_dir/$output" \
+              -frames:v 1 -pix_fmt rgba -f rawvideo "$smoke_dir/$output.rgba"
+            test -s "$smoke_dir/$output.rgba"
+          }
+          testsrc='testsrc2=size=320x240:rate=1:duration=1'
+          smoke_codec h264.mp4 "$testsrc" -c:v libx264 -pix_fmt yuv420p -g 1
+          smoke_codec hevc.mp4 "$testsrc" -c:v libx265 -pix_fmt yuv420p -g 1 -tag:v hvc1
+          smoke_codec vp9.webm "$testsrc" -c:v libvpx-vp9 -pix_fmt yuv420p -g 1
+          smoke_codec prores.mov "$testsrc,format=rgba,colorchannelmixer=aa=0.5" \
+            -c:v prores_ks -profile:v 4 -pix_fmt yuva444p10le
+
+          # Mirror the module's stdin/stdout sentinel path as well as its
+          # file-based fixture paths.
+          "$ffmpeg_path" -v error -f lavfi -i "$testsrc" \
+            -frames:v 1 -pix_fmt rgba -f rawvideo - | \
+            "$ffmpeg_path" -y -v error -f rawvideo -pix_fmt rgba -s 320x240 -i - \
+              -frames:v 1 -c:v mjpeg -q:v 3 -f mjpeg "$smoke_dir/sentinel.mjpeg"
+          test -s "$smoke_dir/sentinel.mjpeg"
+          "$ffmpeg_path" -v error -f mjpeg -i - -frames:v 1 \
+            -pix_fmt rgba -f rawvideo "$smoke_dir/sentinel.rgba" \
+            < "$smoke_dir/sentinel.mjpeg"
+          test -s "$smoke_dir/sentinel.rgba"
+
+          echo "NEMO_TEST_FFMPEG_PATH=$ffmpeg_path" >> "$GITHUB_ENV"
+          echo "NEMO_TEST_H264_ENCODER=libx264" >> "$GITHUB_ENV"
+          echo "NEMO_TEST_HEVC_ENCODER=libx265" >> "$GITHUB_ENV"
       - run: node scripts/nemo/ci.cjs surfaces
       - uses: actions/upload-artifact@v4
         if: always()
