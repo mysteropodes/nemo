@@ -442,6 +442,31 @@ var TW_PIN_IN_SOLVER=true;
 //     (0,30 + 0,50) : à revoir si ces poids changent.
 var TW_ID_PINS=true;
 var ID_PIN_LEN_RATIO=2.0,ID_PIN_TRAVEL_K=3.0,ID_PIN_MIN=3,ID_PIN_SPAN_RATIO=1.6,ID_PIN_SHAPE_MAX=0.5;
+// Épingles d'identité : tout ou rien AUSSI au niveau des filtres géométriques.
+// Le filtre 4 rend la portée tout-ou-rien sur le COÛT, mais rien n'empêchait
+// jusqu'ici qu'une identité vraie soit écartée par le filtre de longueur pendant
+// que sa voisine, elle, était épinglée. Cas mesuré sur cats_anim 6→16 : le petit
+// trait du museau (L16 → L41, rapport 2,56 > 2) voit son épingle refusée, celle
+// de son voisin passe et lui prend sa cible ; le museau de la clé B se retrouve
+// sans partenaire (apparition ex nihilo) et le petit trait est recollé sur un
+// morceau d'un trait du corps 100 px plus bas. C'est exactement le « hybride
+// pire que rien » déjà constaté sur le rapport de coût. Quand une identité
+// unique est écartée par un filtre géométrique, on abandonne donc toutes les
+// épingles de la portée et on laisse la géométrie décider seule.
+//
+// Mesuré sur les 7 fichiers de test, 16 portées. Douze ne bougent pas : aucune
+// identité n'y est écartée, les épingles s'appliquent comme avant. Les quatre
+// autres (paires, fondus, découpes, croisements de trajectoires, trajet max) :
+//   cats 6→16      25p 3f 2s  5x 173px  ->  25p 2f 0s  8x 154px
+//   untitled3 6→16 27p 1f 6s  8x 173px  ->  25p 2f 0s  8x 154px
+//   traits 0→12    15p 1f 4s  2x 312px  ->  15p 0f 2s  0x 133px
+//   totale 0→6     24p 1f 2s 201x 408px ->  24p 0f 0s 195x 408px
+// Les découpes tombent partout, le trajet maximum baisse ou reste égal, les
+// fondus baissent sauf sur untitled3 (1→2). Seul contre-exemple : les
+// croisements de cats 6→16 montent de 5 à 8 — comptés sur les centroïdes, ils
+// pénalisent des moustaches qui se croisent sans que ce soit visible ; le rendu
+// de l'image 8, lui, perd le trait parasite sous le museau. 70/70 tests passent.
+var TW_ID_PIN_ALL_OR_NONE=true;
 // TW_ARC_FROM_CHAIN (2026-09-05, Cyril : « une main va parcourir un chemin
 // courbe, si on déduit la courbe par rapport à toutes les keyframes… on
 // n'aurait plus des tweens sur un chemin linéaire »). Le centroïde de
@@ -5515,7 +5540,7 @@ function _identityPins(sA,sB,forcedAIdx,forcedBIdx){
   var aById={},aDup={},bById={},bDup={};
   sA.forEach(function(sd,ii){var id=_origIdOf(sd);if(_engineMadeId(id))return;if(aById[id]!==undefined)aDup[id]=1;else aById[id]=ii;});
   sB.forEach(function(sd,jj){var id=_origIdOf(sd);if(_engineMadeId(id))return;if(bById[id]!==undefined)bDup[id]=1;else bById[id]=jj;});
-  var cand=[];
+  var cand=[],geomRejected=0;
   Object.keys(aById).forEach(function(id){
     if(aDup[id]||bDup[id]||bById[id]===undefined)return;
     var ai=aById[id],bi=bById[id];
@@ -5526,12 +5551,15 @@ function _identityPins(sA,sB,forcedAIdx,forcedBIdx){
        (fa.strokeCol&&fb.strokeCol&&colorDist(fa.strokeCol,fb.strokeCol)>0.35))return;
     // filtre 1 : longueurs
     var lr=Math.max(fa.length,fb.length)/Math.max(1,Math.min(fa.length,fb.length));
-    if(lr>ID_PIN_LEN_RATIO)return;
+    if(lr>ID_PIN_LEN_RATIO){geomRejected++;return;}
     // filtre 0 : forme (voir ID_PIN_SHAPE_MAX)
-    if(axisPenaltyPair(fa.elong,fb.elong)>ID_PIN_SHAPE_MAX)return;
+    if(axisPenaltyPair(fa.elong,fb.elong)>ID_PIN_SHAPE_MAX){geomRejected++;return;}
     cand.push({a:ai,b:bi,ax:fa.cx,ay:fa.cy,bx:fb.cx,by:fb.cy,
                d:Math.sqrt((fb.cx-fa.cx)*(fb.cx-fa.cx)+(fb.cy-fa.cy)*(fb.cy-fa.cy))});
   });
+  // voir TW_ID_PIN_ALL_OR_NONE : une identité vraie écartée par la géométrie
+  // invalide toute la portée, sinon on applique une identité à moitié.
+  if(TW_ID_PIN_ALL_OR_NONE&&geomRejected>0)return out;
   if(cand.length<ID_PIN_MIN)return out;
   // filtre 4 : tout ou rien sur la portée (voir ID_PIN_SPAN_RATIO)
   var featB=sB.map(function(sd){return strokeFeat(sd);});
