@@ -690,6 +690,21 @@ var TW_SPLIT_BACK_RELATIVE=true,SPLIT_BACK_MARGIN=0.15;
 // reste refusé ; avec, le morceau coupé au point de contact (jonction en T
 // comprise) revient de 0 au bord et passe. Actif.
 var TW_SPLIT_JUNCTION_CUT=true,SPLIT_JUNCTION_MAX=24;
+// ---- SCISSION : COUPE PAR CORRESPONDANCE (image 14 « bizarre au menton ») ----
+// La jonction est projetée depuis B sur le trait de A ; quand la tête a bougé
+// entre les clés, elle tombe à côté (110 px trop loin sur le menton, et le
+// bout du morceau nez-bouche glisse le long du menton toute la portée). Ici :
+// les parties de B sont mises bout à bout dans l'ordre, un DTW aligne ce
+// chemin sur le trait fusionné (il porte sa propre similitude, donc le
+// déplacement ne le trompe pas), et la frontière entre parties se lit sur A à
+// l'indice où la fraction de B franchit la frontière. Troisième coupe
+// candidate, évaluée en premier.
+// MESURÉ (2026-09-06) : sur la tête, la coupe DTW tombe à 0,472 du trait
+// (jonction projetée : 0,292 ; prorata : 0,104), morceaux à 0,13 et 0,09 contre
+// 0,23 et 0,15 ; le bout du morceau nez-bouche glisse de 60 px vers la lèvre
+// au lieu de 110 px le long du menton. Onze autres fichiers identiques,
+// vérité terrain et extrémités inchangées. Actif, évalué en premier.
+var TW_SPLIT_DTW_CUT=true;
 // Retour en arrière d'un trait, mesuré sur sa COURBE échantillonnée (60 points
 // sur le chemin Paper), pas sur ses ancres : un menton à 4 ancres ne revient
 // jamais en arrière par ses ancres, alors que sa courbe si — et le morceau
@@ -5337,6 +5352,38 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
         mpJ.remove();
         if(okJ&&frJ.length===ordered.length-1)cutSets.unshift(frJ); // la jonction d'abord, le prorata en repli
       }
+      if(TW_SPLIT_DTW_CUT&&ordered.length>=2){
+        // chemin des parties bout à bout (orientées pour se suivre), en polyligne Paper
+        var chain=[],prevEnd=null,partLens=[];
+        for(var od=0;od<ordered.length;od++){
+          var pd=sParts[ordered[od].idx],ppath=buildTPFeat(pd),plen=ppath.length,K=Math.max(8,Math.round(plen/6)),ptsD=[];
+          for(var kd=0;kd<=K;kd++){var qd=ppath.getPointAt(plen*kd/K);if(qd)ptsD.push([qd.x,qd.y]);}
+          ppath.remove();if(ptsD.length<2)continue;
+          if(prevEnd){var d0=Math.hypot(ptsD[0][0]-prevEnd[0],ptsD[0][1]-prevEnd[1]),d1=Math.hypot(ptsD[ptsD.length-1][0]-prevEnd[0],ptsD[ptsD.length-1][1]-prevEnd[1]);if(d1<d0)ptsD.reverse();}
+          else if(ordered.length>1){ // première partie : orienter vers la suivante
+            var nx=sParts[ordered[1].idx],npath=buildTPFeat(nx),nc=npath.getPointAt(npath.length/2);npath.remove();
+            if(nc){var e0=Math.hypot(ptsD[0][0]-nc.x,ptsD[0][1]-nc.y),e1=Math.hypot(ptsD[ptsD.length-1][0]-nc.x,ptsD[ptsD.length-1][1]-nc.y);if(e0<e1)ptsD.reverse();}
+          }
+          ptsD.forEach(function(q){chain.push(q);});prevEnd=ptsD[ptsD.length-1];partLens.push(plen);
+        }
+        if(chain.length>=4&&partLens.length===ordered.length){
+          var pc=new Path({insert:false});chain.forEach(function(q){pc.add(new Point(q[0],q[1]));});
+          var mpD=buildTPFeat(sMerged[mi2]);
+          var dtwC=null;try{dtwC=_dtwCorrespondence(mpD,mpD.length,pc,pc.length,120);}catch(eD){dtwC=null;}
+          mpD.remove();pc.remove();
+          if(dtwC){
+            var totalC=partLens.reduce(function(a,b){return a+b;},0),frD=[],accD=0,okD=true,prevD=0;
+            for(var bd=0;bd<partLens.length-1;bd++){
+              accD+=partLens[bd];var bound=accD/totalC,idx=-1;
+              for(var q2=0;q2<dtwC.fracB.length;q2++){if(dtwC.fracB[q2]>=bound){idx=q2;break;}}
+              if(idx<0){okD=false;break;}
+              var fD=dtwC.fracA[idx];if(fD<=prevD+0.03||fD>0.97){okD=false;break;}
+              frD.push(fD);prevD=fD;
+            }
+            if(okD&&frD.length===ordered.length-1)cutSets.unshift(frD);
+          }
+        }
+      }
       var bestEval=null;
       for(var cs=0;cs<cutSets.length;cs++){
       var frC=cutSets[cs];
@@ -5398,11 +5445,12 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
       }
       if(!ok)continue;
       var avgC=scores.reduce(function(a,b){return a+b;},0)/scores.length;
-      if(!bestEval||avgC<bestEval.avg)bestEval={pieces:pieces,scores:scores,avg:avgC,coupe:cs===0&&cutSets.length>1?'jonction':'prorata'};
+      var coupeNom=(cs===cutSets.length-1)?'prorata':(TW_SPLIT_DTW_CUT&&cs===0&&cutSets.length===3)?'dtw':(cutSets.length===2&&cs===0)?(TW_SPLIT_DTW_CUT&&!(TW_SPLIT_JUNCTION_CUT)?'dtw':'jonction ou dtw'):'jonction';
+      if(!bestEval||avgC<bestEval.avg)bestEval={pieces:pieces,scores:scores,avg:avgC,coupe:coupeNom,fr:frC.map(function(x){return +x.toFixed(3);})};
       }
       if(!bestEval)continue;
       var pieces=bestEval.pieces,scores=bestEval.scores,avg=bestEval.avg;
-      _mlNote('scission : coupe retenue',{coupe:bestEval.coupe,scores:scores.map(function(x){return +x.toFixed(3);})});
+      _mlNote('scission : coupe retenue',{coupe:bestEval.coupe,fractions:bestEval.fr,scores:scores.map(function(x){return +x.toFixed(3);}),candidats:cutSets.length});
       var baseline=cand.map(function(i){return(curPair&&(mergedSide==='B'?curPair.aIdx:curPair.bIdx)===i)?curPair.score:0.95;});
       var baseAvg=baseline.reduce(function(a,b){return a+b;},0)/baseline.length;
       if(avg>=baseAvg-0.03)continue;
