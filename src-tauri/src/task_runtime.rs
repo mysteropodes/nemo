@@ -20,6 +20,8 @@
 //   * WKWebView's localStorage/IndexedDB do NOT live under those directories;
 //     they follow the webview's data store, so an isolated window is built with
 //     an explicit `data_store_identifier` (macOS >= 14 / iOS >= 17).
+//     Isolated macOS startup is refused below 14 before Tauri is initialized:
+//     Wry would otherwise silently fall back to the shared default store.
 //
 // Isolation is OFF unless `NEMO_TAURI_DATA_DIR` is set: with that variable
 // absent nothing here changes a single resolved path, and the production app
@@ -136,6 +138,40 @@ fn epoch_millis() -> u128 {
         .unwrap_or(0)
 }
 
+/// Match Wry's native version check before it can fall back to the default
+/// persistent store. NSProcessInfo needs no application or WebKit instance.
+#[cfg(target_os = "macos")]
+fn supports_isolated_webkit_store() -> bool {
+    use objc::runtime::Object;
+    use objc::{class, msg_send, sel, sel_impl};
+
+    #[repr(C)]
+    struct OperatingSystemVersion {
+        major: isize,
+        _minor: isize,
+        _patch: isize,
+    }
+
+    // SAFETY: Foundation declares operatingSystemVersion (macOS 10.10+) as
+    // three NSInteger fields, which are isize on macOS. The existing objc
+    // crate selects the struct-return ABI for both Intel and Apple Silicon.
+    // processInfo is a borrowed singleton, used only for this synchronous read.
+    unsafe {
+        let info: *mut Object = msg_send![class!(NSProcessInfo), processInfo];
+        if info.is_null() {
+            return false;
+        }
+        let version: OperatingSystemVersion = msg_send![info, operatingSystemVersion];
+        version.major >= 14
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn supports_isolated_webkit_store() -> bool {
+    // This guard changes only macOS startup; other platform policy is unchanged.
+    true
+}
+
 impl TaskRuntime {
     /// Resolve an isolation request from an arbitrary environment lookup.
     /// Taking the lookup as a parameter is what makes every branch below
@@ -193,9 +229,29 @@ impl TaskRuntime {
         }))
     }
 
-    /// Read the real process environment.
+    /// Validate support only for an actual isolation request. The injected
+    /// probe keeps unsupported-host controls independent of the test host OS.
+    fn resolve_for_startup<F, P>(get: F, supports_store: P) -> Result<Option<Self>, String>
+    where
+        F: Fn(&str) -> Option<String>,
+        P: FnOnce() -> bool,
+    {
+        let runtime = Self::resolve(get)?;
+        if runtime.is_some() && !supports_store() {
+            return Err(
+                "task-isolated WebKit storage requires macOS 14 or later; refusing to use the shared default store"
+                    .into(),
+            );
+        }
+        Ok(runtime)
+    }
+
+    /// Read the real process environment and validate native startup support.
     pub fn from_env() -> Result<Option<Self>, String> {
-        Self::resolve(|key| std::env::var(key).ok())
+        Self::resolve_for_startup(
+            |key| std::env::var(key).ok(),
+            supports_isolated_webkit_store,
+        )
     }
 
     pub fn identifier(&self, base_identifier: &str) -> String {

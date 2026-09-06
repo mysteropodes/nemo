@@ -184,3 +184,83 @@ fn manifest_file_lives_inside_the_task_data_root() {
         PathBuf::from("/tmp/nemo-runtime/tasks/abc/tauri-data/native-runtime.json")
     );
 }
+
+#[test]
+fn unsupported_isolated_startup_fails_before_config_or_window_creation() {
+    let result = TaskRuntime::resolve_for_startup(env(&full()), || false);
+    let err = result.expect_err("macOS below 14 must not reach Tauri with an isolated request");
+    assert!(err.contains("macOS 14"), "{err}");
+    assert!(err.contains("WebKit"), "{err}");
+}
+
+#[test]
+fn ordinary_startup_does_not_probe_isolated_store_support() {
+    for pairs in [
+        vec![],
+        vec![(ENV_TASK_ID, "task-a"), (ENV_TASK_KEY, KEY)],
+        vec![(ENV_DATA_DIR, "   ")],
+    ] {
+        assert_eq!(
+            TaskRuntime::resolve_for_startup(env(&pairs), || panic!(
+                "ordinary startup must not probe"
+            )),
+            Ok(None)
+        );
+    }
+}
+
+#[test]
+fn invalid_request_fails_before_platform_probe() {
+    let err = TaskRuntime::resolve_for_startup(env(&[(ENV_DATA_DIR, "/tmp/x")]), || {
+        panic!("invalid request must not probe")
+    })
+    .unwrap_err();
+    assert!(err.contains(ENV_TASK_ID), "{err}");
+}
+
+#[test]
+fn supported_startup_preserves_distinct_persistent_store_configuration() {
+    let a = TaskRuntime::resolve_for_startup(env(&full()), || true)
+        .unwrap()
+        .unwrap();
+    let mut pairs = full();
+    pairs[1] = (ENV_TASK_ID, "task-b");
+    pairs[2] = (
+        ENV_TASK_KEY,
+        "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+    );
+    let b = TaskRuntime::resolve_for_startup(env(&pairs), || true)
+        .unwrap()
+        .unwrap();
+    assert_eq!(a.data_store_identifier(), data_store_identifier(KEY));
+    assert_ne!(a.data_store_identifier(), b.data_store_identifier());
+
+    let mut config = tauri::utils::config::Config::default();
+    config.identifier = "com.strokemotion.app".into();
+    config.app.windows = vec![tauri::utils::config::WindowConfig::default()];
+    let label = config.app.windows[0].label.clone();
+    a.apply_to_config(&mut config);
+    assert_eq!(
+        config.identifier,
+        "com.strokemotion.app.nemo-task-0123456789abcdef"
+    );
+    // Tauri must leave window creation to start(), which attaches the store ID.
+    assert!(!config.app.windows[0].create);
+    assert!(!config.app.windows[0].incognito);
+    assert_eq!(config.app.windows[0].label, label);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn native_store_support_matches_host_macos_version() {
+    // Exercise the real Foundation/objc ABI without creating an app or store.
+    // sw_vers supplies an independent host-version observation for this check.
+    let output = std::process::Command::new("/usr/bin/sw_vers")
+        .arg("-productVersion")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let version = String::from_utf8(output.stdout).unwrap();
+    let major: u32 = version.trim().split('.').next().unwrap().parse().unwrap();
+    assert_eq!(supports_isolated_webkit_store(), major >= 14, "{version}");
+}

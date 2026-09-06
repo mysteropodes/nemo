@@ -175,7 +175,6 @@ fn start_tablet_pressure_monitor(app: tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut ctx = tauri::generate_context!();
     // R06 (#902): opt-in per-task isolation of every mutable native root.
     // Without NEMO_TAURI_DATA_DIR this is None and not one resolved path below
     // changes; with it, an invalid request aborts instead of quietly falling
@@ -187,6 +186,9 @@ pub fn run() {
             std::process::exit(2);
         }
     };
+    // Reject unsupported isolated WebKit startup before any Tauri context,
+    // plugin, window or persistent data store can be initialized.
+    let mut ctx = tauri::generate_context!();
     if let Some(runtime) = &task_runtime {
         runtime.apply_to_config(ctx.config_mut());
     }
