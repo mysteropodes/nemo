@@ -18,7 +18,7 @@ function app() {
     }
   };
   vm.createContext(context);
-  for (const f of ['src/domain/animation/opacity.js', 'src/application/opacity-application.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), context, { filename: f });
+  for (const f of ['src/js/domain/animation/opacity.js', 'src/js/application/opacity-application.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), context, { filename: f });
   return context;
 }
 function request(ctx, id, operation, payload) { const m = ctx.NemoOpacityApplication.meta(); return { apiVersion: 1, requestId: id, instanceId: m.instanceId, documentId: m.documentId, expectedRevision: m.revision, operation, payload: payload || {} }; }
@@ -40,4 +40,11 @@ test('key and animation commands share the opacity writer and trace is bounded',
   assert.equal(ctx.state.layers[0].motion.opacity.keys[0].v[0], 12);
   assert.equal(api.handle(request(ctx, 'remove', 'property.key.remove', { layerId: 'a', property: 'opacity', frame: 8 })).ok, true);
   assert.equal(api.handle(request(ctx, 'trace', 'diagnostics.trace')).result.entries.length, 2);
+});
+test('native bootstrap can replace only the provisional instance identity', () => {
+  const ctx = app();
+  assert.equal(ctx.NemoApplication.setInstanceId('native-id').ok, true);
+  assert.equal(ctx.NemoOpacityApplication.meta().instanceId, 'native-id');
+  assert.equal(ctx.NemoApplication.setInstanceId('native-id').ok, true);
+  assert.equal(ctx.NemoApplication.setInstanceId('other-native-id').error.code, 'INSTANCE_ID_CONFLICT');
 });

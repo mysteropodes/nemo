@@ -7,7 +7,12 @@
   function stable(value, fallback) { return value || fallback; }
   function meta() {
     var state = root.state;
-    if (!state.__nemoOpacityMeta) state.__nemoOpacityMeta = { instanceId: 'nemo-instance-1', documentId: 'nemo-document-1', revision: 0 };
+    if (!state.__nemoOpacityMeta) {
+      var browserId = root.crypto && typeof root.crypto.randomUUID === 'function'
+        ? root.crypto.randomUUID()
+        : 'browser-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+      state.__nemoOpacityMeta = { instanceId: browserId, documentId: 'nemo-document-1', revision: 0, instanceIdAssigned: false };
+    }
     return state.__nemoOpacityMeta;
   }
   function copy(value) { return JSON.parse(JSON.stringify(value)); }
@@ -98,7 +103,22 @@
       return result;
     } finally { dispatching = false; }
   }
-  var api = { handle: execute };
+  function setInstanceId(id) {
+    if (typeof id !== 'string' || !id) return fail({}, 'invalid_instance_id', 'instanceId must be a non-empty string.');
+    var m = meta();
+    if (m.instanceId === id) {
+      m.instanceIdAssigned = true;
+      return response({}, true, { instanceId: id });
+    }
+    // The browser starts with a provisional identifier. Native may replace it
+    // once during bootstrap, but a later different identity would make an
+    // existing document/history stream ambiguous.
+    if (m.instanceIdAssigned) return fail({}, 'INSTANCE_ID_CONFLICT', 'A different instanceId is already authoritative.');
+    m.instanceId = id;
+    m.instanceIdAssigned = true;
+    return response({}, true, { instanceId: id });
+  }
+  var api = { handle: execute, setInstanceId: setInstanceId };
   root.NemoApplication = api;
   root.NemoOpacityApplication = { isDispatching: function () { return dispatching; }, legacy: legacy, meta: meta };
 })(window);
