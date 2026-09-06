@@ -21,7 +21,7 @@ regressions live in `scripts/nemo/isolation.test.cjs`.
 | Launcher ownership | `registerLauncher()` atomically refuses an already-registered task, including a stale or unreadable record. Concurrent registrations have one winner. Root release and launcher record changes use the same per-task mutation guard. |
 | Local owner/source check | `verifyHandshake()` requires the owner token and a live positive PID. With `checkSource:true`, it requires available source identity and compares the **complete R02 `sourceIdentity()` snapshot**, including HEAD, branch, worktree and dirty digest. Missing identity fails closed. |
 | Stop | `await requestStop(taskId, ownerToken, {signal, timeoutMs})` signals only an owner-matching record, then polls for exit. `stopped:true` means exit was observed. A timeout returns `stopped:false` and retains the owner record for a retry. Allowed signals are SIGTERM, SIGINT and SIGKILL; default timeout is 3 seconds, maximum 60 seconds. |
-| Root release | `releaseTask(taskId, ownerToken)` refuses a live launcher, including its owner, and refuses mismatched or unreadable records. It removes only that validated task's roots after exit. Release port reservations separately before removing their metadata. |
+| Root release | `releaseTask(taskId, ownerToken)` refuses a live launcher, including its owner, and refuses mismatched or unreadable records. It removes that validated task's roots after exit and reconciles only its verifiably dead exclusive-slot records; live, foreign or uncertain records remain untouched. Release port reservations separately before removing their metadata. |
 | Exclusive resources | Slot acquire/release and stale-holder replacement all take the same atomic per-slot mutation guard. An ordinary record belonging to a dead PID can be replaced; two reclaimers cannot delete each other's live ownership. |
 
 The default runtime root is `<os.tmpdir()>/nemo-runtime`; override it with
@@ -334,3 +334,26 @@ GPU, export or complete R06 acceptance. Its focused tests are run with
 `node --test scripts/nemo/browser-runtime.test.cjs`. They exercise concurrent
 real servers, served source bytes and identities, source drift, ownership, stale
 process recovery, failed startup, duplicate launch and static path confinement.
+
+## Integrated packaged-native validation
+
+`npm run native -- start --task <id> --app <Nemo.app>` uses the isolated native
+launcher. Reserve `desktop-input` when driving a window and `gpu-reference` for
+reference measurements. Owner-authorized `stop --retain-data` ends the process
+and releases its reservations while retaining the task's app/WebKit state for
+a subsequent start with the same task id. Ordinary `stop` also releases that
+state, after proving the application process group has exited. Uncertain
+orphan-process identity blocks cleanup for explicit reconciliation.
+
+`NEMO_DESKTOP_APP=/absolute/path/Nemo.app npm run test:desktop` executes the
+Node tests in `tests/desktop` serially. The named job rejects failed, cancelled,
+skipped and incomplete test output; its receipt identifies the chosen package
+and report directory. The app runtime manifest includes the child's observed
+temporary, cache and report environment so the harness can compare actual
+values against launcher intent. Only those directory variables are disclosed.
+
+These automated process, ownership and storage checks are one R06 gate. Actual
+UI save/reload and rendering must be exercised separately on the identified
+package; launcher source identity does not establish the provenance of an
+arbitrary prebuilt executable. Record the clean build receipt and package
+hashes when running acceptance. Signing and release acceptance remain separate.

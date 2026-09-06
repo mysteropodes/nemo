@@ -12,7 +12,8 @@ implemented with Node only (no new dependencies). Work package R02.
 | `npm run test:rust` | `cargo test` for `geometry-wasm` (CPU, native host). | 0/1/2 |
 | `npm run test:integration` | `tests/integration` when it exists; `not-run` until R12/R13 define it. | 0/1/2 |
 | `npm run test:browser` | Playwright specs under `tests/browser`; `blocked` while `@playwright/test` is absent. | 0/1/2 |
-| `npm run test:desktop` | Packaged-app harness under `tests/desktop`; `blocked` without a built `Nemo.app`. | 0/1/2 |
+| `npm run test:desktop` | Runs `tests/desktop/*.test.cjs` serially against `NEMO_DESKTOP_APP` or the local packaged app; `blocked` without a package. Native process/storage checks are separate from UI workflow acceptance. | 0/1/2 |
+| `npm run native -- start/status/stop ...` | Owner-controlled isolated native launcher. See [runtime isolation](../../engineering/runtime-isolation.md#native-app-launcher). | 0/1 |
 | `npm run bench` | `tests/bench` workloads; `not-run` until R03/R19 define them. | 0/1/2 |
 | `npm run build:wasm` | `wasm-pack build` into the run directory and compare with the committed `src/wasm`; `blocked` without wasm-pack. | 0/1/2 |
 | `npm run build:desktop` | `tauri build -b app` for the host triple, then `scripts/bundle-ffmpeg-dylibs.py`. Local, unsigned. | 0/1/2 |

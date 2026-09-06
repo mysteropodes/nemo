@@ -158,15 +158,30 @@ function jobTestBrowser() {
   return (r.status === 0 ? pass : fail)(`playwright test tests/browser: exit ${r.status}`, { exitCode: r.status, log: logOf(r) });
 }
 
-function jobTestDesktop() {
+function jobTestDesktop(ctx) {
   const app = caps.findBuiltApp();
-  const harness = exists(path.join(ROOT, 'tests', 'desktop'));
+  const directory = path.join(ROOT, 'tests', 'desktop');
+  const files = exists(directory) ? fs.readdirSync(directory).filter((name) => name.endsWith('.test.cjs')).sort() : [];
   const missing = [];
   if (!app) missing.push('no packaged app found (src-tauri/target/*/release/bundle/macos/Nemo.app or NEMO_DESKTOP_APP)');
-  if (!harness) missing.push('no tests/desktop harness defined yet (R06 isolated data roots, R21 installed-artifact validation)');
+  if (!files.length) missing.push('no tests/desktop/*.test.cjs harness defined');
   if (!app) return blocked(missing.join('; '));
-  if (!harness) return notRun(missing.join('; '), { artifacts: [{ path: path.relative(ROOT, app) }] });
-  return notRun('tests/desktop exists but no runner is wired for it yet');
+  if (!files.length) return notRun(missing.join('; '), { artifacts: [{ path: path.relative(ROOT, app) }] });
+  const r = run(process.execPath, ['--test', '--test-reporter=tap', '--test-concurrency=1'].concat(files.map((name) => 'tests/desktop/' + name)), {
+    timeout: 30 * 60 * 1000,
+    env: { NEMO_DESKTOP_APP: path.resolve(app), NEMO_DESKTOP_REPORT_DIR: ctx.reportDir, NODE_TEST_CONTEXT: undefined },
+  });
+  const counts = Object.fromEntries(['tests', 'pass', 'fail', 'cancelled', 'skipped', 'todo'].map((name) => {
+    const match = r.stdout.match(new RegExp(`^# ${name} (\\d+)$`, 'm'));
+    return [name, match ? Number(match[1]) : null];
+  }));
+  const complete = counts.tests > 0 && counts.pass === counts.tests
+    && ['fail', 'cancelled', 'skipped', 'todo'].every((name) => counts[name] === 0);
+  return (r.status === 0 && complete ? pass : fail)(`packaged-native Node harness: exit ${r.status}, ${counts.pass}/${counts.tests} passing`, {
+    exitCode: r.status === 0 && !complete ? 1 : r.status, log: logOf(r), details: { files, counts },
+    artifacts: [{ path: path.relative(ROOT, app) }],
+    limitations: ['Native process and storage-isolation checks do not establish UI save/reload, rendering, or release acceptance.'],
+  });
 }
 
 function jobBench() {

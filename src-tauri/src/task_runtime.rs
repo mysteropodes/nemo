@@ -312,6 +312,17 @@ pub fn start<R: Runtime>(
         "ownerTokenConfigured": runtime.owner_token.is_some(),
         "startedAtEpochMs": epoch_millis(),
         "dirs": resolved_dirs(&handle),
+        // Observe only the task's known directory variables, never the full
+        // environment or owner token. The harness compares these child values
+        // with the launcher's intended roots instead of trusting its config.
+        "processEnvironment": {
+            "tempDir": std::env::temp_dir().to_string_lossy(),
+            "TMPDIR": std::env::var("TMPDIR").ok(),
+            "TMP": std::env::var("TMP").ok(),
+            "TEMP": std::env::var("TEMP").ok(),
+            "XDG_CACHE_HOME": std::env::var("XDG_CACHE_HOME").ok(),
+            "NEMO_REPORT_DIR": std::env::var("NEMO_REPORT_DIR").ok(),
+        },
     });
     write_manifest(&manifest_file, &manifest)?;
     // One machine-readable line for a launcher that captured stdout, matching
