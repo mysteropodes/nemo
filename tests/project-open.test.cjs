@@ -7,6 +7,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync('src/js/project.js', 'utf8');
 const timelineSource = fs.readFileSync('src/js/timeline.js', 'utf8');
+const documentSource = fs.readFileSync('src/js/project-document.js', 'utf8');
 
 function realImportJSON() {
   const start = timelineSource.indexOf('  importJSON:function(json,silent){');
@@ -17,10 +18,12 @@ function realImportJSON() {
   const calls = [];
   const state = { layers: [{ name: 'Keep' }] };
   const engine = { clearRetainedPaths() { calls.push('engine'); } };
-  const importJSON = vm.runInNewContext(`(${method})`, {
+  const context = vm.createContext({
     window: { SMLabs: { resetAll() { calls.push('labs'); } }, SMEngineBridge: engine }, SMEngineBridge: engine,
     SM: { t(key) { return key; } }, state, userLayers: [], _symbolPaperLayers: {}, showToast(message) { calls.push(message); }
-  }, { filename: 'timeline-importJSON.js' });
+  });
+  vm.runInContext(documentSource, context);
+  const importJSON = vm.runInContext(`(${method})`, context, { filename: 'timeline-importJSON.js' });
   return { calls, importJSON, state };
 }
 
@@ -85,5 +88,21 @@ test('real importJSON reports malformed and structurally invalid input without r
     const before = JSON.stringify(actual.state);
     assert.equal(actual.importJSON(raw, true), false, 'actual importJSON reports failure');
     assert.equal(JSON.stringify(actual.state), before, 'validation fails before the current document is replaced');
+    assert.doesNotMatch(actual.calls.at(-1), /undefined|not a function/, 'the real validator must run');
+  }
+});
+
+test('project validation preserves fields and the legacy frame-only migration', () => {
+  const context = vm.createContext({ window: {} });
+  vm.runInContext(documentSource, context);
+  const parse = context.window.SMProjectDocument.parse;
+  const frame = { strokes: [{ custom: 'retained' }] };
+  const current = { version: 13, fps: 24, layers: [{ frames: [frame] }] };
+  assert.deepEqual(JSON.parse(JSON.stringify(parse(JSON.stringify(current)))), current);
+  const old = parse(JSON.stringify({ frames: [frame], fps: 12 }));
+  assert.equal(old.layers[0].name, 'Layer 1');
+  assert.equal(old.layers[0].frames[0].strokes[0].custom, 'retained');
+  for (const raw of ['null', '{}', '{"layers":[]}', '{"layers":[{"frames":[{}]}]}']) {
+    assert.throws(() => parse(raw));
   }
 });
