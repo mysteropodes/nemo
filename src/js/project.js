@@ -257,12 +257,9 @@
     }catch(e){return [];}
   }
   async function restoreVersion(path){
-    // Snapshot the CURRENT state into history before overwriting it with
-    // the old version — otherwise "restore from 10 min ago" silently
-    // discards up to 30s of work since the last autosave tick, and worse,
-    // makes the restore itself irreversible: the pre-restore state was
-    // never captured anywhere. With this, a restore is always undoable by
-    // restoring the snapshot taken right here.
+    // Capture the current document before import, then record that snapshot
+    // only after a successful restore. Rejected input must leave both the
+    // current project and its version history unchanged.
     var json=await window.__TAURI__.fs.readTextFile(path);
     try{window.SMProjectDocument.parse(json);}catch(e){return false;}
     saveAllLayerFrames();
