@@ -1,0 +1,99 @@
+name: Nemo validation
+
+on:
+  pull_request:
+    branches: [main]
+
+# Untrusted PR code runs only on disposable GitHub-hosted runners.
+permissions:
+  contents: read
+
+concurrency:
+  group: nemo-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  NEMO_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+
+jobs:
+  quick:
+    name: Nemo / local quick
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node scripts/nemo/ci.cjs quick
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nemo-quick-receipts
+          path: reports/
+          if-no-files-found: error
+
+  boundaries:
+    name: Nemo / boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node scripts/nemo/ci.cjs boundaries
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nemo-boundary-receipts
+          path: reports/ci/
+          if-no-files-found: error
+
+  surfaces:
+    name: Nemo / affected surfaces
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node scripts/nemo/ci.cjs surfaces
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nemo-surface-receipts
+          path: reports/
+          if-no-files-found: error
+
+  aggregate:
+    name: Nemo / required
+    if: always()
+    needs: [quick, boundaries, surfaces]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node scripts/nemo/ci.cjs aggregate
+        env:
+          NEMO_CI_NEEDS: ${{ toJSON(needs) }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nemo-aggregate-receipt
+          path: reports/ci/
+          if-no-files-found: error
