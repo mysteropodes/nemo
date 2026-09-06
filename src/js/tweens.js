@@ -467,6 +467,37 @@ var ID_PIN_LEN_RATIO=2.0,ID_PIN_TRAVEL_K=3.0,ID_PIN_MIN=3,ID_PIN_SPAN_RATIO=1.6,
 // pénalisent des moustaches qui se croisent sans que ce soit visible ; le rendu
 // de l'image 8, lui, perd le trait parasite sous le museau. 70/70 tests passent.
 var TW_ID_PIN_ALL_OR_NONE=true;
+
+// TW_FIELD_ITER — champ de déformation ITÉRÉ (esprit Coherent Point Drift).
+// Le champ TPS existe depuis longtemps, mais il n'est calé QU'UNE FOIS, sur la
+// meilleure moitié des appariements de la passe 1. Si la passe 1 se trompe, le
+// champ hérite de l'erreur et la passe 2 confirme la faute qu'elle devait
+// corriger — la correction par exclusion (leave-one-out) protège un trait
+// contre SA PROPRE erreur, pas contre celle de ses voisins. CPD résout ça en
+// alternant : on estime la correspondance, on recale le champ dessus, on
+// recommence. C'est ce que fait ce drapeau : N tours supplémentaires où les
+// germes du champ sont les appariements du tour précédent, avec arrêt dès que
+// l'assignation ne bouge plus. 0 = comportement d'avant.
+//
+// MESURÉ, ET LAISSÉ À 0. Sur les 7 fichiers, 16 portées, deux tours de plus :
+// quatorze portées ne bougent pas du tout, et les deux qui bougent ne vont pas
+// dans le bon sens.
+//   cats 34→46   25p 3f 16x 457px  ->  22p 9f 10x 281px
+//   untitled4 20→32  ...2x...      ->  ...3x...
+// Sur 34→46 — justement la portée des moustaches — le champ affiné réduit le
+// trajet maximum de 457 à 281 px et les croisements de 16 à 10, mais il y
+// arrive en ABANDONNANT : six traits de plus préfèrent le fondu plutôt qu'un
+// appariement. Vérifié à l'image (38, 40, 43) : les moustaches disparaissent au
+// lieu de se déplacer mal. Un fondu de moustache est plus visible qu'un
+// déplacement imparfait, donc ce n'est pas un progrès. Le coût est réel au
+// passage : de +50 % à +85 % de temps de calcul (192 → 355 ms sur la grosse
+// portée de b).
+// À retenir pour la suite : ce n'est PAS le champ de déformation qui manquait —
+// il existe depuis longtemps, régularisé et robuste, avec exclusion du germe
+// courant. L'affiner ne crée pas d'appariement là où le moteur n'en voit pas.
+// La question ouverte sur 34→46 est en amont : ces six traits ont-ils seulement
+// un partenaire, ou le dessin change-t-il de topologie entre les deux clés ?
+var TW_FIELD_ITER=0;
 // TW_ARC_FROM_CHAIN (2026-09-05, Cyril : « une main va parcourir un chemin
 // courbe, si on déduit la courbe par rapport à toutes les keyframes… on
 // n'aurait plus des tweens sur un chemin linéaire »). Le centroïde de
@@ -1165,10 +1196,24 @@ function _applyPins(cost,pins,n,m){
   });
 }
 function autoMatchJS(sA,sB,hist,pins){
-  try{return _autoMatchJSCore(sA,sB,hist,pins);}
+  try{
+    var r=_autoMatchJSCore(sA,sB,hist,pins);
+    if(TW_FIELD_ITER>0&&r&&r.length>=2){
+      var sig=r.map(function(m){return m.a+'>'+m.b;}).join(',');
+      for(var it=0;it<TW_FIELD_ITER;it++){
+        var r2=_autoMatchJSCore(sA,sB,hist,pins,r);
+        if(!r2||r2.length<2)break;
+        var sig2=r2.map(function(m){return m.a+'>'+m.b;}).join(',');
+        r=r2;
+        if(sig2===sig)break;   // point fixe atteint
+        sig=sig2;
+      }
+    }
+    return r;
+  }
   finally{_relStruct=null;}
 }
-function _autoMatchJSCore(sA,sB,hist,pins){
+function _autoMatchJSCore(sA,sB,hist,pins,seedOverride){
   if(!sA.length||!sB.length)return[];
   var fA=sA.map(strokeFeat),fB=sB.map(strokeFeat);
   var bA=unionBounds(fA),bB=unionBounds(fB);
@@ -1221,7 +1266,10 @@ function _autoMatchJSCore(sA,sB,hist,pins){
   // agrees with that predicted motion — this is what untangles close/
   // similar features (eyes, chin, parallel hatching on an arm) that pass 1
   // alone can flip.
-  var seeds=matches.slice().sort(function(x,y){return x.score-y.score;});
+  // voir TW_FIELD_ITER : au deuxième tour et aux suivants, les germes du champ
+  // sont les appariements du tour précédent et non ceux de la passe 1.
+  var seedSrc=(seedOverride&&seedOverride.length>=2)?seedOverride:matches;
+  var seeds=seedSrc.slice().sort(function(x,y){return x.score-y.score;});
   var seedCount=Math.max(2,Math.ceil(seeds.length*0.5));
   seeds=seeds.slice(0,seedCount);
   var ptsA=seeds.map(function(s){return{x:fA[s.a].cx,y:fA[s.a].cy};});
