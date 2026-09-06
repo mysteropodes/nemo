@@ -176,9 +176,12 @@ This serializes same-worktree builds and isolates Cargo output; it does not make
 the checkout immutable. Tauri or its build scripts can still update generated
 files under `src-tauri/gen/`. Treat those as shared-writer paths: inspect the
 source diff after a real build and coordinate any expected regeneration with
-its owner. Actual paired native-build evidence and integration with the R02/R03
-`build:desktop` job remain separate work because that job surface is currently
-owned by R03/R04.
+its owner. The standard `npm run build:desktop` job uses this launcher through an owned
+one-shot controller. It copies the exact successful app and logs into its report
+directory before cleanup, finalizes ffmpeg dylibs on the copy, and records hashes
+using `CFBundleExecutable`. Later desktop tests in the same job runner receive
+that preserved app. Missing prerequisites are required blockers; an unrelated
+shared-target bundle cannot satisfy a missing isolated build output.
 
 The focused non-native regressions run with
 `node --test scripts/nemo/build-runtime.test.cjs`. They use executable stubs to
@@ -291,55 +294,22 @@ resolution rules (activation, fail-closed refusals, identifier and data-store
 derivation) are proved by `cargo test task_runtime` in `src-tauri`.
 
 
-## Validation and remaining integration
+## Validation boundaries
 
-Run `node --test scripts/nemo/isolation.test.cjs`. The 20 behavioral tests cover
-two task roots and bound ports, R02 report routing, independent stop authority,
-invalid/case-sensitive IDs, long generated IDs, duplicate/concurrent launcher
-registration, full source mismatch and unavailable identity, ignored SIGTERM
-with a later successful owner retry, simultaneous stale-slot reclamation, and
-an interrupted guard refusing takeover. These exercise real spawned processes
-and sockets; they do not launch Nemo's browser or desktop application.
+The focused isolation, browser, build and native suites enter ordinary Node
+check discovery through `tests/nemo-*.test.cjs`. Their executable controls test
+ownership, source drift, startup refusal, process-group cleanup and exclusive
+reservations without substituting stubs for live application acceptance.
+The browser suite also uses real concurrent HTTP servers and verifies served
+source bytes; browser document workflows still use the separate R03/R07
+Playwright surface.
 
-Still required for the full acceptance contract in
-[the parallel-work specification](remediation/07_GITHUB_PROJECT_AND_PARALLEL_WORK.md#isolation):
-
-- Complete automated browser/application workflow coverage and standard harness
-  integration. The preview launcher supplies real origins, explicit Chromium
-  profiles and the served identity, while R02 `test:browser` still requires its
-  separate Playwright harness. A browser preview does not build WASM or the app.
-- Two real packaged instances were run at once on 2026-09-05 and the isolated
-  roots hold on the live desktop. Both apps reported distinct identifiers and
-  app directories from Tauri's own path resolver; WebKit materialised two
-  separate stores (`~/Library/WebKit/com.strokemotion.app/WebsiteDataStore/
-  99377ca9-…` and `80a136b6-…`); both autosaved real project JSON into their own
-  `history/untitled-autosave` directory with **zero shared filenames** (9 files
-  against 24); one instance was driven through its real UI (New Project dialog,
-  named project, Create) through the accessibility tree; and the shared
-  production state was byte-for-byte untouched — `com.strokemotion.app` stayed at
-  25 files / 464K with its newest mtime predating the run, and the production
-  WebKit and Caches directories likewise. A stopped instance's state survived
-  its app exit. Still open: a restart of the same task id reading back its own
-  saved document through the UI, which was interrupted when a parallel session
-  took the `desktop-input` slot.
-- `--reserve` gives desktop input and reference GPU measurements an explicit
-  exclusive reservation with a real consumer. Benchmark and input-driving
-  harnesses still have to ask for those slots from their own entry points.
-- Validate two real native builds through the standalone isolated launcher,
-  inspect their source diffs and then integrate it with the standard R02/R03
-  `build:desktop` job after that shared surface is available.
-- Production profile/launcher adoption remains separate from test discovery.
-  Normal `npm test`/`verify` discovery reaches the six focused suites through
-  isolated entry processes under `tests/nemo-{boundaries,boundaries-ratchet,
-  isolation,browser-runtime,build-runtime,native-runtime}.test.cjs`; each suite
-  can still be invoked directly while developing it.
-
-Those remaining integrations require shared package/job/platform files. The
-preview launcher is a bounded browser increment; it does not establish Tauri,
-GPU, export or complete R06 acceptance. Its focused tests are run with
-`node --test scripts/nemo/browser-runtime.test.cjs`. They exercise concurrent
-real servers, served source bytes and identities, source drift, ownership, stale
-process recovery, failed startup, duplicate launch and static path confinement.
+R06 acceptance requires identified real packages and browser instances, actual
+independent mutable state, owner-controlled stop/relaunch, and reserved shared
+resources. Keep those observed results with their source/artifact receipts in
+[the R06 issue](https://github.com/mysteropodes/nemo/issues/902). Historical test
+counts and earlier candidate builds do not establish a later candidate's status.
+Benchmark workloads and export validation remain their own work packages.
 
 ## Integrated packaged-native validation
 
@@ -352,8 +322,9 @@ state, after proving the application process group has exited. Uncertain
 orphan-process identity blocks cleanup for explicit reconciliation.
 
 `NEMO_DESKTOP_APP=/absolute/path/Nemo.app npm run test:desktop` executes the
-Node tests in `tests/desktop` serially. The named job rejects failed, cancelled,
-skipped and incomplete test output; its receipt identifies the chosen package
+Node tests in `tests/desktop` serially. The named job requires its package and
+harness and rejects comment-only files, failed, cancelled, skipped and incomplete
+test output; its receipt identifies the chosen package
 and report directory. The app runtime manifest includes the child's observed
 temporary, cache and report environment so the harness can compare actual
 values against launcher intent. Only those directory variables are disclosed.
