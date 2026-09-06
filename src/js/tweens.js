@@ -660,6 +660,50 @@ var TW_GROUP_RIGID=false,GROUP_MIN_MEMBERS=3,GROUP_MIN_DEG=6,GROUP_REACH=1.5,GRO
 // (les contours du bras) et les remplace par des retraits ; pas convaincant.
 // DÉSACTIVÉ, à essayer sur un tournant via window.TW_DOUBT_FADE=true.
 var TW_DOUBT_FADE=false,DOUBT_INDICE=1.2,DOUBT_SCORE=0.4;
+// ---- SCISSION : RETOUR EN ARRIÈRE RELATIF (tête de Cyril, 2026-09-06) ----
+// Un visage dessiné d'un seul trait (contour + nez + bouche, 1 217 px) en A
+// et en deux traits (551 + 461 px) en B : la scission avait tout — deux
+// candidats, longueurs 0,84, morceaux à 0,14 et 0,10 — et refusait, parce
+// que le morceau du contour revient en arrière de 30 % de sa corde, au-delà
+// des 25 % de la garde anti-artefact. Or c'est la forme du menton, et le
+// trait cible revient autant. Ici : un morceau n'est suspect que si son
+// retour dépasse celui de son trait cible de SPLIT_BACK_MARGIN (la garde
+// absolue reste pour un trait cible droit). Mesuré ci-dessous.
+// MESURÉ (2026-09-06, douze fichiers, avec la coupe à la jonction) : la tête
+// de Cyril 10→17 passe de « visage rattrapé sur un seul des deux traits +
+// l'autre en fondu » à deux morceaux coupés à la jonction (0,23 et 0,15) ;
+// vérité terrain par clés retirées 21,5 → 17,1 px (meilleur rang 11,8 →
+// 10,8). cats gagne deux scissions (6→16, 34→46 ; 16,5→16,4 et 28,5→28,2).
+// Neuf fichiers strictement identiques. Extrémités neutres. Actif.
+var TW_SPLIT_BACK_RELATIVE=true,SPLIT_BACK_MARGIN=0.15;
+// ---- SCISSION : COUPE À LA JONCTION (même cas) ----
+// La scission coupe le trait fusionné au prorata des longueurs des parties.
+// Quand l'artiste a coupé ailleurs (le nez fait 40 % du visage en A mais
+// 46 % en B), chaque morceau embarque un bout du voisin : le morceau du
+// contour revenait de 30 % en arrière avec un bout du nez. Ici, une deuxième
+// coupe candidate : le point de contact entre deux parties consécutives de B
+// (extrémités à ≤ SPLIT_JUNCTION_MAX px), projeté sur le trait fusionné. On
+// évalue les deux coupes et on garde celle qui passe les gardes avec le
+// meilleur score moyen.
+// MESURÉ avec le retour relatif (voir ci-dessus) : sans la coupe à la
+// jonction, le morceau du contour au prorata revient de 30 % au bord et
+// reste refusé ; avec, le morceau coupé au point de contact (jonction en T
+// comprise) revient de 0 au bord et passe. Actif.
+var TW_SPLIT_JUNCTION_CUT=true,SPLIT_JUNCTION_MAX=24;
+// Retour en arrière d'un trait, mesuré sur sa COURBE échantillonnée (60 points
+// sur le chemin Paper), pas sur ses ancres : un menton à 4 ancres ne revient
+// jamais en arrière par ses ancres, alors que sa courbe si — et le morceau
+// qu'on lui compare est, lui, échantillonné dense par extractStrokePiece.
+function _backtrackRatioSd(sd){
+  var p=buildTPFeat(sd);var len=p.length;if(!(len>1)){p.remove();return 0;}
+  var K=60,pts=[];for(var i=0;i<=K;i++){var q=p.getPointAt(len*i/K);if(q)pts.push([q.x,q.y]);}
+  p.remove();if(pts.length<3)return 0;
+  var p0=pts[0],pl=pts[pts.length-1],ch=Math.hypot(pl[0]-p0[0],pl[1]-p0[1]);
+  if(ch<=1)return 0;
+  var ux=(pl[0]-p0[0])/ch,uy=(pl[1]-p0[1])/ch,mx=-Infinity,wb=0;
+  for(var j=0;j<pts.length;j++){var pr=(pts[j][0]-p0[0])*ux+(pts[j][1]-p0[1])*uy;if(pr>mx)mx=pr;else if(mx-pr>wb)wb=mx-pr;}
+  return wb/ch;
+}
 var TW_XING_HAIRLINE=true,XING_HAIRLINE_AREA=4,XING_HAIRLINE_W=2;
 var TW_CAND_ENDS=true,CAND_END_TOL=6,CAND_END_W=0.15;
 // TW_CAND_EDGE — compression LOCALE d'arêtes dans l'arbitrage. Cas mesuré (brasG,
@@ -5270,9 +5314,35 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
       // cut fractions = cumulative length share of the ordered parts
       var fr=[],acc=0;
       for(var oi=0;oi<ordered.length-1;oi++){acc+=featParts[ordered[oi].idx].length;fr.push(Math.min(0.95,Math.max(0.05,acc/sumLen)));}
+      // voir TW_SPLIT_JUNCTION_CUT : coupes candidates à la jonction des parties
+      var cutSets=[fr];
+      if(TW_SPLIT_JUNCTION_CUT&&ordered.length>=2){
+        var frJ=[],okJ=true,prevJ=0,mpJ=buildTPFeat(sMerged[mi2]),lenJ=Math.max(1,mpJ.length);
+        for(var oj=0;oj<ordered.length-1&&okJ;oj++){
+          var P_=sParts[ordered[oj].idx],Q_=sParts[ordered[oj+1].idx];
+          var pp=(P_.isVectorBrush&&P_.centerSegments&&P_.centerSegments.length>1)?P_.centerSegments:P_.segments;
+          var qq=(Q_.isVectorBrush&&Q_.centerSegments&&Q_.centerSegments.length>1)?Q_.centerSegments:Q_.segments;
+          if(!pp||!qq||pp.length<2||qq.length<2){okJ=false;break;}
+          // jonction en T comprise : une extrémité de l'une posée n'importe où sur l'autre
+          var eP=[pp[0].point,pp[pp.length-1].point],eQ=[qq[0].point,qq[qq.length-1].point],bestJ=Infinity,J=null;
+          var pathP=buildTPFeat(P_),pathQ=buildTPFeat(Q_);
+          eP.forEach(function(e){var l=pathQ.getNearestLocation(new Point(e[0],e[1]));if(l&&l.distance<bestJ){bestJ=l.distance;J=[(e[0]+l.point.x)/2,(e[1]+l.point.y)/2];}});
+          eQ.forEach(function(g){var l=pathP.getNearestLocation(new Point(g[0],g[1]));if(l&&l.distance<bestJ){bestJ=l.distance;J=[(g[0]+l.point.x)/2,(g[1]+l.point.y)/2];}});
+          pathP.remove();pathQ.remove();
+          if(!J||bestJ>SPLIT_JUNCTION_MAX){okJ=false;break;}
+          var locJ=mpJ.getNearestLocation(new Point(J[0],J[1]));var fJ=locJ?locJ.offset/lenJ:null;
+          if(fJ===null||fJ<=prevJ+0.03||fJ>0.97){okJ=false;break;}
+          frJ.push(fJ);prevJ=fJ;
+        }
+        mpJ.remove();
+        if(okJ&&frJ.length===ordered.length-1)cutSets.unshift(frJ); // la jonction d'abord, le prorata en repli
+      }
+      var bestEval=null;
+      for(var cs=0;cs<cutSets.length;cs++){
+      var frC=cutSets[cs];
       var pieces=[],scores=[],prevF=0,ok=true;
       for(var oi2=0;oi2<ordered.length;oi2++){
-        var f1=oi2<fr.length?fr[oi2]:1;
+        var f1=oi2<frC.length?frC[oi2]:1;
         var piece=extractStrokePiece(sMerged[mi2],prevF,f1);prevF=f1;
         var pf=strokeFeat(piece);
         pf.relX=(pf.cx-mergedBounds.x)/mergedBounds.w;pf.relY=(pf.cy-mergedBounds.y)/mergedBounds.h;
@@ -5305,12 +5375,34 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
               var proj=(pieceSegs[pj].point[0]-pFirst[0])*ux+(pieceSegs[pj].point[1]-pFirst[1])*uy;
               if(proj>maxProj)maxProj=proj;else if(maxProj-proj>worstBack)worstBack=maxProj-proj;
             }
-            if(worstBack>chordLen*0.25)ok=false;
+            if(worstBack>chordLen*0.25){
+              if(TW_SPLIT_BACK_RELATIVE){
+                // Le crochet d'origine venait d'une coupe tombée DANS un
+                // rebroussement du trait fusionné : il est au BORD du morceau.
+                // Un rebroussement au milieu est la forme du dessin (menton,
+                // nez), que le score de forme juge déjà. On ne refuse donc que
+                // si le retour en arrière se produit dans les 20 % de chaque
+                // bout, ou s'il dépasse celui du trait cible de SPLIT_BACK_MARGIN.
+                var partSd=sParts[ordered[oi2].idx];
+                var partBack=_backtrackRatioSd(partSd);
+                var nb=pieceSegs.length,win=Math.max(2,Math.floor(nb*0.2)),edgeBack=0;
+                var scan=function(from,to,step){var mxp=-Infinity,wb2=0;for(var q=from;q!==to;q+=step){var pr2=(pieceSegs[q].point[0]-pFirst[0])*ux+(pieceSegs[q].point[1]-pFirst[1])*uy;if(step<0)pr2=-pr2;if(pr2>mxp)mxp=pr2;else if(mxp-pr2>wb2)wb2=mxp-pr2;}return wb2;};
+                edgeBack=Math.max(scan(0,win,1),scan(nb-1,nb-1-win,-1));
+                var relBad=worstBack/chordLen>partBack+SPLIT_BACK_MARGIN,edgeBad=edgeBack>chordLen*0.25;
+                if(relBad&&edgeBad)ok=false;
+                _mlNote('scission : retour en arrière',{morceau:+(worstBack/chordLen).toFixed(2),auxBords:+(edgeBack/chordLen).toFixed(2),cible:+partBack.toFixed(2),verdict:(relBad&&edgeBad)?'refusé (bord)':'accepté'});
+              }else ok=false;
+            }
           }
         }
       }
       if(!ok)continue;
-      var avg=scores.reduce(function(a,b){return a+b;},0)/scores.length;
+      var avgC=scores.reduce(function(a,b){return a+b;},0)/scores.length;
+      if(!bestEval||avgC<bestEval.avg)bestEval={pieces:pieces,scores:scores,avg:avgC,coupe:cs===0&&cutSets.length>1?'jonction':'prorata'};
+      }
+      if(!bestEval)continue;
+      var pieces=bestEval.pieces,scores=bestEval.scores,avg=bestEval.avg;
+      _mlNote('scission : coupe retenue',{coupe:bestEval.coupe,scores:scores.map(function(x){return +x.toFixed(3);})});
       var baseline=cand.map(function(i){return(curPair&&(mergedSide==='B'?curPair.aIdx:curPair.bIdx)===i)?curPair.score:0.95;});
       var baseAvg=baseline.reduce(function(a,b){return a+b;},0)/baseline.length;
       if(avg>=baseAvg-0.03)continue;
