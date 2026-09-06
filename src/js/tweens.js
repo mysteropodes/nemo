@@ -1256,6 +1256,88 @@ function _strokeInJson(sd){
   // same input, purely depending on which one happened to run.
   return{segments:sd.segments||[],centerSegments:sd.centerSegments,strokeColor:realStrokeColor(sd)||null,fillColor:sd.fillColor||null,isVectorBrush:!!sd.isVectorBrush,closed:!!sd.closed};
 }
+// ---- JOURNAL DE DÉCISION DE L'APPARIEMENT (plan 2026-09, chantier 0.3) ----
+// window.__TW_DEBUG_MATCH=true avant generateTweens : chaque portée pousse une
+// entrée dans window.__twMatchLog. Par paire et par passe : coût, meilleure
+// alternative sur la ligne et sur la colonne, marge, accord mutuel (la paire est
+// le minimum de sa ligne ET de sa colonne), marge au fondu ; puis chaque passe
+// qui a modifié l'appariement avec sa raison (relationnel, 2-opt, seuil,
+// rattrapage et ses motifs de refus, complétion de pièce, scission, passe
+// d'ordre et ses gardes) ; enfin la source de chaque paire retenue. Aucun
+// effet quand le drapeau est éteint : _twML reste null et chaque point de
+// journalisation revient immédiatement. Lecture : B.journal() dans le banc.
+var _twML=null;
+function _mlShort(sd){var id=sd&&sd.strokeId;if(id===undefined||id===null)return '?';id=String(id);return id.length>8?id.slice(-8):id;}
+function _mlBegin(fA,fB,sA,sB){
+  _twML=null;
+  if(typeof window==='undefined'||!window.__TW_DEBUG_MATCH)return;
+  _twML={fA:fA,fB:fB,n:sA.length,m:sB.length,idsA:sA.map(_mlShort),idsB:sB.map(_mlShort),epingles:[],passes:[],etapes:[],final:null};
+  window.__twMatchLog=window.__twMatchLog||[];window.__twMatchLog.push(_twML);
+}
+function _mlEnd(){_twML=null;}
+function _mlIdA(a){return (_twML&&a>=0&&a<_twML.n)?_twML.idsA[a]:(a<0?'fondu':'pièce');}
+function _mlIdB(b){return (_twML&&b>=0&&b<_twML.m)?_twML.idsB[b]:(b<0?'fondu':'pièce');}
+function _mlPins(forcedPairs){
+  if(!_twML)return;
+  forcedPairs.forEach(function(fp){if(fp.isPiece)return;
+    _twML.epingles.push({type:fp.provenance?'provenance':fp.identity?'identité':fp.twin?'jumeau':'manuel',a:fp.aIdx,b:fp.bIdx,idA:_mlIdA(fp.aIdx),idB:_mlIdB(fp.bIdx)});});
+}
+// Une affectation complète lue dans la matrice augmentée (colonnes >= m = fondu).
+function _mlAssign(nom,cost,matches,n,m,extra){
+  if(!_twML)return;
+  var rows=[],byA={};matches.forEach(function(mm){byA[mm.a]=mm.b;});
+  for(var a=0;a<n;a++){
+    var b=byA[a],row=cost[a];
+    var best1=Infinity,best2=Infinity,arg=-1;
+    for(var j=0;j<m;j++){var c=row[j];if(c<best1){best2=best1;best1=c;arg=j;}else if(c<best2)best2=c;}
+    var fade=row.length>m?row[m]:null;
+    var e={a:a,idA:_mlIdA(a)};
+    if(b===undefined){
+      e.b=-1;e.idB='fondu';e.mutuel=false;e.marge=null;
+      e.meilleur=isFinite(best1)?{b:arg,idB:_mlIdB(arg),cout:+best1.toFixed(3)}:null;
+    }else{
+      e.b=b;e.idB=_mlIdB(b);e.cout=+row[b].toFixed(3);
+      var altL=Infinity;for(var j2=0;j2<m;j2++)if(j2!==b&&row[j2]<altL)altL=row[j2];
+      var altC=Infinity,argC=-1,minC=Infinity;
+      for(var i2=0;i2<n;i2++){var cc=cost[i2][b];if(cc<minC){minC=cc;argC=i2;}if(i2!==a&&cc<altC)altC=cc;}
+      e.altLigne=isFinite(altL)?+altL.toFixed(3):null;e.altCol=isFinite(altC)?+altC.toFixed(3):null;
+      var mg=Math.min(altL-row[b],altC-row[b]);e.marge=isFinite(mg)?+mg.toFixed(3):null;
+      e.mutuel=(arg===b&&argC===a);
+      e.margeFondu=fade===null?null:+(fade-row[b]).toFixed(3);
+    }
+    if(extra)extra(e,a,b);
+    rows.push(e);
+  }
+  _twML.passes.push({passe:nom,paires:rows});
+}
+function _mlSpecs(ps){if(!_twML)return[];return ps.map(function(p){return{a:p.aIdx,b:p.bIdx};});}
+// Différence entre deux affectations ({a,b}[]) : ce qui a changé, côté A.
+function _mlDiff(nom,avant,apres,raison){
+  if(!_twML)return;
+  var bA={},bB={};avant.forEach(function(x){bA[x.a]=x.b;});apres.forEach(function(x){bB[x.a]=x.b;});
+  var ch=[],seen={};
+  avant.concat(apres).forEach(function(x){var a=x.a;if(seen[a])return;seen[a]=1;
+    var d=bA[a],v=bB[a];if(d===undefined)d=-1;if(v===undefined)v=-1;if(d===v)return;
+    ch.push({a:a,idA:_mlIdA(a),de:d,idDe:_mlIdB(d),vers:v,idVers:_mlIdB(v)});});
+  _twML.etapes.push({etape:nom,raison:raison||null,changements:ch});
+}
+function _mlNote(nom,data){
+  if(!_twML)return;
+  var e={etape:nom};for(var k in data)e[k]=data[k];
+  if(e.a!==undefined&&e.idA===undefined)e.idA=_mlIdA(e.a);
+  if(e.b!==undefined&&e.idB===undefined)e.idB=_mlIdB(e.b);
+  if(e.a1!==undefined){e.idA1=_mlIdA(e.a1);e.idA2=_mlIdA(e.a2);}
+  _twML.etapes.push(e);
+}
+function _mlFinal(pairSpecs,unA,unB,th){
+  if(!_twML)return;
+  _twML.final=pairSpecs.map(function(p){
+    var src=p.forced?(p.provenance?'provenance':p.identity?'identité':p.twin?'jumeau':'manuel'):p.isPiece?'scission':p.completion?'complétion':((typeof p.score==='number'&&p.score>th)?'rattrapage':'hongrois');
+    return{a:p.aIdx,b:p.bIdx,idA:_mlIdA(p.aIdx),idB:_mlIdB(p.bIdx),source:src,score:(typeof p.score==='number')?+p.score.toFixed(3):null};});
+  _twML.fondusA=unA.map(function(i){return{a:i,idA:_mlIdA(i)};});
+  _twML.fondusB=unB.map(function(i){return{b:i,idB:_mlIdB(i)};});
+  _twML=null;
+}
 // pins: [{a,b}] pairs imposed inside the solver (TW_PIN_IN_SOLVER) — manual
 // overrides and provenance. Ignored by the wasm twin (bypassed anyway while
 // the relational path is on).
@@ -1351,6 +1433,7 @@ function _autoMatchJSCore(sA,sB,hist,pins,seedOverride){
   var assign=hungarian(cost);
   var matches=[];
   for(var a2=0;a2<n;a2++){var b2=assign[a2];if(b2!==undefined&&b2>=0&&b2<m)matches.push({a:a2,b:b2,score:cost[a2][b2]});}
+  _mlAssign('passe 1 (forme)',cost,matches,n,m);
   if(matches.length<2)return matches;
   // Pass 2: seed the motion model from the best-scoring (least ambiguous)
   // half of pass 1's matches, then re-resolve every pair using how well it
@@ -1363,6 +1446,7 @@ function _autoMatchJSCore(sA,sB,hist,pins,seedOverride){
   var seeds=seedSrc.slice().sort(function(x,y){return x.score-y.score;});
   var seedCount=Math.max(2,Math.ceil(seeds.length*0.5));
   seeds=seeds.slice(0,seedCount);
+  _mlNote('graines du champ',{n:seeds.length,paires:seeds.map(function(s){return{a:s.a,b:s.b,idA:_mlIdA(s.a),idB:_mlIdB(s.b),score:+s.score.toFixed(3)};})});
   var ptsA=seeds.map(function(s){return{x:fA[s.a].cx,y:fA[s.a].cy};});
   var ptsB=seeds.map(function(s){return{x:fB[s.b].cx,y:fB[s.b].cy};});
   var transform=fitSimilarityTransform(ptsA,ptsB);
@@ -1494,6 +1578,7 @@ function _autoMatchJSCore(sA,sB,hist,pins,seedOverride){
   var hypOf=null,hyps=null,assign2,matches2=[];
   if(TW_MATCH_RELATIONAL&&TW_MATCH_MULTI_MOTION)hyps=multiMotionHypotheses(fA,fB,n,m,hist);
   if(hyps&&hyps.length){
+    _mlNote('hypothèses de mouvement',{n:hyps.length,supports:hyps.map(function(h){return h.support;})});
     // Pre-score every pairing under every hypothesis once; then solve,
     // count how many matched strokes actually ADOPT each hypothesis, drop
     // the ones adopted by fewer than MM_MIN_SUPPORT strokes and re-solve.
@@ -1532,24 +1617,28 @@ function _autoMatchJSCore(sA,sB,hist,pins,seedOverride){
       assign2=hungarian(cost2);
       matches2=[];
       for(var a5=0;a5<n;a5++){var b5=assign2[a5];if(b5!==undefined&&b5>=0&&b5<m)matches2.push({a:a5,b:b5,score:cost2[a5][b5]});}
+      _mlAssign('passe 2 tour '+round+' (transport + hypothèses)',cost2,matches2,n,m,function(e,a,b){if(b!==undefined&&b>=0){var hh=hypOf[a*m+b];e.canal=(hh===undefined?'champ ou brut':'hypothèse '+hh);}});
       // adopters are counted AFTER the relational pass: a hypothesis's
       // strokes often win only as a group (a chain shifted by one is
       // individually cheaper on the raw channel), which is exactly what
       // the arrangement term sees and the unary Hungarian does not.
       matches2.forEach(function(mm2){var hh=hypOf[mm2.a*m+mm2.b];localTfs[mm2.a]=hh!==undefined?hyps[hh].tf:localTfs0[mm2.a];});
+      var _mlAv=matches2.slice();
       matches2=relationalRefine(matches2,fA,fB,cost2,localTfs,n,m,FADE_COST);
+      _mlDiff('relationnel tour '+round,_mlAv,matches2,'voisinage, structure, 2-opt');
       var adopters=hyps.map(function(){return 0;});
       matches2.forEach(function(mm3){var h5=hypOf[mm3.a*m+mm3.b];if(h5!==undefined)adopters[h5]++;});
       var dropped=false;
-      for(var di=0;di<hyps.length;di++)if(alive[di]&&adopters[di]<(hyps[di].minAdopt||MM_MIN_SUPPORT)){alive[di]=false;dropped=true;}
+      for(var di=0;di<hyps.length;di++)if(alive[di]&&adopters[di]<(hyps[di].minAdopt||MM_MIN_SUPPORT)){alive[di]=false;dropped=true;_mlNote('hypothèse abandonnée',{h:di,adoptants:adopters[di],minimum:(hyps[di].minAdopt||MM_MIN_SUPPORT)});}
       if(!dropped)return matches2;
     }
     return matches2;
   }else{
     assign2=hungarian(cost2);
     for(var a4=0;a4<n;a4++){var b4=assign2[a4];if(b4!==undefined&&b4>=0&&b4<m)matches2.push({a:a4,b:b4,score:cost2[a4][b4]});}
+    _mlAssign('passe 2 (transport)',cost2,matches2,n,m);
   }
-  if(TW_MATCH_RELATIONAL)return relationalRefine(matches2,fA,fB,cost2,localTfs,n,m,FADE_COST);
+  if(TW_MATCH_RELATIONAL){var _mlR=relationalRefine(matches2,fA,fB,cost2,localTfs,n,m,FADE_COST);_mlDiff('relationnel',matches2,_mlR,'voisinage, structure, 2-opt');return _mlR;}
   return uncrossMatches(matches2,fA,fB);
 }
 // ---- MULTI-MOTION hypotheses (see TW_MATCH_MULTI_MOTION) ----
@@ -1889,6 +1978,7 @@ function relationalRefine(matches,fA,fB,cost,localTfs,n,m,fadeCost){
     var changed=false,next=new Array(n).fill(-1);
     for(var a2=0;a2<n;a2++){var b2=assign[a2];next[a2]=(b2!==undefined&&b2>=0&&b2<m)?b2:-1;if(next[a2]!==sigma[a2])changed=true;}
     sigma=next;cur=aug;
+    _mlNote('tour relationnel '+round,{modifie:changed});
     if(!changed)break;
   }
   // 2-OPT on the EXACT objective (2026-09, cat's toes): the Hungarian
@@ -1928,7 +2018,7 @@ function relationalRefine(matches,fA,fB,cost,localTfs,n,m,fadeCost){
         if(sigma[i2]<0)continue;
         var t1=sigma[i1];sigma[i1]=sigma[i2];sigma[i2]=t1;
         var o=objective(sigma);
-        if(o<best-1e-9){best=o;improved=true;}
+        if(o<best-1e-9){_mlNote('2-opt',{a1:i1,a2:i2,objectif:+o.toFixed(3),gain:+(best-o).toFixed(3)});best=o;improved=true;}
         else{sigma[i2]=sigma[i1];sigma[i1]=t1;}
       }
     }
@@ -5330,6 +5420,7 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
   _dedupeFrameStrokeIds(ld.frames[fB].strokes,fB);
   var sAsplit=splitTweenables(ld.frames[fA].strokes,manualMode),sBsplit=splitTweenables(ld.frames[fB].strokes,false);
   var sA=sAsplit.list,sB=sBsplit.list;
+  _mlBegin(fA,fB,sA,sB);
   // v16: manual pairing overrides (state.tweenOverrides) take priority
   // over autoMatch for this specific keyframe pair — resolved here by
   // stable strokeId, since sA/sB index order isn't stable across edits.
@@ -5437,7 +5528,9 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
       forcedPairs.push({aIdx:pp.a,bIdx:pp.b,aData:sA[pp.a],bData:sB[pp.b],mi:-1-forcedPairs.length,score:0,forced:true,identity:true});
     });
     var pins=forcedPairs.filter(function(fp){return!fp.isPiece;}).map(function(fp){return{a:fp.aIdx,b:fp.bIdx};});
-    var matches=autoMatch(sA,sB,hist,pins);if(!sA.length&&!sB.length&&!forcedPairs.length)return null;
+    _mlPins(forcedPairs);
+    var matches=autoMatch(sA,sB,hist,pins);if(!sA.length&&!sB.length&&!forcedPairs.length){_mlEnd();return null;}
+    _mlNote('sortie du cœur',{paires:matches.map(function(mm){return{a:mm.a,b:mm.b,idA:_mlIdA(mm.a),idB:_mlIdB(mm.b),score:+mm.score.toFixed(3)};})});
     // ---- GROUPES DE JUMEAUX (voir TW_TWIN_GROUPS) : vote de la première
     // passe → épingles de groupe → seconde résolution autour d'elles.
     if(TW_TWIN_GROUPS){
@@ -5485,6 +5578,7 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
   matches.forEach(function(m){
     if(forcedAIdx[m.a]||forcedBIdx[m.b])return; // conflicts with a manual override — drop the auto guess
     if(m.score<=MATCH_TH){pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;}
+    else _mlNote('seuil',{a:m.a,b:m.b,score:+m.score.toFixed(3),seuil:MATCH_TH,verdict:'au-dessus du seuil, candidat au rattrapage'});
   });
   // Second chance for mutually-leftover Hungarian pairs (see comment above).
   // BOUNDED (2026-07, "grosses déformations... j'ai fait différentes
@@ -5506,9 +5600,9 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
   var rescueCands=[];
   matches.forEach(function(m){
     if(m.score<=MATCH_TH)return; // already handled by the first pass
-    if(m.score>rescueCeil)return; // beyond any plausible same-object motion — fade/trim instead
+    if(m.score>rescueCeil){_mlNote('rattrapage',{a:m.a,b:m.b,score:+m.score.toFixed(3),plafond:+rescueCeil.toFixed(3),verdict:'refusé : au-dessus du plafond'});return;} // beyond any plausible same-object motion — fade/trim instead
     if(forcedAIdx[m.a]||forcedBIdx[m.b])return;
-    if(aMatched[m.a]||bMatched[m.b])return; // one side already claimed — real ambiguity, let it fade
+    if(aMatched[m.a]||bMatched[m.b]){_mlNote('rattrapage',{a:m.a,b:m.b,score:+m.score.toFixed(3),verdict:'refusé : un côté déjà pris'});return;} // one side already claimed — real ambiguity, let it fade
     var fta=strokeFeat(sA[m.a]),ftb=strokeFeat(sB[m.b]);
     var clash=(fta.fillCol&&ftb.fillCol&&colorDist(fta.fillCol,ftb.fillCol)>0.35)||(fta.strokeCol&&ftb.strokeCol&&colorDist(fta.strokeCol,ftb.strokeCol)>0.35);
     // closed-flag agreement only counts as an identity veto when both
@@ -5517,6 +5611,7 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
     // (same rationale as matchSc's softened closedPen above).
     var closedOk=fta.closed===ftb.closed||fta.closedIsGuess||ftb.closedIsGuess;
     if(fta.type===ftb.type&&closedOk&&!clash)rescueCands.push({m:m,fa:fta,fb:ftb});
+    else _mlNote('rattrapage',{a:m.a,b:m.b,score:+m.score.toFixed(3),verdict:'refusé : identité ('+(fta.type!==ftb.type?'type':!closedOk?'fermeture':'couleur')+')'});
   });
   // MOTION-SUPPORT gate (2026-09, with TW_MATCH_RELATIONAL — Cyril's
   // turning face: "une pupille qui part sur la bouche"). The ceiling
@@ -5541,9 +5636,10 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
       if(!big){
         var near=refDisp.filter(function(r){return r.cand!==c;}).map(function(r){return{r:r,d2:(r.x-c.fa.cx)*(r.x-c.fa.cx)+(r.y-c.fa.cy)*(r.y-c.fa.cy)};}).sort(function(p,q){return p.d2-q.d2;}).slice(0,3);
         var supported=near.some(function(nq){var r=nq.r,rd=Math.sqrt(r.dx*r.dx+r.dy*r.dy);var ddx=r.dx-dx,ddy=r.dy-dy;return Math.sqrt(ddx*ddx+ddy*ddy)<=0.35*Math.max(disp,rd)+15;});
-        if(!supported)return; // moves unlike everything around it — fade instead
+        if(!supported){_mlNote('rattrapage',{a:m.a,b:m.b,score:+m.score.toFixed(3),deplacement:Math.round(disp),verdict:'refusé : sans témoin de mouvement'});return;} // moves unlike everything around it — fade instead
       }
     }
+    _mlNote('rattrapage',{a:m.a,b:m.b,score:+m.score.toFixed(3),verdict:'rattrapé'});
     pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;
   });
   var unA=[],unB=[];
@@ -5551,8 +5647,12 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
   for(var bi2=0;bi2<sB.length;bi2++)if(!bMatched[bi2])unB.push(bi2);
   // N:1 rescue pass — may convert fades + a mediocre pair into clean
   // piece-wise morphs by splitting a merged stroke (see resolveSplitMatches)
+  var _mlS0=_mlSpecs(pairSpecs);
   if(unA.length&&unB.length)_pieceCompletion(sA,sB,pairSpecs,unA,unB);
+  _mlDiff('complétion de pièce',_mlS0,_mlSpecs(pairSpecs),'restes encadrés par les mêmes deux paires');
+  var _mlS1=_mlSpecs(pairSpecs);
   if(unA.length||unB.length)resolveSplitMatches(sA,sB,pairSpecs,unA,unB);
+  _mlDiff('scission N:1',_mlS1,_mlSpecs(pairSpecs),'trait fusionné découpé en morceaux');
   var fadeOutA=unA.map(function(i){return sA[i];}),fadeInB=unB.map(function(i){return sB[i];});
   // Identity-COLLISION guard (2026-07, live-reported: 2 real frames
   // showed a duplicate strokeId on two visually unrelated strokes). A
@@ -5585,7 +5685,7 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
     if(sd.strokeId&&pendingPairIds[sd.strokeId])sd.strokeId='twc_'+fB+'_b'+i2;
     if(!sd.strokeId)sd.strokeId='twf_'+fB+'_b'+i2;
   });
-  if(!pairSpecs.length&&!fadeOutA.length&&!fadeInB.length)return null;
+  if(!pairSpecs.length&&!fadeOutA.length&&!fadeInB.length){_mlEnd();return null;}
   // Trim-vs-fade plans, computed ONCE per span (see _vanishPlanFor). The
   // junction anchors are the strokes that persist through the span:
   // every matched pair's own keyframe stroke, plus held strokes.
@@ -5680,7 +5780,7 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
       var pA=_ocCentroid(ocP.aData),pB=_ocCentroid(ocP.bData);
       var qA=_ocCentroid(ocQ.aData),qB=_ocCentroid(ocQ.bData);
       if(!_ocSegsCross(pA,pB,qA,qB))continue;
-      if(_ocSegsCross(pA,qB,qA,pB))continue; // swap still crosses — not a simple order inversion
+      if(_ocSegsCross(pA,qB,qA,pB)){_mlNote('passe d\'ordre',{a1:ocP.aIdx,a2:ocQ.aIdx,verdict:'trajectoires croisées, échange encore croisé : rien'});continue;} // swap still crosses — not a simple order inversion
       // GARDE D'ARRANGEMENT (2026-09-04, « entre 26 et 35 confusion au
       // niveau de son bras droit ») : deux contours parallèles d'un même
       // membre (20 px d'écart, 100 px de long) qui glissent ensemble ont
@@ -5698,11 +5798,11 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
       if(TW_OC_SIDE_GUARD){
         var rAx=qA[0]-pA[0],rAy=qA[1]-pA[1],rBx=qB[0]-pB[0],rBy=qB[1]-pB[1];
         var rla=Math.sqrt(rAx*rAx+rAy*rAy),rlb=Math.sqrt(rBx*rBx+rBy*rBy);
-        if(rla>1e-6&&rlb>1e-6&&(rAx*rBx+rAy*rBy)/(rla*rlb)>0.3)continue;
+        if(rla>1e-6&&rlb>1e-6&&(rAx*rBx+rAy*rBy)/(rla*rlb)>0.3){_mlNote('passe d\'ordre',{a1:ocP.aIdx,a2:ocQ.aIdx,verdict:'garde de côté : arrangement conservé, rien'});continue;}
       }
       var curCost=_ocCost(_ocFeatA[oc1],_ocFeatB[oc1])+_ocCost(_ocFeatA[oc2],_ocFeatB[oc2]);
       var swapCost=_ocCost(_ocFeatA[oc1],_ocFeatB[oc2])+_ocCost(_ocFeatA[oc2],_ocFeatB[oc1]);
-      if(swapCost>curCost+0.15)continue; // meaningfully worse — likely a real intended crossing, leave it
+      if(swapCost>curCost+0.15){_mlNote('passe d\'ordre',{a1:ocP.aIdx,a2:ocQ.aIdx,cout:+curCost.toFixed(3),coutEchange:+swapCost.toFixed(3),verdict:'échange plus cher : croisement voulu, rien'});continue;} // meaningfully worse — likely a real intended crossing, leave it
       // IDENTITY GUARD (2026-09, same cat case): never let this pass
       // create a pairing the matcher itself would call absurd. A swap
       // that turns two same-size pairs into two wildly mismatched ones
@@ -5711,13 +5811,15 @@ function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
       function _ocRatio(fX,fY){return Math.max(fX.length,fY.length)/Math.max(1,Math.min(fX.length,fY.length));}
       var curWorst=Math.max(_ocRatio(_ocFeatA[oc1],_ocFeatB[oc1]),_ocRatio(_ocFeatA[oc2],_ocFeatB[oc2]));
       var swapWorst=Math.max(_ocRatio(_ocFeatA[oc1],_ocFeatB[oc2]),_ocRatio(_ocFeatA[oc2],_ocFeatB[oc1]));
-      if(swapWorst>Math.max(2,curWorst*1.5))continue;
+      if(swapWorst>Math.max(2,curWorst*1.5)){_mlNote('passe d\'ordre',{a1:ocP.aIdx,a2:ocQ.aIdx,cout:+curCost.toFixed(3),coutEchange:+swapCost.toFixed(3),verdict:'garde d\'identité (rapport de longueurs) : rien'});continue;}
       var tmpData=ocP.bData,tmpIdx=ocP.bIdx;
       ocP.bData=ocQ.bData;ocP.bIdx=ocQ.bIdx;
       ocQ.bData=tmpData;ocQ.bIdx=tmpIdx;
       _ocFeatB[oc1]=strokeFeat(ocP.bData);_ocFeatB[oc2]=strokeFeat(ocQ.bData);
+      _mlNote('passe d\'ordre',{a1:ocP.aIdx,a2:ocQ.aIdx,cout:+curCost.toFixed(3),coutEchange:+swapCost.toFixed(3),verdict:'ÉCHANGÉ (partenaires B permutés)'});
     }
   }
+  _mlFinal(pairSpecs,unA,unB,MATCH_TH);
   return{sA:sA,sB:sB,sAsplit:sAsplit,sBsplit:sBsplit,pairSpecs:pairSpecs,unA:unA,unB:unB,fadeOutA:fadeOutA,fadeInB:fadeInB,outPlans:outPlans,inPlans:inPlans,forcedPairs:forcedPairs,matches:matches};
 }
 // Provenance pins (TW_PROVENANCE_PINS): a B stroke whose dupOf names

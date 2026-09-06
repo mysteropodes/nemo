@@ -416,6 +416,46 @@
       out.banc=b0.concat(b6).reduce(function(a,x){return a+x.errors_new;},0);}
     return out;
   };
+  // ---- journal d'appariement (chantier 0.3) : lecture humaine ----
+  // window.__TW_DEBUG_MATCH=true ; générer ; B.journal() = dernière portée,
+  // B.journal(k) = k-ième, B.journal(fA,fB) = la portée fA→fB. Renvoie un
+  // texte et l'affiche en console.
+  B.journal=function(a,b){
+    var L=window.__twMatchLog||[];if(!L.length)return 'journal vide (mettre window.__TW_DEBUG_MATCH=true avant de générer)';
+    var J=null;
+    if(b!==undefined){for(var i=0;i<L.length;i++)if(L[i].fA===a&&L[i].fB===b)J=L[i];}
+    else J=(a===undefined)?L[L.length-1]:L[a];
+    if(!J)return 'portée introuvable';
+    var out=[];
+    out.push('PORTÉE '+J.fA+'→'+J.fB+' : '+J.n+' traits en A, '+J.m+' en B');
+    if(J.epingles.length){out.push('ÉPINGLES');J.epingles.forEach(function(e){out.push('  '+e.type+' : '+e.idA+' → '+e.idB);});}
+    J.passes.forEach(function(p){
+      out.push('PASSE '+p.passe);
+      p.paires.forEach(function(e){
+        if(e.b<0){out.push('  '+e.idA+' → fondu'+(e.meilleur?' (meilleur candidat '+e.meilleur.idB+' à '+e.meilleur.cout+')':''));return;}
+        var flags=[];if(e.mutuel)flags.push('mutuel');if(e.marge!==null&&e.marge<0.05)flags.push('MARGE FAIBLE');
+        out.push('  '+e.idA+' → '+e.idB+'  coût '+e.cout+'  alt ligne '+e.altLigne+' / col '+e.altCol+'  marge '+e.marge+'  fondu '+(e.margeFondu===null?'?':(e.margeFondu>=0?'+':'')+e.margeFondu)+(e.canal?'  ['+e.canal+']':'')+(flags.length?'  '+flags.join(', '):''));
+      });
+    });
+    J.etapes.forEach(function(e){
+      if(e.changements){
+        if(!e.changements.length){out.push('ÉTAPE '+e.etape+' : aucun changement');return;}
+        out.push('ÉTAPE '+e.etape+(e.raison?' ('+e.raison+')':''));
+        e.changements.forEach(function(c){out.push('  '+c.idA+' : '+c.idDe+' → '+c.idVers);});
+        return;
+      }
+      var parts=[];for(var k in e){if(k==='etape'||k==='paires')continue;var v=e[k];if(v&&typeof v==='object')v=JSON.stringify(v);parts.push(k+'='+v);}
+      if(e.paires){parts.push('paires='+e.paires.map(function(q){return q.idA+'→'+q.idB+(q.score!==undefined?'('+q.score+')':'');}).join(' '));}
+      out.push('NOTE '+e.etape+' : '+parts.join('  '));
+    });
+    if(J.final){
+      out.push('BILAN');
+      J.final.forEach(function(f){out.push('  '+f.idA+' → '+f.idB+'  ['+f.source+']'+(f.score!==null?'  '+f.score:''));});
+      if(J.fondusA&&J.fondusA.length)out.push('  fondus A : '+J.fondusA.map(function(x){return x.idA;}).join(' '));
+      if(J.fondusB&&J.fondusB.length)out.push('  fondus B : '+J.fondusB.map(function(x){return x.idB;}).join(' '));
+    }
+    var txt=out.join('\n');console.log(txt);return txt;
+  };
   B.snapshot=function(){var c=document.querySelector('#canvas')||document.querySelector('canvas');return c?c.toDataURL('image/png'):null;};
   window.__twBench=B;
 })();
