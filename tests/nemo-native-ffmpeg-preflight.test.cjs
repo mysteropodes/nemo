@@ -8,7 +8,7 @@ const { JOBS, execute } = require('../scripts/nemo/lib/jobs.cjs');
 
 function executable(dir, name, source) {
   const file = path.join(dir, name);
-  fs.writeFileSync(file, `#!${process.execPath}\n${source}\n`, { mode: 0o755 });
+  fs.writeFileSync(file, `#!/usr/bin/env node\n${source}\n`, { mode: 0o755 });
   return file;
 }
 
