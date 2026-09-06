@@ -223,23 +223,29 @@ function jobBuildDesktop(ctx) {
   const missing = [];
   if (!tauri) missing.push('node_modules/.bin/tauri (run npm ci)');
   if (!which('cargo')) missing.push('cargo');
-  const triple = ctx.receipt.build.hostTriple;
-  if (!triple) missing.push('rustc host triple');
-  if (process.platform === 'darwin' && !which('xcode-select')) missing.push('Xcode command line tools');
+  if (!ctx.receipt.build.hostTriple) missing.push('rustc host triple');
   if (!which('python3')) missing.push('python3 (scripts/bundle-ffmpeg-dylibs.py)');
+  if (process.platform !== 'darwin') missing.push('macOS (isolated desktop build is not validated on this platform)');
+  else if (!which('xcode-select')) missing.push('Xcode command line tools');
   if (missing.length) return blocked('missing: ' + missing.join(', '));
-  const r = run(tauri, ['build', '--target', triple, '-b', 'app', '--no-sign'], { timeout: 2 * 60 * 60 * 1000 });
-  if (r.status !== 0) return fail(`tauri build exit ${r.status}`, { exitCode: r.status, log: logOf(r) });
-  const app = path.join(ROOT, 'src-tauri', 'target', triple, 'release', 'bundle', 'macos', 'Nemo.app');
-  if (process.platform !== 'darwin') return pass('tauri build ok (non-macOS: dylib bundling step not applicable)', { exitCode: 0, log: logOf(r) });
-  if (!exists(app)) return fail('tauri build reported success but Nemo.app not found at ' + path.relative(ROOT, app), { log: logOf(r) });
-  const d = run('python3', ['scripts/bundle-ffmpeg-dylibs.py', app], { timeout: 10 * 60 * 1000 });
-  const log = logOf(r) + '\n' + logOf(d);
-  if (d.status !== 0) return fail(`bundle-ffmpeg-dylibs.py exit ${d.status}`, { exitCode: d.status, log });
-  const mainBin = fileInfo(path.join(app, 'Contents', 'MacOS', 'Nemo'));
-  const sidecar = fileInfo(path.join(app, 'Contents', 'MacOS', 'ffmpeg'));
-  return pass('tauri build + ffmpeg dylib bundling ok', { exitCode: 0, log, artifacts: [{ path: path.relative(ROOT, app) }, mainBin, sidecar],
-    limitations: ['unsigned, un-notarized local build; not the release pipeline artifact'] });
+  const r = run(process.execPath, ['scripts/nemo/build-job.cjs', ctx.reportDir], { timeout: 2 * 60 * 60 * 1000 + 120_000 });
+  let result;
+  try { result = JSON.parse(r.stdout); } catch { return fail('isolated desktop build controller returned no valid receipt', { exitCode: 1, log: r.stderr }); }
+  const expectedExit = result.status === 'pass' ? 0 : result.status === 'blocked' ? 2 : 1;
+  if (result.schema !== 'nemo.build-job/1' || !['pass', 'fail', 'blocked'].includes(result.status) || r.status !== expectedExit) {
+    return fail('isolated desktop build controller receipt and exit disagree', { exitCode: 1, log: r.stderr });
+  }
+  if (result.status === 'pass') {
+    const app = Array.isArray(result.artifacts) && result.artifacts.find(item => typeof item.path === 'string' && item.path.endsWith('.app'));
+    if (!app || !result.details || !result.details.cleanup || !result.details.cleanup.released || !exists(path.resolve(ROOT, app.path))) {
+      return fail('isolated desktop build did not preserve a released package', { exitCode: 1 });
+    }
+    // A later test:desktop in this same job runner must consume this package,
+    // not an older shared-target artifact. This does not change the caller's shell.
+    process.env.NEMO_DESKTOP_APP = path.resolve(ROOT, app.path);
+  }
+  const { schema: _schema, ...job } = result;
+  return job;
 }
 
 // ---- registry ----------------------------------------------------------
@@ -254,7 +260,7 @@ const JOBS = {
   'test:desktop': { run: jobTestDesktop, required: true },
   bench: { run: jobBench, required: false },
   'build:wasm': { run: jobBuildWasm, required: false },
-  'build:desktop': { run: jobBuildDesktop, required: false },
+  'build:desktop': { run: jobBuildDesktop, required: true },
 };
 
 const PROFILES = {
