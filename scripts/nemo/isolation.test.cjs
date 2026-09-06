@@ -538,3 +538,47 @@ test('an interrupted mutation stays closed until explicit reconciliation', async
   assert.equal(attempt.acquired, false);
   assert.match(attempt.reason, /busy or interrupted/);
 });
+
+test('owner-confirmed slots survive holder exit until a verified owned release', async () => {
+  const child = spawnDummyProcess();
+  const task = 'owner-confirmed-release';
+  const slot = 'owner-confirmed-slot';
+  const launcher = iso.registerLauncher(task, { pid: child.pid });
+  const held = iso.acquireExclusiveSlot(slot, task, { pid: child.pid, releasePolicy: 'owner-confirmed' });
+  try {
+    await reap(child);
+    assert.equal(iso.acquireExclusiveSlot(slot, 'contender').acquired, false);
+    assert.equal(iso.releaseTask(task, launcher.ownerToken).released, false);
+    assert.ok(fs.existsSync(iso.taskRoots(task).root));
+    assert.ok(iso.readLauncher(task), 'an unverified release preserves ownership');
+    assert.equal(iso.releaseTask(task, launcher.ownerToken, { releaseManagedSlots: true }).released, false);
+    assert.throws(() => iso.releaseTask(task, launcher.ownerToken, {
+      releaseManagedSlots: true, beforeRelease() { throw new Error('lifetime still active'); },
+    }), /lifetime still active/);
+    assert.equal(iso.acquireExclusiveSlot(slot, 'contender').acquired, false);
+    const record = JSON.parse(fs.readFileSync(held.file));
+    fs.writeFileSync(held.file, JSON.stringify({ ...record, releasePolicy: 'future-policy' }));
+    assert.equal(iso.acquireExclusiveSlot(slot, 'contender').acquired, false);
+    assert.equal(iso.releaseTask(task, launcher.ownerToken, {
+      releaseManagedSlots: true, beforeRelease() {},
+    }).released, false, 'an unknown lifetime policy requires reconciliation');
+    fs.writeFileSync(held.file, JSON.stringify(record));
+    let verified = false;
+    const result = iso.releaseTask(task, launcher.ownerToken, {
+      releaseManagedSlots: true, beforeRelease() { verified = true; },
+    });
+    assert.equal(verified, true);
+    assert.equal(result.released, true);
+    assert.deepEqual(result.slots.reconciled, [slot]);
+    const successor = iso.acquireExclusiveSlot(slot, 'successor');
+    assert.equal(successor.acquired, true);
+    successor.release();
+  } finally {
+    await reap(child);
+    held.release();
+  }
+});
+
+test('unknown slot release policies cannot silently gain automatic reclamation', () => {
+  assert.throws(() => iso.acquireExclusiveSlot('bad-policy', 'bad-policy', { releasePolicy: 'unknown' }), /release policy/);
+});

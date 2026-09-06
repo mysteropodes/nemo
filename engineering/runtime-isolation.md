@@ -22,7 +22,7 @@ regressions live in `scripts/nemo/isolation.test.cjs`.
 | Local owner/source check | `verifyHandshake()` requires the owner token and a live positive PID. With `checkSource:true`, it requires available source identity and compares the **complete R02 `sourceIdentity()` snapshot**, including HEAD, branch, worktree and dirty digest. Missing identity fails closed. |
 | Stop | `await requestStop(taskId, ownerToken, {signal, timeoutMs})` signals only an owner-matching record, then polls for exit. `stopped:true` means exit was observed. A timeout returns `stopped:false` and retains the owner record for a retry. Allowed signals are SIGTERM, SIGINT and SIGKILL; default timeout is 3 seconds, maximum 60 seconds. |
 | Root release | `releaseTask(taskId, ownerToken)` refuses a live launcher, including its owner, and refuses mismatched or unreadable records. It removes that validated task's roots after exit and reconciles only its verifiably dead exclusive-slot records; live, foreign or uncertain records remain untouched. Release port reservations separately before removing their metadata. |
-| Exclusive resources | Slot acquire/release and stale-holder replacement all take the same atomic per-slot mutation guard. An ordinary record belonging to a dead PID can be replaced; two reclaimers cannot delete each other's live ownership. |
+| Exclusive resources | Slot acquire/release and stale-holder replacement all take the same atomic per-slot mutation guard. An ordinary process-exit record belonging to a dead PID can be replaced; two reclaimers cannot delete each other's live ownership. Native slots require owner-confirmed app-group exit and survive launcher death. |
 
 The default runtime root is `<os.tmpdir()>/nemo-runtime`; override it with
 `NEMO_ISOLATION_ROOT` **before importing the module**. Reports can use
@@ -277,6 +277,14 @@ it starts: `desktop-input` for a run that drives the one keyboard and mouse,
 slot is refused by name. Running two isolated instances at once is **not** what a
 slot restricts — that is the point of the roots above; a second instance that
 does not ask for the shared resource still starts.
+
+Native reservations use `releasePolicy: 'owner-confirmed'` before spawning the
+app. Other callers cannot reclaim them merely because the launcher PID died.
+Normal launcher cleanup releases them only after confirming process-group exit.
+After a crash, the owner's native `stop` verifies that same exit condition under
+the task guard before requesting managed-slot release. A live or unknown group
+retains the reservation and task records for reconciliation. Generic task release
+cannot remove those records without the consumer's explicit lifetime verifier.
 
 Focused regressions run with `node --test scripts/nemo/native-runtime.test.cjs`
 and reach normal discovery through `tests/nemo-native-runtime.test.cjs`. They

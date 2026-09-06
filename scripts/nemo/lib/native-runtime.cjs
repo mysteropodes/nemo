@@ -351,7 +351,7 @@ async function runNativeLauncher(taskId, options = {}, emit = () => {}) {
   // serialized (R06 acceptance: "explicit exclusive reservations").
   const reservations = [];
   for (const slot of config.reserve) {
-    const acquired = isolation.acquireExclusiveSlot(slot, taskId, { pid: process.pid });
+    const acquired = isolation.acquireExclusiveSlot(slot, taskId, { pid: process.pid, releasePolicy: 'owner-confirmed' });
     if (!acquired.acquired) {
       for (const held of reservations) held.release();
       throw new Error(`exclusive resource "${slot}" unavailable: ${acquired.reason}`);

@@ -79,7 +79,7 @@ async function stop(args) {
   if (stopped.stopped) {
     try {
       released = isolation.releaseTask(args.task, args.owner, {
-        requireOwner: true, retainData: retainedData,
+        requireOwner: true, retainData: retainedData, releaseManagedSlots: true,
         beforeRelease: (record) => {
           processTree = nativeProcessTreeStopped(args.task, record, statusBeforeRelease);
           if (!processTree.stopped) throw new Error(processTree.reason);
