@@ -73,15 +73,15 @@ VENDORED_FILES = [
 BUNDLED_BINARIES = [
     {
         "name": "ffmpeg",
-        "license": "GPL (built with --enable-gpl --enable-libx264 --enable-libx265)",
+        "license": "LGPL-2.1-or-later (documented macOS rebuild)",
         "note": (
-            "Piped as an external subprocess (src-tauri/binaries/, invoked via "
-            "std::process::Command) — never linked into the Rust binary. This is "
-            "\"simple aggregation\", not linking, which is the standard, safer "
-            "pattern for shipping ffmpeg with a commercial app. It does NOT make "
-            "the GPL dependency disappear, though: before selling this app, this "
-            "binary should be replaced with a custom LGPL-only, decode-only ffmpeg "
-            "build to be fully clean of GPL obligations."
+            "The macOS sidecar is rebuilt from FFmpeg n8.1 by "
+            "scripts/rebuild-ffmpeg-lgpl.sh and invoked as an external subprocess. "
+            "The recipe omits --enable-gpl and libx264/libx265, while retaining "
+            "VideoToolbox encoding. It links dynamically against Homebrew dylibs; "
+            "scripts/bundle-ffmpeg-dylibs.py bundles them into the packaged app. "
+            "This record describes the repository build recipe; packaged-artifact "
+            "verification remains a separate acceptance step."
         ),
     },
 ]

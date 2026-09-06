@@ -37,7 +37,7 @@ The optional workflow's aggregate retains the name **`Nemo / required`** for com
 | Lane in an explicitly requested validation run | Local invocation | Success criterion |
 |---|---|---|
 | `quick` / Nemo / local quick | `node scripts/nemo/ci.cjs quick` | Existing `verify.cjs --jobs doctor,check,test:unit,test:rust --json`; every selected job passes |
-| `boundaries` / Nemo / boundaries | `node scripts/nemo/ci.cjs boundaries` | Existing boundary CLI and its protected-base ratchet both pass |
+| `boundaries` / Nemo / boundaries | `node scripts/nemo/ci.cjs boundaries` | Repository discovery, adopted profiles, coverage checks and protected-base ratchets all pass |
 | `surfaces` / Nemo / affected surfaces | `node scripts/nemo/ci.cjs surfaces` | Explicit applicability decision, then every applicable runtime job passes |
 | `aggregate` / Nemo / required | `node scripts/nemo/ci.cjs aggregate` | All three named workflow lanes return exactly `success` |
 
@@ -90,9 +90,17 @@ The current dependency/suite gaps deliberately prevent a green aggregate:
   updater, notarization, deployment, or feedback credentials.
 - WASM builds require `wasm-pack` and its target. The current local job builds geometry only;
   vectorize rebuild/parity and GPU acceptance remain outside that job's success claim.
-- Only the adopted `scripts/nemo` boundary profile is enforced here. Full application
-  architecture profiles and coverage for newly introduced tooling files remain the R05
-  adoption/integration gate. A profile passing is not proof of whole-application coverage.
+- Repository discovery records all tracked and nonignored untracked Git candidates,
+  independent of language or profile selection. Missing tracked files, unresolved index
+  conflicts, unsupported entries and unreadable content fail the boundary lane. This is
+  an inventory and integrity check; it does not classify every candidate into an
+  architectural profile or take an atomic filesystem snapshot.
+- The adopted tooling profile and its source coverage run alongside application size,
+  exclusion provenance and protected-base ratchets. Application size checks count UTF-8
+  text without applying a JavaScript lexer, including when called for Rust, WGSL, CSS,
+  Python, shell or HTML source. Language-neutral counting does not add dependency-graph
+  coverage for those languages. Full source classification and application architecture
+  enforcement remain the R05 adoption/integration gate.
 
 There are no placeholder green browser/native jobs and no label-based bypass. A green
 tooling/docs PR reports runtime jobs as **not applicable**, not tested or accepted.

@@ -71,8 +71,8 @@ test('tooling coverage profiles every current scripts/nemo CommonJS source', () 
   const profile = JSON.parse(fs.readFileSync(path.join(ROOT, ci.PROFILE), 'utf8'));
   const result = ci.toolingCoverage(profile, ROOT);
   assert.equal(result.ok, true);
-  assert.equal(result.sourcePathCount, 41);
-  assert.equal(result.declaredPathCount, 41);
+  assert.equal(result.sourcePathCount, 45);
+  assert.equal(result.declaredPathCount, 45);
   const incomplete = structuredClone(profile);
   incomplete.modules = incomplete.modules.filter((module) => module.id !== 'nemo.lib.boundariesApplication');
   const rejected = ci.toolingCoverage(incomplete, ROOT);
@@ -194,6 +194,19 @@ console.log(${JSON.stringify(JSON.stringify(report))});`);
     assert.deepEqual(invocation.baseline, profile);
     assert.equal(fs.existsSync(invocation.args[2]), false, 'temporary baseline removed after checker');
   }
+  const extra = path.join(root, 'unselected.rs');
+  fs.writeFileSync(extra, 'fn main() {}\n');
+  git(root, ['add', 'unselected.rs']);
+  const present = ci.boundaries(base, root);
+  assert.equal(present.ok, true);
+  assert.ok(present.repository.entries.some(entry => entry.path === 'unselected.rs'));
+  fs.unlinkSync(extra);
+  const missing = ci.boundaries(base, root);
+  assert.equal(missing.report.ok, true, 'existing checker still passes');
+  assert.equal(missing.ok, false, 'repository diagnostics must fail the real CI lane');
+  assert.ok(missing.repository.diagnostics.some(item => item.path === 'unselected.rs'
+    && item.code === 'missing-indexed-path'));
+  fs.writeFileSync(extra, 'fn main() {}\n');
   fs.writeFileSync(path.join(root, 'scripts/nemo/unprofiled.cjs'), '// new tooling source\n');
   assert.equal(ci.boundaries(base, root).ok, false);
 });

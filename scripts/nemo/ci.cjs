@@ -10,6 +10,7 @@ const { compareSizeBaseline } = require('./lib/boundaries-ratchet.cjs');
 const { checkApplicationPolicy, checkApplicationSize } = require('./lib/boundaries-application.cjs');
 const { checkSourceCoverage } = require('./lib/boundaries-coverage.cjs');
 const { discoverSourcePaths } = require('./lib/boundaries-discovery.cjs');
+const { discoverRepositoryFiles } = require('./lib/boundaries-repository.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const PROFILE = 'engineering/boundaries/profiles/scripts-nemo.profile.json';
@@ -159,10 +160,11 @@ function boundaries(base, root = ROOT) {
     const toolingOk = result.status === 0 && report?.ok === true && report?.ratchet?.ok === true
       && toolingSourceCoverage.ok;
     const application = applicationBoundaries(base, scratch, root);
-    const ok = toolingOk && (!application || application.ok);
-    return { ok, problems: ok ? [] : ['boundary checker, source coverage, current size, or protected baseline ratchet did not pass'],
+    const repository = discoverRepositoryFiles({ root });
+    const ok = repository.ok && toolingOk && (!application || application.ok);
+    return { ok, problems: ok ? [] : ['repository inventory, boundary checker, source coverage, current size, or protected baseline ratchet did not pass'],
       baseline: { base: baseline.base, sourcePath: baseline.sourcePath, sha256: baseline.sha256 },
-      report: report || null, toolingSourceCoverage, application, stderr: result.stderr || null };
+      report: report || null, toolingSourceCoverage, application, repository, stderr: result.stderr || null };
   } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 }
 
