@@ -5,14 +5,19 @@ independent of `main` and contains no application checkout or GitHub Actions wor
 Do not merge it into `main`. Its active GitHub rules block force pushes and deletion.
 Add later snapshots through ordinary fast-forward commits; never overwrite an earlier bundle.
 
-## Retirement completed: 2026-09-07
+## Retirement completed: two verified batches
 
-The [retirement receipt](retirements/2026-09-07.json) records the verified deletion of
-**168 remote and 259 local branch refs**, after fresh ownership and exact-SHA checks.
-GitHub now has **60 branch heads including archive**; the original local repository has
-**120 retained branches**. All 23 open PR heads/bases, existing worktrees, release refs
-and unresolved work were preserved. The bundle below remains unchanged and restores every
-retired tip exactly. Snapshot counts describe the earlier preparation census.
+The [first retirement](retirements/2026-09-07.json) and
+[superseded-work retirement](retirements/2026-09-07-superseded.json) record verified deletion
+of **175 remote and 289 local branch refs** in total. Seven obsolete PRs were closed only
+after their exact heads were archived and restored from GitHub; their reasons and closure
+order are recorded in the supplemental receipt. No comments were posted.
+
+GitHub has **53 branch heads including archive** and the original local repository has
+**90 retained branches** at completion. All **16 remaining open PR heads/bases**, active
+Fizz/Honey/parity work, existing worktrees, release refs and unresolved work were preserved.
+Both immutable bundles remain self-contained and restore every retired tip exactly.
+Snapshot counts below describe the earlier preparation censuses.
 
 ## Snapshot: 2026-09-07
 
@@ -41,7 +46,7 @@ additional candidate refs**, including R03 predecessors and obsolete report-publ
 branches. The latter contain unique historical receipts; they are archived, not claimed
 merged. PR dispositions and required closure order are recorded in the manifest. This
 supplement is independently self-contained and does not require the first snapshot.
-Actual completed retirement is recorded separately below when verified.
+The [completed retirement receipt](retirements/2026-09-07-superseded.json) records actual closures, deletions and preservation checks.
 
 ## Verify everything
 
@@ -61,7 +66,7 @@ and preservation limits. Pass a snapshot directory to verify only that snapshot.
 
 ## Restore one branch
 
-Look up the exact `scope`, `name`, `sha` and `archive_ref` in the index first. The following
+Choose the appropriate snapshot and look up its exact `scope`, `name`, `sha` and `archive_ref` in that index first. The following
 example restores one archived remote branch under a new local recovery name:
 
 ```bash

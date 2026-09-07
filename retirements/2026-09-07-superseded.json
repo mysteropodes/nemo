@@ -1,0 +1,246 @@
+{
+  "completed_at": "2026-09-07T23:44:27.090476+00:00",
+  "snapshot_commit": "b078daf61b44f57164432d1e95e82f8ad6fee86a",
+  "snapshot": "2026-09-07-superseded",
+  "archive_url": "https://github.com/mysteropodes/nemo/tree/archive",
+  "bundle_sha256": "7e45f347fcf1d8184d81790ca3abcf089405f08f595277692edbeba4da868468",
+  "closed_prs": [
+    {
+      "number": 959,
+      "head_ref": "claude/r03-curve-compat",
+      "head_sha": "8faadbe5b2ea0b420e2241f280fe81088a792f03",
+      "closed_at": "2026-09-07T23:43:07Z",
+      "url": "https://github.com/mysteropodes/nemo/pull/959"
+    },
+    {
+      "number": 946,
+      "head_ref": "claude/r03-fixtures-bench",
+      "head_sha": "6d499212fdf447af439d66f5aadb905f6575110d",
+      "closed_at": "2026-09-07T23:43:09Z",
+      "url": "https://github.com/mysteropodes/nemo/pull/946"
+    },
+    {
+      "number": 944,
+      "head_ref": "claude/r03-inventory",
+      "head_sha": "dd39e5215f000031c5f75821913cce2e6f971db9",
+      "closed_at": "2026-09-07T23:43:10Z",
+      "url": "https://github.com/mysteropodes/nemo/pull/944"
+    },
+    {
+      "number": 982,
+      "head_ref": "codex/40min-checkin-60-20260906",
+      "head_sha": "72a5c01472b25b5919187ddba8887cc473cdde12",
+      "closed_at": "2026-09-07T23:43:12Z",
+      "url": "https://github.com/mysteropodes/nemo/pull/982"
+    },
+    {
+      "number": 987,
+      "head_ref": "codex/check70-report-20260906",
+      "head_sha": "5a02104efec2c8189aafce48c0fca22be793c19a",
+      "closed_at": "2026-09-07T23:43:13Z",
+      "url": "https://github.com/mysteropodes/nemo/pull/987"
+    },
+    {
+      "number": 989,
+      "head_ref": "codex/check75-report-20260906",
+      "head_sha": "435c057a9042920a6fc5889159b77707a2aede62",
+      "closed_at": "2026-09-07T23:43:14Z",
+      "url": "https://github.com/mysteropodes/nemo/pull/989"
+    },
+    {
+      "number": 990,
+      "head_ref": "codex/check80-report-20260907",
+      "head_sha": "090706c2409874aa734e3bb97c087f126ccccead",
+      "closed_at": "2026-09-07T23:43:15Z",
+      "url": "https://github.com/mysteropodes/nemo/pull/990"
+    }
+  ],
+  "closure_order": [
+    959,
+    946,
+    944,
+    982,
+    987,
+    989,
+    990
+  ],
+  "closure_disposition": "R03 predecessors superseded by integrated patch history; report-publication work retired under the approved issue-handoff workflow. Unique report history preserved in archive. No comments posted.",
+  "remote_before": 60,
+  "remote_removed": 7,
+  "remote_after": 53,
+  "local_before": 120,
+  "local_removed": 30,
+  "local_after": 90,
+  "matching_tracking_refs_removed": 7,
+  "cumulative_remote_removed": 175,
+  "cumulative_local_removed": 289,
+  "cumulative_matching_tracking_removed": 175,
+  "skipped": [],
+  "removed_refs": {
+    "remote": [
+      {
+        "ref": "refs/heads/claude/r03-curve-compat",
+        "sha": "8faadbe5b2ea0b420e2241f280fe81088a792f03"
+      },
+      {
+        "ref": "refs/heads/claude/r03-fixtures-bench",
+        "sha": "6d499212fdf447af439d66f5aadb905f6575110d"
+      },
+      {
+        "ref": "refs/heads/claude/r03-inventory",
+        "sha": "dd39e5215f000031c5f75821913cce2e6f971db9"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-60-20260906",
+        "sha": "72a5c01472b25b5919187ddba8887cc473cdde12"
+      },
+      {
+        "ref": "refs/heads/codex/check70-report-20260906",
+        "sha": "5a02104efec2c8189aafce48c0fca22be793c19a"
+      },
+      {
+        "ref": "refs/heads/codex/check75-report-20260906",
+        "sha": "435c057a9042920a6fc5889159b77707a2aede62"
+      },
+      {
+        "ref": "refs/heads/codex/check80-report-20260907",
+        "sha": "090706c2409874aa734e3bb97c087f126ccccead"
+      }
+    ],
+    "local": [
+      {
+        "ref": "refs/heads/claude/r03-curve-compat",
+        "sha": "8faadbe5b2ea0b420e2241f280fe81088a792f03"
+      },
+      {
+        "ref": "refs/heads/claude/r03-fixtures-bench",
+        "sha": "6d499212fdf447af439d66f5aadb905f6575110d"
+      },
+      {
+        "ref": "refs/heads/claude/r03-inventory",
+        "sha": "dd39e5215f000031c5f75821913cce2e6f971db9"
+      },
+      {
+        "ref": "refs/heads/cleanup-preserve/20260907/nemo-r03-records-validation-2584444-2584444d",
+        "sha": "2584444dfc3fc4bc4d36a1cf44cb55ee23ea3728"
+      },
+      {
+        "ref": "refs/heads/cleanup-preserve/20260907/r03-review-20260905-075cac5b",
+        "sha": "075cac5b3ebc1b7f5af1130c2ba68611c846f54c"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-60-20260906",
+        "sha": "72a5c01472b25b5919187ddba8887cc473cdde12"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-2d7f58561f03",
+        "sha": "421c26984e9396e65de74b3ba2f1123fa8b9d810"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-574b7ecde5e0",
+        "sha": "05b5784a98046444534bf9e28f6e69e5f74ce9a4"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-9dc9d1cdb425",
+        "sha": "09c8096b87b468dd63938bc5750d9c59c3674007"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-c065dc96821e",
+        "sha": "8fc901493c8fe398b334c9975aea8a8dd28aeec3"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-d68466291838",
+        "sha": "99158fd824b83c685dfabb6e4865becacde97145"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-stdio-roundtrip-e1ebd30d716b",
+        "sha": "aa24a8252cbefa466f1c37d9964766fc39b4a205"
+      },
+      {
+        "ref": "refs/heads/codex/check70-report-20260906",
+        "sha": "5a02104efec2c8189aafce48c0fca22be793c19a"
+      },
+      {
+        "ref": "refs/heads/codex/check71-mcp-protocol-20260906",
+        "sha": "38600b805ab7ef52d88ed8a11b1bb2a0e877f68e"
+      },
+      {
+        "ref": "refs/heads/codex/check72-mcp-lifecycle-20260906",
+        "sha": "34a83c1370ac8732dc42811f840e93d2ae1cb2e5"
+      },
+      {
+        "ref": "refs/heads/codex/check72-mcp-reconnect-20260906",
+        "sha": "e6114d6cf87618c6caa912b50a9a7512ac1e2997"
+      },
+      {
+        "ref": "refs/heads/codex/check73-mcp-application-parity-20260906",
+        "sha": "575e13c0515aa6d68169fbfd69df0eb2d434f393"
+      },
+      {
+        "ref": "refs/heads/codex/check74-opacity-bootstrap-20260906",
+        "sha": "c54edb2602bb6646e95924afe2f2514593d52922"
+      },
+      {
+        "ref": "refs/heads/codex/check75-mcp-composition-20260906",
+        "sha": "cbc870216ed5d7440100131a240f916acbd89bb0"
+      },
+      {
+        "ref": "refs/heads/codex/check75-report-20260906",
+        "sha": "435c057a9042920a6fc5889159b77707a2aede62"
+      },
+      {
+        "ref": "refs/heads/codex/check76-opacity-consumers-20260906",
+        "sha": "8135ee7164a5cadd5b96b51e52ecb13ca0122c26"
+      },
+      {
+        "ref": "refs/heads/codex/check77-opacity-replay-20260906",
+        "sha": "ebd0b1c0bf1deac1d35ab8d7bbc553b6e7c72383"
+      },
+      {
+        "ref": "refs/heads/codex/check78-slice-composition-20260906",
+        "sha": "9a5f61ee0ac0cf6ef1d42e7eff6110504539ec89"
+      },
+      {
+        "ref": "refs/heads/codex/check80-history-acceptance-20260907",
+        "sha": "aec4a0e576de18d55ae914a134a571fdfbb4feb6"
+      },
+      {
+        "ref": "refs/heads/codex/check80-report-20260907",
+        "sha": "090706c2409874aa734e3bb97c087f126ccccead"
+      },
+      {
+        "ref": "refs/heads/codex/r03-swatch-inventory-20260906",
+        "sha": "2584444dfc3fc4bc4d36a1cf44cb55ee23ea3728"
+      },
+      {
+        "ref": "refs/heads/codex/r05-notice-regression-81d599",
+        "sha": "7123fd8c469d6545157b0e483f821e1c44066855"
+      },
+      {
+        "ref": "refs/heads/codex/r06-orphan-reservation-fix-20260906",
+        "sha": "f40ad512cb426ddb6d77b41dd28672fa3d560628"
+      },
+      {
+        "ref": "refs/heads/pr944-fetch",
+        "sha": "dd39e5215f000031c5f75821913cce2e6f971db9"
+      },
+      {
+        "ref": "refs/heads/pr946-fetch",
+        "sha": "6d499212fdf447af439d66f5aadb905f6575110d"
+      }
+    ]
+  },
+  "remaining_pr_count": 16,
+  "retained_remote_refs_unchanged": true,
+  "retained_local_refs_unchanged": true,
+  "remaining_existing_pr_heads_and_bases_unchanged": true,
+  "added_prs": [],
+  "added_remote_refs": [],
+  "registered_worktrees_unchanged": true,
+  "main_protection_unchanged": true,
+  "archive_ruleset_id": 22490418,
+  "archive_protected": true,
+  "hosted_workflows_disabled": true,
+  "archive_actions_runs": 0,
+  "remote_restore_proof": "All 464 named refs restored from two self-contained bundles fetched through a brand-new HTTPS clone; exact SHA and full fsck passed independently."
+}
