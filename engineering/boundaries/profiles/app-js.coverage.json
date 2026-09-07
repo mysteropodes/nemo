@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files and a project-document validator and project-entry presentation adapter. Complete architecture boundaries remain a separate gate.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, and the opacity application MCP slice. Complete architecture boundaries remain a separate gate.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "b4a1b3ca81ab997d0d582dcfbfcbfbad5af8059d",
-    "sourceRootTree": "cd7230618d16d751063fd771aaa01ce6245bd3d7",
+    "candidateCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1",
+    "sourceRootTree": "7777923c59eafbaeac185c38751d5d49c00af40f",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "facbe03a23588fa1834674b037706afc82221a45",
-      "lastChangedCommit": "b4a1b3ca81ab997d0d582dcfbfcbfbad5af8059d"
+      "gitTree": "123f9d1630c5c55a5f24bc7df19841aec8e1721e",
+      "lastChangedCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "674599af5b3b28d04e0adb2df40a6c1c1e93912b",
-      "sha256": "f430737e5e2310c46b41703980200215ef563a078f0c771a77d4c934088cd98d",
-      "lastChangedCommit": "455d44fafe0cccaa12f14ff01481d119d523c2d2"
+      "gitBlob": "30f060e529a80824f5ba883e2ef0a31fc2b8006c",
+      "sha256": "59edd84035111cd94beb335d2dc89d127a224ab12817b28d842c203b9e002302",
+      "lastChangedCommit": "9e5daae92a68799c8ba108064ddac8066af209e9"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "a440f2018c58d0f4f0059404e245f77b95c745bb40aa9d134c9ba2059fb2270f"
+      "value": "12c9f47d1c3b83623f216b88edc4f7cb4e3788ebb2ebd7af5a59dc3238b5ccdb"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "45dc4863ed1f2d5adff44e69ae548a4624a5fee1",
-        "sha256": "c469ee0a51eea2d4c9a49442ff8bfff1c97fb5baf293ba38b3359ed392cd5657",
-        "moduleCount": 142,
-        "basedOnCommit": "6ca24e4bd7060c2806519358da6c4754b3f7e640"
+        "gitBlob": "923336d515332ce0c5dca6d8bac0722f85462445",
+        "sha256": "3fd272522ddb5d8d1cc8cb4884ce1a2b870cf4ce7d3d5e42f1139c6eae24b24e",
+        "moduleCount": 147,
+        "basedOnCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -55,14 +55,14 @@
     ],
     "exclusionSupport": [
       {
-        "path": ".gitignore",
-        "gitBlob": "36273bdc819159f7f0aeed42851ebf2f74098347",
-        "sha256": "095b4d4bc2cc85bead977c11a52d9aa3f68011f56396154ee7b75fd37e430b15"
+      "path": ".gitignore",
+      "gitBlob": "bd4832bff7e91fbd758f386f3a844f44f5d3e386",
+      "sha256": "14d67915d6cdab22901e5e227da46d588c25b20f32e7501cec5707423bcb6670"
       },
       {
-        "path": "THIRD_PARTY_NOTICES.md",
-        "gitBlob": "3d00e38b4485e2771873d84f745b9ac526026f66",
-        "sha256": "0a46adb978e07aae2dac2ffaa782a26b3576b540435d48ce448c363c412b1a7d"
+      "path": "THIRD_PARTY_NOTICES.md",
+      "gitBlob": "7886b7fad14b2015815e21b6ae268327658afe14",
+      "sha256": "049f872f54b5499d256513eb81b2800c0419313162e98cc6550bdf14833ac211"
       },
       {
         "path": "src/wasm/package.json",
@@ -121,13 +121,13 @@
   "bootstrapObservations": {
     "path": "src/index.html",
     "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
-    "totalScriptTags": 134,
-    "externalClassicTags": 131,
+    "totalScriptTags": 139,
+    "externalClassicTags": 136,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 127,
+    "retainedClassicTags": 132,
     "retainedModuleTags": 2,
-    "classicTagsUnderSrcJsIncludingVendors": 130,
+    "classicTagsUnderSrcJsIncludingVendors": 135,
     "inlineScripts": [
       {
         "path": "src/index.html",
@@ -2009,6 +2009,66 @@
           "scriptOrdinal": 49
         }
       ]
+    },
+    {
+      "path": "src/js/domain/animation/opacity.js",
+      "moduleId": "app.opacity.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2360,
+          "scriptOrdinal": 57
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/opacity-application.js",
+      "moduleId": "app.opacity.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2362,
+          "scriptOrdinal": 59
+        }
+      ]
+    },
+    {
+      "path": "src/js/bootstrap/opacity-application.js",
+      "moduleId": "app.opacity.bootstrap",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2459,
+          "scriptOrdinal": 138
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/application-mcp.js",
+      "moduleId": "app.application.mcp.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2460,
+          "scriptOrdinal": 139
+        }
+      ]
+    },
+    {
+      "path": "src/js/animation/curve.js",
+      "moduleId": "app.animation.curve",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2359,
+          "scriptOrdinal": 56
+        }
+      ]
     }
   ],
   "exclusions": [
@@ -2470,19 +2530,19 @@
     }
   ],
   "snapshotCounts": {
-    "selectedSources": 154,
+    "selectedSources": 159,
     "bySourceKind": {
-      ".js": 148,
+      ".js": 153,
       ".mjs": 2,
       ".cjs": 0,
       ".ts": 4
     },
-    "retainedSources": 142,
+    "retainedSources": 147,
     "exclusions": 12,
     "vendorExclusions": 6,
     "generatedExclusions": 6,
     "retainedExecutionClasses": {
-      "document-classic": 127,
+      "document-classic": 132,
       "document-module": 2,
       "classic-without-load-site": 12,
       "module-worker": 1
@@ -2490,7 +2550,7 @@
   },
   "integration": {
     "coverageHelper": {
-      "candidateCommit": "ad88e76122e09340e10fd746e24c2015efba5b44",
+      "candidateCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1",
       "path": "scripts/nemo/lib/boundaries-coverage.cjs",
       "export": "checkSourceCoverage",
       "sourcePaths": "Independently rediscover all selected committed candidate paths from scope, including exclusions. Never seed discovery from retainedSources, a profile or a baseline.",

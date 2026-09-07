@@ -1693,6 +1693,54 @@
       ]
     },
     {
+      "id": "app.opacity.application",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "opacity-application.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "opacity-application.js"
+      ]
+    },
+    {
+      "id": "app.opacity.bootstrap",
+      "layer": "bootstrap",
+      "dir": "src/js/bootstrap",
+      "files": [
+        "opacity-application.js"
+      ],
+      "sizeProfile": "Handwritten config/bootstrap",
+      "publicApi": [
+        "opacity-application.js"
+      ]
+    },
+    {
+      "id": "app.opacity.domain",
+      "layer": "domain",
+      "dir": "src/js/domain/animation",
+      "files": [
+        "opacity.js"
+      ],
+      "sizeProfile": "Domain kernel",
+      "publicApi": [
+        "opacity.js"
+      ]
+    },
+    {
+      "id": "app.application.mcp.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "application-mcp.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "application-mcp.js"
+      ]
+    },
+    {
       "id": "app.project.document",
       "layer": "app-domain",
       "dir": "src/js",
@@ -1729,6 +1777,24 @@
         "domain"
       ]
     },
+    "application": {
+      "allowedLayers": [
+        "domain"
+      ]
+    },
+    "bootstrap": {
+      "allowedLayers": [
+        "application",
+        "domain",
+        "adapters"
+      ]
+    },
+    "adapters": {
+      "allowedLayers": [
+        "application",
+        "domain"
+      ]
+    },
     "app-presentation-adapter": {
       "allowedLayers": [
         "app-legacy"
@@ -1754,6 +1820,10 @@
     "Domain/application": {
       "warn": 300,
       "hardMax": 400
+    },
+    "Handwritten config/bootstrap": {
+      "warn": 150,
+      "hardMax": 250
     }
   },
   "exceptions": [
