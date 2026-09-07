@@ -152,7 +152,7 @@ but the claim is cleaner without them.
 **1. The sidecar digest is checkout-dependent, so a single pinned hash is not
 reproducible.** The release binary embeds its own absolute build path: `strings`
 on the installed sidecar returns
-`/Users/cyril/.buzz/REPOS/nemo-worktrees/buzz-7f3a1c924b6d/nemo-mcp/src/server.rs`.
+`<HOME>/.buzz/REPOS/nemo-worktrees/buzz-7f3a1c924b6d/nemo-mcp/src/server.rs`.
 Two checkouts of the same source therefore give different digests — this
 worktree `93f346fa…`, the `nemo-r14-fixture` checkout `2adbbf90…`. It is
 deterministic *within* a checkout (rebuilds here reproduced `93f346fa…`,

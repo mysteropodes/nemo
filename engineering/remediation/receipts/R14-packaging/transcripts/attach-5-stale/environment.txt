@@ -1,15 +1,15 @@
 # clean-room environment (captured from inside the scrubbed shell)
 cwd=/
-server=/Users/cyril/Applications/Nemo.app/Contents/MacOS/nemo-mcp
+server=<HOME>/Applications/Nemo.app/Contents/MacOS/nemo-mcp
 
 ## full environment after env -i
 NEMO_R14_CLEANROOM=1
 PATH=/tmp/nemo-r14-emptybin
 PWD=/
 SHLVL=1
-HOME=/Users/cyril
+HOME=<HOME>
 _=/usr/bin/env
-OLDPWD=/Users/cyril/.buzz/REPOS/nemo-worktrees/buzz-7f3a1c924b6d
+OLDPWD=<HOME>/.buzz/REPOS/nemo-worktrees/buzz-7f3a1c924b6d
 
 ## PATH contents (must be empty)
 PATH=/tmp/nemo-r14-emptybin
