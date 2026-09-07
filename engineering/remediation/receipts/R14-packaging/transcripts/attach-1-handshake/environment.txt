@@ -1,0 +1,33 @@
+# clean-room environment (captured from inside the scrubbed shell)
+cwd=/
+server=<HOME>/Applications/Nemo.app/Contents/MacOS/nemo-mcp
+
+## full environment after env -i
+NEMO_R14_CLEANROOM=1
+PATH=/tmp/nemo-r14-emptybin
+PWD=/
+SHLVL=1
+HOME=<HOME>
+_=/usr/bin/env
+OLDPWD=<HOME>/.buzz/REPOS/nemo-worktrees/buzz-7f3a1c924b6d
+
+## PATH contents (must be empty)
+PATH=/tmp/nemo-r14-emptybin
+(no output above means the single PATH entry is an empty directory)
+
+## toolchain resolvability by name
+node -> <<NOT RESOLVABLE>>
+npm -> <<NOT RESOLVABLE>>
+npx -> <<NOT RESOLVABLE>>
+cargo -> <<NOT RESOLVABLE>>
+rustc -> <<NOT RESOLVABLE>>
+python3 -> <<NOT RESOLVABLE>>
+python -> <<NOT RESOLVABLE>>
+git -> <<NOT RESOLVABLE>>
+cc -> <<NOT RESOLVABLE>>
+clang -> <<NOT RESOLVABLE>>
+make -> <<NOT RESOLVABLE>>
+
+## registry overrides (both must be unset)
+NEMO_MCP_REGISTRY=<<unset>>
+NEMO_TAURI_DATA_DIR=<<unset>>

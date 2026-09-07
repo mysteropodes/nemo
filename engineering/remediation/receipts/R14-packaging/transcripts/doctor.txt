@@ -1,0 +1,64 @@
+# npm run doctor — after the build and the dylib bundling attempt
+
+
+> nemo@0.7.0-alpha.4 doctor
+> node scripts/nemo/doctor.cjs
+
+
+Nemo doctor  (read-only)
+
+Source
+  HEAD                   66ece0641708122eb8447e85ad8dd7e3402aaf6c (honey/r14-packaging, v0.7.0-alpha.4-166-g66ece06)
+  commit                 2026-09-07T22:22:49+02:00  Merge pull request #992: integrate opacity commands and bundled Rust MCP
+  worktree               <HOME>/.buzz/REPOS/nemo-worktrees/buzz-7f3a1c924b6d
+  state                  DIRTY — 0 modified, 5 untracked, digest 555d31f7ca4c
+Build
+  package.json           0.7.0-alpha.4
+  tauri.conf.json        0.7.0-alpha.4
+  index.html fallback    0.7.0-alpha.4 (title) / 0.7.0-alpha.4 (status bar)
+  crates                 geometry-wasm@0.1.0  vectorize-wasm@0.1.0  src-tauri@0.5.0
+  geometry_wasm          1644666 B  c35ad2045f18
+  vectorize_wasm         862315 B  a1d67c391782
+  ffmpeg sidecar         src-tauri/binaries/ffmpeg-aarch64-apple-darwin  22127000 B  8fbf0afc8a0c
+Platform
+  os                     darwin 25.6.0 arm64  (Darwin Kernel Version 25.6.0: Fri Jul 31 19:17:26 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6041)
+  cpu / memory           Apple M4 Max ×14, 36 GiB
+  node                   v24.4.1
+  rust host              aarch64-apple-darwin
+Tools
+  node                   ok      v24.4.1
+  npm                    ok      11.16.0
+  git                    ok      git version 2.50.1 (Apple Git-155)
+  rustc                  ok      rustc 1.91.1 (ed61e7d7e 2025-11-07)
+  cargo                  ok      cargo 1.91.1 (ea2d97820 2025-10-10)
+  rustup                 ok      rustup 1.28.2 (e4f3ad6f8 2025-04-28)
+  wasm-pack              ok      wasm-pack 0.15.0
+  wasm-bindgen           MISSING 
+  tauri-cli              ok      tauri-cli 2.11.4
+  ffmpeg                 ok      ffmpeg version 8.0 Copyright (c) 2000-2025 the FFmpeg developers
+  ffprobe                ok      ffprobe version 8.0 Copyright (c) 2007-2025 the FFmpeg developers
+  python3                ok      Python 3.14.6
+  playwright             ok      Version 1.63.0
+  xcodeSelect            ok      /Applications/Xcode.app/Contents/Developer
+  otool                  ok      llvm-otool(1): Apple Inc. version cctools-1040
+  brew                   ok      Homebrew 6.0.18
+Capabilities
+  rust targets           aarch64-apple-darwin wasm32-unknown-unknown
+  wasm32 target          ok     
+  host target            ok     
+  node_modules           ok     
+  sidecar runs           MISSING dyld[86950]: Library not loaded: /opt/homebrew/opt/libvpx/lib/libvpx.12.dylib |   Referenced from: <249CE339-765B-3B08-A2C1-C44CE163B729> <HOME>/.buzz/REPOS/nemo-worktrees/buzz-7f3a1c924b6d/src-tauri/binaries/ffmpeg-aarch64-apple-darwin |   Reason: tried: '/opt/homebrew/opt/libvpx/lib/libvpx.12.dylib' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/opt/homebrew/opt/libvpx/lib/libvpx.12.dylib' (no such file), '/opt/homebrew/opt/libvpx/lib/libvpx.12.dylib' (no such file), '/opt/homebrew/Cellar/libvpx/1.15.2/lib/libvpx.12.dylib' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/opt/homebrew/Cellar/libvpx/1.15.2/lib/libvpx.12.dylib' (no such file), '/opt/homebrew/Cellar/libvpx/1.15.2/lib/libvpx.12.dylib' (no such file)
+  sidecar dylibs         26 external, 2 missing on this machine
+                         MISSING /opt/homebrew/opt/libvpx/lib/libvpx.12.dylib
+                         MISSING /opt/homebrew/opt/svt-av1/lib/libSvtAv1Enc.4.dylib
+  gpu                    Apple M4 Max (spdisplays_metal4)
+  webgpu                 unknown outside a browser
+  browser suite          runner ok      specs ok     
+  desktop suite          harness ok      app <HOME>/.buzz/REPOS/nemo-worktrees/buzz-7f3a1c924b6d/src-tauri/target/release/bundle/macos/Nemo.app
+  integration suite      ok     
+  bench workloads        ok     
+
+receipt reports/20260907T203014Z-66ece06-dirty/receipt.json
+
+
+exit status: 0

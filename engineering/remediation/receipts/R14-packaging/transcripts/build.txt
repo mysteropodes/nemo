@@ -1,0 +1,59 @@
+# Local build of the desktop package, and the identity of every bundled executable.
+
+## host
+Darwin macstudodecyril.home 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:17:26 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6041 arm64
+arch: arm64
+ProductName:		macOS
+ProductVersion:		26.6.2
+BuildVersion:		25G83
+rustc: rustc 1.91.1 (ed61e7d7e 2025-11-07)
+cargo: cargo 1.91.1 (ea2d97820 2025-10-10)
+node:  v24.4.1
+
+## source
+base/HEAD: 66ece0641708122eb8447e85ad8dd7e3402aaf6c
+branch:    honey/r14-packaging
+worktree:  <HOME>/.buzz/REPOS/nemo-worktrees/buzz-7f3a1c924b6d
+
+## commands (in order)
+npm install
+npm run build -- --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'
+python3 scripts/bundle-ffmpeg-dylibs.py src-tauri/target/release/bundle/macos/Nemo.app
+npm run doctor
+npm run build -- --bundles app,dmg --config '{"bundle":{"createUpdaterArtifacts":false}}'
+
+createUpdaterArtifacts is overridden to false ON THE COMMAND LINE ONLY; the
+committed tauri.conf.json is unmodified. Reason: updater artifacts require
+TAURI_SIGNING_PRIVATE_KEY, which is Cyril's personal secret and is not present
+in this session. With it left true the build fails at the signing step AFTER
+the .app and .dmg are already written. The .app/.dmg payloads are unaffected.
+
+## artifact identities (sha256)
+93f346fa05ba62446c31a49a0c19f5b30418d0cbdc032819eb54a3b6799cd1de  src-tauri/binaries/nemo-mcp-aarch64-apple-darwin
+a5c0882ebc51ba0706aaffe39340b9448aa59ca919c479bbb7438d0c36a91245  src-tauri/target/release/bundle/macos/Nemo.app/Contents/MacOS/nemo
+93f346fa05ba62446c31a49a0c19f5b30418d0cbdc032819eb54a3b6799cd1de  src-tauri/target/release/bundle/macos/Nemo.app/Contents/MacOS/nemo-mcp
+8fbf0afc8a0cf3b30307da69eebc4c7b21585ac3f90f3f82f90405a1a367eeb7  src-tauri/target/release/bundle/macos/Nemo.app/Contents/MacOS/ffmpeg
+6fc3bdca79f0fe602a28320f58ad4f1bb9416422740e766fb18082eb3cadaa5d  src-tauri/target/release/bundle/dmg/Nemo_0.7.0-alpha.4_aarch64.dmg
+a5c0882ebc51ba0706aaffe39340b9448aa59ca919c479bbb7438d0c36a91245  <HOME>/Applications/Nemo.app/Contents/MacOS/nemo
+93f346fa05ba62446c31a49a0c19f5b30418d0cbdc032819eb54a3b6799cd1de  <HOME>/Applications/Nemo.app/Contents/MacOS/nemo-mcp
+
+## bundle layout
+src-tauri/target/release/bundle/macos/Nemo.app
+src-tauri/target/release/bundle/macos/Nemo.app/Contents
+src-tauri/target/release/bundle/macos/Nemo.app/Contents/Info.plist
+src-tauri/target/release/bundle/macos/Nemo.app/Contents/MacOS
+src-tauri/target/release/bundle/macos/Nemo.app/Contents/MacOS/ffmpeg
+src-tauri/target/release/bundle/macos/Nemo.app/Contents/MacOS/nemo
+src-tauri/target/release/bundle/macos/Nemo.app/Contents/MacOS/nemo-mcp
+src-tauri/target/release/bundle/macos/Nemo.app/Contents/Resources
+src-tauri/target/release/bundle/macos/Nemo.app/Contents/Resources/icon.icns
+
+## Homebrew-linked dependency count per bundled executable
+  nemo: 0
+  nemo-mcp: 0
+  ffmpeg: 26
+
+## the MCP executable has no CLI identity surface
+$ nemo-mcp --version   (arguments are ignored; it goes straight to MCP stdio)
+Error: ConnectionClosed("initialize request")
+exit=1

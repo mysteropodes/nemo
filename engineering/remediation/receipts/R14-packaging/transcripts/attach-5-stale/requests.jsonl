@@ -1,0 +1,5 @@
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"nemo-r14-cleanroom","version":"1.0.0"}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"nemo_query","arguments":{"instance_id":"4506d905-6f8f-47af-a76b-b570315baa85","operation":"snapshot","payload":{}}}}
+{"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"nemo_query","arguments":{"instance_id":"00000000-0000-4000-8000-000000000000","operation":"snapshot","payload":{}}}}
+{"jsonrpc":"2.0","id":22,"method":"tools/call","params":{"name":"nemo_discover","arguments":{}}}

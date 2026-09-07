@@ -1,0 +1,15 @@
+# Does an instance remove its own discovery record when it exits?
+# Controlled test: launch one instance of the installed package, wait for it
+# to register, then quit it the way a user does (LaunchServices quit, not a kill).
+
+records before launch: 4
+registered: 552a551f-784b-4355-94ba-065cb5649fe7  port=56786  pid=90017
+records after launch: 5
+
+## graceful quit via AppleScript (the user-visible Quit path)
+process exited
+
+RESULT: 552a551f-784b-4355-94ba-065cb5649fe7.json STILL PRESENT after the instance exited.
+        Registration::drop did not run, so discovery records are orphaned
+        on exit. nemo_discover tolerates this - it probes every record and
+        only lists responders - but the registry directory grows without bound.

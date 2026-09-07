@@ -1,0 +1,67 @@
+# Finding: discovery records outlive their instance, and only nemo_discover notices
+
+Observed while producing the instance-selection transcript. Not a packaging
+defect — the bundled executable is fine — but it bears directly on the
+acceptance property "client setup selects the intended Nemo instance", so it
+is recorded here rather than left for someone to rediscover.
+
+Evidence: transcripts/registry-lifecycle.txt (record lifetime) and
+transcripts/attach-5-stale/ (what each caller sees). Both were produced with
+the installed package at ~/Applications/Nemo.app.
+
+## What was measured
+
+1. Record lifetime. nemo-mcp/src/registry.rs deletes an instance's record in
+   Registration::drop. A controlled test launched one instance of the
+   installed package, waited for it to register, then quit it the way a user
+   does (LaunchServices quit via osascript, not a kill):
+
+       registered: 552a551f-784b-4355-94ba-065cb5649fe7  port=56786
+       process exited
+       RESULT: 552a551f-784b-4355-94ba-065cb5649fe7.json STILL PRESENT
+
+   So the leak is NOT limited to crashes and kills. A graceful quit leaks the
+   record too, because the Registration lives in a spawned async task and the
+   process exits without unwinding it. Every ordinary run of Nemo leaves one
+   record behind. Over this session, five separate launches left five.
+
+2. What each caller does with a stale record. One instance was registered and
+   then SIGKILLed, guaranteeing a stale record, and all three calls were made
+   in a single MCP session against the bundled executable:
+
+       nemo_query, stale record        -> unavailable / Connection refused (os error 61)
+       nemo_query, never-registered id -> unavailable / Selected instance is absent;
+                                          discover again after reconnect
+       nemo_discover                   -> 0 instances
+
+## The accurate shape of the defect
+
+nemo_discover is NOT affected. It probes every endpoint with a 2s timeout and
+pushes only responders, so it correctly reported 0 instances while a stale
+record sat on disk, and correctly reported 4 while 4 were live
+(transcripts/attach-2-discover). Any claim that discovery advertises dead
+instances is wrong, and was checked rather than assumed.
+
+The gap is in the non-probing path. NemoServer::call looks a record up by id
+and connects; read_endpoints() validates shape only — .json extension, regular
+file, <=4096 bytes, parseable, instanceId is a UUID, secret is 36 chars — and
+never checks that anything still listens. So a stale record is "present" to
+nemo_query and nemo_command, and the client gets a raw OS error that reads like
+a transient fault, when the actionable message for exactly this situation
+already exists and is what a never-registered id produces.
+
+Practical effect for a client: after Nemo restarts, the id from the previous
+discover is stale, and the error does not say "re-discover" — it says
+"Connection refused", which invites a retry loop instead.
+
+Second-order: because records are never pruned, the registry directory grows
+by one file per launch forever, and each one costs nemo_discover a connection
+attempt on every call.
+
+## Not fixed here
+
+nemo-mcp/src/registry.rs and src/server.rs are outside this lane's write scope.
+Reported to integration. The natural fix is in read_endpoints() — probe the
+port, or record and check the owning pid — and prune what fails, which would
+both prune the directory and route the stale case to the existing
+"Selected instance is absent; discover again after reconnect" message.

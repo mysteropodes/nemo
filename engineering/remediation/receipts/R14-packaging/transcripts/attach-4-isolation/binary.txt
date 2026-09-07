@@ -1,0 +1,10 @@
+# installed server binary
+-rwxr-xr-x@ 1 cyril  staff  3662976 Sep  7 22:31 <HOME>/Applications/Nemo.app/Contents/MacOS/nemo-mcp
+
+## shasum -a 256
+93f346fa05ba62446c31a49a0c19f5b30418d0cbdc032819eb54a3b6799cd1de  <HOME>/Applications/Nemo.app/Contents/MacOS/nemo-mcp
+
+## otool -L (dynamic dependencies)
+<HOME>/Applications/Nemo.app/Contents/MacOS/nemo-mcp:
+	/usr/lib/libiconv.2.dylib (compatibility version 7.0.0, current version 7.0.0)
+	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1356.0.0)
