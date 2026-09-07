@@ -1,11 +1,14 @@
-# 40-minute remediation check-ins
+# Remediation execution reports
 
-The permanent home for Codexitron's every-fifth-check-in reports is this directory on `main`:
+The permanent home for Codexitron's execution reports is this directory on `main`.
+Beginning with check 87, publish a 45-minute report every third check. Earlier
+40-minute reports retain their original cadence and reporting windows.
 
 **[All reports on main](https://github.com/mysteropodes/nemo/tree/main/40min-checkins)**
 
 | Check-in | Date (UTC) | Reporting window (UTC) | Report |
 | --- | --- | --- | --- |
+| 87 | 2026-09-07 | 00:35:47–01:20:47; subsequent native acceptance | [Eighty-seventh check-in](2026-09-07-checkin-87.md) |
 | 85 | 2026-09-07 | Checks 81–85; continuation after 00:52 UTC | [Eighty-fifth check-in](2026-09-07-checkin-85.md) |
 | 65 | 2026-09-06 | Checks 61–65; continuation through 21:39 UTC | [Sixty-fifth check-in](2026-09-06-checkin-65.md) |
 | 55 | 2026-09-06 | 14:41:56–15:29:57 | [Fifty-fifth check-in](2026-09-06-checkin-55.md) |
@@ -22,6 +25,6 @@ The permanent home for Codexitron's every-fifth-check-in reports is this directo
 
 ## Publication rule
 
-Every fifth check-in, add the dated 40-minute report here and update this index, newest first. Publish the documentation through the repository's normal PR route, merge it into `main` under the standing user authorization, and verify the report is available on `main` before marking reporting complete. A local worktree, branch, open PR, or Buzz-only post does not complete publication. Return the permanent index and report links in the initiating conversation; if repository protections or access prevent publication, report the exact blocker and keep publication pending.
+Every third check-in, add the dated 45-minute report here and update this index, newest first. Publish the documentation through the repository's normal PR route, merge it into `main` under the standing user authorization, and verify the report is available on `main` before marking reporting complete. A local worktree, branch, open PR, or Buzz-only post does not complete publication. Return the permanent index and report links in the initiating conversation; if repository protections or access prevent publication, report the exact blocker and keep publication pending.
 
 Preserve each report's original reporting window, accomplishments, validation scope and remaining gates. Identify results received after the cutoff separately. These are historical progress snapshots; current issue, pull request and board state remains on GitHub. Report publication does not promote product acceptance or authorize unrelated source changes.
