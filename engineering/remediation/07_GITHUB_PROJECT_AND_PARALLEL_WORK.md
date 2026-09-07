@@ -91,6 +91,60 @@ to that owner.
 
 A separate worktree does not isolate browser storage, app data, GPU load or desktop input.
 
+## Worktree lifetime and disk use
+
+**Current user-directed policy (2026-09-06): remove a temporary worktree as soon as it is
+unneeded.** Each worktree has an owner, a concrete purpose and a cleanup trigger in its task
+packet. Reuse a suitable owned checkout for successive steps of the same task. Pushing a
+commit, opening a PR or publishing another report does not itself require a new checkout.
+
+Reassess the checkout at every boundary:
+
+| Boundary | Cleanup decision |
+|---|---|
+| Commit, push, PR creation or report publication | Verify the required preservation/publication result; remove the checkout if no remaining local step needs it. An open PR can keep its branch without keeping a checkout. |
+| Review, validation or integration finishes | Preserve the relevant evidence, stop owned processes and remove the checkout when its local purpose is complete. |
+| Pause or handoff | Preserve the checkpoint and settle ownership. Retain only for an identified next action or an accepted transfer of the same checkout. |
+| Cancellation or interruption | Wait for the worker to stop; reconcile indeterminate effects before deciding whether the checkout is disposable. |
+| Completion, supersession or abandonment | Remove the obsolete checkout before the final receipt, or record the exact remaining dependency, owner and next cleanup trigger. |
+
+Before removal, inspect tracked changes, untracked **and ignored** files, local commits,
+worktree locks and processes still using the checkout. Preserve required source, fixtures and
+evidence at a verified durable destination. A clean status, merged HEAD, empty Git journal or
+silent worker alone does not prove that a checkout is obsolete. Unresolved ownership or
+unique data requires a specific retention reason, not a guessed deletion.
+
+Run `git worktree remove <path>` from outside the checkout and verify that its directory and
+entry in `git worktree list` are gone. Do not force-remove unknown state. Branch retention
+is a separate decision: removing a checkout does not delete its named branch or the PR.
+`git worktree prune` only removes stale registration metadata; it does not reclaim existing
+checkout directories. Record removal or retention in the existing task receipt, not a new ledger.
+
+For report and documentation jobs, materialize only the required paths with sparse checkout.
+For example, after selecting unused task-specific branch and path values:
+
+```sh
+git worktree add --no-checkout -b <task-branch> <worktree-path> origin/main
+git -C <worktree-path> sparse-checkout set --cone 40min-checkins
+git -C <worktree-path> checkout <task-branch>
+```
+
+Cone mode also includes top-level files and files in ancestor directories. Read relevant
+guidance outside the selected paths with `git show HEAD:<path>`, or add the needed directories
+with `git sparse-checkout add`. Expand the checkout when a build or validation needs more
+source; missing paths are not a reason to omit an applicable check. Do not shrink an active
+worker's checkout or share writable source/build outputs through hard links or symlinks.
+
+Git worktrees share repository objects/history but normally materialize separate working
+files. Sparse checkout selects paths; it is not a diff overlay that reads missing files from
+main. APFS copy-on-write clones can share file storage while keeping writes independent, but
+ordinary Git worktree creation does not establish clone sharing. Any clone-based setup needs
+separate implementation and validation and does not replace lifecycle cleanup.
+
+References: [Git worktrees](https://git-scm.com/docs/git-worktree),
+[sparse checkout](https://git-scm.com/docs/git-sparse-checkout),
+[Apple APFS cloning](https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/APFS_Guide/FAQ/FAQ.html).
+
 ## Commit hygiene
 
 1. Fetch and inspect main, relevant branches/PRs and current claims before diagnosis.

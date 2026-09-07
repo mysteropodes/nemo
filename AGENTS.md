@@ -35,6 +35,11 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
   See [the CI policy](engineering/ci/README.md); preserve normal PR review protections.
 - Read `CONTRIBUTING.md`, inspect current source, related branches and existing ownership,
   then use a dedicated branch and isolated worktree for tracked changes.
+- Reuse a suitable owned checkout within a task; use sparse checkout for narrow report or
+  documentation work. At publication, review, integration, handoff, cancellation and completion,
+  remove the worktree as soon as it is unneeded, after preserving its work and settling ownership.
+  Record removal or a concrete retention reason and next cleanup trigger in the receipt. Follow
+  [the worktree lifecycle](engineering/remediation/07_GITHUB_PROJECT_AND_PARALLEL_WORK.md#worktree-lifetime-and-disk-use).
 - Record the outcome, scope, dependencies, base, branch/worktree, acceptance checks,
   reviewer, and publication authority before writing. Repository-relative paths coordinate
   ownership; they are not a user-maintained filesystem permission list.
