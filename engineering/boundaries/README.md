@@ -203,7 +203,7 @@ explicitly selected older profile; the checker never infers which Git revision i
 
 ## Adopted application coverage and size gate
 
-[`app-js.profile.json`](./profiles/app-js.profile.json) declares all 141 reviewed handwritten
+[`app-js.profile.json`](./profiles/app-js.profile.json) declares all 143 reviewed handwritten
 application sources. [`app-js.coverage.json`](./profiles/app-js.coverage.json) records the 12
 exact vendor/generated exclusions and their provenance. The application gate composes
 [`boundaries-discovery.cjs`](../../scripts/nemo/lib/boundaries-discovery.cjs),

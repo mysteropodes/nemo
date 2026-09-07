@@ -1285,6 +1285,30 @@
       ]
     },
     {
+      "id": "app.project.document",
+      "layer": "app-domain",
+      "dir": "src/js",
+      "files": [
+        "project-document.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "project-document.js"
+      ]
+    },
+    {
+      "id": "app.project.entry",
+      "layer": "app-presentation-adapter",
+      "dir": "src/js",
+      "files": [
+        "project-entry.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "project-entry.js"
+      ]
+    },
+    {
       "id": "app.project",
       "layer": "app-legacy",
       "dir": "src/js",
@@ -1704,6 +1728,14 @@
       "allowedLayers": [
         "domain"
       ]
+    },
+    "app-presentation-adapter": {
+      "allowedLayers": [
+        "app-legacy"
+      ]
+    },
+    "app-domain": {
+      "allowedLayers": []
     }
   },
   "sizeProfiles": {
@@ -1714,6 +1746,14 @@
     "Domain kernel": {
       "warn": 200,
       "hardMax": 300
+    },
+    "Platform/engine adapter": {
+      "warn": 300,
+      "hardMax": 500
+    },
+    "Domain/application": {
+      "warn": 300,
+      "hardMax": 400
     }
   },
   "exceptions": [
