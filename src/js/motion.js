@@ -932,7 +932,7 @@
   // points, so the waypoint interpretation reproduces the curve that was
   // meant all along. Legacy keys carrying the exact old array are rewritten
   // by migrateLegacyCurves below.
-  var DEFAULT_CURVE = [{ x: 0, y: 0 }, { x: 0.25, y: 0.156 }, { x: 0.5, y: 0.5 }, { x: 0.75, y: 0.844 }, { x: 1, y: 1 }];
+  var DEFAULT_CURVE = NemoOpacityDomain.defaultCurve();
   var LEGACY_STEP_CURVE = [{ x: 0, y: 0 }, { x: 0.42, y: 0 }, { x: 0.58, y: 1 }, { x: 1, y: 1 }];
   // A key still carrying the broken default bit-for-bit was never touched by
   // hand, so replacing it restores the intended motion without overwriting
@@ -2703,35 +2703,39 @@
     if (window._curveEditor) window._curveEditor.editMotionSeg(seg, PROP_LABEL[prop] + ' : clé ' + (seg.frame + 1) + ' → ' + (next.frame + 1));
   }
 
+  function opacityLegacy(kind, holder, values, frame, curvePoints) {
+    var application = window.NemoOpacityApplication;
+    if (application && typeof application.legacy === 'function') return application.legacy(kind, holder, values, frame, curvePoints);
+    return null;
+  }
+  function opacityDomain() { return window.NemoOpacityDomain; }
   function setKeyAtCurrentFrame(ld, prop, values) {
-    var track = ensureTrack(ld, prop);
-    var k = keyAt(track, state.currentFrame);
-    if (k) { k.v = values.slice(); }
-    else {
-      track.keys.push({ frame: state.currentFrame, v: values.slice(), curvePoints: cloneCurvePts(DEFAULT_CURVE), hOut: [0, 0], hIn: [0, 0] });
-      sortKeys(track);
+    if (prop === 'opacity') {
+      var legacy = opacityLegacy('key-current', ld, values, state.currentFrame);
+      if (legacy !== null) return legacy;
+      return opacityDomain().setKeyAtFrame(ld, state.currentFrame, values);
     }
-    return keyAt(track, state.currentFrame);
+    return NemoOpacityDomain.setTrackKey(ensureTrack(ld, prop), state.currentFrame, values);
   }
   // Arbitrary-frame sibling of setKeyAtCurrentFrame — for callers that
   // build several keys across a range in one pass (Text Animator, below)
   // rather than reacting to the playhead one commit at a time. Same key
   // shape, curvePoints defaulting to DEFAULT_CURVE when omitted.
   function setKeyAtFrame(holder, prop, frame, values, curvePoints) {
-    var track = ensureTrack(holder, prop);
-    var k = keyAt(track, frame);
-    if (k) { k.v = values.slice(); if (curvePoints) k.curvePoints = curvePoints; }
-    else {
-      track.keys.push({ frame: frame, v: values.slice(), curvePoints: curvePoints || cloneCurvePts(DEFAULT_CURVE), hOut: [0, 0], hIn: [0, 0] });
-      sortKeys(track);
+    if (prop === 'opacity') {
+      var legacy = opacityLegacy('key-frame', holder, values, frame, curvePoints);
+      if (legacy !== null) return legacy;
+      return opacityDomain().setKeyAtFrame(holder, frame, values, curvePoints);
     }
-    return keyAt(track, frame);
+    return NemoOpacityDomain.setTrackKey(ensureTrack(holder, prop), frame, values, curvePoints);
   }
   function removeKeyAtCurrentFrame(ld, prop) {
-    var track = trackFor(ld, prop);
-    if (!track) return;
-    var i = track.keys.findIndex(function (k) { return k.frame === state.currentFrame; });
-    if (i >= 0) track.keys.splice(i, 1);
+    if (prop === 'opacity') {
+      var legacy = opacityLegacy('remove', ld, null, state.currentFrame);
+      if (legacy !== null) return legacy;
+      return opacityDomain().removeKeyAtFrame(ld, state.currentFrame);
+    }
+    return NemoOpacityDomain.removeTrackKey(trackFor(ld, prop), state.currentFrame);
   }
   // Stopwatch toggle: OFF→ON starts animating from the CURRENT effective
   // value (matches AE: turning on keyframing never jumps the value); ON→OFF
@@ -2758,6 +2762,12 @@
   // below, so keying a plain layer's Position/Rotation/etc. now just
   // keys it, no surprise conversion.
   function toggleAnimated(ld, prop) {
+    if (prop === 'opacity') {
+      var animated = !isAnimated(ld, prop), effectiveValue = valueAtFrame(ld, prop, state.currentFrame);
+      var legacy = opacityLegacy('animated', ld, animated, state.currentFrame, effectiveValue);
+      if (legacy !== null) return legacy;
+      return opacityDomain().setAnimated(ld, animated, state.currentFrame, effectiveValue);
+    }
     // The Time Remap row's stopwatch IS the remap switch (AE behavior) —
     // there is no "static timeRemap" fallback to freeze into, the feature
     // is either on (track exists) or off (field deleted, default playback).
@@ -2809,6 +2819,11 @@
   }
   function setValue(ld, prop, values) {
     selectLayerForEdit(ld);
+    if (prop === 'opacity') {
+      var legacy = opacityLegacy('set', ld, values, state.currentFrame);
+      if (legacy !== null) return legacy;
+      return opacityDomain().setValue(ld, values, state.currentFrame);
+    }
     if (isAnimated(ld, prop)) setKeyAtCurrentFrame(ld, prop, values);
     else { if (!ld.motionStatic) ld.motionStatic = {}; ld.motionStatic[prop] = values.slice(); }
     // Order (feedback #97, "l'order n'a pas l'air de marcher... dans le

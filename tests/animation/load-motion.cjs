@@ -13,7 +13,7 @@ module.exports = function loadMotion() {
   context.window = context;
   vm.createContext(context);
   const root = path.resolve(__dirname, '../..');
-  for (const file of ['src/js/animation/curve.js', 'src/js/motion.js']) {
+  for (const file of ['src/js/animation/curve.js', 'src/js/domain/animation/opacity.js', 'src/js/motion.js']) {
     const absolute = path.join(root, file);
     vm.runInContext(fs.readFileSync(absolute, 'utf8'), context, { filename: absolute });
   }

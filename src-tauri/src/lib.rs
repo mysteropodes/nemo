@@ -5,6 +5,7 @@ use tauri_plugin_shell::ShellExt;
 // EXPERIMENTAL (experimental/native-video-decode) — see the module header.
 mod video_decode;
 mod vectorize;
+mod application_mcp;
 // Per-task isolation of the app's native mutable state (R06, #902).
 mod task_runtime;
 
@@ -211,7 +212,11 @@ pub fn run() {
         // app later and saw the new version number).
         .plugin(tauri_plugin_process::init())
         .manage(video_decode::VideoSessions::default())
+        .manage(application_mcp::ApplicationMcp::default())
         .invoke_handler(tauri::generate_handler![
+            application_mcp::nemo_mcp_identity,
+            application_mcp::nemo_mcp_ready,
+            application_mcp::nemo_mcp_reply,
             run_ffmpeg,
             fetch_google_font,
             video_decode::open_video_session,

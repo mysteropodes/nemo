@@ -1,0 +1,132 @@
+{
+  "apiVersion": 1,
+  "request": {
+    "$defs": {
+      "Operation": {
+        "enum": [
+          "capabilities",
+          "snapshot",
+          "property.get",
+          "property.set",
+          "property.key.set",
+          "property.key.remove",
+          "property.animation.set",
+          "history.undo",
+          "history.redo",
+          "diagnostics.trace",
+          "diagnostics.replay"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "apiVersion": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "documentId": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "expectedRevision": {
+        "format": "uint64",
+        "minimum": 0,
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "instanceId": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "operation": {
+        "$ref": "#/$defs/Operation"
+      },
+      "payload": true,
+      "requestId": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "apiVersion",
+      "requestId",
+      "operation",
+      "payload"
+    ],
+    "title": "ApplicationRequest",
+    "type": "object"
+  },
+  "response": {
+    "$defs": {
+      "ApplicationError": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "apiVersion": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "documentId": {
+        "type": "string"
+      },
+      "error": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/ApplicationError"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "instanceId": {
+        "type": "string"
+      },
+      "ok": {
+        "type": "boolean"
+      },
+      "requestId": {
+        "type": "string"
+      },
+      "result": true,
+      "revision": {
+        "format": "uint64",
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "apiVersion",
+      "requestId",
+      "instanceId",
+      "documentId",
+      "revision",
+      "ok"
+    ],
+    "title": "ApplicationResponse",
+    "type": "object"
+  }
+}

@@ -21,6 +21,18 @@ unchanged. The counts and file table below are historical evidence for `c9ab634`
 Current membership and bootstrap pins are in `app-js.coverage.json`; complete
 application architecture enforcement remains open.
 
+The integrated opacity MCP slice at `aacc6ad` adds four more retained classic-script
+modules with no legacy ceiling or blanket exception: the pure
+[`domain/animation/opacity.js`](../../../src/js/domain/animation/opacity.js) kernel uses
+the domain budget; [`application/opacity-application.js`](../../../src/js/application/opacity-application.js)
+uses the application budget; [`bootstrap/opacity-application.js`](../../../src/js/bootstrap/opacity-application.js)
+uses the handwritten-bootstrap budget; and
+[`adapters/application-mcp.js`](../../../src/js/adapters/application-mcp.js) uses the
+platform-adapter budget. `app-js.coverage.json` pins each source's document load site
+and the updated `src`/`src/js`/bootstrap/profile provenance. The normal Node boundary
+entry verifies this four-module slice with no exceptions; it does not claim complete
+legacy global-provider coverage.
+
 Scope: the application source the previous `scripts/nemo/**` increment
 ([`scripts-nemo.md`](./scripts-nemo.md)) explicitly excluded — `src/**`, `src-tauri/src/**`,
 `geometry-wasm/src/**`. This packet classifies every file in that scope into one of four

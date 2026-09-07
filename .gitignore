@@ -20,6 +20,8 @@ geometry-wasm/target/
 # Re-run `wasm-pack build --target web --out-dir ../src/wasm` from
 # geometry-wasm/ after any change to geometry-wasm/src/.
 vectorize-core/target/
+nemo-mcp/target/
+src-tauri/binaries/nemo-mcp-*
 vectorize-wasm/target/
 # src/wasm-vectorize/ — same reasoning as src/wasm/ above, NOT ignored.
 # Re-run `wasm-pack build --target web --out-dir ../src/wasm-vectorize`

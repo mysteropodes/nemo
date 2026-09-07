@@ -84,7 +84,7 @@ function defaultState() {
 // with it. A prelude file is skipped only when the tree does not have it
 // (a motion.js that still declares the evaluator itself needs nothing); a
 // motion.js that needs the kernel without the file fails loudly, never silently.
-const MOTION_PRELUDE = ['animation/curve.js'];
+const MOTION_PRELUDE = ['animation/curve.js', 'domain/animation/opacity.js'];
 
 // motion.js: returns { SMMotion, SMAnimationCurve, modules, state, sandbox }.
 // `state.layers` and `state.fps` are read by the evaluator and the expression
@@ -109,8 +109,10 @@ function loadMotion(state = defaultState(), hooks = {}) {
     vm.runInNewContext(read('motion.js'), sb, { filename: 'src/js/motion.js' });
   } catch (e) {
     // Errors thrown inside the vm belong to another realm: match by name, not instanceof.
-    if (e && e.name === 'ReferenceError' && /SMAnimationCurve/.test(String(e.message))) {
-      throw new Error('motion.js binds to SMAnimationCurve at load, which src/js/animation/curve.js installs; the sandbox mirrors the src/index.html loader order (' + MOTION_PRELUDE.join(', ') + ' before motion.js) and that module is missing or was not installed: ' + e.message);
+    const missing = /SMAnimationCurve/.test(String(e && e.message)) ? 'src/js/animation/curve.js'
+      : /NemoOpacityDomain/.test(String(e && e.message)) ? 'src/js/domain/animation/opacity.js' : null;
+    if (e && e.name === 'ReferenceError' && missing) {
+      throw new Error('motion.js requires ' + missing + ' at load; the sandbox mirrors the src/index.html loader order (' + MOTION_PRELUDE.join(', ') + ' before motion.js) and that module is missing or was not installed: ' + e.message);
     }
     throw e;
   }

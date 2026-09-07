@@ -2688,6 +2688,7 @@ videoMeshId:l.videoMeshId,layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,pa
     state.currentFrame=0;state.activeLayerIdx=0;activateUL(0);drawStage();loadFrame(0);renderOS();renderArcs();updateUI();renderSymbolTabs();
     syncDocFields();
     if(!silent)showToast(SM.t('toastProjectLoaded'));
+    if(window.NemoOpacityApplication)window.NemoOpacityApplication.documentChanged();
     return true;
     }catch(e){showToast('Erreur: '+e.message);return false;}},
   getState:function(){return state;},

@@ -96,6 +96,7 @@
     if(window.renderPaletteGrid)window.renderPaletteGrid();
     syncDocFields();
     currentPath=null;currentName=cfg.name||'Untitled';updateCurrentLabel();
+    if(window.NemoOpacityApplication)window.NemoOpacityApplication.documentChanged();
     try{var freshJson=window.SM.exportJSON();markSaved(freshJson);autosaveWrite(freshJson);}catch(e){}
     showToast('New project created');
   }
