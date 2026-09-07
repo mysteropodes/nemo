@@ -147,6 +147,62 @@ the repo, which made the process hold two handles in the checkout purely because
 that is where its output went. Those were output sinks, never resolution inputs,
 but the claim is cleaner without them.
 
+### Identity of the bundled executable
+
+The digest originally proposed as an acceptance value was retracted by
+integration once finding 1 was established. It appears only in two narrative
+check-in logs and never in the normative R14 text, so nothing had to change in
+the repository — and those logs are historical record, left as written. What
+follows is the criterion that replaced it, evidenced on the **installed** copy
+at `~/Applications/Nemo.app/Contents/MacOS/nemo-mcp`.
+
+| Check | Result |
+|---|---|
+| `file` | `Mach-O 64-bit executable arm64` |
+| `lipo -archs` | `arm64` |
+| mode / size | `-rwxr-xr-x`, 3 662 976 bytes |
+| `otool -L` | `/usr/lib/libiconv.2.dylib`, `/usr/lib/libSystem.B.dylib` — no Homebrew, nothing bundled |
+| `codesign -v --verbose=2` | exit 0 — `valid on disk`, `satisfies its Designated Requirement` |
+| `codesign -dv` | `Signature=adhoc`, `flags=0x20002(adhoc,linker-signed)` |
+
+The signature is the one Tauri's linker produced. It is **not** a signature
+applied by `scripts/bundle-ffmpeg-dylibs.py`: that script aborts on this host
+before reaching its re-sign step (finding 2), so that step is unreachable here
+until the ffmpeg sidecar is rebuilt. `codesign -v` passes on the installed copy
+as shipped regardless.
+
+**The digests are observations, not portable identities.** Each is recorded with
+the checkout and toolchain that produced it, and neither is reproducible
+elsewhere — that is finding 1, not a caveat about it:
+
+| Stage | SHA-256 | Produced by |
+|---|---|---|
+| staged, `src-tauri/binaries/` | `93f346fa05ba62446c31a49a0c19f5b30418d0cbdc032819eb54a3b6799cd1de` | worktree `buzz-7f3a1c924b6d`, rustc 1.91.1 |
+| in-package, installed | `93f346fa05ba62446c31a49a0c19f5b30418d0cbdc032819eb54a3b6799cd1de` | same — equal *only* because the re-sign step never ran |
+
+The portable identity of this build, and what a future lane can actually
+reproduce, is the combination:
+
+- source SHA `66ece0641708122eb8447e85ad8dd7e3402aaf6c`
+- `nemo-mcp/Cargo.lock` SHA-256 `418f58cc4818f218894ffff9b58b9439df51aa72991dcf82d56b471ba55b31d2`
+- built with `cargo build --locked`, as `scripts/build-mcp-sidecar.cjs` does
+- rustc 1.91.1 (ed61e7d7e 2025-11-07)
+
+### The instances under test used the default registry
+
+A discovery result only means something if the apps under test register where an
+ordinary installed app registers. Both launched processes were checked directly
+with `ps eww`: `NEMO_MCP_REGISTRY` and `NEMO_TAURI_DATA_DIR` are **unset** in
+each, so both fall back to `dirs::data_local_dir()` and use
+`~/Library/Application Support/com.strokemotion.app/mcp` — the same root the
+clean-room client resolved, with no override on either side.
+
+Installing under a different path does not weaken this. The registry root is
+derived from the bundle identifier in `Info.plist`, not from the install
+location, so a copy installed to `~/Applications` still registers in the real
+per-user root. That is what keeps the proof representative while leaving Cyril's
+`/Applications/Nemo.app` untouched.
+
 ## Findings
 
 **1. The sidecar digest is checkout-dependent, so a single pinned hash is not
