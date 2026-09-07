@@ -6,6 +6,10 @@ Beginning with check 87, publish a 45-minute report every third check. Earlier
 
 **[All reports on main](https://github.com/mysteropodes/nemo/tree/main/40min-checkins)**
 
+**[Final weekend handoff — September 4–6, 2026](2026-09-07-weekend-final-handoff.md)**
+consolidates accomplishments, final delegate results, acceptance limits, blockers,
+owners and next steps, including the Sunday-night continuation recorded on September 7 UTC.
+
 | Check-in | Date (UTC) | Reporting window (UTC) | Report |
 | --- | --- | --- | --- |
 | 90 | 2026-09-07 | 01:20:46–02:05:46; subsequent native CLI integration | [Ninetieth check-in](2026-09-07-checkin-90.md) |
