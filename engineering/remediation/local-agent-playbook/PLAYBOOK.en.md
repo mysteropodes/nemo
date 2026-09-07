@@ -2,7 +2,7 @@
 
 English edition · 7 September 2026 · v1.0 · [French edition](PLAYBOOK.fr.md)
 
-**Purpose:** let Ilya and Mysteropodes direct their own local agents concurrently, with stable ownership, useful sprint handoffs and visible progress toward the same remediation goals: a modular application, shared application commands and bundled Rust MCP, stronger regression coverage, and reproducible browser/desktop behavior.
+**Purpose:** let Ilya and Cyrill direct their own local agents concurrently, with stable ownership, useful sprint handoffs and visible progress toward the same remediation goals: a modular application, shared application commands and bundled Rust MCP, stronger regression coverage, and reproducible browser/desktop behavior.
 
 **Status: proposed operating instructions for the two leads to adopt.** The review below is factual at its stated snapshot. The task allocations below are recommendations, not claims that agents have been assigned. This preparation did not post messages, edit issues or boards, launch agents, or merge code. Existing assignments continue until their owners explicitly hand them over.
 
@@ -17,9 +17,9 @@ The review fetched GitHub `main` at **`66ece0641708122eb8447e85ad8dd7e3402aaf6c`
 | R05 boundaries | Discovery, language-neutral text sizing, provenance and no-growth checks landed through #984. The opacity slice has JS and MCP Rust profiles. #901 remains Review. | Complete a bounded part of native Rust classification/enforcement. Whole-source dependency policy is still incomplete; do not treat size coverage as architecture coverage. |
 | R06 isolation | #991 integrated isolation; #993 corrected rejected-import side effects; #996 fixed truncated native CLI receipts. #902 remains In progress / Needs validation. | Validate outstanding concurrent desktop/build behavior against current source. Do not reimplement already integrated fixes. |
 | R08 animation seam | The production curve extraction and Node runner decision landed through #986. #904 is Validate / Needs validation. | Reuse the extracted kernel; finish its remaining acceptance rather than create another extraction. |
-| R09/R11/R12/R13/R14 slice | #992 is merged in the reviewed main. Application/domain/bootstrap/adapters, opacity consumers and compiled Rust MCP are present. #905/#907/#908/#909 remain In progress. | Ilya's team owns subsequent core contract and application changes, subject to explicitly reserved Mysteropodes lanes. Broad remediation remains open. |
-| Mysteropodes Lane F | Draft [#1002](https://github.com/mysteropodes/nemo/pull/1002), `8c1dd9bdcc3b82d65fe963c8d7d95d30c48fb8c5`, repairs advertised payload shape and query instance naming. | Preserve the Fizz lane and its exact files. Its PR explicitly still requires validation evidence. |
-| Mysteropodes Lane H | [#1001](https://github.com/mysteropodes/nemo/pull/1001), `a99d718685f0515e2e5e949dd6a076eb46feda38`, contains packaging/clean-attach evidence only. | Preserve the Honey lane. Its author reports macOS arm64 attach proof, plus separate FFmpeg and registry-lifecycle findings. It does not establish all-platform packaging or export acceptance. |
+| R09/R11/R12/R13/R14 slice | #992 is merged in the reviewed main. Application/domain/bootstrap/adapters, opacity consumers and compiled Rust MCP are present. #905/#907/#908/#909 remain In progress. | Ilya's team owns subsequent core contract and application changes, subject to explicitly reserved Cyrill lanes. Broad remediation remains open. |
+| Cyrill Lane F | Draft [#1002](https://github.com/mysteropodes/nemo/pull/1002), `8c1dd9bdcc3b82d65fe963c8d7d95d30c48fb8c5`, repairs advertised payload shape and query instance naming. | Preserve the Fizz lane and its exact files. Its PR explicitly still requires validation evidence. |
+| Cyrill Lane H | [#1001](https://github.com/mysteropodes/nemo/pull/1001), `a99d718685f0515e2e5e949dd6a076eb46feda38`, contains packaging/clean-attach evidence only. | Preserve the Honey lane. Its author reports macOS arm64 attach proof, plus separate FFmpeg and registry-lifecycle findings. It does not establish all-platform packaging or export acceptance. |
 
 **An immediate tracking correction needs a human decision.** [#910](https://github.com/mysteropodes/nemo/issues/910) was closed as completed at 20:22:52 UTC with merge commit `66ece06`. Both remediation boards still say In progress / Needs validation. Later [Claude client findings](https://github.com/mysteropodes/nemo/issues/910#issuecomment-5575427772) and [Codex client findings](https://github.com/mysteropodes/nemo/issues/910#issuecomment-5575438157) report a real advertised-schema defect. Main still declares `payload: Value` while rejecting non-object payloads. This supports keeping client acceptance open, even though transport and application code are merged. The leads should explicitly reopen #910 or link an open acceptance follow-up with equivalent coverage. Do not silently call the gate Done. Saved views filtered with `is:open` can hide this unfinished acceptance.
 
@@ -30,9 +30,9 @@ The older [weekend handoff](../../../40min-checkins/2026-09-07-weekend-final-han
 ### Two leads, one remediation program
 
 1. **Ilya is the remediation and integration lead.** He sequences shared contracts, maintains the global dependency order, decides cross-team scope changes and accepts phase gates.
-2. **Mysteropodes directs his own local agents.** Once the leads agree a lane pool and its boundaries, he may assign, review and continue those packets locally without waiting for Ilya at every step.
+2. **Cyrill directs his own local agents.** Once the leads agree a lane pool and its boundaries, he may assign, review and continue those packets locally without waiting for Ilya at every step.
 3. Each task has **one accountable human, one active writer and one named reviewer**. An agent/session identifier belongs in the issue, not in place of the human GitHub assignee.
-4. Ilya's agents receive instructions from Ilya; Mysteropodes's agents receive instructions from Mysteropodes. Cross-team requests go into the relevant issue and to the responsible human. No remote agent dispatch is required for ordinary work.
+4. Ilya's agents receive instructions from Ilya; Cyrill's agents receive instructions from Cyrill. Cross-team requests go into the relevant issue and to the responsible human. No remote agent dispatch is required for ordinary work.
 5. Both teams use the same issue/PR/Project workflow. Buzz may carry an optional link or discussion; a Buzz connection, timer, relay receipt or remote-agent repair is not a prerequisite for these local packets.
 6. The [existing handbook](../README.md), [task packet](../templates/TASK_PACKET.md), [handoff receipt](../templates/HANDOFF_RECEIPT.md), `AGENTS.md`, `CONTRIBUTING.md` and relevant `CLAUDE.md` sections continue to apply. These instructions adapt coordination to human-directed local execution.
 
@@ -51,18 +51,18 @@ An unavailable or silent agent does not make its files free. Its human preserves
 3. **Resolve the R14 mismatch.** Record whether #910 is reopened or which open issue now owns the outstanding acceptance. Preserve the existing F and H work. Review #1001's FFmpeg finding as a separate package defect; do not erase it because #900 is closed.
 4. **Agree the initial lane pool.** Retain F and H; select additional packets below to fit actual local capacity. A practical starting limit is two implementation writers per human plus an independent reviewer or acceptance lane when resources allow. Finish review backlog before adding writers.
 5. **Split independently deliverable work into existing or new child issues.** Search for an equivalent issue first. Use the existing R-parent; create a child only when the leads authorize it. Record real child URLs in its parent and both Projects. Labels such as M1 below are planning packet IDs, not already-created GitHub issues.
-6. **Fill the packet and grant once.** Name the human, writer, reviewer, exact paths, base, dependencies, acceptance, resource slots, next checkpoint and publication authority. Mysteropodes may then issue sub-packets within his granted lane pool; crossing the pool boundary returns to Ilya.
+6. **Fill the packet and grant once.** Name the human, writer, reviewer, exact paths, base, dependencies, acceptance, resource slots, next checkpoint and publication authority. Cyrill may then issue sub-packets within his granted lane pool; crossing the pool boundary returns to Ilya.
 7. **Confirm GitHub access from each machine.** Use the correct authenticated human account. Verify repository and both Project reads separately; an existing repository role alone does not demonstrate Project write access. Use existing approved access. If access is missing, the human handles it while the agent continues independent local work and prepares the precise update.
 8. **Choose a board steward and backup.** Normally the task's assigned agent updates its own item and both mirrors; its human is the backup. Ilya owns aggregate/phase updates. One person or agent writes a given item at a time; no second polling bot rewrites it.
 9. **Set the cadence.** Suggested: 60–90 minute working sprints, a small update at each sprint end, and a 10–15 minute joint review after two sprints or at a convenient agreed time. These are adjustable starting intervals, not deadlines that cancel work.
 
-## 4. Recommended task pool for Mysteropodes
+## 4. Recommended task pool for Cyrill
 
 F and H are retained work. M1–M4 are additional bounded packets to admit after ownership reconciliation. Their listed new paths are proposed destinations and must be checked for collisions before the grant. Evidence is stored under a packet-specific receipt directory; raw data stays in isolated ignored report roots until sanitized.
 
 ### F — Finish the MCP client contract correction already in #1002
 
-**Human:** Mysteropodes. **Existing lane:** Fizz / Lane F. **Priority:** P0. **Goal:** reliable client discovery and commands through the shared application API. **Parent:** R14/#910 or its explicitly chosen acceptance follow-up; related R09/#905.
+**Human:** Cyrill. **Existing lane:** Fizz / Lane F. **Priority:** P0. **Goal:** reliable client discovery and commands through the shared application API. **Parent:** R14/#910 or its explicitly chosen acceptance follow-up; related R09/#905.
 
 **Reserved files:** `nemo-mcp/src/contract.rs`, `nemo-mcp/src/server.rs`, `nemo-mcp/tests/stdio_contract.rs`, `engineering/application/transport-v1.schema.json`, `engineering/application/OPACITY_SLICE.md`. These are a specific exception to Ilya's shared-contract ownership. Other agents treat them as read-only until release.
 
@@ -75,7 +75,7 @@ F and H are retained work. M1–M4 are additional bounded packets to admit after
 
 ### H — Finish installed-package evidence already in #1001
 
-**Human:** Mysteropodes. **Existing lane:** Honey / Lane H. **Priority:** P0. **Parent:** R14/#910; packaging residuals relate to R21/#923.
+**Human:** Cyrill. **Existing lane:** Honey / Lane H. **Priority:** P0. **Parent:** R14/#910; packaging residuals relate to R21/#923.
 
 **Reserved paths:** `engineering/remediation/receipts/R14-packaging/**`. Source, build scripts and configuration remain outside this evidence-only packet.
 
@@ -88,7 +88,7 @@ F and H are retained work. M1–M4 are additional bounded packets to admit after
 
 ### M1 — Close a bounded concurrent-desktop isolation acceptance slice
 
-**Human:** Mysteropodes after Ilya grants this R06 sub-scope. **Priority:** P0. **Parent:** R06/#902. **Suggested size:** two sprints, adjusted after the first reproducible result. **Dependency:** identified runnable package and a reserved desktop slot; no need to wait for new MCP payload semantics.
+**Human:** Cyrill after Ilya grants this R06 sub-scope. **Priority:** P0. **Parent:** R06/#902. **Suggested size:** two sprints, adjusted after the first reproducible result. **Dependency:** identified runnable package and a reserved desktop slot; no need to wait for new MCP payload semantics.
 
 **Proposed writable paths:** `tests/desktop/local-isolation-acceptance.test.cjs` and `engineering/remediation/receipts/M1-isolation/**`. Read the existing harness and `engineering/runtime-isolation.md` first. Production launcher, storage, `project.js`, Rust sources and test registry remain read-only.
 
@@ -101,7 +101,7 @@ F and H are retained work. M1–M4 are additional bounded packets to admit after
 
 ### M2 — Enforce a reviewed native Rust boundary subset
 
-**Human:** Mysteropodes after Ilya grants this R05 sub-scope. **Priority:** P1. **Parent:** R05/#901. **Suggested size:** two sprints. **Dependency:** agreement on the selected Rust roots and the single integration owner for checker wiring.
+**Human:** Cyrill after Ilya grants this R05 sub-scope. **Priority:** P1. **Parent:** R05/#901. **Suggested size:** two sprints. **Dependency:** agreement on the selected Rust roots and the single integration owner for checker wiring.
 
 **Proposed writable paths:** `scripts/nemo/lib/boundaries-rust.cjs`, `tests/nemo-rust-boundaries.test.cjs`, `engineering/boundaries/profiles/native-rust.profile.json`, `engineering/remediation/receipts/M2-rust-boundaries/**`. Confirm these are unused. Existing checker, `ci.cjs`, package/lockfiles and production Rust are read-only. Exclude the active MCP contract files and `src-tauri/src/application_mcp.rs` from this new ownership grant; retain their existing profile treatment.
 
@@ -114,7 +114,7 @@ F and H are retained work. M1–M4 are additional bounded packets to admit after
 
 ### M3 — Add missing browser consumer regressions around the merged opacity slice
 
-**Human:** Mysteropodes. **Priority:** P1. **Parents:** R03/#899 and R13/#909, with one primary child issue. **Suggested size:** one characterization sprint plus one implementation sprint. **Dependency:** merged opacity handlers and a stable fixture/consumer contract from Ilya.
+**Human:** Cyrill. **Priority:** P1. **Parents:** R03/#899 and R13/#909, with one primary child issue. **Suggested size:** one characterization sprint plus one implementation sprint. **Dependency:** merged opacity handlers and a stable fixture/consumer contract from Ilya.
 
 **Proposed writable paths:** `tests/browser/local-opacity-consumers.spec.cjs` and `engineering/remediation/receipts/M3-opacity-consumers/**`. Existing `tests/browser/opacity-consumers.spec.cjs`, fixtures, bootstrap, production code and Playwright configuration remain read-only.
 
@@ -127,7 +127,7 @@ F and H are retained work. M1–M4 are additional bounded packets to admit after
 
 ### M4 — Measure a comparable baseline for the next extraction
 
-**Human:** Mysteropodes. **Priority:** P1. **Parents:** R19/#921, inputs from R03/#899 and the implemented R12 slice. **Suggested size:** one sprint. **Start classification:** bounded measurement preparation, not full R19 acceptance.
+**Human:** Cyrill. **Priority:** P1. **Parents:** R19/#921, inputs from R03/#899 and the implemented R12 slice. **Suggested size:** one sprint. **Start classification:** bounded measurement preparation, not full R19 acceptance.
 
 **Writable paths:** only `engineering/remediation/receipts/M4-performance/**`; raw output uses an isolated ignored report directory. Production code, fixture corpus and benchmark runner remain read-only.
 
@@ -143,7 +143,7 @@ F and H are retained work. M1–M4 are additional bounded packets to admit after
 | Packet | Why it waits | Useful next work |
 |---|---|---|
 | R10/#906 native OpenFX feasibility | R09 image/parameter port is not fully adopted; the older Pollen request needs disposition reconciliation. | After the port is agreed, authorize one disposable load/describe/CPU-float-render proof. Retire or integrate it explicitly; do not invent a second product backend. |
-| R18.1/#915 document identity/codec extraction | Shared persistence/history boundaries still require an exact contract and whole-file reservation. | Ilya selects one pure leaf and its consumers; Mysteropodes can then own that child end to end. |
+| R18.1/#915 document identity/codec extraction | Shared persistence/history boundaries still require an exact contract and whole-file reservation. | Ilya selects one pure leaf and its consumers; Cyrill can then own that child end to end. |
 | R18.2/#916 next animation extraction | Needs accepted current seam and one agreed API. | Choose one remaining pure responsibility; preserve curve/opacity authority and avoid concurrent `motion.js` rewrites. |
 | R20/#922 and full R21/#923 | Broad migration, media and platform prerequisites remain open. | Admit individual fault/platform subcases when their specific inputs exist; do not label the full programs Ready. |
 
@@ -292,7 +292,7 @@ Use the existing Projects, adding saved views only if the leads decide they help
 - **Next work:** Ready, sorted by priority and satisfied concrete dependencies.
 - **Acceptance history:** Done / Accepted with integrated source/artifact references; keep closed history accessible.
 
-At each joint checkpoint, Ilya and Mysteropodes inspect changes since the previous checkpoint, not entire conversation logs. Each human contributes a short issue-comment rollup on the relevant phase issue, linking child receipts:
+At each joint checkpoint, Ilya and Cyrill inspect changes since the previous checkpoint, not entire conversation logs. Each human contributes a short issue-comment rollup on the relevant phase issue, linking child receipts:
 
 ```text
 Team / checkpoint:
@@ -320,7 +320,7 @@ Integration is sequential even when implementation is parallel:
 Fill the bracketed values before issuing this instruction. The publication line is an explicit suggested grant for a normal implementation packet; the human may narrow it. A reviewer or evidence-only packet should say so.
 
 ```text
-You are working on Nemo foundation remediation under [Ilya / Mysteropodes].
+You are working on Nemo foundation remediation under [Ilya / Cyrill].
 Your task is [issue URL + packet ID]. Your human owner is [name]; your reviewer
 is [name]. Read the assigned packet, latest sprint receipt, relevant PRs,
 AGENTS.md, CONTRIBUTING.md and the applicable remediation/module documentation.

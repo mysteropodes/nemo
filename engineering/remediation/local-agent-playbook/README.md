@@ -1,8 +1,8 @@
 # Nemo local-agent coordination / Coordination des agents locaux
 
-Prepared 7 September 2026 for Ilya and Mysteropodes. Proposed instructions; no assignments or GitHub changes were made by preparing these documents.
+Prepared 7 September 2026 for Ilya and Cyrill. Proposed instructions; no assignments or GitHub changes were made by preparing these documents.
 
-Préparé le 7 septembre 2026 pour Ilya et Mysteropodes. Instructions proposées ; leur préparation n’a attribué aucune tâche ni modifié GitHub.
+Préparé le 7 septembre 2026 pour Ilya et Cyrill. Instructions proposées ; leur préparation n’a attribué aucune tâche ni modifié GitHub.
 
 ## Documents
 
@@ -24,9 +24,9 @@ Les deux éditions contiennent l’analyse des travaux actuels, les missions con
 | M3 | Missing opacity consumer tests / tests manquants des consommateurs d’opacité | Stable application/fixture contract / contrat application/jeux de test stable |
 | M4 | Comparable performance measurements / mesures de performance comparables | Identified fixtures and reserved machine / jeux de test identifiés et machine réservée |
 
-Start with the available capacity, not all six lanes automatically. Section 3 is the joint kickoff; section 4 contains each packet; sections 6–8 are the agent workflow; section 10 is the instruction to copy. Ilya retains core/integration ownership; Mysteropodes controls his agreed local lane pool through successive sprints.
+Start with the available capacity, not all six lanes automatically. Section 3 is the joint kickoff; section 4 contains each packet; sections 6–8 are the agent workflow; section 10 is the instruction to copy. Ilya retains core/integration ownership; Cyrill controls his agreed local lane pool through successive sprints.
 
-Démarrer selon la capacité disponible, sans lancer automatiquement les six volets. La section 3 décrit le lancement commun ; la section 4 détaille chaque mission ; les sections 6 à 8 donnent le processus des agents ; la section 10 fournit l’instruction à copier. Ilya conserve la responsabilité du cœur et de l’intégration ; Mysteropodes dirige les volets locaux convenus au fil des sprints.
+Démarrer selon la capacité disponible, sans lancer automatiquement les six volets. La section 3 décrit le lancement commun ; la section 4 détaille chaque mission ; les sections 6 à 8 donnent le processus des agents ; la section 10 fournit l’instruction à copier. Ilya conserve la responsabilité du cœur et de l’intégration ; Cyrill dirige les volets locaux convenus au fil des sprints.
 
 ## First oversight action / Première action de supervision
 

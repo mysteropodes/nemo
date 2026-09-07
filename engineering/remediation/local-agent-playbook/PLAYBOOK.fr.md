@@ -2,7 +2,7 @@
 
 Édition française · 7 septembre 2026 · v1.0 · [Édition anglaise](PLAYBOOK.en.md)
 
-**Objectif :** permettre à Ilya et Mysteropodes de diriger chacun leurs agents locaux en parallèle, avec des responsabilités stables, des transmissions utiles entre les sprints et une progression visible vers les mêmes objectifs de remédiation : une application modulaire, des commandes applicatives partagées et un serveur MCP Rust intégré à la distribution, une meilleure couverture de régression et un comportement reproductible dans le navigateur et l’application de bureau.
+**Objectif :** permettre à Ilya et Cyrill de diriger chacun leurs agents locaux en parallèle, avec des responsabilités stables, des transmissions utiles entre les sprints et une progression visible vers les mêmes objectifs de remédiation : une application modulaire, des commandes applicatives partagées et un serveur MCP Rust intégré à la distribution, une meilleure couverture de régression et un comportement reproductible dans le navigateur et l’application de bureau.
 
 **Statut : proposition de règles de fonctionnement à adopter par les deux responsables.** L’analyse ci-dessous décrit les faits au moment de l’observation indiqué. Les répartitions proposées ne signifient pas que les agents ont reçu ces missions. Cette préparation n’a publié aucun message, modifié aucun ticket ni tableau, lancé aucun agent ni fusionné de code. Les affectations existantes restent en vigueur jusqu’à une transmission explicite par leurs responsables.
 
@@ -17,9 +17,9 @@ L’analyse a récupéré la branche `main` de GitHub au commit **`66ece06417081
 | R05 : frontières des modules | La découverte des fichiers, le comptage textuel indépendant du langage, la provenance et les contrôles de non-croissance ont été intégrés par #984. La tranche opacité possède des profils JS et MCP Rust. #901 reste Review. | Compléter une partie délimitée de la classification et du contrôle du Rust natif. La politique de dépendances de l’ensemble du code reste incomplète ; la couverture des tailles ne vaut pas couverture architecturale. |
 | R06 : isolation | #991 a intégré l’isolation ; #993 a corrigé les effets de bord des imports refusés ; #996 a corrigé la troncature des comptes rendus JSON du CLI natif. #902 reste In progress / Needs validation. | Valider les critères restants d’exécution et de compilation simultanées sur le code actuel. Ne pas réimplémenter les corrections déjà intégrées. |
 | R08 : extraction d’une fonction d’animation | L’extraction de la courbe utilisée en production et le choix du lanceur Node ont été intégrés par #986. #904 est Validate / Needs validation. | Réutiliser le noyau extrait ; terminer les validations restantes au lieu de produire une autre extraction. |
-| Tranche R09/R11/R12/R13/R14 | #992 est fusionnée dans le `main` examiné. Les modules application/domain/bootstrap/adapters, les consommateurs de l’opacité et le MCP Rust compilé sont présents. #905/#907/#908/#909 restent In progress. | L’équipe d’Ilya prend en charge les évolutions suivantes des contrats centraux et de l’application, sous réserve des périmètres explicitement réservés à Mysteropodes. La remédiation globale reste ouverte. |
-| Volet F de Mysteropodes | La PR en brouillon [#1002](https://github.com/mysteropodes/nemo/pull/1002), `8c1dd9bdcc3b82d65fe963c8d7d95d30c48fb8c5`, corrige la structure annoncée du payload et le nom du champ d’instance des requêtes. | Préserver le volet de Fizz et ses fichiers exacts. La PR indique explicitement que les preuves de validation restent à fournir. |
-| Volet H de Mysteropodes | [#1001](https://github.com/mysteropodes/nemo/pull/1001), `a99d718685f0515e2e5e949dd6a076eb46feda38`, contient uniquement des preuves de packaging et de connexion depuis un environnement épuré. | Préserver le volet de Honey. Son auteur rapporte une connexion réussie sous macOS arm64 ainsi que des constats distincts sur FFmpeg et le cycle de vie du registre. Cela ne prouve ni le packaging sur toutes les plateformes ni la validation de l’export. |
+| Tranche R09/R11/R12/R13/R14 | #992 est fusionnée dans le `main` examiné. Les modules application/domain/bootstrap/adapters, les consommateurs de l’opacité et le MCP Rust compilé sont présents. #905/#907/#908/#909 restent In progress. | L’équipe d’Ilya prend en charge les évolutions suivantes des contrats centraux et de l’application, sous réserve des périmètres explicitement réservés à Cyrill. La remédiation globale reste ouverte. |
+| Volet F de Cyrill | La PR en brouillon [#1002](https://github.com/mysteropodes/nemo/pull/1002), `8c1dd9bdcc3b82d65fe963c8d7d95d30c48fb8c5`, corrige la structure annoncée du payload et le nom du champ d’instance des requêtes. | Préserver le volet de Fizz et ses fichiers exacts. La PR indique explicitement que les preuves de validation restent à fournir. |
+| Volet H de Cyrill | [#1001](https://github.com/mysteropodes/nemo/pull/1001), `a99d718685f0515e2e5e949dd6a076eb46feda38`, contient uniquement des preuves de packaging et de connexion depuis un environnement épuré. | Préserver le volet de Honey. Son auteur rapporte une connexion réussie sous macOS arm64 ainsi que des constats distincts sur FFmpeg et le cycle de vie du registre. Cela ne prouve ni le packaging sur toutes les plateformes ni la validation de l’export. |
 
 **Une incohérence de suivi exige une décision humaine immédiate.** [#910](https://github.com/mysteropodes/nemo/issues/910) a été fermé comme terminé à 20:22:52 UTC avec le commit de fusion `66ece06`. Les deux tableaux de remédiation indiquent encore In progress / Needs validation. Des [constats ultérieurs avec Claude](https://github.com/mysteropodes/nemo/issues/910#issuecomment-5575427772) et [avec Codex](https://github.com/mysteropodes/nemo/issues/910#issuecomment-5575438157) rapportent un défaut réel du schéma annoncé. Main déclare encore `payload: Value` tout en refusant les payloads qui ne sont pas des objets. Ces éléments justifient de garder la validation des clients ouverte, même si le transport et le code applicatif sont fusionnés. Les responsables doivent explicitement rouvrir #910 ou relier un ticket de validation ouvert offrant la même couverture. Ne pas déclarer silencieusement ce jalon Done. Les vues enregistrées filtrées par `is:open` peuvent masquer cette validation inachevée.
 
@@ -30,9 +30,9 @@ L’ancien [compte rendu de fin de week-end](../../../40min-checkins/2026-09-07-
 ### Deux responsables, un seul programme de remédiation
 
 1. **Ilya est responsable de la remédiation et de l’intégration.** Il ordonne les évolutions des contrats partagés, maintient l’ordre global des dépendances, décide des changements de périmètre entre équipes et accepte les jalons de phase.
-2. **Mysteropodes dirige ses propres agents locaux.** Une fois l’ensemble des volets et leurs limites convenus, il peut affecter, examiner et poursuivre ces missions localement sans attendre Ilya à chaque étape.
+2. **Cyrill dirige ses propres agents locaux.** Une fois l’ensemble des volets et leurs limites convenus, il peut affecter, examiner et poursuivre ces missions localement sans attendre Ilya à chaque étape.
 3. Chaque tâche a **un responsable humain, un seul agent autorisé à modifier son périmètre à un instant donné et un relecteur nommé**. L’identifiant de l’agent ou de sa session figure dans le ticket, sans remplacer le responsable humain dans Assignees.
-4. Les agents d’Ilya reçoivent leurs instructions d’Ilya ; ceux de Mysteropodes les reçoivent de Mysteropodes. Les demandes entre équipes passent par le ticket concerné et le responsable humain. Le travail courant ne nécessite aucune attribution de tâche à un agent distant.
+4. Les agents d’Ilya reçoivent leurs instructions d’Ilya ; ceux de Cyrill les reçoivent de Cyrill. Les demandes entre équipes passent par le ticket concerné et le responsable humain. Le travail courant ne nécessite aucune attribution de tâche à un agent distant.
 5. Les deux équipes utilisent le même processus tickets/PR/Projects. Buzz peut transmettre un lien ou accueillir une discussion facultative ; une connexion Buzz, un minuteur, un accusé de réception du relais ou une réparation d’agent distant n’est pas un prérequis pour ces missions locales.
 6. Le [guide existant](../README.md), la [fiche de mission](../templates/TASK_PACKET.md), le [compte rendu de transmission](../templates/HANDOFF_RECEIPT.md), `AGENTS.md`, `CONTRIBUTING.md` et les sections pertinentes de `CLAUDE.md` continuent de s’appliquer. Ces instructions adaptent la coordination à une exécution locale dirigée par les humains.
 
@@ -51,18 +51,18 @@ Un agent indisponible ou silencieux ne libère pas ses fichiers. Son responsable
 3. **Résoudre l’incohérence R14.** Consigner si #910 est rouvert ou quel ticket ouvert porte désormais les validations restantes. Préserver les travaux F et H existants. Examiner le constat FFmpeg de #1001 comme un défaut distinct de packaging ; ne pas l’effacer au motif que #900 est fermé.
 4. **Convenir de l’ensemble initial des missions.** Conserver F et H ; sélectionner les missions supplémentaires ci-dessous selon la capacité locale réelle. Un point de départ pratique est de limiter chaque humain à deux agents d’implémentation, plus un relecteur indépendant ou un volet de validation si les ressources le permettent. Traiter les relectures en attente avant d’ajouter des agents qui modifient le code.
 5. **Découper les livrables indépendants en tickets enfants existants ou nouveaux.** Rechercher d’abord un ticket équivalent. Utiliser le parent R existant ; créer un enfant uniquement lorsque les responsables l’autorisent. Inscrire les vraies URL des enfants dans le parent et dans les deux Projects. Les libellés M1, etc. sont des identifiants de planification, pas des tickets GitHub déjà créés.
-6. **Remplir et attribuer la mission une fois.** Nommer l’humain, l’agent qui modifie les fichiers, le relecteur, les chemins exacts, la base, les dépendances, les critères d’acceptation, les ressources, le prochain point d’étape et les droits de publication. Mysteropodes peut ensuite attribuer des sous-missions dans l’ensemble convenu ; dépasser ces limites revient à Ilya.
+6. **Remplir et attribuer la mission une fois.** Nommer l’humain, l’agent qui modifie les fichiers, le relecteur, les chemins exacts, la base, les dépendances, les critères d’acceptation, les ressources, le prochain point d’étape et les droits de publication. Cyrill peut ensuite attribuer des sous-missions dans l’ensemble convenu ; dépasser ces limites revient à Ilya.
 7. **Vérifier l’accès GitHub depuis chaque machine.** Utiliser le bon compte humain authentifié. Vérifier séparément la lecture du dépôt et des deux Projects ; un rôle dans le dépôt ne démontre pas à lui seul un droit d’écriture dans les Projects. Utiliser les accès déjà approuvés. Si un accès manque, l’humain s’en charge pendant que l’agent poursuit le travail local indépendant et prépare la mise à jour exacte.
 8. **Choisir un responsable des mises à jour du tableau et son remplaçant.** Normalement, l’agent affecté à la tâche met à jour son élément dans les deux tableaux ; son humain le remplace si nécessaire. Ilya gère les mises à jour globales et des phases. Une seule personne ou un seul agent modifie un élément à la fois ; aucun second robot de surveillance ne le réécrit en parallèle.
 9. **Fixer le rythme.** Proposition : sprints de travail de 60 à 90 minutes, courte mise à jour à la fin de chaque sprint, et revue commune de 10 à 15 minutes après deux sprints ou à un horaire convenu. Ces intervalles sont ajustables ; ce ne sont pas des échéances qui annulent le travail.
 
-## 4. Ensemble de missions recommandé pour Mysteropodes
+## 4. Ensemble de missions recommandé pour Cyrill
 
 F et H sont des travaux à poursuivre. M1 à M4 sont des missions supplémentaires délimitées, à attribuer après clarification des responsabilités. Les nouveaux chemins indiqués sont des destinations proposées dont il faut vérifier la disponibilité avant attribution. Les preuves vont dans un répertoire propre à la mission ; les données brutes restent dans des répertoires de rapports isolés et ignorés par Git jusqu’à leur nettoyage.
 
 ### F — Terminer la correction du contrat client MCP déjà engagée dans #1002
 
-**Humain :** Mysteropodes. **Volet existant :** Fizz / Lane F. **Priorité :** P0. **Objectif :** découverte et commandes fiables depuis les clients, via l’API applicative partagée. **Parent :** R14/#910 ou le ticket de validation explicitement choisi ; lien avec R09/#905.
+**Humain :** Cyrill. **Volet existant :** Fizz / Lane F. **Priorité :** P0. **Objectif :** découverte et commandes fiables depuis les clients, via l’API applicative partagée. **Parent :** R14/#910 ou le ticket de validation explicitement choisi ; lien avec R09/#905.
 
 **Fichiers réservés :** `nemo-mcp/src/contract.rs`, `nemo-mcp/src/server.rs`, `nemo-mcp/tests/stdio_contract.rs`, `engineering/application/transport-v1.schema.json`, `engineering/application/OPACITY_SLICE.md`. Il s’agit d’une exception explicite à la responsabilité d’Ilya sur les contrats partagés. Les autres agents les consultent en lecture seule jusqu’à leur libération.
 
@@ -75,7 +75,7 @@ F et H sont des travaux à poursuivre. M1 à M4 sont des missions supplémentair
 
 ### H — Terminer les preuves sur le paquet installé déjà engagées dans #1001
 
-**Humain :** Mysteropodes. **Volet existant :** Honey / Lane H. **Priorité :** P0. **Parent :** R14/#910 ; les points restants de packaging se rattachent à R21/#923.
+**Humain :** Cyrill. **Volet existant :** Honey / Lane H. **Priorité :** P0. **Parent :** R14/#910 ; les points restants de packaging se rattachent à R21/#923.
 
 **Chemins réservés :** `engineering/remediation/receipts/R14-packaging/**`. Le code, les scripts de compilation et la configuration restent hors de cette mission consacrée aux preuves.
 
@@ -88,7 +88,7 @@ F et H sont des travaux à poursuivre. M1 à M4 sont des missions supplémentair
 
 ### M1 — Valider une tranche délimitée de l’isolation de plusieurs instances de bureau
 
-**Humain :** Mysteropodes après attribution de ce sous-périmètre R06 par Ilya. **Priorité :** P0. **Parent :** R06/#902. **Taille suggérée :** deux sprints, à ajuster après le premier résultat reproductible. **Dépendance :** paquet identifié et exécutable, avec un créneau réservé pour le bureau ; il n’est pas nécessaire d’attendre la nouvelle sémantique des payloads MCP.
+**Humain :** Cyrill après attribution de ce sous-périmètre R06 par Ilya. **Priorité :** P0. **Parent :** R06/#902. **Taille suggérée :** deux sprints, à ajuster après le premier résultat reproductible. **Dépendance :** paquet identifié et exécutable, avec un créneau réservé pour le bureau ; il n’est pas nécessaire d’attendre la nouvelle sémantique des payloads MCP.
 
 **Chemins modifiables proposés :** `tests/desktop/local-isolation-acceptance.test.cjs` et `engineering/remediation/receipts/M1-isolation/**`. Lire d’abord le dispositif de test existant et `engineering/runtime-isolation.md`. Le lanceur de production, le stockage, `project.js`, les sources Rust et le registre de tests restent en lecture seule.
 
@@ -101,7 +101,7 @@ F et H sont des travaux à poursuivre. M1 à M4 sont des missions supplémentair
 
 ### M2 — Faire respecter un sous-ensemble examiné des frontières Rust natives
 
-**Humain :** Mysteropodes après attribution de ce sous-périmètre R05 par Ilya. **Priorité :** P1. **Parent :** R05/#901. **Taille suggérée :** deux sprints. **Dépendance :** accord sur les racines Rust sélectionnées et sur l’unique responsable du raccordement du contrôleur.
+**Humain :** Cyrill après attribution de ce sous-périmètre R05 par Ilya. **Priorité :** P1. **Parent :** R05/#901. **Taille suggérée :** deux sprints. **Dépendance :** accord sur les racines Rust sélectionnées et sur l’unique responsable du raccordement du contrôleur.
 
 **Chemins modifiables proposés :** `scripts/nemo/lib/boundaries-rust.cjs`, `tests/nemo-rust-boundaries.test.cjs`, `engineering/boundaries/profiles/native-rust.profile.json`, `engineering/remediation/receipts/M2-rust-boundaries/**`. Vérifier leur disponibilité. Le contrôleur existant, `ci.cjs`, les fichiers package/lock et le Rust de production restent en lecture seule. Exclure de cette nouvelle attribution les fichiers actifs du contrat MCP et `src-tauri/src/application_mcp.rs` ; conserver leur traitement par le profil existant.
 
@@ -114,7 +114,7 @@ F et H sont des travaux à poursuivre. M1 à M4 sont des missions supplémentair
 
 ### M3 — Ajouter les régressions navigateur manquantes autour de l’opacité intégrée
 
-**Humain :** Mysteropodes. **Priorité :** P1. **Parents :** R03/#899 et R13/#909, avec un seul ticket enfant principal. **Taille suggérée :** un sprint de caractérisation puis un sprint d’implémentation. **Dépendance :** gestionnaires d’opacité fusionnés et contrat stable des jeux de test/consommateurs fourni par Ilya.
+**Humain :** Cyrill. **Priorité :** P1. **Parents :** R03/#899 et R13/#909, avec un seul ticket enfant principal. **Taille suggérée :** un sprint de caractérisation puis un sprint d’implémentation. **Dépendance :** gestionnaires d’opacité fusionnés et contrat stable des jeux de test/consommateurs fourni par Ilya.
 
 **Chemins modifiables proposés :** `tests/browser/local-opacity-consumers.spec.cjs` et `engineering/remediation/receipts/M3-opacity-consumers/**`. Le fichier existant `tests/browser/opacity-consumers.spec.cjs`, les jeux de test, le bootstrap, le code de production et la configuration Playwright restent en lecture seule.
 
@@ -127,7 +127,7 @@ F et H sont des travaux à poursuivre. M1 à M4 sont des missions supplémentair
 
 ### M4 — Mesurer une référence comparable pour la prochaine extraction
 
-**Humain :** Mysteropodes. **Priorité :** P1. **Parents :** R19/#921, avec les apports de R03/#899 et de la tranche R12 implémentée. **Taille suggérée :** un sprint. **Qualification au démarrage :** préparation de mesures délimitée, pas validation complète de R19.
+**Humain :** Cyrill. **Priorité :** P1. **Parents :** R19/#921, avec les apports de R03/#899 et de la tranche R12 implémentée. **Taille suggérée :** un sprint. **Qualification au démarrage :** préparation de mesures délimitée, pas validation complète de R19.
 
 **Chemins modifiables :** uniquement `engineering/remediation/receipts/M4-performance/**` ; les sorties brutes utilisent un répertoire de rapports isolé et ignoré par Git. Le code de production, le corpus et le lanceur de benchmark restent en lecture seule.
 
@@ -143,7 +143,7 @@ F et H sont des travaux à poursuivre. M1 à M4 sont des missions supplémentair
 | Mission | Raison de l’attente | Prochain travail utile |
 |---|---|---|
 | R10/#906 : faisabilité OpenFX native | Le port image/paramètres R09 n’est pas entièrement adopté ; l’ancienne demande à Pollen doit recevoir une disposition clarifiée. | Après accord sur le port, autoriser une preuve jetable de chargement/description/rendu CPU float. La retirer ou l’intégrer explicitement ; ne pas inventer un second backend produit. |
-| R18.1/#915 : extraction identité/codec du document | Les frontières partagées de persistance/historique exigent encore un contrat exact et une réservation de fichiers entiers. | Ilya sélectionne une fonction pure indépendante et ses consommateurs ; Mysteropodes peut alors prendre cet enfant en charge de bout en bout. |
+| R18.1/#915 : extraction identité/codec du document | Les frontières partagées de persistance/historique exigent encore un contrat exact et une réservation de fichiers entiers. | Ilya sélectionne une fonction pure indépendante et ses consommateurs ; Cyrill peut alors prendre cet enfant en charge de bout en bout. |
 | R18.2/#916 : prochaine extraction d’animation | Nécessite l’acceptation de l’extraction actuelle et une API convenue. | Choisir une responsabilité pure restante ; préserver l’autorité courbe/opacité et éviter des réécritures concurrentes de `motion.js`. |
 | R20/#922 et R21/#923 complet | Les prérequis étendus de migration, de médias et de plateformes restent ouverts. | Attribuer des sous-cas de panne/plateforme lorsque leurs entrées précises existent ; ne pas déclarer les programmes complets Ready. |
 
@@ -292,7 +292,7 @@ Utiliser les Projects existants et ajouter des vues enregistrées uniquement si 
 - **Travail suivant :** Ready, trié par priorité et dépendances concrètes satisfaites.
 - **Historique d’acceptation :** Done / Accepted avec références du code/des artefacts intégrés ; garder l’historique fermé accessible.
 
-À chaque point commun, Ilya et Mysteropodes examinent les changements depuis le point précédent, pas les journaux de conversation complets. Chaque humain ajoute un court bilan dans un commentaire du ticket de phase concerné, avec des liens vers les comptes rendus enfants :
+À chaque point commun, Ilya et Cyrill examinent les changements depuis le point précédent, pas les journaux de conversation complets. Chaque humain ajoute un court bilan dans un commentaire du ticket de phase concerné, avec des liens vers les comptes rendus enfants :
 
 ```text
 Équipe / point d’étape :
@@ -321,7 +321,7 @@ Remplir les valeurs entre crochets avant de donner cette instruction. La ligne d
 
 ```text
 Tu travailles à la remédiation des fondations de Nemo sous la direction de
-[Ilya / Mysteropodes]. Ta tâche est [URL du ticket + identifiant de mission].
+[Ilya / Cyrill]. Ta tâche est [URL du ticket + identifiant de mission].
 Ton responsable humain est [nom] ; ton relecteur est [nom]. Lis la fiche
 attribuée, le dernier compte rendu de sprint, les PR pertinentes, AGENTS.md,
 CONTRIBUTING.md et la documentation applicable de remédiation/des modules.
