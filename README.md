@@ -33,6 +33,16 @@ The audited main is `66ece0641708122eb8447e85ad8dd7e3402aaf6c`. Fresh ownership,
 protection and exact-SHA checks are required immediately before deleting any candidate.
 If a ref changed, acquired an owner, or became an open PR dependency, retain it and audit again.
 
+## Supplement: superseded predecessors and reports
+
+The [supplemental audit](snapshots/2026-09-07-superseded/audit.json) and
+[manifest](snapshots/2026-09-07-superseded/manifest.json) preserve **7 remote and 30 local
+additional candidate refs**, including R03 predecessors and obsolete report-publication
+branches. The latter contain unique historical receipts; they are archived, not claimed
+merged. PR dispositions and required closure order are recorded in the manifest. This
+supplement is independently self-contained and does not require the first snapshot.
+Actual completed retirement is recorded separately below when verified.
+
 ## Verify everything
 
 Use an independent checkout of this branch:
@@ -43,11 +53,11 @@ cd nemo-archive
 python3 verify.py
 ```
 
-The verifier checks every artifact checksum, verifies the bundle in an empty repository,
-fetches every archived ref, compares all 427 original tip SHAs, and runs full Git integrity
-validation. It uses no existing Nemo objects or object alternates. No external Git history
-is required. The machine-readable [manifest](snapshots/2026-09-07/manifest.json) contains the
-bundle digest, size, scope and preservation limits.
+The verifier checks every snapshot's artifact checksums, verifies each bundle in its own
+empty repository, fetches every archived ref, compares all original tip SHAs, and runs full
+Git integrity validation. It uses no existing Nemo objects or object alternates. No external
+Git history is required. Each snapshot's manifest contains its bundle digest, size, scope
+and preservation limits. Pass a snapshot directory to verify only that snapshot.
 
 ## Restore one branch
 

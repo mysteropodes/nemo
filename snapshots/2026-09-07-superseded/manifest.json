@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "snapshot": "2026-09-07-superseded",
+  "repository": "https://github.com/mysteropodes/nemo",
+  "main_sha": "66ece0641708122eb8447e85ad8dd7e3402aaf6c",
+  "created_at": "2026-09-07T23:36:55.037407+00:00",
+  "bundle": "retired-branches.bundle",
+  "bundle_bytes": 67488403,
+  "bundle_sha256": "7e45f347fcf1d8184d81790ca3abcf089405f08f595277692edbeba4da868468",
+  "self_contained": true,
+  "prerequisites": [],
+  "candidate_counts": {
+    "local": {
+      "candidate": 30
+    },
+    "remote": {
+      "candidate": 7
+    }
+  },
+  "candidate_refs": 37,
+  "unique_candidate_tips": 27,
+  "deletion_status": "Prepared; seven PR closures and subsequent exact-SHA branch retirement await independent remote restore proof.",
+  "pr_dispositions": {
+    "944": "Superseded by integrated R03 patches; broader R03 acceptance remains separate.",
+    "946": "Superseded R03 fixture predecessor; close stacked #959 first.",
+    "959": "Superseded compatibility predecessor; patch represented on main.",
+    "982": "Obsolete report-publication task under issue-handoff workflow; preserve unique historical receipt.",
+    "987": "Obsolete report-publication task under issue-handoff workflow; preserve unique historical receipt.",
+    "989": "Obsolete report-publication task under issue-handoff workflow; preserve unique historical receipt.",
+    "990": "Obsolete report-publication task under issue-handoff workflow; preserve unique historical receipt."
+  },
+  "excluded": "Uncommitted/ignored files, external LFS payloads and application state are not included. Worktrees and remaining branches stay intact."
+}

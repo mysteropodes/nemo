@@ -41,6 +41,14 @@ def verify(snapshot):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('snapshot',nargs='?',type=pathlib.Path,default=pathlib.Path(__file__).parent/'snapshots'/'2026-09-07')
+    parser.add_argument('snapshot',nargs='?',type=pathlib.Path)
     args=parser.parse_args()
-    print(json.dumps(verify(args.snapshot),indent=2))
+    if args.snapshot:
+        result=verify(args.snapshot)
+    else:
+        snapshots=sorted((pathlib.Path(__file__).parent/'snapshots').glob('*/manifest.json'))
+        if not snapshots:raise ValueError('No archive snapshots found')
+        receipts=[verify(manifest.parent) for manifest in snapshots]
+        result={'snapshots':receipts,'snapshot_count':len(receipts),
+                'restored_refs':sum(r['restored_refs'] for r in receipts)}
+    print(json.dumps(result,indent=2))

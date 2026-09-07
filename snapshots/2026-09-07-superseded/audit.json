@@ -1,0 +1,985 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/mysteropodes/nemo",
+  "audited_at": "2026-09-07T23:36:55.037407+00:00",
+  "main_sha": "66ece0641708122eb8447e85ad8dd7e3402aaf6c",
+  "policy": "Additional reviewed retirement: exact patch duplication without unique merge resolutions, plus obsolete report publication tasks. Seven PRs must close only after remote restoration proof. No age-only decisions.",
+  "counts": {
+    "local": {
+      "candidate": 30
+    },
+    "remote": {
+      "candidate": 7
+    }
+  },
+  "refs": [
+    {
+      "scope": "local",
+      "name": "claude/r03-curve-compat",
+      "original_ref": "refs/heads/claude/r03-curve-compat",
+      "sha": "8faadbe5b2ea0b420e2241f280fe81088a792f03",
+      "tree_sha": "f819eb99fbec52e24ffd11b17fe8399308852b19",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/claude/r03-curve-compat",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [
+        {
+          "number": 959,
+          "state": "open",
+          "head_sha": "8faadbe5b2ea0b420e2241f280fe81088a792f03",
+          "head_tree_sha": "f819eb99fbec52e24ffd11b17fe8399308852b19",
+          "merge_sha": "9d1f64f65804b05a8a383bd7a8ed2da081f26b46",
+          "merged_at": null,
+          "url": "https://github.com/mysteropodes/nemo/pull/959"
+        }
+      ],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 4,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": [
+        959
+      ]
+    },
+    {
+      "scope": "local",
+      "name": "claude/r03-fixtures-bench",
+      "original_ref": "refs/heads/claude/r03-fixtures-bench",
+      "sha": "6d499212fdf447af439d66f5aadb905f6575110d",
+      "tree_sha": "dcbc552be0119a6782e5bcb9549469af059d12f6",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/claude/r03-fixtures-bench",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [
+        {
+          "number": 946,
+          "state": "open",
+          "head_sha": "6d499212fdf447af439d66f5aadb905f6575110d",
+          "head_tree_sha": "dcbc552be0119a6782e5bcb9549469af059d12f6",
+          "merge_sha": null,
+          "merged_at": null,
+          "url": "https://github.com/mysteropodes/nemo/pull/946"
+        }
+      ],
+      "open_body_references": [
+        899
+      ],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 3,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": [
+        959,
+        946
+      ]
+    },
+    {
+      "scope": "local",
+      "name": "claude/r03-inventory",
+      "original_ref": "refs/heads/claude/r03-inventory",
+      "sha": "dd39e5215f000031c5f75821913cce2e6f971db9",
+      "tree_sha": "8a1ff7b8e8912a8e3d074ee978f2504051335262",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/claude/r03-inventory",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [
+        {
+          "number": 944,
+          "state": "open",
+          "head_sha": "dd39e5215f000031c5f75821913cce2e6f971db9",
+          "head_tree_sha": "8a1ff7b8e8912a8e3d074ee978f2504051335262",
+          "merge_sha": null,
+          "merged_at": null,
+          "url": "https://github.com/mysteropodes/nemo/pull/944"
+        }
+      ],
+      "open_body_references": [
+        899
+      ],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 2,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": [
+        944
+      ]
+    },
+    {
+      "scope": "local",
+      "name": "cleanup-preserve/20260907/nemo-r03-records-validation-2584444-2584444d",
+      "original_ref": "refs/heads/cleanup-preserve/20260907/nemo-r03-records-validation-2584444-2584444d",
+      "sha": "2584444dfc3fc4bc4d36a1cf44cb55ee23ea3728",
+      "tree_sha": "7324981bf7f6c87852c772c64552a3d0dd6b7792",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/cleanup-preserve/20260907/nemo-r03-records-validation-2584444-2584444d",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 1,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "cleanup-preserve/20260907/r03-review-20260905-075cac5b",
+      "original_ref": "refs/heads/cleanup-preserve/20260907/r03-review-20260905-075cac5b",
+      "sha": "075cac5b3ebc1b7f5af1130c2ba68611c846f54c",
+      "tree_sha": "fd0dde2133758b16ab6edda3768be4badf70e9e8",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/cleanup-preserve/20260907/r03-review-20260905-075cac5b",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 1,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/40min-checkin-60-20260906",
+      "original_ref": "refs/heads/codex/40min-checkin-60-20260906",
+      "sha": "72a5c01472b25b5919187ddba8887cc473cdde12",
+      "tree_sha": "51c10c9842ece92ca0ae9375ce99980d90105280",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/40min-checkin-60-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Only historical check-in report/index changes; approved issue-handoff workflow supersedes report-publication task. Unique report history is preserved, not claimed merged."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [
+        {
+          "number": 982,
+          "state": "open",
+          "head_sha": "72a5c01472b25b5919187ddba8887cc473cdde12",
+          "head_tree_sha": "51c10c9842ece92ca0ae9375ce99980d90105280",
+          "merge_sha": null,
+          "merged_at": null,
+          "url": "https://github.com/mysteropodes/nemo/pull/982"
+        }
+      ],
+      "open_body_references": [],
+      "previous_disposition": "retain",
+      "requires_pr_closure": [
+        982
+      ]
+    },
+    {
+      "scope": "local",
+      "name": "codex/buzz-2d7f58561f03",
+      "original_ref": "refs/heads/codex/buzz-2d7f58561f03",
+      "sha": "421c26984e9396e65de74b3ba2f1123fa8b9d810",
+      "tree_sha": "6fa13a4785423afff790324f0d092b336079de88",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/buzz-2d7f58561f03",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 1,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/buzz-574b7ecde5e0",
+      "original_ref": "refs/heads/codex/buzz-574b7ecde5e0",
+      "sha": "05b5784a98046444534bf9e28f6e69e5f74ce9a4",
+      "tree_sha": "93a0c689ba61235cd43fe9db6548e7e50480ce77",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/buzz-574b7ecde5e0",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 2,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/buzz-9dc9d1cdb425",
+      "original_ref": "refs/heads/codex/buzz-9dc9d1cdb425",
+      "sha": "09c8096b87b468dd63938bc5750d9c59c3674007",
+      "tree_sha": "aa552cff470639008fcd438e4c773a3b740c6884",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/buzz-9dc9d1cdb425",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 1,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/buzz-c065dc96821e",
+      "original_ref": "refs/heads/codex/buzz-c065dc96821e",
+      "sha": "8fc901493c8fe398b334c9975aea8a8dd28aeec3",
+      "tree_sha": "228b055412d6f45ab6a4673afba630c02e73a2dd",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/buzz-c065dc96821e",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 1,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/buzz-d68466291838",
+      "original_ref": "refs/heads/codex/buzz-d68466291838",
+      "sha": "99158fd824b83c685dfabb6e4865becacde97145",
+      "tree_sha": "589ca6dc1f15017116116064f2616ed713bd7bba",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/buzz-d68466291838",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 4,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/buzz-stdio-roundtrip-e1ebd30d716b",
+      "original_ref": "refs/heads/codex/buzz-stdio-roundtrip-e1ebd30d716b",
+      "sha": "aa24a8252cbefa466f1c37d9964766fc39b4a205",
+      "tree_sha": "a7d7e0677c7eff4c2f3ce699ea1b71cb239e4943",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/buzz-stdio-roundtrip-e1ebd30d716b",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 1,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/check70-report-20260906",
+      "original_ref": "refs/heads/codex/check70-report-20260906",
+      "sha": "5a02104efec2c8189aafce48c0fca22be793c19a",
+      "tree_sha": "8cc776d53a4eb32743b18308fced981cec07e674",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/check70-report-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Only historical check-in report/index changes; approved issue-handoff workflow supersedes report-publication task. Unique report history is preserved, not claimed merged."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [
+        {
+          "number": 987,
+          "state": "open",
+          "head_sha": "5a02104efec2c8189aafce48c0fca22be793c19a",
+          "head_tree_sha": "8cc776d53a4eb32743b18308fced981cec07e674",
+          "merge_sha": null,
+          "merged_at": null,
+          "url": "https://github.com/mysteropodes/nemo/pull/987"
+        }
+      ],
+      "open_body_references": [],
+      "previous_disposition": "retain",
+      "requires_pr_closure": [
+        987
+      ]
+    },
+    {
+      "scope": "local",
+      "name": "codex/check71-mcp-protocol-20260906",
+      "original_ref": "refs/heads/codex/check71-mcp-protocol-20260906",
+      "sha": "38600b805ab7ef52d88ed8a11b1bb2a0e877f68e",
+      "tree_sha": "6b668b5b08bb9aabe2a1afbb5db647881a71ccfa",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/check71-mcp-protocol-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 1,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/check72-mcp-lifecycle-20260906",
+      "original_ref": "refs/heads/codex/check72-mcp-lifecycle-20260906",
+      "sha": "34a83c1370ac8732dc42811f840e93d2ae1cb2e5",
+      "tree_sha": "ef473830b809f8d077038a41a0dbd680e3f782ac",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/check72-mcp-lifecycle-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 2,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/check72-mcp-reconnect-20260906",
+      "original_ref": "refs/heads/codex/check72-mcp-reconnect-20260906",
+      "sha": "e6114d6cf87618c6caa912b50a9a7512ac1e2997",
+      "tree_sha": "f501d1c500c6e3f91d42fbf5c0bef9a5406f917b",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/check72-mcp-reconnect-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 1,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/check73-mcp-application-parity-20260906",
+      "original_ref": "refs/heads/codex/check73-mcp-application-parity-20260906",
+      "sha": "575e13c0515aa6d68169fbfd69df0eb2d434f393",
+      "tree_sha": "6f086157e65d1e7d0f908a3daa2dd0667630f9fb",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/check73-mcp-application-parity-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 1,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/check74-opacity-bootstrap-20260906",
+      "original_ref": "refs/heads/codex/check74-opacity-bootstrap-20260906",
+      "sha": "c54edb2602bb6646e95924afe2f2514593d52922",
+      "tree_sha": "7305770ff38e106de6e7e0fce97b6c27e19cf824",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/check74-opacity-bootstrap-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 1,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/check75-mcp-composition-20260906",
+      "original_ref": "refs/heads/codex/check75-mcp-composition-20260906",
+      "sha": "cbc870216ed5d7440100131a240f916acbd89bb0",
+      "tree_sha": "48470633b1fd5bda105632f8d6d0a5c8443f7f6d",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/check75-mcp-composition-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 8,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/check75-report-20260906",
+      "original_ref": "refs/heads/codex/check75-report-20260906",
+      "sha": "435c057a9042920a6fc5889159b77707a2aede62",
+      "tree_sha": "1d9613db12ade11681f29611d787698d24acae5c",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/check75-report-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Only historical check-in report/index changes; approved issue-handoff workflow supersedes report-publication task. Unique report history is preserved, not claimed merged."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [
+        {
+          "number": 989,
+          "state": "open",
+          "head_sha": "435c057a9042920a6fc5889159b77707a2aede62",
+          "head_tree_sha": "1d9613db12ade11681f29611d787698d24acae5c",
+          "merge_sha": null,
+          "merged_at": null,
+          "url": "https://github.com/mysteropodes/nemo/pull/989"
+        }
+      ],
+      "open_body_references": [],
+      "previous_disposition": "retain",
+      "requires_pr_closure": [
+        989
+      ]
+    },
+    {
+      "scope": "local",
+      "name": "codex/check76-opacity-consumers-20260906",
+      "original_ref": "refs/heads/codex/check76-opacity-consumers-20260906",
+      "sha": "8135ee7164a5cadd5b96b51e52ecb13ca0122c26",
+      "tree_sha": "6bacb23bf792f9277ec34b44c485d77ca666f21c",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/check76-opacity-consumers-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 1,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/check77-opacity-replay-20260906",
+      "original_ref": "refs/heads/codex/check77-opacity-replay-20260906",
+      "sha": "ebd0b1c0bf1deac1d35ab8d7bbc553b6e7c72383",
+      "tree_sha": "13c444b989bb5fe65b91a9b704876deeb1f6d26d",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/check77-opacity-replay-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 1,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/check78-slice-composition-20260906",
+      "original_ref": "refs/heads/codex/check78-slice-composition-20260906",
+      "sha": "9a5f61ee0ac0cf6ef1d42e7eff6110504539ec89",
+      "tree_sha": "61266ec258a710af64c151564ad81d4ff437a6c6",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/check78-slice-composition-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 10,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/check80-history-acceptance-20260907",
+      "original_ref": "refs/heads/codex/check80-history-acceptance-20260907",
+      "sha": "aec4a0e576de18d55ae914a134a571fdfbb4feb6",
+      "tree_sha": "7b5f52e0d27aef1682606b126318e03ec044d6f4",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/check80-history-acceptance-20260907",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 11,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/check80-report-20260907",
+      "original_ref": "refs/heads/codex/check80-report-20260907",
+      "sha": "090706c2409874aa734e3bb97c087f126ccccead",
+      "tree_sha": "0f8a8945456c2e2ca9a78aed3f2e480f2cbc4ac7",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/check80-report-20260907",
+      "disposition": "candidate",
+      "reasons": [
+        "Only historical check-in report/index changes; approved issue-handoff workflow supersedes report-publication task. Unique report history is preserved, not claimed merged."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [
+        {
+          "number": 990,
+          "state": "open",
+          "head_sha": "090706c2409874aa734e3bb97c087f126ccccead",
+          "head_tree_sha": "0f8a8945456c2e2ca9a78aed3f2e480f2cbc4ac7",
+          "merge_sha": null,
+          "merged_at": null,
+          "url": "https://github.com/mysteropodes/nemo/pull/990"
+        }
+      ],
+      "open_body_references": [],
+      "previous_disposition": "retain",
+      "requires_pr_closure": [
+        990
+      ]
+    },
+    {
+      "scope": "local",
+      "name": "codex/r03-swatch-inventory-20260906",
+      "original_ref": "refs/heads/codex/r03-swatch-inventory-20260906",
+      "sha": "2584444dfc3fc4bc4d36a1cf44cb55ee23ea3728",
+      "tree_sha": "7324981bf7f6c87852c772c64552a3d0dd6b7792",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/r03-swatch-inventory-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 1,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/r05-notice-regression-81d599",
+      "original_ref": "refs/heads/codex/r05-notice-regression-81d599",
+      "sha": "7123fd8c469d6545157b0e483f821e1c44066855",
+      "tree_sha": "af0c1e7c684d83f65c27c80e57cdb04dbb2eded2",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/r05-notice-regression-81d599",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 1,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "codex/r06-orphan-reservation-fix-20260906",
+      "original_ref": "refs/heads/codex/r06-orphan-reservation-fix-20260906",
+      "sha": "f40ad512cb426ddb6d77b41dd28672fa3d560628",
+      "tree_sha": "89c9eb7e0563252880cbf485809e98306700ae85",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/codex/r06-orphan-reservation-fix-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 2,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "pr944-fetch",
+      "original_ref": "refs/heads/pr944-fetch",
+      "sha": "dd39e5215f000031c5f75821913cce2e6f971db9",
+      "tree_sha": "8a1ff7b8e8912a8e3d074ee978f2504051335262",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/pr944-fetch",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 2,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "local",
+      "name": "pr946-fetch",
+      "original_ref": "refs/heads/pr946-fetch",
+      "sha": "6d499212fdf447af439d66f5aadb905f6575110d",
+      "tree_sha": "dcbc552be0119a6782e5bcb9549469af059d12f6",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/local/pr946-fetch",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 3,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": []
+    },
+    {
+      "scope": "remote",
+      "name": "claude/r03-curve-compat",
+      "original_ref": "refs/heads/claude/r03-curve-compat",
+      "sha": "8faadbe5b2ea0b420e2241f280fe81088a792f03",
+      "tree_sha": "f819eb99fbec52e24ffd11b17fe8399308852b19",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/remote/claude/r03-curve-compat",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [
+        {
+          "number": 959,
+          "state": "open",
+          "head_sha": "8faadbe5b2ea0b420e2241f280fe81088a792f03",
+          "head_tree_sha": "f819eb99fbec52e24ffd11b17fe8399308852b19",
+          "merge_sha": "9d1f64f65804b05a8a383bd7a8ed2da081f26b46",
+          "merged_at": null,
+          "url": "https://github.com/mysteropodes/nemo/pull/959"
+        }
+      ],
+      "open_body_references": [],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 4,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": [
+        959
+      ]
+    },
+    {
+      "scope": "remote",
+      "name": "claude/r03-fixtures-bench",
+      "original_ref": "refs/heads/claude/r03-fixtures-bench",
+      "sha": "6d499212fdf447af439d66f5aadb905f6575110d",
+      "tree_sha": "dcbc552be0119a6782e5bcb9549469af059d12f6",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/remote/claude/r03-fixtures-bench",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [
+        {
+          "number": 946,
+          "state": "open",
+          "head_sha": "6d499212fdf447af439d66f5aadb905f6575110d",
+          "head_tree_sha": "dcbc552be0119a6782e5bcb9549469af059d12f6",
+          "merge_sha": null,
+          "merged_at": null,
+          "url": "https://github.com/mysteropodes/nemo/pull/946"
+        }
+      ],
+      "open_body_references": [
+        899
+      ],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 3,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": [
+        959,
+        946
+      ]
+    },
+    {
+      "scope": "remote",
+      "name": "claude/r03-inventory",
+      "original_ref": "refs/heads/claude/r03-inventory",
+      "sha": "dd39e5215f000031c5f75821913cce2e6f971db9",
+      "tree_sha": "8a1ff7b8e8912a8e3d074ee978f2504051335262",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/remote/claude/r03-inventory",
+      "disposition": "candidate",
+      "reasons": [
+        "Every non-merge patch is equivalent to main history; zero unmatched patches and zero unique merge commits. Superseded predecessor or historical worker/review alias."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [
+        {
+          "number": 944,
+          "state": "open",
+          "head_sha": "dd39e5215f000031c5f75821913cce2e6f971db9",
+          "head_tree_sha": "8a1ff7b8e8912a8e3d074ee978f2504051335262",
+          "merge_sha": null,
+          "merged_at": null,
+          "url": "https://github.com/mysteropodes/nemo/pull/944"
+        }
+      ],
+      "open_body_references": [
+        899
+      ],
+      "unique_patch_count": 0,
+      "equivalent_patch_count": 2,
+      "unique_merge_count": 0,
+      "previous_disposition": "retain",
+      "requires_pr_closure": [
+        944
+      ]
+    },
+    {
+      "scope": "remote",
+      "name": "codex/40min-checkin-60-20260906",
+      "original_ref": "refs/heads/codex/40min-checkin-60-20260906",
+      "sha": "72a5c01472b25b5919187ddba8887cc473cdde12",
+      "tree_sha": "51c10c9842ece92ca0ae9375ce99980d90105280",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/remote/codex/40min-checkin-60-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Only historical check-in report/index changes; approved issue-handoff workflow supersedes report-publication task. Unique report history is preserved, not claimed merged."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [
+        {
+          "number": 982,
+          "state": "open",
+          "head_sha": "72a5c01472b25b5919187ddba8887cc473cdde12",
+          "head_tree_sha": "51c10c9842ece92ca0ae9375ce99980d90105280",
+          "merge_sha": null,
+          "merged_at": null,
+          "url": "https://github.com/mysteropodes/nemo/pull/982"
+        }
+      ],
+      "open_body_references": [],
+      "previous_disposition": "retain",
+      "requires_pr_closure": [
+        982
+      ]
+    },
+    {
+      "scope": "remote",
+      "name": "codex/check70-report-20260906",
+      "original_ref": "refs/heads/codex/check70-report-20260906",
+      "sha": "5a02104efec2c8189aafce48c0fca22be793c19a",
+      "tree_sha": "8cc776d53a4eb32743b18308fced981cec07e674",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/remote/codex/check70-report-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Only historical check-in report/index changes; approved issue-handoff workflow supersedes report-publication task. Unique report history is preserved, not claimed merged."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [
+        {
+          "number": 987,
+          "state": "open",
+          "head_sha": "5a02104efec2c8189aafce48c0fca22be793c19a",
+          "head_tree_sha": "8cc776d53a4eb32743b18308fced981cec07e674",
+          "merge_sha": null,
+          "merged_at": null,
+          "url": "https://github.com/mysteropodes/nemo/pull/987"
+        }
+      ],
+      "open_body_references": [],
+      "previous_disposition": "retain",
+      "requires_pr_closure": [
+        987
+      ]
+    },
+    {
+      "scope": "remote",
+      "name": "codex/check75-report-20260906",
+      "original_ref": "refs/heads/codex/check75-report-20260906",
+      "sha": "435c057a9042920a6fc5889159b77707a2aede62",
+      "tree_sha": "1d9613db12ade11681f29611d787698d24acae5c",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/remote/codex/check75-report-20260906",
+      "disposition": "candidate",
+      "reasons": [
+        "Only historical check-in report/index changes; approved issue-handoff workflow supersedes report-publication task. Unique report history is preserved, not claimed merged."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [
+        {
+          "number": 989,
+          "state": "open",
+          "head_sha": "435c057a9042920a6fc5889159b77707a2aede62",
+          "head_tree_sha": "1d9613db12ade11681f29611d787698d24acae5c",
+          "merge_sha": null,
+          "merged_at": null,
+          "url": "https://github.com/mysteropodes/nemo/pull/989"
+        }
+      ],
+      "open_body_references": [],
+      "previous_disposition": "retain",
+      "requires_pr_closure": [
+        989
+      ]
+    },
+    {
+      "scope": "remote",
+      "name": "codex/check80-report-20260907",
+      "original_ref": "refs/heads/codex/check80-report-20260907",
+      "sha": "090706c2409874aa734e3bb97c087f126ccccead",
+      "tree_sha": "0f8a8945456c2e2ca9a78aed3f2e480f2cbc4ac7",
+      "identical_main_tree_commit": null,
+      "archive_ref": "refs/archive/remote/codex/check80-report-20260907",
+      "disposition": "candidate",
+      "reasons": [
+        "Only historical check-in report/index changes; approved issue-handoff workflow supersedes report-publication task. Unique report history is preserved, not claimed merged."
+      ],
+      "ancestor_of_main": false,
+      "merged_pr_evidence": [],
+      "prs": [
+        {
+          "number": 990,
+          "state": "open",
+          "head_sha": "090706c2409874aa734e3bb97c087f126ccccead",
+          "head_tree_sha": "0f8a8945456c2e2ca9a78aed3f2e480f2cbc4ac7",
+          "merge_sha": null,
+          "merged_at": null,
+          "url": "https://github.com/mysteropodes/nemo/pull/990"
+        }
+      ],
+      "open_body_references": [],
+      "previous_disposition": "retain",
+      "requires_pr_closure": [
+        990
+      ]
+    }
+  ]
+}
