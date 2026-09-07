@@ -43,7 +43,12 @@
   root.NemoOpacityApplication = {
     meta: app.meta,
     historyChanged: app.historyChanged,
-    documentChanged: function () { ensureIds(); app.documentChanged(); },
+    documentChanged: function () {
+      root.state.undoStack = []; root.state.undoLabels = [];
+      root.state.redoStack = []; root.state.redoLabels = [];
+      ensureIds(); app.documentChanged();
+      if (root.renderHistoryPanelIfOpen) root.renderHistoryPanelIfOpen();
+    },
     legacy: function (kind, holder, values, frame, curvePoints) {
       var result;
       if (kind === 'set') result = domain.setValue(holder, values, root.state.currentFrame);

@@ -84,7 +84,7 @@ var NemoOpacityApplicationCore = (function () {
       if (op === 'diagnostics.trace') return response(request, true, { entries: clone(trace) });
       if (op === 'diagnostics.replay') {
         var recorded = request.payload.request;
-        if (!object(recorded) || !PROPERTY_WRITES.includes(recorded.operation) || request.requestId.length > 120) return fail(request, 'invalid_request', 'Replay requires one recorded property command.');
+        if (!object(recorded) || !object(recorded.payload) || !PROPERTY_WRITES.includes(recorded.operation) || request.requestId.length > 120) return fail(request, 'invalid_request', 'Replay requires one recorded property command.');
         var replay = { apiVersion: 1, requestId: request.requestId + ':replay', instanceId: identity.instanceId,
           documentId: identity.documentId, expectedRevision: identity.revision,
           operation: recorded.operation, payload: clone(recorded.payload) };
