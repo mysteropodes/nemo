@@ -14,7 +14,7 @@ test('adopted application policy composes fresh discovery, exact coverage and pr
   const result = checkApplicationPolicy(read('app-js.profile.json'), read('app-js.coverage.json'), { root: ROOT });
   assert.equal(result.ok, true);
   assert.deepEqual({ selected: result.sourcePathCount, retained: result.retainedPathCount, excluded: result.excludedPathCount },
-    { selected: 158, retained: 146, excluded: 12 });
+    { selected: 159, retained: 147, excluded: 12 });
 });
 
 test('provisional policy and profile membership drift fail before becoming a standard pass', () => {

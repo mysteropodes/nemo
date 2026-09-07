@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1",
-    "sourceRootTree": "7777923c59eafbaeac185c38751d5d49c00af40f",
+    "candidateCommit": "d8c316de308c25c212c71c6a6202120c8909d543",
+    "sourceRootTree": "7bf34f0cbb3b6be8b96dadcb906abae5fd5c8a00",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "123f9d1630c5c55a5f24bc7df19841aec8e1721e",
-      "lastChangedCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1"
+      "gitTree": "088287a83567f9767d4a98dad4026af32f7997a5",
+      "lastChangedCommit": "d8c316de308c25c212c71c6a6202120c8909d543"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,7 +35,7 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "12c9f47d1c3b83623f216b88edc4f7cb4e3788ebb2ebd7af5a59dc3238b5ccdb"
+      "value": "08863d0460d4dd8a5419905fbbe95d8ea808d167283267e5c8df30ce33c7e703"
     },
     "profiles": [
       {
@@ -55,14 +55,14 @@
     ],
     "exclusionSupport": [
       {
-      "path": ".gitignore",
-      "gitBlob": "bd4832bff7e91fbd758f386f3a844f44f5d3e386",
-      "sha256": "14d67915d6cdab22901e5e227da46d588c25b20f32e7501cec5707423bcb6670"
+        "path": ".gitignore",
+        "gitBlob": "bd4832bff7e91fbd758f386f3a844f44f5d3e386",
+        "sha256": "14d67915d6cdab22901e5e227da46d588c25b20f32e7501cec5707423bcb6670"
       },
       {
-      "path": "THIRD_PARTY_NOTICES.md",
-      "gitBlob": "7886b7fad14b2015815e21b6ae268327658afe14",
-      "sha256": "049f872f54b5499d256513eb81b2800c0419313162e98cc6550bdf14833ac211"
+        "path": "THIRD_PARTY_NOTICES.md",
+        "gitBlob": "7886b7fad14b2015815e21b6ae268327658afe14",
+        "sha256": "049f872f54b5499d256513eb81b2800c0419313162e98cc6550bdf14833ac211"
       },
       {
         "path": "src/wasm/package.json",

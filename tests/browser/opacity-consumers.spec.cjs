@@ -24,7 +24,13 @@ async function openProject(browser, origin, filename, contexts, errors) {
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(origin, { waitUntil: 'networkidle' });
-  await until(page, () => !!(window.SM && window.NemoApplication && window.state));
+  try {
+    await until(page, () => !!(window.SM && window.NemoApplication && window.state));
+  } catch (error) {
+    const readiness = await page.evaluate(() => ({ document: !!window.SM,
+      application: !!window.NemoApplication, state: !!window.state }));
+    throw new Error(`Application bootstrap did not become ready: ${JSON.stringify(readiness)}; page errors: ${errors.join('; ')}`, { cause: error });
+  }
   const chooser = page.waitForEvent('filechooser');
   await page.locator('#start-open').click();
   await (await chooser).setFiles(filename);
