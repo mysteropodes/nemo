@@ -112,7 +112,8 @@ test('sandbox: valueAtFrame on a keyed track invokes the extracted evaluator wit
   assert.deepEqual(calls, [{ pts: SMOOTH, x: 0.25 }], 'the edited key curve reaches the kernel unchanged');
 });
 
-test('sandbox: motion.js run alone on an extracted tree (the original failure) fails loudly with the loader-order explanation', { skip: !extracted && 'src/js/animation/curve.js is absent (before the R08 extraction)' }, () => {
-  assert.throws(() => sandbox.loadMotion(undefined, { prelude: [] }), (e) => /animation\/curve\.js/.test(e.message) && /SMAnimationCurve is not defined/.test(e.message) && /src\/index\.html loader order/.test(e.message));
+test('sandbox: either missing Motion dependency fails with the loader-order explanation', { skip: !extracted && 'src/js/animation/curve.js is absent (before the R08 extraction)' }, () => {
+  assert.throws(() => sandbox.loadMotion(undefined, { prelude: ['domain/animation/opacity.js'] }), (e) => /animation\/curve\.js/.test(e.message) && /SMAnimationCurve is not defined/.test(e.message) && /src\/index\.html loader order/.test(e.message));
+  assert.throws(() => sandbox.loadMotion(undefined, { prelude: ['animation/curve.js'] }), (e) => /domain\/animation\/opacity\.js/.test(e.message) && /NemoOpacityDomain is not defined/.test(e.message) && /src\/index\.html loader order/.test(e.message));
   assert.deepEqual(sandbox.loadMotion(undefined, { prelude: sandbox.MOTION_PRELUDE }).modules, ['animation/curve.js', 'domain/animation/opacity.js', 'motion.js']);
 });

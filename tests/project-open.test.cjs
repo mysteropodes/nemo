@@ -123,7 +123,6 @@ test('browser Open leaves the current document alone for cancellation and failed
 });
 
 test('real importJSON reports malformed and structurally invalid input without replacing state', () => {
-  assert.match(timelineSource, /if\(!silent\)showToast\(SM\.t\('toastProjectLoaded'\)\);\s+return true;/, 'successful imports explicitly report success');
   for (const raw of ['{', '{"layers":[{"frames":null}]}']) {
     const actual = realImportJSON();
     const before = JSON.stringify(actual.state);

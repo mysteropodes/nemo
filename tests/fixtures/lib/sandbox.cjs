@@ -109,8 +109,10 @@ function loadMotion(state = defaultState(), hooks = {}) {
     vm.runInNewContext(read('motion.js'), sb, { filename: 'src/js/motion.js' });
   } catch (e) {
     // Errors thrown inside the vm belong to another realm: match by name, not instanceof.
-    if (e && e.name === 'ReferenceError' && /SMAnimationCurve/.test(String(e.message))) {
-      throw new Error('motion.js binds to SMAnimationCurve at load, which src/js/animation/curve.js installs; the sandbox mirrors the src/index.html loader order (' + MOTION_PRELUDE.join(', ') + ' before motion.js) and that module is missing or was not installed: ' + e.message);
+    const missing = /SMAnimationCurve/.test(String(e && e.message)) ? 'src/js/animation/curve.js'
+      : /NemoOpacityDomain/.test(String(e && e.message)) ? 'src/js/domain/animation/opacity.js' : null;
+    if (e && e.name === 'ReferenceError' && missing) {
+      throw new Error('motion.js requires ' + missing + ' at load; the sandbox mirrors the src/index.html loader order (' + MOTION_PRELUDE.join(', ') + ' before motion.js) and that module is missing or was not installed: ' + e.message);
     }
     throw e;
   }
