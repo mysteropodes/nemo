@@ -41,8 +41,8 @@ var NemoOpacityDomain = (function () {
     for (var i = 0; i < track.keys.length; i++) if (track.keys[i].frame === frame) return track.keys[i];
     return null;
   }
-  function setKeyAtFrame(holder, frame, values, curvePoints, defaults) {
-    var track = ensureTrack(holder), key = keyAt(track, frame);
+  function setTrackKey(track, frame, values, curvePoints, defaults) {
+    var key = keyAt(track, frame);
     if (key) {
       key.v = values.slice();
       if (curvePoints) key.curvePoints = curvePoints;
@@ -54,15 +54,20 @@ var NemoOpacityDomain = (function () {
     track.keys.sort(function (a, b) { return a.frame - b.frame; });
     return key;
   }
+  function setKeyAtFrame(holder, frame, values, curvePoints, defaults) {
+    return setTrackKey(ensureTrack(holder), frame, values, curvePoints, defaults);
+  }
+  function removeTrackKey(track, frame) {
+    var key = keyAt(track, frame);
+    if (key) track.keys.splice(track.keys.indexOf(key), 1);
+  }
   function setValue(holder, values, frame, defaults) {
     if (isAnimated(holder)) { setKeyAtFrame(holder, frame, values, null, defaults); return; }
     if (!holder.motionStatic) holder.motionStatic = {};
     holder.motionStatic.opacity = values.slice();
   }
   function removeKeyAtFrame(holder, frame) {
-    var track = trackFor(holder), key = keyAt(track, frame);
-    if (!key) return;
-    track.keys.splice(track.keys.indexOf(key), 1);
+    removeTrackKey(trackFor(holder), frame);
   }
   function setAnimated(holder, animated, frame, effectiveValue, defaults) {
     if (isAnimated(holder) === animated) return;
@@ -76,7 +81,8 @@ var NemoOpacityDomain = (function () {
   }
 
   return {
-    DEFAULT_CURVE: DEFAULT_CURVE,
+    setTrackKey: setTrackKey,
+    removeTrackKey: removeTrackKey,
     number: number,
     copyCurvePoints: copyCurvePoints,
     defaultCurve: defaultCurve,

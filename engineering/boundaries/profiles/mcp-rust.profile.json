@@ -1,0 +1,23 @@
+{
+  "modules": [
+    {
+      "id": "mcp.transport",
+      "layer": "adapters",
+      "dir": "nemo-mcp",
+      "files": ["build.rs", "src/contract.rs", "src/lib.rs", "src/main.rs", "src/registry.rs", "src/schema.rs", "src/server.rs", "src/wire.rs"],
+      "publicApi": ["src/lib.rs", "src/contract.rs", "src/registry.rs", "src/wire.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "mcp.desktop",
+      "layer": "adapters",
+      "dir": "src-tauri/src",
+      "files": ["application_mcp.rs"],
+      "publicApi": ["application_mcp.rs"],
+      "sizeProfile": "Rust production module"
+    }
+  ],
+  "layerRules": {"adapters": {"allowedLayers": ["adapters"]}},
+  "sizeProfiles": {"Rust production module": {"warn": 350, "hardMax": 500}},
+  "exceptions": []
+}

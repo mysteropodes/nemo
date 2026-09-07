@@ -15,7 +15,7 @@ function load(frame) {
   };
   context.window = context;
   vm.createContext(context);
-  for (const file of ['src/js/animation/curve.js', 'src/js/motion.js', 'src/js/domain/animation/opacity.js']) {
+  for (const file of ['src/js/animation/curve.js', 'src/js/domain/animation/opacity.js', 'src/js/motion.js']) {
     vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), context, { filename: file });
   }
   return context;

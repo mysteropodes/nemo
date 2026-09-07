@@ -84,7 +84,7 @@ function defaultState() {
 // with it. A prelude file is skipped only when the tree does not have it
 // (a motion.js that still declares the evaluator itself needs nothing); a
 // motion.js that needs the kernel without the file fails loudly, never silently.
-const MOTION_PRELUDE = ['animation/curve.js'];
+const MOTION_PRELUDE = ['animation/curve.js', 'domain/animation/opacity.js'];
 
 // motion.js: returns { SMMotion, SMAnimationCurve, modules, state, sandbox }.
 // `state.layers` and `state.fps` are read by the evaluator and the expression

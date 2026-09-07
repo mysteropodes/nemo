@@ -55,7 +55,7 @@ test('sandbox: the production prelude precedes motion.js exactly as src/index.ht
   assert.equal(typeof m.SMMotion.evalCurvePoints, 'function');
   assert.equal(m.modules[m.modules.length - 1], 'motion.js');
   if (extracted) {
-    assert.deepEqual(m.modules, ['animation/curve.js', 'motion.js']);
+    assert.deepEqual(m.modules, ['animation/curve.js', 'domain/animation/opacity.js', 'motion.js']);
     assert.equal(typeof m.SMAnimationCurve.evalCurvePoints, 'function', 'the kernel is installed in the VM');
     assert.equal(m.SMMotion.evalCurvePoints, m.SMAnimationCurve.evalCurvePoints, 'the facade member is the extracted kernel itself, not a copy');
     assert.doesNotMatch(motionSource, /function evalCurvePoints\(/, 'after the extraction motion.js no longer declares the evaluator');
@@ -114,5 +114,5 @@ test('sandbox: valueAtFrame on a keyed track invokes the extracted evaluator wit
 
 test('sandbox: motion.js run alone on an extracted tree (the original failure) fails loudly with the loader-order explanation', { skip: !extracted && 'src/js/animation/curve.js is absent (before the R08 extraction)' }, () => {
   assert.throws(() => sandbox.loadMotion(undefined, { prelude: [] }), (e) => /animation\/curve\.js/.test(e.message) && /SMAnimationCurve is not defined/.test(e.message) && /src\/index\.html loader order/.test(e.message));
-  assert.deepEqual(sandbox.loadMotion(undefined, { prelude: sandbox.MOTION_PRELUDE }).modules, ['animation/curve.js', 'motion.js']);
+  assert.deepEqual(sandbox.loadMotion(undefined, { prelude: sandbox.MOTION_PRELUDE }).modules, ['animation/curve.js', 'domain/animation/opacity.js', 'motion.js']);
 });
