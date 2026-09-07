@@ -232,8 +232,27 @@
   var HISTORY_MAX=120; // 60 min of history at the existing 30s cadence
   function simpleHash(s){var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return (h>>>0).toString(36);}
   function historyKey(){return currentPath?(baseName(currentPath).replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'-'+simpleHash(currentPath)):'untitled-autosave';}
+  // R06 task-runtime isolation (#902) — every on-disk consumer must go
+  // through this, not straight to appDataDir(). appDataDir() is a single
+  // directory per bundle identifier, so two concurrent task instances of the
+  // app would interleave their version history and feedback into the same
+  // tree. When the desktop instance was launched with an isolated task data
+  // root, `nemo_task_runtime` (src-tauri/src/task_runtime.rs) hands back that
+  // task's own `data` root instead, and the layout below it is unchanged.
+  // A binary without the command (older build) falls through to appDataDir(),
+  // which is also exactly what a normal, non-isolated launch resolves to.
+  var _appDataBase=null;
+  async function appDataBase(){
+    if(_appDataBase)return _appDataBase;
+    try{
+      var rt=await window.__TAURI__.core.invoke('nemo_task_runtime');
+      if(rt&&rt.active&&rt.roots&&rt.roots.data)_appDataBase=rt.roots.data;
+    }catch(e){/* command absent: production default below */}
+    if(!_appDataBase)_appDataBase=await window.__TAURI__.path.appDataDir();
+    return _appDataBase;
+  }
   async function historyDir(){
-    var base=await window.__TAURI__.path.appDataDir();
+    var base=await appDataBase();
     return base.replace(/[\\/]+$/,'')+'/history/'+historyKey();
   }
   async function pushVersionSnapshot(json){
@@ -411,6 +430,11 @@
     // feedback-bridge.js's local + shared feedback storage keys off, so a
     // feedback thread and this project's own history/sync folders always
     // agree on which project they belong to without re-deriving the logic.
+    // Single resolver for "where does this instance keep its app data" —
+    // feedback-bridge.js reads it too, so an isolated task instance never has
+    // one consumer following the task root while another writes into the
+    // shared install (CLAUDE.md §1: one new path, every reader).
+    appDataBase:appDataBase,
     getProjectKey:historyKey,profileDir:profileDir,isDirty:isDirty,markSaved:function(){try{markSaved(window.SM.exportJSON());}catch(e){}},getCurrentLabel:getCurrentLabel,
     refreshActiveTabDirtyDot:refreshActiveTabDirtyDot,
     // Read-only list of every OTHER open project tab (feedback #109: "voir

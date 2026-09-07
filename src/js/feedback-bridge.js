@@ -163,8 +163,17 @@
   // preview) -> localStorage (last resort — a live browser tab only, not
   // reachable outside an active eval session, but keeps this working even
   // if the plain http.server is what's actually running). ----
+  // R06 task-runtime isolation (#902): SMProject.appDataBase() is the single
+  // resolver — it returns this task instance's own data root when the desktop
+  // app was launched isolated, and appDataDir() otherwise. Going straight to
+  // appDataDir() here would leave feedback entries in the shared install while
+  // version history followed the task root, which is the split-reader bug
+  // CLAUDE.md §1 is about. The fallback keeps this working if project.js has
+  // not loaded (same guard shape projectKey() above already uses).
   async function localDir() {
-    var base = await window.__TAURI__.path.appDataDir();
+    var base = (window.SMProject && window.SMProject.appDataBase)
+      ? await window.SMProject.appDataBase()
+      : await window.__TAURI__.path.appDataDir();
     return base.replace(/[\\/]+$/, '') + '/feedback/' + projectKey();
   }
   function lsKey() { return 'nemo-feedback-' + projectKey(); }
