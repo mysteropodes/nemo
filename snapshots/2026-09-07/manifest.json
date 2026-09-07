@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "snapshot": "2026-09-07",
+  "repository": "https://github.com/mysteropodes/nemo",
+  "main_sha": "66ece0641708122eb8447e85ad8dd7e3402aaf6c",
+  "created_at": "2026-09-07T22:53:13.807480+00:00",
+  "bundle": "retired-branches.bundle",
+  "bundle_bytes": 67634181,
+  "bundle_sha256": "3c4d47034f5e9ab80e2e34b6cc6a5ae6845c4e24ec69db6e08d907f00be54084",
+  "self_contained": true,
+  "prerequisites": [],
+  "candidate_counts": {
+    "local": {
+      "candidate": 259,
+      "retain": 120
+    },
+    "remote": {
+      "candidate": 168,
+      "retain": 59
+    }
+  },
+  "candidate_refs": 427,
+  "unique_candidate_tips": 190,
+  "deletion_status": "No branches have been deleted. Retirement is a separate step after fresh safety checks.",
+  "excluded": "Git bundles contain committed Git objects and refs. They do not include uncommitted/ignored files, local application state, reflog-only objects, or Git LFS payloads. Existing worktrees are retained; this snapshot retires no tags."
+}
