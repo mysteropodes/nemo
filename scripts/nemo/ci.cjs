@@ -45,6 +45,7 @@ function applicability(files) {
   // Explicit exemption only for documentation and the isolated tooling command surface.
   // Unknown files, executable docs, dependency/build changes and app tests require all surfaces.
   const exempt = (file) => /^(?:docs|engineering)\/.*\.md$/.test(file)
+    || /^40min-checkins\/.*\.md$/.test(file)
     || /^engineering\/boundaries\/.*\.json$/.test(file)
     || file.startsWith('engineering/boundaries/profiles/scripts-nemo.fixture/')
     || file === 'scripts/nemo/README.md'

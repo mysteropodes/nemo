@@ -67,6 +67,16 @@ test('surface applicability exempts explicit tooling/docs only and treats unknow
   }
 });
 
+test('surface applicability exempts Markdown check-ins and fails closed for mixed non-doc paths', () => {
+  const reports = ['40min-checkins/README.md', '40min-checkins/2026-09-06-checkin-15.md'];
+  assert.deepEqual(ci.applicability(reports).required, []);
+  for (const file of ['src/js/app.js', '40min-checkins/publish.cjs', '40min-checkins/report.json']) {
+    const selection = ci.applicability([...reports, file]);
+    assert.deepEqual(selection.required, ci.SURFACES, file);
+    assert.deepEqual(selection.affected, [file], file);
+  }
+});
+
 const benignPaths = ['scripts/nemo/README.md',
   'engineering/boundaries/profiles/scripts-nemo.fixture/src/cycle-a.cjs'];
 for (const file of benignPaths) {
