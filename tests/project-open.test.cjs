@@ -129,6 +129,8 @@ test('real importJSON reports malformed and structurally invalid input without r
     const before = JSON.stringify(actual.state);
     assert.equal(actual.importJSON(raw, true), false, 'actual importJSON reports failure');
     assert.equal(JSON.stringify(actual.state), before, 'validation fails before the current document is replaced');
+    assert.equal(actual.calls.includes('engine'), false, 'rejected input preserves retained renderer paths');
+    assert.equal(actual.calls.includes('labs'), false, 'rejected input preserves live lab state');
     assert.doesNotMatch(actual.calls.at(-1), /undefined|not a function/, 'the real validator must run');
   }
 });

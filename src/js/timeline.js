@@ -2352,6 +2352,7 @@ videoMeshId:l.videoMeshId,layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,pa
     showToast('Couleur propagee sur '+count+' frame(s)');
   },
   importJSON:function(json,silent){
+    try{var d=window.SMProjectDocument.parse(json);
     // See labs-core.js's own comment on resetAll — a Labs prototype flag
     // must never silently carry into a different project. `silent` here
     // doesn't distinguish "boot-time nemo-auto resume" from "explicit Open
@@ -2362,7 +2363,6 @@ videoMeshId:l.videoMeshId,layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,pa
     // Every stored stroke dict is about to be replaced, so the engine's
     // retained path store (keyed on dict identity) is entirely stale.
     if(window.SMEngineBridge&&SMEngineBridge.clearRetainedPaths)SMEngineBridge.clearRetainedPaths();
-    try{var d=window.SMProjectDocument.parse(json);
     // exportJSON stamps version:13 but nothing ever CHECKED it — a file
     // written by a future format (version bumped for a breaking change)
     // half-loaded silently, dropping whatever the old code didn't know
