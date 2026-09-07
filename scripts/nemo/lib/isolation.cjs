@@ -241,7 +241,10 @@ async function requestStop(taskId, ownerToken, opts = {}) {
       if (!rec) return { stopped: false, reason: 'no launcher record for task' };
       if (!ownerToken || ownerToken !== rec.ownerToken) return { stopped: false, reason: 'refused: caller is not the task owner (owner token mismatch)' };
       validPid(rec.pid);
-      if (pidAlive(rec.pid)) process.kill(rec.pid, signal);
+      if (pidAlive(rec.pid)) {
+        if (opts.verifyProcess && !opts.verifyProcess(rec)) return { stopped: false, reason: 'launcher process identity changed or unavailable; explicit reconciliation required' };
+        process.kill(rec.pid, signal);
+      }
       return null;
     });
     if (refused) return refused;
@@ -252,7 +255,7 @@ async function requestStop(taskId, ownerToken, opts = {}) {
   try {
     mutate('task', taskId, () => {
       const current = readLauncher(taskId);
-      if (current && current.ownerToken === rec.ownerToken && current.pid === rec.pid) {
+      if (!opts.retainRecord && current && current.ownerToken === rec.ownerToken && current.pid === rec.pid) {
         fs.unlinkSync(launcherFile(taskRoot(taskId)));
       }
     });
@@ -260,15 +263,38 @@ async function requestStop(taskId, ownerToken, opts = {}) {
   return { stopped: true, reason: 'exit confirmed', pid: rec.pid };
 }
 
-function releaseTask(taskId, ownerToken) {
+function releaseTask(taskId, ownerToken, opts = {}) {
   return mutate('task', taskId, () => {
     const file = launcherFile(taskRoot(taskId));
     const rec = readLauncher(taskId);
+    if (opts.requireOwner && !rec) return { released: false, reason: 'no launcher record to prove ownership' };
     if (exists(file) && !rec) return { released: false, reason: 'unreadable launcher record; reconcile before release' };
     if (rec && (!ownerToken || ownerToken !== rec.ownerToken)) return { released: false, reason: 'refused: caller is not the task owner' };
     if (rec && pidAlive(rec.pid)) return { released: false, reason: 'launcher still running; stop it before release' };
-    fs.rmSync(taskRoot(taskId), { recursive: true, force: true });
-    return { released: true, taskId };
+    if (opts.releaseManagedSlots && typeof opts.beforeRelease !== 'function') {
+      return { released: false, reason: 'managed slots require an explicit lifetime verifier' };
+    }
+    // Native callers retain the record through stop and verify the app group
+    // here. The same task guard prevents cleanup racing a successor launch.
+    const lifetimeVerified = opts.beforeRelease && opts.beforeRelease(rec);
+    if (opts.releaseManagedSlots && lifetimeVerified !== true) {
+      return { released: false, reason: 'managed resource lifetime was not confirmed' };
+    }
+    // Slot records live in SLOTS_DIR, outside every task root, so the rmSync
+    // below cannot reach them. Reconcile first: reconcileTaskSlots never throws,
+    // and doing it before the tree is gone keeps a retried release idempotent.
+    // Only a release that matched a real launcher record has proven ownership;
+    // an ownerless release (no record to check against) reclaims nothing beyond
+    // this task's own tree.
+    const slots = rec ? reconcileTaskSlots(taskId, opts.releaseManagedSlots === true)
+      : { scanned: 0, reconciled: [], retained: [{ reason: 'no launcher record to prove ownership; slot records left untouched' }], otherTasks: 0, truncated: false };
+    if (slots.retained.some(item => item.protected)) {
+      return { released: false, reason: 'managed resource lifetime unconfirmed; task ownership retained', slots };
+    }
+    if (opts.retainData) {
+      if (rec) fs.unlinkSync(file);
+    } else fs.rmSync(taskRoot(taskId), { recursive: true, force: true });
+    return { released: true, taskId, slots, ...(opts.retainData ? { retainedData: true } : {}) };
   });
 }
 
@@ -277,6 +303,8 @@ function slotFile(slot) { return path.join(SLOTS_DIR, `${idKey(slot)}.lock`); }
 
 function acquireExclusiveSlot(slot, taskId, opts = {}) {
   validId(slot); validId(taskId);
+  const releasePolicy = opts.releasePolicy === undefined ? 'process-exit' : opts.releasePolicy;
+  if (!['process-exit', 'owner-confirmed'].includes(releasePolicy)) throw new Error('invalid slot release policy');
   const pid = validPid(opts.pid != null ? opts.pid : process.pid);
   if (!pidAlive(pid)) throw new Error('cannot acquire a slot for a process that is not running');
   try {
@@ -288,10 +316,13 @@ function acquireExclusiveSlot(slot, taskId, opts = {}) {
         return { acquired: false, reason: 'unreadable slot record; reconcile before reuse' };
       }
       if (holder && pidAlive(holder.pid)) return { acquired: false, reason: 'slot held by another task', holder };
+      if (holder && holder.releasePolicy !== undefined && holder.releasePolicy !== 'process-exit') {
+        return { acquired: false, reason: 'resource lifetime requires owner confirmation; reconcile before reuse', holder };
+      }
       // Replacement is safe only inside the same guard used by every acquire/release.
       const ownerToken = opts.ownerToken || crypto.randomBytes(16).toString('hex');
-      writeRecord(file, { slot, taskId, pid, ownerToken, acquiredAt: nowIso() });
-      return { acquired: true, ownerToken, taskId, slot, file, release: () => releaseExclusiveSlot(slot, ownerToken) };
+      writeRecord(file, { slot, taskId, pid, ownerToken, releasePolicy, acquiredAt: nowIso() });
+      return { acquired: true, ownerToken, taskId, slot, file, release: (options) => releaseExclusiveSlot(slot, ownerToken, options) };
     });
   } catch (err) {
     if (err.code === 'EBUSY') return { acquired: false, reason: err.message };
@@ -299,13 +330,19 @@ function acquireExclusiveSlot(slot, taskId, opts = {}) {
   }
 }
 
-function releaseExclusiveSlot(slot, ownerToken) {
+function releaseExclusiveSlot(slot, ownerToken, opts = {}) {
   try {
     return mutate('slot', slot, () => {
       const file = slotFile(slot);
       const holder = safeReadJson(file);
       if (!holder) return { released: false, reason: 'slot not held or record unreadable' };
       if (!ownerToken || holder.ownerToken !== ownerToken) return { released: false, reason: 'refused: caller is not the slot owner' };
+      if (holder.releasePolicy !== undefined && holder.releasePolicy !== 'process-exit') {
+        let verified = false;
+        try { verified = holder.releasePolicy === 'owner-confirmed' && typeof opts.verifyRelease === 'function' && opts.verifyRelease() === true; }
+        catch { /* An uncertain lifetime must remain held. */ }
+        if (!verified) return { released: false, reason: 'resource lifetime unconfirmed; use the owning consumer release path' };
+      }
       fs.unlinkSync(file);
       return { released: true };
     });
@@ -315,9 +352,84 @@ function releaseExclusiveSlot(slot, ownerToken) {
   }
 }
 
+// A slot record survives its owning task's release because it lives outside the
+// task tree. Ordinary process-exit slots may be reclaimed after holder death;
+// owner-confirmed slots protect a longer lifetime, such as a native app group.
+// Those require the owning consumer to verify that lifetime before release.
+//
+// An authorized release reconciles only what the record itself proves: it names
+// THIS task, it is complete, its declared slot name is the one this filename
+// encodes (so the guard taken below is the right guard), and its holder pid is
+// verifiably not running. Nothing here can grant more than the existing acquire
+// path already grants — a dead holder's record is reclaimable by any task today
+// — so removing one is strictly narrower than reclaiming it. Anything live,
+// foreign, malformed, self-inconsistent, or under an interrupted guard is
+// reported and left exactly as found. Not exported: the ownership proof is the
+// caller's verified launcher token inside releaseTask, not a standalone verb.
+const SLOT_SCAN_LIMIT = 4096;
+
+function ownSlotClaim(file, taskId, releaseManaged) {
+  const name = path.basename(file);
+  const rec = safeReadJson(file);
+  if (!rec || typeof rec !== 'object') return { retain: { file: name, reason: 'unreadable slot record; left for explicit reconciliation' } };
+  if (rec.taskId !== taskId) return { foreign: true };
+  const managed = rec.releasePolicy !== undefined && rec.releasePolicy !== 'process-exit';
+  const retain = (reason, bySlot = false) => ({ retain: {
+    ...(bySlot ? { slot: rec.slot } : { file: name }), ...(managed ? { protected: true } : {}), reason,
+  } });
+  if (typeof rec.slot !== 'string' || typeof rec.ownerToken !== 'string') return retain('incomplete slot record; left for explicit reconciliation');
+  let expected;
+  try { expected = slotFile(rec.slot); } catch { return retain('invalid slot name in record; left for explicit reconciliation'); }
+  if (expected !== file) return retain('slot record does not match its own filename; left for explicit reconciliation');
+  if (!Number.isSafeInteger(rec.pid) || rec.pid <= 0) return retain('malformed holder pid; left for explicit reconciliation', true);
+  if (pidAlive(rec.pid)) return retain('holder still running; left held', true);
+  if (managed && !(rec.releasePolicy === 'owner-confirmed' && releaseManaged)) {
+    return retain('resource lifetime requires owner confirmation', true);
+  }
+  return { slot: rec.slot };
+}
+
+function reconcileTaskSlots(taskId, releaseManaged = false) {
+  const out = { scanned: 0, reconciled: [], retained: [], otherTasks: 0, truncated: false };
+  let entries;
+  try { entries = fs.readdirSync(SLOTS_DIR); }
+  catch (err) {
+    if (err.code !== 'ENOENT') out.retained.push({ reason: `slot directory unreadable (${err.code}); left for explicit reconciliation` });
+    return out;
+  }
+  if (entries.length > SLOT_SCAN_LIMIT) { out.truncated = true; entries = entries.slice(0, SLOT_SCAN_LIMIT); }
+  for (const entry of entries) {
+    out.scanned += 1;
+    const file = path.join(SLOTS_DIR, entry);
+    const claim = ownSlotClaim(file, taskId, releaseManaged);
+    if (claim.foreign) { out.otherTasks += 1; continue; }
+    if (claim.retain) { out.retained.push(claim.retain); continue; }
+    try {
+      // Re-read under the same guard every acquire/release takes: a contender
+      // may have reclaimed this record between the scan above and this point.
+      const blocked = mutate('slot', claim.slot, () => {
+        const now = ownSlotClaim(file, taskId, releaseManaged);
+        if (now.slot !== claim.slot) return { slot: claim.slot, reason: (now.retain && now.retain.reason) || 'record changed during reconciliation; left as found' };
+        fs.unlinkSync(file);
+        return null;
+      });
+      if (blocked) out.retained.push(blocked);
+      else out.reconciled.push(claim.slot);
+    } catch (err) {
+      out.retained.push({ slot: claim.slot, reason: err.code === 'EBUSY' ? 'slot mutation busy or interrupted; left for explicit reconciliation' : err.message });
+    }
+  }
+  return out;
+}
+
 module.exports = {
   RUNTIME_ROOT,
   PORT_RANGE,
+  // Exported so a consumer that must name this task's resources OUTSIDE these
+  // roots (the native app launcher derives its bundle identifier and WebKit
+  // data store from it) uses this exact derivation instead of writing a second
+  // one that has to stay identical by hand.
+  idKey,
   resolveTaskId,
   taskRoot,
   taskRoots,

@@ -2,9 +2,11 @@
 
 [R06 / #902](https://github.com/mysteropodes/nemo/issues/902) requires concurrent
 tasks to keep their source, browser/desktop state, ports, caches, builds and
-reports separate. The coordination library and browser preview launcher provide
-local ownership checks, distinct task origins and a served source/build identity.
-Full R06 acceptance remains open for the desktop and remaining consumers below.
+reports separate. The coordination library, the browser preview launcher and the
+native app launcher provide local ownership checks, distinct task origins,
+per-task native state and a served or written source/build identity. Full R06
+acceptance remains open for the live two-instance desktop evidence and the
+remaining consumers below.
 
 ## API and guarantees
 
@@ -19,8 +21,8 @@ regressions live in `scripts/nemo/isolation.test.cjs`.
 | Launcher ownership | `registerLauncher()` atomically refuses an already-registered task, including a stale or unreadable record. Concurrent registrations have one winner. Root release and launcher record changes use the same per-task mutation guard. |
 | Local owner/source check | `verifyHandshake()` requires the owner token and a live positive PID. With `checkSource:true`, it requires available source identity and compares the **complete R02 `sourceIdentity()` snapshot**, including HEAD, branch, worktree and dirty digest. Missing identity fails closed. |
 | Stop | `await requestStop(taskId, ownerToken, {signal, timeoutMs})` signals only an owner-matching record, then polls for exit. `stopped:true` means exit was observed. A timeout returns `stopped:false` and retains the owner record for a retry. Allowed signals are SIGTERM, SIGINT and SIGKILL; default timeout is 3 seconds, maximum 60 seconds. |
-| Root release | `releaseTask(taskId, ownerToken)` refuses a live launcher, including its owner, and refuses mismatched or unreadable records. It removes only that validated task's roots after exit. Release port reservations separately before removing their metadata. |
-| Exclusive resources | Slot acquire/release and stale-holder replacement all take the same atomic per-slot mutation guard. An ordinary record belonging to a dead PID can be replaced; two reclaimers cannot delete each other's live ownership. |
+| Root release | `releaseTask(taskId, ownerToken)` refuses a live launcher, including its owner, and refuses mismatched or unreadable records. It removes that validated task's roots after exit and reconciles only its verifiably dead exclusive-slot records; live, foreign or uncertain records remain untouched. Release port reservations separately before removing their metadata. |
+| Exclusive resources | Slot acquire/release and stale-holder replacement all take the same atomic per-slot mutation guard. An ordinary process-exit record belonging to a dead PID can be replaced; two reclaimers cannot delete each other's live ownership. Native slots require owner-confirmed app-group exit and survive launcher death. |
 
 The default runtime root is `<os.tmpdir()>/nemo-runtime`; override it with
 `NEMO_ISOLATION_ROOT` **before importing the module**. Reports can use
@@ -38,8 +40,9 @@ its current limitation that untracked-file contents are not hashed separately.
 
 Despite its historical name, `verifyHandshake()` reads local launcher metadata;
 it does **not** challenge a running server or establish which checkout serves a
-URL. The browser launcher adds the served endpoint described below. Tauri still
-requires an equivalent runtime handshake before trusting its application instance.
+URL. The browser launcher adds the served endpoint described below. The native app launcher adds the
+manifest the running instance writes for itself, which is what identifies the
+application instance rather than the launcher's own bookkeeping.
 
 Each mutation creates an atomic directory under `<runtime>/mutations/`, with an
 `owner.json` identifying the mutating PID. Normal completion removes the guard.
@@ -173,9 +176,12 @@ This serializes same-worktree builds and isolates Cargo output; it does not make
 the checkout immutable. Tauri or its build scripts can still update generated
 files under `src-tauri/gen/`. Treat those as shared-writer paths: inspect the
 source diff after a real build and coordinate any expected regeneration with
-its owner. Actual paired native-build evidence and integration with the R02/R03
-`build:desktop` job remain separate work because that job surface is currently
-owned by R03/R04.
+its owner. The standard `npm run build:desktop` job uses this launcher through an owned
+one-shot controller. It copies the exact successful app and logs into its report
+directory before cleanup, finalizes ffmpeg dylibs on the copy, and records hashes
+using `CFBundleExecutable`. Later desktop tests in the same job runner receive
+that preserved app. Missing prerequisites are required blockers; an unrelated
+shared-target bundle cannot satisfy a missing isolated build output.
 
 The focused non-native regressions run with
 `node --test scripts/nemo/build-runtime.test.cjs`. They use executable stubs to
@@ -185,40 +191,156 @@ exit and retained artifacts without starting a Tauri, desktop or GPU process.
 The core isolation suite already covers source-identity drift without adding a
 second concurrent worktree mutation to normal test discovery.
 
-## Validation and remaining integration
+## Native app launcher
 
-Run `node --test scripts/nemo/isolation.test.cjs`. The 20 behavioral tests cover
-two task roots and bound ports, R02 report routing, independent stop authority,
-invalid/case-sensitive IDs, long generated IDs, duplicate/concurrent launcher
-registration, full source mismatch and unavailable identity, ignored SIGTERM
-with a later successful owner retry, simultaneous stale-slot reclamation, and
-an interrupted guard refusing takeover. These exercise real spawned processes
-and sockets; they do not launch Nemo's browser or desktop application.
+`node scripts/nemo/native.cjs start --task app-a` starts a built Nemo with that
+task's isolated environment, owns the resulting process group, and reports what
+the running instance disclosed about itself. It resolves the app from an
+explicit `--app`/`--executable`, else this task's own build output, else the
+worktree's default target, and reads the bundle's `CFBundleExecutable` rather
+than guessing the binary name. A missing build is a named blocker listing every
+path it looked in.
 
-Still required for the full acceptance contract in
-[the parallel-work specification](remediation/07_GITHUB_PROJECT_AND_PARALLEL_WORK.md#isolation):
+Isolation has two halves, because macOS keeps the two kinds of state in two
+different places:
 
-- Complete automated browser/application workflow coverage and standard harness
-  integration. The preview launcher supplies real origins, explicit Chromium
-  profiles and the served identity, while R02 `test:browser` still requires its
-  separate Playwright harness. A browser preview does not build WASM or the app.
-- Configure and exercise isolated Tauri data/autosave paths. Merely creating a
-  `tauri-data` directory does not make the app use it. The platform owner must
-  implement and validate the actual runtime override; no untested Tauri launch
-  configuration is prescribed by this document.
-- Wire exclusive slots into desktop input and reference GPU benchmark consumers.
-- Validate two real native builds through the standalone isolated launcher,
-  inspect their source diffs and then integrate it with the standard R02/R03
-  `build:desktop` job after that shared surface is available.
-- Production profile/launcher adoption remains separate from test discovery.
-  Normal `npm test`/`verify` discovery reaches the five focused suites through
-  isolated entry processes under `tests/nemo-{boundaries,boundaries-ratchet,
-  isolation,browser-runtime,build-runtime}.test.cjs`; each suite can still be
-  invoked directly while developing it.
+| State | Mechanism |
+|---|---|
+| App data, config, cache, logs | every `app_*_dir()` in Tauri resolves as `<platform dir>/<config identifier>`, so the bootstrap rewrites the identifier to `com.strokemotion.app.nemo-task-<16 hex>` before the app runs. Everything that goes through the path resolver — the fs plugin scope, `appDataDir()` in JS, the feedback and history folders — follows without knowing this exists. |
+| WebKit `localStorage`/IndexedDB | not under those directories at all; they follow the webview's data store, so the configured windows are created in `setup` with an explicit `data_store_identifier` (macOS >= 14). Window labels are untouched, so `capabilities/default.json` keeps applying to the same window. |
 
-Those remaining integrations require shared package/job/platform files. The
-preview launcher is a bounded browser increment; it does not establish Tauri,
-GPU, export or complete R06 acceptance. Its focused tests are run with
-`node --test scripts/nemo/browser-runtime.test.cjs`. They exercise concurrent
-real servers, served source bytes and identities, source drift, ownership, stale
-process recovery, failed startup, duplicate launch and static path confinement.
+Both derive from the task key — the SHA-256 of the exact task id that
+`isolation.cjs` already computes (`idKey`, exported for this). The native side
+takes it as input instead of recomputing it: a second derivation would be one
+more pair of functions that has to stay identical by hand.
+
+| Variable | Meaning |
+|---|---|
+| `NEMO_TAURI_DATA_DIR` | absolute path to this task's `tauri-data` root. **Its presence is what turns isolation on**; nothing else in the repository sets it. |
+| `NEMO_TASK_ID` | the task id, echoed in the manifest. |
+| `NEMO_TASK_KEY` | 64 lowercase hex characters, `idKey(taskId)`. |
+| `NEMO_TASK_OWNER_TOKEN` | optional. Without it the instance refuses every release request; a missing token is never read as "no check required". |
+
+With `NEMO_TAURI_DATA_DIR` absent nothing changes: the app resolves exactly the
+paths it always has. With it set and anything else missing or invalid, the app
+exits 2 naming the variable instead of starting on the shared production
+identifier — a silent fallback would write an isolated run's state into the
+user's real app data, which is the failure this work package exists to prevent.
+`NEMO_TASK_ID` alone is deliberately not enough, since the build launcher
+already exports it for every desktop build.
+
+The app writes `native-runtime.json` (schema `nemo.native-runtime/1`) into that
+root and prints the same document as its first stdout line: task id and key, the
+identifier and data store identifier actually in use, the app directories read
+back from Tauri's own path resolver, pid, executable and app version. It never
+contains the owner token. The `nemo_task_runtime` command returns the same
+document to the page, so an in-app check can assert which task's state it is
+looking at before writing anything. `nemo_task_runtime_release` takes the owner
+token, marks the manifest released and exits — the stop path that stays
+available when process-group termination does not, because an instance started
+through macOS `open` is reparented by launchd.
+
+```sh
+node scripts/nemo/native.cjs start --task app-a --reserve desktop-input
+node scripts/nemo/native.cjs status --task app-a --owner <token>
+node scripts/nemo/native.cjs stop --task app-a --owner <token>
+```
+
+`status` is `ok` only when all of the owner token, the complete R02 source and
+build identities, and a live app manifest naming this task agree. A manifest
+left by an earlier or different run is reported as such, never accepted as this
+instance's identity. `stop` refuses a mismatched owner, terminates the owned
+process group, waits for launcher exit and then removes that task's roots.
+Copy wanted artifacts first. `stop --retain-data` instead releases the launcher
+registration and reservations while preserving task roots, app directories and
+the WebKit store for a later launch with the same task id. Both modes require
+confirmed app-process-group exit before releasing ownership; an orphan whose
+process identity or group exit cannot be proved retains its state and reports
+that explicit reconciliation is required. A stale manifest cannot satisfy a
+new launch.
+
+Removing the task root is not enough on its own: the isolated app directories
+are `<platform dir>/<identifier>`, so they live outside it and
+`isolation.releaseTask` never sees them, as does the WebKit store under
+`~/Library/WebKit/<bundle identifier>/WebsiteDataStore/<uuid>`. `stop` therefore
+reads the manifest the instance wrote, and removes each directory **whose last
+component carries this task's own identifier suffix** — recomputed locally from
+the task id, never trusted from the manifest. A manifest naming the shared
+`com.strokemotion.app` directory, another task's directory or a relative path is
+refused by name and reported in `appState.refused`. A start that fails does not
+release anything it did not acquire. Reuse the task id after an explicit
+`--retain-data` stop to read its saved state; the default stop removes it.
+
+`--reserve` takes the shared resources this instance needs exclusively, before
+it starts: `desktop-input` for a run that drives the one keyboard and mouse,
+`gpu-reference` for a reference measurement. A second launcher asking for a held
+slot is refused by name. Running two isolated instances at once is **not** what a
+slot restricts — that is the point of the roots above; a second instance that
+does not ask for the shared resource still starts.
+
+Native reservations use `releasePolicy: 'owner-confirmed'` before spawning the
+app. Other callers cannot reclaim them merely because the launcher PID died.
+Normal launcher cleanup releases them only after confirming process-group exit.
+After a crash, the owner's native `stop` verifies that same exit condition under
+the task guard before requesting managed-slot release. A live or unknown group
+retains the reservation and task records for reconciliation. Generic task release
+cannot remove those records without the consumer's lifetime verifier returning
+`true`. Direct managed-slot release likewise requires `verifyRelease()` to confirm
+exit under the slot guard; the generic `slot-release` CLI cannot bypass that check.
+
+Focused regressions run with `node --test scripts/nemo/native-runtime.test.cjs`
+and reach normal discovery through `tests/nemo-native-runtime.test.cjs`. They
+use an executable stub that reproduces only the app's observable contract (the
+environment it is handed, the manifest it writes), so they cover two concurrent
+instances on disjoint roots, per-task keys, handshake refusal for a silent or
+foreign manifest, owner-only stop with root removal, explicit reservation
+refusal and release, the missing-build blocker, derivation-bound removal of the
+isolated app directories (refusing the production directory, another task's
+directory and a relative path), and a refused start leaving an earlier
+instance's state intact — without a desktop, a GPU or a window. The environment contract itself is asserted against
+`src-tauri/src/task_runtime.rs`, so renaming a variable on one side only fails
+the suite instead of silently returning the app to shared state. The native
+resolution rules (activation, fail-closed refusals, identifier and data-store
+derivation) are proved by `cargo test task_runtime` in `src-tauri`.
+
+
+## Validation boundaries
+
+The focused isolation, browser, build and native suites enter ordinary Node
+check discovery through `tests/nemo-*.test.cjs`. Their executable controls test
+ownership, source drift, startup refusal, process-group cleanup and exclusive
+reservations without substituting stubs for live application acceptance.
+The browser suite also uses real concurrent HTTP servers and verifies served
+source bytes; browser document workflows still use the separate R03/R07
+Playwright surface.
+
+R06 acceptance requires identified real packages and browser instances, actual
+independent mutable state, owner-controlled stop/relaunch, and reserved shared
+resources. Keep those observed results with their source/artifact receipts in
+[the R06 issue](https://github.com/mysteropodes/nemo/issues/902). Historical test
+counts and earlier candidate builds do not establish a later candidate's status.
+Benchmark workloads and export validation remain their own work packages.
+
+## Integrated packaged-native validation
+
+`npm run native -- start --task <id> --app <Nemo.app>` uses the isolated native
+launcher. Reserve `desktop-input` when driving a window and `gpu-reference` for
+reference measurements. Owner-authorized `stop --retain-data` ends the process
+and releases its reservations while retaining the task's app/WebKit state for
+a subsequent start with the same task id. Ordinary `stop` also releases that
+state, after proving the application process group has exited. Uncertain
+orphan-process identity blocks cleanup for explicit reconciliation.
+
+`NEMO_DESKTOP_APP=/absolute/path/Nemo.app npm run test:desktop` executes the
+Node tests in `tests/desktop` serially. The named job requires its package and
+harness and rejects comment-only files, failed, cancelled, skipped and incomplete
+test output; its receipt identifies the chosen package
+and report directory. The app runtime manifest includes the child's observed
+temporary, cache and report environment so the harness can compare actual
+values against launcher intent. Only those directory variables are disclosed.
+
+These automated process, ownership and storage checks are one R06 gate. Actual
+UI save/reload and rendering must be exercised separately on the identified
+package; launcher source identity does not establish the provenance of an
+arbitrary prebuilt executable. Record the clean build receipt and package
+hashes when running acceptance. Signing and release acceptance remain separate.
