@@ -131,17 +131,50 @@ test('document replacement rejects old retries and assigns stable ids to newly l
   const ctx = application();
   const old = command(ctx, 'old-document-write', 'property.set', opacity(30));
   assert.equal(ctx.NemoApplication.handle(old).ok, true);
+  handle(ctx, 'second-old-write', 'property.set', opacity(45));
+  handle(ctx, 'old-undo', 'history.undo');
+  for (const field of ['undoStack', 'undoLabels', 'redoStack', 'redoLabels']) {
+    assert.equal(ctx.state[field].length, 1, field + ' must contain prior-document history');
+  }
+  let historyRefreshes = 0;
+  ctx.renderHistoryPanelIfOpen = () => historyRefreshes++;
   ctx.state.layers = [{ name: 'Imported', motionStatic: { opacity: [75] }, frames: { 0: { strokes: [] } } }];
-  ctx.state.undoStack = []; ctx.state.redoStack = [];
   ctx.NemoOpacityApplication.documentChanged();
+  for (const field of ['undoStack', 'undoLabels', 'redoStack', 'redoLabels']) {
+    assert.equal(ctx.state[field].length, 0, field + ' must not cross the document boundary');
+  }
+  assert.equal(historyRefreshes, 1);
   const loaded = handle(ctx, 'new-snapshot', 'snapshot');
   assert.notEqual(loaded.documentId, old.documentId);
   assert.ok(loaded.result.layers[0].id);
   assert.equal(loaded.result.layers[0].opacity, 75);
   assert.equal(ctx.NemoApplication.handle(old).error.code, 'wrong_document');
+  for (const operation of ['history.undo', 'history.redo']) {
+    const refused = ctx.NemoApplication.handle(command(ctx, 'new-' + operation, operation));
+    assert.equal(refused.ok, false);
+    assert.equal(refused.error.code, 'history_unavailable');
+  }
   assert.equal(value(ctx), 75);
   assert.equal(ctx.state.undoStack.length, 0);
   assert.equal(handle(ctx, 'again', 'snapshot').result.layers[0].id, loaded.result.layers[0].id);
+});
+
+test('ordinary context changes retain history for returning to the edited context', () => {
+  const ctx = application();
+  handle(ctx, 'scene-write', 'property.set', opacity(30));
+  const stacks = JSON.stringify([ctx.state.undoStack, ctx.state.undoLabels, ctx.state.redoStack, ctx.state.redoLabels]);
+  ctx.state.symbols.other = { name: 'Other' };
+  ctx.state.activeSymbolId = 'other';
+  assert.equal(ctx.NemoApplication.handle({ apiVersion: 1, requestId: 'symbol-snapshot', operation: 'snapshot', payload: {} }).ok, true);
+  assert.equal(JSON.stringify([ctx.state.undoStack, ctx.state.undoLabels, ctx.state.redoStack, ctx.state.redoLabels]), stacks);
+  const refused = ctx.NemoApplication.handle(command(ctx, 'symbol-undo', 'history.undo'));
+  assert.equal(refused.error.code, 'history_unavailable');
+  ctx.state.activeSymbolId = null;
+  assert.equal(ctx.NemoApplication.handle({ apiVersion: 1, requestId: 'scene-snapshot', operation: 'snapshot', payload: {} }).ok, true);
+  handle(ctx, 'scene-undo', 'history.undo');
+  assert.equal(value(ctx), 100);
+  handle(ctx, 'scene-redo', 'history.redo');
+  assert.equal(value(ctx), 30);
 });
 
 test('a live UI gesture rejects API writes before checkpointing or changing stored opacity', () => {

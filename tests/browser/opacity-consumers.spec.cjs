@@ -116,6 +116,12 @@ test('opacity commands survive real save/reopen and preserve stored layers durin
     ({ page, context } = await openProject(browser, runtime.origin, staticPath, contexts, errors));
     expect((await command(page, 'property.get', payload)).result.value).toBe(25);
     expect(await page.evaluate(() => JSON.parse(SM.exportJSON()).layers)).toEqual(staticSaved.layers);
+    expect((await command(page, 'property.set', { ...payload, value: 40 })).ok).toBe(true);
+    expect((await command(page, 'property.set', { ...payload, value: 60 })).ok).toBe(true);
+    expect((await command(page, 'history.undo')).ok).toBe(true);
+    const historyBeforeImport = await page.evaluate(() =>
+      [state.undoStack, state.undoLabels, state.redoStack, state.redoLabels].map(stack => stack.length));
+    expect(historyBeforeImport.every(count => count > 0)).toBe(true);
     const oldRequest = await page.evaluate(({ layerId }) => {
       const meta = NemoOpacityApplication.meta();
       return { apiVersion: 1, requestId: 'before-document-replacement', ...meta, expectedRevision: meta.revision,
@@ -126,6 +132,15 @@ test('opacity commands survive real save/reopen and preserve stored layers durin
     const replacement = await page.evaluate(request => NemoApplication.handle(request), oldRequest);
     expect(replacement.ok, 'the pre-import request must not mutate the replacement document').toBe(false);
     expect(replacement.error.code).toBe('wrong_document');
+    expect(await page.evaluate(() =>
+      [state.undoStack, state.undoLabels, state.redoStack, state.redoLabels].map(stack => stack.length)))
+      .toEqual([0, 0, 0, 0]);
+    for (const operation of ['history.undo', 'history.redo']) {
+      const refused = await command(page, operation);
+      expect(refused.ok).toBe(false);
+      expect(refused.error.code).toBe('history_unavailable');
+    }
+    expect(await page.evaluate(() => JSON.parse(SM.exportJSON()).layers)).toEqual(staticSaved.layers);
     expect((await command(page, 'property.get', payload)).result.value).toBe(25);
     expect((await command(page, 'property.key.set', { ...payload, frame: 0, value: 20 })).ok).toBe(true);
     expect((await command(page, 'property.key.set', { ...payload, frame: 20, value: 80 })).ok).toBe(true);
@@ -155,8 +170,9 @@ test('opacity commands survive real save/reopen and preserve stored layers durin
     expect((await fetch(runtime.origin + IDENTITY_PATH).then(r => r.json())).healthy).toBe(true);
     await testInfo.attach('opacity-consumers', { body: JSON.stringify({ sourceHashes, layerId, samples,
       fixtureSha256: sha(fs.readFileSync(fixture)), staticSaved: true, freshContextReopened: true,
-      storedLayersUnchanged: true, oldDocumentRejected: true }), contentType: 'application/json' });
+      storedLayersUnchanged: true, oldDocumentRejected: true, oldHistoryRejected: true }), contentType: 'application/json' });
   } finally {
+    await testInfo.attach('page-errors', { body: JSON.stringify(errors), contentType: 'application/json' });
     try { await Promise.all([...contexts].map(context => context.close())); }
     finally { await runtime.close(); }
   }
