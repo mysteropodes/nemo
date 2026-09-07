@@ -8,6 +8,7 @@ Beginning with check 87, publish a 45-minute report every third check. Earlier
 
 | Check-in | Date (UTC) | Reporting window (UTC) | Report |
 | --- | --- | --- | --- |
+| 90 | 2026-09-07 | 01:20:46–02:05:46; subsequent native CLI integration | [Ninetieth check-in](2026-09-07-checkin-90.md) |
 | 87 | 2026-09-07 | 00:35:47–01:20:47; subsequent native acceptance | [Eighty-seventh check-in](2026-09-07-checkin-87.md) |
 | 85 | 2026-09-07 | Checks 81–85; continuation after 00:52 UTC | [Eighty-fifth check-in](2026-09-07-checkin-85.md) |
 | 65 | 2026-09-06 | Checks 61–65; continuation through 21:39 UTC | [Sixty-fifth check-in](2026-09-06-checkin-65.md) |
