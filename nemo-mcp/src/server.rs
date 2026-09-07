@@ -21,12 +21,16 @@ pub struct NemoServer {
 }
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Query {
-    /// Instance returned by nemo_discover. Required when several apps are running.
+    /// Instance returned by nemo_discover as `instances[].instanceId`. Required when
+    /// several apps are running. `nemo_command` spells this field the same way.
+    #[serde(alias = "instance_id")]
     pub instance_id: String,
     /// capabilities, snapshot, property.get or diagnostics.trace.
     pub operation: Operation,
     #[serde(default = "empty_payload")]
+    #[schemars(schema_with = "crate::contract::query_payload_schema")]
     pub payload: serde_json::Value,
 }
 fn empty_payload() -> serde_json::Value {
@@ -124,7 +128,7 @@ impl NemoServer {
     }
 
     #[tool(
-        description = "Read Nemo capabilities, current document snapshot, opacity property, or bounded diagnostics. Always select the instance from nemo_discover."
+        description = "Read Nemo capabilities, current document snapshot, opacity property, or bounded diagnostics. Always select the instance from nemo_discover. The payload schema carries one copyable template per operation; property.get needs {\"layerId\",\"property\"} and the other reads take {}."
     )]
     async fn nemo_query(
         &self,
@@ -134,23 +138,25 @@ impl NemoServer {
         if !query.operation.is_query() {
             return failure("invalid_request", "Use nemo_command for mutations");
         }
-        self.call(
-            ApplicationRequest {
-                api_version: 1,
-                request_id: uuid::Uuid::new_v4().to_string(),
-                instance_id: Some(query.instance_id),
-                document_id: None,
-                expected_revision: None,
-                operation: query.operation,
-                payload: query.payload,
-            },
-            context,
-        )
-        .await
+        let request = ApplicationRequest {
+            api_version: 1,
+            request_id: uuid::Uuid::new_v4().to_string(),
+            instance_id: Some(query.instance_id),
+            document_id: None,
+            expected_revision: None,
+            operation: query.operation,
+            payload: query.payload,
+        };
+        // Report a malformed read as invalid_request here; reaching the transport
+        // would report the same fault as an unavailable instance.
+        if let Err(message) = request.validate() {
+            return failure("invalid_request", &message);
+        }
+        self.call(request, context).await
     }
 
     #[tool(
-        description = "Call the same application command/history service as Nemo UI. Use the latest snapshot instanceId, documentId, expectedRevision and a unique requestId. Identical retries reuse their result; changed-body retries fail. Supports opacity editing/keying, undo/redo and diagnostic replay."
+        description = "Call the same application command/history service as Nemo UI. Use the latest snapshot instanceId, documentId, expectedRevision and a unique requestId. Identical retries reuse their result; changed-body retries fail. Supports opacity editing/keying, undo/redo and diagnostic replay. The payload schema carries one copyable template per operation: send it as a JSON object, not as a JSON-encoded string."
     )]
     async fn nemo_command(
         &self,
@@ -161,11 +167,11 @@ impl NemoServer {
             return failure("invalid_request", "Use nemo_query for reads");
         }
         if let Err(message) = request.validate() {
-            return failure("invalid_request", message);
+            return failure("invalid_request", &message);
         }
         self.call(request, context).await
     }
 }
 
-#[tool_handler(router = self.tool_router, name = "nemo", version = "0.1.0", instructions = "Discover Nemo, select an instance, read snapshot, then use its identity and revision for commands. Nemo owns document state. After a cancelled or disconnected write query state before retrying; reuse the exact requestId and body for idempotent retries.")]
+#[tool_handler(router = self.tool_router, name = "nemo", version = "0.1.0", instructions = "Discover Nemo, select an instance, read snapshot, then use its identity and revision for commands. Nemo owns document state. Every payload is a JSON object shaped by the template its operation advertises in the tool schema. After a cancelled or disconnected write query state before retrying; reuse the exact requestId and body for idempotent retries.")]
 impl ServerHandler for NemoServer {}

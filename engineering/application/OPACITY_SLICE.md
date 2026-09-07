@@ -16,6 +16,16 @@ The application checks revision and idempotency at the actual mutation boundary.
 Reusing an identical request returns its retained result; changing its body fails.
 Queries return identity/revision without granting a later stale write.
 
+`payload` stays a free JSON value on the wire, so the document owner receives
+exactly what the client sent, but the MCP tools advertise its shape: the schema
+is generated from `CommandPayload`, names every accepted key, and carries one
+copyable template per operation. `Operation::check_payload` admits a payload on
+that structure alone — key presence, key spelling, JSON types. Value ranges,
+frame bounds, layer existence and locking remain the document owner's decision,
+so the two cannot drift into disagreeing rule sets. Both tools spell instance
+identity `instanceId`; `nemo_query` also accepts `instance_id` for callers
+written against the earlier spelling.
+
 The bundled `nemo-mcp` executable uses the official Rust SDK, pinned at 3.2.0 in
 Cargo and locked dependencies. Its compact tools discover running instances,
 query capabilities/snapshots/properties/trace, and dispatch typed commands.

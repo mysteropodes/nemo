@@ -2,6 +2,64 @@
   "apiVersion": 1,
   "request": {
     "$defs": {
+      "CommandPayload": {
+        "additionalProperties": false,
+        "description": "Every key a payload may carry. Which of them an operation requires is listed\nwith that operation's template; no other key is accepted.",
+        "properties": {
+          "animated": {
+            "description": "Whether the property is animated.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "curvePoints": {
+            "description": "Unavailable: curve editing is not exposed by this capability, and a payload\ncarrying this key is rejected."
+          },
+          "frame": {
+            "description": "Timeline frame; defaults to the document's current frame where it is optional.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "layerId": {
+            "description": "Layer identity, copied from `layers[].layerUid` of the latest snapshot.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "property": {
+            "description": "Property identity: the `id` of a `capabilities.properties` entry, currently\nonly `\"opacity\"`. Note the key is `property`, while capabilities names it `id`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "request": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/RecordedCommand"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "One recorded property command, as `diagnostics.trace` reports it."
+          },
+          "value": {
+            "description": "New value, in the unit and range `capabilities` advertises for the property.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "Operation": {
         "enum": [
           "capabilities",
@@ -17,23 +75,43 @@
           "diagnostics.replay"
         ],
         "type": "string"
+      },
+      "RecordedCommand": {
+        "description": "One recorded command, in the form `diagnostics.trace` reports it. An entry read\nfrom a trace can be handed back unchanged; its extra fields are ignored.",
+        "properties": {
+          "operation": {
+            "$ref": "#/$defs/Operation",
+            "description": "`property.set`, `property.key.set`, `property.key.remove` or `property.animation.set`."
+          },
+          "payload": {
+            "$ref": "#/$defs/CommandPayload"
+          }
+        },
+        "required": [
+          "operation",
+          "payload"
+        ],
+        "type": "object"
       }
     },
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
       "apiVersion": {
+        "description": "Always 1; this transport speaks no other version.",
         "format": "uint32",
         "minimum": 0,
         "type": "integer"
       },
       "documentId": {
+        "description": "Document identity from the latest `snapshot`. Required by every command; it\nchanges whenever the open document is replaced.",
         "type": [
           "string",
           "null"
         ]
       },
       "expectedRevision": {
+        "description": "The `revision` of the latest snapshot. Required by every command, and the\nwrite is refused as stale if the document has moved on since.",
         "format": "uint64",
         "minimum": 0,
         "type": [
@@ -42,16 +120,111 @@
         ]
       },
       "instanceId": {
+        "description": "Instance identity from `nemo_discover` (`instances[].instanceId`). Required\nby every command.",
         "type": [
           "string",
           "null"
         ]
       },
       "operation": {
-        "$ref": "#/$defs/Operation"
+        "$ref": "#/$defs/Operation",
+        "description": "The operation to run; its name selects the payload template below."
       },
-      "payload": true,
+      "payload": {
+        "additionalProperties": false,
+        "description": "Operation body. Always a JSON object, never a JSON-encoded string. Copy the template for the chosen operation:\n  property.set           {\"layerId\":\"<layers[].layerUid from snapshot>\",\"property\":\"opacity\",\"value\":40}\n  property.key.set       {\"frame\":12,\"layerId\":\"<layers[].layerUid from snapshot>\",\"property\":\"opacity\",\"value\":40}\n  property.key.remove    {\"frame\":12,\"layerId\":\"<layers[].layerUid from snapshot>\",\"property\":\"opacity\"}\n  property.animation.set {\"animated\":true,\"layerId\":\"<layers[].layerUid from snapshot>\",\"property\":\"opacity\"}\n  history.undo           {}\n  history.redo           {}\n  diagnostics.replay     {\"request\":{\"operation\":\"property.set\",\"payload\":{\"layerId\":\"<layers[].layerUid from snapshot>\",\"property\":\"opacity\",\"value\":40}}}\n`layerId` is `layers[].layerUid` from the latest snapshot. `property` is the `id` of a `capabilities.properties` entry, currently only \"opacity\" — the payload key is `property` even though capabilities names it `id`. `frame` defaults to the document's current frame wherever the template omits it.",
+        "examples": [
+          {
+            "layerId": "<layers[].layerUid from snapshot>",
+            "property": "opacity",
+            "value": 40
+          },
+          {
+            "frame": 12,
+            "layerId": "<layers[].layerUid from snapshot>",
+            "property": "opacity",
+            "value": 40
+          },
+          {
+            "frame": 12,
+            "layerId": "<layers[].layerUid from snapshot>",
+            "property": "opacity"
+          },
+          {
+            "animated": true,
+            "layerId": "<layers[].layerUid from snapshot>",
+            "property": "opacity"
+          },
+          {},
+          {},
+          {
+            "request": {
+              "operation": "property.set",
+              "payload": {
+                "layerId": "<layers[].layerUid from snapshot>",
+                "property": "opacity",
+                "value": 40
+              }
+            }
+          }
+        ],
+        "properties": {
+          "animated": {
+            "description": "Whether the property is animated.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "curvePoints": {
+            "description": "Unavailable: curve editing is not exposed by this capability, and a payload\ncarrying this key is rejected."
+          },
+          "frame": {
+            "description": "Timeline frame; defaults to the document's current frame where it is optional.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "layerId": {
+            "description": "Layer identity, copied from `layers[].layerUid` of the latest snapshot.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "property": {
+            "description": "Property identity: the `id` of a `capabilities.properties` entry, currently\nonly `\"opacity\"`. Note the key is `property`, while capabilities names it `id`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "request": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/RecordedCommand"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "One recorded property command, as `diagnostics.trace` reports it."
+          },
+          "value": {
+            "description": "New value, in the unit and range `capabilities` advertises for the property.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "requestId": {
+        "description": "Caller-chosen identity, 1..128 bytes. Re-sending it with an identical body\nreturns the retained result; re-sending it with a changed body is rejected.",
         "type": "string"
       }
     },
