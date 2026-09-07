@@ -1,0 +1,1745 @@
+{
+  "completed_at": "2026-09-07T23:05:30.128792+00:00",
+  "archive_ruleset_id": 22490418,
+  "remote_before": 228,
+  "remote_removed": 168,
+  "remote_after": 60,
+  "local_before": 379,
+  "local_removed": 259,
+  "local_after": 120,
+  "skipped_count": 0,
+  "skipped": [],
+  "remote_deletion": "atomic push with explicit expected-SHA leases; exit 0",
+  "local_deletion": "expected-old-SHA update-ref transaction after current worktree exclusion; exit 0",
+  "retained_remote_refs_unchanged": true,
+  "retained_local_refs_unchanged": true,
+  "all_open_pr_heads_and_bases_preserved": true,
+  "open_pr_count": 23,
+  "registered_worktrees_unchanged": true,
+  "default_branch_sha_unchanged": true,
+  "main_protection_unchanged": true,
+  "archive_protected": true,
+  "archive_rules_unchanged": true,
+  "hosted_workflows_disabled": true,
+  "archive_actions_runs": 0,
+  "matching_remote_tracking_refs_removed": 168,
+  "other_tracking_ref_retained": "refs/remotes/origin/pr-992-head",
+  "snapshot_commit": "285ca26a082d7d30f8167ecd0356a693d4ed11bc",
+  "snapshot": "2026-09-07",
+  "bundle_sha256": "3c4d47034f5e9ab80e2e34b6cc6a5ae6845c4e24ec69db6e08d907f00be54084",
+  "removed_refs": {
+    "remote": [
+      {
+        "ref": "refs/heads/GHproject_and_issue_triage",
+        "sha": "197f5bd276557745b02042e414c96abddd69acfe"
+      },
+      {
+        "ref": "refs/heads/chore/drop-ae-from-readme",
+        "sha": "b57aec20f75240eef49bf6ca00c753c82311672b"
+      },
+      {
+        "ref": "refs/heads/chore/pre-public-cleanup",
+        "sha": "44adc0f5adc338a739f3f5f4709ba32fc4485fbc"
+      },
+      {
+        "ref": "refs/heads/chore/rotate-updater-key",
+        "sha": "80ff46fac245b734602b61bbe7101c4a9a7fe86f"
+      },
+      {
+        "ref": "refs/heads/claude/anamorphic-halo-and-8-effect-params",
+        "sha": "55a1857ba7cc7af2baa2f19325efdf99c15ca1d8"
+      },
+      {
+        "ref": "refs/heads/claude/bitmap-brush-selection-edit",
+        "sha": "f806e6a459c18729435ce8335ad228a273665643"
+      },
+      {
+        "ref": "refs/heads/claude/blur-quality-separable-gaussian",
+        "sha": "75a571a3b5ec6127fb6628789e33beb5cd8ed3f8"
+      },
+      {
+        "ref": "refs/heads/claude/brush-editor-access-and-p5brush-grain-noise",
+        "sha": "823a48240ffa6e42fec4d35d91a044b7ca3d3814"
+      },
+      {
+        "ref": "refs/heads/claude/brush-menu-header",
+        "sha": "7495d10484b0558f5aa353c72dc84f3b7670690d"
+      },
+      {
+        "ref": "refs/heads/claude/brush-stroke-visual-separation",
+        "sha": "e12ffccfd2eb3e2e65df054fa9c3bedd7aad1ef9"
+      },
+      {
+        "ref": "refs/heads/claude/calligraphic-nib",
+        "sha": "838a51e986d81cb487bc808f13f69150ddec44cd"
+      },
+      {
+        "ref": "refs/heads/claude/combine-vectorbrush-ring-geometry",
+        "sha": "e644b4d801ae058cf01395fc13894af426b80a98"
+      },
+      {
+        "ref": "refs/heads/claude/dims-lock-icon-fix",
+        "sha": "c73b7bca0b700c8c96505ba18ec383364ed68f82"
+      },
+      {
+        "ref": "refs/heads/claude/dockable-tools-panel",
+        "sha": "8cb0e8a346e29262e233bb9eac6c78b837160c01"
+      },
+      {
+        "ref": "refs/heads/claude/duplicate-layer-identity-flags",
+        "sha": "a66c3a57813a8f6e2e80d26d4224cf3eff5cc29c"
+      },
+      {
+        "ref": "refs/heads/claude/effect-glow-vignette",
+        "sha": "98e32d7364343ad7f8f26270796ca2a6c101c4ea"
+      },
+      {
+        "ref": "refs/heads/claude/effect-library-expansion",
+        "sha": "cf786c4390ef91e07d2f9308122d0179505b31b5"
+      },
+      {
+        "ref": "refs/heads/claude/effects-export-supersample",
+        "sha": "5d9c72d6106d7f6335e00e96a771b9d0ff1d773c"
+      },
+      {
+        "ref": "refs/heads/claude/effects-labels-i18n",
+        "sha": "9a104358f607cdb9083d2246478767911017c588"
+      },
+      {
+        "ref": "refs/heads/claude/elements-panel-stroke-row-pressure-brush",
+        "sha": "83a085840883a8005040bd70a369c65d0461f179"
+      },
+      {
+        "ref": "refs/heads/claude/eraser-tool-opts-and-feedback-profile",
+        "sha": "bc08ea3c22bfa248a0b0a20df40c10e9425427be"
+      },
+      {
+        "ref": "refs/heads/claude/export-folder-engine-gate",
+        "sha": "cda808c94cf10893f6e97c0473d01dffb43f2137"
+      },
+      {
+        "ref": "refs/heads/claude/expr-controls",
+        "sha": "a26f818234beaf5d30be0ad1843c3167d24628be"
+      },
+      {
+        "ref": "refs/heads/claude/expr-editor-height",
+        "sha": "419983408028bcfbd8d7cdc95310c5a2b370fd85"
+      },
+      {
+        "ref": "refs/heads/claude/expr-editor-scroll-fix",
+        "sha": "cced8380daea38e17bf75c7b1234fdb9e07dfaa3"
+      },
+      {
+        "ref": "refs/heads/claude/expr-graph-plot",
+        "sha": "26f24b6fb54111aec183c0269720311800cd2765"
+      },
+      {
+        "ref": "refs/heads/claude/expression-engine-mvp",
+        "sha": "b0ec9ec81aa40c868ee368f7d6c12ae93da0f138"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-105-labs-i18n",
+        "sha": "41500b47cd29a630f13def169143c2cab7aa178f"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-106-video-optim-badge",
+        "sha": "e6e5018af9ac6230c5762bf8b0ad88d9941249f0"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-107-delete-key-layer",
+        "sha": "38268d04fb0e67cb8766a7a88a9dd28149e8bba0"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-109-transplant-open-tabs",
+        "sha": "fdb378071bed43808b2e40e0fc80734445961134"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-110-fill-dab-crash",
+        "sha": "e3c3e84bde5f2ecbc78d34a87496b91239170cb9"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-2026-07-26-recut",
+        "sha": "d6c398bcba7acbd61e073767809fee268dd4e7af"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-2026-07-26-suite",
+        "sha": "eb26243cb2d8e331a515a0eedb8e3adf3375a7ad"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-59-null-layer-move",
+        "sha": "cbf1eb3a7e37ea375362087d198332fc88a05d93"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-80-eyedropper-preset",
+        "sha": "3767383e0ba10050f70b95fbb700ff35a1796641"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-81-brush-favorites",
+        "sha": "772c04729ec0f4030fd2cf2bb75dfa8f4f453b41"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-82-brush-width-texture",
+        "sha": "5defe24350f4d20ee008842811db035c2dc732f7"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-82-width-vector-ribbon-texture",
+        "sha": "1768301ee9603ee8319d44a44d470ecc8fbabc68"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-84-timeline-width",
+        "sha": "c08c6ae6e4f6b3816c00679a6f7bd522264695df"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-85-shortcut-and-shape-icons",
+        "sha": "9d218b0df1a6bad6c3e8d3dd58d5612717f519d2"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-86-typography-fonts",
+        "sha": "750c111d449dbfed194804ce22e5afbadb0bb43b"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-89-tween-dab-centerline",
+        "sha": "7a28efcae32570d3c6bfb98ab28d2cb72120aa0d"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-97-order-engine-warning",
+        "sha": "a8a3fdeef20a66f442d6c1302851c52980167eab"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-98-motion-edge-scale",
+        "sha": "bc585b5b4e1eef3ef91be51e40bdd1f312961c8d"
+      },
+      {
+        "ref": "refs/heads/claude/feedback-silent-write-failure",
+        "sha": "837cde88ab9adb0be19236d911beea9c32615de9"
+      },
+      {
+        "ref": "refs/heads/claude/figma-style-panel",
+        "sha": "84b4a855f82ee299db4e707d6752d4d4734e0491"
+      },
+      {
+        "ref": "refs/heads/claude/fill-auto-gap-closure",
+        "sha": "e325f5f3bb63e584824284f0353040fb2e28592a"
+      },
+      {
+        "ref": "refs/heads/claude/fill-close-line-guide",
+        "sha": "139f9263e0ad47b40f1b20d5d803bfc9da43aef1"
+      },
+      {
+        "ref": "refs/heads/claude/fill-propagate-across-frames",
+        "sha": "c5d83b5680a67eaa72805b04fa1e161968329ad9"
+      },
+      {
+        "ref": "refs/heads/claude/fill-propagate-skip-held",
+        "sha": "28362caa059ba1775f0ce04602c941f99a434b77"
+      },
+      {
+        "ref": "refs/heads/claude/fillbrush-preserve-paths-on-merge",
+        "sha": "10d6eb7ea353598327262ed96418df81e98fd204"
+      },
+      {
+        "ref": "refs/heads/claude/fillclose-dab-perf",
+        "sha": "e4955576cacdc206b03529a3bab25c24a9511b0a"
+      },
+      {
+        "ref": "refs/heads/claude/fillclose-snap-centerline",
+        "sha": "b38b3c68f52f10a738e20d6638e75954c472da6f"
+      },
+      {
+        "ref": "refs/heads/claude/fillclose-snap-guards",
+        "sha": "25e0bb78b80466bfc785895946dd0fc455cc4360"
+      },
+      {
+        "ref": "refs/heads/claude/fix-labs-float-panel-sm-t-race",
+        "sha": "6a3249f707ab1ce20cd04c377fc68daefc00965f"
+      },
+      {
+        "ref": "refs/heads/claude/folder-drag-children-completeness",
+        "sha": "d644dab1734dcc3aa9c05ee80d184f615c344bcb"
+      },
+      {
+        "ref": "refs/heads/claude/folder-visibility-solo",
+        "sha": "34e64ab3cce3b297b7979ea237f35d3e6274004e"
+      },
+      {
+        "ref": "refs/heads/claude/followpath-textbox-timeline-overflow",
+        "sha": "993962382688a0ca02626deed6b2f6a0357fa218"
+      },
+      {
+        "ref": "refs/heads/claude/gradient-blur-effects",
+        "sha": "b9c058da3f3798cd92b09dd4467fe43e45e99dd4"
+      },
+      {
+        "ref": "refs/heads/claude/groups-guide-handles-brush-menu",
+        "sha": "c8593506aa9b6e66c3c83efa8c24114351226e10"
+      },
+      {
+        "ref": "refs/heads/claude/guides-drag-and-gradient-gizmo",
+        "sha": "5e5e8c8ba7f6809099d6701cc72141826bb3e306"
+      },
+      {
+        "ref": "refs/heads/claude/image-mesh",
+        "sha": "dbc205140a7b7c305fb7f3fbfbee66eaa1d56597"
+      },
+      {
+        "ref": "refs/heads/claude/image-mesh-animation",
+        "sha": "7233d9d6d796b0e80f6d5b9eab8160fe7aa1bffa"
+      },
+      {
+        "ref": "refs/heads/claude/image-mesh-editor",
+        "sha": "ed082123fdbc3773f424c30a0bd6a7ebec653e7d"
+      },
+      {
+        "ref": "refs/heads/claude/index-version-fallback",
+        "sha": "64888367563329a00198e64950d878174d626929"
+      },
+      {
+        "ref": "refs/heads/claude/inpoint-handle-grip-fix",
+        "sha": "dd7a2020a3fea7a995dadaf840b4b451b6c0b9a5"
+      },
+      {
+        "ref": "refs/heads/claude/motion-autonomous-batch",
+        "sha": "7d73c3d36dcd076d1235370312c0827f8291b2c5"
+      },
+      {
+        "ref": "refs/heads/claude/motion-effect-null-layers",
+        "sha": "4c4fdd62d537e6d66fff386c80d26dca0ad97c8a"
+      },
+      {
+        "ref": "refs/heads/claude/motion-fill-color",
+        "sha": "ba83c8f6a85e27470e69a0f3753244f410e2e229"
+      },
+      {
+        "ref": "refs/heads/claude/motion-path-vertex-property",
+        "sha": "d827fb8620a4081351ede1bcfa218075618f1c1a"
+      },
+      {
+        "ref": "refs/heads/claude/motion-precomp-layer",
+        "sha": "5435e84bde6df32acfe678ff460578f4c7823540"
+      },
+      {
+        "ref": "refs/heads/claude/motion-props-panel-visibility",
+        "sha": "888644ccc0ff08f639a408a451c66458e7670233"
+      },
+      {
+        "ref": "refs/heads/claude/motion-timeline-alignment",
+        "sha": "2b2f786351d74992fbea39b560a6811001e1f74c"
+      },
+      {
+        "ref": "refs/heads/claude/mouth-rotation-mirage",
+        "sha": "7f33570b788143df773a8e5af24ebe4410ab7a7b"
+      },
+      {
+        "ref": "refs/heads/claude/null-layer-canvas",
+        "sha": "ccf63f4dc29f8c554f9932a6dcd637cd289d7602"
+      },
+      {
+        "ref": "refs/heads/claude/onion-skin-and-lag-fixes",
+        "sha": "fee87cc22a96ece5cb62d12044f12b31c946dd09"
+      },
+      {
+        "ref": "refs/heads/claude/p5brush-vector-settings",
+        "sha": "13c421b645b9dc3e076b2b515a5ffd4d193b2084"
+      },
+      {
+        "ref": "refs/heads/claude/panel-cleanup-checkbox-ui",
+        "sha": "3ff0d1f34ea0e65928adb3c1ca36279840443262"
+      },
+      {
+        "ref": "refs/heads/claude/persistent-fill-close-lines",
+        "sha": "de6cb3c3d8a7b24f726d48dd3fdff685043f0474"
+      },
+      {
+        "ref": "refs/heads/claude/perspective-angle-snap",
+        "sha": "6a85b5ff7fe2c7621dab15424bd2696d259d8c1c"
+      },
+      {
+        "ref": "refs/heads/claude/pressure-curve-editor",
+        "sha": "2ced20450508a75478f57d9aefbab1811e48c4da"
+      },
+      {
+        "ref": "refs/heads/claude/preview-adaptive-resolution",
+        "sha": "94e36773c00d467cfb212807b0a90523daf9a01f"
+      },
+      {
+        "ref": "refs/heads/claude/psd-import",
+        "sha": "c99905150899a69464794078eb49ae373c7a25c5"
+      },
+      {
+        "ref": "refs/heads/claude/r02-doctor-receipts",
+        "sha": "1ea8d34ed766a5b0b6b4b071b487a46d84e89fb3"
+      },
+      {
+        "ref": "refs/heads/claude/r04-ffmpeg-sidecar-rebuild",
+        "sha": "7bd1f88c9816873cbb2f1a4996a135d40fdc636a"
+      },
+      {
+        "ref": "refs/heads/claude/reassign-multi-source",
+        "sha": "98410cee2d69165c213bd3d686c9b869fc5cfa94"
+      },
+      {
+        "ref": "refs/heads/claude/remove-projet-panel",
+        "sha": "173197c0254ee31c1d7c3cac1aff0e4d90c998a7"
+      },
+      {
+        "ref": "refs/heads/claude/revert-calligraphic-nib",
+        "sha": "86271ec2280e524d47d08e94cfb43f0e6e6a7759"
+      },
+      {
+        "ref": "refs/heads/claude/rig-widget-layers",
+        "sha": "9fd509cd350b607619efc0a4d929f5b187d8db40"
+      },
+      {
+        "ref": "refs/heads/claude/rulers-guides-and-snap",
+        "sha": "fee87cc22a96ece5cb62d12044f12b31c946dd09"
+      },
+      {
+        "ref": "refs/heads/claude/selected-colors-panel",
+        "sha": "f620cc774df458206139d03361830ea1e728b5c8"
+      },
+      {
+        "ref": "refs/heads/claude/sketchbook-parity-symmetry-fisheye",
+        "sha": "3e4d84cf7422218ac76a69246982d85870768aef"
+      },
+      {
+        "ref": "refs/heads/claude/skew-transform-handles",
+        "sha": "f2645a61b545dace78557dfdc16ec15538d52388"
+      },
+      {
+        "ref": "refs/heads/claude/smooth-stabilizer-clarity",
+        "sha": "ac2dc9e5b6ae074e145badbbfab35c7fcf22cea1"
+      },
+      {
+        "ref": "refs/heads/claude/symmetry-float-panel-discoverability",
+        "sha": "7e5a90d95c022267f051ed7b7e5d5e39ac8c0fd6"
+      },
+      {
+        "ref": "refs/heads/claude/symmetry-shape-tools",
+        "sha": "09f2ed1fbf7faa07a701b107274c6888e9bd3307"
+      },
+      {
+        "ref": "refs/heads/claude/text-layer-marking",
+        "sha": "1fa461ca224304f7d0809c6c306b4382387b52b4"
+      },
+      {
+        "ref": "refs/heads/claude/text-per-char-animation",
+        "sha": "a3b31a1f7e8e8a25fcbc515b4f4520bf0e9cb70d"
+      },
+      {
+        "ref": "refs/heads/claude/text-tool-rework",
+        "sha": "8d4313c1e466fc0893744612435cb558b36c2546"
+      },
+      {
+        "ref": "refs/heads/claude/toolbar-followup-fixes",
+        "sha": "f16cfadb92112ca4c56624dfb0e0023fff1a4bca"
+      },
+      {
+        "ref": "refs/heads/claude/tools-handle-bottom",
+        "sha": "5315fc95522e0202ede8bde1e20f148f3c753503"
+      },
+      {
+        "ref": "refs/heads/claude/trim-and-motion-anchor-fixes",
+        "sha": "908706c7cb0bf39406f1fcecb8d34ff8f31fc591"
+      },
+      {
+        "ref": "refs/heads/claude/trim-stroke-ends",
+        "sha": "1b711bb7df90660c6f4a82c74c557bd473b7c02b"
+      },
+      {
+        "ref": "refs/heads/claude/tween-engine-stress-test",
+        "sha": "0fdb849f12d7a9d72270401dfadb910692aa1db3"
+      },
+      {
+        "ref": "refs/heads/claude/tween-per-pair-easing",
+        "sha": "fbf7f94852f623076b4394144a30c85175395a23"
+      },
+      {
+        "ref": "refs/heads/claude/tween-reassign-id-hover",
+        "sha": "73d24e116d2557dbdcb5a58cf90bdb2cbf64f1b4"
+      },
+      {
+        "ref": "refs/heads/claude/ui-polish-batch2",
+        "sha": "bae529248045f0b7962cecb569e2e14c9a8d55a3"
+      },
+      {
+        "ref": "refs/heads/claude/vandijk-batch2",
+        "sha": "ee3bc82c993e8a93a10ef52a70264bfbd2729c81"
+      },
+      {
+        "ref": "refs/heads/claude/vector-text-glyphs",
+        "sha": "a04045b0c717ee645da42a92f6913a7e737fb5d4"
+      },
+      {
+        "ref": "refs/heads/claude/vertex-path-morph-drag",
+        "sha": "d8a65eef14d42dc68d14240086a4353fa0fcafd8"
+      },
+      {
+        "ref": "refs/heads/claude/web-public-beta",
+        "sha": "48b3bb738a56210e5ff25cdd047ecf40d7393e68"
+      },
+      {
+        "ref": "refs/heads/claude/web-save",
+        "sha": "438831bebdced9421e7bc90aebfa1cf59f24b568"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-15-20260906",
+        "sha": "bcdc331e439711f4c7618c80d6c964e8337a7ce2"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-20-20260906",
+        "sha": "f6ecab576ce7eacbd53079bd9746ec6514b7d316"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-25-20260906",
+        "sha": "781ee77c948bc0e4cf76eb9019051388942f5b61"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-30-20260906",
+        "sha": "0bda6ffecebd287e432d6a7e2247174334d30ebd"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-35-20260906",
+        "sha": "b40b7376df3c98114ff25d1802f717d9b589d037"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-40-20260906",
+        "sha": "9bc854107ff3dfc377ec502325fe646049a2152a"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-45-20260906",
+        "sha": "1851a2e7ce9f0b357c2d515805a72bc10332be12"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-50-20260906",
+        "sha": "a4f3f84c00f664310fd6aba01e745beb6212d68d"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-55-20260906",
+        "sha": "d61fd5f28ff159eb638368dd47d4c4ae292e0cf9"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkins-20260905",
+        "sha": "fadd953ba1012e2f5c381f65b273eef9e120df24"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-2f64d9d01c8e",
+        "sha": "4f72560e89e9983a89ff9e8db8aa1cdbe00bca5f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-4e687b4d01e9",
+        "sha": "62decabd08193d2489f047d3d89b0863cda6d2ea"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-614661f3b03b",
+        "sha": "6bf3bebbbc6e2153af627914dd88a40919726abd"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-65e0a8fd13e7",
+        "sha": "5daa6b5b01583f1559284142ef52dc8427371da6"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-e141caa33478",
+        "sha": "dad942594b51c4947f4d907a1d296549d50bc7d5"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-e8f5cacaf88f",
+        "sha": "025761b5bfe7af044b5008935e0f94d96833bef3"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-f8b4d83fa5d4",
+        "sha": "d520e9495666ba098cf5fda2168aa81878a458e4"
+      },
+      {
+        "ref": "refs/heads/codex/bz0-contract-alignment-20260905",
+        "sha": "6c74e6d577a3a409af2e389ed701043c540eae53"
+      },
+      {
+        "ref": "refs/heads/codex/check65-svg-export-20260906",
+        "sha": "58d208187bb9222e249741c9fa6eabe8d471252b"
+      },
+      {
+        "ref": "refs/heads/codex/check70-r08-composition-20260906",
+        "sha": "582f51e2b0290207136629b634dcbf18b07069e2"
+      },
+      {
+        "ref": "refs/heads/codex/check85-r06-import-validation-20260907",
+        "sha": "521fe316ebe7bfcfcf0d64bfc2892b9d5ab71f62"
+      },
+      {
+        "ref": "refs/heads/codex/check85-r06-integration-20260907",
+        "sha": "223f98d92157e162585120c20ee553060007416d"
+      },
+      {
+        "ref": "refs/heads/codex/check85-report-20260907",
+        "sha": "70d739a73c97a26e4c441c8551514af483007fbb"
+      },
+      {
+        "ref": "refs/heads/codex/check87-report-20260907",
+        "sha": "e6d4eefbc6224c10289a87356544d4935e0ac34c"
+      },
+      {
+        "ref": "refs/heads/codex/check90-native-receipt-20260907",
+        "sha": "3a1261c78571a7b35b1ab362d316dbc5e6633a84"
+      },
+      {
+        "ref": "refs/heads/codex/check90-report-20260907",
+        "sha": "62e91c90d4bc6123023f837b87d76940cb8c13ce"
+      },
+      {
+        "ref": "refs/heads/codex/check92-main-composition-20260907",
+        "sha": "e17a8c113c2bdf104cdd2293b2ee47366eadce4b"
+      },
+      {
+        "ref": "refs/heads/codex/feedback-2026-08-22",
+        "sha": "1e4fd85af77872c004e07f12c3fc7ae96cc07469"
+      },
+      {
+        "ref": "refs/heads/codex/manual-only-actions-20260906",
+        "sha": "41081aa3383f2cc8c76c7805f531f43057f33534"
+      },
+      {
+        "ref": "refs/heads/codex/performance-refactor-handoff",
+        "sha": "201e4947606f82a35d1b5e5e8a9ae39d96517bb4"
+      },
+      {
+        "ref": "refs/heads/codex/r01-adoption-candidate-20260905",
+        "sha": "464eb05eb59c083ac9484144f783e1658de394b0"
+      },
+      {
+        "ref": "refs/heads/codex/r03-baseline-resume-20260906",
+        "sha": "f1147c0806e4f511be3c46843c8ae4480e61e9b9"
+      },
+      {
+        "ref": "refs/heads/codex/r05-adoption-resume-20260906",
+        "sha": "a2d7e51a133ae891e4d6c6c3c7c71afb188a5fae"
+      },
+      {
+        "ref": "refs/heads/codex/r05-baseline-ratchet-20260905",
+        "sha": "1b0e77d77165f9a120aace877efeda26798bd588"
+      },
+      {
+        "ref": "refs/heads/codex/r05-checker-followup-20260905",
+        "sha": "72e8bce0781f5a63a939c83359b7b976f23f2c39"
+      },
+      {
+        "ref": "refs/heads/codex/r05-integration-20260906",
+        "sha": "778daad654e658e65e7d9769fd989098afde5291"
+      },
+      {
+        "ref": "refs/heads/codex/r06-browser-preview-integration-20260905",
+        "sha": "9d16c1f6bd67a27e1f912775b6586fd3b75d22a2"
+      },
+      {
+        "ref": "refs/heads/codex/r06-build-runtime-20260905",
+        "sha": "f1f378c8691db1a1520899a7d6db5a624944fc19"
+      },
+      {
+        "ref": "refs/heads/codex/r06-integration-resume-20260906",
+        "sha": "207a6dd4e72ae2dd9800b397ed6dd447a9948ccf"
+      },
+      {
+        "ref": "refs/heads/codex/r07-browser-source-isolation-20260905",
+        "sha": "93266464ca79f48c2feb211e027d1af26d2f08f2"
+      },
+      {
+        "ref": "refs/heads/codex/r07-runtime-fixture-paths-20260905",
+        "sha": "f728346a5592d37edd5ba7ce4891afe7d9053e23"
+      },
+      {
+        "ref": "refs/heads/codex/rust-js-batching",
+        "sha": "5b696bdfa88b65fa3ed035a1c03396d966e45453"
+      },
+      {
+        "ref": "refs/heads/codex/shareable-remediation-package",
+        "sha": "2ec97e2440708fae783babc4d9c9e777b520fb04"
+      },
+      {
+        "ref": "refs/heads/codex/tooling-test-discovery-20260905",
+        "sha": "874726d33f06287cd48854e8216e02a31d2ee0c7"
+      },
+      {
+        "ref": "refs/heads/codex/weekend-final-handoff-20260907",
+        "sha": "c0cb6a6b8670da5aa3eddbb438a606a1b51bc8e3"
+      },
+      {
+        "ref": "refs/heads/docs/claude-md-facts",
+        "sha": "0782c5dbbe02055438d0d92591c07f48810b485e"
+      },
+      {
+        "ref": "refs/heads/docs/readme",
+        "sha": "84b2589cad032c232b466e58d210255e0af65edc"
+      },
+      {
+        "ref": "refs/heads/docs/readme-screenshot",
+        "sha": "7e6fb52d2f1327ea359c2725f8c05ffca0c056bd"
+      },
+      {
+        "ref": "refs/heads/docs/whats-next",
+        "sha": "dc1530c28893ca0e53cefb90a01bdf446b1485a5"
+      },
+      {
+        "ref": "refs/heads/feat/desktop-feedback-via-worker-v2",
+        "sha": "03c352f6d258503c3ee7612cf6924252ab47d985"
+      },
+      {
+        "ref": "refs/heads/feat/feedback-spam-filter",
+        "sha": "e46d99ee80065c930a944e6cced00e19226b1269"
+      },
+      {
+        "ref": "refs/heads/feat/feedback-to-nemo",
+        "sha": "6be719c2ec4853075e73aba8236a27c705c66f89"
+      },
+      {
+        "ref": "refs/heads/feat/security-headers",
+        "sha": "91f6d7d597c25733c79920e694a8fd907cdb2cac"
+      },
+      {
+        "ref": "refs/heads/fix/release-app-signing-key",
+        "sha": "fbfe8aef8819e2a8bc80f35d9b31770c309edae1"
+      },
+      {
+        "ref": "refs/heads/fix/release-ffmpeg-dylib-bundling",
+        "sha": "c7fe03a77c9658a74cd80fb9a36424a71b5e8c5f"
+      }
+    ],
+    "local": [
+      {
+        "ref": "refs/heads/GHproject_and_issue_triage",
+        "sha": "197f5bd276557745b02042e414c96abddd69acfe"
+      },
+      {
+        "ref": "refs/heads/claude/r04-ffmpeg-sidecar-rebuild",
+        "sha": "7bd1f88c9816873cbb2f1a4996a135d40fdc636a"
+      },
+      {
+        "ref": "refs/heads/claude/r09-gap-map-evidence-correction",
+        "sha": "6bf3bebbbc6e2153af627914dd88a40919726abd"
+      },
+      {
+        "ref": "refs/heads/cleanup-preserve/20260907/buzz-e9f6c805b978-aacc6adf",
+        "sha": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1"
+      },
+      {
+        "ref": "refs/heads/cleanup-preserve/20260907/check49-coverage-handoff-20260906-01705aff",
+        "sha": "01705aff57581428f0e1ab22aa1cac070c224f91"
+      },
+      {
+        "ref": "refs/heads/cleanup-preserve/20260907/nemo-ffmpeg-ci.GDY3TI-bf2020c7",
+        "sha": "bf2020c76a0e1abba6da7ba0bae99dcb0b408954"
+      },
+      {
+        "ref": "refs/heads/cleanup-preserve/20260907/nemo-r05-acceptance-20260906-6ca24e4b",
+        "sha": "6ca24e4bd7060c2806519358da6c4754b3f7e640"
+      },
+      {
+        "ref": "refs/heads/cleanup-preserve/20260907/nemo-r05-check47.h4uGMs-01705aff",
+        "sha": "01705aff57581428f0e1ab22aa1cac070c224f91"
+      },
+      {
+        "ref": "refs/heads/cleanup-preserve/20260907/nemo-r06-native-validation-20260906-10c930a2",
+        "sha": "10c930a29a7ee3c3339a52f1ddee12ce1c9afcb9"
+      },
+      {
+        "ref": "refs/heads/cleanup-preserve/20260907/pr970-review-20260906-41081aa3",
+        "sha": "41081aa3383f2cc8c76c7805f531f43057f33534"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-15-20260906",
+        "sha": "bcdc331e439711f4c7618c80d6c964e8337a7ce2"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-20-20260906",
+        "sha": "f6ecab576ce7eacbd53079bd9746ec6514b7d316"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-25-20260906",
+        "sha": "781ee77c948bc0e4cf76eb9019051388942f5b61"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-30-20260906",
+        "sha": "0bda6ffecebd287e432d6a7e2247174334d30ebd"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-35-20260906",
+        "sha": "b40b7376df3c98114ff25d1802f717d9b589d037"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-40-20260906",
+        "sha": "9bc854107ff3dfc377ec502325fe646049a2152a"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-45-20260906",
+        "sha": "1851a2e7ce9f0b357c2d515805a72bc10332be12"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-50-20260906",
+        "sha": "a4f3f84c00f664310fd6aba01e745beb6212d68d"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkin-55-20260906",
+        "sha": "d61fd5f28ff159eb638368dd47d4c4ae292e0cf9"
+      },
+      {
+        "ref": "refs/heads/codex/40min-checkins-20260905",
+        "sha": "fadd953ba1012e2f5c381f65b273eef9e120df24"
+      },
+      {
+        "ref": "refs/heads/codex/a2a-live-requester",
+        "sha": "7481870fe0a77b2ed0a790fa1e492944c9aa570d"
+      },
+      {
+        "ref": "refs/heads/codex/a2a-live-responder",
+        "sha": "7481870fe0a77b2ed0a790fa1e492944c9aa570d"
+      },
+      {
+        "ref": "refs/heads/codex/application-mcp-slice-20260906",
+        "sha": "fc7145e6358434a7a07957aea416ed4470fa90cb"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-016f3b8b308f",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-0193f5bfb625",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-048c0a67cab4",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-04c57b0c1698",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-04d3bc5345ed",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-0724eaca19f1",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-08ecf185c80e",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-0931d4be0d61",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-0a0d4b6f5478",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-0b4a1d3940e8",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-0be705930157",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-0c4c27c80a10",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-0d591a6ea850",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-0ece0e92cc73",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-10674ae951e4",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-1136cb6c4b27",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-114d8f317a46",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-11e37b0b37bd",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-1288d921aac4",
+        "sha": "de959e047e94e019db50cf0b5f6ea9b9bcdd2b46"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-14fb2185acbb",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-160d855ca1a2",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-16dd87d1e993",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-179bf4ea12da",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-19c6d9fd25f0",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-1a65df389954",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-1be543e034e9",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-1d7010cc30fc",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-23c16f4f14d9",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-2bd7640f76c4",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-2cc3657b6947",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-2e7d080099d6",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-2f64d9d01c8e",
+        "sha": "4f72560e89e9983a89ff9e8db8aa1cdbe00bca5f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-34409f2969e3",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-34950424e650",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-370990aeab10",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-380eb63c8dfc",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-38f19ff2ee27",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-3909f05e3713",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-3c636dd00ca4",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-3d4c137e6482",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-3d82c79242a4",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-3e3912d522a2",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-3ef9d9ae5a17",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-3f98ac2c3df9",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-40b3ca66ec93",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-40d12b578066",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-4396c6618199",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-482169e483a6",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-482d60420d3c",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-4b41c8f24d73",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-4e687b4d01e9",
+        "sha": "b53fccae6426f14b6541e927869a0abc1515c415"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-4ebcfc77cd26",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-4f7f1424c083",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-4f9ee4b41cdf",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-50efa62fb597",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-5426fbc87c4a",
+        "sha": "2e37f07d4565a72daad1212bf3e9cecd14641077"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-54286c25b33d",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-56e49e3b0706",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-57318d0a13b6",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-59bd4cb0c9bd",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-5c63ee5b49ed",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-5d028a0a88ea",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-5f208792b49a",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-5fe1186331de",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-602241215967",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-603b97c8d3dc",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-60a99813c2f6",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-614661f3b03b",
+        "sha": "32306fbcc1831fae7e05658e13709179f9d59c33"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-61c530a763ae",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-61c731a85bd1",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-64e43591d38a",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-65e0a8fd13e7",
+        "sha": "5daa6b5b01583f1559284142ef52dc8427371da6"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-66b3c317431d",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-6af683f06746",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-6b61c7d803d4",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-6c9de6f4e6c0",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-6d1cf48604ba",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-6ddc8efb164a",
+        "sha": "b827e736c0706a6f39e3435feb50174d02cc2427"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-6f0bcb549e2a",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-6f1e2c449b3a",
+        "sha": "2e37f07d4565a72daad1212bf3e9cecd14641077"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-6f412a700a32",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-6f6b376a27a1",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-702d7123ecb3",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-725aee41409f",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-742853fed2fc",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-76171acf08bb",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-7660bdae0497",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-7a2f3d550c4b",
+        "sha": "2e37f07d4565a72daad1212bf3e9cecd14641077"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-7a3f8bb7e44a",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-7b8e4d180521",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-7da9bb5a0355",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-7e27328f93d6",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-7ed7ee4ccd83",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-7f23e4d9b26b",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-7f8021a0a58c",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-7fbf7a447b9b",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-81d599d55cba",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-842859795685",
+        "sha": "541f2c163fc99452b6455f7f62f5ff7a7ac6d1f4"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-85419d805b5c",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-8810b975e9e0",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-897ac0f2ba1f",
+        "sha": "2e37f07d4565a72daad1212bf3e9cecd14641077"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-8b690992dfa2",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-8e1fe6bd0eea",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-9064f66aa18a",
+        "sha": "2e37f07d4565a72daad1212bf3e9cecd14641077"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-90a3a4551d7f",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-92cec35e0d3c",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-92dc3899d238",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-92ef71804258",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-93ab5e1c7f21",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-98253b3b1f22",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-9bd4d5f2018d",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-9dc26f91fae3",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-a17658fd951f",
+        "sha": "2e37f07d4565a72daad1212bf3e9cecd14641077"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-a17ebca832c8",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-a25d849f3410",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-a2f974b5e460",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-a387789a6c2b",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-a410f88e22b0",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-a9a6f8162702",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-aa6f18c02d2b",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-ab725b59409d",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-ab8bff9ae9c4",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-ae4a14244b95",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-ae71cebcf64f",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-b31123496283",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-b3676afd9d7c",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-b372ce6d3daf",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-b3781fdab839",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-b47afed066ed",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-b57259277859",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-b60f4533e004",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-b6105e922390",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-b63053433c2f",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-b7ba1c204e30",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-b95af72a5d76",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-baf63c93647c",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-bb665221c93f",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-bb9284f153f2",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-bd25423058bf",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-bd7d2341ac4b",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-c0424fc9e4df",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-c128fb40dbc5",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-c26b9c463c25",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-c27e91a28ec0",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-c3d7a5609b39",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-c5d2edaac739",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-c6427f806852",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-c6d6d8bc533d",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-ca93d0ab3d41",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-cb32aa298c27",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-cd5cae4a5bf7",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-ce7dfb145b9e",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-d167d365cad8",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-d18e0c861e23",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-d34662915fe9",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-d40a62014286",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-d6e72653eaf8",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-d6eacbac3e10",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-d6f4ab42c6d1",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-d75fc35104e4",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-d963caa7ef34",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-d990b2a678a8",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-da8485a2a915",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-db99a1fed2fa",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-defd3fa9c19a",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-e141caa33478",
+        "sha": "dad942594b51c4947f4d907a1d296549d50bc7d5"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-e1ebd30d716b",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-e3e819ea10f2",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-e4ec95c6c988",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-e843b46d9974",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-e8e68aeef95e",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-e8f5cacaf88f",
+        "sha": "025761b5bfe7af044b5008935e0f94d96833bef3"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-e9f6c805b978",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-eaa05acdb363",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-eaf671020950",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-ec652ffa0fb1",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-edc8de069a5c",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-ee1671462b28",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-ef2fe2a27b20",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-f0a256e052c5",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-f1b51e8999d5",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-f305c441c4a9",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-f3a816c870c1",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-f45276e4b807",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-f45ce56283ee",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-f4942b8db0a9",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-f813b4520ed9",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-f83a21cdf6be",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-f861d9b40bcf",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-f8b4d83fa5d4",
+        "sha": "5f9b85d46f06487751838654ce70ba61e4793e58"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-fbac8f42671a",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-fcd684c5b0c8",
+        "sha": "e1d2ea760a45d5dd2f587cc98d708326786a7d9d"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-fe66d09194f8",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/buzz-fe9cfc6808e7",
+        "sha": "d4995210e8142cf6c13a3fa5dab865aca263410f"
+      },
+      {
+        "ref": "refs/heads/codex/bz0-contract-alignment-20260905",
+        "sha": "6c74e6d577a3a409af2e389ed701043c540eae53"
+      },
+      {
+        "ref": "refs/heads/codex/check47-source-coverage-20260906",
+        "sha": "01705aff57581428f0e1ab22aa1cac070c224f91"
+      },
+      {
+        "ref": "refs/heads/codex/check65-svg-export-20260906",
+        "sha": "58d208187bb9222e249741c9fa6eabe8d471252b"
+      },
+      {
+        "ref": "refs/heads/codex/check68-media-persistence-20260906",
+        "sha": "cf22365f909069e232a6b6bf992a272e4bd96ff3"
+      },
+      {
+        "ref": "refs/heads/codex/check69-frame-persistence-20260906",
+        "sha": "cf22365f909069e232a6b6bf992a272e4bd96ff3"
+      },
+      {
+        "ref": "refs/heads/codex/check70-r08-composition-20260906",
+        "sha": "582f51e2b0290207136629b634dcbf18b07069e2"
+      },
+      {
+        "ref": "refs/heads/codex/check85-r06-import-validation-20260907",
+        "sha": "521fe316ebe7bfcfcf0d64bfc2892b9d5ab71f62"
+      },
+      {
+        "ref": "refs/heads/codex/check85-r06-integration-20260907",
+        "sha": "223f98d92157e162585120c20ee553060007416d"
+      },
+      {
+        "ref": "refs/heads/codex/check85-report-20260907",
+        "sha": "70d739a73c97a26e4c441c8551514af483007fbb"
+      },
+      {
+        "ref": "refs/heads/codex/check87-report-20260907",
+        "sha": "e6d4eefbc6224c10289a87356544d4935e0ac34c"
+      },
+      {
+        "ref": "refs/heads/codex/check90-native-receipt-20260907",
+        "sha": "3a1261c78571a7b35b1ab362d316dbc5e6633a84"
+      },
+      {
+        "ref": "refs/heads/codex/check90-report-20260907",
+        "sha": "62e91c90d4bc6123023f837b87d76940cb8c13ce"
+      },
+      {
+        "ref": "refs/heads/codex/check92-main-composition-20260907",
+        "sha": "e17a8c113c2bdf104cdd2293b2ee47366eadce4b"
+      },
+      {
+        "ref": "refs/heads/codex/manual-only-actions-20260906",
+        "sha": "41081aa3383f2cc8c76c7805f531f43057f33534"
+      },
+      {
+        "ref": "refs/heads/codex/nemo-r02-baseline",
+        "sha": "2e37f07d4565a72daad1212bf3e9cecd14641077"
+      },
+      {
+        "ref": "refs/heads/codex/nemo-r03-inventory",
+        "sha": "2e37f07d4565a72daad1212bf3e9cecd14641077"
+      },
+      {
+        "ref": "refs/heads/codex/nemo-r05-boundaries",
+        "sha": "2e37f07d4565a72daad1212bf3e9cecd14641077"
+      },
+      {
+        "ref": "refs/heads/codex/opacity-application-r09-20260906",
+        "sha": "16802cf4c25e5cdda54a557e611cf26c5d119af5"
+      },
+      {
+        "ref": "refs/heads/codex/opacity-history-r09-20260906",
+        "sha": "16802cf4c25e5cdda54a557e611cf26c5d119af5"
+      },
+      {
+        "ref": "refs/heads/codex/property-mcp-production-20260906",
+        "sha": "582f51e2b0290207136629b634dcbf18b07069e2"
+      },
+      {
+        "ref": "refs/heads/codex/r01-adoption-candidate-20260905",
+        "sha": "464eb05eb59c083ac9484144f783e1658de394b0"
+      },
+      {
+        "ref": "refs/heads/codex/r03-baseline-resume-20260906",
+        "sha": "f1147c0806e4f511be3c46843c8ae4480e61e9b9"
+      },
+      {
+        "ref": "refs/heads/codex/r05-adoption-resume-20260906",
+        "sha": "a2d7e51a133ae891e4d6c6c3c7c71afb188a5fae"
+      },
+      {
+        "ref": "refs/heads/codex/r05-baseline-ratchet-20260905",
+        "sha": "1b0e77d77165f9a120aace877efeda26798bd588"
+      },
+      {
+        "ref": "refs/heads/codex/r05-checker-followup-20260905",
+        "sha": "72e8bce0781f5a63a939c83359b7b976f23f2c39"
+      },
+      {
+        "ref": "refs/heads/codex/r05-checker-validation-20260905",
+        "sha": "3bc8e54db0f9b44067789e755f3eb09923c7bf8b"
+      },
+      {
+        "ref": "refs/heads/codex/r05-integration-20260906",
+        "sha": "778daad654e658e65e7d9769fd989098afde5291"
+      },
+      {
+        "ref": "refs/heads/codex/r06-browser-preview-bounded-20260905",
+        "sha": "ba8b8ac0da9eb9816449cf03a5aad20bf2502f37"
+      },
+      {
+        "ref": "refs/heads/codex/r06-browser-preview-integration-20260905",
+        "sha": "9d16c1f6bd67a27e1f912775b6586fd3b75d22a2"
+      },
+      {
+        "ref": "refs/heads/codex/r06-browser-runtime-20260905",
+        "sha": "3acf73a2f5e4bacbf0562944c17d41e6d9a5f832"
+      },
+      {
+        "ref": "refs/heads/codex/r06-build-runtime-20260905",
+        "sha": "f1f378c8691db1a1520899a7d6db5a624944fc19"
+      },
+      {
+        "ref": "refs/heads/codex/r06-integration-resume-20260906",
+        "sha": "207a6dd4e72ae2dd9800b397ed6dd447a9948ccf"
+      },
+      {
+        "ref": "refs/heads/codex/r06-isolation-corrections-20260905",
+        "sha": "d520e9495666ba098cf5fda2168aa81878a458e4"
+      },
+      {
+        "ref": "refs/heads/codex/r07-browser-source-isolation-20260905",
+        "sha": "93266464ca79f48c2feb211e027d1af26d2f08f2"
+      },
+      {
+        "ref": "refs/heads/codex/r07-runtime-fixture-paths-20260905",
+        "sha": "f728346a5592d37edd5ba7ce4891afe7d9053e23"
+      },
+      {
+        "ref": "refs/heads/codex/r07-runtime-race-repro-20260905",
+        "sha": "b698291e6a4f1aa6bae96b8f423a35c4f08936bb"
+      },
+      {
+        "ref": "refs/heads/codex/r09-matrix-refresh-08ecf185",
+        "sha": "8725798c450dda30439ee3d181b415f685b2515a"
+      },
+      {
+        "ref": "refs/heads/codex/r09-matrix-review-corrections-20260905",
+        "sha": "62decabd08193d2489f047d3d89b0863cda6d2ea"
+      },
+      {
+        "ref": "refs/heads/codex/shareable-remediation-package",
+        "sha": "2ec97e2440708fae783babc4d9c9e777b520fb04"
+      },
+      {
+        "ref": "refs/heads/codex/tooling-test-discovery-20260905",
+        "sha": "874726d33f06287cd48854e8216e02a31d2ee0c7"
+      },
+      {
+        "ref": "refs/heads/codex/weekend-final-handoff-20260907",
+        "sha": "c0cb6a6b8670da5aa3eddbb438a606a1b51bc8e3"
+      },
+      {
+        "ref": "refs/heads/pr954-fetch",
+        "sha": "32306fbcc1831fae7e05658e13709179f9d59c33"
+      }
+    ]
+  },
+  "recovery": "Restore these exact original refs from snapshots/2026-09-07/retired-branches.bundle using README.md. Retained refs and tags were not deleted."
+}

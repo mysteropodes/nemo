@@ -5,6 +5,15 @@ independent of `main` and contains no application checkout or GitHub Actions wor
 Do not merge it into `main`. Its active GitHub rules block force pushes and deletion.
 Add later snapshots through ordinary fast-forward commits; never overwrite an earlier bundle.
 
+## Retirement completed: 2026-09-07
+
+The [retirement receipt](retirements/2026-09-07.json) records the verified deletion of
+**168 remote and 259 local branch refs**, after fresh ownership and exact-SHA checks.
+GitHub now has **60 branch heads including archive**; the original local repository has
+**120 retained branches**. All 23 open PR heads/bases, existing worktrees, release refs
+and unresolved work were preserved. The bundle below remains unchanged and restores every
+retired tip exactly. Snapshot counts describe the earlier preparation census.
+
 ## Snapshot: 2026-09-07
 
 The [audit](snapshots/2026-09-07/audit.json) classifies all **227 remote heads and 379 local
