@@ -16,7 +16,7 @@ helper [`project-document.js`](../../../src/js/project-document.js), loaded befo
 The validator preserves the existing frame-only migration and rejects malformed
 layer/frame structures before document replacement. The adapter schedules Open/Resume
 repaint after canvas resize, with native-renderer and Paper fallbacks. Both enter the
-142-file profile with ordinary 400/500-line budgets; existing legacy ceilings remain
+143-file profile alongside the extracted animation kernel with ordinary 400/500-line budgets; existing legacy ceilings remain
 unchanged. The counts and file table below are historical evidence for `c9ab634`.
 Current membership and bootstrap pins are in `app-js.coverage.json`; complete
 application architecture enforcement remains open.
