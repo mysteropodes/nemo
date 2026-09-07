@@ -25,6 +25,18 @@
       ]
     },
     {
+      "id": "app.animation.curve",
+      "layer": "domain",
+      "dir": "src/js/animation",
+      "files": [
+        "curve.js"
+      ],
+      "publicApi": [
+        "curve.js"
+      ],
+      "sizeProfile": "Domain kernel"
+    },
+    {
       "id": "app.asset.tree",
       "layer": "app-legacy",
       "dir": "src/js",
@@ -1684,7 +1696,13 @@
   "layerRules": {
     "app-legacy": {
       "allowedLayers": [
-        "app-legacy"
+        "app-legacy",
+        "domain"
+      ]
+    },
+    "domain": {
+      "allowedLayers": [
+        "domain"
       ]
     }
   },
@@ -1692,6 +1710,10 @@
     "App JS unclassified (pre-R01)": {
       "warn": 350,
       "hardMax": 500
+    },
+    "Domain kernel": {
+      "warn": 200,
+      "hardMax": 300
     }
   },
   "exceptions": [

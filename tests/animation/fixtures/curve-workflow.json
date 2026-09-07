@@ -1,0 +1,760 @@
+{
+  "version": 13,
+  "totalFrames": 21,
+  "fps": 24,
+  "canvasW": 320,
+  "canvasH": 180,
+  "canvasBg": "#ffffff",
+  "waIn": 0,
+  "waOut": 20,
+  "layers": [
+    {
+      "name": "R08 rectangle",
+      "visible": true,
+      "locked": false,
+      "frames": [
+        {
+          "strokes": [
+            {
+              "segments": [
+                {
+                  "point": [
+                    20,
+                    80
+                  ],
+                  "handleIn": [
+                    0,
+                    0
+                  ],
+                  "handleOut": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "point": [
+                    20,
+                    60
+                  ],
+                  "handleIn": [
+                    0,
+                    0
+                  ],
+                  "handleOut": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "point": [
+                    40,
+                    60
+                  ],
+                  "handleIn": [
+                    0,
+                    0
+                  ],
+                  "handleOut": [
+                    0,
+                    0
+                  ]
+                },
+                {
+                  "point": [
+                    40,
+                    80
+                  ],
+                  "handleIn": [
+                    0,
+                    0
+                  ],
+                  "handleOut": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "closed": true,
+              "strokeColor": "#ffffff",
+              "hasRealStroke": false,
+              "strokeWidth": 1,
+              "strokeCap": "butt",
+              "strokeJoin": "miter",
+              "miterLimit": 10,
+              "fillColor": "#ff0000",
+              "opacity": 1,
+              "dashOffset": 0,
+              "strokeId": "r08_curve_rect"
+            }
+          ],
+          "isKeyframe": true,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        },
+        {
+          "strokes": [],
+          "isKeyframe": false,
+          "isInterpolated": false
+        }
+      ],
+      "color": "#5FA875",
+      "motion": {
+        "position": {
+          "keys": [
+            {
+              "frame": 0,
+              "v": [
+                0,
+                0
+              ],
+              "curvePoints": [
+                {
+                  "x": 0,
+                  "y": 0,
+                  "tx": 1,
+                  "ty": 0
+                },
+                {
+                  "x": 1,
+                  "y": 1,
+                  "tx": 1,
+                  "ty": 0
+                }
+              ],
+              "hOut": [
+                0,
+                0
+              ],
+              "hIn": [
+                0,
+                0
+              ]
+            },
+            {
+              "frame": 20,
+              "v": [
+                128,
+                0
+              ],
+              "curvePoints": [
+                {
+                  "x": 0,
+                  "y": 0,
+                  "tx": 1,
+                  "ty": 0
+                },
+                {
+                  "x": 1,
+                  "y": 1,
+                  "tx": 1,
+                  "ty": 0
+                }
+              ],
+              "hOut": [
+                0,
+                0
+              ],
+              "hIn": [
+                0,
+                0
+              ]
+            }
+          ]
+        }
+      },
+      "layerUid": "r08_curve_layer",
+      "parentLayerUid": null
+    }
+  ],
+  "symbols": {},
+  "cameraKeys": []
+}

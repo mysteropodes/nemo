@@ -8,9 +8,14 @@
 // worthless (CLAUDE.md §5bis on why rAF-based probes mislead).
 //
 //   evaluation.*   the real motion.js, loaded whole in a vm sandbox
-//                  (tests/fixtures/lib/sandbox.cjs): valueAtFrame over the
-//                  keyed-props fixture, evalCurvePoints, expression evaluation
-//                  over the expression-props fixture
+//                  (tests/fixtures/lib/sandbox.cjs, which first installs the
+//                  production modules src/index.html loads before it — the
+//                  R08 easing kernel src/js/animation/curve.js when the tree
+//                  has it): valueAtFrame over the keyed-props fixture,
+//                  evalCurvePoints, expression evaluation over the
+//                  expression-props fixture. The backend string names every
+//                  module that ran, so receipts from before and after the
+//                  extraction are distinguishable.
 //   copy.undoClone the PRODUCTION undo snapshot (tweens.js _cloneLayersForUndo,
 //                  lifted) of a workload document's layers; copy.jsonClone is
 //                  the plain JSON round trip it is built on, copy.serialize the
@@ -104,6 +109,14 @@ function measureMemoryHere(id) {
   return { id, gcAvailable, before, after, delta: Math.max(0, after - before), identity: built.identity };
 }
 
+// The evaluation backend names every production module the sandbox ran, in
+// load order (sandbox.cjs MOTION_PRELUDE + motion.js), so a receipt taken
+// before the R08 extraction ('src/js/motion.js') and one taken after
+// ('src/js/animation/curve.js + src/js/motion.js') are never confused.
+function evaluationBackend(motion) {
+  return 'node:' + motion.modules.map((f) => 'src/js/' + f).join(' + ') + ' (whole modules in a vm sandbox, tests/fixtures/lib/sandbox.cjs)';
+}
+
 function loadProject(id) {
   const project = readJson(path.join(FIXTURES, id, 'project.json'));
   const state = sandbox.defaultState();
@@ -117,13 +130,15 @@ function runBench(opts) {
   const iterations = opts.iterations || (quick ? 2 : 5);
   const docIds = opts.workloads || (quick ? [QUICK_WORKLOAD] : Object.keys(gen.WORKLOAD_DOCS));
   const workloads = [];
-  const EVAL_BACKEND = 'node:motion.js (whole module in a vm sandbox, tests/fixtures/lib/sandbox.cjs)';
+  let EVAL_BACKEND = null;
   const UNDO_BACKEND = 'node:tweens.js _cloneLayersForUndo (lifted, tests/fixtures/lib/sandbox.cjs)';
 
   // ---- evaluation ---------------------------------------------------------
   {
     const { state, motion } = loadProject('keyed-props');
     const { SMMotion } = motion;
+    EVAL_BACKEND = evaluationBackend(motion);
+    const evaluator = motion.SMAnimationCurve ? 'SMAnimationCurve.evalCurvePoints (src/js/animation/curve.js)' : 'evalCurvePoints declared in src/js/motion.js';
     const ld = state.layers[0]; // "Default ease": position, rotation, scale and opacity keyed
     const synthetic = corpus.helpers.layer('ly_bench_synthetic', 'Synthetic 200 keys', corpus.helpers.frames(state.totalFrames), {
       motion: { position: corpus.helpers.keys(Array.from({ length: 200 }, (_, i) => ({ frame: i * 3, v: [i * 7, (i % 5) * 11] }))) },
@@ -138,15 +153,16 @@ function runBench(opts) {
         evaluations += 5;
       }
     }, iterations);
-    workloads.push({ id: 'evaluation.valueAtFrame', kind: 'evaluation', status: 'ran', fixture: 'keyed-props', backend: EVAL_BACKEND, workload: { framesPerIteration: framesPer, propertiesPerFrame: 5, keysInSyntheticTrack: 200, evaluations }, stats: stats(samples.map((ms) => (ms * 1e6) / (framesPer * 5)), 'ns/evaluation') });
+    workloads.push({ id: 'evaluation.valueAtFrame', kind: 'evaluation', status: 'ran', fixture: 'keyed-props', backend: EVAL_BACKEND, workload: { framesPerIteration: framesPer, propertiesPerFrame: 5, keysInSyntheticTrack: 200, evaluations, evaluator }, stats: stats(samples.map((ms) => (ms * 1e6) / (framesPer * 5)), 'ns/evaluation') });
 
     const curve = SMMotion.DEFAULT_CURVE();
     const n = quick ? 5000 : 100000;
     const curveSamples = timed(() => { let acc = 0; for (let i = 0; i < n; i++) acc += SMMotion.evalCurvePoints(curve, i / n); if (acc < 0) throw new Error('unreachable'); }, iterations);
-    workloads.push({ id: 'evaluation.evalCurvePoints', kind: 'evaluation', status: 'ran', fixture: null, backend: EVAL_BACKEND, workload: { evaluationsPerIteration: n, curve: 'DEFAULT_CURVE' }, stats: stats(curveSamples.map((ms) => (ms * 1e6) / n), 'ns/evaluation') });
+    workloads.push({ id: 'evaluation.evalCurvePoints', kind: 'evaluation', status: 'ran', fixture: null, backend: EVAL_BACKEND, workload: { evaluationsPerIteration: n, curve: 'DEFAULT_CURVE', evaluator }, stats: stats(curveSamples.map((ms) => (ms * 1e6) / n), 'ns/evaluation') });
   }
   {
     const { project, state, motion } = loadProject('expression-props');
+    if (evaluationBackend(motion) !== EVAL_BACKEND) throw new Error('the sandbox loaded different modules for two projects: ' + evaluationBackend(motion) + ' vs ' + EVAL_BACKEND);
     const le = state.layers[project.layers.findIndex((l) => l.layerUid === 'ly_expr_e')];
     const framesPer = quick ? 48 : 600;
     const samples = timed(() => { for (let f = 0; f < framesPer; f++) { motion.SMMotion.valueAtFrame(le, 'rotation', f); motion.SMMotion.valueAtFrame(le, 'position', f); } }, iterations);
@@ -196,4 +212,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { runBench, measureMemory, verifyWorkloadJson, buildWorkload, SCHEMA, QUICK_WORKLOAD };
+module.exports = { runBench, measureMemory, verifyWorkloadJson, buildWorkload, evaluationBackend, SCHEMA, QUICK_WORKLOAD };

@@ -6,10 +6,13 @@
 //
 // motion.js runs whole: its IIFE only touches the DOM lazily, so a stub
 // `document` whose lookups return null is enough for the evaluator, the
-// expression compiler and the migrations. app.js does not (Paper.js bound at
-// load), so the few pure functions the fixtures need are lifted out of it by
-// brace matching — the same technique tests/performance-regressions.test.cjs
-// uses — and run against a minimal `state`. Nothing here modifies src/.
+// expression compiler and the migrations. It is preceded by the production
+// modules src/index.html loads before it (MOTION_PRELUDE below), because
+// motion.js binds to globals they install at load time. app.js does not run
+// whole (Paper.js bound at load), so the few pure functions the fixtures need
+// are lifted out of it by brace matching — the same technique
+// tests/performance-regressions.test.cjs uses — and run against a minimal
+// `state`. Nothing here modifies src/.
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -72,13 +75,49 @@ function defaultState() {
   return { layers: [], symbols: {}, fps: 24, totalFrames: 24, frame: 0, mode: 'motion', canvasW: 1920, canvasH: 1080, imageMeshes: {}, trackRoles: {}, cameraKeys: [] };
 }
 
-// motion.js: returns { SMMotion, state, sandbox }. `state.layers` and
-// `state.fps` are read by the evaluator and the expression engine.
-function loadMotion(state = defaultState()) {
+// Production modules that src/index.html loads BEFORE motion.js and that
+// motion.js binds to at load time, in that order. animation/curve.js (R08,
+// #949) installs the pure easing kernel `SMAnimationCurve`, which motion.js
+// reads once (`var evalCurvePoints = SMAnimationCurve.evalCurvePoints`) as
+// its IIFE runs — so a sandbox that ran motion.js alone died on that line
+// (ReferenceError) and took every fixture check and bench evaluation workload
+// with it. A prelude file is skipped only when the tree does not have it
+// (a motion.js that still declares the evaluator itself needs nothing); a
+// motion.js that needs the kernel without the file fails loudly, never silently.
+const MOTION_PRELUDE = ['animation/curve.js'];
+
+// motion.js: returns { SMMotion, SMAnimationCurve, modules, state, sandbox }.
+// `state.layers` and `state.fps` are read by the evaluator and the expression
+// engine. `modules` lists the production files that ran, in order, so a
+// receipt can name its backend exactly; `SMAnimationCurve` is the installed
+// kernel, or null on a tree from before the extraction.
+// Two test seams: `hooks.prelude` replaces MOTION_PRELUDE (an empty list runs
+// motion.js alone, which is how a regression reproduces the original failure;
+// a `var` a vm script declared cannot be deleted from the context afterwards),
+// and `hooks.beforeMotion(sb)` runs after the prelude and before motion.js so a
+// regression can observe or wrap what motion.js binds at load.
+function loadMotion(state = defaultState(), hooks = {}) {
   const sb = baseSandbox(state);
-  vm.runInNewContext(read('motion.js'), sb, { filename: 'src/js/motion.js' });
+  const modules = [];
+  for (const file of Array.isArray(hooks.prelude) ? hooks.prelude : MOTION_PRELUDE) {
+    if (!fs.existsSync(path.join(SRC, file))) continue;
+    vm.runInNewContext(read(file), sb, { filename: 'src/js/' + file });
+    modules.push(file);
+  }
+  if (typeof hooks.beforeMotion === 'function') hooks.beforeMotion(sb);
+  try {
+    vm.runInNewContext(read('motion.js'), sb, { filename: 'src/js/motion.js' });
+  } catch (e) {
+    // Errors thrown inside the vm belong to another realm: match by name, not instanceof.
+    if (e && e.name === 'ReferenceError' && /SMAnimationCurve/.test(String(e.message))) {
+      throw new Error('motion.js binds to SMAnimationCurve at load, which src/js/animation/curve.js installs; the sandbox mirrors the src/index.html loader order (' + MOTION_PRELUDE.join(', ') + ' before motion.js) and that module is missing or was not installed: ' + e.message);
+    }
+    throw e;
+  }
+  modules.push('motion.js');
   if (!sb.SMMotion || typeof sb.SMMotion.valueAtFrame !== 'function') throw new Error('motion.js did not expose SMMotion.valueAtFrame');
-  return { SMMotion: sb.SMMotion, state, sandbox: sb };
+  if (typeof sb.SMMotion.evalCurvePoints !== 'function') throw new Error('motion.js did not expose SMMotion.evalCurvePoints');
+  return { SMMotion: sb.SMMotion, SMAnimationCurve: sb.SMAnimationCurve || null, modules, state, sandbox: sb };
 }
 
 // Pure document-resolution helpers lifted from app.js (read-only over the
@@ -133,4 +172,4 @@ function loadVectorTextGroup() {
   return { vectorTextGroupMembers: sb.__api.vectorTextGroupMembers, sandbox: sb };
 }
 
-module.exports = { ROOT, extractFunction, loadMotion, loadAppHelpers, loadImageMesh, loadTextSelector, loadUndoClone, loadVectorTextGroup, defaultState };
+module.exports = { ROOT, MOTION_PRELUDE, extractFunction, loadMotion, loadAppHelpers, loadImageMesh, loadTextSelector, loadUndoClone, loadVectorTextGroup, defaultState };
