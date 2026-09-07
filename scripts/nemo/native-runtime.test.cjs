@@ -60,6 +60,7 @@ if (mode !== 'no-manifest') {
     dataStoreIdentifier: key.slice(0, 32),
     dataDir: seen.dataDir,
     pid: process.pid,
+    diagnostics: mode === 'large-manifest' ? 'x'.repeat(2 * 1024 * 1024) : null,
   };
   fs.mkdirSync(seen.dataDir, { recursive: true });
   fs.writeFileSync(path.join(seen.dataDir, 'native-runtime.json'), JSON.stringify(manifest, null, 2));
@@ -98,13 +99,15 @@ async function launch(task, capture, { mode = 'manifest', reserve = null, appDir
   return { child, info: JSON.parse(await firstLine(child)) };
 }
 
-function command(args) {
+function command(args, slowReader = false) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [cli, ...args], { cwd: repoRoot, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = ''; let stderr = '';
-    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    const read = () => child.stdout.on('data', (chunk) => { stdout += chunk; });
+    if (slowReader) child.stdout.once('readable', () => setTimeout(read, 50));
+    else read();
     child.stderr.on('data', (chunk) => { stderr += chunk; });
-    child.once('exit', (code, signal) => resolve({ code, signal, stdout, stderr }));
+    child.once('close', (code, signal) => resolve({ code, signal, stdout, stderr }));
   });
 }
 
@@ -221,6 +224,31 @@ test('only the owner stops an instance, and stopping removes its native state', 
     assert.equal(stopped.code, 0, stopped.stderr || stopped.stdout);
     await exited(instance.child);
     assert.equal(fs.existsSync(dataDir), false, 'the task tauri-data root is removed on release');
+  } finally {
+    await stopOwned(instance);
+  }
+});
+
+test('native status and stop drain complete receipts to a slow pipe reader', { timeout: 20_000 }, async () => {
+  const instance = await launch(`native-drain-${process.pid}`, path.join(scratch, 'capture-drain.json'), { mode: 'large-manifest' });
+  const dataDir = isolation.taskRoots(instance.info.taskId).tauriDataDir;
+  try {
+    await waitFor(() => runtime.readNativeStatus(instance.info.taskId).appRuntime, 'large app manifest');
+    for (const [action, owner, expectedCode] of [
+      ['status', instance.info.ownerToken, 0], ['status', 'not-the-owner', 1],
+      ['stop', 'not-the-owner', 1], ['stop', instance.info.ownerToken, 0],
+    ]) {
+      const result = await command([action, '--task', instance.info.taskId, '--owner', owner], true);
+      assert.equal(result.code, expectedCode, result.stderr);
+      const receipt = JSON.parse(result.stdout);
+      assert.equal(receipt.runtime.appRuntime.diagnostics, 'x'.repeat(2 * 1024 * 1024));
+      assert.ok(result.stdout.endsWith('\n'), 'the complete JSON line is delivered');
+      if (action === 'status') assert.equal(receipt.ok, expectedCode === 0);
+      else assert.equal(receipt.stopped, expectedCode === 0);
+      if (expectedCode === 1) assert.ok(isolation.pidAlive(instance.child.pid), 'refusal preserves the running app');
+    }
+    await exited(instance.child);
+    assert.equal(fs.existsSync(dataDir), false);
   } finally {
     await stopOwned(instance);
   }

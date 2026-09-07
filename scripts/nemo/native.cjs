@@ -53,7 +53,7 @@ function status(args) {
   if (!args.task || !args.owner) throw new Error('status requires --task ID and --owner TOKEN');
   const result = nativeHandshake(args.task, args.owner);
   output(result);
-  process.exit(result.ok ? 0 : 1);
+  process.exitCode = result.ok ? 0 : 1;
 }
 
 async function stop(args) {
@@ -97,7 +97,7 @@ async function stop(args) {
   const ok = stopped.stopped && released && released.released;
   output({ ...stopped, stopped: !!ok, reason: ok ? stopped.reason : (released ? released.reason : stopped.reason),
     runtime: statusBeforeRelease, processTree, retainedData: !!ok && retainedData, appState, released });
-  process.exit(ok ? 0 : 1);
+  process.exitCode = ok ? 0 : 1;
 }
 
 async function main() {
@@ -109,4 +109,4 @@ async function main() {
   throw new Error('usage: native.cjs start [--task ID] [--app /path/Nemo.app | --executable /absolute/path] [--reserve desktop-input,gpu-reference] [--manifest-timeout-ms N] [-- args...] | status --task ID --owner TOKEN | stop --task ID --owner TOKEN [--timeout-ms N] [--retain-data]');
 }
 
-main().catch((err) => { process.stderr.write((err.stack || String(err)) + '\n'); process.exit(1); });
+main().catch((err) => { process.stderr.write((err.stack || String(err)) + '\n'); process.exitCode = 1; });
