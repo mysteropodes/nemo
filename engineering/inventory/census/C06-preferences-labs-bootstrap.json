@@ -1,0 +1,1136 @@
+{
+  "census_id": "C06",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1041",
+  "title": "Preferences, Labs and bootstrap — bounded extraction packets",
+  "owner": "Cyrill/D2 (Honey)",
+  "source_sha": "419f192631b715b3a6c763575dac29162aefa2d9",
+  "status": "read-only census complete; no source mutated; proposed IDs and packet boundaries are placeholders for the orchestrator to renumber into the global P-sequence and fold into engineering/inventory/remediation-scope.json",
+  "scope_files": [
+    "src/js/labs/auto-actions.js",
+    "src/js/labs/boil-effect.js",
+    "src/js/labs/canvas-grid.js",
+    "src/js/labs/clip-mask-bake.js",
+    "src/js/labs/command-palette.js",
+    "src/js/labs/flip-roll.js",
+    "src/js/labs/follow-path.js",
+    "src/js/labs/french-curve.js",
+    "src/js/labs/interval-assistant.js",
+    "src/js/labs/labs-core.js",
+    "src/js/labs/labs-float-panel.js",
+    "src/js/labs/labs-panel.js",
+    "src/js/labs/lagoon-menu.js",
+    "src/js/labs/layer-effects-bake.js",
+    "src/js/labs/lipsync-assistant.js",
+    "src/js/labs/mirror-check.js",
+    "src/js/labs/move-to-layer.js",
+    "src/js/labs/multiframe-draw.js",
+    "src/js/labs/oca-export.js",
+    "src/js/labs/out-of-pegs.js",
+    "src/js/labs/pingpong-cycle.js",
+    "src/js/labs/pose-library.js",
+    "src/js/labs/predictive-stroke.js",
+    "src/js/labs/reference-3d.js",
+    "src/js/labs/reference-fill.js",
+    "src/js/labs/retime-exposure.js",
+    "src/js/labs/rig-deform.js",
+    "src/js/labs/screentone-bake.js",
+    "src/js/labs/shader-effects-bake.js",
+    "src/js/labs/speed-lines.js",
+    "src/js/labs/storyboard-mode.js",
+    "src/js/labs/timelapse.js",
+    "src/js/labs/timeline-markers.js",
+    "src/js/labs/timeline-zoom.js",
+    "src/js/labs/vector-sculpt.js",
+    "src/js/labs/vector-trim.js",
+    "src/js/labs/view-filter.js",
+    "src/js/labs/xsheet-panel.js",
+    "src/js/app.js (partial: lines 1-40, 314-359)",
+    "src/js/i18n.js (whole, 4241 lines)",
+    "src/index.html (partial: lines 9-2460 script order, 357-366, 1743-1933, 2285-2297)",
+    "src/js/timeline.js (partial: lines 349, 2354-2374, 7450-7723, 8997-9077, 9228-9273, 9641-9949, 11884-11888)",
+    "src/css/style.css (partial: lines 91-104, 422-461, 2132-2163)"
+  ],
+  "coverage_note": "38 files in src/js/labs/** read in full (26 <script>-included: 3 infrastructure + 23 reachable prototypes; 12 present-on-disk but never <script>-included, i.e. dead code — see C06.labs.dormant-timeline-zoom and C06.labs.dormant-unreachable). src/js/i18n.js read in full (4,241 lines, single packet). src/js/app.js, src/index.html, src/js/timeline.js and src/css/style.css read only for the preferences/Labs/bootstrap slices named in the issue's bounded ownership — NOT their full contents, which are owned by other census tasks. Explicitly out of scope and NOT repartitioned here even where their DOM anchors live inside an in-scope file: src/js/updater-bridge.js (Settings ▸ Updates tab behavior), src/js/feedback-bridge.js (Settings ▸ Feedback tab), src/js/p2p-contacts.js and src/js/project.js (Settings ▸ Collaboration tab), src/js/figma-import.js (Settings ▸ Figma tab, already censused by C05/#1040), src/js/tutorial.js (first-run/onboarding flow). src/css/tutorial.css confirmed unrelated (tutorial-module-only). scripts/assert-no-private-labs.py confirmed a false-positive name collision with an unrelated private-labs/ (Adobe AE-bridge, license-excluded) directory, not this packet's src/js/labs/. All CSS in scope was folded into the JS packet that owns each UI rather than given a separate css-only area; generic app-wide modal/form-control classes the Settings modal merely consumes (.modal-box, .pi, .pr, .pbtn, .psel, .phdr, .pl) are noted but not owned by any packet here.",
+  "areas": [
+    {
+      "area": "bootstrap",
+      "packets": [
+        {
+          "id": "C06.bootstrap.storage-key-migration",
+          "title": "One-time sm-* → nemo-* localStorage key migration",
+          "files": [
+            "src/js/app.js:10-20"
+          ],
+          "symbols": [
+            "migrateStorageKeysToNemo (anonymous IIFE)"
+          ],
+          "responsibility": "Forward-copies every legacy 'sm-'/'sm_'-prefixed localStorage key to its 'nemo-'/'nemo_' equivalent, leaving old keys untouched. Documented (app.js:1-9) as needing to run before anything else touches localStorage.",
+          "writer": "localStorage (all nemo-* keys, additive copy only)",
+          "public_api": "none (anonymous IIFE, runs once at parse time)",
+          "consumers": [
+            "implicitly every other packet in this census that reads a nemo-* localStorage key (i18n's nemo-lang, every Labs flag, nemo-shortcuts, nemo-profile, etc.) depends on this having already run"
+          ],
+          "oracle": "none; zero test coverage (grepped tests/**)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Ordering-critical: this is the first statement of the first non-vendor app script (app.js, src/index.html:2300), by design. A future modularization must preserve 'runs before any other localStorage read' as an explicit contract, not an accident of script order."
+        },
+        {
+          "id": "C06.bootstrap.paper-dom-setup",
+          "title": "Paper.js install + DOM-constructor restoration workaround",
+          "files": [
+            "src/js/app.js:21-40"
+          ],
+          "symbols": [
+            "paper.install(window)",
+            "paper.setup(#drawing-canvas)"
+          ],
+          "responsibility": "Installs Paper.js into the global namespace, then restores window.Event/window.MouseEvent from a throwaway iframe (Paper's install clobbers the real DOM constructors), then sets up the Paper.js view on #drawing-canvas.",
+          "writer": "global window.Event/window.MouseEvent (restored), Paper.js's internal global state",
+          "public_api": "none (runs once at parse time)",
+          "consumers": [
+            "every other module in the app implicitly depends on paper.js being installed and the real DOM Event constructors being intact"
+          ],
+          "oracle": "none possible via unit test (real DOM/Paper.js coupling); validated by the app launching at all",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Self-contained documented workaround (app.js:22-39 comment). Not touched by this census beyond confirming it's still the only place this happens."
+        },
+        {
+          "id": "C06.bootstrap.feature-flags",
+          "title": "SM_FROZEN_IN_DEV hardcoded feature-flag registry",
+          "files": [
+            "src/index.html:2285-2297",
+            "src/css/style.css:91-104"
+          ],
+          "symbols": [
+            "window.SM_FROZEN_IN_DEV={rig,storyboard,import3d}"
+          ],
+          "responsibility": "Inline, first-loaded (before any other script) hardcoded registry gating already-promoted-but-still-rough features. Distinct from the SMLabs opt-in mechanism: not user-toggleable, no localStorage, no settings-panel row.",
+          "writer": "none after initial inline assignment (read-only flags for the session)",
+          "public_api": "window.SM_FROZEN_IN_DEV.{rig,storyboard,import3d} (plain object, read directly)",
+          "consumers": [
+            "src/js/timeline.js:386 (rig tool-switch gate)",
+            "src/js/timeline.js:9186-9189 (Import-3D-reference menu gate, sole caller of C06.labs.reference-3d's public API)",
+            "src/js/motion.js:13147 (storyboard app-mode gate, out of this census's file scope)"
+          ],
+          "oracle": "none; zero test coverage",
+          "depends_on": [],
+          "entangled_with": [
+            "C06.labs.reference-3d (import3d flag is its only real entry point)"
+          ],
+          "notes": "CSS support (.in-dev-badge, .tool-btn.in-dev(-locked)) is co-located here rather than given its own packet, since it has no independent responsibility."
+        },
+        {
+          "id": "C06.bootstrap.sm-namespace-init",
+          "title": "Shared window.SM namespace bootstrap and its load-order hazard",
+          "files": [
+            "src/js/timeline.js:349",
+            "src/js/timeline.js:11884-11888",
+            "src/js/i18n.js:4236"
+          ],
+          "symbols": [
+            "window.SM={...} (timeline.js:349, full literal reassignment)",
+            "window.SM=window.SM||{} (i18n.js:4236, correct merge)"
+          ],
+          "responsibility": "timeline.js:349 defines the shared window.SM namespace as a full object-literal REASSIGNMENT (not a window.SM=window.SM||{} merge). Because timeline.js loads after all of src/js/labs/**, any window.SM.* write those files perform at parse time would be silently discarded when this line runs.",
+          "writer": "window.SM (shared, multi-writer — NOT a clean single-owner packet, flagged deliberately)",
+          "public_api": "window.SM (shared namespace object; also ships a placeholder SM.t stub here specifically so calls before i18n.js loads don't crash)",
+          "consumers": [
+            "every other file in the app that touches window.SM — in this census's scope specifically: C06.labs.settings-panel and C06.labs.float-panel, which both defer their own window.SM.afterI18n registration to the 'load' event for exactly this reason (their own header comments document the workaround independently)"
+          ],
+          "oracle": "none; the hazard itself is undocumented in one central place (DEF-9) — three separate files independently re-derived and documented the same constraint",
+          "depends_on": [],
+          "entangled_with": [
+            "C06.labs.settings-panel",
+            "C06.labs.float-panel",
+            "C06.i18n.translation-core"
+          ],
+          "notes": "DEF-9: fragile-by-construction. If timeline.js:349's assignment style or the labs/** vs timeline.js load order ever changes, three independent files' correctness assumptions break silently (none would fail loudly). A real fix (timeline.js:349 → merge instead of reassign) would remove the need for every downstream 'defer to load' workaround, but is out of scope for a read-only census."
+        }
+      ]
+    },
+    {
+      "area": "preferences",
+      "packets": [
+        {
+          "id": "C06.preferences.user-profile",
+          "title": "Per-installation user profile (identity, not project data)",
+          "files": [
+            "src/js/app.js:314-359"
+          ],
+          "symbols": [
+            "state.userProfile",
+            "initUserProfile()",
+            "saveUserProfile()"
+          ],
+          "responsibility": "Loads/migrates/generates a per-installation identity {id,name,color,role,email} from localStorage['nemo-profile']; explicitly NOT part of the project JSON (app.js:314-318 comment, same class as sm-shortcuts).",
+          "writer": "sole owner of state.userProfile and localStorage['nemo-profile']",
+          "public_api": "state.userProfile (read directly by other files, no accessor function); saveUserProfile() callable from timeline.js",
+          "consumers": [
+            "src/js/feedback-bridge.js:288,322,324,516 (feedback authorship, profile directory naming)",
+            "src/js/engine-bridge.js:1362,3431,3441 (filters/colors strokes by ownerId for team-review overlay)",
+            "src/js/p2p-contacts.js:63 (P2P display-name fallback)",
+            "src/js/tools.js:1999-2110 (stroke-ownership tagging: ownerId/ownerName/ownerColor, role==='supervisor' branching)",
+            "C06.preferences.profile-fields-ui (timeline.js, the only writer-side UI)"
+          ],
+          "oracle": "none; zero test coverage for initUserProfile/saveUserProfile/migrateStorageKeysToNemo",
+          "depends_on": [
+            "C06.bootstrap.storage-key-migration"
+          ],
+          "entangled_with": [
+            "C06.preferences.profile-fields-ui"
+          ],
+          "notes": "state.userProfile is a shared identity primitive with real READ consumers scattered across 4 files outside this packet's own write path (feedback-bridge.js, engine-bridge.js, p2p-contacts.js, tools.js) — extraction will require touching those files' reads even though only app.js/timeline.js own the writes. Original bug this replaced (every install got the literal name 'Animateur', making feedback issues unattributable) is documented in the app.js:340-351 comment, already fixed."
+        },
+        {
+          "id": "C06.preferences.settings-modal-shell",
+          "title": "Settings modal shell: open/close, tab switching, About tab",
+          "files": [
+            "src/js/timeline.js:9001-9028",
+            "src/index.html:1743-1933",
+            "src/css/style.css:2132-2163"
+          ],
+          "symbols": [
+            "initSettingsTabs()",
+            "initSettingsModal()"
+          ],
+          "responsibility": "Modal open/close (#btn-settings, #project-tabs-settings, #settings-close, backdrop) and 8-tab switching (General/Updates/Collaboration/Feedback/Figma/Shortcuts/Labs/About). initSettingsModal's open handler (timeline.js:9017) is a fan-out point calling into several OTHER packets' renderers.",
+          "writer": "DOM visibility only (.settings-pane display); no state.* writes",
+          "public_api": "none exported; DOM-event-driven",
+          "consumers": [
+            "none external"
+          ],
+          "oracle": "none; only indirect test coverage via tests/feedback-2026-08-22.test.cjs:10-17 (About-tab routing)",
+          "depends_on": [],
+          "entangled_with": [
+            "C06.preferences.shortcuts-system (renderShortcutsList, called from :9017)",
+            "C06.preferences.profile-fields-ui (syncProfileFields, called from :9017)",
+            "C06.labs.settings-panel (renderLabsPanel, called from :9017)",
+            "updater-bridge.js (Updates tab content — OUT OF SCOPE, not in this issue's file list)",
+            "feedback-bridge.js (Feedback tab content — OUT OF SCOPE)",
+            "src/js/p2p-contacts.js and src/js/project.js (Collaboration tab content — OUT OF SCOPE)",
+            "figma-import.js (Figma tab fields — already censused by C05, OUT OF SCOPE here)"
+          ],
+          "notes": "DEF-3: the About tab's hardcoded version fallback (index.html:1895, '0.7.0-alpha.1') is 3 patch-alphas behind package.json/tauri.conf.json ('0.7.0-alpha.4'); only overwritten at runtime by updater-bridge.js's showVersion() when window.__TAURI__.app exists. CLAUDE.md §7's own version-sync checklist (lines 466-478) names only 2 static-fallback locations to bump by hand and does not mention this third one. DEF-4: the About tab is NOT where this lives, but note index.html:1798 and :1829 share one i18n key (settingsCheckUpdates) across two semantically unrelated Settings buttons (app-update-check vs team-sync-check) — see C06.i18n.translation-core. This packet's true single-writer boundary is the shell only; the 4 delegated tabs above are explicitly excluded from this census's ownership, not silently absorbed."
+        },
+        {
+          "id": "C06.preferences.profile-fields-ui",
+          "title": "Settings ▸ General profile-field editors",
+          "files": [
+            "src/js/timeline.js:9029-9074"
+          ],
+          "symbols": [
+            "ROLE_HINTS",
+            "syncProfileFields()",
+            "initProfileFields()"
+          ],
+          "responsibility": "Reads/writes state.userProfile.{name,email,color,role} via #profile-name/-email/-color/-role fields; forces SM.setTool('hand') if switching to role==='producer' while on a disallowed tool.",
+          "writer": "state.userProfile fields (delegates persistence to app.js's saveUserProfile())",
+          "public_api": "none exported; DOM-event-driven, calls saveUserProfile() on every field input/change (timeline.js:7949,9052,9056,9062,9066)",
+          "consumers": [
+            "none external"
+          ],
+          "oracle": "none; zero test coverage",
+          "depends_on": [
+            "C06.preferences.user-profile"
+          ],
+          "entangled_with": [],
+          "notes": "Positive check, no bug found: the color field (timeline.js:9059) correctly follows the CLAUDE.md §2 .dataset.hex8/.value alpha-color convention via app.js's setHex8Input — verified, not just assumed."
+        },
+        {
+          "id": "C06.preferences.shortcuts-system",
+          "title": "Keyboard-shortcut config, remapping and dispatch",
+          "files": [
+            "src/js/timeline.js:7450-7723",
+            "src/js/timeline.js:9641,9935-9949",
+            "src/index.html:1876-1883"
+          ],
+          "symbols": [
+            "TOOL_SHORTCUTS (21 entries)",
+            "COMMAND_SHORTCUTS (15 entries)",
+            "READONLY_SHORTCUTS (14 entries)",
+            "SHORTCUT_CATS",
+            "shortcutOverrides()",
+            "shortcutDefFor(action)",
+            "shortcutKeyFor(action)",
+            "shortcutClashFor(action,key)",
+            "runCommandShortcut(k,event)",
+            "setShortcutKey(action,key)",
+            "syncToolButtonShortcutBadge(action)",
+            "syncAllToolButtonShortcutBadges()",
+            "runToolShortcut(k)",
+            "renderShortcutsList()",
+            "onKeyDown(...) dispatch"
+          ],
+          "responsibility": "Full remap system for tool/command keyboard shortcuts: default tables, per-user override storage, clash detection, live rebinding UI (Réglages ▸ Shortcuts), and the actual keydown dispatch that consults overrides before falling back to defaults.",
+          "writer": "sole owner of _shortcutOverrides (module-private) and localStorage['nemo-shortcuts']",
+          "public_api": "none exported globally; internal to timeline.js's own keydown handler",
+          "consumers": [
+            "none external — self-contained dispatch + its own settings-panel UI"
+          ],
+          "oracle": "none; zero test coverage for any shortcut function",
+          "depends_on": [],
+          "entangled_with": [
+            "C06.preferences.settings-modal-shell (#shortcuts-reset button, wired in initSettingsModal)"
+          ],
+          "notes": "COMMAND_SHORTCUTS (added 2026-09, comment timeline.js:7498-7507) closed a gap where 63 hardcoded keys were previously unremappable. syncToolButtonShortcutBadge(s) keeps the left-rail badge letters in sync with rebinds — itself fixing a documented 2026-07 staleness bug, already resolved."
+        }
+      ]
+    },
+    {
+      "area": "i18n",
+      "packets": [
+        {
+          "id": "C06.i18n.translation-core",
+          "title": "Translation dictionary, lookup, language switching and afterI18n hook",
+          "files": [
+            "src/js/i18n.js (whole, 4241 lines)"
+          ],
+          "symbols": [
+            "I18N (en/fr/ja/es blocks)",
+            "LANGS",
+            "currentLang()",
+            "t(key)",
+            "applyI18n()",
+            "setLanguage(lang)",
+            "initLanguage()",
+            "window.SM.afterI18n"
+          ],
+          "responsibility": "Flat key→string dictionaries for 4 languages; t(key) resolves current-language → fr fallback → en fallback → raw key; applyI18n() sweeps [data-i18n*] attributes and runs queued afterI18n callbacks for JS-built (non-declarative) UI; initLanguage() reads/defaults/persists the chosen language.",
+          "writer": "sole owner of state.language and localStorage['nemo-lang']",
+          "public_api": "window.SM.{afterI18n, setLanguage, t, applyI18n}",
+          "consumers": [
+            "nearly all of src/index.html via the [data-i18n*] sweep (app-wide, not preferences-specific)",
+            "C06.labs.settings-panel and C06.labs.float-panel (SM.t + SM.afterI18n, deferred per C06.bootstrap.sm-namespace-init)",
+            "C06.preferences.shortcuts-system and C06.preferences.settings-modal-shell (shortcut*/settings*/menu* key families)"
+          ],
+          "oracle": "none direct; only tests/feedback-2026-08-22.test.cjs:25 touches i18n.js at all, asserting one unrelated key exists",
+          "depends_on": [],
+          "entangled_with": [
+            "C06.bootstrap.sm-namespace-init",
+            "C06.preferences.settings-modal-shell (DEF-4)"
+          ],
+          "notes": "DEF-5: three independently hand-written default-language fallbacks disagree — currentLang() (:4183) falls back to 'fr', initLanguage() (:4230) defaults fresh installs to 'en' (deliberate 2026-07 change, comment documents the feedback that prompted it), and src/js/tutorial.js:520 (out of this packet's file scope) has its own separate 'fr' fallback. Masked today because initLanguage() always runs first and always sets state.language — but any future code reading state.language before that, or in a context without window.state, silently gets French instead of the documented English default. DEF-4: index.html:1798 and :1829 share the i18n key 'settingsCheckUpdates' across two unrelated Settings buttons — editing it for one purpose silently affects the other. No missing-translation-key gaps confirmed in the Labs/preferences string subset (spot-checked); a rough total-key-count-per-language-block comparison shows a ~7% spread but is too noisy a heuristic to assert a specific gap."
+        }
+      ]
+    },
+    {
+      "area": "labs-infrastructure",
+      "packets": [
+        {
+          "id": "C06.labs.registry-core",
+          "title": "SMLabs registry: register/enable/disable/toggle/list + fan-out hooks",
+          "files": [
+            "src/js/labs/labs-core.js (whole, 102 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register(name,def)",
+            "SMLabs.isOn/enable/disable/toggle(name)",
+            "SMLabs.list()",
+            "SMLabs.resetAll()",
+            "SMLabs.onStrokeCommitted(path,layer)",
+            "SMLabs.buildDrawPreviewExtras(samples,overlayItemFor)"
+          ],
+          "responsibility": "The whole Labs opt-in mechanism: each prototype file calls register() once with {flag,describe,onEnable?,onDisable?,onStroke?,onPreview?}; on/off state is a plain localStorage flag per prototype; list() resolves each describe field as an i18n KEY (not a literal, fixing feedback #105). Two guarded hooks fan out to every enabled prototype.",
+          "writer": "module-private protos{}; localStorage['nemo-labs-*'] flags (one per prototype, see per-prototype packets)",
+          "public_api": "window.SMLabs.{register,isOn,enable,disable,toggle,list,resetAll,onStrokeCommitted,buildDrawPreviewExtras}",
+          "consumers": [
+            "all 35 files in src/js/labs/** that call SMLabs.register (23 reachable + 12 dormant)",
+            "src/js/draw-bridge.js:680-681,1054 (the only external callers of the two fan-out hooks, matching the file's own 'single guarded hook' claim)",
+            "src/js/timeline.js:2362 (SM.importJSON) and src/js/project.js:55 (resetAll on new-project/import)",
+            "C06.labs.settings-panel and C06.labs.float-panel (both render off of isOn/list)"
+          ],
+          "oracle": "none direct on the registry functions themselves; tests/project-open.test.cjs:23,125-135 covers the resetAll-on-rejected-importJSON guard specifically",
+          "depends_on": [],
+          "entangled_with": [
+            "C06.labs.settings-panel (DEF-1, DEF-2)"
+          ],
+          "notes": "DEF-6: docs/feature-scouting.md is referenced by comment from ≥10 files across this census (index.html:2313, this file's neighbors, 9 of the 35 labs/*.js headers) but does not exist anywhere in the repo — docs/ only contains FUNCTIONAL_GAPS.md. Either lost/never-committed or aspirational; worth a decision before citing it again. resetAll()'s force-disable is deliberately silent (setOn(n,false,true)) — documented intent, not a bug."
+        },
+        {
+          "id": "C06.labs.settings-panel",
+          "title": "Réglages ▸ Labs tab renderer (TOOLS + ACTIONS lists)",
+          "files": [
+            "src/js/labs/labs-panel.js (whole, 446 lines)"
+          ],
+          "symbols": [
+            "TOOLS (14 entries, :95-205)",
+            "ACTIONS (10 entries, :216-379)",
+            "renderLabsPanel() (:432)"
+          ],
+          "responsibility": "Renders the Settings ▸ Labs tab's two lists (toggle-style TOOLS, run-once ACTIONS) from hand-maintained arrays that must independently mirror which prototypes are actually loaded.",
+          "writer": "DOM only (#labs-tools-list, #labs-actions-list)",
+          "public_api": "window.renderLabsPanel",
+          "consumers": [
+            "C06.preferences.settings-modal-shell (called from initSettingsModal, timeline.js:9017)"
+          ],
+          "oracle": "none; zero test coverage",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [
+            "C06.labs.dormant-timeline-zoom (DEF-1)",
+            "C06.labs.canvas-grid (DEF-8)",
+            "C06.bootstrap.sm-namespace-init (defers window.SM.afterI18n registration to 'load', :437-441)"
+          ],
+          "notes": "DEF-1: TOOLS still lists a 'timeline-zoom' entry (:184-193) whose backing src/js/labs/timeline-zoom.js is never loaded (superseded by the promoted src/js/timeline-zoom.js). Toggling it silently no-ops (labs-core.js's setOn hits the unknown-prototype branch, console.warn only) and its 'Reset Zoom' button calls window.SMLabs.resetTimelineZoom, which does not exist once the dead file is excluded — a fully-localized, working-LOOKING dead UI row. Verified: diffing all 24 TOOLS+ACTIONS names against the 23 actually-loaded prototype register-names found exactly one orphan (timeline-zoom); every other name matches 1:1. DEF-2 (index.html's stale loader-exclusion comment) is adjacent context for why this drifted."
+        },
+        {
+          "id": "C06.labs.float-panel",
+          "title": "Contextual floating Labs strip over the canvas",
+          "files": [
+            "src/js/labs/labs-float-panel.js (whole, 620 lines)",
+            "src/index.html:357-366",
+            "src/css/style.css:422-461"
+          ],
+          "symbols": [
+            "TOOL_CONTEXT (:18-72)",
+            "REAL_FEATURES (:79-112)",
+            "ACTIONS (:120-165)",
+            "PARAMS (:263-270)",
+            "paramValue()",
+            "renderLabsFloatPanel() (:611)"
+          ],
+          "responsibility": "Tool-contextual floating strip: shows the Labs tools/actions relevant to the current state.tool, plus two non-Labs entries (symmetry/perspective) that read/write state.*Enabled flags directly, plus quick numeric steppers (PARAMS) duplicating 3 prototypes' own localStorage-backed defaults.",
+          "writer": "localStorage['nemo-labs-float-pos'] (own drag position, :548-553); no other state.* writes of its own — REAL_FEATURES entries write state.symmetryEnabled/state.perspectiveEnabled directly, which this packet does NOT own",
+          "public_api": "window.renderLabsFloatPanel",
+          "consumers": [
+            "src/js/brush-menu-bridge.js:39,464",
+            "src/js/shadow-brush-bridge.js:60,125",
+            "src/js/timeline.js:458"
+          ],
+          "oracle": "none; zero test coverage",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [
+            "C06.labs.canvas-grid (DEF-8)",
+            "C06.labs.vector-sculpt",
+            "C06.labs.flip-roll",
+            "brush-menu-bridge.js / shadow-brush-bridge.js (OUT OF SCOPE, own the ACTIONS entries this panel merely surfaces)"
+          ],
+          "notes": "DEF-8: PARAMS (:263-270) re-implements 3 numeric defaults (sculpt-radius, grid-step, flip-speed/-span) that each prototype file already owns, read via this file's own local paramValue() rather than through the prototype's getter — a 3-way hand-duplication, one instance of which (grid-step) is already confirmed mismatched. REAL_FEATURES' symmetry/perspective entries are presented identically to real Labs entries in this UI but are NOT SMLabs-registered prototypes and are NOT owned by this packet or this census area — flagged so a future extraction doesn't assume this file's whole surface is Labs-scoped."
+        }
+      ]
+    },
+    {
+      "area": "labs-prototypes",
+      "packets": [
+        {
+          "id": "C06.labs.predictive-stroke",
+          "title": "Freehand-to-perfect-shape correction (line/circle/rect recognizer)",
+          "files": [
+            "src/js/labs/predictive-stroke.js (whole, 162 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('predictive-stroke', ...)"
+          ],
+          "responsibility": "Freehand-to-perfect-shape correction (line/circle/rect recognizer)",
+          "writer": "localStorage['nemo-labs-predictive'] (module-private state otherwise)",
+          "public_api": "none (behavior only; pure onEnable/onDisable/onStroke/onPreview hook via labs-core.js)",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, TOOLS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.vector-sculpt",
+          "title": "Vector push-sculpt brush (drag pushes points, Shift smooths, Alt sets radius)",
+          "files": [
+            "src/js/labs/vector-sculpt.js (whole, 445 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('vector-sculpt', ...)",
+            "setSculptRadius(r)"
+          ],
+          "responsibility": "Vector push-sculpt brush (drag pushes points, Shift smooths, Alt sets radius)",
+          "writer": "localStorage['nemo-labs-sculpt']; extra: nemo-labs-sculpt-radius (module-private state otherwise)",
+          "public_api": "window.SMLabs.{setSculptRadius}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, TOOLS row",
+            "labs-float-panel.js PARAMS stepper (shares a hand-duplicated default, see cross_cutting_notes)"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [
+            "C06.labs.float-panel (PARAMS stepper duplicates the radius default, see cross_cutting_notes)"
+          ],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.french-curve",
+          "title": "Magnetic curve/ellipse drawing guide (hold F)",
+          "files": [
+            "src/js/labs/french-curve.js (whole, 144 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('french-curve', ...)",
+            "setCurveGuide(kind,opts)",
+            "getCurveGuide()"
+          ],
+          "responsibility": "Magnetic curve/ellipse drawing guide (hold F)",
+          "writer": "localStorage['nemo-labs-frenchcurve']; extra: nemo-labs-curveguide (module-private state otherwise)",
+          "public_api": "window.SMLabs.{setCurveGuide, getCurveGuide}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, TOOLS row",
+            "labs-float-panel.js PARAMS stepper (shares a hand-duplicated default, see cross_cutting_notes)"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.canvas-grid",
+          "title": "World-space grid overlay (follows pan/zoom/rotation)",
+          "files": [
+            "src/js/labs/canvas-grid.js (whole, 140 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('canvas-grid', ...)",
+            "setGridStep(px)"
+          ],
+          "responsibility": "World-space grid overlay (follows pan/zoom/rotation)",
+          "writer": "localStorage['nemo-labs-grid']; extra: nemo-labs-grid-step (module-private state otherwise)",
+          "public_api": "window.SMLabs.{setGridStep}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, TOOLS+float PARAMS row",
+            "labs-float-panel.js PARAMS stepper (shares a hand-duplicated default, see cross_cutting_notes)"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [
+            "C06.labs.settings-panel (DEF-8)",
+            "C06.labs.float-panel (DEF-8)"
+          ],
+          "notes": "DEF-8: this file's own default (100, :13/:17) disagrees with the Réglages row's displayed default (labs-panel.js:117, mkNum(50,...)) — three independent hand-copies of the same config value, one already wrong."
+        },
+        {
+          "id": "C06.labs.view-filter",
+          "title": "Value/contrast/dim display-only check filter (drawing itself untouched)",
+          "files": [
+            "src/js/labs/view-filter.js (whole, 56 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('view-filter', ...)",
+            "setViewFilter(mode)"
+          ],
+          "responsibility": "Value/contrast/dim display-only check filter (drawing itself untouched)",
+          "writer": "localStorage['nemo-labs-viewfilter'] (module-private state otherwise)",
+          "public_api": "window.SMLabs.{setViewFilter}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, TOOLS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.flip-roll",
+          "title": "Animator's roll: hold R to cycle ±N frames around the pose",
+          "files": [
+            "src/js/labs/flip-roll.js (whole, 72 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('flip-roll', ...)",
+            "setFlipSpeed(n)",
+            "setFlipSpan(n)"
+          ],
+          "responsibility": "Animator's roll: hold R to cycle ±N frames around the pose",
+          "writer": "localStorage['nemo-labs-flip']; extra: nemo-labs-flip-speed/-span (module-private state otherwise)",
+          "public_api": "window.SMLabs.{setFlipSpeed, setFlipSpan}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, TOOLS+float PARAMS row",
+            "labs-float-panel.js PARAMS stepper (shares a hand-duplicated default, see cross_cutting_notes)"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [
+            "C06.labs.float-panel (shares PARAMS stepper default, same duplication pattern as DEF-8)"
+          ],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.mirror-check",
+          "title": "Hold M to flip the canvas view horizontally (proportion check)",
+          "files": [
+            "src/js/labs/mirror-check.js (whole, 55 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('mirror-check', ...)"
+          ],
+          "responsibility": "Hold M to flip the canvas view horizontally (proportion check)",
+          "writer": "localStorage['nemo-labs-mirror'] (module-private state otherwise)",
+          "public_api": "none (behavior only; pure onEnable/onDisable/onStroke/onPreview hook via labs-core.js)",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, TOOLS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.lagoon-menu",
+          "title": "Radial tool menu around the cursor (hold Q)",
+          "files": [
+            "src/js/labs/lagoon-menu.js (whole, 91 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('lagoon-menu', ...)"
+          ],
+          "responsibility": "Radial tool menu around the cursor (hold Q)",
+          "writer": "localStorage['nemo-labs-lagoon'] (module-private state otherwise)",
+          "public_api": "none (behavior only; pure onEnable/onDisable/onStroke/onPreview hook via labs-core.js)",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, TOOLS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.out-of-pegs",
+          "title": "Onion-ghost offset (misalign prev/next ghosts to line up an in-between)",
+          "files": [
+            "src/js/labs/out-of-pegs.js (whole, 74 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('out-of-pegs', ...)",
+            "setPegOffset(which,dx,dy)",
+            "resetPegs()"
+          ],
+          "responsibility": "Onion-ghost offset (misalign prev/next ghosts to line up an in-between)",
+          "writer": "localStorage['nemo-labs-pegs'] (module-private state otherwise)",
+          "public_api": "window.SMLabs.{setPegOffset, resetPegs}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, TOOLS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.timeline-markers",
+          "title": "Named/colored markers on timeline frames",
+          "files": [
+            "src/js/labs/timeline-markers.js (whole, 89 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('timeline-markers', ...)",
+            "addMarker(frame,label,color)",
+            "removeMarker(...)",
+            "listMarkers()"
+          ],
+          "responsibility": "Named/colored markers on timeline frames",
+          "writer": "localStorage['nemo-labs-markers']; extra: nemo-labs-markers-<projectKey> (module-private state otherwise)",
+          "public_api": "window.SMLabs.{addMarker, removeMarker, listMarkers}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, TOOLS row",
+            "labs-float-panel.js PARAMS stepper (shares a hand-duplicated default, see cross_cutting_notes)"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Flag is global but marker DATA is namespaced per-project (SMProject.getProjectKey(), falls back to 'default') — two different persistence granularities by design, not a bug."
+        },
+        {
+          "id": "C06.labs.xsheet-panel",
+          "title": "Floating exposure sheet (frames × layers, key/tween/held glyphs)",
+          "files": [
+            "src/js/labs/xsheet-panel.js (whole, 81 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('xsheet-panel', ...)"
+          ],
+          "responsibility": "Floating exposure sheet (frames × layers, key/tween/held glyphs)",
+          "writer": "localStorage['nemo-labs-xsheet'] (module-private state otherwise)",
+          "public_api": "none (behavior only; pure onEnable/onDisable/onStroke/onPreview hook via labs-core.js)",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, TOOLS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Registers under the short name 'xsheet', not the file's own basename — matches by design (labs-panel.js TOOLS entry uses name:'xsheet')."
+        },
+        {
+          "id": "C06.labs.reference-3d",
+          "title": "Rotating 3D reference viewer (CC0 avatar/hands/mannequin or OBJ import)",
+          "files": [
+            "src/js/labs/reference-3d.js (whole, 398 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('reference-3d', ...)",
+            "open3DReference(...)",
+            "openCC0AvatarReference()",
+            "openCC0HandReference()",
+            "openCharacterReference()",
+            "openHandReference()",
+            "set3DRotation(...)",
+            "redraw3D()",
+            "close3DReference()",
+            "get3DState()"
+          ],
+          "responsibility": "Rotating 3D reference viewer (CC0 avatar/hands/mannequin or OBJ import)",
+          "writer": "localStorage['nemo-labs-3dref'] (module-private state otherwise)",
+          "public_api": "window.SMLabs.{open3DReference, openCC0AvatarReference, openCC0HandReference, openCharacterReference, openHandReference, set3DRotation, redraw3D, close3DReference, get3DState}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, TOOLS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [
+            "C06.bootstrap.feature-flags (SM_FROZEN_IN_DEV.import3d gates the only entry point)"
+          ],
+          "notes": "Sole call site of SMLabs.open3DReference is timeline.js:9113-9114's 'Import 3D reference' context-menu row, itself gated by SM_FROZEN_IN_DEV.import3d (see C06.bootstrap.feature-flags) — a real cross-area dependency: this Labs prototype is reachable only through a bootstrap-area flag it doesn't own. index.html:2313-2321's own loader comment incorrectly claims this file is 'left out of this wave' (DEF-2) — it is in fact loaded (index.html:2341) and fully reachable."
+        },
+        {
+          "id": "C06.labs.multiframe-draw",
+          "title": "A drawn stroke is mirrored onto every frame selected in the timeline",
+          "files": [
+            "src/js/labs/multiframe-draw.js (whole, 80 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('multiframe-draw', ...)"
+          ],
+          "responsibility": "A drawn stroke is mirrored onto every frame selected in the timeline",
+          "writer": "localStorage['nemo-labs-multiframe'] (module-private state otherwise)",
+          "public_api": "none (behavior only; pure onEnable/onDisable/onStroke/onPreview hook via labs-core.js)",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, TOOLS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Pure onStroke hook via labs-core.js's fan-out (labs-core.js:75-81); no direct public API."
+        },
+        {
+          "id": "C06.labs.move-to-layer",
+          "title": "Action: move selected strokes to another layer, same frame",
+          "files": [
+            "src/js/labs/move-to-layer.js (whole, 65 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('move-to-layer', ...)",
+            "moveSelectionToLayer(idx)"
+          ],
+          "responsibility": "Action: move selected strokes to another layer, same frame",
+          "writer": "localStorage['nemo-labs-move-to-layer'] (module-private state otherwise)",
+          "public_api": "window.SMLabs.{moveSelectionToLayer}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, ACTIONS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.pingpong-cycle",
+          "title": "Action: repeat the selected frame range back-and-forth (A B C B A…)",
+          "files": [
+            "src/js/labs/pingpong-cycle.js (whole, 57 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('pingpong-cycle', ...)",
+            "pingpongCycle(n)"
+          ],
+          "responsibility": "Action: repeat the selected frame range back-and-forth (A B C B A…)",
+          "writer": "localStorage['nemo-labs-pingpong-cycle'] (module-private state otherwise)",
+          "public_api": "window.SMLabs.{pingpongCycle}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, ACTIONS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.retime-exposure",
+          "title": "Action: retime selected keyframes to a fixed exposure (ones/twos/threes…)",
+          "files": [
+            "src/js/labs/retime-exposure.js (whole, 68 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('retime-exposure', ...)",
+            "retimeExposure(n)"
+          ],
+          "responsibility": "Action: retime selected keyframes to a fixed exposure (ones/twos/threes…)",
+          "writer": "localStorage['nemo-labs-retime'] (module-private state otherwise)",
+          "public_api": "window.SMLabs.{retimeExposure}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, ACTIONS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.interval-assistant",
+          "title": "Action: place N breakdown keyframes at eased intervals between 2 ends",
+          "files": [
+            "src/js/labs/interval-assistant.js (whole, 65 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('interval-assistant', ...)",
+            "intervalAssistant(n,ease)"
+          ],
+          "responsibility": "Action: place N breakdown keyframes at eased intervals between 2 ends",
+          "writer": "localStorage['nemo-labs-interval'] (module-private state otherwise)",
+          "public_api": "window.SMLabs.{intervalAssistant}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, ACTIONS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.pose-library",
+          "title": "Drawing-substitution pose library (save/stamp poses, lip-sync mouths/hand kits)",
+          "files": [
+            "src/js/labs/pose-library.js (whole, 86 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('pose-library', ...)",
+            "savePose(name)",
+            "stampPose(name,opts)",
+            "listPoses()",
+            "deletePose(name)"
+          ],
+          "responsibility": "Drawing-substitution pose library (save/stamp poses, lip-sync mouths/hand kits)",
+          "writer": "localStorage['nemo-labs-poses']; extra: nemo-labs-poses-<projectKey> (module-private state otherwise)",
+          "public_api": "window.SMLabs.{savePose, stampPose, listPoses, deletePose}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, ACTIONS row",
+            "labs-float-panel.js PARAMS stepper (shares a hand-duplicated default, see cross_cutting_notes)"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [
+            "C06.labs.dormant-unreachable (lipsync-assistant.js, dead, would consume pose-library's stamp API if re-enabled)"
+          ],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.speed-lines",
+          "title": "Action: generate a radial burst of speed-line strokes",
+          "files": [
+            "src/js/labs/speed-lines.js (whole, 51 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('speed-lines', ...)",
+            "speedLines(opts)"
+          ],
+          "responsibility": "Action: generate a radial burst of speed-line strokes",
+          "writer": "localStorage['nemo-labs-speedlines'] (module-private state otherwise)",
+          "public_api": "window.SMLabs.{speedLines}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, ACTIONS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.boil-effect",
+          "title": "Action: 'boiling line' — places N shaky keyframe-variants on following frames",
+          "files": [
+            "src/js/labs/boil-effect.js (whole, 70 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('boil-effect', ...)",
+            "boil(opts)"
+          ],
+          "responsibility": "Action: 'boiling line' — places N shaky keyframe-variants on following frames",
+          "writer": "localStorage['nemo-labs-boil'] (module-private state otherwise)",
+          "public_api": "window.SMLabs.{boil}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, ACTIONS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.follow-path",
+          "title": "Action: bake the selection along a trajectory stroke into keyframes",
+          "files": [
+            "src/js/labs/follow-path.js (whole, 114 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('follow-path', ...)",
+            "followPath(opts)"
+          ],
+          "responsibility": "Action: bake the selection along a trajectory stroke into keyframes",
+          "writer": "localStorage['nemo-labs-followpath'] (module-private state otherwise)",
+          "public_api": "window.SMLabs.{followPath}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, ACTIONS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.reference-fill",
+          "title": "Ink & paint reference fill (fills reading all visible layers as walls)",
+          "files": [
+            "src/js/labs/reference-fill.js (whole, 85 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('reference-fill', ...)",
+            "referenceFillAtPointer(x,y)",
+            "referenceFill(x,y)"
+          ],
+          "responsibility": "Ink & paint reference fill (fills reading all visible layers as walls)",
+          "writer": "localStorage['nemo-labs-reffill'] (module-private state otherwise)",
+          "public_api": "window.SMLabs.{referenceFillAtPointer, referenceFill}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, ACTIONS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        },
+        {
+          "id": "C06.labs.vector-trim",
+          "title": "Vector knife (drag a knife-stroke to cut lines at intersections)",
+          "files": [
+            "src/js/labs/vector-trim.js (whole, 264 lines)"
+          ],
+          "symbols": [
+            "SMLabs.register('vector-trim', ...)",
+            "setKnifeTrimActive(on)",
+            "isKnifeTrimActive()"
+          ],
+          "responsibility": "Vector knife (drag a knife-stroke to cut lines at intersections)",
+          "writer": "localStorage['nemo-labs-trim'] (module-private state otherwise)",
+          "public_api": "window.SMLabs.{setKnifeTrimActive, isKnifeTrimActive}",
+          "consumers": [
+            "labs-panel.js Réglages ▸ Labs, ACTIONS row"
+          ],
+          "oracle": "none; zero test coverage found for this file (grepped tests/**)",
+          "depends_on": [
+            "C06.labs.registry-core"
+          ],
+          "entangled_with": [],
+          "notes": "Self-contained single-file Labs prototype; already isolated in its own module, low extraction hazard."
+        }
+      ]
+    },
+    {
+      "area": "labs-dormant",
+      "packets": [
+        {
+          "id": "C06.labs.dormant-timeline-zoom",
+          "title": "Superseded Labs prototype: timeline zoom (intentionally dormant)",
+          "files": [
+            "src/js/labs/timeline-zoom.js (whole, 238 lines)"
+          ],
+          "symbols": [
+            "setTimelineZoom",
+            "zoomTimelineIn/Out",
+            "resetTimelineZoom",
+            "getTimelineZoom"
+          ],
+          "responsibility": "Original Labs-prototype timeline-zoom implementation, superseded by the promoted src/js/timeline-zoom.js (own header comment documents the lineage) and never <script>-included.",
+          "writer": "none (never runs)",
+          "public_api": "none (SMLabs.register never executes)",
+          "consumers": [
+            "C06.labs.settings-panel's dead TOOLS row (DEF-1) is the only remaining reference"
+          ],
+          "oracle": "tests/performance-regressions.test.cjs:76-80 explicitly asserts this file's <script> tag is ABSENT — dormancy itself is test-covered and intentional",
+          "depends_on": [],
+          "entangled_with": [
+            "C06.labs.settings-panel (DEF-1)"
+          ],
+          "notes": "Intentional and verified dormant — the one case of the 12 unreachable labs/*.js files with clear documentation and a regression test proving the exclusion is deliberate. Its own file uses a different localStorage key (nemo-labs-fc) than the promoted replacement (nemo-timeline-fc, src/js/timeline-zoom.js:47) — no runtime key collision. The only outstanding action is DEF-1 (remove the dead UI row), not this file itself."
+        },
+        {
+          "id": "C06.labs.dormant-unreachable",
+          "title": "Undocumented unreachable Labs prototypes (11 files, ~2,083 lines)",
+          "files": [
+            "src/js/labs/auto-actions.js (whole, 105 lines)",
+            "src/js/labs/clip-mask-bake.js (whole, 90 lines)",
+            "src/js/labs/command-palette.js (whole, 116 lines)",
+            "src/js/labs/layer-effects-bake.js (whole, 95 lines)",
+            "src/js/labs/lipsync-assistant.js (whole, 79 lines)",
+            "src/js/labs/oca-export.js (whole, 179 lines)",
+            "src/js/labs/rig-deform.js (whole, 258 lines)",
+            "src/js/labs/screentone-bake.js (whole, 164 lines)",
+            "src/js/labs/shader-effects-bake.js (whole, 310 lines)",
+            "src/js/labs/storyboard-mode.js (whole, 359 lines)",
+            "src/js/labs/timelapse.js (whole, 90 lines)"
+          ],
+          "symbols": [
+            "auto-actions: macroStart()/macroStop(name)/macroPlay(name)/macroList()/macroDelete(name)",
+            "clip-mask-bake: bakeClipMask(maskLayerIdx,targetLayerIdx)",
+            "command-palette: internal commands() list only; reads SMLabs.list()",
+            "layer-effects-bake: bakeLayerEffect(layerIdx,cssFilter|'bloom')",
+            "lipsync-assistant: lipsyncAmplitudeCurve(...)/lipsyncFromAudio(trackIdx,f0,f1,kit)",
+            "oca-export: exportOCA({range})",
+            "rig-deform: rigAddControl/rigListControls/rigBindStroke/rigWeightsFor/rigSetWeight/rigMoveControl/rigResetPose/rigCommitFrame/rigSetIK/rigDragIKEnd/rigMagnetBrush/rigAutosway",
+            "screentone-bake: applyScreentone(null,{pattern,cellPx,angle,color})",
+            "shader-effects-bake: listShaderEffects()/bakeShaderEffect(layerIdx,name,params)",
+            "storyboard-mode: setBoardCaption/setSceneBoundary/removeSceneBoundary/listSceneBoundaries/openStoryboard/closeStoryboard/printStoryboard",
+            "timelapse: timelapseStart()/timelapseStop()"
+          ],
+          "responsibility": "Fully implemented, each independently registers with SMLabs.register(), but none is ever <script>-included in src/index.html, so none ever runs. Unlike timeline-zoom.js, none has a test asserting the exclusion is deliberate, and index.html:2313-2321's own loader comment only accounts for 6 of these 11 by name (storyboard-mode, oca-export, layer-effects-bake/shader-effects-bake/clip-mask-bake, screentone-bake, rig-deform) — it says nothing about auto-actions, command-palette, lipsync-assistant, or timelapse being excluded.",
+          "writer": "none (never runs)",
+          "public_api": "none (SMLabs.register never executes for any of these)",
+          "consumers": [
+            "none — fully unreachable"
+          ],
+          "oracle": "none; no test asserts or denies their dormancy",
+          "depends_on": [],
+          "entangled_with": [
+            "C06.labs.pose-library (lipsync-assistant would consume its stamp API if re-enabled)"
+          ],
+          "notes": "DEF-7: docs/FUNCTIONAL_GAPS.md:157 states '35 prototypes, off by default, a single hook in production' — true of files-with-a-register()-call but overstates real reachability (only 23 of 35 ever load); docs/FUNCTIONAL_GAPS.md:119 even singles out 'Export OCA' as a rough-but-reachable Labs prototype, when it is in fact fully unreachable dead code. Recommend the orchestrator get an explicit decision per file (delete / re-enable / keep intentionally dormant with a test like timeline-zoom.js) rather than treating this as one extraction packet — grouped here only because none currently has a live writer or consumer to differentiate them; each should be re-evaluated as its own packet at the moment it's re-enabled."
+        }
+      ]
+    }
+  ],
+  "cross_cutting_notes": [
+    "Hand-maintained parity lists drifting silently (CLAUDE.md §1 family-of-bug-#1 shape, here across a JS registry rather than layer.children readers): labs-panel.js's TOOLS/ACTIONS arrays must independently mirror which labs/*.js prototypes are actually <script>-included; one entry (timeline-zoom, DEF-1) has already drifted into a dead, silently-no-op UI row with no visible error.",
+    "Default-value hand-duplication, two independent instances of the same hazard class (CLAUDE.md §3's 'two implementations must be kept in sync' shape, applied here to JS config defaults, not Rust render functions): (a) default language — i18n.js's currentLang() ('fr') vs initLanguage() ('en', the documented deliberate default) vs tutorial.js:520 ('fr', DEF-5); (b) Labs float-panel numeric-stepper defaults — labs-float-panel.js's PARAMS, labs-panel.js's inline mkNum(...), and each prototype's own default are 3 hand-copies of the same value, one confirmed already mismatched (canvas-grid step, DEF-8).",
+    "Script-load-order hazard undocumented in one central place: timeline.js:349's window.SM={...} is a full reassignment, not a merge, so every file that loads earlier (all of src/js/labs/**) must defer any window.SM.* write to the 'load' event or have it silently discarded. Three separate files (labs-panel.js, labs-float-panel.js, and timeline.js's own later initPropsPanelCollapse IIFE) independently rediscovered and documented this constraint rather than it living in one place (DEF-9).",
+    "docs/feature-scouting.md is referenced by comment from at least 10 files across this census's scope (index.html, i18n.js, timeline-zoom.js, 9 of the labs/*.js headers) but does not exist anywhere in the current repository — either lost, never committed, or describing an aspirational process. Worth a decision (write it, or strip the dangling references) independent of any single packet.",
+    "Test/fixture coverage across this entire census area is close to nonexistent: exactly 3 narrow regression tests touch any of it (tests/performance-regressions.test.cjs — labs/timeline-zoom.js must stay unloaded; tests/project-open.test.cjs — SMLabs.resetAll() must not fire on rejected importJSON; tests/feedback-2026-08-22.test.cjs — About-tab menu routing). Nothing tests i18n.js's own functions, app.js's profile functions, timeline.js's shortcut-remap functions, or either Labs panel's rendering. engineering/inventory/SURFACES.md independently confirms zero fixture project exists yet for either the 'labs' or 'preferences-workspace' inventory areas."
+  ],
+  "known_defects": [
+    {
+      "id": "DEF-1",
+      "file": "src/js/labs/labs-panel.js",
+      "line": 184,
+      "summary": "TOOLS still lists a 'timeline-zoom' entry whose backing src/js/labs/timeline-zoom.js is never <script>-included (superseded by the promoted src/js/timeline-zoom.js); toggling it silently no-ops (labs-core.js's setOn hits its unknown-prototype branch) and its 'Reset Zoom' button calls a nonexistent window.SMLabs.resetTimelineZoom.",
+      "packet": "C06.labs.settings-panel",
+      "severity": "product-debt (matches CLAUDE.md §1 family-of-bug pattern)"
+    },
+    {
+      "id": "DEF-2",
+      "file": "src/index.html",
+      "line": 2313,
+      "summary": "Loader comment (2313-2321) claims '3D reference … intentionally left out of this wave' while reference-3d.js is in fact <script>-included two lines later (:2341) and fully reachable/registered.",
+      "packet": "C06.labs.reference-3d",
+      "severity": "informational (stale comment, no runtime impact)"
+    },
+    {
+      "id": "DEF-3",
+      "file": "src/index.html",
+      "line": 1895,
+      "summary": "About-tab hardcoded version fallback reads '0.7.0-alpha.1', three patch-alphas behind the actual package.json/tauri.conf.json version '0.7.0-alpha.4'; only corrected at runtime when window.__TAURI__.app exists. CLAUDE.md §7's own version-sync checklist doesn't enumerate this third hardcoded location.",
+      "packet": "C06.preferences.settings-modal-shell",
+      "severity": "product-debt"
+    },
+    {
+      "id": "DEF-4",
+      "file": "src/index.html",
+      "line": 1798,
+      "summary": "data-i18n key 'settingsCheckUpdates' is reused verbatim at both :1798 (#app-check-update, Tauri app-update check) and :1829 (#sync-check, team shared-project update check) — two unrelated actions in two different Settings tabs share one translatable label.",
+      "packet": "C06.i18n.translation-core",
+      "severity": "product-debt"
+    },
+    {
+      "id": "DEF-5",
+      "file": "src/js/i18n.js",
+      "line": 4183,
+      "summary": "currentLang()'s hardcoded fallback ('fr') disagrees with initLanguage()'s documented, deliberate fresh-install default ('en', :4230) and with an independent third fallback in src/js/tutorial.js:520 ('fr') — three hand-written copies of one policy decision, two different literal values. Masked today because initLanguage() always runs first, but any future state.language read before that (or without window.state) would silently diverge from the documented default.",
+      "packet": "C06.i18n.translation-core",
+      "severity": "product-debt (currently masked)"
+    },
+    {
+      "id": "DEF-6",
+      "file": "docs/feature-scouting.md",
+      "line": null,
+      "summary": "Referenced by comment from >=10 files across this census's scope (src/index.html:2313, i18n.js, timeline-zoom.js, 9 of the labs/*.js file headers) but the file does not exist anywhere in the repository; docs/ only contains FUNCTIONAL_GAPS.md.",
+      "packet": "C06.labs.registry-core / multiple labs files",
+      "severity": "informational"
+    },
+    {
+      "id": "DEF-7",
+      "file": "docs/FUNCTIONAL_GAPS.md",
+      "line": 157,
+      "summary": "States Labs ships '35 prototypes, off by default' and separately (line 119) presents 'Export OCA' as a rough-but-reachable prototype; in fact only 23 of the 35 registering files are ever <script>-included, and oca-export.js is fully unreachable dead code.",
+      "packet": "C06.labs.dormant-unreachable",
+      "severity": "informational (doc overstates reachability)"
+    },
+    {
+      "id": "DEF-8",
+      "file": "src/js/labs/labs-panel.js",
+      "line": 117,
+      "summary": "Canvas-grid step default is hand-duplicated 3 times and already disagrees: labs-panel.js's Réglages row uses mkNum(50,...), while canvas-grid.js itself (:13,17) and labs-float-panel.js's PARAMS (:265) both use 100 — the Réglages-displayed default is the odd one out.",
+      "packet": "C06.labs.canvas-grid",
+      "severity": "product-debt"
+    },
+    {
+      "id": "DEF-9",
+      "file": "src/js/timeline.js",
+      "line": 349,
+      "summary": "window.SM={...} is a full object-literal reassignment rather than a window.SM=window.SM||{} merge; because timeline.js loads after all of src/js/labs/**, this silently discards any window.SM.* write those files perform at parse time. Independently documented/worked around in 3 separate files (labs-panel.js, labs-float-panel.js, and timeline.js's own later initPropsPanelCollapse IIFE) rather than fixed or centrally documented once.",
+      "packet": "C06.bootstrap.sm-namespace-init",
+      "severity": "extraction-blocker"
+    }
+  ],
+  "uncovered_responsibilities": []
+}
