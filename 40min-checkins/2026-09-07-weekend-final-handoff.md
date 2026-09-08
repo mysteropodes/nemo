@@ -79,9 +79,9 @@ kickoff. BZ0 closed on September 5 at 15:46:49 UTC for its contract-adoption sco
 
 The durable entry points are the
 [remediation handbook](../engineering/remediation/README.md),
-[architecture](../engineering/remediation/01_CURRENT_AND_TARGET.md),
+[architecture](../engineering/remediation/reference/01_CURRENT_AND_TARGET.md),
 [task registry and publication receipt](../engineering/project-management/PUBLICATION.md),
-and [acceptance policy](../engineering/remediation/08_ACCEPTANCE_AND_MAINTENANCE.md).
+and [acceptance policy](../engineering/remediation/archive/2026-09-07-handbook/08_ACCEPTANCE_AND_MAINTENANCE.md).
 Historical publication prose must be interpreted at its recorded date; current
 GitHub issue and PR state takes precedence.
 

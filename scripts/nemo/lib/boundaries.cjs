@@ -1,6 +1,6 @@
 'use strict';
 // Self-contained module-profile / dependency rule checker — R05 first increment
-// (engineering/remediation/04_MODULARITY_POLICY.md).
+// (engineering/remediation/reference/04_MODULARITY_POLICY.md).
 //
 // This checks a hand- or tool-authored *profile* (a bounded list of modules the
 // caller is reviewing), not the whole application. It has no dependency on the

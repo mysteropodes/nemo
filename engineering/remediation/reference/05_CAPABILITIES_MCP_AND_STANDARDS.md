@@ -8,9 +8,18 @@
 
 # Shared capabilities, Rust MCP and open standards
 
-Status: **proposed product architecture**. The Nemo Rust MCP and shared capability registry are
-not current product features. They are built during remediation from application contracts,
-not as a DOM-control wrapper.
+> **Current/target boundary — 2026-09-07.** Use the
+> [English execution checklist](../EXECUTION_PLAN.en.md) / [French copy](../EXECUTION_PLAN.fr.md)
+> for the approved scope, ownership and acceptance. New OpenFX/OCIO/EXR/OTIO product breadth
+> is deferred; its ports and data contracts remain architectural references.
+
+Source at `66ece0641708122eb8447e85ad8dd7e3402aaf6c` already includes the
+[opacity application service and Rust MCP transport/bridge](../../application/OPACITY_SLICE.md),
+generated transport schema, stdio tests and [sidecar packaging wiring](../../application/MCP_INSTALL.md).
+General per-feature declarations, automatic catalog discovery and complete installed-client
+acceptance remain separate work. In particular, `nemo-mcp/src/registry.rs` discovers running
+application endpoints; it is not the proposed feature registry. Build on the existing shared
+application handlers; do not restart MCP as a DOM-control wrapper or second document writer.
 
 ## One definition, many consumers
 
@@ -29,8 +38,10 @@ Each descriptor defines:
 - native/browser availability, permissions and runtime/diagnostic/developer mode;
 - fixtures, invariants, diagnostics and performance-sensitive contracts.
 
-Dynamic extensions register compatible descriptors and validated handlers at runtime. Avoid
-a central switch or a new general-purpose DSL.
+Trusted feature modules register compatible descriptors and validated handlers through
+deterministic build/launch discovery. This registration convention is the remediation target;
+a general third-party runtime plugin loader is future scope. Avoid a central per-feature
+operation switch or a new general-purpose DSL.
 
 ## Complete surface inventory
 
@@ -93,7 +104,10 @@ Never expose unrestricted remote shell/eval from release builds. A production bi
 patch itself; a fix becomes a reviewed build and normal update. Developer mode uses explicit
 operations and least privilege.
 
-## Open standards from the foundation
+## Future open standards through foundation ports
+
+Preserve these contracts now. Full adapters, a new real plugin and the proof sequence below
+belong to later product work; they are not additional prerequisites for current remediation.
 
 | Standard | Required boundary |
 |---|---|
@@ -106,7 +120,7 @@ OpenFX affects images, scheduling, cache and time, not only a plugin menu. Start
 controlled CPU float subset and one real redistributable plugin. Map supported parameter
 descriptors into ordinary Nemo properties so UI, animation, SDK and MCP use the same handlers.
 
-Required early proof:
+Proof for a future OpenFX implementation:
 
 1. discover/load/describe one real plugin and record its version/supported suites;
 2. edit and key a parameter through UI and MCP, then undo and save/reload;

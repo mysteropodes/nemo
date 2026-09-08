@@ -622,19 +622,26 @@ Component partagé par StoryBoard et Animation2D/Motion — trois lacunes concr�
    survolée (jamais toutes à la fois — coût déjà rejeté par le commentaire historique de
    `thumbDataUrl`), qui revient à la vignette statique au `mouseleave`.
 
-## 9. Collaboration Git (2026-07) — repo `mysteropodes/nemo`
+## 9. Collaboration Git — repo `mysteropodes/nemo`
+
+Pour la remédiation, suivre le [plan d’exécution actuel](engineering/remediation/EXECUTION_PLAN.fr.md)
+(2026-09-07) : une branche et une PR par résultat délimité, conservées entre les sessions ;
+worktrees limités aux rédacteurs réellement concurrents ; tâches et preuves sur le Projet #2,
+rapports partagés dans l’issue #1062. Les rappels restent en pause jusqu’au début de
+l’exécution et sont suspendus à l’arrêt de l’équipe.
 
 Depuis l'arrivée d'un collaborateur (pencilpark), ce dossier n'est plus le seul endroit où le
 code vit — `origin` pointe vers un vrai repo GitHub (public depuis 2026-08-26), et il faut éviter de s'écraser
 mutuellement. Règles à suivre **sans qu'on ait besoin de le redemander** :
 
-- **Jamais de commit direct sur `main`.** Toujours une branche dédiée par tâche/session :
+- **Jamais de commit direct sur `main`.** Toujours une branche dédiée par résultat délimité, réutilisée entre les sessions :
   `git checkout -b claude/<sujet-court>` pour le travail fait avec Claude (préfixe qui
   identifie la provenance dans l'historique), branches sans préfixe particulier pour le
   travail humain direct. Une fois la tâche terminée, ouvrir une Pull Request vers `main`
   plutôt que de merger en local en douce.
-- **`git pull` avant de commencer à toucher au code**, à chaque nouvelle session — le dossier
-  peut avoir bougé depuis la dernière fois (pencilpark, ou une session précédente).
+- **`git fetch origin` puis vérifier l’état local, la base et les propriétaires avant d’éditer**
+  à chaque nouvelle session. Intégrer les mises à jour nécessaires sur une branche propre,
+  sans écraser les modifications d’un autre agent ; reprendre la branche du résultat actif.
 - **Pousser la branche dès qu'un morceau cohérent est fini**, ne pas laisser des commits
   locaux non poussés s'accumuler sur plusieurs sessions — plus l'écart avec `main` grandit,
   plus les conflits de merge sont douloureux à résoudre.
@@ -642,11 +649,11 @@ mutuellement. Règles à suivre **sans qu'on ait besoin de le redemander** :
   correction d'une ligne passe par une branche + PR, pour rester cohérent et laisser une
   trace revue.
 - Ce dossier reste synchronisé par kDrive/OneDrive en tâche de fond (usage personnel de
-  Cyril) — **ce n'est PAS le mécanisme de partage avec pencilpark**, qui clone sa propre
+  Cyrill) — **ce n'est PAS le mécanisme de partage avec pencilpark**, qui clone sa propre
   copie du repo GitHub ailleurs. Ne jamais partager ce dossier OneDrive directement avec un
   collaborateur pour du travail simultané (sync cloud + git en parallèle sur le même dossier
   risque de corrompre l'historique).
-- Secrets (`TAURI_SIGNING_PRIVATE_KEY`) restent strictement personnels à Cyril — jamais
+- Secrets (`TAURI_SIGNING_PRIVATE_KEY`) restent strictement personnels à Cyrill — jamais
   committés (déjà couvert par `.gitignore` pour les clés de signature), jamais partagés même
   avec un collaborateur de confiance. Depuis 2026-09, ni l'updater (releases GitHub
   publiques, voir §7) ni le feedback (Worker Cloudflare, voir §6) n'ont besoin d'un token
@@ -656,9 +663,9 @@ mutuellement. Règles à suivre **sans qu'on ait besoin de le redemander** :
 - **Avant de partir en investigation sur un bug rapporté (surtout Motion/canvas), vérifier
   les branches sœurs AVANT de diagnostiquer soi-même** — quand plusieurs sessions Claude
   travaillent en parallèle dans des worktrees séparés (ex. `nemo` sur `claude/web-public-beta`
-  vs `nemo-motion` sur `claude/trim-and-motion-anchor-fixes`), le SEUL canal entre elles est
-  Git, de façon asynchrone : rien n'informe une session que l'autre a déjà committé un fix
-  tant qu'un `git fetch` explicite n'est pas fait. Incident du 2026-08-22 : un bug de
+  vs `nemo-motion` sur `claude/trim-and-motion-anchor-fixes`), vérifier les claims dans les
+  issues, les rapports partagés et les refs Git. Une note Buzz ne remplace pas la lecture
+  du commit effectivement poussé ; utiliser `git fetch` pour vérifier les changements. Incident du 2026-08-22 : un bug de
   keyframes Position en Motion a été diagnostiqué et corrigé en profondeur (deux causes
   distinctes trouvées par du reverse-engineering en direct) — alors qu'un fix pour une
   troisième cause du MÊME bug (`29f4e7e`, feedback #41) était déjà poussé sur

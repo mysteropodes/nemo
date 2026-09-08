@@ -8,16 +8,25 @@
 
 # Task packet
 
-- Issue/Project item:
+> **Optional field reference — 2026-09-07.** Use the compact claim in the
+> [English execution checklist](../../EXECUTION_PLAN.en.md) /
+> [French copy](../../EXECUTION_PLAN.fr.md), recorded in the existing task issue.
+> Do not create a separate packet file or report PR. Primary execution is Project #2;
+> Project #8 is legacy. Broad R parents are rollups; only named leaf dependencies block.
+
+- Issue/Project #2 item:
 - Human owner:
-- Coordinator:
+- Team and lane: Ilya/Cyrill; O/D1/D2
+- Orchestrator:
 - Agent/session:
-- Status: Ready
+- Actual model/effort (not assumed from recommended settings):
+- Current status read from issue/Project #2:
 - Priority/area/goal:
-- Intended user-visible outcome:
+- Observable structural/behavioral outcome:
 - Forbidden regression:
 - Explicit non-goals:
 - Base SHA:
+- Known baseline failures/blocked/not-run cases and evidence:
 - Branch:
 - Worktree ID:
 - Repository-relative writable paths:
@@ -30,7 +39,8 @@
 - Acceptance fixtures and checks:
 - Evidence/artifact location and source identity:
 - Reviewer:
-- Checkpoint/expiry:
+- Next checkpoint and bounded active-work estimate:
+- Claim retention/release on pause; exception expiry only when applicable:
 - Publication/PR/merge/release authority:
 - Expected result format:
 
@@ -43,3 +53,5 @@
 
 This packet records scope and authority already granted by the appropriate human/coordinator.
 It does not grant new account, deployment, merge or release permission.
+Baseline means exact observed state, including defects. Do not repair unrelated features
+to make a claim ready. Reuse one branch across sprints; keep local writer/worktree limits.

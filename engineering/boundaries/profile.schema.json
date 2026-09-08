@@ -14,7 +14,7 @@
     },
     "layerRules": {
       "type": "object",
-      "description": "Keyed by layer name (engineering/remediation/04_MODULARITY_POLICY.md's 'Logical layers'). A layer with no entry is treated permissively (no layer-violation is ever raised for imports it makes) — declare every layer you want enforced.",
+      "description": "Keyed by layer name (engineering/remediation/reference/04_MODULARITY_POLICY.md's 'Logical layers'). A layer with no entry is treated permissively (no layer-violation is ever raised for imports it makes) — declare every layer you want enforced.",
       "additionalProperties": { "$ref": "#/definitions/layerRule" }
     },
     "sizeProfiles": {

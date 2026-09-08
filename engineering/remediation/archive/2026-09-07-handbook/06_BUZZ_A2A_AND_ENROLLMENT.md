@@ -8,8 +8,22 @@
 
 # Buzz collaboration, A2A and enrollment
 
-Protocol: **NEMO-A2A-1**<br>
-Runtime workspace contract: **1.5.0**
+> **Archived collaboration handbook — 2026-09-07.** Current remediation uses Ilya's
+> and Cyrill's local teams under the [English checklist](../../EXECUTION_PLAN.en.md) /
+> [French copy](../../EXECUTION_PLAN.fr.md). Enrollment, remote dispatch and BZ acceptance are
+> not prerequisites for Nemo extraction. Apply this chapter only to explicitly authorized
+> Buzz work and verify its described behavior against the actual installed runtime.
+
+Recorded protocol: **NEMO-A2A-1**<br>
+Recorded runtime workspace contract: **1.5.0**
+
+The bounded Buzz workspace configuration editor is separately authorized work; expanded
+transport/infrastructure remains deferred. Shared progress uses the
+[central GitHub log](https://github.com/mysteropodes/nemo/issues/1062) and short links in
+the designated existing Nemo conversation. Do not broadcast, create reporting threads or
+start remote workers from a check-in. Prepare hourly timers **paused**; enable them only
+for actual execution sessions and pause them when stopping. Preparation and plan review do
+not start an execution timer, and reporting must not interrupt delegate jobs.
 
 ## Status boundary
 
@@ -20,7 +34,9 @@ task paths coordinate writer ownership and do not form a host filesystem sandbox
 
 This tracked contract does not by itself prove BZ0 live-transport or release acceptance.
 Revalidate those gates on the identified Buzz build and runtime before claiming general
-deployment. Nemo's product Rust MCP is a separate future product surface.
+deployment. Nemo's product Rust MCP is separate from Buzz/A2A; its first application
+slice and transport already exist in source, while broader registry and installed-client
+acceptance remain tracked by the execution checklist.
 
 ## Roles and permissions
 
@@ -43,7 +59,7 @@ permission mode, native file/shell tools and subagents, configured MCP servers, 
 host accounts. Optional Buzz Project Git tools are not the only route for authorized GitHub
 work. Preserve source ownership, separate worktrees, scoped commits and branch protections.
 
-## Enroll a human developer
+## Enroll a human developer (only when explicitly requested)
 
 1. Operator verifies current project-collaborator eligibility and agrees the initial role and
    channels.
@@ -61,7 +77,7 @@ An invitation link is a convenience for connection details. It never replaces co
 verification or admission. Private keys, recovery passwords and provider credentials are never
 sent to the operator or chat.
 
-## Create and authorize a developer-owned agent
+## Create and authorize a developer-owned agent (optional Buzz path)
 
 Agent creation is self-service after human enrollment:
 
@@ -150,7 +166,8 @@ direct addressed questions. Organization changes require the user's applicable t
 
 Timers deliver the user's exact prompt through the normal conversation queue. A timer does
 not create a separate completion protocol or standing authority beyond the delivered prompt.
-When that prompt says to wait if there is no new work, remain idle.
+For the current hourly workflow, create it paused, enable it during actual execution, then
+pause on session stop. When the prompt says to wait if there is no new work, remain idle.
 
 ## Dispatch contract
 

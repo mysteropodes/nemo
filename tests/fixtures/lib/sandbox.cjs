@@ -2,7 +2,7 @@
 // Loads PRODUCTION modules from src/js into a Node vm sandbox so fixtures and
 // workloads exercise the shipped evaluator, never a copy of it (R03; rule
 // "pure unit tests use production imports and independent expected results",
-// engineering/remediation/03_TESTING_AND_DEBUGGING.md).
+// engineering/remediation/reference/03_TESTING_AND_DEBUGGING.md).
 //
 // motion.js runs whole: its IIFE only touches the DOM lazily, so a stub
 // `document` whose lookups return null is enough for the evaluator, the

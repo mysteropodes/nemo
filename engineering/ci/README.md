@@ -8,6 +8,12 @@
 
 # Local validation and explicitly requested hosted runs
 
+Implementation scope reviewed on **2026-09-07** at
+`66ece0641708122eb8447e85ad8dd7e3402aaf6c`. The
+[execution checklist](../remediation/EXECUTION_PLAN.en.md) governs current remediation
+leaves and known-defect disposition. The local/hosted policy below remains in force;
+updating this reference enables no workflow and claims no fresh runtime acceptance.
+
 **Current policy (2026-09-06): all builds and validation run locally by default.**
 Commits, pushes, PR updates, merges, and version tags must not trigger GitHub Actions
 builds. A routine request to implement, test, open a PR, merge, deploy, or release does
@@ -80,13 +86,22 @@ plus addition, so moving application code into a docs path cannot hide its forme
 
 When applicable, the runner invokes the established verifier with `test:integration`,
 `test:browser`, `test:rust-tauri`, `build:wasm`, `build:desktop`, and `test:desktop`.
-The current dependency/suite gaps deliberately prevent a green aggregate:
+Source already contains browser, integration and packaged-native harnesses. Each selected
+job still needs its real environment and artifact, and a harness's existence does not
+establish full feature or platform acceptance:
 
-- Document-contract suites are not yet defined (R12/R13).
-- Playwright and the browser acceptance suite are not yet installed/defined (R03/R07).
-- Packaged desktop test harness and installed-artifact acceptance remain open (R06/R21).
-- Native builds require toolchain/dependencies and usable sidecar packaging. R04's unsigned
-  desktop build/sidecar correction is separate work. This workflow does not supply signing,
+- `tests/integration/r06-browser-runtime.test.cjs` is the current integration-directory
+  suite. It does not by itself cover every document, history or persistence contract.
+  The opacity application tests have separate unit/browser coverage.
+- `@playwright/test` is declared in `package.json`, and `tests/browser` contains opacity
+  consumers, preview lifecycle and isolation specs. Dependency/browser installation and
+  actual supported graphics behavior must still be verified on the selected environment.
+- `tests/desktop/native-harness.cjs` and `packaged-native.test.cjs` exist. The desktop job
+  requires a real package and rejects empty/skipped tests. Process/storage isolation is
+  separate from installed UI, save/reload, render/export and MCP-client acceptance.
+- Native builds require toolchain/dependencies and usable sidecar packaging. The existing
+  isolated builder preserves an unsigned package and runs FFmpeg dylib finalization; its
+  source is not a release receipt. This workflow does not supply signing,
   updater, notarization, deployment, or feedback credentials.
 - WASM builds require `wasm-pack` and its target. The current local job builds geometry only;
   vectorize rebuild/parity and GPU acceptance remain outside that job's success claim.
@@ -100,13 +115,21 @@ The current dependency/suite gaps deliberately prevent a green aggregate:
   text without applying a JavaScript lexer, including when called for Rust, WGSL, CSS,
   Python, shell or HTML source. Language-neutral counting does not add dependency-graph
   coverage for those languages. Full source classification and application architecture
-  enforcement remain the R05 adoption/integration gate.
+  enforcement remain the named P10/P11 and related leaf outcomes in the current checklist,
+  tracked under R05; whole-parent closure is not a global extraction prerequisite.
+
+The selected CI jobs do not include the `nemo-mcp` crate's Cargo suite or the new coverage
+and feature-registration gates. Run the crate's applicable tests explicitly and implement
+the missing gate wiring through its named leaves; a green aggregate cannot stand in for
+checks it never selected.
 
 There are no placeholder green browser/native jobs and no label-based bypass. A green
 tooling/docs PR reports runtime jobs as **not applicable**, not tested or accepted.
-Application-affecting PRs will remain blocked until the required harnesses and build
-prerequisites land. Full R07 acceptance still needs actual browser and packaged-native
-receipts on their supported environments; CPU tests cannot supply that evidence.
+Application-affecting candidates need the selected job receipts and actual prerequisites;
+do not assume they are all blocked because earlier documentation predates the harnesses.
+Known baseline failures remain explicit comparison evidence, not concealed passes or an
+instruction to fix unrelated features first. Runtime acceptance still needs actual browser
+and packaged-native receipts on supported environments; CPU tests cannot supply them.
 
 ## Protected base and PR trust
 
@@ -140,6 +163,8 @@ them in `npm test` and `npm run verify`. Tests exercise real CLI invocation, a z
 blocked verifier, missing/duplicate receipts, all nonsuccess aggregate states, conservative
 selection and a Git fixture where candidate policy differs from the protected base.
 
-[PR #945](https://github.com/mysteropodes/nemo/pull/945) is a separate test-fixture
-prerequisite for Node executable paths containing spaces. Until integrated, those existing
-fixtures can fail on affected hosts; this CI runner does not mask or patch them.
+Historical fixture correction: [PR #945](https://github.com/mysteropodes/nemo/pull/945)
+merged as `1d652dd5de550bf6f5863faf5ed89c2481a36412` on 2026-09-05 and is contained in the
+reviewed main. It is no longer an outstanding prerequisite for Node executable paths
+containing spaces. Preserve its regression coverage and diagnose any fresh failure on the
+actual candidate; this source review is not a rerun of those fixtures.

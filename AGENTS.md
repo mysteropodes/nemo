@@ -14,18 +14,40 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
 
 ## Find the project contract
 
-- Start with [the remediation handbook](engineering/remediation/README.md) and its
-  [manifest](engineering/remediation/MANIFEST.md). Respect each document's Current,
-  Proposed, Gate, and Future labels.
-- Read [current and target architecture](engineering/remediation/01_CURRENT_AND_TARGET.md),
+- Start with the single remediation execution checklist:
+  [English](engineering/remediation/EXECUTION_PLAN.en.md) /
+  [français](engineering/remediation/EXECUTION_PLAN.fr.md). Its human-approved
+  2026-09-07 scope and workflow supersede older plans, phase gates and agent playbooks.
+  The [short entry point](engineering/remediation/README.md) links the four supporting
+  references. The archived handbook is historical context, not a required reading list.
+- Read [current and target architecture](engineering/remediation/reference/01_CURRENT_AND_TARGET.md),
   then the relevant source and the relevant section of `CLAUDE.md` before editing.
-- Use [testing and debugging](engineering/remediation/03_TESTING_AND_DEBUGGING.md) and
-  [modularity policy](engineering/remediation/04_MODULARITY_POLICY.md) for quality gates.
-- Use [Buzz/A2A and authority](engineering/remediation/06_BUZZ_A2A_AND_ENROLLMENT.md) and
-  [parallel work](engineering/remediation/07_GITHUB_PROJECT_AND_PARALLEL_WORK.md) for
-  coordination, ownership, worktrees, commits, and integration.
-- Start writable work from the [task packet](engineering/remediation/templates/TASK_PACKET.md)
-  and report it with the [handoff receipt](engineering/remediation/templates/HANDOFF_RECEIPT.md).
+- Use the execution checklist for current acceptance, board updates, claims, commits,
+  pushes and issue handoffs. Use [testing and debugging](engineering/remediation/reference/03_TESTING_AND_DEBUGGING.md)
+  and [modularity policy](engineering/remediation/reference/04_MODULARITY_POLICY.md) as supporting
+  references; planned tooling is not implemented merely because a document names it.
+- Work through Ilya's or Cyrill's local team, at most one orchestrator and two delegates
+  each. Reuse one branch per outcome across sprints; keep at most two writable task
+  worktrees plus the primary checkout per machine. Progress and handoffs belong in the
+  existing issue, not new report PRs or additional ledgers.
+- The checklist contains portable workflows and the compact claim/handoff format. No
+  personal skill installation or Buzz enrollment is required for this remediation.
+  Existing packet/receipt templates are reference material, not extra required documents.
+
+## Remediation scope
+
+- Baseline means the exact observed current state, including identified failures and
+  unavailable checks. Preserve that evidence; do not repair unrelated features first.
+- Finish module boundaries, one writable state authority, regression tests, enforcement,
+  feature declarations and their shared application API/bundled Rust MCP integration.
+  Existing broken features need explicit availability and isolated ownership, not a
+  product fix as a prerequisite to remediation completion.
+- R03/R05 and the other broad issues are tracking parents. Only named executable leaf
+  dependencies block work; their whole-issue closure is not a global extraction gate.
+- New OpenFX effects, full OCIO/EXR/OTIO implementations, expanded Buzz transport/
+  infrastructure and broad product/performance work are deferred. The explicitly
+  authorized bounded Buzz workspace configuration editor may proceed in its separate
+  owned lane; it is not a prerequisite to Nemo extraction. Preserve suitable ports now.
 
 ## Work safely
 
@@ -38,12 +60,13 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
 - Record the outcome, scope, dependencies, base, branch/worktree, acceptance checks,
   reviewer, and publication authority before writing. Repository-relative paths coordinate
   ownership; they are not a user-maintained filesystem permission list.
-- The dedicated Nemo Buzz workspace supplies authenticated Project/repository participation
-  and runtime instructions to enrolled collaborators. Do not ask users to configure manual
-  path grants, revision pins, or agent assignments. Tool availability does not broaden the
-  current task or authorize publishing, merging, deployment, enrollment, or release.
-- Treat relay storage, `processed`, `accepted`, progress, and terminal results as distinct
-  A2A states. Never replay an indeterminate operation without reconciling its actual effects.
+- Tool availability does not broaden the current task's publication, merge, deployment,
+  enrollment or release authority. Preserve existing human authorization across handoffs.
+- For explicitly requested Buzz/A2A work, use the current execution checklist and actual
+  runtime documentation. The [archived authority chapter](engineering/remediation/archive/2026-09-07-handbook/06_BUZZ_A2A_AND_ENROLLMENT.md)
+  provides historical protocol context only. Treat relay storage, `processed`, `accepted`,
+  progress and terminal results as distinct states; reconcile actual effects before retrying
+  an indeterminate operation.
 - Preserve other contributors' edits and scoped commits. Keep credentials, private machine
   paths, private evidence, and protected infrastructure details out of source and receipts.
 

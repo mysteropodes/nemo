@@ -8,14 +8,30 @@
 
 # GitHub Project and parallel-development contract
 
-Status: **proposed team workflow**. The board, fields and automation are not active until a
-Project owner creates/adopts them. GitHub issues, PRs, CI and review remain canonical even
-when Buzz carries the coordination messages.
+> **Archived historical workflow — 2026-09-07; execution superseded.** Use the
+> [English checklist](../../EXECUTION_PLAN.en.md) / [French copy](../../EXECUTION_PLAN.fr.md)
+> for the existing boards, claims, handoffs, publication and integration. Ilya and Cyrill
+> direct local teams of at most one orchestrator and two delegates each. Keep one branch
+> per outcome across sprints and at most two writable task worktrees plus the primary
+> checkout per machine. Notes belong in the existing issue, not report PRs. Do not create
+> another board, require Buzz enrollment or treat broad R parents as global blockers.
 
-## Project
+**Primary board:** [Cyrill's Project #2](https://github.com/users/mysteropodes/projects/2/views/1).
+Update its `Remediation status`, validation and applicable metadata as directed by the
+checklist. Ilya's Project #8 is a legacy snapshot; no ongoing dual-board parity is required.
+The [shared hourly log](https://github.com/mysteropodes/nemo/issues/1062) contains team
+summaries and is excluded from executable-leaf counts. Prepare reporting timers paused;
+enable only while actually executing and pause when the session stops.
 
-Create one Project named **Nemo Development**, owned where the repository maintainers can
-administer it, and link it to the Nemo repository.
+Status: **historical setup/workflow proposal and ownership reference**. The projects and
+issues already exist. The creation instructions below are historical, not a new setup task.
+
+## Historical initial Project proposal
+
+The original proposal was to create one Project named **Nemo Development**. The existing
+Project #2 now supplies that role; this historical name is not an instruction to create or
+rename a board. The table below records the original minimal field proposal; the execution
+checklist defines current fields, options and status mappings.
 
 Recommended fields:
 
@@ -49,7 +65,10 @@ A merged PR is not automatically Done when desktop, export or visual acceptance 
 Use issue-closing keywords only when the full issue acceptance is satisfied by merge/CI.
 Do not mass-close old issues based on a `resolved` label; triage each against evidence.
 
-## Minimal automation
+## Historical automation options (not enabled by this reference)
+
+The current workflow uses explicit read-before/write/readback on Project #2. Do not install
+automation or change hosted workflows merely to implement this old option list.
 
 - Auto-add only intentionally triaged items, for example those with a `tracked` label.
 - Link PRs, issues and CI receipts.
@@ -61,12 +80,15 @@ Do not mass-close old issues based on a `resolved` label; triage each against ev
 
 ## Claim and assignment
 
-Every task uses [the task packet](templates/TASK_PACKET.md). One coordinator issues scope.
+Every task uses the execution checklist's compact issue claim. The
+[task packet](../../reference/templates/TASK_PACKET.md) is an optional field reference, not a required new
+file. Each human's orchestrator issues its team's scope and reconciles shared files with
+the other orchestrator.
 A claim identifies issue, human owner, unique agent session, base, branch/worktree, allowed
 paths, contracts, dependencies, resource slots, checkpoint and acceptance.
 
-Buzz/Project status is not an atomic file lock. Before editing, the writer acknowledges the
-exact grant. Scope expiry starts reconciliation; it never permits a second writer to overwrite
+An issue claim or Buzz/Project status is not an atomic file lock. Before editing, the writer
+acknowledges the exact grant. Scope expiry starts reconciliation; it never permits a second writer to overwrite
 an unreachable owner's work.
 
 Reserve whole legacy files during extraction. Line ranges are too fragile for shared monoliths.

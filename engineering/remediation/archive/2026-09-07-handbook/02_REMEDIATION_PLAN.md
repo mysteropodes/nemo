@@ -8,10 +8,19 @@
 
 # Dependency-ordered remediation plan
 
-Status: **proposed execution plan**. R00-R22 are work-package identifiers, not existing issue
-numbers. Resolve current `main`, open work and owner assignments at kickoff.
+> **Archived historical plan — 2026-09-07; execution superseded.** Use the single
+> [English checklist](../../EXECUTION_PLAN.en.md) / [French copy](../../EXECUTION_PLAN.fr.md).
+> This chapter preserves historical reasoning. Its forecasts, lead structure, kickoff,
+> phase order and broad product/remote-agent gates are not current instructions.
+> Baseline means exact observed state, including defects; R parents are rollups and only
+> named leaf dependencies block extraction. New OFX/OCIO/EXR/OTIO and expanded Buzz
+> transport/infrastructure are deferred. The separately authorized bounded Buzz workspace
+> configuration editor does not reinstate the BZ kickoff or gate Nemo extraction.
 
-## Operating model
+Status: **historical execution proposal**. R00-R22 identify existing tracking parents;
+use their current executable leaves and ownership through the checklist and GitHub.
+
+## Historical operating model
 
 Use three lead programs when capacity is available:
 
@@ -29,7 +38,7 @@ Planning target: a first integrated foundation increment within 24 elapsed hours
 existing-scope remediation within 7-14 calendar days, with days 11-14 reserved for defects and
 acceptance reruns. These are planning targets. Gates are never waived to meet them.
 
-## Immediate kickoff
+## Historical kickoff (not required for current local teams)
 
 Begin with **R00/BZ0**: collect every active developer's task, branch, head, changed/planned
 paths, contracts, agent sessions, unpushed work and next checkpoint. Name the human integration
@@ -52,9 +61,9 @@ Normalize the existing Buzz pilot through these collaboration packets:
 Retain accepted pilot behavior, but revalidate it on the final distributed builds. Do not
 describe a source-complete packet as deployed until its runtime gate passes.
 
-## Phase sequence
+## Historical phase sequence
 
-### Current execution order — September 6, 2026
+### Historical execution order — September 6, 2026 (superseded)
 
 The accepted F0 comparison is PR #983, merge `cf22365f909069e232a6b6bf992a272e4bd96ff3`.
 Preserve its known native timing failure and unrun/blocked platform cases. Reuse
@@ -79,7 +88,8 @@ Add R15's gesture/job shape, then migrate R18's subsystem families in dependency
 Complete R03 and R05 coverage alongside each family. R10 starts at the native host/image
 contract; R16 consumes that proof and the shared property/job services; R17 starts at
 the image/color/time contracts. Accumulate R19/R20/R21 evidence during migration and
-finish R22 acceptance. The phase gates below remain final acceptance obligations.
+finish R22 acceptance. Those phase gates belonged to the earlier plan; the current
+execution checklist replaces them.
 Installed bundled executable and actual Codex/Claude discovery, editing, history,
 persistence, render/export, reconnect, cancellation and stale-write behavior are
 required for the property/MCP slice. Workflows remain manual-only.
@@ -111,8 +121,9 @@ other's source, state or artifacts; a clean clone finds the same team instructio
 
 ### F2 — contracts, first extraction and diagnostics
 
-**R08** Extract one pure animation/easing seam through a compatibility facade. Compare Node
-and Vitest using the same unit, stateful behavior and browser control; record the runner ADR.<br>
+**R08** Extract one pure animation/easing seam through a compatibility facade. The originally
+proposed runner comparison is complete: [ADR 001](../../../animation/ADR-001-curve-runner.md)
+retains Node; do not repeat that trial.<br>
 **R09** Decide writable state ownership, stable IDs, timebase, persistence, image/color,
 platform capability and dependency direction. Generate boundary types/schemas.<br>
 **R10** Prove a disposable native OpenFX load/describe/CPU-float-render path.<br>
@@ -175,7 +186,7 @@ setup, rehearse a task with fresh Codex and Claude sessions, and obtain maintain
 Gate: all shipped actionable surfaces are classified; persistent data survives every required
 consumer; no unowned bypass remains; browser and packaged desktop evidence is current.
 
-## Parallel work during the program
+## Historical parallel-work proposal
 
 Unrelated feature work is paused during this production sequence. Reserve the exact shared scaffold, contract or whole
 legacy file under active extraction. Typical reservation windows are 1-4 hours for shared

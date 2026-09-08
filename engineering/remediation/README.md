@@ -6,43 +6,27 @@
 3. **Match agents and effort to the work.** Use the least costly capable model and reasoning effort for each bounded task; delegate independent work when useful and escalate when complexity, uncertainty or risk warrants it.
 <!-- nemo-golden-rules:end -->
 
-# Using this package
+# Nemo remediation: start here
 
-Start with [the manifest](MANIFEST.md), then read the current/target architecture and the
-remediation plan. A developer or agent working on one packet reads only the relevant policy,
-task packet and module documentation in addition to the repository's contributor guidance.
+Use the single execution checklist in [English](EXECUTION_PLAN.en.md) or
+[French](EXECUTION_PLAN.fr.md). It contains the approved task sequence, team roles,
+model/effort guidance, tests, check-ins, Git workflow, board updates and completion gate.
+The baseline is the exact observed state, including defects. The goal is modular ownership,
+testing, enforced boundaries and feature contracts served through the bundled Rust MCP.
 
-## Adoption checklist
+Track execution on [Cyrill's Project #2](https://github.com/users/mysteropodes/projects/2/views/1)
+and team summaries in the [shared hourly log](https://github.com/mysteropodes/nemo/issues/1062).
+Detailed claims and handoffs stay in their task issues. Project #8 is a legacy snapshot.
 
-1. Reconcile every current-state statement with the selected `main` commit.
-2. Review and accept, amend or reject the proposed ADR-level decisions.
-3. Choose the tracked destination, for example `engineering/remediation/`, and move this
-   directory as one unit so its internal links remain valid.
-4. Keep the repository's Codex and Claude entry files short and point them at the adopted
-   documents.
-5. The dedicated Nemo workspace supplies its current A2A instructions at agent startup; do
-   not add a mandatory repository skill reference unless that skill is tracked in the same
-   candidate. Test clean-clone instruction discovery in both clients.
-6. Create the GitHub Project fields/views and real CI workflow before making their checks
-   required.
-7. Open R00-R22 as parent/child issues only after current owners, dependencies and acceptance
-   are reconciled.
-8. Validate one small multi-agent fixture before opening broad concurrent extraction.
+Read only the supporting reference needed for the selected task:
 
-## Working interpretation
+- [Current and target architecture](reference/01_CURRENT_AND_TARGET.md)
+- [Testing and debugging](reference/03_TESTING_AND_DEBUGGING.md)
+- [Modularity and file-size policy](reference/04_MODULARITY_POLICY.md)
+- [Capability contracts, Rust MCP and future standards](reference/05_CAPABILITIES_MCP_AND_STANDARDS.md)
 
-A proposal does not grant file, GitHub, relay, deployment, merge or release authority.
-Every writable task needs a human owner, exact base, branch/worktree, allowed paths,
-dependencies, observable acceptance and a reviewer. New requests are queued without
-silently abandoning the active task.
-
-Implementation status belongs in the corresponding issue and handoff receipt. Do not turn
-this package into a shared mutable task ledger. Update a policy document in the same pull
-request that changes its contract, and retain dated evidence outside normative prose.
-
-## Safe customization
-
-Replace placeholders such as `<base-sha>` and `<worktree-id>` when creating a task. Keep
-secrets and machine-local paths in approved local configuration. Repository-relative paths,
-public issue/PR links, commit IDs and sanitized artifact hashes are suitable for shared
-receipts.
+Optional expanded field templates are under `reference/templates/`; the checklist already
+contains the required issue formats. [The archived handbook](archive/2026-09-07-handbook/)
+preserves superseded plans, collaboration assumptions and acceptance gates for historical
+context. It is not an additional execution plan or prerequisite. Current source and dated
+runtime evidence establish implementation; reference prose alone does not.
