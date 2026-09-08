@@ -6,38 +6,52 @@
 3. **Match agents and effort to the work.** Use the least costly capable model and reasoning effort for each bounded task; delegate independent work when useful and escalate when complexity, uncertainty or risk warrants it.
 <!-- nemo-golden-rules:end -->
 
-# Using this package
+# Nemo remediation: start here
 
-Start with [the manifest](MANIFEST.md), then read the current/target architecture and the
-remediation plan. A developer or agent working on one packet reads only the relevant policy,
-task packet and module documentation in addition to the repository's contributor guidance.
+The single execution checklist is available in [English](EXECUTION_PLAN.en.md) and
+[French](EXECUTION_PLAN.fr.md). Both copies describe the same human-approved strategy of
+**2026-09-07**. Use it for the complete task sequence, team roles, model/effort settings,
+claims, tests, check-ins, commits, pushes, board updates and handoffs.
 
-## Adoption checklist
+Its scope and workflow supersede the older R00-R22 execution order, forecasts, global phase
+blockers, remote-agent assumptions and local-agent playbooks. A baseline records the exact
+observed state, including known defects. Completion means modular ownership, appropriate
+tests, enforced boundaries and feature contracts served through the bundled Rust MCP;
+unrelated product repairs and new product breadth are outside that completion gate.
 
-1. Reconcile every current-state statement with the selected `main` commit.
-2. Review and accept, amend or reject the proposed ADR-level decisions.
-3. Choose the tracked destination, for example `engineering/remediation/`, and move this
-   directory as one unit so its internal links remain valid.
-4. Keep the repository's Codex and Claude entry files short and point them at the adopted
-   documents.
-5. The dedicated Nemo workspace supplies its current A2A instructions at agent startup; do
-   not add a mandatory repository skill reference unless that skill is tracked in the same
-   candidate. Test clean-clone instruction discovery in both clients.
-6. Create the GitHub Project fields/views and real CI workflow before making their checks
-   required.
-7. Open R00-R22 as parent/child issues only after current owners, dependencies and acceptance
-   are reconciled.
-8. Validate one small multi-agent fixture before opening broad concurrent extraction.
+Use [Cyrill's Project #2](https://github.com/users/mysteropodes/projects/2/views/1) for
+live execution and the [shared hourly log](https://github.com/mysteropodes/nemo/issues/1062)
+for team summaries. Ilya's Project #8 is a legacy snapshot. Detailed receipts stay in
+their task issues; the log is not another executable leaf.
+
+## Supporting references
+
+Read the [manifest](MANIFEST.md) to find architecture, source invariants, quality references
+and historical evidence. Then read only the relevant source, local module/node documentation
+and `CLAUDE.md` section for the selected leaf. Historical proposals and acceptance statements
+do not override the current checklist or establish current implementation status.
+
+The handbook and GitHub projects already exist. Do not repeat the original adoption setup,
+create another backlog or require a personal skill/Buzz installation. Use the portable
+workflows and issue handoff format in the checklist. The Node runner comparison is recorded
+in [ADR 001](../animation/ADR-001-curve-runner.md); retain Node rather than repeating that
+trial. The new c8, Rust coverage and expanded diagnostics work remains planned until its
+named tasks are implemented and validated.
+
+The approved parallel Buzz workspace configuration editor is a bounded collaboration
+task. Expanded transport/infrastructure work and remote-agent enrollment remain outside
+Nemo's remediation prerequisites.
 
 ## Working interpretation
 
 A proposal does not grant file, GitHub, relay, deployment, merge or release authority.
-Every writable task needs a human owner, exact base, branch/worktree, allowed paths,
-dependencies, observable acceptance and a reviewer. New requests are queued without
-silently abandoning the active task.
+Every writable leaf needs a human owner, exact base, branch/worktree, allowed paths,
+dependencies, observable acceptance and a reviewer. Reuse its branch across sprints and
+leave progress/handoffs in its existing issue. New requests are queued without silently
+abandoning the active task.
 
-Implementation status belongs in the corresponding issue and handoff receipt. Do not turn
-this package into a shared mutable task ledger. Update a policy document in the same pull
+Implementation status belongs in the corresponding issue and board. Do not turn the
+reference handbook into another task ledger. Update a policy document in the same pull
 request that changes its contract, and retain dated evidence outside normative prose.
 
 ## Safe customization

@@ -8,6 +8,15 @@
 
 # Acceptance, evidence and maintenance
 
+> **Completion gate superseded — 2026-09-07.** The
+> [English checklist](EXECUTION_PLAN.en.md) / [French copy](EXECUTION_PLAN.fr.md)
+> defines current completion. Preserve exact observed behavior and known defects while
+> finishing module/state ownership, regression tests, enforced boundaries and feature
+> registration through the bundled Rust MCP. The former broad phase gate below must not
+> require unrelated repairs, new OFX/OCIO/EXR/OTIO features or Buzz/A2A enrollment. Evidence
+> vocabulary and relevant consumer/platform verification remain useful references; use
+> the checklist's compact issue handoff rather than an additional receipt document.
+
 ## Evidence vocabulary
 
 - **Observed:** directly reproduced on the named source/runtime with retained evidence.
@@ -23,7 +32,11 @@ interaction, fixture/version/seed, result, date and limitations.
 
 ## Per-packet acceptance
 
-Use [the handoff receipt](templates/HANDOFF_RECEIPT.md). Minimum gates:
+Use the execution checklist's compact receipt in the existing task issue. The
+[expanded handoff fields](templates/HANDOFF_RECEIPT.md) are optional reference, not a new
+document requirement. Apply the following checks to the selected leaf and its actual
+consumers; an unrelated product defect or absent platform support does not become a
+blanket extraction blocker:
 
 1. Intended behavior and forbidden regression are explicit.
 2. Changed paths stay inside the acknowledged grant.
@@ -36,9 +49,15 @@ Use [the handoff receipt](templates/HANDOFF_RECEIPT.md). Minimum gates:
 9. Performance changes preserve output and compare controlled workloads.
 10. Limitations, blocked/not-run scope, reviewer and rollback are visible.
 
-## Foundation close gate
+Record the exact observed baseline, including known failures. Require preservation of
+that behavior and correction of newly introduced regressions; keep unrelated product
+repairs separate. A missing check limits its acceptance claim and must remain visible.
 
-Remediation is complete only when:
+## Historical foundation close gate (superseded)
+
+The earlier proposal listed these obligations. They are retained as historical context;
+the execution checklist's final acceptance section replaces them, including its explicit
+separation of existing defects, current structural work and future product breadth:
 
 - every actionable shipped surface is mapped to a capability and handler or has an explicit
   unavailable/owned exception;
@@ -72,8 +91,10 @@ or agent completion message alone is not this gate.
 | before release | validate built bytes, support matrix, native/media/plugin paths and recovery |
 | periodic active review | triage stale claims/exceptions, dependencies, CI flakes, docs drift and benchmark baselines |
 
-Do not schedule activity merely to generate reports. Review when the project is active and
-when evidence can affect a decision.
+Use the authorized hourly central report while actively executing, plus immediate blocker,
+handoff and session-end updates; do not interrupt delegate jobs for a report. Timers are
+prepared paused, enabled only for actual execution, and paused when stopping. Task evidence
+stays in the owning issue; the shared log is a coordination summary, not another leaf.
 
 ## Document ownership and updates
 

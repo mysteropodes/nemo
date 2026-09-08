@@ -1,18 +1,21 @@
 # `scripts/nemo` — doctor, check, named jobs and receipts
 
-The one command surface proposed in
-[engineering/remediation/03_TESTING_AND_DEBUGGING.md](../../engineering/remediation/03_TESTING_AND_DEBUGGING.md),
-implemented with Node only (no new dependencies). Work package R02.
+Current command implementation, reviewed on **2026-09-07** at
+`66ece0641708122eb8447e85ad8dd7e3402aaf6c`. The orchestration scripts use Node; the jobs
+they invoke have their own dependencies and runtime requirements. The
+[execution checklist](../../engineering/remediation/EXECUTION_PLAN.en.md) governs current
+scope and acceptance; [testing guidance](../../engineering/remediation/03_TESTING_AND_DEBUGGING.md)
+distinguishes existing commands from planned coverage and diagnostics work.
 
 | Command | What it does | Exit |
 |---|---|---|
 | `npm run doctor` | Read-only: source identity (HEAD, branch, dirty digest), build identity (versions, wasm/sidecar hashes), platform, tool prerequisites, capabilities. Never installs or writes outside `reports/`. | always 0 |
 | `npm run check` | Static integrity: version strings in sync (package.json, tauri.conf.json, index.html fallback), JSON validity, `src/js` syntax (ES modules checked as such), `index.html` script references resolve, private-labs guard, committed artifacts present. | 0 pass / 1 fail / 2 blocked |
-| `npm run inventory` | Regenerates `engineering/inventory/{surfaces.json,surfaces.csv,SURFACES.md}` from `src/` (R03): every actionable control, shortcut, menu item, Labs prototype and script API member, bound to its handler and the document consumers it reaches, with unbound controls kept as explicit `unmapped` rows. The `inventory` job runs `npm run inventory -- --check` and fails when the committed files are stale; it is in both verify profiles. | 0/1 |
+| `npm run inventory` | Regenerates `engineering/inventory/{surfaces.json,surfaces.csv,SURFACES.md}` through static `src/` discovery and handler/consumer binding analysis. Unbound rows remain `unmapped`; this does not prove runtime behavior or exhaust the fixed source/consumer census. The `inventory` job runs `npm run inventory -- --check` and fails on stale committed output; it is in both verify profiles. | 0/1 |
 | `npm test` | Node unit tests in `tests/*.test.cjs` and `tests/animation/*.test.cjs`; the named `test:unit` job uses the same scope. | node |
 | `npm run test:rust` | `cargo test` for `geometry-wasm` (CPU, native host). | 0/1/2 |
-| `npm run test:integration` | `tests/integration` when it exists; `not-run` until R12/R13 define it. | 0/1/2 |
-| `npm run test:browser` | Playwright specs under `tests/browser`; `blocked` while `@playwright/test` is absent. | 0/1/2 |
+| `npm run test:integration` | Runs test files in `tests/integration`, currently the R06 browser-runtime isolation suite. This is not complete document/history/persistence coverage. | 0/1/2 |
+| `npm run test:browser` | Playwright specs under `tests/browser`; the runner is declared in devDependencies, but installed dependency/browser and graphics prerequisites still need verification. Reports `blocked` if the runner cannot be resolved. | 0/1/2 |
 | `npm run test:desktop` | Runs `tests/desktop/*.test.cjs` serially against `NEMO_DESKTOP_APP` or the local packaged app; required `blocked` without a package or harness; empty files and skipped tests fail. Native process/storage checks are separate from UI workflow acceptance. | 0/1/2 |
 | `npm run native -- start/status/stop ...` | Owner-controlled isolated native launcher. See [runtime isolation](../../engineering/runtime-isolation.md#native-app-launcher). | 0/1 |
 | `npm run bench` | `tests/bench/run.cjs` (R03): evaluation workloads on the real `motion.js` loaded whole in a vm sandbox, copy and memory workloads over the workload documents the fixture corpus generates (`tests/fixtures/lib/corpus.cjs`, hashes pinned in `tests/fixtures/manifest.json`), plus render/export workloads declared with the `export` fixture and recorded `not-run` without a WebGPU backend. Writes `bench.json` next to the receipt; records source, hardware and backend, sets no budget (R19). | 0/1/2 |
@@ -22,6 +25,18 @@ implemented with Node only (no new dependencies). Work package R02.
 
 Any job can be run alone: `node scripts/nemo/job.cjs test:rust,build:wasm`. Add `--json` to
 print the receipt instead of the summary.
+
+The named `test:rust-tauri` job runs the native crate in release mode with serial test
+threads and a checked native fixture sidecar. It is part of the full verifier profile,
+not `npm test` or the quick profile. The `nemo-mcp` crate is not selected by either verifier
+profile: use its applicable `cargo test --manifest-path nemo-mcp/Cargo.toml` command
+explicitly. Read the candidate's job source/help when selecting checks.
+
+`npm run check` does not run all architecture/type/coverage checks. The adopted boundary
+lane is described in [the local CI reference](../../engineering/ci/README.md). Its `quick`
+lane explicitly selects doctor/check/unit/geometry tests, whereas the verifier's default
+quick profile also includes inventory. c8, Rust coverage and general feature-registration
+enforcement are planned leaves, not capabilities delivered merely by this command list.
 
 The [R03 baseline](../../engineering/inventory/BASELINE.md) records the retained
 CPU, browser, native, and packaged-desktop evidence and their separate limitations.
@@ -34,6 +49,11 @@ CPU, browser, native, and packaged-desktop evidence and their separate limitatio
 | `fail` | the job ran and it did not |
 | `blocked` | a tool, target, suite or artifact the job needs is absent. Named precisely. **Never** downgraded to a skip: a required blocked job fails `verify` with exit 2 |
 | `not-run` | intentionally not attempted, with the work package that will define it |
+
+Required blocked jobs fail verification. Some optional jobs can remain `blocked`/`not-run`
+while the overall local receipt exits zero; inspect every selected job and its limitations.
+The CI lane requires every selected job to pass. `doctor` always exits zero and reports
+missing capabilities rather than establishing that the environment can run every job.
 
 ## Receipts
 

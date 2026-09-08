@@ -8,10 +8,17 @@
 
 # Handoff / review / completion receipt
 
+> **Optional field reference — 2026-09-07.** Put the compact handoff from the
+> [English execution checklist](../EXECUTION_PLAN.en.md) /
+> [French copy](../EXECUTION_PLAN.fr.md) in the existing task issue. No extra receipt file
+> or report PR is required. Update Project #2, then read back; Project #8 is legacy.
+
 - Issue/task:
 - Human owner:
+- Team and lane: Ilya/Cyrill; O/D1/D2
 - Agent/session:
-- Disposition: review-ready / blocked / paused / handoff / completed
+- Actual model/effort:
+- Disposition: review-ready / blocked / paused / handoff / integrated-and-accepted
 - Base SHA:
 - Candidate SHA and dirty digest:
 - Branch/worktree ID:
@@ -21,6 +28,7 @@
 - Generated artifacts and hashes:
 - Fixture/version/seed:
 - Platform/runtime/backend:
+- Coverage/report links and measured source denominator (or not run):
 
 ## Verification
 
@@ -32,7 +40,7 @@
 
 - Independent reviewer:
 - Review result:
-- Known failures/untested scope:
+- Known baseline failures / newly introduced regressions / untested scope:
 - Data/compatibility/rollback considerations:
 - Visual baseline decision:
 - Required downstream revalidation:
@@ -40,10 +48,13 @@
 ## Ownership
 
 - Working state preserved at:
-- Grant disposition requested:
+- Claim retained/released; pending unpushed or dirty work:
 - Handoff recipient, if any:
 - Exact next action:
 - Product acceptance owner/result:
 
 An agent-complete state, green branch or merged PR does not imply product acceptance. Tie
 acceptance to the declared behavior and identified integrated bytes.
+The orchestrator owns integration acceptance and final closure. Link this receipt from
+the shared hourly log when relevant; do not duplicate it across reports or interrupt
+another owner to manufacture a check-in. Pause the reporting timer when execution stops.

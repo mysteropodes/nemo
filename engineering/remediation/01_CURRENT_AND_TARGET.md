@@ -8,7 +8,17 @@
 
 # Current architecture and target direction
 
-Status date: **2026-09-04**. Revalidate against the implementation branch before work starts.
+> **Architecture reference — 2026-09-07.** The
+> [English execution checklist](EXECUTION_PLAN.en.md) / [French copy](EXECUTION_PLAN.fr.md)
+> governs scope and completion. The architectural snapshot below originated on 2026-09-04;
+> it does not assert that every listed feature currently works. Characterize exact current
+> behavior, including defects, before changing the selected responsibility.
+
+Source review at `66ece0641708122eb8447e85ad8dd7e3402aaf6c` confirms a first extracted
+animation seam and an [opacity application/MCP slice](../application/OPACITY_SLICE.md),
+including the Rust transport, native bridge and initial trace/replay. These are partial
+steps toward the target, not proof of complete modularization, automatic feature discovery
+or installed-client acceptance. Revalidate against the implementation branch before work.
 
 ## Current
 
@@ -75,9 +85,11 @@ Recommended ownership:
 Each migrated aggregate has exactly one writable authority. A legacy adapter may bridge old
 callers, but JavaScript and Rust must not become concurrent editable mirrors.
 
-## Performance direction
+## Future performance direction
 
-Measure before moving kernels. First establish fixed workloads and p50/p95/p99 timings for
+Preserve measured behavior during remediation; new performance architecture is separate
+product work unless a named current leaf requires its contract. Measure before moving
+kernels. Establish fixed workloads and p50/p95/p99 timings for
 evaluation, scene preparation, GPU completion, decode, copies, memory and export. Then:
 
 1. introduce headless evaluation from `document revision + time + quality`;

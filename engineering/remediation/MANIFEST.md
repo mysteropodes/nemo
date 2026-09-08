@@ -8,39 +8,42 @@
 
 # Nemo foundation remediation package
 
-Status: **R01 adoption candidate for maintainer review**<br>
-Prepared: **2026-09-04**<br>
-Package version: **0.2.1**
+Status: **current execution contract with supporting architecture references**<br>
+Strategy approved: **2026-09-07**<br>
+Package version: **0.3.0**
 Repository: <https://github.com/mysteropodes/nemo>
 
-This package is the portable starting point for Nemo's foundation remediation. It contains
-architecture, execution, quality, collaboration and maintenance guidance that can be reviewed
-and tracked with the source. It contains no credentials, private relay address, machine-specific
-checkout path, private evidence, or deployment procedure.
+The [English execution checklist](EXECUTION_PLAN.en.md) and its
+[French copy](EXECUTION_PLAN.fr.md) are one operating plan in two languages. They govern
+the approved remediation scope and workflow. The remaining handbook preserves architectural
+contracts and historical reasoning; it is not a second execution plan or task ledger.
+Implementation status must be verified against source, current issues and identified evidence.
 
 ## Reading order
 
 | File | Purpose |
 |---|---|
-| [README.md](README.md) | How to adopt the package and interpret status labels |
-| [01_CURRENT_AND_TARGET.md](01_CURRENT_AND_TARGET.md) | Current architecture, confirmed constraints and target direction |
-| [02_REMEDIATION_PLAN.md](02_REMEDIATION_PLAN.md) | Dependency-ordered R00-R22 implementation plan |
-| [03_TESTING_AND_DEBUGGING.md](03_TESTING_AND_DEBUGGING.md) | Test-runner decision, fixture stack and built-in diagnostics |
+| [EXECUTION_PLAN.en.md](EXECUTION_PLAN.en.md) / [EXECUTION_PLAN.fr.md](EXECUTION_PLAN.fr.md) | Current scope, checkable leaves, Ilya/Cyrill teams, settings, workflows and completion gate |
+| [README.md](README.md) | Short entry point and reference interpretation |
+| [01_CURRENT_AND_TARGET.md](01_CURRENT_AND_TARGET.md) | Architecture reference; reconcile dated current-state claims with source |
+| [02_REMEDIATION_PLAN.md](02_REMEDIATION_PLAN.md) | Historical R00-R22 reasoning; execution order, forecasts and broad gates superseded |
+| [03_TESTING_AND_DEBUGGING.md](03_TESTING_AND_DEBUGGING.md) | Quality reference; Node decision retained, expanded coverage/diagnostics still planned |
 | [04_MODULARITY_POLICY.md](04_MODULARITY_POLICY.md) | Layer rules, file/function budgets, exceptions and migration method |
-| [05_CAPABILITIES_MCP_AND_STANDARDS.md](05_CAPABILITIES_MCP_AND_STANDARDS.md) | Shared capability registry, Rust MCP and OpenFX/OCIO/EXR/OTIO boundaries |
-| [06_BUZZ_A2A_AND_ENROLLMENT.md](06_BUZZ_A2A_AND_ENROLLMENT.md) | Human/agent enrollment and the NEMO-A2A-1 operating contract |
-| [07_GITHUB_PROJECT_AND_PARALLEL_WORK.md](07_GITHUB_PROJECT_AND_PARALLEL_WORK.md) | Project fields, ownership, worktrees, commits and integration |
-| [08_ACCEPTANCE_AND_MAINTENANCE.md](08_ACCEPTANCE_AND_MAINTENANCE.md) | Phase gates, evidence vocabulary and update rules |
-| [templates/TASK_PACKET.md](templates/TASK_PACKET.md) | Ready-work and scope-grant template |
-| [templates/HANDOFF_RECEIPT.md](templates/HANDOFF_RECEIPT.md) | Review, handoff and completion evidence template |
+| [05_CAPABILITIES_MCP_AND_STANDARDS.md](05_CAPABILITIES_MCP_AND_STANDARDS.md) | Capability/application/MCP contracts and future standard ports; new OFX/OCIO/EXR/OTIO breadth deferred |
+| [06_BUZZ_A2A_AND_ENROLLMENT.md](06_BUZZ_A2A_AND_ENROLLMENT.md) | Reference only for explicitly requested Buzz/A2A work; no remediation enrollment prerequisite |
+| [07_GITHUB_PROJECT_AND_PARALLEL_WORK.md](07_GITHUB_PROJECT_AND_PARALLEL_WORK.md) | Historical setup/workflow proposal plus ownership and isolation reference |
+| [08_ACCEPTANCE_AND_MAINTENANCE.md](08_ACCEPTANCE_AND_MAINTENANCE.md) | Evidence vocabulary and maintenance reference; former broad close gate superseded |
+| [templates/TASK_PACKET.md](templates/TASK_PACKET.md) | Optional detailed scope reference; use the checklist's issue format for current leaves |
+| [templates/HANDOFF_RECEIPT.md](templates/HANDOFF_RECEIPT.md) | Optional evidence reference; no additional handoff document required |
 
 ## Authority
 
-These documents become team policy only after maintainer review and adoption. Source, tests,
-accepted ADRs and observed runtime behavior settle implementation facts. GitHub remains
-canonical for code, issues, pull requests, CI and review. Buzz carries authenticated
-coordination and A2A lifecycle events; it is not the product backlog or source of merge
-authority.
+The human-approved execution checklist governs current scope and workflow where older
+documents conflict. Source, tests, accepted ADRs and observed runtime behavior settle
+implementation facts; approving a plan does not mark its work implemented or accepted.
+GitHub remains canonical for code, issues, pull requests, CI and review. Local teams use
+existing issue claims/handoffs and board updates. Tool availability or a reference document
+does not independently grant publication, merge, deployment or release authority.
 
 The package deliberately separates:
 
@@ -49,15 +52,34 @@ The package deliberately separates:
 - **Gate:** evidence required before a proposal can be called delivered.
 - **Future:** product breadth beyond foundation remediation.
 
-## Migration note for 0.2.0
+## Migration note for 0.3.0 — 2026-09-07
+
+Replace competing execution/playbook documents with the English/French checklist. Preserve
+the exact observed baseline, including defects; atomize broad R parents into bounded leaves;
+use human-led local teams and issue handoffs, with one branch across sprints and bounded
+writer worktrees. Finish modular ownership, tests, enforcement and feature registration via
+the bundled Rust MCP. New product breadth and expanded Buzz transport/infrastructure are
+deferred; the explicitly authorized bounded Buzz workspace configuration editor has its
+own lane and does not gate Nemo extraction. Project #2 is primary; Project #8 is legacy.
+
+The [Node runner decision](../animation/ADR-001-curve-runner.md) already exists. New c8,
+Rust coverage and expanded diagnostics are planned work, not newly delivered capabilities.
+Source reviewed at `66ece0641708122eb8447e85ad8dd7e3402aaf6c` already includes the opacity
+application service, Rust MCP transport/bridge, schema and stdio tests. General feature
+declaration discovery and full surface/installed-client acceptance remain distinct work.
+The original handbook adoption, forecast and remote-enrollment requirements below are
+historical; do not rerun them as prerequisites for current remediation.
+
+## Historical migration note for 0.2.0
 
 The adoption candidate adds portable Codex and Claude entry points and aligns the handbook
 with the dedicated Nemo workspace contract: enrolled collaborators receive Project/repository
 participation and current A2A instructions from the runtime. Repository-relative task paths
 coordinate concurrent ownership; contributors do not configure manual path grants or revision
-pins. BZ0 transport acceptance and clean-clone Codex/Claude rehearsal remain required gates.
+pins. That version required BZ0 transport acceptance and a clean-clone Codex/Claude
+rehearsal; the current checklist replaces its execution prerequisites.
 
-## Migration note for 0.2.1
+## Historical migration note for 0.2.1
 
 Aligns the collaboration chapter with runtime contract 1.5.0: ordinary host tools in conversations
 and delegated jobs, existing automatic Project participation, thread-visible tasks and peer

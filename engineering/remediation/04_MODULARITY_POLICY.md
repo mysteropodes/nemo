@@ -8,9 +8,18 @@
 
 # Modularity and file-size policy
 
-Status: **proposed initial policy**. Adopt after maintainer review, then tune from the first
-two meaningful extractions. A line budget is a warning against mixed responsibilities, not a
-substitute for a coherent API.
+> **Policy reference — 2026-09-07.** The
+> [English execution checklist](EXECUTION_PLAN.en.md) / [French copy](EXECUTION_PLAN.fr.md)
+> governs current migration and acceptance. Existing reviewed profile JSON and source
+> define the enforced rules; the broader target below must not be mistaken for delivered
+> tooling or an instruction to repeat initial adoption.
+
+Source at `66ece0641708122eb8447e85ad8dd7e3402aaf6c` already contains the
+[bounded checker and adopted profiles](../boundaries/README.md), source discovery and
+size ratchets. It does not establish complete application dependency enforcement or all
+Rust-source classification. P10/P11 and the registration/schema leaves close those named
+gaps. A line budget is a warning against mixed responsibilities, not a substitute for a
+coherent API; never raise a reviewed ceiling just to obtain a pass.
 
 ## Logical layers
 
@@ -36,10 +45,11 @@ Dependency rules:
 - every migrated module declares owner/reviewer, public API, state owner, dependencies,
   lifecycle, fixtures and performance invariants.
 
-## Initial size profiles
+## Size profile reference
 
 Count nonblank physical lines including comments after formatting, and separately report total
-physical lines.
+physical lines. Reconcile these reference budgets with the selected path's adopted profile;
+a policy change needs review rather than silently replacing its protected-base ratchet.
 
 | Profile | Warn | Hard maximum |
 |---|---:|---:|
@@ -57,7 +67,12 @@ Cyclomatic/branch complexity warns at 12 and requires explicit review above 20.
 Do not pass the gate by deleting useful comments, minifying, moving code into arbitrary tiny
 files or hiding branches behind meaningless helpers.
 
-## Enforcement
+## Enforcement target and current boundary
+
+The current checker uses bounded lexical JS analysis and separate language-neutral size
+counting; it is not a complete AST/type system or a Rust dependency graph. The tools below
+describe possible enforcement mechanisms. Use the checklist's named outcomes and extend
+existing checks; do not install a parallel toolchain just because it appears in this list.
 
 - ESLint handles JS/TS line/function/complexity and global rules.
 - dependency-cruiser enforces imports, cycles and forbidden layer edges.
@@ -67,14 +82,16 @@ files or hiding branches behind meaningless helpers.
 - schemas/types are generated from one source and checked for drift.
 - dynamic loaders/plugin entry points are declared rather than omitted from the graph.
 
-Prove the checker with temporary deliberate violations: oversized module, forbidden import,
-implicit global, stale generated schema and missing capability registration. Remove the
-fixtures after verifying each failure mode.
+Prove the checker with deliberate negative controls: oversized module, forbidden import,
+implicit global, stale generated schema and missing capability registration. Retain useful
+controlled regression fixtures in the test harness; leave no violation in production source.
 
 ## Legacy migration
 
 1. Record an exact-path baseline for current violations. New/migrated code follows policy
    immediately; an oversized legacy file may shrink but cannot silently exceed its ceiling.
+   The complete frozen census must eventually migrate every handwritten monolith; a temporary
+   ceiling is not a permanent remediation-completion exemption.
 2. Characterize one responsibility through real behavior fixtures.
 3. Extract it behind a narrow compatibility facade with one state owner.
 4. Migrate from classic global script order toward ESM with a bootstrap that waits for required
