@@ -9,8 +9,8 @@
 # Handoff / review / completion receipt
 
 > **Optional field reference — 2026-09-07.** Put the compact handoff from the
-> [English execution checklist](../EXECUTION_PLAN.en.md) /
-> [French copy](../EXECUTION_PLAN.fr.md) in the existing task issue. No extra receipt file
+> [English execution checklist](../../EXECUTION_PLAN.en.md) /
+> [French copy](../../EXECUTION_PLAN.fr.md) in the existing task issue. No extra receipt file
 > or report PR is required. Update Project #2, then read back; Project #8 is legacy.
 
 - Issue/task:

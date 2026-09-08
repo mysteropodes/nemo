@@ -18,13 +18,13 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
   [English](engineering/remediation/EXECUTION_PLAN.en.md) /
   [français](engineering/remediation/EXECUTION_PLAN.fr.md). Its human-approved
   2026-09-07 scope and workflow supersede older plans, phase gates and agent playbooks.
-  The [handbook index](engineering/remediation/README.md) and
-  [manifest](engineering/remediation/MANIFEST.md) identify supporting references.
-- Read [current and target architecture](engineering/remediation/01_CURRENT_AND_TARGET.md),
+  The [short entry point](engineering/remediation/README.md) links the four supporting
+  references. The archived handbook is historical context, not a required reading list.
+- Read [current and target architecture](engineering/remediation/reference/01_CURRENT_AND_TARGET.md),
   then the relevant source and the relevant section of `CLAUDE.md` before editing.
 - Use the execution checklist for current acceptance, board updates, claims, commits,
-  pushes and issue handoffs. Use [testing and debugging](engineering/remediation/03_TESTING_AND_DEBUGGING.md)
-  and [modularity policy](engineering/remediation/04_MODULARITY_POLICY.md) as supporting
+  pushes and issue handoffs. Use [testing and debugging](engineering/remediation/reference/03_TESTING_AND_DEBUGGING.md)
+  and [modularity policy](engineering/remediation/reference/04_MODULARITY_POLICY.md) as supporting
   references; planned tooling is not implemented merely because a document names it.
 - Work through Ilya's or Cyrill's local team, at most one orchestrator and two delegates
   each. Reuse one branch per outcome across sprints; keep at most two writable task
@@ -62,10 +62,11 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
   ownership; they are not a user-maintained filesystem permission list.
 - Tool availability does not broaden the current task's publication, merge, deployment,
   enrollment or release authority. Preserve existing human authorization across handoffs.
-- If a human explicitly requests Buzz/A2A work, consult its
-  [authority reference](engineering/remediation/06_BUZZ_A2A_AND_ENROLLMENT.md). Treat relay
-  storage, `processed`, `accepted`, progress and terminal results as distinct states;
-  reconcile actual effects before retrying an indeterminate operation.
+- For explicitly requested Buzz/A2A work, use the current execution checklist and actual
+  runtime documentation. The [archived authority chapter](engineering/remediation/archive/2026-09-07-handbook/06_BUZZ_A2A_AND_ENROLLMENT.md)
+  provides historical protocol context only. Treat relay storage, `processed`, `accepted`,
+  progress and terminal results as distinct states; reconcile actual effects before retrying
+  an indeterminate operation.
 - Preserve other contributors' edits and scoped commits. Keep credentials, private machine
   paths, private evidence, and protected infrastructure details out of source and receipts.
 

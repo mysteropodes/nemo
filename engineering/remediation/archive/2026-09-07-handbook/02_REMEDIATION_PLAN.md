@@ -8,8 +8,8 @@
 
 # Dependency-ordered remediation plan
 
-> **Superseded for execution — 2026-09-07.** Use the single
-> [English checklist](EXECUTION_PLAN.en.md) / [French copy](EXECUTION_PLAN.fr.md).
+> **Archived historical plan — 2026-09-07; execution superseded.** Use the single
+> [English checklist](../../EXECUTION_PLAN.en.md) / [French copy](../../EXECUTION_PLAN.fr.md).
 > This chapter preserves historical reasoning. Its forecasts, lead structure, kickoff,
 > phase order and broad product/remote-agent gates are not current instructions.
 > Baseline means exact observed state, including defects; R parents are rollups and only
@@ -122,7 +122,7 @@ other's source, state or artifacts; a clean clone finds the same team instructio
 ### F2 — contracts, first extraction and diagnostics
 
 **R08** Extract one pure animation/easing seam through a compatibility facade. The originally
-proposed runner comparison is complete: [ADR 001](../animation/ADR-001-curve-runner.md)
+proposed runner comparison is complete: [ADR 001](../../../animation/ADR-001-curve-runner.md)
 retains Node; do not repeat that trial.<br>
 **R09** Decide writable state ownership, stable IDs, timebase, persistence, image/color,
 platform capability and dependency direction. Generate boundary types/schemas.<br>

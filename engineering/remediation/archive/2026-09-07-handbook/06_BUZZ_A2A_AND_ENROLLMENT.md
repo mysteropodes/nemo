@@ -8,9 +8,9 @@
 
 # Buzz collaboration, A2A and enrollment
 
-> **Conditional collaboration reference — 2026-09-07.** Current remediation uses Ilya's
-> and Cyrill's local teams under the [English checklist](EXECUTION_PLAN.en.md) /
-> [French copy](EXECUTION_PLAN.fr.md). Enrollment, remote dispatch and BZ acceptance are
+> **Archived collaboration handbook — 2026-09-07.** Current remediation uses Ilya's
+> and Cyrill's local teams under the [English checklist](../../EXECUTION_PLAN.en.md) /
+> [French copy](../../EXECUTION_PLAN.fr.md). Enrollment, remote dispatch and BZ acceptance are
 > not prerequisites for Nemo extraction. Apply this chapter only to explicitly authorized
 > Buzz work and verify its described behavior against the actual installed runtime.
 

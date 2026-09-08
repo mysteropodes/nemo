@@ -8,8 +8,8 @@
 
 # GitHub Project and parallel-development contract
 
-> **Workflow superseded — 2026-09-07.** Use the
-> [English checklist](EXECUTION_PLAN.en.md) / [French copy](EXECUTION_PLAN.fr.md)
+> **Archived historical workflow — 2026-09-07; execution superseded.** Use the
+> [English checklist](../../EXECUTION_PLAN.en.md) / [French copy](../../EXECUTION_PLAN.fr.md)
 > for the existing boards, claims, handoffs, publication and integration. Ilya and Cyrill
 > direct local teams of at most one orchestrator and two delegates each. Keep one branch
 > per outcome across sprints and at most two writable task worktrees plus the primary
@@ -81,7 +81,7 @@ automation or change hosted workflows merely to implement this old option list.
 ## Claim and assignment
 
 Every task uses the execution checklist's compact issue claim. The
-[task packet](templates/TASK_PACKET.md) is an optional field reference, not a required new
+[task packet](../../reference/templates/TASK_PACKET.md) is an optional field reference, not a required new
 file. Each human's orchestrator issues its team's scope and reconciles shared files with
 the other orchestrator.
 A claim identifies issue, human owner, unique agent session, base, branch/worktree, allowed

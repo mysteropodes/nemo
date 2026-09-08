@@ -4,7 +4,7 @@ Current command implementation, reviewed on **2026-09-07** at
 `66ece0641708122eb8447e85ad8dd7e3402aaf6c`. The orchestration scripts use Node; the jobs
 they invoke have their own dependencies and runtime requirements. The
 [execution checklist](../../engineering/remediation/EXECUTION_PLAN.en.md) governs current
-scope and acceptance; [testing guidance](../../engineering/remediation/03_TESTING_AND_DEBUGGING.md)
+scope and acceptance; [testing guidance](../../engineering/remediation/reference/03_TESTING_AND_DEBUGGING.md)
 distinguishes existing commands from planned coverage and diagnostics work.
 
 | Command | What it does | Exit |

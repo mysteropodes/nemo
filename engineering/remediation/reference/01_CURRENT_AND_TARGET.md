@@ -9,13 +9,13 @@
 # Current architecture and target direction
 
 > **Architecture reference — 2026-09-07.** The
-> [English execution checklist](EXECUTION_PLAN.en.md) / [French copy](EXECUTION_PLAN.fr.md)
+> [English execution checklist](../EXECUTION_PLAN.en.md) / [French copy](../EXECUTION_PLAN.fr.md)
 > governs scope and completion. The architectural snapshot below originated on 2026-09-04;
 > it does not assert that every listed feature currently works. Characterize exact current
 > behavior, including defects, before changing the selected responsibility.
 
 Source review at `66ece0641708122eb8447e85ad8dd7e3402aaf6c` confirms a first extracted
-animation seam and an [opacity application/MCP slice](../application/OPACITY_SLICE.md),
+animation seam and an [opacity application/MCP slice](../../application/OPACITY_SLICE.md),
 including the Rust transport, native bridge and initial trace/replay. These are partial
 steps toward the target, not proof of complete modularization, automatic feature discovery
 or installed-client acceptance. Revalidate against the implementation branch before work.

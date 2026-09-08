@@ -8,8 +8,8 @@
 
 # Acceptance, evidence and maintenance
 
-> **Completion gate superseded — 2026-09-07.** The
-> [English checklist](EXECUTION_PLAN.en.md) / [French copy](EXECUTION_PLAN.fr.md)
+> **Archived acceptance handbook — 2026-09-07; completion gate superseded.** The
+> [English checklist](../../EXECUTION_PLAN.en.md) / [French copy](../../EXECUTION_PLAN.fr.md)
 > defines current completion. Preserve exact observed behavior and known defects while
 > finishing module/state ownership, regression tests, enforced boundaries and feature
 > registration through the bundled Rust MCP. The former broad phase gate below must not
@@ -33,7 +33,7 @@ interaction, fixture/version/seed, result, date and limitations.
 ## Per-packet acceptance
 
 Use the execution checklist's compact receipt in the existing task issue. The
-[expanded handoff fields](templates/HANDOFF_RECEIPT.md) are optional reference, not a new
+[expanded handoff fields](../../reference/templates/HANDOFF_RECEIPT.md) are optional reference, not a new
 document requirement. Apply the following checks to the selected leaf and its actual
 consumers; an unrelated product defect or absent platform support does not become a
 blanket extraction blocker:

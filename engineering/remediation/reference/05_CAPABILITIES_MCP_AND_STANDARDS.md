@@ -9,13 +9,13 @@
 # Shared capabilities, Rust MCP and open standards
 
 > **Current/target boundary — 2026-09-07.** Use the
-> [English execution checklist](EXECUTION_PLAN.en.md) / [French copy](EXECUTION_PLAN.fr.md)
+> [English execution checklist](../EXECUTION_PLAN.en.md) / [French copy](../EXECUTION_PLAN.fr.md)
 > for the approved scope, ownership and acceptance. New OpenFX/OCIO/EXR/OTIO product breadth
 > is deferred; its ports and data contracts remain architectural references.
 
 Source at `66ece0641708122eb8447e85ad8dd7e3402aaf6c` already includes the
-[opacity application service and Rust MCP transport/bridge](../application/OPACITY_SLICE.md),
-generated transport schema, stdio tests and [sidecar packaging wiring](../application/MCP_INSTALL.md).
+[opacity application service and Rust MCP transport/bridge](../../application/OPACITY_SLICE.md),
+generated transport schema, stdio tests and [sidecar packaging wiring](../../application/MCP_INSTALL.md).
 General per-feature declarations, automatic catalog discovery and complete installed-client
 acceptance remain separate work. In particular, `nemo-mcp/src/registry.rs` discovers running
 application endpoints; it is not the proposed feature registry. Build on the existing shared

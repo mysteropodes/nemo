@@ -9,8 +9,8 @@
 # Task packet
 
 > **Optional field reference — 2026-09-07.** Use the compact claim in the
-> [English execution checklist](../EXECUTION_PLAN.en.md) /
-> [French copy](../EXECUTION_PLAN.fr.md), recorded in the existing task issue.
+> [English execution checklist](../../EXECUTION_PLAN.en.md) /
+> [French copy](../../EXECUTION_PLAN.fr.md), recorded in the existing task issue.
 > Do not create a separate packet file or report PR. Primary execution is Project #2;
 > Project #8 is legacy. Broad R parents are rollups; only named leaf dependencies block.
 

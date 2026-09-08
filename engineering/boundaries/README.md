@@ -1,7 +1,7 @@
 # Boundaries checker — R05 bounded enforcement
 
 Implements the enforcement half of
-[`engineering/remediation/04_MODULARITY_POLICY.md`](../remediation/04_MODULARITY_POLICY.md)
+[`engineering/remediation/reference/04_MODULARITY_POLICY.md`](../remediation/reference/04_MODULARITY_POLICY.md)
 for a **bounded, explicitly declared set of modules** — a *profile* — not the whole
 application. Code lives in [`scripts/nemo/lib/boundaries.cjs`](../../scripts/nemo/lib/boundaries.cjs)
 (the parser and graph checks),

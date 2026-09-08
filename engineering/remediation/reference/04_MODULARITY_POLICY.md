@@ -9,13 +9,13 @@
 # Modularity and file-size policy
 
 > **Policy reference — 2026-09-07.** The
-> [English execution checklist](EXECUTION_PLAN.en.md) / [French copy](EXECUTION_PLAN.fr.md)
+> [English execution checklist](../EXECUTION_PLAN.en.md) / [French copy](../EXECUTION_PLAN.fr.md)
 > governs current migration and acceptance. Existing reviewed profile JSON and source
 > define the enforced rules; the broader target below must not be mistaken for delivered
 > tooling or an instruction to repeat initial adoption.
 
 Source at `66ece0641708122eb8447e85ad8dd7e3402aaf6c` already contains the
-[bounded checker and adopted profiles](../boundaries/README.md), source discovery and
+[bounded checker and adopted profiles](../../boundaries/README.md), source discovery and
 size ratchets. It does not establish complete application dependency enforcement or all
 Rust-source classification. P10/P11 and the registration/schema leaves close those named
 gaps. A line budget is a warning against mixed responsibilities, not a substitute for a
