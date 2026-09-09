@@ -86,6 +86,10 @@ Use native sub-issues under R03/R05/etc to count progress. Those old issues are 
 - [ ] Push the **same branch** at review-ready and before ending a sprint or transferring ownership with committed work. Routine local edits do not need repeated pushes. Keep logs/build products out of source; attach sanitized reports or reproducible artifact references to the existing issue/PR.
 - [ ] Update the issue and board at start, a material blocker, review-ready and sprint end. Never silently drop ownership, reassign another lane, merge your own unreviewed work or close the integration gate.
 - [ ] If interrupted, write the compact handoff below. The successor reads it, checks actual source/remote state and resumes from the next action; it does not rerun the original assignment from scratch.
+- [ ] Never write "resuming"/"continuing" without checking actual state (worktree `git status`/`reflog`, `gh pr list`) and citing it in the same message; an unverified intention is not a status report.
+- [ ] "Done" or "in progress" requires a pushed commit or an existing PR to cite; without that proof, the real state is "not started," even if announced the day before.
+- [ ] Before resuming a task left by another writer: flag it in the shared log/conversation first, to avoid a duplicate restart if the other acts in the meantime.
+- [ ] Split then delegate (A2A or a second writer) any blocked or clearly oversized cross-cutting leaf instead of waiting silently or leaving it idle.
 
 Handoff template, used as one issue comment or the issue's current handoff section:
 
