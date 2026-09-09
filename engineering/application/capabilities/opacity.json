@@ -27,7 +27,7 @@
   "effects": {
     "kind": "mutation",
     "scope": "document",
-    "lifecycle": ["property.set", "property.key.set", "property.key.remove", "property.animation.set"]
+    "lifecycle": ["property.get", "property.set", "property.key.set", "property.key.remove", "property.animation.set"]
   },
   "availability": { "state": "available", "reason": null },
   "handlerKey": "application.opacity.property",

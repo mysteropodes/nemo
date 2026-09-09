@@ -5,10 +5,11 @@
   "input": {
     "type": "object",
     "additionalProperties": false,
+    "description": "What a caller supplies to invoke this capability. \"frameIdx\" addresses the \"start\" stage; \"jobId\" (returned by \"start\"'s output) addresses \"status\" and \"cancel\". Exactly one is required depending on stage, enforced by the handler per stage rather than by this shape — full per-stage input contracts are D02/#1045.",
     "properties": {
-      "frameIdx": { "type": "integer", "minimum": 0, "description": "0-based timeline frame to export." }
-    },
-    "required": ["frameIdx"]
+      "frameIdx": { "type": "integer", "minimum": 0, "description": "0-based timeline frame to export. Required for the \"start\" stage." },
+      "jobId": { "type": "string", "minLength": 1, "description": "Job identifier returned by \"start\". Required for the \"status\" and \"cancel\" stages." }
+    }
   },
   "output": {
     "type": "object",
@@ -44,7 +45,7 @@
     "scope": "none",
     "lifecycle": ["start", "status", "cancel"]
   },
-  "availability": { "state": "available", "reason": null },
+  "availability": { "state": "unavailable", "reason": "missing-dependency" },
   "handlerKey": "application.export.svgFrame",
   "fixture": {
     "label": "export frame 10 as SVG, complete",
@@ -53,12 +54,12 @@
   },
   "examples": [
     { "label": "start", "input": { "frameIdx": 10 }, "output": { "jobId": "job-1", "status": "running", "progress": 0 } },
-    { "label": "status while rendering", "input": { "frameIdx": 10 }, "output": { "jobId": "job-1", "status": "running", "progress": 0.5 } },
+    { "label": "status while rendering", "input": { "jobId": "job-1" }, "output": { "jobId": "job-1", "status": "running", "progress": 0.5 } },
     {
       "label": "status once complete",
-      "input": { "frameIdx": 10 },
+      "input": { "jobId": "job-1" },
       "output": { "jobId": "job-1", "status": "succeeded", "progress": 1, "artifact": { "mimeType": "image/svg+xml", "data": "<svg></svg>" } }
     },
-    { "label": "cancel before completion", "input": { "frameIdx": 10 }, "output": { "jobId": "job-1", "status": "cancelled", "progress": 0.5 } }
+    { "label": "cancel before completion", "input": { "jobId": "job-1" }, "output": { "jobId": "job-1", "status": "cancelled", "progress": 0.5 } }
   ]
 }

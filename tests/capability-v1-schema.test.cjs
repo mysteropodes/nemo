@@ -124,3 +124,13 @@ test('registration rejects two descriptors sharing one id', () => {
 test('registration accepts distinct ids', () => {
   assert.doesNotThrow(() => assertNoDuplicateIds([load(OPACITY_PATH), load(EXPORT_JOB_PATH)]));
 });
+
+test('every fixture/example conforms to its own descriptor input/output', () => {
+  for (const p of [OPACITY_PATH, EXPORT_JOB_PATH]) {
+    const d = load(p);
+    for (const ex of [d.fixture, ...d.examples]) {
+      assert.deepStrictEqual(validate(d.input, ex.input), [], `${d.id} / ${ex.label} input`);
+      assert.deepStrictEqual(validate(d.output, ex.output), [], `${d.id} / ${ex.label} output`);
+    }
+  }
+});
