@@ -39,7 +39,7 @@
     { "id": "nemo.lib.receipt", "layer": "tooling-application", "dir": "scripts/nemo/lib",
       "files": ["receipt.cjs"], "publicApi": ["receipt.cjs"], "sizeProfile": "Domain/application JS or TS" },
     { "id": "nemo.lib.baseline", "layer": "tooling-application", "dir": "scripts/nemo/lib",
-      "files": ["baseline.cjs"], "publicApi": ["baseline.cjs"], "sizeProfile": "Domain/application JS or TS" },
+      "files": ["baseline.cjs", "baseline-verdicts.cjs"], "publicApi": ["baseline.cjs"], "sizeProfile": "Domain/application JS or TS" },
     { "id": "nemo.lib.inventoryBindings", "layer": "tooling-application", "dir": "scripts/nemo/lib",
       "files": ["inventory-bindings.cjs"], "publicApi": ["inventory-bindings.cjs"], "sizeProfile": "Domain/application JS or TS" },
     { "id": "nemo.lib.inventoryRecords", "layer": "tooling-application", "dir": "scripts/nemo/lib",

@@ -28,6 +28,30 @@ changed or newly observed failure), `2` is inconclusive (a stale reference, an
 environment mismatch, or a job this run did not cover). A job the run did not
 cover is reported as `missing-entry` — never as a pass.
 
+Severity depends on the verdict **and on whether the job is required** (T02):
+
+| situation | required job | optional job |
+|---|---|---|
+| baseline entry the run was expected to cover is absent | exit `1` — the run did not answer | exit `2` — uncomparable |
+| still `blocked` / still `not-run`, unchanged | exit `2` — no evidence, listed under `summary.noEvidence` | exit `0` — nothing to answer for |
+
+An unchanged `blocked` used to exit `0` on both, so a required runtime that had
+produced no evidence at all read as "nothing to answer for". It is now
+inconclusive until a run produces a result: missing native/desktop evidence is
+never a pass. `test:desktop` is the live case — replaying this baseline exits
+`2` and names it, and will keep doing so until a packaged app exists to test.
+
+A run only answers for what it claimed: `compare(..., { expect })` limits the
+required-missing rule to the jobs the run was asked to execute, so
+`node scripts/nemo/job.cjs test:rust` is not judged for `test:desktop`. Entries
+outside that scope are still listed, marked `severity: "ok"`.
+
+Every run through `verify.cjs`/`job.cjs` also writes
+`reports/<runId>/comparison.json` with this classification. It is a **separate**
+result: job statuses and the run's own exit code are untouched by it, so a known
+failure still fails the run and is only labelled as known. `--no-baseline` skips
+it.
+
 ### Selected source and environment
 
 | | |

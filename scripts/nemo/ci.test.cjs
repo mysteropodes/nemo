@@ -71,9 +71,11 @@ test('tooling coverage profiles every current scripts/nemo CommonJS source', () 
   const profile = JSON.parse(fs.readFileSync(path.join(ROOT, ci.PROFILE), 'utf8'));
   const result = ci.toolingCoverage(profile, ROOT);
   assert.equal(result.ok, true);
-  // 55 + the four T04 Rust-coverage sources (lib evaluator, lib job, CLI, tests).
-  assert.equal(result.sourcePathCount, 59);
-  assert.equal(result.declaredPathCount, 59);
+  // 55 + T04's four Rust-coverage sources + T02's lib/baseline-verdicts.cjs.
+  // Neither side of this rebase conflict was right alone: 59 drops T02's new
+  // module, 56 drops T04's four.
+  assert.equal(result.sourcePathCount, 60);
+  assert.equal(result.declaredPathCount, 60);
   const incomplete = structuredClone(profile);
   incomplete.modules = incomplete.modules.filter((module) => module.id !== 'nemo.lib.boundariesApplication');
   const rejected = ci.toolingCoverage(incomplete, ROOT);
