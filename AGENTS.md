@@ -4,6 +4,8 @@
 1. **Preserve the active task.** Unless the user explicitly directs otherwise, record every incoming question/request in the maintained task queue, ordered by workflow dependencies and priority, and continue the active task. Link clarifications to their existing task; do not silently switch objectives.
 2. **Be frugal with tokens.** Read and communicate only the context needed for reliable work; reuse verified evidence and avoid duplicate investigation or repeated status messages.
 3. **Match agents and effort to the work.** Use the least costly capable model and reasoning effort for each bounded task; delegate independent work when useful and escalate when complexity, uncertainty or risk warrants it.
+4. **Follow the documented process — never propose a bypass.** Even when elevated access makes a shortcut technically possible (e.g., an admin-bypass merge, skipping a required independent approval), surface and follow the plan's compliant path instead; do not offer the non-compliant option as if it were a normal choice.
+5. **Verify before asserting or starting work.** State process, permission, or ownership facts only after checking the live source (git/gh state, the plan text) — label anything unchecked as an assumption. Before claiming or recommending work on an issue/PR/branch, check for an existing claim by another agent to avoid duplicating it.
 <!-- nemo-golden-rules:end -->
 
 # Nemo repository agent entry point
@@ -54,7 +56,11 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
 - Run builds and validation locally. Do not enable, dispatch, rerun, or add automatic
   GitHub Actions builds without an explicit human request for that specific hosted run.
   Commits, pushes, PRs, merges, tags, and routine acceptance work are not that request.
-  See [the CI policy](engineering/ci/README.md); preserve normal PR review protections.
+  See [the CI policy](engineering/ci/README.md). The agreed metadata-only collaborator
+  approval workflow is the sole automatic exception; it runs no PR code or builds.
+  Follow execution-plan section 7: each collaborator team reviews, validates and merges
+  its own deliveries; external-author PRs require collaborator approval. Preserve other
+  protections and coordinate actual shared decisions without a routine cross-team gate.
 - Read `CONTRIBUTING.md`, inspect current source, related branches and existing ownership,
   then use a dedicated branch and isolated worktree for tracked changes.
 - Record the outcome, scope, dependencies, base, branch/worktree, acceptance checks,

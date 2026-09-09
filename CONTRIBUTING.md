@@ -57,6 +57,14 @@ Each job reports `pass`, `fail`, `blocked` or `not-run` with a reason; a missing
 
 - Branch per change (`your-topic`), PR against `main`. No direct pushes to
   `main`.
+- Current repository collaborators with write/maintain/admin access may merge their own
+  PRs after their team's technical review and local validation. Record the reviewed SHA
+  and evidence in the PR. Agents sharing one account can review each other's code; they
+  do not need approval from the other human team for routine work.
+- External-author PRs require a collaborator's approving GitHub review. The metadata-only
+  `Collaborator PR policy` automation acknowledges eligible collaborator authors without
+  claiming technical review or test success. Human change requests, conversations and
+  exact-head validation still apply. Follow [the integration checklist](engineering/remediation/EXECUTION_PLAN.en.md#7-integration-and-branch-cleanup).
 - Keep PRs scoped — one feature/fix per PR is much easier to review than a
   pile of unrelated changes.
 - If you're fixing a bug, a short repro (or a failing test if the area has
