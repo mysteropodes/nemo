@@ -38,6 +38,8 @@
       "files": ["boundaries-discovery.cjs"], "publicApi": ["boundaries-discovery.cjs"], "sizeProfile": "Platform/engine adapter" },
     { "id": "nemo.lib.receipt", "layer": "tooling-application", "dir": "scripts/nemo/lib",
       "files": ["receipt.cjs"], "publicApi": ["receipt.cjs"], "sizeProfile": "Domain/application JS or TS" },
+    { "id": "nemo.lib.baseline", "layer": "tooling-application", "dir": "scripts/nemo/lib",
+      "files": ["baseline.cjs"], "publicApi": ["baseline.cjs"], "sizeProfile": "Domain/application JS or TS" },
     { "id": "nemo.lib.inventoryBindings", "layer": "tooling-application", "dir": "scripts/nemo/lib",
       "files": ["inventory-bindings.cjs"], "publicApi": ["inventory-bindings.cjs"], "sizeProfile": "Domain/application JS or TS" },
     { "id": "nemo.lib.inventoryRecords", "layer": "tooling-application", "dir": "scripts/nemo/lib",
@@ -78,6 +80,8 @@
       "files": ["job.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
     { "id": "nemo.cli.verify", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
       "files": ["verify.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
+    { "id": "nemo.cli.baseline", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
+      "files": ["baseline.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
 
     { "id": "nemo.test.boundaries", "layer": "tooling-test", "dir": "scripts/nemo",
       "files": ["boundaries.test.cjs"], "publicApi": ["boundaries.test.cjs"], "sizeProfile": "Test file" },
@@ -108,7 +112,9 @@
     { "id": "nemo.test.isolation", "layer": "tooling-test", "dir": "scripts/nemo",
       "files": ["isolation.test.cjs"], "publicApi": ["isolation.test.cjs"], "sizeProfile": "Test file" },
     { "id": "nemo.test.ci", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["ci.test.cjs"], "publicApi": ["ci.test.cjs"], "sizeProfile": "Test file" }
+      "files": ["ci.test.cjs"], "publicApi": ["ci.test.cjs"], "sizeProfile": "Test file" },
+    { "id": "nemo.test.baseline", "layer": "tooling-test", "dir": "scripts/nemo",
+      "files": ["baseline.test.cjs"], "publicApi": ["baseline.test.cjs"], "sizeProfile": "Test file" }
   ],
   "layerRules": {
     "tooling-shared": { "allowedLayers": [] },
