@@ -1,0 +1,234 @@
+{
+  "census_id": "C07",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1042",
+  "title": "Application, MCP and diagnostics — bounded extraction packets",
+  "owner": "Cyrill/D1 (Fizz)",
+  "source_sha": "ded641bd763379f36d629bf1686fcce8a6137a66",
+  "status": "read-only census complete; no source mutated; proposed IDs and packet boundaries are placeholders for the orchestrator to renumber into the global P-sequence and fold into engineering/inventory/remediation-scope.json",
+  "scope_files": [
+    "src/js/application/opacity-application.js",
+    "src/js/bootstrap/opacity-application.js",
+    "src/js/adapters/application-mcp.js",
+    "src-tauri/src/application_mcp.rs",
+    "nemo-mcp/src/lib.rs",
+    "nemo-mcp/src/main.rs",
+    "nemo-mcp/src/registry.rs",
+    "nemo-mcp/src/schema.rs",
+    "nemo-mcp/src/server.rs",
+    "nemo-mcp/src/wire.rs",
+    "nemo-mcp/src/contract.rs",
+    "nemo-mcp/build.rs",
+    "nemo-mcp/tests/stdio.rs",
+    "nemo-mcp/tests/stdio_application.rs",
+    "nemo-mcp/tests/stdio_cancellation.rs",
+    "nemo-mcp/tests/stdio_contract.rs",
+    "nemo-mcp/tests/stdio_reconnect.rs",
+    "nemo-mcp/tests/stdio_rejection.rs",
+    "nemo-mcp/tests/stdio_roundtrip.rs",
+    "nemo-mcp/tests/transport.rs"
+  ],
+  "coverage_note": "All 20 in-scope files (12 source + 8 integration/unit test files under nemo-mcp/tests/) are assigned to exactly one packet below; test files are not extraction targets themselves and are listed as oracle evidence for the source packets they exercise. 'Diagnostics' in the issue title names the diagnostics.trace/diagnostics.replay OPERATIONS inside this same request/response contract, not a separate directory — confirmed no other diagnostics-named path exists anywhere in the bounded source ownership. engineering/application/{OPACITY_SLICE.md, MCP_INSTALL.md, transport-v1.schema.json} are pre-existing design/reference docs for this exact slice, read for context only; they are not in C07's bounded source ownership and are not claimed or modified by this census. This slice is NOT legacy debt being reverse-engineered: per OPACITY_SLICE.md it is a fresh, already-modular R08 pilot (base 582f51e, issues #905/#907-910) built by Ilya's team (owners Codexitron/Codeximator, reviewer Codexalog) as the first concrete instance of the Application/domain/adapter pattern the whole remediation program targets, deliberately scoped to one property (Motion layer opacity) before extending further.",
+  "areas": [
+    {
+      "area": "application-service",
+      "packets": [
+        {
+          "id": "C07.application-service.command-core",
+          "title": "Transport-agnostic opacity command/query authority",
+          "files": ["src/js/application/opacity-application.js:1-137"],
+          "symbols": ["NemoOpacityApplicationCore", "NemoOpacityApplicationCore.create", "handle", "perform", "validate", "property", "readProperty", "fingerprint", "remember", "documentChanged", "setInstanceId", "touch"],
+          "responsibility": "DOM/transport-agnostic command+query authority for the single 'opacity' capability: request shape validation, per-write idempotency via a capped (256-entry) retained-result cache, monotonic revision counter, capped (32-entry) diagnostics trace, reentrant diagnostics.replay, and a single in-flight 'editing' mutex. Owns none of document/history/render state directly — all supplied via the ports argument passed to create().",
+          "writer": "sole owner of identity/retained/trace/editing (closed over per create() call; non-persisted; one instance per document lifetime, reset wholesale by documentChanged())",
+          "public_api": "NemoOpacityApplicationCore.create(ports) -> {handle, setInstanceId, documentChanged, historyChanged, changed, meta}; CommonJS export for Node in addition to the browser global",
+          "consumers": ["src/js/bootstrap/opacity-application.js (sole caller of .create(), binds the real ports)", "nemo-mcp/tests/stdio_application.rs (Node harness requiring this exact production file with fake ports)"],
+          "oracle": "nemo-mcp/tests/stdio_application.rs loads this exact file via Node require(), drives it through the compiled nemo-mcp binary over a real TCP wire round trip with deterministic fixture ports, and asserts revision/retry/history/mutation counts. Best-covered packet in this census.",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Reentrant by design: perform()'s diagnostics.replay branch calls handle() a second time with the recorded command; the outer call deliberately leaves editing=false (`editing = request.operation !== 'diagnostics.replay'`) so the inner recursive call's own editing-guard can run — removing that special case would make every replay reject itself as 'a document edit is already in progress'. Revision bumps have two independent paths that must not double-count: the write path's `if (identity.revision === before) touch()` fallback is a deliberate no-op whenever a caller-supplied port (e.g. bootstrap's monkey-patched undo/redo) has already called touch() first during ports.history.checkpoint()/undo()/redo() — verified by tracing the call graph, not documented in a comment at either end."
+        },
+        {
+          "id": "C07.application-service.bootstrap-bindings",
+          "title": "Document/history/render port bindings and legacy UI bridge",
+          "files": ["src/js/bootstrap/opacity-application.js:1-78"],
+          "symbols": ["write", "refresh", "history", "read", "ensureIds", "newId", "window.NemoApplication", "window.NemoOpacityApplication", "window.NemoOpacityApplication.legacy"],
+          "responsibility": "Binds NemoOpacityApplicationCore to the real running document: reads/writes go through NemoOpacityDomain (out-of-scope animation-domain module) and SMMotion; history checkpoint/undo/redo go through the app's real undo/redo stacks; repaint goes through renderLayerList/renderTimeline/updateUI/SMEngineBridge.renderNow. Also monkey-patches the four global undo-stack-mutating functions (pushUndoLayers, pushUndoActiveFrame, undo, redo) so any caller of those trips historyChanged(), and exposes legacy() so existing Motion property-editing call sites can route through the application service without themselves handling requestId/revision/instanceId.",
+          "writer": "sole owner of the four monkey-patched globals' wrapper closures, installed once at script-load time for the page lifetime",
+          "public_api": "window.NemoApplication.{handle,setInstanceId} (native transport's only entry point); window.NemoOpacityApplication.{meta,historyChanged,documentChanged,legacy} (UI's entry point)",
+          "consumers": ["src/js/adapters/application-mcp.js (window.NemoApplication.handle/setInstanceId)", "src/js/motion.js (opacityLegacy() -> window.NemoOpacityApplication.legacy, all 5 write kinds: set/key-current/key-frame/remove/animated, lines 2706-2823)", "src/js/timeline.js:2691 (documentChanged, guarded by `if(window.NemoOpacityApplication)`)", "src/js/project.js:99 (documentChanged, same guard)"],
+          "oracle": "None. Repo-wide grep for 'opacity-application.js' finds only nemo-mcp/tests/stdio_application.rs, and that fixture requires only application/opacity-application.js with its own fake ports — it never loads this file. Zero Playwright/JS-unit references to NemoApplication or NemoOpacityApplication either. See known defect DEF-3.",
+          "depends_on": ["src/js/domain/animation/opacity.js (NemoOpacityDomain — out of C07 scope, owned by the C02 animation/time census)", "src/js/motion.js (SMMotion.ensureLayerUid/valueAtFrame — out of scope)"],
+          "entangled_with": ["src/js/domain/animation/opacity.js"],
+          "notes": "Script-load order (src/index.html:2360-2460) is domain/animation/opacity.js -> application/opacity-application.js -> ... -> project.js -> bootstrap/opacity-application.js (last) -> adapters/application-mcp.js. Safe today only because every consumer (motion.js/timeline.js/project.js) reads window.NemoOpacityApplication lazily inside an event handler, never at top-level script-execution time; a future top-level read introduced between line 2362 and 2459 would see undefined."
+        }
+      ]
+    },
+    {
+      "area": "native-transport",
+      "packets": [
+        {
+          "id": "C07.native-transport.webview-adapter",
+          "title": "Webview-side Tauri event adapter",
+          "files": ["src/js/adapters/application-mcp.js:1-46"],
+          "symbols": ["start", "beforeunload handler"],
+          "responsibility": "Browser/webview half of the native wire. No-ops outside Tauri; otherwise fetches the real instance id from Rust (nemo_mcp_identity), binds it to the application core (setInstanceId), listens for nemo-application-request/nemo-application-cancel Tauri events, defers each request one tick (setTimeout 0) so a same-tick cancellation wins first, calls NemoApplication.handle, and posts the result back via nemo_mcp_reply. Cleans up listeners/pending timers on beforeunload.",
+          "writer": "sole owner of the module-private pending Map and unlisten array",
+          "public_api": "none (side-effecting IIFE only; no exports)",
+          "consumers": ["src-tauri/src/application_mcp.rs (the Tauri event source on the other end of nemo-application-request/-cancel, and the command target of nemo_mcp_identity/nemo_mcp_reply)"],
+          "oracle": "None directly (no test loads a real Tauri webview). Indirectly exercised in spirit but not in fact by nemo-mcp/tests/stdio_application.rs's Node fixture, which reimplements this adapter's role over the same wire shape rather than running this file.",
+          "depends_on": ["window.NemoApplication (defined by bootstrap/opacity-application.js, must load first — src/index.html:2459 before :2460, confirmed)"],
+          "entangled_with": [],
+          "notes": "The one-tick defer (setTimeout(...,0)) is what lets a nemo-application-cancel event delivered in the same JS turn preempt a request that has not started running yet; once the deferred callback begins, a cancellation can no longer roll back an already-committed document mutation — matches OPACITY_SLICE.md's documented acceptance note ('Disconnect/cancellation does not prove that an already committed command rolled back')."
+        },
+        {
+          "id": "C07.native-transport.tauri-listener",
+          "title": "Loopback TCP listener and Tauri command surface",
+          "files": ["src-tauri/src/application_mcp.rs:1-200"],
+          "symbols": ["ApplicationMcp", "nemo_mcp_identity", "nemo_mcp_ready", "nemo_mcp_reply", "start", "serve_connection", "require_main", "RequestEvent"],
+          "responsibility": "Owns the loopback TCP listener (OS-assigned port), per-instance registration via nemo_mcp::registry, the 3 Tauri commands the webview calls, and per-connection request/response lifecycle: read+validate a WireRequest, forward it to the webview as a nemo-application-request event, race the webview's reply against a 30s timeout and the peer disconnecting, then reply on the wire or emit nemo-application-cancel.",
+          "writer": "sole owner of the `pending: Arc<Mutex<HashMap<String,oneshot::Sender<..>>>>` connection table and the spawned accept-loop task (capped at 32 concurrent connections via a Semaphore)",
+          "public_api": "3 #[tauri::command]s registered in src-tauri/src/lib.rs:217-219 (nemo_mcp_identity, nemo_mcp_ready, nemo_mcp_reply), plus the ApplicationMcp managed state (lib.rs:215)",
+          "consumers": ["src/js/adapters/application-mcp.js (invokes all 3 commands, listens for the 2 events this file emits)", "nemo-mcp/src/wire.rs::call (the TCP client on the other end of the socket this file listens on)"],
+          "oracle": "None. See known defect DEF-1 — this file has no #[cfg(test)] module, is not referenced by any file under nemo-mcp/tests/, and is not exercised from any other src-tauri source file besides its own registration in lib.rs.",
+          "depends_on": ["nemo_mcp::contract (ApplicationRequest/ApplicationResponse)", "nemo_mcp::registry (Endpoint, Registration)", "nemo_mcp::wire (read_json/write_json)"],
+          "entangled_with": [],
+          "notes": "require_main() gates all 3 commands to window.label()=='main' — a second window, if one is ever added, cannot drive or observe the application service. serve_connection's tokio::select! races the webview's oneshot reply against a 30s server-side timeout AND the peer socket closing; see known defect DEF-2 for the untested silent-drop race this creates."
+        }
+      ]
+    },
+    {
+      "area": "mcp-contract",
+      "packets": [
+        {
+          "id": "C07.mcp-contract.request-response-types",
+          "title": "Versioned wire contract (types, validation, schema generation)",
+          "files": ["nemo-mcp/src/contract.rs:1-359"],
+          "symbols": ["ApplicationRequest", "ApplicationResponse", "ApplicationError", "Operation", "CommandPayload", "RecordedCommand", "READ_OPERATIONS", "WRITE_OPERATIONS", "Operation::is_query", "Operation::label", "Operation::required_payload_keys", "Operation::payload_example", "Operation::check_payload", "ApplicationRequest::validate", "command_payload_schema", "query_payload_schema", "payload_schema", "payload_table", "json_kind"],
+          "responsibility": "The one versioned wire contract every other packet in this census imports: request/response shape, the 11-operation enum, structural (not semantic) payload admission, human-readable payload templates reused both in tool descriptions and in rejection messages, and the JSON-schema generation hooks schemars calls through #[schemars(schema_with=...)].",
+          "writer": "sole owner; every other Rust file in scope only calls its public fns/reads its public types, never redefines payload rules",
+          "public_api": "the full pub surface above, re-exported at crate root via nemo_mcp::contract::*",
+          "consumers": ["nemo-mcp/src/server.rs (Query, ApplicationRequest, Operation::is_query/label)", "nemo-mcp/src/wire.rs (ApplicationRequest::validate, ApplicationResponse, MAX_MESSAGE_BYTES)", "src-tauri/src/application_mcp.rs (ApplicationRequest::validate, ApplicationResponse)", "nemo-mcp/src/schema.rs (schema dump)", "src/js/application/opacity-application.js (hand-mirrors this contract's request/response JSON shape and operation labels in JS — not code-shared, see entangled_with)"],
+          "oracle": "nemo-mcp/tests/stdio_contract.rs (advertised_payload_schema_names_every_key_and_operation_template, rejected_payloads_name_the_shape_the_operation_expects, replay_payload_validates_the_nested_recorded_command, reads_keep_their_own_templates_and_identity_spelling), nemo-mcp/tests/transport.rs (mutation_needs_identity_before_transport), and stdio_roundtrip.rs (compiled_stdio_roundtrip_preserves_identity_and_errors asserts ApplicationResponse's apiVersion/requestId/instanceId echo end-to-end) exercise validate()/check_payload() through the compiled binary. engineering/application/transport-v1.schema.json is a committed snapshot of this file's generated schema; regenerated for this census via `cargo run --manifest-path nemo-mcp/Cargo.toml --bin nemo-mcp-schema` at this census's source_sha and diffed byte-identical against the committed file — confirmed not stale.",
+          "depends_on": [],
+          "entangled_with": ["src/js/application/opacity-application.js (its READS/WRITES arrays are a hand-maintained JS mirror of READ_OPERATIONS/WRITE_OPERATIONS here; nothing but the shared integration test enforces the two stay in sync)"],
+          "notes": "check_payload's recursion into a diagnostics.replay's nested `request` (lines 244-251) is the fix landed 2026-09-09 (f1fefdc) — it is the only place a payload's own sub-operation gets re-validated against its own required keys, because CommandPayload's fields are all Option so the outer deserialize alone cannot catch an incomplete nested command."
+        },
+        {
+          "id": "C07.mcp-contract.schema-dump-binary",
+          "title": "Standalone schema-export dev binary",
+          "files": ["nemo-mcp/src/schema.rs:1-9"],
+          "symbols": ["main"],
+          "responsibility": "Standalone dev binary (nemo-mcp-schema, declared via Cargo.toml [[bin]]) that pretty-prints {apiVersion, request: schema_for!(ApplicationRequest), response: schema_for!(ApplicationResponse)} to stdout — the documented way to regenerate engineering/application/transport-v1.schema.json (OPACITY_SLICE.md:12-13).",
+          "writer": "sole owner",
+          "public_api": "the nemo-mcp-schema executable (no library surface)",
+          "consumers": ["engineering/application/transport-v1.schema.json (manually regenerated output, committed separately)", "engineering/application/OPACITY_SLICE.md (documents the regeneration command)"],
+          "oracle": "None automated. Verified for this census by actually running the binary at this census's source_sha and diffing against the committed snapshot: byte-identical.",
+          "depends_on": ["nemo-mcp/src/contract.rs (ApplicationRequest, ApplicationResponse)"],
+          "entangled_with": [],
+          "notes": "Only dumps ApplicationRequest/ApplicationResponse — nemo_query's separate Query struct (server.rs) has its own distinct schema (different required fields, instance_id alias) that is live-advertised through the MCP tool listing but never appears in this binary's output or in the committed snapshot. See known defect DEF-4 (informational)."
+        }
+      ]
+    },
+    {
+      "area": "mcp-server",
+      "packets": [
+        {
+          "id": "C07.mcp-server.tool-router",
+          "title": "The 3 MCP tools an external client calls",
+          "files": ["nemo-mcp/src/server.rs:1-177"],
+          "symbols": ["NemoServer", "NemoServer::new", "NemoServer::call", "Query", "failure", "nemo_discover", "nemo_query", "nemo_command", "ServerHandler for NemoServer"],
+          "responsibility": "nemo_discover (fan out to every registered endpoint's capabilities, 2s timeout each, silently drop non-responders), nemo_query (reads only, rejects a write operation before it reaches the wire), nemo_command (writes only, same guard in reverse), and the shared call() that resolves an instanceId to a registered Endpoint and forwards over wire::call.",
+          "writer": "sole owner of NemoServer's tool_router/root",
+          "public_api": "the 3 #[tool]-annotated async methods, wired into the rmcp ServerHandler via #[tool_handler]; instantiated once in nemo-mcp/src/main.rs",
+          "consumers": ["nemo-mcp/src/main.rs (constructs the one NemoServer instance)", "any external MCP client (Claude/Codex) speaking rmcp's stdio transport"],
+          "oracle": "nemo-mcp/tests/stdio.rs (nemo_discover with zero running apps), stdio_application.rs (nemo_query+nemo_command full round trip against the real application core), stdio_reconnect.rs (nemo_discover/nemo_query after a registration is replaced), stdio_rejection.rs (nemo_command rejecting an invalid write before it reaches the transport), stdio_cancellation.rs (a tool call's CancellationToken crossing the compiled MCP protocol into NemoServer::call), stdio_roundtrip.rs (identity/error preservation across discovery + a full command round trip through the compiled binary).",
+          "depends_on": ["nemo-mcp/src/contract.rs (ApplicationRequest, Operation)", "nemo-mcp/src/registry.rs (read_endpoints)", "nemo-mcp/src/wire.rs (call)"],
+          "entangled_with": [],
+          "notes": "nemo_query re-validates the assembled request (request.validate()) itself before calling through, specifically so a malformed read fails as invalid_request rather than reaching wire::call and being misreported as 'instance unavailable' (comment at server.rs:150-152) — a deliberate duplicate of the check nemo_command gets for free from the same call() path, not an oversight."
+        },
+        {
+          "id": "C07.mcp-server.discovery-registry",
+          "title": "Per-user endpoint discovery directory",
+          "files": ["nemo-mcp/src/registry.rs:1-92"],
+          "symbols": ["Endpoint", "registry_root", "read_endpoints", "Registration", "Registration::create", "Registration::drop"],
+          "responsibility": "Per-user discovery directory resolution (NEMO_MCP_REGISTRY / NEMO_TAURI_DATA_DIR env override, else OS local-data-dir/com.strokemotion.app/mcp), reading+validating every *.json endpoint record in it (size-capped at 4096 bytes, UUID + 36-char-secret sanity check), and an RAII Registration that atomically creates its own record (create_new(true), mode 0600, parent dir 0700 on unix) and deletes it on Drop.",
+          "writer": "sole owner of the registry directory's file lifecycle",
+          "public_api": "Endpoint, registry_root, read_endpoints, Registration::create",
+          "consumers": ["src-tauri/src/application_mcp.rs::start (creates one Registration per app launch)", "nemo-mcp/src/server.rs (read_endpoints in nemo_discover and call)"],
+          "oracle": "nemo-mcp/tests/transport.rs::registrations_are_private_and_removed_when_released; stdio_reconnect.rs exercises read_endpoints indirectly through nemo_discover after a registration file is replaced.",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Drop-based cleanup is best-effort: a hard kill (SIGKILL, power loss) leaves a stale record behind. read_endpoints tolerates this without special-casing it — a stale endpoint just times out (server.rs's 2s nemo_discover timeout) and is silently excluded, never surfaced as an error. No reaper proactively deletes a long-stale record; the directory only shrinks when a live app's own Registration drops."
+        },
+        {
+          "id": "C07.mcp-server.wire-framing",
+          "title": "Newline-delimited JSON framing and client call()",
+          "files": ["nemo-mcp/src/wire.rs:1-77"],
+          "symbols": ["WireRequest", "write_json", "read_json", "call"],
+          "responsibility": "The newline-delimited JSON framing shared by both ends of the TCP connection (size-bounded via MAX_MESSAGE_BYTES on both read and write), and the client-side call() that connects, sends a WireRequest{secret, request}, reads back an ApplicationResponse, checks its apiVersion/requestId/instanceId echo the request, and races the whole round trip against both a CancellationToken and a 30s timeout (tokio::select! biased, cancellation checked first).",
+          "writer": "sole owner",
+          "public_api": "WireRequest, write_json, read_json, call",
+          "consumers": ["nemo-mcp/src/server.rs::call (the only caller of wire::call)", "src-tauri/src/application_mcp.rs::serve_connection (the only caller of wire::read_json, and implicitly the peer of a client using wire::write_json/call)"],
+          "oracle": "nemo-mcp/tests/transport.rs (bounded_reader_rejects_incomplete_and_oversized_input, call_preserves_command_and_checks_response_identity, pre_cancelled_write_never_connects, malformed_peer_cannot_supply_success, mutation_needs_identity_before_transport).",
+          "depends_on": ["nemo-mcp/src/contract.rs (ApplicationRequest::validate, ApplicationResponse, MAX_MESSAGE_BYTES)", "nemo-mcp/src/registry.rs (Endpoint)"],
+          "entangled_with": [],
+          "notes": "call() validates the request BEFORE connecting (line 50) — a malformed request never opens a socket at all, which is what pre_cancelled_write_never_connects and mutation_needs_identity_before_transport actually assert. Easy to mistake for dead code since NemoServer::call() already validates upstream for nemo_command, but nemo_discover's synthesized Capabilities request reaches wire::call directly without going through that upstream check, so this inner validate() is load-bearing for that caller too."
+        },
+        {
+          "id": "C07.mcp-server.binary-entrypoint",
+          "title": "Process entrypoint, module root, and build-time source stamping",
+          "files": ["nemo-mcp/src/main.rs:1-13", "nemo-mcp/src/lib.rs:1-7", "nemo-mcp/build.rs:1-37"],
+          "symbols": ["main (main.rs)", "BUILD_SOURCE_ID", "build.rs::main", "build.rs::git"],
+          "responsibility": "Process entrypoint (constructs one NemoServer over rmcp's stdio transport and waits), the crate's module root plus one public const (BUILD_SOURCE_ID, the git SHA the binary was built from, -dirty suffixed if the tree had uncommitted changes at build time), and the build script that stamps that env var and declares cargo's rerun-if-changed set (src, Cargo.toml/lock, sibling ../src and ../src-tauri/src, plus git HEAD and the current branch ref).",
+          "writer": "sole owner (3 tiny files bundled as one packet — none has independent responsibility large enough to extract alone)",
+          "public_api": "the nemo-mcp executable; nemo_mcp::BUILD_SOURCE_ID",
+          "consumers": ["src-tauri/src/application_mcp.rs::start (reads nemo_mcp::BUILD_SOURCE_ID into the registered Endpoint's build_id, alongside the Tauri app's own package version)"],
+          "oracle": "None directly for main.rs/lib.rs (every nemo-mcp/tests/*.rs test spawns the compiled binary as a child process, so they exercise main.rs's wiring only incidentally, never asserting on it specifically). build.rs has no test; its output is only observable indirectly via BUILD_SOURCE_ID appearing in a discovered endpoint's buildId.",
+          "depends_on": ["nemo-mcp/src/server.rs (NemoServer)", "nemo-mcp/src/registry.rs (registry_root)"],
+          "entangled_with": [],
+          "notes": "build.rs shells out to git at compile time and silently falls back to the literal string 'source-unknown' if git is absent or the command fails (e.g. building from a source tarball with no .git) — BUILD_SOURCE_ID is diagnostic-only (surfaced in nemo_discover's buildId), never validated or parsed by any consumer, so this fallback is safe by construction."
+        }
+      ]
+    }
+  ],
+  "cross_cutting_notes": [
+    "This slice is not legacy debt being reverse-engineered: per engineering/application/OPACITY_SLICE.md it is a fresh, already-modular R08 pilot (base 582f51e, issues #905/#907-910) built by Ilya's team (owners Codexitron/Codeximator, reviewer Codexalog) as the first concrete instance of the Application/domain/adapter pattern the whole remediation program targets, deliberately scoped to one property (Motion layer opacity) before extending further. Treat this census as confirming/documenting an already-clean boundary, not carving up a tangle.",
+    "Single-property coverage gap: src/js/motion.js only special-cases prop === 'opacity' in its 5 generic property-writer functions (lines 2706-2823) to route through window.NemoOpacityApplication.legacy(). Every other Motion property (position/anchor/rotation/scale, exprControls, per-vertex path, image-mesh vertex offsets...) still writes directly to its own domain module with zero Application/MCP visibility. Extending the pattern to more properties is unbuilt, not merely untested — out of scope for this census (motion.js is owned elsewhere) but material to anyone estimating the next slice's size.",
+    "Two independent, evidenced test-coverage gaps sit on opposite sides of the same wire boundary: src-tauri/src/application_mcp.rs (Rust/Tauri side, DEF-1) and src/js/bootstrap/opacity-application.js (JS/DOM side, DEF-3) are the only two files in this census with no oracle at all — every other packet has at least one. Both are exactly the files that cannot run outside a real Tauri+webview process, which is also why OPACITY_SLICE.md and MCP_INSTALL.md both explicitly flag 'installed executable' / 'packaged desktop' acceptance as a separate, not-yet-done gate rather than an oversight.",
+    "engineering/application/{OPACITY_SLICE.md, MCP_INSTALL.md, transport-v1.schema.json} are pre-existing design/reference docs for exactly this slice — read for context in this census, not in C07's bounded source ownership, not modified or claimed here."
+  ],
+  "known_defects": [
+    {
+      "id": "DEF-1",
+      "file": "src-tauri/src/application_mcp.rs",
+      "line": null,
+      "summary": "Zero test coverage of this file's actual compiled code: no #[cfg(test)] module inside it, no file under nemo-mcp/tests/ references it (they all fake the endpoint instead, via a Node harness or Rust fixtures), and no other src-tauri source file exercises it beyond its own command registration in lib.rs:215-219.",
+      "packet": "C07.native-transport.tauri-listener",
+      "severity": "test-coverage gap"
+    },
+    {
+      "id": "DEF-2",
+      "file": "src-tauri/src/application_mcp.rs",
+      "line": 176,
+      "summary": "serve_connection's tokio::select! races the webview's oneshot reply against a 30s server-side timeout. If the JS reply arrives via nemo_mcp_reply after the timeout has already fired and removed the connection_id from `pending`, nemo_mcp_reply's `pending.lock()...remove()` finds None and returns Ok(()) silently (application_mcp.rs:93-100) — the MCP client already received a cancellation, and any document write the JS side performed has no visible trace on either end. Inferred from reading both sides, not reproduced by a running test — consistent with DEF-1, no fixture exercises this file at all.",
+      "packet": "C07.native-transport.tauri-listener",
+      "severity": "product-debt (unverified — silent-divergence risk under a slow or blocked webview)"
+    },
+    {
+      "id": "DEF-3",
+      "file": "src/js/bootstrap/opacity-application.js",
+      "line": null,
+      "summary": "Zero test coverage anywhere in the repository. A repo-wide grep for 'opacity-application.js' finds only nemo-mcp/tests/stdio_application.rs, and that fixture requires solely src/js/application/opacity-application.js (the pure core) with its own fake ports — it never loads this file. No Playwright/JS-unit test references NemoApplication or NemoOpacityApplication either, so the document/history/render port bindings, the legacy() bridge motion.js actually calls, and the global undo/redo monkey-patch are all unverified by anything automated.",
+      "packet": "C07.application-service.bootstrap-bindings",
+      "severity": "test-coverage gap"
+    },
+    {
+      "id": "DEF-4",
+      "file": "nemo-mcp/src/schema.rs",
+      "line": null,
+      "summary": "The committed schema snapshot (engineering/application/transport-v1.schema.json) and the binary that generates it only cover ApplicationRequest/ApplicationResponse. nemo_query's separate Query struct (server.rs) has its own distinct schema (different required fields, instance_id alias) that is live-advertised through the MCP tool listing but never appears in this binary's output or the committed doc.",
+      "packet": "C07.mcp-contract.schema-dump-binary",
+      "severity": "informational (documentation completeness, not a runtime gap)"
+    }
+  ],
+  "uncovered_responsibilities": []
+}
