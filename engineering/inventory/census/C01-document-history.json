@@ -91,7 +91,7 @@
           "public_api": "window.SMProject.{pushVersionSnapshot,listVersionHistory,restoreVersion}",
           "consumers": ["src/js/timeline.js:11796-11809 (30s autosave tick pushes a snapshot every tick)", "project.js's own openHistoryModal (this packet, UI over listVersionHistory/restoreVersion)"],
           "oracle": "tests/project-open.test.cjs (matched pushVersionSnapshot/listVersionHistory/restoreVersion symbols directly)",
-          "depends_on": ["C01.project.document-io-and-dirty-tracking (currentPath for historyKey; window.SM.exportJSON/importJSON via restoreVersion)", "C01.project-document-validation (SMProjectDocument.parse, pre-restore validation)"],
+          "depends_on": ["C01.project.document-io-and-dirty-tracking (currentPath for historyKey; window.SM.exportJSON/importJSON via restoreVersion)", "C01.project-document.validation (SMProjectDocument.parse, pre-restore validation)"],
           "entangled_with": [],
           "notes": "historyKey() falls back to a fixed 'untitled-autosave' slug for a never-saved document — every such document across every project shares ONE history directory until the first Save As gives it a real path. Not verified as a defect (plausibly intentional, matches the single nemo-auto autosave's own pre-v15 behavior) but worth the orchestrator's attention before extraction."
         },
