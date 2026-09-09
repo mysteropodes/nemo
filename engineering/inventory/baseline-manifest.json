@@ -1,0 +1,663 @@
+{
+  "schema": "nemo.baseline-manifest/1",
+  "adoptedAt": "2026-09-09T16:14:59.569Z",
+  "task": "P02 / #1004",
+  "note": "Adopted for P02 (#1004) at ded641bd (origin/main). Two receipts on the same commit: the quick profile on a clean tree, and the remaining full-profile jobs with the P02 tooling files present uncommitted (scripts/nemo/baseline*.cjs, tests/nemo-baseline.test.cjs) — those add no application source and are committed together with this manifest.",
+  "references": {
+    "source": {
+      "head": "ded641bd763379f36d629bf1686fcce8a6137a66",
+      "branch": "pollen/p02-current-state-manifest",
+      "commitDate": "2026-09-09T16:35:17+02:00",
+      "dirty": false,
+      "dirtyDigest": null,
+      "worktreeIgnored": true,
+      "worktreeWasDirty": true,
+      "worktreeDigest": "12a26fc65796ff3c4522120732a235de412a97af9bfc8227898b9dacbd0784fc"
+    },
+    "fixtures": {
+      "path": "tests/fixtures/manifest.json",
+      "present": true,
+      "sha256": "eea9aa1cb9e39e1ed86b9d44169f415fdc36fef0e65c96640acbc8cd999ecbc6",
+      "formatVersion": 13
+    },
+    "artifacts": {
+      "geometryWasm": {
+        "path": "src/wasm/geometry_wasm_bg.wasm",
+        "present": true,
+        "bytes": 1644666,
+        "sha256": "c35ad2045f183c69c6fec40721886cc48c14f9e7b05cf127192f4739d15fd3d5"
+      },
+      "vectorizeWasm": {
+        "path": "src/wasm-vectorize/vectorize_wasm_bg.wasm",
+        "present": true,
+        "bytes": 862315,
+        "sha256": "a1d67c391782c6ba2d16b435c9bc9885e56af78950ef546f5cb2562063c92422"
+      },
+      "ffmpegSidecar": {
+        "path": "src-tauri/binaries/ffmpeg-aarch64-apple-darwin",
+        "present": true,
+        "bytes": 22127000,
+        "sha256": "8fbf0afc8a0cf3b30307da69eebc4c7b21585ac3f90f3f82f90405a1a367eeb7"
+      }
+    },
+    "build": {
+      "packageVersion": "0.7.0-alpha.4",
+      "tauriVersion": "0.7.0-alpha.4",
+      "indexHtmlTitleVersion": "0.7.0-alpha.4",
+      "hostTriple": "aarch64-apple-darwin"
+    }
+  },
+  "platform": {
+    "os": "darwin",
+    "osRelease": "25.6.0",
+    "arch": "arm64",
+    "cpuModel": "Apple M4 Max",
+    "cpuCount": 14,
+    "node": "v24.4.1"
+  },
+  "receipts": [
+    {
+      "runId": "20260909T154312Z-ded641b",
+      "command": "verify",
+      "profile": "quick",
+      "finishedAt": "2026-09-09T15:44:17.500Z",
+      "path": "reports/20260909T154312Z-ded641b/receipt.json",
+      "sha256": "d1aae6928fb9fd769e4ab74c464964fd640748b9bf61ce1c0d10f65a4ccf90b9",
+      "source": "ded641bd763379f36d629bf1686fcce8a6137a66",
+      "sourceDirty": false
+    },
+    {
+      "runId": "20260909T154544Z-ded641b-dirty",
+      "command": "verify",
+      "profile": "custom",
+      "finishedAt": "2026-09-09T15:48:29.904Z",
+      "path": "reports/20260909T154544Z-ded641b-dirty/receipt.json",
+      "sha256": "1d5c7768ccf916d63a9191b04be6ac97f7c3aefda3900ecfbaa103c70ec1587d",
+      "source": "ded641bd763379f36d629bf1686fcce8a6137a66",
+      "sourceDirty": true
+    }
+  ],
+  "entries": [
+    {
+      "job": "bench",
+      "required": false,
+      "status": "pass",
+      "case": {
+        "reason": "15 workloads measured, 2 not-run (no render backend); budgets: none (R19)",
+        "exitCode": 0,
+        "limitations": [
+          "render.engine.export: requires the WebGPU engine in a browser or the packaged desktop app (test:browser / test:desktop, R21); the fixture and its expectations are in tests/fixtures/export/",
+          "export.mp4.export: requires the WebGPU engine in a browser or the packaged desktop app (test:browser / test:desktop, R21); the fixture and its expectations are in tests/fixtures/export/"
+        ],
+        "details": {
+          "evaluation.valueAtFrame": {
+            "median": 526.597,
+            "p90": 618.444,
+            "unit": "ns/evaluation"
+          },
+          "evaluation.evalCurvePoints": {
+            "median": 1580.775,
+            "p90": 1587,
+            "unit": "ns/evaluation"
+          },
+          "evaluation.expression": {
+            "median": 649.688,
+            "p90": 744.931,
+            "unit": "ns/evaluation"
+          },
+          "copy.undoClone.bench-vectors-40x24": {
+            "median": 59.992,
+            "p90": 61.249,
+            "unit": "ms"
+          },
+          "copy.jsonClone.bench-vectors-40x24": {
+            "median": 53.669,
+            "p90": 54.027,
+            "unit": "ms"
+          },
+          "copy.serialize.bench-vectors-40x24": {
+            "median": 27.457,
+            "p90": 27.541,
+            "unit": "ms"
+          },
+          "memory.parsedDocument.bench-vectors-40x24": {
+            "median": 19713568,
+            "p90": 19713568,
+            "unit": "bytes"
+          },
+          "copy.undoClone.bench-vectors-8x24": {
+            "median": 5.886,
+            "p90": 5.981,
+            "unit": "ms"
+          },
+          "copy.jsonClone.bench-vectors-8x24": {
+            "median": 5.523,
+            "p90": 5.616,
+            "unit": "ms"
+          },
+          "copy.serialize.bench-vectors-8x24": {
+            "median": 2.784,
+            "p90": 2.83,
+            "unit": "ms"
+          },
+          "memory.parsedDocument.bench-vectors-8x24": {
+            "median": 1971432,
+            "p90": 1971432,
+            "unit": "bytes"
+          },
+          "copy.undoClone.bench-images-20x24": {
+            "median": 3.251,
+            "p90": 3.263,
+            "unit": "ms"
+          },
+          "copy.jsonClone.bench-images-20x24": {
+            "median": 2.891,
+            "p90": 2.905,
+            "unit": "ms"
+          },
+          "copy.serialize.bench-images-20x24": {
+            "median": 1.467,
+            "p90": 1.531,
+            "unit": "ms"
+          },
+          "memory.parsedDocument.bench-images-20x24": {
+            "median": 1188952,
+            "p90": 1188952,
+            "unit": "bytes"
+          },
+          "render.engine.export": {
+            "status": "not-run",
+            "reason": "requires the WebGPU engine in a browser or the packaged desktop app (test:browser / test:desktop, R21); the fixture and its expectations are in tests/fixtures/export/"
+          },
+          "export.mp4.export": {
+            "status": "not-run",
+            "reason": "requires the WebGPU engine in a browser or the packaged desktop app (test:browser / test:desktop, R21); the fixture and its expectations are in tests/fixtures/export/"
+          }
+        }
+      },
+      "caseSignature": null,
+      "evidence": {
+        "runId": "20260909T154544Z-ded641b-dirty",
+        "command": "verify",
+        "profile": "custom",
+        "finishedAt": "2026-09-09T15:48:29.904Z",
+        "path": "reports/20260909T154544Z-ded641b-dirty/receipt.json",
+        "sha256": "1d5c7768ccf916d63a9191b04be6ac97f7c3aefda3900ecfbaa103c70ec1587d",
+        "source": "ded641bd763379f36d629bf1686fcce8a6137a66",
+        "sourceDirty": true
+      },
+      "measuredDirty": true,
+      "carriedOver": false,
+      "carriedOverNote": null
+    },
+    {
+      "job": "build:desktop",
+      "required": true,
+      "status": "fail",
+      "case": {
+        "reason": "bundle-ffmpeg-dylibs.py failed (1)",
+        "exitCode": 1,
+        "limitations": [
+          "Unsigned local verification package; not release acceptance."
+        ],
+        "details": {
+          "taskId": "desktop-build-88f0cf7bd973dbc281cc88adb84a908c",
+          "source": {
+            "head": "ded641bd763379f36d629bf1686fcce8a6137a66",
+            "branch": "pollen/p02-current-state-manifest",
+            "describe": "v0.7.0-alpha.4-188-gded641b",
+            "commitDate": "2026-09-09T16:35:17+02:00",
+            "subject": "Merge pull request #1068 from mysteropodes/fizz/t03-playwright-failure-traces",
+            "upstream": "origin/main",
+            "worktree": "<repo>",
+            "dirty": true,
+            "modifiedTracked": 0,
+            "untracked": 2,
+            "dirtyDigest": "2eeba8fc268414b64363957c2cf6be50e13bed69d8c1803640778123f60c71cb",
+            "changedPaths": [
+              "?? scripts/nemo/baseline.cjs",
+              "?? scripts/nemo/lib/baseline.cjs"
+            ]
+          },
+          "build": {
+            "startup": {
+              "packageVersion": "0.7.0-alpha.4",
+              "tauriVersion": "0.7.0-alpha.4",
+              "indexHtmlTitleVersion": "0.7.0-alpha.4",
+              "indexHtmlStatusVersion": "0.7.0-alpha.4",
+              "productName": "Nemo",
+              "identifier": "com.strokemotion.app",
+              "tauriCliRange": "^2.11.4",
+              "crates": {
+                "geometry-wasm": "0.1.0",
+                "vectorize-wasm": "0.1.0",
+                "src-tauri": "0.5.0"
+              },
+              "hostTriple": "aarch64-apple-darwin",
+              "artifacts": {
+                "geometryWasm": {
+                  "path": "src/wasm/geometry_wasm_bg.wasm",
+                  "present": true,
+                  "bytes": 1644666,
+                  "sha256": "c35ad2045f183c69c6fec40721886cc48c14f9e7b05cf127192f4739d15fd3d5"
+                },
+                "vectorizeWasm": {
+                  "path": "src/wasm-vectorize/vectorize_wasm_bg.wasm",
+                  "present": true,
+                  "bytes": 862315,
+                  "sha256": "a1d67c391782c6ba2d16b435c9bc9885e56af78950ef546f5cb2562063c92422"
+                },
+                "ffmpegSidecar": {
+                  "path": "src-tauri/binaries/ffmpeg-aarch64-apple-darwin",
+                  "present": true,
+                  "bytes": 22127000,
+                  "sha256": "8fbf0afc8a0cf3b30307da69eebc4c7b21585ac3f90f3f82f90405a1a367eeb7"
+                }
+              }
+            }
+          },
+          "state": "completed",
+          "buildExitCode": 0,
+          "processTree": {
+            "stopped": true,
+            "forced": false,
+            "reason": "owned build process tree already exited"
+          },
+          "handshake": {
+            "ok": false,
+            "reason": "source moved: recorded source identity differs from current checkout"
+          },
+          "finalState": "stopped",
+          "cleanup": {
+            "stopped": true,
+            "released": true,
+            "retainedData": false,
+            "slots": {
+              "scanned": 0,
+              "reconciled": [],
+              "retained": [],
+              "otherTasks": 0,
+              "truncated": false
+            }
+          }
+        }
+      },
+      "caseSignature": "01b88f58ab770032a848f706c6db3142765a83bbb5cd7b902af13387d08aa48d",
+      "evidence": {
+        "runId": "20260909T154544Z-ded641b-dirty",
+        "command": "verify",
+        "profile": "custom",
+        "finishedAt": "2026-09-09T15:48:29.904Z",
+        "path": "reports/20260909T154544Z-ded641b-dirty/receipt.json",
+        "sha256": "1d5c7768ccf916d63a9191b04be6ac97f7c3aefda3900ecfbaa103c70ec1587d",
+        "source": "ded641bd763379f36d629bf1686fcce8a6137a66",
+        "sourceDirty": true
+      },
+      "measuredDirty": true,
+      "carriedOver": false,
+      "carriedOverNote": null
+    },
+    {
+      "job": "build:wasm",
+      "required": false,
+      "status": "pass",
+      "case": {
+        "reason": "wasm-pack build ok; differs from committed src/wasm bundle",
+        "exitCode": 0,
+        "limitations": [
+          "built bundle differs from the committed one — wasm-pack output is not guaranteed reproducible across toolchains; treat as information, not failure"
+        ],
+        "details": null
+      },
+      "caseSignature": null,
+      "evidence": {
+        "runId": "20260909T154544Z-ded641b-dirty",
+        "command": "verify",
+        "profile": "custom",
+        "finishedAt": "2026-09-09T15:48:29.904Z",
+        "path": "reports/20260909T154544Z-ded641b-dirty/receipt.json",
+        "sha256": "1d5c7768ccf916d63a9191b04be6ac97f7c3aefda3900ecfbaa103c70ec1587d",
+        "source": "ded641bd763379f36d629bf1686fcce8a6137a66",
+        "sourceDirty": true
+      },
+      "measuredDirty": true,
+      "carriedOver": false,
+      "carriedOverNote": null
+    },
+    {
+      "job": "check",
+      "required": true,
+      "status": "pass",
+      "case": {
+        "reason": "6 checks pass",
+        "exitCode": null,
+        "limitations": [],
+        "details": {
+          "version-sync": {
+            "status": "pass",
+            "reason": "all four version strings say 0.7.0-alpha.4"
+          },
+          "json-valid": {
+            "status": "pass",
+            "reason": "6 JSON files parse"
+          },
+          "js-syntax": {
+            "status": "pass",
+            "reason": "150 scripts under src/js parse (3 as ES modules)"
+          },
+          "script-refs": {
+            "status": "pass",
+            "reason": "138 <script src> references in index.html resolve"
+          },
+          "private-labs-guard": {
+            "status": "pass",
+            "reason": "no private-labs leakage under src/"
+          },
+          "artifacts-present": {
+            "status": "pass",
+            "reason": "committed wasm bundles and host ffmpeg sidecar present"
+          }
+        }
+      },
+      "caseSignature": null,
+      "evidence": {
+        "runId": "20260909T154312Z-ded641b",
+        "command": "verify",
+        "profile": "quick",
+        "finishedAt": "2026-09-09T15:44:17.500Z",
+        "path": "reports/20260909T154312Z-ded641b/receipt.json",
+        "sha256": "d1aae6928fb9fd769e4ab74c464964fd640748b9bf61ce1c0d10f65a4ccf90b9",
+        "source": "ded641bd763379f36d629bf1686fcce8a6137a66",
+        "sourceDirty": false
+      },
+      "measuredDirty": false,
+      "carriedOver": false,
+      "carriedOverNote": null
+    },
+    {
+      "job": "doctor",
+      "required": true,
+      "status": "pass",
+      "case": {
+        "reason": "probed 16 tools, 1 absent (wasm-bindgen)",
+        "exitCode": null,
+        "limitations": [
+          "WebGPU availability is only observable inside a browser or the packaged app (test:browser / test:desktop)"
+        ],
+        "details": {
+          "absentTools": [
+            "wasm-bindgen"
+          ],
+          "gpu": "ok",
+          "sidecar": "present but does not run"
+        }
+      },
+      "caseSignature": null,
+      "evidence": {
+        "runId": "20260909T154312Z-ded641b",
+        "command": "verify",
+        "profile": "quick",
+        "finishedAt": "2026-09-09T15:44:17.500Z",
+        "path": "reports/20260909T154312Z-ded641b/receipt.json",
+        "sha256": "d1aae6928fb9fd769e4ab74c464964fd640748b9bf61ce1c0d10f65a4ccf90b9",
+        "source": "ded641bd763379f36d629bf1686fcce8a6137a66",
+        "sourceDirty": false
+      },
+      "measuredDirty": false,
+      "carriedOver": false,
+      "carriedOverNote": null
+    },
+    {
+      "job": "inventory",
+      "required": true,
+      "status": "pass",
+      "case": {
+        "reason": "inventory up to date (902 rows, digest c4c968bc2d41)",
+        "exitCode": 0,
+        "limitations": [],
+        "details": null
+      },
+      "caseSignature": null,
+      "evidence": {
+        "runId": "20260909T154312Z-ded641b",
+        "command": "verify",
+        "profile": "quick",
+        "finishedAt": "2026-09-09T15:44:17.500Z",
+        "path": "reports/20260909T154312Z-ded641b/receipt.json",
+        "sha256": "d1aae6928fb9fd769e4ab74c464964fd640748b9bf61ce1c0d10f65a4ccf90b9",
+        "source": "ded641bd763379f36d629bf1686fcce8a6137a66",
+        "sourceDirty": false
+      },
+      "measuredDirty": false,
+      "carriedOver": false,
+      "carriedOverNote": null
+    },
+    {
+      "job": "test:browser",
+      "required": false,
+      "status": "pass",
+      "case": {
+        "reason": "playwright test tests/browser: exit 0",
+        "exitCode": 0,
+        "limitations": [],
+        "details": null
+      },
+      "caseSignature": null,
+      "evidence": {
+        "runId": "20260909T154544Z-ded641b-dirty",
+        "command": "verify",
+        "profile": "custom",
+        "finishedAt": "2026-09-09T15:48:29.904Z",
+        "path": "reports/20260909T154544Z-ded641b-dirty/receipt.json",
+        "sha256": "1d5c7768ccf916d63a9191b04be6ac97f7c3aefda3900ecfbaa103c70ec1587d",
+        "source": "ded641bd763379f36d629bf1686fcce8a6137a66",
+        "sourceDirty": true
+      },
+      "measuredDirty": true,
+      "carriedOver": false,
+      "carriedOverNote": null
+    },
+    {
+      "job": "test:desktop",
+      "required": true,
+      "status": "blocked",
+      "case": {
+        "reason": "no packaged app found (src-tauri/target/*/release/bundle/macos/Nemo.app or NEMO_DESKTOP_APP)",
+        "exitCode": null,
+        "limitations": [],
+        "details": null
+      },
+      "caseSignature": "978c5bbffb2eeca0ce112531b6e1f09e63f59813f4d2d80f6844641a9bc21f51",
+      "evidence": {
+        "runId": "20260909T154544Z-ded641b-dirty",
+        "command": "verify",
+        "profile": "custom",
+        "finishedAt": "2026-09-09T15:48:29.904Z",
+        "path": "reports/20260909T154544Z-ded641b-dirty/receipt.json",
+        "sha256": "1d5c7768ccf916d63a9191b04be6ac97f7c3aefda3900ecfbaa103c70ec1587d",
+        "source": "ded641bd763379f36d629bf1686fcce8a6137a66",
+        "sourceDirty": true
+      },
+      "measuredDirty": true,
+      "carriedOver": false,
+      "carriedOverNote": null
+    },
+    {
+      "job": "test:integration",
+      "required": false,
+      "status": "pass",
+      "case": {
+        "reason": "node --test tests/integration: exit 0",
+        "exitCode": 0,
+        "limitations": [],
+        "details": null
+      },
+      "caseSignature": null,
+      "evidence": {
+        "runId": "20260909T154544Z-ded641b-dirty",
+        "command": "verify",
+        "profile": "custom",
+        "finishedAt": "2026-09-09T15:48:29.904Z",
+        "path": "reports/20260909T154544Z-ded641b-dirty/receipt.json",
+        "sha256": "1d5c7768ccf916d63a9191b04be6ac97f7c3aefda3900ecfbaa103c70ec1587d",
+        "source": "ded641bd763379f36d629bf1686fcce8a6137a66",
+        "sourceDirty": true
+      },
+      "measuredDirty": true,
+      "carriedOver": false,
+      "carriedOverNote": null
+    },
+    {
+      "job": "test:rust",
+      "required": true,
+      "status": "pass",
+      "case": {
+        "reason": "cargo test geometry-wasm: 4 binaries, 15 passed, 0 failed",
+        "exitCode": 0,
+        "limitations": [],
+        "details": null
+      },
+      "caseSignature": null,
+      "evidence": {
+        "runId": "20260909T154312Z-ded641b",
+        "command": "verify",
+        "profile": "quick",
+        "finishedAt": "2026-09-09T15:44:17.500Z",
+        "path": "reports/20260909T154312Z-ded641b/receipt.json",
+        "sha256": "d1aae6928fb9fd769e4ab74c464964fd640748b9bf61ce1c0d10f65a4ccf90b9",
+        "source": "ded641bd763379f36d629bf1686fcce8a6137a66",
+        "sourceDirty": false
+      },
+      "measuredDirty": false,
+      "carriedOver": false,
+      "carriedOverNote": null
+    },
+    {
+      "job": "test:rust-tauri",
+      "required": false,
+      "status": "blocked",
+      "case": {
+        "reason": "native fixture sidecar unavailable (bundled): src-tauri/binaries/ffmpeg-aarch64-apple-darwin: exit null; SIGABRT; missing FFmpeg version banner; dyld[41600]: Library not loaded: /opt/homebrew/opt/libvpx/lib/libvpx.12.dylib |   Referenced from: <249CE339-765B-3B08-A2C1-C44CE163B729> <repo>/src-tauri/binaries/ffmpeg-aarch64-apple-darwin |   Reason: tried: '/opt/homebrew/opt/libvpx/lib/libvpx.12.dylib' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/opt/homebrew/opt/libvpx/lib/libvpx.12.dylib' (no such file), '/opt/homebrew/opt/libvpx/lib/libvpx.12.dylib' (no such file), '/opt/homebrew/Cellar/libvpx/1.15.2/lib/libvpx.12.dylib' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/opt/homebrew/Cellar/libvpx/1.15.2/lib/libvpx.12.dylib' (no such file), '/opt/homebrew/Cellar/libvpx/1.15.2/lib/libvpx.12.dylib' (no such file)",
+        "exitCode": null,
+        "limitations": [],
+        "details": {
+          "nativeFixtureSidecar": {
+            "path": "src-tauri/binaries/ffmpeg-aarch64-apple-darwin",
+            "source": "bundled",
+            "present": true,
+            "runs": false,
+            "exitCode": null,
+            "signal": "SIGABRT",
+            "error": null,
+            "failure": "exit null; SIGABRT; missing FFmpeg version banner; dyld[41600]: Library not loaded: /opt/homebrew/opt/libvpx/lib/libvpx.12.dylib |   Referenced from: <249CE339-765B-3B08-A2C1-C44CE163B729> <repo>/src-tauri/binaries/ffmpeg-aarch64-apple-darwin |   Reason: tried: '/opt/homebrew/opt/libvpx/lib/libvpx.12.dylib' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/opt/homebrew/opt/libvpx/lib/libvpx.12.dylib' (no such file), '/opt/homebrew/opt/libvpx/lib/libvpx.12.dylib' (no such file), '/opt/homebrew/Cellar/libvpx/1.15.2/lib/libvpx.12.dylib' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/opt/homebrew/Cellar/libvpx/1.15.2/lib/libvpx.12.dylib' (no such file), '/opt/homebrew/Cellar/libvpx/1.15.2/lib/libvpx.12.dylib' (no such file)"
+          }
+        }
+      },
+      "caseSignature": "38beee7566f233bb8c7ecc28a7c084700af8253e35660a6942cf27edc3b46be6",
+      "evidence": {
+        "runId": "20260909T154544Z-ded641b-dirty",
+        "command": "verify",
+        "profile": "custom",
+        "finishedAt": "2026-09-09T15:48:29.904Z",
+        "path": "reports/20260909T154544Z-ded641b-dirty/receipt.json",
+        "sha256": "1d5c7768ccf916d63a9191b04be6ac97f7c3aefda3900ecfbaa103c70ec1587d",
+        "source": "ded641bd763379f36d629bf1686fcce8a6137a66",
+        "sourceDirty": true
+      },
+      "measuredDirty": true,
+      "carriedOver": false,
+      "carriedOverNote": null
+    },
+    {
+      "job": "test:unit",
+      "required": true,
+      "status": "pass",
+      "case": {
+        "reason": "node --test: 634 tests, 632 pass, 0 fail",
+        "exitCode": 0,
+        "limitations": [],
+        "details": {
+          "files": [
+            "application-opacity-bootstrap.test.cjs",
+            "application-opacity-replay.test.cjs",
+            "application-opacity.test.cjs",
+            "domain-opacity.test.cjs",
+            "duplicator-hue.test.cjs",
+            "easing-reference.test.cjs",
+            "expr-bake.test.cjs",
+            "feedback-2026-08-22.test.cjs",
+            "nemo-bench.test.cjs",
+            "nemo-boundaries-ratchet.test.cjs",
+            "nemo-boundaries.test.cjs",
+            "nemo-browser-runtime.test.cjs",
+            "nemo-build-job.test.cjs",
+            "nemo-build-runtime.test.cjs",
+            "nemo-ci.test.cjs",
+            "nemo-coverage-job.test.cjs",
+            "nemo-desktop-harness.test.cjs",
+            "nemo-desktop-job.test.cjs",
+            "nemo-exclusion-provenance.test.cjs",
+            "nemo-fixtures.test.cjs",
+            "nemo-inventory-records.test.cjs",
+            "nemo-inventory-swatch.test.cjs",
+            "nemo-inventory.test.cjs",
+            "nemo-isolation.test.cjs",
+            "nemo-mcp-adapter.test.cjs",
+            "nemo-mcp-boundaries.test.cjs",
+            "nemo-mcp-bundle.test.cjs",
+            "nemo-native-ffmpeg-preflight.test.cjs",
+            "nemo-native-runtime.test.cjs",
+            "nemo-third-party-notices.test.cjs",
+            "performance-regressions.test.cjs",
+            "project-entry-repaint.test.cjs",
+            "project-open.test.cjs",
+            "text-selector.test.cjs",
+            "animation/boundaries.test.cjs",
+            "animation/curve.test.cjs",
+            "animation/motion-facade.test.cjs"
+          ]
+        }
+      },
+      "caseSignature": null,
+      "evidence": {
+        "runId": "20260909T154312Z-ded641b",
+        "command": "verify",
+        "profile": "quick",
+        "finishedAt": "2026-09-09T15:44:17.500Z",
+        "path": "reports/20260909T154312Z-ded641b/receipt.json",
+        "sha256": "d1aae6928fb9fd769e4ab74c464964fd640748b9bf61ce1c0d10f65a4ccf90b9",
+        "source": "ded641bd763379f36d629bf1686fcce8a6137a66",
+        "sourceDirty": false
+      },
+      "measuredDirty": false,
+      "carriedOver": false,
+      "carriedOverNote": null
+    }
+  ],
+  "summary": {
+    "total": 12,
+    "counts": {
+      "pass": 9,
+      "fail": 1,
+      "blocked": 2
+    },
+    "carriedOver": [],
+    "knownNonPass": [
+      {
+        "job": "build:desktop",
+        "status": "fail",
+        "reason": "bundle-ffmpeg-dylibs.py failed (1)"
+      },
+      {
+        "job": "test:desktop",
+        "status": "blocked",
+        "reason": "no packaged app found (src-tauri/target/*/release/bundle/macos/Nemo.app or NEMO_DESKTOP_APP)"
+      },
+      {
+        "job": "test:rust-tauri",
+        "status": "blocked",
+        "reason": "native fixture sidecar unavailable (bundled): src-tauri/binaries/ffmpeg-aarch64-apple-darwin: exit null; SIGABRT; missing FFmpeg version banner; dyld[41600]: Library not loaded: /opt/homebrew/opt/libvpx/lib/libvpx.12.dylib |   Referenced from: <249CE339-765B-3B08-A2C1-C44CE163B729> <repo>/src-tauri/binaries/ffmpeg-aarch64-apple-darwin |   Reason: tried: '/opt/homebrew/opt/libvpx/lib/libvpx.12.dylib' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/opt/homebrew/opt/libvpx/lib/libvpx.12.dylib' (no such file), '/opt/homebrew/opt/libvpx/lib/libvpx.12.dylib' (no such file), '/opt/homebrew/Cellar/libvpx/1.15.2/lib/libvpx.12.dylib' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/opt/homebrew/Cellar/libvpx/1.15.2/lib/libvpx.12.dylib' (no such file), '/opt/homebrew/Cellar/libvpx/1.15.2/lib/libvpx.12.dylib' (no such file)"
+      }
+    ]
+  }
+}
