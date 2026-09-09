@@ -1,0 +1,329 @@
+{
+  "census_id": "C03",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1038",
+  "title": "Rendering and resource ownership — bounded extraction packets",
+  "owner": "Cyrill/D1 (Fizz)",
+  "source_sha": "ded641bd763379f36d629bf1686fcce8a6137a66",
+  "status": "read-only census complete; no source mutated; proposed IDs and packet boundaries are placeholders for the orchestrator to renumber into the global P-sequence and fold into engineering/inventory/remediation-scope.json",
+  "scope_files": [
+    "src/js/engine-bridge.js",
+    "src/js/render-manager.js",
+    "src/js/playback-cache.js",
+    "src/js/color-manager.js",
+    "src/js/path-fx.js",
+    "src/js/custom-effects.js",
+    "src/js/shader-effects-library.js",
+    "geometry-wasm/src/engine.rs",
+    "geometry-wasm/src/eraser.rs",
+    "geometry-wasm/src/tween.rs",
+    "geometry-wasm/src/tweenmatch.rs"
+  ],
+  "coverage_note": "engine-bridge.js (4711 lines) and engine.rs (4235 lines) dominate this census; both were mapped via their complete top-level function/struct inventory (grep, all 81 engine-bridge.js functions and all engine.rs fn/struct/impl signatures) plus targeted reads at each responsibility boundary, not a full linear read — the same targeted strategy C01 used for timeline.js/tweens.js. shader-effects-library.js's 70 WGSL shader bodies were catalogued by id/name/category via grep rather than read line-by-line; the WGSL math itself is data, not logic requiring responsibility mapping. geometry-wasm/src/** is C03's bounded ownership per the issue text, but tweenmatch.rs (auto_match/resample_stroke/align_pair — stroke correspondence matching and resampling for tween interpolation) is conceptually animation/time domain (C02's territory: motion.js/tweens.js are its only JS-side callers), not rendering/resource ownership — flagged for the orchestrator's eventual module boundary decision rather than silently included as if it belonged here. tween.rs's interp_stroke is confirmed DEAD CODE (see DEF-5). CLAUDE.md sections 3, 5, 5bis-5quinquies already document composite_scene, retained paths, the image store budget and the playback bake cache in detail; this census verified those descriptions against the actual current source (exact line numbers, confirmed function names) rather than re-deriving them from scratch.",
+  "areas": [
+    {
+      "area": "engine-bridge-scene-serialization",
+      "packets": [
+        {
+          "id": "C03.engine-bridge.scene-graph-builder",
+          "title": "JS state.layers -> engine scene JSON, per frame",
+          "files": ["src/js/engine-bridge.js:735-2667"],
+          "symbols": ["sceneEffectsOf", "buildSceneJson"],
+          "responsibility": "The one function (buildSceneJson, 1865 lines) that walks every visible layer's effective strokes and serializes them into the JSON payload engine.rs's render()/render_to_pixels() consume: per-item geometry (inline segments or a pathRef into the retained-path store), fills/strokes/opacity, per-layer effects stacks (sceneEffectsOf resolves a layer's effects array into engine-facing EffectIn shape, keyframe-aware via frameIdx), blend/matte modes, and Motion's composed affine per item. Optionally includes editor-only overlay items (guides, handles, cursors — see the two overlay-builder packets below) when includeEditorOverlays is true.",
+          "writer": "sole owner of the scene JSON shape sent to the engine each frame; does not own the underlying stroke data (state.layers, app.js) or the retained-path/image identity stores (separate packets below)",
+          "public_api": "window.SMEngineBridge.buildSceneJsonForFrame (thin wrapper); buildSceneJson itself is called internally by renderNow/renderWithOverlayItem/renderFrameRawPixels/timeSceneBuild",
+          "consumers": ["C03.engine-bridge.viewport-tick-render (tick's per-frame render)", "C03.engine-bridge.effects-export-pipeline (renderFrameRawPixels/renderFrameToPixelsPNG)", "src/js/playback-cache.js (bakeRange, via renderFrameRawPixels)"],
+          "oracle": "geometry-wasm/tests/effect_layer_overlay_repro.rs and dab_dense_overlap_repro.rs exercise composite_scene with hand-built SceneIn JSON matching this function's output shape, but neither calls buildSceneJson itself (no JS test harness constructs a real document and asserts on its JSON output). tests/performance-regressions.test.cjs times scene builds but does not assert on content correctness.",
+          "depends_on": ["getEffectiveStrokesRendered (app.js, out of this census)", "C03.engine-bridge.retained-geometry-store (pathRefFor)", "C03.engine-bridge.image-store (engineIdFor/registerRasterIfNeeded)", "src/js/path-fx.js (SMPathFx.apply, this census)", "affineFromMotion/affineMul/motionChainUniform (this file, engine-bridge.js:360-400)"],
+          "entangled_with": ["C03.engine-bridge.retained-geometry-store", "C03.engine-bridge.image-store"],
+          "notes": "Motion affine composition (affineFromMotion) must stay the exact mirror of transformSegments (motion.js, out of this census) per CLAUDE.md 5ter v2 — a future edit to either without the other silently only affects animated shapes, not caught by re-reading, only by a pixel A/B."
+        },
+        {
+          "id": "C03.engine-bridge.retained-geometry-store",
+          "title": "Path-identity-based geometry retention (skip re-serializing unchanged paths)",
+          "files": ["src/js/engine-bridge.js:261-433"],
+          "symbols": ["installGeometryHook", "affineFromMotion", "affineMul", "motionChainUniform", "existingPathRef", "pathRefFor", "flushRetiredPaths"],
+          "responsibility": "Stamps a stroke dict's object identity as the engine-side geometry cache key (CLAUDE.md 5ter's documented invariant), so an unchanged path is referenced (pathRef) instead of re-walked into inline segments every frame. installGeometryHook patches Path/CompoundPath/Raster's _changed to invalidate a stamp on live mutation, discovered by auto-test (bit mask), not hard-coded.",
+          "writer": "sole owner of _pathKeyByDict (WeakMap) and the retire queue",
+          "public_api": "window.SMEngineBridge.{clearRetainedPaths, setRetainedPathsEnabled, retainedPathStats}",
+          "consumers": ["C03.engine-bridge.scene-graph-builder (pathRefFor, called once per item per frame)"],
+          "oracle": "none found in tests/ — no automated test constructs a document, scrubs frames, and asserts the retained-path store's registered/pendingRetire counts behave as documented. CLAUDE.md records this was verified by manual pixel-identical A/B (ON vs OFF) at authoring time, not by a regression test that would catch a future break.",
+          "depends_on": ["engine.register_path / retire_paths / clear_paths / path_store_size (geometry-wasm engine.rs, this census)"],
+          "entangled_with": ["C03.engine-bridge.scene-graph-builder"],
+          "notes": "setRetainedPathsEnabled is both an A/B kill switch and a field escape hatch per its own in-source comment — if a future item type mutates geometry without tripping installGeometryHook's patched _changed, this is the documented recovery path, not a code fix."
+        },
+        {
+          "id": "C03.engine-bridge.image-store",
+          "title": "Bounded LRU image/raster upload store",
+          "files": ["src/js/engine-bridge.js:440-735"],
+          "symbols": ["registerRasterIfNeeded", "_hashSrc", "engineIdFor", "bitmapTrimmedImage", "rasterImageRect", "drawableToPixels", "_noteImageRegistered", "_touchImage", "_imgTotalBytes", "enforceImageBudget", "registerCachedImage", "registerImagePixels", "registerImageRaw"],
+          "responsibility": "Uploads raster pixel data to the engine keyed by a stable id (engineIdFor), tracks byte usage per id, and evicts least-recently-used entries once the running total exceeds a configurable budget (default per CLAUDE.md 5quinquies) — bounded specifically because footage (video/image sequences) can otherwise grow unbounded (measured: 950MB/5s at 1080p). _imgUsedThisBuild (opened/closed around buildSceneJson) marks the current frame's images as ineligible for eviction.",
+          "writer": "sole owner of registeredImageIds, _imgBytes, _imgLastUsed, _imgUsedThisBuild, _imgEvictions",
+          "public_api": "window.SMEngineBridge.{registerImagePixels, registerImageRaw, hasImage, engineIdFor, imageStoreStats, setImageBudgetBytes, rasterImageRect}",
+          "consumers": ["C03.engine-bridge.scene-graph-builder (registerRasterIfNeeded per raster item)", "src/js/native-video-bridge.js (registerImageRaw, out of this census)"],
+          "oracle": "none found in tests/ for the eviction policy itself (LRU-under-budget, ordering, re-upload-after-evict). CLAUDE.md records a manual verification (8MB budget forcing 223 evictions, pixel-identical output vs. a large-budget reference) but no regression test encodes that scenario.",
+          "depends_on": ["engine.register_image / retire_images / image_store_bytes / image_store_size (geometry-wasm engine.rs, this census)"],
+          "entangled_with": ["C03.engine-bridge.scene-graph-builder"],
+          "notes": "setImageBudgetBytes uses Math.floor, not `| 0` — CLAUDE.md records a real prior bug here (bitwise coercion wraps at 2^31, a 4GB budget silently became 1 byte and evicted everything on the first frame). The current source (line 4598, in the public API packet below) already uses Math.floor — verified fixed, not a currently-observed defect."
+        },
+        {
+          "id": "C03.engine-bridge.onion-and-ghost-content",
+          "title": "Onion-skin and Ghost-All content rendering",
+          "files": ["src/js/engine-bridge.js:2667-2778"],
+          "symbols": ["onionLayerItems", "buildOnionSkinItems", "buildGhostAllItems"],
+          "responsibility": "Renders adjacent-frame (onion skin) or all-frame (Ghost-All, timeline.js) content as tinted/faded reference items alongside the current frame's live content — actual document content shown as a drawing aid, distinct from the editor-chrome overlays below (guides, handles). Uses getEffectiveStrokesRendered (not getEffectiveStrokes) per CLAUDE.md 1's documented 2026-09-03 fix so a ghost matches what the frame actually draws (mograph duplicator copies, stroke effects included).",
+          "writer": "sole owner of onion/ghost item construction; reads frame data via getEffectiveStrokesRendered (app.js, out of this census)",
+          "public_api": "called internally by buildSceneJson, not separately exported",
+          "consumers": ["C03.engine-bridge.scene-graph-builder"],
+          "oracle": "none found in tests/",
+          "depends_on": ["getEffectiveStrokesRendered, SMGroup.applyCombinesToStrokes (app.js, out of this census)", "osTagFrame (tweens.js, out of this census — tags each onion item with its source frame, per CLAUDE.md 12ter)"],
+          "entangled_with": ["C03.engine-bridge.scene-graph-builder"],
+          "notes": "None beyond the CLAUDE.md-documented 2026-09-03 fix already cited above — verified current source matches that description."
+        },
+        {
+          "id": "C03.engine-bridge.editor-overlay-item-builders",
+          "title": "Editor-chrome overlay items (guides, handles, cursors, selection UI)",
+          "files": ["src/js/engine-bridge.js:2778-3863"],
+          "symbols": ["circleItem", "rectItem", "lineItem", "boundsRectItem", "buildClipMaskItems", "buildGuideLayerItems", "buildNullLayerItems", "buildSafetyZoneItems", "buildHoverBoxItems", "buildTextDragBoxItems", "buildTransformBoxItems", "buildMarqueeItems", "fsHatchClipLines", "buildCommentPinItems", "buildRevisionOutlineItems", "buildFSSelectionItems", "setEraserCursor", "buildEraserCursorItems", "setFSBreakMarks", "buildFSBreakMarkItems", "setPressureCursor", "buildPressureCursorItems", "setPenPreview", "buildPenPreviewItems", "setRigPreview", "buildRigPreviewItems", "buildArcHandleItems", "buildNodeHandleItems"],
+          "responsibility": "~20 near-uniform small builders, each producing decorative/handle Paper-like items for one specific tool affordance (rulers/guides, Null layer markers, safety-zone frame, hover/selection boxes, marquee rectangle, comment pins, revision outline, freeform-select fill hatching, eraser/pressure/pen/rig cursors, arc and node handles). Included in buildSceneJson's output only when includeEditorOverlays is true — excluded from export/PNG readback (renderFrameRawPixels sets it false) per the widget/rig-widget precedent in CLAUDE.md 13.",
+          "writer": "sole owner of each builder's own item construction; several also own small setter state (eraserCursorWorld, pressureCursorWorld, penPreviewWorld, rigPreviewWorld, fsBreakMarksWorld)",
+          "public_api": "window.SMEngineBridge.{setEraserCursor, setFSBreakMarks, setPressureCursor, setPenPreview, setRigPreview}",
+          "consumers": ["C03.engine-bridge.scene-graph-builder (buildSceneJson, gated by includeEditorOverlays)", "select-bridge.js, eraser-bridge.js, tools.js, rig-widget.js (all out of this census — callers of the setters)"],
+          "oracle": "none found in tests/ for any of these 20 builders",
+          "depends_on": ["view.zoom (Paper.js, for 1/zoom-scaled handle sizing)"],
+          "entangled_with": ["C03.engine-bridge.scene-graph-builder"],
+          "notes": "Uniform enough in purpose that this census treats them as one packet rather than 20 — CLAUDE.md 13's own widget precedent explicitly frames this group as reusable pattern (buildGuideLayerItems/buildNullLayerItems), so a future addition (e.g. a new tool cursor) should follow the same shape rather than inventing a new mechanism."
+        },
+        {
+          "id": "C03.engine-bridge.viewport-tick-render",
+          "title": "Live render loop, viewport sync, resize, screen<->world",
+          "files": ["src/js/engine-bridge.js:3863-4413"],
+          "symbols": ["syncViewport", "viewportKeyNow", "_deferForReadback", "_flushAfterReadback", "tick", "handleResize", "webgpuFailureHint", "screenToWorld", "invalidateOverlayBase", "renderWithOverlayItem", "renderOverlayNow", "renderNow", "renderImageOnly"],
+          "responsibility": "The unconditional rAF loop (tick) that keeps the Rust canvas in sync with the live document every frame, coalescing rapid pointer/stylus events to one render per displayed frame (CLAUDE.md 5.2). renderWithOverlayItem/renderOverlayNow give an in-progress drag its own single-writer render path during `suspended`, avoiding the tick-vs-overlay race CLAUDE.md documents in detail. syncViewport composes pan/zoom/rotation into the engine's set_viewport call; screenToWorld is the inverse used by every tool's hit-testing.",
+          "writer": "sole owner of rafId, overlayRafId, suspended, lastSceneJson/lastViewportKey/lastSceneVersion cache keys",
+          "public_api": "window.SMEngineBridge.{screenToWorld, renderWithOverlayItem, renderNow, renderImageOnly, suspend, resume}",
+          "consumers": ["draw-bridge.js, select-bridge.js, eraser-bridge.js and other tool bridges (out of this census — suspend/resume callers around intercepted drags)"],
+          "oracle": "tests/performance-regressions.test.cjs times render/scrub intervals (the rAF-interval-is-the-honest-number methodology CLAUDE.md 5bis documents) but does not assert the suspend/resume race-avoidance contract itself.",
+          "depends_on": ["engine.set_viewport, engine.screen_to_world (geometry-wasm engine.rs, this census)", "C03.engine-bridge.scene-graph-builder (tick's per-frame buildSceneJson + engine.render)"],
+          "entangled_with": ["C03.engine-bridge.scene-graph-builder"],
+          "notes": "resume() is documented as never inferred automatically — select-bridge/eraser-bridge mutate geometry without bumping _sceneVersion, so an incorrect auto-resume would use a stale cache. Caller discipline, not enforced by this file."
+        },
+        {
+          "id": "C03.engine-bridge.effects-export-pipeline",
+          "title": "Offscreen batch-render path shared by export and the playback bake cache",
+          "files": ["src/js/engine-bridge.js:4413-4524"],
+          "symbols": ["beginEffectsExport", "resizeEngineOffscreen", "resizeEngineOffscreenAtScale", "renderFrameRawPixels", "renderFrameToPixelsPNG", "endEffectsExport"],
+          "responsibility": "Suspends the live tick() loop and snapshots/restores state.currentFrame plus the engine's native render size around a whole batch of loadFrame() calls, so PNG/video export and playback-cache.js's bakeRange can render many frames back-to-back without racing the live document — one shared mechanism per CLAUDE.md's own cross-reference in playback-cache.js's header comment.",
+          "writer": "sole owner of the suspend/restore bracket around a batch",
+          "public_api": "window.SMEngineBridge.{beginEffectsExport, renderFrameToPixelsPNG, endEffectsExport, resizeEngineOffscreen, renderFrameRawPixels}",
+          "consumers": ["src/js/playback-cache.js (bakeRange, this census)", "export.js (out of this census — PNG/video frame export)"],
+          "oracle": "tests/bench/browser-render.cjs and tests/animation/browser-acceptance.cjs reference SMEngineBridge in a real-browser harness; not confirmed to specifically exercise begin/endEffectsExport's suspend/restore correctness rather than just calling renderNow.",
+          "depends_on": ["engine.render_to_pixels (geometry-wasm engine.rs, this census)", "C03.engine-bridge.scene-graph-builder"],
+          "entangled_with": ["C03.playback-cache.bake"],
+          "notes": "None beyond what's already documented in CLAUDE.md; current source matches."
+        },
+        {
+          "id": "C03.engine-bridge.bootstrap-and-public-api",
+          "title": "Engine lifecycle, adaptive preview-quality calibration, and the public API surface",
+          "files": ["src/js/engine-bridge.js:1-260,4524-4711"],
+          "symbols": ["recordCalibSample", "setPreviewRenderScale", "applyEngineSize", "cssColorToRgba", "r2", "roundSegs", "window.SMEngineBridge", "autoEnable", "tauriOk", "showWebgpuUnavailableModal", "init"],
+          "responsibility": "One-shot startup calibration (first 12 real renders, not continuous rAF monitoring — documented as more reliable than the continuous approach CLAUDE.md 5ter flags as unreliable) that adaptively reduces live-preview render resolution on slow machines. autoEnable retries ensureEngine on a timer since the Paper canvas may be 0x0 mid-layout on the very first attempt. window.SMEngineBridge is the single object every other packet's public_api entries above are actually properties of.",
+          "writer": "sole owner of enabled/engine/rustCanvas/_previewRenderScale/_calibDone",
+          "public_api": "window.SMEngineBridge (the full object, assembled from every function across this file); window.SMEngineBridge.setEnabled/isEnabled/getPreviewRenderScale/setPreviewRenderScale/forcePreviewCalibration",
+          "consumers": ["every other packet in this file (the object literal at 4524 references nearly every function documented above)", "app.js, tools.js and effectively all bridge files (out of this census — isEnabled()/setEnabled() gate checks)"],
+          "oracle": "none found in tests/ specifically for the calibration heuristic itself; SMEngineBridge.isEnabled/setEnabled are referenced across the wider test suite as a precondition gate, not as the subject under test.",
+          "depends_on": ["window.GeometryWasm.create_engine (geometry-wasm's wasm-bindgen-generated JS glue, not source in this census)"],
+          "entangled_with": [],
+          "notes": "CLAUDE.md's own documented gotcha (setEnabled(true) must be awaited before isEnabled() reads true — an un-awaited call plus setTimeout silently keeps the Paper.js fallback active) lives in this packet's setEnabled/autoEnable, confirmed present in current source."
+        }
+      ]
+    },
+    {
+      "area": "render-queue-and-playback-cache",
+      "packets": [
+        {
+          "id": "C03.render-manager.batch-queue",
+          "title": "Multi-job render queue UI (queue N jobs, own format/range/output each)",
+          "files": ["src/js/render-manager.js:1-501"],
+          "symbols": ["window.SMRenderManager", "newItem", "addCurrentComposition", "duplicateItem", "deleteItem", "deleteAll", "renderItem", "runRenderAll", "resolveFileName", "resolveRange", "computeOutputPreview", "browsePath"],
+          "responsibility": "Pure UI + queue orchestration over export.js's existing exporters (SMExport.*) — never encodes a frame itself. Each queue item is 'the current document, over some frame range, with its own output settings' (no multi-composition/multi-project concept exists in Nemo, confirmed against a reference screenshot's own primary action). Dynamic Index token ({index} in a filename) auto-numbers batch output.",
+          "writer": "sole owner of the in-memory _queue array and _globals (dynamicIndex/dynamicIndexOffset) — nothing here persists to project JSON",
+          "public_api": "window.SMRenderManager.{open, close, _queue, _globals}",
+          "consumers": ["none found in tests/ or other src/js files besides its own modal's DOM wiring"],
+          "oracle": "none found in tests/ — zero references to SMRenderManager anywhere in the test suite.",
+          "depends_on": ["window.SMExport.* (export.js, out of this census — every actual encode call)", "state.totalFrames/waIn/waOut/canvasW/canvasH/fps (app.js, out of this census)"],
+          "entangled_with": [],
+          "notes": "DEF-1 (confirmed coverage gap): a feature-complete batch UI with zero automated coverage — a regression in resolveFileName's {index} substitution or runRenderAll's per-item error handling would only surface as a user report."
+        },
+        {
+          "id": "C03.playback-cache.bake",
+          "title": "Pre-baked bitmap playback cache (fallback for real-time-can't-keep-up)",
+          "files": ["src/js/playback-cache.js:1-165"],
+          "symbols": ["window.SMPlaybackCache", "_stampMatches", "invalidateAll", "hasFrame", "blitFrame", "hideBakePreview", "bakeRange", "cancelBake", "isBaking"],
+          "responsibility": "Pre-renders a frame range to small in-memory ImageBitmaps at reduced resolution (default half native) so replaying an already-baked range blits instantly instead of re-materializing Paper.js objects and re-running the GPU render every tick. Explicitly a fallback, not a step every project pays. Identity-stamps state.layers/canvasW/canvasH/totalFrames at bake time (CLAUDE.md 1's family-of-bug-1 pattern applied defensively: catches ANY code path that swaps state.layers, including ones this file's author never enumerated) rather than hooking every individual swap site.",
+          "writer": "sole owner of the _cache Map (frameIndex -> ImageBitmap), _bytes, _bakeW/_bakeH, the stamp vars",
+          "public_api": "window.SMPlaybackCache.{invalidateAll, hasFrame, blitFrame, hideBakePreview, bakeRange, cancelBake, isBaking, cacheSize, cacheBytes, getBakeSize, setBudgetBytes, setScale}",
+          "consumers": ["timeline.js's playStep rAF-interval monitor (out of this census — auto-triggers bakeRange when playback can't keep up) and its manual #btn-bake-cache button"],
+          "oracle": "tests/performance-regressions.test.cjs references SMPlaybackCache — confirmed a real match, not verified whether it asserts bake/blit correctness or only timing.",
+          "depends_on": ["C03.engine-bridge.effects-export-pipeline (beginEffectsExport/endEffectsExport/resizeEngineOffscreen/renderFrameRawPixels — bakeRange reuses this exact batch-render bracket)"],
+          "entangled_with": ["C03.engine-bridge.effects-export-pipeline"],
+          "notes": "_budgetBytes (256MB) is hardcoded, not exposed in Settings — same deferral CLAUDE.md 5quinquies already documented for the image store's own budget, explicitly called out in this file's own comment."
+        }
+      ]
+    },
+    {
+      "area": "color-and-path-effects",
+      "packets": [
+        {
+          "id": "C03.color-manager.selected-colors-panel",
+          "title": "Selection-scoped (or project-context) color management panel",
+          "files": ["src/js/color-manager.js:1-359"],
+          "symbols": ["computeUsedColors", "recolorColor", "selectPathsWithColor", "buildColorRow", "updateColorRow", "renderSelectedColorsPanel", "autoExpandOnSelection", "init"],
+          "responsibility": "Lists every distinct fill/stroke color used by the current selection, or (nothing selected) the active layer's current frame plus canvas background. Editing a row's hex/opacity batch-recolors every exact match, scoped identically (selection if present, else active-layer-only). Explicitly handles the vector-brush ribbon+companion-fill split (CLAUDE.md 1-adjacent gotcha: a brush's visible fill lives on a separate isLinkedFillCompanion item) on both the read (computeUsedColors) and write (recolorColor) sides.",
+          "writer": "sole owner of this panel's DOM rows; mutates fillColor/strokeColor on live Paper items and persisted stroke dicts directly (not via a shared setColor helper)",
+          "public_api": "window.updateSelectedColorsPanel (monkey-patches window.updateUI to add auto-expand + conditional re-render)",
+          "consumers": ["none outside this file's own DOM wiring"],
+          "oracle": "none found in tests/ — zero references to computeUsedColors/recolorColor/selected-colors by name.",
+          "depends_on": ["colorHex8 (app.js, out of this census — CLAUDE.md 2's documented toCSS(true)-alpha-bug workaround, correctly used here not color.toCSS(true))", "findLinkedFillCompanion (tools.js, out of this census)", "SM.setCanvasBg (app.js, out of this census)"],
+          "entangled_with": [],
+          "notes": "DEF-2 (confirmed coverage gap): zero automated coverage, including the recolor path's hasRealStroke guard that prevents corrupting persisted data (writing a real visible '#ffffff' strokeColor onto a shape that never had a stroke) — a regression here would silently corrupt saved project data, not just a visual glitch."
+        },
+        {
+          "id": "C03.path-fx.non-destructive-geometry-modifiers",
+          "title": "Non-destructive path-effect stack (zigzag, roughen)",
+          "files": ["src/js/path-fx.js:1-207"],
+          "symbols": ["window.SMPathFx", "typeDef", "paramValue", "defaultsFor", "hash2", "smoothNoise", "walk", "applyZigzag", "applyRoughen", "roundCorners", "activeStack", "apply"],
+          "responsibility": "A stack of non-destructive geometry modifiers applied at getEffectiveStrokesRendered's single funnel point (CLAUDE.md 1's documented consumer list) — receives stored stroke dicts, returns a NEW list, never mutates the original (reversible by disabling). Pure JS, not a shader, specifically because a shader works on already-rasterized pixels and can't deform a vector contour that must stay exportable to SVG/Lottie/Rive. Uses a deterministic hash-based noise (not Math.random) so repeated renders of the same frame produce identical geometry.",
+          "writer": "sole owner — pure functions over the strokes array passed in, no persisted state of its own beyond ld.pathFx (read, not owned — the layer data structure itself is app.js's)",
+          "public_api": "window.SMPathFx.{TYPES, typeDef, defaultsFor, paramValue, hasAny, apply}",
+          "consumers": ["C03.engine-bridge.scene-graph-builder (buildSceneJson calls SMPathFx.apply as part of resolving a layer's effective strokes)"],
+          "oracle": "none found in tests/ — zero references to SMPathFx by name.",
+          "depends_on": [],
+          "entangled_with": ["C03.engine-bridge.scene-graph-builder"],
+          "notes": "DEF-3 (confirmed coverage gap): zero automated coverage, including the reproducibility guarantee (deterministic hash noise) that the file's own comment states is load-bearing for export/thumbnail consistency — nothing currently verifies two renders of the same frame actually produce byte-identical geometry."
+        },
+        {
+          "id": "C03.custom-effects.user-wgsl-authoring",
+          "title": "User-authored custom WGSL effect editor and registration",
+          "files": ["src/js/custom-effects.js:1-159"],
+          "symbols": ["window.customEffectDef", "window.registerAllCustomEffects", "window.openCustomEffectEditor", "ensureModal", "save", "renderParamRows"],
+          "responsibility": "Lets an author write a fragment-shader BODY (engine.rs's register_custom_effect wraps it with the standard fullscreen-triangle vertex shader + bindings every built-in effect already uses) and define up to 4 named parameters shown in the Effects stack UI like a built-in effect's own params. Project-wide data model (state.customEffects), referenced by any layer's effects stack as 'custom:<id>'. registerAllCustomEffects re-sends every saved definition's source to a freshly-created engine instance, since the compiled pipeline lives only in that instance's memory, not in project data.",
+          "writer": "sole owner of state.customEffects and the authoring modal's DOM",
+          "public_api": "window.{customEffectDef, registerAllCustomEffects, openCustomEffectEditor}",
+          "consumers": ["effects-panel.js (out of this census — isCustomEffect/customEffectDef helpers, the stack UI that lists a saved custom effect alongside built-ins)"],
+          "oracle": "none found in tests/ for this file's own logic. The underlying WGSL wrapping/compilation this editor feeds is validated Rust-side for the SHIPPED library only (shader_library_validation.rs) — a user-authored effect's WGSL is never validated by any test, only by the live WebGPU pipeline creation at save time (save()'s own `/return\\s+vec4/` regex is the only client-side check, not a real WGSL parse).",
+          "depends_on": ["window.SMEngineBridge.registerCustomEffect (this census)", "window.addEffectToActiveLayer (effects-panel.js, out of this census)"],
+          "entangled_with": [],
+          "notes": "DEF-4 (confirmed coverage gap): zero automated coverage. save()'s regex-only validation ('must end with return vec4') is a weak guard — a shader with a genuine WGSL syntax error elsewhere in the body only fails at the point WebGPU actually compiles the pipeline (register_custom_effect's Result), surfaced as whatever error message that produces, not a friendly authoring-time diagnostic."
+        },
+        {
+          "id": "C03.shader-effects-library.built-in-catalog",
+          "title": "70 built-in WGSL shader effects across 8 categories",
+          "files": ["src/js/shader-effects-library.js:1-1315"],
+          "symbols": ["window.SMSHADER_EFFECTS", "window.SMSHADER_EFFECT_CATEGORIES", "window.SMShaderEffectDef", "param", "fx"],
+          "responsibility": "Static data table of 70 shipped shader effects (Color: 14, Stylize: 12, Generate: 12, Distort: 11, Particles: 6, Keying: 5, Blur: 3, Channel: 2 — counted from this census's own grep of every fx() entry), each a fragment-shader BODY plus up to 4 named/ranged parameters. The `spatial` param flag (introduced fixing a real bug: a Twirl effect's radius not compensating for canvas zoom) marks any parameter that's a distance/size/offset so sceneEffectsOf (engine-bridge.js) can multiply it by view.zoom before it reaches the engine, mirroring run_one_effect's own compensation for built-ins.",
+          "writer": "sole owner of the effects array — appended to, never mutated per-id after ship (an id's source is the shipped definition, not user-editable; contrast custom-effects.js above)",
+          "public_api": "window.{SMSHADER_EFFECTS, SMSHADER_EFFECT_CATEGORIES, SMShaderEffectDef}",
+          "consumers": ["effects-panel.js (out of this census — built-in effect picker/stack UI)", "C03.engine-bridge.scene-graph-builder (sceneEffectsOf reads the spatial flag)"],
+          "oracle": "geometry-wasm/tests/shader_library_validation.rs — wraps every shipped shader body in the real vertex-shader/binding boilerplate and validates the resulting WGSL compiles, brought into `cargo test` specifically so a malformed built-in can no longer silently ship. This is the one packet in this census with a real, well-targeted oracle, even though it lives in a different language's test suite than the source it validates.",
+          "depends_on": [],
+          "entangled_with": ["C03.custom-effects.user-wgsl-authoring (shares the fullscreen-triangle wrapping convention, engine.rs-side)"],
+          "notes": "Some individual params document their own past bugs in-source (e.g. shader_roughen_alpha's Scale param was missing the `spatial` flag until an explicit 2026-07-30 audit) — all present and flagged correctly as of this census's source_sha; no currently-missing spatial flag found by spot-check, but this census did not exhaustively re-verify all 70 x up-to-4 params against the actual reference screenshots/behavior."
+        }
+      ]
+    },
+    {
+      "area": "geometry-wasm-rendering-engine",
+      "packets": [
+        {
+          "id": "C03.engine_rs.style-and-viewport-helpers",
+          "title": "Style conversion and viewport transform helpers",
+          "files": ["geometry-wasm/src/engine.rs:178-782"],
+          "symbols": ["default_opacity", "default_stroke_width", "default_mask_mode", "mix_mode_index", "build_variable_width_outline", "add_semicircle_cap", "color_from", "gradient_brush", "cap_from", "join_from", "dash_pattern_with_offset", "stroke_from", "Viewport", "document_bbox_px"],
+          "responsibility": "Pure conversion helpers from the wire format (ItemIn, GradientIn, string enum names) to vello's native types (Stroke, Color, Cap, Join, Gradient), plus the single Viewport struct/impl whose transform() method is the one formula render()/render_to_pixels()/screen_to_world() all share (CLAUDE.md 3's documented no-duplication invariant, confirmed: grepped, exactly one transform() definition).",
+          "writer": "sole owner — free functions and one small struct, no engine-wide state",
+          "public_api": "not directly wasm_bindgen-exported; internal to engine.rs, used by composite_scene/paint_layer_items and the wasm_bindgen impl block below",
+          "consumers": ["C03.engine_rs.vello_engine_gpu_pipeline (composite_scene, paint_layer_items)", "C03.engine_rs.wasm_public_api (set_viewport, screen_to_world call into Viewport)"],
+          "oracle": "none found dedicated to this packet specifically; exercised indirectly by any test that renders a real scene.",
+          "depends_on": [],
+          "entangled_with": ["C03.engine_rs.vello_engine_gpu_pipeline"],
+          "notes": "build_variable_width_outline / add_semicircle_cap are the Rust-side pressure-brush outline reconstruction — the counterpart tween.rs's interp_stroke explicitly does NOT yet have ported (see DEF-5)."
+        },
+        {
+          "id": "C03.engine_rs.vello_engine_gpu_pipeline",
+          "title": "VelloEngine: GPU resources, per-effect pipelines, and composite_scene",
+          "files": ["geometry-wasm/src/engine.rs:782-3680"],
+          "symbols": ["VelloEngine", "create_blend_layer_texture", "create_blend_accum_texture", "create_blend_pipeline", "create_matte_result_texture", "create_matte_pipeline", "matte_pass", "matte_mode_of", "resolve_all_mattes", "resolve_matte_source", "create_blur_pipeline", "blur_pass_1d", "blur_pass", "create_color_adjust_pipeline", "color_adjust_pass", "create_vignette_pipeline", "vignette_pass", "create_simple_fx_pipeline", "create_custom_effect_pipeline", "simple_fx_pass", "vignette_pass", "wgpu_color_from", "clear_texture", "composite_scene", "draw_image_mesh", "paint_layer_items"],
+          "responsibility": "The actual GPU rendering pipeline: one wgpu pipeline object per effect family (blend, matte, blur, color-adjust, vignette, generic simple-fx, and one dynamically-compiled pipeline per custom WGSL effect), built once at engine creation. composite_scene is the single body both render() and render_to_pixels() call (CLAUDE.md 3's central documented invariant — confirmed at engine.rs:3239, exactly one definition) — walks layers back-to-front, applies each layer's own effects stack, blend mode, and matte-track compositing, painting shape/image/mesh items via paint_layer_items and draw_image_mesh.",
+          "writer": "sole owner of every GPU texture/pipeline/buffer this struct holds — the single stateful #[wasm_bindgen] object per the file's own header comment",
+          "public_api": "not directly wasm_bindgen-exported (composite_scene/paint_layer_items/draw_image_mesh are private, called only from the wasm_bindgen impl block below) except VelloEngine's own struct visibility (pub struct VelloEngine)",
+          "consumers": ["C03.engine_rs.wasm_public_api (render, render_to_pixels call composite_scene)"],
+          "oracle": "geometry-wasm/tests/effect_layer_overlay_repro.rs (feedback #50 — an Effect/adjustment layer's distortion must not warp overlay items painted after it in composite_scene's layer order) and geometry-wasm/tests/dab_dense_overlap_repro.rs (feedback #104 — verifies vello's Renderer::render_to_texture, the exact call paint_layer_items uses, doesn't silently drop densely-overlapping small semi-transparent paths, the shape a textured-brush stroke's hundreds of dab companions take) both exercise this packet directly with real regression scenarios, not just smoke tests.",
+          "depends_on": ["C03.engine_rs.style-and-viewport-helpers"],
+          "entangled_with": ["C03.engine_rs.wasm_public_api"],
+          "notes": "This is the single largest packet in this census (~2900 lines) — deliberately not split further: composite_scene is documented (CLAUDE.md 3) as the one place all scene-composition logic must live, so a packet boundary cutting through it would recreate exactly the render()/render_to_pixels() duplication CLAUDE.md records as already fixed once."
+        },
+        {
+          "id": "C03.engine_rs.wasm_public_api",
+          "title": "The #[wasm_bindgen] surface JS's engine-bridge.js actually calls",
+          "files": ["geometry-wasm/src/engine.rs:3680-4235"],
+          "symbols": ["set_viewport", "screen_to_world", "select_at", "clear_selection", "get_selection", "selection_bounds", "gizmo_handles", "scale_selection", "rotate_selection", "resize", "register_custom_effect", "register_image", "has_image", "image_store_bytes", "image_store_size", "retire_images", "register_path", "retire_paths", "clear_paths", "path_store_size", "render", "render_to_pixels"],
+          "responsibility": "The complete public method surface of the stateful VelloEngine WASM object — every one of these 21 methods has an exact JS call site in engine-bridge.js (cross-checked against this census's other engine-bridge.js packets). render() bakes an opaque pasteboard color matching the app's --panel CSS var for on-screen display (the WebGPU surface only advertises CompositeAlphaMode::Opaque); render_to_pixels() uses fully transparent background instead and reads the offscreen texture back to CPU as straight-alpha RGBA8, async via a oneshot channel bridging WebGPU's callback-based buffer mapping.",
+          "writer": "sole owner of this exact API shape — any signature change here is a breaking change to every engine-bridge.js call site listed as this packet's consumer",
+          "public_api": "the 21 #[wasm_bindgen] pub fn methods themselves, consumed as `engine.<method>(...)` from JS after window.GeometryWasm.create_engine()",
+          "consumers": ["C03.engine-bridge.retained-geometry-store (register_path/retire_paths/clear_paths/path_store_size)", "C03.engine-bridge.image-store (register_image/retire_images/image_store_bytes/image_store_size/has_image)", "C03.engine-bridge.viewport-tick-render (set_viewport/screen_to_world/resize)", "C03.engine-bridge.effects-export-pipeline (render_to_pixels)", "C03.custom-effects.user-wgsl-authoring (register_custom_effect)", "select-bridge.js (out of this census — select_at/clear_selection/get_selection/selection_bounds/gizmo_handles/scale_selection/rotate_selection)"],
+          "oracle": "render/render_to_pixels indirectly covered via C03.engine_rs.vello_engine_gpu_pipeline's two repro tests (both call composite_scene, which these two methods wrap). select_at/scale_selection/rotate_selection/gizmo_handles/selection_bounds have no oracle found in this census (their JS callers live in select-bridge.js, out of scope, and no Rust test exercises them directly).",
+          "depends_on": ["C03.engine_rs.vello_engine_gpu_pipeline", "C03.engine_rs.style-and-viewport-helpers"],
+          "entangled_with": ["C03.engine_rs.vello_engine_gpu_pipeline"],
+          "notes": "A wide (21-method) single-object API surface — not a defect, but worth the orchestrator's attention if this crate is ever split, since every method assumes exclusive access to the same &mut self GPU state."
+        }
+      ]
+    },
+    {
+      "area": "geometry-wasm-tween-and-erase",
+      "packets": [
+        {
+          "id": "C03.eraser_rs.boolean_erase",
+          "title": "WASM eraser: boolean-subtract a round/capsule brush from an item",
+          "files": ["geometry-wasm/src/eraser.rs:1-154"],
+          "symbols": ["erase_at_point", "bezpath_to_polygon_in", "is_usable_ring", "circle_bezpath", "capsule_bezpath", "EraseInput"],
+          "responsibility": "Ports eraseAtPoint/eraseExpandStrokeToFill (tools.js) to Rust: expands a stroke-only path to its filled outline via kurbo's stroker (matching what the JS version hand-rolled via Paper.js), builds a circle or (mid-drag) swept capsule eraser shape, and subtracts via the same boolean_op (lib.rs, out of this census) already used elsewhere. Deduplicates near-coincident consecutive points before handing geometry to geo_booleanop's sweep-line algorithm, which panics (unrecoverable, wasm-bindgen panic=abort has no working catch_unwind) on degenerate rings.",
+          "writer": "sole owner — stateless, one exported function",
+          "public_api": "erase_at_point(json) -> Result<String, JsValue>",
+          "consumers": ["a JS wrapper in tools.js (out of this census, referenced only in a comment inside app.js:116) — WASM-first with a silent JS fallback on error, per CLAUDE.md 3's documented pattern for this exact function"],
+          "oracle": "no dedicated Rust test found calling erase_at_point directly. tests/performance-regressions.test.cjs and tests/bench/browser-render.cjs reference the JS-side wrapper (grep matched 'eraseAtPointWasm'-shaped identifiers), so the integration is exercised at least indirectly through a real browser harness, but this census did not confirm those tests assert correctness of the erase RESULT versus just measuring performance.",
+          "depends_on": ["build_bezpath, ItemIn (engine.rs, this census)", "boolean_op, from_multipolygon, to_polygon, PolygonIn (lib.rs, out of this census — declared bounded ownership is engine.rs/eraser.rs/tween.rs/tweenmatch.rs specifically, not lib.rs)"],
+          "entangled_with": [],
+          "notes": "The DEDUP_EPS_SQ dedup step exists specifically because a fast dab-like drag or a near-zero-length capsule can otherwise crash the whole WASM module (panic=abort) rather than degrade gracefully — the degenerate-ring bail-out (returning a controlled JsValue error) is the actual safety net; verified present and matches CLAUDE.md's account of this subsystem."
+        },
+        {
+          "id": "C03.tween_rs.interp_stroke_dead_code",
+          "title": "Tween interpolation core (CONFIRMED UNUSED)",
+          "files": ["geometry-wasm/src/tween.rs:1-165"],
+          "symbols": ["interp_stroke", "lerp", "qbez", "pick_color"],
+          "responsibility": "A Rust port of interpStroke/qBez (tweens.js), scoped to pure point interpolation between two already-matched, already-resampled, already-aligned strokes at an eased t. Per its own source comment and this census's independent grep confirmation (zero call sites of GeometryWasm.interp_stroke anywhere in src/js/*.js), this function has never been wired into the app.",
+          "writer": "sole owner — stateless, one exported function, currently dead",
+          "public_api": "interp_stroke(json) -> Result<String, JsValue> — exported but uncalled",
+          "consumers": ["none — verified zero JS callers"],
+          "oracle": "none — nothing calls it, so nothing can test the integration; no standalone Rust unit test either.",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "DEF-5 (confirmed dead code, not fixed per baseline/no-source-migration policy): the function's OWN header comment documents exactly why it's unsafe to wire in as-is — it predates two behaviors the JS interpStroke has since grown (per-pair similarity-transform rotation/scale blending, and vector-brush width-profile interpolation + outline reconstruction). Wiring it in today would silently regress both. Either finish porting both missing behaviors before use, or remove it — leaving it as unreachable exported dead code is itself a small maintenance/confusion cost (a future reader can reasonably assume an exported, documented WASM function is live)."
+        },
+        {
+          "id": "C03.tweenmatch_rs.stroke_matching_and_resampling",
+          "title": "Stroke auto-matching (Hungarian assignment) and resampling for tweens",
+          "files": ["geometry-wasm/src/tweenmatch.rs:1-1115"],
+          "symbols": ["SegIn", "CenterSegIn", "StrokeIn", "is_vb", "PathSampler", "build_feat_path", "add_segs", "parse_hex_color", "color_dist", "stroke_type", "Feat", "fourier_descriptor", "fourier_dist", "stroke_feat", "union_bounds", "match_sc", "SimT", "fit_similarity_transform", "apply_similarity_transform", "hungarian", "MatchOut", "segs_intersect", "order_reversed", "uncross_matches", "auto_match", "ResampledOut", "SegOut", "resample_stroke", "resampled_is_closed", "align_cost", "wrap_pi", "align_turn_disagreement", "reverse_resampled", "rotate_resampled", "rotation_fit_residual", "align_pair"],
+          "responsibility": "Rust port of tweens.js's stroke-correspondence machinery: shape-feature descriptors (Fourier + color/type), a Hungarian-algorithm assignment (auto_match) to pair strokes between two keyframes, uncrossing to avoid visually swapped matches, equal-count resampling (resample_stroke) so paired strokes have the same point count for interpolation, and rotation/reflection alignment search (align_pair) to avoid a closed loop visibly swirling. All three exported functions are LIVE — called from tweens.js with a WASM-first, silent-JS-fallback pattern (CLAUDE.md 3).",
+          "writer": "sole owner — stateless, three exported entry points, no engine-wide state (unlike engine.rs's VelloEngine)",
+          "public_api": "auto_match(strokes_a_json, strokes_b_json), resample_stroke(stroke_json, n), align_pair(a_json, b_json) — all Result<String, JsValue>",
+          "consumers": ["src/js/tweens.js:463-465 (auto_match), :790-792 (resample_stroke), :3211-3221 (align_pair) — all out of this census, all documented as WASM-first/JS-fallback"],
+          "oracle": "no dedicated Rust test found calling auto_match/resample_stroke/align_pair directly (grep across geometry-wasm/ and tests/ found only their own definitions). Exercised indirectly whenever a JS tween-matching test runs with the WASM path available and doesn't force the JS fallback — this census did not independently confirm any such test exists that distinguishes which path actually ran.",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "DEF-6 (informational, module-boundary observation): this file's actual responsibility (animation/tween stroke-matching) does not match C03's charter (rendering and resource ownership) — it's grouped into this census only because the issue's bounded source ownership names the whole geometry-wasm/src/** directory under C03. The orchestrator should weigh moving this file's eventual extraction target under C02 (animation and time) rather than treating its physical crate location as the module boundary."
+        }
+      ]
+    }
+  ]
+}
