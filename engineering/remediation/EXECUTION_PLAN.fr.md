@@ -92,6 +92,10 @@ Utiliser les sous-issues natives sous R03/R05/etc. pour mesurer l’avancement. 
 - [ ] Pousser la **même branche** lorsqu’elle est prête pour revue et avant de terminer un sprint ou de transférer la responsabilité avec du travail commité. Les modifications locales ordinaires n’exigent pas des poussées répétées. Garder journaux et produits de compilation hors du code ; joindre des rapports expurgés ou des références d’artefacts reproductibles à l’issue ou à la PR existante.
 - [ ] Mettre à jour l’issue et le tableau au démarrage, lors d’un blocage significatif, à la préparation de la revue et en fin de sprint. Ne jamais abandonner silencieusement sa responsabilité, réassigner un autre flux, fusionner son propre travail non relu ni clôturer la validation d’intégration.
 - [ ] En cas d’interruption, rédiger la transmission compacte ci-dessous. Le successeur la lit, vérifie l’état réel du code et du dépôt distant puis reprend à l’action suivante ; il ne relance pas toute la mission initiale depuis zéro.
+- [ ] Ne jamais écrire « je reprends »/« je continue » sans vérifier l’état réel (`git status`/`reflog` du worktree, `gh pr list`) et le citer dans le même message ; une intention non vérifiée ne vaut pas un compte rendu.
+- [ ] « Terminé » ou « en cours » exige un commit poussé ou une PR existante à citer ; sans cette preuve, l’état réel est « non commencé », même annoncé la veille.
+- [ ] Avant de reprendre la tâche laissée par un autre rédacteur : le signaler d’abord dans le journal/la conversation partagée, pour éviter une reprise en double si l’autre agit entretemps.
+- [ ] Diviser puis déléguer (A2A ou second rédacteur) toute tâche croisée bloquée ou manifestement surdimensionnée plutôt que d’attendre en silence ou de la laisser inactive.
 
 Modèle de transmission, à utiliser dans un commentaire d’issue ou dans sa section de transmission actuelle :
 
