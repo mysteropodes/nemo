@@ -1,0 +1,228 @@
+{
+  "census_id": "C01",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1036",
+  "title": "Document and history — bounded extraction packets",
+  "owner": "Cyrill/D1 (Fizz)",
+  "source_sha": "ded641bd763379f36d629bf1686fcce8a6137a66",
+  "status": "read-only census complete; no source mutated; proposed IDs and packet boundaries are placeholders for the orchestrator to renumber into the global P-sequence and fold into engineering/inventory/remediation-scope.json",
+  "scope_files": [
+    "src/js/project.js",
+    "src/js/project-document.js",
+    "src/js/project-entry.js",
+    "src/js/idb-store.js",
+    "src/js/asset-tree.js",
+    "src/js/history-panel.js",
+    "src/js/timeline.js:11796-11809",
+    "src/js/tweens.js:4753-5022"
+  ],
+  "coverage_note": "timeline.js (11907 lines) and tweens.js (5278 lines) are both overwhelmingly non-document/history code (Motion, tween matching, timeline UI, layer list) — only the bounded regions cited above are this census's ownership, located by grepping every pushUndo/autosave/setInterval call site and reading outward until responsibility boundaries were clear. Every packet in this census ultimately bottlenecks through `window.SM.exportJSON()`/`window.SM.importJSON()` (defined in app.js, NOT in C01's bounded ownership) as the actual document (de)serialize/normalize authority — project.js, the undo/redo engine, and the tab system all treat it as a black box and never duplicate its logic. `state.undoStack/redoStack/undoLabels/redoLabels/maxUndo` and `state.actionLog` are likewise declared in app.js (verified: app.js:218,231) and only READ/PUSHED/POPPED by the packets below, not owned by them. The frame-only (non-'layers'-typed) branch inside tweens.js's undo()/redo() and pushUndoActiveFrame() already has its own dedicated, separately-owned mapping task — H02 (#1059) and P21 (#1023), both Ilya/D1 — so this census covers that sub-path only at the same coarse level as the rest of the undo engine, deferring detailed capture/restore-ownership design to those issues rather than re-doing it here.",
+  "areas": [
+    {
+      "area": "project-document-io",
+      "packets": [
+        {
+          "id": "C01.project.document-io-and-dirty-tracking",
+          "title": "New / Open / Save / Save As, dirty tracking, browser-mode fallback",
+          "files": ["src/js/project.js:20,25-30,40-50,54-219,395-411"],
+          "symbols": ["tauriOk", "autosaveWrite", "updateCurrentLabel", "getCurrentLabel", "newProject", "lastSavedJson", "markSaved", "isDirty", "writeProjectTo", "downloadJson", "saveAsDownload", "saveAs", "save", "openPath", "openDialog", "window.SMProject (save/saveAs/open/openPath/newProject/enterEditor/autosaveWrite/isDirty/markSaved/getCurrentLabel/getProjectKey/getOpenTabs)"],
+          "responsibility": "The one authoritative path from in-memory `state` to a real file (Tauri fs, atomic write via temp+rename) or a browser download, and back. Owns the dirty/clean flag (`lastSavedJson`, module-closure) that gates the close-guard and every tab's dirty dot. `newProject` is the single reset chokepoint every blank-project entry point (New Project form, '+' tab, closed-tab fallback) funnels through — resets ~25 distinct `state.*` fields (layers, symbols, palettes, camera, guides, audio, perspective, symmetry, media library, image meshes, etc).",
+          "writer": "sole owner of currentPath/currentName/lastSavedJson (module-closure, never exposed directly — only via getCurrentLabel/isDirty/markSaved); mutates the ~25 state.* fields newProject() resets, but the actual document read/write format is delegated wholesale to window.SM.exportJSON/importJSON (app.js, out of this census's bounded ownership)",
+          "public_api": "window.SMProject.{save,saveAs,open,openPath,newProject,enterEditor,autosaveWrite,isDirty,markSaved,getCurrentLabel,getProjectKey,getOpenTabs}",
+          "consumers": ["src/js/timeline.js:11796-11809 (30s autosave tick calls autosaveWrite/pushVersionSnapshot/refreshActiveTabDirtyDot)", "src/js/project-entry.js (repaint after openPath/newProject swap the canvas)", "kitsu.js (calls SMProject.newProject/enterEditor by exported name — see project.js:398-403 comment on why enterEditor is exported at all)", "start-screen DOM handlers (project.js:696-736, this same file's own IIFE)"],
+          "oracle": "tests/project-open.test.cjs (matched SMProject/autosaveWrite/writeProjectTo/openPath/saveAsDownload symbols directly)",
+          "depends_on": ["window.SM.exportJSON/importJSON (app.js) — the actual document serialize/normalize authority, treated as a black box here", "window.SMProjectDocument.baseName (project-document.js, this census)"],
+          "entangled_with": ["src/js/project.js project-tabs packet (switchToTab/addTab/closeTab call newProject/markSaved/lastSavedJson directly, same closure)"],
+          "notes": "Atomic save (write .saving temp file, then rename) with a documented fallback to direct write if rename fails (fs:allow-rename capability, added 2026-07-13) — a build predating that capability degrades to non-atomic writes silently, no toast warns of the weaker guarantee. isDirty()'s catch-branch defaults to true ('can't serialize -> assume dirty') — a defensive choice, correct baseline behavior, not a defect."
+        },
+        {
+          "id": "C01.project.close-unsaved-work-guard",
+          "title": "Cmd+Q / window-close data-loss guard",
+          "files": ["src/js/project.js:433-485"],
+          "symbols": ["initCloseGuard (IIFE)"],
+          "responsibility": "Blocks app quit / window close while isDirty() is true: Tauri path shows a native confirm dialog and only allows the close via appWindow.destroy() (not close(), which would re-issue a fresh CloseRequested event — see the in-source comment on feedback #27); browser-preview path uses the standard beforeunload prompt.",
+          "writer": "sole owner of the `allowConfirmedClose` local and the onCloseRequested listener registration; reads isDirty()/markSaved() from the sibling document-io packet",
+          "public_api": "none — self-invoking IIFE, no exports",
+          "consumers": ["none directly; behavior is observed only via the OS/browser close gesture"],
+          "oracle": "none found in tests/ for this specific guard (no Tauri close-event or beforeunload simulation located)",
+          "depends_on": ["C01.project.document-io-and-dirty-tracking (isDirty, markSaved)"],
+          "entangled_with": [],
+          "notes": "Baseline stamps markSaved() at boot from whatever document is already in memory (a fresh blank project, or whatever timeline.js's own nemo-auto restore already loaded) — without this the guard stays permanently unarmed until the first explicit save/open/new, which the in-source comment already documents as the bug this line fixes."
+        },
+        {
+          "id": "C01.project.project-tabs",
+          "title": "Multi-project tab strip (independent per-tab document snapshots)",
+          "files": ["src/js/project.js:498-633"],
+          "symbols": ["makeTabId", "activeTab", "snapshotActiveIntoTab", "ensureInitialTab", "switchToTab", "addTab", "closeTab", "startTabRename", "tabIsDirty", "renderTabBar", "refreshActiveTabDirtyDot"],
+          "responsibility": "Each tab holds a full independent exportJSON()-format snapshot; switching tabs exports the outgoing one into its slot and imports the incoming one, reusing the same save/open serialization rather than restructuring `state` into a multi-document model. Real separate projects (own layers/frames/palettes/etc.), confirmed against explicit user intent, not a cosmetic strip.",
+          "writer": "sole owner of `tabs` array and `activeTabId` (module-closure, declared at project.js:18 alongside RECENTS_KEY for hoisting reasons documented in-source)",
+          "public_api": "none exported on window.SMProject directly except getOpenTabs (see document-io packet) and the '+' button's addTab listener (project.js:633)",
+          "consumers": ["src/js/project.js:421-424 getOpenTabs (feeds transplant.js's cross-project component picker, out of this census's scope)"],
+          "oracle": "none found in tests/ referencing tabs/switchToTab/addTab/closeTab by name",
+          "depends_on": ["C01.project.document-io-and-dirty-tracking (newProject, markSaved, lastSavedJson, isDirty — same closure)"],
+          "entangled_with": ["C01.project.document-io-and-dirty-tracking"],
+          "notes": "switchToTab/closeTab both special-case the dirty-baseline handoff across an import boundary: a clean tab re-exports post-import as its fresh baseline, a dirty tab is pinned to the empty-string sentinel ('' can never equal a real exportJSON() string) rather than comparing against a stale pre-import string — documented in-source as deliberate, not something this census flags as a defect."
+        },
+        {
+          "id": "C01.project.start-screen",
+          "title": "Landing screen: New/Open forms, Recents list, Resume autosave",
+          "files": ["src/js/project.js:10,31-38,636-743"],
+          "symbols": ["RECENTS_KEY", "MAX_RECENTS", "getRecents", "setRecents", "touchRecent", "removeRecent", "hideStartScreen", "showStartScreen", "renderRecents", "initStartScreen"],
+          "responsibility": "Presentation layer over the document-io packet: renders the New Project / Open / Recent-projects landing screen, wires its DOM controls, and drives the 'Resume last session' flow (reads the same nemo-auto slot timeline.js's autosave tick writes). `touchRecent`/`removeRecent` own the separate `nemo-recents` localStorage list (path/name/canvasW/canvasH/fps/lastOpened, capped at 8), called as a side effect from writeProjectTo/openPath in the document-io packet.",
+          "writer": "sole owner of the nemo-recents localStorage list",
+          "public_api": "none exported on window.SMProject — pure DOM wiring, invoked once via DOMContentLoaded/immediate at file bottom",
+          "consumers": ["none outside this file"],
+          "oracle": "none found in tests/ referencing renderRecents/initStartScreen/touchRecent by name",
+          "depends_on": ["C01.project.document-io-and-dirty-tracking (openPath, newProject, SMProject.enterEditor)", "window.SMIdb (idb-store.js, this census — async fallback lookup when localStorage's nemo-auto is empty, e.g. quota overflow on a media-heavy autosave)"],
+          "entangled_with": [],
+          "notes": "The Resume button previously had a real bug (fixed pre-baseline, see in-source comment: hid the start screen without ever importing the autosave, silently discarding real stroke data) — left in the source as documentation of why the current explicit importJSON call is structured the way it is; not a currently-observed defect."
+        }
+      ]
+    },
+    {
+      "area": "project-persistence-history",
+      "packets": [
+        {
+          "id": "C01.project.version-history",
+          "title": "Dense on-disk rolling version history (v15)",
+          "files": ["src/js/project.js:228-310"],
+          "symbols": ["HISTORY_MAX", "simpleHash", "historyKey", "historyDir", "pushVersionSnapshot", "listVersionHistory", "restoreVersion", "relTime", "openHistoryModal"],
+          "responsibility": "Keeps up to 120 timestamped full-document JSON snapshots per project (Tauri fs only — browser preview has no equivalent) in appDataDir/history/<slug>-<hash>/, oldest evicted past the cap. Exists because the single-slot nemo-auto autosave meant a crash right after a bad edit overwrote the one good copy. restoreVersion captures the CURRENT document, imports the chosen snapshot, and only pushes the pre-restore state into history on success — rejected input leaves both the live document and history untouched (parse-validated via SMProjectDocument.parse before anything is touched).",
+          "writer": "sole owner of the on-disk history directory for the current project (historyKey derives its path from currentPath, a document-io-packet closure var)",
+          "public_api": "window.SMProject.{pushVersionSnapshot,listVersionHistory,restoreVersion}",
+          "consumers": ["src/js/timeline.js:11796-11809 (30s autosave tick pushes a snapshot every tick)", "project.js's own openHistoryModal (this packet, UI over listVersionHistory/restoreVersion)"],
+          "oracle": "tests/project-open.test.cjs (matched pushVersionSnapshot/listVersionHistory/restoreVersion symbols directly)",
+          "depends_on": ["C01.project.document-io-and-dirty-tracking (currentPath for historyKey; window.SM.exportJSON/importJSON via restoreVersion)", "C01.project-document-validation (SMProjectDocument.parse, pre-restore validation)"],
+          "entangled_with": [],
+          "notes": "historyKey() falls back to a fixed 'untitled-autosave' slug for a never-saved document — every such document across every project shares ONE history directory until the first Save As gives it a real path. Not verified as a defect (plausibly intentional, matches the single nemo-auto autosave's own pre-v15 behavior) but worth the orchestrator's attention before extraction."
+        },
+        {
+          "id": "C01.project.team-sync",
+          "title": "Async shared-folder publish/pull/merge (v16 Phase 2)",
+          "files": ["src/js/project.js:322-393"],
+          "symbols": ["SYNC_MAX_PER_PROFILE", "syncFolderKey", "getSyncFolder", "setSyncFolder", "profileDir", "chooseSyncFolder", "disableSync", "publishToShared", "checkSharedUpdates", "pullAndMerge"],
+          "responsibility": "Not realtime — reuses the version-history packet's timestamped-JSON-directory pattern, but rooted in a user-chosen shared folder (kDrive/S3 mount/etc.) and namespaced by profile id so collaborators don't clobber each other. publishToShared writes the current document + profile metadata; checkSharedUpdates lists the latest snapshot per OTHER profile; pullAndMerge delegates the actual merge to window.SM.mergeRemoteSnapshot (app.js, out of this census).",
+          "writer": "sole owner of the nemo-sync-<historyKey> localStorage pointer to the chosen shared folder, and of this project's own profile subfolder within it",
+          "public_api": "window.SMProject.{getSyncFolder,chooseSyncFolder,disableSync,publishToShared,checkSharedUpdates,pullAndMerge}",
+          "consumers": ["none found inside this census's scope_files — UI trigger presumably lives in a Settings/Team panel outside C01's bounded ownership"],
+          "oracle": "tests/project-open.test.cjs (matched checkSharedUpdates/publishToShared/pullAndMerge symbols directly)",
+          "depends_on": ["C01.project.document-io-and-dirty-tracking (window.SM.exportJSON, saveAllLayerFrames)", "window.SM.mergeRemoteSnapshot (app.js, out of this census — the actual conflict-merge logic)", "state.userProfile (app.js, out of this census)"],
+          "entangled_with": [],
+          "notes": "checkSharedUpdates has a defensive-looking branch `if(e.children===undefined&&e.isDirectory===false)continue` to skip stray non-directory entries at the sync root — plausible Tauri readDir quirk-handling, not independently verified against the actual plugin return shape by this census."
+        },
+        {
+          "id": "C01.timeline.autosave-tick",
+          "title": "30-second autosave/version-snapshot/dirty-dot heartbeat",
+          "files": ["src/js/timeline.js:11796-11809"],
+          "symbols": ["(anonymous setInterval callback, module scope)"],
+          "responsibility": "The one place that actually TRIGGERS periodic persistence: every 30s, if not currently playing back, saves the active frame into the document, exports full JSON once, and fans that single export out to autosaveWrite (localStorage+IDB), pushVersionSnapshot (disk history), and refreshActiveTabDirtyDot — explicitly reusing the one export rather than paying for three. Runs unconditionally at module load (not inside any gate/IIFE), so it starts ticking the moment timeline.js executes.",
+          "writer": "sole owner of this interval's timer; does not own any of the state it reads/writes (delegates entirely to project.js's exported functions)",
+          "public_api": "none — anonymous callback, no exported handle to stop/inspect the interval",
+          "consumers": ["none — this is a leaf trigger, not a service"],
+          "oracle": "tests/project-open.test.cjs (autosaveWrite is directly covered; the interval's own 30s trigger and its playing-guard were not independently found under a dedicated test)",
+          "depends_on": ["C01.project.document-io-and-dirty-tracking (autosaveWrite, refreshActiveTabDirtyDot)", "C01.project.version-history (pushVersionSnapshot)", "state.playing, saveAllLayerFrames, window.SM.exportJSON (app.js, out of this census)"],
+          "entangled_with": [],
+          "notes": "No exported handle to clear/pause this interval — a future feature needing to suspend autosave (e.g. a modal blocking fs access) has no hook to do so without adding one. Not a currently-observed defect, just a noted extension gap for the orchestrator."
+        }
+      ]
+    },
+    {
+      "area": "document-validation-and-entry",
+      "packets": [
+        {
+          "id": "C01.project-document.validation",
+          "title": "Pure project-JSON shape validation and path helpers",
+          "files": ["src/js/project-document.js:1-23"],
+          "symbols": ["parse", "baseName", "window.SMProjectDocument"],
+          "responsibility": "The one shared shape-check for a project JSON blob before anything downstream (openPath, restoreVersion, tab import) tears down the current document: requires layers-or-frames, normalizes a legacy frame-only file into a synthetic single layer, then hard-validates every layer has a `frames` array and every frame has a `strokes` array — throwing a specific French error message per failure level (file / which layer / which layer+frame). `baseName` strips a path down to a filename sans `.json`, used everywhere a tab/recents/title needs a display name.",
+          "writer": "sole owner — pure functions, no state",
+          "public_api": "window.SMProjectDocument.{parse,baseName}",
+          "consumers": ["C01.project.version-history (restoreVersion's pre-restore validation)", "src/js/app.js's window.SM.importJSON (out of this census — the actual full import pipeline this shape-check presumably gates, not independently confirmed by this read-only census since app.js was not read)", "C01.project.document-io-and-dirty-tracking (writeProjectTo/openPath call baseName for display names)"],
+          "oracle": "none found in tests/ referencing SMProjectDocument/parse/baseName by name",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "parse()'s legacy frame-only normalization only checks `!d.layers` — a malformed `d.layers` that is present but e.g. an object instead of an array falls through to the `!Array.isArray(d.layers)` check two lines later and throws correctly; no gap found. This file's own consumer chain into app.js's importJSON was not traced further since app.js is out of C01's bounded ownership — worth the orchestrator confirming parse() is actually called from importJSON and not just available-but-unused."
+        },
+        {
+          "id": "C01.project-entry.repaint",
+          "title": "Post-import first-paint timing fix",
+          "files": ["src/js/project-entry.js:1-18"],
+          "symbols": ["repaintProjectEntry", "window.SMProjectEntry"],
+          "responsibility": "A native Open/Resume can restore a live document while the canvas stays blank until an explicit render, because the canvas ResizeObserver can resize (and clear) the WebGPU surface after callbacks in the first post-import frame. Schedules the actual repaint (engine renderNow, or Paper's view.update() fallback) two requestAnimationFrame ticks out to land after that resize settles, without touching the imported document/viewport state itself.",
+          "writer": "sole owner — no state, pure scheduling side effect",
+          "public_api": "window.SMProjectEntry.repaint",
+          "consumers": ["C01.project.document-io-and-dirty-tracking (openPath, browser file-input handler)", "C01.project.start-screen (Resume button handler)"],
+          "oracle": "tests/project-entry-repaint.test.cjs (dedicated test file, name matches the packet directly)",
+          "depends_on": ["window.SMEngineBridge (engine-bridge.js, out of this census)"],
+          "entangled_with": [],
+          "notes": "Best-covered packet in this census — the only one with a test file named after it rather than incidentally exercising it."
+        }
+      ]
+    },
+    {
+      "area": "shared-storage-and-widgets",
+      "packets": [
+        {
+          "id": "C01.idb-store.kv",
+          "title": "Minimal async IndexedDB key/value store",
+          "files": ["src/js/idb-store.js:1-50"],
+          "symbols": ["window.SMIdb", "openDb", "withStore", "get", "set", "remove"],
+          "responsibility": "Large-capacity autosave backend for browser (no-Tauri) mode: a single 'kv' object store, get/set/remove only, deliberately not a general storage layer. Exists because localStorage's ~5-10MB quota silently throws/truncates once a project embeds base64 media, and IndexedDB has no such practical ceiling.",
+          "writer": "sole owner of the 'nemo-store' IndexedDB database",
+          "public_api": "window.SMIdb.{get,set,remove}",
+          "consumers": ["C01.project.document-io-and-dirty-tracking (autosaveWrite mirrors every autosave write here)", "C01.project.start-screen (initStartScreen's async fallback check for the Resume card when localStorage's nemo-auto is empty)"],
+          "oracle": "none found anywhere in tests/ — zero references to SMIdb by name in the entire test suite",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "DEF-1 (confirmed coverage gap): the browser-mode media-heavy-project autosave fallback path has no automated coverage at all — a regression here would only surface as a beta-tester report of lost work on a large web-preview project, not a CI failure."
+        },
+        {
+          "id": "C01.asset-tree.folder-widget",
+          "title": "Shared folder-group UI primitive (header + collapse mechanics)",
+          "files": ["src/js/asset-tree.js:1-70"],
+          "symbols": ["window.SMAssetTree", "FOLDER_COLORS", "KIND_GROUP_LABEL", "componentsLabel", "compositionsLabel", "layersLabel", "folderGroup"],
+          "responsibility": "Deliberately just the folder HEADER (chevron, colored icon, label, count) plus collapse/expand mechanics, shared by media-library.js and transplant.js so both read as one consistent tree widget instead of two different list stylings — each caller still builds its own row markup and appends into the returned body element. Folders are automatic-by-kind (Composants/Images/Vidéos/Audio/Compositions), not user-managed, by explicit scope decision recorded in-source.",
+          "writer": "sole owner — stateless DOM factory function, no persisted state",
+          "public_api": "window.SMAssetTree.{FOLDER_COLORS,KIND_GROUP_LABEL,componentsLabel,compositionsLabel,layersLabel,folderGroup}",
+          "consumers": ["media-library.js (out of this census's scope_files — C01's bounded ownership list names this file explicitly despite its consumers living in editor-tools/presentation territory, likely C04/C05)", "transplant.js (same, out of scope)"],
+          "oracle": "none found anywhere in tests/ — zero references to SMAssetTree or folderGroup by name",
+          "depends_on": ["window.SM.t (i18n.js, out of this census — KIND_GROUP_LABEL's getters resolve lazily specifically because SM.t's language can change after load)"],
+          "entangled_with": [],
+          "notes": "DEF-2 (confirmed coverage gap): zero automated coverage. Also the one packet in this census whose actual consumers (media-library.js, transplant.js) fall outside C01's own bounded scope_files — flagged for the orchestrator since the responsibility itself (a document-tree/asset-organization primitive) sits closer to 'document' than its physical consumers do; included here because the issue's bounded source ownership names it explicitly."
+        }
+      ]
+    },
+    {
+      "area": "app-history-engine",
+      "packets": [
+        {
+          "id": "C01.tweens.undo-redo-engine",
+          "title": "App-wide undo/redo: snapshot, clone, restore, cross-context guard",
+          "files": ["src/js/tweens.js:4753-5022"],
+          "symbols": ["pushUndo", "_walkStrokes", "_cloneStrokesForUndo", "pushUndoActiveFrame", "_cloneLayersForUndo", "layersSnapshotNow", "_undoContextLabel", "_actionLabelNow", "pushUndoLayers", "restoreLayersSnapshot", "undo", "redo"],
+          "responsibility": "The single history authority for the whole document: every pushUndoLayers() snapshots the ENTIRE layers tree (all frames, all layers, frame count, camera keys, image meshes, folder/link-group metadata, motion arcs, tween easing/overrides) plus a symbolId/montageViewId tag so undo/redo can refuse to silently apply a snapshot from a different component/montage context (cross-context guard in undo()/redo(), peek-before-pop). A lighter-weight frame-only path (pushUndoActiveFrame, and the non-'layers'-typed branches inside undo()/redo()) exists for single-frame tools where the full-tree snapshot's cost was measured at ~80% of a paint-bucket click on a large project — see H02/#1059, P21/#1023 for that sub-path's own dedicated ownership mapping. Heavy stroke fields (src, bitmapPressureProfile) are detached before JSON.stringify and shared by reference into the clone rather than duplicated (measured fastest of three cloning strategies).",
+          "writer": "sole owner of state.undoStack/redoStack/undoLabels/redoLabels (declared in app.js — C01 reads/pushes/pops them but does not declare them) and of window._tweenFrameDirty",
+          "public_api": "global functions pushUndo, pushUndoLayers, pushUndoActiveFrame, undo, redo (called from timeline.js's toolbar API object and from throughout the same file's tool-action handlers, plus dozens of other call sites app-wide)",
+          "consumers": ["src/js/history-panel.js (this census — reads state.undoStack/redoStack/*Labels directly, calls undo()/redo() by array position)", "src/js/timeline.js (dozens of call sites calling pushUndo/pushUndoLayers as a side effect of tool actions — consumption only, not ownership, confirmed by grep: no pushUndo/undo/redo DEFINITION exists in timeline.js)", "SMFeedback.logAction, SMPlaybackCache.invalidateAll, SMMotion.invalidateSymbolUnionBounds (all out of this census, called as side effects)"],
+          "oracle": "No dedicated test file. Indirectly exercised as setup/side-effect inside tests/application-opacity.test.cjs, tests/application-opacity-bootstrap.test.cjs, tests/duplicator-hue.test.cjs, tests/expr-bake.test.cjs, tests/feedback-2026-08-22.test.cjs, tests/performance-regressions.test.cjs, tests/browser/opacity-ui-consumers.spec.cjs — none of these assert undo/redo's own invariants (cross-context guard, maxUndo eviction, redo-stack-cleared-on-new-action, layers-vs-frame-only branch selection).",
+          "depends_on": ["state.undoStack/redoStack/undoLabels/redoLabels/maxUndo (app.js:218, out of this census)", "state.actionLog / SMFeedback.logAction (app.js:231 + feedback-bridge.js, out of this census)", "window._HEAVY_STROKE_FIELDS (app.js, out of this census)", "saveAllLayerFrames, saveActiveLayerFrame, loadFrame, activateUL, createUserLayer (app.js, out of this census)"],
+          "entangled_with": ["C01.history-panel.ui (direct array access, not through a getter)"],
+          "notes": "DEF-3 (confirmed coverage gap, most significant in this census): the single most safety-critical piece of application state (every user edit's undo path) has no dedicated regression test — only incidental exposure through unrelated feature tests. A regression in the cross-context guard, the maxUndo eviction, or the layers-vs-frame-only branch selection could ship undetected by CI. DEF-4 (informational): the frame-only sub-path's own deeper ownership/extraction design is intentionally deferred to H02 (#1059) / P21 (#1023), both already filed and owned by Ilya/D1 — not re-scoped here."
+        },
+        {
+          "id": "C01.history-panel.ui",
+          "title": "Read+jump UI over the undo/redo stacks",
+          "files": ["src/js/history-panel.js:1-139"],
+          "symbols": ["_histRelTime", "_histRow", "renderHistoryPanel", "renderHistoryPanelIfOpen", "toggleHistoryPopover", "initHistoryPanel"],
+          "responsibility": "Renders state.undoStack/redoStack (paired with undoLabels/redoLabels) as a chronological list — past entries clickable to undo() N times, future (redo) entries clickable to redo() N times, current position as a non-interactive marker. Session-only, like the stacks themselves; nothing here is ever persisted (same convention as state.actionLog, per CLAUDE.md). renderHistoryPanelIfOpen is the cheap guard the undo-redo-engine packet calls after every stack mutation so the panel stays live only while actually open.",
+          "writer": "sole owner of the #history-pop DOM popover's rendered content; does not own the stacks it reads",
+          "public_api": "renderHistoryPanelIfOpen (called from the undo-redo-engine packet), initHistoryPanel (self-invoked at DOMContentLoaded/immediate)",
+          "consumers": ["C01.tweens.undo-redo-engine (calls renderHistoryPanelIfOpen after every stack push/pop)"],
+          "oracle": "none. The only match in tests/ is tests/application-opacity-bootstrap.test.cjs:140 (`ctx.renderHistoryPanelIfOpen = () => historyRefreshes++;`) — that REPLACES this packet's real function with a call counter for an unrelated opacity test, so the actual rendering logic (_histRow, DOM output, undo/redo-N-times click handlers) is never exercised by that test or any other found.",
+          "depends_on": ["C01.tweens.undo-redo-engine (state.undoStack/redoStack/undoLabels/redoLabels, undo(), redo())", "TOOL_LABELS (timeline.js, out of this census — human-readable tool names for action labels, actually populated by _actionLabelNow in the undo-redo-engine packet, not here)"],
+          "entangled_with": ["C01.tweens.undo-redo-engine"],
+          "notes": "Extends DEF-3 (see the undo-redo-engine packet): this panel's own rendering/click-to-jump logic is never exercised by a real test either, only mocked away. Separately, direct array indexing into live state.undoStack/etc rather than a snapshot is correct per its own in-source comment (reads the LIVE array at click time so it stays accurate even if more actions happened while the popover was left open) — not a defect."
+        }
+      ]
+    }
+  ]
+}
