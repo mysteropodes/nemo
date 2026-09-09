@@ -229,11 +229,13 @@ console.log(${JSON.stringify(JSON.stringify(receipt([{ name: 'test:browser', sta
   assert.equal(ci.verify(['test:browser'], root).ok, false);
 });
 
-test('all hosted workflows require manual dispatch and explicit build approval before allocating a runner', () => {
+test('hosted product workflows require manual dispatch and explicit build approval before allocating a runner', () => {
   const directory = path.join(ROOT, '.github/workflows');
   const files = fs.readdirSync(directory).filter((file) => /\.ya?ml$/.test(file));
   assert.ok(files.length > 0);
   for (const file of files) {
+    // The sole metadata-only exception has its own privilege/trigger regressions.
+    if (file === 'collaborator-pr-policy.yml') continue;
     const workflow = fs.readFileSync(path.join(directory, file), 'utf8');
     const triggerBlock = workflow.match(/^on:\n((?:[ \t].*\n|#.*\n|\n)*)/m)?.[1];
     assert.ok(triggerBlock, `${file}: expected a block-form trigger declaration`);
