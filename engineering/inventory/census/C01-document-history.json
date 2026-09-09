@@ -224,5 +224,45 @@
         }
       ]
     }
-  ]
+  ],
+  "cross_cutting_notes": [
+    "Every packet in this census ultimately bottlenecks through `window.SM.exportJSON()`/`window.SM.importJSON()` (defined in app.js, NOT in C01's bounded ownership) as the actual document (de)serialize/normalize authority — project.js, the undo/redo engine, and the tab system all treat it as a black box and never duplicate its logic.",
+    "`state.undoStack/redoStack/undoLabels/redoLabels/maxUndo` and `state.actionLog` are declared in app.js (verified: app.js:218,231), not in this census's bounded ownership — the packets below only read/push/pop them.",
+    "The frame-only (non-'layers'-typed) branch inside tweens.js's undo()/redo() and pushUndoActiveFrame() already has its own dedicated, separately-owned mapping task — H02 (#1059) and P21 (#1023), both Ilya/D1 — so this census covers that sub-path only at the same coarse level as the rest of the undo engine, deferring detailed capture/restore-ownership design to those issues rather than re-doing it here."
+  ],
+  "known_defects": [
+    {
+      "id": "DEF-1",
+      "file": "src/js/idb-store.js",
+      "line": null,
+      "summary": "The browser-mode (no-Tauri) media-heavy-project autosave fallback path has no automated coverage at all — zero references to SMIdb by name anywhere in tests/. A regression here would only surface as a beta-tester report of lost work on a large web-preview project, not a CI failure.",
+      "packet": "C01.idb-store.kv",
+      "severity": "test-coverage gap"
+    },
+    {
+      "id": "DEF-2",
+      "file": "src/js/asset-tree.js",
+      "line": null,
+      "summary": "Zero automated coverage — no references to SMAssetTree or folderGroup by name anywhere in tests/. Also the one packet in this census whose actual consumers (media-library.js, transplant.js) fall outside C01's own bounded scope_files.",
+      "packet": "C01.asset-tree.folder-widget",
+      "severity": "test-coverage gap"
+    },
+    {
+      "id": "DEF-3",
+      "file": "src/js/tweens.js",
+      "line": null,
+      "summary": "Most significant coverage gap in this census: the single most safety-critical piece of application state (every user edit's undo path, src/js/tweens.js:4753-5022) has no dedicated regression test. It is only incidentally exercised as setup/side-effect inside tests/application-opacity.test.cjs, tests/application-opacity-bootstrap.test.cjs, tests/duplicator-hue.test.cjs, tests/expr-bake.test.cjs, tests/feedback-2026-08-22.test.cjs, tests/performance-regressions.test.cjs, and tests/browser/opacity-ui-consumers.spec.cjs — none of which assert undo/redo's own invariants (cross-context guard, maxUndo eviction, redo-stack-cleared-on-new-action, layers-vs-frame-only branch selection). Extends to the sibling C01.history-panel.ui packet, whose own rendering/click-to-jump logic is likewise never exercised by a real test, only mocked away (tests/application-opacity-bootstrap.test.cjs:140 replaces renderHistoryPanelIfOpen with a call counter).",
+      "packet": "C01.tweens.undo-redo-engine",
+      "severity": "test-coverage gap (most safety-critical in this census)"
+    },
+    {
+      "id": "DEF-4",
+      "file": "src/js/tweens.js",
+      "line": null,
+      "summary": "Informational, not a gap: the frame-only sub-path's own deeper ownership/extraction design (pushUndoActiveFrame and the non-'layers'-typed branches inside undo()/redo()) is intentionally deferred to H02 (#1059) and P21 (#1023), both already filed and owned by Ilya/D1 — not re-scoped here.",
+      "packet": "C01.tweens.undo-redo-engine",
+      "severity": "informational (deferred, not a gap)"
+    }
+  ],
+  "uncovered_responsibilities": []
 }
