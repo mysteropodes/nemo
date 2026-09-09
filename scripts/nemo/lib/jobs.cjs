@@ -171,11 +171,16 @@ function jobTestBrowser(ctx) {
   const dir = path.join(ROOT, 'tests', 'browser');
   if (!exists(dir) || !fs.readdirSync(dir).some((f) => /\.spec\.(c?js|mjs|ts)$/.test(f))) return notRun('runner present but no tests/browser/*.spec.* defined yet (R03 fixtures / R07 gates)');
   const bin = caps.localBin('playwright');
-  const output = path.join(ctx.reportDir, 'playwright-results');
+  // playwright.config.cjs owns trace/report/retention policy; it reads this
+  // var for where to put them so every job's evidence lands under its own
+  // report directory instead of a shared repo-root default.
+  const reportDir = path.join(ctx.reportDir, 'playwright-report');
   const r = run(bin || process.execPath,
-    bin ? ['test', 'tests/browser', '--output', output] : [runner, 'test', 'tests/browser', '--output', output],
-    { timeout: 60 * 60 * 1000 });
-  return (r.status === 0 ? pass : fail)(`playwright test tests/browser: exit ${r.status}`, { exitCode: r.status, log: logOf(r) });
+    bin ? ['test', 'tests/browser'] : [runner, 'test', 'tests/browser'],
+    { timeout: 60 * 60 * 1000, env: { NEMO_BROWSER_REPORT_DIR: reportDir } });
+  const artifacts = [fileInfo(path.join(reportDir, 'html', 'index.html')), fileInfo(path.join(reportDir, 'junit.xml'))]
+    .filter((a) => a.present);
+  return (r.status === 0 ? pass : fail)(`playwright test tests/browser: exit ${r.status}`, { exitCode: r.status, log: logOf(r), artifacts });
 }
 
 function jobTestDesktop(ctx) {
