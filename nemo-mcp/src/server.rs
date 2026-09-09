@@ -21,7 +21,7 @@ pub struct NemoServer {
 }
 
 #[derive(Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Query {
     /// Instance returned by nemo_discover as `instances[].instanceId`. Required when
     /// several apps are running. `nemo_command` spells this field the same way.

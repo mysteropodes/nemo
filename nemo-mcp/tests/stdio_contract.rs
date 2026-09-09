@@ -171,6 +171,50 @@ async fn rejected_payloads_name_the_shape_the_operation_expects() {
 }
 
 #[tokio::test]
+async fn replay_payload_validates_the_nested_recorded_command() {
+    let client = client().await;
+    let base = json!({"apiVersion": 1, "requestId": "replay-1",
+        "instanceId": "3f1a5f3c-4a05-4a3f-9d59-2f9f1c65b3ad", "documentId": "document-a",
+        "expectedRevision": 4, "operation": "diagnostics.replay"});
+
+    // The recorded command is missing its own required keys — CommandPayload
+    // deserializes it fine (every field is optional there), so only a recursive
+    // check catches this, not the outer "request is present" check.
+    let mut incomplete = base.clone();
+    incomplete["payload"] = json!({"request": {"operation": "property.set",
+        "payload": {"property": "opacity"}}});
+    let response = client
+        .call_tool(CallToolRequestParams::new("nemo_command").with_arguments(arguments(incomplete)))
+        .await
+        .unwrap();
+    assert_eq!(response.is_error, Some(true));
+    let body = response.structured_content.unwrap();
+    assert_eq!(body["error"]["code"], "invalid_request");
+    let message = body["error"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("recorded request payload is invalid"),
+        "{message}"
+    );
+    assert!(message.contains("missing layerId, value"), "{message}");
+    assert!(message.contains("property.set expects"), "{message}");
+
+    // A fully-formed recorded command still passes and fails later on the absent
+    // instance, proving the recursive check isn't a false positive.
+    let mut complete = base.clone();
+    complete["payload"] = json!({"request": {"operation": "property.set",
+        "payload": {"layerId": "layer-a", "property": "opacity", "value": 37}}});
+    let response = client
+        .call_tool(CallToolRequestParams::new("nemo_command").with_arguments(arguments(complete)))
+        .await
+        .unwrap();
+    assert_eq!(
+        response.structured_content.unwrap()["error"]["code"],
+        "unavailable"
+    );
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
 async fn reads_keep_their_own_templates_and_identity_spelling() {
     let client = client().await;
     let missing_target = client
@@ -199,5 +243,19 @@ async fn reads_keep_their_own_templates_and_identity_spelling() {
         legacy.structured_content.unwrap()["error"]["code"],
         "unavailable"
     );
+
+    // A misspelled key is rejected rather than silently dropped, same guard
+    // nemo_command's ApplicationRequest already has. This fails during parameter
+    // deserialization itself (rmcp's own path, before our error mapping runs), so
+    // the message lands in `content`, not the app's usual `structured_content`.
+    let typo = client
+        .call_tool(CallToolRequestParams::new("nemo_query").with_arguments(arguments(
+            json!({"instanceId": "a68d0f2d-6b4f-4f5b-8a4b-6b8f0f2a4d61", "operatoin": "snapshot"}),
+        )))
+        .await
+        .unwrap();
+    assert_eq!(typo.is_error, Some(true), "{typo:?}");
+    let text = typo.content[0].as_text().unwrap().text.as_str();
+    assert!(text.contains("unknown field `operatoin`"), "{text}");
     client.cancel().await.unwrap();
 }

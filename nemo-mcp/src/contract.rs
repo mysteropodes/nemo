@@ -236,6 +236,19 @@ impl Operation {
                 missing.join(", ")
             ));
         }
+        // `request` carries a recorded command (diagnostics.replay) whose own
+        // operation has its own required keys; CommandPayload's fields are all
+        // optional, so deserializing it above never checks those. Recurse once so
+        // a replay of an incomplete or mismatched command is rejected up front,
+        // not silently forwarded to the document owner.
+        if let Some(recorded) = parsed.request.as_deref() {
+            let nested = serde_json::to_value(&recorded.payload)
+                .map_err(|error| format!("recorded request payload is not usable: {error}"))?;
+            recorded
+                .operation
+                .check_payload(&nested)
+                .map_err(|error| format!("recorded request payload is invalid: {error}"))?;
+        }
         Ok(())
     }
 }
