@@ -151,3 +151,21 @@ test('manual reconciliation records failure while evaluating remaining PRs', asy
   assert.equal(failures.length, 1);
   assert.equal(f.calls.approvals.length, 0);
 });
+
+test('automatic policy workflow cannot execute PR code or gain unrelated write scopes', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const workflow = fs.readFileSync(path.join(__dirname, '../workflows/collaborator-pr-policy.yml'), 'utf8');
+  const triggers = workflow.match(/^on:\n((?:[ \t].*\n|#.*\n|\n)*)/m)[1];
+  assert.deepEqual([...triggers.matchAll(/^  ([\w]+):/gm)].map(m => m[1]),
+    ['pull_request_target', 'workflow_dispatch']);
+  assert.match(triggers, /branches: \[main\]/);
+  assert.match(workflow, /^permissions: \{\}$/m);
+  assert.deepEqual([...workflow.matchAll(/^\s+([\w-]+): write$/gm)].map(m => m[1]), ['pull-requests']);
+  assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /ref: context\.sha,/);
+  assert.match(workflow, /path: '\.github\/scripts\/collaborator-pr-policy\.cjs'/);
+  assert.deepEqual([...workflow.matchAll(/uses: (.*)/g)].map(m => m[1]),
+    ['actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8']);
+  assert.doesNotMatch(workflow, /^\s*(?:- )?run:|secrets\.|pull_request\.head|actions\/checkout/m);
+});
