@@ -56,7 +56,11 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
 - Run builds and validation locally. Do not enable, dispatch, rerun, or add automatic
   GitHub Actions builds without an explicit human request for that specific hosted run.
   Commits, pushes, PRs, merges, tags, and routine acceptance work are not that request.
-  See [the CI policy](engineering/ci/README.md); preserve normal PR review protections.
+  See [the CI policy](engineering/ci/README.md). The agreed metadata-only collaborator
+  approval workflow is the sole automatic exception; it runs no PR code or builds.
+  Follow execution-plan section 7: each collaborator team reviews, validates and merges
+  its own deliveries; external-author PRs require collaborator approval. Preserve other
+  protections and coordinate actual shared decisions without a routine cross-team gate.
 - Read `CONTRIBUTING.md`, inspect current source, related branches and existing ownership,
   then use a dedicated branch and isolated worktree for tracked changes.
 - Record the outcome, scope, dependencies, base, branch/worktree, acceptance checks,

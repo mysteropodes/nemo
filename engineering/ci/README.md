@@ -24,7 +24,8 @@ All four workflows (`nemo-validation`, `deploy-web`, `deploy-feedback-worker`, a
 `release`) expose only `workflow_dispatch`. Every job also requires the boolean input
 `allow_hosted_build: true`, which defaults to false. This is an execution guard; the
 human's request must already exist before an agent sets it. No scheduled, push, PR,
-tag, or chained workflow trigger is permitted. Build and publish locally unless the
+tag, or chained **build/test/deploy/release** workflow trigger is permitted. The sole
+automatic exception is the metadata-only collaborator PR policy described below. Build and publish locally unless the
 requested exception explicitly covers hosted execution and any deployment/release effect.
 
 The workflows were disabled in repository settings as immediate containment. Keep them
@@ -75,7 +76,7 @@ runner or killed process cannot pass. This does not change local optional-job se
 ## Applicability and remaining acceptance
 
 Quick and the adopted boundary profile run whenever the validation lanes are explicitly
-invoked, including for documentation changes; opening or updating a PR runs no workflow.
+invoked, including for documentation changes; opening or updating a PR runs no build or validation workflow.
 Only explicit Markdown documentation paths (including `scripts/nemo/README.md`), boundary
 policy JSON, the isolated `engineering/boundaries/profiles/scripts-nemo.fixture/` subtree,
 the CI workflow/runner, and boundary checker/tests are exempt from runtime jobs. See `applicability()` in
@@ -130,6 +131,48 @@ do not assume they are all blocked because earlier documentation predates the ha
 Known baseline failures remain explicit comparison evidence, not concealed passes or an
 instruction to fix unrelated features first. Runtime acceptance still needs actual browser
 and packaged-native receipts on supported environments; CPU tests cannot supply them.
+
+## Collaborator merge-policy automation
+
+Ilya and Cyrill approved collaborator self-merge on **9 September 2026**. The sole automatic
+Actions exception is [.github/workflows/collaborator-pr-policy.yml](../../.github/workflows/collaborator-pr-policy.yml).
+It reads PR/review metadata and live author permissions, then acknowledges policy eligibility
+with an explicitly automated approval at the current head. It never checks out or executes
+PR code, builds, tests, publishes artifacts, merges PRs or dismisses a human review. The
+script is loaded from the trusted base SHA; manual dispatch is restricted to `main`.
+The pinned official action receives only contents-read and pull-requests-write permissions.
+
+Keep the native one-review requirement, latest-push approval, stale-review dismissal and
+conversation resolution. Only current human authors with write/maintain/admin permission
+qualify. External/read/triage authors still need a collaborator's GitHub review. Each team
+records its own technical review and local acceptance before merging; the bot's policy
+acknowledgement cannot substitute for that evidence. Human change requests remain blocking.
+GitHub's existing administrator emergency bypass is not the ordinary merge route.
+
+An admin enables “Allow GitHub Actions to create and approve pull requests” while keeping
+the default workflow token read-only. The four product workflows stay disabled. PR metadata
+events reconcile eligible heads automatically. To recover a failed/missed event, run:
+
+```sh
+gh workflow run collaborator-pr-policy.yml --repo mysteropodes/nemo --ref main -f pull_request=1077
+# Omit the PR input for a one-time reconciliation of every open main PR.
+```
+
+This policy-only dispatch is covered by the agreed workflow, not permission to run product
+CI. Inspect failed/ambiguous writes before retrying; a matching bot approval at the same SHA
+is reused. A newer push needs fresh review/validation and policy evaluation. Avoid running
+an all-PR reconciliation concurrently with individual manual retries.
+
+**Access changes:** after granting/removing collaborator write access, the repository admin
+must immediately dispatch an all-PR reconciliation and verify its result. It removes only
+this policy's marked bot approvals from ineligible PRs. GitHub does not notify this workflow
+of membership changes; an earlier policy approval is not continuously re-evaluated. Do not
+merge affected PRs during access reconciliation. Scheduled coordination reminders are
+unrelated and remain paused outside active remediation sessions.
+
+Run policy regressions locally with
+`node --test .github/scripts/collaborator-pr-policy.test.cjs`. These check the authorization
+boundary, changed heads, access loss, human review objections and ambiguous retries.
 
 ## Protected base and PR trust
 

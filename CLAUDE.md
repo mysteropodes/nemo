@@ -626,6 +626,15 @@ Component partagé par StoryBoard et Animation2D/Motion — trois lacunes concr�
 
 ## 9. Collaboration Git — repo `mysteropodes/nemo`
 
+Politique approuvée par Ilya et Cyrill le 9 septembre 2026 : les collaborateurs actuels
+(write/maintain/admin) peuvent fusionner leurs propres PR après revue technique et
+validation locale par leur équipe, avec preuves au SHA exact. Les agents d’un même
+compte peuvent effectuer cette revue ; aucune approbation systématique de l’autre humain
+n’est requise. Les PR d’auteurs externes nécessitent une approbation GitHub d’un
+collaborateur. L’accusé automatique `Collaborator PR policy` reconnaît uniquement cette
+politique ; il n’atteste aucun test ni revue technique. Conserver les autres protections,
+les demandes de modifications et la coordination des conflits/contrats partagés.
+
 Pour la remédiation, suivre le [plan d’exécution actuel](engineering/remediation/EXECUTION_PLAN.fr.md)
 (2026-09-07) : une branche et une PR par résultat délimité, conservées entre les sessions ;
 worktrees limités aux rédacteurs réellement concurrents ; tâches et preuves sur le Projet #2,

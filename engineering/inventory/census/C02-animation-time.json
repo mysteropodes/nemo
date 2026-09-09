@@ -1,0 +1,689 @@
+{
+  "census_id": "C02",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1037",
+  "title": "Animation and time — bounded extraction packets",
+  "owner": "Cyrill/D2 (Honey)",
+  "source_sha": "ded641bd763379f36d629bf1686fcce8a6137a66",
+  "status": "read-only census complete; no source mutated; proposed IDs and packet boundaries are placeholders for the orchestrator to renumber into the global P-sequence and fold into engineering/inventory/remediation-scope.json. Corrected 2026-09-09 per Pollen's #1084 review: the motion-advanced area's packet boundaries were redrawn from per-symbol grep (canvas-drag-interactions no longer claims 298-13134; the other 7 motion-advanced packets that previously cited export-table lines only now carry real implementation ranges too). See cross_cutting_notes for what changed and what was found but left uncorrected.",
+  "scope_files": [
+    "src/js/motion.js (whole, 13929 lines)",
+    "src/js/tweens.js (partial: lines 1-4752 and 5023-5278 — lines 4753-5022 are the undo/redo/history engine, already owned by C01/#1036, verified against C01's own delivered census JSON)",
+    "src/js/timeline.js (partial: lines 40-192 playback transport, ~372-515 SM.* wrappers re-exposing tweens.js's bare globals, ~846-848/459 onion-skin control setters, ~4193-4229 camera-row insertion hooks, ~4331-4332 markers/bpm render hooks, ~5253 tween-regenerate context-menu entry, ~5450-5535 Motion-mode per-layer shape/group tree rendering — the remaining ~11700 lines are owned by sibling census tasks C01/C04a/C04b/C05/C06)",
+    "src/js/animation/curve.js (whole, 68 lines)",
+    "src/js/domain/animation/opacity.js (whole, 97 lines)",
+    "src/js/expr-bake.js (whole, 339 lines)",
+    "src/js/expr-code-panel.js (whole, 474 lines)",
+    "src/js/expr-examples.js (whole, 494 lines)",
+    "src/js/expr-functions.js (whole, 115 lines)",
+    "src/js/layer-inout.js (whole, 1660 lines)",
+    "src/js/camera.js (whole, 670 lines)",
+    "src/js/markers.js (whole, 253 lines)",
+    "src/js/bpm-grid.js (whole, 104 lines)",
+    "src/js/text-animator.js (whole, 433 lines)",
+    "src/js/text-animator-panel.js (whole, 486 lines)"
+  ],
+  "coverage_note": "motion.js (13929 lines, ~520 top-level functions) was mapped from its own authoritative public surface — the single window.SMMotion export object (read in full, lines 13367-13917) — cross-referenced against a structural grep of every 2-space-indented top-level function declaration, rather than read line-by-line in exhaustive detail; this is the same file-granularity depth C06 used for its largest files (i18n.js, 4241 lines, 'read in full, single packet'), scaled to motion.js's much larger public surface by grouping into 9 areas / 22 packets instead of one. tweens.js (5278 lines) was fully mapped by structural TOC (every top-level `function` — this file, unlike every other in scope, is NOT IIFE-wrapped and has no window.SM* namespace, see cross_cutting_notes) plus a full read of its tail; its exact undo/redo boundary (lines 4753-5022) was taken from C01/#1036's own delivered JSON, not estimated. timeline.js's animation/time-relevant slice was located by grep for playback (`startPlay`/`stopPlay`/`updatePlayhead`), onion (`Onion`), tween (`renderArcs`/`generateTweens`), and cross-file call sites into SMCamera/SMMarkers/SMBpm/SMMotion; the shape-tree block at ~5450-5535 was cross-checked against C04b's own delivered census (which claims a DIFFERENT, textually separate 'shapes tree' — window.renderShapesPanel / #shapes-sec — confirmed by reading C04b's packet directly, not assumed) to rule out an accidental duplicate claim. All ten smaller files (camera.js, markers.js, bpm-grid.js, layer-inout.js, expr-bake.js, expr-code-panel.js, expr-examples.js, expr-functions.js, text-animator.js, text-animator-panel.js) were read in full. Every 'oracle: none found' claim below was produced by grepping the complete tests/ directory for both the file's basename and its exposed window.SM* namespace/symbol names before being recorded — this session independently reviewed a sibling PR (#1080/#1081) where an unverified 'zero coverage' claim turned out to be false, so every negative coverage claim here was checked, not assumed.",
+  "areas": [
+    {
+      "area": "properties-and-curves",
+      "packets": [
+        {
+          "id": "C02.properties-and-curves.properties-and-metadata",
+          "title": "Property-row metadata and Expression Controls",
+          "files": ["src/js/motion.js:118-560"],
+          "symbols": ["registerEffectorPropMeta", "registerExposedPropMeta", "controlsOf", "registerControlPropMeta", "controlTypeOf", "propsFor", "findControl", "genControlKey", "addExprControl", "renameExprControl", "removeExprControl", "moveExprControl", "afterControlEdit", "openExprControlsMenu", "transformRowPlan", "trackFor", "refreshPropLabels"],
+          "responsibility": "propsFor is the single decider of which property rows exist for a holder (layer or element) — CLAUDE.md §11's panel/grid alignment invariant depends on nothing else ever building this list independently. Expression Controls (rig-widget-style xc_ keys) are created/renamed/removed/reordered here and registered into the same PROP_LABEL/DIM/UNIT tables real properties use, so they render identically in every consumer.",
+          "writer": "ld.exprControls (array); module-level PROP_LABEL/PROP_DIM/PROP_UNIT/_controlTypeByKey tables",
+          "public_api": "SMMotion.{propsFor, exprControls, controlTypeOf, addExprControl, renameExprControl, removeExprControl, moveExprControl, openExprControlsMenu, registerControlPropMeta, registerEffectorPropMeta, registerExposedPropMeta}",
+          "consumers": ["timeline.js (renderLayerList/renderTimeline, via SMMotion.propsFor — sibling census C04b)", "rig-widget.js (addExprControl per axis, per CLAUDE.md §13 — out of this census's bounded files)"],
+          "oracle": "none found (grepped tests/ for SMMotion — referenced broadly by fixture/integration setup, but propsFor's own row-list decision logic has no dedicated assertion)",
+          "depends_on": [],
+          "entangled_with": ["C02.properties-and-curves.key-selection-and-clipboard (shares the PROP_* tables)"],
+          "notes": "refreshPropLabels self-registers into window.SM.afterI18n — a live language switch re-labels already-built rows without a full rebuild, same pattern C06 documented for other afterI18n consumers."
+        },
+        {
+          "id": "C02.properties-and-curves.keyframe-track-model",
+          "title": "Generic holder-based keyframe track model",
+          "files": ["src/js/motion.js:1178-1338", "src/js/motion.js:13368-13386 (export)"],
+          "symbols": ["ensureTrack", "hasKeys", "isAnimated", "sortKeys", "keyAt", "staticValue", "displayValueFor", "segmentIndexAtFrame", "evalTrack", "rawValueAtFrame", "valueAtFrame", "toggleAnimated", "setValue", "setKeyAtCurrentFrame", "removeKeyAtCurrentFrame"],
+          "responsibility": "The core per-property keyframe data model shared by every holder in this codebase (layer, element, expression control, image-mesh vertex, rig-widget axis) — the export object's own 2026-08-31 comment calls these out as 'generic, holder-based keyframe writers... only ld.motion/.motionStatic are ever touched'. setValue is the single writer: keys at the playhead when the stopwatch is on, writes motionStatic otherwise (the AE convention every other packet in this census reuses rather than reimplementing).",
+          "writer": "holder.motion[prop] (track {keys:[]}), holder.motionStatic[prop]",
+          "public_api": "SMMotion.{valueAtFrame, toggleAnimated, setValue, trackFor, keyAt, setKeyAtCurrentFrame, removeKeyAtCurrentFrame, rawValueAtFrame, isAnimated, getLayerValue, setLayerValue}",
+          "consumers": ["virtually every other packet in this census except camera.js's own separate track model", "text-animator-panel.js's stopwatch helper (this census)", "rig-widget.js's layerControl (out of this census's bounded files)"],
+          "oracle": "indirect only — no test asserts setValue/toggleAnimated/valueAtFrame's own stopwatch-on-vs-off branching directly; exercised as setup/side-effect inside tests referencing SMMotion (tests/domain-opacity.test.cjs, tests/expr-bake.test.cjs, tests/feedback-2026-08-22.test.cjs, tests/application-opacity*.test.cjs)",
+          "depends_on": [],
+          "entangled_with": ["C02.math-kernels.opacity-domain-writers (see known_defects DEF-3 — two independent implementations of the same track shape for one property)"],
+          "notes": "The single riskiest shared model in this census — nearly every other packet's 'writer' field ultimately bottlenecks through setValue/ensureTrack."
+        },
+        {
+          "id": "C02.properties-and-curves.curves-and-easing",
+          "title": "Per-segment easing curve assignment",
+          "files": ["src/js/motion.js:941-1177", "src/js/motion.js:13895-13910 (onEaseSegChanged, setKeyInterp, applyEasyEase exports)"],
+          "symbols": ["isLegacyStepCurve", "prevKeyOf", "curveMatchesPreset", "keyInterpolationKind", "keyInterpolationLabel", "applyCurveToSelection", "setKeyInterp", "applyEasyEase", "migrateLegacyCurves", "cloneCurvePts", "onEaseSegChanged"],
+          "responsibility": "Per-segment easing curve assignment (Linear/Ease/Ease In/Ease Out presets, or a custom curvePoints array edited in the shared curve widget). onEaseSegChanged propagates a manually-reshaped curve to every OTHER selected key too when 2+ keys are selected (2026-07-30 feature, explicit Cyril feedback), cloning per key so later edits to one never reshape the rest.",
+          "writer": "key.curvePoints (per-keyframe)",
+          "public_api": "SMMotion.{migrateLegacyCurves, setKeyInterp, applyEasyEase, onEaseSegChanged, DEFAULT_CURVE, evalCurvePoints (re-exported from animation/curve.js)}",
+          "consumers": ["ui.js's shared curve-editor widget (out of this census's bounded files — opens on a key, calls back into onEaseSegChanged)"],
+          "oracle": "the underlying evaluator (evalCurvePoints, C02.math-kernels.curve-evaluator) is well tested; the curve ASSIGNMENT/propagation logic here (applyCurveToSelection, onEaseSegChanged's multi-key propagation) has no dedicated test of its own",
+          "depends_on": ["C02.math-kernels.curve-evaluator"],
+          "entangled_with": [],
+          "notes": "migrateLegacyCurves is a one-time-per-load upgrade path for pre-curve-widget projects."
+        },
+        {
+          "id": "C02.properties-and-curves.key-selection-and-clipboard",
+          "title": "Multi-key selection box, clipboard, and batch key operations",
+          "files": ["src/js/motion.js:1033-1157", "src/js/motion.js:13841-13868 (exports)"],
+          "symbols": ["nudgeSelectedKeys", "deleteSelectedKeys", "copySelectedKeys", "pasteKeys", "hasKeySelection", "hasKeyClipboard", "holderRefOf", "holderFromRef", "distributeKeys", "flipKeys", "selectEveryNthKey", "invertKeySelection", "applyMarqueeSelection", "keysLockedTo", "shiftKeySelection"],
+          "responsibility": "The multi-key selection model (CLAUDE.md §11's selection-box: top/bottom edges = skew, left/right = space, fill = move, Cmd+drag = liquify, one shared drag engine) plus clipboard (copy/paste across holders via holderRefOf's {uid,elem} addressing, which survives a loadFrame rebuild unlike a raw object reference).",
+          "writer": "module-level _motionKeySel array (selection only, not persisted); target holder tracks via paste",
+          "public_api": "SMMotion.{getKeySelection, selectKeys, marqueeSelect, clearKeySelection, hasKeySelection, hasKeyClipboard, nudgeSelectedKeys, deleteSelectedKeys, copySelectedKeys, pasteKeys, distributeKeys, flipKeys, selectEveryNthKey, invertKeySelection, shiftKeySelection, keysLockedTo, holderRefOf}",
+          "consumers": ["C02.layer-inout.selection-and-marquee (bidirectional marquee forwarding, CLAUDE.md §11)"],
+          "oracle": "none found",
+          "depends_on": [],
+          "entangled_with": ["C02.layer-inout.selection-and-marquee"],
+          "notes": "holderRefOf/holderFromRef's {uid,elem} addressing scheme is also reused by C02.expressions.expr-code-split-editor — one addressing scheme, two independent consumers."
+        }
+      ]
+    },
+    {
+      "area": "expressions",
+      "packets": [
+        {
+          "id": "C02.expressions.expression-runtime",
+          "title": "Expression language VM and function library",
+          "files": ["src/js/motion.js:1333-1783", "src/js/motion.js:13637-13758 (exports)"],
+          "symbols": ["ensureExpr", "hasExpr", "_exprTick", "instrumentLoops", "_formatRuntimeError", "ensureExprSeed", "hashUnit", "hashNoise1D", "hashNoise2D", "exprRemap*", "exprClamp", "exprRadians", "exprDegrees", "exprAdd/Sub/Mul/Div/Dot/Length/Normalize/Cross/AngleTo", "exprStepTime", "exprToFrames", "exprToSeconds", "exprSeed", "_rand01", "_gauss01", "exprRandom*", "exprSnapshotFor", "applyExprCode", "setExprEnabled", "exprGlobals", "setExprGlobals"],
+          "responsibility": "The actual expression VM — an After-Effects-like sandboxed language (time/frame/value/wiggle/noise/random/layer()/self/control()/layerControl(), per expr-functions.js's own reference) with per-property seeded randomness (hashNoise/hashUnit) so a 'fixed' random draw stays stable across sessions, and loop-body instrumentation (instrumentLoops) to guard user-written loops.",
+          "writer": "holder.expressions[prop] ({code, enabled, lastError, errorLine}), holder._exprCompiled cache",
+          "public_api": "SMMotion.{hasExpression, exprSnapshotFor, applyExprCode, setExprEnabled, exprGlobals, setExprGlobals, rawValueAtFrame}",
+          "consumers": ["C02.expressions.expr-code-split-editor (exprSnapshotFor/applyExprCode/setExprEnabled ARE its entire write path, per its own header comment: one writer, two surfaces)", "the inline ƒx row (out of this census's bounded files)"],
+          "oracle": "none found for the evaluator itself; exercised only incidentally via tests/expr-bake.test.cjs, which asserts baking OUTPUT, not the evaluator's own correctness (loop instrumentation, error-line reporting, seeded-random determinism)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "EXPR_PUBLIC_NAMES (the documented boundary between real API and undocumented AE-compat aliases, referenced by expr-examples.js/expr-functions.js/expr-code-panel.js's highlighter) was not individually located by this pass's grep — likely lives in this same area; worth the orchestrator confirming its exact location."
+        },
+        {
+          "id": "C02.expressions.expr-code-split-editor",
+          "title": "Split-pane expression code editor",
+          "files": ["src/js/expr-code-panel.js (whole, 474 lines)"],
+          "symbols": ["open", "close", "build", "commit", "refresh", "paintGutter", "highlightLine", "toggleExamplesMenu", "toggleFunctionsMenu", "buildMenu", "insertBlock", "insertInline"],
+          "responsibility": "Split-pane code editor for expressions (2026-08-30) beside the canvas — a SECOND view of the same expression the inline ƒx row edits, never a second copy: writes exclusively through SMMotion.applyExprCode/setExprEnabled. Includes a from-scratch syntax highlighter (textarea-behind-pre trick, one regex pass) and two accordion dropdowns (Examples/Functions) sourced from C02.expressions.expr-reference-library's data tables.",
+          "writer": "DOM only (#expr-code-panel and its wrapper around #canvas-area); holder.expressions[prop] via SMMotion",
+          "public_api": "window.SMExprPanel = {open, close, isOpen, isShowing, refresh}",
+          "consumers": ["the inline ƒx row's 'open in split editor' button (out of this census's bounded files)"],
+          "oracle": "none found — pure DOM/UI code",
+          "depends_on": ["C02.expressions.expression-runtime", "C02.expressions.expr-reference-library"],
+          "entangled_with": [],
+          "notes": "Canvas resize is done by dispatching a real `resize` event rather than a bespoke callback — Paper.js and the Rust engine both already listen for it (documented as deliberate: 'no third resize path to invent')."
+        },
+        {
+          "id": "C02.expressions.expr-bake-to-keyframes",
+          "title": "Bake an expression to optimized keyframes",
+          "files": ["src/js/expr-bake.js (whole, 339 lines)"],
+          "symbols": ["rdp", "unionKeyframeTimes", "fitSegmentCurve", "bakeExpressionToKeyframes"],
+          "responsibility": "Converts a live expression into an optimized keyframe set via three Ramer-Douglas-Peucker passes: Pass A picks WHERE keys land (per-axis, unioned across axes), Pass B fits HOW each segment eases (verified against the exact evalCurvePoints evaluator that will render it, not a hand-ported copy), Pass C greedily merges adjacent Pass-A segments a single curve can still reconstruct within tolerance. A fully-constant expression collapses to zero keyframes (motionStatic only).",
+          "writer": "holder.motion[prop] (track replaced wholesale over [frameStart,frameEnd]); ex.enabled=false after baking",
+          "public_api": "window.SMExprBake = {bakeExpressionToKeyframes, _rdp, _fitSegmentCurve, _unionKeyframeTimes (exposed for unit tests only)}",
+          "consumers": ["a right-panel 'Bake' button (out of this census's bounded files)"],
+          "oracle": "tests/expr-bake.test.cjs — dedicated test file, real coverage",
+          "depends_on": ["C02.properties-and-curves.keyframe-track-model", "C02.math-kernels.curve-evaluator"],
+          "entangled_with": [],
+          "notes": "Deliberately does not fit Position's spatial hOut/hIn bezier handles (a 2D point-cloud curve-fit, harder than the 1D progress-curve fit this file does) — a documented, intentional limitation, not a defect."
+        },
+        {
+          "id": "C02.expressions.expr-reference-library",
+          "title": "Expression examples and function-reference data tables",
+          "files": ["src/js/expr-examples.js (whole, 494 lines)", "src/js/expr-functions.js (whole, 115 lines)"],
+          "symbols": ["CATEGORIES (both files — same shape, different content: examples = complete recipes, functions = atomic building blocks)"],
+          "responsibility": "Two static data tables (no logic) feeding C02.expressions.expr-code-split-editor's two accordion dropdowns. expr-examples.js holds ~18 curated, credited expressions (several explicitly ported from Dan Ebberts / Creative COW); expr-functions.js is the IntelliSense-style hover-doc reference for every name in Nemo's documented expression vocabulary.",
+          "writer": "none (pure data)",
+          "public_api": "window.SM_EXPR_EXAMPLES, window.SM_EXPR_FUNCTIONS",
+          "consumers": ["C02.expressions.expr-code-split-editor (menus, and its syntax highlighter's HL_BUILTINS list — a third hand-copy of the same public-name list, see cross_cutting_notes)"],
+          "oracle": "none — not meaningfully applicable to static data",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Example/function prose is English-only by explicit design (documented scope note in expr-examples.js) — not a missing-i18n defect."
+        }
+      ]
+    },
+    {
+      "area": "tween-engine",
+      "packets": [
+        {
+          "id": "C02.tween-engine.feature-extraction-and-matching",
+          "title": "Shape-feature extraction and Hungarian bipartite matching",
+          "files": ["src/js/tweens.js:104-789"],
+          "symbols": ["buildTP", "parseHexColor", "colorDist", "realStrokeColor", "strokeType", "buildTPFeat", "fourierDescriptor", "fourierDist", "strokeFeat", "unionBounds", "matchSc", "fitSimilarityTransform", "fitSimilarityTransformWeighted", "applySimilarityTransform", "hungarian", "_strokeInJson", "autoMatch", "autoMatchJS", "relationalRefine", "_segsIntersect", "_orderReversed", "uncrossMatches"],
+          "responsibility": "Shape-feature extraction (Fourier descriptors, similarity-transform fitting) and the Hungarian-algorithm bipartite matcher that pairs strokes between two keyframes for tweening. autoMatch tries a WASM path first with a silent JS fallback (autoMatchJS) per CLAUDE.md §3's documented 'a Rust-only bug can hide behind the JS fallback' pattern. relationalRefine/uncrossMatches post-process the raw assignment to fix crossed/tangled correspondences.",
+          "writer": "none (pure computation, returns a match plan)",
+          "public_api": "none — tweens.js has no window.SM* export object (see cross_cutting_notes); these are bare top-level functions",
+          "consumers": ["C02.tween-engine.tween-generation-and-splitting", "C02.tween-engine.arc-rendering-and-reassignment"],
+          "oracle": "none found (grepped tests/ for autoMatch/hungarian — zero hits); the WASM/JS dual path means a Rust-only regression here is currently undetectable by any automated test",
+          "depends_on": [],
+          "entangled_with": ["C02.tween-engine.tween-generation-and-splitting"],
+          "notes": "CLAUDE.md §1 documents that brush-texture dabs are explicitly filtered out (splitTweenables) before this matcher runs — letting them in previously caused O(n^3) blowups and nonsensical cross-shape pairings."
+        },
+        {
+          "id": "C02.tween-engine.resampling-and-nonrigid-warping",
+          "title": "Feature-aware resampling and per-vertex warping",
+          "files": ["src/js/tweens.js:789-1592", "src/js/tweens.js:1988-2427"],
+          "symbols": ["resampleP", "resamplePJS", "resampleCenterline", "resampleCenterlineJS", "detectFeatureFractions", "buildSharedFractions", "_sampleAtFractions", "_matchLandmarks", "_dtwCorrespondence", "_regulariseWarp", "_landmarkFractions", "resamplePairFeatureAware", "outlineFromCenterSegs", "_fitMLSPerVertex", "buildMLSSegs", "_sampleByArc", "_renderedRipple", "_reharmoniseHandles", "_reharmoniseCore", "_applyFoldCorrection", "_decimateKeepIndices", "_reduceSegs", "_segsHFRoughness", "_reductionIsSafe", "_applyPointReduction"],
+          "responsibility": "Resamples two strokes to a shared point count using feature-aware correspondence (landmark detection, dynamic-time-warping, moving-least-squares per-vertex fitting) rather than naive arc-length resampling — the machinery that makes a tween between two hand-drawn shapes with different vertex counts/starting points correspond visually, not just numerically.",
+          "writer": "none (pure computation)",
+          "public_api": "none (bare top-level functions)",
+          "consumers": ["C02.tween-engine.interpolation-core"],
+          "oracle": "none found",
+          "depends_on": [],
+          "entangled_with": ["C02.tween-engine.interpolation-core"],
+          "notes": "The single densest, least-tested cluster in this census by line count (~850 lines, zero direct test references) — a strong candidate for a characterization test before any future refactor touches it."
+        },
+        {
+          "id": "C02.tween-engine.interpolation-core",
+          "title": "Per-frame stroke interpolation evaluator",
+          "files": ["src/js/tweens.js:2427-3389"],
+          "symbols": ["interpStroke", "reverseResampled", "rotateResampled", "resampledIsClosed", "alignCost", "alignResampledPair", "alignResampledPairJS", "rotationFitResidual", "alignTurnDisagreement", "resampledRotationOk"],
+          "responsibility": "interpStroke (726 lines — the single largest function in this census's entire scope) is the per-frame tween evaluator: given two matched, resampled strokes and a progress t, produces the interpolated stroke data (position, color, width, fill/stroke carry-over). The alignment helpers correct for closed-shape rotation/starting-point ambiguity before interpolating.",
+          "writer": "none (pure computation, returns a stroke dict)",
+          "public_api": "none (bare top-level function)",
+          "consumers": ["C02.tween-engine.tween-generation-and-splitting (the per-in-between-frame call site)"],
+          "oracle": "none found",
+          "depends_on": ["C02.tween-engine.resampling-and-nonrigid-warping"],
+          "entangled_with": [],
+          "notes": "At 726 lines, interpStroke is a strong module-boundary split candidate on its own merits, independent of the test-coverage gap — it reads as several cohesive sub-responsibilities (spatial-handle interpolation, color/style carry-over, closed-shape seam handling) currently living in one function."
+        },
+        {
+          "id": "C02.tween-engine.tween-generation-and-splitting",
+          "title": "Tween generation orchestration and dabs exclusion",
+          "files": ["src/js/tweens.js:3389-3763", "src/js/tweens.js:3772-4447"],
+          "symbols": ["extractStrokePiece", "splitMergedIntoOrderedPieces", "boundsOverlapLoose", "resolveSplitMatches", "splitTweenables", "_backdropFromCenterSegs", "_vanishPlanFor", "_trimmedStroke", "dabRecordsForTween", "generateTweens", "harmonizeAfterEdit"],
+          "responsibility": "generateTweens (627 lines) is the main orchestration entry point — walks the layer's keyframe pairs, invokes the matcher and interpolator for each, writes the resulting in-between frames. splitTweenables is CLAUDE.md §1's documented dabs-exclusion filter applied before matching. dabRecordsForTween re-stamps brush-texture dabs along the interpolated ancestor path using a per-pair SEEDED rng (not fresh Math.random) so texture doesn't 'boil' frame to frame.",
+          "writer": "ld.frames[i].strokes for every generated in-between frame",
+          "public_api": "none of its own — generateTweens/harmonizeAfterEdit are re-exposed via timeline.js's own window.SM object (sibling census C04a/C04b territory for the wrapper itself; see C02.playback-integration.onion-and-tween-controls-wiring)",
+          "consumers": ["timeline.js's 'Regenerate Tween' context-menu action and T shortcut (out of this census's file-content scope, in scope only as an integration point)", "app.js (frame-structure edits that must regenerate affected tweens, out of this census's bounded files)"],
+          "oracle": "none found (zero hits for generateTweens across the whole tests/ tree)",
+          "depends_on": ["C02.tween-engine.feature-extraction-and-matching", "C02.tween-engine.interpolation-core"],
+          "entangled_with": [],
+          "notes": "See known_defects DEF-1 — this is Nemo's single most complex generated-content pipeline with zero automated test coverage, the highest-severity finding in this census."
+        },
+        {
+          "id": "C02.tween-engine.arc-rendering-and-reassignment",
+          "title": "Tween-arc overlay and manual match reassignment",
+          "files": ["src/js/tweens.js:4447-4770", "src/js/tweens.js:5046-5278"],
+          "symbols": ["computeArcMatchBase", "computeArcMatchState", "matchStateForPath", "renderArcs", "reassignStatusEl", "reassignSetStatus", "cancelReassign", "startReassign", "confirmReassignStep1", "reassignHandleClick", "initReassignUI", "updateReassignBadgeHover", "reassignBadgeEl", "hideReassignBadge", "shortIdLabel", "positionReassignBadge", "updateReassignBadge"],
+          "responsibility": "renderArcs draws the on-canvas 'tween arc' overlay connecting matched shapes between keyframes; computeArcMatchState runs the same matcher (C02.tween-engine.feature-extraction-and-matching) specifically to drive that overlay and a reassign-badge hover UI, letting a user manually override a wrong auto-match (hover-driven single click, or a legacy two-click flow).",
+          "writer": "the reassign flow ultimately calls generateTweens after rewriting the match",
+          "public_api": "none (bare top-level functions; wired from timeline.js)",
+          "consumers": ["timeline.js (renderArcs called after nearly every structural edit — insert/delete/move frame, tool switch)"],
+          "oracle": "none found",
+          "depends_on": ["C02.tween-engine.feature-extraction-and-matching"],
+          "entangled_with": [],
+          "notes": "CLAUDE.md §5bis already fixed one real duplication bug here (updateReassignBadge used to recompute computeArcMatchState a second time per scrub tick instead of reusing renderArcs' own result, measured at 13.1ms/tick doubled) — the `cached` parameter on both functions is the fix. A future call site must thread the same cache through rather than recomputing."
+        },
+        {
+          "id": "C02.tween-engine.onion-skinning",
+          "title": "Onion-skin ghost overlay rendering",
+          "files": ["src/js/tweens.js:4617-4770"],
+          "symbols": ["osTagFrame", "onionTint", "setOnionTint", "onionTintColor", "onionShift", "setOnionShift", "renderOS", "renderGhostAll"],
+          "responsibility": "Renders previous/next-frame ghost overlays as translucent canvas items, tagged (osTagFrame) with which layer/frame they represent so a Motion-transformed or symbol-internal ghost shows the correct pose rather than the resting one (CLAUDE.md §12ter's image-mesh ghost fix reuses this exact tagging convention).",
+          "writer": "none directly (overlay items only, non-destructive)",
+          "public_api": "none (bare top-level functions; renderOS wired from timeline.js, called after nearly every edit)",
+          "consumers": ["C02.playback-integration.onion-and-tween-controls-wiring"],
+          "oracle": "none found",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "renderGhostAll (all frames shown at once) is a heavier variant of the same tagging pattern — worth confirming its cost on a long timeline given CLAUDE.md §5bis's general finding that this file's functions run far more often than their cost would suggest is safe."
+        }
+      ]
+    },
+    {
+      "area": "playback-integration",
+      "packets": [
+        {
+          "id": "C02.playback-integration.playback-transport",
+          "title": "Frame-advance playback loop and playhead update",
+          "files": ["src/js/timeline.js:40-192"],
+          "symbols": ["startPlay", "stopPlay", "togglePlay", "updatePlayhead"],
+          "responsibility": "The actual frame-advance interval loop and the split-update contract CLAUDE.md §5bis documents in depth: startPlay's tick calls updatePlayhead ALONE (cheap: playhead position + .cur class only), while stopPlay calls the full updateUI (content-aware rebuild). A caller that changed CONTENT during playback must never route through the cheap path.",
+          "writer": "state.currentFrame, state.playing",
+          "public_api": "window.SM.{goToFrame (thin wrapper around app.js's own goToFrame), togglePlay, stopPlay}",
+          "consumers": ["app.js's goToFrame (calls stopPlay before jumping, out of this census's bounded files)", "SMCamera.applyCameraView (called from inside updatePlayhead so camera-view-lock tracks the transport, not just goToFrame's own path)"],
+          "oracle": "none found (zero hits for startPlay/stopPlay/updatePlayhead anywhere in tests/)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "See known_defects DEF-2 — this is the exact function pair CLAUDE.md §5bis's own performance investigation is about, and the single most performance-load-bearing untested code in this census."
+        },
+        {
+          "id": "C02.playback-integration.onion-and-tween-controls-wiring",
+          "title": "Onion-skin and tween-regenerate control wrappers",
+          "files": ["src/js/timeline.js:459", "src/js/timeline.js:846-848", "src/js/timeline.js:5253"],
+          "symbols": ["toggleOnion", "setOnionRange", "setOnionPrevOp", "setOnionNextOp", "setOnionMode"],
+          "responsibility": "Thin state-then-refresh wrappers exposed on window.SM for the onion-skin panel's controls and the 'Regenerate Tween' context-menu action — each writes one state.onion* field and calls renderOS()/generateTweens().",
+          "writer": "state.onionSkin, state.onionIn, state.onionOut, state.onionPrevOpacity, state.onionNextOpacity, state.onionMode",
+          "public_api": "window.SM.{toggleOnion, setOnionRange, setOnionPrevOp, setOnionNextOp, setOnionMode}",
+          "consumers": ["the onion-skin settings row (right panel, out of this census's bounded files)"],
+          "oracle": "none found",
+          "depends_on": ["C02.tween-engine.onion-skinning", "C02.tween-engine.tween-generation-and-splitting"],
+          "entangled_with": [],
+          "notes": "none"
+        },
+        {
+          "id": "C02.playback-integration.camera-markers-bpm-row-integration",
+          "title": "Camera/markers/BPM row insertion into the frame grid",
+          "files": ["src/js/timeline.js:4193-4229", "src/js/timeline.js:4331-4332"],
+          "symbols": [],
+          "responsibility": "The exact insertion points where the frame-grid's own render pass prepends the camera row (always first) and refreshes the markers/BPM overlays — the seam between timeline.js's presentation (owned by sibling census C04b) and this census's camera/markers/bpm feature files.",
+          "writer": "none (delegates entirely)",
+          "public_api": "none",
+          "consumers": [],
+          "oracle": "none found",
+          "depends_on": ["C02.camera.interaction-and-overlay-render", "C02.markers-and-bpm.timeline-markers", "C02.markers-and-bpm.bpm-guides"],
+          "entangled_with": [],
+          "notes": "Recorded as its own packet only to make the cross-file seam explicit for the orchestrator — not a suggestion to extract these two call sites alone; they are integration points, not an independent responsibility."
+        },
+        {
+          "id": "C02.playback-integration.motion-shape-tree-rendering",
+          "title": "Motion-mode per-layer shape/group tree rendering",
+          "files": ["src/js/timeline.js:5450-5535"],
+          "symbols": [],
+          "responsibility": "Renders the LEFT-PANEL per-layer shape/group breakdown in Motion mode (one row per SMMotion.buildShapeTree(li,ld) entry: group headers, member rows, rename, select-by-strokeIds) — verified textually distinct from C04b's own '#shapes-sec' right-panel Figma-style shape/group tree (window.renderShapesPanel), which is a different DOM section reading the same motion.js data model but is C04b's own claimed responsibility, not this census's.",
+          "writer": "window._layerShapesExpanded / _layerActiveExplicit (session-only)",
+          "public_api": "none (inline render block)",
+          "consumers": [],
+          "oracle": "none found",
+          "depends_on": ["C02.motion-advanced.component-shape-tree"],
+          "entangled_with": [],
+          "notes": "Two visually-similar 'shape tree' UIs (this one and C04b's #shapes-sec) reading the same underlying motion.js data model is worth a product-level sanity check on whether both are intentionally kept — flagged here since it surfaced directly from cross-referencing sibling censuses, not asserted as a defect."
+        }
+      ]
+    },
+    {
+      "area": "camera",
+      "packets": [
+        {
+          "id": "C02.camera.keyframe-model-and-viewport-lock",
+          "title": "Camera keyframe model, easing, and viewport lock",
+          "files": ["src/js/camera.js:1-157", "src/js/camera.js:509-616"],
+          "symbols": ["ensureState", "aspect", "keyHeight", "bezierEase", "sortKeys", "keyAt", "defaultRect", "snap", "cameraAtFrameFor", "cameraAtFrame", "cameraMatrixAtFrame", "setKey", "removeKey", "segmentLeftKey", "resetCameraViewOverride", "applyCameraView", "applyToExportLayer"],
+          "responsibility": "A completely independent keyframe/easing model from motion.js's (one camera, one array of {frame,x,y,w,rot,hOut,hIn,ease} keys) with its own cubic-bezier solver (Newton + bisection fallback, tightened to 1e-9 in 2026-09 after a cross-solver disagreement found via tests/easing-reference.test.cjs). 'Vue caméra' viewport lock captures manual zoom/pan as a delta so it survives scrubbing instead of being overwritten every frame (2026-07 feedback fix). applyToExportLayer bakes the identical transform into export.js's frame builder.",
+          "writer": "state.cameraKeys, state.cameraLayerOn, state.cameraView, state.canvasRotation",
+          "public_api": "window.SMCamera = {cameraAtFrame, cameraAtFrameFor, cameraMatrixAtFrame, keyAt, setKey, removeKey, applyCameraView, resetCameraViewOverride, applyToExportLayer, ...}",
+          "consumers": ["app.js's getEffectiveStrokes (a Component's own cameraKeys composited via cameraMatrixAtFrame, per CLAUDE.md §8, out of this census's bounded files)", "export.js (applyToExportLayer, out of this census's bounded files)", "C02.playback-integration.camera-markers-bpm-row-integration"],
+          "oracle": "partial — bezierEase specifically is cross-checked against two other independent solvers in tests/easing-reference.test.cjs (the 2026-09 precision fix was validated this way); cameraAtFrame/cameraMatrixAtFrame/setKey/applyToExportLayer/the viewport-lock delta logic have no direct test",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "CLAUDE.md §8 documents a live-verified (not automated) gotcha here: bare-Matrix rotate/scale/translate composes by APPENDING while Item.rotate/scale/translate composes by PREPENDING; cameraMatrixAtFrame's call order is deliberately reversed from applyToExportLayer's to match. A future edit to either must preserve that asymmetry consciously — there is no automated regression for it."
+        },
+        {
+          "id": "C02.camera.interaction-and-overlay-render",
+          "title": "Camera gizmo interaction and timeline row rendering",
+          "files": ["src/js/camera.js:158-508", "src/js/camera.js:617-670"],
+          "symbols": ["dashedRectItems", "crossItems", "rotPt", "corners", "buildOverlayItems", "circleSegs", "rotationHandlePos", "hitCorner", "hitTrajectoryHandle", "onDown", "onDrag", "onUp", "renderPanelRow", "renderGridRow", "drawSpeedCurves", "renderCameraRow", "updateCameraPanel", "openCameraEaseEditor", "initUI"],
+          "responsibility": "The on-canvas gizmo (dashed key rects, trajectory handles, rotation handle, resize corners) and its Paper-native pointer-event handlers (delegated from tools.js when state.tool==='camera'), plus the timeline row (panel + frame-grid twin, kept aligned per CLAUDE.md §11's invariant) with an inline SVG speed-curve overlay sampling the real bezierEase — previously decorative-only despite a comment claiming it was clickable, fixed same session.",
+          "writer": "state.cameraKeys[*].{x,y,w,rot,hOut,hIn} via direct mutation during drag",
+          "public_api": "window.SMCamera.{buildOverlayItems, onDown, onDrag, onUp, renderPanelRow, renderGridRow, renderCameraRow, updatePanel}; window.updateCameraPanel",
+          "consumers": ["tools.js (pointer-event delegation when state.tool==='camera', sibling census C04a)", "C02.playback-integration.camera-markers-bpm-row-integration"],
+          "oracle": "none found",
+          "depends_on": ["C02.camera.keyframe-model-and-viewport-lock"],
+          "entangled_with": [],
+          "notes": "none"
+        }
+      ]
+    },
+    {
+      "area": "markers-and-bpm",
+      "packets": [
+        {
+          "id": "C02.markers-and-bpm.timeline-markers",
+          "title": "Comp and layer markers",
+          "files": ["src/js/markers.js (whole, 253 lines)"],
+          "symbols": ["compMarkers", "layerMarkers", "markerAt", "sortMarkers", "addCompMarker", "addLayerMarker", "removeMarker", "renameMarker", "gotoAdjacent", "render", "buildEl", "startDrag", "frameFromEvent", "initRulerMenu", "initKeys"],
+          "responsibility": "After Effects' two marker scopes (comp-wide state.markers and per-layer ld.markers) — pure annotation, read by nothing at render time by design, so a marker can never desync from the drawing. Deliberately its own file specifically so the 'which reader did I forget' bug family (CLAUDE.md §1) structurally cannot apply.",
+          "writer": "state.markers, ld.markers",
+          "public_api": "window.SMMarkers = {render, addCompMarker, addLayerMarker, gotoAdjacent, compMarkers, layerMarkers}",
+          "consumers": ["C02.playback-integration.camera-markers-bpm-row-integration"],
+          "oracle": "none found",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Markers past the end of a shrunk timeline are skipped at RENDER time only (data untouched) — same contract as the frames array, documented as deliberate (2026-08-16)."
+        },
+        {
+          "id": "C02.markers-and-bpm.bpm-guides",
+          "title": "BPM beat-grid guides and snapping",
+          "files": ["src/js/bpm-grid.js (whole, 104 lines)"],
+          "symbols": ["cfg", "framesPerBeat", "beatFrames", "snapFrame", "render", "openSettings", "toggle", "refresh", "init"],
+          "responsibility": "Optional visual beat-grid (audio-driven-animation aid) plus a snap-to-beat helper for layer bars/keyframes. Purely derived from state.bpm/bpmOffset/bpmShow at render time — never stored per beat, so it can't desync.",
+          "writer": "state.bpm, state.bpmOffset, state.bpmShow",
+          "public_api": "window.SMBpm = {render, refresh, toggle, openSettings, snapFrame, framesPerBeat, beatFrames}",
+          "consumers": ["C02.playback-integration.camera-markers-bpm-row-integration", "the ruler's own context menu (C02.markers-and-bpm.timeline-markers' initRulerMenu, 'Grille BPM…' entry)"],
+          "oracle": "none found",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "beatFrames() caps at 4096 iterations to stay bounded at an absurd bpm/fps combination — a deliberate guard. See uncovered_responsibilities — snapFrame has no call site inside this census's bounded files."
+        }
+      ]
+    },
+    {
+      "area": "layer-inout",
+      "packets": [
+        {
+          "id": "C02.layer-inout.bar-rendering",
+          "title": "In/out bar rendering and Parent-in-Time anchors",
+          "files": ["src/js/layer-inout.js:23-341", "src/js/layer-inout.js:1459-1600"],
+          "symbols": ["inPointOf", "outPointOf", "hasCustomRange", "hexToRgba", "updateBar", "renderContentGaps", "renderKeyTicks", "buildBar", "timeLinkChildAnchor", "isTimeLinkParentAnchor"],
+          "responsibility": "Renders each layer's in/out bar in the frame-grid — content gaps (frames outside the layer's active range), key tick marks, and the three Parent-in-Time anchor points (in/out/whole-layer) that share the exact same drag/cycle-check/link-creation logic as motion.js's side-panel 'Temps' pickwhip (startTimeLinkPickwhip).",
+          "writer": "DOM only (the bar element's classes/children)",
+          "public_api": "window.SMLayerInOut.{inPointOf, outPointOf, hasCustomRange, buildBar, updateBar}",
+          "consumers": ["timeline.js (per-layer row construction, sibling census C04b)"],
+          "oracle": "none found",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "none"
+        },
+        {
+          "id": "C02.layer-inout.selection-and-marquee",
+          "title": "Bar selection model and marquee",
+          "files": ["src/js/layer-inout.js:341-583"],
+          "symbols": ["onKeyDown", "findSelEntry", "isBarSelected", "selPartOf", "applySelClasses", "startMarquee", "partForBoxHit", "partForOverlap", "applyMarqueeSelection", "updateMarquee", "endMarquee", "clearBarSel", "refreshBarSelClasses", "toggleBarSel", "keySelNow"],
+          "responsibility": "Bar-level selection model (which layers' in/out bars are selected, and which part — in-tick/out-tick/whole-bar) plus the marquee rectangle, which can start from anywhere in the empty grid space (2026-07-25 fix) and is forwarded to/from motion.js's own key-selection marquee so one drag gesture drives both selections (CLAUDE.md §11).",
+          "writer": "module-level _barSel array (selection only)",
+          "public_api": "window.SMLayerInOut.{marqueeSelect, clearSelection, getBarSelection, setBarSelection}",
+          "consumers": ["C02.properties-and-curves.key-selection-and-clipboard (bidirectional marquee forwarding)"],
+          "oracle": "none found",
+          "depends_on": [],
+          "entangled_with": ["C02.properties-and-curves.key-selection-and-clipboard"],
+          "notes": "none"
+        },
+        {
+          "id": "C02.layer-inout.drag-and-batch-ops",
+          "title": "In/out drag interaction and batch bar operations",
+          "files": ["src/js/layer-inout.js:583-1459", "src/js/layer-inout.js:1647 (retimeLayers, export)"],
+          "symbols": ["onDown", "isTimeLinkDescendant", "timeLinkUidOf", "captureLinkedOrig", "updateLinkedChildrenBars", "selectedLayers", "applyBatch", "setBarEdges", "alignBars", "distributeBars", "flipBars", "staggerBars", "selectEveryNth", "invertBarSelection", "retimeLayers"],
+          "responsibility": "The actual in/out-point drag (move/trim, with linked Parent-in-Time children retiming in lockstep and a cycle guard via isTimeLinkDescendant) plus the batch operations menu (Align/Distribute/Flip/Stagger selected bars). retimeLayers is exposed specifically so motion.js's key-selection box can stagger a whole layer selection's in/out points AND keyframes together without a second implementation.",
+          "writer": "ld.inPoint/outPoint (direct); carried keyframes via SMMotion.shiftLayerMotionKeys",
+          "public_api": "window.SMLayerInOut.{onDown, alignBars, distributeBars, flipBars, staggerBars, selectEveryNth, invertBarSelection, retimeLayers}",
+          "consumers": ["motion.js's shiftKeySelection (C02.properties-and-curves.key-selection-and-clipboard) mirrors the same 'carry selected keys with an in/out drag' feature at the keyframe level"],
+          "oracle": "none found",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "onDown alone is ~170 lines and is the natural first split candidate in this file — it already reads as several sub-decisions (which handle, a forceHandleEl override for the reorder-grip handoff, linked-children capture) glued into one dispatcher."
+        }
+      ]
+    },
+    {
+      "area": "text-animation",
+      "packets": [
+        {
+          "id": "C02.text-animation.presets",
+          "title": "Staggered text-animation preset library",
+          "files": ["src/js/text-animator.js (whole, 433 lines)"],
+          "symbols": ["unitsForGroup", "groupIdForItem", "PRESETS", "clearGroup", "seededRng", "shuffledOrder", "apply", "openPanel", "closePanel"],
+          "responsibility": "A simple, self-contained preset library (fadeIn/slideUp/scaleIn/popIn and their Out mirrors) that writes ordinary staggered elementMotion keyframes per character/word/line, grouped by an index already stamped at build time (vector text's groupId or split-raster's textGroupId). A seeded RNG (mulberry32, same pattern as tools.js's brush-texture dabs) makes 'Randomize order' reproducible across preview tweaks and identical between preview and export.",
+          "writer": "ld.elementMotion[strokeId].motion/motionStatic (opacity/position/scale), via SMMotion primitives",
+          "public_api": "window.SMTextAnimator = {PRESETS, PRESET_LABELS, unitsForGroup, groupIdForItem, apply, openPanel, closePanel}",
+          "consumers": ["the 'Animer' button in the Texte panel section (out of this census's bounded files)"],
+          "oracle": "none found",
+          "depends_on": ["C02.properties-and-curves.keyframe-track-model"],
+          "entangled_with": ["C02.text-animation.selectors-panel (see known_defects DEF-7 — two independent, non-interoperating text-animation systems)"],
+          "notes": "An exit animation staggers the LAST unit first by default (AE/Figma convention); Randomize replaces that base order with a seeded shuffle rather than combining with it."
+        },
+        {
+          "id": "C02.text-animation.selectors-panel",
+          "title": "Selector-based text animator panel",
+          "files": ["src/js/text-animator-panel.js (whole, 486 lines)"],
+          "symbols": ["textStrokesOf", "activeTextLayer", "wholeTextLayerContext", "commit", "numField", "colorPropRow", "selField", "stopwatch", "shapeOptions", "buildAnimator", "liveRefresh", "render", "init"],
+          "responsibility": "The right-panel face of a separate, richer text-animation system — ld.textAnimators, an array of {selector, props} descriptors (Range or Wiggly selector types) evaluated per-character via motion.js's textAnimatorWeights (a continuous weight curve, not literal per-unit keyframes). Every field is independently keyable through the same generic stopwatch/holder primitives every other Motion property uses.",
+          "writer": "an.selector.*/an.props.* (direct field mutation; commit()/liveRefresh() re-render after each change)",
+          "public_api": "window.renderTextAnimatorPanel = render",
+          "consumers": ["timeline.js's updatePropsContext (visibility toggle, alongside rig-widget/image-mesh panels, out of this census's bounded files)"],
+          "oracle": "none found",
+          "depends_on": ["C02.properties-and-curves.keyframe-track-model", "src/js/text-selector.js (SMTextSelector.SHAPE — out of this census's bounded files)"],
+          "entangled_with": ["C02.text-animation.presets"],
+          "notes": "See known_defects DEF-7 — this and text-animator.js are two independent text-animation systems (different data shapes, different evaluation) coexisting under one 'Texte' panel section, with no shared code beyond both ultimately writing/reading through SMMotion's generic holder primitives."
+        }
+      ]
+    },
+    {
+      "area": "math-kernels",
+      "packets": [
+        {
+          "id": "C02.math-kernels.curve-evaluator",
+          "title": "Pure on-curve easing kernel",
+          "files": ["src/js/animation/curve.js (whole, 68 lines)"],
+          "symbols": ["curveCubicAt", "curveCubicDerivAt", "curveTangentAt", "curveSegCtrl", "curveSegFor", "evalCurvePoints"],
+          "responsibility": "Motion's pure on-curve easing kernel (Catmull-Rom-derived tangents feeding a per-segment cubic bezier, Newton-solved) — explicitly documented as classic-script/CommonJS dual-compatible with no document/UI/Paper/native/timer/writable-module-state dependency, i.e. already extraction-ready by construction. ui.js owns a separate, textually-independent editor evaluator by design ('this extraction changes no math', per its own header comment).",
+          "writer": "none (pure function)",
+          "public_api": "window.SMAnimationCurve (also CommonJS module.exports) = {evalCurvePoints}",
+          "consumers": ["motion.js (re-exported as SMMotion.evalCurvePoints)", "C02.expressions.expr-bake-to-keyframes (Pass B curve-fit verification)"],
+          "oracle": "tests/animation/curve.test.cjs (dedicated), tests/easing-reference.test.cjs, tests/performance-regressions.test.cjs — well covered, one of the few packets in this census with real direct tests",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "The clearest 'already done' module-boundary example in this census's whole scope — no code change needed to extract it, only a build-target decision."
+        },
+        {
+          "id": "C02.math-kernels.opacity-domain-writers",
+          "title": "Pure opacity-track domain writers",
+          "files": ["src/js/domain/animation/opacity.js (whole, 97 lines)"],
+          "symbols": ["number", "copyCurvePoints", "defaultCurve", "findLayer", "snapshot", "trackFor", "isAnimated", "ensureTrack", "keyAt", "setTrackKey", "setKeyAtFrame", "removeTrackKey", "setValue", "removeKeyAtFrame", "setAnimated"],
+          "responsibility": "'Pure writers for the persisted opacity track shared by layers and elements' per its own header — a second, independent implementation of the same track/key data shape motion.js's generic keyframe model already owns, scoped to one property (opacity) and written to be document/DOM-free for isolated testing.",
+          "writer": "holder.motion.opacity, holder.motionStatic.opacity (identical shape to motion.js's own opacity track)",
+          "public_api": "window.NemoOpacityDomain (also CommonJS) = {setTrackKey, removeTrackKey, setValue, setKeyAtFrame, removeKeyAtFrame, setAnimated, isAnimated, trackFor, snapshot, findLayer, defaultCurve, copyCurvePoints, number}",
+          "consumers": ["src/js/bootstrap/opacity-application.js (out of this census's bounded files, owned by C07/#1042)"],
+          "oracle": "tests/domain-opacity.test.cjs, tests/application-opacity*.test.cjs, tests/browser/opacity-consumers.spec.cjs — well covered",
+          "depends_on": [],
+          "entangled_with": ["C02.properties-and-curves.keyframe-track-model"],
+          "notes": "See known_defects DEF-3."
+        }
+      ]
+    },
+    {
+      "area": "motion-advanced",
+      "packets": [
+        {
+          "id": "C02.motion-advanced.component-shape-tree",
+          "title": "Component precomp-entry and shape/group tree data model",
+          "files": ["src/js/motion.js:6870-6946 (enterComponentLayer)", "src/js/motion.js:9451-9840 (buildShapeTree cluster: layerElements, elementLabel, groupNode, textNode, explodeTextRun, shapeTreeRowPlan, toggleShapeGroupExpanded, toggleShapesSectionCollapsed, liveItemByStrokeId, selectShapesByStrokeIds, startShapeTreeRename)", "src/js/motion.js:13410-13436 (export)"],
+          "symbols": ["enterComponentLayer", "buildShapeTree", "groupNode", "shapeTreeRowPlan", "textNode", "explodeTextRun", "toggleShapeGroupExpanded", "toggleShapesSectionCollapsed", "selectShapesByStrokeIds", "elementLabel", "layerElements", "liveItemByStrokeId", "startShapeTreeRename"],
+          "responsibility": "CLAUDE.md §8's 'double-click a Component layer = enter it like an AE precomp' feature — enterComponentLayer calls enterSymbol, resolves the correct internal frame, then silently auto-splits any still-multi-shape child layer. buildShapeTree/shapeTreeRowPlan is the mode-agnostic group/shape data model Animation 2D's own shape list (timeline.js, sibling census) also reuses, so the two views can never disagree on which shapes/groups exist.",
+          "writer": "none directly (enterComponentLayer delegates to window.SM.enterSymbol/splitLayerIntoElementsCore, out of this census's bounded files)",
+          "public_api": "SMMotion.{enterComponentLayer, buildShapeTree, groupNode, shapeTreeRowPlan, textNode, explodeTextRun, toggleShapeGroupExpanded, toggleShapesSectionCollapsed, selectShapesByStrokeIds, elementLabel, layerElements, liveItemByStrokeId, startShapeTreeRename}",
+          "consumers": ["C02.playback-integration.motion-shape-tree-rendering", "C04b's #shapes-sec right panel (window.renderShapesPanel, sibling census — verified distinct, not owned here)"],
+          "oracle": "none found directly; exercised only incidentally through whatever consumes it",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "none"
+        },
+        {
+          "id": "C02.motion-advanced.3d-layers-and-gizmo",
+          "title": "3D layers and on-canvas 3D gizmo",
+          "files": ["src/js/motion.js:2987-3242 (degToRad, rotate3D, project3DToScreenPoint, make3DProjector, layerMotion3DPointMap, project3DSegments, project3DImageRect, toggleLayer3D)", "src/js/motion.js:3320-3443 (project3DToScreen, gizmo3DPose, gizmo3DOriginScreen, gizmo3DAxisScreenPoints, gizmo3DRingScreenPoints, distToSegment, hit3DGizmoAxis, hit3DGizmoRing)", "src/js/motion.js:3746-3943 (composeChainTransform/weightedParentsOf/blendWeighted/blendedAncestorMat/blendedParent3D helpers feeding blendedParentContributionFor3D)", "src/js/motion.js:13437-13469 (export)"],
+          "symbols": ["make3DProjector", "project3DSegments", "toggleLayer3D", "activeMotionTarget", "gizmo3DPose", "gizmo3DAxisScreenPoints", "gizmo3DRingScreenPoints", "hit3DGizmoAxis", "hit3DGizmoRing", "layerMotion3DPointMap", "project3DImageRect", "blendedParentContributionFor3D"],
+          "responsibility": "Grease-Pencil-style 3D layers (vertices move in 3D, stroke width never scales, per its own doc comment) — a true perspective-projection counterpart to the 2D affine point-map (C02.motion-advanced.point-mapping-and-parent-chain), plus an on-canvas 3D gizmo (axis/ring hit-testing) with diagnostics explicitly exposed 'so its projection/hit-test math can be verified directly (screenshots/pixel-probing alone can't confirm WHICH handle a screen point resolves to)'.",
+          "writer": "ld.threeD-related fields (not individually enumerated by this pass)",
+          "public_api": "SMMotion.{toggleLayer3D, layerMotion3DPointMap, activeMotionTarget, gizmo3DPose, gizmo3DAxisScreenPoints, gizmo3DRingScreenPoints, hit3DGizmoAxis, hit3DGizmoRing, project3DImageRect, debugMotionDrag}",
+          "consumers": ["C02.motion-advanced.canvas-drag-interactions (the gizmo's own pointer handlers)"],
+          "oracle": "none found — the packet's own author already anticipated the 'can't verify via screenshot' problem and built diagnostic exposure for it, but no automated test currently calls that diagnostic surface",
+          "depends_on": [],
+          "entangled_with": ["C02.motion-advanced.point-mapping-and-parent-chain"],
+          "notes": "The exposed diagnostics (gizmo3DPose etc.) are a ready-made oracle a future test task could use directly, without inventing a new introspection surface first."
+        },
+        {
+          "id": "C02.motion-advanced.point-mapping-and-parent-chain",
+          "title": "Geometry-to-world point mapping through the parent chain",
+          "files": ["src/js/motion.js:3534-3706 (ensureLayerUid, layerWorldBoundsUnion, findLayerIndexByUid, wouldCreateParentCycle, ownPivotBase, composedPivotWorld, setLayerParent, setLayerParentB)", "src/js/motion.js:3944-4047 (parentChainMats, legacyParentChainMats, invertVectorThroughParentChain, applyParentChainToSegments, applyParentChainToImageRect)", "src/js/motion.js:5230-5262 (outerMotionMaps, outerWorldPoint, outerLocalPoint)", "src/js/motion.js:13492-13579 (export block)"],
+          "symbols": ["layerMotionPointMap", "outerWorldPoint", "outerLocalPoint", "parentChainMats", "invertVectorThroughParentChain", "setLayerParent", "setLayerParentB", "findLayerIndexByUid", "ensureLayerUid", "layerWorldBoundsUnion"],
+          "responsibility": "Maps a click/drag point between geometry-space and rendered-world-space through a layer's own Motion transform AND its full parent chain (fixed 2026-07-29 — previously only considered the layer's own transform, so a parented-but-unanimated child rendered wherever its ancestor's transform put it while every consumer hit-tested at the raw click position instead). Every on-canvas drag tool depends on this being correct.",
+          "writer": "none (pure geometry mapping)",
+          "public_api": "SMMotion.{layerMotionPointMap, layerMotion3DPointMap, outerWorldPoint, outerLocalPoint, parentChainMats, invertVectorThroughParentChain, setLayerParent, setLayerParentB, findLayerIndexByUid, ensureLayerUid, layerWorldBoundsUnion}",
+          "consumers": ["select-bridge.js, subselect-bridge.js, rig-bridge.js, rig-widget.js (all out of this census's bounded files — cited by motion.js's own comments as the reason the 2026-07-29 fix mattered)"],
+          "oracle": "none found — the 2026-07-29 fix was 'confirmed live' per its own comment, not via an automated regression test",
+          "depends_on": [],
+          "entangled_with": ["C02.motion-advanced.3d-layers-and-gizmo"],
+          "notes": "See known_defects DEF-4."
+        },
+        {
+          "id": "C02.motion-advanced.transform-application",
+          "title": "Per-point Motion transform formula",
+          "files": ["src/js/motion.js:2948-2986 (computeMotionMat)", "src/js/motion.js:3444-3533 (sampleFollowPathAt, layerMotionAt)", "src/js/motion.js:3707-3745 (setLayerFollowPath, lerpAngleDeg)", "src/js/motion.js:4284-4335 (elementMotionAt)", "src/js/motion.js:4437-4544 (layerBlendModeAt, sortBlendKeys, upsertBlendKeyAt, removeBlendKeyAt, layerParentUidAt, sortParentKeys, upsertParentKeyAt, removeParentKeyAt)", "src/js/motion.js:5131-5229 (transformSegments, transformImageRect, transformImageRectByMatrix, circleSegs, applyMotionPoint, invertMotionPoint)", "src/js/motion.js:13729-13738 (export)"],
+          "symbols": ["transformSegments", "transformImageRect", "transformImageRectByMatrix", "computeMotionMat", "layerMotionAt", "elementMotionAt", "layerBlendModeAt", "upsertBlendKeyAt", "removeBlendKeyAt", "layerParentUidAt", "upsertParentKeyAt", "removeParentKeyAt", "setLayerFollowPath"],
+          "responsibility": "The per-point transform formula for an animated layer/element. CLAUDE.md §5ter states explicitly that engine-bridge.js's affineFromMotion (Rust-side retained-path rendering, out of this census's bounded files) 'MUST remain the exact mirror of transformSegments', and that a divergence would change rendering only for animated shapes, silently, catchable only by a pixel A/B, not a code review.",
+          "writer": "none (pure per-point transform)",
+          "public_api": "SMMotion.{transformSegments, transformImageRect, transformImageRectByMatrix, computeMotionMatFor, layerMotionAt, elementMotionAt, layerBlendModeAt, upsertBlendKeyAt, removeBlendKeyAt, layerParentUidAt, upsertParentKeyAt, removeParentKeyAt, setLayerFollowPath}",
+          "consumers": ["app.js's getEffectiveStrokes/buildSceneJson (the actual render path, out of this census's bounded files)", "engine-bridge.js's affineFromMotion (the Rust-mirroring counterpart, out of this census's bounded files)"],
+          "oracle": "none found within this census's bounded files; CLAUDE.md §5ter documents a one-time manual pixel-A/B verification (63/2,073,600 px, 1/255 max channel diff, attributed to rounding order not a math error), not a standing automated test",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "See known_defects DEF-6 — CLAUDE.md's own explicitly-flagged highest-risk seam in the whole animation system, confirmed by this census to have no automated guard within its bounded files."
+        },
+        {
+          "id": "C02.motion-advanced.duplicator-and-effector-props",
+          "title": "Duplicator/Effector target-property registry",
+          "files": ["src/js/motion.js:581-582 (DUP_TARGET_PROPS, DUP_OFFSET_PROP — embedded inside properties-and-metadata's own block)", "src/js/motion.js:3243-3319 (toggleLayerDuplicator, setDuplicatorEditSource)", "src/js/motion.js:13447-13461 (export block)"],
+          "symbols": ["DUP_TARGET_PROPS", "DUP_OFFSET_PROP", "propDim", "propLabel", "propUnit", "propDimLabels", "toggleLayerDuplicator", "setDuplicatorEditSource"],
+          "responsibility": "The shared 'which properties can a duplicator's stagger and its Effectors target' list plus their PROP_DIM/LABEL/UNIT shape — the single source of truth app.js's math and timeline.js's UI both read, per its own comment, rather than each hardcoding a parallel copy (avoiding the CLAUDE.md §1 family of bug).",
+          "writer": "none (data + toggle)",
+          "public_api": "SMMotion.{DUP_TARGET_PROPS, DUP_OFFSET_PROP, propDim, propLabel, propUnit, propDimLabels, toggleLayerDuplicator, setDuplicatorEditSource}",
+          "consumers": ["app.js (duplicator math, out of this census's bounded files)", "timeline.js (duplicator panel UI, sibling census C04a/C04b)"],
+          "oracle": "none found",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "none"
+        },
+        {
+          "id": "C02.motion-advanced.geometry-motion-integrations",
+          "title": "Non-affine geometry feature motion-track adapters",
+          "files": ["src/js/motion.js:4381-4436 (layerOrderAt, layerHasExplicitOrder, elementOrderAt)", "src/js/motion.js:4545-5130 (anyLayerHasOrder, layerElementsHaveOrder, anyOrderUsedAnywhere, hasBrushSizeMotionFor, isVectorBrushSd, pathVertexRowCount, hasVectorBrushOutlineMotionFor, applyVectorBrushOutlineFor, hasPathVertexMotion, applyPathVertexOffsets, applyPathVertexOffsetsFor, setPathVertexOffset, hasMeshVertexMotionFor, meshVertexOffsetAt, setMeshVertexOffset, isMeshVertexAnimated, meshVertexRowCount, hasTrimMotion, trimWindowAt, buildTrimPolyline, applyTrimSegments, trimIsFullWindow, applyTrimFor, applyTrimToVectorBrush, hasParamShapeMotionFor, applyParamShapeFor, hasPathVertexFollowMotionFor, applyPathVertexFollowFor)", "src/js/motion.js:13718-13822 (export)"],
+          "symbols": ["layerOrderAt", "layerHasExplicitOrder", "elementOrderAt", "anyLayerHasOrder", "layerElementsHaveOrder", "anyOrderUsedAnywhere", "hasBrushSizeMotionFor", "hasVectorBrushOutlineMotionFor", "applyVectorBrushOutlineFor", "isVectorBrushSd", "pathVertexRowCount", "applyPathVertexOffsetsFor", "setPathVertexOffset", "hasMeshVertexMotionFor", "meshVertexOffsetAt", "setMeshVertexOffset", "isMeshVertexAnimated", "meshVertexRowCount", "applyTrimFor", "hasParamShapeMotionFor", "applyParamShapeFor", "trimWindowAt", "hasTrimMotion", "flattenSegmentsToPolyline", "trimIsFullWindow", "applyTrimToVectorBrush", "hasPathVertexMotionFor", "hasTrimMotionFor"],
+          "responsibility": "Six adjacent 'how does the generic Motion keyframe model reach into a non-affine geometry feature' integrations, each belonging to a different feature owned outside this census: z-order/render-order, vector-brush outline width, per-vertex path offsets, image-mesh per-vertex offsets (CLAUDE.md §12ter — keyed by meshId, not strokeId, because a raster's strokeId isn't stable across frames), and Trim Paths/parametric-shape animation. Grouped into one packet because each is a thin adapter rather than a standalone subsystem, sharing one shape: 'does holder X have a motion track for non-standard property Y, and what is its value/offset at this frame.'",
+          "writer": "various holder.motion[prop] tracks, one per integration",
+          "public_api": "SMMotion.{layerOrderAt, elementOrderAt, anyLayerHasOrder, hasVectorBrushOutlineMotionFor, applyVectorBrushOutlineFor, pathVertexRowCount, applyPathVertexOffsetsFor, setPathVertexOffset, hasMeshVertexMotionFor, meshVertexOffsetAt, setMeshVertexOffset, meshVertexRowCount, applyTrimFor, trimWindowAt, hasTrimMotion, flattenSegmentsToPolyline, applyParamShapeFor}",
+          "consumers": ["engine-bridge.js (z-order in buildSceneJson's stacking, out of this census's bounded files)", "image-mesh-bridge.js (mesh vertex animation editor, CLAUDE.md §12ter, out of this census's bounded files)", "tools.js (Trim Paths/parametric-shape tools, sibling census C04a)"],
+          "oracle": "none found within this census's bounded files",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "See uncovered_responsibilities — image-mesh.js itself (the mesh data model/topology/rendering) is not in this census's bounded file list; only the motion-track integration is."
+        },
+        {
+          "id": "C02.motion-advanced.time-remap",
+          "title": "Component Time Remap",
+          "files": ["src/js/motion.js:12421-12501 (enableTimeRemap, disableTimeRemap, timeRemapValue)", "src/js/motion.js:13759-13761 (export block)"],
+          "symbols": ["enableTimeRemap", "disableTimeRemap", "timeRemapValue"],
+          "responsibility": "Per-Component 'Time Remap' (After Effects' feature of the same name) — lets a placed Component instance play back its internal frames non-linearly. resolveSymbolFrameIdx (app.js, out of this census's bounded files) is the single point of passage every other component-frame reader goes through.",
+          "writer": "ld.timeRemap",
+          "public_api": "SMMotion.{enableTimeRemap, disableTimeRemap, timeRemapValue}",
+          "consumers": ["app.js's resolveSymbolFrameIdx (out of this census's bounded files)"],
+          "oracle": "none found",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "See known_defects DEF-5 — CLAUDE.md §13 already documents that timeRemapValue bypasses valueAtFrame, so an expression placed on Time Remap is silently ignored; recorded here for the census baseline, not newly discovered by this pass."
+        },
+        {
+          "id": "C02.motion-advanced.canvas-drag-interactions",
+          "title": "Motion-canvas pointer dispatch and Parent-in-Time pickwhip",
+          "files": ["src/js/motion.js:6139-6790 (setMotionCanvasEmptyClick, activeMotionTarget, activePositionKeys, hitAnchorPoint, hitEffectorHandle, onDown, layerMotionPointMapFor, axisLocked, onDrag, liveRefreshVisiblePropertyFields, onUp)", "src/js/motion.js:6947-6968 (syncBarSelToLayerSel, syncLayerSelFromBarSel)", "src/js/motion.js:8454-8493 (timeLinkWouldCycle)", "src/js/motion.js:8569-8666 (setLayerTimeLink, startTimeLinkPickwhip)"],
+          "symbols": ["onDown", "onDrag", "onUp", "setMotionCanvasEmptyClick", "startTimeLinkPickwhip", "setLayerTimeLink", "timeLinkWouldCycle", "syncLayerSelFromBarSel", "syncBarSelToLayerSel"],
+          "responsibility": "The single pointer-event dispatcher for Motion-mode canvas gestures — box-select-driven skew/space/move/liquify (CLAUDE.md §11's one-engine, one-factor-per-key-per-mode design), the Parent-in-Time on-timeline connector pickwhip (shares its drag/cycle-check/link-creation logic with the side-panel version), and the two-way bar-selection/layer-selection sync that keeps C02.layer-inout's bar selection and motion.js's own layer-list selection from disagreeing.",
+          "writer": "session-only drag state (_motionSkewDrag, _motionConnectDrag); commits through setValue/setLayerTimeLink",
+          "public_api": "SMMotion.{onDown, onDrag, onUp, setMotionCanvasEmptyClick, startTimeLinkPickwhip, setLayerTimeLink, timeLinkWouldCycle, syncLayerSelFromBarSel, syncBarSelToLayerSel}",
+          "consumers": ["C02.layer-inout.selection-and-marquee (bidirectional selection sync)"],
+          "oracle": "none found",
+          "depends_on": ["C02.layer-inout.selection-and-marquee"],
+          "entangled_with": [],
+          "notes": "Motion mode's single largest pointer-event surface by call-site count. A natural split candidate is by DRAG MODE (skew/space/move/liquify/pickwhip) rather than by file position, since each mode's logic is largely self-contained once dispatched."
+        },
+        {
+          "id": "C02.motion-advanced.mode-toggle-and-workspace-continuity",
+          "title": "App-mode switching and Motion's own row renderers",
+          "files": ["src/js/motion.js:5263-6138 (unifiedMotionTargets, unifiedFrames, unifiedPointAt, buildUnifiedOverlay, hoverBoundsSig, hitTestLayerAt, onHoverMove, hoverOverlayItems, buildOverlayItems, perObjectBoxItems, buildOverlayItemsInner, motionPivotOf, invalidateSymbolUnionBounds, symbolUnionBounds, vertexPosedElementBounds, motionBoxGeom, motionHandlePositions, multiLayerBox, multiLayerOverlay, hitMotionBoxHandle, hitPositionHandle, hitPositionDot, findElementItem)", "src/js/motion.js:7047-7575 (renderLayerListMotion)", "src/js/motion.js:11141-11426 (selectLayerFromGrid, renderTimelineMotion)", "src/js/motion.js:12502-12699 (previewKeyframeShift, clearKeyframeShiftPreview, shiftLayerMotionKeys)", "src/js/motion.js:13140-13262 (setAppMode)", "src/js/motion.js:13924-13929 (restoreLastAppMode)"],
+          "symbols": ["setAppMode", "restoreLastAppMode", "buildOverlayItems", "onHoverMove", "renderLayerListMotion", "renderTimelineMotion", "selectLayerFromGrid", "shiftLayerMotionKeys", "previewKeyframeShift", "clearKeyframeShiftPreview"],
+          "responsibility": "Switches the app between Animation2D/Motion/StoryBoard (setAppMode, including the SM_FROZEN_IN_DEV gate that toasts 'not yet available' for StoryBoard in frozen builds) and restores the last-used mode from localStorage on startup, timed to run after timeline.js's own project restore. renderLayerListMotion/renderTimelineMotion are Motion's own row-list/grid renderers, parallel to but independent from C04b's Animation-2D equivalents.",
+          "writer": "state.appMode, localStorage['nemo-app-mode']",
+          "public_api": "SMMotion.{setAppMode, buildOverlayItems, onHoverMove, renderLayerListMotion, renderTimelineMotion, selectLayerFromGrid, shiftLayerMotionKeys, previewKeyframeShift, clearKeyframeShiftPreview}",
+          "consumers": ["index.html's mode-switch buttons (out of this census's bounded files)"],
+          "oracle": "none found",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "none"
+        }
+      ]
+    }
+  ],
+  "cross_cutting_notes": [
+    "tweens.js (5278 lines, in scope apart from C01's undo/redo slice) has no window.SM*-style namespace export — unlike every other file in this census, and the codebase's general post-2026-07 convention, it declares dozens of bare top-level `function` names that become implicit globals, re-exposed piecemeal by timeline.js's own window.SM object (e.g. `generateTweens:generateTweens`). A future extraction of this file needs to either introduce a real namespace or explicitly enumerate its true public surface — 'everything is technically global' is not a real module boundary.",
+    "This census's file list overlaps two sibling census tasks in shared files, both verified directly against the sibling's own delivered JSON rather than assumed: tweens.js:4753-5022 (undo/redo/history) is owned by C01/#1036 (Fizz); timeline.js's bulk (renderTimeline/renderLayerList and most UI construction) is owned by C04a/C04b/C05/C06, and this census's timeline.js slice is limited to the six integration points listed in scope_files.",
+    "Three separate easing/curve implementations coexist by deliberate team decision, not accidental drift: animation/curve.js's evalCurvePoints (well-tested, extraction-ready), camera.js's own bezierEase (partially tested via cross-solver comparison against curve.js and text-selector.js), and ui.js's editor evaluator (out of this census's bounded files, explicitly documented by curve.js's own header comment as textually independent — 'this extraction changes no math'). Recorded here only so the orchestrator has the full picture in one place.",
+    "Every 'oracle: none found' claim in this census was produced by grepping the complete tests/ directory for both the file's basename and its exposed namespace/symbol names before being recorded — see coverage_note. This discipline was adopted directly after this session observed a sibling PR (#1080/#1081) where an unverified 'zero test coverage' claim was checked and found false by an independent reviewer.",
+    "The CLAUDE.md §5ter/§5quater engine-retention optimizations (retained paths, loadFrame reuse) key off identity/dirty-flag invariants on data this census's packets write (motion.js's transformSegments output, tweens.js's generateTweens-written frames). None of those optimizations' own invariant-check code lives inside this census's bounded files, but a future change to a C02 packet's writer semantics (e.g. replacing vs. mutating a track key in place) should be cross-checked against them before merging.",
+    "Correction 2026-09-09 (Pollen's #1084 review): C02.motion-advanced.canvas-drag-interactions originally declared motion.js:298-13134 as a catch-all — 12,837 lines for a 9-symbol responsibility, overlapping six sibling packets' declared ranges (properties-and-metadata 118-560, curves-and-easing 941-1177, key-selection-and-clipboard 1033-1157, keyframe-track-model 1178-1338, expression-runtime 1333-1783) and inflating motion.js's apparent coverage to 100%. Redrawn to its real ranges (6139-6790, 6947-6968, 8454-8493, 8569-8666). Fixing that catch-all exposed the SAME defect in the other seven motion-advanced packets: component-shape-tree, 3d-layers-and-gizmo, point-mapping-and-parent-chain, transform-application, duplicator-and-effector-props, geometry-motion-integrations and time-remap had all previously declared ONLY their export-table line(s) ('per export object lines …') — their real implementations were physically inside the old catch-all too. All seven now carry real ranges (this pass, grepped by exact symbol name against motion.js, not estimated).",
+    "Found but NOT corrected in this pass (out of scope — outside the motion-advanced area Pollen's #1084 review covered; needs its own follow-up using the same per-symbol-grep method): the identical declared-range-vs-real-location mismatch also affects at least three siblings elsewhere in motion.js. C02.properties-and-curves.keyframe-track-model's higher-level writers (valueAtFrame@2654, toggleAnimated@2764, setKeyAtCurrentFrame@2712, removeKeyAtCurrentFrame@2732, setValue@2820) sit nowhere near its declared 1178-1338, which only covers the lower-level ensureTrack/hasKeys/keyAt/rawValueAtFrame cluster. C02.properties-and-curves.key-selection-and-clipboard's declared 1033-1157 doesn't contain distributeKeys/flipKeys/selectEveryNthKey/invertKeySelection/applyMarqueeSelection/shiftKeySelection or keysLockedTo — their real implementation is the ease-curve/marquee/skew-drag engine at roughly motion.js:8553-8568 and 11427-13139. C02.expressions.expression-runtime's declared 1333-1783 ends well before evalExpressionFor/exprSelfAt/exprLayer/exprLayerControl/the alias-comp helpers, whose real implementation continues to roughly motion.js:2653. Also, C02.properties-and-curves.properties-and-metadata's declared 118-560 is short on the high end — its own PROP_LABEL/PROP_DIM/PROP_UNIT/PROP_DEFAULT/PROP_DIM_LABELS tables and several of its own listed symbols continue to at least motion.js:899, with C02.motion-advanced.duplicator-and-effector-props's DUP_TARGET_PROPS/DUP_OFFSET_PROP constants (motion.js:581-582) embedded inside that extended block. A programmatic pairwise-overlap check (run as part of this correction) confirms these three siblings' OWN declared ranges also overlap each other pre-existing, independent of the catch-all: curves-and-easing's 941-1177 fully contains key-selection-and-clipboard's declared 1033-1157, and keyframe-track-model's declared 1178-1338 overlaps expression-runtime's declared 1333-1783 by six lines (1333-1338). Neither was introduced by this pass — both were already present in the reviewed #1084 candidate. The same check found zero new overlaps among this pass's corrected motion-advanced ranges, and zero overlap between them and any of the five sibling ranges Pollen's review named; the only other overlaps it found are between different packets' own export-table line CITATIONS (e.g. transform-application's and geometry-motion-integrations's, or 3d-layers-and-gizmo's and duplicator's) — expected, since window.SMMotion's single export object literal interleaves many packets' key:value lines within the same numeric span, and citing that span coarsely (as every packet in this census already does) will always look like it 'overlaps' a neighbor's export citation without being a real implementation double-claim."
+  ],
+  "known_defects": [
+    {
+      "id": "DEF-1",
+      "file": "src/js/tweens.js",
+      "line": 3772,
+      "summary": "generateTweens (the main tween-generation entry point, ~627 lines) and its full dependency chain (autoMatch/hungarian, the resampling/warping cluster, interpStroke) have zero automated test coverage — grepped by symbol name across the whole tests/ tree, zero hits.",
+      "packet": "C02.tween-engine.tween-generation-and-splitting",
+      "severity": "high (core generated-content pipeline; the WASM/JS dual path in autoMatch per CLAUDE.md §3 means a Rust-only regression is currently undetectable by any test)"
+    },
+    {
+      "id": "DEF-2",
+      "file": "src/js/timeline.js",
+      "line": 40,
+      "summary": "startPlay/stopPlay/togglePlay/updatePlayhead — the playback transport CLAUDE.md §5bis's own performance investigation is built around — have zero automated test coverage for either correctness or the frameOnly-vs-full-update contract.",
+      "packet": "C02.playback-integration.playback-transport",
+      "severity": "medium (simpler logic than DEF-1, but the most performance-sensitive code in this census with no regression guard at all)"
+    },
+    {
+      "id": "DEF-3",
+      "file": "src/js/domain/animation/opacity.js",
+      "line": 1,
+      "summary": "NemoOpacityDomain and motion.js's own generic keyframe-track model (ensureTrack/setValue/setKeyAtFrame) are two textually-independent implementations of the same opacity-track read/write contract. Nothing in this census's bounded files enforces they stay in agreement if one is edited without the other.",
+      "packet": "C02.math-kernels.opacity-domain-writers",
+      "severity": "informational (both are currently well-tested and, per this pass's reading, produce the same track shape — flagged as a structural duplication risk, not a confirmed live bug)"
+    },
+    {
+      "id": "DEF-4",
+      "file": "src/js/motion.js",
+      "line": 13492,
+      "summary": "layerMotionPointMap's parent-chain point-mapping fix (2026-07-29) is load-bearing for every external drag tool (select-bridge, subselect-bridge, rig-bridge, rig-widget.js) but was verified 'confirmed live' at the time per its own comment, not via an automated regression test — none exists in this census's bounded files.",
+      "packet": "C02.motion-advanced.point-mapping-and-parent-chain",
+      "severity": "medium"
+    },
+    {
+      "id": "DEF-5",
+      "file": "src/js/motion.js",
+      "line": 13761,
+      "summary": "timeRemapValue bypasses valueAtFrame (the canonical per-property evaluator), so an expression placed on a Component's Time Remap property is silently ignored — already documented as a known, unfixed gap in CLAUDE.md §13's own closing note ('deserves its own PR with a pixel A/B').",
+      "packet": "C02.motion-advanced.time-remap",
+      "severity": "medium (pre-existing and already self-documented by the team; recorded here for the census baseline per the 'preserve exact observed behavior including defects' policy, not newly discovered)"
+    },
+    {
+      "id": "DEF-6",
+      "file": "src/js/motion.js",
+      "line": 13729,
+      "summary": "transformSegments (the per-point Motion transform formula) has no automated test within this census's bounded files, despite CLAUDE.md §5ter's own explicit warning that its Rust mirror (engine-bridge.js's affineFromMotion, out of scope here) diverging from it would silently corrupt rendering only for ANIMATED shapes, catchable only by a pixel A/B, not a code review.",
+      "packet": "C02.motion-advanced.transform-application",
+      "severity": "high (the highest blast-radius packet in this census per the team's own documented risk assessment; the historical pixel-A/B CLAUDE.md cites was a one-time manual check, not a standing regression test)"
+    },
+    {
+      "id": "DEF-7",
+      "file": "src/js/text-animator.js",
+      "line": 1,
+      "summary": "Two independent, non-interoperating text-animation systems coexist under one 'Texte' panel section: text-animator.js's simple preset library (writes literal staggered elementMotion keyframes) and text-animator-panel.js's ld.textAnimators Selector system (continuous per-character weight curves via motion.js's textAnimatorWeights). Neither reads the other's output; a user animating text via one has no way to see or adjust the result via the other.",
+      "packet": "C02.text-animation.presets",
+      "severity": "informational (not confirmed broken — flagged for a product-level decision on whether this is intentional layering or duplicated effort)"
+    }
+  ],
+  "uncovered_responsibilities": [
+    "motion-graph.js (exists in the repo, ~26KB) is the graph-editor UI for the same track/curve model this census owns — motion.js's own comment says 'the graph editor plots both (see motion-graph.js)' for rawValueAtFrame — but is not in C02's bounded file list, and was not found claimed by any other delivered census as of this writing (grepped across every delivered census JSON). Likely needs an explicit owner in a future pass or C08's set-difference check.",
+    "image-mesh.js (the mesh data model/topology/masking/rendering, CLAUDE.md §12/§12bis) is a close neighbor of this census's C02.motion-advanced.geometry-motion-integrations packet (which owns only the motion-TRACK integration, meshVertexOffsetAt etc.) but the mesh model itself is out of C02's bounded files, and its ownership by another census was not verified in this pass.",
+    "bpm-grid.js's snapFrame helper has no call site anywhere inside this census's bounded files — either it is invoked from a file outside C02's scope (tools.js's or layer-inout.js's own drag code would be the natural caller) or it is currently unreachable. Not resolved by this read-only pass; worth a quick grep across the full repo before assuming either way.",
+    "motion.js:4048-4283 — text-animator per-frame integration (taSelectorAt, taUnitCount, _taStrokeRestBounds, taUnitPivotCenter, textAnimatorContribution, addTextAnimator, removeTextAnimator, textAnimatorWeights) lives in motion.js itself and is referenced by C02.text-animation.selectors-panel's own responsibility text ('evaluated per-character via motion.js's textAnimatorWeights') but was never given a files entry by that packet or any other. Found while redrawing canvas-drag-interactions (#1084 review); belongs to text-animation.selectors-panel's ownership, not fixed here.",
+    "motion.js:4336-4380 — per-element fill/stroke color and width resolution (rgba255, elementFillColorAt, elementStrokeColorAt, elementStrokeWidthAt) has no packet owner in this census.",
+    "motion.js:6791-6869 and 6969-7046 — property-field scrub-editing helpers (fmtVal, scrubField, selectedKeysForEditableProperty, selectedDimensionDisplay, setSelectedKeyDimension, offsetSelectedKeyDimension, setSelectedKeyVector) and Motion-context-header sync (syncMotionContextHeader, ensureMotionHeaderTools) have no packet owner.",
+    "motion.js:7576-8453 (878 lines) — an entire layer-feature right-panel rendering block (renderMotionPropsPanel, renderMatteRow, renderWidgetSizeRow, renderBlendRow, openMatteConfigMenu/openExtraMatteMenu/firstFreeMatteLayer, renderNullShapeRow, renderFollowPathRow, renderParentRow/openExtraParentMenu/firstFreeParentLayer, renderTimeLinkRow) has no packet owner anywhere in this census. This was silently absorbed into canvas-drag-interactions's old 298-13134 catch-all; redrawing that packet's real range (per Pollen's #1084 review) exposes it as a genuine gap rather than fixing it — a strong candidate for its own future packet.",
+    "motion.js:8494-8568 — buildKeyLockMenuItems/buildKeySelectionLockMenuItems have no owner anywhere in this census; keysLockedTo in this same span is C02.properties-and-curves.key-selection-and-clipboard's own named symbol, but that packet's declared range (1033-1157) doesn't reach here — see the new cross_cutting_notes entry on declared-vs-real-location drift.",
+    "motion.js:8667-9450 (784 lines) — Transform property-group rendering plus the inline ƒx row's own expression-editor UI (renderTransformGroup, renderTransformHeader, renderDupGroupHeader, renderTransformProps, buildAnchorGridRow, exprPanelLabelFor, buildExprEditorRow, startExprPickwhip) has no packet owner.",
+    "motion.js:9841-11140 (1300 lines) — per-property row rendering (renderElementsList, renderColorRow/renderFillColorRow/renderStrokeColorRow, renderTrimScalarRow/renderTrimPathsGroup, renderTextAnimatorsList, renderPathVertexGroup/renderPathGroupTrackRow, renderMeshVertexGroup/renderVertexRow, trackRowHtml, renderTracksFor) has no packet owner."
+  ]
+}

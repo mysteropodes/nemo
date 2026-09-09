@@ -71,8 +71,8 @@ test('tooling coverage profiles every current scripts/nemo CommonJS source', () 
   const profile = JSON.parse(fs.readFileSync(path.join(ROOT, ci.PROFILE), 'utf8'));
   const result = ci.toolingCoverage(profile, ROOT);
   assert.equal(result.ok, true);
-  assert.equal(result.sourcePathCount, 52);
-  assert.equal(result.declaredPathCount, 52);
+  assert.equal(result.sourcePathCount, 55);
+  assert.equal(result.declaredPathCount, 55);
   const incomplete = structuredClone(profile);
   incomplete.modules = incomplete.modules.filter((module) => module.id !== 'nemo.lib.boundariesApplication');
   const rejected = ci.toolingCoverage(incomplete, ROOT);
@@ -229,11 +229,13 @@ console.log(${JSON.stringify(JSON.stringify(receipt([{ name: 'test:browser', sta
   assert.equal(ci.verify(['test:browser'], root).ok, false);
 });
 
-test('all hosted workflows require manual dispatch and explicit build approval before allocating a runner', () => {
+test('hosted product workflows require manual dispatch and explicit build approval before allocating a runner', () => {
   const directory = path.join(ROOT, '.github/workflows');
   const files = fs.readdirSync(directory).filter((file) => /\.ya?ml$/.test(file));
   assert.ok(files.length > 0);
   for (const file of files) {
+    // The sole metadata-only exception has its own privilege/trigger regressions.
+    if (file === 'collaborator-pr-policy.yml') continue;
     const workflow = fs.readFileSync(path.join(directory, file), 'utf8');
     const triggerBlock = workflow.match(/^on:\n((?:[ \t].*\n|#.*\n|\n)*)/m)?.[1];
     assert.ok(triggerBlock, `${file}: expected a block-form trigger declaration`);

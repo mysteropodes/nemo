@@ -1,0 +1,27 @@
+{
+  "all": true,
+  "src": ["src/js", "tests/fixtures"],
+  "include": [
+    "src/js/domain/animation/opacity.js",
+    "src/js/application/opacity-application.js",
+    "src/js/bootstrap/opacity-application.js",
+    "src/js/adapters/application-mcp.js",
+    "src/js/animation/curve.js",
+    "tests/fixtures/coverage-negative-control.cjs"
+  ],
+  "reporter": ["html", "lcov", "json", "json-summary", "text"],
+  "clean": true,
+  "exclude": [],
+  "lines": 90,
+  "branches": 80,
+  "exceptions": [
+    {
+      "path": "tests/fixtures/coverage-negative-control.cjs",
+      "reason": "Deliberately unimported negative control proving c8 --all reports a real gap instead of silently omitting an unexecuted file; not real product code, kept out of src/js on purpose (see file header). T01/#1050."
+    },
+    {
+      "path": "src/js/adapters/application-mcp.js",
+      "reason": "Real tests exist (tests/nemo-mcp-adapter.test.cjs, tests/nemo-mcp-boundaries.test.cjs) but evaluate this classic-script file via vm.runInNewContext(source, context) with no `filename` in the options, so V8 cannot attribute executed ranges back to this path — c8 measures 0% regardless of actual behavioral coverage. Fixing the harness to pass a filename is a real, separate change to files outside T01's bounded ownership (tests/nemo-mcp-*.test.cjs are not curve/opacity coverage job tests); tracked here rather than silently excluded or worked around. T01/#1050."
+    }
+  ]
+}

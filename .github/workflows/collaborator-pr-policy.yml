@@ -1,0 +1,48 @@
+name: Collaborator PR policy
+
+# Sole automatic Actions exception: repository/review metadata only, no PR code or builds.
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, edited]
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: 'PR number; leave empty to reconcile all open main PRs (also after collaborator access changes)'
+        required: false
+        type: string
+
+permissions: {}
+
+# Keep the newest event per PR; unrelated PR events must not replace each other.
+concurrency:
+  group: nemo-collaborator-pr-policy-${{ github.event.pull_request.number || github.event.inputs.pull_request || 'reconcile-all' }}
+  cancel-in-progress: false
+
+jobs:
+  acknowledge-policy:
+    if: github.repository == 'mysteropodes/nemo' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Evaluate current collaborator permissions and PR metadata
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          # No checkout. Load executable policy only from the trusted base SHA, never PR head.
+          script: |
+            const { data } = await github.rest.repos.getContent({
+              ...context.repo,
+              path: '.github/scripts/collaborator-pr-policy.cjs',
+              ref: context.sha,
+            });
+            if (data.type !== 'file' || data.encoding !== 'base64') {
+              throw new Error('Trusted policy source is unavailable');
+            }
+            const Module = require('node:module');
+            const policy = new Module('nemo-collaborator-pr-policy');
+            policy._compile(Buffer.from(data.content, 'base64').toString('utf8'),
+              'collaborator-pr-policy.cjs');
+            await policy.exports.run({ github, context, core });
