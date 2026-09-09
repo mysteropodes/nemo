@@ -187,7 +187,8 @@
           "id": "C06.preferences.settings-modal-shell",
           "title": "Settings modal shell: open/close, tab switching, About tab",
           "files": [
-            "src/js/timeline.js:9001-9028",
+            "src/js/timeline.js:8997-9028 (initSettingsTabs, initSettingsModal — includes initSettingsTabs's leading comment at 8997-9000)",
+            "src/js/timeline.js:9075-9077 (initSettingsModal's own DOMContentLoaded registration)",
             "src/index.html:1743-1933",
             "src/css/style.css:2132-2163"
           ],
@@ -239,12 +240,36 @@
           "notes": "Positive check, no bug found: the color field (timeline.js:9059) correctly follows the CLAUDE.md §2 .dataset.hex8/.value alpha-color convention via app.js's setHex8Input — verified, not just assumed."
         },
         {
+          "id": "C06.preferences.sync-folder-ui",
+          "title": "Settings ▸ Collaboration sync-folder UI wiring",
+          "files": [
+            "src/js/timeline.js:9228-9273"
+          ],
+          "symbols": [
+            "syncFolderFields()",
+            "renderSyncUpdates(entries)",
+            "initSyncUI()"
+          ],
+          "responsibility": "UI glue for the team-sync folder controls on the Settings ▸ Collaboration tab: reflects the current sync folder path (#sync-folder-path), renders the incoming-updates list with a per-entry merge button, and wires choose/publish/check buttons to window.SMProject's own sync methods. Owns none of the sync logic itself — every button handler is a thin call into p2p-contacts.js/project.js (out of this census's scope, per this file's own coverage_note), the same 'UI glue only' pattern C06.preferences.profile-fields-ui uses for the General tab.",
+          "writer": "DOM only (#sync-folder-path value, #sync-updates-list children); no state.* writes",
+          "public_api": "none exported; DOM-event-driven, self-registers on DOMContentLoaded",
+          "consumers": [
+            "C06.preferences.settings-modal-shell (calls syncFolderFields from the Collaboration tab's own open path, same fan-out pattern as :9017)"
+          ],
+          "oracle": "none; zero test coverage",
+          "depends_on": [],
+          "entangled_with": [
+            "src/js/p2p-contacts.js and src/js/project.js (SMProject.getSyncFolder/chooseSyncFolder/publishToShared/checkSharedUpdates/pullAndMerge — OUT OF SCOPE, same exclusion settings-modal-shell already names for the Collaboration tab)"
+          ],
+          "notes": "Found unclaimed during Fizz's #1067 review (2026-09-09) — this census's own scope_files already declared 9228-9273 but no packet had picked it up. Added here rather than folded into settings-modal-shell: it is a distinct, cohesive single-writer responsibility (the sync-folder pane's own controls), the same granularity as profile-fields-ui's General-tab pane, not shell chrome."
+        },
+        {
           "id": "C06.preferences.shortcuts-system",
           "title": "Keyboard-shortcut config, remapping and dispatch",
           "files": [
             "src/js/timeline.js:7450-7723",
             "src/js/timeline.js:9641,9935-9949",
-            "src/index.html:1876-1883"
+            "src/index.html:1876-1883 (nested pane inside settings-modal-shell's 1743-1933 — shortcuts-system owns the #shortcuts-list pane, the shell owns the tab-switching chrome around it; not a duplicate-ownership violation)"
           ],
           "symbols": [
             "TOOL_SHORTCUTS (21 entries)",
@@ -1132,5 +1157,7 @@
       "severity": "extraction-blocker"
     }
   ],
-  "uncovered_responsibilities": []
+  "uncovered_responsibilities": [
+    "src/js/timeline.js:2354-2374 (21 lines, inside importJSON's SMLabs.resetAll()/clearRetainedPaths()/version-check block) is named in this census's own scope_files but not owned by any packet here. Not this census's job to extract — it's three statements embedded inside importJSON's own much larger, mostly out-of-scope body, not a standalone module boundary — but checked and confirmed unclaimed by any of the 5 sibling censuses merged so far (C01/C03/C04a/C05/C07) too, per Fizz's #1067 review (2026-09-09): still genuinely unowned program-wide, not silently someone else's already-documented job."
+  ]
 }
