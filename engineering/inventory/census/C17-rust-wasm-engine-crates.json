@@ -1,0 +1,113 @@
+{
+  "census_id": "C17",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1094",
+  "title": "geometry-wasm and vectorize Rust/WASM crates (non-.rs support files) — extraction packet mapping",
+  "owner": "Cyrill/D2 (Honey)",
+  "source_sha": "e94dd799a817b78fd1e9f1a42017343ae3c59755",
+  "status": "read-only inventory complete; no source mutated. C08's draft grouping for this area (engineering/inventory/census/C08-completeness.json, area `rust-wasm-engine-crates`) had explicitly left both vectorize-core/src/lib.rs and vectorize-wasm/src/lib.rs unread ('writer: unknown (not read in depth)', 'oracle: not checked') and had asserted the geometry-wasm shader packet's oracle without tracing which shaders each test actually exercises. Both gaps are closed here: both vectorize files were read in full (209 + 28 lines), and shader/test coupling was traced by cross-referencing every include_str! call site in engine.rs against every include_str!/.wgsl reference in the 3 test files, plus a repo-wide grep for each shader's filename. Result: one real, substantive finding (DEF-1 — the draft's shader-oracle claim was materially wrong) and one positive correction (vectorize-core actually has a real inline test, draft said 'not checked').",
+  "scope_files": [
+    "geometry-wasm/src/blend.wgsl",
+    "geometry-wasm/src/blur.wgsl",
+    "geometry-wasm/src/color_adjust.wgsl",
+    "geometry-wasm/src/matte.wgsl",
+    "geometry-wasm/src/simple_fx.wgsl",
+    "geometry-wasm/src/vignette.wgsl",
+    "geometry-wasm/tests/dab_dense_overlap_repro.rs",
+    "geometry-wasm/tests/effect_layer_overlay_repro.rs",
+    "geometry-wasm/tests/shader_library_validation.rs",
+    "geometry-wasm/Cargo.lock",
+    "geometry-wasm/Cargo.toml",
+    "vectorize-core/src/lib.rs",
+    "vectorize-core/Cargo.lock",
+    "vectorize-core/Cargo.toml",
+    "vectorize-wasm/src/lib.rs",
+    "vectorize-wasm/Cargo.lock",
+    "vectorize-wasm/Cargo.toml"
+  ],
+  "coverage_note": "All 17 files in scope_files exist at e94dd79 and are accounted for across exactly 2 packets, matching C08's draft split with no file-count corrections needed. No file outside this bounded list was found to belong in this area. Overlap check against all other merged censuses (C01-C09, C13, C15 — grepped every scope_files/packet filename in this list against every other census JSON): the only hits are C08-completeness.json itself (the source draft); zero overlap with any census that actually owns a zone.",
+  "areas": [
+    {
+      "area": "rust-wasm-engine-crates",
+      "proposed_future_ids": "C17",
+      "packets": [
+        {
+          "id": "C17.engines.geometry-wasm-shaders-and-tests",
+          "title": "geometry-wasm/ non-.rs-source: WGSL compositor shaders + integration tests",
+          "files": [
+            "geometry-wasm/src/blend.wgsl",
+            "geometry-wasm/src/blur.wgsl",
+            "geometry-wasm/src/color_adjust.wgsl",
+            "geometry-wasm/src/matte.wgsl",
+            "geometry-wasm/src/simple_fx.wgsl",
+            "geometry-wasm/src/vignette.wgsl",
+            "geometry-wasm/tests/dab_dense_overlap_repro.rs",
+            "geometry-wasm/tests/effect_layer_overlay_repro.rs",
+            "geometry-wasm/tests/shader_library_validation.rs",
+            "geometry-wasm/Cargo.lock",
+            "geometry-wasm/Cargo.toml"
+          ],
+          "symbols": [
+            "vs_main / fs_main (shared fullscreen-triangle entry points, all 6 shaders)",
+            "blend.wgsl: blend_multiply, blend_screen, blend_hardlight, blend_overlay, blend_darken, blend_lighten, blend_colordodge, blend_colorburn, blend_softlight, blend_difference, blend_exclusion, lum, clip_color, set_lum, sat, set_sat, blend_hue, blend_saturation, blend_color, blend_luminosity",
+            "simple_fx.wgsl: luma, hash, effect_id-switched single shared pipeline for 10 effects",
+            "geometry-wasm/tests: bump_estimate_vs_fixed_vello_buffers, dense_dab_stroke_render_gap_repro (dab_dense_overlap_repro.rs); overlay_layer_after_effect_layer_stays_straight (effect_layer_overlay_repro.rs); every_shipped_shader_parses_and_validates (shader_library_validation.rs)"
+          ],
+          "responsibility": "The engine.rs/viewport.rs/composite_scene Rust source (CLAUDE.md §3/§5ter/§5quater) is already claimed elsewhere (confirmed absent from this uncovered set) — what remains is the actual hand-written GPU shader source plus its 3 test files. All 6 .wgsl files share the same fullscreen-triangle vs_main shape and are include_str!'d directly into geometry-wasm/src/engine.rs (confirmed exact line numbers: blend.wgsl:1113, matte.wgsl:1238, blur.wgsl:1482, color_adjust.wgsl:1668, vignette.wgsl:1808, simple_fx.wgsl:1897). Real logic, not generated/vendored: blend.wgsl is the compositor's ~15-function Photoshop-style blend-mode library (multiply/screen/hardlight/overlay/darken/lighten/dodge/burn/softlight/difference/exclusion plus the HSL-composite hue/saturation/color/luminosity group) — exists because vello/kurbo has no generic layer-blend-mode primitive, per its own doc comment (referenced by every sibling shader's header). blur.wgsl is a separable two-pass Gaussian feather (rewritten 2026-07 to fix a blocky/banded artifact where sample spacing scaled with radius but tap count stayed fixed). matte.wgsl is the AE-style 'track matte' pass (one layer's alpha/luma masks the layer directly below it). color_adjust.wgsl and vignette.wgsl are Motion 'effect/adjustment layer' passes, each applied to everything below the effect layer in the stack, not just one layer's own content (the AE convention). simple_fx.wgsl is a single shared pipeline switched by effect_id for 10 independent one-texture-in/one-pixel-out effects (standard luminance/sepia/Sobel/hash-noise techniques), deliberately one pipeline instead of ten near-identical copies.",
+          "writer": "hand-edited directly (WGSL source); compiled in via include_str! at Rust build time for both the native and wasm32-unknown-unknown targets",
+          "public_api": "invoked exclusively from geometry-wasm/src/engine.rs's composite_scene pipeline (CLAUDE.md §3 — the one place render logic is allowed to live)",
+          "consumers": [
+            "composite_scene (geometry-wasm/src/engine.rs) — the sole caller of all 6 shader pipelines"
+          ],
+          "oracle": "MAJOR CORRECTION to C08's draft, traced via include_str!/reference cross-check rather than trusted from the draft or from test names: only blend.wgsl has real regression coverage — effect_layer_overlay_repro.rs's create_blend_pipe loads it VERBATIM (`include_str!(\"../src/blend.wgsl\")`, confirmed at line 174) and asserts real GPU-rendered pixel output (Feedback #50, effect-layer-over-overlay distortion). matte.wgsl, blur.wgsl, color_adjust.wgsl, vignette.wgsl and simple_fx.wgsl have ZERO test coverage anywhere in the repository — confirmed by a repo-wide grep for each filename: every other hit is engine.rs's own production include_str!/doc-comments, not a test reference. dab_dense_overlap_repro.rs does not exercise any of these 6 shaders at all — it tests vello's own Scene/Renderer fill path directly (Feedback #104: a fixed-buffer-size truncation bug in vello itself, silently dropping overlapping semi-transparent fills). shader_library_validation.rs's every_shipped_shader_parses_and_validates — the test C08's draft explicitly named as 'the oracle... for every shipped shader' — does NOT validate any of these 6 files despite its name: it loads and WGSL-validates `window.SMSHADER_EFFECTS` from the separate, JS-authored `src/js/shader-effects-library.js` (Motion's user-facing custom-effect catalog, an entirely different corpus). See DEF-1.",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C17. WGSL shader source is real logic (blend modes, blur, color adjust, matte, vignette, the simple-fx library) — do not treat as generated/vendor. C08's draft counted this packet's oracle correctly by file name (3 test files exist) but not by what those files actually test — see DEF-1 for the corrected, per-shader picture."
+        },
+        {
+          "id": "C17.engines.vectorize-engine-crates",
+          "title": "vectorize-core + vectorize-wasm Rust crates",
+          "files": [
+            "vectorize-core/src/lib.rs",
+            "vectorize-core/Cargo.lock",
+            "vectorize-core/Cargo.toml",
+            "vectorize-wasm/src/lib.rs",
+            "vectorize-wasm/Cargo.lock",
+            "vectorize-wasm/Cargo.toml"
+          ],
+          "symbols": [
+            "vectorize-core: VectorizeConfigIn, VecContour, VecShape, VectorizeResult (structs); contour_from_element, vectorize_image_bytes (shared entry point), vectorize_color_image (pure core); #[cfg(test)] mod tests::vectorizes_two_distinct_color_regions",
+            "vectorize-wasm: vectorize_image (#[wasm_bindgen] pub fn, sole export)"
+          ],
+          "responsibility": "FULLY CHARACTERIZED this census — C08's draft explicitly left both files 'not read in depth' ('writer: unknown'). vectorize-core is the shared, platform-agnostic image-vectorization core (CLAUDE.md §3 single-source-of-truth principle: 'two callers must never duplicate the same logic and drift apart') — traces a raster into flat color regions with cubic-bezier boundaries via the `vtracer` crate (visioncortex), Illustrator 'Image Trace' style. Exactly ONE entry point, vectorize_image_bytes, used by BOTH callers: src-tauri/src/vectorize.rs (native Tauri command, confirmed by grep — `use vectorize_core::{vectorize_image_bytes, VectorizeConfigIn, VectorizeResult}` and a direct call, both outside this packet's bounded ownership) and vectorize-wasm/src/lib.rs (this packet). Neither re-implements decoding or the vtracer-to-JSON conversion. Output contract is raw geometry only — absolute-coordinate cubic-bezier chains ('spline') or plain polygons — never an SVG string, so vectorize-bridge.js builds real paper.Path/CompoundPath objects directly with no round-trip to parse. A shape with holes produces multiple contours, becoming a paper.CompoundPath on the JS side (explicit cross-reference to CLAUDE.md §1's CompoundPath convention in the source's own comment). vectorize-wasm/src/lib.rs is a thin (28-line) wasm-bindgen shim around the same function: JSON-decodes an optional config, calls vectorize_image_bytes, JSON-encodes the result. Its own doc comment confirms it is loaded LAZILY (only when the Vectorize dialog is actually opened) unlike geometry-wasm-loader.js's eager load, deliberately keeping ~1MB+ of wasm out of the startup bundle. Documented scope boundary in the source itself, not a defect: a test comment states 'Phase 2's occlusion COMPLETION isn't built yet' — a partially-occluded shape is expected to render as its visible crescent/cut form, not reconstructed into a full shape; this is current baseline behavior, not a gap introduced or found here.",
+          "writer": "hand-edited directly by application developers; both files are real, non-generated Rust source (confirmed by reading both in full, 209 + 28 lines)",
+          "public_api": "vectorize_image(bytes: &[u8], config_json: &str) -> Result<String, JsValue> (wasm-bindgen export, exact signature confirmed by direct read) — internally calls vectorize_image_bytes / vectorize_color_image in vectorize-core",
+          "consumers": [
+            "src/js/vectorize-worker.js — confirmed by grep: dynamically imports vectorize_wasm.js, calls `mod.vectorize_image(bytes, configJson)` at line 25, inside a dedicated Web Worker per the file's own comment ('que le rastérize se fasse en arrière-plan')",
+            "src-tauri/src/vectorize.rs — native Tauri command, calls vectorize-core directly and bypasses vectorize-wasm entirely; out of this packet's bounded ownership, cross-ref only"
+          ],
+          "oracle": "CORRECTION to C08's draft ('not checked'): vectorize-core/src/lib.rs has a real inline unit test, vectorizes_two_distinct_color_regions, exercising the FULL pipeline end-to-end (image decode -> vtracer color clustering -> spline fitting -> contour assembly) against a synthetic red-disk-occluded-by-blue-square fixture, with concrete per-channel color assertions and a check that at least one contour is a real 4+-point cubic-bezier spline (not silently falling through to the polygon branch) — confirmed by direct read, not run here (read-only census). vectorize-wasm/src/lib.rs's own wasm-bindgen boundary (JSON round-trip, JsValue error mapping) has no direct test — a smaller, lower-stakes gap than DEF-1, since the logic it wraps is tested.",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C17b or fold into C17 (draft's own suggestion) — confirmed as the right call now that actual sizes are known: 209 + 28 lines of real source, comfortably fits in the same 30-90 minute leaf as the shader packet above."
+        }
+      ]
+    }
+  ],
+  "cross_cutting_notes": [
+    "Methodology: all 17 files existence-checked at e94dd79. Both vectorize crates were read in full end-to-end, not sampled — C08's draft had explicitly left them unread. Shader/test coupling was traced with a three-way cross-check rather than trusted from the draft or from test names: (1) grep for every include_str!(...wgsl) call site in engine.rs, establishing which of the 6 shaders are actually compiled in and where; (2) grep for include_str!/.wgsl references inside the 3 test files, establishing which shader(s) each test actually exercises; (3) a repo-wide grep for each of the 5 non-blend shader filenames, confirming zero test references anywhere outside engine.rs's own production code and doc comments.",
+    "DEF-1 is the substantive finding of this census, not the packet split: C08's draft had counted this packet's oracle by file existence (3 test files present) rather than by tracing what each test actually validates, and its per-packet notes named shader_library_validation.rs as covering 'every shipped shader' — a reasonable reading of that test's NAME that turns out to be wrong once the test body is read.",
+    "One positive correction, opposite direction from DEF-1: vectorize-core actually has a real, non-trivial inline oracle (vectorizes_two_distinct_color_regions) — the draft's 'not checked' was a gap in the draft's own verification depth (consistent with its own stated map-level, not a code-reading, work-size guidance for this area), not a gap in the repository.",
+    "The draft's own 'C17b or fold into C17' suggestion for the vectorize packet is confirmed appropriate now that both files have been read in full: 209 + 28 lines total, far below any threshold that would need a separate leaf."
+  ],
+  "known_defects": [
+    {
+      "id": "DEF-1",
+      "file": "geometry-wasm/src/matte.wgsl, geometry-wasm/src/blur.wgsl, geometry-wasm/src/color_adjust.wgsl, geometry-wasm/src/vignette.wgsl, geometry-wasm/src/simple_fx.wgsl",
+      "line": "n/a (absence of test coverage, confirmed by include_str!/reference tracing — see cross_cutting_notes methodology)",
+      "summary": "5 of geometry-wasm's 6 compiled-in compositor shaders have zero automated test coverage anywhere in the repository; only blend.wgsl is exercised by a real regression test. C08's draft materially overstated this packet's oracle: its packet notes credited 'the 3 tests/*.rs files' as the oracle for the shader library and specifically pointed to shader_library_validation.rs's every_shipped_shader_parses_and_validates test — but that test validates `window.SMSHADER_EFFECTS` from the separate, JS-authored src/js/shader-effects-library.js (Motion's user-facing custom-effect catalog), never touching any of these 6 compiled-in files despite its name. dab_dense_overlap_repro.rs tests vello's own Scene/Renderer fill path directly (a buffer-overflow truncation bug, Feedback #104) and is also unrelated to these shaders. Only effect_layer_overlay_repro.rs actually loads one of the six verbatim (include_str!(\"../src/blend.wgsl\"), confirmed at line 174) for a real GPU-render pixel-readback assertion (Feedback #50). Severity: these are core compositor passes reachable by every Motion track-matte, blur, adjustment-layer and simple-effect feature in the app (per engine.rs's own composite_scene call sites) — a regression in matte/blur/color_adjust/vignette/simple_fx would not be caught by `cargo test` at all, only by manual/visual QA.",
+      "packet": "C17.engines.geometry-wasm-shaders-and-tests",
+      "severity": "test-coverage gap (core rendering logic reachable by multiple shipped Motion features; confirmed by direct three-way cross-reference tracing, not inferred from test names or file presence)"
+    }
+  ],
+  "uncovered_responsibilities": []
+}
