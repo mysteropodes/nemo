@@ -1559,27 +1559,23 @@
     for (var i = 0; i < prop.length; i++) h = (h * 31 + prop.charCodeAt(i)) | 0;
     return h;
   }
-  // Tiny deterministic hash (not cryptographic, doesn't need to be) — the
-  // same value for the same (seed, n) every time. Extracted from the inner
-  // h() hashNoise1D used to define privately, so the smooth noise below and
-  // the uniform draw above share ONE definition instead of drifting
-  // (CLAUDE.md §3's duplicated-pair hazard).
-  function hashUnit(seed, n) {
-    var v = Math.sin(n * 12.9898 + seed * 78.233) * 43758.5453;
-    return v - Math.floor(v);
-  }
+  // The deterministic hash itself now lives in NemoExpressionRandomDomain
+  // (extracted for A01/#1061, random() family) — smooth noise below and the
+  // uniform draw in the randomness section share that ONE definition instead
+  // of drifting (CLAUDE.md §3's duplicated-pair hazard), same as before this
+  // extraction, just across a module boundary instead of a shared local.
   // Smoothly interpolated 1D value noise, so wiggle() reads as continuous
   // motion rather than a stepped random walk.
   function hashNoise1D(seed, x) {
     var i = Math.floor(x), f = x - i;
-    var a = hashUnit(seed, i), b = hashUnit(seed, i + 1);
+    var a = NemoExpressionRandomDomain.hashUnit(seed, i), b = NemoExpressionRandomDomain.hashUnit(seed, i + 1);
     var t = f * f * (3 - 2 * f); // smoothstep
     return a + (b - a) * t;
   }
   // 2D counterpart — bilinear blend of the same lattice, used by noise([x,y]).
   function hashNoise2D(seed, x, y) {
     var xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
-    function g(a, b) { return hashUnit(seed, a + b * 311.7); }
+    function g(a, b) { return NemoExpressionRandomDomain.hashUnit(seed, a + b * 311.7); }
     var u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
     var n00 = g(xi, yi), n10 = g(xi + 1, yi), n01 = g(xi, yi + 1), n11 = g(xi + 1, yi + 1);
     var a = n00 + (n10 - n00) * u, b = n01 + (n11 - n01) * u;
@@ -1744,31 +1740,23 @@
     _exprTick();
     var ctx = _ectx;
     if (!ctx) return 0;
-    var tPart = (fixed || ctx.rngTimeless) ? 0 : Math.round(ctx.frame * 1000) / 1000;
-    return hashUnit(ctx.rngSeed, tPart * 1013.13 + (ctx.rngCounter++) * 7919 + 0.5);
+    var v = NemoExpressionRandomDomain.rand01FromInputs(ctx.rngSeed, ctx.rngCounter, ctx.frame, ctx.rngTimeless, fixed);
+    ctx.rngCounter++;
+    return v;
   }
   // Bell-shaped counterpart (Box-Muller), centred on 0.5 with a spread that
-  // keeps roughly nine draws in ten inside 0..1.
+  // keeps roughly nine draws in ten inside 0..1. Two full _rand01 calls (not
+  // one call for two values) so each keeps its own tick/counter step, exactly
+  // as before this was split across a module boundary.
   function _gauss01(fixed) {
-    var u1 = Math.max(1e-9, _rand01(fixed)), u2 = _rand01(fixed);
-    return 0.5 + 0.304 * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    var u1 = _rand01(fixed), u2 = _rand01(fixed);
+    return NemoExpressionRandomDomain.gaussFromUniforms(u1, u2);
   }
   // Shared by all four draw functions: no args = the raw 0..1 draw, one arg
   // = 0..max, two = min..max, and either bound may be an array for a
   // per-axis range.
   function _randomWith(gen, a, b) {
-    if (a === undefined) return gen();
-    if (b === undefined) {
-      if (Array.isArray(a)) { var o = []; for (var i = 0; i < a.length; i++) o.push(gen() * _num(a[i])); return o; }
-      return gen() * _num(a);
-    }
-    if (Array.isArray(a) || Array.isArray(b)) {
-      var A = _vec(a), B = _vec(b), n = Math.max(A.length, B.length), out = [];
-      for (var j = 0; j < n; j++) { var lo = _num(A[j]), hi = _num(B[j]); out.push(lo + gen() * (hi - lo)); }
-      return out;
-    }
-    var l = _num(a), h = _num(b);
-    return l + gen() * (h - l);
+    return NemoExpressionRandomDomain.randomWith(gen, a, b);
   }
   function _rndVary() { return _rand01(false); }
   function _rndFixed() { return _rand01(true); }

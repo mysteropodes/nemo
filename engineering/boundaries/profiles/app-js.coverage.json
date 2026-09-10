@@ -20,29 +20,29 @@
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
     "candidateCommit": "d8c316de308c25c212c71c6a6202120c8909d543",
-    "sourceRootTree": "c3780eefe502f015239629141b21616284a3869b",
+    "sourceRootTree": "60baae2229657e5c97d4b63b553dd1278689a6d0",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "44955ab816b536f9799f84070a0ce270e1587120",
+      "gitTree": "04502514ae140ab8d18f7271a2cbd39cf9616d0d",
       "lastChangedCommit": "d8c316de308c25c212c71c6a6202120c8909d543"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "d0a818480f0fdb665f96fd66e9c590ffe683a66e",
-      "sha256": "355ca64a1867fe36302b1daaf9c0f47b70bb274d040c364abb4ece05b322986b",
+      "gitBlob": "efe442e0916a763b480e89857747234fcb2a0431",
+      "sha256": "d7ca8c459d5043b4463b25e21af8aec95be17d2ae8e408a6326bb225ef772427",
       "lastChangedCommit": "9e5daae92a68799c8ba108064ddac8066af209e9"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "1140a6a84bb64d5e24587e45f9c4b3dff74c7c4ed6f091c0d2540c761c89b858"
+      "value": "662d6a17bc8452bc6df51e18c2f13d870aa2e953c597625b391f7378fcd81705"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "83997e61fff3366dfaf08a515689c69fb5f739f4",
-        "sha256": "ab17aeff18a6da63eb7772e69d3cc886547f030b3934b2e4eda322efbb6ca027",
-        "moduleCount": 148,
+        "gitBlob": "c1170748aea7a16f5d2ff0d5fb80604d5f9763db",
+        "sha256": "6e09288b3aea266bd70c14f4b9dba1fe70957640593d961f8a5afc21d2ad99bb",
+        "moduleCount": 149,
         "basedOnCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1"
       },
       {
@@ -2035,6 +2035,18 @@
       ]
     },
     {
+      "path": "src/js/domain/animation/expression-random.js",
+      "moduleId": "app.expression.random.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2362,
+          "scriptOrdinal": 59
+        }
+      ]
+    },
+    {
       "path": "src/js/application/opacity-application.js",
       "moduleId": "app.opacity.application",
       "executionClass": "document-classic",
@@ -2542,19 +2554,19 @@
     }
   ],
   "snapshotCounts": {
-    "selectedSources": 160,
+    "selectedSources": 161,
     "bySourceKind": {
-      ".js": 154,
+      ".js": 155,
       ".mjs": 2,
       ".cjs": 0,
       ".ts": 4
     },
-    "retainedSources": 148,
+    "retainedSources": 149,
     "exclusions": 12,
     "vendorExclusions": 6,
     "generatedExclusions": 6,
     "retainedExecutionClasses": {
-      "document-classic": 133,
+      "document-classic": 134,
       "document-module": 2,
       "classic-without-load-site": 12,
       "module-worker": 1

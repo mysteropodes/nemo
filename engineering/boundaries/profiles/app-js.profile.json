@@ -1741,6 +1741,18 @@
       ]
     },
     {
+      "id": "app.expression.random.domain",
+      "layer": "domain",
+      "dir": "src/js/domain/animation",
+      "files": [
+        "expression-random.js"
+      ],
+      "sizeProfile": "Domain kernel",
+      "publicApi": [
+        "expression-random.js"
+      ]
+    },
+    {
       "id": "app.application.mcp.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
