@@ -71,8 +71,9 @@ test('tooling coverage profiles every current scripts/nemo CommonJS source', () 
   const profile = JSON.parse(fs.readFileSync(path.join(ROOT, ci.PROFILE), 'utf8'));
   const result = ci.toolingCoverage(profile, ROOT);
   assert.equal(result.ok, true);
-  assert.equal(result.sourcePathCount, 55);
-  assert.equal(result.declaredPathCount, 55);
+  // 55 + the four T04 Rust-coverage sources (lib evaluator, lib job, CLI, tests).
+  assert.equal(result.sourcePathCount, 59);
+  assert.equal(result.declaredPathCount, 59);
   const incomplete = structuredClone(profile);
   incomplete.modules = incomplete.modules.filter((module) => module.id !== 'nemo.lib.boundariesApplication');
   const rejected = ci.toolingCoverage(incomplete, ROOT);
