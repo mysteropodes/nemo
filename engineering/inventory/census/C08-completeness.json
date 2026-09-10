@@ -1,0 +1,1290 @@
+{
+  "census_id": "C08",
+  "issue": 1043,
+  "title": "Map completeness and remaining tracked roots into bounded extraction packets",
+  "owner": "Cyrill/D2 (Honey)",
+  "source_sha": "a19cc20656c27789867ea52bf6994669c2cf399c",
+  "status": "read-only census complete; no source mutated; proposed IDs (C09-C18) and packet groupings are placeholders for the orchestrator to renumber into the global sequence and fold into engineering/inventory/remediation-scope.json",
+  "scope_files": [
+    ".c8rc.json",
+    ".claude/launch.json",
+    ".github/scripts/collaborator-pr-policy.cjs",
+    ".github/scripts/collaborator-pr-policy.test.cjs",
+    ".github/workflows/collaborator-pr-policy.yml",
+    ".github/workflows/deploy-feedback-worker.yml",
+    ".github/workflows/deploy-web.yml",
+    ".github/workflows/nemo-validation.yml",
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "40min-checkins/2026-09-05-checkin-05.md",
+    "40min-checkins/2026-09-05-checkin-10.md",
+    "40min-checkins/2026-09-06-checkin-15.md",
+    "40min-checkins/2026-09-06-checkin-20.md",
+    "40min-checkins/2026-09-06-checkin-25.md",
+    "40min-checkins/2026-09-06-checkin-30.md",
+    "40min-checkins/2026-09-06-checkin-35.md",
+    "40min-checkins/2026-09-06-checkin-40.md",
+    "40min-checkins/2026-09-06-checkin-45.md",
+    "40min-checkins/2026-09-06-checkin-50.md",
+    "40min-checkins/2026-09-06-checkin-55.md",
+    "40min-checkins/2026-09-06-checkin-65.md",
+    "40min-checkins/2026-09-07-checkin-85.md",
+    "40min-checkins/2026-09-07-checkin-87.md",
+    "40min-checkins/2026-09-07-checkin-90.md",
+    "40min-checkins/2026-09-07-weekend-final-handoff.md",
+    "40min-checkins/README.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "README.md",
+    "THIRD_PARTY_LICENSES_RUST_TAURI.txt",
+    "THIRD_PARTY_LICENSES_RUST_WASM.txt",
+    "THIRD_PARTY_NOTICES.md",
+    "assets/logo.ai",
+    "assets/logo_nemo.png",
+    "assets/logo_nemo.svg",
+    "assets/logo_nemo_alpha.png",
+    "assets/logo_nemo_alpha.svg",
+    "assets/logo_nemo_alpha_white.png",
+    "assets/screenshot-motion.png",
+    "docs/FUNCTIONAL_GAPS.md",
+    "engineering/animation/ADR-001-curve-runner.md",
+    "engineering/animation/BROWSER_ACCEPTANCE.md",
+    "engineering/animation/browser-evidence-20260905/before-0.png",
+    "engineering/animation/browser-evidence-20260905/before-10.png",
+    "engineering/animation/browser-evidence-20260905/before-15.png",
+    "engineering/animation/browser-evidence-20260905/before-20.png",
+    "engineering/animation/browser-evidence-20260905/before-5.png",
+    "engineering/animation/browser-evidence-20260905/edited-0.png",
+    "engineering/animation/browser-evidence-20260905/edited-10.png",
+    "engineering/animation/browser-evidence-20260905/edited-15.png",
+    "engineering/animation/browser-evidence-20260905/edited-20.png",
+    "engineering/animation/browser-evidence-20260905/edited-5.png",
+    "engineering/animation/browser-evidence-20260905/edited-project.json",
+    "engineering/animation/browser-evidence-20260905/export-0.svg",
+    "engineering/animation/browser-evidence-20260905/export-10.svg",
+    "engineering/animation/browser-evidence-20260905/export-15.svg",
+    "engineering/animation/browser-evidence-20260905/export-20.svg",
+    "engineering/animation/browser-evidence-20260905/export-5.svg",
+    "engineering/animation/browser-evidence-20260905/receipt.json",
+    "engineering/animation/browser-evidence-20260905/redo-0.png",
+    "engineering/animation/browser-evidence-20260905/redo-10.png",
+    "engineering/animation/browser-evidence-20260905/redo-15.png",
+    "engineering/animation/browser-evidence-20260905/redo-20.png",
+    "engineering/animation/browser-evidence-20260905/redo-5.png",
+    "engineering/animation/browser-evidence-20260905/reopened-0.png",
+    "engineering/animation/browser-evidence-20260905/reopened-10.png",
+    "engineering/animation/browser-evidence-20260905/reopened-15.png",
+    "engineering/animation/browser-evidence-20260905/reopened-20.png",
+    "engineering/animation/browser-evidence-20260905/reopened-5.png",
+    "engineering/animation/browser-evidence-20260905/reopened-frame-5.png",
+    "engineering/animation/browser-evidence-20260905/undo-0.png",
+    "engineering/animation/browser-evidence-20260905/undo-10.png",
+    "engineering/animation/browser-evidence-20260905/undo-15.png",
+    "engineering/animation/browser-evidence-20260905/undo-20.png",
+    "engineering/animation/browser-evidence-20260905/undo-5.png",
+    "engineering/animation/runner-trial-20260905.json",
+    "engineering/application/MCP_INSTALL.md",
+    "engineering/application/OPACITY_SLICE.md",
+    "engineering/application/transport-v1.schema.json",
+    "engineering/boundaries/README.md",
+    "engineering/boundaries/profile.schema.json",
+    "engineering/boundaries/profiles/app-js.baseline.json",
+    "engineering/boundaries/profiles/app-js.coverage.json",
+    "engineering/boundaries/profiles/app-js.profile.json",
+    "engineering/boundaries/profiles/app-surfaces.md",
+    "engineering/boundaries/profiles/mcp-rust.profile.json",
+    "engineering/boundaries/profiles/scripts-nemo.baseline.json",
+    "engineering/boundaries/profiles/scripts-nemo.fixture/profile.json",
+    "engineering/boundaries/profiles/scripts-nemo.fixture/src/adapter-target.cjs",
+    "engineering/boundaries/profiles/scripts-nemo.fixture/src/cycle-a.cjs",
+    "engineering/boundaries/profiles/scripts-nemo.fixture/src/cycle-b.cjs",
+    "engineering/boundaries/profiles/scripts-nemo.fixture/src/expired.cjs",
+    "engineering/boundaries/profiles/scripts-nemo.fixture/src/global-offender.cjs",
+    "engineering/boundaries/profiles/scripts-nemo.fixture/src/oversized.cjs",
+    "engineering/boundaries/profiles/scripts-nemo.fixture/src/priv-importer.cjs",
+    "engineering/boundaries/profiles/scripts-nemo.fixture/src/priv-secret.cjs",
+    "engineering/boundaries/profiles/scripts-nemo.fixture/src/priv-target.cjs",
+    "engineering/boundaries/profiles/scripts-nemo.fixture/src/shared-violator.cjs",
+    "engineering/boundaries/profiles/scripts-nemo.md",
+    "engineering/boundaries/profiles/scripts-nemo.profile.json",
+    "engineering/ci/README.md",
+    "engineering/contracts/evidence/cross-contract-acceptance.md",
+    "engineering/contracts/evidence/inventory-contract-gaps.md",
+    "engineering/contracts/evidence/schema-generation-plan.md",
+    "engineering/inventory/BASELINE.md",
+    "engineering/inventory/BINDING_REPAIR_20260905.md",
+    "engineering/inventory/SURFACES.md",
+    "engineering/inventory/baseline-manifest.json",
+    "engineering/inventory/census/C01-document-history.json",
+    "engineering/inventory/census/C02-animation-time.json",
+    "engineering/inventory/census/C03-rendering-resource-ownership.json",
+    "engineering/inventory/census/C04a-editor-tools-selection.json",
+    "engineering/inventory/census/C04b-editor-presentation-support.json",
+    "engineering/inventory/census/C05-media-import-export-native.json",
+    "engineering/inventory/census/C06-preferences-labs-bootstrap.json",
+    "engineering/inventory/census/C07-application-mcp-diagnostics.json",
+    "engineering/inventory/surfaces.csv",
+    "engineering/inventory/surfaces.json",
+    "engineering/project-management/PLAN_REVIEW.md",
+    "engineering/project-management/PUBLICATION.md",
+    "engineering/project-management/README.md",
+    "engineering/project-management/TIMELINE.md",
+    "engineering/project-management/issue-triage.csv",
+    "engineering/project-management/project-schema.json",
+    "engineering/project-management/remediation-schedule.json",
+    "engineering/project-management/remediation-tasks.json",
+    "engineering/remediation/EXECUTION_PLAN.en.md",
+    "engineering/remediation/EXECUTION_PLAN.fr.md",
+    "engineering/remediation/README.md",
+    "engineering/remediation/archive/2026-09-07-handbook/02_REMEDIATION_PLAN.md",
+    "engineering/remediation/archive/2026-09-07-handbook/06_BUZZ_A2A_AND_ENROLLMENT.md",
+    "engineering/remediation/archive/2026-09-07-handbook/07_GITHUB_PROJECT_AND_PARALLEL_WORK.md",
+    "engineering/remediation/archive/2026-09-07-handbook/08_ACCEPTANCE_AND_MAINTENANCE.md",
+    "engineering/remediation/archive/2026-09-07-handbook/MANIFEST.md",
+    "engineering/remediation/reference/01_CURRENT_AND_TARGET.md",
+    "engineering/remediation/reference/03_TESTING_AND_DEBUGGING.md",
+    "engineering/remediation/reference/04_MODULARITY_POLICY.md",
+    "engineering/remediation/reference/05_CAPABILITIES_MCP_AND_STANDARDS.md",
+    "engineering/remediation/reference/templates/HANDOFF_RECEIPT.md",
+    "engineering/remediation/reference/templates/TASK_PACKET.md",
+    "engineering/runtime-isolation.md",
+    "geometry-wasm/Cargo.lock",
+    "geometry-wasm/Cargo.toml",
+    "geometry-wasm/src/blend.wgsl",
+    "geometry-wasm/src/blur.wgsl",
+    "geometry-wasm/src/color_adjust.wgsl",
+    "geometry-wasm/src/matte.wgsl",
+    "geometry-wasm/src/simple_fx.wgsl",
+    "geometry-wasm/src/vignette.wgsl",
+    "geometry-wasm/tests/dab_dense_overlap_repro.rs",
+    "geometry-wasm/tests/effect_layer_overlay_repro.rs",
+    "geometry-wasm/tests/shader_library_validation.rs",
+    "nemo-mcp/Cargo.lock",
+    "nemo-mcp/Cargo.toml",
+    "package-lock.json",
+    "package.json",
+    "playwright.config.cjs",
+    "scripts/assert-no-private-labs.py",
+    "scripts/build-mcp-sidecar.cjs",
+    "scripts/bundle-ffmpeg-dylibs.py",
+    "scripts/dev_server.py",
+    "scripts/generate-third-party-notices.py",
+    "scripts/nemo/README.md",
+    "scripts/nemo/baseline.cjs",
+    "scripts/nemo/baseline.test.cjs",
+    "scripts/nemo/boundaries-application.test.cjs",
+    "scripts/nemo/boundaries-cli.test.cjs",
+    "scripts/nemo/boundaries-coverage.test.cjs",
+    "scripts/nemo/boundaries-discovery.test.cjs",
+    "scripts/nemo/boundaries-ratchet.test.cjs",
+    "scripts/nemo/boundaries-repository.test.cjs",
+    "scripts/nemo/boundaries-size.test.cjs",
+    "scripts/nemo/boundaries.cjs",
+    "scripts/nemo/boundaries.test.cjs",
+    "scripts/nemo/browser-runtime.test.cjs",
+    "scripts/nemo/browser.cjs",
+    "scripts/nemo/build-job.cjs",
+    "scripts/nemo/build-job.test.cjs",
+    "scripts/nemo/build-runtime.test.cjs",
+    "scripts/nemo/build.cjs",
+    "scripts/nemo/check.cjs",
+    "scripts/nemo/ci.cjs",
+    "scripts/nemo/ci.test.cjs",
+    "scripts/nemo/doctor.cjs",
+    "scripts/nemo/inventory.cjs",
+    "scripts/nemo/inventory.test.cjs",
+    "scripts/nemo/isolation.cjs",
+    "scripts/nemo/isolation.test.cjs",
+    "scripts/nemo/job.cjs",
+    "scripts/nemo/lib/baseline.cjs",
+    "scripts/nemo/lib/boundaries-application.cjs",
+    "scripts/nemo/lib/boundaries-coverage.cjs",
+    "scripts/nemo/lib/boundaries-discovery.cjs",
+    "scripts/nemo/lib/boundaries-ratchet.cjs",
+    "scripts/nemo/lib/boundaries-repository.cjs",
+    "scripts/nemo/lib/boundaries-resolver.cjs",
+    "scripts/nemo/lib/boundaries-size.cjs",
+    "scripts/nemo/lib/boundaries.cjs",
+    "scripts/nemo/lib/browser-runtime.cjs",
+    "scripts/nemo/lib/build-job.cjs",
+    "scripts/nemo/lib/build-runtime.cjs",
+    "scripts/nemo/lib/capabilities.cjs",
+    "scripts/nemo/lib/cli.cjs",
+    "scripts/nemo/lib/identity.cjs",
+    "scripts/nemo/lib/inventory-bindings.cjs",
+    "scripts/nemo/lib/inventory-lexer.cjs",
+    "scripts/nemo/lib/inventory-records.cjs",
+    "scripts/nemo/lib/inventory-render.cjs",
+    "scripts/nemo/lib/inventory-surfaces.cjs",
+    "scripts/nemo/lib/isolation.cjs",
+    "scripts/nemo/lib/jobs.cjs",
+    "scripts/nemo/lib/native-process.cjs",
+    "scripts/nemo/lib/native-runtime.cjs",
+    "scripts/nemo/lib/receipt.cjs",
+    "scripts/nemo/lib/util.cjs",
+    "scripts/nemo/native-runtime.test.cjs",
+    "scripts/nemo/native.cjs",
+    "scripts/nemo/verify.cjs",
+    "scripts/rebuild-ffmpeg-lgpl.sh",
+    "src-tauri/.tauri_private_key.pub",
+    "src-tauri/Cargo.lock",
+    "src-tauri/Cargo.toml",
+    "src-tauri/binaries/ffmpeg-aarch64-apple-darwin",
+    "src-tauri/build.rs",
+    "src-tauri/capabilities/default.json",
+    "src-tauri/gen/schemas/acl-manifests.json",
+    "src-tauri/gen/schemas/capabilities.json",
+    "src-tauri/gen/schemas/desktop-schema.json",
+    "src-tauri/gen/schemas/macOS-schema.json",
+    "src-tauri/icons/128x128.png",
+    "src-tauri/icons/128x128@2x.png",
+    "src-tauri/icons/32x32.png",
+    "src-tauri/icons/64x64.png",
+    "src-tauri/icons/icon.icns",
+    "src-tauri/icons/icon.ico",
+    "src-tauri/icons/icon.png",
+    "src-tauri/tauri.conf.json",
+    "src/_headers",
+    "src/assets/reference-3d/ATTRIBUTION.md",
+    "src/assets/reference-3d/AvatarSample_D.vrm",
+    "src/assets/reference-3d/CC0_Rigged_Arms.obj",
+    "src/assets/reference-3d/CC0_Rigged_Arms_Texture.png",
+    "src/css/tutorial.css",
+    "src/favicon-32.png",
+    "src/favicon-64.png",
+    "src/fonts/DejaVuSans-Bold.ttf",
+    "src/fonts/DejaVuSans.ttf",
+    "src/fonts/DejaVuSerif-Bold.ttf",
+    "src/fonts/DejaVuSerif.ttf",
+    "src/fonts/Inter-Regular.ttf",
+    "src/fonts/Manrope-Regular.ttf",
+    "src/fonts/Roboto-Bold.ttf",
+    "src/fonts/Roboto-Regular.ttf",
+    "src/js/ag-psd.vendor.mjs",
+    "src/js/delaunator.vendor.js",
+    "src/js/effector-layer.js",
+    "src/js/geometry-wasm-loader.js",
+    "src/js/gpu-gate.js",
+    "src/js/images.js",
+    "src/js/kitsu.js",
+    "src/js/layer-kind.js",
+    "src/js/layer-scroll-sync.js",
+    "src/js/lipsync.js",
+    "src/js/lottie-preview.js",
+    "src/js/motion-graph.js",
+    "src/js/mp4box.all.min.js",
+    "src/js/nemo-plugin.js",
+    "src/js/nemo-script.js",
+    "src/js/node-buffer-shim.vendor.mjs",
+    "src/js/opentype.min.js",
+    "src/js/p2p-contacts.js",
+    "src/js/storyboard.js",
+    "src/js/timeline-zoom.js",
+    "src/js/timeline.js (nominally declared by C01/C02/C06; see DEF-5 — ~94% has no real packet anywhere)",
+    "src/js/tracker.js",
+    "src/js/transplant.js",
+    "src/js/tutorial.js",
+    "src/js/updater-bridge.js",
+    "src/js/vectorize-wasm-loader.js",
+    "src/js/vectorize-worker.js",
+    "src/logo-128.png",
+    "src/logo-64.png",
+    "src/paper-full.min.js",
+    "src/wasm-vectorize/package.json",
+    "src/wasm-vectorize/vectorize_wasm.d.ts",
+    "src/wasm-vectorize/vectorize_wasm.js",
+    "src/wasm-vectorize/vectorize_wasm_bg.wasm",
+    "src/wasm-vectorize/vectorize_wasm_bg.wasm.d.ts",
+    "src/wasm/geometry_wasm.d.ts",
+    "src/wasm/geometry_wasm.js",
+    "src/wasm/geometry_wasm_bg.wasm",
+    "src/wasm/geometry_wasm_bg.wasm.d.ts",
+    "src/wasm/package.json",
+    "tests/animation/boundaries.test.cjs",
+    "tests/animation/browser-acceptance.cjs",
+    "tests/animation/curve.test.cjs",
+    "tests/animation/fixtures/curve-workflow.json",
+    "tests/animation/load-motion.cjs",
+    "tests/animation/motion-facade.test.cjs",
+    "tests/application-opacity-bootstrap.test.cjs",
+    "tests/application-opacity-replay.test.cjs",
+    "tests/application-opacity.test.cjs",
+    "tests/bench/BROWSER_RENDER.md",
+    "tests/bench/README.md",
+    "tests/bench/browser-render.cjs",
+    "tests/bench/run.cjs",
+    "tests/browser/_negative-control.spec.cjs",
+    "tests/browser/opacity-consumers.spec.cjs",
+    "tests/browser/opacity-ui-consumers.spec.cjs",
+    "tests/browser/preview-lifecycle.cjs",
+    "tests/browser/preview-lifecycle.spec.cjs",
+    "tests/browser/r06-isolated-preview.spec.cjs",
+    "tests/desktop/README.md",
+    "tests/desktop/native-harness.cjs",
+    "tests/desktop/packaged-native.test.cjs",
+    "tests/desktop/unit/native-harness.test.cjs",
+    "tests/domain-opacity.test.cjs",
+    "tests/duplicator-hue.test.cjs",
+    "tests/easing-reference.test.cjs",
+    "tests/expr-bake.test.cjs",
+    "tests/feedback-2026-08-22.test.cjs",
+    "tests/fixtures/BROWSER_ACCEPTANCE.md",
+    "tests/fixtures/README.md",
+    "tests/fixtures/browser-acceptance.cjs",
+    "tests/fixtures/components/expected.json",
+    "tests/fixtures/components/project.json",
+    "tests/fixtures/coverage-negative-control.cjs",
+    "tests/fixtures/export/assets/frames/frame_0001.png",
+    "tests/fixtures/export/assets/frames/frame_0002.png",
+    "tests/fixtures/export/assets/frames/frame_0003.png",
+    "tests/fixtures/export/assets/frames/frame_0004.png",
+    "tests/fixtures/export/assets/frames/frame_0005.png",
+    "tests/fixtures/export/assets/frames/frame_0006.png",
+    "tests/fixtures/export/assets/frames/frame_0007.png",
+    "tests/fixtures/export/assets/frames/frame_0008.png",
+    "tests/fixtures/export/assets/frames/frame_0009.png",
+    "tests/fixtures/export/assets/frames/frame_0010.png",
+    "tests/fixtures/export/assets/frames/frame_0011.png",
+    "tests/fixtures/export/assets/frames/frame_0012.png",
+    "tests/fixtures/export/expected.json",
+    "tests/fixtures/export/project.json",
+    "tests/fixtures/expression-props/expected.json",
+    "tests/fixtures/expression-props/project.json",
+    "tests/fixtures/fixtures.test.cjs",
+    "tests/fixtures/generate.cjs",
+    "tests/fixtures/held-frames/expected.json",
+    "tests/fixtures/held-frames/project.json",
+    "tests/fixtures/interaction/expected.json",
+    "tests/fixtures/interaction/gesture.json",
+    "tests/fixtures/interaction/project.json",
+    "tests/fixtures/keyed-props/expected.json",
+    "tests/fixtures/keyed-props/project.json",
+    "tests/fixtures/lib/corpus.cjs",
+    "tests/fixtures/lib/png.cjs",
+    "tests/fixtures/lib/reference.cjs",
+    "tests/fixtures/lib/rng.cjs",
+    "tests/fixtures/lib/sandbox.cjs",
+    "tests/fixtures/lib/sandbox.test.cjs",
+    "tests/fixtures/manifest.json",
+    "tests/fixtures/masks-alpha/expected.json",
+    "tests/fixtures/masks-alpha/project.json",
+    "tests/fixtures/media/assets/embedded.png",
+    "tests/fixtures/media/assets/linked.png",
+    "tests/fixtures/media/expected.json",
+    "tests/fixtures/media/project.json",
+    "tests/fixtures/mesh/assets/image.png",
+    "tests/fixtures/mesh/expected.json",
+    "tests/fixtures/mesh/project.json",
+    "tests/fixtures/migration/expected.json",
+    "tests/fixtures/migration/project.json",
+    "tests/fixtures/static-props/expected.json",
+    "tests/fixtures/static-props/project.json",
+    "tests/fixtures/text/expected.json",
+    "tests/fixtures/text/project.json",
+    "tests/integration/r06-browser-runtime.test.cjs",
+    "tests/nemo-baseline.test.cjs",
+    "tests/nemo-bench.test.cjs",
+    "tests/nemo-boundaries-ratchet.test.cjs",
+    "tests/nemo-boundaries.test.cjs",
+    "tests/nemo-browser-runtime.test.cjs",
+    "tests/nemo-build-job.test.cjs",
+    "tests/nemo-build-runtime.test.cjs",
+    "tests/nemo-ci.test.cjs",
+    "tests/nemo-coverage-job.test.cjs",
+    "tests/nemo-desktop-harness.test.cjs",
+    "tests/nemo-desktop-job.test.cjs",
+    "tests/nemo-exclusion-provenance.test.cjs",
+    "tests/nemo-fixtures.test.cjs",
+    "tests/nemo-inventory-records.test.cjs",
+    "tests/nemo-inventory-swatch.test.cjs",
+    "tests/nemo-inventory.test.cjs",
+    "tests/nemo-isolation.test.cjs",
+    "tests/nemo-mcp-adapter.test.cjs",
+    "tests/nemo-mcp-boundaries.test.cjs",
+    "tests/nemo-mcp-bundle.test.cjs",
+    "tests/nemo-native-ffmpeg-preflight.test.cjs",
+    "tests/nemo-native-runtime.test.cjs",
+    "tests/nemo-third-party-notices.test.cjs",
+    "tests/performance-regressions.test.cjs",
+    "tests/project-entry-repaint.test.cjs",
+    "tests/project-open.test.cjs",
+    "tests/text-selector.test.cjs",
+    "vectorize-core/Cargo.lock",
+    "vectorize-core/Cargo.toml",
+    "vectorize-core/src/lib.rs",
+    "vectorize-wasm/Cargo.lock",
+    "vectorize-wasm/Cargo.toml",
+    "vectorize-wasm/src/lib.rs",
+    "worker-feedback/README.md",
+    "worker-feedback/src/index.js",
+    "worker-feedback/wrangler.jsonc",
+    "worker/index.js",
+    "wrangler.jsonc"
+  ],
+  "coverage_note": "Mechanical set-difference: 578 git-tracked paths at HEAD a19cc20 vs the normalized union of C01-C07's scope_files (163 distinct base paths after resolving each census's path-annotation style — C02's alone required a custom normalizer, see DEF-6). 415 paths have no declared owner anywhere; all 415 are accounted for in the areas below (packets for real code, explicit non-extraction notes for docs/vendor/assets/generated/process artifacts). A 416th path, src/js/timeline.js, is NOT in the raw uncovered set (it IS nominally declared, by C01/C02/C06) but a packet-level line-coverage audit found only 6.0% of it actually owned by any packet — see DEF-5, the single largest finding in this census. 11 paths are declared by more than one census's scope_files; 6 of those are genuine full-file packet-level duplicates or phantom reservations (DEF-1 through DEF-4), the other 5 (tweens.js, timeline.js's 3-way split, and the two text-animator files already counted under DEF-3) are legitimate documented partial splits.",
+  "areas": [
+    {
+      "area": "remaining-browser-modules",
+      "proposed_future_ids": "C09-C12 (see per-packet grouping notes; each cluster likely still needs further splitting at execution time — sizes given, not verified against the 30-90min budget)",
+      "packets": [
+        {
+          "id": "C08.browser.storyboard-mode",
+          "title": "StoryBoard node-graph montage editor",
+          "files": [
+            "src/js/storyboard.js (1321 lines)"
+          ],
+          "symbols": [
+            "window.SM",
+            "window.SMCamera",
+            "window.SMEngineBridge"
+          ],
+          "responsibility": "Third app mode next to Animation 2D and Motion: node-space montage editor, draggable MODULES connected by 'Edit module' blocks (CLAUDE.md §8 — 'StoryBoard ne manipule QUE des Components'). Entirely unread by C01-C07.",
+          "writer": "state.storyboard* (graph nodes/edges), auto-converts a plain layer to a Component on connection per §8",
+          "public_api": "window.SM* storyboard entry points (not enumerated here)",
+          "consumers": [
+            "timeline.js mode switch",
+            "app.js Component auto-conversion"
+          ],
+          "oracle": "none found (grepped tests/**)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C09. Largest single uncharacterized module by responsibility weight (whole app mode); should not be bundled with anything else."
+        },
+        {
+          "id": "C08.browser.tutorial-onboarding",
+          "title": "Interactive in-app tutorial system",
+          "files": [
+            "src/js/tutorial.js (1907 lines)",
+            "src/css/tutorial.css"
+          ],
+          "symbols": [
+            "window.SMTutorial",
+            "window.SMProject",
+            "window.SMShapeGroup"
+          ],
+          "responsibility": "Spotlight + tooltip lesson runner: highlights a real UI element, gates step advancement on the user actually performing the real action (event delegation), not a scripted replay.",
+          "writer": "localStorage first-launch/progress keys (FIRST_LAUNCH_SEEN_KEY etc.)",
+          "public_api": "window.SMTutorial.*",
+          "consumers": [
+            "onboarding flow triggered from app bootstrap"
+          ],
+          "oracle": "none found (grepped tests/**)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C09b or folded into C09 as a second packet — largest file in the whole uncovered set (1907 lines) by line count."
+        },
+        {
+          "id": "C08.browser.timeline-scroll-and-zoom",
+          "title": "Layer panel <-> frame grid scroll sync, and timeline zoom",
+          "files": [
+            "src/js/layer-scroll-sync.js (107 lines)",
+            "src/js/timeline-zoom.js (369 lines)"
+          ],
+          "symbols": [
+            "window.SMTimelineZoom",
+            "window.SMAudio",
+            "mirror",
+            "equalize"
+          ],
+          "responsibility": "layer-scroll-sync.js: 1:1 vertical scroll mirror between #layer-list and #fg-wrap (CLAUDE.md §11 names this file explicitly as the invariant to never re-break). timeline-zoom.js: Ctrl+wheel zoom + drag-to-zoom scrollbar, promoted out of a Labs prototype (the old src/js/labs/timeline-zoom.js is dead code per C06/DEF-1 in C06's own census, cross-referenced below).",
+          "writer": "scroll positions of both panels; timeline pixel-per-frame zoom state",
+          "public_api": "window.SMTimelineZoom.*",
+          "consumers": [
+            "motion.js timeline rendering",
+            "layer-inout.js"
+          ],
+          "oracle": "none found (grepped tests/**)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C10. Directly named in CLAUDE.md §11 as invariant-bearing — high care, low line count (476 combined)."
+        },
+        {
+          "id": "C08.browser.layer-kind-taxonomy",
+          "title": "Single source of truth for 'what kind of layer is this'",
+          "files": [
+            "src/js/layer-kind.js (149 lines)"
+          ],
+          "symbols": [
+            "window.SMLayerKind",
+            "FALLBACK",
+            "ICONS"
+          ],
+          "responsibility": "Consolidates 6 previously-inline flags (symbolId/nativeVideo/montageId/isNullLayer/isEffectLayer/isTextLayer) into one keyOf() classifier + icon/fallback/i18n tables. CLAUDE.md §13 explicitly flags this file's own known gap: the Guide layer kind has a keyOf branch but no ICONS/FALLBACK/i18n entry (pre-existing, not introduced here).",
+          "writer": "none (pure classifier, reads layer data)",
+          "public_api": "window.SMLayerKind.keyOf and friends",
+          "consumers": [
+            "timeline.js row rendering",
+            "select-bridge.js",
+            "app.js menu labels"
+          ],
+          "oracle": "none found (grepped tests/**)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C10b or folded into C10. Cross-ref CLAUDE.md §13's own documented Guide-layer icon gap — a real product-debt item, not a census gap."
+        },
+        {
+          "id": "C08.browser.wasm-engine-loaders",
+          "title": "GPU/WASM capability gating and geometry-wasm loader",
+          "files": [
+            "src/js/geometry-wasm-loader.js (56 lines)",
+            "src/js/gpu-gate.js (54 lines)"
+          ],
+          "symbols": [
+            "window.GeometryWasm",
+            "gate",
+            "showGate"
+          ],
+          "responsibility": "gpu-gate.js runs synchronously before any other app script to block unsupported browsers (no navigator.gpu) with a clear message instead of a silent mid-boot crash on the public web beta. geometry-wasm-loader.js loads the wasm-pack build output and exposes window.GeometryWasm={ready, boolean_op, fill_find, create_engine}.",
+          "writer": "none (loader/gate only)",
+          "public_api": "window.GeometryWasm.*, gpu-gate's DOM overlay",
+          "consumers": [
+            "every call site that checks GeometryWasm.ready before a Rust-side geometry op (CLAUDE.md §1 CompoundPath helpers, §3 engine bridge)"
+          ],
+          "oracle": "none found (grepped tests/**)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C11 (bundle with vectorize bridge below — same 'is the engine ready yet' shape)."
+        },
+        {
+          "id": "C08.browser.vectorize-worker-bridge",
+          "title": "Off-main-thread image vectorization bridge",
+          "files": [
+            "src/js/vectorize-wasm-loader.js (65 lines)",
+            "src/js/vectorize-worker.js (34 lines)"
+          ],
+          "symbols": [
+            "ensureWorker",
+            "vectorize_image",
+            "resultJson"
+          ],
+          "responsibility": "vectorize-wasm-loader.js spins up vectorize-worker.js as a Web Worker on demand (lazy, unlike geometry-wasm-loader's eager load) so vectorize_image()'s synchronous tracing call (color clustering + spline fitting, can take real seconds on a photo) never blocks the main thread.",
+          "writer": "none (worker plumbing only)",
+          "public_api": "window-level job queue (jobId/job2 pattern) exposed to callers",
+          "consumers": [
+            "image_vectorize-style UI actions"
+          ],
+          "oracle": "none found (grepped tests/**)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C11 (same leaf as wasm-engine-loaders — both are thin engine-readiness bridges)."
+        },
+        {
+          "id": "C08.browser.motion-graph-editor",
+          "title": "After Effects-style Graph Editor for Motion interpolation",
+          "files": [
+            "src/js/motion-graph.js (521 lines)"
+          ],
+          "symbols": [
+            "window.SMMotionGraph",
+            "window.SMMotion",
+            "window.SMEngineBridge"
+          ],
+          "responsibility": "Draws/edits the interpolation curve over time directly (curve view) instead of only inferring it from diamond keyframes on a track — a Motion-mode-only companion view to motion.js's own timeline (CLAUDE.md §11's panel/grid alignment invariant is motion.js's job, not this file's).",
+          "writer": "keyframe ease/curve values (via SMMotion)",
+          "public_api": "window.SMMotionGraph.*",
+          "consumers": [
+            "Motion panel toggle between track view and graph view"
+          ],
+          "oracle": "none found (grepped tests/**)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C12."
+        },
+        {
+          "id": "C08.browser.effector-duplicator-layer",
+          "title": "Duplicator effector as an animatable layer kind",
+          "files": [
+            "src/js/effector-layer.js (226 lines)"
+          ],
+          "symbols": [
+            "window.SMEffectorLayer",
+            "window.SMEngineBridge",
+            "window.SMMotion"
+          ],
+          "responsibility": "Feedback #168 (2026-08-30): exposes a mograph duplicator's effector as its own timeline row so its parameters become keyable, instead of being buried inside the duplicator's own settings panel.",
+          "writer": "ld.effector* on the synthetic effector layer",
+          "public_api": "window.SMEffectorLayer.*",
+          "consumers": [
+            "applyLayerDuplicator / getEffectiveStrokesRendered (app.js, per CLAUDE.md §1 dupIndex family)"
+          ],
+          "oracle": "none found (grepped tests/**)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C12. Entangled with CLAUDE.md §1's isDuplicatorCopy/dupIndex family-of-bug pattern — a future packet here should re-verify against that section's consumer list."
+        },
+        {
+          "id": "C08.browser.project-transplant",
+          "title": "Cross-project layer/media cherry-pick ('AEP Transplant')",
+          "files": [
+            "src/js/transplant.js (345 lines)"
+          ],
+          "symbols": [
+            "window.SMAssetTree",
+            "window.SMMediaLibrary",
+            "window.SMMotion"
+          ],
+          "responsibility": "Opens ANOTHER Nemo project's .json on disk and cherry-picks specific layers/media into the currently-open project, remapping layerUid. CLAUDE.md §13 notes transplant.js explicitly as NOT porting widget/exprControls (a documented v1 limitation, not a bug).",
+          "writer": "current project's userLayers/state.symbols on import",
+          "public_api": "window.SMAssetTree/SMMediaLibrary transplant entry points",
+          "consumers": [
+            "asset-tree.js panel"
+          ],
+          "oracle": "none found (grepped tests/**)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C12b."
+        },
+        {
+          "id": "C08.browser.app-updater-bridge",
+          "title": "Tauri auto-updater UI + web changelog fallback",
+          "files": [
+            "src/js/updater-bridge.js (260 lines)"
+          ],
+          "symbols": [
+            "window.SM",
+            "showVersion"
+          ],
+          "responsibility": "Bridges tauri_plugin_updater (Rust side registers it with a read-only repo-scoped token, capabilities/default.json grants updater:default) to a UI (download/reopen/spinner icons). showVersion() is the single dynamic source of the on-screen version string per CLAUDE.md §7 — index.html's title/status-text are only the pre-resolve fallback.",
+          "writer": "none (reads app.getVersion(), triggers plugin calls)",
+          "public_api": "window.SM.showVersion and update UI hooks",
+          "consumers": [
+            "Settings > Mises à jour de l'app panel, window title, status bar"
+          ],
+          "oracle": "none found (grepped tests/**)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C12b. Directly named in CLAUDE.md §7 — verify against that section before editing."
+        },
+        {
+          "id": "C08.browser.plugin-and-scripting-api",
+          "title": "Nemo scripting API + HTML plugin host",
+          "files": [
+            "src/js/nemo-script.js (695 lines)",
+            "src/js/nemo-plugin.js (220 lines)"
+          ],
+          "symbols": [
+            "window.SMBpm",
+            "window.SMEffectKeys",
+            "window.SMPlugin"
+          ],
+          "responsibility": "nemo-script.js exposes a `nemo` object (this app's document model in this app's vocabulary) plus a panel builder for user scripts. nemo-plugin.js hosts a plugin (ordinary HTML page + JSON manifest in a zip) as an in-app panel driven through that same `nemo` API — the extensibility surface pair.",
+          "writer": "whatever a loaded script/plugin chooses to touch via `nemo.*`",
+          "public_api": "window.nemo (script API), window.SMPlugin.* (plugin host)",
+          "consumers": [
+            "any installed script or plugin"
+          ],
+          "oracle": "none found (grepped tests/**)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C13. This is the app's actual third-party-extensibility attack surface — worth flagging for a security-review pass independent of the modularization census."
+        },
+        {
+          "id": "C08.browser.bitmap-import",
+          "title": "Single-image and numbered-sequence bitmap import",
+          "files": [
+            "src/js/images.js (782 lines)"
+          ],
+          "symbols": [
+            "window.SM",
+            "window.SMEngineBridge",
+            "window.SMLinkedMedia"
+          ],
+          "responsibility": "Imports single images or auto-detects numbered sequences (PRO_IMAGE_EXTS) as raster layers/frames; interacts with the engine bridge's image store (CLAUDE.md §5quinquies budget/eviction) and image-mesh's meshId propagation (§12).",
+          "writer": "raster stroke dicts per frame, image store registration",
+          "public_api": "window.SM.* image import entry points",
+          "consumers": [
+            "image-mesh.js (§12, meshId propagation depends on this import path)",
+            "engine-bridge.js image registration"
+          ],
+          "oracle": "none found (grepped tests/**)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C13b. Second-largest uncovered file (782 lines) — do not fold into the 'misc' packet below, size it as its own leaf."
+        },
+        {
+          "id": "C08.browser.media-integration-misc",
+          "title": "Grab-bag of external/preview integrations",
+          "files": [
+            "src/js/lottie-preview.js (137 lines)",
+            "src/js/lipsync.js (214 lines)",
+            "src/js/kitsu.js (468 lines)",
+            "src/js/p2p-contacts.js (163 lines)",
+            "src/js/tracker.js (186 lines)"
+          ],
+          "symbols": [
+            "window.SMLottiePreview",
+            "window.SMLipSync",
+            "window.SMKitsu",
+            "window.SMP",
+            "window.SMNativeVideo"
+          ],
+          "responsibility": "Five independent, unrelated integrations bundled here only because each is small and none is covered elsewhere: Lottie JSON round-trip preview; lip-sync audio-driven keyframe remap preview; Kitsu/zou pipeline integration (first outbound network code per its own header comment); P2P contact/pairing model (v1, no transport yet); Lucas-Kanade motion tracker's JS half (Rust half in geometry-wasm/src/track.rs, already covered elsewhere).",
+          "writer": "each keeps its own state; no shared writer",
+          "public_api": "five independent window.SM* namespaces",
+          "consumers": [
+            "tracker.js specifically depends on geometry-wasm/src/track.rs (verify which C0X packet owns that file before splitting this leaf)"
+          ],
+          "oracle": "none found (grepped tests/**)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C13c. Explicitly NOT one responsibility — a future leaf executing this should re-split per file; grouped here only for the completeness map, not as an extraction-ready packet."
+        }
+      ]
+    },
+    {
+      "area": "tooling-and-ci",
+      "proposed_future_ids": "C13-C14 (see notes; scripts/nemo is ~56 files and will likely need 2+ leaves on its own)",
+      "packets": [
+        {
+          "id": "C08.tooling.scripts-nemo-core",
+          "title": "scripts/nemo/*.cjs top-level tooling (30 files)",
+          "files": [
+            "scripts/nemo/*.cjs (30 files at top level, not lib/), scripts/nemo/README.md"
+          ],
+          "symbols": [],
+          "responsibility": "The job/verify/ci/doctor/capabilities/receipt/identity CLI surface referenced throughout the remediation program (Pollen's T02/#1088, the P02/#1004 baseline manifest). Not read file-by-file here per C08's own 'do not repeat C01-C07 research' instruction, since none of these were ever in a C01-C07 census to begin with — genuinely new ground.",
+          "writer": "reports/<runId>/*.json receipts",
+          "public_api": "npm run job / verify / ci / doctor (package.json scripts)",
+          "consumers": [
+            "every remediation task's Ready/Done acceptance check"
+          ],
+          "oracle": "scripts/nemo/*.test.cjs (co-located, already git-tracked)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C14. EXCLUDE lib/baseline.cjs and lib/baseline-verdicts.cjs from whatever leaf executes this — those two are already fully characterized by P02/#1004 and T02/#1051/#1088; re-deriving them would be duplicate work."
+        },
+        {
+          "id": "C08.tooling.scripts-nemo-lib",
+          "title": "scripts/nemo/lib/*.cjs shared library modules (26 files)",
+          "files": [
+            "scripts/nemo/lib/*.cjs (26 files, excluding baseline.cjs and baseline-verdicts.cjs)"
+          ],
+          "symbols": [],
+          "responsibility": "Shared modules imported by the scripts/nemo/*.cjs CLI surface above (profile loading, boundary rules, coverage computation, etc. per engineering/boundaries/profile.schema.json's own field names) — exact per-file responsibility not yet enumerated.",
+          "writer": "none known yet",
+          "public_api": "required by scripts/nemo/*.cjs",
+          "consumers": [
+            "scripts-nemo.profile.json consumers (engineering/boundaries/profiles/)"
+          ],
+          "oracle": "co-located *.test.cjs where present",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C14b. Cross-ref engineering/boundaries/profiles/scripts-nemo.*.json (Area 6 below) — same subsystem, split only because one is code and the other is data."
+        },
+        {
+          "id": "C08.tooling.standalone-build-scripts",
+          "title": "One-off build/lint scripts outside scripts/nemo/",
+          "files": [
+            "scripts/rebuild-ffmpeg-lgpl.sh",
+            "scripts/bundle-ffmpeg-dylibs.py",
+            "scripts/generate-third-party-notices.py",
+            "scripts/dev_server.py",
+            "scripts/build-mcp-sidecar.cjs",
+            "scripts/assert-no-private-labs.py"
+          ],
+          "symbols": [],
+          "responsibility": "Six independent single-purpose scripts: FFmpeg LGPL rebuild + dylib bundling (CLAUDE.md §7 step 3), third-party notice generation, the browser preview dev server, the MCP sidecar build, and a CI guard against private Labs prototypes leaking into a public build.",
+          "writer": "each writes its own artifact (rebuilt binary, bundled dylibs, notices file, etc.)",
+          "public_api": "invoked from npm scripts / CI workflows",
+          "consumers": [
+            ".github/workflows/*.yml (Area 3)"
+          ],
+          "oracle": "none found (grepped tests/**), assert-no-private-labs.py IS itself a test-shaped gate",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C14 (fold into scripts-nemo-core leaf as a tail section, or its own tiny leaf — six files, low line count each)."
+        },
+        {
+          "id": "C08.tooling.nemo-tooling-test-suite",
+          "title": "tests/ suite for the scripts/nemo tooling + fixtures",
+          "files": [
+            "tests/nemo-*.test.cjs (per grep: baseline, third-party-notices, native-runtime, native-ffmpeg-preflight, mcp-bundle, mcp-boundaries, mcp-adapter, and others)",
+            "tests/fixtures/** (53 files)",
+            "tests/bench/** (4 files)"
+          ],
+          "symbols": [],
+          "responsibility": "Test suite exercising scripts/nemo/** (packets above) plus the fixture trees those tests copy into temporary directories (per Pollen's #1088 finding: fixtures intentionally mirror only a SUBSET of scripts/nemo/, which is why compareToBaseline's require had to be lazy).",
+          "writer": "reports/**, temp fixture trees",
+          "public_api": "npm test (package.json), CI workflows",
+          "consumers": [
+            "scripts-nemo-core/lib packets above — same subsystem, split only because one is source and one is test"
+          ],
+          "oracle": "self-oracle (this IS the oracle for the tooling packets)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C14c. Do not size independently of C14/C14b — same subsystem."
+        },
+        {
+          "id": "C08.tooling.browser-and-app-test-suites",
+          "title": "Playwright/browser/animation/desktop app-behavior tests",
+          "files": [
+            "tests/browser/** (6 files)",
+            "tests/animation/** (6 files)",
+            "tests/desktop/** (4 files)",
+            "tests/integration/r06-browser-runtime.test.cjs",
+            "tests/text-selector.test.cjs",
+            "tests/project-open.test.cjs",
+            "tests/project-entry-repaint.test.cjs",
+            "tests/performance-regressions.test.cjs",
+            "tests/application-opacity.test.cjs",
+            "tests/application-opacity-bootstrap.test.cjs",
+            "tests/application-opacity-replay.test.cjs",
+            "tests/domain-opacity.test.cjs",
+            "tests/duplicator-hue.test.cjs",
+            "tests/easing-reference.test.cjs",
+            "tests/expr-bake.test.cjs",
+            "tests/feedback-2026-08-22.test.cjs"
+          ],
+          "symbols": [],
+          "responsibility": "Behavioral/regression tests for the actual application (browser UI, Animation 2D, desktop packaging) as opposed to the tooling suite above — likely the real oracle for several C01-C07 packets' 'oracle' fields, not yet cross-referenced.",
+          "writer": "test reports / playwright traces (cf. T03/#1073 playwright-failure-traces work)",
+          "public_api": "npm run test:browser / test:desktop etc.",
+          "consumers": [
+            "T01/#1073 JS coverage work, T03 playwright trace work — likely already touched some of these without claiming the files"
+          ],
+          "oracle": "self-oracle",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C15. A future leaf here should first check whether T01/T03 already characterized any of these files before re-reading them. Corrected during self-verification: initial draft used a .test.js extension guess for text-selector/project-open/project-entry-repaint/performance-regressions (actual extension is .test.cjs), and missed tests/integration/ (a whole subdirectory, r06-browser-runtime.test.cjs — 'r06' suggests it targets remediation issue R06, not yet cross-referenced) plus 8 individually-named test files (opacity x4, duplicator-hue, easing-reference, expr-bake, feedback-2026-08-22) that matched no glob in the first draft. application-opacity*/domain-opacity tests likely exercise src/js/domain/animation/opacity.js (C02-owned) and P15/#1065's opacity UI pilot — cross-ref before re-deriving."
+        },
+        {
+          "id": "C08.tooling.ci-workflows-and-root-config",
+          "title": "GitHub Actions workflows + root build/lint config",
+          "files": [
+            ".github/workflows/collaborator-pr-policy.yml",
+            ".github/workflows/deploy-feedback-worker.yml",
+            ".github/workflows/deploy-web.yml",
+            ".github/workflows/nemo-validation.yml",
+            ".github/workflows/release.yml",
+            ".github/scripts/collaborator-pr-policy.cjs",
+            ".github/scripts/collaborator-pr-policy.test.cjs",
+            "package.json",
+            "package-lock.json",
+            "playwright.config.cjs",
+            ".c8rc.json",
+            "wrangler.jsonc",
+            ".gitignore",
+            ".claude/launch.json",
+            "engineering/ci/README.md (CI policy doc referenced by CLAUDE.md §7)"
+          ],
+          "symbols": [],
+          "responsibility": "CI/CD pipeline definitions (collaborator PR policy bot per CLAUDE.md §9, feedback-worker and web deploy targets, the validation gate, the release build) plus root-level build tool configuration. Per repo policy (CLAUDE.md §7/AGENTS.md 'Work safely'), no workflow here may be dispatched/enabled without explicit human request — this packet is read-only inventory, not a trigger.",
+          "writer": "GitHub Actions run state (external)",
+          "public_api": "triggered by push/PR/manual dispatch per each workflow's own 'on:' block",
+          "consumers": [
+            "collaborator-pr-policy.yml is the one automatic exception noted in CLAUDE.md §9"
+          ],
+          "oracle": "workflow YAML has no local test oracle; collaborator-pr-policy.cjs has its own .test.cjs",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C14 tail section (small, config-shaped, pairs naturally with standalone-build-scripts)."
+        }
+      ]
+    },
+    {
+      "area": "native-shell-and-services",
+      "proposed_future_ids": "C15-C16",
+      "packets": [
+        {
+          "id": "C08.native.src-tauri-build-and-config",
+          "title": "src-tauri/ non-source: build/config/generated/icons/keys",
+          "files": [
+            "src-tauri/Cargo.lock",
+            "src-tauri/Cargo.toml",
+            "src-tauri/build.rs",
+            "src-tauri/tauri.conf.json",
+            "src-tauri/capabilities/default.json",
+            "src-tauri/gen/schemas/*.json (4 files)",
+            "src-tauri/icons/* (7 files)",
+            "src-tauri/.tauri_private_key.pub"
+          ],
+          "symbols": [],
+          "responsibility": "Everything in src-tauri/ that is NOT hand-written Rust application logic — the actual src-tauri/src/*.rs (lib.rs, commands, etc.) is already claimed elsewhere (grep confirms it does not appear in this uncovered set). This packet is build metadata, Tauri capability/ACL config, wasm-pack-equivalent generated schemas, app icons, and the PUBLIC half of the updater signing key (private key is git-ignored per CLAUDE.md §9, never committed).",
+          "writer": "gen/schemas/* is regenerated by `tauri` CLI, not hand-edited",
+          "public_api": "consumed by the Tauri build + OS installers",
+          "consumers": [
+            "updater-bridge.js (Area 1) reads the update-relevant subset of tauri.conf.json indirectly via the updater plugin"
+          ],
+          "oracle": "npm run doctor surfaces sidecar/dylib mismatches (CLAUDE.md §7 step 3)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C15. Config/generated only — low risk, unlikely to need a full symbol-level packet treatment."
+        },
+        {
+          "id": "C08.native.ffmpeg-sidecar-binary",
+          "title": "Vendored FFmpeg sidecar binary",
+          "files": [
+            "src-tauri/binaries/ffmpeg-aarch64-apple-darwin"
+          ],
+          "symbols": [],
+          "responsibility": "The LGPL-relinked FFmpeg binary described at length in CLAUDE.md §7 (VideoToolbox H.264/H.265, dynamically linked against Homebrew dylibs). Provenance already documented in THIRD_PARTY_NOTICES.md and THIRD_PARTY_LICENSES_RUST_TAURI.txt — this packet's job is to verify those notices are still current, not re-derive them.",
+          "writer": "rebuilt by scripts/rebuild-ffmpeg-lgpl.sh (Area 2)",
+          "public_api": "invoked by export.js (already covered elsewhere) via Tauri sidecar API",
+          "consumers": [
+            "scripts/bundle-ffmpeg-dylibs.py"
+          ],
+          "oracle": "npm run doctor (sidecar dylibs check)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C15 (fold into src-tauri-build-and-config — same 'verify config/binary is current' shape, not a code-reading task)."
+        },
+        {
+          "id": "C08.native.feedback-worker-service",
+          "title": "Cloudflare Worker: beta-tester feedback intake",
+          "files": [
+            "worker-feedback/README.md",
+            "worker-feedback/src/index.js",
+            "worker-feedback/wrangler.jsonc"
+          ],
+          "symbols": [],
+          "responsibility": "The entire trust boundary described in CLAUDE.md §6: the ONLY holder of the GitHub write-scoped token (GITHUB_FEEDBACK_TOKEN, Cloudflare secret), handles /issue and /attachment for both desktop and web builds, runs spam filtering (looksLikeSpam). Zero C01-C07 coverage — this is a real, security-relevant gap, not a documentation nicety.",
+          "writer": "GitHub Issues in mysteropodes/nemo, commits to mysteropodes/strokemotion-feedback",
+          "public_api": "POST /issue, POST /attachment (called via window.__TAURI__.http.fetch on desktop, plain fetch on web)",
+          "consumers": [
+            "feedback-bridge.js (src/js/, check whether already covered by C06 or C07 before assuming it's this packet's job too)"
+          ],
+          "oracle": "none found (grepped tests/**) — flag for a follow-up oracle, given it handles a write-scoped secret",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C16. Higher priority than its file count (3) suggests, given it is the app's only outbound-write-credential surface."
+        },
+        {
+          "id": "C08.native.web-deploy-worker",
+          "title": "Cloudflare Worker: static web app deploy target",
+          "files": [
+            "worker/index.js",
+            "wrangler.jsonc (root)"
+          ],
+          "symbols": [],
+          "responsibility": "Separate Worker from worker-feedback/ (its own wrangler.jsonc), paired with .github/workflows/deploy-web.yml. Not read in depth — flagged as distinct from the feedback worker so a future leaf doesn't conflate the two.",
+          "writer": "unknown (not read)",
+          "public_api": "unknown (not read)",
+          "consumers": [
+            "deploy-web.yml"
+          ],
+          "oracle": "none found (grepped tests/**)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C16b or fold into C16 as a second packet — genuinely un-characterized, only its existence and separateness from worker-feedback/ is established here."
+        },
+        {
+          "id": "C08.native.nemo-mcp-build-metadata",
+          "title": "nemo-mcp/ build metadata only",
+          "files": [
+            "nemo-mcp/Cargo.lock",
+            "nemo-mcp/Cargo.toml"
+          ],
+          "symbols": [],
+          "responsibility": "All of nemo-mcp/src/*.rs, build.rs, and tests/*.rs are already claimed by C07 (application-mcp-diagnostics) per grep verification — only the two Cargo build files are outside its scope_files, same category as any other package manifest.",
+          "writer": "cargo build",
+          "public_api": "n/a",
+          "consumers": [],
+          "oracle": "n/a (build metadata)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "No proposed leaf needed — trivial, fold into whichever leaf touches Cargo manifests generally, or leave unowned like package-lock.json."
+        }
+      ]
+    },
+    {
+      "area": "rust-wasm-engine-crates",
+      "proposed_future_ids": "C17",
+      "packets": [
+        {
+          "id": "C08.engines.geometry-wasm-shaders-and-tests",
+          "title": "geometry-wasm/ non-.rs-source: WGSL shaders + integration tests",
+          "files": [
+            "geometry-wasm/src/blend.wgsl",
+            "geometry-wasm/src/blur.wgsl",
+            "geometry-wasm/src/color_adjust.wgsl",
+            "geometry-wasm/src/matte.wgsl",
+            "geometry-wasm/src/simple_fx.wgsl",
+            "geometry-wasm/src/vignette.wgsl",
+            "geometry-wasm/tests/dab_dense_overlap_repro.rs",
+            "geometry-wasm/tests/effect_layer_overlay_repro.rs",
+            "geometry-wasm/tests/shader_library_validation.rs",
+            "geometry-wasm/Cargo.lock",
+            "geometry-wasm/Cargo.toml"
+          ],
+          "symbols": [],
+          "responsibility": "The engine.rs/viewport.rs/composite_scene Rust source (CLAUDE.md §3/§5ter/§5quater) is already claimed elsewhere (not in this uncovered set) — what remains is the actual GPU shader source (6 .wgsl files, real hand-written code, not generated) plus 3 regression-repro integration tests and Cargo build files.",
+          "writer": "compiled into the wasm binary at build time",
+          "public_api": "invoked from Rust via wgpu pipeline setup",
+          "consumers": [
+            "composite_scene (CLAUDE.md §3 — the one place render logic is allowed to live)"
+          ],
+          "oracle": "the 3 tests/*.rs files ARE the oracle for at least dab-overlap and effect-layer-overlay regressions",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C17. WGSL shader source is real logic (blend modes, blur, color adjust, matte, vignette) — do not treat as generated/vendor."
+        },
+        {
+          "id": "C08.engines.vectorize-engine-crates",
+          "title": "vectorize-core + vectorize-wasm Rust crates",
+          "files": [
+            "vectorize-core/src/lib.rs",
+            "vectorize-core/Cargo.lock",
+            "vectorize-core/Cargo.toml",
+            "vectorize-wasm/src/lib.rs",
+            "vectorize-wasm/Cargo.lock",
+            "vectorize-wasm/Cargo.toml"
+          ],
+          "symbols": [],
+          "responsibility": "Backs the JS vectorize-worker.js/vectorize-wasm-loader.js bridge (Area 1): color clustering + spline fitting to trace a bitmap into vector paths. Single lib.rs per crate — sizes not read in depth here (map-level only, per C08's own work-size guidance).",
+          "writer": "unknown (not read in depth)",
+          "public_api": "vectorize_image() WASM export, called from vectorize-worker.js",
+          "consumers": [
+            "src/js/vectorize-wasm-loader.js, src/js/vectorize-worker.js (Area 1, same feature split JS/Rust)"
+          ],
+          "oracle": "not checked",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C17b or fold into C17 — a future leaf should read both lib.rs files' actual line counts before committing to a work-size estimate."
+        }
+      ]
+    },
+    {
+      "area": "vendor-generated-and-provenance",
+      "proposed_future_ids": "C18 (provenance-verification shape, not module-boundary packets)",
+      "packets": [
+        {
+          "id": "C08.vendor.vendored-js-libraries",
+          "title": "Third-party JS libraries vendored in src/js/ and src/",
+          "files": [
+            "src/js/ag-psd.vendor.mjs",
+            "src/js/delaunator.vendor.js",
+            "src/js/mp4box.all.min.js",
+            "src/js/node-buffer-shim.vendor.mjs",
+            "src/js/opentype.min.js",
+            "src/paper-full.min.js"
+          ],
+          "symbols": [],
+          "responsibility": "Not application code — Paper.js itself (paper-full.min.js), PSD parsing, Delaunay triangulation (used by image-mesh per CLAUDE.md §12's own credit: 'Delaunator, ISC, vendorisé'), MP4 box parsing, a Node Buffer shim, and font parsing. Provenance already recorded in THIRD_PARTY_NOTICES.md.",
+          "writer": "n/a (vendored, not hand-edited)",
+          "public_api": "imported by many app modules",
+          "consumers": [],
+          "oracle": "THIRD_PARTY_NOTICES.md is the oracle: verify it still lists all six, not re-derive licenses",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C18. This is a verification checklist (does the notices file match what's actually vendored), not a code-reading task."
+        },
+        {
+          "id": "C08.vendor.wasm-generated-bindings",
+          "title": "wasm-pack generated JS/TS bindings",
+          "files": [
+            "src/wasm/geometry_wasm.js",
+            "src/wasm/geometry_wasm.d.ts",
+            "src/wasm/geometry_wasm_bg.wasm",
+            "src/wasm/geometry_wasm_bg.wasm.d.ts",
+            "src/wasm/package.json",
+            "src/wasm-vectorize/vectorize_wasm.js",
+            "src/wasm-vectorize/vectorize_wasm.d.ts",
+            "src/wasm-vectorize/vectorize_wasm_bg.wasm",
+            "src/wasm-vectorize/vectorize_wasm_bg.wasm.d.ts",
+            "src/wasm-vectorize/package.json"
+          ],
+          "symbols": [],
+          "responsibility": "Build output of `wasm-pack build` for geometry-wasm and vectorize-wasm respectively (Area 4) — regenerated on every native build, never hand-edited.",
+          "writer": "wasm-pack (build tool)",
+          "public_api": "imported by geometry-wasm-loader.js / vectorize-wasm-loader.js (Area 1)",
+          "consumers": [],
+          "oracle": "n/a (generated)",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "No packet-level ownership needed beyond 'regenerated, don't hand-edit' — same category as package-lock.json."
+        },
+        {
+          "id": "C08.vendor.static-assets",
+          "title": "Fonts, icons, logos, reference 3D models",
+          "files": [
+            "src/fonts/*.ttf (7 files)",
+            "src/favicon-32.png",
+            "src/favicon-64.png",
+            "src/logo-128.png",
+            "src/logo-64.png",
+            "src/_headers",
+            "src/assets/reference-3d/* (5 files incl. ATTRIBUTION.md)",
+            "assets/* (root, 7 files)"
+          ],
+          "symbols": [],
+          "responsibility": "Static binary/text assets — fonts (DejaVu/Inter/Manrope/Roboto, need license verification against THIRD_PARTY_NOTICES.md), app icons/logos, Cloudflare Pages _headers file, and a CC0-licensed reference 3D rig (already has its own ATTRIBUTION.md).",
+          "writer": "n/a",
+          "public_api": "referenced by CSS/HTML/3D-reference tooling",
+          "consumers": [],
+          "oracle": "n/a",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Proposed C18b or fold into C18 — verify font licenses are in THIRD_PARTY_NOTICES.md (fonts are the one asset category with real license obligations)."
+        }
+      ]
+    },
+    {
+      "area": "documentation-and-process",
+      "proposed_future_ids": "none proposed — accounted for and explicitly excluded from extraction packeting",
+      "packets": [
+        {
+          "id": "C08.docs.remediation-program-docs",
+          "title": "Program planning, ADRs, evidence, and root-level docs",
+          "files": [
+            "engineering/remediation/** (14 files)",
+            "engineering/project-management/** (8 files)",
+            "engineering/contracts/** (3 files)",
+            "engineering/application/** (3 files, note transport-v1.schema.json is machine-read, see notes)",
+            "engineering/animation/** (36 files, mostly ADRs + browser-evidence-20260905/*.png screenshots)",
+            "engineering/runtime-isolation.md",
+            "docs/FUNCTIONAL_GAPS.md",
+            "README.md",
+            "LICENSE",
+            "CONTRIBUTING.md",
+            "AGENTS.md",
+            "CLAUDE.md",
+            "THIRD_PARTY_LICENSES_RUST_TAURI.txt",
+            "THIRD_PARTY_LICENSES_RUST_WASM.txt",
+            "THIRD_PARTY_NOTICES.md"
+          ],
+          "symbols": [],
+          "responsibility": "Prose documentation, ADRs, and screenshot evidence artifacts for the remediation program and prior feature work (e.g. the curve-runner ADR, browser acceptance evidence). Not module-boundary extraction candidates — there is no 'responsibility' to partition, no writer/consumer pair to name. Accounted for here so C08's set-difference does not silently drop 101 files.",
+          "writer": "human/agent editors",
+          "public_api": "read by contributors and by this very remediation program",
+          "consumers": [],
+          "oracle": "n/a — not code",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "engineering/application/transport-v1.schema.json is a real machine-consumed JSON Schema, not prose — flagged here rather than moved to Area 6's config packet only because it's small (1 file) and thematically closer to program docs; a stricter partition could move it."
+        },
+        {
+          "id": "C08.docs.boundary-enforcement-config-data",
+          "title": "Machine-consumed boundary/profile config (data, not docs)",
+          "files": [
+            "engineering/boundaries/README.md",
+            "engineering/boundaries/profile.schema.json",
+            "engineering/boundaries/profiles/*.json (per grep: app-js.baseline.json, app-js.coverage.json, app-js.profile.json, mcp-rust.profile.json, scripts-nemo.baseline.json, and others)",
+            "engineering/boundaries/profiles/app-surfaces.md",
+            "engineering/boundaries/profiles/scripts-nemo.md",
+            "engineering/boundaries/profiles/scripts-nemo.fixture/** (10 files: deliberately-violating .cjs fixtures used by the boundary-checker's own test suite — cycle-a/b, oversized, expired, priv-secret/importer/target, adapter-target, global-offender, shared-violator)"
+          ],
+          "symbols": [],
+          "responsibility": "Unlike the prose docs above, these JSON files are ACTUALLY READ by scripts/nemo/** tooling (Area 2) to enforce module size/dependency gates — e.g. scripts-nemo.profile.json's hardMax=400 was the exact constraint Pollen's #1088 split against. Distinguishing this from Area 6's docs packet matters: editing these has real enforcement consequences.",
+          "writer": "edited by whichever leaf adds/moves a file governed by a profile (e.g. #1088's one-line diff to nemo.lib.baseline's files array)",
+          "public_api": "read by scripts/nemo/lib/** boundary-checking code (Area 2)",
+          "consumers": [
+            "scripts-nemo-core/lib packets (Area 2) — same subsystem, split only because one is code and one is data"
+          ],
+          "oracle": "scripts/nemo's own test suite (Area 2) exercises these profiles",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "No new leaf proposed — this is config for Area 2's leaves, not an independent extraction target."
+        },
+        {
+          "id": "C08.docs.inventory-and-census-artifacts",
+          "title": "This census program's own outputs",
+          "files": [
+            "engineering/inventory/BASELINE.md",
+            "engineering/inventory/BINDING_REPAIR_20260905.md",
+            "engineering/inventory/SURFACES.md",
+            "engineering/inventory/baseline-manifest.json",
+            "engineering/inventory/surfaces.csv",
+            "engineering/inventory/surfaces.json",
+            "engineering/inventory/census/C01-document-history.json",
+            "engineering/inventory/census/C02-animation-time.json",
+            "engineering/inventory/census/C03-rendering-resource-ownership.json",
+            "engineering/inventory/census/C04a-editor-tools-selection.json",
+            "engineering/inventory/census/C04b-editor-presentation-support.json",
+            "engineering/inventory/census/C05-media-import-export-native.json",
+            "engineering/inventory/census/C06-preferences-labs-bootstrap.json",
+            "engineering/inventory/census/C07-application-mcp-diagnostics.json"
+          ],
+          "symbols": [],
+          "responsibility": "Self-referential: these ARE C01-C07's own delivered outputs (plus P02's baseline manifest). Listed here only so the set-difference computation is honest about every git-tracked path, not because they need their own extraction packet. This C08 file itself (once committed) joins this list.",
+          "writer": "C01-C08 authors",
+          "public_api": "the orchestrator, when folding into engineering/inventory/remediation-scope.json",
+          "consumers": [],
+          "oracle": "n/a",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "No leaf proposed. Note for the orchestrator: engineering/inventory/remediation-scope.json (C08's own bounded-ownership target) does not exist yet at this SHA — this census is the input to creating it, not a report about an existing file."
+        },
+        {
+          "id": "C08.docs.periodic-checkin-logs",
+          "title": "40min-checkins/ periodic log entries",
+          "files": [
+            "40min-checkins/*.md (17 files, dated 2026-09-05 and 2026-09-06)"
+          ],
+          "symbols": [],
+          "responsibility": "Dated markdown check-in notes, format '<date>-checkin-<NN>.md'. Purpose not established by this census (not referenced by CLAUDE.md/AGENTS.md, not read in depth) — flagged factually rather than characterized, since guessing its intent risks being wrong.",
+          "writer": "unknown",
+          "public_api": "unknown",
+          "consumers": [],
+          "oracle": "n/a",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "No leaf proposed. Recommend a human call on whether this directory is still live process (keep accounting for it in future censuses) or a one-time artifact (could be archived) — not this census's decision to make."
+        }
+      ]
+    }
+  ],
+  "cross_cutting_notes": [
+    "DEF-1/2/3 (full-file duplicates) and DEF-4 (phantom reservation) all trace to Honey's own three prior deliverables (C02, C03, C04b) never being diffed against EACH OTHER before merge — each was reviewed for internal consistency and against immediately-prior siblings (per Fizz's C02 canvas-drag-interactions review), but not against every already-merged census. Recommend the census review checklist add: 'diff this PR's scope_files against the UNION of all already-merged census scope_files, not just line-range overlap within this PR's own packets.'",
+    "geometry-wasm (Area 4) + vectorize-core/vectorize-wasm (Area 4) + their JS loader bridges (Area 1: geometry-wasm-loader.js, vectorize-wasm-loader.js, vectorize-worker.js) form one natural dependency cluster for the remediation program's stated Rust-MCP integration goal — a future extraction pass should treat them together even though this census splits them by area (JS vs Rust) for mapping purposes only.",
+    "scripts/nemo/lib/baseline.cjs and lib/baseline-verdicts.cjs are the ONLY two files under scripts/ or tests/ that already have deep characterization (via P02/#1004 and T02/#1051/#1088) — explicitly excluded from C08.tooling.scripts-nemo-lib's file list so a future leaf doesn't re-derive them.",
+    "worker-feedback/ (Area 3) is the single highest-priority genuine gap by risk rather than size: 3 files, but it is the app's only holder of a GitHub write-scoped secret (CLAUDE.md §6) and has zero test oracle. Recommend the orchestrator prioritize its leaf over larger-but-lower-risk clusters."
+  ],
+  "known_defects": [
+    {
+      "id": "DEF-1",
+      "file": "src/js/shader-effects-library.js",
+      "line": "1-1314 (whole file)",
+      "summary": "Fully duplicated whole-file ownership: C03's packet C03.js-effects-and-playback.shader-effects-library (lines 4-1314) and C04b's five packets (shader-table-registry x2 ranges + shader-table-data-1/2/3, together 1-1314) both claim the entire 1314-line file with REAL packets on both sides (not a phantom scope_files entry — verified at the packets[].files level, not just top-level scope_files).",
+      "packet": "C03.js-effects-and-playback.shader-effects-library / C04b.presets-and-effects.shader-table-*",
+      "severity": "census-consistency defect, both docs authored by Honey"
+    },
+    {
+      "id": "DEF-2",
+      "file": "src/js/expr-code-panel.js",
+      "line": "1-474 (whole file)",
+      "summary": "Fully duplicated whole-file ownership: C02.expressions.expr-code-split-editor and C04b.docked-panels.expr-code-editor both declare 'src/js/expr-code-panel.js (whole, 474 lines)' as a real packet.",
+      "packet": "C02.expressions.expr-code-split-editor / C04b.docked-panels.expr-code-editor",
+      "severity": "census-consistency defect, both docs authored by Honey"
+    },
+    {
+      "id": "DEF-3",
+      "file": "src/js/text-animator.js, src/js/text-animator-panel.js",
+      "line": "whole files (433 and 486 lines)",
+      "summary": "Fully duplicated whole-file ownership: C02.text-animation.presets / C02.text-animation.selectors-panel vs C04b.animated-primitives.text-animator / C04b.docked-panels.text-animator-panel — same two files, both sides real packets.",
+      "packet": "C02.text-animation.* / C04b.animated-primitives.text-animator, C04b.docked-panels.text-animator-panel",
+      "severity": "census-consistency defect, both docs authored by Honey"
+    },
+    {
+      "id": "DEF-4",
+      "file": "src/js/asset-tree.js, src/js/history-panel.js, src/js/color-manager.js, src/js/path-fx.js, src/js/custom-effects.js",
+      "line": "n/a (scope_files-level, not packet-level)",
+      "summary": "C04b's top-level scope_files array lists these 5 files, but ZERO C04b packets actually reference any of them (verified at packets[].files level) — a phantom reservation. True sole owners are C01 (asset-tree.js, history-panel.js) and C03 (the other three), each with real packets.",
+      "packet": "C04b-editor-presentation-support.json top-level scope_files",
+      "severity": "census-metadata defect (over-declared reservation, no actual overlap in practice), authored by Honey"
+    },
+    {
+      "id": "DEF-5",
+      "file": "src/js/timeline.js",
+      "line": "~11187 of 11907 lines (94%)",
+      "summary": "C02's own scope_files annotation for timeline.js claims 'the remaining ~11700 lines are owned by sibling census tasks C01/C04a/C04b/C05/C06' — false per packet-level audit: C04a, C04b and C05 own ZERO packets touching timeline.js. Total real packet coverage across ALL EIGHT census docs (C01/C02/C03/C04a/C04b/C05/C06/C07) is 720/11907 lines = 6.0%. The remaining 94% (16 gaps, largest 3344 and 1914 and 1846 contiguous lines) — including stretches of the panel/grid rendering CLAUDE.md §11 calls its #1 invariant — has no packet anywhere despite reading as fully accounted for.",
+      "packet": "C02-animation-time.json scope_files (the misleading delegation note)",
+      "severity": "high — largest single uncovered-responsibility gap found by this census, file is explicitly invariant-bearing per CLAUDE.md §11"
+    },
+    {
+      "id": "DEF-6",
+      "file": "engineering/inventory/census/C02-animation-time.json",
+      "line": "scope_files array (14 entries)",
+      "summary": "C02's scope_files uses free-text annotated prose ('src/js/motion.js (whole, 13929 lines)', multi-sentence partial-range descriptions) instead of the plain-path or path:line-range convention every other census (C01/C03/C04a/C04b/C05/C06/C07) follows. This directly defeats C08's own instruction to 'verify set difference mechanically' — a naive automated diff silently mismatches all 14 entries (confirmed: this is exactly what happened on this census's first pass, caught only by manual normalization).",
+      "packet": "C02-animation-time.json (schema-level, not any one packet)",
+      "severity": "tooling-risk — any future automated consumer of scope_files (e.g. feeding engineering/boundaries/profiles/*.json) needs the same normalization or will silently miscompute coverage"
+    }
+  ],
+  "uncovered_responsibilities": [
+    "src/js/timeline.js's real ~11187-line gap (DEF-5) is flagged with full evidence here but NOT sized or packet-split — at over 11,000 lines with CLAUDE.md §11's documented alignment/scroll/zoom invariants, a proper packet-level treatment is itself several leaf tasks' worth of work, which would blow this census's own work-size budget. The orchestrator should treat this as its own multi-leaf mini-program (candidate: C19+), not a single proposed ID.",
+    "vectorize-core/src/lib.rs and vectorize-wasm/src/lib.rs line counts and internal structure were not read (map-level only, per C08's own 'no packet requires days of implementation' guidance applied to the mapping step itself) — a future leaf executing C08.engines.vectorize-engine-crates should confirm actual size before committing to a single-leaf work estimate.",
+    "40min-checkins/ (17 files) purpose is genuinely unknown to this census — not characterized as either process-live or archivable; flagged for a human decision rather than guessed.",
+    "worker/index.js and root wrangler.jsonc (C08.native.web-deploy-worker) were confirmed to exist and be distinct from worker-feedback/, but not read beyond that — lowest-confidence packet in this census."
+  ]
+}
