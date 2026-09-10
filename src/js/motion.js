@@ -1713,22 +1713,19 @@
   function exprStepTime(everyNFrames) {
     var ctx = _ectx;
     if (!ctx) return 0;
-    var n = Number(everyNFrames);
-    if (!isFinite(n) || n <= 0) return ctx.frame;
-    ctx.frame = Math.floor(ctx.frame / n) * n;
+    ctx.frame = NemoExpressionTimeDomain.stepTime(ctx.frame, everyNFrames);
     ctx.time = ctx.frame / ctx.fps;
     return ctx.frame;
   }
   function exprToFrames(seconds) {
     var ctx = _ectx;
     var s = (seconds === undefined) ? (ctx ? ctx.time : 0) : _num(seconds);
-    return s * (ctx ? ctx.fps : _exprFps());
+    return NemoExpressionTimeDomain.toFrames(s, ctx ? ctx.fps : _exprFps());
   }
   function exprToSeconds(frames) {
     var ctx = _ectx;
     var f = (frames === undefined) ? (ctx ? ctx.frame : 0) : _num(frames);
-    var r = ctx ? ctx.fps : _exprFps();
-    return r === 0 ? 0 : f / r;
+    return NemoExpressionTimeDomain.toSeconds(f, ctx ? ctx.fps : _exprFps());
   }
 
   // ---- randomness -------------------------------------------------------
