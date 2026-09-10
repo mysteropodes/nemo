@@ -1,0 +1,33 @@
+=== attach-1: handshake + capability listing ===
+ initialize -> protocolVersion 2025-06-18 | serverInfo {'name': 'nemo', 'version': '0.1.0'}
+              capabilities {'tools': {}}
+ tools/list -> ['nemo_command', 'nemo_discover', 'nemo_query']
+
+=== attach-2: nemo_discover ===
+ 4 responsive instance(s):
+   instanceId 103cf3e8-a523-4444-8594-7dcab037abda
+     buildId    0.7.0-alpha.4:66ece0641708122eb8447e85ad8dd7e3402aaf6c
+     documentId ad8898e0-67bb-4084-8a3a-299103f53de0  revision 0
+     operations 11, properties ['opacity']
+   instanceId 3a24f756-1fbc-4f19-b88a-a09963dee31e
+     buildId    0.7.0-alpha.4:66ece0641708122eb8447e85ad8dd7e3402aaf6c
+     documentId 325a7990-6d0f-4fe2-8917-a07376e4a11f  revision 0
+     operations 11, properties ['opacity']
+   instanceId 43d07397-b349-4f68-a362-7f888919f082
+     buildId    0.7.0-alpha.4:66ece0641708122eb8447e85ad8dd7e3402aaf6c
+     documentId 26d810bf-667c-431f-a8a8-bb621e1bb5c4  revision 0
+     operations 11, properties ['opacity']
+   instanceId a95225ae-7a3e-4b61-abb9-a3c1deb09dfc
+     buildId    0.7.0-alpha.4:66ece0641708122eb8447e85ad8dd7e3402aaf6c
+     documentId b18f19df-ad89-4d7d-8b50-926b444295f2  revision 0
+     operations 11, properties ['opacity']
+
+=== attach-3: instance selection (correlated by JSON-RPC id, NOT order) ===
+ id=12 negative control 00000000-0000-4000-8000-000000000000 (never registered)
+   -> refused: unavailable / Selected instance is absent; discover again after reconnect
+ id=11 intended B 3a24f756-1fbc-4f19-b88a-a09963dee31e (pid 89385)
+   -> reached instanceId 3a24f756-1fbc-4f19-b88a-a09963dee31e  [MATCHES REQUESTED]
+      documentId 325a7990-6d0f-4fe2-8917-a07376e4a11f
+ id=10 intended A 103cf3e8-a523-4444-8594-7dcab037abda (pid 89295)
+   -> reached instanceId 103cf3e8-a523-4444-8594-7dcab037abda  [MATCHES REQUESTED]
+      documentId ad8898e0-67bb-4084-8a3a-299103f53de0

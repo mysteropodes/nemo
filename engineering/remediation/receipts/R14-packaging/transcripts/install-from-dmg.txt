@@ -1,0 +1,58 @@
+# Install the locally built package the way a user does: mount the DMG,
+# copy Nemo.app out of it, eject. Target is ~/Applications so the existing
+# /Applications/Nemo.app (2026-07-20 build) is not overwritten.
+
+## dmg identity
+-rw-r--r--@ 1 cyril  staff  38025816 Sep  7 22:31 src-tauri/target/release/bundle/dmg/Nemo_0.7.0-alpha.4_aarch64.dmg
+6fc3bdca79f0fe602a28320f58ad4f1bb9416422740e766fb18082eb3cadaa5d  src-tauri/target/release/bundle/dmg/Nemo_0.7.0-alpha.4_aarch64.dmg
+
+## hdiutil attach
+Calcul de la somme de contrôle de Protective Master Boot Record (MBR : 0)…
+Protective Master Boot Record (MBR : : vérifiée   CRC32 $F9315418
+Calcul de la somme de contrôle de GPT Header (Primary GPT Header : 1)…
+ GPT Header (Primary GPT Header : 1) : vérifiée   CRC32 $6BEC9C45
+Calcul de la somme de contrôle de GPT Partition Data (Primary GPT Table : 2)…
+GPT Partition Data (Primary GPT Tabl : vérifiée   CRC32 $113B102E
+Calcul de la somme de contrôle de  (Apple_Free : 3)…
+                    (Apple_Free : 3) : vérifiée   CRC32 $00000000
+Calcul de la somme de contrôle de disk image (Apple_HFS : 4)…
+          disk image (Apple_HFS : 4) : vérifiée   CRC32 $32968FA7
+Calcul de la somme de contrôle de  (Apple_Free : 5)…
+                    (Apple_Free : 5) : vérifiée   CRC32 $00000000
+Calcul de la somme de contrôle de GPT Partition Data (Backup GPT Table : 6)…
+GPT Partition Data (Backup GPT Table : vérifiée   CRC32 $113B102E
+Calcul de la somme de contrôle de GPT Header (Backup GPT Header : 7)…
+  GPT Header (Backup GPT Header : 7) : vérifiée   CRC32 $FF6C06A8
+vérifiée   CRC32 $058E9413
+/dev/disk13         	GUID_partition_scheme          	
+/dev/disk13s1       	Apple_HFS                      	/private/tmp/r14h-mnt
+
+## contents of the mounted image
+total 360
+drwxr-xr-x@  6 cyril  staff     272 Sep  7 22:30 .
+drwxrwxrwt  58 root   wheel    1856 Sep  7 22:31 ..
+-rw-r--r--@  1 cyril  staff    6148 Sep  7 22:30 .DS_Store
+-rw-r--r--@  1 cyril  staff  170842 Sep  7 22:30 .VolumeIcon.icns
+lrwxr-xr-x@  1 cyril  staff      13 Sep  7 22:30 Applications -> /Applications
+drwxr-xr-x@  3 cyril  staff     102 Sep  7 22:30 Nemo.app
+
+## nemo-mcp INSIDE the disk image (before any copy)
+total 126616
+-rwxr-xr-x@ 1 cyril  staff  22127000 Sep  7 22:20 ffmpeg
+-rwxr-xr-x@ 1 cyril  staff  39027056 Sep  7 22:30 nemo
+-rwxr-xr-x@ 1 cyril  staff   3662976 Sep  7 22:30 nemo-mcp
+93f346fa05ba62446c31a49a0c19f5b30418d0cbdc032819eb54a3b6799cd1de  /tmp/r14h-mnt/Nemo.app/Contents/MacOS/nemo-mcp
+
+## copy to ~/Applications
+copied
+
+## eject
+"disk13" ejected.
+
+## installed package
+total 126616
+-rwxr-xr-x@ 1 cyril  staff  22127000 Sep  7 22:31 ffmpeg
+-rwxr-xr-x@ 1 cyril  staff  39027056 Sep  7 22:31 nemo
+-rwxr-xr-x@ 1 cyril  staff   3662976 Sep  7 22:31 nemo-mcp
+93f346fa05ba62446c31a49a0c19f5b30418d0cbdc032819eb54a3b6799cd1de  <HOME>/Applications/Nemo.app/Contents/MacOS/nemo-mcp
+a5c0882ebc51ba0706aaffe39340b9448aa59ca919c479bbb7438d0c36a91245  <HOME>/Applications/Nemo.app/Contents/MacOS/nemo

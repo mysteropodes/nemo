@@ -1,0 +1,9 @@
+# scripts/bundle-ffmpeg-dylibs.py — run after npm run build (CLAUDE.md §7 step 3)
+# command: python3 scripts/bundle-ffmpeg-dylibs.py src-tauri/target/release/bundle/macos/Nemo.app
+
+ERROR: dependency not resolvable on this machine: /opt/homebrew/opt/svt-av1/lib/libSvtAv1Enc.4.dylib (from <HOME>/.buzz/REPOS/nemo-worktrees/buzz-7f3a1c924b6d/src-tauri/target/release/bundle/macos/Nemo.app/Contents/MacOS)
+
+exit status: 1
+total 0
+drwxr-xr-x@ 2 cyril  staff   64 Sep  7 22:30 .
+drwxr-xr-x@ 6 cyril  staff  192 Sep  7 22:30 ..

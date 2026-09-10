@@ -1,0 +1,30 @@
+# Live inspection of the bundled MCP server while it serves an MCP session.
+# Transcripts go to /tmp on purpose: writing them inside the repo would make
+# the server hold handles in the checkout purely because that is where its
+# stdout/stderr were redirected - output sinks, never resolution inputs.
+pid=89865
+
+## every open file/handle
+COMMAND    PID  USER   FD     TYPE             DEVICE SIZE/OFF                NODE NAME
+nemo-mcp 89865 cyril  cwd      DIR               1,18      704                   2 /
+nemo-mcp 89865 cyril  txt      REG               1,18  3662976          1059678195 <HOME>/Applications/Nemo.app/Contents/MacOS/nemo-mcp
+nemo-mcp 89865 cyril  txt      REG               1,18  2562000 1152921500312573255 /usr/lib/dyld
+nemo-mcp 89865 cyril    0     PIPE 0xc810590f0893a893    16384                     ->0x41b49ce75039f7e2
+nemo-mcp 89865 cyril    1w     REG               1,18     3950          1059682999 /private/tmp/r14h/ev/attach-4-isolation/stdout.jsonl
+nemo-mcp 89865 cyril    2w     REG               1,18        0          1059683000 /private/tmp/r14h/ev/attach-4-isolation/stderr.log
+nemo-mcp 89865 cyril    3u  KQUEUE                                                 count=0, state=0xa
+nemo-mcp 89865 cyril    4u  KQUEUE                                                 count=0, state=0xa
+nemo-mcp 89865 cyril    5u  KQUEUE                                                 count=0, state=0xa
+
+## handles referencing ANY source checkout under <HOME>/.buzz/REPOS
+count = 0
+(0 == the running server touches nothing in any source checkout)
+
+## complete process environment
+NEMO_R14_CLEANROOM=1
+PATH=/tmp/nemo-r14-emptybin
+PWD=/
+SHLVL=1
+HOME=<HOME>
+_=<HOME>/Applications/Nemo.app/Contents/MacOS/nemo-mcp
+OLDPWD=<HOME>/.buzz/REPOS/nemo-worktrees/buzz-7f3a1c924b6d
