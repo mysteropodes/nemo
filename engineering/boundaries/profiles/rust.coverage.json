@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "policyId": "nemo.rust.coverage",
+  "status": "adopted",
+  "purpose": "Adopted whole-repository Rust source classification and no-growth size enforcement for every tracked .rs file across the desktop shell, geometry/vectorize engines and the MCP transport crate. Establishes the coverage and ratchet controls that a later extraction packet (for example P28/#1030, which adds src-tauri/src/media_probe.rs) must satisfy before a new Rust module can land.",
+  "scope": {
+    "sourceRoot": ".",
+    "profileSourceRoot": "engineering/boundaries/profiles",
+    "sourceKinds": [".rs"],
+    "selection": "Git candidate inventory via discoverRepositoryFiles (scripts/nemo/lib/boundaries-repository.cjs): all tracked paths plus non-ignored untracked paths, filtered to the .rs suffix. Selection is not a filesystem walk and applies no root, vendor or generated policy of its own.",
+    "pathConvention": "Repository-relative POSIX paths.",
+    "outsideSelection": "Ignored build output is never a Git candidate, so generated Rust under */target/ is outside the selection rather than an exclusion. This is a reviewed consequence of the committed .gitignore, not a filename heuristic: no rule in this policy matches on the substring 'target'. At the candidate commit the working tree carried 5 generated .rs files under nemo-mcp/target/; that count is local build state and is deliberately not asserted as a repository fact. The regression test asserts the mechanism instead, on a purpose-built scratch repository."
+  },
+  "provenance": {
+    "repository": "mysteropodes/nemo",
+    "candidateCommit": "9735e962e04e98ad49202d76ec085f406c687641",
+    "discoveryHelper": "scripts/nemo/lib/boundaries-repository.cjs",
+    "discoveryReport": {
+      "ok": true,
+      "diagnostics": 0,
+      "repositoryCandidates": 623,
+      "repositoryCandidatesNote": "Clean working tree at candidateCommit. Only the Rust figures below are asserted by the gate; the whole-repository total is context, so ordinary growth elsewhere cannot manufacture a failure here.",
+      "rustCandidates": 41,
+      "trackedRustCandidates": 41,
+      "untrackedRustCandidates": 0
+    },
+    "lineCounter": "countNonBlankLines (scripts/nemo/lib/boundaries.cjs) — the same counter the size checker uses, so recorded ceilings and enforced ceilings cannot drift.",
+    "profiles": {
+      "candidate": "engineering/boundaries/profiles/rust.profile.json",
+      "baseline": "engineering/boundaries/profiles/rust.baseline.json"
+    }
+  },
+  "relatedPolicies": [
+    {
+      "path": "engineering/boundaries/profiles/mcp-rust.profile.json",
+      "relationship": "stricter overlay",
+      "reason": "The MCP slice (nemo-mcp/** plus src-tauri/src/application_mcp.rs) additionally forbids size waivers entirely, asserted by tests/nemo-mcp-boundaries.test.cjs. That file is left byte-identical by this packet. Its 9 declared paths are also declared here, and the regression test asserts the two profiles agree on the overlap so they cannot drift apart."
+    }
+  ],
+  "layerEnforcement": {
+    "claimed": false,
+    "reason": "Module.layer values in rust.profile.json are classification labels only. This packet proves discovery and size; it does not claim Cargo dependency or module-graph enforcement, and no Rust dependency analyzer exists in the repository. layerRules is therefore deliberately omitted from rust.profile.json rather than declared unenforced. checkProfile is a JavaScript lexer and is never run against Rust source.",
+    "checksApplied": ["checkSourceCoverage", "checkSourceSizes", "compareSizeBaseline"]
+  },
+  "sizePolicy": {
+    "ordinaryProfile": "Rust production module",
+    "warn": 350,
+    "hardMax": 500,
+    "singleProfileRationale": "One ordinary budget covers production, test and build sources. Introducing a laxer test-specific budget here would define existing debt away instead of recording it; a future packet that actually reviews Rust test-size policy can add one, and compareSizeBaseline will surface it as size-baseline-new-profile if it exceeds the prior ordinary maximum.",
+    "warnOnlyAtAdoption": [
+      { "path": "geometry-wasm/src/interp.rs", "nonblankLines": 384 },
+      { "path": "geometry-wasm/src/track.rs", "nonblankLines": 410 },
+      { "path": "src-tauri/src/task_runtime.rs", "nonblankLines": 367 }
+    ]
+  },
+  "retainedCeilings": [
+    { "path": "geometry-wasm/src/engine.rs", "ceiling": 4151, "nonblankLinesAtAdoption": 4151 },
+    { "path": "geometry-wasm/src/fill.rs", "ceiling": 998, "nonblankLinesAtAdoption": 998 },
+    { "path": "geometry-wasm/src/tweenmatch.rs", "ceiling": 1074, "nonblankLinesAtAdoption": 1074 },
+    { "path": "geometry-wasm/tests/effect_layer_overlay_repro.rs", "ceiling": 503, "nonblankLinesAtAdoption": 503 },
+    { "path": "src-tauri/src/video_decode.rs", "ceiling": 2266, "nonblankLinesAtAdoption": 2266 }
+  ],
+  "exclusions": [],
+  "exclusionsRationale": "Every one of the 41 discovered Rust candidates is adopted into a module, so the reviewed exclusion list is empty. An empty list is an assertion, not an omission: checkSourceCoverage reports coverage-unprofiled-source for any selected path that is neither declared nor exactly excluded, and the regression test exercises that failure.",
+  "snapshotCounts": {
+    "selectedSources": 41,
+    "declaredSources": 41,
+    "exclusions": 0,
+    "modules": 15,
+    "retainedCeilings": 5
+  },
+  "integration": {
+    "gate": "tests/nemo-boundaries-rust.test.cjs",
+    "runsUnder": "npm test and the test:unit job, which is in both the quick and full verify profiles — normal local validation, not an opt-in CLI.",
+    "requiredChecks": [
+      "every discovered .rs is declared or exactly excluded",
+      "no declared .rs exceeds its effective ceiling",
+      "no effective ceiling grows against rust.baseline.json",
+      "an oversized in-scope .rs fails",
+      "an undeclared .rs fails",
+      "a raised legacy ceiling fails",
+      "negative fixtures leave the committed policy and its retained ceilings byte-identical"
+    ],
+    "openGates": [
+      "Cargo dependency/module-graph enforcement for Rust (not claimed by this packet).",
+      "Rust source is not wired into scripts/nemo/ci.cjs applicability; that file is shared and serialized."
+    ]
+  }
+}
