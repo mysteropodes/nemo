@@ -13,15 +13,15 @@
   },
   "provenance": {
     "repository": "mysteropodes/nemo",
-    "candidateCommit": "9735e962e04e98ad49202d76ec085f406c687641",
+    "candidateCommit": "391f2e347b098e0f7bb68000ebba6fc3119d28a3",
     "discoveryHelper": "scripts/nemo/lib/boundaries-repository.cjs",
     "discoveryReport": {
       "ok": true,
       "diagnostics": 0,
-      "repositoryCandidates": 623,
-      "repositoryCandidatesNote": "Clean working tree at candidateCommit. Only the Rust figures below are asserted by the gate; the whole-repository total is context, so ordinary growth elsewhere cannot manufacture a failure here.",
-      "rustCandidates": 41,
-      "trackedRustCandidates": 41,
+      "repositoryCandidates": 629,
+      "repositoryCandidatesNote": "Measured on this packet's working tree: 628 tracked paths at candidateCommit plus the single new module this packet adds. The P11/#1013 adoption recorded 623 at its own earlier candidate commit; the difference is ordinary repository growth on main between the two, not a discovery change. Only the Rust figures below are asserted by the gate; the whole-repository total is context, so ordinary growth elsewhere cannot manufacture a failure here.",
+      "rustCandidates": 42,
+      "trackedRustCandidates": 42,
       "untrackedRustCandidates": 0
     },
     "lineCounter": "countNonBlankLines (scripts/nemo/lib/boundaries.cjs) — the same counter the size checker uses, so recorded ceilings and enforced ceilings cannot drift.",
@@ -58,13 +58,13 @@
     { "path": "geometry-wasm/src/fill.rs", "ceiling": 998, "nonblankLinesAtAdoption": 998 },
     { "path": "geometry-wasm/src/tweenmatch.rs", "ceiling": 1074, "nonblankLinesAtAdoption": 1074 },
     { "path": "geometry-wasm/tests/effect_layer_overlay_repro.rs", "ceiling": 503, "nonblankLinesAtAdoption": 503 },
-    { "path": "src-tauri/src/video_decode.rs", "ceiling": 2266, "nonblankLinesAtAdoption": 2266 }
+    { "path": "src-tauri/src/video_decode.rs", "ceiling": 2266, "nonblankLinesAtAdoption": 2266, "nonblankLinesNow": 2160, "note": "nonblankLinesAtAdoption is the P11/#1013 adoption record and is deliberately not rewritten; nonblankLinesNow records the 106-line reduction P28/#1030 produced by moving the ffmpeg probe parser out to src-tauri/src/media_probe.rs, so the win stays visible instead of being erased. The ceiling stays at the adoption value: an extraction packet changes code, not size policy, and lowering the candidate ceiling without lowering the frozen baseline would give the baseline growth check 106 lines of slack." }
   ],
   "exclusions": [],
-  "exclusionsRationale": "Every one of the 41 discovered Rust candidates is adopted into a module, so the reviewed exclusion list is empty. An empty list is an assertion, not an omission: checkSourceCoverage reports coverage-unprofiled-source for any selected path that is neither declared nor exactly excluded, and the regression test exercises that failure.",
+  "exclusionsRationale": "Every one of the 42 discovered Rust candidates is adopted into a module, so the reviewed exclusion list is empty. An empty list is an assertion, not an omission: checkSourceCoverage reports coverage-unprofiled-source for any selected path that is neither declared nor exactly excluded, and the regression test exercises that failure.",
   "snapshotCounts": {
-    "selectedSources": 41,
-    "declaredSources": 41,
+    "selectedSources": 42,
+    "declaredSources": 42,
     "exclusions": 0,
     "modules": 15,
     "retainedCeilings": 5

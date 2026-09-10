@@ -75,7 +75,10 @@ function fixtureProfile(files) {
 test('committed Rust policy is a valid profile and its recorded budget matches the coverage policy', () => {
   validateProfile(profile);
   validateProfile(baseline);
-  assert.deepEqual(profile, baseline, 'baseline must be the reviewed candidate at adoption');
+  // The baseline is deliberately NOT required to equal the candidate. It is
+  // frozen at adoption; if every profile change had to change it too, the
+  // ratchet would only ever compare a file to itself. The invariant is the
+  // compareSizeBaseline result below, not equality.
   assert.equal(LIMITS.warn, coverage.sizePolicy.warn);
   assert.equal(LIMITS.hardMax, coverage.sizePolicy.hardMax);
   assert.equal(profile.layerRules, undefined, 'layer rules are not declared because no Rust dependency analyzer runs');
@@ -130,10 +133,25 @@ test('no declared Rust source exceeds its effective ceiling, and retained ceilin
     assert.ok(record, `retained ceiling for ${exception.path} is missing from the coverage policy`);
     assert.equal(exception.rule, 'size');
     assert.equal(exception.ceiling, record.ceiling);
-    // A no-growth baseline is the measured count, not a rounded allowance.
+    // A no-growth baseline is the measured count at ADOPTION, not a rounded
+    // allowance — and "no growth" is an upper bound, not an equality. The
+    // first version of this test asserted `actual === nonblankLinesAtAdoption`
+    // and `ceiling === actual`, which forbade a waived file from ever
+    // SHRINKING: exactly the outcome remediation exists to produce. P28/#1030
+    // tripped it by moving the probe parser out of video_decode.rs.
     const actual = countNonBlankLines(fs.readFileSync(path.join(ROOT, exception.path), 'utf8'));
-    assert.equal(actual, record.nonblankLinesAtAdoption);
-    assert.equal(exception.ceiling, actual);
+    assert.ok(actual <= record.nonblankLinesAtAdoption,
+      `${exception.path} grew past its adoption count (${actual} > ${record.nonblankLinesAtAdoption})`);
+    assert.ok(exception.ceiling <= record.nonblankLinesAtAdoption,
+      `${exception.path} waiver was widened above its adoption count`);
+    assert.ok(exception.ceiling >= actual,
+      `${exception.path} waiver no longer covers the file (${exception.ceiling} < ${actual})`);
+    // When a file has shrunk, the coverage policy must say so rather than
+    // silently carrying an allowance nobody can account for.
+    if (actual !== record.nonblankLinesAtAdoption) {
+      assert.equal(record.nonblankLinesNow, actual,
+        `${exception.path} shrank to ${actual}; record it as nonblankLinesNow in rust.coverage.json`);
+    }
     assert.ok(exception.ceiling > LIMITS.hardMax, `${exception.path} does not need a waiver`);
   }
   const applied = result.exceptionsApplied.map((entry) => entry.path).sort();
@@ -143,7 +161,12 @@ test('no declared Rust source exceeds its effective ceiling, and retained ceilin
 test('committed policy has no ratchet regression against its own baseline', () => {
   const result = compareSizeBaseline(baseline, profile, { root: ROOT });
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2));
-  assert.equal(result.baselinePathCount, result.candidatePathCount);
+  // The candidate may declare MORE paths than the frozen baseline — that is a
+  // new module being adopted (P28/#1030 added src-tauri/src/media_probe.rs).
+  // It may never declare FEWER: a path dropping out of the candidate would be
+  // coverage silently disappearing, which is the case worth failing on.
+  assert.ok(result.candidatePathCount >= result.baselinePathCount,
+    `candidate declares ${result.candidatePathCount} path(s), fewer than the baseline's ${result.baselinePathCount}`);
 });
 
 test('the stricter MCP overlay stays consistent with the whole-tree profile', () => {

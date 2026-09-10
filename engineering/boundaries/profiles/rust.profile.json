@@ -69,10 +69,12 @@
       "layer": "desktop-shell",
       "dir": "src-tauri/src",
       "files": [
+        "media_probe.rs",
         "vectorize.rs",
         "video_decode.rs"
       ],
       "publicApi": [
+        "media_probe.rs",
         "vectorize.rs",
         "video_decode.rs"
       ],
@@ -260,7 +262,7 @@
       "ceiling": 2266,
       "owner": "mysteropodes",
       "issue": "1013",
-      "reason": "Legacy pre-extraction Rust source; ceiling captured as an exact-path no-growth baseline pending real module extraction (R02/R05), not an architectural review of this file's content.",
+      "reason": "Legacy pre-extraction Rust source; ceiling captured as an exact-path no-growth baseline pending real module extraction (R02/R05), not an architectural review of this file's content. P28/#1030 began that extraction and the file now measures 2160; the allowance is deliberately left at its adoption value so an extraction packet changes code, not size policy. See nonblankLinesNow in rust.coverage.json.",
       "expires": "2026-12-05"
     }
   ]
