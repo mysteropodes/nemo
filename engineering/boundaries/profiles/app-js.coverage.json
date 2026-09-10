@@ -40,8 +40,8 @@
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "923336d515332ce0c5dca6d8bac0722f85462445",
-        "sha256": "3fd272522ddb5d8d1cc8cb4884ce1a2b870cf4ce7d3d5e42f1139c6eae24b24e",
+        "gitBlob": "880527c118eb236560b8bc4b13ec1254948ef626",
+        "sha256": "5ba27fd0db1a3bc8f464cf0c1eb17aab9b8997d6aaa8ed4a867a3fc4aaa190be",
         "moduleCount": 147,
         "basedOnCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1"
       },

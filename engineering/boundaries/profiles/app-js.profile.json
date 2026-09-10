@@ -1896,7 +1896,7 @@
       "ceiling": 1312,
       "owner": "ivg-design",
       "issue": "901",
-      "reason": "Legacy pre-R01 file; ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897) \u2014 not an architectural review of this file's content.",
+      "reason": "Shader effect catalog embedded in hand-written JS (04_MODULARITY_POLICY.md: 'do not split a shader catalog or translation table merely to satisfy an application-code line budget'). Confirmed by direct read: lines 20-28 are two small builder helpers (param(), fx(), 9 lines combined), lines 30-1306 are the `effects` array \u2014 roughly 80 WGSL-fragment-body entries built via those helpers \u2014 and lines 1308-1313 are the window.SMSHADER_EFFECTS/SMSHADER_EFFECT_CATEGORIES assignments plus a 4-line window.SMShaderEffectDef lookup helper. Data catalog, not undisciplined control-flow growth; ceiling captured as an exact no-growth baseline, not an application-code review.",
       "expires": "2026-12-05"
     },
     {
