@@ -1,0 +1,369 @@
+{
+  "census_id": "C09",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1091",
+  "title": "Remaining browser modules — bounded extraction packets",
+  "owner": "Cyrill/D2 (Honey)",
+  "source_sha": "2ff0599246b56be1bf01cd400a03fd1ecf2483fe",
+  "status": "read-only census complete; no source mutated; C08's own draft for this area (engineering/inventory/census/C08-completeness.json, area `remaining-browser-modules`) was re-verified file-by-file via 9 independent read-only passes rather than taken on faith, and substantially corrected — see coverage_note and cross_cutting_notes. Proposed IDs and packet boundaries are placeholders for the orchestrator to renumber into the global sequence and fold into engineering/inventory/remediation-scope.json (which does not exist yet at this SHA).",
+  "scope_files": [
+    "src/js/storyboard.js",
+    "src/js/tutorial.js",
+    "src/css/tutorial.css",
+    "src/js/layer-scroll-sync.js",
+    "src/js/timeline-zoom.js",
+    "src/js/layer-kind.js",
+    "src/js/geometry-wasm-loader.js",
+    "src/js/gpu-gate.js",
+    "src/js/vectorize-wasm-loader.js",
+    "src/js/vectorize-worker.js",
+    "src/js/motion-graph.js",
+    "src/js/effector-layer.js",
+    "src/js/transplant.js",
+    "src/js/updater-bridge.js",
+    "src/js/nemo-script.js",
+    "src/js/nemo-plugin.js",
+    "src/js/images.js",
+    "src/js/lottie-preview.js",
+    "src/js/lipsync.js",
+    "src/js/kitsu.js",
+    "src/js/p2p-contacts.js",
+    "src/js/tracker.js"
+  ],
+  "coverage_note": "All 22 files in this issue's bounded source ownership are assigned to exactly one packet below. C08's draft grouped 5 of these files (lottie-preview.js, lipsync.js, kitsu.js, p2p-contacts.js, tracker.js) into a single 'media-integration-misc' packet while explicitly flagging that grouping as non-extraction-ready ('a future leaf executing this should re-split per file'). Verification confirmed zero coupling among those 5 files, so this census implements that re-split now: 5 independent single-file packets instead of 1 grab-bag, bringing the total from C08's original 13 packets to 17. geometry-wasm/src/track.rs (tracker.js's Rust half) is explicitly OUT of this packet's files — already owned by C03-rendering-resource-ownership.json, confirmed by grep of the existing census JSONs.",
+  "areas": [
+    {
+      "area": "storyboard-mode",
+      "packets": [
+        {
+          "id": "C09.storyboard-mode.core",
+          "title": "StoryBoard node-graph montage editor",
+          "files": ["src/js/storyboard.js (1321 lines)"],
+          "symbols": ["window.SMStoryboard = {setVisible, render, addInstance, addInstanceAuto, addMontage, getPreviewLayer, updatePreview, montageStrokesAt, montageTotal, montageById, chainModsForView, invalidateThumb, thumbDataUrl}"],
+          "responsibility": "Third app mode next to Animation 2D and Motion: node-space montage editor. Corrected from C08's draft: the current (v2) data model has no 'Edit module' block type — v1 was reworked away from that per the file's own header comment. Instances snap directly onto a montage 'block' (film icon); 'Edit' is a per-card button opening the component editor, not a distinct node type.",
+          "writer": "state.storyboard (pan/zoom/nextId/activeMontageId/modules) — NOT covered by undo (file's own comment, line 1036); also state.layers[idx].montageId and state.activeLayerIdx via placeMontageAsLayer.",
+          "public_api": "the 13 window.SMStoryboard.* functions listed above",
+          "consumers": ["src/js/app.js (addInstanceAuto call sites 3296/3429/3552; ld.montageId render-funnel resolution 2980-2985; enterMontageView 4280-4325+; invalidateThumb 4255)", "src/js/motion.js:13238 (setAppMode, the real app-mode switch — corrects C08 draft's wrong attribution to timeline.js)", "src/js/engine-bridge.js:850 (getPreviewLayer)", "src/js/timeline.js:6994,7147 (montageById/thumbDataUrl)", "src/js/tweens.js:4908 (montageById)", "src/js/comp-preview.js:194 (thumbDataUrl)"],
+          "oracle": "No behavioral test. Schema/passthrough coverage only: state.storyboard is a null-passthrough field in tests/fixtures/corpus.cjs:76 and fixtures/components/project.json:969, and 'storyboard' is a tagged invariant area in the components fixture manifest (manifest.json:278, corpus.cjs:295) — no test exercises chain math, retiming, join/leave, or playback.",
+          "depends_on": ["window.SM (timeline.js:349, extended by ~7 files)", "window.SMCamera (camera.js:652)", "window.SMEngineBridge (engine-bridge.js:4524)", "window.SMPathFx / window.SMGroup (stroke readers)", "app.js globals: applyLayerDuplicator, applyMatrixToStrokeData", "window.SMFeedback.logAction"],
+          "entangled_with": [],
+          "notes": "C08's draft claim 'entirely unread by C01-C07' is FALSE: C03-rendering-resource-ownership.json already cites storyboard.js:356 as an SMPathFx consumer, and C04b-editor-presentation-support.json cites it 5+ times (SMGroup, SMFeedback, path-fx thumbnails, an explicit 'comp-preview.js dependency out of this census's scope' note) — as a CONSUMER in those files' own packets, not as an owned file, so no ownership overlap, just a corrected framing. Draft's 'auto-converts a plain layer to a Component on connection per CLAUDE.md §8' is also backwards: no call to convertLayerToComponent/convertLayersToComponent exists in this file; the actual flow is app.js converting layer→Component first, then calling SMStoryboard.addInstanceAuto(symId) to mirror it into the graph — §8's 'auto-convert on connect' description reads as stale against current code. Naming collision warning: src/js/labs/storyboard-mode.js (359 lines) is a wholly unrelated, never-`<script>`-included Labs prototype (already dead-code-flagged by C06/DEF-1) — zero code overlap, but will pollute a naive `grep -i storyboard` during extraction."
+        }
+      ]
+    },
+    {
+      "area": "tutorial-onboarding",
+      "packets": [
+        {
+          "id": "C09.tutorial-onboarding.core",
+          "title": "Interactive in-app tutorial system",
+          "files": ["src/js/tutorial.js (1907 lines)", "src/css/tutorial.css (169 lines)"],
+          "symbols": ["window.SMTutorial = {open, start, stop, MODULES}"],
+          "responsibility": "Spotlight + tooltip lesson runner (28 modules in MODULES): highlights a real UI element, gates step advancement on the user actually performing the real action via event delegation, never scripted replay. Also owns a small QA/search feature (answerQuestion, buildQACorpus) not mentioned in C08's draft.",
+          "writer": "Two localStorage keys (draft under-specified as 'FIRST_LAUNCH_SEEN_KEY etc.' without naming both): nemo-tutorial-done (loadDone/markDone, line 1428) and FIRST_LAUNCH_SEEN_KEY='nemo-tut-feedback-shown' (line 1441). Never writes to state/userLayers — read-only against app state, confirmed against its own header comment.",
+          "public_api": "window.SMTutorial.open(), .start(id), .stop(), .MODULES",
+          "consumers": ["None internally. The module is entirely self-triggering: its own DOMContentLoaded listener wires #btn-open-tutorial/#btn-open-tutorial-topbar and calls maybeAutoStartWelcome() itself. index.html only <script>-loads it (line 2458) and <link>s tutorial.css (line 18) — neither calls into SMTutorial.*. This directly contradicts C08's draft consumer claim ('onboarding flow triggered from app bootstrap'), which is a phantom — no bootstrap-side trigger exists."],
+          "oracle": "C08's draft 'none found' is WRONG. Three Playwright specs depend on tutorial.js's DOM output to dismiss its popup before unrelated assertions: tests/animation/browser-acceptance.cjs:104-105, tests/browser/opacity-consumers.spec.cjs:39-40, tests/browser/opacity-ui-consumers.spec.cjs:51-52 (each does `page.locator('.tut-close')` then clicks if visible). Not a functional test of tutorial.js's own lesson logic, but a real, load-bearing dependency on the `.tut-close` class name — renaming it silently breaks three unrelated suites. See known_defects DEF-3.",
+          "depends_on": ["state/userLayers/selectedPaths/_fsSel (read-only polling)", "SMProject.newProject (project.js:395)", "SMShapeGroup.ensureFront (timeline.js)", "showToast (app.js)", "dozens of hardcoded #id selectors spanning nearly every panel file"],
+          "entangled_with": ["timeline.js:10313-10326 — the shape-tool-stack code explicitly keeps some buttons `visibility:hidden` (not `display:none`) specifically so tutorial.js's getBoundingClientRect spotlight still works; timeline.js was written aware of tutorial.js's needs, a real (if narrow) reverse coupling"],
+          "notes": "Otherwise a strong extraction candidate: single IIFE, one real export, no back-writes to shared state — only the untracked `.tut-close` test coupling needs carrying forward explicitly at extraction time. tutorial.css's 169 lines and 35 classes are self-contained (no collisions found in style.css)."
+        }
+      ]
+    },
+    {
+      "area": "timeline-panel-support",
+      "packets": [
+        {
+          "id": "C09.timeline-panel-support.scroll-and-zoom",
+          "title": "Layer panel <-> frame grid scroll sync, and timeline zoom",
+          "files": ["src/js/layer-scroll-sync.js (107 lines)", "src/js/timeline-zoom.js (369 lines)"],
+          "symbols": ["layer-scroll-sync.js: NO window.* export at all — mirror()/equalize() are function-scoped inside the IIFE's init(), never attached to window (corrects C08 draft, which listed them as top-level symbols)", "window.SMTimelineZoom = {set, zoomIn, zoomOut, reset, get, redraw}"],
+          "responsibility": "layer-scroll-sync.js: 1:1 vertical scroll mirror between #layer-list and #fg-wrap (CLAUDE.md §11 names this file as the invariant to never re-break) — refined beyond the draft: it also equalizes the two scroll RANGES via a dynamically-sized #fg-bottom-spacer, which per the file's own header comment was the actual 2026-07-25 fix (the old per-row header-offset approach was the bug it replaced). timeline-zoom.js: Ctrl+wheel zoom + drag-to-zoom scrollbar, promoted out of a Labs prototype (src/js/labs/timeline-zoom.js, 238 lines, confirmed still present and confirmed dead by an actual test — see oracle).",
+          "writer": "layer-scroll-sync.js: DOM-only (scrollTop of both panels, plus the spacer's height). timeline-zoom.js: window.FC (global), the --fc CSS custom property, localStorage keys nemo-timeline-fc/nemo-timeline-fc-ver, and its own scrollbar DOM.",
+          "public_api": "SMTimelineZoom.set/.zoomIn/.zoomOut/.reset/.get/.redraw. layer-scroll-sync.js: none (DOM-id contract only: #layer-list/#fg-wrap/#frame-grid).",
+          "consumers": ["src/js/timeline.js:4170 (SMTimelineZoom.redraw()) — sole caller, repo-wide grep confirmed", "src/js/timeline.js:4015-4021 (_tlScrollSnapshot/_tlScrollRestore, wrapping renderTimeline/renderLayerList) — DOM-coupled to layer-scroll-sync.js's scrollTop, NEW: timeline.js is missing from C08's draft entirely despite being the one true consumer of both files", "window.FC readers (NEW, all missing from draft): app.js, audio-bridge.js, bpm-grid.js, camera.js, layer-inout.js, markers.js, motion-graph.js, motion.js, ui.js"],
+          "oracle": "C08's draft 'none found' is WRONG. tests/performance-regressions.test.cjs:76-80 ('only the promoted timeline zoom module is loaded') asserts index.html has exactly one <script src=\"js/timeline-zoom.js\"> and not the dead src/js/labs/timeline-zoom.js. No test targets layer-scroll-sync.js's mirror/equalize logic specifically.",
+          "depends_on": [],
+          "entangled_with": ["src/js/timeline.js (both files, independently — no direct call or shared symbol exists BETWEEN layer-scroll-sync.js and timeline-zoom.js themselves; they are effectively independent packets bundled only by feature-area proximity to #fg-wrap)"],
+          "notes": "C08 draft's symbol 'window.SMAudio' does not belong to this packet — it's audio-bridge.js's own export, merely read inside timeline-zoom.js's refresh(). Real extraction risk found: app.js:76 hardcodes `var FC=30` as a fallback explicitly commented 'kept in sync to avoid a flash-of-wrong-zoom' with timeline-zoom.js's own `DEFAULT_FC=30` — an unenforced cross-file duplicate constant. See known_defects DEF-4."
+        },
+        {
+          "id": "C09.timeline-panel-support.layer-kind-taxonomy",
+          "title": "Single source of truth for 'what kind of layer is this'",
+          "files": ["src/js/layer-kind.js (149 lines)"],
+          "symbols": ["window.SMLayerKind = {of, keyOf, labelOf, iconOf}"],
+          "responsibility": "Consolidates layer-kind flags into one classifier. Draft undercounted: the file's own header cites 6 flags, but keyOf() actually branches on 13 conditions (adds isCameraLayer, montageId, isFolderLayer, isGuideLayer, isWidgetLayer, isEffectorLayer, plus footage/raster-sniffing) — the classifier has grown broader than its own description while staying one place.",
+          "writer": "None — pure classifier/reader. Only reads ld.folderCollapsed, to pick an icon variant.",
+          "public_api": "SMLayerKind.of(ld) -> {key,label,icon} (the actual primary entry point, missing from C08's draft, which only named keyOf), plus .keyOf(ld), .labelOf(key), .iconOf(key). ICONS/FALLBACK are module-private tables, not part of the public surface — draft wrongly listed them as symbols.",
+          "consumers": ["src/js/timeline.js (~6477, ~7022 — row rendering, confirmed)", "src/js/motion.js (~7217, confirmed)", "src/js/tracker-panel.js (~18-19, NEW, missing from draft)"],
+          "oracle": "grep -rniE \"layer-kind|SMLayerKind|layerKind\" tests/ → zero matches. C08 draft's 'none found' confirmed accurate here (unlike the sibling packet above).",
+          "depends_on": ["layer-data fields owned elsewhere: symbolId/montageId/isNullLayer/isFolderLayer/isGuideLayer/isWidgetLayer/isEffectorLayer/isTextLayer/footage (the last written by images.js, per images.js:170's own comment)", "i18n.js (SM.t, with FALLBACK as backstop)"],
+          "entangled_with": [],
+          "notes": "C08 draft's consumer claim was wrong, not just incomplete: select-bridge.js and app.js show ZERO repo-wide matches for SMLayerKind — drop both. CLAUDE.md §13's documented Guide-layer icon gap (keyOf branch with no ICONS/FALLBACK/i18n entry) independently reverified verbatim at CLAUDE.md:1023-1029 — confirmed accurate, real pre-existing product debt, not a census gap. Independent of the sibling scroll-and-zoom packet — no shared symbols/DOM/calls; both merely happen to be used inside timeline.js in unrelated code paths."
+        }
+      ]
+    },
+    {
+      "area": "engine-readiness-bridges",
+      "packets": [
+        {
+          "id": "C09.engine-readiness.wasm-engine-loaders",
+          "title": "GPU/WASM capability gating and geometry-wasm loader",
+          "files": ["src/js/geometry-wasm-loader.js (56 lines)", "src/js/gpu-gate.js (54 lines)"],
+          "symbols": ["window.GeometryWasm = {ready, boolean_op, boolean_op_multi, fill_find, create_engine, hit_test, interp_stroke, auto_match, resample_stroke, align_pair, erase_at_point, line_segments, rect_segments, ellipse_segments, resolve_symbol_frame, effective_frame_index, track_points, compute_flow, interpolate_at, StrokeModeler}", "gpu-gate.js: NO public API — gate/showGate are private IIFE locals, never exposed (corrects C08's draft)"],
+          "responsibility": "gpu-gate.js runs synchronously before any other app script (first <script> tag in <head>, index.html:9) to block unsupported browsers with a clear message instead of a silent mid-boot crash. geometry-wasm-loader.js loads the wasm-pack build (type=module, near end of <body>) and is the sole writer of every GeometryWasm.* field.",
+          "writer": "geometry-wasm-loader.js: sole writer of all GeometryWasm.* fields (grep-confirmed, zero external assignments). gpu-gate.js: DOM only (document.title, an injected overlay, window.stop()), no shared JS state.",
+          "public_api": "window.GeometryWasm.* (full 19-field + StrokeModeler list above). gpu-gate.js: none.",
+          "consumers": ["10 files, all more specific than C08's vague placeholder ('every call site'): tools.js, tweens.js, engine-bridge.js, stroke-modeler.js, shape-bridge.js, tracker.js, second-viewer.js, native-video-bridge.js, labs/clip-mask-bake.js, labs/screentone-bake.js"],
+          "oracle": "C08 draft's 'none found' is WRONG. tests/performance-regressions.test.cjs:265,283 mocks {GeometryWasm:{ready,StrokeModeler}} to test stroke-modeler.js's consumer logic; tests/bench/browser-render.cjs:145,241 is a live E2E bench polling real GeometryWasm.ready. Correct as 'indirect/consumer coverage only, no test exercises the loader file itself.'",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "gpu-gate.js and geometry-wasm-loader.js share zero runtime code — only a comment cross-reference, and use structurally different load mechanisms (classic <script> vs type=module). The real extraction risk is the 10-file consumer fan-out, not the two files' relationship to each other."
+        },
+        {
+          "id": "C09.engine-readiness.vectorize-worker-bridge",
+          "title": "Off-main-thread image vectorization bridge",
+          "files": ["src/js/vectorize-wasm-loader.js (65 lines)", "src/js/vectorize-worker.js (34 lines)"],
+          "symbols": ["window.VectorizeWasm = {ready, vectorize}. None of C08 draft's three named symbols (ensureWorker, vectorize_image, resultJson) are real public API — ensureWorker is a private closure, vectorize_image is the wasm module's own export merely consumed here, resultJson is a message-payload field name."],
+          "responsibility": "vectorize-wasm-loader.js spins up vectorize-worker.js as a Web Worker on demand (lazy, unlike geometry-wasm-loader's eager load) so vectorize_image()'s synchronous trace call never blocks the main thread. Confirmed accurate against the file's own comments.",
+          "writer": "vectorize-wasm-loader.js is the sole writer of VectorizeWasm.{ready,vectorize} (grep-confirmed). vectorize-worker.js has zero references to `window` at all — runs in Worker global scope (`self` only), a structurally different execution context from every other file in this area.",
+          "public_api": "window.VectorizeWasm.vectorize(bytes, configJson) -> Promise<string>, .ready. C08 draft's 'window-level job queue (jobId/job2 pattern) exposed to callers' is inaccurate — jobId/pending/job2 are private closure internals; callers see only the single .vectorize() promise.",
+          "consumers": ["src/js/vectorize-bridge.js:435 — exactly one, not a plural set as the draft implied"],
+          "oracle": "grep across all three test roots for VectorizeWasm/vectorize-worker/vectorize_image → zero hits. C08 draft's 'none found' confirmed accurate.",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "No shared code/state with the sibling wasm-engine-loaders packet — different globals, different wasm crates (src/wasm vs src/wasm-vectorize), different threading model. Key structural fact for the draft's proposed bundling of these two packets into one leaf: vectorize-worker.js is the only file of the four with no window/DOM access at all (true Worker isolation) — a merge must preserve its `new Worker(new URL(...))` construction path, not just concatenate source."
+        }
+      ]
+    },
+    {
+      "area": "motion-authoring-extensions",
+      "packets": [
+        {
+          "id": "C09.motion-extensions.graph-editor",
+          "title": "After Effects-style Graph Editor for Motion interpolation",
+          "files": ["src/js/motion-graph.js (521 lines)"],
+          "symbols": ["window.SMMotionGraph = {isOn, toggle, render, setMode, mode, freezeRange, isFrozen}"],
+          "responsibility": "Draws/edits the interpolation curve directly (curve view) as a Motion-mode-only companion to motion.js's own timeline — deliberately an absolutely-positioned overlay inside #fg-wrap, not a row, so it never touches motion.js's panel/grid alignment invariant (CLAUDE.md §11). Confirmed accurate against the file's own header comment almost verbatim.",
+          "writer": "More precise than C08's draft: this file calls no SMMotion setter — onMove/onDown directly mutate the shared keyframe objects in place (k.v, k.frame, cps[wi].x/y), i.e. ld.motion[prop].keys, the same objects the track view owns. Also owns pure session-local UI state (_heightOverride, _fit, _mode), explicitly marked 'not persisted'.",
+          "public_api": "SMMotionGraph.toggle()/.isOn()/.render()/.setMode()/.mode()/.freezeRange()/.isFrozen()",
+          "consumers": ["src/js/motion.js:13208 (force-closes graph on leaving Motion mode)", "src/js/timeline.js:4338,4340,9887 (render-loop hook + Shift+F3 shortcut owner — more load-bearing than the draft's vague 'Motion panel toggle' phrasing suggests)"],
+          "oracle": "grep -rln \"motion-graph|SMMotionGraph|motionGraph\" tests/ → no hits. Confirmed 'none found'.",
+          "depends_on": ["window.SMMotion (deep, bidirectional: reads tracks/expressions, mutates key data directly)", "DOM owned by motion.js/timeline.js (#fg-wrap, #frame-grid, #btn-mgraph)"],
+          "entangled_with": ["z-index conflict with timeline-zoom.js's scrollbar (documented workaround in-file)"],
+          "notes": "Not exposed to CLAUDE.md §1's family-of-bug pattern — this file never iterates state.layers or layer children, so it's structurally outside that consumer list. C08 draft is otherwise accurate; only the writer/symbols precision above needed correction."
+        },
+        {
+          "id": "C09.motion-extensions.effector-duplicator-layer",
+          "title": "Duplicator effector as an animatable layer kind",
+          "files": ["src/js/effector-layer.js (226 lines)"],
+          "symbols": ["window.SMEffectorLayer = {isEffectorLayer, resolvedEffectorsFor, propKeysFor, addEffectorLayer, buildOverlayItems, CHANNELS}"],
+          "responsibility": "Feedback #168 (2026-08-30): exposes a mograph duplicator's effector as its own timeline row so its parameters become keyable. Confirmed against the file header verbatim.",
+          "writer": "Narrower than C08's draft implied: addEffectorLayer (creation only) writes ld.isEffectorLayer, ld.color, ld.effector{targetLayerUid,falloff,pos}, and seeds one ld.motionStatic.effOffPosition. The ONGOING effRadius/effStrength/effAngle/effOff* values are written by the generic Motion keyframe/motionStatic system (motion.js), not by this file — this file only registers their prop metadata (registerEffectorPropMeta) and reads them back (resolveEffector). It never sets ld.locked, unlike duplicator-copy layers.",
+          "public_api": "as listed in symbols; called from app.js, motion.js, engine-bridge.js",
+          "consumers": ["src/js/app.js:1525-1526 (_duplicatorClonePlacement, inside applyLayerDuplicator)", "src/js/engine-bridge.js:2541 (buildOverlayItems, editor-only overlay)", "src/js/motion.js:202-203,7466 (propKeysFor in propsFor; context-menu 'Add Effector Layer' action)", "src/js/layer-kind.js:120 (NEW — keyOf labels it 'effector')", "src/js/timeline.js:1244,1308,1396-1482,2117,2451-2452 (NEW — persistence/copy/duplicate-layer/paste all carry isEffectorLayer+effector)", "src/js/app.js:2973 (NEW — getEffectiveStrokes excludes it; the single choke point export.js/rive-export.js/Lottie all read through, and the one place this layer kind IS correctly excluded — see known_defects DEF-1)"],
+          "oracle": "grep -rln \"effector-layer|SMEffectorLayer|isEffectorLayer|effectorLayer\" tests/ → no hits (duplicator-hue.test.cjs is unrelated). Confirmed 'none found'.",
+          "depends_on": ["app.js's duplicator pipeline (shared effector-math shape with inline dup.effectors)", "motion.js's property system", "timeline.js's layer persistence/clone paths", "layer-kind.js"],
+          "entangled_with": ["CLAUDE.md §1's isDuplicatorCopy/dupIndex family-of-bug pattern, as the draft itself flagged — see known_defects DEF-1 for the confirmed, demonstrable instance found in this census"],
+          "notes": "See known_defects DEF-1: effector layers are missing from three of the hard-coded per-layer-kind exclusion lists that Null/Guide/Widget/Effect layers ARE in (buildSceneJson, saveActiveLayerFrame/saveAllLayerFrames, select-bridge.js's multiLayerSelectionBox), independently confirmed by direct code read, not just subagent report."
+        }
+      ]
+    },
+    {
+      "area": "app-level-utilities",
+      "packets": [
+        {
+          "id": "C09.app-utilities.project-transplant",
+          "title": "Cross-project layer/media cherry-pick ('AEP Transplant')",
+          "files": ["src/js/transplant.js (345 lines)"],
+          "symbols": ["NONE — a plain IIFE with zero window.* assignments. C08 draft's symbol list (SMAssetTree/SMMediaLibrary/SMMotion) is backwards: those are dependencies this file calls INTO, not exports. Its only surface is DOM wiring onto ids in src/index.html (#btn-transplant-open line 1322, #transplant-file-input line 1337)."],
+          "responsibility": "Opens another Nemo project's .json (Tauri file dialog, <input type=file> fallback, or an already-open tab via SMProject.getOpenTabs()) and cherry-picks specific layers/media into the current project with fresh layerUid/symbolId remap. Picked file is read-only, never rewritten. Confirmed accurate.",
+          "writer": "state.layers (via global createUserLayer() + direct mutation of ~20 fields — corrects C08 draft's non-existent field name 'state.userLayers'), state.symbols (new sym_* entries), state.mediaLibrary (pushed clones); also calls saveAllLayerFrames()/pushUndoLayers(true) for undo and loadFrame/renderOS/renderArcs/updateUI to re-render.",
+          "public_api": "None. Sole entry point is the click listener on #btn-transplant-open.",
+          "consumers": ["NONE found at the code level. C08 draft's 'asset-tree.js panel' consumer claim is backwards — asset-tree.js DEFINES folderGroup/FOLDER_COLORS that transplant.js calls, not the reverse. All repo-wide grep hits for 'transplant' outside this file are comments citing it as precedent (tools.js:4253 is an unrelated word, false positive) or media-library.js/project.js/app.js comments — none actually call into it."],
+          "oracle": "grep -rln \"transplant|Transplant\" across all three test roots → zero hits. Confirmed 'none found'.",
+          "depends_on": ["global state, createUserLayer, saveAllLayerFrames, pushUndoLayers, loadFrame, renderOS, renderArcs, updateUI, showToast, SM.t", "SMProject.getOpenTabs", "SMAssetTree", "SMMediaLibrary.reload", "SMMotion.registerControlPropMeta"],
+          "entangled_with": ["app.js's instantiateForeignProjectAsComponent (invoked from media-library.js's 'Compositions' drag-drop) — an independently-coded SECOND path over the same getOpenTabs() data, conceptually duplicating this file's cross-project cherry-pick without sharing any code. See known_defects DEF-5."],
+          "notes": "C08 draft's CLAUDE.md §13 citation is WRONG: §13 (around line 920) is entirely about rig-widget.js. The real sentence about transplant.js is at CLAUDE.md:990-999 and says the OPPOSITE of the draft — transplant.js DOES carry widget+exprControls together; the one thing it never carries is `expressions` (the driven side). Verified against code lines 239-258, matches exactly."
+        },
+        {
+          "id": "C09.app-utilities.updater-bridge",
+          "title": "Tauri auto-updater UI + web changelog fallback",
+          "files": ["src/js/updater-bridge.js (260 lines)"],
+          "symbols": ["NONE on window. C08 draft's 'window.SM' is backwards (SM is defined in timeline.js:349, merged into by many files; this file only calls SM.t(...)). showVersion is closure-private, never attached to window — nothing outside this file can call it directly."],
+          "responsibility": "Bridges tauri_plugin_updater to a UI: manual check button + status line in Réglages, a 4s-delayed silent startup check, a macOS titlebar icon (download/spinner/reopen states, separate silent check path), and a web-build-only GitHub commits changelog fallback. showVersion() is the single dynamic source of the on-screen version string per CLAUDE.md §7.",
+          "writer": "No state writes. DOM-only: #app-version-txt, #app-version-txt-about, #status-text, document.title, #app-update-status, #mac-update-btn, #web-changelog-list; plus Tauri plugin calls (updater.check/downloadAndInstall, dialog.confirm, process.relaunch).",
+          "public_api": "None exported. Real entry points: click on #app-check-update, click on #mac-update-btn, Tauri event menu-check-update, and its own internal setTimeout.",
+          "consumers": ["feedback-bridge.js:402 (comment only, explains the document.title format showVersion() maintains — no call)", "timeline.js:6-7 (comment only, citing the updater's confirm()-Promise bug as precedent)", "src-tauri/src/lib.rs:203 (registers tauri_plugin_updater) and :245 (app.emit('menu-check-update', ()) — the actual producer of the event this file listens for)", "index.html (supplies every DOM id and the <script> tag)"],
+          "oracle": "grep -rln \"updater|Updater|showVersion\" across all three test roots → zero hits. Confirmed 'none found'.",
+          "depends_on": ["SM.t/showToast globals", "window.__TAURI__.{updater,dialog,process,app,event}", "src-tauri/src/lib.rs's menu emit", "index.html's static fallback strings (CLAUDE.md §7 hand-bump requirement at build time)"],
+          "entangled_with": [],
+          "notes": "C08 draft's 'read-only repo-scoped token' claim is STALE: src-tauri/src/lib.rs:196-202 confirms the endpoint is now the PUBLIC repo's GitHub Releases over plain HTTPS with NO token — matches CLAUDE.md §7's current description of the public-releases updater exactly. Only a minisign pubkey (tauri.conf.json) verifies update-package signatures. capabilities/default.json does grant updater:default as drafted."
+        }
+      ]
+    },
+    {
+      "area": "extensibility-api",
+      "packets": [
+        {
+          "id": "C09.extensibility-api.scripting-and-plugins",
+          "title": "Nemo scripting API + HTML plugin host",
+          "files": ["src/js/nemo-script.js (695 lines)", "src/js/nemo-plugin.js (220 lines)"],
+          "symbols": ["window.SMScript = {run, openFile, api: buildApi, help} (nemo-script.js:694) — MISSING ENTIRELY from C08's draft, which named SMBpm/SMEffectKeys instead (both are dependencies this file only READS — grep-confirmed at lines 207,211,222,223,245,537,540,543,545 — never assigned here). window.SMPlugin = {openFile, loadArchive, loadFiles, close, closeAll, openCount, setTitle} (nemo-plugin.js:211) — the part of the draft that was correct. window.nemo is NOT a persistent global: the only 'window.nemo =' text is inside a string literal (nemo-plugin.js:120, part of bridgeSource(), injected into a plugin iframe at runtime) — the real nemo object is a bare parameter name inside the sandboxed script Function and, separately, an iframe-local property rebuilt fresh on each plugin load."],
+          "responsibility": "nemo-script.js builds a fresh `nemo` document-model object per invocation (buildApi()) and runs user source against it. nemo-plugin.js unzips/inlines an HTML+manifest plugin into an iframe and injects the same `nemo` object as window.nemo inside that iframe. Confirmed accurate.",
+          "writer": "Broader than the draft's vague phrasing: state.layers[i] (name/visible/locked/parentLayerUid/inPoint/outPoint/motionStatic/motion/expressions/markers/color/blendMode/matteMode/keyLock/timeLink/solo/shy/motionBlur), effects[j] fields, state.currentFrame/markers/bpm*/exprGlobals/appMode/waIn/waOut, window._layerSel/selectedPaths, plus structural layer add/remove/duplicate/split/merge via window.SM.* — effectively the whole live project/document graph.",
+          "public_api": "SMScript.run(source,opts), .openFile(), .api() (=buildApi), .help(); SMPlugin.openFile(), .loadArchive(buf), .loadFiles(files), .close(id), .closeAll(), .openCount(), .setTitle(id,t)",
+          "consumers": ["src/js/timeline.js:9154 (SMScript.openFile()) and :9156 (SMPlugin.openFile()) — both context-menu entries ('Open Script.../Open Plugin...'). NEW vs draft: this is the real in-repo upstream trigger, missing from C08's draft, which only described downstream third-party script/plugin code."],
+          "oracle": "grep -rEn for nemo-script/nemo-plugin/SMScript/SMPlugin/buildApi/readZip/loadArchive/nemo.layer(/SMScript.run across tests/ → zero matches. A similarly-named tests/nemo-isolation.test.cjs is unrelated dev-tooling (a process-lock system, engineering/runtime-isolation.md), not JS sandboxing. Confirmed 'none found'.",
+          "depends_on": ["state/userLayers (whole-app shared)", "window.SM, window.SMMotion, window.SMEffectKeys, window.SMBpm, window.SMMarkers, window.SMEngineBridge", "bare globals: goToFrame/renderLayerList/renderTimeline/updateUI/showToast/pushUndo/saveActiveLayerFrame/loadFrame/clearSel/layerInPoint/layerOutPoint", "window.SMPanelUI (src/js/nemo-panel.js, 147 lines — NOT in this packet's files, but already owned by C04b-editor-presentation-support.json, confirmed by grep of existing census JSONs, so this is a correctly-excluded cross-reference, not a gap)"],
+          "entangled_with": ["src/js/nemo-panel.js (SMPanelUI) — owned elsewhere (C04b), see depends_on"],
+          "security_surface": "No sandboxing exists at any layer, and the exposure is much larger than 'the document model'. (1) Scripts run via `new Function('nemo','__src','\"use strict\";\\nreturn eval(__src);')(api, src)` — since Function bodies close over the global scope and the eval is direct, script code has unrestricted read/write access to `window` itself (bypassing `nemo` entirely: window.state, document, fetch, etc). (2) Plugins mount via `frame.srcdoc=...` with NO sandbox attribute (confirmed by grep) — same-origin, so parent.* (the entire host window) is reachable, not just the injected nemo/SMPlugin bridge. (3) tauri.conf.json sets withGlobalTauri:true, and src-tauri/capabilities/default.json grants broad fs access ($HOME/**, $DOCUMENT/**, $DESKTOP/**, $DOWNLOAD/**, read/write/mkdir/remove/rename), shell:allow-open, shell:allow-execute on the ffmpeg sidecar (args:true), http:default (arbitrary http(s)://*/*, bypassing the page's own CSP connect-src since it's IPC not fetch), process:allow-restart, updater:default — all reachable through window.__TAURI__ with zero script/plugin-specific gating. CSP (script-src 'self' 'unsafe-eval' 'unsafe-inline') applies webview-wide, enabling this for the iframe too.",
+          "notes": "See known_defects DEF-2. This is not sandboxed access to a document model — it is full native Tauri capability (broad filesystem, arbitrary HTTP, shell/process/ffmpeg execution) plus unrestricted page JS, identical to the main app's own privilege, for any loaded script or plugin. C08 draft's own instinct to flag this for an independent security-review pass is correct and now substantiated with concrete capability enumeration."
+        }
+      ]
+    },
+    {
+      "area": "footage-import",
+      "packets": [
+        {
+          "id": "C09.footage-import.core",
+          "title": "Image, sequence, and video footage import (broader than C08's 'bitmap-import' title)",
+          "files": ["src/js/images.js (782 lines)"],
+          "symbols": ["window.SM.{importImages, importVideo, replaceFootageSource, importImageFiles, importVideoFile, _readImageAsDataUrl (=readAsDataUrl), _makeSmallImageThumb (=makeSmallThumb)} — all attached to the shared window.SM namespace, not standalone globals as the draft's symbol list implied."],
+          "responsibility": "Broader than C08's title/draft: imports single images, auto-detected numbered sequences (PRO_IMAGE_EXTS), AND videos (~46% of the file, lines 351-707: WebCodecs/SMNativeVideo + ffmpeg-bake + <video>/canvas fallback, batch import, linked-mode warnings) as raster-per-frame footage layers, plus replaceFootageSource (hot-swaps an existing footage layer's source). Recommend renaming from 'bitmap-import' at extraction time.",
+          "writer": "Per-frame raster stroke dicts ({isRaster, src|linked+linkedPath/linkedHandleId, x,y,width,height,opacity}) on ld.frames[f].strokes for every frame, plus layer.footage descriptors, createUserLayer/activateUL, and SMMediaLibrary entries. CORRECTION to C08 draft: this file does NOT write to the engine's image store (zero register_image/_imgUsedThisBuild occurrences) and has zero meshId occurrences — it only supplies the base64 src/dataUrl; image-store registration and mesh-tagging happen elsewhere.",
+          "public_api": "The 7 window.SM.* functions above, plus 5 DOM listeners wired directly in this IIFE (image-input/video-input change, btn-import-img/btn-import-video/btn-footage-replace click).",
+          "consumers": ["src/js/drop-import.js (importImageFiles, importVideoFile) — NEW", "src/js/media-library.js (importImageFiles, importVideoFile, importImages, importVideo) — NEW", "src/js/linked-media.js (_readImageAsDataUrl, _makeSmallImageThumb) — NEW", "src/index.html (script tag + DOM ids) — NEW"],
+          "oracle": "Not literally 'none found' as drafted: tests/performance-regressions.test.cjs:244 is a static source-scan asserting images.js/app.js/timeline.js never contain the literal anti-pattern `saveAllLayerFrames();pushUndo(Layers)?()`; tests/fixtures/README.md:131 has a prose-only mention. No functional/behavioral test of import, sequence-detection, ffmpeg, or linked-mode logic exists.",
+          "depends_on": ["SMNativeVideo (native-video-bridge.js, 11 refs — heavier than the draft's cited SMEngineBridge, which appears only once)", "SMMediaLibrary (12 refs, also heavier than drafted)", "SMLinkedMedia", "export.js's ffmpeg globals (exportTempDirPath/exportMkdir/exportRemoveDir/exportRunFfmpeg, used as bare globals)", "app.js shared state/helpers"],
+          "entangled_with": [],
+          "notes": "C08 draft's listed consumers (image-mesh.js, engine-bridge.js) call ZERO exported symbols from this file — each has only a descriptive code comment pointing back at this file's per-frame loop, no actual function call in either direction. The real relationship to CLAUDE.md §12/§5quinquies is DOCUMENTARY, not code coupling: CLAUDE.md §12 cites this file's per-frame stroke-copy loop as the precedent SMImageMesh.propagate() must independently replicate (to avoid the exact one-frame-only bug §12 warns about) — a one-way convention dependency, not an API call. Given the size (782 lines) and the ~46% video-import share with distinct dependencies, recommend splitting into two sub-packets (still/sequence-image vs. video-import) at extraction time — flagged, not executed in this census."
+        }
+      ]
+    },
+    {
+      "area": "media-integration-misc",
+      "packets": [
+        {
+          "id": "C09.media-misc.lottie-preview",
+          "title": "Lottie JSON round-trip preview",
+          "files": ["src/js/lottie-preview.js (137 lines)"],
+          "symbols": ["window.SMLottiePreview = {open}"],
+          "responsibility": "Re-renders the JSON lottieBuild() just emitted into an isolated paper.Project/canvas as a round-trip sanity check — explicitly not a general Lottie player, per its own header.",
+          "writer": "No app `state` writes — only its own module closures (previewProject, currentJson) and the preview modal/canvas DOM.",
+          "public_api": "window.SMLottiePreview.open(json)",
+          "consumers": ["src/js/timeline.js:11780,11782 (real call when export format is 'lottie') — NEW, not listed anywhere in C08's draft, which only addressed tracker.js's consumer"],
+          "oracle": "grep -rln \"SMLottiePreview\" outside its own file and tests/ → zero hits. Confirmed 'none found'.",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Confirmed fully independent of the other 4 files in this area — no shared symbol or call."
+        },
+        {
+          "id": "C09.media-misc.lipsync",
+          "title": "Audio-driven lip-sync keyframe preview",
+          "files": ["src/js/lipsync.js (214 lines)"],
+          "symbols": ["window.SMLipSync = {MOUTHS, defaults, settingsOf, analyze, apply, _featuresAt, _classify, _smooth}"],
+          "responsibility": "FFT-based heuristic (rms/centroid/zero-crossing) classifies audio into Preston-Blair mouth shapes; apply() writes symbol-instance componentFrame keys only where the mouth changes. Confirmed accurate.",
+          "writer": "Mutates state directly: ld.lipSync settings and ld.frames[f].{isKeyframe,componentFrame,isInterpolated} on the layer data.",
+          "public_api": "SMLipSync.settingsOf/.analyze/.apply",
+          "consumers": ["src/js/timeline.js (8 sites, 7116-11355 — the lip-sync panel UI) — NEW, not enumerated in C08's draft"],
+          "oracle": "Same repo-wide grep pattern → zero hits in tests/. Confirmed 'none found'.",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Confirmed fully independent of the other 4 files in this area."
+        },
+        {
+          "id": "C09.media-misc.kitsu",
+          "title": "Kitsu/zou production-tracking pipeline integration",
+          "files": ["src/js/kitsu.js (468 lines)"],
+          "symbols": ["window.SMKitsu — the file is actually two IIFEs; the second (lines 302-468) is Kitsu-modal UI wiring with no separate window.* export of its own, calling only into window.SMKitsu/SM.t/DOM."],
+          "responsibility": "Login/browse/publish against Kitsu, plus (addition beyond C08's draft) a generic 'Working Files' push (pushWorkingFile) used for cross-app handoff — e.g. an After Effects camera export — not just preview publishing. First outbound network code in the app per its own header comment.",
+          "writer": "state.kitsuSession (sessionStorage-backed) and state.kitsuShot; openShot() also mutates state.layers/totalFrames/waIn/waOut via window.SMProject.newProject.",
+          "public_api": "window.SMKitsu.* (login/browse/publish/pushWorkingFile surface)",
+          "consumers": ["src/js/timeline.js:9209 (getCurrentShot)", "src/js/ae-camera-export.js:103,106 (isOpenedFromKitsu, pushWorkingFile) — REAL cross-file coupling NOT in C08's draft: kitsu.js is not fully isolated, the AE camera-export pipeline depends on it"],
+          "oracle": "grep across tests/ → zero hits.",
+          "depends_on": [],
+          "entangled_with": ["src/js/ae-camera-export.js (real, non-trivial coupling — see consumers)"],
+          "notes": "The only one of the 5 media-misc files with a real cross-file dependent outside timeline.js — worth flagging at extraction time so ae-camera-export.js's needs aren't broken by a mechanical per-file split."
+        },
+        {
+          "id": "C09.media-misc.p2p-contacts",
+          "title": "P2P contact/pairing model (v1, no transport)",
+          "files": ["src/js/p2p-contacts.js (163 lines)"],
+          "symbols": ["window.SMP2P = {addContact, removeContact, myInviteCode} — C08 draft's 'window.SMP' is INCORRECT, the real export is SMP2P."],
+          "responsibility": "v1 contact/pairing model only, no live transport yet: local identity/contact list in localStorage, invite codes are ephemeral base64 pairing tokens, contacts stay 'pending' forever (no handshake implemented). Confirmed accurate.",
+          "writer": "localStorage['nemo-p2p-identity'], localStorage['nemo-p2p-contacts'], plus state.p2pIdentity/state.p2pContacts in memory; renders its own DOM list directly.",
+          "public_api": "window.SMP2P.addContact/.removeContact/.myInviteCode",
+          "consumers": ["NONE found anywhere in src/js/** — confirmed fully isolated (wires its own DOM on DOMContentLoaded, nothing else calls it)"],
+          "oracle": "grep across tests/ → zero hits.",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "The most cleanly isolated of the 5 media-misc files — zero consumers, zero cross-file coupling. Straightforward extraction candidate."
+        },
+        {
+          "id": "C09.media-misc.tracker",
+          "title": "Lucas-Kanade motion tracker, JS half",
+          "files": ["src/js/tracker.js (186 lines)"],
+          "symbols": ["window.SMTracker = {available, lumaAt, displayRect, pixelToWorld, worldToPixel, trackLayer, applyToLayer} — C08 draft's 'window.SMNativeVideo' is INCORRECT and significant: that symbol belongs to src/js/native-video-bridge.js and is merely CONSUMED here (SMNativeVideo.frameBytes, .displayRect), conflating a dependency with this file's own export."],
+          "responsibility": "Extended beyond the draft: (1) supplies per-frame luma pixel buffers (native-video bridge, or a raster image via offscreen canvas), (2) pixel<->world conversion via the media's per-frame display rect, (3) calls Rust GeometryWasm.track_points per frame pair, (4) bakes results into Position keyframes via window.SMMotion.",
+          "writer": "Broader than the draft's blanket 'keeps its own state': applyToLayer writes Position motion keys via window.SMMotion.setKeyAtFrame/toggleAnimated, and calls saveAllLayerFrames, pushUndoLayers, loadFrame, updateUI, SMEngineBridge.renderNow — reaches into several other subsystems, not an isolated writer.",
+          "public_api": "window.SMTracker.available/.lumaAt/.displayRect/.pixelToWorld/.worldToPixel/.trackLayer/.applyToLayer",
+          "consumers": ["src/js/tracker-panel.js (SMTracker.available/trackLayer/applyToLayer, lines 85-128) — the sole real consumer, NOT mentioned anywhere in C08's draft"],
+          "oracle": "grep for SMTracker across tests/ → zero hits for the JS half. The Rust half (geometry-wasm/src/track.rs) DOES have an oracle — see cross-census ownership note below.",
+          "depends_on": ["window.SMNativeVideo (native-video-bridge.js)", "window.GeometryWasm.track_points (Rust, via engine-readiness-bridges area)", "window.SMMotion"],
+          "entangled_with": ["src/js/tracker-panel.js"],
+          "notes": "Cross-census ownership confirmed by grep: geometry-wasm/src/track.rs is already explicitly owned by C03-rendering-resource-ownership.json (listed in its files array with a full write-up: responsibility, files geometry-wasm/src/track.rs:22-344, consumers naming src/js/tracker.js:128 as the live JS caller, oracle '4 #[cfg(test)] tests, track.rs:388-429'). C08 draft's parenthetical 'already covered elsewhere' is accurate; this packet correctly excludes track.rs from its own files list to avoid ownership overlap with C03."
+        }
+      ]
+    }
+  ],
+  "cross_cutting_notes": [
+    "Methodology: rather than taking C08's quick draft on faith, all 13 of its packets for this area were independently re-verified via 9 parallel read-only passes (one per file cluster), each explicitly instructed to be skeptical and re-derive every field from the actual source. The corrections were extensive and systematic, not occasional: the draft's 'symbols' field conflated a file's OWN exports with its EXTERNAL dependencies in at least 10 of 13 original packets (e.g. storyboard.js's draft symbols were window.SM/SMCamera/SMEngineBridge — all three are things storyboard.js READS, not what it exports); 'oracle: none found' was wrong in at least 5 of 17 final packets (tutorial.js, timeline-scroll-and-zoom, wasm-engine-loaders, images.js — each has real if indirect/thin test coverage); consumer lists were undercounted, wrong-file, or in one case (project-transplant) entirely backwards in most packets. This pattern is worth naming explicitly for whoever consumes census documents downstream: a fast completeness-pass draft (C08's own stated purpose) is not a substitute for a per-packet verification pass before a packet is treated as extraction-ready.",
+    "The 'media-integration-misc' grab-bag (5 files) was re-split into 5 independent single-file packets per C08's own recommendation ('a future leaf executing this should re-split per file') — verification confirmed zero coupling among the 5 files themselves (each may have its own external consumer, e.g. kitsu.js <-> ae-camera-export.js, but none references another's window.SM* symbol).",
+    "storyboard.js's draft claim of being 'entirely unread by C01-C07' was false: C03-rendering-resource-ownership.json and C04b-editor-presentation-support.json both already cite it as a CONSUMER of their own owned symbols (SMPathFx, SMGroup, SMFeedback) — a corrected framing, not an ownership overlap, since neither census claims storyboard.js itself as an owned file.",
+    "Numbering: issue #1091 (this census, C09) covers the full 'remaining-browser-modules' area (9 topical areas / 17 packets after the re-split above) in one census document, consistent with the issue's own text anticipating it 'may become C09-C12' sub-leaves at execution time. Sibling areas split out from the same C08 draft have already claimed C13 (#1092, tooling-and-ci), C15 (#1093, native-shell-and-services), C17 (#1094, rust-wasm-engine-crates), and C18 (#1095, vendor-generated-and-provenance) — recommend the orchestrator avoid reusing those specific numbers when carving real extraction leaves out of this census; C10, C11, C12, C14, C16, and C19+ remain open.",
+    "Two real, code-verified product findings surfaced during this census (not merely draft corrections) — see known_defects DEF-1 and DEF-2. DEF-2 in particular (the scripting/plugin extensibility surface has zero sandboxing and full native Tauri capability) is recommended for an independent security-review pass, separate from ordinary modularization work, exactly as C08's own draft anticipated but without the concrete capability enumeration this census adds."
+  ],
+  "known_defects": [
+    {
+      "id": "DEF-1",
+      "file": "src/js/effector-layer.js (consumer-side gap in engine-bridge.js, app.js, select-bridge.js)",
+      "line": null,
+      "summary": "Effector layers (ld.isEffectorLayer) are missing from three of the hard-coded per-layer-kind exclusion lists that sibling 'no content' layer kinds (Null/Guide/Widget/Effect) ARE in, independently confirmed by direct code read: engine-bridge.js's buildSceneJson per-kind skip block (lines ~880-946, checks isNullLayer/isGuideLayer/isWidgetLayer/isEffectLayer but not isEffectorLayer); app.js's saveActiveLayerFrame (line 4663) and saveAllLayerFrames (line 4699), both of which check symbolId/montageId/isNullLayer/isEffectLayer/isGuideLayer/isWidgetLayer/lfsGroup/duplicator/_rigPoseLive/SMPathFx but omit isEffectorLayer; and select-bridge.js's multiLayerSelectionBox (line 344), which checks symbolId/nativeVideo/isNullLayer/isEffectLayer/isGuideLayer/isWidgetLayer but omits isEffectorLayer. By contrast, app.js's getEffectiveStrokes (line 2973) DOES correctly exclude isEffectorLayer alongside the other four. Practical consequence, confirmed by also reading tools.js's editRefusalReason (line 1806): it has no check for any of the five 'no content' layer kinds, so a draw gesture on any of them is never blocked at the gesture level — for Null/Guide/Widget/Effect layers the drawn stroke is silently discarded because saveActiveLayerFrame/saveAllLayerFrames refuse to persist it, but for an effector layer (missing from that same exclusion) the stroke DOES get persisted into frame data, while getEffectiveStrokes then excludes it from rendering/export — i.e. a user who draws right after inserting an effector layer gets dead, invisible stroke data silently written into the save file. This is a concrete instance of the exact bug family CLAUDE.md §1 names ('a new item/tag handled in one consumer loop over layer children but missed in others').",
+      "packet": "C09.motion-extensions.effector-duplicator-layer",
+      "severity": "product bug (silent persisted-but-unrendered data; confirmed by direct code read, not merely reported by a subagent)"
+    },
+    {
+      "id": "DEF-2",
+      "file": "src/js/nemo-script.js, src/js/nemo-plugin.js",
+      "line": null,
+      "summary": "The scripting/plugin extensibility surface has zero sandboxing at any layer: script code runs via `new Function('nemo','__src','\"use strict\";\\nreturn eval(__src);')`, which closes over the global scope and grants unrestricted window/document/fetch access bypassing the `nemo` API entirely; plugins mount via `frame.srcdoc` with no `sandbox` attribute, making `parent.*` (the whole host window) reachable; and tauri.conf.json's withGlobalTauri:true plus src-tauri/capabilities/default.json's broad grants (filesystem read/write/mkdir/remove/rename under $HOME/$DOCUMENT/$DESKTOP/$DOWNLOAD, shell:allow-open, shell:allow-execute on the ffmpeg sidecar with args:true, http:default for arbitrary outbound HTTP bypassing the page's own CSP connect-src, process:allow-restart, updater:default) are all reachable through window.__TAURI__ with zero script/plugin-specific gating. This is full native-app privilege, not sandboxed document-model access.",
+      "packet": "C09.extensibility-api.scripting-and-plugins",
+      "severity": "security (by-design-today, not introduced by this census; flagged for an independent security-review pass per C08's own original instinct, now substantiated with concrete capability enumeration)"
+    },
+    {
+      "id": "DEF-3",
+      "file": "src/js/tutorial.js",
+      "line": null,
+      "summary": "C08's draft claimed 'oracle: none found' for this file. In fact three unrelated Playwright specs (tests/animation/browser-acceptance.cjs:104-105, tests/browser/opacity-consumers.spec.cjs:39-40, tests/browser/opacity-ui-consumers.spec.cjs:51-52) depend on tutorial.js's `.tut-close` DOM class to dismiss its popup before proceeding with unrelated assertions. Not a functional test of tutorial.js's own behavior, but a real, undocumented test dependency — renaming that class would silently break three unrelated suites.",
+      "packet": "C09.tutorial-onboarding.core",
+      "severity": "test-coverage / documentation gap (not a functional bug today)"
+    },
+    {
+      "id": "DEF-4",
+      "file": "src/js/app.js:76, src/js/timeline-zoom.js",
+      "line": 76,
+      "summary": "app.js hardcodes `var FC=30` as a startup fallback, explicitly commented 'kept in sync to avoid a flash-of-wrong-zoom' with timeline-zoom.js's own `DEFAULT_FC=30` constant. Nothing enforces the two stay equal — an unenforced cross-file duplicate constant that a future edit to one side could silently desync.",
+      "packet": "C09.timeline-panel-support.scroll-and-zoom",
+      "severity": "informational (drift risk, not a current bug)"
+    },
+    {
+      "id": "DEF-5",
+      "file": "src/js/transplant.js, src/js/app.js (instantiateForeignProjectAsComponent)",
+      "line": null,
+      "summary": "transplant.js's cross-project cherry-pick and app.js's instantiateForeignProjectAsComponent (invoked from media-library.js's 'Compositions' drag-drop) are two independently-coded paths performing conceptually the same operation over the same SMProject.getOpenTabs() data, with no shared code between them.",
+      "packet": "C09.app-utilities.project-transplant",
+      "severity": "informational (duplicate-logic consolidation candidate, out of this census's bounded read-only scope to fix)"
+    }
+  ],
+  "uncovered_responsibilities": []
+}
