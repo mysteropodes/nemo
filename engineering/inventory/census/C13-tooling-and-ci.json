@@ -1,0 +1,205 @@
+{
+  "census_id": "C13",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1092",
+  "title": "Tooling and CI — bounded extraction packets",
+  "owner": "Cyrill/D2 (Honey)",
+  "source_sha": "9735e962e04e98ad49202d76ec085f406c687641",
+  "status": "read-only census complete; no source mutated. C08's own draft for this area (engineering/inventory/census/C08-completeness.json, area `tooling-and-ci`) was re-verified via 6 independent read-only passes, one per draft packet, rather than taken on faith — several claims corrected (file counts, oracle claims, public_api claims), one cross-packet ownership conflict between two independent verifiers resolved during assembly (see cross_cutting_notes #3). Proposed IDs and packet boundaries are placeholders for the orchestrator to renumber into the global sequence.",
+  "scope_files": [
+    "scripts/nemo/*.cjs (29 files at top level, not lib/ — corrected from draft's 30)",
+    "scripts/nemo/lib/*.cjs (26 files — all in scope, draft's baseline-verdicts.cjs exclusion target does not exist)",
+    "scripts/rebuild-ffmpeg-lgpl.sh, scripts/bundle-ffmpeg-dylibs.py, scripts/generate-third-party-notices.py, scripts/dev_server.py, scripts/build-mcp-sidecar.cjs, scripts/assert-no-private-labs.py (6 files)",
+    "tests/nemo-*.test.cjs (23 files) + tests/fixtures/** (53 files) + tests/bench/** (4 files)",
+    "tests/browser/** (6) + tests/animation/** (6) + tests/desktop/** (4) + tests/integration/r06-browser-runtime.test.cjs + 12 individually-named root tests/*.test.cjs (29 files total)",
+    ".github/workflows/*.yml (5) + .github/scripts/*.cjs (2) + package.json, package-lock.json, playwright.config.cjs, .c8rc.json, wrangler.jsonc, .gitignore, .claude/launch.json, engineering/ci/README.md (8) — 15 files total"
+  ],
+  "coverage_note": "185 files across 6 packets (29+26+6+80+29+15), every one accounted for exactly once after assembly-time reconciliation. scripts/nemo/** = 55 .cjs files total (29 top-level + 26 lib), independently cross-validated by two separate verification passes (the scripts-nemo-core and scripts-nemo-lib agents) computing the same 55 via different methods. tests/ tree fully reconciled: nemo-tooling-test-suite (80) + browser-and-app-test-suites (29) = 109 = exact recursive file count under tests/, verified independently by the browser-and-app-test-suites agent. Root .github/ and build/lint config swept for gaps by the ci-workflows agent — none found beyond the 15 listed.",
+  "areas": [
+    {
+      "area": "tooling-and-ci",
+      "packets": [
+        {
+          "id": "C13.tooling.scripts-nemo-core",
+          "title": "scripts/nemo/*.cjs top-level CLI surface + colocated tests (29 files, 6603 lines)",
+          "files": [
+            "scripts/nemo/*.cjs (29 files at top level: 13 implementation CLI entry points + 16 colocated *.test.cjs test files — corrected from draft's 30)",
+            "scripts/nemo/README.md"
+          ],
+          "symbols": [],
+          "responsibility": "Four loosely-coupled CLI families sharing a directory, not one cohesive surface: (a) the receipt-writing job pipeline — doctor.cjs/check.cjs/verify.cjs/job.cjs, all delegate to lib/cli.cjs's runJobs() over the JOBS registry in lib/jobs.cjs:356-370; (b) the CI-lane orchestrator ci.cjs, invoked directly by .github/workflows/nemo-validation.yml (node scripts/nemo/ci.cjs quick|boundaries|surfaces|aggregate), which itself shells out to verify.cjs and boundaries.cjs; (c) the R06 task-runtime-isolation launcher family (browser.cjs/build.cjs/native.cjs/isolation.cjs) documented in engineering/runtime-isolation.md; (d) two standalone leaves — boundaries.cjs (invoked by ci.cjs's boundaries lane) and baseline.cjs (not referenced by package.json/ci.cjs/lib/jobs.cjs anywhere, purely manual per BASELINE.md). All 13 implementation files are genuine CLI entry points (shebang + argv parsing + process.exit); no pure-library file is misplaced at top level.",
+          "writer": "reports/<runId>/receipt.json (schema nemo.receipt/1) + receipt.md + one <job>.log per job, written by lib/receipt.cjs, called from lib/cli.cjs:26 (backs doctor/check/verify/job.cjs). reports/ is git-ignored. Exception: build-job.cjs takes a caller-supplied reportDir and prints one JSON line to stdout instead of calling receipt.cjs itself.",
+          "public_api": "doctor/check/inventory/native/verify map directly to package.json scripts; test:rust/test:integration/test:browser/test:desktop/bench/build:wasm/build:desktop all go through `node scripts/nemo/job.cjs <subcommand>`. No literal `npm run job`, `npm run ci`, `npm run boundaries`, or `npm run baseline` — ci.cjs is invoked only directly by the GH workflow; boundaries.cjs/baseline.cjs/browser.cjs/isolation.cjs have no package.json entry at all. `npm run build` (tauri build, the app build) is an unrelated naming collision with scripts/nemo/build.cjs (the R06 launcher), which is never invoked via any npm script.",
+          "consumers": [
+            "EXECUTION_PLAN.en.md:125 names npm run doctor/check/test/test:browser/test:desktop/verify as the plan's current acceptance-check entry commands",
+            ".github/workflows/nemo-validation.yml (ci.cjs, all 4 lanes)",
+            "tests/nemo-desktop-job.test.cjs, tests/nemo-native-runtime.test.cjs, tests/desktop/native-harness.cjs, tests/browser/preview-lifecycle.cjs (spawn job.cjs/native.cjs/browser.cjs by path)",
+            "tests/nemo-inventory-swatch.test.cjs, tests/nemo-inventory-records.test.cjs (require inventory.cjs's build export directly)"
+          ],
+          "oracle": "9 of 13 implementation files have a real, direct test that spawns/requires the top-level file itself: baseline, boundaries(via boundaries-cli.test.cjs), browser, build, native (the three \"-runtime\" tests spawn the CLI directly), build-job, ci, inventory, isolation. Four files have zero test coverage anywhere in the repo: check.cjs, doctor.cjs, verify.cjs (no reference at all), and job.cjs (only incidentally spawned by two other tests for single job names — its own argv/exit-64 paths are untested). lib/jobs.cjs and lib/cli.cjs (the registry these four wrap) also have no dedicated test file.",
+          "depends_on": [
+            "C13.tooling.scripts-nemo-lib (scripts/nemo/lib/*.cjs)"
+          ],
+          "entangled_with": [],
+          "notes": "Draft's exclusion note (\"EXCLUDE lib/baseline.cjs and lib/baseline-verdicts.cjs\") does not apply to this packet — it has no lib/ files at all, and baseline-verdicts.cjs does not exist anywhere in the repo (only ever mentioned inside C08-completeness.json's own text, apparently confusing baseline.cjs's internal \"verdict\" concept with a separate file). Dropped. Cross-packet note: 16 of this packet's 29 files are *.test.cjs test bodies; 10 of C13.tooling.nemo-tooling-test-suite's 23 tests/nemo-*.test.cjs files are one-line forwarders that require() these files so Node's default test glob (which only scans tests/) picks them up. This packet is their single whole-file writer/owner (physical location scripts/nemo/); the test-suite packet references them only by reachability — do not double-declare size/ownership across both."
+        },
+        {
+          "id": "C13.tooling.scripts-nemo-lib",
+          "title": "scripts/nemo/lib/*.cjs shared library modules (26 files, 5901 lines)",
+          "files": [
+            "scripts/nemo/lib/*.cjs (26 files, all in scope — no baseline-verdicts.cjs exists to exclude, corrected from draft)"
+          ],
+          "symbols": [],
+          "responsibility": "Six real sub-clusters, cross-checked against engineering/boundaries/profiles/scripts-nemo.profile.json (which already declares each of these 26 files as its own one-file boundary module with an explicit layer — used as primary source of truth rather than re-deriving from scratch): (A) base infra leaves — util.cjs (process/fs/git primitives), identity.cjs (source+build+platform identity for receipts), receipt.cjs (nemo.receipt/1 schema+writer), capabilities.cjs (read-only tool probes); (B) job/CLI orchestration — jobs.cjs (named job registry), cli.cjs (shared parseArgs→runJobs→receipt→exit-code runner); (C) boundaries/R05 module-boundary checker, 8 files — boundaries.cjs (core rules), boundaries-resolver/coverage/discovery/size/ratchet/repository/application.cjs; (D) inventory/static-surface scan, 5 files — inventory-lexer.cjs (base tokenizer), inventory-bindings/records/surfaces/render.cjs; (E) isolation/native+browser runtime, 6 files — isolation.cjs (R06/#902 per-task roots+port+handshake), browser-runtime.cjs, build-runtime.cjs, build-job.cjs, native-process.cjs, native-runtime.cjs; (F) baseline.cjs alone — the P02 current-state comparison manifest (schema nemo.baseline-manifest/1), single-commit history, cross-ref P02/#1004 rather than re-derived here.",
+          "writer": "7 of 26 files perform real filesystem writes, all scoped to the run's isolated runtime/report roots: build-job.cjs, build-runtime.cjs, browser-runtime.cjs, jobs.cjs, isolation.cjs, receipt.cjs, native-runtime.cjs. baseline.cjs additionally reads/writes the checked-in engineering/inventory/baseline-manifest.json. The other 19 are pure computation/read-only.",
+          "public_api": "engineering/boundaries/profiles/scripts-nemo.profile.json declares a publicApi per module — for all 26 it's just [\"<own filename>\"] (single-file modules, no deep-import surface beyond the whole file).",
+          "consumers": [
+            "Directly required by specific top-level scripts/nemo/*.cjs entry points per file (e.g. cli.cjs ← check/doctor/job/verify.cjs; inventory-lexer/render/surfaces/bindings.cjs ← inventory.cjs only)",
+            "Extensive intra-lib requires between the 26 files themselves",
+            "The scripts/nemo/*.test.cjs suite (see oracle)"
+          ],
+          "oracle": "Tests are NOT co-located in lib/ (corrected from draft) — all 16 *.test.cjs files live one level up at scripts/nemo/*.test.cjs. 17 of 26 lib files are directly require()'d by name in a named test. The other 9 (boundaries-resolver, capabilities, cli, native-process, inventory-bindings/lexer/records/render/surfaces) have credible transitive coverage only — via a directly-tested file that imports them, or via real subprocess spawns of a top-level CLI copied into a test fixture. Zero files with neither an importer nor any test connection — full intra-lib + top-level require graph confirmed every file has an incoming edge (no dead code).",
+          "depends_on": [],
+          "entangled_with": [
+            "C13.tooling.scripts-nemo-core (all 26 required by top-level CLI entry points)"
+          ],
+          "notes": "baseline.cjs: draft also cites T02 (#1051/#1088) as already characterizing this file — only half-true. T02's actual commit (2cdf92d, on origin/pollen/t02-baseline-regression-comparator) is NOT an ancestor of this branch's HEAD (9735e96); lib/baseline.cjs:47-49 still shows the pre-fix behavior that commit's message describes as a bug (BLOCKING/INCONCLUSIVE Sets keyed only on verdict, UNCHANGED_BLOCKED in neither). P02's characterization is solid; T02's isn't reflected here yet — don't assert T02 as settled for this file without re-checking at merge time. Separately, DEF-2 (see known_defects): engineering/boundaries/profiles/scripts-nemo.md's \"Coverage limits\" section is stale (claims receipt.cjs is excluded — it isn't; claims \"23 of 24\" files declared — real count is 55 across all of scripts/nemo/**)."
+        },
+        {
+          "id": "C13.tooling.standalone-build-scripts",
+          "title": "One-off build/lint scripts outside scripts/nemo/ (6 files)",
+          "files": [
+            "scripts/rebuild-ffmpeg-lgpl.sh (72 lines)",
+            "scripts/bundle-ffmpeg-dylibs.py (191 lines)",
+            "scripts/generate-third-party-notices.py (210 lines)",
+            "scripts/dev_server.py (159 lines)",
+            "scripts/build-mcp-sidecar.cjs (38 lines)",
+            "scripts/assert-no-private-labs.py (51 lines)"
+          ],
+          "symbols": [],
+          "responsibility": "Six independent single-purpose scripts, none require()/exec each other (only doc-comment cross-references, verified by grep): FFmpeg LGPL rebuild (VideoToolbox h264/h265/prores, no libx264/libx265) + dylib bundling scanning ALL of Contents/MacOS/; third-party notice generation from npm+cargo license trees; dev_server.py — NOT the documented preview server (that's plain `python3 -m http.server` per npm run serve/README/CONTRIBUTING) but an undocumented, opt-in alternative whose distinguishing feature is implementing /__feedback/* endpoints for feedback-bridge.js's browser fallback; the MCP sidecar cargo build; a build-time + npm-run-check guard against private Labs prototypes leaking into a public build.",
+          "writer": "4 of 6 write a build artifact in place (rebuilt ffmpeg binary; bundled dylibs; THIRD_PARTY_NOTICES.md; staged nemo-mcp binary). dev_server.py writes feedback-entry JSON files as a side effect of serving, not a build artifact. assert-no-private-labs.py writes nothing (stdout/stderr diagnostics only).",
+          "public_api": "Not accurate as drafted (\"invoked from npm scripts\") — no package.json scripts entry names any of these 6 directly. 3 are reached transitively (assert-no-private-labs.py + build-mcp-sidecar.cjs via tauri.conf.json's beforeBuildCommand reached by `npm run build`; bundle-ffmpeg-dylibs.py via scripts/nemo's build:desktop job and release.yml). The other 3 (rebuild-ffmpeg-lgpl.sh, generate-third-party-notices.py, dev_server.py) have no automated invoker at all, npm or CI — pure manual/on-demand tools.",
+          "consumers": [
+            "bundle-ffmpeg-dylibs.py: scripts/nemo/lib/build-job.cjs:120 (build:desktop job) AND .github/workflows/release.yml:139",
+            "assert-no-private-labs.py + build-mcp-sidecar.cjs: src-tauri/tauri.conf.json:8 beforeBuildCommand (via npm run build); assert-no-private-labs.py additionally via scripts/nemo/lib/jobs.cjs:87-91 checkPrivateLabs() (npm run check + CI's quick lane)",
+            "rebuild-ffmpeg-lgpl.sh, generate-third-party-notices.py, dev_server.py: no automated consumer found"
+          ],
+          "oracle": "Draft's \"none found\" is incorrect — tests/nemo-third-party-notices.test.cjs spawns the actual generate-third-party-notices.py as a subprocess and asserts on generated Markdown; tests/nemo-mcp-bundle.test.cjs copies the actual build-mcp-sidecar.cjs into a fixture sandbox with a fake cargo and asserts staging/cleanup + the exact tauri.conf.json beforeBuildCommand string. build-job.test.cjs/baseline.test.cjs reference bundle-ffmpeg-dylibs.py but only test the build orchestrator's error handling via a fake stand-in script, not the real dylib logic. rebuild-ffmpeg-lgpl.sh and dev_server.py: confirmed genuinely no test coverage. assert-no-private-labs.py IS itself a test-shaped gate (confirmed: exits 1/0, run for real at build+check time) but has no separate test of its own internal logic.",
+          "depends_on": [],
+          "entangled_with": [
+            "C13.tooling.scripts-nemo-lib (build-job.cjs invokes bundle-ffmpeg-dylibs.py; jobs.cjs invokes assert-no-private-labs.py)"
+          ],
+          "notes": "CLAUDE.md §7 doc/code cross-check: no mismatch found (VideoToolbox rationale, Homebrew formula list, \"scans ALL executables\" all verbatim-match current code); one incomplete doc example noted (CLAUDE.md names only the main binary + ffmpeg sidecar as scanned executables, but tauri.conf.json also externalBins nemo-mcp, which the same \"ALL executables\" loop also sweeps — not a contradiction, just an incomplete example list). DEF-3 (see known_defects, unverified): rebuild-ffmpeg-lgpl.sh's LGPL-license verification step has two read-only-observable oddities not executed to confirm at runtime."
+        },
+        {
+          "id": "C13.tooling.nemo-tooling-test-suite",
+          "title": "tests/ suite for the scripts/nemo tooling + fixtures (80 files: 23 + 53 + 4)",
+          "files": [
+            "tests/nemo-*.test.cjs (23 files)",
+            "tests/fixtures/** (53 files: 7 top-level + 13 subdirs)",
+            "tests/bench/** (4 files)"
+          ],
+          "symbols": [],
+          "responsibility": "Test suite exercising scripts/nemo/** — including the 16 colocated scripts/nemo/*.test.cjs files physically owned by C13.tooling.scripts-nemo-core and reached here only via 10 thin one-line forwarders (see that packet's notes) — plus the fixture trees those tests copy into temporary directories (per Pollen's #1088 finding on lazy compareToBaseline require). 4 of the 23 nemo-*.test.cjs files additionally/instead cover material OUTSIDE scripts/nemo/**: nemo-ci.test.cjs also requires .github/scripts/collaborator-pr-policy.test.cjs; nemo-mcp-adapter.test.cjs reads src/js/adapters/application-mcp.js (real application source); nemo-mcp-bundle.test.cjs spawns scripts/build-mcp-sidecar.cjs; nemo-third-party-notices.test.cjs spawns scripts/generate-third-party-notices.py — the latter two are repo scripts/ root, not scripts/nemo/, and both belong to C13.tooling.standalone-build-scripts.",
+          "writer": "reports/**, temp fixture trees — confirmed directly (e.g. nemo-desktop-job.test.cjs's fixture() helper: fs.mkdtempSync, copies real source in, removes after).",
+          "public_api": "npm test (package.json, glob `tests/*.test.cjs tests/animation/*.test.cjs` — non-recursive single-level, matches 35 files total: these 23 plus 12 belonging to the sibling browser-and-app-test-suites packet). CI does NOT call npm test directly — node scripts/nemo/ci.cjs quick runs a test:unit job that independently re-implements the identical glob in Node (also run under c8 coverage). npm run bench → job.cjs bench → jobs.cjs jobBench → tests/bench/run.cjs.",
+          "consumers": [
+            "C13.tooling.scripts-nemo-core / scripts-nemo-lib — not just \"same subsystem\": 16 of scripts/nemo/core's 29 files are test bodies reached only through this packet's forwarders (physical colocation, not mere relatedness)",
+            ".github/scripts/, src/js/adapters/, and scripts/ root (build-mcp-sidecar.cjs, generate-third-party-notices.py) are real, verified targets partly outside scripts/nemo/ (see responsibility)"
+          ],
+          "oracle": "self-oracle (this IS the oracle for the tooling packets)",
+          "depends_on": [
+            "C13.tooling.scripts-nemo-core",
+            "C13.tooling.scripts-nemo-lib"
+          ],
+          "entangled_with": [
+            "C13.tooling.standalone-build-scripts (2 of 23 test files exercise its scripts)"
+          ],
+          "notes": "Do not size independently of scripts-nemo-core/lib — same subsystem, and 16/29 of scripts-nemo-core's files are physically this suite's test bodies. CROSS-PACKET CONFLICT RESOLVED DURING ASSEMBLY: this packet's own verification pass recommended adding tests/desktop/** (4 files) here, reasoning by analogy to tests/bench. However the sibling browser-and-app-test-suites packet's independent verification pass did a full tests/ tree reconciliation (find tests -type f = 109 exactly = this packet's 80 + that packet's 29, zero gap/overlap) and confirmed tests/desktop/** already belongs there, matching the original C08 draft. The first pass lacked visibility into the sibling packet's scope when it flagged the \"gap\" — tests/desktop/** is NOT added here; it stays with browser-and-app-test-suites. package.json's `test:unit` job (jobs.cjs) is a separate re-implementation of the same glob as npm test, not a literal call to it."
+        },
+        {
+          "id": "C13.tooling.browser-and-app-test-suites",
+          "title": "Playwright/browser/animation/desktop app-behavior tests (29 files)",
+          "files": [
+            "tests/browser/** (6 files)",
+            "tests/animation/** (6 files, incl. fixtures/curve-workflow.json)",
+            "tests/desktop/** (4 files)",
+            "tests/integration/r06-browser-runtime.test.cjs (1 file — thin wrapper; real body is scripts/nemo/browser-runtime.test.cjs, owned by scripts-nemo-core)",
+            "tests/{text-selector,project-open,project-entry-repaint,performance-regressions,application-opacity,application-opacity-bootstrap,application-opacity-replay,domain-opacity,duplicator-hue,easing-reference,expr-bake,feedback-2026-08-22}.test.cjs (12 files)"
+          ],
+          "symbols": [],
+          "responsibility": "Behavioral/regression tests for the actual application (browser UI, Animation 2D, desktop packaging), as opposed to the tooling suite. Confirmed by full reconciliation of the entire tests/ tree: this packet (29) + sibling nemo-tooling-test-suite (80) = 109 = exact recursive file count under tests/, zero gap, zero overlap. Opacity cross-ref confirmed strong (not just \"likely\"): all 4 application-opacity*/domain-opacity files directly require src/js/domain/animation/opacity.js, two also load src/js/{application,bootstrap}/opacity-application.js (Ilya's team's fresh pilot per C07 census, not legacy debt — cross-ref rather than re-derive). r06 cross-ref resolved: tests/integration/r06-browser-runtime.test.cjs and the sibling packet's tests/nemo-browser-runtime.test.cjs are both thin wrappers requiring the same real test body at scripts/nemo/browser-runtime.test.cjs.",
+          "writer": "Three distinct sinks: Playwright → reports/.../playwright-report/{html,junit.xml} (NEMO_BROWSER_REPORT_DIR); desktop → packaged-native.json (NEMO_DESKTOP_REPORT_DIR); tests/animation/browser-acceptance.cjs → reports/r08-browser-acceptance directly (own schema nemo.r08.browser-acceptance.v1).",
+          "public_api": "Four distinct npm scripts, not \"test:browser/test:desktop etc.\": npm test (root 12 files + boundaries/curve/motion-facade.test.cjs, plus sibling nemo-*), test:browser (playwright against tests/browser, *.spec.(c?js|mjs|ts)), test:desktop (lib/jobs.cjs jobTestDesktop does fs.readdirSync non-recursive — see DEF-1, only reaches top-level tests/desktop/packaged-native.test.cjs), test:integration (reaches tests/integration/r06-browser-runtime.test.cjs, not mentioned in original draft). tests/animation/browser-acceptance.cjs and tests/desktop/unit/native-harness.test.cjs are reached by none of these npm globs directly.",
+          "consumers": [
+            "T01/#1073 JS coverage work, T03 playwright trace work — draft's claim not independently verified either way, left as an unconfirmed assumption"
+          ],
+          "oracle": "self-oracle",
+          "depends_on": [],
+          "entangled_with": [
+            "C13.tooling.nemo-tooling-test-suite (tree-adjacent, see coverage_note)"
+          ],
+          "notes": "DEF-1 (see known_defects): npm run test:desktop is non-recursive and silently never runs tests/desktop/unit/native-harness.test.cjs (9 tests of the harness's own failure handling) — only reachable via direct invocation or transitively through the sibling packet's nemo-desktop-harness.test.cjs forwarder under plain npm test."
+        },
+        {
+          "id": "C13.tooling.ci-workflows-and-root-config",
+          "title": "GitHub Actions workflows + root build/lint config (15 files)",
+          "files": [
+            ".github/workflows/{collaborator-pr-policy,deploy-feedback-worker,deploy-web,nemo-validation,release}.yml (5)",
+            ".github/scripts/collaborator-pr-policy.{cjs,test.cjs} (2)",
+            "package.json, package-lock.json, playwright.config.cjs, .c8rc.json, wrangler.jsonc, .gitignore, .claude/launch.json, engineering/ci/README.md (8)"
+          ],
+          "symbols": [],
+          "responsibility": "CI/CD pipeline definitions plus root-level build tool configuration. Except for collaborator-pr-policy.yml (auto-triggers on pull_request_target to main, metadata-only per CLAUDE.md §9), no workflow here runs without an explicit human-approved workflow_dispatch + allow_hosted_build=true — verified individually gated for all jobs in all 4 of the other workflows (no ungated job found). .github/workflows/ and .github/scripts/ swept for gaps: exactly the listed files, nothing more; no other root build/lint config exists (no eslintrc/tsconfig/nvmrc — plain JS, no bundler).",
+          "writer": "GitHub Actions run state (external); collaborator-pr-policy additionally writes GitHub PR review state via the API (createReview/dismissReview).",
+          "public_api": "Corrected from draft (\"triggered by push/PR/manual dispatch\" — none trigger on plain push or pull_request): collaborator-pr-policy.yml auto-triggers on pull_request_target to main (+ manual workflow_dispatch reconcile); the other 4 workflows trigger only via manual workflow_dispatch with a required allow_hosted_build gate (deploy-feedback-worker, deploy-web, nemo-validation each also require base_sha/tag inputs on top).",
+          "consumers": [
+            "collaborator-pr-policy.yml is the one automatic exception noted in CLAUDE.md §9/AGENTS.md (\"metadata-only... no PR code or builds\", verified verbatim in the workflow's own header comment and collaborator-pr-policy.cjs:73-81)"
+          ],
+          "oracle": "workflow YAML has no local test oracle; collaborator-pr-policy.cjs has its own .test.cjs. Confirmed no discrepancy between code and CLAUDE.md §9's description of the policy bot's scope.",
+          "depends_on": [],
+          "entangled_with": [
+            "C13.tooling.standalone-build-scripts (release.yml invokes bundle-ffmpeg-dylibs.py)",
+            "C13.tooling.scripts-nemo-core (nemo-validation.yml invokes ci.cjs)"
+          ],
+          "notes": "package-lock.json: 1003 lines, lockfileVersion 3, only 3 devDependencies (@playwright/test, @tauri-apps/cli, c8), 70 resolved transitive entries — small, legitimate, fully derived from package.json; kept as a provenance/pass-through entry rather than needing independent inventory content. .claude/launch.json: 83 lines, 13 per-feature local static-server debugger presets for manual browser QA (each just `python3 -m http.server <port> -d src` with a scenario name) — editor tooling config, not a CI artifact. Draft's \"Proposed C14 tail section\" line dropped (stale — this packet is already renamed C13 by this task's own framing)."
+        }
+      ]
+    }
+  ],
+  "cross_cutting_notes": [
+    "scripts/nemo/** totals exactly 55 .cjs files (29 top-level in scripts-nemo-core + 26 in scripts-nemo-lib), independently cross-validated by two separate verification passes reaching the same 55 via different methods (direct top-level listing vs. the scripts-nemo.profile.json's own 55 declared module ids).",
+    "16 of scripts-nemo-core's 29 files are *.test.cjs bodies physically colocated in scripts/nemo/, reached only via one-line forwarders from 10 of nemo-tooling-test-suite's 23 tests/nemo-*.test.cjs files. scripts-nemo-core is the single whole-file writer/owner (physical location); nemo-tooling-test-suite references them only by reachability. Do not double-declare size/ownership for these 16 files across both packets.",
+    "tests/ tree fully reconciled: nemo-tooling-test-suite (80) + browser-and-app-test-suites (29) = 109 = exact recursive file count under tests/, zero gap, zero overlap — verified independently by the browser-and-app-test-suites agent reading both packets' real definitions and cross-checking with `find`.",
+    "CROSS-PACKET CONFLICT, RESOLVED AT ASSEMBLY: the nemo-tooling-test-suite verification pass recommended adding tests/desktop/** to its own packet (reasoning by analogy to tests/bench), without visibility into the sibling browser-and-app-test-suites packet's scope, which already includes tests/desktop/** per the original C08 draft and whose own independent full-tree reconciliation (previous note) confirms zero gap with it staying there. tests/desktop/** remains in browser-and-app-test-suites. This is a concrete instance of why cross-packet claims need reconciliation at assembly time, not just per-packet verification in isolation.",
+    "package.json's plain `npm test` glob (`tests/*.test.cjs tests/animation/*.test.cjs`, non-recursive single-level) matches 35 files spanning two packets: nemo-tooling-test-suite's 23 nemo-*.test.cjs plus 12 of browser-and-app-test-suites' individually-named files. CI's actual \"quick\" gate does not call npm test directly — ci.cjs's test:unit job (lib/jobs.cjs) independently re-implements the identical glob in Node, also run under c8 coverage.",
+    "4 of nemo-tooling-test-suite's 23 files test material fully or partly outside both scripts/nemo/** and tests/**: nemo-ci.test.cjs (also requires .github/scripts/collaborator-pr-policy.test.cjs, owned by ci-workflows-and-root-config), nemo-mcp-adapter.test.cjs (reads src/js/adapters/application-mcp.js, real application source entirely outside this census area), nemo-mcp-bundle.test.cjs and nemo-third-party-notices.test.cjs (both spawn scripts owned by standalone-build-scripts)."
+  ],
+  "known_defects": [
+    {
+      "id": "DEF-1",
+      "file": "scripts/nemo/lib/jobs.cjs (jobTestDesktop, ~line 186-217)",
+      "line": null,
+      "summary": "`npm run test:desktop` (via job.cjs → lib/jobs.cjs's jobTestDesktop) does `fs.readdirSync(tests/desktop).filter(name => name.endsWith('.test.cjs'))` — non-recursive. It therefore only ever runs the top-level tests/desktop/packaged-native.test.cjs and silently never reaches tests/desktop/unit/native-harness.test.cjs (9 tests covering the test harness's OWN failure-handling logic). That file is only actually exercised via direct manual invocation, or transitively through the sibling nemo-tooling-test-suite packet's tests/nemo-desktop-harness.test.cjs forwarder under plain `npm test` — i.e. the script whose name and purpose most directly promise \"run the desktop tests\" silently under-covers by one whole file, with no error or warning.",
+      "packet": "C13.tooling.browser-and-app-test-suites",
+      "severity": "tooling gap (silent incomplete test coverage via the intended entry point; confirmed by direct code read of lib/jobs.cjs's directory-walk logic, not merely inferred from naming)"
+    },
+    {
+      "id": "DEF-2",
+      "file": "engineering/boundaries/profiles/scripts-nemo.md (≈ lines 220-262, \"Coverage limits\" section)",
+      "line": null,
+      "summary": "This doc claims scripts/nemo/lib/receipt.cjs is excluded from scripts-nemo.profile.json due to a lexer ambiguous-slash limitation, and that \"23 of 24\" .cjs files under scripts/nemo/** are declared. Both are stale: receipt.cjs is fully declared in both scripts-nemo.profile.json and scripts-nemo.baseline.json today (id nemo.lib.receipt), and the real current count is 55 .cjs files under scripts/nemo/** (26 lib + 2 top-level application + 11 top-level bootstrap + 16 test files), matching the profile's 55 declared ids exactly. The .md's last touch is measurably older (by several profile-touching commits) than the profile.json/baseline.json it's meant to document.",
+      "packet": "C13.tooling.scripts-nemo-lib",
+      "severity": "documentation staleness (no runtime behavior affected; this is the canonical write-up for the schema this packet's boundaries-* cluster directly cross-references, so it will mislead the next person who reads it before the code)"
+    },
+    {
+      "id": "DEF-3",
+      "file": "scripts/rebuild-ffmpeg-lgpl.sh (lines ~60, ~65)",
+      "line": null,
+      "summary": "Two read-only-observable oddities in the LGPL-license self-verification step, NOT executed to confirm actual runtime behavior (out of scope for a read-only census — the script is a 10-20 minute full FFmpeg rebuild): line 60's `grep -q \"^License: LGPL\" ffbuild/config.log 2>/dev/null || true` discards its own match result (the `|| true` means the line's outcome is never captured or tested, making it a no-op as written); line 65's real gate (`./ffmpeg -version | grep -q \"GPL\" && exit 1`) would also match the substring \"GPL\" inside the word \"LGPL\" if `ffmpeg -version` ever prints that word in its own license banner, which could cause the gate to fail closed on a legitimately-LGPL build. Flagged as an unverified risk for whoever next touches this script, not a confirmed defect.",
+      "packet": "C13.tooling.standalone-build-scripts",
+      "severity": "unverified / low-confidence (static-read-only observation; not confirmed by execution)"
+    }
+  ],
+  "uncovered_responsibilities": []
+}
