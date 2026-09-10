@@ -4,6 +4,8 @@ use tauri_plugin_shell::ShellExt;
 
 // EXPERIMENTAL (experimental/native-video-decode) — see the module header.
 mod video_decode;
+// Pure text parsing of `ffmpeg -i` output, split out of video_decode (P28).
+mod media_probe;
 mod vectorize;
 mod application_mcp;
 // Per-task isolation of the app's native mutable state (R06, #902).
