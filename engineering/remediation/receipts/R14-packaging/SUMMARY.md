@@ -106,7 +106,7 @@ installed package, never the build tree.
 | Live server holds **0** handles into any source checkout | pass | `transcripts/isolation-live-process.txt` | — |
 | Live server: `cwd=/`, only mapped executable is the installed binary + `/usr/lib/dyld` | pass | `transcripts/isolation-live-process.txt` | — |
 | `scripts/bundle-ffmpeg-dylibs.py` run after the build | **fail (exit 1)** | `transcripts/dylib-bundling.txt` | Pre-existing ffmpeg/Homebrew drift, unrelated to MCP — finding 2 |
-| `npm run doctor` reports sidecar dylib state | pass (exit 0, reports 2 missing) | `transcripts/doctor.txt` | Reports the finding-2 failure |
+| `npm run doctor` reports sidecar dylib state | **as expected: 2 missing** (probe itself exits 0) | `transcripts/doctor.txt` | Reports the finding-2 failure |
 | Updater signing | not-run | — | Requires Cyril's personal key |
 | Windows / Linux / macOS x86_64 packaging | not-run | — | darwin/arm64 only on this host |
 

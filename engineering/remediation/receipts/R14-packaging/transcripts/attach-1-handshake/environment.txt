@@ -9,7 +9,7 @@ PWD=/
 SHLVL=1
 HOME=<HOME>
 _=/usr/bin/env
-OLDPWD=<HOME>/.buzz/REPOS/nemo-worktrees/buzz-7f3a1c924b6d
+OLDPWD=<HOME>/.buzz/REPOS/<AGENT-WORKTREE>
 
 ## PATH contents (must be empty)
 PATH=/tmp/nemo-r14-emptybin
