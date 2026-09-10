@@ -1,0 +1,267 @@
+{
+  "modules": [
+    {
+      "id": "rust.mcp.transport",
+      "layer": "adapters",
+      "dir": "nemo-mcp",
+      "files": [
+        "build.rs",
+        "src/contract.rs",
+        "src/lib.rs",
+        "src/main.rs",
+        "src/registry.rs",
+        "src/schema.rs",
+        "src/server.rs",
+        "src/wire.rs"
+      ],
+      "publicApi": [
+        "src/contract.rs",
+        "src/lib.rs",
+        "src/registry.rs",
+        "src/wire.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.mcp.transport.tests",
+      "layer": "tests",
+      "dir": "nemo-mcp/tests",
+      "files": [
+        "stdio.rs",
+        "stdio_application.rs",
+        "stdio_cancellation.rs",
+        "stdio_contract.rs",
+        "stdio_reconnect.rs",
+        "stdio_rejection.rs",
+        "stdio_roundtrip.rs",
+        "transport.rs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.desktop.mcp.adapter",
+      "layer": "adapters",
+      "dir": "src-tauri/src",
+      "files": [
+        "application_mcp.rs"
+      ],
+      "publicApi": [
+        "application_mcp.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.desktop.shell",
+      "layer": "desktop-shell",
+      "dir": "src-tauri/src",
+      "files": [
+        "lib.rs",
+        "main.rs"
+      ],
+      "publicApi": [
+        "lib.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.desktop.media",
+      "layer": "desktop-shell",
+      "dir": "src-tauri/src",
+      "files": [
+        "vectorize.rs",
+        "video_decode.rs"
+      ],
+      "publicApi": [
+        "vectorize.rs",
+        "video_decode.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.desktop.tasks",
+      "layer": "desktop-shell",
+      "dir": "src-tauri/src",
+      "files": [
+        "task_runtime.rs"
+      ],
+      "publicApi": [
+        "task_runtime.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.desktop.tasks.tests",
+      "layer": "tests",
+      "dir": "src-tauri/src/task_runtime",
+      "files": [
+        "tests.rs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.desktop.build",
+      "layer": "build",
+      "dir": "src-tauri",
+      "files": [
+        "build.rs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.geometry.engine",
+      "layer": "engine",
+      "dir": "geometry-wasm/src",
+      "files": [
+        "engine.rs"
+      ],
+      "publicApi": [
+        "engine.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.geometry.shapes",
+      "layer": "engine",
+      "dir": "geometry-wasm/src",
+      "files": [
+        "eraser.rs",
+        "fill.rs",
+        "hit.rs",
+        "shapes.rs"
+      ],
+      "publicApi": [
+        "eraser.rs",
+        "fill.rs",
+        "hit.rs",
+        "shapes.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.geometry.animation",
+      "layer": "engine",
+      "dir": "geometry-wasm/src",
+      "files": [
+        "interp.rs",
+        "strokemodeler.rs",
+        "timeline.rs",
+        "track.rs",
+        "tween.rs",
+        "tweenmatch.rs"
+      ],
+      "publicApi": [
+        "interp.rs",
+        "strokemodeler.rs",
+        "timeline.rs",
+        "track.rs",
+        "tween.rs",
+        "tweenmatch.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.geometry.api",
+      "layer": "adapters",
+      "dir": "geometry-wasm/src",
+      "files": [
+        "lib.rs"
+      ],
+      "publicApi": [
+        "lib.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.geometry.tests",
+      "layer": "tests",
+      "dir": "geometry-wasm/tests",
+      "files": [
+        "dab_dense_overlap_repro.rs",
+        "effect_layer_overlay_repro.rs",
+        "shader_library_validation.rs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.vectorize.core",
+      "layer": "engine",
+      "dir": "vectorize-core/src",
+      "files": [
+        "lib.rs"
+      ],
+      "publicApi": [
+        "lib.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.vectorize.wasm",
+      "layer": "adapters",
+      "dir": "vectorize-wasm/src",
+      "files": [
+        "lib.rs"
+      ],
+      "publicApi": [
+        "lib.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    }
+  ],
+  "sizeProfiles": {
+    "Rust production module": {
+      "warn": 350,
+      "hardMax": 500
+    }
+  },
+  "exceptions": [
+    {
+      "path": "geometry-wasm/src/engine.rs",
+      "rule": "size",
+      "ceiling": 4151,
+      "owner": "mysteropodes",
+      "issue": "1013",
+      "reason": "Legacy pre-extraction Rust source; ceiling captured as an exact-path no-growth baseline pending real module extraction (R02/R05), not an architectural review of this file's content.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "geometry-wasm/src/fill.rs",
+      "rule": "size",
+      "ceiling": 998,
+      "owner": "mysteropodes",
+      "issue": "1013",
+      "reason": "Legacy pre-extraction Rust source; ceiling captured as an exact-path no-growth baseline pending real module extraction (R02/R05), not an architectural review of this file's content.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "geometry-wasm/src/tweenmatch.rs",
+      "rule": "size",
+      "ceiling": 1074,
+      "owner": "mysteropodes",
+      "issue": "1013",
+      "reason": "Legacy pre-extraction Rust source; ceiling captured as an exact-path no-growth baseline pending real module extraction (R02/R05), not an architectural review of this file's content.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "geometry-wasm/tests/effect_layer_overlay_repro.rs",
+      "rule": "size",
+      "ceiling": 503,
+      "owner": "mysteropodes",
+      "issue": "1013",
+      "reason": "Legacy pre-extraction Rust source; ceiling captured as an exact-path no-growth baseline pending real module extraction (R02/R05), not an architectural review of this file's content.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "src-tauri/src/video_decode.rs",
+      "rule": "size",
+      "ceiling": 2266,
+      "owner": "mysteropodes",
+      "issue": "1013",
+      "reason": "Legacy pre-extraction Rust source; ceiling captured as an exact-path no-growth baseline pending real module extraction (R02/R05), not an architectural review of this file's content.",
+      "expires": "2026-12-05"
+    }
+  ]
+}
