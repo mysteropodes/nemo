@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "id": "opacity",
+  "version": 1,
+  "input": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "layerId": { "type": "string", "minLength": 1, "description": "layers[].layerUid from the latest snapshot." },
+      "value": { "type": "number", "minimum": 0, "maximum": 100 },
+      "frame": { "type": "integer", "minimum": 0 },
+      "animated": { "type": "boolean" }
+    },
+    "required": ["layerId"]
+  },
+  "output": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "layerId": { "type": "string" },
+      "property": { "const": "opacity" },
+      "value": { "type": "number", "minimum": 0, "maximum": 100 }
+    },
+    "required": ["layerId", "property", "value"]
+  },
+  "units": { "value": "percent" },
+  "effects": {
+    "kind": "mutation",
+    "scope": "document",
+    "lifecycle": ["property.get", "property.set", "property.key.set", "property.key.remove", "property.animation.set"]
+  },
+  "availability": { "state": "available", "reason": null },
+  "handlerKey": "application.opacity.property",
+  "fixture": {
+    "label": "set opacity to 40 on one layer",
+    "input": { "layerId": "layer-1", "value": 40 },
+    "output": { "layerId": "layer-1", "property": "opacity", "value": 40 }
+  },
+  "examples": [
+    {
+      "label": "set opacity to 40 on one layer",
+      "input": { "layerId": "layer-1", "value": 40 },
+      "output": { "layerId": "layer-1", "property": "opacity", "value": 40 }
+    },
+    {
+      "label": "key opacity at frame 12",
+      "input": { "layerId": "layer-1", "value": 40, "frame": 12 },
+      "output": { "layerId": "layer-1", "property": "opacity", "value": 40 }
+    },
+    {
+      "label": "enable animation on the property",
+      "input": { "layerId": "layer-1", "animated": true },
+      "output": { "layerId": "layer-1", "property": "opacity", "value": 40 }
+    }
+  ]
+}

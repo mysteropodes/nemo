@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nemo.internal/schema/capability-v1.schema.json",
+  "title": "CapabilityDescriptor",
+  "description": "One feature-owned capability declaration. UI, the JS application layer, and the Rust MCP dispatch all read the same descriptor to expose a consistent operation, instead of each hand-maintaining its own copy of the property's shape, units, and availability. `id` is the public identity a caller names; `handlerKey` is the internal, deterministic lookup a registry (see P05/#1007) resolves to the implementing handler. A registration set (the value passed to that registry) is a JSON array of descriptors; registration rejects a set containing two descriptors with the same `id` — JSON Schema alone cannot express cross-item uniqueness, so this is enforced by the registry, not by this document (see tests/capability-v1-schema.test.cjs for the specified failure case).",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "Effects": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What invoking this capability can change. Full transaction/job/resource lifecycle contracts are specified separately (D02/#1045); this is the minimal shape a v1 descriptor needs to say whether it mutates the open document and, if it runs as a job, which stages exist.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["read", "mutation", "job"],
+          "description": "\"read\" never changes state. \"mutation\" commits a change to the open document synchronously within one request. \"job\" runs across multiple requests (start/status/cancel) and may or may not touch the document (see `scope`)."
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["none", "document"],
+          "description": "\"document\" means a successful invocation changes the open document's persisted state (and its revision). \"none\" means it does not — a pure read, or a job whose output is an external artifact rather than a document mutation."
+        },
+        "lifecycle": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "Ordered stage names a caller may invoke, in the vocabulary this capability's handler actually accepts. For a \"mutation\", the transport operation suffixes it answers to (e.g. [\"property.set\", \"property.key.set\"]). For a \"job\", its lifecycle stages (e.g. [\"start\", \"status\", \"cancel\"])."
+        }
+      },
+      "required": ["kind", "scope", "lifecycle"]
+    },
+    "Availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Whether this capability can be invoked right now, in a form the UI and MCP can both render identically instead of drifting into two different messages for the same disabled backend.",
+      "properties": {
+        "state": { "type": "string", "enum": ["available", "unavailable"] },
+        "reason": {
+          "anyOf": [
+            { "type": "string", "enum": ["platform-unsupported", "backend-disabled", "missing-dependency", "feature-flag-off"] },
+            { "type": "null" }
+          ],
+          "description": "A stable, machine-readable code — never free text, so two independent renderers of the same descriptor produce the same user-facing reason. Convention (not enforced by this shape alone, to keep the schema in the minimal subset this repo's own validator implements): non-null when `state` is \"unavailable\", null when \"available\". A registry can add the `if`/`then` pairing this field's own shape omits."
+        }
+      },
+      "required": ["state", "reason"]
+    },
+    "Example": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "input": true,
+        "output": true
+      },
+      "required": ["label", "input", "output"]
+    }
+  },
+  "properties": {
+    "schemaVersion": {
+      "const": 1,
+      "description": "Always 1; this schema speaks no other version. A descriptor claiming any other value is rejected before its own `version` is even read — mirrors `apiVersion` in transport-v1.schema.json."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)*$",
+      "description": "Stable public capability identity, dot-namespaced lowercase (e.g. \"opacity\", \"export.svg.frame\"). Never reused for a semantically different capability; a shape change bumps `version` instead of the id."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "This capability's own revision, independent of `schemaVersion`. Bump when `input`, `output`, or `effects` changes in a way an existing caller must handle."
+    },
+    "input": {
+      "type": "object",
+      "required": ["type"],
+      "description": "A JSON Schema (draft 2020-12) fragment describing what a caller supplies to invoke this capability. Required to at least declare its own `type` so this field cannot silently hold a non-schema value."
+    },
+    "output": {
+      "type": "object",
+      "required": ["type"],
+      "description": "A JSON Schema fragment describing what a caller receives back."
+    },
+    "units": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Unit for every unit-bearing numeric field named in `input`/`output`, e.g. {\"value\": \"percent\"}. Empty object when nothing needs one."
+    },
+    "effects": { "$ref": "#/$defs/Effects" },
+    "availability": { "$ref": "#/$defs/Availability" },
+    "handlerKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-zA-Z0-9]*(\\.[a-z][a-zA-Z0-9]*)*$",
+      "description": "Stable registry lookup key for the implementing handler, shared verbatim by the UI binding, the JS application service, and the Rust MCP dispatch — the deterministic-registration join key (P05/#1007, P07/#1009). Distinct from `id`: several capability ids can route through handlers under one feature's namespace."
+    },
+    "fixture": {
+      "$ref": "#/$defs/Example",
+      "description": "One canonical, realistic example — this capability's reference test fixture."
+    },
+    "examples": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Example" },
+      "description": "Further example input/output pairs, including boundary and lifecycle-stage cases, for documentation and client generation."
+    }
+  },
+  "required": ["schemaVersion", "id", "version", "input", "output", "units", "effects", "availability", "handlerKey", "fixture", "examples"]
+}

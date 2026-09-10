@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "id": "export.svg.frame",
+  "version": 1,
+  "input": {
+    "type": "object",
+    "additionalProperties": false,
+    "description": "What a caller supplies to invoke this capability. \"frameIdx\" addresses the \"start\" stage; \"jobId\" (returned by \"start\"'s output) addresses \"status\" and \"cancel\". Exactly one is required depending on stage, enforced by the handler per stage rather than by this shape — full per-stage input contracts are D02/#1045.",
+    "properties": {
+      "frameIdx": { "type": "integer", "minimum": 0, "description": "0-based timeline frame to export. Required for the \"start\" stage." },
+      "jobId": { "type": "string", "minLength": 1, "description": "Job identifier returned by \"start\". Required for the \"status\" and \"cancel\" stages." }
+    }
+  },
+  "output": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "jobId": { "type": "string", "minLength": 1 },
+      "status": { "type": "string", "enum": ["running", "succeeded", "failed", "cancelled"] },
+      "progress": { "type": "number", "minimum": 0, "maximum": 1 },
+      "artifact": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mimeType": { "const": "image/svg+xml" },
+          "data": { "type": "string", "description": "Inline SVG document text." }
+        },
+        "required": ["mimeType", "data"]
+      },
+      "error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" }
+        },
+        "required": ["code", "message"]
+      }
+    },
+    "required": ["jobId", "status"]
+  },
+  "units": { "progress": "ratio" },
+  "effects": {
+    "kind": "job",
+    "scope": "none",
+    "lifecycle": ["start", "status", "cancel"]
+  },
+  "availability": { "state": "unavailable", "reason": "missing-dependency" },
+  "handlerKey": "application.export.svgFrame",
+  "fixture": {
+    "label": "export frame 10 as SVG, complete",
+    "input": { "frameIdx": 10 },
+    "output": { "jobId": "job-1", "status": "succeeded", "progress": 1, "artifact": { "mimeType": "image/svg+xml", "data": "<svg></svg>" } }
+  },
+  "examples": [
+    { "label": "start", "input": { "frameIdx": 10 }, "output": { "jobId": "job-1", "status": "running", "progress": 0 } },
+    { "label": "status while rendering", "input": { "jobId": "job-1" }, "output": { "jobId": "job-1", "status": "running", "progress": 0.5 } },
+    {
+      "label": "status once complete",
+      "input": { "jobId": "job-1" },
+      "output": { "jobId": "job-1", "status": "succeeded", "progress": 1, "artifact": { "mimeType": "image/svg+xml", "data": "<svg></svg>" } }
+    },
+    { "label": "cancel before completion", "input": { "jobId": "job-1" }, "output": { "jobId": "job-1", "status": "cancelled", "progress": 0.5 } }
+  ]
+}
