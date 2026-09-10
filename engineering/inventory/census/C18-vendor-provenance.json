@@ -1,0 +1,184 @@
+{
+  "census_id": "C18",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1095",
+  "title": "Vendored libraries, generated WASM bindings and static assets — provenance verification",
+  "owner": "Cyrill/D2 (Honey)",
+  "source_sha": "391f2e347b098e0f7bb68000ebba6fc3119d28a3",
+  "status": "read-only provenance census complete; no source mutated. C08's draft grouping for this area (engineering/inventory/census/C08-completeness.json, area `vendor-generated-and-provenance`) was re-verified file-by-file against the live tree and THIRD_PARTY_NOTICES.md rather than taken on faith. The 3-packet split holds (the draft's tentative 'C18b or fold into C18' note for static-assets is resolved as fold-in), but two of the three oracles were never actually executed before now — running them for real fails on both. See known_defects DEF-1/DEF-2, the substantive findings of this census.",
+  "scope_files": [
+    "src/js/ag-psd.vendor.mjs",
+    "src/js/delaunator.vendor.js",
+    "src/js/mp4box.all.min.js",
+    "src/js/node-buffer-shim.vendor.mjs",
+    "src/js/opentype.min.js",
+    "src/paper-full.min.js",
+    "src/wasm/geometry_wasm.js",
+    "src/wasm/geometry_wasm.d.ts",
+    "src/wasm/geometry_wasm_bg.wasm",
+    "src/wasm/geometry_wasm_bg.wasm.d.ts",
+    "src/wasm/package.json",
+    "src/wasm-vectorize/vectorize_wasm.js",
+    "src/wasm-vectorize/vectorize_wasm.d.ts",
+    "src/wasm-vectorize/vectorize_wasm_bg.wasm",
+    "src/wasm-vectorize/vectorize_wasm_bg.wasm.d.ts",
+    "src/wasm-vectorize/package.json",
+    "src/fonts/DejaVuSans-Bold.ttf",
+    "src/fonts/DejaVuSans.ttf",
+    "src/fonts/DejaVuSerif-Bold.ttf",
+    "src/fonts/DejaVuSerif.ttf",
+    "src/fonts/Inter-Regular.ttf",
+    "src/fonts/Manrope-Regular.ttf",
+    "src/fonts/Roboto-Bold.ttf",
+    "src/fonts/Roboto-Regular.ttf",
+    "src/favicon-32.png",
+    "src/favicon-64.png",
+    "src/logo-128.png",
+    "src/logo-64.png",
+    "src/_headers",
+    "src/assets/reference-3d/ATTRIBUTION.md",
+    "src/assets/reference-3d/AvatarSample_D.vrm",
+    "src/assets/reference-3d/CC0_Rigged_Arms.obj",
+    "src/assets/reference-3d/CC0_Rigged_Arms_Texture.png",
+    "assets/logo.ai",
+    "assets/logo_nemo.png",
+    "assets/logo_nemo.svg",
+    "assets/logo_nemo_alpha.png",
+    "assets/logo_nemo_alpha.svg",
+    "assets/logo_nemo_alpha_white.png",
+    "assets/screenshot-motion.png"
+  ],
+  "coverage_note": "All 40 files in scope_files exist at 391f2e3 and are accounted for across exactly 3 packets, matching C08's draft split. No file outside this bounded list was found to belong in this area (a `find` for other *.vendor.*/*.min.js/*.wasm/*.ttf under src/ turned up nothing new). Two of C08's draft file counts were stale: src/fonts/*.ttf is 8 files, not 7; src/assets/reference-3d/* is 4 files including ATTRIBUTION.md, not 5 — both corrected here against the actual git-tracked tree, not just a working-directory listing.",
+  "areas": [
+    {
+      "area": "vendor-generated-and-provenance",
+      "packets": [
+        {
+          "id": "C18.vendor.vendored-js-libraries",
+          "title": "Third-party JS libraries vendored in src/js/ and src/",
+          "files": [
+            "src/js/ag-psd.vendor.mjs",
+            "src/js/delaunator.vendor.js",
+            "src/js/mp4box.all.min.js",
+            "src/js/node-buffer-shim.vendor.mjs",
+            "src/js/opentype.min.js",
+            "src/paper-full.min.js"
+          ],
+          "symbols": [],
+          "responsibility": "Not application code. Paper.js (paper-full.min.js), PSD parsing (ag-psd.vendor.mjs — its own header identifies it as `ag-psd@31.0.2`, bundled via esm.sh), Delaunay triangulation (delaunator.vendor.js v5.0.1 per THIRD_PARTY_NOTICES.md, used by image-mesh.js per CLAUDE.md §12), MP4/MOV container demuxing (mp4box.all.min.js — its own header identifies it as `MP4Box.js v0.5.2` from github.com/gpac/mp4box.js, used by native-video-bridge.js), a browser Buffer polyfill (node-buffer-shim.vendor.mjs, unenv-style output, no embedded header or version string), and TTF font parsing (opentype.min.js).",
+          "writer": "n/a (vendored, not hand-edited)",
+          "public_api": "ag-psd.vendor.mjs → imported by src/js/psd-import-bridge.js. delaunator.vendor.js → loaded via src/index.html script tag, used by src/js/image-mesh.js. mp4box.all.min.js → loaded via src/index.html script tag, used by src/js/native-video-bridge.js. node-buffer-shim.vendor.mjs → imported by src/js/ag-psd.vendor.mjs itself and by src/js/psd-import-bridge.js. opentype.min.js → loaded via src/index.html script tag, used by src/js/vector-text-bridge.js and src/js/psd-import-bridge.js. paper-full.min.js → loaded via src/index.html script tag, used by src/js/app.js.",
+          "consumers": [
+            "src/js/psd-import-bridge.js",
+            "src/js/image-mesh.js",
+            "src/js/native-video-bridge.js",
+            "src/js/vector-text-bridge.js",
+            "src/js/app.js",
+            "src/index.html"
+          ],
+          "oracle": "THIRD_PARTY_NOTICES.md's 'Clean — no action needed' table (lines 17-22) is the stated oracle: verify it still lists all six, not re-derive licenses. VERIFICATION RESULT: FAILS. Only 3 of 6 are listed — Paper.js (line 19), opentype.js (line 20), Delaunator (line 22). ag-psd.vendor.mjs, mp4box.all.min.js and node-buffer-shim.vendor.mjs have zero entries. See DEF-1.",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "Supersedes C08's draft packet C08.vendor.vendored-js-libraries (same 6 files). The draft's oracle line was written as an instruction to run, not a checked fact — this census is the first time it was actually executed, and it fails for half the files. mp4box.all.min.js is the cheapest of the three to close: it carries its own embedded BSD-style header inline (Telecom ParisTech/TSI/MM/GPAC Cyril Concolato, 'Redistribution and use in source and binary forms...') — the exact situation opentype.js was already in before it got added to the table (line 20's own note: 'already carries its full MIT header inline'). ag-psd.vendor.mjs's header gives a version but no license text. node-buffer-shim.vendor.mjs has neither. None of the three licenses were independently re-derived here — out of this packet's oracle scope by its own wording — flagged in DEF-1 for a follow-up leaf task instead."
+        },
+        {
+          "id": "C18.vendor.wasm-generated-bindings",
+          "title": "wasm-pack generated JS/TS bindings",
+          "files": [
+            "src/wasm/geometry_wasm.js",
+            "src/wasm/geometry_wasm.d.ts",
+            "src/wasm/geometry_wasm_bg.wasm",
+            "src/wasm/geometry_wasm_bg.wasm.d.ts",
+            "src/wasm/package.json",
+            "src/wasm-vectorize/vectorize_wasm.js",
+            "src/wasm-vectorize/vectorize_wasm.d.ts",
+            "src/wasm-vectorize/vectorize_wasm_bg.wasm",
+            "src/wasm-vectorize/vectorize_wasm_bg.wasm.d.ts",
+            "src/wasm-vectorize/package.json"
+          ],
+          "symbols": [],
+          "responsibility": "Build output of `wasm-pack build` for geometry-wasm and vectorize-wasm respectively (proposed C17's area) — regenerated on every native build, never hand-edited. Confirmed present and unchanged in shape since C08's draft; sizes at this SHA: geometry_wasm_bg.wasm 1,644,666 bytes, vectorize_wasm_bg.wasm 862,315 bytes.",
+          "writer": "wasm-pack (build tool)",
+          "public_api": "src/wasm/geometry_wasm.js → dynamically imported by src/js/geometry-wasm-loader.js (confirmed, lines 23-24: `import('../wasm/geometry_wasm.js...')`). src/wasm-vectorize/vectorize_wasm.js → dynamically imported by src/js/vectorize-worker.js (confirmed, lines 18-19), not directly by vectorize-wasm-loader.js as C08's draft implied — the loader and the worker are separate files and the import call site is in the worker.",
+          "consumers": [
+            "src/js/geometry-wasm-loader.js",
+            "src/js/vectorize-worker.js"
+          ],
+          "oracle": "n/a (generated) — confirmed accurate, no THIRD_PARTY_NOTICES.md claim applies to build output.",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "The one packet that verified clean end-to-end. Only correction against C08's draft is the consumer attribution above (vectorize-worker.js, not vectorize-wasm-loader.js, holds the actual dynamic import)."
+        },
+        {
+          "id": "C18.vendor.static-assets",
+          "title": "Fonts, icons, logos, reference 3D model",
+          "files": [
+            "src/fonts/DejaVuSans-Bold.ttf",
+            "src/fonts/DejaVuSans.ttf",
+            "src/fonts/DejaVuSerif-Bold.ttf",
+            "src/fonts/DejaVuSerif.ttf",
+            "src/fonts/Inter-Regular.ttf",
+            "src/fonts/Manrope-Regular.ttf",
+            "src/fonts/Roboto-Bold.ttf",
+            "src/fonts/Roboto-Regular.ttf",
+            "src/favicon-32.png",
+            "src/favicon-64.png",
+            "src/logo-128.png",
+            "src/logo-64.png",
+            "src/_headers",
+            "src/assets/reference-3d/ATTRIBUTION.md",
+            "src/assets/reference-3d/AvatarSample_D.vrm",
+            "src/assets/reference-3d/CC0_Rigged_Arms.obj",
+            "src/assets/reference-3d/CC0_Rigged_Arms_Texture.png",
+            "assets/logo.ai",
+            "assets/logo_nemo.png",
+            "assets/logo_nemo.svg",
+            "assets/logo_nemo_alpha.png",
+            "assets/logo_nemo_alpha.svg",
+            "assets/logo_nemo_alpha_white.png",
+            "assets/screenshot-motion.png"
+          ],
+          "symbols": [],
+          "responsibility": "Static binary/text assets — 8 bundled TTF fonts (corrected from C08's draft count of 7; DejaVu ×4, Inter, Manrope, Roboto ×2), referenced from src/js/{vector-text-bridge,figma-import,timeline,app}.js and src/index.html; app icons/logos (4 PNGs); a Cloudflare Pages `_headers` file; a CC0-licensed reference 3D rig with its own ATTRIBUTION.md (4 files, corrected from C08's draft count of 5); and 7 root-level Nemo branding assets (logo.ai/svg/png variants, one screenshot) — all original Nemo material, not third-party.",
+          "writer": "n/a",
+          "public_api": "referenced by CSS/HTML/vector-text rendering/3D-reference tooling",
+          "consumers": [
+            "src/js/vector-text-bridge.js",
+            "src/js/figma-import.js",
+            "src/js/timeline.js",
+            "src/js/app.js",
+            "src/index.html"
+          ],
+          "oracle": "THIRD_PARTY_NOTICES.md line 21 is the oracle for the fonts specifically (draft's stated scope: 'need license verification'). VERIFICATION RESULT: FAILS. Only Roboto-Bold.ttf/Roboto-Regular.ttf (2 of 8) are listed; the 4 DejaVu files, Inter-Regular.ttf and Manrope-Regular.ttf (6 of 8) have no entry. See DEF-2. Favicons/logos/_headers/reference-3d/root-assets: no oracle claimed by C08's draft (original Nemo branding, plus a self-attributed CC0 3D rig with its own ATTRIBUTION.md) — confirmed still accurate, genuinely not third-party in the THIRD_PARTY_NOTICES.md sense.",
+          "depends_on": [],
+          "entangled_with": [],
+          "notes": "C08's own 'Proposed C18b or fold into C18' question is resolved here as fold-in: issue #1095's own bounded-source-ownership section already scopes fonts+favicons+reference-3d+root-assets together under one C18, and splitting a 3rd sub-packet out of an already 30-90-minute-sized task adds an issue without shrinking any actual work. DejaVu uses the Bitstream Vera-derived DejaVu font license (requires the license text travel with redistributed copies); Inter and Manrope are both SIL OFL 1.1 ('Reserved Font Name' license, also has redistribution conditions, not just a citation nicety). Neither license was independently re-confirmed here — same oracle-scope reasoning as DEF-1 — flagged in DEF-2 instead."
+        }
+      ]
+    }
+  ],
+  "cross_cutting_notes": [
+    "Methodology: each of the three draft packets' file lists was checked against the live tree at 391f2e3 (ls/find), and every one of the 6 vendored JS libraries plus all 8 font files was checked by name against THIRD_PARTY_NOTICES.md's full text (141 lines, read in full after an initial grep-by-guessed-synonym pass under-matched two libraries). Real consumers were re-derived via grep across src/ rather than trusting the draft's 'imported by many app modules' placeholder — see each packet's public_api/consumers field.",
+    "The two license-gap defects (DEF-1, DEF-2) are the substantive finding of this census, not the packet split itself: THIRD_PARTY_NOTICES.md's own stated purpose is to catalog everything bundled/vendored for a public GPL-3.0-or-later repository, and its 2026-08-17 audit undercounted its own subject matter — 3 of 6 vendored JS libraries and 6 of 8 fonts never made it into the table, including one (mp4box.all.min.js) that already carries an embedded license header ready to transcribe.",
+    "Two small file-count corrections against C08's draft, unrelated to the license gaps above: src/fonts/*.ttf is 8 files, not 7; src/assets/reference-3d/* is 4 files including ATTRIBUTION.md, not 5. Both read as simple miscounts in a fast first-pass draft rather than files added or removed since C08 — verified against the git-tracked tree at this SHA, not just a working-directory listing.",
+    "wasm-generated-bindings is the one packet that verified clean end-to-end: all 10 files present with sizes recorded in the packet, oracle correctly 'n/a (generated)'; only the loader-file consumer attribution needed a small correction (vectorize's actual wasm import call site is vectorize-worker.js, not vectorize-wasm-loader.js as the draft implied)."
+  ],
+  "known_defects": [
+    {
+      "id": "DEF-1",
+      "file": "THIRD_PARTY_NOTICES.md (gap); source files src/js/ag-psd.vendor.mjs, src/js/mp4box.all.min.js, src/js/node-buffer-shim.vendor.mjs",
+      "line": "THIRD_PARTY_NOTICES.md lines 15-22 ('Clean — no action needed' table)",
+      "summary": "3 of the 6 vendored JS libraries bounded to this census have zero entry in THIRD_PARTY_NOTICES.md, despite the file's own stated purpose ('catalogs everything bundled or vendored in this repository... its license, and what needs to happen for distribution') and despite the repo being public since 2026-08-26 (CLAUDE.md §9). mp4box.all.min.js is the cheapest to close: it carries its own embedded BSD-style header inline at the top of the file (Telecom ParisTech/TSI/MM/GPAC Cyril Concolato, 'Redistribution and use in source and binary forms...') — the same situation opentype.js was already in before being added to the table (line 20's own note: 'already carries its full MIT header inline'). ag-psd.vendor.mjs identifies its version (ag-psd@31.0.2, via an esm.sh header comment) but has no inline license text. node-buffer-shim.vendor.mjs has neither a version string nor a license header; its code shape (`[unenv] ... is not implemented yet!`, `__unenv__`) matches the unenv project's Buffer-polyfill output. None of the three licenses were independently re-derived here — this packet's own oracle (C08's draft wording) scopes the job as 'verify it still lists all six, not re-derive licenses', and it does not.",
+      "packet": "C18.vendor.vendored-js-libraries",
+      "severity": "compliance gap (undocumented third-party licenses in a public GPL-3.0-or-later repository; confirmed by direct, full read of THIRD_PARTY_NOTICES.md, not merely reported by a subagent)"
+    },
+    {
+      "id": "DEF-2",
+      "file": "THIRD_PARTY_NOTICES.md (gap); source files src/fonts/{DejaVuSans,DejaVuSans-Bold,DejaVuSerif,DejaVuSerif-Bold,Inter-Regular,Manrope-Regular}.ttf",
+      "line": "THIRD_PARTY_NOTICES.md line 21 ('Clean — no action needed' table, fonts row)",
+      "summary": "6 of the 8 bundled TTF font files have zero entry in THIRD_PARTY_NOTICES.md — only the Roboto pair (Roboto-Bold.ttf, Roboto-Regular.ttf) is listed. DejaVuSans.ttf, DejaVuSans-Bold.ttf, DejaVuSerif.ttf, DejaVuSerif-Bold.ttf, Inter-Regular.ttf and Manrope-Regular.ttf are all bundled and actively referenced (src/js/vector-text-bridge.js, figma-import.js, timeline.js, app.js, src/index.html) but carry no license row. Notably, the SAME 2026-08-17 audit that produced this table individually reviewed and removed a ninth, unused font file from this same directory (icons-subset.ttf, line 61) for lacking a verifiable license — meaning the six undocumented in-use fonts were more consequential to check than the one that got removed, and were missed. DejaVu uses the Bitstream Vera-derived DejaVu font license (redistribution requires the license text travel with the font); Inter and Manrope are both SIL OFL 1.1 (a 'Reserved Font Name' license with its own redistribution conditions). Neither license was independently re-confirmed here, same oracle-scope reasoning as DEF-1.",
+      "packet": "C18.vendor.static-assets",
+      "severity": "compliance gap (undocumented third-party font licenses in a public GPL-3.0-or-later repository; confirmed by direct, full read of THIRD_PARTY_NOTICES.md, not merely reported by a subagent)"
+    }
+  ],
+  "uncovered_responsibilities": []
+}
