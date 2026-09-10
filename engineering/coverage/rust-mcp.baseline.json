@@ -1,0 +1,80 @@
+{
+  "schema": "nemo.rust-coverage-baseline/1",
+  "metrics": [
+    "lines",
+    "regions",
+    "functions"
+  ],
+  "branchesExcluded": "branch coverage is not instrumented by the stable Rust toolchain (needs nightly -Z coverage-options=branch); every branch count is 0, so a branch floor would be a gate that cannot fail. Excluded on purpose — see T04/#1053.",
+  "crate": "nemo-mcp",
+  "manifestPath": "nemo-mcp/Cargo.toml",
+  "recorded": {
+    "sha": "391f2e347b098e0f7bb68000ebba6fc3119d28a3",
+    "treeDirty": true,
+    "crateDirty": false,
+    "date": "2026-09-10",
+    "issue": "T04/#1053"
+  },
+  "tool": {
+    "name": "cargo-llvm-cov",
+    "version": "0.9.1",
+    "versionLine": "cargo-llvm-cov 0.9.1",
+    "install": "cargo install cargo-llvm-cov --version 0.9.1 --locked",
+    "rustupComponent": "llvm-tools-preview",
+    "cargo": "1.91.1",
+    "rustc": "1.91.1",
+    "hostTriple": "aarch64-apple-darwin"
+  },
+  "tests": {
+    "binaries": 11,
+    "passed": 16,
+    "failed": 0
+  },
+  "exclusions": [],
+  "sourceRoot": "nemo-mcp/src",
+  "totals": {
+    "lines": 89.23,
+    "regions": 85.52,
+    "functions": 88.88
+  },
+  "files": {
+    "nemo-mcp/src/contract.rs": {
+      "lines": 94.44,
+      "regions": 93.39,
+      "functions": 94.11
+    },
+    "nemo-mcp/src/lib.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "Module declarations and one const only; llvm-cov emits no record because there are no executable regions. Baselined explicitly so that gaining real code here is caught as a change requiring re-baseline rather than passing unnoticed. T04/#1053."
+    },
+    "nemo-mcp/src/main.rs": {
+      "lines": 100,
+      "regions": 81.25,
+      "functions": 100,
+      "note": "Lines 100% but regions 81.25%: the binary entry point is executed by the stdio integration tests, while some error-path regions inside covered lines are not. T04/#1053."
+    },
+    "nemo-mcp/src/registry.rs": {
+      "lines": 69.49,
+      "regions": 71.17,
+      "functions": 75,
+      "note": "Lowest measured module (69.49% lines). Uncovered lines 21, 24-34, 39, 45, 49, 55 are the endpoint-discovery rejection paths: registry_root()'s NEMO_MCP_REGISTRY / NEMO_TAURI_DATA_DIR absolute-path rejection and the dirs::data_local_dir fallback, plus read_endpoints()'s missing-root, non-.json, non-file/over-4096-byte and malformed-record filters. These are the transport's input-validation branches, so this is the most load-bearing gap in the crate. T04/#1053."
+    },
+    "nemo-mcp/src/schema.rs": {
+      "lines": 0,
+      "regions": 0,
+      "functions": 0,
+      "note": "0% by construction: this file is the `nemo-mcp-schema` binary ([[bin]] in Cargo.toml) that dumps the request/response JSON Schema to stdout. No test in the crate executes that binary, so every one of its 7 lines is uncovered. Recorded as an observed gap, not excluded — a test that runs the binary and parses its output would raise this floor. T04/#1053."
+    },
+    "nemo-mcp/src/server.rs": {
+      "lines": 93.54,
+      "regions": 92.19,
+      "functions": 100
+    },
+    "nemo-mcp/src/wire.rs": {
+      "lines": 96.55,
+      "regions": 87.05,
+      "functions": 87.5
+    }
+  }
+}

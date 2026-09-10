@@ -57,8 +57,14 @@
       "files": ["boundaries-ratchet.cjs"], "publicApi": ["boundaries-ratchet.cjs"], "sizeProfile": "Domain/application JS or TS" },
     { "id": "nemo.lib.boundariesApplication", "layer": "tooling-application", "dir": "scripts/nemo/lib",
       "files": ["boundaries-application.cjs"], "publicApi": ["boundaries-application.cjs"], "sizeProfile": "Domain/application JS or TS" },
+    { "id": "nemo.lib.coverageRust", "layer": "tooling-application", "dir": "scripts/nemo/lib",
+      "files": ["coverage-rust.cjs"], "publicApi": ["coverage-rust.cjs"], "sizeProfile": "Domain/application JS or TS" },
+    { "id": "nemo.lib.coverageRustJob", "layer": "tooling-application", "dir": "scripts/nemo/lib",
+      "files": ["coverage-rust-job.cjs"], "publicApi": ["coverage-rust-job.cjs"], "sizeProfile": "Domain/application JS or TS" },
     { "id": "nemo.ci", "layer": "tooling-application", "dir": "scripts/nemo",
       "files": ["ci.cjs"], "publicApi": ["ci.cjs"], "sizeProfile": "Domain/application JS or TS" },
+    { "id": "nemo.cli.coverageRust", "layer": "tooling-application", "dir": "scripts/nemo",
+      "files": ["coverage-rust.cjs"], "publicApi": ["coverage-rust.cjs"], "sizeProfile": "Domain/application JS or TS" },
 
     { "id": "nemo.cli.boundaries", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
       "files": ["boundaries.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
@@ -114,7 +120,9 @@
     { "id": "nemo.test.ci", "layer": "tooling-test", "dir": "scripts/nemo",
       "files": ["ci.test.cjs"], "publicApi": ["ci.test.cjs"], "sizeProfile": "Test file" },
     { "id": "nemo.test.baseline", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["baseline.test.cjs"], "publicApi": ["baseline.test.cjs"], "sizeProfile": "Test file" }
+      "files": ["baseline.test.cjs"], "publicApi": ["baseline.test.cjs"], "sizeProfile": "Test file" },
+    { "id": "nemo.test.coverageRust", "layer": "tooling-test", "dir": "scripts/nemo",
+      "files": ["coverage-rust.test.cjs"], "publicApi": ["coverage-rust.test.cjs"], "sizeProfile": "Test file" }
   ],
   "layerRules": {
     "tooling-shared": { "allowedLayers": [] },

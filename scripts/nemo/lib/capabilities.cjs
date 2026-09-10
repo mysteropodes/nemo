@@ -120,6 +120,9 @@ function collect(build) {
     rustc: probeTool('rustc'),
     cargo: probeTool('cargo'),
     rustup: probeTool('rustup'),
+    // A cargo subcommand: `cargo-llvm-cov --version` is an error, so the
+    // probe has to go through the `llvm-cov` subcommand (T04).
+    'cargo-llvm-cov': probeTool('cargo-llvm-cov', ['llvm-cov', '--version']),
     'wasm-pack': probeTool('wasm-pack'),
     'wasm-bindgen': probeTool('wasm-bindgen'),
     'tauri-cli': localBin('tauri') ? probeTool('tauri', ['--version'], { path: localBin('tauri') }) : { present: false, path: null, version: null, note: 'node_modules/.bin/tauri missing — run npm ci' },

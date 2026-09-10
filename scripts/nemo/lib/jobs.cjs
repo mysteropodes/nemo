@@ -367,6 +367,17 @@ const JOBS = {
   'build:wasm': { run: jobBuildWasm, required: false },
   'build:desktop': { run: jobBuildDesktop, required: true },
   'test:coverage': { run: jobTestCoverageJs, required: false },
+  // T04. Deliberately in NEITHER profile — cargo-llvm-cov is not yet a
+  // declared prerequisite, so no profile run depends on it — but `required`
+  // once it is explicitly selected: asking for coverage on a workstation that
+  // cannot measure it must exit 2, not report an overall pass with a blocked
+  // line buried in the receipt. Run it with:
+  //   node scripts/nemo/job.cjs test:coverage-rust
+  //
+  // Required lazily: this registry is loaded by every CLI entry point, and by
+  // harnesses that copy a minimal subset of scripts/nemo (build-job.test.cjs).
+  // A top-level require would make all of them depend on this leaf's modules.
+  'test:coverage-rust': { run: (ctx) => require('./coverage-rust-job.cjs').jobCoverageRust(ctx), required: true },
 };
 
 const PROFILES = {

@@ -32,11 +32,26 @@ not `npm test` or the quick profile. The `nemo-mcp` crate is not selected by eit
 profile: use its applicable `cargo test --manifest-path nemo-mcp/Cargo.toml` command
 explicitly. Read the candidate's job source/help when selecting checks.
 
+The named `test:coverage-rust` job (T04) runs the same `nemo-mcp` suites under
+`cargo-llvm-cov`, writes LCOV/HTML/JSON for the crate's production source into the run's
+report directory, and compares each file against
+[`engineering/coverage/rust-mcp.baseline.json`](../../engineering/coverage/rust-mcp.baseline.json)
+— the coverage observed at a reviewed SHA. It is in no profile and is not required,
+because `cargo-llvm-cov` is not yet a declared prerequisite; run it with
+`node scripts/nemo/job.cjs test:coverage-rust`. Without the tool or the `llvm-tools`
+component it reports `blocked` and names what is missing; it never reports `pass`.
+`node scripts/nemo/coverage-rust.cjs` runs the same comparison directly, and `--update`
+re-records the baseline. Floors are per file: there is no invented global target, and
+**branch coverage is deliberately absent** — the stable toolchain does not instrument
+branches, so a branch floor would compare 0 against 0 and could never fail.
+
 `npm run check` does not run all architecture/type/coverage checks. The adopted boundary
 lane is described in [the local CI reference](../../engineering/ci/README.md). Its `quick`
 lane explicitly selects doctor/check/unit/geometry tests, whereas the verifier's default
-quick profile also includes inventory. c8, Rust coverage and general feature-registration
-enforcement are planned leaves, not capabilities delivered merely by this command list.
+quick profile also includes inventory. JS coverage (`test:coverage`, c8) and Rust coverage
+(`test:coverage-rust`) exist as explicitly selected, non-required jobs; neither is in a
+profile, so a green `verify` run does not mean either one ran. General feature-registration
+enforcement remains a planned leaf, not a capability delivered by this command list.
 
 The [R03 baseline](../../engineering/inventory/BASELINE.md) records the retained
 CPU, browser, native, and packaged-desktop evidence and their separate limitations.
