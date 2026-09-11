@@ -3101,6 +3101,15 @@
           nvItems.push(rectItem(p.x, p.y, 3.5 * nzs, [255, 255, 255, 255], [74, 158, 255, 255], 1.2 * nzs));
         });
         nvItems.push(circleItem(nvTb.ringCenter.x, nvTb.ringCenter.y, nvTb.ringRadius, null, [74, 158, 255, 160], 1 * nzs));
+        // Anchor/pivot crosshair (2026-07) — same AE-style ringed-cross
+        // glyph as the path selection's own anchor (buildTransformBoxItems
+        // below), same hover-grow convention (state.xformAnchorHovered is
+        // shared: only one gizmo is ever on screen at a time, path OR video).
+        var nvAr = (state.xformAnchorHovered ? 10 : 8) * nzs;
+        var nvAp = nvTb.anchor;
+        nvItems.push(circleItem(nvAp.x, nvAp.y, nvAr, null, [74, 158, 255, 255], 1.2 * nzs));
+        nvItems.push(lineItem([nvAp.x - nvAr, nvAp.y], [nvAp.x + nvAr, nvAp.y], [74, 158, 255, 255], 1 * nzs));
+        nvItems.push(lineItem([nvAp.x, nvAp.y - nvAr], [nvAp.x, nvAp.y + nvAr], [74, 158, 255, 255], 1 * nzs));
         return nvItems;
       }
     }
