@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nemo.internal/schema/operation-contract-v1.schema.json",
+  "title": "OperationContract",
+  "description": "The transaction/job/resource lifecycle contract capability-v1.schema.json's `Effects` defers to (D02/#1045). This is a `$defs` library, not an instantiated document like a capability descriptor — a job-kind capability's own `input`/`output` (capability-v1.schema.json) references these shapes via `$ref`, the same way `transport-v1.schema.json`'s `request`/`response` are referenced rather than duplicated. The request/response envelope itself (`apiVersion`, `requestId`, `instanceId`, `documentId`, `expectedRevision`/`revision`, `ok`, `error`/`result`) is already fully specified there and is not re-specified here; `transport-v1.schema.json`'s own prose already gestures at retry (\"re-sending it with an identical body returns the retained result; re-sending it with a changed body is rejected\") and staleness (\"documentId ... changes whenever the open document is replaced\") without naming them — `RetryResolution` and `StaleDocument` below are that formalization. `JobLifecycle` and `ResourceHandle` have no running implementation to formalize yet (P17-P19 and P05's own handle note are still Inbox); those two are specified prospectively, grounded in the one job-shaped fixture that already exists (`capabilities/export-job.json`) and P05's forward note, so a future handler converges on this vocabulary instead of inventing its own. Versioned by filename, like its two siblings — a breaking change ships as `operation-contract-v2.schema.json`, never a silent rewrite of this one. Access-control policy (this ticket's outcome check 3): mutation authority lives in exactly one place, the JS application-layer handler that already owns \"validation, revision and retry boundaries\" (`src/js/application/opacity-application.js` line 1) — no generic service container sits between a capability descriptor and its handler (`handlerKey`, capability-v1.schema.json, is a direct registry lookup, not a layer this contract adds), and the Rust MCP dispatch (P07/#1009, `nemo-mcp/src/contract.rs`) is a transport that routes to this same JS authority, never a second, independently-writable mirror of document state.",
+  "$defs": {
+    "RetryResolution": {
+      "type": "string",
+      "enum": ["applied", "replayed", "rejected_reuse"],
+      "description": "The three outcomes of dispatching a write `requestId` against the handler's retained set (`src/js/application/opacity-application.js` `handle()` line 118-119, `remember()` line 51-57 — only WRITE operations are retained, capped at 256 by insertion order). \"applied\": `requestId` not previously seen — proceeds to the `expectedRevision` check `transport-v1.schema.json` already names. \"replayed\": `requestId` seen before with an identical fingerprint (`fingerprint()` line 46-50 — the canonical JSON of `{apiVersion, instanceId, documentId, expectedRevision, operation, payload}`) — the ORIGINAL cached response is cloned and returned unchanged. \"rejected_reuse\": `requestId` seen before with a DIFFERENT fingerprint — rejected as `invalid_request` (\"requestId was reused with a changed body.\"), never re-applied and never silently accepted as fresh. Ordering that would otherwise surprise a reader: this check runs BEFORE the expected-revision check, so a genuine \"replayed\" retry returns its original result even if the document's current revision has since moved past `expectedRevision` — a retry is not itself subject to going stale.",
+      "examples": ["applied", "replayed", "rejected_reuse"]
+    },
+    "JobLifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "PROSPECTIVE — no handler implements this yet (P17 extracts the export adapter, H01 maps its start/status/cancel inputs, P18 adds the bounded lifecycle itself; all still Inbox as of this writing). Canonical stage vocabulary this ticket asks for is `begin/update/commit/cancel`; the one existing job-shaped fixture, `capabilities/export-job.json`, already uses the narrower `start/status/cancel` for its own `effects.lifecycle` — that fixture does not need renaming, `lifecycle` is free-text per capability-v1.schema.json. The mapping: `begin`=`start` (creates `jobId`, the only stage that may omit it); `update`=a `status` poll that returns before a terminal state; `commit`=the specific `update`/`status` response whose `status` output field first reaches a success terminal state (currently implicit in export-job.json's output enum, named explicitly here so a future handler and its tests can assert on it directly instead of re-deriving it from `status===\"succeeded\"`); `cancel`=`cancel`, unchanged.",
+      "properties": {
+        "stage": {
+          "type": "string",
+          "enum": ["begin", "update", "commit", "cancel"],
+          "description": "Which lifecycle stage this call addresses. `begin` is the only stage whose request may omit `jobId` (one is minted and returned); every other stage requires it — resolves the gap named in export-job.json line 8 (\"exactly one is required depending on stage, enforced by the handler per stage rather than by this shape\"): the handler enforces `jobId` presence/absence per this enum, this schema does not attempt a cross-field JSON Schema conditional for the same reason capability-v1 doesn't enforce cross-item id uniqueness in-shape (see its own top-level `description`)."
+        },
+        "jobId": { "type": "string", "minLength": 1, "description": "Minted by `begin`, required by `update`/`commit`/`cancel`. Distinct from `requestId`: one job spans many requests, each with its own `requestId` and its own `RetryResolution` above." },
+        "terminal": {
+          "type": "string",
+          "enum": ["succeeded", "failed", "cancelled"],
+          "description": "Matches export-job.json's own `output.status` enum values minus the two non-terminal ones (`running` has no terminal counterpart here — it is simply the absence of this field on an `update` response). Once a job reaches a terminal state it accepts no further `update`/`commit`/`cancel` for that `jobId`; a late result belonging to a job whose document has since changed underneath it is `wrong_document` (see `StaleDocument` below), never silently attached to the new document."
+        }
+      },
+      "required": ["stage"],
+      "examples": [
+        { "stage": "begin" },
+        { "stage": "update", "jobId": "job-1" },
+        { "stage": "commit", "jobId": "job-1", "terminal": "succeeded" },
+        { "stage": "cancel", "jobId": "job-1", "terminal": "cancelled" }
+      ]
+    },
+    "ResourceHandle": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "PROSPECTIVE — grounded in the one forward note that exists for this (execution plan P05 outcome check 3: \"Opaque raw image/geometry data is represented by handles, not command JSON\"); no registry or handle implementation exists yet. \"One mutation authority remains\" (this ticket's outcome check 2) is not a new invention either — it generalizes a real, already-enforced exclusivity: `ports.canMutate()` (opacity-application.js `handle()` line 122) rejects a WRITE with `unavailable` (\"An interactive gesture owns the document.\") whenever a live UI gesture currently holds the document, and the `editing` guard (rejection check at line 123, the flag it reads is set/cleared at lines 125 and 128) rejects a WRITE re-entering while another WRITE from the same handler is still in flight, also as `unavailable` — the same code both times, distinguished only by message text, a fact worth citing plainly rather than inventing two codes that do not exist. A handle's `ownerId` is this same kind of exclusive claim, scoped to one resource instead of the whole document: at most one live owner, and a competing acquisition attempt is rejected the same way a competing write is, not queued and not silently granted.",
+      "properties": {
+        "handleId": { "type": "string", "minLength": 1, "description": "Opaque, per-resource identity a caller passes instead of re-embedding raw image/geometry bytes in a command payload — the literal problem P05's note names." },
+        "ownerId": { "type": "string", "minLength": 1, "description": "The `requestId` or `jobId` currently holding exclusive use of this handle. Absent once released (see `disposition`)." },
+        "disposition": {
+          "type": "string",
+          "enum": ["held", "released"],
+          "description": "\"held\": `ownerId` is populated and current; disposal has not run. \"released\": the owner disposed it explicitly, or the document/job that created it ended (see `StaleDocument` below) and released it implicitly — either way, `ownerId` from that point on refers to nothing live, and any further reference to `handleId` is `invalid_request`, the same code the running code already uses for a structurally-wrong request."
+        }
+      },
+      "required": ["handleId", "disposition"],
+      "examples": [
+        { "handleId": "handle-1", "ownerId": "req-42", "disposition": "held" },
+        { "handleId": "handle-1", "disposition": "released" }
+      ]
+    },
+    "StaleDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Grounded directly in `documentChanged()` (opacity-application.js line 23-28), called from `handle()` line 111 whenever `ports.context() !== context` — the document/instance identity was replaced underneath the handler (e.g. a project load) since the last request. It mints a new `documentId`, resets `revision` to 0, and clears both the retry-retained set and the trace log: nothing carries over, by design, rather than trying to reconcile old requestIds/handles against a document they were never issued against.",
+      "properties": {
+        "priorDocumentId": { "type": "string", "minLength": 1 },
+        "newDocumentId": { "type": "string", "minLength": 1 },
+        "affected": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["retained_requests", "trace", "in_flight_jobs", "held_handles"]
+          },
+          "description": "What the rotation invalidates. The first two are real (`retained.clear()`, `trace.length = 0`, same line). The last two are the prospective consequence for `JobLifecycle`/`ResourceHandle` once those exist: a job or handle is scoped to the `documentId` that was current when it was created (begun / acquired), so it cannot survive a rotation any more than a stale `requestId` can — an `update`/`commit`/`cancel` or handle reference naming the prior `documentId` is `wrong_document`, the code this running handler already returns for exactly that mismatch (line 41, line 43), not a new code invented for this case."
+        }
+      },
+      "required": ["priorDocumentId", "newDocumentId", "affected"],
+      "examples": [
+        { "priorDocumentId": "doc-1", "newDocumentId": "doc-2", "affected": ["retained_requests", "trace"] },
+        { "priorDocumentId": "doc-1", "newDocumentId": "doc-2", "affected": ["retained_requests", "trace", "in_flight_jobs", "held_handles"] }
+      ]
+    }
+  }
+}
