@@ -27,7 +27,11 @@ function application() {
   };
   ctx.window = ctx;
   vm.createContext(ctx);
+  // domain/document/folder-codec.js is a load-order dependency of tweens.js:
+  // layersSnapshotNow calls it to copy folder metadata (P20), the same way
+  // motion.js hard-references its own domain modules above.
   for (const file of ['animation/curve.js', 'domain/animation/opacity.js', 'motion.js',
+    'domain/document/folder-codec.js',
     'tweens.js', 'application/opacity-application.js', 'bootstrap/opacity-application.js']) {
     const filename = path.resolve(__dirname, '../src/js', file);
     vm.runInContext(fs.readFileSync(filename, 'utf8'), ctx, { filename });

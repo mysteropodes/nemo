@@ -4889,7 +4889,7 @@ function layersSnapshotNow(){return{type:'layers',layers:_cloneLayersForUndo(sta
   // these two maps, which _cloneLayersForUndo cannot see. Without them an
   // undo brought the layers back out of the folder and left its now-empty
   // entry behind (renamed folders came back with the new name, too).
-  layerFolders:JSON.parse(JSON.stringify(state.layerFolders||{})),
+  layerFolders:NemoFolderCodec.snapshotFolderMap(state.layerFolders),
   layerLinkGroups:JSON.parse(JSON.stringify(state.layerLinkGroups||{})),
   // Tween-side state (2026-09 QA sweep) — same blind spot again: a motion
   // ARC handle and an ease CURVE point are real edits to the animation,
@@ -4954,7 +4954,7 @@ function restoreLayersSnapshot(s){
   state.activeLayerIdx=Math.max(0,Math.min(s.active,state.layers.length-1));
   // Folder/link-group metadata (see layersSnapshotNow) — undefined in any
   // snapshot taken before this existed, left untouched in that case.
-  if(s.layerFolders)state.layerFolders=JSON.parse(JSON.stringify(s.layerFolders));
+  if(NemoFolderCodec.hasFolderMap(s.layerFolders))state.layerFolders=NemoFolderCodec.restoreFolderMap(s.layerFolders);
   if(s.layerLinkGroups)state.layerLinkGroups=JSON.parse(JSON.stringify(s.layerLinkGroups));
   if(s.motionArcs)state.motionArcs=JSON.parse(JSON.stringify(s.motionArcs));
   if(s.tweenEasing)state.tweenEasing=JSON.parse(JSON.stringify(s.tweenEasing));

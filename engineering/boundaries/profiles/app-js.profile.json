@@ -1741,6 +1741,18 @@
       ]
     },
     {
+      "id": "app.folder.codec.domain",
+      "layer": "domain",
+      "dir": "src/js/domain/document",
+      "files": [
+        "folder-codec.js"
+      ],
+      "sizeProfile": "Domain kernel",
+      "publicApi": [
+        "folder-codec.js"
+      ]
+    },
+    {
       "id": "app.expression.random.domain",
       "layer": "domain",
       "dir": "src/js/domain/animation",
