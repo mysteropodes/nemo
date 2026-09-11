@@ -20,28 +20,28 @@
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
     "candidateCommit": "d8c316de308c25c212c71c6a6202120c8909d543",
-    "sourceRootTree": "60baae2229657e5c97d4b63b553dd1278689a6d0",
+    "sourceRootTree": "225722a6d6f903517bbf9a126102e09a27a03699",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "04502514ae140ab8d18f7271a2cbd39cf9616d0d",
+      "gitTree": "d7624a17786c9adbdc8a55e08aa1d578bc6a0c1d",
       "lastChangedCommit": "d8c316de308c25c212c71c6a6202120c8909d543"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "efe442e0916a763b480e89857747234fcb2a0431",
-      "sha256": "d7ca8c459d5043b4463b25e21af8aec95be17d2ae8e408a6326bb225ef772427",
+      "gitBlob": "1bb165a4e44a69e9c1276d0dfde43fbb6ed99f9d",
+      "sha256": "54a9392beb7a6ccb52908a89b6bf9b336c94acd06a0f4143acb54fc3637e7f5f",
       "lastChangedCommit": "9e5daae92a68799c8ba108064ddac8066af209e9"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "662d6a17bc8452bc6df51e18c2f13d870aa2e953c597625b391f7378fcd81705"
+      "value": "e67038deb03e1df0264e2e823205d42d293e93c52fb5cc50a38275f9d11ff363"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "c1170748aea7a16f5d2ff0d5fb80604d5f9763db",
-        "sha256": "6e09288b3aea266bd70c14f4b9dba1fe70957640593d961f8a5afc21d2ad99bb",
+        "gitBlob": "3c8a9598bb742bb21800c1792c335e1fba4c6dc8",
+        "sha256": "b4b68b752caf01fd67b61e7eb22766bc5d306c6dde01ad94623e6631c2b60a7d",
         "moduleCount": 149,
         "basedOnCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1"
       },
@@ -218,6 +218,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/application-mcp.js",
+      "moduleId": "app.application.mcp.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2460,
+          "scriptOrdinal": 139
+        }
+      ]
+    },
+    {
       "path": "src/js/ae-camera-export.js",
       "moduleId": "app.ae.camera.export",
       "executionClass": "document-classic",
@@ -230,6 +242,18 @@
       ]
     },
     {
+      "path": "src/js/animation/curve.js",
+      "moduleId": "app.animation.curve",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2359,
+          "scriptOrdinal": 56
+        }
+      ]
+    },
+    {
       "path": "src/js/app.js",
       "moduleId": "app.app",
       "executionClass": "document-classic",
@@ -238,6 +262,18 @@
           "path": "src/index.html",
           "line": 2300,
           "scriptOrdinal": 6
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/opacity-application.js",
+      "moduleId": "app.opacity.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2362,
+          "scriptOrdinal": 59
         }
       ]
     },
@@ -298,6 +334,18 @@
           "path": "src/index.html",
           "line": 2442,
           "scriptOrdinal": 121
+        }
+      ]
+    },
+    {
+      "path": "src/js/bootstrap/opacity-application.js",
+      "moduleId": "app.opacity.bootstrap",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2459,
+          "scriptOrdinal": 138
         }
       ]
     },
@@ -418,6 +466,54 @@
           "path": "src/index.html",
           "line": 2407,
           "scriptOrdinal": 89
+        }
+      ]
+    },
+    {
+      "path": "src/js/domain/animation/expression-random.js",
+      "moduleId": "app.expression.random.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2362,
+          "scriptOrdinal": 59
+        }
+      ]
+    },
+    {
+      "path": "src/js/domain/animation/expression-time.js",
+      "moduleId": "app.expression.time.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2361,
+          "scriptOrdinal": 58
+        }
+      ]
+    },
+    {
+      "path": "src/js/domain/animation/opacity.js",
+      "moduleId": "app.opacity.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2360,
+          "scriptOrdinal": 57
+        }
+      ]
+    },
+    {
+      "path": "src/js/domain/document/folder-codec.js",
+      "moduleId": "app.folder.codec.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2305,
+          "scriptOrdinal": 7
         }
       ]
     },
@@ -1517,6 +1613,30 @@
       ]
     },
     {
+      "path": "src/js/project-document.js",
+      "moduleId": "app.project.document",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2352,
+          "scriptOrdinal": 49
+        }
+      ]
+    },
+    {
+      "path": "src/js/project-entry.js",
+      "moduleId": "app.project.entry",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2409,
+          "scriptOrdinal": 91
+        }
+      ]
+    },
+    {
       "path": "src/js/project.js",
       "moduleId": "app.project",
       "executionClass": "document-classic",
@@ -1985,114 +2105,6 @@
           "scriptOrdinal": 118
         }
       ]
-    },
-    {
-      "path": "src/js/project-entry.js",
-      "moduleId": "app.project.entry",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2409,
-          "scriptOrdinal": 91
-        }
-      ]
-    },
-    {
-      "path": "src/js/project-document.js",
-      "moduleId": "app.project.document",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2352,
-          "scriptOrdinal": 49
-        }
-      ]
-    },
-    {
-      "path": "src/js/domain/animation/opacity.js",
-      "moduleId": "app.opacity.domain",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2360,
-          "scriptOrdinal": 57
-        }
-      ]
-    },
-    {
-      "path": "src/js/domain/animation/expression-time.js",
-      "moduleId": "app.expression.time.domain",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2361,
-          "scriptOrdinal": 58
-        }
-      ]
-    },
-    {
-      "path": "src/js/domain/animation/expression-random.js",
-      "moduleId": "app.expression.random.domain",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2362,
-          "scriptOrdinal": 59
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/opacity-application.js",
-      "moduleId": "app.opacity.application",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2362,
-          "scriptOrdinal": 59
-        }
-      ]
-    },
-    {
-      "path": "src/js/bootstrap/opacity-application.js",
-      "moduleId": "app.opacity.bootstrap",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2459,
-          "scriptOrdinal": 138
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/application-mcp.js",
-      "moduleId": "app.application.mcp.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2460,
-          "scriptOrdinal": 139
-        }
-      ]
-    },
-    {
-      "path": "src/js/animation/curve.js",
-      "moduleId": "app.animation.curve",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2359,
-          "scriptOrdinal": 56
-        }
-      ]
     }
   ],
   "exclusions": [
@@ -2554,19 +2566,19 @@
     }
   ],
   "snapshotCounts": {
-    "selectedSources": 161,
+    "selectedSources": 162,
     "bySourceKind": {
-      ".js": 155,
+      ".js": 156,
       ".mjs": 2,
       ".cjs": 0,
       ".ts": 4
     },
-    "retainedSources": 149,
+    "retainedSources": 150,
     "exclusions": 12,
     "vendorExclusions": 6,
     "generatedExclusions": 6,
     "retainedExecutionClasses": {
-      "document-classic": 134,
+      "document-classic": 135,
       "document-module": 2,
       "classic-without-load-site": 12,
       "module-worker": 1

@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "377c9fd22c90a17b53a0fac1132e3301ac0d8d97",
-  "describe": "v0.7.0-alpha.4-248-g377c9fd-dirty"
+  "head": "6f4b91f79f134c4f1fcb6caedb3abbaee78c2fb8",
+  "describe": "v0.7.0-alpha.4-250-g6f4b91f-dirty"
  },
- "inputsDigest": "0f9864b41e575fc9d685bd7de25f8eb03216f10b641e50158303da5e3e1bf939",
+ "inputsDigest": "652e9caee61379aabe4e355a404f5d2120bd4c872c467370ab1a1cd0a4dd4110",
  "states": [
   "inventoried",
   "characterized",
@@ -2502,7 +2502,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 108,
+    "functionsVisited": 112,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9161 action()"
@@ -2853,7 +2853,7 @@
     "container": "comp-instance-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 423,
+    "functionsVisited": 424,
     "via": "variable btn",
     "references": []
    },
@@ -3458,7 +3458,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 121,
+    "functionsVisited": 125,
     "via": "chain",
     "references": []
    },
@@ -4677,7 +4677,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 96,
+    "functionsVisited": 98,
     "via": "chain",
     "references": []
    },
@@ -4719,7 +4719,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 97,
+    "functionsVisited": 99,
     "via": "chain",
     "references": []
    },
@@ -7827,7 +7827,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 197,
+    "functionsVisited": 201,
     "via": "chain",
     "references": [
      "src/js/project.js:215 openDialog()"
@@ -8030,7 +8030,7 @@
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 220,
+    "functionsVisited": 221,
     "via": "variable sel",
     "references": []
    },
@@ -9222,7 +9222,7 @@
     "container": "start-newpanel",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 138,
+    "functionsVisited": 140,
     "via": "chain",
     "references": []
    },
@@ -14716,7 +14716,7 @@
     "container": "project-tabs-bar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 161,
+    "functionsVisited": 163,
     "via": "chain",
     "references": [
      "src/js/project.js:633",
@@ -15802,7 +15802,7 @@
     "container": "start-cards",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 121,
+    "functionsVisited": 125,
     "via": "chain",
     "references": []
    },
@@ -15845,7 +15845,7 @@
     "container": "start-cards",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 179,
+    "functionsVisited": 181,
     "via": "chain",
     "references": [
      "src/js/project.js:664 initStartScreen()"
@@ -16091,7 +16091,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 48,
+    "functionsVisited": 50,
     "via": "variable publishBtn",
     "references": []
    },
@@ -25900,7 +25900,7 @@
    "source": "src/js/motion.js:7892",
    "meta": {
     "i18n": null,
-    "functionsVisited": 152
+    "functionsVisited": 153
    },
    "fixtures": [
     "static-props",
@@ -25975,7 +25975,7 @@
    "source": "src/js/motion.js:7909",
    "meta": {
     "i18n": null,
-    "functionsVisited": 148
+    "functionsVisited": 149
    },
    "fixtures": [
     "static-props",
@@ -26015,7 +26015,7 @@
    "source": "src/js/motion.js:7916",
    "meta": {
     "i18n": "matteMenuRemove",
-    "functionsVisited": 148
+    "functionsVisited": 149
    },
    "fixtures": [
     "static-props",
@@ -26090,7 +26090,7 @@
    "source": "src/js/motion.js:7967",
    "meta": {
     "i18n": null,
-    "functionsVisited": 152
+    "functionsVisited": 153
    },
    "fixtures": [
     "static-props",
@@ -26165,7 +26165,7 @@
    "source": "src/js/motion.js:7976",
    "meta": {
     "i18n": null,
-    "functionsVisited": 148
+    "functionsVisited": 149
    },
    "fixtures": [
     "static-props",
@@ -26205,7 +26205,7 @@
    "source": "src/js/motion.js:7982",
    "meta": {
     "i18n": "matteMenuRemove",
-    "functionsVisited": 148
+    "functionsVisited": 149
    },
    "fixtures": [
     "static-props",
@@ -26247,7 +26247,7 @@
    "source": "src/js/motion.js:8323",
    "meta": {
     "i18n": "menuRemoveThisParent",
-    "functionsVisited": 456
+    "functionsVisited": 457
    },
    "fixtures": [
     "static-props",
