@@ -98,13 +98,46 @@ test('pass -> blocked is an environment mismatch, not a pass and not a failure',
 
 // --- blocked / not-run are never rounded up --------------------------------
 
-test('blocked -> blocked stays blocked and is never reported as a pass', () => {
+// T02: the verdict was already right here in P02 — `unchanged-blocked`, and
+// the comment even said "still not a pass". The SEVERITY was wrong: the
+// verdict sat in neither the blocking nor the inconclusive set, so a required
+// runtime that produced no evidence at all exited 0, i.e. read as a pass to
+// anything reading the exit code. Required and optional now part ways.
+test('a required runtime blocked in both runs is never rounded up to a pass', () => {
   const b = job('test:desktop', 'blocked', { reason: 'no packaged app found' });
   const c = compareOf(adoptOf([b]), [b]);
   assert.equal(c.results[0].verdict, VERDICT.UNCHANGED_BLOCKED);
   assert.notEqual(c.results[0].verdict, VERDICT.PASS);
-  assert.equal(c.summary.overall, 'ok'); // known and unchanged, but still not a pass
   assert.equal(c.results[0].current, 'blocked');
+  assert.equal(c.results[0].severity, 'inconclusive');
+  assert.equal(c.summary.overall, 'inconclusive');
+  assert.equal(c.summary.exitCode, 2, 'no evidence for a required runtime is not exit 0');
+  assert.deepEqual(c.summary.noEvidence.map((n) => n.job), ['test:desktop']);
+});
+
+test('the same block on an OPTIONAL job is genuinely nothing to answer for', () => {
+  const b = job('test:rust-tauri', 'blocked', { required: false, reason: 'native fixture sidecar unavailable' });
+  const c = compareOf(adoptOf([b]), [b]);
+  assert.equal(c.results[0].verdict, VERDICT.UNCHANGED_BLOCKED);
+  assert.equal(c.results[0].severity, 'ok');
+  assert.equal(c.summary.overall, 'ok');
+  assert.deepEqual(c.summary.noEvidence, []);
+});
+
+test('a required job that stays not-run is no evidence either', () => {
+  const b = job('test:desktop', 'not-run', { reason: 'no suite defined yet' });
+  const c = compareOf(adoptOf([b]), [b]);
+  assert.equal(c.results[0].verdict, VERDICT.UNCHANGED_NOT_RUN);
+  assert.equal(c.summary.exitCode, 2);
+});
+
+test('required in the baseline is enough, even if the run stopped saying so', () => {
+  // The two can disagree; taking the stricter side is the only direction that
+  // cannot silently downgrade a case that used to have to answer for itself.
+  const m = adoptOf([job('test:desktop', 'blocked', { required: true, reason: 'no packaged app found' })]);
+  const c = compareOf(m, [job('test:desktop', 'blocked', { required: false, reason: 'no packaged app found' })]);
+  assert.equal(c.results[0].required, true);
+  assert.equal(c.summary.exitCode, 2);
 });
 
 test('a failure first observed while blocked is not called a regression against a pass it never had', () => {
@@ -174,6 +207,36 @@ test('a baseline entry the run did not cover is reported as missing, not as pass
   const r = c.results.find((x) => x.job === 'test:desktop');
   assert.equal(r.verdict, VERDICT.MISSING_ENTRY);
   assert.equal(r.current, null);
+});
+
+// T02: "a missing required case fails". P02 filed every missing entry as
+// inconclusive, so a required entry silently dropped from a profile exited 2
+// alongside genuine can't-tell cases instead of failing.
+test('a required baseline entry the run was expected to cover is a failure', () => {
+  const m = adoptOf([job('test:unit', 'pass'), job('test:desktop', 'blocked', { required: true })]);
+  const c = compareOf(m, [job('test:unit', 'pass')], { expect: ['test:unit', 'test:desktop'] });
+  const r = c.results.find((x) => x.job === 'test:desktop');
+  assert.equal(r.verdict, VERDICT.MISSING_ENTRY);
+  assert.equal(r.severity, 'blocking');
+  assert.equal(c.summary.exitCode, 1);
+  assert.ok(c.summary.blocking.some((b) => b.job === 'test:desktop' && b.required));
+});
+
+test('an optional entry the run did not cover is uncomparable, not a failure', () => {
+  const m = adoptOf([job('test:unit', 'pass'), job('bench', 'pass', { required: false })]);
+  const c = compareOf(m, [job('test:unit', 'pass')], { expect: ['test:unit', 'bench'] });
+  assert.equal(c.results.find((x) => x.job === 'bench').severity, 'inconclusive');
+  assert.equal(c.summary.exitCode, 2);
+});
+
+test('a targeted run is not judged for entries it never claimed to cover', () => {
+  // `npm run test:rust` has not failed to answer for test:desktop.
+  const m = adoptOf([job('test:rust', 'pass'), job('test:desktop', 'blocked', { required: true })]);
+  const c = compareOf(m, [job('test:rust', 'pass')], { expect: ['test:rust'] });
+  const r = c.results.find((x) => x.job === 'test:desktop');
+  assert.equal(r.verdict, VERDICT.MISSING_ENTRY, 'still reported, not hidden');
+  assert.equal(r.severity, 'ok');
+  assert.equal(c.summary.overall, 'ok');
 });
 
 // --- adoption --------------------------------------------------------------
@@ -301,7 +364,7 @@ test('--check exits 0 when the run reproduces the adopted state', (t) => {
   // Replay the manifest's own entries as a receipt: same statuses, same cases.
   const m = baseline.loadManifest();
   const jobs = m.entries.map((e) => job(e.job, e.status, {
-    reason: e.case.reason, exitCode: e.case.exitCode, limitations: e.case.limitations, details: e.case.details,
+    required: e.required, reason: e.case.reason, exitCode: e.case.exitCode, limitations: e.case.limitations, details: e.case.details,
   }));
   fs.writeFileSync(path.join(runDir, 'receipt.json'), JSON.stringify(receipt(jobs), null, 2));
 
@@ -310,16 +373,81 @@ test('--check exits 0 when the run reproduces the adopted state', (t) => {
   });
   const cmp = JSON.parse(r.stdout);
   assert.deepEqual(cmp.summary.blocking, [], 'replaying the adopted state produces no blocking verdict');
-  assert.deepEqual(cmp.summary.inconclusive, [], 'every adopted entry is comparable');
   assert.notEqual(r.status, 1, 'replaying the adopted state is never a failure');
 
-  // Exit is then decided by the references alone: 0 when the tree still
-  // matches what was adopted, 2 when it does not. Which one applies here
-  // depends on the checkout the suite runs in (a dirty worktree, or a commit
-  // later than the adopted one, both legitimately report stale), so assert
-  // the implication rather than a fixed code.
-  assert.equal(r.status, cmp.references.stale ? 2 : 0);
+  // Every inconclusive entry must be one of the required jobs the baseline
+  // itself records as having produced no result (T02): replaying the adopted
+  // state re-lists them, because replaying "still no evidence" is still no
+  // evidence. Nothing else may be inconclusive.
+  const noEvidenceJobs = m.entries.filter((e) => e.required && (e.status === 'blocked' || e.status === 'not-run')).map((e) => e.job);
+  assert.deepEqual(cmp.summary.inconclusive.map((i) => i.job).sort(), noEvidenceJobs.slice().sort(),
+    'the only uncomparable entries are the required ones with no evidence');
+  assert.deepEqual(cmp.summary.noEvidence.map((n) => n.job).sort(), noEvidenceJobs.slice().sort());
+
+  // Exit is then 2 when the tree moved OR a required runtime still has no
+  // evidence, 0 only when neither applies. Which one holds depends on the
+  // checkout the suite runs in, so assert the implication, not a fixed code.
+  const expectTwo = cmp.references.stale || noEvidenceJobs.length > 0;
+  assert.equal(r.status, expectTwo ? 2 : 0);
   if (cmp.references.stale) {
     assert.ok(cmp.summary.staleReferences.length > 0, 'a stale result names which reference moved');
   }
+});
+
+// --- T02: a separate result, never a rewritten one -------------------------
+
+test('comparison does not touch the receipt it classifies', () => {
+  const failing = job('build:desktop', 'fail', { reason: 'bundle-ffmpeg-dylibs.py failed (1)', exitCode: 1 });
+  const m = adoptOf([failing]);
+  const run = receipt([job('build:desktop', 'fail', { reason: 'bundle-ffmpeg-dylibs.py failed (1)', exitCode: 1 })]);
+  const before = JSON.stringify(run);
+  const c = baseline.compare(m, run, { references: REFS, platform: PLATFORM, now: '2026-09-09T00:03:00Z' });
+
+  assert.equal(JSON.stringify(run), before, 'the receipt is read, never rewritten');
+  assert.equal(c.results[0].verdict, VERDICT.UNCHANGED_KNOWN_FAILURE);
+  assert.equal(c.results[0].current, 'fail', 'the raw failure stays a failure');
+  assert.equal(c.results[0].currentReason, 'bundle-ffmpeg-dylibs.py failed (1)', 'the raw reason is carried verbatim');
+  // "Known" is a label on the comparison, not permission for the run to pass:
+  // the comparison's own overall may be ok while the job is still failing.
+  assert.equal(c.summary.overall, 'ok');
+  assert.equal(run.jobs[0].status, 'fail');
+});
+
+test('runJobs writes a comparison beside the receipt without changing the run', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-baseline-wire-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const reports = path.join(dir, 'reports');
+
+  const r = spawnSync(process.execPath, [path.join(__dirname, 'job.cjs'), 'check', '--quiet'], {
+    cwd: ROOT, encoding: 'utf8', env: Object.assign({}, process.env, { NEMO_REPORT_DIR: reports }),
+  });
+  const runs = fs.readdirSync(reports);
+  assert.equal(runs.length, 1, 'one report directory');
+  const runDir = path.join(reports, runs[0]);
+
+  const receiptJson = JSON.parse(fs.readFileSync(path.join(runDir, 'receipt.json'), 'utf8'));
+  const cmpPath = path.join(runDir, 'comparison.json');
+  assert.ok(fs.existsSync(cmpPath), 'the run wrote comparison.json next to the receipt');
+  const cmp = JSON.parse(fs.readFileSync(cmpPath, 'utf8'));
+  assert.equal(cmp.schema, 'nemo.baseline-comparison/1');
+
+  // The run's exit code is the receipt's own, never the comparison's.
+  assert.equal(r.status, receiptJson.summary.exitCode);
+  // A targeted single-job run is not judged for the rest of the baseline.
+  assert.deepEqual(cmp.summary.blocking, [], 'a targeted run does not block on entries it never claimed');
+  const outOfScope = cmp.results.filter((x) => x.job !== 'check' && x.job !== 'doctor');
+  assert.ok(outOfScope.length > 0 && outOfScope.every((x) => x.severity === 'ok'),
+    'entries outside the run are reported but not judged');
+});
+
+test('--no-baseline runs without comparing', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-baseline-off-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const reports = path.join(dir, 'reports');
+  spawnSync(process.execPath, [path.join(__dirname, 'job.cjs'), 'check', '--quiet', '--no-baseline'], {
+    cwd: ROOT, encoding: 'utf8', env: Object.assign({}, process.env, { NEMO_REPORT_DIR: reports }),
+  });
+  const runDir = path.join(reports, fs.readdirSync(reports)[0]);
+  assert.ok(fs.existsSync(path.join(runDir, 'receipt.json')));
+  assert.equal(fs.existsSync(path.join(runDir, 'comparison.json')), false);
 });
