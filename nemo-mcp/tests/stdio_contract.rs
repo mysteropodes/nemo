@@ -5,6 +5,7 @@
 //! schema that types nothing, so the schema and the rejection are asserted here.
 use rmcp::{model::CallToolRequestParams, transport::TokioChildProcess, ServiceExt};
 use serde_json::{json, Map, Value};
+use std::process::Command;
 
 async fn client() -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
     let root = Box::leak(Box::new(tempfile::tempdir().unwrap()));
@@ -19,6 +20,44 @@ async fn client() -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
 
 fn arguments(value: Value) -> Map<String, Value> {
     value.as_object().unwrap().clone()
+}
+
+#[test]
+fn compiled_schema_binary_matches_the_committed_contract_and_descriptors() {
+    let output = Command::new(env!("CARGO_BIN_EXE_nemo-mcp-schema"))
+        .output()
+        .expect("compiled schema binary runs");
+    assert!(
+        output.status.success(),
+        "schema binary failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let generated: Value = serde_json::from_slice(&output.stdout).expect("schema stdout is JSON");
+    let committed: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/transport-v1.schema.json"
+    ))
+    .expect("committed transport schema is JSON");
+    assert_eq!(
+        generated, committed,
+        "run cargo run --manifest-path nemo-mcp/Cargo.toml --bin nemo-mcp-schema --quiet > \
+         engineering/application/transport-v1.schema.json"
+    );
+
+    let descriptors = json!([
+        serde_json::from_str::<Value>(include_str!(
+            "../../engineering/application/capabilities/opacity.json"
+        ))
+        .unwrap(),
+        serde_json::from_str::<Value>(include_str!(
+            "../../engineering/application/capabilities/export-job.json"
+        ))
+        .unwrap(),
+    ]);
+    assert_eq!(
+        generated["request"]["properties"]["payload"]["x-nemo-registeredCapabilities"], descriptors,
+        "the generated contract embeds the canonical descriptors verbatim"
+    );
 }
 
 #[tokio::test]
