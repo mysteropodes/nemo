@@ -350,6 +350,8 @@ Le tableau initial contient **59 tâches élémentaires : 33 sous la responsabil
 
   Limite : Ne pas confondre les 902 lignes d’inventaire avec 902 capacités distinctes, ni classer chaque grande table de données comme monolithe de code.
 
+  Admission découpée avant implémentation : [P03A / #1116](https://github.com/mysteropodes/nemo/issues/1116) fige l’index source et rejette les déclarations de complétude non prouvées. [Contrat de l’index](../inventory/REMEDIATION_SCOPE.md). P03 reste ouvert pour la cartographie bornée des lacunes timeline/Motion et l’admission des feuilles d’extraction liées ; les références de paquets en attente ne sont pas des tâches Ready.
+
 - [ ] **[F01 / #1047](https://github.com/mysteropodes/nemo/issues/1047) — Examiner les preuves existantes de Honey sur le paquet installé**
 
   Responsable **Cyrill/O** · compétence `validation` · `opus` / **high**. Prédécesseurs : aucun ; réserver les fichiers et l’environnement d’exécution.

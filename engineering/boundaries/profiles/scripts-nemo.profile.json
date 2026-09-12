@@ -1,5 +1,7 @@
 {
   "modules": [
+    { "id": "nemo.remediationScope", "layer": "tooling-adapters", "dir": "scripts/nemo",
+      "files": ["remediation-scope.cjs"], "publicApi": ["remediation-scope.cjs"], "sizeProfile": "Platform/engine adapter" },
     { "id": "nemo.lib.inventoryLexer", "layer": "tooling-shared", "dir": "scripts/nemo/lib",
       "files": ["inventory-lexer.cjs"], "publicApi": ["inventory-lexer.cjs"], "sizeProfile": "Domain/application JS or TS" },
     { "id": "nemo.lib.inventoryRender", "layer": "tooling-shared", "dir": "scripts/nemo/lib",

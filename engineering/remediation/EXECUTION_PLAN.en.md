@@ -354,6 +354,8 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: Do not confuse 902 inventory rows with 902 separate capabilities, or classify every large data table as a code monolith.
 
+  Admission is split before implementation: [P03A / #1116](https://github.com/mysteropodes/nemo/issues/1116) freezes the source index and rejects false completeness claims. [Index contract](../inventory/REMEDIATION_SCOPE.md). P03 remains open for bounded timeline/Motion gap mapping and linked extraction-leaf admission; pending packet references are not Ready tasks.
+
 - [x] **[F01 / #1047](https://github.com/mysteropodes/nemo/issues/1047) — Review the existing Honey installed-package evidence**
 
   Owner **Cyrill/O** · skill `validation` · `opus` / **high**. Predecessors: none; claim the file/runtime slot.
