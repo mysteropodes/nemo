@@ -1,0 +1,553 @@
+{
+  "census_id": "C20d",
+  "issue": 1150,
+  "title": "Motion active-layer properties, matte, widget-size and blend adapters",
+  "status": "read-only census with source-derived proposed, unrun fixtures; no runtime extraction or behavior pass",
+  "owner": "P03/C20d census only; historical Motion runtime ownership and named consumer owners remain separate",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "8c56d9200ce023efeda28cb0d626cc1482c04712",
+  "source_path": "src/js/motion.js",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_line_count": 13914,
+  "scope_files": [
+    "src/js/motion.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 7554,
+      "end": 7654
+    },
+    {
+      "start": 7655,
+      "end": 7755
+    },
+    {
+      "start": 7756,
+      "end": 7800
+    },
+    {
+      "start": 7801,
+      "end": 7879
+    },
+    {
+      "start": 7880,
+      "end": 7995
+    }
+  ],
+  "coverage_note": "Exactly 442 assigned lines occur once across five adjacent complete-function packets: 292 code, 148 full-line comments and 2 whitespace lines. Line7553 closes renderLayerListMotion; line7996 begins renderNullShapeRow comments. Both are excluded.",
+  "source_baselines": {
+    "pinned": "59a5a38:src/js/motion.js resolves to blob 6617bac29042c22399cac202bf054c09e4fdf30e.",
+    "current": "Observed main 8c56d920 has the identical Motion blob.",
+    "runtime": "No browser, Tauri, export, native IPC, GPU or application behavior was executed for this JSON-only census.",
+    "fixtures": "All fixture oracles are source-derived, proposed and unrun. Historical comments are not fresh execution evidence."
+  },
+  "historical_overlap": {
+    "artifact": "engineering/inventory/census/C02-animation-time.json and engineering/inventory/remediation-scope.json remain frozen and unchanged.",
+    "packet": "C02.motion-advanced.mode-toggle-and-workspace-continuity names renderLayerListMotion but its raw range is motion.js:7047-7575.",
+    "actual_construct": "renderLayerListMotion begins7032 and closes7553. The historical citation omits7032-7046 and overlaps C20d at7554-7575 by22 lines.",
+    "disposition": "Record the mismatch rather than rewriting the pinned predecessor. A separately pinned successor consolidation must resolve the numeric overlap before claiming global C02/C20 disjointness or completeness. The withdrawn298-13134 catch-all and C02:7 gap note are history, not executable ownership.",
+    "limit": "C20d claims complete responsibility mapping for7554-7995 only; it makes no global disjointness claim and does not complete C02:7."
+  },
+  "whole_file_writer_guidance": {
+    "source_access": "motion.js, timeline.js, motion-preset-picker.js and every dependency/caller remain read-only; C20d owns only this JSON.",
+    "runtime": "Historical Motion ownership retains motion.js runtime writing; P30 retains timeline.js. Any extraction must serialize through those owners.",
+    "reservations": "D01, T05/Pollen, C01/C02/C03/C04/C19/C20c and other active reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C02/#1037",
+      "disposition": "Retains track/evaluator, renderLayerListMotion, Motion selection and animation semantics. C20d records the frozen numeric mismatch and consumes dependencies without correcting C02. C02 also owns ensureElementHolder (2879-2910), which can allocate elementMotion and seed paramShapeKind/motionStatic while the panel renders."
+    },
+    {
+      "owner": "C20c/#1137",
+      "disposition": "Retains key-lock menu builders and their exact selection/time-link boundaries. C20d ends7995 and does not approach them."
+    },
+    {
+      "owner": "C19h/#1141",
+      "disposition": "Retains timeline updateUI caller at timeline.js2756; C20d records it as an external refresh call only."
+    },
+    {
+      "owner": "C04 selection and presentation",
+      "disposition": "Retains active layer/element selection sources and shared UI painter conventions. C20d maps reads and DOM construction."
+    },
+    {
+      "owner": "C01 document/history",
+      "disposition": "Retains codecs and undo/redo implementation. C20d maps push/save calls and field persistence consumers only."
+    },
+    {
+      "owner": "C03/export and engine bridge",
+      "disposition": "Retain scene rendering, blend/matte export and bridge implementation. SMEngineBridge is a shared render bridge; its presence is not proof of native IPC."
+    },
+    {
+      "owner": "later C20 leaf",
+      "disposition": "Must cover renderNullShapeRow, renderFollowPathRow, renderParentRow, extra-parent menus and renderTimeLinkRow from 7996 through 8434 without duplicating C20d. C02 retains timeLinkWouldCycle at 8435-8452, as accepted C20c reconciliation records."
+    },
+    {
+      "owner": "historical product PRs",
+      "disposition": "Closed PRs #433, #435, #444 and #459 are history, not competing census claims. Bounded live searches found no admitted duplicate before allocation."
+    }
+  ],
+  "boundaries": [
+    "7554-7995 builds DOM synchronously, calls C02-owned ensureElementHolder which can allocate/seed live document holders, and installs event callbacks that later mutate the layer. Render-time captures and click-time reads are distinguished below.",
+    "body.innerHTML destroys previous child/listener identity before most guards; later thrown required calls leave partial replacement DOM.",
+    "Installed Matte/Widget/Blend mutation callbacks invoke undo before their own field writes and have no rollback. Rendering a truthy target separately calls C02-owned ensureElementHolder without local undo/save; allocation/seeding and earlier DOM survive a later required-call failure.",
+    "A truthy SMEngineBridge object causes an unguarded renderNow method call. A present object with missing/non-callable renderNow throws; this does not establish Tauri IPC or installed-native execution.",
+    "The top-level renderer calls later-owned Parent/Null/Follow/Time row functions. Those calls are dependencies, not duplicated coverage."
+  ],
+  "areas": [
+    {
+      "area": "motion-properties-panel",
+      "packets": [
+        {
+          "id": "C20d.motion-properties-panel",
+          "files": [
+            "src/js/motion.js:7554-7654"
+          ],
+          "coverage_ranges": [
+            [
+              7554,
+              7654
+            ]
+          ],
+          "classification": {
+            "code": 57,
+            "comment": 44,
+            "whitespace": 0
+          },
+          "symbols": [
+            "renderMotionPropsPanel"
+          ],
+          "signature": "renderMotionPropsPanel() -> undefined",
+          "responsibility": "Destructively rebuilds the active Motion layer properties body, orders layer feature rows, chooses Widget Size versus Blend/Matte, and projects either a targeted element property family or the layer Transform group.",
+          "guards_and_identity": [
+            "Missing motion-props-body returns before mutation. Present body is cleared via innerHTML, destroying every child/listener identity.",
+            "motionDeselected is _motionCanvasEmptyClick OR no expanded layer plus a defined, empty _layerSel. Undefined _layerSel does not cause deselection.",
+            "A null layer still creates/appends one translated no-selection name row then returns.",
+            "Candidate element ID requires non-null plus active-layer expansion equality, then must also be truthy at if(elSel); zero and empty string fall through to layer Transform."
+          ],
+          "layer_order": [
+            "name row",
+            "renderParentRow required",
+            "renderNullShapeRow required only for isNullLayer and not isFolderLayer",
+            "renderFollowPathRow required",
+            "renderTimeLinkRow required",
+            "widget: renderWidgetSizeRow only; non-widget: renderBlendRow then renderMatteRow",
+            "target element properties or layer Transform"
+          ],
+          "target_element_matrix": [
+            "ensureElementHolder and element Transform run before entry lookup.",
+            "layerElements may return falsy and becomes []; first strict strokeId match wins.",
+            "Non-raster with positive pathVertexRowCount renders path vertices; raster with meshId and positive meshVertexRowCount renders mesh vertices with its own holder.",
+            "Fill row requires fillColor and either non-vector-brush or __linkedFillStrokeId.",
+            "Stroke row requires explicit hasRealStroke when defined, otherwise strokeColor truthiness, or any vector brush. Vector brush ink prefers __inkColor when defined, otherwise fillColor.",
+            "Stroke Width requires non-vector and strokeWidth !== undefined. Brush Size requires vector brush and at least two centerSegments. Trim requires non-raster nonempty segments.",
+            "After any truthy elSel, return even if no matching entry; layer Transform is therefore omitted."
+          ],
+          "direct_writes": "Direct assignments in the synchronous renderer construct/replace DOM. Its required C02 ensureElementHolder calls can allocate ld.elementMotion and missing entries, then seed paramShapeKind/motionStatic from live rect/ellipse/star data. The target holder is ensured before entry lookup, even for a missing matching entry; the raster-mesh branch can ensure a second holder. C02 owns those delegated model writes and row builders retain their own effects. No local undo or save surrounds this resolution.",
+          "returns_and_errors": "All normal/early paths return undefined. No catch/rollback; any required row/helper failure retains body clearing and earlier appended rows.",
+          "callers": [
+            "renderLayerListMotion at7552",
+            "renderBlendRow stopwatch at7846",
+            "later Follow Path callbacks8055/8063/8076",
+            "SMMotion export at13387",
+            "timeline updateUI2756",
+            "timeline blend edit10939",
+            "motion-preset-picker154"
+          ]
+        }
+      ]
+    },
+    {
+      "area": "matte-rows-and-mutations",
+      "packets": [
+        {
+          "id": "C20d.matte-row",
+          "files": [
+            "src/js/motion.js:7655-7755"
+          ],
+          "coverage_ranges": [
+            [
+              7655,
+              7755
+            ]
+          ],
+          "classification": {
+            "code": 67,
+            "comment": 32,
+            "whitespace": 2
+          },
+          "symbols": [
+            "renderMatteRow",
+            "matteModeLabelSafe"
+          ],
+          "signatures": [
+            "renderMatteRow(body,ld,li) -> undefined",
+            "matteModeLabelSafe(m) -> label"
+          ],
+          "responsibility": "Builds primary/extra matte pills and installs click actions; resolves explicit or legacy display source and delegates mutations to complete menu helpers.",
+          "source_resolution": "Explicit matteSourceLayerUid uses findLayerIndexByUid. If it is absent or unresolved, any truthy matteMode with li+1 in range displays the layer above. on still requires matteMode truthy and !== none. Missing resolved source renders ?; off renders em dash.",
+          "events": [
+            "Primary pill captures ld/li but uses event coordinates at click and prevents/stops.",
+            "Add exists only when on. It computes firstFreeMatteLayer at click time; null optionally toasts and exits without undo. Otherwise pushUndoLayers(true), lazily creates mattesMore, pushes stable candidate UID with alpha, then matteChanged.",
+            "Extra rows require on and nonempty mattesMore. forEach closures capture entry index mi; missing sources display ?."
+          ],
+          "asymmetry": "firstFreeMatteLayer tracks only explicit primary UID and truthy extra UIDs. A legacy implicit li+1 source is not marked used and may be chosen again by Add.",
+          "label_fallback": "matteModeLabelSafe calls global matteModeLabel only when typeof function, otherwise returns raw mode.",
+          "returns_and_errors": "Undefined; required DOM/translation/lookup operations can throw after partial DOM. Event mutations have no rollback."
+        }
+      ]
+    },
+    {
+      "area": "widget-size",
+      "packets": [
+        {
+          "id": "C20d.widget-size",
+          "files": [
+            "src/js/motion.js:7756-7800"
+          ],
+          "coverage_ranges": [
+            [
+              7756,
+              7800
+            ]
+          ],
+          "classification": {
+            "code": 33,
+            "comment": 12,
+            "whitespace": 0
+          },
+          "symbols": [
+            "renderWidgetSizeRow",
+            "commit (closure)"
+          ],
+          "signatures": [
+            "renderWidgetSizeRow(body,ld) -> undefined",
+            "commit() -> undefined"
+          ],
+          "responsibility": "Builds W/H scrub fields from widget size and commits both dimensions as one replacement array on either change event.",
+          "render": "Falsy ld.widget returns. size uses w.size identity, else joystick160x160, slider200x26, else160x160; displayed values are rounded, fields step1, unit px.",
+          "commit": "Reads both current field strings at event time, parseFloat then Math.max(8,value). If either is non-finite return before undo. Otherwise pushUndo, replace w.size with new [wv,hv], require saveActiveLayerFrame/renderLayerList/renderTimeline, optionally renderRigWidgetPanel, then if SMEngineBridge object truthy call its renderNow method.",
+          "asymmetries": [
+            "No equality guard: valid unchanged inputs still push/save/render.",
+            "Only the DOM display rounds; stored parsed/clamped values retain fractions.",
+            "Missing renderRigWidgetPanel is skipped. Present SMEngineBridge without callable renderNow throws after all previous effects."
+          ],
+          "returns_and_errors": "Undefined; no catch/rollback."
+        }
+      ]
+    },
+    {
+      "area": "blend-row",
+      "packets": [
+        {
+          "id": "C20d.blend-row",
+          "files": [
+            "src/js/motion.js:7801-7879"
+          ],
+          "coverage_ranges": [
+            [
+              7801,
+              7879
+            ]
+          ],
+          "classification": {
+            "code": 44,
+            "comment": 35,
+            "whitespace": 0
+          },
+          "symbols": [
+            "renderBlendRow"
+          ],
+          "signature": "renderBlendRow(body,ld,li) -> undefined",
+          "responsibility": "Builds the shared Blend stopwatch/pill row, mutates discrete Blend keys from render-time state, refreshes both Motion surfaces, and opens the shared dropdown at click coordinates.",
+          "capture_timing": "keyed and hasKeyHere are computed at render time and captured by the stopwatch. state.currentFrame, ld fields and evaluators are read again in its click action, so stale row flags can direct a mutation using a later frame/model.",
+          "stopwatch_branches": [
+            "Unkeyed captured: set blendKeys to one key at click-time currentFrame with ld.blendMode||normal.",
+            "Captured keyed+here with one current array key: copy that key mode to static blendMode, deleting static for normal, then delete blendKeys.",
+            "Captured keyed+here with multiple current array keys: call SMMotion.removeBlendKeyAt when truthy, otherwise filter click-time currentFrame.",
+            "Captured keyed+not-here: required SMMotion.upsertBlendKeyAt using live layerBlendModeAt(li,currentFrame)."
+          ],
+          "ordered_effects": "stopPropagation, pushUndo, field mutation, required renderLayerList, renderTimeline, renderMotionPropsPanel, then if SMEngineBridge truthy call renderNow.",
+          "pill": "Mode is layerBlendModeAt(li,currentFrame)||normal at render. Label uses defined BLEND_MODE_LABELS entry or raw mode. Click prevents/stops, captures clientX/clientY, and optionally opens shared dropdown with a synthetic getBoundingClientRect returning the captured point and zero dimensions. It does not activate a layer or mutate blend.",
+          "returns_and_errors": "Undefined. Present SMMotion without required upsert or present SMEngineBridge without renderNow throws after prior effects; no rollback."
+        }
+      ]
+    },
+    {
+      "area": "matte-menus-refresh",
+      "packets": [
+        {
+          "id": "C20d.matte-menus-refresh",
+          "files": [
+            "src/js/motion.js:7880-7995"
+          ],
+          "coverage_ranges": [
+            [
+              7880,
+              7995
+            ]
+          ],
+          "classification": {
+            "code": 91,
+            "comment": 25,
+            "whitespace": 0
+          },
+          "symbols": [
+            "openMatteConfigMenu",
+            "firstFreeMatteLayer",
+            "openExtraMatteMenu",
+            "matteChanged"
+          ],
+          "signatures": [
+            "openMatteConfigMenu(x,y,li,ld) -> undefined",
+            "firstFreeMatteLayer(li,ld) -> index|null",
+            "openExtraMatteMenu(x,y,li,ld,mi) -> undefined",
+            "matteChanged() -> undefined"
+          ],
+          "primary_menu": [
+            "Missing window.showContextMenu returns before item construction. Source list excludes self; chosen uses explicit UID, otherwise truthy mode plus li+1 legacy source.",
+            "Source actions pushUndoLayers(true), assign ensureLayerUid(o), default missing/none mode to alpha, then matteChanged.",
+            "Four mode actions alpha/alphaInverted/luma/lumaInverted push undo, assign, refresh.",
+            "Remove appears only for truthy non-none mode; after undo it deletes mode/source/extras and conditional motion/motionStatic/expressions matteOn fields, then refreshes."
+          ],
+          "candidate_selector": "Builds used from explicit primary UID and truthy extra UIDs only. Iterates current state.layers, skips self and truthy already-used UIDs, returns first index; a candidate with falsy UID can be returned and later stabilized. Returns null if none.",
+          "extra_menu": [
+            "Missing context-menu port or missing captured entry returns. Source items exclude self but permit duplicates with other primary/extra sources.",
+            "Source and mode actions push undo before direct captured-entry mutation then refresh. Remove splices current mattesMore at captured mi, deletes property if now empty, then refreshes."
+          ],
+          "refresh": "matteChanged increments window._sceneVersion=(old||0)+1, optionally saveActiveLayerFrame, requires renderLayerList then renderTimeline, then if SMEngineBridge truthy calls renderNow. It does not directly call renderMotionPropsPanel.",
+          "returns_and_errors": "Menus and refresh normally return undefined; candidate selector returns index/null. No catch/rollback; required failures retain undo, model mutations, scene-version increments and prior refresh effects."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "matteChanged optionally invokes saveActiveLayerFrame; widget commit requires it. Panel rendering invokes no save itself, but delegated ensureElementHolder can create/seed elementMotion state that a later codec/save consumes. Project codecs separately serialize elementMotion, blendMode/blendKeys, matte fields, motion/motionStatic/expressions and widget."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No parser runs here. Timeline import separately validates/rebuilds blend, matte and widget data; these adapters read the resulting live layer and preserve unresolved/missing-field fallbacks."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Matte actions pushUndoLayers(true); Widget and Blend pushUndo. Unavailable menus, no-free matte and invalid Widget exit before history; a valid unchanged Widget still pushes. Undo/redo implementation and refresh triggering remain separately owned. Required holder allocation/seeding during panel rendering has no local history call; no guarantee of a standalone undo entry is asserted."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "Active layer, empty-click/list selection and expanded element choose panel content. Target ID must be truthy and match by strict strokeId. No selection collection is mutated."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "Blend stopwatch writes discrete blendKeys. Primary matte removal deletes matteOn motion/static/expression slots. Delegated Transform/element rows retain track ownership; no time-link/parent/key-lock behavior is mapped. C02-owned holder resolution can seed static shape-property values before Transform rows render; this is an existing delegated state mutation, not a newly implemented capability."
+    },
+    {
+      "consumer": "render",
+      "disposition": "Panel/list/timeline DOM is rebuilt. Mutations optionally request shared engine render. Matte resolution, blend evaluation, canvas/export rendering and bridge implementation remain owned elsewhere."
+    },
+    {
+      "consumer": "export",
+      "disposition": "Separate exports read Blend/Matte/Widget fields. These functions emit no export payload and no export behavior was run."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "SMEngineBridge.renderNow is a shared rendering bridge call, not evidence of Tauri IPC. A truthy object with missing method throws. No command, filesystem, clipboard or installed-native workflow occurs."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "panel-body-and-deselection",
+      "status": "proposed, unrun",
+      "initial_state": "Body absent/present; each empty-click/expanded-layer/_layerSel condition; active layer absent/present.",
+      "expected_effects": "Missing body inert; present body identity destroyed first; exact deselection truth table; no-layer row appended then return."
+    },
+    {
+      "id": "panel-row-order",
+      "status": "proposed, unrun",
+      "initial_state": "Ordinary, widget, null, null-folder and component layers.",
+      "expected_effects": "Exact row order; widget substitutes Size for Blend/Matte; Null row gate; name fallback and fixed suffix."
+    },
+    {
+      "id": "target-id-and-element-matrix",
+      "status": "proposed, unrun",
+      "initial_state": "null, zero, empty and truthy target IDs; matching/missing entries covering raster/path/fill/stroke/vector/trim predicates.",
+      "expected_effects": "Zero/empty fall through to layer Transform; truthy missing target renders element Transform then returns; exact property rows for each predicate."
+    },
+    {
+      "id": "panel-partial-failure",
+      "status": "proposed, unrun",
+      "initial_state": "Missing/existing elementMotion maps and target/mesh entries; live ordinary/rect/ellipse/star items; missing matching layerElements entry; injected required row/helper failures after holder resolution.",
+      "expected_effects": "C02 helper creates missing maps/entries and conditionally seeds paramShapeKind/motionStatic before entry lookup; existing entries are reused. The renderer makes no local undo/save call. Holder changes, body clear and earlier rows persist after later failure; later rows remain absent."
+    },
+    {
+      "id": "matte-display-resolution",
+      "status": "proposed, unrun",
+      "initial_state": "Explicit resolved/unresolved UID, legacy mode with above layer, last layer, none/on modes and missing label function.",
+      "expected_effects": "Exact source/name/?/dash and safe raw-label fallbacks."
+    },
+    {
+      "id": "matte-add-candidates",
+      "status": "proposed, unrun",
+      "initial_state": "Self, explicit used UIDs, extra used UIDs, falsy candidate UID, no-free case, and implicit legacy primary source without explicit UID.",
+      "expected_effects": "First eligible current index; implicit primary may be selected again; no-free optional toast/no undo; successful add undo then stable alpha entry."
+    },
+    {
+      "id": "primary-matte-menu",
+      "status": "proposed, unrun",
+      "initial_state": "Context menu absent/present; every source/mode; off/on removal with motion/static/expression matteOn.",
+      "expected_effects": "Exact item availability/order, undo-first writes, alpha default and complete conditional cleanup."
+    },
+    {
+      "id": "extra-matte-menu",
+      "status": "proposed, unrun",
+      "initial_state": "Missing entry, duplicate source choices, each mode, remove middle/last entry.",
+      "expected_effects": "Early returns; duplicate permitted; captured entry mutation; splice and property deletion only when empty."
+    },
+    {
+      "id": "matte-refresh-partials",
+      "status": "proposed, unrun",
+      "initial_state": "Falsy/truthy scene version, optional save and bridge combinations, required list/timeline throws, truthy bridge lacking renderNow.",
+      "expected_effects": "Exact increment/order; present missing renderNow throws after earlier effects; no native-IPC claim."
+    },
+    {
+      "id": "widget-size",
+      "status": "proposed, unrun",
+      "initial_state": "Missing widget, every kind/default, fractional/NaN/infinite/below-min/unchanged fields, optional panel/bridge shapes.",
+      "expected_effects": "Exact rendering/rounding; invalid no-op; min clamp; unchanged still undo; new array identity; ordered save/refresh; truthy bridge missing method throws."
+    },
+    {
+      "id": "blend-stopwatch",
+      "status": "proposed, unrun",
+      "initial_state": "All four captured keyed/hasKey branches, changed model/frame after render, optional remover absent/present and missing required upsert.",
+      "expected_effects": "Mutation follows captured flags with click-time fields/frame; exact static/key delete/filter/upsert; undo and partial effects preserved."
+    },
+    {
+      "id": "blend-pill",
+      "status": "proposed, unrun",
+      "initial_state": "Normal/known/unknown mode, labels absent/present, dropdown absent/present, body rerender between pointer event and opener.",
+      "expected_effects": "Exact class/label; captured coordinates synthetic zero rect; no layer activation or direct field mutation."
+    },
+    {
+      "id": "consumer-round-trips",
+      "status": "proposed, unrun",
+      "initial_state": "Persisted Blend/Matte/Widget mutations followed by separately owned save/load and undo/redo refresh.",
+      "expected_effects": "Fields round-trip according to existing codecs; UI rehydrates only through callers; fixture does not certify runtime behavior."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "planMotionPropertiesPanel(context) -> MotionPropertiesPlan",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure active-layer/target/row ordering and element predicates; owns no DOM, selection or animation writer."
+    },
+    {
+      "api": "projectMotionPropertiesPanel(domPort, plan, rowPorts) -> ProjectionReceipt",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Owns destructive body replacement and row identity/order; delegates feature builders and reports partial projection."
+    },
+    {
+      "api": "planMatteRows(layer,layers,index) -> MatteRowsModel; buildMatteMenu(model) -> MenuItems",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure explicit/legacy source resolution, label/candidate rules and command descriptions."
+    },
+    {
+      "api": "applyMatteCommand(documentPort,command) -> MutationReceipt",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Owns undo-first exact matte/extras/matteOn patch; save/list/timeline/engine refresh are injected ports."
+    },
+    {
+      "api": "commitWidgetSize(layer,rawW,rawH) -> Noop|WidgetSizePatch",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure parse/clamp/new-array decision; history/save/render remain adapters."
+    },
+    {
+      "api": "planBlendRow(layer,index,frame) -> BlendRowModel; applyBlendStopwatch(ports,capturedModel)",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Preserves render-time flags and click-time state explicitly without absorbing shared evaluator, dropdown or serializer."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "declared_symbols": [
+      "renderMotionPropsPanel",
+      "renderMatteRow",
+      "matteModeLabelSafe",
+      "renderWidgetSizeRow",
+      "commit",
+      "renderBlendRow",
+      "openMatteConfigMenu",
+      "firstFreeMatteLayer",
+      "openExtraMatteMenu",
+      "matteChanged"
+    ],
+    "caller_anchors": [
+      "motion.js7552",
+      "motion.js7846",
+      "motion.js8055/8063/8076",
+      "motion.js13387",
+      "timeline.js2756",
+      "timeline.js10939",
+      "motion-preset-picker.js154"
+    ],
+    "boundary_anchors": [
+      "renderLayerListMotion closes7553",
+      "C20d comments begin7554",
+      "matteChanged closes7995",
+      "renderNullShapeRow comments begin7996"
+    ],
+    "overlap_assertion": "Historical7554-7575 overlap is recorded and intentionally not presented as a globally disjoint ownership result."
+  },
+  "validation": {
+    "expected_assigned_lines": 442,
+    "expected_classification": {
+      "code": 292,
+      "comment": 148,
+      "whitespace": 2
+    },
+    "packet_partition": [
+      [
+        7554,
+        7654
+      ],
+      [
+        7655,
+        7755
+      ],
+      [
+        7756,
+        7800
+      ],
+      [
+        7801,
+        7879
+      ],
+      [
+        7880,
+        7995
+      ]
+    ],
+    "required_consumer_dimensions": [
+      "save",
+      "load",
+      "undo/redo",
+      "selection",
+      "animation",
+      "render",
+      "export",
+      "native bridges"
+    ],
+    "negative_controls": [
+      "remove7554 through same coverage function => reject omission",
+      "duplicate7654 through same coverage function => reject overlap"
+    ],
+    "required_checks": [
+      "pinned/current Motion blobs",
+      "allocated-base ancestry with committed descendant support",
+      "exact complete constructs and caller anchors",
+      "historical overlap and successor disposition",
+      "JSON stable format, whitespace/private-path hygiene",
+      "sole untracked artifact or committed-clean worktree mode"
+    ],
+    "runtime_limit": "Behavioral fixtures remain proposed/unrun. No app suite, browser/Tauri runtime, source correction or GitHub mutation is part of this artifact."
+  }
+}
