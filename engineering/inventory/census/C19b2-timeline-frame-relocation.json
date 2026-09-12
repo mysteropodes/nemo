@@ -1,0 +1,591 @@
+{
+  "census_id": "C19b2",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1121",
+  "title": "Timeline frame relocation and clipboard boundaries",
+  "owner": "Ilya/D1; Codexitron / Ilya O integration and validation",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "observed_main_sha": "691e7428d9308753432d54b724cad67029e9e41e",
+  "status": "read-only census and proposals; no runtime writer or Ready extraction claim",
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 1675,
+      "end": 1976,
+      "lines": 302,
+      "classification": {
+        "code": 188,
+        "comment": 114,
+        "whitespace": 0
+      }
+    }
+  ],
+  "coverage_note": "Exactly 302 assigned lines are covered once across seven complete methods: 188 code and 114 full-line // comments, no whitespace. Lexical classification treats blank trimmed lines as whitespace, trimmed // lines as comments, and every other line as code. Nothing before 1675 or after 1976 is claimed.",
+  "context_boundaries": [
+    {
+      "assigned": "1675-1976",
+      "context": "Line 1674 is the complete preceding SM.setSymbolPlacedAt property. Line 1977 begins SM.deleteSelStrokes. Both are read-only context and excluded."
+    },
+    {
+      "assigned": "1675-1976",
+      "context": "All seven methods are complete properties inside window.SM, whose opener at line 349 and closer at line 2695 are outside this census. No full-facade or 849-2701 gap claim is made."
+    }
+  ],
+  "whole_file_writer_guidance": {
+    "source_access": "timeline.js and every runtime consumer remain read-only; C19b2 claims only the eventual new census JSON artifact.",
+    "serialization": "Open P30 PR #1114 at head a0f13e7da2f97248e1e8ab6cb44a1fd399e5f454 currently owns the whole timeline.js runtime writer. No P24 or C19b2 runtime writer may overlap it. Future implementation must reserve the whole file even for one method.",
+    "publication": "The census artifact may integrate only after C19b releases the reusable checkout, with independent review at the exact candidate and the normal protected path.",
+    "reservations": "D01/#1044 and T05/Pollen remain separate. C01/C02/C04/C06 and P20/P24/P30 ownership is not transferred by this mapping."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19a",
+      "disposition": "Reuse its frame-selection 209-240 and tween-retime 241-346 contracts; do not create duplicate selection or retiming authorities."
+    },
+    {
+      "owner": "C01",
+      "disposition": "Retain saveAllLayerFrames, layersSnapshotNow, pushUndo/undo/redo and export/import ownership."
+    },
+    {
+      "owner": "C02",
+      "disposition": "Retain tweens.js motionArcs/tweenEasing/tweenOverrides keys, rekeyTweenPairData, Motion key shifting, rendering consumers and animation semantics."
+    },
+    {
+      "owner": "C04",
+      "disposition": "Retain canvas selectedPaths and canvas clipboard. C19b2 maps only timeline frame selection/clipboard arbitration."
+    },
+    {
+      "owner": "C06",
+      "disposition": "Retain window.SM bootstrap/facade and preference/Labs scopes."
+    },
+    {
+      "owner": "P20/#1022",
+      "disposition": "Accepted folder codec remains unchanged; frame relocation must preserve opaque layer/frame data without widening folder serialization."
+    },
+    {
+      "owner": "P24/#1026",
+      "disposition": "Playback kernel stays separate and cannot acquire a timeline writer while P30 owns it."
+    },
+    {
+      "owner": "P30/#1032 / PR #1114",
+      "disposition": "Open whole-file timeline writer at a0f13e7; must complete/release before any mapped runtime extraction starts."
+    }
+  ],
+  "areas": [
+    {
+      "area": "frame-relocation-and-clipboard",
+      "packets": [
+        {
+          "id": "C19b2.move-selected-frames",
+          "title": "Move selected frame cells with single-key ripple",
+          "files": [
+            "src/js/timeline.js:1675-1788"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 1675,
+              "end": 1788
+            }
+          ],
+          "symbols": [
+            "SM.moveFrames"
+          ],
+          "responsibility": "Moves a selected block by layer/frame offset. A single same-layer key drag expands to every later keyframe, filters locked sources/targets, snapshots full frame records, blanks sources, writes in-range targets, rekeys motion-arc lookup keys, retimes captured interpolated spans and rebuilds the destination frame selection.",
+          "writer": "Writes state.layers[*].frames, state.motionArcs through rekeyTweenPairData, and _sel.frames. Reads caller-supplied selection plus selBounds global state; invokes history, frame-save and render owners.",
+          "public_api": "window.SM.moveFrames(selection,destinationMinLayer,destinationMinFrame). Return value is undefined for all paths.",
+          "consumers": [
+            "timeline frame-grid mouseup at line 5413",
+            "C19a frame-selection helpers",
+            "C19a tween-retime helpers",
+            "tweens.js rekeyTweenPairData",
+            "C01 full-layer history/save",
+            "loadFrame/renderOS/renderArcs/updateUI"
+          ],
+          "oracle": "Future independent fixture matrix: empty/no-bounds/no-offset; single-key forward/back ripple and positive-edge clamp; multi-cell and cross-layer no-ripple; locked source, locked target and mixed partial selection; negative/high destinations; full-record clone preservation; two adjacent tween pairs with sparse/dense inbetweens; arc/easing/override keys; destination selection and render calls. Keep current partial/data-loss outcomes explicit.",
+          "depends_on": [
+            "C19a.frame-selection",
+            "C19a.tween-retime",
+            "C01 history/save",
+            "C02 tween/arc ownership"
+          ],
+          "entangled_with": [
+            "timeline drag selection construction lines 5108-5202 and drop line 5413",
+            "tweens.js rekeyTweenPairData"
+          ],
+          "proposed_module": "src/js/domain/animation/frame-relocation.js",
+          "proposed_api": "planFrameMove(document,selection,target,{clone}) -> {writes,clears,newSelection,keyPairMoves}; application adapter owns undo/save/rekey/retime/render.",
+          "consumer_matrix": {
+            "save": "Calls saveAllLayerFrames after pushUndo; subsequent exportJSON persists moved frame records and global tween metadata.",
+            "load": "importJSON/deserialization owns reconstruction. The move must preserve the complete opaque frame record rather than define a new schema.",
+            "history": "pushUndo() creates a full layers snapshot before mutation and includes motionArcs/tweenEasing/tweenOverrides through C01; the following saveAllLayerFrames call is redundant but current behavior.",
+            "selection": "Reads explicit sel but computes the offset from global selBounds(); replaces _sel.frames with in-range destinations after the move.",
+            "animation": "Retimes interpolated frames and calls rekeyTweenPairData, which currently moves only state.motionArcs keys; tweenEasing/tweenOverrides are not rekeyed.",
+            "render": "Calls loadFrame(current), renderOS, renderArcs and updateUI after mutation.",
+            "export": "All stored frames and tween maps flow through exportJSON and downstream animation exporters via existing C01/C02 consumers.",
+            "native": "N/A: no native or system clipboard call."
+          },
+          "admission": "characterization plus pure move-plan seam is admissible only after P30 releases the whole-file writer; repairs must be separately accepted",
+          "construct_boundary": "complete",
+          "notes": "Out-of-range entries are included in `data`, then their sources are blanked before destination writes skip them, so a multi-selection whose non-anchor cell falls outside the timeline can lose that frame. Cross-layer moves rekey/retime against source-layer indices only; no metadata is transferred to the target layer."
+        },
+        {
+          "id": "C19b2.copy-frames",
+          "title": "Copy selected frames to the in-memory frame clipboard",
+          "files": [
+            "src/js/timeline.js:1789-1801"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 1789,
+              "end": 1801
+            }
+          ],
+          "symbols": [
+            "SM.copyFrames"
+          ],
+          "responsibility": "Saves live layer frames, clones each selected full frame record into relative layer/frame coordinates, marks the operation as frame-copy and records frames as the most recent internal clipboard kind.",
+          "writer": "Writes _sel.clipboard, _sel.clipOp and window._lastClipKind; does not mutate document frames.",
+          "public_api": "window.SM.copyFrames().",
+          "consumers": [
+            "frame-grid context menu",
+            "Cmd/Ctrl-C routing in timeline.js",
+            "app.js duplicateSelectedFrames"
+          ],
+          "oracle": "Fixture test: no selection toast after live save; rectangular and sparse multi-layer relative offsets from selBounds; deep-copy isolation; missing layer skip; clipOp and lastClipKind routing; no history/render calls.",
+          "depends_on": [
+            "C19a.frame-selection",
+            "C01 saveAllLayerFrames"
+          ],
+          "entangled_with": [
+            "canvas clipboard in tools.js and keyboard arbitration around timeline.js:9664-9708"
+          ],
+          "proposed_module": "src/js/application/frame-clipboard.js",
+          "proposed_api": "copyFrames(selection,{getFrame,saveAll,clone,setClipboard,setLastKind}) -> clipboard entries.",
+          "consumer_matrix": {
+            "save": "Calls saveAllLayerFrames even when selection is empty; clipboard itself is not persisted.",
+            "load": "N/A: clipboard is session-only and project load does not restore it.",
+            "history": "No undo entry because document state is unchanged.",
+            "selection": "Reads _sel.frames and selBounds; leaves selection unchanged.",
+            "animation": "Copies complete key/interpolated/held frame records without changing timing.",
+            "render": "No render; toast only.",
+            "export": "N/A: clipboard is excluded from project/export formats.",
+            "native": "N/A: uses an internal memory clipboard, not OS/native clipboard."
+          },
+          "admission": "bounded candidate after C19a frame-selection API; can share one frame-clipboard module with cut/paste",
+          "construct_boundary": "complete",
+          "notes": "Complete method. `_lastClipKind` arbitrates against the canvas clipboard and SVG paste path outside this range."
+        },
+        {
+          "id": "C19b2.cut-frames",
+          "title": "Cut selected frames to the in-memory frame clipboard",
+          "files": [
+            "src/js/timeline.js:1802-1818"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 1802,
+              "end": 1818
+            }
+          ],
+          "symbols": [
+            "SM.cutFrames"
+          ],
+          "responsibility": "Saves current frames, snapshots history, copies every selected frame into relative clipboard coordinates, blanks only unlocked source layers, marks frame-cut, clears the frame selection and rerenders.",
+          "writer": "Writes _sel clipboard/clipOp/frames, window._lastClipKind and unlocked state.layers[*].frames.",
+          "public_api": "window.SM.cutFrames().",
+          "consumers": [
+            "frame-grid context menu",
+            "Cmd/Ctrl-X routing in timeline.js"
+          ],
+          "oracle": "Fixture test: empty selection; mixed locked/unlocked sources; every selected record copied but only unlocked records blanked; deep-copy isolation; one history snapshot, clear-selection, render sequence and counts/toast.",
+          "depends_on": [
+            "C19a.frame-selection",
+            "C01 history/save"
+          ],
+          "entangled_with": [
+            "tween metadata maps are not changed when keyframes are blanked"
+          ],
+          "proposed_module": "src/js/application/frame-clipboard.js",
+          "proposed_api": "cutFrames(selection,{getFrame,isLocked,saveAll,pushUndo,clone,setClipboard,blankFrame,clearSelection,render}) -> result summary.",
+          "consumer_matrix": {
+            "save": "Calls saveAllLayerFrames before checking selection and again indirectly through pushUndo; moved blanks persist through later export/save.",
+            "load": "Project load restores frame data only; clipboard remains session-only.",
+            "history": "pushUndo() records a full snapshot before blanking. A locked-only cut still pushes history despite changing no frames.",
+            "selection": "Reads _sel.frames, then selClear removes all selected cells including locked sources.",
+            "animation": "Blanking keys/inbetweens does not retime neighbors or remove motionArcs/tweenEasing/tweenOverrides.",
+            "render": "Calls loadFrame, renderOS, renderArcs and updateUI.",
+            "export": "Export consumes blanked frame arrays and unchanged tween metadata.",
+            "native": "N/A: internal memory clipboard only."
+          },
+          "admission": "bounded with copy/paste after behavior fixtures; metadata cleanup is outside extraction",
+          "construct_boundary": "complete",
+          "notes": "Locked frames remain in the clipboard and source document, yet the whole selection clears and toast reports every clipboard entry as cut."
+        },
+        {
+          "id": "C19b2.paste-frames",
+          "title": "Paste frame clipboard at active layer and playhead",
+          "files": [
+            "src/js/timeline.js:1819-1846"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 1819,
+              "end": 1846
+            }
+          ],
+          "symbols": [
+            "SM.pasteFrames"
+          ],
+          "responsibility": "Anchors relative clipboard entries at state.activeLayerIdx/currentFrame, skips out-of-range and locked targets, deep-clones records, promotes pasted interpolated frames into ordinary full keyframes, rebuilds a destination selection and rerenders.",
+          "writer": "Writes in-range unlocked state.layers[*].frames and _sel.frames; reads _sel.clipboard.",
+          "public_api": "window.SM.pasteFrames().",
+          "consumers": [
+            "frame-grid context menu",
+            "Cmd/Ctrl-V internal clipboard routing",
+            "app.js duplicateSelectedFrames"
+          ],
+          "oracle": "Fixture matrix: empty clipboard; sparse multi-layer placement; low/high bounds; locked and mixed targets; overwriting existing key/tween/held records; interpolated-to-key promotion removes isManualEdit; clipboard immutability; exact selection and render/toast counts.",
+          "depends_on": [
+            "C19a.frame-selection",
+            "C01 history/save"
+          ],
+          "entangled_with": [
+            "canvas/SVG clipboard arbitration",
+            "tween pair metadata at overwritten destinations"
+          ],
+          "proposed_module": "src/js/application/frame-clipboard.js",
+          "proposed_api": "pasteFrames(clipboard,anchor,{layers,totalFrames,isLocked,clone}) -> {writes,newSelection,skipped}; adapter owns history/save/render.",
+          "consumer_matrix": {
+            "save": "pushUndo() saves/snapshots before writes; later export persists pasted frames.",
+            "load": "Pastes opaque loaded frame records but deliberately normalizes interpolated flags.",
+            "history": "One full undo snapshot is pushed before paste, even if every target is out of range or locked.",
+            "selection": "Clears selection then adds every in-range clipboard destination; the second loop does not exclude locked targets that were skipped.",
+            "animation": "Promotes interpolated copies to full keys; does not regenerate spans or rekey/clear motionArcs, tweenEasing or tweenOverrides around overwritten frames.",
+            "render": "Calls loadFrame, renderOS, renderArcs and updateUI.",
+            "export": "Export consumes resulting frame arrays; clipboard state is excluded.",
+            "native": "N/A: internal memory clipboard; SVG/system paste is a separate path."
+          },
+          "admission": "bounded with copy/cut after characterization; no tween repair bundled",
+          "construct_boundary": "complete",
+          "notes": "Known mismatch: an in-range locked destination is selected after paste although its frame was not changed."
+        },
+        {
+          "id": "C19b2.delete-selected-frames",
+          "title": "Clear selected frame contents in place",
+          "files": [
+            "src/js/timeline.js:1847-1856"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 1847,
+              "end": 1856
+            }
+          ],
+          "symbols": [
+            "SM.deleteSelectedFrames"
+          ],
+          "responsibility": "Creates a history snapshot, saves live content, replaces each selected unlocked frame with a blank frame record, clears selection and rerenders.",
+          "writer": "Writes unlocked state.layers[*].frames and _sel.frames.",
+          "public_api": "window.SM.deleteSelectedFrames().",
+          "consumers": [
+            "Delete/Backspace routing at timeline.js:10151"
+          ],
+          "oracle": "Fixture test: empty selection true no-op; unlocked, locked-only and mixed selection; blank record shape; one history snapshot; selection clear; render/toast calls; retained tween metadata documented.",
+          "depends_on": [
+            "C19a.frame-selection",
+            "C01 history/save"
+          ],
+          "entangled_with": [
+            "C02 tween/arc/easing maps"
+          ],
+          "proposed_module": "src/js/application/frame-edit-commands.js",
+          "proposed_api": "clearSelectedFrames(selection,{layers,pushUndo,saveAll,clearSelection,render}) -> {cleared,locked}.",
+          "consumer_matrix": {
+            "save": "Saves before clearing; export persists blanked frames.",
+            "load": "Import/load independently restores frame arrays.",
+            "history": "pushUndo() makes the full operation undoable; locked-only selection still creates a no-change history entry.",
+            "selection": "Consumes _sel.frames and clears the full selection after processing.",
+            "animation": "Does not retime interpolated neighbors or delete arc/easing/override metadata for removed keys.",
+            "render": "Calls loadFrame, renderOS, renderArcs and updateUI.",
+            "export": "Export sees blank frames plus unchanged global tween maps.",
+            "native": "N/A: browser-domain edit only."
+          },
+          "admission": "bounded candidate after C19a selection and C02 metadata contract",
+          "construct_boundary": "complete",
+          "notes": "Complete method; differs from removeFrameSpan, which changes global duration and lies outside this census."
+        },
+        {
+          "id": "C19b2.move-single-keyframe",
+          "title": "Ripple-move one Animation 2D keyframe",
+          "files": [
+            "src/js/timeline.js:1857-1927"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 1857,
+              "end": 1927
+            }
+          ],
+          "symbols": [
+            "SM.moveKeyframe"
+          ],
+          "responsibility": "Validates one source key and destination, ripples every later key on the same layer by the effective delta, captures inbetweens, rewrites moved key slots, rekeys motion arcs, retimes interpolated spans and rerenders. Used by Motion in/out key ticks without frame-grid selection.",
+          "writer": "Writes one layer frames and state.motionArcs through rekeyTweenPairData; reads totalFrames and delegates history/save/retime/render.",
+          "public_api": "window.SM.moveKeyframe(layerIndex,fromFrame,toFrame) -> boolean.",
+          "consumers": [
+            "layer-inout.js key-tick mouseup at line 363"
+          ],
+          "oracle": "Independent fixture matrix: same frame, missing/locked layer, invalid destination, non-key source; forward/back ripple; positive-edge clamp to zero delta; adjacent and three-key spans; sparse/dense inbetween preservation; complete frame-record fields; non-active layer arc keys; return value and one render/toast.",
+          "depends_on": [
+            "C19a.tween-retime",
+            "C01 history/save",
+            "C02 tween/arc ownership"
+          ],
+          "entangled_with": [
+            "layer-inout.js owns pointer preview and final bar repaint"
+          ],
+          "proposed_module": "src/js/domain/animation/keyframe-relocation.js",
+          "proposed_api": "planRippleKeyMove(layerFrames,from,to,totalFrames,{clone}) -> {moves,pairs,effectiveTo}; adapter owns history, arc rekey, inbetween retime and render.",
+          "consumer_matrix": {
+            "save": "pushUndo() saves/snapshots before mutation; later export persists results.",
+            "load": "Consumes loaded frame records; extraction must treat fields outside strokes/flags as opaque.",
+            "history": "One full undo snapshot inside the method, matching layer-inout.js caller contract.",
+            "selection": "Intentionally independent of _sel; layer-inout key ticks can move without frame-grid selection.",
+            "animation": "Ripples later keys and retimes inbetweens; rekeyTweenPairData currently moves motionArcs only.",
+            "render": "Calls loadFrame, renderOS, renderArcs and updateUI; layer-inout then repaints the bar.",
+            "export": "Frames and global tween maps persist/export through existing paths.",
+            "native": "N/A: no native bridge."
+          },
+          "admission": "characterization and pure plan candidate after P30 releases timeline writer",
+          "construct_boundary": "complete",
+          "notes": "Reconstructs destination records from `strokes` plus key/interpolated flags, dropping any other frame fields such as componentFrame, blankOverride or isManualEdit. It also omits layerIdx when calling rekeyTweenPairData, so arcKey falls back to state.activeLayerIdx rather than the method argument."
+        },
+        {
+          "id": "C19b2.shift-layer-frames",
+          "title": "Shift a layer frame array for caller-owned range retiming",
+          "files": [
+            "src/js/timeline.js:1928-1976"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 1928,
+              "end": 1976
+            }
+          ],
+          "symbols": [
+            "SM.shiftLayerFrames"
+          ],
+          "responsibility": "Rebuilds a fixed-duration layer frame array, shifts nonempty stroke-bearing records by dx, drops records crossing timeline bounds, rekeys motion-arc pair keys and returns whether the request was accepted. It intentionally performs no history/save/render.",
+          "writer": "Writes state.layers[layerIdx].frames and state.motionArcs through rekeyTweenPairData. Caller separately writes layer in/out points and Motion property/effect keys.",
+          "public_api": "window.SM.shiftLayerFrames(layerIndex,delta) -> boolean.",
+          "consumers": [
+            "layer-inout.js bar-drop retime at line 1267",
+            "SMLayerInOut.retimeLayers at lines 1647-1652",
+            "motion.js layer-skew drop at line 12289"
+          ],
+          "oracle": "Future fixture matrix: missing/locked/zero delta; positive/negative shifts; records falling off both edges; nonempty key/interpolated records; empty keyframes and metadata-only component records; motion-arc/easing/override keys. Consumer integration asserts layer-inout takes exactly one pre-drag undo/save, shifts Motion keys once, then load/render once; Motion layer-skew path needs equivalent pre-drag evidence.",
+          "depends_on": [
+            "C01 caller-owned history/save",
+            "C02 Motion shiftLayerMotionKeys",
+            "C19a tween metadata"
+          ],
+          "entangled_with": [
+            "layer-inout.js range/time-link/key-lock transaction",
+            "motion.js layer-skew transaction"
+          ],
+          "proposed_module": "src/js/domain/animation/layer-frame-shift.js",
+          "proposed_api": "shiftLayerFrameRecords(frames,delta,totalFrames) -> {frames,dropped}; caller transaction separately shifts Motion tracks and pair metadata.",
+          "consumer_matrix": {
+            "save": "No save inside by design; layer-inout onDown saves before live range changes. SMLayerInOut.retimeLayers and Motion callers must establish the same precondition.",
+            "load": "Loaded frame schema is opaque input; output array is always exactly state.totalFrames long.",
+            "history": "No history inside by design. layer-inout pushes once at drag start; the exported retimeLayers helper itself supplies neither undo nor save.",
+            "selection": "Does not update _sel or Motion key selection.",
+            "animation": "Moves only frame records whose strokes array is nonempty; caller separately invokes SMMotion.shiftLayerMotionKeys. rekeyTweenPairData changes motionArcs only.",
+            "render": "No render inside. Layer-inout drop and Motion skew callers own timeline/layer/frame/engine refresh.",
+            "export": "Later save/export consumes the rebuilt frame array and arc map.",
+            "native": "N/A: no native bridge."
+          },
+          "admission": "pure frame-array shifter is a bounded candidate only with explicit caller transaction preconditions; no writer until P30 completes",
+          "construct_boundary": "complete",
+          "notes": "Despite the method name/comment, empty keyframes, empty interpolated frames and metadata-only frame records are skipped and therefore dropped. Out-of-bounds pair rekeys can create negative or beyond-duration arc keys; tweenEasing/tweenOverrides are unchanged."
+        }
+      ]
+    }
+  ],
+  "known_defects_and_unavailable_evidence": [
+    {
+      "id": "C19b2.DEF-1",
+      "evidence": "moveFrames blanks every filtered source before its destination loop skips out-of-range targets. UI clamps the drag anchor, not every cell in a multi-selection.",
+      "impact": "A selection extending past a destination edge can lose non-anchor source frames."
+    },
+    {
+      "id": "C19b2.DEF-2",
+      "evidence": "Cross-layer moveFrames computes beforeKeyframes, rekeyTweenPairData and retimeTweenSpans with the source layer index even after records are written to another layer.",
+      "impact": "Tween spans and arc keys are not transferred coherently to the destination layer."
+    },
+    {
+      "id": "C19b2.DEF-3",
+      "evidence": "rekeyTweenPairData only rewrites state.motionArcs. No relocation method rekeys state.tweenEasing or state.tweenOverrides.",
+      "impact": "Per-span easing and manual pair overrides can remain under stale frame-pair keys after relocation."
+    },
+    {
+      "id": "C19b2.DEF-4",
+      "evidence": "moveKeyframe reconstructs each moved record from strokes/isKeyframe/isInterpolated and calls rekeyTweenPairData without layerIdx.",
+      "impact": "Other frame fields can be lost, and a non-active layer move can rekey arcs under the active layer identity."
+    },
+    {
+      "id": "C19b2.DEF-5",
+      "evidence": "shiftLayerFrames copies a record only when src.strokes.length is nonzero.",
+      "impact": "Empty keys, empty interpolated records and metadata-only component keys disappear during a whole-layer shift."
+    },
+    {
+      "id": "C19b2.DEF-6",
+      "evidence": "pasteFrames selects every in-range destination after writing, while its write pass skips locked layers.",
+      "impact": "Locked cells can appear selected as paste destinations even though their contents were unchanged."
+    },
+    {
+      "id": "C19b2.DEF-7",
+      "evidence": "cut/delete blank frame records without rekeying or clearing arc/easing/override maps; locked-only cut/delete still records history and reports an operation.",
+      "impact": "Stale tween metadata and no-change undo entries remain possible."
+    },
+    {
+      "id": "C19b2.DEF-8",
+      "evidence": "No test file references any of the seven mapped methods or rekeyTweenPairData.",
+      "impact": "All listed behavior fixtures and consumer checks are future, independent oracles and were not run for this data-only census."
+    }
+  ],
+  "uncovered_responsibilities": [
+    "deleteSelStrokes 1977-2001, flipPreview 2002-2010, duplicateKeyframe/extendExposure 2012-2026, transforms 2027-2048 and all other 849-2701 gaps remain outside C19b2.",
+    "System/SVG and canvas-shape clipboards remain owned by svg-import.js/tools.js and keyboard arbitration outside this assigned span.",
+    "Any fixes for bounds data loss, cross-layer tween ownership, metadata preservation, locked paste selection or stale tween maps require separate accepted behavior leaves after characterization."
+  ],
+  "validation": {
+    "expected_assigned_lines": 302,
+    "expected_classification": {
+      "code": 188,
+      "comment": 114,
+      "whitespace": 0
+    },
+    "required_consumer_dimensions": [
+      "save",
+      "load",
+      "history",
+      "selection",
+      "animation",
+      "render",
+      "export",
+      "native"
+    ],
+    "negative_controls": [
+      "remove line 1675 from coverage => omission rejection",
+      "also assign line 1675 to a second packet => overlap rejection"
+    ],
+    "symbol_checks": [
+      {
+        "needle": "moveFrames:function(",
+        "ranges": [
+          [
+            1675,
+            1788
+          ]
+        ]
+      },
+      {
+        "needle": "copyFrames:function(",
+        "ranges": [
+          [
+            1789,
+            1801
+          ]
+        ]
+      },
+      {
+        "needle": "cutFrames:function(",
+        "ranges": [
+          [
+            1802,
+            1818
+          ]
+        ]
+      },
+      {
+        "needle": "pasteFrames:function(",
+        "ranges": [
+          [
+            1819,
+            1846
+          ]
+        ]
+      },
+      {
+        "needle": "deleteSelectedFrames:function(",
+        "ranges": [
+          [
+            1847,
+            1856
+          ]
+        ]
+      },
+      {
+        "needle": "moveKeyframe:function(",
+        "ranges": [
+          [
+            1857,
+            1927
+          ]
+        ]
+      },
+      {
+        "needle": "shiftLayerFrames:function(",
+        "ranges": [
+          [
+            1928,
+            1976
+          ]
+        ]
+      },
+      {
+        "needle": "setSymbolPlacedAt:function(",
+        "ranges": [
+          [
+            1674,
+            1674
+          ]
+        ],
+        "context_only": true
+      },
+      {
+        "needle": "deleteSelStrokes:function(",
+        "ranges": [
+          [
+            1977,
+            1977
+          ]
+        ],
+        "context_only": true
+      },
+      {
+        "needle": "window.SM={",
+        "ranges": [
+          [
+            349,
+            349
+          ]
+        ],
+        "context_only": true
+      },
+      {
+        "needle": "};",
+        "ranges": [
+          [
+            2695,
+            2695
+          ]
+        ],
+        "context_only": true
+      }
+    ]
+  }
+}
