@@ -60,7 +60,7 @@
     },
     {
       "assigned": "6832-6915",
-      "context": "The enterComponentLayer documentation and implementation are a separate unresolved component-entry/auto-split transaction. They are not C20b coverage."
+      "context": "C02.motion-advanced.component-shape-tree already owns enterComponentLayer by name. Its historical 6870-6946 citation drifts from the pinned source: documentation is 6832-6854 and the complete function is 6855-6915. This context is excluded from C20b; reconcile the existing C02 range without creating a duplicate census or transferring its ownership."
     },
     {
       "assigned": "6916-6953",
@@ -276,7 +276,7 @@
     "fixtures": "All behavioral and DOM fixtures are proposals and were not run for this artifact-only census."
   },
   "uncovered_responsibilities": [
-    "enterComponentLayer at 6832-6915 remains separately unmapped.",
+    "C02.motion-advanced.component-shape-tree retains enterComponentLayer at pinned 6832-6915 (documentation 6832-6854; implementation 6855-6915); its old numeric citation requires range reconciliation, not a new owner.",
     "C02 selection synchronization at 6916-6953 remains owned and excluded.",
     "C02 renderLayerListMotion at 7032 onward remains owned and excluded.",
     "The remaining Motion queue, runtime extraction and browser/native validation remain outside C20b."
