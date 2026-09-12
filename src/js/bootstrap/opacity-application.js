@@ -39,7 +39,18 @@
     afterMutation: refresh
   });
   ensureIds();
-  root.NemoApplication = { handle: app.handle, setInstanceId: app.setInstanceId };
+  // P06: opacity registers itself, and the application entry point reaches its
+  // handler THROUGH the registry instead of closing over `app.handle`. The
+  // lookup happens per call rather than being cached here, so there is exactly
+  // one place that decides which handler serves a request — changing the
+  // registration changes dispatch, and no stale reference survives it.
+  var registry = root.NemoCapabilities || (root.NemoCapabilities = NemoCapabilityRegistry.create());
+  NemoOpacityCapability.register(registry, app.handle);
+  root.NemoApplication = {
+    handle: function (request) { return registry.handlerFor(NemoOpacityCapability.DESCRIPTOR.id)(request); },
+    setInstanceId: app.setInstanceId,
+    capabilities: function () { return registry.list(); },
+  };
   root.NemoOpacityApplication = {
     meta: app.meta,
     historyChanged: app.historyChanged,
