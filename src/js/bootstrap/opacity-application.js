@@ -27,6 +27,7 @@
     root[action]();
     return stack.length < count;
   }
+  var registry = root.NemoCapabilities || (root.NemoCapabilities = NemoCapabilityRegistry.create());
   var app = NemoOpacityApplicationCore.create({
     newId: newId, state: function () { return root.state; }, valueAtFrame: read, write: write,
     context: function () { return JSON.stringify([root.state.activeSymbolId || null, root.state.activeMontageViewId || null]); },
@@ -36,7 +37,8 @@
     }), frame: root.state.currentFrame, totalFrames: root.state.totalFrames }; },
     history: { checkpoint: function () { root.pushUndo(); },
       undo: function () { return history('undo'); }, redo: function () { return history('redo'); } },
-    afterMutation: refresh
+    afterMutation: refresh,
+    capabilities: function () { return registry.list(); }
   });
   ensureIds();
   // P06: opacity registers itself, and the application entry point reaches its
@@ -44,7 +46,6 @@
   // lookup happens per call rather than being cached here, so there is exactly
   // one place that decides which handler serves a request — changing the
   // registration changes dispatch, and no stale reference survives it.
-  var registry = root.NemoCapabilities || (root.NemoCapabilities = NemoCapabilityRegistry.create());
   NemoOpacityCapability.register(registry, app.handle);
   root.NemoApplication = {
     handle: function (request) { return registry.handlerFor(NemoOpacityCapability.DESCRIPTOR.id)(request); },

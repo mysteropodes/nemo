@@ -75,11 +75,25 @@ var NemoOpacityApplicationCore = (function () {
     function readProperty(layer, frame) {
       return { layerId: layer.layerUid, property: 'opacity', value: ports.valueAtFrame(layer, frame)[0] };
     }
+    function capabilitySummary() {
+      var registrations = typeof ports.capabilities === 'function' ? ports.capabilities() : [];
+      var descriptors = registrations.map(function (entry) { return clone(entry.descriptor); });
+      var properties = descriptors.filter(function (descriptor) {
+        return descriptor.effects && Array.isArray(descriptor.effects.lifecycle)
+          && descriptor.effects.lifecycle.includes('property.get');
+      }).map(function (descriptor) {
+        var value = descriptor.input && descriptor.input.properties && descriptor.input.properties.value || {};
+        var lifecycle = descriptor.effects.lifecycle;
+        return { id: descriptor.id, min: value.minimum, max: value.maximum,
+          unit: descriptor.units && descriptor.units.value,
+          animated: lifecycle.includes('property.animation.set') };
+      });
+      return { operations: READS.concat(WRITES), properties: properties, descriptors: descriptors,
+        retryRetention: 256, traceRetention: 32, documentIdentity: 'open-document-incarnation' };
+    }
     function perform(request) {
       var op = request.operation;
-      if (op === 'capabilities') return response(request, true, { operations: READS.concat(WRITES),
-        properties: [{ id: 'opacity', min: 0, max: 100, unit: 'percent', animated: true }],
-        retryRetention: 256, traceRetention: 32, documentIdentity: 'open-document-incarnation' });
+      if (op === 'capabilities') return response(request, true, capabilitySummary());
       if (op === 'snapshot') return response(request, true, ports.snapshot());
       if (op === 'diagnostics.trace') return response(request, true, { entries: clone(trace) });
       if (op === 'diagnostics.replay') {

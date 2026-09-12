@@ -93,6 +93,13 @@ var NemoCapabilityRegistry = (function () {
           'Capability "' + descriptor.id + '" was registered with a non-function handler.',
           { handlerKey: descriptor.handlerKey });
       }
+      var existingHandler = handlersByKey[descriptor.handlerKey];
+      if (typeof handler === 'function' && typeof existingHandler === 'function' && existingHandler !== handler) {
+        throw fail('handler_key_conflict',
+          'Capability "' + descriptor.id + '" tried to replace the handler already registered for handlerKey "'
+            + descriptor.handlerKey + '".',
+          { handlerKey: descriptor.handlerKey });
+      }
       // THE semantic availability check, and the reason this registry exists
       // as more than a map. A descriptor asserting `{state:"available"}` is
       // making a claim about the running system, not picking an enum value —
@@ -105,15 +112,17 @@ var NemoCapabilityRegistry = (function () {
       // not-yet-implemented capability (export-job.json today) declares
       // itself honestly — but only while it says `unavailable`. Claiming
       // `available` with nothing to dispatch to is refused.
-      var bound = typeof handler === 'function' || typeof handlersByKey[descriptor.handlerKey] === 'function';
+      var bound = typeof handler === 'function' || typeof existingHandler === 'function';
       if (descriptor.availability.state === 'available' && !bound) {
         throw fail('availability_unbacked',
           'Capability "' + descriptor.id + '" claims availability "available" with no handler registered for handlerKey "'
             + descriptor.handlerKey + '".',
           { handlerKey: descriptor.handlerKey });
       }
-      byId[descriptor.id] = { descriptor: descriptor, handlerKey: descriptor.handlerKey, bound: bound };
-      if (typeof handler === 'function') handlersByKey[descriptor.handlerKey] = handler;
+      byId[descriptor.id] = { descriptor: descriptor, handlerKey: descriptor.handlerKey };
+      if (typeof handler === 'function' && typeof existingHandler !== 'function') {
+        handlersByKey[descriptor.handlerKey] = handler;
+      }
       return descriptor.id;
     }
 
@@ -125,7 +134,8 @@ var NemoCapabilityRegistry = (function () {
 
     function list() {
       return ids().map(function (id) {
-        return { id: id, handlerKey: byId[id].handlerKey, bound: byId[id].bound, descriptor: byId[id].descriptor };
+        return { id: id, handlerKey: byId[id].handlerKey,
+          bound: typeof handlersByKey[byId[id].handlerKey] === 'function', descriptor: byId[id].descriptor };
       });
     }
 

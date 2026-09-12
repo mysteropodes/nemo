@@ -4,14 +4,10 @@
 // hands over its own handler, and the registry becomes the single place the
 // application entry point looks the handler up.
 //
-// The runtime descriptor below is a SUBSET of
-// engineering/application/capabilities/opacity.json — exactly the fields
-// registration inspects (schemaVersion, id, handlerKey, availability, effects,
-// and the presence of input/output). The JSON file stays the source of truth
-// for the full contract; shipping it into src/ just to re-read it at runtime
-// would put the same document in two places with no check that they agree.
-// Instead tests/application-opacity-capability.test.cjs pins these fields
-// against that file, so drift fails a test rather than going unnoticed.
+// This synchronous classic-script projection is kept byte-for-value equivalent
+// to engineering/application/capabilities/opacity.json by the focused contract
+// test. The JSON file is canonical; the runtime copy exists because application
+// boot cannot fetch a descriptor asynchronously before native MCP discovery.
 //
 // `effects.kind: "mutation"` / `scope: "document"` classify the capability AS A
 // WHOLE — the union across its lifecycle — which is why they read "mutation"
@@ -25,7 +21,27 @@ var NemoOpacityCapability = (function () {
     id: 'opacity',
     version: 1,
     handlerKey: 'application.opacity.property',
-    input: {}, output: {},
+    input: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        layerId: { type: 'string', minLength: 1, description: 'layers[].layerUid from the latest snapshot.' },
+        value: { type: 'number', minimum: 0, maximum: 100 },
+        frame: { type: 'integer', minimum: 0 },
+        animated: { type: 'boolean' },
+      },
+      required: ['layerId'],
+    },
+    output: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        layerId: { type: 'string' },
+        property: { const: 'opacity' },
+        value: { type: 'number', minimum: 0, maximum: 100 },
+      },
+      required: ['layerId', 'property', 'value'],
+    },
     units: { value: 'percent' },
     effects: {
       kind: 'mutation',
@@ -33,6 +49,28 @@ var NemoOpacityCapability = (function () {
       lifecycle: ['property.get', 'property.set', 'property.key.set', 'property.key.remove', 'property.animation.set'],
     },
     availability: { state: 'available', reason: null },
+    fixture: {
+      label: 'set opacity to 40 on one layer',
+      input: { layerId: 'layer-1', value: 40 },
+      output: { layerId: 'layer-1', property: 'opacity', value: 40 },
+    },
+    examples: [
+      {
+        label: 'set opacity to 40 on one layer',
+        input: { layerId: 'layer-1', value: 40 },
+        output: { layerId: 'layer-1', property: 'opacity', value: 40 },
+      },
+      {
+        label: 'key opacity at frame 12',
+        input: { layerId: 'layer-1', value: 40, frame: 12 },
+        output: { layerId: 'layer-1', property: 'opacity', value: 40 },
+      },
+      {
+        label: 'enable animation on the property',
+        input: { layerId: 'layer-1', animated: true },
+        output: { layerId: 'layer-1', property: 'opacity', value: 40 },
+      },
+    ],
   };
 
   // Registering asserts the availability claim: `available` is refused unless

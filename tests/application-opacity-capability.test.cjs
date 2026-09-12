@@ -60,16 +60,8 @@ test('the runtime descriptor matches engineering/application/capabilities/opacit
   const committed = JSON.parse(fs.readFileSync(
     path.join(ROOT, 'engineering', 'application', 'capabilities', 'opacity.json'), 'utf8'));
   const runtime = capability.DESCRIPTOR;
-  // Every field registration actually inspects. If opacity.json changes one of
-  // these and the runtime copy is not updated, this fails rather than the two
-  // silently disagreeing about what opacity claims to be.
-  for (const field of ['schemaVersion', 'id', 'version', 'handlerKey']) {
-    assert.equal(runtime[field], committed[field], `${field} drifted from opacity.json`);
-  }
-  assert.deepEqual(runtime.availability, committed.availability);
-  assert.deepEqual(runtime.effects, committed.effects);
-  assert.deepEqual(runtime.units, committed.units);
-  assert.ok('input' in runtime && 'output' in runtime);
+  assert.deepEqual(runtime, committed,
+    'the synchronous runtime projection drifted from the canonical descriptor');
 });
 
 test('the descriptor claims "available", which registration only accepts when backed', () => {
@@ -96,6 +88,30 @@ test('opacity is registered at boot and discoverable', () => {
   assert.equal(listed[0].id, 'opacity');
   assert.equal(listed[0].handlerKey, 'application.opacity.property');
   assert.equal(listed[0].bound, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(listed[0].descriptor)), capability.DESCRIPTOR);
+});
+
+test('the production capabilities operation derives its legacy projection and full contract from registration', () => {
+  const ctx = application();
+  const result = ctx.NemoApplication.handle(command(ctx, 'discover', 'capabilities')).result;
+  assert.deepEqual(JSON.parse(JSON.stringify(result.properties)), [
+    { id: 'opacity', min: 0, max: 100, unit: 'percent', animated: true },
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.descriptors)), [capability.DESCRIPTOR]);
+
+  // Prove the public response performs a fresh registry read and is not the old
+  // hard-coded opacity metadata: changing discovery changes the returned data.
+  const original = ctx.NemoCapabilities.list;
+  ctx.NemoCapabilities.list = function () {
+    const entries = original.call(this);
+    entries[0].descriptor = Object.assign({}, entries[0].descriptor,
+      { id: 'opacity-from-registry', units: { value: 'ratio' } });
+    return entries;
+  };
+  const changed = ctx.NemoApplication.handle(command(ctx, 'discover-again', 'capabilities')).result;
+  assert.equal(changed.descriptors[0].id, 'opacity-from-registry');
+  assert.equal(changed.properties[0].id, 'opacity-from-registry');
+  assert.equal(changed.properties[0].unit, 'ratio');
 });
 
 test('the application entry looks the handler up per call, not once at boot', () => {
