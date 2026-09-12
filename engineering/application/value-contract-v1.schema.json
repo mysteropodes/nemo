@@ -11,7 +11,7 @@
     "unknownFields": "additionalProperties is intentionally true for partial structural validation. It is not a preservation promise. The pure parser retains unknown JSON fields; import/export use explicit top-level, layer and stroke fields and can discard unknowns. Future adapters must report unsupported/lossy fields or retain them before claiming a lossless roundtrip. No opaque extension store exists in the current writer.",
     "roundtripOracle": "Use tests/fixtures/migration/project.json (version 12) and migration/expected.json. Characterize the first import/export against the base, including expected migrations, then reopen that canonical version-13 export in a fresh context and compare all serialized values. Preserve existing layerUid/strokeId values. Do not equate original version-12 bytes with the canonical export, or a parser-only check with editor persistence acceptance.",
     "knownRoundtripDefect": "At the observed source and migration fixture SHA-256 90b6c525a6936a2d635046682ebc5c68148f65969c6af7fd315a1eb77cc2aa31, strict equality between the first canonical export and its fresh-context reopen fails only at /workspace/panelOrder: canvas-sec and combine-opts-sec move from after shapes-sec to the front, in that order; every other serialized value and existing layer/stroke ID is unchanged. The same first and second exports match unchanged main exactly. Record this exact baseline failure (SMWorkspace.capture/apply in ui.js), not a general workspace-field waiver or a claim that every value already roundtrips. D01 specifies the contract and preserves this existing defect; it does not repair UI workspace ordering.",
-    "identity": "layerUid and strokeId are opaque persisted strings once assigned. Their generators use time/random values, without a global uniqueness guarantee; numeric layer id and array position are not stable references. Reordering must retain IDs and UID references. A missing legacy ID can be assigned by existing migration, but an existing ID must not be renumbered as part of extraction. Duplicate-ID rejection is not supplied by this schema or asserted for the current importer.",
+    "identity": "layerUid and strokeId are opaque persisted strings once assigned. Their generators use time/random values, without a global uniqueness guarantee; numeric layer id and array position are not stable references. Reordering must retain IDs and UID references. strokeId is not a stable cross-frame shape identity for ordinary hand-drawn multi-keyframe layers: Motion may assign it lazily only on the inspected frame. Per-element Motion references use strokeId at their reference frame; adapters must not infer cross-frame shape identity from strokeId alone. A missing legacy ID can be assigned by existing migration, but an existing ID must not be renumbered as part of extraction. Duplicate-ID rejection is not supplied by this schema or asserted for the current importer.",
     "ownership": "The JavaScript editor owns the open document: state holds persisted values and userLayers/Paper items hold active edits that saveAllLayerFrames flushes. During component or montage editing, exportJSON selects the existing scene snapshot so it does not serialize the temporary view as the top-level document. Runtime documentId names an open-document incarnation and changes on replacement; file path, tab ID and layer index must not substitute for it. No new state mirror is introduced here."
   },
   "x-nemo-adapter-boundaries": {
@@ -63,7 +63,7 @@
     "StableId": {
       "type": "string",
       "minLength": 1,
-      "description": "Opaque existing persisted ID; do not impose a UUID syntax, regenerate a present value, or derive it from array position. Namespace and referential integrity are owner checks, not uniqueness guarantees from a string schema."
+      "description": "Opaque existing persisted ID; do not impose a UUID syntax, regenerate a present value, or derive it from array position. Namespace, reference scope and referential integrity are owner checks, not uniqueness guarantees from a string schema. For strokeId, preservation of an assigned value does not imply stable cross-frame shape identity; see the identity compatibility rule."
     },
     "FrameIndex": {
       "type": "integer",
@@ -80,7 +80,7 @@
       "prefixItems": [{ "type": "number" }, { "type": "number" }],
       "items": false,
       "minItems": 2,
-      "description": "Two finite JSON numbers [x, y]. Position or relative vector semantics belong to the referencing field. No persistence rounding is imposed."
+      "description": "Two finite JSON numbers [x, y]. Position or relative vector semantics belong to the referencing field. This schema adds no universal rounding rule. Segment points and handles serialized from live paths follow app.js serP's three-decimal persistence rule; other Point2 uses retain their field-specific encoding."
     },
     "StoredPaint": {
       "type": ["string", "null"],
@@ -99,7 +99,7 @@
     "Stroke": {
       "type": "object",
       "additionalProperties": true,
-      "description": "Partial common stroke vocabulary; image, text, compound, mesh and other existing item payloads remain owned by their current serializers. Missing strokeId is allowed for legacy input and may be assigned by the existing owner.",
+      "description": "Partial common stroke vocabulary; image, text, compound, mesh and other existing item payloads remain owned by their current serializers. Missing strokeId is allowed for legacy input and may be assigned by the existing owner. Preserve an assigned strokeId within its existing item/reference context; ordinary hand-drawn multi-keyframe layers need not have consistent IDs across frames, so strokeId alone is not a cross-frame shape key.",
       "properties": {
         "strokeId": { "$ref": "#/$defs/StableId" },
         "segments": { "type": "array", "items": { "$ref": "#/$defs/Segment" } },
