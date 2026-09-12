@@ -1,0 +1,413 @@
+{
+  "census_id": "C19c",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1124",
+  "title": "Timeline layer split and duplication transactions",
+  "owner": "Ilya/D1; Sol read-only draft with Codexitron/Ilya O integration and independent Terra review",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "current_main_sha": "a3c9e347372415a365f25e0aba8074547429e8c1",
+  "status": "read-only census and future proposals; no runtime writer or Ready extraction claim",
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 1196,
+      "end": 1533,
+      "lines": 338,
+      "classification": {
+        "code": 136,
+        "comment": 202,
+        "whitespace": 0
+      }
+    }
+  ],
+  "coverage_note": "Exactly 338 assigned lines are covered once: 136 code and 202 full-line // comments, with no whitespace. The five packet ranges below partition 1196-1533 without omission or overlap. Lexical classification treats a blank trimmed line as whitespace, a trimmed line beginning // as comment, and every other line as code.",
+  "construct_boundaries": [
+    {
+      "range": "1196-1270",
+      "boundary": "Lines 1196-1199 are the immediately leading contract comment and lines 1200-1270 are the complete SM.splitLayerAtPlayhead property. Line 1195 closes toggleShyMode."
+    },
+    {
+      "range": "1271-1533",
+      "boundary": "The complete SM.duplicateLayer property begins at 1271 and closes at 1533. Its nested dupOne function opens at 1278 and closes at 1496; remapMeshes opens at 1340 and closes at 1364."
+    },
+    {
+      "range": "1196-1533",
+      "boundary": "Line 1534 begins SM.setActiveLayer and is excluded. Both properties remain inside window.SM, opened at line 349 and closed at line 2695; this census does not claim the facade or whole file."
+    }
+  ],
+  "whole_file_writer_guidance": {
+    "source_access": "timeline.js and all callers remain read-only; C19c owns only the eventual new census JSON artifact.",
+    "serialization": "P30 PR #1114 is OPEN at a0f13e7da2f97248e1e8ab6cb44a1fd399e5f454 and includes timeline.js. It retains the exclusive whole-file runtime writer; no C19c or P24 runtime work may overlap it.",
+    "publication": "Codexitron/Ilya O owns the sole tracked artifact writer on the reserved integration branch. Independent review and normal protected integration follow issue #1124.",
+    "reservations": "D01/#1044 remains separate. T05/Pollen and all C01/C02/C04/C06/P20/P30 owners remain reserved. Census range ownership conveys no runtime authority."
+  },
+  "reconciliation": [
+    {
+      "owner": "C01",
+      "disposition": "Retain saveAllLayerFrames, layersSnapshotNow, pushUndo/undo/redo, export/import and persistent document ownership. C19c maps the two commands' use of those ports and compares copy policy with exportJSON."
+    },
+    {
+      "owner": "C02",
+      "disposition": "Retain effective layer in/out semantics, Motion/tween engines and layerUid-keyed motionArcs/tweenEasing/tweenOverrides. C19c records that neither transaction creates destination-UID side-map entries."
+    },
+    {
+      "owner": "C04",
+      "disposition": "Retain canvas selection, editor presentation and render wiring. C19c maps active-layer, _layerSel and Motion expanded-row changes only as command side effects."
+    },
+    {
+      "owner": "C06",
+      "disposition": "Retain window.SM bootstrap/facade, global keyboard dispatch and Labs command-palette ownership. C19c records those surfaces as callers."
+    },
+    {
+      "owner": "P20/#1022",
+      "disposition": "Retain accepted folderId/layerFolders codec ownership. C19c separately maps isFolderLayer structural children and the legacy folderId copy behavior without changing either model."
+    },
+    {
+      "owner": "P30/#1032 and PR #1114",
+      "disposition": "Retain shortcut registry/persistence and the active whole timeline.js writer. C19c does not edit shortcut dispatch or runtime source."
+    },
+    {
+      "owner": "C19a/C19b/C19b2",
+      "disposition": "Reuse their frame-selection, work-area/in-out, history, frame-relocation and UID-keyed tween-side-data contracts. Their assigned unions do not overlap 1196-1533."
+    },
+    {
+      "owner": "D01/#1044 and T05/Pollen",
+      "disposition": "Keep compatibility specification and diagnostics work separately owned; neither claim is transferred or made prerequisite by this census."
+    }
+  ],
+  "areas": [
+    {
+      "area": "layer-copy-transactions",
+      "packets": [
+        {
+          "id": "C19c.layer-split",
+          "title": "Split one layer at the playhead",
+          "files": [
+            "src/js/timeline.js:1196-1270"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 1196,
+              "end": 1270
+            }
+          ],
+          "classification": {
+            "code": 44,
+            "comment": 31,
+            "whitespace": 0
+          },
+          "symbols": [
+            "SM.splitLayerAtPlayhead"
+          ],
+          "responsibility": "Resolve target and effective bounds, reject an unsplittable playhead, snapshot once, create a second descriptor/Paper layer, clone layer payload, split visibility windows, remove timeLink, move the second half adjacent in both parallel arrays, select/load it and refresh render/UI.",
+          "public_api": "window.SM.splitLayerAtPlayhead(optionalLayerIndex); Nemo Script exposes Layer.prototype.splitAt(frame).",
+          "callers": [
+            "timeline layer-row context menu at 6716",
+            "Cmd/Ctrl+Shift+D dispatcher at 9736-9742",
+            "Motion layer-row context menu at motion.js:7408",
+            "Nemo Script Layer.prototype.splitAt at nemo-script.js:384-391"
+          ],
+          "copy_policy": {
+            "deep_copied": [
+              "frames",
+              "motion",
+              "motionStatic",
+              "elementMotion",
+              "effects",
+              "markers",
+              "nativeVideo",
+              "footage",
+              "timeRemap",
+              "blendKeys",
+              "expressions",
+              "exprControls",
+              "mattesMore",
+              "textAnimators",
+              "parentKeys",
+              "parentsMore",
+              "followPath",
+              "duplicator",
+              "widget",
+              "nullPos",
+              "nullShape",
+              "guidePos",
+              "effector",
+              "lfsIds",
+              "lfsSettings",
+              "groups",
+              "shapeNames",
+              "pathFx",
+              "lipSync",
+              "rig through cloneRigForSymbol only when both source rig and the window.cloneRigForSymbol port exist"
+            ],
+            "scalar_or_shared": [
+              "color",
+              "blendMode",
+              "symbolId and symbol playback fields",
+              "symMatrix by reference",
+              "_nvSessionId by reference",
+              "matte and parent target UIDs",
+              "channel/keyLock/shy/threeD/motionBlur/effectsFrom",
+              "folderId/linkGroupId",
+              "layer-kind flags except isFolderLayer"
+            ],
+            "transformed": [
+              "name becomes source name plus (2)",
+              "fresh layerUid from createUserLayer",
+              "source outPoint becomes frame-1",
+              "destination inPoint becomes frame and outPoint becomes prior effective out",
+              "timeLink is deleted from both halves"
+            ],
+            "observed_missing": [
+              "isFolderLayer",
+              "folderCollapsed",
+              "montageId",
+              "videoMeshId",
+              "ordinary-layer locked value",
+              "destination-UID motionArcs/tweenEasing/tweenOverrides entries",
+              "rig when source has one but window.cloneRigForSymbol is unavailable; no fallback copy"
+            ]
+          },
+          "actual_side_effects": "Writes state.layers and userLayers, source/destination in/out state, activeLayerIdx, _layerSel and _layerSelAnchor; may share native-video session identity; calls saveAllLayerFrames, pushUndoLayers(true), createUserLayer, activateUL, loadFrame, renderLayerList, renderTimeline, updateUI, optional SMEngineBridge.renderNow and two possible toast paths.",
+          "oracle": "Exercise every boundary, ordinary and special layer kinds, locked ordinary versus symbol layers, exact field-policy classification, fresh identity, adjacent insertion, timeLink deletion, destination-UID tween side-map absence, one history snapshot, selection and render order.",
+          "notes": "Source comments say every identity field travels, but exportJSON comparison disproves that for the four persisted fields listed above. symMatrix is assigned by reference here; duplicateLayer deep-clones it."
+        },
+        {
+          "id": "C19c.duplicate-base-copy",
+          "title": "Duplicate transaction entry and base copy kernel",
+          "files": [
+            "src/js/timeline.js:1271-1329"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 1271,
+              "end": 1329
+            }
+          ],
+          "classification": {
+            "code": 19,
+            "comment": 40,
+            "whitespace": 0
+          },
+          "symbols": [
+            "SM.duplicateLayer",
+            "SM.duplicateLayer::dupOne (opens at 1278; continues through 1496)"
+          ],
+          "responsibility": "Capture live frames/history once, allocate a uniquely named layer with a fresh layerUid, clone base frames/Motion/matte/media/relationship payload and prepare the nested per-layer copier used for the active layer and structural-folder children.",
+          "copy_policy": "Frames and most mutable payloads are JSON-deep-copied. matte source UIDs and legacy folderId remain references by identifier. nativeVideo is deep-copied while runtime-only _nvSessionId is shared. linkGroupId is explicitly omitted. rig is cloned with raw JSON rather than cloneRigForSymbol.",
+          "actual_side_effects": "pushUndoLayers(true) follows saveAllLayerFrames; every dupOne call immediately appends one Paper layer and one state.layers descriptor through createUserLayer before copying fields.",
+          "oracle": "Use a source with every current exportJSON field and runtime-only handles; classify copied/shared/transformed/omitted values, prove one outer history snapshot even for folder recursion, and exercise rig data with and without live _live handles.",
+          "notes": "This range is a lexical slice inside dupOne, not a complete callable boundary; its closure is line 1496. Raw JSON rig cloning has a different live-reference policy from splitLayerAtPlayhead's cloneRigForSymbol path."
+        },
+        {
+          "id": "C19c.duplicate-mesh-remap",
+          "title": "Project mesh duplication and reference remap",
+          "files": [
+            "src/js/timeline.js:1330-1364"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 1330,
+              "end": 1364
+            }
+          ],
+          "classification": {
+            "code": 22,
+            "comment": 13,
+            "whitespace": 0
+          },
+          "symbols": [
+            "SM.duplicateLayer::dupOne::remapMeshes"
+          ],
+          "responsibility": "Deduplicate source mesh IDs found in cloned frame strokes, ask SMImageMesh to create fresh project-store entries, rewrite cloned stroke meshId values, then rewrite matching elementMotion keys and rig bind meshId values.",
+          "actual_side_effects": "Mutates state.imageMeshes indirectly through SMImageMesh.duplicate and mutates cloned frames, elementMotion and rig binds. If the mesh service is absent or duplication returns null, cloned source mesh IDs remain shared.",
+          "oracle": "Cover repeated use of one mesh across frames, several mesh IDs, missing store entries, absent service, elementMotion and rig-bind remaps, uniqueness of created IDs, history restoration of the project mesh store and absence of writes to source-layer references.",
+          "notes": "The code reads destination.videoMeshId at 1353 but no earlier duplicate assignment copies source.videoMeshId. The advertised video-mesh remap path is therefore unreachable for a normal video duplicate and the destination loses videoMeshId. Record this as source behavior, not a fixed contract."
+        },
+        {
+          "id": "C19c.duplicate-kind-and-relationship-copy",
+          "title": "Duplicate kinds, relationships and identity-bearing payload",
+          "files": [
+            "src/js/timeline.js:1365-1496"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 1365,
+              "end": 1496
+            }
+          ],
+          "classification": {
+            "code": 35,
+            "comment": 97,
+            "whitespace": 0
+          },
+          "symbols": [
+            "SM.duplicateLayer::dupOne (continuation and close)"
+          ],
+          "responsibility": "Finish per-layer copying for combine groups, symbols/LFS, ranges, effects, parenting, Parent in Time, expressions, 3D, special-layer kinds, widgets/effectors and text animators, then return the appended destination index.",
+          "identity_policy": {
+            "fresh": [
+              "layerUid from createUserLayer",
+              "layer name through uniqueLayerName",
+              "each textAnimator.id"
+            ],
+            "preserved_within_copy": [
+              "strokeId",
+              "groupId",
+              "expression-control keys",
+              "symbolId",
+              "lfsIds"
+            ],
+            "shared_target_uids": [
+              "matteSourceLayerUid",
+              "parentLayerUid",
+              "parentLayerUidB",
+              "parentsMore uid values",
+              "timeLink uid",
+              "effectsFrom"
+            ],
+            "conditional_lock": "A symbol copies source.locked; duplicator and LFS copies force locked=true; an ordinary layer does not copy source.locked and retains createUserLayer's false default."
+          },
+          "observed_omissions_against_exportJSON": [
+            "montageId",
+            "lipSync",
+            "videoMeshId",
+            "linkGroupId by explicit product-policy comment",
+            "ordinary-layer locked value",
+            "destination-UID motionArcs/tweenEasing/tweenOverrides entries"
+          ],
+          "actual_side_effects": "Mutates only the appended destination descriptor in this slice, including forced locks and regenerated text animator IDs; it does not retarget other document layers or external tween side maps.",
+          "oracle": "Use a generated export-field matrix plus relationship fixtures. Assert special-kind flags, deep versus shared values, fresh text animator IDs, preserved control/stroke/group IDs, conditional locks, explicit link-group omission, persisted-field omissions and unchanged source objects.",
+          "notes": "mattesMore is rebuilt as uid/mode pairs and parentsMore as uid-only entries, matching current loaders but not a generic deep clone. isEffectorLayer/effector copies only when both are truthy."
+        },
+        {
+          "id": "C19c.duplicate-folder-and-selection",
+          "title": "Folder child expansion, parent retarget and final selection",
+          "files": [
+            "src/js/timeline.js:1497-1533"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 1497,
+              "end": 1533
+            }
+          ],
+          "classification": {
+            "code": 16,
+            "comment": 21,
+            "whitespace": 0
+          },
+          "symbols": [
+            "SM.duplicateLayer outer orchestration and close"
+          ],
+          "responsibility": "Capture the active source and its direct structural-folder children before mutation, append a folder copy and one copy per collected child, retarget child parentLayerUid/parentLayerUidB references that pointed at the source folder, update Motion expanded-row state, activate/select the main duplicate, load the frame and update UI.",
+          "actual_index_behavior": "createUserLayer appends every copy. There is no splice or move in duplicateLayer. A non-folder duplicate lands at the prior layer count; a folder duplicate lands there and its child copies follow at later indices. The final active selection is the main folder/active-layer duplicate index, not the last appended child.",
+          "folder_policy": "Children are collected only when the active source has isFolderLayer and layerUid, and only through parentLayerUid or parentLayerUidB equality. parentsMore references are neither used to discover children nor retargeted. Nested folders are assumed absent by comment, not guarded here. legacy folderId values copy unchanged inside dupOne and state.layerFolders is not cloned.",
+          "motion_expansion_policy": "If _motionExpandedLayer equals the source index it is set to the main duplicate index. The second branch increments values at or above the duplicate index, but because duplication only appends, a valid pre-existing expanded index cannot normally satisfy that branch. The adjacent-insertion premise in lines 1527-1530 does not match the code.",
+          "oracle": "Verify append order and indices for first/middle/last sources; direct A/B child collection and retargeting; parentsMore-only exclusion; folder plus several children; ordinary and stale Motion expanded indices; final active/_layerSel/_layerSelAnchor; and Nemo Script return identity for folder versus non-folder duplication.",
+          "notes": "Nemo Script Layer.prototype.duplicate returns state.layers.length-1. That is the main duplicate for an ordinary layer but the last child copy for a folder, while duplicateLayer itself activates the folder copy. Record this caller-visible mismatch."
+        }
+      ]
+    }
+  ],
+  "consumer_matrix": {
+    "save": "Both commands call saveAllLayerFrames before cloning/snapshot. Later project save serializes both descriptors and state.imageMeshes; runtime-only _nvSessionId is not exported.",
+    "load": "Both commands call loadFrame on the newly active main result. importJSON separately reconstructs persisted fields, layer UIDs, relationships and image mesh storage; it cannot restore omitted copy fields that never reached the duplicate.",
+    "history": "Each top-level command pushes exactly one full-layer snapshot before mutation. Folder duplication calls dupOne repeatedly without extra snapshots. The snapshot includes imageMeshes, layerFolders/layerLinkGroups and tween side maps through C01-owned history.",
+    "selection": "Split moves its new layer adjacent and selects it. Duplicate appends its result(s), activates/selects the main source copy and adjusts _motionExpandedLayer under an incorrect adjacent-insertion premise. Nemo Script temporarily selects its source and restores the previous active layer after duplication.",
+    "animation": "Per-layer frames/Motion payloads copy, but fresh destination layerUid values receive no motionArcs, tweenEasing or tweenOverrides keys. Split changes only visibility windows and deletes timeLink; duplicate retains in/out and timeLink and remaps only direct folder-parent A/B references.",
+    "render": "Split explicitly renders layer list/timeline, calls updateUI and optionally engine render after loadFrame. Duplicate calls loadFrame then updateUI only. Menu, keyboard, Motion and script callers rely on these shared commands rather than duplicating rendering logic.",
+    "export": "exportJSON is the independent persisted-field oracle. Split omits isFolderLayer/folderCollapsed/montageId/videoMeshId; duplicate omits montageId/lipSync/videoMeshId, deliberately omits linkGroupId, and conditionally omits or overrides locked. Newly allocated layerUid/name/textAnimator IDs and split timeLink removal are transformations.",
+    "native": "Both commands deep-copy nativeVideo and share _nvSessionId. Duplicate is also called by media-library video-clone reinsertion. Image mesh duplication mutates the project mesh store through SMImageMesh, but the current missing videoMeshId assignment prevents the video-specific remap path. No command directly starts or tears down a native decode session."
+  },
+  "caller_surfaces": {
+    "split": [
+      "src/js/timeline.js:6716 layer context menu",
+      "src/js/timeline.js:9736-9742 Cmd/Ctrl+Shift+D",
+      "src/js/motion.js:7408 Motion context menu",
+      "src/js/nemo-script.js:384-391 Layer.splitAt"
+    ],
+    "duplicate": [
+      "src/js/timeline.js:6704 layer context menu",
+      "src/js/timeline.js:9751-9773 Cmd/Ctrl+D arbitration",
+      "src/js/timeline.js:11425 duplicate button",
+      "src/js/nemo-script.js:261-266 Layer.duplicate",
+      "src/js/media-library.js:173-185 video-clone reinsertion",
+      "src/js/labs/command-palette.js:34 Labs command"
+    ]
+  },
+  "future_implementation_proposals": [
+    {
+      "id": "C19c-F1",
+      "scope": "Pure persisted-field copy classifier shared by split and ordinary duplicate modes, with explicit copied/shared/transformed/omitted outputs and no global state.",
+      "proposed_module": "src/js/domain/animation/layer-copy-policy.js",
+      "proposed_api": "planLayerCopy(source, mode, context) -> {draft, identityPlan, relationshipPlan, omissions}",
+      "admission": "Pending separate executable-leaf admission and an export-schema drift oracle. It must not include mesh-store mutation, folder recursion or UI/history effects."
+    },
+    {
+      "id": "C19c-F2",
+      "scope": "Image/video mesh copy plan and adapter call, including old-to-new ID mapping for frames, elementMotion and rig binds.",
+      "proposed_module": "src/js/application/layer-mesh-copy.js",
+      "proposed_api": "duplicateLayerMeshes(layerDraft, duplicateMesh) -> {layerDraft, idMap, failures}",
+      "admission": "Pending separate executable-leaf admission after the videoMeshId baseline decision. It must use an injected mesh port and stay separate from the descriptor-copy policy."
+    },
+    {
+      "id": "C19c-F3",
+      "scope": "Structural folder-copy planner: discover direct A/B children from a frozen source list, allocate new identities and retarget only the documented relationship edges.",
+      "proposed_module": "src/js/domain/layers/folder-copy-plan.js",
+      "proposed_api": "planFolderCopy(layers, sourceIndex, allocateIdentity) -> {copies, sourceToCopyUid, activationTarget}",
+      "admission": "Pending separate executable-leaf admission and a decision for parentsMore/nested folders. It does not own legacy folderId/layerFolders serialization."
+    },
+    {
+      "id": "C19c-F4",
+      "scope": "Thin duplicate application transaction that owns one history boundary, append order, Paper layer creation, selection/Motion-row result and render ports.",
+      "proposed_module": "src/js/application/duplicate-layer-command.js",
+      "proposed_api": "duplicateActiveLayer(state, ports) -> {mainIndex, appendedIndices}",
+      "admission": "Pending separate executable-leaf admission after the pure copy and folder/mesh seams plus a separate whole-file writer reservation. It must not absorb the full duplicate method as one extraction."
+    },
+    {
+      "id": "C19c-F5",
+      "scope": "Split planning and thin application wrapper with explicit effective bounds, timeLink disposition, adjacent insertion and render ports.",
+      "proposed_module": "src/js/domain/animation/layer-split.js",
+      "proposed_api": "planLayerSplit(source, frame, effectiveBounds, copyPolicy) -> {sourcePatch, secondDraft, removedTimeLink}",
+      "admission": "Pending separate executable-leaf admission. It may reuse F1 but must keep history, Paper arrays, selection and rendering in the application wrapper."
+    }
+  ],
+  "independent_future_fixture_oracles": [
+    "Generate a source layer with every current exportJSON per-layer key plus runtime-only _nvSessionId, then independently classify every result field for split and duplicate. Fail when a new export key has no policy.",
+    "Split boundary matrix: missing layer; frame <= effective in; interior frame; frame == effective out; frame > out; absent/raw out-of-range in/out. Assert exact no-op or source/destination windows.",
+    "Identity matrix: fresh layerUid and unique duplicate name, split name suffix, preserved stroke/group/control IDs, fresh text animator IDs, shared symbol/LFS IDs, split symMatrix reference versus duplicate symMatrix deep clone.",
+    "Lock matrix: ordinary locked, symbol locked/unlocked, duplicator and LFS. Capture current destination lock results without silently adding a guard or normalization.",
+    "Tween-side fixture: customize motionArcs, tweenEasing and tweenOverrides for the source UID and prove neither command creates destination-UID entries.",
+    "Mesh fixture: repeated frame mesh IDs, several meshes, absent service, failed duplicate, elementMotion keys and rig binds; separately prove current videoMeshId loss and unreachable destination lookup.",
+    "Rig fixture: plain serializable rig and rig with live _live handles; exercise cloneRigForSymbol present and absent. Split copies through the available port and otherwise omits the rig without fallback; duplicate uses raw JSON cloning.",
+    "Folder fixture: source in middle of stack with A child, B child, parentsMore-only child and several ordinary neighbors. Assert actual append order, only A/B retarget, unchanged legacy folderId and final folder-copy activation.",
+    "Index/caller fixture: duplicate first/middle/last ordinary layers and a folder with children; assert _motionExpandedLayer behavior and compare Nemo Script's returned Layer with duplicateLayer's activated main result.",
+    "History fixture: one snapshot per top-level action, including a recursive folder duplicate and image mesh store changes; verify undo/redo through the independent C01 APIs.",
+    "Consumer fixture: exercise both timeline menus, both keyboard paths, Motion split menu, duplicate button, Labs command, media-library video-clone and Nemo Script APIs with render/update spies.",
+    "Persistence fixture: save/reload after each layer kind and relationship combination, distinguishing export omissions from runtime-only session sharing and checking browser and native-video consumers separately."
+  ],
+  "validation_contract": {
+    "range_union": "Require exactly 1196-1533 once and packet union [1196-1270,1271-1329,1330-1364,1365-1496,1497-1533] once; reject omissions, overlaps, reversals and out-of-range spans.",
+    "source_identity": "Require the exact source SHA/blob/path and verify current main's timeline blob remains identical before integration.",
+    "constructs": "Require exact anchors at split 1200, duplicate 1271, dupOne 1278/1496, remapMeshes 1340/1364 and setActiveLayer 1534 exclusion.",
+    "classification": "Recompute whole and per-packet code/comment/whitespace counts from the pinned blob.",
+    "completeness": "Require eight consumer dispositions, split and duplicate caller surfaces, state effects, copy/share/transform/omit policies, independent fixture oracles and all reconciliation owners.",
+    "source_truth": "Require explicit append-not-adjacent behavior, unreachable videoMeshId remap, copy-strategy differences, persisted-field omissions, UID side-map behavior and caller-visible folder result mismatch.",
+    "future_scope": "Require several bounded future proposals and reject any proposal that presents all of duplicateLayer 1271-1533 as one executable implementation leaf.",
+    "publication_hygiene": "Reject temporary paths, private absolute paths, runtime-ready claims or timeline.js write authority in the artifact."
+  },
+  "negative_controls": [
+    "Validator removes line 1533 from an in-memory packet union and must reject the omission.",
+    "Validator makes the second packet begin at 1270 and must reject overlap at line 1270."
+  ],
+  "exclusions": [
+    "timeline.js:1190-1195 shy-mode predecessor",
+    "timeline.js:1534 onward setActiveLayer and later responsibilities",
+    "all runtime source and consumer edits",
+    "behavior fixes for field omissions, lock rules, tween side maps, rig live handles, append/index comments or folder relationship breadth",
+    "whole duplicateLayer extraction as one future executable leaf"
+  ]
+}
