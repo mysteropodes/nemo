@@ -90,7 +90,7 @@
             "SM.setWorkArea"
           ],
           "responsibility": "Assigns the inclusive composition work-area start and end exactly as supplied. It performs no coercion, ordering, timeline-bound clamp, mirror update, render, save or history action.",
-          "writer": "Direct writer of state.waIn and state.waOut. ui.js owns drag validation and the legacy window._waIn/_waOut mirrors; this method does not.",
+          "writer": "Direct writer of state.waIn and state.waOut. ui.js validates drag input and writes window._waIn/_waOut as drag scratch/compatibility mirrors; timeline.js also writes those mirrors in setTotalFrames (861), importJSON (2378) and updateUI (2743). SM.setWorkArea itself does not write the mirrors. Preserve this existing multi-writer baseline until a separately reviewed authority extraction.",
           "public_api": "window.SM.setWorkArea(inFrame,outFrame). Nemo Script exposes the same operation as nemo.comp.setWorkArea(in,out).",
           "consumers": [
             "src/js/ui.js work-area drag commit",
