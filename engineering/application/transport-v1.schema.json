@@ -32,7 +32,7 @@
             ]
           },
           "property": {
-            "description": "Property identity: the `id` of a `capabilities.properties` entry, currently\nonly `\"opacity\"`. Note the key is `property`, while capabilities names it `id`.",
+            "description": "Property identity: the `id` of a registered property capability\n(engineering/application/capabilities/*.json). Note the key is `property`,\nwhile the descriptor names it `id`.",
             "type": [
               "string",
               "null"
@@ -132,27 +132,28 @@
       },
       "payload": {
         "additionalProperties": false,
-        "description": "Operation body. Always a JSON object, never a JSON-encoded string. Copy the template for the chosen operation:\n  property.set           {\"layerId\":\"<layers[].layerUid from snapshot>\",\"property\":\"opacity\",\"value\":40}\n  property.key.set       {\"frame\":12,\"layerId\":\"<layers[].layerUid from snapshot>\",\"property\":\"opacity\",\"value\":40}\n  property.key.remove    {\"frame\":12,\"layerId\":\"<layers[].layerUid from snapshot>\",\"property\":\"opacity\"}\n  property.animation.set {\"animated\":true,\"layerId\":\"<layers[].layerUid from snapshot>\",\"property\":\"opacity\"}\n  history.undo           {}\n  history.redo           {}\n  diagnostics.replay     {\"request\":{\"operation\":\"property.set\",\"payload\":{\"layerId\":\"<layers[].layerUid from snapshot>\",\"property\":\"opacity\",\"value\":40}}}\n`layerId` is `layers[].layerUid` from the latest snapshot. `property` is the `id` of a `capabilities.properties` entry, currently only \"opacity\" — the payload key is `property` even though capabilities names it `id`. `frame` defaults to the document's current frame wherever the template omits it.",
+        "description": "Operation body. Always a JSON object, never a JSON-encoded string. Copy the template for the chosen operation:\n  property.set           {\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.key.set       {\"frame\":12,\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.key.remove    {\"frame\":12,\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.animation.set {\"animated\":true,\"layerId\":\"layer-1\",\"property\":\"opacity\"}\n  history.undo           {}\n  history.redo           {}\n  diagnostics.replay     {\"request\":{\"operation\":\"property.set\",\"payload\":{\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}}}\n`layerId` is `layers[].layerUid` from the latest snapshot. `property` is the `id` of a registered property capability (engineering/application/capabilities/*.json) — the payload key is `property` even though the descriptor names it `id`. `frame` defaults to the document's current frame wherever the template omits it.",
         "examples": [
           {
-            "layerId": "<layers[].layerUid from snapshot>",
+            "layerId": "layer-1",
             "property": "opacity",
             "value": 40
           },
           {
             "frame": 12,
-            "layerId": "<layers[].layerUid from snapshot>",
+            "layerId": "layer-1",
             "property": "opacity",
             "value": 40
           },
           {
             "frame": 12,
-            "layerId": "<layers[].layerUid from snapshot>",
-            "property": "opacity"
+            "layerId": "layer-1",
+            "property": "opacity",
+            "value": 40
           },
           {
             "animated": true,
-            "layerId": "<layers[].layerUid from snapshot>",
+            "layerId": "layer-1",
             "property": "opacity"
           },
           {},
@@ -161,7 +162,7 @@
             "request": {
               "operation": "property.set",
               "payload": {
-                "layerId": "<layers[].layerUid from snapshot>",
+                "layerId": "layer-1",
                 "property": "opacity",
                 "value": 40
               }
@@ -195,7 +196,7 @@
             ]
           },
           "property": {
-            "description": "Property identity: the `id` of a `capabilities.properties` entry, currently\nonly `\"opacity\"`. Note the key is `property`, while capabilities names it `id`.",
+            "description": "Property identity: the `id` of a registered property capability\n(engineering/application/capabilities/*.json). Note the key is `property`,\nwhile the descriptor names it `id`.",
             "type": [
               "string",
               "null"

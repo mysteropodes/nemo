@@ -128,7 +128,7 @@ impl NemoServer {
     }
 
     #[tool(
-        description = "Read Nemo capabilities, current document snapshot, opacity property, or bounded diagnostics. Always select the instance from nemo_discover. The payload schema carries one copyable template per operation; property.get needs {\"layerId\",\"property\"} and the other reads take {}."
+        description = "Read Nemo capabilities, current document snapshot, a registered property capability, or bounded diagnostics. Always select the instance from nemo_discover. The payload schema carries one copyable template per operation; property.get needs {\"layerId\",\"property\"} (property names a registered capability id) and the other reads take {}."
     )]
     async fn nemo_query(
         &self,
@@ -147,16 +147,16 @@ impl NemoServer {
             operation: query.operation,
             payload: query.payload,
         };
-        // Report a malformed read as invalid_request here; reaching the transport
-        // would report the same fault as an unavailable instance.
-        if let Err(message) = request.validate() {
-            return failure("invalid_request", &message);
+        // Report a rejected read with its typed code here; reaching the transport
+        // would report every fault alike, as an unavailable instance.
+        if let Err(error) = request.validate() {
+            return failure(error.code(), error.message());
         }
         self.call(request, context).await
     }
 
     #[tool(
-        description = "Call the same application command/history service as Nemo UI. Use the latest snapshot instanceId, documentId, expectedRevision and a unique requestId. Identical retries reuse their result; changed-body retries fail. Supports opacity editing/keying, undo/redo and diagnostic replay. The payload schema carries one copyable template per operation: send it as a JSON object, not as a JSON-encoded string."
+        description = "Call the same application command/history service as Nemo UI. Use the latest snapshot instanceId, documentId, expectedRevision and a unique requestId. Identical retries reuse their result; changed-body retries fail. Supports editing/keying a registered property capability, undo/redo and diagnostic replay. The payload schema carries one copyable template per operation: send it as a JSON object, not as a JSON-encoded string."
     )]
     async fn nemo_command(
         &self,
@@ -166,8 +166,8 @@ impl NemoServer {
         if request.operation.is_query() {
             return failure("invalid_request", "Use nemo_query for reads");
         }
-        if let Err(message) = request.validate() {
-            return failure("invalid_request", &message);
+        if let Err(error) = request.validate() {
+            return failure(error.code(), error.message());
         }
         self.call(request, context).await
     }

@@ -82,9 +82,10 @@ async fn advertised_payload_schema_names_every_key_and_operation_template() {
     ] {
         assert!(description.contains(operation), "{operation} is templated");
     }
-    // Capabilities names the property `id`; the payload key is `property`. The one
-    // client that recovered lost an attempt to exactly this mismatch.
-    assert!(description.contains("capabilities names it `id`"));
+    // The registered capability descriptor names the property `id`; the payload key
+    // is `property`. The one client that recovered lost an attempt to exactly this
+    // mismatch.
+    assert!(description.contains("the descriptor names it `id`"));
     assert!(description.contains("never a JSON-encoded string"));
     let examples = payload["examples"].as_array().unwrap();
     assert_eq!(examples.len(), 7, "one example per write operation");
@@ -146,7 +147,10 @@ async fn rejected_payloads_name_the_shape_the_operation_expects() {
             .unwrap();
         assert_eq!(response.is_error, Some(true), "{label}");
         let body = response.structured_content.unwrap();
-        assert_eq!(body["error"]["code"], "invalid_request", "{label}");
+        // A malformed body is its own typed code (P07/#1009), distinct from
+        // unsupported_capability/unavailable below and from invalid_request (the
+        // transport-shape checks in ApplicationRequest::validate itself).
+        assert_eq!(body["error"]["code"], "malformed_payload", "{label}");
         let message = body["error"]["message"].as_str().unwrap();
         for fragment in fragments {
             assert!(message.contains(fragment), "{label}: {message}");
@@ -167,6 +171,23 @@ async fn rejected_payloads_name_the_shape_the_operation_expects() {
         response.structured_content.unwrap()["error"]["code"],
         "unavailable"
     );
+
+    // `property` naming no registered capability is its own typed code (P07/#1009),
+    // distinct from a malformed body — the shape is fine, the target does not exist.
+    let response = client
+        .call_tool(
+            CallToolRequestParams::new("nemo_command").with_arguments(with_payload(
+                json!({"layerId": "layer-a", "property": "banana", "value": 37}),
+            )),
+        )
+        .await
+        .unwrap();
+    let body = response.structured_content.unwrap();
+    assert_eq!(body["error"]["code"], "unsupported_capability");
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("banana"));
     client.cancel().await.unwrap();
 }
 
@@ -189,7 +210,9 @@ async fn replay_payload_validates_the_nested_recorded_command() {
         .unwrap();
     assert_eq!(response.is_error, Some(true));
     let body = response.structured_content.unwrap();
-    assert_eq!(body["error"]["code"], "invalid_request");
+    // The nested command's own body is malformed, same typed code check_payload
+    // reports at the top level (P07/#1009) — replay does not get a weaker check.
+    assert_eq!(body["error"]["code"], "malformed_payload");
     let message = body["error"]["message"].as_str().unwrap();
     assert!(
         message.contains("recorded request payload is invalid"),
@@ -227,10 +250,32 @@ async fn reads_keep_their_own_templates_and_identity_spelling() {
         .await
         .unwrap();
     let body = missing_target.structured_content.unwrap();
-    assert_eq!(body["error"]["code"], "invalid_request");
+    // `property` is unresolved (absent), so only it — not the capability-declared
+    // `layerId` a resolved capability would also require — can be reported yet
+    // (P07/#1009: a property's required keys are no longer knowable before `property`
+    // itself names which registered capability to consult).
+    assert_eq!(body["error"]["code"], "malformed_payload");
     let message = body["error"]["message"].as_str().unwrap();
-    assert!(message.contains("missing layerId, property"), "{message}");
+    assert!(message.contains("missing property"), "{message}");
     assert!(message.contains("property.get expects"), "{message}");
+
+    // Supplying `property` resolves the capability, and the rest of its declared
+    // requirement surfaces on the next attempt.
+    let missing_layer = client
+        .call_tool(
+            CallToolRequestParams::new("nemo_query").with_arguments(arguments(
+                json!({"instanceId": "a68d0f2d-6b4f-4f5b-8a4b-6b8f0f2a4d61",
+                "operation": "property.get", "payload": {"property": "opacity"}}),
+            )),
+        )
+        .await
+        .unwrap();
+    let body = missing_layer.structured_content.unwrap();
+    assert_eq!(body["error"]["code"], "malformed_payload");
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("missing layerId"));
 
     // The pre-camelCase spelling still deserializes, so an existing caller is kept.
     let legacy = client

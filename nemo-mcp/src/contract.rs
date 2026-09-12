@@ -1,4 +1,5 @@
 //! Versioned boundary shared by the SDK, desktop bridge, and MCP transport.
+use crate::capabilities;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -94,8 +95,9 @@ pub struct CommandPayload {
     /// Layer identity, copied from `layers[].layerUid` of the latest snapshot.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub layer_id: Option<String>,
-    /// Property identity: the `id` of a `capabilities.properties` entry, currently
-    /// only `"opacity"`. Note the key is `property`, while capabilities names it `id`.
+    /// Property identity: the `id` of a registered property capability
+    /// (engineering/application/capabilities/*.json). Note the key is `property`,
+    /// while the descriptor names it `id`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub property: Option<String>,
     /// New value, in the unit and range `capabilities` advertises for the property.
@@ -142,6 +144,45 @@ impl CommandPayload {
     }
 }
 
+/// A validation failure, typed so a caller can distinguish a malformed request body
+/// from an unknown or currently-unavailable capability instead of matching on prose
+/// (P07/#1009 outcome check 3).
+#[derive(Clone, Debug)]
+pub enum RequestError {
+    InvalidRequest(String),
+    MalformedPayload(String),
+    UnsupportedCapability(String),
+    Unavailable(String),
+}
+
+impl RequestError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::InvalidRequest(_) => "invalid_request",
+            Self::MalformedPayload(_) => "malformed_payload",
+            Self::UnsupportedCapability(_) => "unsupported_capability",
+            Self::Unavailable(_) => "unavailable",
+        }
+    }
+
+    pub fn message(&self) -> &str {
+        match self {
+            Self::InvalidRequest(message)
+            | Self::MalformedPayload(message)
+            | Self::UnsupportedCapability(message)
+            | Self::Unavailable(message) => message,
+        }
+    }
+}
+
+impl std::fmt::Display for RequestError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{}", self.message())
+    }
+}
+
+impl std::error::Error for RequestError {}
+
 impl Operation {
     pub fn is_query(&self) -> bool {
         READ_OPERATIONS.contains(self)
@@ -164,6 +205,27 @@ impl Operation {
         }
     }
 
+    /// Whether this operation names a lifecycle stage a property-style capability
+    /// registers (engineering/application/capabilities/*.json), as opposed to a fixed
+    /// transport primitive (capabilities/snapshot/history/diagnostics). A `payload`
+    /// naming a subsequent property capability answers to these same five verbs, so a
+    /// new capability never needs a new `Operation` variant.
+    const fn is_property_operation(&self) -> bool {
+        matches!(
+            self,
+            Self::PropertyGet
+                | Self::PropertySet
+                | Self::PropertyKeySet
+                | Self::PropertyKeyRemove
+                | Self::PropertyAnimationSet
+        )
+    }
+
+    /// The fixed portion of what a payload must carry for this verb, independent of
+    /// which capability `payload.property` names. A property operation's full
+    /// requirement also includes that capability's own declared `input.required`
+    /// (checked in `check_payload`, not representable here since it is per-capability
+    /// and this list is `'static`).
     pub const fn required_payload_keys(&self) -> &'static [&'static str] {
         match self {
             Self::Capabilities
@@ -171,70 +233,129 @@ impl Operation {
             | Self::DiagnosticsTrace
             | Self::HistoryUndo
             | Self::HistoryRedo => &[],
-            Self::PropertyGet => &["layerId", "property"],
-            Self::PropertySet => &["layerId", "property", "value"],
-            Self::PropertyKeySet => &["layerId", "property", "value", "frame"],
-            Self::PropertyKeyRemove => &["layerId", "property", "frame"],
-            Self::PropertyAnimationSet => &["layerId", "property", "animated"],
+            Self::PropertyGet => &[],
+            Self::PropertySet => &["value"],
+            Self::PropertyKeySet => &["value", "frame"],
+            Self::PropertyKeyRemove => &["frame"],
+            Self::PropertyAnimationSet => &["animated"],
             Self::DiagnosticsReplay => &["request"],
         }
     }
 
-    /// A payload a client can copy. Placeholders name where the real value comes
-    /// from, so the example reads as a template rather than a literal to send.
+    /// A payload a client can copy, built from the actual registered capability's own
+    /// fixture/examples rather than a literal Rust-side value, so a subsequent
+    /// property capability is advertised correctly with no new code here.
     pub fn payload_example(&self) -> Value {
-        let layer = "<layers[].layerUid from snapshot>";
+        if self.is_property_operation() {
+            return self.property_payload_example();
+        }
         match self {
             Self::Capabilities
             | Self::Snapshot
             | Self::DiagnosticsTrace
             | Self::HistoryUndo
             | Self::HistoryRedo => json!({}),
-            Self::PropertyGet => json!({"layerId": layer, "property": "opacity"}),
-            Self::PropertySet => json!({"layerId": layer, "property": "opacity", "value": 40}),
-            Self::PropertyKeySet => {
-                json!({"layerId": layer, "property": "opacity", "value": 40, "frame": 12})
-            }
-            Self::PropertyKeyRemove => {
-                json!({"layerId": layer, "property": "opacity", "frame": 12})
-            }
-            Self::PropertyAnimationSet => {
-                json!({"layerId": layer, "property": "opacity", "animated": true})
-            }
-            Self::DiagnosticsReplay => json!({"request": {"operation": "property.set",
-                "payload": {"layerId": layer, "property": "opacity", "value": 40}}}),
+            Self::DiagnosticsReplay => json!({"request": {
+                "operation": Self::PropertySet.label(),
+                "payload": Self::PropertySet.payload_example(),
+            }}),
+            Self::PropertyGet
+            | Self::PropertySet
+            | Self::PropertyKeySet
+            | Self::PropertyKeyRemove
+            | Self::PropertyAnimationSet => unreachable!("handled by is_property_operation above"),
         }
     }
 
-    /// Structural admission only — key presence, key spelling and JSON types. Value
-    /// ranges, frame bounds, layer existence and locking stay with the document
-    /// owner, so this cannot drift into a second, disagreeing rule set.
-    pub fn check_payload(&self, payload: &Value) -> Result<(), String> {
+    /// The first registered capability answering to this stage's own example inputs,
+    /// with `property` set to that capability's id — a template built from the
+    /// descriptor's reviewed fixture, not a hand-maintained literal.
+    fn property_payload_example(&self) -> Value {
+        let placeholder = || json!({"property": "<id of a registered property capability>"});
+        let Some(capability) = capabilities::catalog().first_supporting(self.label()) else {
+            return placeholder();
+        };
+        let required = self.required_payload_keys();
+        let chosen = capability
+            .example_inputs()
+            .find(|input| required.iter().all(|key| input.get(*key).is_some()))
+            .or_else(|| capability.example_inputs().next());
+        let Some(chosen) = chosen else {
+            return placeholder();
+        };
+        let mut example = chosen.clone();
+        if let Some(object) = example.as_object_mut() {
+            object.insert("property".to_string(), json!(capability.id));
+        }
+        example
+    }
+
+    /// Structural admission only — key presence, key spelling, JSON types and (for a
+    /// property operation) that `payload.property` names a registered, available
+    /// capability. Value ranges, frame bounds, layer existence and locking stay with
+    /// the document owner, so this cannot drift into a second, disagreeing rule set.
+    pub fn check_payload(&self, payload: &Value) -> Result<(), RequestError> {
         let expected = format!("{} expects {}", self.label(), self.payload_example());
         if !payload.is_object() {
-            return Err(format!(
+            return Err(RequestError::MalformedPayload(format!(
                 "payload must be a JSON object, not {}; {expected}",
                 json_kind(payload)
-            ));
+            )));
         }
-        let parsed: CommandPayload = serde_json::from_value(payload.clone())
-            .map_err(|error| format!("payload is not usable: {error}; {expected}"))?;
+        let parsed: CommandPayload = serde_json::from_value(payload.clone()).map_err(|error| {
+            RequestError::MalformedPayload(format!("payload is not usable: {error}; {expected}"))
+        })?;
         if parsed.curve_points.is_some() {
-            return Err(format!(
+            return Err(RequestError::MalformedPayload(format!(
                 "payload.curvePoints is not exposed by this capability; {expected}"
-            ));
+            )));
         }
-        let missing = self
-            .required_payload_keys()
-            .iter()
-            .copied()
-            .filter(|key| !parsed.supplies(key))
-            .collect::<Vec<_>>();
+        // Built capability-declared keys first, then this verb's own fixed keys, so a
+        // joint report reads in the same order the original per-operation lists did
+        // (layerId, property, then the verb's own fields) wherever both are known.
+        let mut missing: Vec<String> = Vec::new();
+        if self.is_property_operation() {
+            if let Some(property) = parsed.property.as_deref().filter(|value| !value.is_empty()) {
+                let capability = capabilities::catalog()
+                    .find(property)
+                    .filter(|capability| capability.supports_stage(self.label()));
+                let Some(capability) = capability else {
+                    return Err(RequestError::UnsupportedCapability(format!(
+                        "No registered capability \"{property}\" answers to {}.",
+                        self.label()
+                    )));
+                };
+                if !capability.is_available() {
+                    let reason = capability
+                        .availability
+                        .reason
+                        .as_deref()
+                        .unwrap_or("unspecified");
+                    return Err(RequestError::Unavailable(format!(
+                        "Capability \"{property}\" is unavailable ({reason})."
+                    )));
+                }
+                // `property` itself resolved to a known, available capability; nothing
+                // further to check about it below beyond its own declared inputs.
+                missing.extend(capability.declared_required());
+            } else {
+                // Unresolved: no capability to consult, so only "property" itself (not
+                // its declared inputs, which depend on which capability it names) can
+                // be reported here. Fixing this and resending surfaces the rest.
+                missing.push("property".to_string());
+            }
+        }
+        missing.extend(
+            self.required_payload_keys()
+                .iter()
+                .map(|key| (*key).to_string()),
+        );
+        missing.retain(|key| !parsed.supplies(key));
         if !missing.is_empty() {
-            return Err(format!(
+            return Err(RequestError::MalformedPayload(format!(
                 "payload is missing {}; {expected}",
                 missing.join(", ")
-            ));
+            )));
         }
         // `request` carries a recorded command (diagnostics.replay) whose own
         // operation has its own required keys; CommandPayload's fields are all
@@ -242,12 +363,17 @@ impl Operation {
         // a replay of an incomplete or mismatched command is rejected up front,
         // not silently forwarded to the document owner.
         if let Some(recorded) = parsed.request.as_deref() {
-            let nested = serde_json::to_value(&recorded.payload)
-                .map_err(|error| format!("recorded request payload is not usable: {error}"))?;
-            recorded
-                .operation
-                .check_payload(&nested)
-                .map_err(|error| format!("recorded request payload is invalid: {error}"))?;
+            let nested = serde_json::to_value(&recorded.payload).map_err(|error| {
+                RequestError::MalformedPayload(format!(
+                    "recorded request payload is not usable: {error}"
+                ))
+            })?;
+            recorded.operation.check_payload(&nested).map_err(|error| {
+                RequestError::MalformedPayload(format!(
+                    "recorded request payload is invalid: {}",
+                    error.message()
+                ))
+            })?;
         }
         Ok(())
     }
@@ -285,8 +411,8 @@ fn payload_schema(generator: &mut SchemaGenerator, operations: &[Operation]) -> 
             "Operation body. Always a JSON object, never a JSON-encoded string. \
              Copy the template for the chosen operation:{}\n\
              `layerId` is `layers[].layerUid` from the latest snapshot. `property` is the \
-             `id` of a `capabilities.properties` entry, currently only \"opacity\" — the \
-             payload key is `property` even though capabilities names it `id`. `frame` \
+             `id` of a registered property capability (engineering/application/capabilities/*.json) \
+             — the payload key is `property` even though the descriptor names it `id`. `frame` \
              defaults to the document's current frame wherever the template omits it.",
             payload_table(operations)
         )),
@@ -312,15 +438,17 @@ pub fn query_payload_schema(generator: &mut SchemaGenerator) -> Schema {
 }
 
 impl ApplicationRequest {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), RequestError> {
         if self.api_version != API_VERSION {
-            return Err(format!(
+            return Err(RequestError::InvalidRequest(format!(
                 "unsupported apiVersion {}; this transport speaks apiVersion {API_VERSION}",
                 self.api_version
-            ));
+            )));
         }
         if self.request_id.is_empty() || self.request_id.len() > 128 {
-            return Err("requestId must contain 1..128 bytes".to_string());
+            return Err(RequestError::InvalidRequest(
+                "requestId must contain 1..128 bytes".to_string(),
+            ));
         }
         self.operation.check_payload(&self.payload)?;
         if !self.operation.is_query()
@@ -328,10 +456,10 @@ impl ApplicationRequest {
                 || self.document_id.as_deref().is_none_or(str::is_empty)
                 || self.expected_revision.is_none())
         {
-            return Err(
+            return Err(RequestError::InvalidRequest(
                 "writes require instanceId, documentId and expectedRevision from snapshot"
                     .to_string(),
-            );
+            ));
         }
         Ok(())
     }
