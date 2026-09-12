@@ -7454,133 +7454,20 @@ function showToast(m){var el=document.getElementById('toast');el.textContent=m;e
 // Overrides persist to localStorage so a rebind survives restarts; nothing
 // here is imported from Animate/Blender — that's a larger, separate effort
 // (see the Settings panel's own note).
-var TOOL_SHORTCUTS=[
-  {action:'draw',key:'b',label:'Draw'},
-  {action:'select',key:'v',label:'Select'},
-  {action:'subselect',key:'a',label:'Subselect (node edit)'},
-  {action:'fsselect',key:'m',label:'Fill/Stroke Select'},
-  {action:'comment',key:'c',label:'Comment'},
-  {action:'pen',key:'p',label:'Pen'},
-  {action:'line',key:'u',label:'Line'},
-  {action:'rect',key:'r',label:'Rectangle'},
-  {action:'ellipse',key:'l',label:'Ellipse'},
-  {action:'speechbubble',key:'d',label:'Bulle de dialogue'},
-  {action:'star',key:'q',label:'Étoile / Polygone'},
-  {action:'eraser',key:'e',label:'Eraser'},
-  {action:'fill',key:'g',label:'Fill'},
-  {action:'fillbrush',key:'n',label:'Fill Brush'},
-  {action:'eyedropper',key:'i',label:'Eyedropper'},
-  {action:'hand',key:'h',label:'Hand (pan)'},
-  {action:'zoom',key:'z',label:'Zoom'},
-  {action:'toggleOnion',key:'o',label:'Toggle Onion Skin'},
-  // UI/UX audit (2026-07): these tools had NO letter shortcut at all —
-  // every other tool button does, so their absence read as an
-  // inconsistency rather than a deliberate omission. The alphabet is
-  // nearly exhausted by the bindings above (only q/s/w/y were free); no
-  // mnemonic reads as cleanly as the existing ones (v=select, b=brush,
-  // p=pen...) so these are arbitrary placeholders, not a claimed "right"
-  // answer — rebindable via the existing Réglages > Raccourcis UI
-  // (shortcutOverrides/localStorage) like any other entry here.
-  {action:'text',key:'y',label:'Texte'},
-  {action:'rotate',key:'w',label:'Rotation du canevas'},
-  {action:'rig',key:'s',label:'Rig (Skeleton)'},
-  // Deliberately NOT bound to 'q' (or anything): the Perspective rail
-  // button was removed on purpose (see the comment above the button
-  // markup in index.html) — perspective is reachable ONLY via the Labs
-  // floating panel now. A live 'q' binding with no matching rail button
-  // used to switch state.tool to 'perspective' silently: every .tool-btn
-  // lost its .active class (none has data-tool="perspective" to match),
-  // so the whole rail went dark with zero explanation while the cursor
-  // quietly became a crosshair — found by the same audit, fixed by
-  // deleting the binding rather than re-adding a button the UI review
-  // that removed it explicitly didn't want back.
-];
-// COMMANDES remappables (2026-09) — jusqu'ici seuls les 21 OUTILS étaient
-// reconfigurables dans Réglages ▸ Raccourcis, alors que 63 autres touches
-// étaient câblées en dur dans onKeyDown : un animateur venu de TVPaint ou
-// d'After Effects ne pouvait déplacer aucune commande. Ce tableau est la
-// liste de celles qui passent par la même table d'overrides que les outils
-// (même stockage, même détection de conflit) ; leurs anciennes branches en
-// dur ont été retirées du gestionnaire pour qu'une touche réassignée ne
-// déclenche pas les deux. Le reste des touches est exposé en LECTURE SEULE
-// dans le panneau (READONLY_SHORTCUTS plus bas) plutôt que d'être passé
-// sous silence — le panneau devient la carte complète du clavier.
-var COMMAND_SHORTCUTS=[
-  {action:'cmdPrevKey',key:'j',cat:'nav',label:'shortcutCmdPrevKey',run:function(){if(state.playing)stopPlay();goToFrame(prevKeyframeFrame(state.activeLayerIdx,state.currentFrame));}},
-  {action:'cmdNextKey',key:'k',cat:'nav',label:'shortcutCmdNextKey',run:function(){if(state.playing)stopPlay();goToFrame(nextKeyframeFrame(state.activeLayerIdx,state.currentFrame));}},
-  {action:'cmdPrevFrame',key:',',cat:'nav',label:'shortcutCmdPrevFrame',run:function(){if(state.playing)stopPlay();goToFrame(state.currentFrame-1);}},
-  {action:'cmdNextFrame',key:'.',cat:'nav',label:'shortcutCmdNextFrame',run:function(){if(state.playing)stopPlay();goToFrame(state.currentFrame+1);}},
-  {action:'cmdGoStart',key:'Home',cat:'nav',label:'shortcutCmdGoStart',run:function(){if(state.playing)stopPlay();goToFrame(0);}},
-  {action:'cmdGoEnd',key:'End',cat:'nav',label:'shortcutCmdGoEnd',run:function(){if(state.playing)stopPlay();goToFrame(state.totalFrames-1);}},
-  {action:'cmdInsertFrame',key:'F5',cat:'frames',label:'shortcutCmdInsertFrame',run:function(e){e.preventDefault();insertFrame();}},
-  {action:'cmdInsertKey',key:'F6',cat:'frames',label:'shortcutCmdInsertKey',run:function(e){e.preventDefault();insertKeyframe();}},
-  {action:'cmdInsertBlankKey',key:'F7',cat:'frames',label:'shortcutCmdInsertBlankKey',run:function(e){e.preventDefault();insertBlankKeyframe();}},
-  {action:'cmdDuplicateKey',key:'',cat:'frames',label:'shortcutCmdDuplicateKey',run:function(){window.SM.duplicateKeyframe();}},
-  {action:'cmdExtendExposure',key:'+',cat:'frames',label:'shortcutCmdExtendExposure',run:function(){window.SM.extendExposure(1);}},
-  {action:'cmdTween',key:'t',cat:'frames',label:'shortcutCmdTween',run:function(){window.SM.generateTweens();}},
-  {action:'cmdFlipPreview',key:'f',cat:'view',label:'shortcutCmdFlipPreview',run:function(e){if(!e.shiftKey)window.SM.flipPreview();}},
-  {action:'cmdResetView',key:'/',cat:'view',label:'shortcutCmdResetView',run:function(e){e.preventDefault();window.SM.resetView();}},
-  {action:'cmdRenameLayer',key:'F2',cat:'layers',label:'shortcutCmdRenameLayer',run:function(e){e.preventDefault();if(state.layers[state.activeLayerIdx])startLayerRename(state.activeLayerIdx);}},
-];
-// Touches câblées ailleurs (playback, presse-papier, modes, gestes) : listées
-// pour que le panneau soit exhaustif, marquées non réassignables.
-var READONLY_SHORTCUTS=[
-  {keys:'Espace',label:'shortcutRoPlay',cat:'nav'},
-  {keys:'←  →',label:'shortcutRoStepFrame',cat:'nav'},
-  {keys:'⇧ Page',label:'shortcutRoStepLayer',cat:'layers'},
-  {keys:'⌘Z / ⇧⌘Z',label:'shortcutRoUndo',cat:'edit'},
-  {keys:'⌘C / ⌘V / ⌘X',label:'shortcutRoClipboard',cat:'edit'},
-  {keys:'⌘D',label:'shortcutRoDuplicate',cat:'edit'},
-  {keys:'⌘G / ⇧⌘G',label:'shortcutRoGroup',cat:'edit'},
-  {keys:'⌘A',label:'shortcutRoSelectAll',cat:'edit'},
-  {keys:'⌫',label:'shortcutRoDelete',cat:'edit'},
-  {keys:'B / N',label:'shortcutRoWorkArea',cat:'nav'},
-  {keys:'F9',label:'shortcutRoEasyEase',cat:'frames'},
-  {keys:'⌥ ← →',label:'shortcutRoNudgeKeys',cat:'frames'},
-  {keys:'⇧⌘D',label:'shortcutRoSplitLayer',cat:'layers'},
-  {keys:'Échap',label:'shortcutRoEscape',cat:'edit'},
-];
-var SHORTCUT_CATS=[{id:'tools',label:'shortcutCatTools'},{id:'nav',label:'shortcutCatNav'},{id:'frames',label:'shortcutCatFrames'},{id:'layers',label:'shortcutCatLayers'},{id:'view',label:'shortcutCatView'},{id:'edit',label:'shortcutCatEdit'}];
-var _shortcutOverrides=null;
-function shortcutOverrides(){
-  if(_shortcutOverrides)return _shortcutOverrides;
-  try{_shortcutOverrides=JSON.parse(localStorage.getItem('nemo-shortcuts')||'{}');}catch(e){_shortcutOverrides={};}
-  return _shortcutOverrides;
-}
-function shortcutDefFor(action){
-  return TOOL_SHORTCUTS.find(function(s){return s.action===action;})||COMMAND_SHORTCUTS.find(function(s){return s.action===action;})||null;
-}
-function shortcutKeyFor(action){
-  var ov=shortcutOverrides();if(ov[action])return ov[action];
-  var d=shortcutDefFor(action);
-  return d?d.key:null;
-}
-// Une touche = une action, outils ET commandes confondus (la détection de
-// conflit du panneau ne regardait que les outils).
-function shortcutClashFor(action,key){
-  var lk=(key||'').toLowerCase();
-  if(!lk)return null;
-  var all=TOOL_SHORTCUTS.concat(COMMAND_SHORTCUTS);
-  for(var i=0;i<all.length;i++){
-    if(all[i].action===action)continue;
-    if((shortcutKeyFor(all[i].action)||'').toLowerCase()===lk)return all[i];
-  }
-  return null;
-}
+//
+// Tables, override persistence and the pure lookups all live in
+// shortcut-registry.js (P30/#1032) now; onOverrideChanged wires a rebind back
+// to the left-rail badge, exactly what setShortcutKey called directly before.
+var shortcutRegistry=NemoShortcutRegistry.create({storage:window.localStorage,onOverrideChanged:function(action){syncToolButtonShortcutBadge(action);}});
 function runCommandShortcut(k,event){
   var lk=(k||'').toLowerCase();
   if(!lk)return false;
-  for(var i=0;i<COMMAND_SHORTCUTS.length;i++){
-    var c=COMMAND_SHORTCUTS[i];
-    if((shortcutKeyFor(c.action)||'').toLowerCase()===lk){c.run(event);return true;}
+  var commands=shortcutRegistry.commandShortcuts();
+  for(var i=0;i<commands.length;i++){
+    var c=commands[i];
+    if((shortcutRegistry.keyFor(c.action)||'').toLowerCase()===lk){c.run(event);return true;}
   }
   return false;
-}
-function setShortcutKey(action,key){
-  var ov=shortcutOverrides();
-  if(key)ov[action]=key.toLowerCase();else delete ov[action];
-  try{localStorage.setItem('nemo-shortcuts',JSON.stringify(ov));}catch(e){}
-  syncToolButtonShortcutBadge(action);
 }
 // UI/UX audit (2026-07): rebinding a shortcut in Réglages > Raccourcis
 // updated shortcutKeyFor()/localStorage correctly, but the left rail's own
@@ -7596,19 +7483,20 @@ function syncToolButtonShortcutBadge(action){
   if(!btn)return;
   var sk=btn.querySelector('.sk');
   if(!sk)return;
-  var key=shortcutKeyFor(action);
+  var key=shortcutRegistry.keyFor(action);
   sk.textContent=key?key.toUpperCase():'';
 }
 function syncAllToolButtonShortcutBadges(){
-  TOOL_SHORTCUTS.forEach(function(s){syncToolButtonShortcutBadge(s.action);});
+  shortcutRegistry.toolShortcuts().forEach(function(s){syncToolButtonShortcutBadge(s.action);});
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',syncAllToolButtonShortcutBadges);else syncAllToolButtonShortcutBadges();
 function runToolShortcut(k){
   var lk=(k||'').toLowerCase();
-  for(var i=0;i<TOOL_SHORTCUTS.length;i++){
-    if(shortcutKeyFor(TOOL_SHORTCUTS[i].action)===lk){
-      if(TOOL_SHORTCUTS[i].action==='toggleOnion')window.SM.toggleOnion();
-      else window.SM.setTool(TOOL_SHORTCUTS[i].action);
+  var tools=shortcutRegistry.toolShortcuts();
+  for(var i=0;i<tools.length;i++){
+    if(shortcutRegistry.keyFor(tools[i].action)===lk){
+      if(tools[i].action==='toggleOnion')window.SM.toggleOnion();
+      else window.SM.setTool(tools[i].action);
       return true;
     }
   }
@@ -7669,13 +7557,13 @@ function renderShortcutsList(){
   }
   function assignFor(def){
     return function(ev,keyBtn){
-      if(ev.key==='Escape'){keyBtn.textContent=shortcutKeyFor(def.action)||'—';return;}
-      var clash=shortcutClashFor(def.action,ev.key);
+      if(ev.key==='Escape'){keyBtn.textContent=shortcutRegistry.keyFor(def.action)||'—';return;}
+      var clash=shortcutRegistry.clashFor(def.action,ev.key);
       if(clash){
         showToast(SM.t('shortcutKeyClashToast').replace('{label}',clash.label&&clash.label.indexOf('shortcut')===0?SM.t(clash.label):clash.label));
-        keyBtn.textContent=shortcutKeyFor(def.action)||'—';
+        keyBtn.textContent=shortcutRegistry.keyFor(def.action)||'—';
       }else{
-        setShortcutKey(def.action,ev.key);
+        shortcutRegistry.setKey(def.action,ev.key);
         keyBtn.textContent=ev.key.toLowerCase();
       }
     };
@@ -7683,20 +7571,20 @@ function renderShortcutsList(){
   function draw(){
     body.innerHTML='';
     var shown=0;
-    SHORTCUT_CATS.forEach(function(cat){
+    shortcutRegistry.categories().forEach(function(cat){
       var rows=[];
       if(cat.id==='tools'){
-        TOOL_SHORTCUTS.forEach(function(d){
-          var key=shortcutKeyFor(d.action)||'';
+        shortcutRegistry.toolShortcuts().forEach(function(d){
+          var key=shortcutRegistry.keyFor(d.action)||'';
           if(matches(d.label,key))rows.push(keyRow(d.label,key||'—',assignFor(d)));
         });
       }
-      COMMAND_SHORTCUTS.forEach(function(d){
+      shortcutRegistry.commandShortcuts().forEach(function(d){
         if(d.cat!==cat.id)return;
-        var label=SM.t(d.label),key=shortcutKeyFor(d.action)||'';
+        var label=SM.t(d.label),key=shortcutRegistry.keyFor(d.action)||'';
         if(matches(label,key))rows.push(keyRow(label,key||'—',assignFor(d)));
       });
-      READONLY_SHORTCUTS.forEach(function(d){
+      shortcutRegistry.readonlyShortcuts().forEach(function(d){
         if(d.cat!==cat.id)return;
         var label=SM.t(d.label);
         if(matches(label,d.keys))rows.push(keyRow(label,d.keys,null));
@@ -9022,7 +8910,7 @@ function initSettingsModal(){
   modal.addEventListener('click',function(e){if(e.target===modal)modal.style.display='none';});
   var resetBtn=document.getElementById('shortcuts-reset');
   if(resetBtn)resetBtn.addEventListener('click',function(){
-    _shortcutOverrides={};try{localStorage.removeItem('nemo-shortcuts');}catch(e){}
+    shortcutRegistry.reset();
     renderShortcutsList();showToast(SM.t('toastShortcutsReset'));
   });
 }

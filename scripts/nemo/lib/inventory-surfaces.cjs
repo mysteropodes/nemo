@@ -220,13 +220,15 @@ function createSurfaces({ src, rel, domRows, i18n, idx, fnIndex, bindings, class
     });
   }
 
-  // 2. Shortcut tables (timeline.js)
-  const tl = byFile.get(path.join(src, 'js', 'timeline.js'));
+  // 2. Shortcut tables (moved off timeline.js to application/shortcut-registry.js by P30/#1032)
+  const tl = byFile.get(path.join(src, 'js', 'application', 'shortcut-registry.js'));
   if (tl) {
     for (const table of ['TOOL_SHORTCUTS', 'COMMAND_SHORTCUTS', 'READONLY_SHORTCUTS']) {
-      const at = tl.code.indexOf('var ' + table + '=[');
+      const declMatch = new RegExp('var\\s+' + table + '\\s*=\\s*\\[').exec(tl.code);
+      const at = declMatch ? declMatch.index : -1;
       if (at < 0) continue;
-      const end = tl.code.indexOf('\n];', at);
+      const endMatch = /\n\s*\];/.exec(tl.code.slice(at));
+      const end = endMatch ? at + endMatch.index : -1;
       const block = tl.code.slice(at, end);
       const re = /\{action:'([^']*)',key:'([^']*)'(?:,cat:'([^']*)')?,label:'([^']*)'|\{keys:'([^']*)',label:'([^']*)',cat:'([^']*)'\}/g;
       let m;
