@@ -546,7 +546,7 @@
             "native": "N/A: browser UI only"
           },
           "admission": "reconciliation only; clipped construct makes independent admission invalid",
-          "construct_boundary": "complete",
+          "construct_boundary": "Clipped tail: toggleOnion starts at line 459 outside the assigned span; reconcile the complete method 459-463 with C02 before any extraction.",
           "notes": ""
         }
       ]
