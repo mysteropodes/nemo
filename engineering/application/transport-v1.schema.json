@@ -2,64 +2,6 @@
   "apiVersion": 1,
   "request": {
     "$defs": {
-      "CommandPayload": {
-        "additionalProperties": false,
-        "description": "Every key a payload may carry. Which of them an operation requires is listed\nwith that operation's template; no other key is accepted.",
-        "properties": {
-          "animated": {
-            "description": "Whether the property is animated.",
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
-          "curvePoints": {
-            "description": "Unavailable: curve editing is not exposed by this capability, and a payload\ncarrying this key is rejected."
-          },
-          "frame": {
-            "description": "Timeline frame; defaults to the document's current frame where it is optional.",
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "layerId": {
-            "description": "Layer identity, copied from `layers[].layerUid` of the latest snapshot.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "property": {
-            "description": "Property identity: the `id` of a registered property capability\n(engineering/application/capabilities/*.json). Note the key is `property`,\nwhile the descriptor names it `id`.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "request": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/RecordedCommand"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "One recorded property command, as `diagnostics.trace` reports it."
-          },
-          "value": {
-            "description": "New value, in the unit and range `capabilities` advertises for the property.",
-            "format": "double",
-            "type": [
-              "number",
-              "null"
-            ]
-          }
-        },
-        "type": "object"
-      },
       "Operation": {
         "enum": [
           "capabilities",
@@ -75,23 +17,6 @@
           "diagnostics.replay"
         ],
         "type": "string"
-      },
-      "RecordedCommand": {
-        "description": "One recorded command, in the form `diagnostics.trace` reports it. An entry read\nfrom a trace can be handed back unchanged; its extra fields are ignored.",
-        "properties": {
-          "operation": {
-            "$ref": "#/$defs/Operation",
-            "description": "`property.set`, `property.key.set`, `property.key.remove` or `property.animation.set`."
-          },
-          "payload": {
-            "$ref": "#/$defs/CommandPayload"
-          }
-        },
-        "required": [
-          "operation",
-          "payload"
-        ],
-        "type": "object"
       }
     },
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -131,8 +56,116 @@
         "description": "The operation to run; its name selects the payload template below."
       },
       "payload": {
-        "additionalProperties": false,
-        "description": "Operation body. Always a JSON object, never a JSON-encoded string. Copy the template for the chosen operation:\n  property.set           {\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.key.set       {\"frame\":12,\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.key.remove    {\"frame\":12,\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.animation.set {\"animated\":true,\"layerId\":\"layer-1\",\"property\":\"opacity\"}\n  history.undo           {}\n  history.redo           {}\n  diagnostics.replay     {\"request\":{\"operation\":\"property.set\",\"payload\":{\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}}}\n`layerId` is `layers[].layerUid` from the latest snapshot. `property` is the `id` of a registered property capability (engineering/application/capabilities/*.json) — the payload key is `property` even though the descriptor names it `id`. `frame` defaults to the document's current frame wherever the template omits it.",
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "animated": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "frame": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "layerId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "property": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "request": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "value": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "animated": {
+                "type": "boolean"
+              },
+              "frame": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "layerId": {
+                "description": "layers[].layerUid from the latest snapshot.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "property": {
+                "const": "opacity"
+              },
+              "value": {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "layerId",
+              "property"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "request": {
+                "additionalProperties": false,
+                "properties": {
+                  "operation": {
+                    "enum": [
+                      "capabilities",
+                      "snapshot",
+                      "property.get",
+                      "property.set",
+                      "property.key.set",
+                      "property.key.remove",
+                      "property.animation.set",
+                      "history.undo",
+                      "history.redo",
+                      "diagnostics.trace",
+                      "diagnostics.replay"
+                    ]
+                  },
+                  "payload": true
+                },
+                "required": [
+                  "operation",
+                  "payload"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "request"
+            ],
+            "type": "object"
+          }
+        ],
+        "description": "Operation body. Always a JSON object, never a JSON-encoded string. Copy the template for the chosen operation:\n  property.set           {\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.key.set       {\"frame\":12,\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.key.remove    {\"frame\":12,\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}\n  property.animation.set {\"animated\":true,\"layerId\":\"layer-1\",\"property\":\"opacity\"}\n  history.undo           {}\n  history.redo           {}\n  diagnostics.replay     {\"request\":{\"operation\":\"property.set\",\"payload\":{\"layerId\":\"layer-1\",\"property\":\"opacity\",\"value\":40}}}\n`property` selects a registered capability. The matching branch projects its exact input fields and JSON types; each full input/output descriptor is also exposed in `x-nemo-registeredCapabilities` for discovery clients.",
         "examples": [
           {
             "layerId": "layer-1",
@@ -169,60 +202,297 @@
             }
           }
         ],
-        "properties": {
-          "animated": {
-            "description": "Whether the property is animated.",
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
-          "curvePoints": {
-            "description": "Unavailable: curve editing is not exposed by this capability, and a payload\ncarrying this key is rejected."
-          },
-          "frame": {
-            "description": "Timeline frame; defaults to the document's current frame where it is optional.",
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "layerId": {
-            "description": "Layer identity, copied from `layers[].layerUid` of the latest snapshot.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "property": {
-            "description": "Property identity: the `id` of a registered property capability\n(engineering/application/capabilities/*.json). Note the key is `property`,\nwhile the descriptor names it `id`.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "request": {
-            "anyOf": [
+        "type": "object",
+        "x-nemo-registeredCapabilities": [
+          {
+            "availability": {
+              "reason": null,
+              "state": "available"
+            },
+            "effects": {
+              "kind": "mutation",
+              "lifecycle": [
+                "property.get",
+                "property.set",
+                "property.key.set",
+                "property.key.remove",
+                "property.animation.set"
+              ],
+              "scope": "document"
+            },
+            "examples": [
               {
-                "$ref": "#/$defs/RecordedCommand"
+                "input": {
+                  "layerId": "layer-1",
+                  "value": 40
+                },
+                "label": "set opacity to 40 on one layer",
+                "output": {
+                  "layerId": "layer-1",
+                  "property": "opacity",
+                  "value": 40
+                }
               },
               {
-                "type": "null"
+                "input": {
+                  "frame": 12,
+                  "layerId": "layer-1",
+                  "value": 40
+                },
+                "label": "key opacity at frame 12",
+                "output": {
+                  "layerId": "layer-1",
+                  "property": "opacity",
+                  "value": 40
+                }
+              },
+              {
+                "input": {
+                  "animated": true,
+                  "layerId": "layer-1"
+                },
+                "label": "enable animation on the property",
+                "output": {
+                  "layerId": "layer-1",
+                  "property": "opacity",
+                  "value": 40
+                }
               }
             ],
-            "description": "One recorded property command, as `diagnostics.trace` reports it."
+            "fixture": {
+              "input": {
+                "layerId": "layer-1",
+                "value": 40
+              },
+              "label": "set opacity to 40 on one layer",
+              "output": {
+                "layerId": "layer-1",
+                "property": "opacity",
+                "value": 40
+              }
+            },
+            "handlerKey": "application.opacity.property",
+            "id": "opacity",
+            "input": {
+              "additionalProperties": false,
+              "properties": {
+                "animated": {
+                  "type": "boolean"
+                },
+                "frame": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "layerId": {
+                  "description": "layers[].layerUid from the latest snapshot.",
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "value": {
+                  "maximum": 100,
+                  "minimum": 0,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "layerId"
+              ],
+              "type": "object"
+            },
+            "output": {
+              "additionalProperties": false,
+              "properties": {
+                "layerId": {
+                  "type": "string"
+                },
+                "property": {
+                  "const": "opacity"
+                },
+                "value": {
+                  "maximum": 100,
+                  "minimum": 0,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "layerId",
+                "property",
+                "value"
+              ],
+              "type": "object"
+            },
+            "schemaVersion": 1,
+            "units": {
+              "value": "percent"
+            },
+            "version": 1
           },
-          "value": {
-            "description": "New value, in the unit and range `capabilities` advertises for the property.",
-            "format": "double",
-            "type": [
-              "number",
-              "null"
-            ]
+          {
+            "availability": {
+              "reason": "missing-dependency",
+              "state": "unavailable"
+            },
+            "effects": {
+              "kind": "job",
+              "lifecycle": [
+                "start",
+                "status",
+                "cancel"
+              ],
+              "scope": "none"
+            },
+            "examples": [
+              {
+                "input": {
+                  "frameIdx": 10
+                },
+                "label": "start",
+                "output": {
+                  "jobId": "job-1",
+                  "progress": 0,
+                  "status": "running"
+                }
+              },
+              {
+                "input": {
+                  "jobId": "job-1"
+                },
+                "label": "status while rendering",
+                "output": {
+                  "jobId": "job-1",
+                  "progress": 0.5,
+                  "status": "running"
+                }
+              },
+              {
+                "input": {
+                  "jobId": "job-1"
+                },
+                "label": "status once complete",
+                "output": {
+                  "artifact": {
+                    "data": "<svg></svg>",
+                    "mimeType": "image/svg+xml"
+                  },
+                  "jobId": "job-1",
+                  "progress": 1,
+                  "status": "succeeded"
+                }
+              },
+              {
+                "input": {
+                  "jobId": "job-1"
+                },
+                "label": "cancel before completion",
+                "output": {
+                  "jobId": "job-1",
+                  "progress": 0.5,
+                  "status": "cancelled"
+                }
+              }
+            ],
+            "fixture": {
+              "input": {
+                "frameIdx": 10
+              },
+              "label": "export frame 10 as SVG, complete",
+              "output": {
+                "artifact": {
+                  "data": "<svg></svg>",
+                  "mimeType": "image/svg+xml"
+                },
+                "jobId": "job-1",
+                "progress": 1,
+                "status": "succeeded"
+              }
+            },
+            "handlerKey": "application.export.svgFrame",
+            "id": "export.svg.frame",
+            "input": {
+              "additionalProperties": false,
+              "description": "What a caller supplies to invoke this capability. \"frameIdx\" addresses the \"start\" stage; \"jobId\" (returned by \"start\"'s output) addresses \"status\" and \"cancel\". Exactly one is required depending on stage, enforced by the handler per stage rather than by this shape — full per-stage input contracts are D02/#1045.",
+              "properties": {
+                "frameIdx": {
+                  "description": "0-based timeline frame to export. Required for the \"start\" stage.",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "jobId": {
+                  "description": "Job identifier returned by \"start\". Required for the \"status\" and \"cancel\" stages.",
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "output": {
+              "additionalProperties": false,
+              "properties": {
+                "artifact": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "description": "Inline SVG document text.",
+                      "type": "string"
+                    },
+                    "mimeType": {
+                      "const": "image/svg+xml"
+                    }
+                  },
+                  "required": [
+                    "mimeType",
+                    "data"
+                  ],
+                  "type": "object"
+                },
+                "error": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "type": "object"
+                },
+                "jobId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "progress": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "status": {
+                  "enum": [
+                    "running",
+                    "succeeded",
+                    "failed",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "jobId",
+                "status"
+              ],
+              "type": "object"
+            },
+            "schemaVersion": 1,
+            "units": {
+              "progress": "ratio"
+            },
+            "version": 1
           }
-        },
-        "type": "object"
+        ]
       },
       "requestId": {
         "description": "Caller-chosen identity, 1..128 bytes. Re-sending it with an identical body\nreturns the retained result; re-sending it with a changed body is rejected.",

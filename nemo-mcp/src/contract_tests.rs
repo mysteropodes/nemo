@@ -21,12 +21,6 @@ fn json_kind_names_every_json_shape() {
 }
 
 #[test]
-fn supplies_reports_false_for_a_key_no_payload_field_owns() {
-    let payload = CommandPayload::default();
-    assert!(!payload.supplies("something-no-descriptor-should-ever-declare"));
-}
-
-#[test]
 fn unavailable_capability_is_a_typed_error_naming_its_reason() {
     // No registered descriptor is both property-family and unavailable today
     // (export-job.json is job-family, opacity.json is available) — a synthetic
@@ -49,6 +43,63 @@ fn unavailable_capability_is_a_typed_error_naming_its_reason() {
     assert!(error.message().contains("feature-flag-off"));
     // The Display impl is a thin wrapper over `message()`, exercised here.
     assert_eq!(error.to_string(), error.message());
+}
+
+#[test]
+fn generic_property_projection_accepts_descriptor_owned_string_and_custom_fields() {
+    // This deliberately differs from opacity: `value` is a string and `mode` is a
+    // required custom field. Adding it needs no Operation variant, payload struct
+    // field, or central dispatch arm — only the descriptor projection changes.
+    let catalog = descriptor(
+        r#"{
+            "id": "label",
+            "input": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "layerId": {"type": "string"},
+                    "value": {"type": "string"},
+                    "mode": {"type": "string"}
+                },
+                "required": ["layerId", "value", "mode"]
+            },
+            "effects": {"lifecycle": ["property.set"]},
+            "availability": {"state": "available", "reason": null},
+            "fixture": {"input": {"layerId": "layer-1", "value": "Title", "mode": "replace"}}
+        }"#,
+    );
+    let valid = json!({
+        "layerId": "layer-1",
+        "property": "label",
+        "value": "Title",
+        "mode": "replace"
+    });
+    assert!(Operation::PropertySet
+        .check_payload_with(&valid, &catalog)
+        .is_ok());
+
+    let wrong_type = json!({
+        "layerId": "layer-1",
+        "property": "label",
+        "value": 42,
+        "mode": "replace"
+    });
+    let error = Operation::PropertySet
+        .check_payload_with(&wrong_type, &catalog)
+        .unwrap_err();
+    assert_eq!(error.code(), "malformed_payload");
+    assert!(error.message().contains("payload.value has type a number"));
+
+    let missing_custom = json!({
+        "layerId": "layer-1",
+        "property": "label",
+        "value": "Title"
+    });
+    let error = Operation::PropertySet
+        .check_payload_with(&missing_custom, &catalog)
+        .unwrap_err();
+    assert_eq!(error.code(), "malformed_payload");
+    assert!(error.message().contains("missing mode"));
 }
 
 #[test]

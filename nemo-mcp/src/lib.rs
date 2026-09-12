@@ -1,5 +1,6 @@
 //! Transport only. The running application's command service owns all document writes.
 pub mod capabilities;
+pub(crate) mod capability_contract;
 pub mod contract;
 pub mod registry;
 pub mod server;

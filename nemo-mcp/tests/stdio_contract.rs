@@ -42,33 +42,33 @@ async fn advertised_payload_schema_names_every_key_and_operation_template() {
     // The defect verbatim: schemars renders `serde_json::Value` as `true`.
     assert_ne!(payload, &json!(true), "payload must carry a real schema");
     assert_eq!(payload["type"], "object");
-    assert_eq!(payload["additionalProperties"], false);
-    for key in [
-        "layerId", "property", "value", "frame", "animated", "request",
-    ] {
-        assert!(
-            payload["properties"][key].is_object(),
-            "payload advertises {key}"
-        );
-    }
-    // Each key is optional because requiredness is per operation, so schemars types
-    // it as a union with null; what matters is that the primitive is named.
-    for (key, primitive) in [
-        ("layerId", "string"),
-        ("property", "string"),
-        ("value", "number"),
-        ("frame", "integer"),
-        ("animated", "boolean"),
-    ] {
-        let advertised = &payload["properties"][key]["type"];
-        assert!(
-            advertised == primitive
-                || advertised
-                    .as_array()
-                    .is_some_and(|types| types.iter().any(|entry| entry == primitive)),
-            "{key} is typed {advertised}"
-        );
-    }
+    let descriptors = &payload["x-nemo-registeredCapabilities"];
+    let expected = json!([
+        serde_json::from_str::<Value>(include_str!(
+            "../../engineering/application/capabilities/opacity.json"
+        ))
+        .unwrap(),
+        serde_json::from_str::<Value>(include_str!(
+            "../../engineering/application/capabilities/export-job.json"
+        ))
+        .unwrap(),
+    ]);
+    assert_eq!(
+        descriptors, &expected,
+        "all descriptor fields survive schema projection"
+    );
+    let opacity = payload["anyOf"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|branch| branch["properties"]["property"]["const"] == "opacity")
+        .expect("opacity descriptor creates a property payload branch");
+    assert_eq!(opacity["properties"]["value"]["type"], "number");
+    assert_eq!(opacity["properties"]["property"]["const"], "opacity");
+    assert!(opacity["required"]
+        .as_array()
+        .unwrap()
+        .contains(&json!("layerId")));
 
     let description = payload["description"].as_str().unwrap();
     for operation in [
@@ -85,7 +85,7 @@ async fn advertised_payload_schema_names_every_key_and_operation_template() {
     // The registered capability descriptor names the property `id`; the payload key
     // is `property`. The one client that recovered lost an attempt to exactly this
     // mismatch.
-    assert!(description.contains("the descriptor names it `id`"));
+    assert!(description.contains("x-nemo-registeredCapabilities"));
     assert!(description.contains("never a JSON-encoded string"));
     let examples = payload["examples"].as_array().unwrap();
     assert_eq!(examples.len(), 7, "one example per write operation");
@@ -100,6 +100,32 @@ async fn advertised_payload_schema_names_every_key_and_operation_template() {
         .as_str()
         .unwrap()
         .contains("property.get"));
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn compiled_discovery_advertises_complete_registered_descriptors_without_an_instance() {
+    let client = client().await;
+    let discovery = client
+        .call_tool(CallToolRequestParams::new("nemo_discover"))
+        .await
+        .unwrap();
+    let body = discovery.structured_content.unwrap();
+    assert_eq!(body["apiVersion"], 1);
+    assert_eq!(body["instances"], json!([]));
+    assert_eq!(
+        body["registeredCapabilities"],
+        json!([
+            serde_json::from_str::<Value>(include_str!(
+                "../../engineering/application/capabilities/opacity.json"
+            ))
+            .unwrap(),
+            serde_json::from_str::<Value>(include_str!(
+                "../../engineering/application/capabilities/export-job.json"
+            ))
+            .unwrap(),
+        ])
+    );
     client.cancel().await.unwrap();
 }
 

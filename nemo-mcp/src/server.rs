@@ -1,5 +1,6 @@
 //! Small MCP tool family over the running application's versioned API.
 use crate::{
+    capabilities,
     contract::{ApplicationRequest, Operation},
     registry, wire,
 };
@@ -124,7 +125,16 @@ impl NemoServer {
                 }
             }
         }
-        CallToolResult::structured(json!({"apiVersion": 1, "instances": instances}))
+        // These embedded declarations are transport-owned contract metadata, not a
+        // second application registry. They are present even when no desktop instance
+        // is running, so a client can discover exact input/output contracts before it
+        // chooses an instance and the live application result remains authoritative
+        // for that instance's current state.
+        CallToolResult::structured(json!({
+            "apiVersion": 1,
+            "registeredCapabilities": capabilities::catalog().descriptors(),
+            "instances": instances
+        }))
     }
 
     #[tool(

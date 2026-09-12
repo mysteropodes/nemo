@@ -4,7 +4,7 @@
 //! adding its JSON to `CAPABILITY_SOURCES` below, not writing a new operation match arm
 //! (P07/#1009) — the descriptor's own `input`/`fixture`/`examples`/`availability` drive
 //! `contract.rs`'s payload validation and advertised examples generically.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::OnceLock;
 
@@ -13,23 +13,42 @@ const CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities/export-job.json"),
 ];
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CapabilityAvailability {
     pub state: String,
     pub reason: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CapabilityExample {
+    #[serde(default)]
+    pub label: String,
     pub input: Value,
+    #[serde(default)]
+    pub output: Value,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+/// The complete feature-owned descriptor. Keeping every public field here is
+/// deliberate: MCP discovery and its generated JSON Schema advertise this value
+/// verbatim, rather than a Rust-side summary that can silently lose input/output
+/// constraints, units, handler identity, or examples.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CapabilityDescriptor {
+    #[serde(default)]
+    pub schema_version: u32,
     pub id: String,
+    #[serde(default)]
+    pub version: u32,
     pub input: Value,
+    #[serde(default)]
+    pub output: Value,
+    #[serde(default)]
+    pub units: Value,
     pub effects: Value,
     pub availability: CapabilityAvailability,
+    #[serde(default)]
+    pub handler_key: String,
     pub fixture: CapabilityExample,
     #[serde(default)]
     pub examples: Vec<CapabilityExample>,
@@ -86,6 +105,12 @@ impl CapabilityCatalog {
         self.descriptors
             .iter()
             .find(|descriptor| descriptor.id == id)
+    }
+
+    /// Full registered declarations in reviewed source order. This is a read-only
+    /// contract projection for discovery/schema clients, never application state.
+    pub fn descriptors(&self) -> &[CapabilityDescriptor] {
+        &self.descriptors
     }
 
     /// The first registered capability whose lifecycle answers to `stage`, used to build
