@@ -1,0 +1,363 @@
+{
+  "census_id": "C19b",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1120",
+  "title": "Timeline work-area and composition-duration boundaries",
+  "owner": "Ilya/D1; read-only census draft with later Codexitron/Ilya O integration",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "status": "read-only census and admission proposals; no runtime writer or Ready extraction claim",
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 849,
+      "end": 861,
+      "lines": 13,
+      "classification": {
+        "code": 4,
+        "comment": 9,
+        "whitespace": 0
+      }
+    },
+    {
+      "start": 1082,
+      "end": 1120,
+      "lines": 39,
+      "classification": {
+        "code": 25,
+        "comment": 14,
+        "whitespace": 0
+      }
+    }
+  ],
+  "coverage_note": "Exactly 52 assigned lines are covered once: 29 code and 23 full-line // comments, with no whitespace lines. Lexical classification treats an empty trimmed line as whitespace, a trimmed line beginning // as comment, and every other line as code. No line in the wider 849-2701 gap is claimed unless it falls in the two assigned ranges.",
+  "context_boundaries": [
+    {
+      "assigned": "849-861",
+      "context": "Properties inside window.SM opened at line 349. Line 848 is the C02-owned setOnionMode property; line 862 begins addLayer. Both assigned methods are complete, but the containing facade is not."
+    },
+    {
+      "assigned": "1082-1120",
+      "context": "trimToWorkArea is complete. Its descriptive comments at 1076-1081 and following setLayerKeyLock at 1121 are read-only context and are not coverage."
+    }
+  ],
+  "whole_file_writer_guidance": {
+    "source_access": "timeline.js remains read-only; C19b claims only the eventual new census JSON artifact.",
+    "serialization": "Any future implementation touching timeline.js reserves the whole file and serializes with C01/C02/C04/C06 work and P20/P24/P30 activity. Range-level census ownership never permits concurrent timeline writers.",
+    "publication": "Integrate only after C19a releases the task checkout, then obtain independent exact-candidate review and use the normal protected path.",
+    "reservations": "D01/#1044 remains separate. T05/Pollen and every other active owner remain reserved. These proposals do not transfer ownership."
+  },
+  "reconciliation": [
+    {
+      "owner": "C02",
+      "disposition": "Retain playback, camera, markers and Motion-track ownership. C19b only maps their consumers and the trim call into shiftLayerMotionKeys."
+    },
+    {
+      "owner": "C06",
+      "disposition": "Retain importJSON and global bootstrap/facade ownership; C19b does not migrate import or the full SM object."
+    },
+    {
+      "owner": "P20/#1022",
+      "disposition": "Folder codec is accepted and remains unchanged; duration/trim uses layer arrays without absorbing folder metadata serialization."
+    },
+    {
+      "owner": "P24/#1026",
+      "disposition": "Playback-step kernel remains separate; it only consumes work-area bounds."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Shortcut tables/persistence remain separate and retain whole-file serialization."
+    }
+  ],
+  "areas": [
+    {
+      "area": "work-area-and-composition-duration",
+      "packets": [
+        {
+          "id": "C19b.work-area-bounds",
+          "title": "Work-area bounds setter",
+          "files": [
+            "src/js/timeline.js:849-849"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 849,
+              "end": 849
+            }
+          ],
+          "symbols": [
+            "SM.setWorkArea"
+          ],
+          "responsibility": "Assigns the inclusive composition work-area start and end exactly as supplied. It performs no coercion, ordering, timeline-bound clamp, mirror update, render, save or history action.",
+          "writer": "Direct writer of state.waIn and state.waOut. ui.js owns drag validation and the legacy window._waIn/_waOut mirrors; this method does not.",
+          "public_api": "window.SM.setWorkArea(inFrame,outFrame). Nemo Script exposes the same operation as nemo.comp.setWorkArea(in,out).",
+          "consumers": [
+            "src/js/ui.js work-area drag commit",
+            "src/js/nemo-script.js composition scripting API",
+            "src/js/export.js default start/end readers",
+            "P24 playback bounds reader",
+            "timeline and Motion work-area renderers"
+          ],
+          "oracle": "Future port-level test calls the public API with ordered, reversed, negative and beyond-duration values and asserts exact assignment with no hidden clamp or side effect; a separate real UI drag check proves ui.js supplies ordered in-range values and updates the bar.",
+          "depends_on": [
+            "C02 playback/time ownership",
+            "C06 global SM facade/bootstrap"
+          ],
+          "entangled_with": [
+            "ui.js initWaDrag/updateWaBar",
+            "P24 playback-step inputs"
+          ],
+          "proposed_module": "src/js/application/work-area-controller.js",
+          "proposed_api": "setWorkAreaBounds(state,inFrame,outFrame) preserving raw assignment; validation remains an explicit caller policy until a separately accepted behavior change.",
+          "consumer_matrix": {
+            "save": "Persisted only when a later exportJSON/save reads state.waIn/waOut; this setter does not save.",
+            "load": "importJSON is the independent loader/writer at timeline.js:2376-2378; this setter is not its load path.",
+            "history": "No undo snapshot; work-area changes are presently outside undo/redo.",
+            "selection": "Does not inspect or rewrite frame/layer selections.",
+            "animation": "Primary bounds consumed by playback and trim; does not move frames itself.",
+            "render": "The setter does not render; both ui.js and Nemo Script call updateWaBar after assigning bounds.",
+            "export": "exportJSON persists waIn/waOut and export.js uses them as default export start/end.",
+            "native": "No direct native call; browser UI and Nemo Script are callers."
+          },
+          "admission": "Bounded extraction proposal preserving raw assignment and existing caller policy; adding validation is a separate behavior change, not a prerequisite to remediation.",
+          "notes": "Complete one-line method, but it is a property of the larger window.SM object opened at line 349. Do not treat line 849 as a whole-facade boundary."
+        },
+        {
+          "id": "C19b.composition-duration",
+          "title": "Non-destructive composition-duration resize",
+          "files": [
+            "src/js/timeline.js:850-861"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 850,
+              "end": 861
+            }
+          ],
+          "symbols": [
+            "SM.setTotalFrames"
+          ],
+          "responsibility": "Clamps requested duration to 1..999, saves live layer frames, pads every layer when growing, changes totalFrames and compatibility mirrors, clamps waOut/waIn and currentFrame, and refreshes UI. Shrinking deliberately retains frame arrays and stored layer in/out values so a later grow restores hidden content.",
+          "writer": "Direct writer of state.totalFrames, state.waIn/state.waOut and window._totalF/_waIn/_waOut; app.js saveAllLayerFrames owns capture of live Paper content; goToFrame owns current-frame navigation.",
+          "public_api": "window.SM.setTotalFrames(value).",
+          "consumers": [
+            "project Frames field at timeline.js:11070",
+            "timeline Total field at timeline.js:11395",
+            "images.js three import paths",
+            "native-video-bridge.js three metadata/import paths",
+            "project/export/import pipelines",
+            "layerInPoint/layerOutPoint resolvers",
+            "camera, markers, audio row, playback cache and timeline renderers"
+          ],
+          "oracle": "Independent fixture matrix: grow 3→5 pads each layer with exact blank-frame records; shrink 5→2 retains arrays and raw in/out/markers; waOut clamp followed by waIn non-inversion; currentFrame navigation; lower/upper clamps; live-frame save and one UI refresh. Record NaN behavior separately because Math.min/Math.max currently yields NaN.",
+          "depends_on": [
+            "C01 document serialization/history",
+            "C02 animation/time",
+            "C03 rendering/cache",
+            "C05 image/native-video import",
+            "P24 playback"
+          ],
+          "entangled_with": [
+            "app.js layer range resolvers intentionally clamp without rewriting raw ranges"
+          ],
+          "proposed_module": "src/js/domain/animation/composition-duration.js",
+          "proposed_api": "planDurationResize({totalFrames,waIn,waOut,currentFrame,layerLengths},requested) -> normalized state and pad counts; application wrapper performs save, padding, mirrors, navigation and UI.",
+          "consumer_matrix": {
+            "save": "saveAllLayerFrames runs before resize; exportJSON later persists totalFrames/waIn/waOut and retained layer arrays.",
+            "load": "importJSON independently restores totalFrames/waIn/waOut and layer frames; resize must not absorb C06 import.",
+            "history": "No pushUndo/pushUndoLayers call, so duration resize is currently not undoable. Preserve and expose this baseline unless separately repaired.",
+            "selection": "Does not clear or remap _sel; selected frame coordinates may refer beyond the shortened visible duration.",
+            "animation": "Changes composition duration and playback/work-area bounds but deliberately does not truncate animation frames, markers, camera keys or Motion tracks.",
+            "render": "updateUI is the only direct render path; downstream timeline, camera, marker and audio widths read totalFrames.",
+            "export": "exportJSON persists duration and work area; export.js defaults frame range to current work area.",
+            "native": "native-video-bridge calls setTotalFrames when decoded media exceeds duration; no native command is issued by the setter."
+          },
+          "admission": "split-ready proposal: extract the pure resize planner first, leaving side-effect application in timeline.js until consumer checks pass",
+          "notes": "Complete method ends at line 861. Neighbor line 862 starts SM.addLayer and is not claimed. `v` is normally parsed/numeric at known UI/import callers, but the method itself has no finite-number guard."
+        },
+        {
+          "id": "C19b.trim-work-area",
+          "title": "Destructive trim and temporal rebase to work area",
+          "files": [
+            "src/js/timeline.js:1082-1120"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 1082,
+              "end": 1120
+            }
+          ],
+          "symbols": [
+            "SM.trimToWorkArea"
+          ],
+          "responsibility": "Refuses component and montage contexts, rejects empty/one-frame-or-less and no-op ranges, snapshots live layer state, slices layer frames to the inclusive work area, rebases layer in/out points and layer/comp markers, shifts Motion keys, rebases camera keys, resets duration/work area and current frame, then reloads and rerenders.",
+          "writer": "Writes state.layers[*].frames/inPoint/outPoint/markers, state.markers, state.cameraKeys, state.totalFrames, state.waIn/waOut, state.currentFrame and compatibility mirrors; delegates Motion-track writes to SMMotion.shiftLayerMotionKeys.",
+          "public_api": "window.SM.trimToWorkArea(); Nemo Script exposes nemo.comp.trimToWorkArea().",
+          "consumers": [
+            "markers.js ruler context-menu action",
+            "nemo-script.js composition scripting API",
+            "C01 export/import/autosave",
+            "tweens.js layersSnapshotNow/restoreLayersSnapshot",
+            "SMMotion.shiftLayerMotionKeys",
+            "camera.js and markers.js",
+            "timeline/load/render/update functions"
+          ],
+          "oracle": "Future fixture oracle must cover symbol/montage refusal and every early return; for a 2..5 trim of an 8-frame document assert 4 frames, layer slice/padding, current-frame rebase, raw in/out transformation, layer/comp marker filtering, camera deep-clone/filter, Motion key result under the current pre-trim total, mirrors, render order and toast. Undo/redo oracle must explicitly demonstrate the current incomplete restoration of prior work area and comp markers rather than assume it works.",
+          "depends_on": [
+            "C01 full-layer history and serialization",
+            "C02 Motion/camera/markers",
+            "C06 global facade/bootstrap"
+          ],
+          "entangled_with": [
+            "SMMotion.shiftLayerMotionKeys clamps using state.totalFrames",
+            "app.js symbol/montage snapshot aliases",
+            "audioTracks/refMedia timing fields not touched"
+          ],
+          "proposed_module": "src/js/domain/animation/trim-composition.js",
+          "proposed_api": "Pure planning seam: trimCompositionTime(document,{inFrame,outFrame},{shiftMotionKeys,clone}) -> transformed document plus changed ranges; application wrapper owns context guards, history, live-frame save, state/mirror replacement and render effects.",
+          "consumer_matrix": {
+            "save": "saveAllLayerFrames captures live frames before mutation; later exportJSON persists new duration/work area/layers/markers/camera/Motion data.",
+            "load": "importJSON independently restores these fields. Trim must consume the established document shapes and must not widen P20 folder codec or C06 import ownership.",
+            "history": "Calls pushUndoLayers(true), whose snapshot includes layers, totalFrames and cameraKeys but not state.markers or waIn/waOut. Undo therefore does not fully restore composition markers or the prior work area.",
+            "selection": "Does not clear/remap _sel or canvas selection; frame-selection coordinates can remain based on pre-trim indices.",
+            "animation": "Slices Animation 2D frames and invokes SMMotion.shiftLayerMotionKeys per layer. That function reads the old state.totalFrames because the new duration is assigned afterward, clamps rather than filters out-of-trim keys, and can leave Motion keys beyond the new duration.",
+            "render": "Calls loadFrame, renderLayerList, renderTimeline, updateUI and updateWaBar; pushUndoLayers invalidates playback cache.",
+            "export": "Export/save consumers receive rebased stored fields. export.js subsequently renders the reset full work area 0..n-1.",
+            "native": "No direct native command. The operation is available to browser UI and Nemo Script; media import only calls setTotalFrames."
+          },
+          "admission": "characterization and pure transformation contract are admissible; implementation must be split from any fixes to history, Motion filtering, selection or media timing",
+          "notes": "Method is syntactically complete at 1082-1120. Its explanatory header is at 1076-1081 outside the assigned range and is contextual evidence only."
+        }
+      ]
+    }
+  ],
+  "known_defects_and_unavailable_evidence": [
+    {
+      "id": "C19b.DEF-1",
+      "evidence": "setTotalFrames calls no history snapshot; setWorkArea also has no history path.",
+      "impact": "Duration/work-area changes are not undoable through these methods."
+    },
+    {
+      "id": "C19b.DEF-2",
+      "evidence": "trimToWorkArea pushes layersSnapshotNow, but that snapshot has totalFrames and cameraKeys while omitting state.markers and waIn/waOut; restoreLayersSnapshot does not reconstruct them.",
+      "impact": "Undo after trim restores layers/duration/camera but leaves composition markers and work-area bounds in their trimmed state."
+    },
+    {
+      "id": "C19b.DEF-3",
+      "evidence": "trim calls SMMotion.shiftLayerMotionKeys before assigning state.totalFrames=n. The shift helper clamps against the old duration and never filters to the trim end.",
+      "impact": "Motion keys outside the kept work area may clamp/rebase to frames beyond the new duration and remain stored but hidden."
+    },
+    {
+      "id": "C19b.DEF-4",
+      "evidence": "trim does not clear or rebase _sel and setTotalFrames does not clear selections beyond a shortened visible range.",
+      "impact": "Timeline frame-selection coordinates may be stale until another selection/render path replaces them."
+    },
+    {
+      "id": "C19b.DEF-5",
+      "evidence": "trim rebases frames, Motion keys, markers and camera keys but does not change audioTracks offsets/trims or refMedia.offsetFrames.",
+      "impact": "Time-based media may remain anchored to the old composition origin; no behavior test was found to settle intended semantics."
+    },
+    {
+      "id": "C19b.DEF-6",
+      "evidence": "No direct tests reference trimToWorkArea, setTotalFrames or setWorkArea. Existing fixtures merely contain totalFrames/waIn/waOut and browser tests assign work-area state directly.",
+      "impact": "All behavioral oracles listed here are proposed and unrun."
+    }
+  ],
+  "uncovered_responsibilities": [
+    "timeline.js:862-1081 and 1121-2701 remain outside C19b except for pre-existing accepted census/leaf claims.",
+    "Frame relocation at 1675-1976 remains the next separately admitted census slice; deleteSelStrokes, flip, duplicate/exposure, transforms and component/layer lifecycle stay separate.",
+    "Any repair of trim history, Motion-key filtering, selection rebasing or audio/reference-media timing requires its own accepted behavior leaf after baseline characterization."
+  ],
+  "validation": {
+    "expected_assigned_lines": 52,
+    "expected_classification": {
+      "code": 29,
+      "comment": 23,
+      "whitespace": 0
+    },
+    "required_consumer_dimensions": [
+      "save",
+      "load",
+      "history",
+      "selection",
+      "animation",
+      "render",
+      "export",
+      "native"
+    ],
+    "negative_controls": [
+      "remove assigned line 849 => omission rejection",
+      "also assign line 849 to a second packet => overlap rejection"
+    ],
+    "symbol_checks": [
+      {
+        "needle": "setWorkArea:function(",
+        "ranges": [
+          [
+            849,
+            849
+          ]
+        ]
+      },
+      {
+        "needle": "setTotalFrames:function(",
+        "ranges": [
+          [
+            850,
+            861
+          ]
+        ]
+      },
+      {
+        "needle": "trimToWorkArea:function(",
+        "ranges": [
+          [
+            1082,
+            1120
+          ]
+        ]
+      },
+      {
+        "needle": "window.SM={",
+        "ranges": [
+          [
+            349,
+            349
+          ]
+        ],
+        "context_only": true
+      },
+      {
+        "needle": "setOnionMode:function(",
+        "ranges": [
+          [
+            848,
+            848
+          ]
+        ],
+        "context_only": true
+      },
+      {
+        "needle": "addLayer:function(",
+        "ranges": [
+          [
+            862,
+            862
+          ]
+        ],
+        "context_only": true
+      },
+      {
+        "needle": "setLayerKeyLock:function(",
+        "ranges": [
+          [
+            1121,
+            1121
+          ]
+        ],
+        "context_only": true
+      }
+    ]
+  }
+}
