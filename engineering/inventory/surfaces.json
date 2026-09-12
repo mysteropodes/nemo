@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "6f4b91f79f134c4f1fcb6caedb3abbaee78c2fb8",
-  "describe": "v0.7.0-alpha.4-250-g6f4b91f-dirty"
+  "head": "f50f2ea8ae0a41cc0a2ccd08d82681017e1b103f",
+  "describe": "v0.7.0-alpha.4-256-gf50f2ea-dirty"
  },
- "inputsDigest": "652e9caee61379aabe4e355a404f5d2120bd4c872c467370ab1a1cd0a4dd4110",
+ "inputsDigest": "a8769e06996cb449b453adeed0953fd87c086d636715f24e77dfa4d63d3c55bc",
  "states": [
   "inventoried",
   "characterized",
@@ -4305,7 +4305,7 @@
     "container": "rig-assign-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 202,
+    "functionsVisited": 203,
     "via": "chain",
     "references": []
    },
@@ -15845,7 +15845,7 @@
     "container": "start-cards",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 181,
+    "functionsVisited": 182,
     "via": "chain",
     "references": [
      "src/js/project.js:664 initStartScreen()"
@@ -23482,7 +23482,7 @@
    "source": "src/js/layer-inout.js:1581",
    "meta": {
     "i18n": null,
-    "functionsVisited": 24
+    "functionsVisited": 25
    },
    "fixtures": [
     "static-props",
@@ -32374,7 +32374,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:218",
    "meta": {
-    "functionsVisited": 21
+    "functionsVisited": 20
    },
    "fixtures": [
     "media",
@@ -32583,7 +32583,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 334
+    "functionsVisited": 316
    },
    "fixtures": [
     "media",
@@ -33080,7 +33080,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:146",
    "meta": {
-    "functionsVisited": 30
+    "functionsVisited": 29
    },
    "fixtures": [
     "media",
@@ -33304,7 +33304,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:393",
    "meta": {
-    "functionsVisited": 125
+    "functionsVisited": 124
    },
    "fixtures": [
     "media",
@@ -33663,7 +33663,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:385",
    "meta": {
-    "functionsVisited": 232
+    "functionsVisited": 231
    },
    "fixtures": [
     "media",

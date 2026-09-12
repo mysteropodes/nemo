@@ -1705,6 +1705,18 @@
       ]
     },
     {
+      "id": "app.capability.registry",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "capability-registry.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "capability-registry.js"
+      ]
+    },
+    {
       "id": "app.opacity.bootstrap",
       "layer": "bootstrap",
       "dir": "src/js/bootstrap",
