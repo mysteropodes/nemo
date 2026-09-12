@@ -1717,6 +1717,18 @@
       ]
     },
     {
+      "id": "app.opacity.capability",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "opacity-capability.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "opacity-capability.js"
+      ]
+    },
+    {
       "id": "app.opacity.bootstrap",
       "layer": "bootstrap",
       "dir": "src/js/bootstrap",

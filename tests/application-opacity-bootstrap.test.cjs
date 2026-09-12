@@ -30,9 +30,14 @@ function application() {
   // domain/document/folder-codec.js is a load-order dependency of tweens.js:
   // layersSnapshotNow calls it to copy folder metadata (P20), the same way
   // motion.js hard-references its own domain modules above.
+  // application/capability-registry.js + application/opacity-capability.js are
+  // load-order dependencies of the bootstrap since P06: it registers opacity
+  // and routes NemoApplication.handle through the registry.
   for (const file of ['animation/curve.js', 'domain/animation/opacity.js', 'motion.js',
     'domain/document/folder-codec.js',
-    'tweens.js', 'application/opacity-application.js', 'bootstrap/opacity-application.js']) {
+    'tweens.js', 'application/opacity-application.js',
+    'application/capability-registry.js', 'application/opacity-capability.js',
+    'bootstrap/opacity-application.js']) {
     const filename = path.resolve(__dirname, '../src/js', file);
     vm.runInContext(fs.readFileSync(filename, 'utf8'), ctx, { filename });
     if (file === 'tweens.js') { ctx.renderOS = noop; ctx.renderArcs = noop; }
