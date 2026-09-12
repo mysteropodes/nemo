@@ -56,7 +56,7 @@
   "reconciliation": [
     {
       "owner": "C02/#1037",
-      "disposition": "Retains track/evaluator, renderLayerListMotion, Motion selection and animation semantics. C20d records the frozen numeric mismatch and consumes dependencies without correcting C02."
+      "disposition": "Retains track/evaluator, renderLayerListMotion, Motion selection and animation semantics. C20d records the frozen numeric mismatch and consumes dependencies without correcting C02. C02 also owns ensureElementHolder (2879-2910), which can allocate elementMotion and seed paramShapeKind/motionStatic while the panel renders."
     },
     {
       "owner": "C20c/#1137",
@@ -80,7 +80,7 @@
     },
     {
       "owner": "later C20 leaf",
-      "disposition": "Must cover renderNullShapeRow, renderFollowPathRow, renderParentRow, extra-parent menus, renderTimeLinkRow and timeLinkWouldCycle from7996 onward without duplicating C20d."
+      "disposition": "Must cover renderNullShapeRow, renderFollowPathRow, renderParentRow, extra-parent menus and renderTimeLinkRow from 7996 through 8434 without duplicating C20d. C02 retains timeLinkWouldCycle at 8435-8452, as accepted C20c reconciliation records."
     },
     {
       "owner": "historical product PRs",
@@ -88,9 +88,9 @@
     }
   ],
   "boundaries": [
-    "7554-7995 is a synchronous DOM-build surface whose installed event callbacks later mutate the live layer. Render-time captures and click-time reads are distinguished below.",
+    "7554-7995 builds DOM synchronously, calls C02-owned ensureElementHolder which can allocate/seed live document holders, and installs event callbacks that later mutate the layer. Render-time captures and click-time reads are distinguished below.",
     "body.innerHTML destroys previous child/listener identity before most guards; later thrown required calls leave partial replacement DOM.",
-    "Every mutation path is incremental with no catch, transaction or rollback. Undo is invoked before field writes, but failures after it preserve the history attempt and preceding mutations.",
+    "Installed Matte/Widget/Blend mutation callbacks invoke undo before their own field writes and have no rollback. Rendering a truthy target separately calls C02-owned ensureElementHolder without local undo/save; allocation/seeding and earlier DOM survive a later required-call failure.",
     "A truthy SMEngineBridge object causes an unguarded renderNow method call. A present object with missing/non-callable renderNow throws; this does not establish Tauri IPC or installed-native execution.",
     "The top-level renderer calls later-owned Parent/Null/Follow/Time row functions. Those calls are dependencies, not duplicated coverage."
   ],
@@ -143,7 +143,7 @@
             "Stroke Width requires non-vector and strokeWidth !== undefined. Brush Size requires vector brush and at least two centerSegments. Trim requires non-raster nonempty segments.",
             "After any truthy elSel, return even if no matching entry; layer Transform is therefore omitted."
           ],
-          "direct_writes": "Only DOM construction/innerHTML in the synchronous renderer. Delegated row builders retain their writes and owners.",
+          "direct_writes": "Direct assignments in the synchronous renderer construct/replace DOM. Its required C02 ensureElementHolder calls can allocate ld.elementMotion and missing entries, then seed paramShapeKind/motionStatic from live rect/ellipse/star data. The target holder is ensured before entry lookup, even for a missing matching entry; the raster-mesh branch can ensure a second holder. C02 owns those delegated model writes and row builders retain their own effects. No local undo or save surrounds this resolution.",
           "returns_and_errors": "All normal/early paths return undefined. No catch/rollback; any required row/helper failure retains body clearing and earlier appended rows.",
           "callers": [
             "renderLayerListMotion at7552",
@@ -324,7 +324,7 @@
   "source_consumers": [
     {
       "consumer": "save",
-      "disposition": "matteChanged optionally invokes saveActiveLayerFrame; widget commit requires it. Project codecs separately serialize blendMode/blendKeys, matte fields, motion/motionStatic/expressions and widget. Render-only paths save nothing."
+      "disposition": "matteChanged optionally invokes saveActiveLayerFrame; widget commit requires it. Panel rendering invokes no save itself, but delegated ensureElementHolder can create/seed elementMotion state that a later codec/save consumes. Project codecs separately serialize elementMotion, blendMode/blendKeys, matte fields, motion/motionStatic/expressions and widget."
     },
     {
       "consumer": "load",
@@ -332,7 +332,7 @@
     },
     {
       "consumer": "undo/redo",
-      "disposition": "Matte actions pushUndoLayers(true); Widget and Blend pushUndo. Unavailable menus, no-free matte and invalid Widget exit before history; a valid unchanged Widget still pushes. Undo/redo implementation and refresh triggering remain separately owned."
+      "disposition": "Matte actions pushUndoLayers(true); Widget and Blend pushUndo. Unavailable menus, no-free matte and invalid Widget exit before history; a valid unchanged Widget still pushes. Undo/redo implementation and refresh triggering remain separately owned. Required holder allocation/seeding during panel rendering has no local history call; no guarantee of a standalone undo entry is asserted."
     },
     {
       "consumer": "selection",
@@ -340,7 +340,7 @@
     },
     {
       "consumer": "animation",
-      "disposition": "Blend stopwatch writes discrete blendKeys. Primary matte removal deletes matteOn motion/static/expression slots. Delegated Transform/element rows retain track ownership; no time-link/parent/key-lock behavior is mapped."
+      "disposition": "Blend stopwatch writes discrete blendKeys. Primary matte removal deletes matteOn motion/static/expression slots. Delegated Transform/element rows retain track ownership; no time-link/parent/key-lock behavior is mapped. C02-owned holder resolution can seed static shape-property values before Transform rows render; this is an existing delegated state mutation, not a newly implemented capability."
     },
     {
       "consumer": "render",
@@ -377,8 +377,8 @@
     {
       "id": "panel-partial-failure",
       "status": "proposed, unrun",
-      "initial_state": "Inject required row/helper failures at successive call positions.",
-      "expected_effects": "Body clear and earlier appended rows persist; later rows absent; no rollback."
+      "initial_state": "Missing/existing elementMotion maps and target/mesh entries; live ordinary/rect/ellipse/star items; missing matching layerElements entry; injected required row/helper failures after holder resolution.",
+      "expected_effects": "C02 helper creates missing maps/entries and conditionally seeds paramShapeKind/motionStatic before entry lookup; existing entries are reused. The renderer makes no local undo/save call. Holder changes, body clear and earlier rows persist after later failure; later rows remain absent."
     },
     {
       "id": "matte-display-resolution",
