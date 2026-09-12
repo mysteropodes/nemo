@@ -1,0 +1,642 @@
+{
+  "census_id": "C19e",
+  "issue": 1132,
+  "title": "Timeline layer controls and component facades",
+  "status": "draft for independent review; proposed runtime fixtures are unrun",
+  "owner": "P03/C19e read-only census; runtime ownership is unchanged",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "43756870a64ba57d6443155f0a36010042d1cf41",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 1121,
+      "end": 1195
+    },
+    {
+      "start": 1534,
+      "end": 1674
+    }
+  ],
+  "coverage_note": "The two assigned ranges contain 216 lines exactly. C19c owns 1196-1533 and C19b2 begins at 1675; neither neighbor is claimed here.",
+  "source_baselines": {
+    "pinned": "git object 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js is cc4cfd27dc59d797c911d840dc46e2f816942123",
+    "current": "observed main 43756870a64ba57d6443155f0a36010042d1cf41 has the same timeline blob",
+    "runtime": "No browser, Tauri, export, native or GPU behavior was executed for this source census."
+  },
+  "whole_file_writer_guidance": {
+    "source_access": "timeline.js and every callee remain read-only; C19e owns only the eventual census JSON artifact.",
+    "serialization": "P30/#1032 PR #1114 is OPEN at a0f13e7da2f97248e1e8ab6cb44a1fd399e5f454 and retains the exclusive whole timeline.js runtime writer. Any later implementation touching timeline.js must serialize after that owner releases the file.",
+    "reservations": "D01/#1044 and T05/Pollen remain separate. C01/C02/C04/C06/P20, Motion, conversion and navigation owners are retained; range-level census coverage conveys no runtime authority."
+  },
+  "reconciliation": [
+    {
+      "owner": "C01 document/history",
+      "disposition": "Retains saveAllLayerFrames, pushUndo/pushUndoLayers, undo/redo and export/import schema. C19e records which commands call or omit those ports."
+    },
+    {
+      "owner": "C02 animation/time",
+      "disposition": "Retains layer in/out, key-lock consumers, symbol-frame resolution and Motion timing. C19e does not absorb those implementations."
+    },
+    {
+      "owner": "C04 editor selection/presentation",
+      "disposition": "Retains selectedPaths, clearSel, transform handles, row/bar selection and UI rendering. setActiveLayer and lock describe their current calls into that surface."
+    },
+    {
+      "owner": "C06 preferences/bootstrap",
+      "disposition": "Retains DOM bootstrap and settings wiring at timeline.js:9085-9105 and11429-11432; C19e maps those locations only as consumers."
+    },
+    {
+      "owner": "P20 folder codec",
+      "disposition": "Retains legacy folderId/layerFolders serialization. Grouped LFS and folder row controls remain distinct."
+    },
+    {
+      "owner": "app.js conversion and document-context functions",
+      "disposition": "Retains reorderLayer/reorderLayersAtGap/reorderLayersBatch, component/LFS conversions, element split/merge/object duplicator, enterSymbol/exitToScene/closeSymbolTab and montage view. Thin SM facades do not create duplicate extraction leaves."
+    },
+    {
+      "owner": "Motion and rendering",
+      "disposition": "Motion owns row callers, key locks and motion state; engine/export own visibility, solo and motion-blur consumption. C19e proposes ports without transferring those algorithms."
+    },
+    {
+      "owner": "P30/#1032 PR #1114",
+      "disposition": "Retains the whole timeline.js writer while open; C19e is documentation-only."
+    }
+  ],
+  "areas": [
+    {
+      "area": "layer-metadata",
+      "packets": [
+        {
+          "id": "C19e.key-lock",
+          "files": [
+            "src/js/timeline.js:1121-1127"
+          ],
+          "coverage_ranges": [
+            [
+              1121,
+              1127
+            ]
+          ],
+          "symbols": [
+            "setLayerKeyLock"
+          ],
+          "responsibility": "Sets or removes the selected layer's standing in/out/whole-layer key lock and refreshes layer and timeline presentation.",
+          "writer": "Resolves an explicit index or activeLayerIdx, returns on a missing layer, calls pushUndo(), writes ld.keyLock=mode for any truthy value or deletes it for a falsy value, then toasts and calls renderLayerList/renderTimeline.",
+          "public_api": "window.SM.setLayerKeyLock(layerIndex?, mode) -> undefined.",
+          "consumers": [
+            "motion.js:8483 layer-row key-lock menu",
+            "nemo-script.js:299-303 Layer.keyLock property",
+            "layer-inout.js:106-1272 standing-lock retime behavior",
+            "application/opacity-application.js:70 treats any truthy keyLock as an opacity-write lock"
+          ],
+          "oracle": "Proposed, unrun: missing layer; explicit and active fallback; modes in/out/layer; falsy removal; unchanged value still snapshots; unsupported truthy string is stored; exact toast branch and two renders; verify layer-inout behavior per mode and opacity application's broader truthy refusal.",
+          "consumer_matrix": {
+            "save": "pushUndo() delegates to pushUndoLayers(), which calls saveAllLayerFrames unless scrub-live suppresses the entire snapshot; there is no separate local save.",
+            "load": "Project import restores truthy keyLock at timeline.js:2531; this setter does not load the current frame.",
+            "history": "Calls pushUndo unconditionally after a valid layer, including an unchanged value. C01 owns snapshot/undo internals.",
+            "selection": "Reads activeLayerIdx only when li is null; does not change frame, path or layer selection.",
+            "animation": "layer-inout.js interprets in/out/layer differently during trims and shifts. opacity-application.js rejects writes for any truthy keyLock, a broader contract than the three UI modes.",
+            "render": "Calls renderLayerList and renderTimeline; no loadFrame, renderOS or engine renderNow.",
+            "export": "Per-layer keyLock is exported at timeline.js:2125 and restored only when truthy at2531.",
+            "native": "No direct native bridge. Native/runtime effects, if any, arise through later consumers rather than this setter."
+          },
+          "construct_boundary": "complete method",
+          "notes": "The setter itself does not validate mode; Nemo Script validates its public wrapper, while the Motion menu supplies only the three named modes.",
+          "proposed_api": "setLayerKeyLock(index,mode,{history,ui}) -> {changed,storedMode}",
+          "admission": "Pending a separate bounded characterization leaf after the timeline writer releases; do not combine with layer-inout extraction."
+        },
+        {
+          "id": "C19e.motion-blur-controls",
+          "files": [
+            "src/js/timeline.js:1128-1173"
+          ],
+          "coverage_ranges": [
+            [
+              1128,
+              1173
+            ]
+          ],
+          "symbols": [
+            "toggleLayerMotionBlur",
+            "toggleMotionBlurComp",
+            "setMotionBlurSettings"
+          ],
+          "responsibility": "Mutates the per-layer blur flag, document-wide blur gate and numeric sampling settings, including automatic comp enablement when a layer is enabled.",
+          "writer": "Layer toggle snapshots through pushUndo, flips ld.motionBlur, may set state.motionBlurOn=true and add the active class to #btn-mblur, then toasts/renders. Comp toggle and settings write document fields without history; settings normalize supplied values only.",
+          "public_api": "window.SM.toggleLayerMotionBlur(layerIndex?) -> undefined; window.SM.toggleMotionBlurComp() -> undefined; window.SM.setMotionBlurSettings(samples?, shutter?) -> undefined.",
+          "consumers": [
+            "motion.js:7410 layer context menu",
+            "nemo-script.js:284 Layer.motionBlur property",
+            "timeline.js:9085-9097 comp button and settings prompts",
+            "engine-bridge.js:2224-2239 scene sampling",
+            "export.js:493-522 engine-only export routing"
+          ],
+          "oracle": "Proposed, unrun: missing layer; off-to-on with comp off; on-to-off; 3D toast; existing comp-on path; button absent/present; comp toggle with zero/multiple flagged layers; null arguments; numeric strings, NaN/empty fallbacks, min/max clamps; exact history counts and engine/export gate using both flags.",
+          "consumer_matrix": {
+            "save": "Only toggleLayerMotionBlur reaches saveAllLayerFrames indirectly through pushUndo. Comp and settings mutations make no save call.",
+            "load": "Import restores per-layer truthy motionBlur at2533 and document fields at2644. None of these methods calls loadFrame.",
+            "history": "Layer toggle calls pushUndo before mutation. Comp toggle and settings have no local history, and layersSnapshotNow does not include motionBlurOn, motionBlurSamples or motionBlurShutter, so layer undo does not restore these document fields.",
+            "selection": "Layer toggle uses activeLayerIdx only for a null index; no selection writes.",
+            "animation": "Blur sampling reads SMMotion.layerMotionAt for subframe motion in engine-bridge. The setters do not create Motion keys.",
+            "render": "All three call engine renderNow when available; layer/comp toggles also render layer list and timeline. Settings do not update button/list/timeline UI.",
+            "export": "motionBlur is exported per layer at2125; document gate/samples/shutter at2238 and restored at2644. export.js routes through the engine only when layer motionBlur and comp gate are both true.",
+            "native": "The methods only call the shared engine bridge. This census does not establish native/GPU execution or exported pixels."
+          },
+          "construct_boundary": "three complete adjacent methods",
+          "notes": "Enabling a layer also enables the comp gate, but disabling the last flagged layer does not disable it. parseInt/parseFloat use fallback values before clamping; no schema validation occurs.",
+          "proposed_api": "applyMotionBlurControl(command,current,{history,dom,render}) -> normalized patch and effects",
+          "admission": "Split future work into layer-toggle and document-settings leaves if characterization cannot stay bounded; preserve engine/export ownership."
+        },
+        {
+          "id": "C19e.shy-controls",
+          "files": [
+            "src/js/timeline.js:1174-1195"
+          ],
+          "coverage_ranges": [
+            [
+              1174,
+              1195
+            ]
+          ],
+          "symbols": [
+            "toggleLayerShy",
+            "toggleShyMode"
+          ],
+          "responsibility": "Marks a layer shy and controls the document-wide row-hiding gate.",
+          "writer": "Layer toggle snapshots, flips ld.shy, and automatically enables state.shyEnabled plus the #btn-shy active class when necessary. Comp toggle flips shyEnabled and reports the count of marked layers. Both rerender list and timeline.",
+          "public_api": "window.SM.toggleLayerShy(layerIndex?) -> undefined; window.SM.toggleShyMode() -> undefined.",
+          "consumers": [
+            "motion.js:7409 context menu",
+            "nemo-script.js:283 Layer.shy property",
+            "timeline.js:6717 context menu",
+            "timeline.js:9099-9105 global button",
+            "timeline.js layer-list filtering consumes shy plus shyEnabled"
+          ],
+          "oracle": "Proposed, unrun: missing layer; first mark auto-enables gate/button; unmark does not disable gate; mark while already enabled; absent button; global toggle and marked-layer count; exact history asymmetry and hidden-row rendering.",
+          "consumer_matrix": {
+            "save": "Layer toggle reaches saveAllLayerFrames through pushUndo; toggleShyMode performs no save.",
+            "load": "Import restores truthy per-layer shy at2530 and state.shyEnabled at2641. Neither method calls loadFrame.",
+            "history": "Layer toggle snapshots before mutation. Global shy mode has no local snapshot, and layersSnapshotNow does not include shyEnabled.",
+            "selection": "No selection state changes. Hiding shy rows can leave underlying layer selection state intact; verify as presentation behavior.",
+            "animation": "No frame, key or Motion data is changed.",
+            "render": "Both render layer list and timeline. No renderOS, loadFrame or engine renderNow call occurs.",
+            "export": "Per-layer shy is exported at2125 and shyEnabled at2221; they are editor presentation fields and are not used by export.js pixel inclusion.",
+            "native": "No direct native bridge or resource operation."
+          },
+          "construct_boundary": "two complete adjacent methods ending immediately before C19c",
+          "notes": "The global switch has no history. Auto-enable occurs only when changing a layer from unmarked to marked while the gate is off.",
+          "proposed_api": "applyShyControl(command,current,{history,dom,ui}) -> patch",
+          "admission": "Pending a separate bounded presentation-control leaf; do not merge with motion-blur behavior."
+        }
+      ]
+    },
+    {
+      "area": "selection-and-layer-controls",
+      "packets": [
+        {
+          "id": "C19e.active-layer",
+          "files": [
+            "src/js/timeline.js:1534-1590"
+          ],
+          "coverage_ranges": [
+            [
+              1534,
+              1590
+            ]
+          ],
+          "symbols": [
+            "setActiveLayer"
+          ],
+          "responsibility": "Canonical non-camera layer activation: saves outgoing live frames, switches the Paper layer, clears canvas selection, reconciles Motion isolation and tool mode, optionally preserves row multi-selection, and selects eligible content for Select/Subselect.",
+          "writer": "Validates index; saveAllLayerFrames, activateUL, clearSel; clears _perObjBoxes/_motionExpandedElement/_motionExpandedLayer when owned by another layer; sets _layerActiveExplicit; normally replaces _layerSel/_layerSelAnchor; updates Motion empty-click state; may setTool(select); replaces selectedPaths from eligible Path/Raster children and clears selectedStrokeIndices; renderArcs/updateUI.",
+          "public_api": "window.SM.setActiveLayer(index, preserveLayerSel?) -> undefined.",
+          "consumers": [
+            "timeline.js:5099-5226 canvas-related picks;5822 group select;6660-6769 rows/menus;9638 layer navigation",
+            "motion.js:2802,7268-7325,9767,11131,11467,12756",
+            "media-library.js:108,181-183 and shapes-panel.js:96",
+            "nemo-script.js:252-265,402-407,592",
+            "bootstrap/opacity-application.js:10",
+            "select-bridge.js and tools.js use it for component/canvas selection paths"
+          ],
+          "oracle": "Proposed, unrun: invalid bounds; outgoing live save; same/different Motion isolation; preserveLayerSel true/false; camera and Motion non-select tools; ordinary mode draw tool; selectable Path/Raster filtering; absent user layer; exact selectedStrokeIndices reset; call-order and render effects across a row, media, script and opacity caller.",
+          "consumer_matrix": {
+            "save": "Always calls saveAllLayerFrames after a valid index and before activation, even when idx already equals activeLayerIdx.",
+            "load": "Does not call loadFrame. activateUL switches the active Paper layer but callers relying on frame materialization use existing surrounding paths.",
+            "history": "No undo snapshot. The save may update current frame data but layer activation is not a history entry.",
+            "selection": "This is the canonical selection writer described above. preserveLayerSel protects a caller-built row multiselect; clearSel still clears canvas selection before content is repopulated.",
+            "animation": "No frame or Motion key data changes. It clears Motion element-isolation globals when switching layers and resets Motion empty-click state.",
+            "render": "Calls renderArcs and updateUI. setTool may trigger its own UI/render path; there is no direct renderOS or engine renderNow.",
+            "export": "Only live-frame save can affect later persisted strokes. activeLayerIdx and transient selection/isolation globals are not part of the per-layer export record.",
+            "native": "No direct native operation. Any visual update travels through existing UI/render owners."
+          },
+          "construct_boundary": "complete method with its leading behavior comments inside the method",
+          "notes": "A same-layer call still saves, clears selection and sets explicit-selection state. preserveLayerSel preserves only row selection, not selectedPaths.",
+          "proposed_api": "activateLayer(index,{preserveLayerSelection,document,canvasSelection,motion,tools,ui}) -> result",
+          "admission": "A bounded application-selection leaf only after C04 ownership review; callers must be migrated together."
+        },
+        {
+          "id": "C19e.layer-display-lock-name",
+          "files": [
+            "src/js/timeline.js:1591-1612"
+          ],
+          "coverage_ranges": [
+            [
+              1591,
+              1612
+            ]
+          ],
+          "symbols": [
+            "toggleLayerVis",
+            "toggleLayerLock",
+            "toggleLayerSolo",
+            "renameLayer"
+          ],
+          "responsibility": "Direct layer visibility, edit lock, solo and name controls, with locked-selection cleanup and a duplicator refusal.",
+          "writer": "Visibility and solo flip flags then loadFrame/updateUI. Lock refuses an active locked duplicator outside edit-source mode; otherwise flips locked and, when locking, removes paths belonging to that Paper layer, rebuilds selectedStrokeIndices and renders arcs before updateUI. Rename directly assigns name and updates UI.",
+          "public_api": "window.SM.toggleLayerVis(index), toggleLayerLock(index), toggleLayerSolo(index), renameLayer(index,name) -> undefined; callers must supply an existing index.",
+          "consumers": [
+            "timeline.js:6380-6384 grouped LFS rows;6453-6464 ordinary rows;5442 rename commit;9824 lock shortcut",
+            "motion.js:7178-7184 row controls",
+            "nemo-script.js:282 Layer.solo property",
+            "app.js:4942-4946 layerIsEffectivelyVisible",
+            "engine-bridge.js, export.js, OCA/reference/storyboard and selection bridges consume effective visibility"
+          ],
+          "oracle": "Proposed, unrun: visible and solo toggles with another soloed layer/folder parent; lock/unlock ordinary; locked duplicator refusal; locking selected content from target plus other layers; no selected user layer; rename empty/direct value; invalid indices as current throwing baseline; exact absence of history and persistence asymmetry for solo.",
+          "consumer_matrix": {
+            "save": "No method calls a save helper. Visibility/solo call loadFrame, whose preceding state change alters what is materialized; rename/lock only update UI.",
+            "load": "Visibility and solo call loadFrame(currentFrame). Lock and rename do not.",
+            "history": "None of the four methods snapshots. Their mutations are not locally undoable through these APIs.",
+            "selection": "Only locking true changes selection: filters selectedPaths by Paper-layer identity, rebuilds selectedStrokeIndices and renders arcs. It does not alter _layerSel or activeLayerIdx.",
+            "animation": "No key data changes. effective visibility is derived from visible/solo and folder-parent state; locked blocks multiple external editing paths.",
+            "render": "Visibility/solo reload then updateUI; lock may renderArcs and always updateUI; rename only updateUI. Engine visibility changes occur through downstream update/load behavior, not an explicit renderNow call.",
+            "export": "name, visible and locked are exported/restored at timeline.js:2117 and import construction. solo is absent from exportJSON, so it does not round-trip; this is a source-derived baseline gap.",
+            "native": "No direct native call. Export/engine consumers apply effective visibility on their own paths."
+          },
+          "construct_boundary": "four complete adjacent methods",
+          "notes": "These APIs dereference state.layers[idx] without a bounds guard. Grouped row callers invoke each member separately, causing one load/update per changed member.",
+          "proposed_api": "Split into setLayerPresentation(index,patch,{load,ui}) and setLayerLocked(index,next,{selection,ui}); keep rename as document metadata.",
+          "admission": "Do not admit all four as one implementation leaf; lock/selection and visibility/solo/render require separate fixtures, while rename can remain with document metadata."
+        },
+        {
+          "id": "C19e.reorder-facades",
+          "files": [
+            "src/js/timeline.js:1613-1615"
+          ],
+          "coverage_ranges": [
+            [
+              1613,
+              1615
+            ]
+          ],
+          "symbols": [
+            "SM.reorderLayer",
+            "SM.reorderLayersAtGap",
+            "SM.reorderLayersBatch"
+          ],
+          "responsibility": "Exposes the existing app.js reorder functions on window.SM without adding behavior.",
+          "writer": "No local writes. Each facade invokes the same-named app.js function; all three discard the callee return value.",
+          "public_api": "window.SM.reorderLayer(fromIndex,toIndex), reorderLayersAtGap(fromIndices,gapIndex,skipUndo?), reorderLayersBatch(fromIndices,toIndex) -> undefined.",
+          "consumers": [
+            "timeline.js:6971 row drag calls reorderLayersAtGap with conditional skipUndo",
+            "app.js:418-488 owns all validation, stable selection remap, parallel state/Paper splices, history and rendering"
+          ],
+          "oracle": "Proposed, unrun facade contract: exact arguments forwarded once, including skipUndo; undefined return preserved. Existing app.js owner must independently cover invalid/no-op gaps, dedupe/sort, stable active/multiselection identity, array alias preservation, Paper z-order and one caller-owned undo for unparenting.",
+          "consumer_matrix": {
+            "save": "No local save. app.js reorderLayersAtGap saves before history unless skipUndo is true.",
+            "load": "No local load. The app.js callee loads currentFrame after a real reorder.",
+            "history": "No local snapshot. skipUndo is forwarded only by reorderLayersAtGap; the row-drop caller uses it after an earlier unparent snapshot.",
+            "selection": "No local write. app.js remaps active layer, _layerSel and anchor by layer object identity and syncs Motion bar selection.",
+            "animation": "No key/frame algorithm in the facades; reordering changes layer stack indices while app.js preserves layer objects and their data.",
+            "render": "No local render. app.js callee activates, loads and calls renderOS/renderArcs/updateUI.",
+            "export": "No schema. New array order is later serialized by C01 export as layer order.",
+            "native": "No direct native bridge."
+          },
+          "construct_boundary": "three complete one-line facades",
+          "notes": "A facade reference does not transfer app.js implementation ownership and is not an independent extraction candidate.",
+          "proposed_api": "Retain a single compatibility export that references the app.js reorder owner.",
+          "admission": "No duplicate executable leaf. Any migration belongs to the existing reorder implementation owner and must preserve the row-drop transaction."
+        },
+        {
+          "id": "C19e.stroke-profile",
+          "files": [
+            "src/js/timeline.js:1616-1628"
+          ],
+          "coverage_ranges": [
+            [
+              1616,
+              1628
+            ]
+          ],
+          "symbols": [
+            "applyStrokeProfile"
+          ],
+          "responsibility": "Applies a stroke-profile kind to eligible selected paths as one batch command and reports converted versus skipped counts.",
+          "writer": "Filters window.selectedPaths to objects with segments; refuses empty selection; pushUndo once; delegates each path to tools.js applyStrokeProfileToPath; saves active frame, reloads it, updates UI, optionally renders engine, then toasts counts.",
+          "public_api": "window.SM.applyStrokeProfile(kind) -> undefined.",
+          "consumers": [
+            "select-bridge.js:3235,3242 context menu",
+            "nemo-script.js:405 Layer.applyStrokeProfile wrapper",
+            "tools.js:5492 applyStrokeProfileToPath owns geometry conversion"
+          ],
+          "oracle": "Proposed, unrun: empty/all-ineligible/mixed/all-convertible selections; exact kind forwarding and path order; one history entry; done/skipped text; saved frame serialization; reload identity; engine bridge absent/present. Use geometry expectations independent of the implementation.",
+          "consumer_matrix": {
+            "save": "Calls saveActiveLayerFrame after all delegated mutations. pushUndo first reaches saveAllLayerFrames through C01 history.",
+            "load": "Calls loadFrame(currentFrame) after saving, replacing live objects from persisted frame data.",
+            "history": "One pushUndo for the batch, before applyStrokeProfileToPath calls.",
+            "selection": "Reads selectedPaths and filters only by p && p.segments. Reload may replace live path objects; no explicit selection rebuild occurs here.",
+            "animation": "Mutates the current live path geometry/paint; saveActiveLayerFrame writes it into the current keyed/interpolated frame under existing animation rules.",
+            "render": "Calls updateUI and optional engine renderNow after loadFrame; no direct renderTimeline.",
+            "export": "The resulting serialized stroke fields travel inside frames through existing project/export paths; this command owns no schema.",
+            "native": "No direct native command. Engine render is optional and no packaged/native output was tested."
+          },
+          "construct_boundary": "leading two-line comment plus complete method",
+          "notes": "Eligibility here is only presence of segments; tools.js decides whether a path can actually accept the requested profile.",
+          "proposed_api": "applyStrokeProfileBatch(paths,kind,{convert,history,frame,render,toast}) -> {done,skipped}",
+          "admission": "A bounded command leaf only with tools.js conversion owner coordination; do not duplicate the geometry algorithm."
+        }
+      ]
+    },
+    {
+      "area": "facades-and-symbol-settings",
+      "packets": [
+        {
+          "id": "C19e.conversion-facades",
+          "files": [
+            "src/js/timeline.js:1629-1637"
+          ],
+          "coverage_ranges": [
+            [
+              1629,
+              1637
+            ]
+          ],
+          "symbols": [
+            "convertActiveLayerToComponent",
+            "convertComponentToLayer",
+            "convertActiveLayerToLFSGroup",
+            "convertActiveLayerToStrokeFillShadow",
+            "convertLFSGroupToLayer",
+            "propagateLFSFill"
+          ],
+          "responsibility": "Routes active-layer conversion and LFS commands to existing app.js implementations, selecting multi-layer component conversion when _layerSel has more than one item.",
+          "writer": "No local document implementation. convertActiveLayerToComponent branches on _layerSel.length and forwards either the selected indices or activeLayerIdx; the other facades forward activeLayerIdx and, for propagation, which. Return values are discarded.",
+          "public_api": "Six window.SM command facades -> undefined; arguments are none except propagateLFSFill(which).",
+          "consumers": [
+            "timeline.js:6722-6735 context menus;9681 shortcut;11426-11428 buttons",
+            "motion.js:7403-7404 context menu",
+            "app.js:3271+,3325+,3997+,4020+,4045+,4087+,5058+ owns conversion algorithms"
+          ],
+          "oracle": "Proposed, unrun facade matrix: zero/one/multiple _layerSel branch; active index forwarding; exact which forwarding; undefined returns; each callee guard and transaction remains tested by its implementation owner.",
+          "consumer_matrix": {
+            "save": "No local save. Callees have distinct save contracts; for example convertLayerToLFSGroup explicitly saves, while component/LFS bake paths call their own history helpers.",
+            "load": "No local load. Successful app.js conversions own loadFrame and UI refresh.",
+            "history": "No local snapshot. Callee contracts differ and must not be flattened into one facade behavior.",
+            "selection": "Reads _layerSel only for component conversion; otherwise uses activeLayerIdx. Callees own resulting layer selections.",
+            "animation": "Callees own baking, per-element Motion promotion, symbol/LFS timelines and fill propagation.",
+            "render": "No local render. Callees own their render and toast paths.",
+            "export": "No local schema. Resulting layers/symbols/LFS data use existing document serialization.",
+            "native": "No direct native bridge."
+          },
+          "construct_boundary": "six complete adjacent facades",
+          "notes": "These facades intentionally do not return underlying success booleans or indices.",
+          "proposed_api": "Reference the existing conversion command owner from the compatibility facade.",
+          "admission": "No combined facade leaf and no transfer of callee ownership. Admit each actual conversion responsibility separately only if its existing census lacks an executable leaf."
+        },
+        {
+          "id": "C19e.navigation-and-structure-facades",
+          "files": [
+            "src/js/timeline.js:1638-1646"
+          ],
+          "coverage_ranges": [
+            [
+              1638,
+              1646
+            ]
+          ],
+          "symbols": [
+            "enterSymbol",
+            "splitLayerIntoElementsCore",
+            "splitLayerIntoElements",
+            "mergeLayersIntoOne",
+            "convertSelectionToObjectDuplicator",
+            "exitToScene",
+            "closeSymbolTab",
+            "enterMontageView",
+            "exitMontageView"
+          ],
+          "responsibility": "Publishes app.js symbol/montage navigation and layer structure operations through window.SM.",
+          "writer": "No local writes. The split-core, split, merge and object-duplicator facades return their callee result; navigation/tab facades discard it.",
+          "public_api": "window.SM.enterSymbol(symId); splitLayerIntoElementsCore(layerIndex,opts) -> callee result; splitLayerIntoElements(layerIndex) -> callee result; mergeLayersIntoOne(indices,opts) -> callee result; convertSelectionToObjectDuplicator(indices) -> callee result; exitToScene(); closeSymbolTab(symId); enterMontageView(montageId); exitMontageView().",
+          "consumers": [
+            "timeline.js:6662,6710-6732,6985-7010,11427",
+            "motion.js:6868,6893-6910,7363-7468",
+            "select-bridge.js:1616,1650; tools.js:7452,7473",
+            "storyboard.js:661,689",
+            "nemo-script.js:395 merge wrapper",
+            "project.js:56 exits symbol before project action",
+            "app.js:3583+,3600+,3767+,4151+,4197+,4257+,4281+,4352+ owns implementations"
+          ],
+          "oracle": "Proposed, unrun facade contract: exact argument and return forwarding; missing/guard outcomes are owned by callees. Separately characterize document-context swaps, saved live frames, selection clearing, symbol write-back after array replacement, tab state, montage synthetic layers and source-owned split/merge semantics.",
+          "consumer_matrix": {
+            "save": "No local save. enter/exit app.js callees save live frames; structure callees each define their own transaction.",
+            "load": "No local load. Successful callees own document swaps and frame materialization.",
+            "history": "No local history. Some structural callees snapshot and silent core split can omit its own undo; navigation swaps are not one uniform history contract.",
+            "selection": "No local selection writes. Callees clear stale canvas selection, activate layers or rebuild _layerSel according to the operation.",
+            "animation": "Callees own symbol/montage arrays, frame splitting/merging and Motion side maps. Facades must not become a second state authority.",
+            "render": "No local rendering. Callees own drawStage/loadFrame/renderOS/renderArcs/updateUI/tab refresh.",
+            "export": "No schema. Symbol and montage write-back into state is later consumed by C01 export; closeSymbolTab changes open-tab UI state rather than document content.",
+            "native": "No direct native bridge. Context swaps can affect later native-video/render consumers, which remain separately owned."
+          },
+          "construct_boundary": "nine complete adjacent facades",
+          "notes": "The four structural facades preserve callee returns; the five navigation/tab facades return undefined. That distinction is part of compatibility.",
+          "proposed_api": "Keep facade exports colocated with their existing app.js command owner or generated from an explicit API table.",
+          "admission": "No duplicate facade extraction. Any implementation leaf must name exactly one existing app.js responsibility and its consumers."
+        },
+        {
+          "id": "C19e.symbol-setting-history",
+          "files": [
+            "src/js/timeline.js:1647-1674"
+          ],
+          "coverage_ranges": [
+            [
+              1647,
+              1674
+            ]
+          ],
+          "symbols": [
+            "_pushSymUndoIfChanged",
+            "setSymbolPlayMode",
+            "setSymbolSpeed",
+            "setSymbolSingleFrame",
+            "setSymbolPlacedAt"
+          ],
+          "responsibility": "Applies component-instance playback mode, speed, single-frame choice and placement offset with change-sensitive layer-history snapshots; single-frame also writes the current outer key's componentFrame and removes blankOverride.",
+          "writer": "All setters guard the active layer and symbolId. Speed clamps parsed value to >=0.1 with fallback1; single frame clamps parsed integer to >=0 with fallback0; placedAt parses integer with fallback0; play mode is unvalidated. Unless skipUndo is set where supported, the helper snapshots only when ld[field] differs. Setters then assign the layer field and load/render/update. On a current isKeyframe record, single-frame additionally sets f.componentFrame=picked and deletes f.blankOverride.",
+          "public_api": "window.SM._pushSymUndoIfChanged(layer,field,value) -> boolean; setSymbolPlayMode(value,skipUndo?) -> undefined; setSymbolSpeed(value) -> undefined; setSymbolSingleFrame(value,skipUndo?) -> undefined; setSymbolPlacedAt(value) -> undefined.",
+          "consumers": [
+            "timeline.js:7183-7189 frame-strip click snapshots only if symSingleFrame differs or symPlayMode is not single, then calls both setters with skipUndo=true",
+            "timeline.js:11429-11432 component-instance form controls",
+            "app.js resolveSymbolFrameIdx consumes per-key componentFrame/blankOverride plus layer playback settings",
+            "engine and export effective-stroke paths consume resolved component frames"
+          ],
+          "oracle": "Proposed, unrun: nonsymbol guard; changed/unchanged each field; invalid/decimal/negative numeric input; skipUndo paths; conditional frame-strip gesture snapshot and scrub-live suppression; keyed versus held/blank current frame; layer symSingleFrame unchanged while keyed componentFrame differs or blankOverride exists; exact componentFrame assignment/deletion and load/render order. Assert the current no-history gap for that last case rather than repairing it.",
+          "consumer_matrix": {
+            "save": "_pushSymUndoIfChanged calls saveAllLayerFrames before pushUndoLayers(true) only when the compared layer field changes. Symbol layers are skipped by saveAllLayerFrames; ordinary surrounding live layers may be synchronized.",
+            "load": "Every setter success path calls loadFrame(currentFrame), including unchanged normalized values. Import reconstructs layer symbol fields from the exported layer record; frame dictionaries carry componentFrame and blankOverride.",
+            "history": "The helper compares only ld[field]. The frame-strip caller snapshots only when its layer symSingleFrame or symPlayMode changes, then passes skipUndo to both setters; scrub-live can suppress that snapshot. A direct setSymbolSingleFrame call can mutate keyed componentFrame/delete blankOverride without a snapshot when ld.symSingleFrame already equals picked. The strip also has this gap when both layer values already match; neither guard compares the keyed fields.",
+            "selection": "Reads activeLayerIdx and does not change selection. load/update can refresh component selection presentation.",
+            "animation": "app.js getEffectiveStrokes checks a current outer frame's blankOverride before calling resolveSymbolFrameIdx; the resolver gives held keyed componentFrame precedence, then time remap, then layer play mode/speed/single-frame/placement. setSymbolSingleFrame changes both the layer fallback and the current explicit key when keyed.",
+            "render": "Each setter calls loadFrame, renderOS and updateUI. The frame-strip caller additionally calls updateCompInstancePanel.",
+            "export": "Layer symPlayMode/symSpeed/symPlacedAt/symSingleFrame serialize at2117. Frame componentFrame and blankOverride live inside frames and round-trip with frame data; import has migration logic at timeline.js:2490-2521.",
+            "native": "No direct native command. Effective component strokes reach engine/export through existing render bridges; no packaged/native acceptance was run."
+          },
+          "construct_boundary": "leading history rationale plus helper and four complete setters",
+          "notes": "skipUndo exists only on play-mode and single-frame setters. The helper's boolean result means only that the layer field differs; pushUndoLayers can still suppress the snapshot during scrub-live. The result is ignored by all setters. Unchanged layer values still trigger assignment and rendering.",
+          "proposed_api": "applySymbolInstanceSetting(layer,currentFrame,field,input,{history,render}) -> {layerPatch,framePatch,changed}",
+          "admission": "Split a pure normalization/patch planner from the history/application adapter. Characterize the keyed-frame no-history gap before any behavior change."
+        }
+      ]
+    }
+  ],
+  "source_consumers": {
+    "history": "tweens.js:4770 pushUndo;4928 pushUndoLayers and layersSnapshotNow/undo/redo remain C01.",
+    "frame_save_load": "app.js:4634 saveActiveLayerFrame;4693 saveAllLayerFrames;4746 loadFrame.",
+    "visibility": "app.js:4942 layerIsEffectivelyVisible; engine-bridge.js:868 and export.js:42/1081 plus OCA/reference/storyboard/select consumers.",
+    "motion_blur": "engine-bridge.js:2224-2239 sampling; export.js:493-522 engine-only routing.",
+    "reorder": "app.js:418-488 owns all three reorder implementations.",
+    "conversion": "app.js:3271+,3325+,3583+,3600+,3767+,3997+,4020+,4045+,4087+,5058+.",
+    "navigation": "app.js:4151-4259 symbol entry/exit/tab and4281-4375 montage entry/exit.",
+    "stroke_profile": "tools.js:5492 applyStrokeProfileToPath owns geometry; select-bridge and Nemo Script call the SM batch command.",
+    "persistence": "timeline.js:2112-2245 exportJSON and2354-2693 importJSON; raw frames carry frame-level component fields."
+  },
+  "fixtures": [
+    "key-lock normalization absence and downstream mode distinctions",
+    "layer versus comp motion-blur gates and numeric normalization",
+    "shy auto-enable and history asymmetry",
+    "active-layer save/tool/isolation/selection matrix",
+    "visibility-solo effective render and nonpersisted solo baseline",
+    "locked selection cleanup and duplicator refusal",
+    "facade argument/return compatibility without duplicate callee tests",
+    "stroke-profile mixed result batch",
+    "symbol setting normalization, caller-owned combined undo and keyed-frame no-history gap"
+  ],
+  "future_proposals": [
+    {
+      "id": "C19e.proposal-key-lock-command",
+      "scope": "standing key-lock write and UI/history ports only",
+      "module": "src/js/application/layer-key-lock.js",
+      "api": "setLayerKeyLock(index,mode,{document,history,ui}) -> result",
+      "admission": "Separate bounded leaf; layer-inout remains C02."
+    },
+    {
+      "id": "C19e.proposal-motion-blur-controls",
+      "scope": "Split per-layer toggle from document gate/settings if consumer fixtures exceed one outcome",
+      "module": "src/js/application/motion-blur-controls.js",
+      "api": "toggleLayerBlur(index,ports); toggleCompBlur(ports); setBlurSettings(input,ports)",
+      "admission": "Engine/export remain existing owners; no runtime writer before P30 release."
+    },
+    {
+      "id": "C19e.proposal-shy-controls",
+      "scope": "per-layer shy mark and global presentation gate",
+      "module": "src/js/application/shy-controls.js",
+      "api": "toggleLayerShy(index,ports); toggleShyMode(ports)",
+      "admission": "Separate from blur and layer content visibility."
+    },
+    {
+      "id": "C19e.proposal-active-layer",
+      "scope": "canonical activation transaction with explicit document, selection, Motion, tool and UI ports",
+      "module": "src/js/application/layer-activation.js",
+      "api": "activateLayer(index,options,ports) -> result",
+      "admission": "Separate bounded leaf coordinated with C04; migrate real callers in the same outcome."
+    },
+    {
+      "id": "C19e.proposal-layer-controls",
+      "scope": "Do not combine: visibility/solo presentation, lock/selection, and rename metadata are distinct future outcomes",
+      "module": "src/js/application/layer-controls.js",
+      "api": "setVisibility/setSolo; setLocked; renameLayer",
+      "admission": "Admit as separate leaves by responsibility and consumer fixtures."
+    },
+    {
+      "id": "C19e.proposal-stroke-profile",
+      "scope": "batch command orchestration only; tools.js retains geometry conversion",
+      "module": "src/js/application/stroke-profile-command.js",
+      "api": "applyStrokeProfileBatch(paths,kind,ports) -> counts",
+      "admission": "Bounded only with tools.js owner coordination."
+    },
+    {
+      "id": "C19e.proposal-symbol-settings",
+      "scope": "pure normalization/patch plan followed by history/render adapter, with explicit layer and current-frame deltas",
+      "module": "src/js/application/symbol-instance-settings.js",
+      "api": "planSymbolSetting(layer,frame,field,input) -> {layerPatch,framePatch,changed}",
+      "admission": "Characterize keyed-frame history gap first; do not silently change baseline."
+    },
+    {
+      "id": "C19e.proposal-facade-disposition",
+      "scope": "reorder, conversion, structure and navigation facade references",
+      "module": "existing app.js owners",
+      "api": "compatibility exports with current argument and return behavior",
+      "admission": "No duplicate facade leaves; attach future work to the actual callee owner."
+    }
+  ],
+  "boundaries": [
+    "1121 begins at the complete setLayerKeyLock method after C19b trim ends1120.",
+    "1195 closes toggleShyMode; C19c starts at the split-layer leading comment1196.",
+    "1534 begins at complete setActiveLayer immediately after C19c duplicateLayer closes1533.",
+    "1616-1617 are the leading comments for applyStrokeProfile and remain with that method.",
+    "1647-1655 are the leading history comments for _pushSymUndoIfChanged and the four setters.",
+    "1674 is the complete one-line setSymbolPlacedAt; C19b2 starts moveFrames at1675.",
+    "The outer SM object declaration/closing lines are outside this range and are contextual only."
+  ],
+  "exclusions": [
+    "C19b trim through1120",
+    "C19c split/duplicate1196-1533",
+    "C19b2 frame relocation1675-1976",
+    "app.js, tools.js, Motion, engine, export and DOM bootstrap implementation ownership",
+    "runtime repairs or claims that proposed fixtures passed"
+  ],
+  "validation": {
+    "expected_assigned_lines": 216,
+    "expected_classification": {
+      "code": 125,
+      "comment": 91,
+      "whitespace": 0
+    },
+    "required_consumer_dimensions": [
+      "save",
+      "load",
+      "history",
+      "selection",
+      "animation",
+      "render",
+      "export",
+      "native"
+    ],
+    "negative_controls": [
+      "remove1121 => reject omission",
+      "duplicate1613-1615 => reject overlap"
+    ],
+    "symbol_checks": [
+      "setLayerKeyLock1121",
+      "toggleLayerMotionBlur1128",
+      "toggleMotionBlurComp1161",
+      "setMotionBlurSettings1169",
+      "toggleLayerShy1174",
+      "toggleShyMode1190",
+      "setActiveLayer1534",
+      "toggleLayerVis1591",
+      "toggleLayerLock1592",
+      "toggleLayerSolo1611",
+      "renameLayer1612",
+      "reorder facades1613-1615",
+      "applyStrokeProfile1618",
+      "conversion/navigation facades1629-1646",
+      "_pushSymUndoIfChanged1656",
+      "symbol setters1660-1674"
+    ]
+  }
+}
