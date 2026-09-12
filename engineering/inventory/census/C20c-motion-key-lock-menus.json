@@ -1,0 +1,74 @@
+{
+  "census_id": "C20c",
+  "issue": 1137,
+  "title": "Motion layer and selected-key lock menus",
+  "status": "read-only census with proposed, unrun fixtures; no runtime extraction or behavior pass",
+  "owner": "P03/C20c census only; C19e setter and C02 key-selection/time-link owners remain separate",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "bf89d9837312a59e9b0b4c5cf376e415e5ef94cb",
+  "source_path": "src/js/motion.js",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_line_count": 13914,
+  "scope_files": ["src/js/motion.js"],
+  "assigned_ranges": [{"start":8470,"end":8494},{"start":8495,"end":8529}],
+  "coverage_note": "Exactly 60 lines occur once in two complete menu-builder packets: 36 code and 24 full-line comments, with no blank lines. The lines begin at each builder's leading comment, not the stale C02 numeric citation.",
+  "source_baselines": {
+    "pinned": "59a5a38:src/js/motion.js resolves to blob 6617bac29042c22399cac202bf054c09e4fdf30e.",
+    "current": "Observed main bf89d983 has the same Motion blob.",
+    "runtime": "No browser, Tauri, export, native, or GPU behavior was executed for this JSON-only census."
+  },
+  "source_range_drift": [
+    {"range":"8435-8452","owner":"C02.motion-advanced.canvas-drag-interactions","observed":"Complete timeLinkWouldCycle; C02's older 8454-8493 citation begins after the function."},
+    {"range":"8453-8469","owner":"C02.motion-advanced.canvas-drag-interactions","observed":"Detached leading comments for setLayerTimeLink; retained as context, not C20c coverage."},
+    {"range":"8530-8553","owner":"C02.properties-and-curves.key-selection-and-clipboard","observed":"Leading comments and complete keysLockedTo; it is a C02 named symbol although its historical 1033-1157 citation is stale."},
+    {"range":"8554-8648","owner":"C02.motion-advanced.canvas-drag-interactions","observed":"Complete setLayerTimeLink and startTimeLinkPickwhip; historic 8569-8666 coordinates drift after actual setter start."}
+  ],
+  "whole_file_writer_guidance": {
+    "source_access":"motion.js and every caller are read-only; C20c owns only its eventual census JSON artifact.",
+    "reservations":"Historical Motion PRs #949/#968, P30/#1032, D01/#1044, and T05/Pollen retain their existing claims. This census grants no Motion writer."
+  },
+  "reconciliation": [
+    {"owner":"C19e timeline layer controls","disposition":"Retains SM.setLayerKeyLock at timeline.js:1121-1127: index resolution, history, delete-versus-set storage, toast, and layer/timeline refresh. C20c maps the menu descriptor that calls it."},
+    {"owner":"C02 key selection","disposition":"Retains _motionKeySel selection model, keysLockedTo 8530-8553, shiftKeySelection and layer-inout retime behavior. C20c maps the menu's direct live-selection lockTo assignment without taking the reader/shift algorithm."},
+    {"owner":"C02 canvas/time-link","disposition":"Retains timeLinkWouldCycle and setLayerTimeLink/pickwhip constructs at their actual pinned boundaries. C20c does not infer ownership from C02's stale numeric citations."},
+    {"owner":"C01/C19g document codec","disposition":"Retains project codec/history consumers. C20c records keyLock export/import and ordinary nested motion-key serialization as consumers only."},
+    {"owner":"P03","disposition":"The parent remains open; this leaf neither proves the Motion queue complete nor admits a runtime migration."}
+  ],
+  "areas": [{"area":"motion-key-lock-menu-adapters","packets":[
+    {
+      "id":"C20c.layer-key-lock-menu",
+      "files":["src/js/motion.js:8470-8494"],
+      "coverage_ranges":[[8470,8494]],
+      "classification":{"code":14,"comment":11,"whitespace":0},
+      "symbols":["buildKeyLockMenuItems"],
+      "responsibility":"Builds the layer-row lock submenu: one disabled heading and In/Out/Layer rows with localized labels and checkmarks from the supplied layer descriptor.",
+      "visibility":"Closure-internal; renderLayerListMotion invokes it at motion.js:7455. It returns an array, never a SMMotion export.",
+      "internal_api":"buildKeyLockMenuItems(li,ld) -> menu array. Each row action reads that captured ld.keyLock when clicked and calls window.SM.setLayerKeyLock(li, currentEqualsMode ? null : mode).",
+      "writer":"The builder writes no document field itself. Its action delegates to C19e's setter, which resolves the current state.layers[li], pushes history, stores a truthy mode or deletes keyLock, and renders layer list/timeline.",
+      "callers_and_consumers":["renderLayerListMotion layer-row context menu spreads descriptors at motion.js:7453-7456.","C19e setter at timeline.js:1121-1127 is the action port.","layer-inout preview and drop retiming consume ld.keyLock at layer-inout.js:103-130 and 1148-1186.","timeline export/import handles layer keyLock at timeline.js:2125 and 2531.","Nemo Script Layer.keyLock validates only in/out/layer/null then delegates at nemo-script.js:298-304.","opacity application treats any truthy layer.keyLock as write-blocking at application/opacity-application.js:68-71."],
+      "consumer_matrix":{"save":"The action reaches pushUndo through C19e's setter; with scrub suppression off, pushUndoLayers saves live frames before snapshot. The menu itself has no save call.","load":"No loadFrame call. keyLock later rehydrates through timeline import's truthy field restore; unset/deleted layer field remains absent.","history":"Setter pushes once after resolving a live layer; a missing current state.layers[li] returns without history. Scrub suppression belongs to pushUndoLayers, not this builder.","selection":"The descriptor captures li and ld when the layer-row menu opens. It does not read activeLayerIdx at click. Its mode test reads the captured ld dynamically, while the setter writes whichever live layer currently occupies li; reordering/removal can therefore separate descriptor state from write target.","animation":"No track key is written directly. A stored layer keyLock later causes whole-layer Motion keys to follow in/out/body retime rules in layer-inout.","render":"Setter calls renderLayerList and renderTimeline; no direct canvas, OS, arc, or engine render occurs in the builder.","export":"Layer keyLock is explicitly exported/imported. Split/duplicate consumers separately copy a non-null keyLock; this packet does not own those operations.","native":"No native bridge. Downstream application-layer write blocking and later rendering are separate consumers."},
+      "oracle":"Proposed, unrun fixtures: descriptor labels/order/disabled heading; each mode set then toggle; stale descriptor after ld.keyLock changes; changed active layer with stable li; reorder/removal causing captured ld versus current index mismatch; missing live target causes no setter history; save/history/render counts; export/import and Nemo Script port remain separate checks.",
+      "proposed_api":"planLayerKeyLockMenu({layerIndex,modeAtOpen,readCurrentMode}) -> descriptors; applyLayerKeyLock(index,mode,{history,ui}) remains C19e's bounded adapter.",
+      "admission":"Any executable leaf must keep menu construction separate from the C19e setter and C02 retiming reader; no source move is admitted."
+    },
+    {
+      "id":"C20c.selected-key-lock-menu",
+      "files":["src/js/motion.js:8495-8529"],
+      "coverage_ranges":[[8495,8529]],
+      "classification":{"code":22,"comment":13,"whitespace":0},
+      "symbols":["buildKeySelectionLockMenuItems"],
+      "responsibility":"Builds the selected-key lock submenu and directly assigns each currently selected key's lockTo field to an In/Out/Layer mode or null.",
+      "visibility":"Closure-internal; renderTimelineMotion calls it for the keyframe-cell context menu at motion.js:11044-11054. It returns [] only when _motionKeySel is empty at construction, otherwise a heading plus three row descriptors.",
+      "internal_api":"buildKeySelectionLockMenuItems() -> [] | menu array. allLockedTo(mode) and each row's active boolean are calculated at construction. On click, the action pushes history, derives next from that captured active, then loops the live _motionKeySel and assigns s.key.lockTo when s.key exists.",
+      "writer":"Action writes live selected key.lockTo values directly, assigning null for a captured-active toggle rather than deleting the property. It calls pushUndo and renderTimeline even if the selection later became empty or every live record lacks key.",
+      "callers_and_consumers":["renderTimelineMotion keyframe-cell menu obtains descriptors at motion.js:11044-11054.","C02 keysLockedTo 8538-8553 reads exact in/out/layer values only from propsFor-addressed h.motion[prop].keys for the layer and element holders; it does not resolve trackFor and excludes timeRemap, effect tracks and other non-h.motion stores. It is exported at 13827-13830.","layer-inout previews and commits selected per-key locks through keysLockedTo/shiftKeySelection at 103-130 and 1188-1215.","Assignment follows the live selection, including a Time Remap key reached through trackFor at motion.js:443-445 and the keyframe-cell handler at10968-10977. Nested key.lockTo persists under layer.motion/elementMotion or the explicit layer.timeRemap field in timeline exportJSON:2117-2125; there is no per-key whitelist. This assignment/persistence reach is wider than keysLockedTo retime reach."],
+      "consumer_matrix":{"save":"pushUndo delegates to pushUndoLayers; absent scrub suppression it saves frames before its snapshot. There is no explicit save after lockTo assignment.","load":"No loadFrame occurs. Subsequent project reload restores enclosing motion/elementMotion key dictionaries and the explicit timeRemap track. Null is serialized differently from an absent property but neither matches C02's in/out/layer reader; persisted timeRemap lockTo remains outside that reader.","history":"Each clicked descriptor pushes history before examining the live selection. Thus a changed-empty or all-missing-key selection still produces a history attempt outside scrub suppression.","selection":"The initial array/nonempty gate and row active state are snapshots at menu construction. The action instead iterates live _motionKeySel, so a changed selection receives the mode determined from the former one; no key, layer, bar, or canvas selection is rewritten.","animation":"Only truthy s.key entries receive lockTo, including a selected Time Remap key. C02 keysLockedTo later selects exact in/out/layer values only from propsFor-addressed h.motion[prop].keys for layer and element holders. It excludes timeRemap, effect tracks and every other non-h.motion store; null/deleted/unrecognized modes are not returned. Unlike shiftLayerMotionKeys at12643-12651, it never scans timeRemap/effects separately. A Time Remap key can persist lockTo while remaining inert to this standing-lock retime reader. The menu does not shift keys.","render":"Action calls renderTimeline only. It does not call renderLayerList, loadFrame, renderOS, renderArcs, or engine renderNow.","export":"lockTo stays inside the selected key's dictionary and follows its enclosing serialization: motion/elementMotion, or explicit timeRemap for a selected remap key. Export/import persistence does not imply that keysLockedTo consumes every store. The menu neither changes the schema nor asserts a codec migration.","native":"No native call. Per-key lock effects happen only through existing layer-inout Motion retime consumers."},
+      "oracle":"Proposed, unrun fixtures: no selection returns []; each descriptor's captured active and label; unchanged live selection set/toggle; changed selection; empty live selection; missing key entries; mixed modes; null assignment versus deleted lockTo; already-null locks; exactly one history/render attempt per click outside scrub suppression; C02 reader only sees exact modes in propsFor-addressed h.motion tracks; a selected Time Remap key receives/persists lockTo yet is excluded from keysLockedTo and standing-lock retiming; effect and other non-h.motion stores are excluded too; later layer-inout preview/drop uses only reader-returned keys without moving unrelated tracks.",
+      "proposed_api":"planSelectedKeyLockMenu(selectionAtOpen) -> descriptors; applySelectedKeyLocks(selectionAtClick,mode,{history,render}) -> {visited,changed}. Both inputs must remain explicit to preserve the current stale-descriptor baseline before a separately accepted behavior decision.",
+      "admission":"Any executable leaf must preserve or deliberately characterize open-time versus click-time selection semantics with C02; it must not extract keysLockedTo or layer-inout behavior."
+    }
+  ]}],
+  "boundaries":["C02 timeLinkWouldCycle ends8452.","8453-8469 are detached C02 setLayerTimeLink comments.","C20c covers two complete comment-plus-builder units8470-8494 and8495-8529.","C02 keysLockedTo begins with its comments8530 and completes8553.","C02 setLayerTimeLink begins8554 after its detached comments."],
+  "validation":{"expected_assigned_lines":60,"expected_classification":{"code":36,"comment":24,"whitespace":0},"packet_partition":[[8470,8494],[8495,8529]],"required_consumer_dimensions":["save","load","history","selection","animation","render","export","native"],"negative_controls":["remove8470 through same coverage function => reject omission","append duplicate8495-8529 through same coverage function => reject overlap"],"symbol_checks":["buildKeyLockMenuItems8479","buildKeySelectionLockMenuItems8508","C02 keysLockedTo8538 excluded","C02 setLayerTimeLink8554 excluded"]},
+  "fixtures_status":"All behavior fixtures are proposals and were not run."
+}
