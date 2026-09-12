@@ -13,7 +13,7 @@ This is the single operating plan for the current remediation. It supersedes the
 - [ ] Keep new OpenFX effects, a full OCIO/EXR/OTIO implementation, new Buzz transport infrastructure, broad performance improvements and product feature additions outside this program. Define their ports, availability and data contracts where needed; do not implement new product breadth to close remediation. The separately authorized Buzz workspace-instruction editor is a current coordination improvement, not a Nemo structural completion gate.
 - [ ] Treat generated, vendor and data catalogs by exact provenance/integrity policy. Handwritten control logic cannot escape modularity checks by being labeled a catalog. Line counts support coherent APIs; arbitrary file splitting is not acceptance.
 
-The source audit used `66ece0641708122eb8447e85ad8dd7e3402aaf6c`, not the older local main checkout. Reuse the honest F0 baseline, merged curve extraction, project parser, opacity application service, existing consumer tests and Rust MCP transport. The general **feature registry is still to be implemented**; the existing `nemo-mcp/src/registry.rs` locates application instances. The 147-module JS profile still classifies 140 modules as legacy. These are source observations, not newly executed test results.
+The source audit used `66ece0641708122eb8447e85ad8dd7e3402aaf6c`, not the older local main checkout. Current `main` at `54e15b6503810607911ae43f7b19ea508790cff0` includes the adopted P02 comparison manifest; completed C01–C08 census work; P04/D02 contracts; P05 deterministic feature registration; completed enforcement/validation leaves; and the completed P20, P22, A01 and P28 extractions. The app-JS profile now has 151 modules, of which 140 remain `app-legacy`. P06 [#1112](https://github.com/mysteropodes/nemo/pull/1112) and P07 [#1113](https://github.com/mysteropodes/nemo/pull/1113) are open candidates, not current-main behavior: both have owner changes requested and remain unmerged until their takeover corrections are accepted. These are source and canonical-record observations, not newly executed test results.
 
 The starting issues below are concrete entry tasks, not a claim that their count exhausts all monoliths. C01–C08 map the fixed source set; P03 admits the remaining one-responsibility leaves. This mapping happens first, and every uncovered responsibility must receive a leaf before a completion forecast. No later family may hide behind a multi-day “migrate everything” issue.
 
@@ -212,7 +212,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 | [P03 / #1005](https://github.com/mysteropodes/nemo/issues/1005) · **O** · Validate the combined source census and admit the complete extraction queue | [P14 / #1016](https://github.com/mysteropodes/nemo/issues/1016) · **D2** · Complete two-instance native isolation acceptance |
 | — | [P15 / #1017](https://github.com/mysteropodes/nemo/issues/1017) · **D1** · Add one real opacity slider gesture regression |
 
-- [ ] **[P01 / #1003](https://github.com/mysteropodes/nemo/issues/1003) — Install the approved execution checklist, owned leaf issues and board views**
+- [x] **[P01 / #1003](https://github.com/mysteropodes/nemo/issues/1003) — Install the approved execution checklist, owned leaf issues and board views**
 
   Owner **Ilya/O** · skill `orchestration` · `gpt-6-astra` / **high**. Predecessors: none; claim the file/runtime slot.
 
@@ -224,7 +224,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: No issue is marked Done because a PR merged. No roadmap Status overwrite before a board decision.
 
-- [ ] **[P02 / #1004](https://github.com/mysteropodes/nemo/issues/1004) — Adopt one current-state comparison manifest**
+- [x] **[P02 / #1004](https://github.com/mysteropodes/nemo/issues/1004) — Adopt one current-state comparison manifest**
 
   Owner **Ilya/O** · skill `orchestration` · `gpt-6-astra` / **high**. Predecessors: none; claim the file/runtime slot.
 
@@ -236,7 +236,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: No feature-repair prerequisite or silently changed golden. Historical F0 remains valid at its own revision.
 
-- [ ] **[C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036) — Map document and history into bounded extraction packets**
+- [x] **[C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036) — Map document and history into bounded extraction packets**
 
   Owner **Ilya/O** · skill `inventory` · `gpt-6-astra` / **high**. Predecessors: none; claim the file/runtime slot.
 
@@ -248,7 +248,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: No source migration in this census task. For C08, verify set difference mechanically and map only uncovered paths; do not repeat C01-C07 research.
 
-- [ ] **[C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037) — Map animation and time into bounded extraction packets**
+- [x] **[C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037) — Map animation and time into bounded extraction packets**
 
   Owner **Ilya/D1** · skill `inventory` · `gpt-5.6-sol` / **medium**. Predecessors: none; claim the file/runtime slot.
 
@@ -260,7 +260,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: No source migration in this census task. For C08, verify set difference mechanically and map only uncovered paths; do not repeat C01-C07 research.
 
-- [ ] **[C03 / #1038](https://github.com/mysteropodes/nemo/issues/1038) — Map rendering and resource ownership into bounded extraction packets**
+- [x] **[C03 / #1038](https://github.com/mysteropodes/nemo/issues/1038) — Map rendering and resource ownership into bounded extraction packets**
 
   Owner **Ilya/D2** · skill `inventory` · `gpt-5.6-terra` / **medium**. Predecessors: none; claim the file/runtime slot.
 
@@ -272,7 +272,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: No source migration in this census task. For C08, verify set difference mechanically and map only uncovered paths; do not repeat C01-C07 research.
 
-- [ ] **[C04 / #1039](https://github.com/mysteropodes/nemo/issues/1039) — Map editor tools and presentation into bounded extraction packets**
+- [x] **[C04 / #1039](https://github.com/mysteropodes/nemo/issues/1039) — Map editor tools and presentation into bounded extraction packets**
 
   Owner **Cyrill/D1** · skill `inventory` · `sonnet` / **medium**. Predecessors: none; claim the file/runtime slot.
 
@@ -284,7 +284,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: No source migration in this census task. For C08, verify set difference mechanically and map only uncovered paths; do not repeat C01-C07 research.
 
-- [ ] **[C05 / #1040](https://github.com/mysteropodes/nemo/issues/1040) — Map media, import, export and native services into bounded extraction packets**
+- [x] **[C05 / #1040](https://github.com/mysteropodes/nemo/issues/1040) — Map media, import, export and native services into bounded extraction packets**
 
   Owner **Cyrill/D1** · skill `inventory` · `sonnet` / **medium**. Predecessors: none; claim the file/runtime slot.
 
@@ -296,7 +296,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: No source migration in this census task. For C08, verify set difference mechanically and map only uncovered paths; do not repeat C01-C07 research.
 
-- [ ] **[C06 / #1041](https://github.com/mysteropodes/nemo/issues/1041) — Map preferences, labs and bootstrap into bounded extraction packets**
+- [x] **[C06 / #1041](https://github.com/mysteropodes/nemo/issues/1041) — Map preferences, labs and bootstrap into bounded extraction packets**
 
   Owner **Cyrill/D2** · skill `inventory` · `sonnet` / **medium**. Predecessors: none; claim the file/runtime slot.
 
@@ -308,7 +308,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: No source migration in this census task. For C08, verify set difference mechanically and map only uncovered paths; do not repeat C01-C07 research.
 
-- [ ] **[C07 / #1042](https://github.com/mysteropodes/nemo/issues/1042) — Map application, mcp and diagnostics into bounded extraction packets**
+- [x] **[C07 / #1042](https://github.com/mysteropodes/nemo/issues/1042) — Map application, mcp and diagnostics into bounded extraction packets**
 
   Owner **Ilya/O** · skill `inventory` · `gpt-6-astra` / **high**. Predecessors: none; claim the file/runtime slot.
 
@@ -320,7 +320,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: No source migration in this census task. For C08, verify set difference mechanically and map only uncovered paths; do not repeat C01-C07 research.
 
-- [ ] **[C08 / #1043](https://github.com/mysteropodes/nemo/issues/1043) — Map completeness and remaining tracked roots into bounded extraction packets**
+- [x] **[C08 / #1043](https://github.com/mysteropodes/nemo/issues/1043) — Map completeness and remaining tracked roots into bounded extraction packets**
 
   Owner **Cyrill/D2** · skill `inventory` · `sonnet` / **medium**. Predecessors: [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036), [C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037), [C03 / #1038](https://github.com/mysteropodes/nemo/issues/1038), [C04 / #1039](https://github.com/mysteropodes/nemo/issues/1039), [C05 / #1040](https://github.com/mysteropodes/nemo/issues/1040), [C06 / #1041](https://github.com/mysteropodes/nemo/issues/1041), [C07 / #1042](https://github.com/mysteropodes/nemo/issues/1042).
 
@@ -344,7 +344,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: Do not confuse 902 inventory rows with 902 separate capabilities, or classify every large data table as a code monolith.
 
-- [ ] **[F01 / #1047](https://github.com/mysteropodes/nemo/issues/1047) — Review the existing Honey installed-package evidence**
+- [x] **[F01 / #1047](https://github.com/mysteropodes/nemo/issues/1047) — Review the existing Honey installed-package evidence**
 
   Owner **Cyrill/O** · skill `validation` · `opus` / **high**. Predecessors: none; claim the file/runtime slot.
 
@@ -356,7 +356,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: Preserve known defects; no unrelated repair or feature addition.
 
-- [ ] **[F02 / #1048](https://github.com/mysteropodes/nemo/issues/1048) — Finish the existing Fizz payload-schema acceptance**
+- [x] **[F02 / #1048](https://github.com/mysteropodes/nemo/issues/1048) — Finish the existing Fizz payload-schema acceptance**
 
   Owner **Cyrill/D1** · skill `capabilities` · `sonnet` / **medium**. Predecessors: none; claim the file/runtime slot.
 
@@ -368,7 +368,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: Preserve known defects; no unrelated repair or feature addition.
 
-- [ ] **[P14 / #1016](https://github.com/mysteropodes/nemo/issues/1016) — Complete two-instance native isolation acceptance**
+- [x] **[P14 / #1016](https://github.com/mysteropodes/nemo/issues/1016) — Complete two-instance native isolation acceptance**
 
   Owner **Cyrill/D2** · skill `validation` · `sonnet` / **medium**. Predecessors: none; claim the file/runtime slot.
 
@@ -380,7 +380,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: No unrelated FFmpeg, export, signing or platform-support repair; harness defect gets its own narrow packet.
 
-- [ ] **[P15 / #1017](https://github.com/mysteropodes/nemo/issues/1017) — Add one real opacity slider gesture regression**
+- [x] **[P15 / #1017](https://github.com/mysteropodes/nemo/issues/1017) — Add one real opacity slider gesture regression**
 
   Owner **Cyrill/D1** · skill `validation` · `sonnet` / **medium**. Predecessors: none; claim the file/runtime slot.
 
@@ -408,7 +408,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 | [T02 / #1051](https://github.com/mysteropodes/nemo/issues/1051) · **D2** · Distinguish exact baseline failures from new regressions | — |
 | [F03 / #1049](https://github.com/mysteropodes/nemo/issues/1049) · **O** · Accept the installed Codex opacity workflow | — |
 
-- [ ] **[P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006) — Approve capability descriptor v1 with two concrete examples**
+- [x] **[P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006) — Approve capability descriptor v1 with two concrete examples**
 
   Owner **Ilya/O** · skill `capabilities` · `gpt-6-astra` / **high**. Predecessors: none; claim the file/runtime slot.
 
@@ -432,7 +432,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: Preserve known defects; no unrelated repair or feature addition.
 
-- [ ] **[D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045) — Specify transaction, job and resource lifecycle contracts**
+- [x] **[D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045) — Specify transaction, job and resource lifecycle contracts**
 
   Owner **Ilya/O** · skill `architecture` · `gpt-6-astra` / **high**. Predecessors: [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
 
@@ -444,7 +444,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: Preserve known defects; no unrelated repair or feature addition.
 
-- [ ] **[P05 / #1007](https://github.com/mysteropodes/nemo/issues/1007) — Create deterministic feature registration and descriptor validation**
+- [x] **[P05 / #1007](https://github.com/mysteropodes/nemo/issues/1007) — Create deterministic feature registration and descriptor validation**
 
   Owner **Ilya/D1** · skill `capabilities` · `gpt-5.6-sol` / **medium**. Predecessors: [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
 
@@ -504,7 +504,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: Do not wait for full R03 or pretend text sizing proves dependency direction.
 
-- [ ] **[P11 / #1013](https://github.com/mysteropodes/nemo/issues/1013) — Cover Rust source classification and size ratchet**
+- [x] **[P11 / #1013](https://github.com/mysteropodes/nemo/issues/1013) — Cover Rust source classification and size ratchet**
 
   Owner **Cyrill/D1** · skill `validation` · `sonnet` / **medium**. Predecessors: [C05 / #1040](https://github.com/mysteropodes/nemo/issues/1040), [C07 / #1042](https://github.com/mysteropodes/nemo/issues/1042).
 
@@ -540,7 +540,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: Preserve known defects; no unrelated repair or feature addition.
 
-- [ ] **[P13 / #1015](https://github.com/mysteropodes/nemo/issues/1015) — Classify UI bootstrap/style/data separately from executable modules**
+- [x] **[P13 / #1015](https://github.com/mysteropodes/nemo/issues/1015) — Classify UI bootstrap/style/data separately from executable modules**
 
   Owner **Cyrill/D2** · skill `validation` · `sonnet` / **medium**. Predecessors: [C06 / #1041](https://github.com/mysteropodes/nemo/issues/1041), [C08 / #1043](https://github.com/mysteropodes/nemo/issues/1043).
 
@@ -552,7 +552,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: No bulk formatting, translation rewrite or arbitrary splitting of tables purely to lower line counts. Exact source edits wait for their whole-file owner slot.
 
-- [ ] **[T01 / #1050](https://github.com/mysteropodes/nemo/issues/1050) — Report and enforce migrated JavaScript coverage with c8**
+- [x] **[T01 / #1050](https://github.com/mysteropodes/nemo/issues/1050) — Report and enforce migrated JavaScript coverage with c8**
 
   Owner **Cyrill/D2** · skill `validation` · `sonnet` / **medium**. Predecessors: none; claim the file/runtime slot.
 
@@ -564,7 +564,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: Preserve known defects; no unrelated repair or feature addition.
 
-- [ ] **[T02 / #1051](https://github.com/mysteropodes/nemo/issues/1051) — Distinguish exact baseline failures from new regressions**
+- [x] **[T02 / #1051](https://github.com/mysteropodes/nemo/issues/1051) — Distinguish exact baseline failures from new regressions**
 
   Owner **Ilya/D2** · skill `validation` · `gpt-5.6-terra` / **medium**. Predecessors: [P02 / #1004](https://github.com/mysteropodes/nemo/issues/1004).
 
@@ -576,7 +576,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: Preserve known defects; no unrelated repair or feature addition.
 
-- [ ] **[T03 / #1052](https://github.com/mysteropodes/nemo/issues/1052) — Retain useful Playwright failure traces and reports**
+- [x] **[T03 / #1052](https://github.com/mysteropodes/nemo/issues/1052) — Retain useful Playwright failure traces and reports**
 
   Owner **Cyrill/D2** · skill `validation` · `sonnet` / **medium**. Predecessors: none; claim the file/runtime slot.
 
@@ -588,7 +588,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: Preserve known defects; no unrelated repair or feature addition.
 
-- [ ] **[T04 / #1053](https://github.com/mysteropodes/nemo/issues/1053) — Generate Rust coverage for the existing MCP crate**
+- [x] **[T04 / #1053](https://github.com/mysteropodes/nemo/issues/1053) — Generate Rust coverage for the existing MCP crate**
 
   Owner **Cyrill/D1** · skill `validation` · `sonnet` / **medium**. Predecessors: [C07 / #1042](https://github.com/mysteropodes/nemo/issues/1042).
 
@@ -756,7 +756,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 | [P26 / #1028](https://github.com/mysteropodes/nemo/issues/1028) · **D2** · Extract image LRU bookkeeping and eviction policy | — |
 | [P27 / #1029](https://github.com/mysteropodes/nemo/issues/1029) · **D2** · Extract the existing Rust brightness/contrast pass | — |
 
-- [ ] **[P20 / #1022](https://github.com/mysteropodes/nemo/issues/1022) — Extract folder metadata serialization**
+- [x] **[P20 / #1022](https://github.com/mysteropodes/nemo/issues/1022) — Extract folder metadata serialization**
 
   Owner **Ilya/D1** · skill `extraction` · `gpt-5.6-sol` / **medium**. Predecessors: [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
 
@@ -792,7 +792,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: Do not replace the entire undo system in one task. Extract only the frame-only entry characterized in H02; P03 tracks the remaining history responsibilities separately.
 
-- [ ] **[P22 / #1024](https://github.com/mysteropodes/nemo/issues/1024) — Extract expression clock conversion helpers**
+- [x] **[P22 / #1024](https://github.com/mysteropodes/nemo/issues/1024) — Extract expression clock conversion helpers**
 
   Owner **Cyrill/D1** · skill `extraction` · `sonnet` / **medium**. Predecessors: [C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
 
@@ -804,7 +804,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: Scope: `motion.js:1712–1732`: `exprStepTime`, `exprToFrames`, `exprToSeconds`; new `src/js/domain/animation/expression-time.js`, existing expression evaluator as caller. Explicit context/fps/numeric-coercion inputs. Suggested Cyrill D1; exclusive motion.js slot.
 
-- [ ] **[A01 / #1061](https://github.com/mysteropodes/nemo/issues/1061) — Extract seeded expression random draws**
+- [x] **[A01 / #1061](https://github.com/mysteropodes/nemo/issues/1061) — Extract seeded expression random draws**
 
   Owner **Cyrill/D1** · skill `extraction` · `sonnet` / **medium**. Predecessors: [P22 / #1024](https://github.com/mysteropodes/nemo/issues/1024).
 
@@ -888,7 +888,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: Scope: `geometry-wasm/src/engine.rs:1665–1802`, `create_color_adjust_pipeline` and `color_adjust_pass`; new `geometry-wasm/src/engine/color_adjust.rs`; existing `color_adjust.wgsl` unchanged. Creation/use sites in `create_engine`/`run_one_effect` are wiring only. Suggested Ilya D2 after Rust module rule agreed.
 
-- [ ] **[P28 / #1030](https://github.com/mysteropodes/nemo/issues/1030) — Extract the FFmpeg probe text parser**
+- [x] **[P28 / #1030](https://github.com/mysteropodes/nemo/issues/1030) — Extract the FFmpeg probe text parser**
 
   Owner **Cyrill/D1** · skill `extraction` · `sonnet` / **medium**. Predecessors: [C05 / #1040](https://github.com/mysteropodes/nemo/issues/1040), [P11 / #1013](https://github.com/mysteropodes/nemo/issues/1013).
 
