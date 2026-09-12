@@ -1,0 +1,500 @@
+{
+  "census_id": "C19k",
+  "issue": 1148,
+  "title": "Timeline drawing defaults and selection-properties adoption",
+  "status": "draft for independent review; source-derived behavioral fixtures are proposed and unrun",
+  "owner": "P03/C19k read-only census; runtime ownership remains with named source owners",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "09719be7b723817cce1089164978b69c893bf21a",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 3512,
+      "end": 3543
+    },
+    {
+      "start": 3544,
+      "end": 3759
+    }
+  ],
+  "coverage_note": "Exactly 248 assigned lines are covered once by two complete packets: 117 code and 131 full-line comments, no whitespace. Line 3511 closes C19j updatePropsContext; line 3760 begins updateFsSelPanel. Both are excluded.",
+  "source_baselines": {
+    "pinned": "git object 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js is cc4cfd27dc59d797c911d840dc46e2f816942123",
+    "current": "observed origin/main 09719be7b723817cce1089164978b69c893bf21a has the same timeline blob",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed for this JSON-only census.",
+    "fixtures": "Every behavioral fixture below is source-derived, proposed and unrun.",
+    "comments": "Historical source comments and their performance or behavior claims were not treated as fresh execution evidence."
+  },
+  "whole_file_writer_guidance": {
+    "source_access": "timeline.js and all callers/dependencies remain read-only; C19k owns only this census JSON artifact.",
+    "serialization": "P30/#1032 retains the whole timeline.js runtime writer; any extraction or correction must serialize through that reservation.",
+    "reservations": "D01/#1044 and PR #1144, T05/Pollen, Motion and all named owners remain separate; census coverage transfers no runtime authority."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19j/#1146",
+      "disposition": "Retains updatePropsContext through line 3511; C19k starts at the following drawing-default declaration and does not duplicate routing or section visibility."
+    },
+    {
+      "owner": "C19i/#1143",
+      "disposition": "Retains _selPropsSig initialization, help/constants and DOM-slot foundations. C19k records the cache reads/writes performed by updateSelPropsPanel."
+    },
+    {
+      "owner": "C19h/#1141",
+      "disposition": "Retains updateUI and its panel refresh order. C19k records updateUI only as the call site for updateSelPropsPanel."
+    },
+    {
+      "owner": "C19a/#1118",
+      "disposition": "Retains SM.setTool and drawing property setters. C19k maps its leaving/entering drawing-tool calls to the snapshot/restore helpers without claiming the caller."
+    },
+    {
+      "owner": "C04a/#1039 selection",
+      "disposition": "Retains selectedPaths, activeXformBounds, Path geometry, anchors and _nodeSel. C19k records how the panel reads and adopts those values."
+    },
+    {
+      "owner": "C04b/#1039 presentation",
+      "disposition": "Retains swatch/icon painters, enablement synchronizers, bitmap controls and selection UI producers. C19k records calls and direct DOM projection only."
+    },
+    {
+      "owner": "C01/#1036, C02/#1037, C03, C05, C06 and C07",
+      "disposition": "Retain persistence/history, Motion/animation, rendering/export, native/media and bootstrap/application APIs. Neither packet implements those workflows."
+    },
+    {
+      "owner": "P30, D01, T05 and Motion reservations",
+      "disposition": "P30 retains timeline.js runtime writing; D01 PR #1144, T05/Pollen and Motion remain untouched and outside this census."
+    }
+  ],
+  "boundaries": [
+    "The first packet is a declaration plus two complete helpers. Its snapshot is a mutable module cache holding ten shallow state values; restore replays the same cached values until another snapshot replaces them.",
+    "updateSelPropsPanel is one complete synchronous transaction. Its signature gate controls adoption of the first selected path, while alignment and final transform/row projection run on every eligible call.",
+    "State and DOM effects are incremental with no rollback. Required calls or nodes can throw after cache/state/DOM writes; the function has no catch or success return.",
+    "Selection reflection changes global drawing defaults and UI state but does not mutate selected paths. Those writes therefore influence later user actions through separately owned setters and tool flows.",
+    "The width branch distinguishes nonempty vector widthProfile, whose positive peak wins and zero peak falls back to the prior brushSize, from absent or empty widthProfile, which uses ref.strokeWidth or prior brushSize."
+  ],
+  "exclusions": [
+    "src/js/timeline.js through 3511 and from 3760 onward",
+    "C19j context routing, C19i constants/cache initialization/help/slot foundations and C19h updateUI implementation",
+    "C19a tool-transition and setter implementations",
+    "C04a selection/geometry/anchor implementations and C04b UI painter implementations",
+    "C01 persistence/history, C02 Motion/animation, C03 render/export and C05 native/media",
+    "P30 runtime changes, D01 PR #1144, T05/Pollen and unrelated work"
+  ],
+  "areas": [
+    {
+      "area": "drawing-default-snapshot-restore",
+      "packets": [
+        {
+          "id": "C19k.drawing-defaults",
+          "files": [
+            "src/js/timeline.js:3512-3543"
+          ],
+          "coverage_ranges": [
+            [
+              3512,
+              3543
+            ]
+          ],
+          "symbols": [
+            "_isDrawingTool",
+            "_drawingDefaultsSnapshot",
+            "_snapshotDrawingDefaults",
+            "_restoreDrawingDefaults"
+          ],
+          "signatures": [
+            "_snapshotDrawingDefaults() -> undefined",
+            "_restoreDrawingDefaults() -> undefined"
+          ],
+          "responsibility": "Defines drawing-tool membership, captures ten current drawing-default state values into one replacement snapshot, and restores those values plus their owned UI projections.",
+          "drawing_tool_membership": {
+            "included": [
+              "draw",
+              "pen",
+              "line",
+              "rect",
+              "ellipse",
+              "speechbubble",
+              "star",
+              "fillbrush",
+              "fill"
+            ],
+            "excluded_observable": "eraser and every unlisted tool are falsy"
+          },
+          "snapshot": {
+            "writes": "Replaces _drawingDefaultsSnapshot with a fresh object.",
+            "fields": [
+              "strokeColor",
+              "strokeEnabled",
+              "fillColor",
+              "fillEnabled",
+              "strokeCap",
+              "strokeJoin",
+              "miterLimit",
+              "dashOffset",
+              "paintOrder",
+              "brushSize"
+            ],
+            "identity": "Assignments are shallow. Primitive or reference identity and undefined values are preserved; no clone or normalization occurs."
+          },
+          "restore": {
+            "guard": "If the cached snapshot is falsy, return before any state, callback or DOM effect.",
+            "state_order": [
+              "strokeColor",
+              "strokeEnabled",
+              "fillColor",
+              "fillEnabled",
+              "strokeCap",
+              "strokeJoin",
+              "miterLimit",
+              "dashOffset",
+              "paintOrder",
+              "brushSize"
+            ],
+            "required_effects_order": [
+              "paintStrokeSwatches",
+              "paintFillSwatches",
+              "window.SM._syncStrokeEnabledUI",
+              "window.SM._syncFillEnabledUI",
+              "paintIconGroup cap",
+              "paintIconGroup join",
+              "paintIconGroup paintOrder"
+            ],
+            "optional_effects": [
+              "syncMiterLimitEnabled when window.syncMiterLimitEnabled is truthy",
+              "p-miterlimit value when present",
+              "p-dashoffset value when present",
+              "p-sw rounded brushSize when present"
+            ],
+            "identity_and_repetition": "The cache is not cleared. Each later restore reassigns the same ten saved values and replays painters/synchronizers."
+          },
+          "callers": [
+            "SM.setTool at line 430 snapshots when old state.tool is listed and requested t is unlisted, before state.tool=t.",
+            "SM.setTool at line 432 restores when requested t is listed and previous tool was unlisted, after state.tool=t and renderArcs()."
+          ],
+          "returns_and_errors": "Both helpers normally return undefined. Restore has no catch or rollback; failure in a required painter/synchronizer preserves all prior state and effects."
+        }
+      ]
+    },
+    {
+      "area": "selection-properties-adoption",
+      "packets": [
+        {
+          "id": "C19k.update-selection-properties",
+          "files": [
+            "src/js/timeline.js:3544-3759"
+          ],
+          "coverage_ranges": [
+            [
+              3544,
+              3759
+            ]
+          ],
+          "symbols": [
+            "updateSelPropsPanel"
+          ],
+          "signatures": [
+            "updateSelPropsPanel() -> undefined"
+          ],
+          "responsibility": "For Select/Subselect with a nonempty selection and usable transform bounds, refreshes count-dependent controls on every call; on numeric-ID signature changes adopts anchor, paint, stroke-style, width and bitmap values from the first selected path into global state and UI; then refreshes transform values and point/boolean rows.",
+          "stages": [
+            {
+              "id": "eligibility-and-bounds",
+              "range": [
+                3547,
+                3553
+              ],
+              "behavior": "If tool is neither select nor subselect, or selectedPaths is empty, set _selPropsSig to the empty string and return. Otherwise call activeXformBounds; a falsy result returns without clearing or changing the existing signature.",
+              "guards": "state, selectedPaths and activeXformBounds are required globals; no selected item or DOM state is touched before the bounds succeeds."
+            },
+            {
+              "id": "alignment-and-signature",
+              "range": [
+                3554,
+                3567
+              ],
+              "behavior": "Optionally displays align-toolbar as flex for at least two selected paths, otherwise none. Required querySelectorAll toggles each distribute button to empty display for at least three paths, otherwise none. The signature sorts selected path IDs numerically ascending and joins them with commas.",
+              "cache_behavior": "If signature differs, reset state.selRotAccum to 0 and publish _selPropsSig before adoption. If equal, skip every adoption stage even if the referenced path properties changed; final projection still executes. Duplicate/undefined/non-numeric IDs follow JavaScript subtraction sort and join coercion."
+            },
+            {
+              "id": "anchor-adoption",
+              "range": [
+                3568,
+                3594
+              ],
+              "behavior": "Uses selectedPaths[0] as ref. A truthy ref custom anchor requires every selected path to have exact matching indices 0 and 1; otherwise every path's anchor key must strictly equal the reference key. Agreed custom anchors are shallow-copied with slice and force key mc; an agreed truthy key clears custom; disagreement or a falsy key resets key mc and custom null. renderXformAnchorGrid is optional.",
+              "identity": "Custom anchor array identity is deliberately not retained; nested members, if any, remain shallow. Missing ref skips all adoption while keeping the already-published signature and rotation reset."
+            },
+            {
+              "id": "paint-channel-adoption",
+              "range": [
+                3595,
+                3670
+              ],
+              "classification": "isBrushShape is truthy for isVectorBrush, isFillShape, bitmapBrushSpec, brushTexturePreset or isBrushTextureCopy. isPressureRibbon requires isVectorBrush and not isFillShape.",
+              "pressure_ribbon": "When a pressure ribbon has fillColor, colorHex8(fillColor) becomes state.strokeColor and is painted; strokeEnabled becomes fillColor.alpha>0 and required SM synchronization runs. It remains excluded from ordinary fill/stroke adoption.",
+              "ordinary_shape": "For non-brush shapes, fillEnabled follows fillColor truthiness; present fill converts through colorHex8, absent fill preserves prior state.fillColor, and fill swatches plus required enablement sync run. strokeEnabled follows strokeColor truthiness; present stroke converts and paints, absent stroke preserves prior state.strokeColor; required stroke enablement sync always runs.",
+              "gradient": "Optional p-strokegrad-along is checked from strokeGradientAlongPath truthiness. A truthy gradient requires four descendant nodes and writes from/to colors with #ff0000/#0000ff falsy fallbacks. Missing checkbox skips all gradient projection.",
+              "asymmetry": "Fill-brush and bitmap/texture brush shapes skip both ordinary channels. A pressure ribbon maps its filled ribbon ink to the Stroke channel only."
+            },
+            {
+              "id": "stroke-style-adoption",
+              "range": [
+                3671,
+                3682
+              ],
+              "behavior": "Every non-vector-brush ref adopts cap and join with round fallbacks, miterLimit with 10 fallback, dashOffset with 0 fallback and data.paintOrder with fillFirst fallback. Zero miter becomes 10; zero dash remains 0.",
+              "effects": "Three paintIconGroup calls, syncMiterLimitEnabled and both p-miterlimit/p-dashoffset nodes are required and unguarded after the non-vector condition succeeds. Bitmap/fill/texture brush shapes are included unless also marked isVectorBrush."
+            },
+            {
+              "id": "width-adoption",
+              "range": [
+                3683,
+                3720
+              ],
+              "guard": "The entire branch is skipped if optional p-sw is absent. It does not protect an actively focused p-sw field.",
+              "behavior": "For a vector brush with nonempty widthProfile, scan samples in order and retain the greatest positive (s.width||0); use that peak or prior state.brushSize when the peak is zero. For absent or empty widthProfile, including a vector brush, use ref.strokeWidth or prior brushSize. Write state.brushSize then the rounded field value.",
+              "asymmetries": [
+                "Negative, zero, missing and other falsy sample widths cannot raise peakW.",
+                "A nonempty all-zero profile ignores ref.strokeWidth and preserves prior brushSize.",
+                "An empty profile follows ref.strokeWidth fallback.",
+                "Falsy ref.strokeWidth, including zero, preserves prior brushSize."
+              ]
+            },
+            {
+              "id": "bitmap-default-adoption",
+              "range": [
+                3721,
+                3748
+              ],
+              "behavior": "Unconditionally within changed-signature/ref adoption, derive bmSpec from ref.data.bitmapBrushSpec and set state.bitmapBrushOn to its truthiness. A truthy spec copies tip, spacing and scatter, rounds opacity*100, and boolean-coerces pressure.",
+              "asymmetry": "A missing/falsy spec turns bitmapBrushOn off but leaves bitmapTip, bitmapSpacing, bitmapScatter, bitmapOpacity and bitmapPressure unchanged. There is no DOM checkbox/field gate."
+            },
+            {
+              "id": "final-live-projection",
+              "range": [
+                3749,
+                3759
+              ],
+              "behavior": "On every eligible call after bounds, required sel-count writes count plus required SM.t singular/plural suffix. Each required sp-x/y/w/h/rot field preserves its value only when it is document.activeElement; other values are rounded from bounds or state.selRotAccum||0. Required point-type row is flex only for subselect with nonempty _nodeSel; required boolean row is flex only for select with at least two paths.",
+              "partial_order": "This runs after adoption or a signature-cache hit. Any earlier throw prevents it; any required final node/helper throw preserves prior adoption/cache effects. _nodeSel is evaluated only when tool is subselect because of short-circuiting."
+            }
+          ],
+          "direct_state_writes": [
+            "state.selRotAccum",
+            "state.xformAnchorCustom",
+            "state.xformAnchorKey",
+            "state.strokeColor",
+            "state.strokeEnabled",
+            "state.fillColor",
+            "state.fillEnabled",
+            "state.strokeCap",
+            "state.strokeJoin",
+            "state.miterLimit",
+            "state.dashOffset",
+            "state.paintOrder",
+            "state.brushSize",
+            "state.bitmapBrushOn",
+            "state.bitmapTip",
+            "state.bitmapSpacing",
+            "state.bitmapScatter",
+            "state.bitmapOpacity",
+            "state.bitmapPressure"
+          ],
+          "direct_non_state_writes": [
+            "_selPropsSig",
+            "align/distribute display",
+            "swatch/icon and enablement callback effects",
+            "gradient checkbox/fields/backgrounds",
+            "p-miterlimit/p-dashoffset/p-sw values",
+            "sel-count text",
+            "sp-x/y/w/h/rot values",
+            "point-type and boolean row display"
+          ],
+          "direct_non_writes": "Does not mutate selected path fields, selectedPaths, _nodeSel, layers, history, animation tracks, renderer/export payloads or native state.",
+          "caller": "C19h-owned updateUI invokes updateSelPropsPanel at timeline line 2757.",
+          "returns_and_errors": "No success value; normal completion yields undefined. There is no catch/finally or rollback, and the signature is committed before adoption, so a thrown adoption can leave a partially mutated state whose next same-signature call skips adoption."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No serialization occurs here. Snapshot cache and panel cache are session-local; adopted global defaults may be observed by separately owned save flows only after a later document mutation."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No parser or load normalization occurs. Loaded paths can later become ref through selectedPaths, but re-adoption requires caller refresh and a signature change or prior signature clear; missing/falsy fields follow the exact fallbacks recorded above."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Neither helper pushes history. Restore and passive selection adoption mutate global defaults/UI outside undo; selected paths remain unchanged. Properties restored by undo/redo are re-adopted only when caller refresh and signature gating permit."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "Primary consumer: tool/selection/bounds guards, numeric ID signature, first-path adoption, all-path anchor agreement, count controls and node/boolean rows are fully mapped."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "No frame, key, track, interpolation or Motion property is read or written. C02/Motion ownership is preserved."
+    },
+    {
+      "consumer": "render",
+      "disposition": "No canvas/scene render is requested. Painter, synchronizer and anchor-grid callbacks project UI and retain their existing owners/effects."
+    },
+    {
+      "consumer": "export",
+      "disposition": "No export path or payload is read or written; C03/export ownership is preserved."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "No Tauri command, filesystem, clipboard or native bridge is invoked; C05/native ownership is preserved."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "drawing-membership-transition",
+      "status": "proposed, unrun",
+      "initial_state": "Each listed/unlisted old-tool and requested-tool pairing through SM.setTool, with ten distinguishable defaults changed while outside drawing tools before the enter transition.",
+      "expected_effects": "Only listed-to-unlisted snapshots before tool assignment; only unlisted-to-listed restores after assignment/renderArcs and round-trips the ten captured defaults; listed-to-listed and unlisted-to-unlisted do neither."
+    },
+    {
+      "id": "snapshot-restore-replay-and-failure",
+      "status": "proposed, unrun",
+      "initial_state": "No snapshot; then a snapshot containing ten distinguishable values, optional nodes/callback absent or present, and injected required or present-optional painter failures.",
+      "expected_effects": "No-snapshot restore is inert; snapshot replaces prior cache; restore writes exact order and replays repeatedly; absent optional surfaces are skipped; a thrown required or present-optional painter leaves preceding state/UI effects without rollback."
+    },
+    {
+      "id": "selection-guards-and-bounds",
+      "status": "proposed, unrun",
+      "initial_state": "Non-selection tools, empty selection, and eligible selection with falsy/truthy bounds.",
+      "expected_effects": "Tool/empty guard clears signature; falsy bounds preserves prior signature; no downstream DOM effects until truthy bounds."
+    },
+    {
+      "id": "alignment-signature-staleness",
+      "status": "proposed, unrun",
+      "initial_state": "Counts 1/2/3, reordered numeric IDs, unchanged IDs with mutated properties, and changed IDs.",
+      "expected_effects": "Align/distribute refresh every call; reordered numeric IDs produce same sorted signature; unchanged signature skips adoption; changed signature resets rotation and adopts."
+    },
+    {
+      "id": "anchor-consensus",
+      "status": "proposed, unrun",
+      "initial_state": "Matching/differing custom coordinates, matching truthy keys, matching falsy keys and missing data.",
+      "expected_effects": "Exact custom agreement clones coordinates and forces mc; truthy key agreement clears custom; disagreement/falsy agreement resets center; optional grid call follows."
+    },
+    {
+      "id": "paint-channel-matrix",
+      "status": "proposed, unrun",
+      "initial_state": "Ordinary shape with present/absent fill/stroke; pressure ribbon with alpha zero/nonzero; fill, bitmap, preset and copied-texture brush shapes.",
+      "expected_effects": "Ordinary channels adopt independently; pressure ink maps to stroke only; brush shapes skip ordinary channels; absent ordinary colors preserve color values while disabling channels."
+    },
+    {
+      "id": "gradient-and-style-required-nodes",
+      "status": "proposed, unrun",
+      "initial_state": "Optional gradient checkbox absent/present with empty/full endpoints; vector/non-vector refs with zeros and missing style fields; injected missing required descendant.",
+      "expected_effects": "Gradient absence skips block; truthy gradient applies endpoint fallbacks; non-vector style applies exact falsy fallbacks; missing required node throws after earlier adoption."
+    },
+    {
+      "id": "width-three-way-fallback",
+      "status": "proposed, unrun",
+      "initial_state": "Nonempty vector profiles with positive peak and all-zero peak; empty/absent profiles with truthy/falsy strokeWidth; focused p-sw; p-sw absent.",
+      "expected_effects": "Positive peak wins; nonempty zero peak preserves prior brushSize and ignores strokeWidth; empty/absent profile uses strokeWidth then prior brushSize; focused field is overwritten; absent field suppresses state adoption."
+    },
+    {
+      "id": "bitmap-adoption",
+      "status": "proposed, unrun",
+      "initial_state": "Truthful spec with fractional opacity and falsy spec after prior populated bitmap defaults.",
+      "expected_effects": "Spec fields copy with rounded percent/boolean pressure; missing spec only disables bitmapBrushOn and preserves the five prior subdefaults."
+    },
+    {
+      "id": "final-transform-projection",
+      "status": "proposed, unrun",
+      "initial_state": "Focused field permutations, fractional bounds, rotation zero/falsy, select/subselect counts and _nodeSel sizes.",
+      "expected_effects": "Only focused transform value is preserved; others round; count translation uses singular/plural; rows follow exact tool/count predicates."
+    },
+    {
+      "id": "signature-commit-partial-effect",
+      "status": "proposed, unrun",
+      "initial_state": "Changed signature with a required adoption callback throwing after cache publication, followed by same-signature retry.",
+      "expected_effects": "First call retains rotation/cache and preceding mutations; retry refreshes pre/post-gate controls but skips adoption, exposing the source-observed partial-effect boundary."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "captureDrawingDefaults(state) -> DrawingDefaultsSnapshot",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Purely captures the ten named values with shallow identity semantics; owns no tool transition or UI."
+    },
+    {
+      "api": "applyDrawingDefaults(state, snapshot) -> DrawingDefaultsPatch",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Returns/applies the ordered ten-field patch; a separate adapter projects swatches, toggles and inputs so state restoration can be fixture-tested without DOM."
+    },
+    {
+      "api": "selectionPropertySignature(paths) -> string",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Preserves numeric ID sorting and join coercion exactly; does not decide whether to adopt."
+    },
+    {
+      "api": "planSelectionPropertyAdoption(state, selectedPaths, bounds) -> SelectionPropertyPlan",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Encodes guards, anchor consensus, brush classification, channel/style/width/bitmap patches and count-derived visibility without mutating paths or DOM."
+    },
+    {
+      "api": "projectSelectionProperties(domPorts, plan, activeElement) -> ProjectionReceipt",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Projects current required/optional DOM and callback effects in source order, including focus guards and explicit partial-failure receipt; does not own selection, persistence, Motion, render, export or native bridges."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "declared_symbols": [
+      "_isDrawingTool",
+      "_drawingDefaultsSnapshot",
+      "_snapshotDrawingDefaults",
+      "_restoreDrawingDefaults",
+      "updateSelPropsPanel"
+    ],
+    "external_calls_or_ports": [
+      "state",
+      "selectedPaths",
+      "activeXformBounds",
+      "colorHex8",
+      "paintStrokeSwatches",
+      "paintFillSwatches",
+      "paintIconGroup",
+      "window.SM._syncStrokeEnabledUI",
+      "window.SM._syncFillEnabledUI",
+      "window.syncMiterLimitEnabled/syncMiterLimitEnabled",
+      "window.renderXformAnchorGrid/renderXformAnchorGrid",
+      "document.getElementById",
+      "document.querySelectorAll",
+      "document.activeElement",
+      "SM.t",
+      "_nodeSel"
+    ],
+    "caller_sites": [
+      "SM.setTool at lines 430 and 432",
+      "updateUI at line 2757"
+    ],
+    "coverage_assertion": "The same executable coverage function must accept the canonical two ranges and reject a probe omitting line 3512 and a probe overlapping line 3543."
+  },
+  "validation": {
+    "required": [
+      "JSON parses and pretty-print is stable",
+      "canonical ranges cover 3512-3759 exactly once",
+      "classification is exactly 117 code, 131 full-line comments and zero whitespace",
+      "pinned and current timeline blobs equal cc4cfd27dc59d797c911d840dc46e2f816942123",
+      "HEAD descends from allocated base 09719be7b723817cce1089164978b69c893bf21a",
+      "real omission and overlap probes fail through the canonical coverage function",
+      "all five declarations/functions and three caller anchors remain present",
+      "exactly eight consumer dispositions exist",
+      "artifact contains no private paths, draft markers or trailing whitespace",
+      "working state is either the sole untracked artifact or clean after its eventual scoped commit"
+    ],
+    "runtime_limit": "Only source/blob/artifact validation is required. Behavioral fixtures remain proposed and unrun; no unrelated application suite is authorized."
+  }
+}
