@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nemo.internal/schema/value-contract-v1.schema.json",
+  "title": "Nemo document values and adapter compatibility, v1",
+  "description": "D01/#1044: the existing project value vocabulary, not a replacement storage format or a new runtime validator. Contract revision 1 is independent of the stored project version (currently 13). This deliberately partial schema constrains the named values while allowing the other existing project fields. It does not certify arbitrary files as safe to import or resave.",
+  "$comment": "Observed source: 54e15b6503810607911ae43f7b19ea508790cff0. Sources are repository-relative. src/js/app.js owns editor state and live Paper items; saveAllLayerFrames serializes active edits into stored frames. src/js/timeline.js: SM.exportJSON/SM.importJSON are the project boundary; src/js/project-document.js: SMProjectDocument.parse is the shared browser/native structural parser. Rust geometry and native transport are consumers, not a second writable project owner. Application request identity is owned by src/js/application/opacity-application.js and is not a persistent document UUID.",
+  "x-nemo-compatibility": {
+    "currentWriterVersion": 13,
+    "legacyRead": "SMProjectDocument.parse wraps legacy top-level frames in one Layer 1 when layers is absent. SM.importJSON supplies missing defaults, assigns missing identities and performs the existing migrations. First load of an older format need not preserve every serialized value: export stamps version 13; frame padding, curve defaults and index-to-UID references can change. Preserve the exact existing transformations rather than silently treating them as new regressions.",
+    "futureRead": "The current importer warns for version > 13 and still loads. It does not reject the document or make it read-only. Its explicit field allowlists can discard data; the next save can therefore be lossy. This observed defect is not repaired by this schema. A future breaking migration needs an explicit versioned adapter and acceptance packet; it must not be inferred from this contract revision.",
+    "unknownFields": "additionalProperties is intentionally true for partial structural validation. It is not a preservation promise. The pure parser retains unknown JSON fields; import/export use explicit top-level, layer and stroke fields and can discard unknowns. Future adapters must report unsupported/lossy fields or retain them before claiming a lossless roundtrip. No opaque extension store exists in the current writer.",
+    "roundtripOracle": "Use tests/fixtures/migration/project.json (version 12) and migration/expected.json. Characterize the first import/export against the base, including expected migrations, then reopen that canonical version-13 export in a fresh context and compare all serialized values. Preserve existing layerUid/strokeId values. Do not equate original version-12 bytes with the canonical export, or a parser-only check with editor persistence acceptance.",
+    "knownRoundtripDefect": "At the observed source and migration fixture SHA-256 90b6c525a6936a2d635046682ebc5c68148f65969c6af7fd315a1eb77cc2aa31, strict equality between the first canonical export and its fresh-context reopen fails only at /workspace/panelOrder: canvas-sec and combine-opts-sec move from after shapes-sec to the front, in that order; every other serialized value and existing layer/stroke ID is unchanged. The same first and second exports match unchanged main exactly. Record this exact baseline failure (SMWorkspace.capture/apply in ui.js), not a general workspace-field waiver or a claim that every value already roundtrips. D01 specifies the contract and preserves this existing defect; it does not repair UI workspace ordering.",
+    "identity": "layerUid and strokeId are opaque persisted strings once assigned. Their generators use time/random values, without a global uniqueness guarantee; numeric layer id and array position are not stable references. Reordering must retain IDs and UID references. A missing legacy ID can be assigned by existing migration, but an existing ID must not be renumbered as part of extraction. Duplicate-ID rejection is not supplied by this schema or asserted for the current importer.",
+    "ownership": "The JavaScript editor owns the open document: state holds persisted values and userLayers/Paper items hold active edits that saveAllLayerFrames flushes. During component or montage editing, exportJSON selects the existing scene snapshot so it does not serialize the temporary view as the top-level document. Runtime documentId names an open-document incarnation and changes on replacement; file path, tab ID and layer index must not substitute for it. No new state mirror is introduced here."
+  },
+  "x-nemo-adapter-boundaries": {
+    "time": "Stored animation frames and API frame arguments are zero-based frame indices. Work area waIn/waOut is inclusive; totalFrames is a count. fps is frames per second, not a frame duration. Render effect time is seconds: engine-bridge.js buildSceneJson uses (renderFrame || 0) / Math.max(1, state.fps || 24). The legacy importer defaults a falsey fps to 12; these different fallbacks are observed, not normalized by this contract. Motion rotations are degrees, scales and layer opacity are percentages; persisted stroke opacity and color alpha are separate normalized factors.",
+    "coordinates": "Project points and canvas dimensions use document/world units (canvas pixels at unit scale), x right and y down. Segment point is a position; handleIn/handleOut are relative vectors from it. View pan/zoom/rotation, device pixel ratio and render resolution are adapter transforms, not changes to stored coordinates. geometry-wasm/src/engine.rs Viewport.transform and screen_to_world share the forward/inverse mapping. Motion position/anchor values and path-local transforms must retain their existing coordinate spaces; do not flatten them into screen pixels.",
+    "precision": "JavaScript uses double-precision numbers, but the current project writer is not lossless at that precision: app.js serP applies _r3 (Math.round(v * 1000) / 1000 for finite values, otherwise 0) to live path segment points and handles. Existing stored dictionaries retain their values until reserialized; other field encodings remain serializer-specific. Separately, engine-bridge.js roundSegs/r2 rounds renderer-bound segments to two decimals and substitutes 0 for non-finite values. Do not replace the existing persistence rule with that renderer rule. JSON cannot encode NaN or Infinity as numbers. Rust SegIn vectors and affine path transforms use f64; other shader/effect fields may use f32. No lossless storage/GPU precision guarantee is made.",
+    "color": "Persisted stroke/fill colors are CSS-style hex strings with optional embedded alpha; null denotes absent paint where supported by the item serializer. Preserve the existing serializer's normalization and independent stroke opacity without introducing a new color conversion. colorHex8 in app.js retains Paper color alpha; native HTML color input .value and Paper toCSS(true) can lose it (CLAUDE.md section 2). engine-bridge.js cssColorToRgba emits byte RGBA, multiplying embedded alpha by item opacity and clamping/rounding the result to 0..255. Rust ItemIn receives byte colors and Color::from_rgba8 consumes them. These arrays carry unmultiplied RGB with a separate alpha byte; do not pre-multiply the saved RGB values.",
+    "colorManagementLimit": "The current serialized project has no required explicit working-color-space/ICC/OCIO or pixel-alpha-mode field. Preserve this absence; do not invent an OCIO transform, linear-light/HDR guarantee or metadata default. The renderer has Rgba8Unorm scratch/output paths and separate image/compositing handling. A future pixel/resource adapter must declare channel format, transfer/color interpretation and straight/premultiplied alpha at its own boundary; this document does not convert existing storage, textures or exports."
+  },
+  "type": "object",
+  "additionalProperties": true,
+  "anyOf": [
+    { "required": ["layers"] },
+    { "required": ["frames"] }
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Stored project format, not application semver, API apiVersion or this contract revision. Optional in legacy files. Current exportJSON writes 13; the observed future-version reader policy is documented above."
+    },
+    "fps": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Frames per second. No conversion to milliseconds or rational frame-rate storage is introduced."
+    },
+    "totalFrames": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Frame count; valid document frame indices are 0 through totalFrames - 1. Older imports can pad layer frame arrays to this count."
+    },
+    "waIn": { "$ref": "#/$defs/FrameIndex" },
+    "waOut": { "$ref": "#/$defs/FrameIndex" },
+    "canvasW": { "$ref": "#/$defs/CanvasExtent" },
+    "canvasH": { "$ref": "#/$defs/CanvasExtent" },
+    "canvasBg": { "$ref": "#/$defs/StoredPaint" },
+    "layers": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Layer" }
+    },
+    "frames": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Frame" },
+      "description": "Legacy frame-only input. The parser adds a Layer 1 wrapper; current writer emits layers."
+    }
+  },
+  "$defs": {
+    "StableId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Opaque existing persisted ID; do not impose a UUID syntax, regenerate a present value, or derive it from array position. Namespace and referential integrity are owner checks, not uniqueness guarantees from a string schema."
+    },
+    "FrameIndex": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Zero-based frame position. Document-bound range checks and waIn <= waOut require the owning document; an inclusive endpoint is not a duration."
+    },
+    "CanvasExtent": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Canvas extent in document units. Do not rescale it using viewport zoom or display device pixel ratio."
+    },
+    "Point2": {
+      "type": "array",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }],
+      "items": false,
+      "minItems": 2,
+      "description": "Two finite JSON numbers [x, y]. Position or relative vector semantics belong to the referencing field. No persistence rounding is imposed."
+    },
+    "StoredPaint": {
+      "type": ["string", "null"],
+      "description": "Existing serialized paint spelling, including #rgb, #rrggbb and #rrggbbaa. Null can mean absent paint. A permissive string preserves legacy syntax; this schema does not implement CSS parsing or repair the known serializer fallback cases."
+    },
+    "Segment": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["point"],
+      "properties": {
+        "point": { "$ref": "#/$defs/Point2" },
+        "handleIn": { "$ref": "#/$defs/Point2" },
+        "handleOut": { "$ref": "#/$defs/Point2" }
+      }
+    },
+    "Stroke": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Partial common stroke vocabulary; image, text, compound, mesh and other existing item payloads remain owned by their current serializers. Missing strokeId is allowed for legacy input and may be assigned by the existing owner.",
+      "properties": {
+        "strokeId": { "$ref": "#/$defs/StableId" },
+        "segments": { "type": "array", "items": { "$ref": "#/$defs/Segment" } },
+        "strokeColor": { "$ref": "#/$defs/StoredPaint" },
+        "fillColor": { "$ref": "#/$defs/StoredPaint" },
+        "opacity": {
+          "type": "number",
+          "description": "Stored item opacity factor, nominally 0..1, distinct from motion/API layer opacity in percent. Existing interpolation can overshoot, so validation does not clamp/rewrite it; the render byte-alpha adapter clamps at its boundary."
+        }
+      }
+    },
+    "Frame": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["strokes"],
+      "properties": {
+        "strokes": { "type": "array", "items": { "$ref": "#/$defs/Stroke" } },
+        "isKeyframe": { "type": "boolean" },
+        "isInterpolated": { "type": "boolean" }
+      }
+    },
+    "Layer": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["frames"],
+      "properties": {
+        "layerUid": { "$ref": "#/$defs/StableId" },
+        "parentLayerUid": { "anyOf": [{ "$ref": "#/$defs/StableId" }, { "type": "null" }] },
+        "frames": { "type": "array", "items": { "$ref": "#/$defs/Frame" } },
+        "motionStatic": { "$ref": "#/$defs/MotionValues" }
+      }
+    },
+    "MotionValues": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Existing static motion properties use arrays (src/js/motion.js PROP_DEFAULT): position/anchor in document-relative units, rotation in degrees, scale and opacity in percent (100 is identity/full opacity). Animated key values use the same property-specific units. No conversion to radians, normalized layer opacity or screen coordinates is authorized.",
+      "properties": {
+        "position": { "$ref": "#/$defs/Point2" },
+        "anchor": { "$ref": "#/$defs/Point2" },
+        "scale": { "$ref": "#/$defs/Point2" },
+        "rotation": { "$ref": "#/$defs/ScalarVector" },
+        "opacity": { "$ref": "#/$defs/ScalarVector" }
+      }
+    },
+    "ScalarVector": {
+      "type": "array",
+      "prefixItems": [{ "type": "number" }],
+      "items": false,
+      "minItems": 1
+    },
+    "RuntimeDocumentIdentity": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["instanceId", "documentId", "revision"],
+      "description": "Application snapshot/request identity, not fields to add to a saved project. documentId is the current open-document incarnation; replacement invalidates prior writes. revision is an owner-managed nonnegative counter, not a timeline frame or format version. See operation-contract-v1.schema.json for expectedRevision/retry/history semantics.",
+      "properties": {
+        "instanceId": { "$ref": "#/$defs/StableId" },
+        "documentId": { "$ref": "#/$defs/StableId" },
+        "revision": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
