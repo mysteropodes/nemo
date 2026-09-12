@@ -235,10 +235,10 @@
             "openExtraParentMenu(x,y,li,ld,pi) -> undefined"
           ],
           "responsibility": "Finds an unused acyclic extra parent, builds captured menu actions, and removes/reindexes extra parents and their numeric weight containers.",
-          "candidate": "Builds used from current A/B/truthy extras, skips self and used truthy UIDs, and cycle-checks only truthy candidate UIDs. A falsy-UID candidate bypasses used/cycle checks and may be returned then stabilized.",
+          "candidate": "Builds used from current A/B/truthy extras, skips self and used truthy UIDs, and cycle-checks only truthy candidate UIDs. A falsy-UID candidate bypasses used/cycle checks and may be returned then stabilized. For each reached truthy unused candidate UID, cycle checking first calls C02 ensureLayerUid(ld), which can lazily assign the child layer UID before the caller pushes history. That identity remains even if all considered candidates are rejected and the search returns null; no save/history occurs inside the search.",
           "menu_open": [
             "Missing showContextMenu or indexed entry returns.",
-            "For each non-self layer, ensureLayerUid runs while constructing items and can mutate candidate identity before any selection/history action.",
+            "For each non-self layer, ensureLayerUid(o) runs and then ensureLayerUid(ld) runs for cycle checking. Both candidate and child identities can be assigned before any choice/history action. C02 owns UID generation from time/random sources; existing truthy UIDs are reused.",
             "UID and cycle bad are captured per item. Existing/duplicate parent UIDs are not rejected. bad actions return before history."
           ],
           "choose": "Successful action pushUndoLayers(true), mutates captured entry.uid, requires list/timeline and conditionally bridges. Stale entry identity can outlive array changes.",
@@ -248,7 +248,7 @@
             "Runs independently in exactly ld.motion and ld.motionStatic; assignments retain value identity. Missing bags skip. expressions.parentWeightN and every other container remain unshifted.",
             "Deletes parentsMore only if empty; then required list/timeline and conditional bridge."
           ],
-          "save_history": "alreadySaved=true skips history saveAllLayerFrames; no direct frame save follows."
+          "save_history": "alreadySaved=true skips history saveAllLayerFrames; no direct frame save follows. Candidate discovery and menu construction can assign missing layer UIDs before any action/history call; these identity changes are not covered by a new local undo entry."
         },
         {
           "id": "C20e.time-link-row",
@@ -307,7 +307,7 @@
     },
     {
       "consumer": "undo/redo",
-      "disposition": "History timing differs exactly: Null/extra-parent use alreadySaved=true; Follow/Parent/Time and first Parent scrub movement use pushUndo. Invalid/no-free/bad actions can exit before history, while stale callbacks may push then no-op/throw. Replay remains separately owned."
+      "disposition": "History timing differs exactly: Null/extra-parent use alreadySaved=true; Follow/Parent/Time and first Parent scrub movement use pushUndo. Invalid/no-free/bad actions can exit before history, while stale callbacks may push then no-op/throw. Replay remains separately owned. C02 ensureLayerUid may assign child/candidate identities during candidate search or menu construction, before any local history action."
     },
     {
       "consumer": "selection",
@@ -376,8 +376,8 @@
     {
       "id": "extra-parent-candidates-menu-open",
       "status": "proposed, unrun",
-      "initial_state": "Self/used/cycle/falsy UID candidates; absent UIDs; duplicate parents; stale entry.",
-      "expected_effects": "Exact first-free rules, ensureLayerUid identity mutation during open, captured bad/UID and duplicate allowance."
+      "initial_state": "Child and candidate layers with missing/existing UIDs; self/used/cyclic/falsy UID candidates; rejected-all search; absent menu/entry; duplicate parents; stale entry. Stub C02 UID generation with deterministic results.",
+      "expected_effects": "Exact first-free rules; reached cycle check can assign child UID before any caller history even when search returns null. Menu opening can assign candidate and child UIDs without selection/history. Existing truthy identities are reused; captured bad/UID and duplicate allowance remain."
     },
     {
       "id": "extra-parent-weight-shift",
