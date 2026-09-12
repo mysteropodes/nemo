@@ -152,6 +152,36 @@ test('the registry holds the feature\'s own handler rather than wrapping it', ()
   assert.equal(registry.handlerFor('owned')(), 'from the feature');
 });
 
+test('a handlerKey cannot be replaced by another function and rejection is atomic', () => {
+  const registry = registryModule.create();
+  const first = () => 'first';
+  const replacement = () => 'replacement';
+  registry.register(descriptor({ id: 'alpha', handlerKey: 'application.shared.property' }), first);
+
+  assert.equal(codeOf(() => registry.register(
+    descriptor({ id: 'beta', handlerKey: 'application.shared.property' }), replacement)),
+  'handler_key_conflict');
+  assert.deepEqual(registry.ids(), ['alpha'], 'rejected registration leaked an id');
+  assert.equal(registry.handlerFor('alpha'), first, 'rejected registration replaced the live handler');
+
+  // Multiple descriptors may deliberately share one feature-owned handler.
+  assert.equal(registry.register(
+    descriptor({ id: 'gamma', handlerKey: 'application.shared.property' }), first), 'gamma');
+  assert.equal(registry.handlerFor('gamma'), first);
+});
+
+test('binding a previously declared handlerKey updates discovery for every sharing descriptor', () => {
+  const registry = registryModule.create();
+  const shared = 'application.deferred.property';
+  registry.register(descriptor({ id: 'declared', handlerKey: shared }));
+  assert.equal(registry.list()[0].bound, false);
+
+  const handler = () => 'ready';
+  registry.register(descriptor({ id: 'provider', handlerKey: shared }), handler);
+  assert.equal(registry.handlerFor('declared'), handler);
+  assert.deepEqual(registry.list().map(entry => entry.bound), [true, true]);
+});
+
 // ---- outcome check 3: opaque data travels as a handle -------------------
 
 test('raw image/geometry data inlined in a payload is refused', () => {
