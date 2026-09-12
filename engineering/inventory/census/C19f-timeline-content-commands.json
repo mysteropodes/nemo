@@ -1,0 +1,393 @@
+{
+  "census_id": "C19f",
+  "issue": 1135,
+  "title": "Timeline content commands",
+  "status": "draft for independent review; behavioral fixtures are proposed and unrun",
+  "owner": "P03/C19f read-only census; runtime ownership remains with named source owners",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "bf89d9837312a59e9b0b4c5cf376e415e5ef94cb",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 1977,
+      "end": 2001
+    },
+    {
+      "start": 2012,
+      "end": 2026
+    },
+    {
+      "start": 2248,
+      "end": 2353
+    }
+  ],
+  "coverage_note": "Exactly 146 assigned lines are covered once by four packets: 102 code and 44 full-line comments, no whitespace. The 33 inspected reference lines at2002-2011,2027-2048 and2247 retain named owners and are excluded.",
+  "source_baselines": {
+    "pinned": "git object 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js is cc4cfd27dc59d797c911d840dc46e2f816942123",
+    "current": "observed main bf89d9837312a59e9b0b4c5cf376e415e5ef94cb has the same timeline blob",
+    "runtime": "No browser, Tauri, export, native or GPU behavior was executed for this JSON-only census.",
+    "history": "History-entry and history-triggered save descriptions assume window._scrubLiveActive is false. pushUndoLayers returns before save/snapshot when it is true (tweens.js:4928); explicit saveAllLayerFrames calls still run. Oracles must test both the ordinary command path and caller-owned scrub suppression."
+  },
+  "whole_file_writer_guidance": {
+    "source_access": "timeline.js and every dependency/caller remain read-only; C19f owns only the eventual census JSON artifact.",
+    "serialization": "P30/#1032 PR #1114 remains OPEN at a0f13e7da2f97248e1e8ab6cb44a1fd399e5f454 and retains the exclusive timeline.js writer. Future runtime work must wait for that reservation to release.",
+    "reservations": "D01/#1044, T05/Pollen, C01/C02/C04/C06/P20, Motion and all active owners remain separate. Census range ownership does not transfer source authority."
+  },
+  "reconciliation": [
+    {
+      "owner": "C01 document/history",
+      "disposition": "C01 retains project file/tab/history workflows and shared history ports. The actual SM exportJSON/importJSON implementation is excluded by C01 and mapped next in C19g/#1136; C19f records command calls into those ports without claiming codec ownership."
+    },
+    {
+      "owner": "C02 animation/time",
+      "disposition": "Retains frame/key selection, held-frame rules, Motion track data, duration/time consumers and tween side maps. C19f exposes commands that currently update only subsets of those states."
+    },
+    {
+      "owner": "C04a selection/revision/brush",
+      "disposition": "Retains selectedPaths/clearSel, markDeleteAsRevision, linked-fill/brush companions, FS-selection primitives and stroke identity. C19f owns no geometry primitive."
+    },
+    {
+      "owner": "C04b image mesh and color UI",
+      "disposition": "Retains mask-with-shape re-resolution and palette/find-replace UI. The delete and identity-color commands are mapped as consumers/adjacent behavior without absorbing those implementations."
+    },
+    {
+      "owner": "C19b duration/work area",
+      "disposition": "Retains totalFrames/waIn/waOut resize contracts. Duplicate/exposure and repeat record their direct duration/mirror writes and omitted timing consumers."
+    },
+    {
+      "owner": "C19b2 frame relocation",
+      "disposition": "Retains frame move/copy/rekey findings. C19f separately records reconstructed-frame field loss and absent tween-side-map moves."
+    },
+    {
+      "owner": "C06/P30 shortcut integration",
+      "disposition": "Retains command binding/dispatch at timeline.js:7508+; caller references do not transfer keyboard ownership."
+    },
+    {
+      "owner": "P30/#1032 PR #1114",
+      "disposition": "Retains the whole timeline.js runtime writer while open; C19f performs no runtime edit."
+    }
+  ],
+  "areas": [
+    {
+      "area": "selection-content",
+      "packets": [
+        {
+          "id": "C19f.selected-stroke-delete",
+          "files": [
+            "src/js/timeline.js:1977-2001"
+          ],
+          "coverage_ranges": [
+            [
+              1977,
+              2001
+            ]
+          ],
+          "symbols": [
+            "deleteSelStrokes"
+          ],
+          "responsibility": "Deletes the selected live paths as one command, preserving foreign-owner edits as revision ghosts, removing direct linked-fill/brush companions, and persisting the result to the correct current or inherited drawing key.",
+          "writer": "If selectedPaths is nonempty, calls pushUndo, promotes a held Animation2D frame through _selPropsPromoteHeld, derives the active layer/current-frame and a prior key origin only when the frame remains held, then visits the live selection. markDeleteAsRevision-handled paths are retained as revisions; other paths lose linkedFill, brushCompanions and the primary. It clears selection, writes collected live strokes directly into a remaining held frame's origin and increments _sceneVersion or calls saveActiveLayerFrame, then updateUI.",
+          "public_api": "window.SM.deleteSelStrokes() -> undefined.",
+          "consumers": [
+            "select-bridge.js:3052 canvas selection context menu",
+            "tools.js:1676 cutSelection after copySelection",
+            "image-mesh-bridge.js:467-490 owns an earlier pushUndo, narrows mask-shape selection, calls deletion, then re-resolves the Raster by meshId to avoid stale references if held-frame promotion rebuilt live items",
+            "timeline.js:10189 Delete-key arbitration for Select with selectedPaths and no explicit layer-row activation"
+          ],
+          "oracle": "Proposed, unrun fixture matrix: empty selection; current key and interpolated frame; held Animation2D promotion/reselected identities; held Motion prior-key rewrite and no-prior-key fallback; local primary with linkedFill and live/removed brush companions; foreign-owner revision ghost with companion non-removal; mixed selection; exact one history entry, selection clear, scene-version/save branch and update count. The image-mesh caller must re-resolve the post-load Raster by meshId and keep its panel target. Also cover non-Motion refused/unavailable promotion, the image-mask caller's earlier history entry and scrub suppression. Re-resolution is defensive after possible rebuild, not evidence that every deletion reloads Paper items.",
+          "consumer_matrix": {
+            "save": "pushUndo delegates to pushUndoLayers, which saves all live frames before the mutation. After removal, the command either writes _collectLayerStrokes directly to the inherited key when the frame remains held and increments _sceneVersion or calls saveActiveLayerFrame. In the direct origin branch there is no second save helper.",
+            "load": "_selPropsPromoteHeld can call ensureKeyframe, whose frame rebuild re-resolves selectedPaths by strokeId. The deletion command itself does not call loadFrame; saveActiveLayerFrame writes live objects into stored strokes.",
+            "history": "A nonempty selection calls pushUndo before held promotion and deletion. Empty selection creates no snapshot. markDeleteAsRevision mutations share the same command snapshot. The image-mesh caller separately invokes pushUndo before calling this command; the full mask gesture can therefore create two entries outside scrub suppression.",
+            "selection": "Reads selectedPaths as the deletion set and calls clearSel after the visit. The image-mesh caller narrows selection before calling and must resolve/select the replacement Raster afterward.",
+            "animation": "Outside Motion, _selPropsPromoteHeld tries ensureKeyframe only for a held record; it skips when the function is unavailable, and ensureKeyframe can refuse when canEditActiveLayer is false. Motion skips promotion. Whenever the current record remains held afterward, the nearest prior isKeyframe receives collected live strokes. Interpolated frames or held frames with no prior key use saveActiveLayerFrame and its own guards.",
+            "render": "Calls updateUI only after persistence. No direct renderOS, renderArcs or engine renderNow; image-mesh performs its own later panel/engine refresh.",
+            "export": "The resulting stored frame strokes and revision metadata flow through C01 project serialization. Linked companion object references are live-only; their persisted id/tag forms are owned by C04a.",
+            "native": "No direct native command or resource disposal. Deleting a Raster or other resource through this path does not prove native decoder/cache cleanup."
+          },
+          "construct_boundary": "Complete SM property from1977 through its nested if/function closures at2001.",
+          "notes": "The foreign revision path returns before this command's companion-removal/direct-remove statements. The origin scan is based on remaining frame flags, not an explicit Motion check; Motion's skipped promotion is the ordinary origin-write path, while unavailable/refused promotion can also leave a held record outside Motion.",
+          "proposed_api": "deleteSelectedContent(selection,{mode,frame,history,revision,companions,frameStore,ui}) -> {removed,revisioned,persistedAt}",
+          "admission": "Future executable leaf must own only command orchestration and preserve C01/C02/C04 ports; source-derived fixtures must run before behavior changes."
+        }
+      ]
+    },
+    {
+      "area": "frame-duration",
+      "packets": [
+        {
+          "id": "C19f.duplicate-and-extend",
+          "files": [
+            "src/js/timeline.js:2012-2026"
+          ],
+          "coverage_ranges": [
+            [
+              2012,
+              2026
+            ]
+          ],
+          "symbols": [
+            "duplicateKeyframe",
+            "extendExposure"
+          ],
+          "responsibility": "Two adjacent duration-growing commands: duplicateKeyframe inserts one frame globally and writes a copied active-layer drawing key; extendExposure inserts n global blank frames after the playhead.",
+          "writer": "duplicateKeyframe first saves all frames, refuses a locked active layer or empty effective strokes, then pushUndo, splices one blank record into every layer, increments totalFrames, advances waOut conditionally plus mirrors, writes a deep-cloned strokes-only key at cf+1, navigates there and toasts. extendExposure saves, calls pushUndo, defaults n through n||1, performs n global insert/increment loops, forces waOut to the new end when behind, writes mirrors, updates UI and toasts.",
+          "public_api": "window.SM.duplicateKeyframe() -> undefined; window.SM.extendExposure(n) -> undefined.",
+          "consumers": [
+            "timeline.js:7518 cmdDuplicateKey command descriptor; no default key is assigned there",
+            "timeline.js:7519 cmdExtendExposure '+' shortcut passes1",
+            "timeline.js:7508+ C06/P30 command binding and dispatch",
+            "goToFrame/load/render consumers observe duplicateKeyframe's new current frame and duration"
+          ],
+          "oracle": "Proposed, unrun: duplicate locked/empty/key/held/interpolated/component/native cases; all-layer aligned insertion; active copied key and navigation; exact waOut/mirror branches; record-field preservation failure fixture containing componentFrame, blankOverride and isManualEdit; Motion/tween/camera/marker/audio non-shift baselines. Extend covers omitted/zero/string/fractional/negative/NaN n, all-layer lengths, history/save call counts, current frame, waOut and mirror values.",
+          "consumer_matrix": {
+            "save": "duplicateKeyframe calls saveAllLayerFrames before its guards, then pushUndo saves all frames again because it is invoked without alreadySaved. extendExposure likewise calls saveAllLayerFrames followed by pushUndo, causing the same second save when history is not scrub-suppressed.",
+            "load": "duplicateKeyframe calls goToFrame(cf+1), whose navigation owns save/load/render behavior. extendExposure does not load or navigate.",
+            "history": "duplicateKeyframe snapshots only after locked/empty guards; those refusal paths still performed the initial save. extendExposure snapshots before normalizing n, including inputs that produce no insertion.",
+            "selection": "Neither method rewrites _sel frame cells, _layerSel or selectedPaths. duplicateKeyframe moves currentFrame through goToFrame.",
+            "animation": "Both splice drawing frame arrays across every layer. They do not shift ld.motion/elementMotion keys, motionArcs, tweenEasing/overrides, camera keys, markers or audio timing. duplicateKeyframe reconstructs only strokes/isKeyframe/isInterpolated at the destination.",
+            "render": "duplicateKeyframe delegates refresh to goToFrame and then toasts. extendExposure calls updateUI and toasts; neither directly calls renderOS/renderArcs/engine.",
+            "export": "totalFrames, waOut and altered layer frames later serialize through C01. The missing frame-record fields and unshifted timing stores are preserved as current baseline, not repaired here.",
+            "native": "No direct native bridge. Global duration changes can affect later export/playback/native-video consumers, which require independent implementation acceptance."
+          },
+          "construct_boundary": "Two complete adjacent SM properties2012-2020 and2021-2026; excluded flipPreview closes at2011 and horizontal flip starts2027.",
+          "notes": "extendExposure n=n||1 neither parses nor clamps. Fractional positive n produces ceil-like loop iterations because integer x advances while x<n; negative truthy n performs zero inserts but can still update/toast. duplicateKeyframe gets displayed strokes through getEffectiveStrokes but drops every frame field outside its three-field reconstruction.",
+          "proposed_api": "planFrameInsertion(document,at,count,{duplicateLayer,sourceFrame}) -> {layerFramePatches,durationPatch,timingDisposition}",
+          "admission": "Future implementation must remain a distinct duration transaction leaf and explicitly decide every timing consumer; it must not be combined with deletion, repeat or color."
+        }
+      ]
+    },
+    {
+      "area": "cycle-and-color",
+      "packets": [
+        {
+          "id": "C19f.repeat-selection",
+          "files": [
+            "src/js/timeline.js:2248-2319"
+          ],
+          "coverage_ranges": [
+            [
+              2248,
+              2319
+            ]
+          ],
+          "symbols": [
+            "repeatSelection"
+          ],
+          "responsibility": "Repeats the bounding rectangle of selected timeline cells N times after its maximum frame, extending every layer if needed, copying drawing frames for each non-component layer in the layer bounds and cloning selected-range layer Motion keys.",
+          "writer": "Gets selBounds, refuses absent selection, normalizes times to integer1..50, snapshots then explicitly saves again, computes span and needed end, appends blank records to every layer and updates totalFrames/_totalF/waOut/_waOut when needed. For every layer index minL..maxL it skips missing or symbolId layers, overwrites each destination with a three-field frame reconstruction for r=1..times, appends deep-cloned ld.motion keys at k.frame+r*span, sorts tracks, then loadFrame/renderOS/renderArcs/updateUI and toasts based on any non-component layer visited.",
+          "public_api": "window.SM.repeatSelection(times) -> undefined.",
+          "consumers": [
+            "timeline.js:8975-8992 Cycle button validates selBounds before prompting, then forwards the prompt string",
+            "timeline.js:231 selBounds supplies the rectangular min/max envelope rather than exact selected cells",
+            "labs/pingpong-cycle.js and labs/retime-exposure.js cite this command as a baseline but do not call it",
+            "C02 Motion/tween consumers read the appended ld.motion keys and untouched side maps"
+          ],
+          "oracle": "Proposed, unrun: no selection; sparse/nonrectangular selection proving bounding-box semantics; times null-like/zero/negative/decimal/string/>50; extension and no-extension paths; selected range with pre-existing destination content; missing, locked, ordinary and symbol layers; all-symbol selection still extending duration then no-layer toast; full frame dictionary with componentFrame/blankOverride/isManualEdit; Motion tracks with keys inside/outside source and pre-existing destination collisions; elementMotion/arcs/easing/overrides/camera/markers/audio unchanged; exact snapshot/save/render order.",
+          "consumer_matrix": {
+            "save": "pushUndoLayers() is called first and saves all layer frames; the following explicit saveAllLayerFrames repeats that save before mutation.",
+            "load": "Calls loadFrame at the unchanged currentFrame after all writes.",
+            "history": "One full-layer snapshot after selection/times validation and before duration/frame/key writes. C01 snapshots include layers/totalFrames and tween side maps but omit work-area bounds, markers and other document timing noted by existing censuses.",
+            "selection": "Reads _sel only through selBounds. Sparse cells expand to the whole minL..maxL by minF..maxF rectangle; selection state is not rewritten.",
+            "animation": "Copies frame records and ld.motion track keys only. It preserves strokeIds, but omits other frame fields; does not copy elementMotion, motionStatic or rekey motionArcs/tweenEasing/tweenOverrides. Locked layers are not skipped; component layers are.",
+            "render": "Calls loadFrame, renderOS, renderArcs and updateUI once after the transaction, then a success or no-layer toast.",
+            "export": "Extended totalFrames/waOut, overwritten frames and appended Motion keys flow through existing project serialization. Side-data omissions remain observable after export/reload and require fixtures.",
+            "native": "No direct native command. Playback/export/native-video duration and frame effects are downstream and untested here."
+          },
+          "construct_boundary": "Leading cycle comments2248-2252 and complete SM method2253-2319.",
+          "notes": "needed=b.maxF+1+span*times creates times additional copies. When the current timeline already extends past b.maxF, destination frame records are overwritten rather than inserted, while Motion keys are concatenated and can coexist at the same destination frame. anyLayerCycled becomes true on visiting an ordinary layer even if no source frame carries content.",
+          "proposed_api": "planCycleRepeat(document,selectionBounds,times) -> {durationPatch,frameWrites,motionKeyWrites,collisions,untouchedStores}",
+          "admission": "Future executable leaf is standalone; characterize destination overwrite/collision and complete consumer timing before migration."
+        },
+        {
+          "id": "C19f.propagate-color",
+          "files": [
+            "src/js/timeline.js:2320-2353"
+          ],
+          "coverage_ranges": [
+            [
+              2320,
+              2353
+            ]
+          ],
+          "symbols": [
+            "propagateColorAllFrames"
+          ],
+          "responsibility": "Takes a selected stroke identity plus fill/stroke color and rewrites matching stored stroke dictionaries across all frames and layers.",
+          "writer": "Reads fsPrimarySel when tool is fsselect, choosing stroke color only for a stroke-kind primary and otherwise fill; otherwise requires exactly one selectedPaths entry and can capture both colors. It refuses a missing strokeId, snapshots and saves again, walks every layer/frame/stroke, writes only an already-present truthy target fillColor/strokeColor for matching strokeId, increments count per identity match regardless of actual mutation, then loadFrame/updateUI and toasts count.",
+          "public_api": "window.SM.propagateColorAllFrames() -> undefined.",
+          "consumers": [
+            "timeline.js:8993-8994 #btn-propagate-color click",
+            "C04a fsPrimarySel and selectedPaths supply source identity/color",
+            "C04b.color-tools.palette-find-replace is an adjacent exact-color batch command, not this identity-based writer",
+            "loadFrame and engine/export consumers read the resulting stored stroke colors"
+          ],
+          "oracle": "Proposed, unrun: fsselect stroke versus fill primary; ordinary zero/one/multiple selections; missing data/strokeId/color; both fill+stroke source; matches across current/held/interpolated frames, layers, locked/invisible/symbol descriptors and revision records; target missing one color property; already-equal colors; duplicate ids; count versus actually changed fields; one snapshot/two saves/load/update and no direct OS/engine render.",
+          "consumer_matrix": {
+            "save": "pushUndoLayers first saves every live layer frame and captures history; the explicit saveAllLayerFrames immediately afterward repeats the pre-mutation save.",
+            "load": "Calls loadFrame(currentFrame) after rewriting stored dictionaries, rebuilding the live current-frame objects from the new colors.",
+            "history": "A valid strokeId creates one full-layer snapshot before writes. Missing-id refusal performs no save/history.",
+            "selection": "FS-select uses only its primary and propagates one color kind. Ordinary Select requires exactly one selected path and may propagate both fill and stroke. The method does not explicitly clear or rebuild selection; loadFrame owns re-resolution behavior.",
+            "animation": "Walks every stored frame directly, including keys, held blanks and interpolated records when strokes exist. It matches strokeId only and does not use tween matching or fill-seed propagation.",
+            "render": "Calls loadFrame and updateUI. No direct renderOS, renderArcs or engine renderNow.",
+            "export": "Changed fillColor/strokeColor fields serialize inside frame strokes. No color schema or palette is changed.",
+            "native": "No direct native bridge. Resulting RGBA strings reach existing engine/export parsers; this census did not execute them."
+          },
+          "construct_boundary": "Leading comments2320-2323 and complete SM method2324-2353; importJSON starts2354 and is excluded.",
+          "notes": "No lock, visibility, layer-kind or owner filter is present. count measures matching stroke records, not changed fields; a match can increment when the target lacks the selected color property or already equals the source.",
+          "proposed_api": "propagateStrokeIdentityColor(layers,{strokeId,fillColor,strokeColor}) -> {patches,matched,changed}",
+          "admission": "Future executable leaf remains separate from C04b palette replace and C04a fill geometry propagation; define match and changed counts independently."
+        }
+      ]
+    }
+  ],
+  "source_consumers": {
+    "selection": "timeline.js:231 selBounds; timeline.js:3857 _selPropsPromoteHeld; C04a selectedPaths/clearSel/fsPrimarySel and revision/companion helpers.",
+    "history": "tweens.js:4770 pushUndo and4928 pushUndoLayers; C01 layersSnapshotNow/undo/redo.",
+    "frame_store": "app.js:4634 saveActiveLayerFrame,4693 saveAllLayerFrames,4746 loadFrame and4969 saveActiveLayerFrameOrPromote.",
+    "image_mesh": "image-mesh-bridge.js:448-494 maskImageWithShape narrows selection, calls deleteSelStrokes and re-resolves the rebuilt Raster by meshId.",
+    "shortcuts_ui": "timeline.js:7508-7521 duplicate/exposure descriptors,8975-8994 Cycle/Propagate buttons and10189 delete arbitration; C06/P30 retain binding ownership.",
+    "animation": "C02 Motion tracks/effective strokes, C19b duration/work area and C19b2 frame/tween-side maps.",
+    "persistence": "timeline.js exportJSON2049-2246 and importJSON2354-2693 are excluded contexts mapped by C19g/#1136; C01 retains their project file/tab/history consumers.",
+    "render": "loadFrame/updateUI/renderOS/renderArcs and engine/export consume results; no runtime surface was executed."
+  },
+  "fixtures": [
+    "selected deletion local/revision/companions and image-mesh caller",
+    "Animation2D held promotion versus Motion origin rewrite",
+    "duplicate key record field loss and unshifted timing stores",
+    "extendExposure input normalization absence and all-layer alignment",
+    "cycle sparse bounds, destination overwrite, Motion collision and skipped components",
+    "identity-color source modes, target property presence and matched-versus-changed count"
+  ],
+  "future_proposals": [
+    {
+      "id": "C19f.proposal-delete-command",
+      "scope": "Selected-content deletion orchestration only; revision, companion, held-frame and image-mesh contracts stay explicit ports.",
+      "module": "src/js/application/selected-content-delete.js",
+      "api": "deleteSelectedContent(selection,context,ports) -> result",
+      "admission": "Separate bounded executable leaf after characterization and whole-file writer availability."
+    },
+    {
+      "id": "C19f.proposal-duration-insert",
+      "scope": "duplicateKeyframe and extendExposure share global frame insertion/duration planning but retain distinct guards/content behavior.",
+      "module": "src/js/application/frame-duration-commands.js",
+      "api": "planFrameInsertion(document,at,count,mode) -> explicit patches and untouched-consumer report",
+      "admission": "Separate from deletion/cycle/color; require C02/C19b contracts."
+    },
+    {
+      "id": "C19f.proposal-cycle-repeat",
+      "scope": "Rectangle-based frame and layer-Motion repetition with collision reporting.",
+      "module": "src/js/application/cycle-repeat.js",
+      "api": "planCycleRepeat(document,bounds,times) -> writes/collisions/omissions",
+      "admission": "Standalone leaf; do not silently add missing side-data behavior during extraction."
+    },
+    {
+      "id": "C19f.proposal-identity-color",
+      "scope": "Pure matching/patch calculation plus one application history/load adapter.",
+      "module": "src/js/application/stroke-color-propagation.js",
+      "api": "propagateStrokeIdentityColor(layers,input) -> {next,matched,changed}",
+      "admission": "Standalone leaf coordinated with C04 color/selection owners; preserve baseline until a separately accepted repair."
+    }
+  ],
+  "boundaries": [
+    "C19b2 closes shiftLayerFrames at1976; deleteSelStrokes begins1977 and closes2001.",
+    "flipPreview2002-2011 is a reference-only exclusion owned by C02 playback plus C06/P30 shortcuts.",
+    "duplicateKeyframe2012-2020 and extendExposure2021-2026 are complete adjacent methods.",
+    "flipHorizontal/flipVertical2027-2048 are reference-only exclusions retaining C04a transform/brush ownership.",
+    "exportJSON2049-2246 is excluded document-codec context mapped by C19g/#1136.",
+    "mergeRemoteSnapshot2247 is a one-line returning facade into app.js/C01 team-sync and is excluded from coverage.",
+    "repeatSelection includes leading comments2248-2252 and complete method2253-2319.",
+    "propagateColorAllFrames includes leading comments2320-2323 and complete method2324-2353.",
+    "importJSON starts2354 and is excluded document-codec context mapped by C19g/#1136.",
+    "The enclosing SM object boundaries are outside this census and provide context only."
+  ],
+  "exclusions": [
+    {
+      "range": [
+        2002,
+        2011
+      ],
+      "symbol": "flipPreview",
+      "owner": "C02.playback-integration.playback-transport plus C06/P30 shortcut integration",
+      "disposition": "Reference only; attach acceptance to named owners rather than opening a duplicate census."
+    },
+    {
+      "range": [
+        2027,
+        2048
+      ],
+      "symbols": [
+        "flipHorizontal",
+        "flipVertical"
+      ],
+      "owner": "C04a.tools.transform-box-oriented and vector-brush geometry owners",
+      "disposition": "Reference only; pair as one adapter if the named owner later needs source migration."
+    },
+    {
+      "range": [
+        2247,
+        2247
+      ],
+      "symbol": "mergeRemoteSnapshot",
+      "owner": "C01.project.team-sync with app.js:897-964 merge implementation",
+      "disposition": "Returning facade only; no duplicate facade leaf."
+    },
+    {
+      "ranges": [
+        [
+          2049,
+          2246
+        ],
+        [
+          2354,
+          2693
+        ]
+      ],
+      "symbols": [
+        "exportJSON",
+        "importJSON"
+      ],
+      "owner": "C19g/#1136 document-codec census; C01 project/history consumers",
+      "disposition": "Excluded context; not inspected as C19f implementation."
+    }
+  ],
+  "validation": {
+    "expected_assigned_lines": 146,
+    "expected_classification": {
+      "code": 102,
+      "comment": 44,
+      "whitespace": 0
+    },
+    "required_consumer_dimensions": [
+      "save",
+      "load",
+      "history",
+      "selection",
+      "animation",
+      "render",
+      "export",
+      "native"
+    ],
+    "negative_controls": [
+      "remove1977 => reject omission",
+      "duplicate2248-2252 => reject overlap"
+    ],
+    "symbol_checks": [
+      "deleteSelStrokes1977",
+      "duplicateKeyframe2012",
+      "extendExposure2021",
+      "repeatSelection2253",
+      "propagateColorAllFrames2324",
+      "excluded flipPreview2002",
+      "excluded flipHorizontal2027",
+      "excluded flipVertical2038",
+      "excluded mergeRemoteSnapshot2247",
+      "excluded exportJSON2049 and importJSON2354"
+    ]
+  }
+}
