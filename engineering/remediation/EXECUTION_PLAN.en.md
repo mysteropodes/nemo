@@ -13,9 +13,19 @@ This is the single operating plan for the current remediation. It supersedes the
 - [ ] Keep new OpenFX effects, a full OCIO/EXR/OTIO implementation, new Buzz transport infrastructure, broad performance improvements and product feature additions outside this program. Define their ports, availability and data contracts where needed; do not implement new product breadth to close remediation. The separately authorized Buzz workspace-instruction editor is a current coordination improvement, not a Nemo structural completion gate.
 - [ ] Treat generated, vendor and data catalogs by exact provenance/integrity policy. Handwritten control logic cannot escape modularity checks by being labeled a catalog. Line counts support coherent APIs; arbitrary file splitting is not acceptance.
 
-The source audit used `66ece0641708122eb8447e85ad8dd7e3402aaf6c`, not the older local main checkout. Current `main` at `54e15b6503810607911ae43f7b19ea508790cff0` includes the adopted P02 comparison manifest; completed C01–C08 census work; P04/D02 contracts; P05 deterministic feature registration; completed enforcement/validation leaves; and the completed P20, P22, A01 and P28 extractions. The app-JS profile now has 151 modules, of which 140 remain `app-legacy`. P06 [#1112](https://github.com/mysteropodes/nemo/pull/1112) and P07 [#1113](https://github.com/mysteropodes/nemo/pull/1113) are open candidates, not current-main behavior: both have owner changes requested and remain unmerged until their takeover corrections are accepted. These are source and canonical-record observations, not newly executed test results.
+The source audit used `66ece0641708122eb8447e85ad8dd7e3402aaf6c`, not the older local main checkout. Reuse the honest F0 baseline, merged curve extraction, project parser, opacity application service, existing consumer tests and Rust MCP transport. At the current main source below, P05 has added the deterministic application capability registry; P06 now publishes the complete registered opacity descriptor through application discovery; P07 still has to finish Rust MCP consumption. The application JavaScript profile now contains 152 modules and still classifies 140 as `App JS unclassified (pre-R01)`. These are source observations, not newly executed test results.
 
-The starting issues below are concrete entry tasks, not a claim that their count exhausts all monoliths. C01–C08 map the fixed source set; P03 admits the remaining one-responsibility leaves. This mapping happens first, and every uncovered responsibility must receive a leaf before a completion forecast. No later family may hide behind a multi-day “migrate everything” issue.
+### Current reconciliation — 12 September 2026
+
+This snapshot was checked against `origin/main` `1cad07768b884cf44c0380e2236c2d3133051cf8`, live leaf issues and PRs, and Project 2. Twenty-eight finite leaves in the original checklist have terminal acceptance/Done receipts and are closed: P01, P02, C01–C08, F01, F02, P14, P15, P04, P05, P06, P11, P13, T01–T04, D02, P20, P22, A01 and P28. Their top-level outcome boxes are checked below. The recurring operating checklists in sections 1, 3, 5–7 and 10, and every final program gate in section 9, remain open.
+
+Five supplemental census leaves created from C08 are also accepted and closed: [C09 / #1091](https://github.com/mysteropodes/nemo/issues/1091), [C13 / #1092](https://github.com/mysteropodes/nemo/issues/1092), [C15 / #1093](https://github.com/mysteropodes/nemo/issues/1093), [C17 / #1094](https://github.com/mysteropodes/nemo/issues/1094) and [C18 / #1095](https://github.com/mysteropodes/nemo/issues/1095). [T09 / #1105](https://github.com/mysteropodes/nemo/issues/1105) is closed by a reviewed non-code disposition: native decode remains unavailable on that workstation; no product fix or passing native-decode result is claimed. P03 remains open until it consolidates the accepted census, freezes the source-set digest and admits the complete bounded extraction queue.
+
+D01 remains claimed in its dedicated worktree. P06 is accepted and merged through [PR #1112](https://github.com/mysteropodes/nemo/pull/1112) as `1cad07768b884cf44c0380e2236c2d3133051cf8`: exact candidate `9489214` passed independent technical review and both real Chrome consumer/gesture controls, with zero retries. P07's takeover handoff is reconciled; [PR #1113](https://github.com/mysteropodes/nemo/pull/1113) remains at `5aa8026ef412f70f4caf1e391b6447657d5cd12a` with changes requested. T05 retains its existing owner reservation; its P06 predecessor is now accepted. The remaining execution queue is this plan reconciliation → P07, while D01 proceeds separately.
+
+Project 2's roadmap `Status` reads `Already there` for the closed leaves, but its `Validation` field is not a reliable acceptance tally: only P01 reads `Accepted`; most closed leaves still read `Planned`, and F01/F02 still read `Needs validation`. The checkmarks below rely on the terminal issue/PR acceptance receipt plus containment in current main, not on issue closure or board status alone.
+
+The starting issues below are concrete entry tasks, not a claim that their count exhausts all monoliths. C01–C08 and the supplemental C09/C13/C15/C17/C18 leaves map the fixed source set; P03 admits the remaining one-responsibility leaves. This mapping happens first, and every uncovered responsibility must receive a leaf before a completion forecast. No later family may hide behind a multi-day “migrate everything” issue.
 
 ## 2. Two human teams, three slots each
 
@@ -193,7 +203,7 @@ Use the returned project/item/field/option IDs with `gh project item-edit --id <
 
 Dependencies determine readiness, not the numeric order of IDs. Start independent Ready tasks only within the three-slot/two-writer limits. A suggested first allocation is Ilya O=P04/P02 and integration, D1=C02, D2=C03; Cyrill O=F01 and existing lane reconciliation, D1=F02 if that owner is active (otherwise P15), D2=T01 only when quota and the shared package-file slot permit. P14 reserves a separate native runtime slot; it must not interrupt a parity session.
 
-After C01–C08, P03 must create the remaining small extraction leaves and attach them to the same family parents. Reuse the leaf protocol below: exact symbols/owner/dependencies, three observable checks, known-defect exclusions, same assignee/lane labels and native parent/blocking links. Extend this checklist in the same ordinary change that adopts the census. The fixed source-set digest and zero-unmapped checks prevent silently declaring remediation complete after only these starting tasks.
+C08 split its remaining coverage into the accepted supplemental census leaves C09, C13, C15, C17 and C18. P03 must consolidate C01–C08 plus C09, C13, C15, C17 and C18, then create the remaining small extraction leaves and attach them to the same family parents. Reuse the leaf protocol below: exact symbols/owner/dependencies, three observable checks, known-defect exclusions, same assignee/lane labels and native parent/blocking links. Extend this checklist in the same ordinary change that adopts the census. The fixed source-set digest and zero-unmapped checks prevent silently declaring remediation complete after only the starting tasks.
 
 <!-- generated-task-index -->
 
@@ -334,11 +344,11 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
 - [ ] **[P03 / #1005](https://github.com/mysteropodes/nemo/issues/1005) — Validate the combined source census and admit the complete extraction queue**
 
-  Owner **Ilya/O** · skill `orchestration` · `gpt-6-astra` / **high**. Predecessors: [P02 / #1004](https://github.com/mysteropodes/nemo/issues/1004), [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036), [C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037), [C03 / #1038](https://github.com/mysteropodes/nemo/issues/1038), [C04 / #1039](https://github.com/mysteropodes/nemo/issues/1039), [C05 / #1040](https://github.com/mysteropodes/nemo/issues/1040), [C06 / #1041](https://github.com/mysteropodes/nemo/issues/1041), [C07 / #1042](https://github.com/mysteropodes/nemo/issues/1042), [C08 / #1043](https://github.com/mysteropodes/nemo/issues/1043).
+  Owner **Ilya/O** · skill `orchestration` · `gpt-6-astra` / **high**. Predecessors: [P02 / #1004](https://github.com/mysteropodes/nemo/issues/1004), [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036), [C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037), [C03 / #1038](https://github.com/mysteropodes/nemo/issues/1038), [C04 / #1039](https://github.com/mysteropodes/nemo/issues/1039), [C05 / #1040](https://github.com/mysteropodes/nemo/issues/1040), [C06 / #1041](https://github.com/mysteropodes/nemo/issues/1041), [C07 / #1042](https://github.com/mysteropodes/nemo/issues/1042), [C08 / #1043](https://github.com/mysteropodes/nemo/issues/1043), [C09 / #1091](https://github.com/mysteropodes/nemo/issues/1091), [C13 / #1092](https://github.com/mysteropodes/nemo/issues/1092), [C15 / #1093](https://github.com/mysteropodes/nemo/issues/1093), [C17 / #1094](https://github.com/mysteropodes/nemo/issues/1094), [C18 / #1095](https://github.com/mysteropodes/nemo/issues/1095).
 
   Scope: `engineering/inventory/remediation-scope.json (new census index)`; `GitHub leaf issues and fixed source/consumer coverage`.
 
-  1. Merge the eight census partitions at one source SHA; every tracked handwritten runtime/tooling root is classified exactly once, with explicit vendor/generated/data exclusions.
+  1. Merge the accepted C01–C08 plus C09, C13, C15, C17 and C18 census partitions at one source SHA; every tracked handwritten runtime/tooling root is classified exactly once, with explicit vendor/generated/data exclusions.
   2. Every remaining responsibility is covered by a linked executable leaf with whole-file writer, public API, consumer matrix and <=90-minute implementation scope; split larger units before Ready.
   3. Freeze counts and source-set digest; added product scope requires explicit human decision. Any unmatched source/surface fails the completeness check.
 
@@ -456,7 +466,7 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
   Limit: Do not repair unrelated pre-existing feature defects. Preserve exact baseline behavior and record limitations.
 
-- [ ] **[P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008) — Move opacity metadata and routing into its feature module**
+- [x] **[P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008) — Move opacity metadata and routing into its feature module**
 
   Owner **Ilya/D1** · skill `capabilities` · `gpt-5.6-sol` / **medium**. Predecessors: [P05 / #1007](https://github.com/mysteropodes/nemo/issues/1007).
 
