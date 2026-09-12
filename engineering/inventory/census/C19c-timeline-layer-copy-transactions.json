@@ -140,7 +140,7 @@
               "shapeNames",
               "pathFx",
               "lipSync",
-              "rig through cloneRigForSymbol"
+              "rig through cloneRigForSymbol only when both source rig and the window.cloneRigForSymbol port exist"
             ],
             "scalar_or_shared": [
               "color",
@@ -166,7 +166,8 @@
               "montageId",
               "videoMeshId",
               "ordinary-layer locked value",
-              "destination-UID motionArcs/tweenEasing/tweenOverrides entries"
+              "destination-UID motionArcs/tweenEasing/tweenOverrides entries",
+              "rig when source has one but window.cloneRigForSymbol is unavailable; no fallback copy"
             ]
           },
           "actual_side_effects": "Writes state.layers and userLayers, source/destination in/out state, activeLayerIdx, _layerSel and _layerSelAnchor; may share native-video session identity; calls saveAllLayerFrames, pushUndoLayers(true), createUserLayer, activateUL, loadFrame, renderLayerList, renderTimeline, updateUI, optional SMEngineBridge.renderNow and two possible toast paths.",
@@ -381,7 +382,7 @@
     "Lock matrix: ordinary locked, symbol locked/unlocked, duplicator and LFS. Capture current destination lock results without silently adding a guard or normalization.",
     "Tween-side fixture: customize motionArcs, tweenEasing and tweenOverrides for the source UID and prove neither command creates destination-UID entries.",
     "Mesh fixture: repeated frame mesh IDs, several meshes, absent service, failed duplicate, elementMotion keys and rig binds; separately prove current videoMeshId loss and unreachable destination lookup.",
-    "Rig fixture: plain serializable rig and rig with live _live handles, distinguishing duplicate's raw JSON clone from split's cloneRigForSymbol behavior.",
+    "Rig fixture: plain serializable rig and rig with live _live handles; exercise cloneRigForSymbol present and absent. Split copies through the available port and otherwise omits the rig without fallback; duplicate uses raw JSON cloning.",
     "Folder fixture: source in middle of stack with A child, B child, parentsMore-only child and several ordinary neighbors. Assert actual append order, only A/B retarget, unchanged legacy folderId and final folder-copy activation.",
     "Index/caller fixture: duplicate first/middle/last ordinary layers and a folder with children; assert _motionExpandedLayer behavior and compare Nemo Script's returned Layer with duplicateLayer's activated main result.",
     "History fixture: one snapshot per top-level action, including a recursive folder duplicate and image mesh store changes; verify undo/redo through the independent C01 APIs.",
