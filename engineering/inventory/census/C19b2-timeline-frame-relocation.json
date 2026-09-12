@@ -93,7 +93,7 @@
             "SM.moveFrames"
           ],
           "responsibility": "Moves a selected block by layer/frame offset. A single same-layer key drag expands to every later keyframe, filters locked sources/targets, snapshots full frame records, blanks sources, writes in-range targets, rekeys motion-arc lookup keys, retimes captured interpolated spans and rebuilds the destination frame selection.",
-          "writer": "Writes state.layers[*].frames, state.motionArcs through rekeyTweenPairData, and _sel.frames. Reads caller-supplied selection plus selBounds global state; invokes history, frame-save and render owners.",
+          "writer": "Writes state.layers[*].frames, state.motionArcs through rekeyTweenPairData, and _sel.frames. Mutates the caller-supplied selection array by appending later keys in the single-key same-layer ripple path before local locked-layer filtering; reads global selBounds and invokes history, frame-save and render owners.",
           "public_api": "window.SM.moveFrames(selection,destinationMinLayer,destinationMinFrame). Return value is undefined for all paths.",
           "consumers": [
             "timeline frame-grid mouseup at line 5413",
@@ -103,7 +103,7 @@
             "C01 full-layer history/save",
             "loadFrame/renderOS/renderArcs/updateUI"
           ],
-          "oracle": "Future independent fixture matrix: empty/no-bounds/no-offset; single-key forward/back ripple and positive-edge clamp; multi-cell and cross-layer no-ripple; locked source, locked target and mixed partial selection; negative/high destinations; full-record clone preservation; two adjacent tween pairs with sparse/dense inbetweens; arc/easing/override keys; destination selection and render calls. Keep current partial/data-loss outcomes explicit.",
+          "oracle": "Future independent fixture matrix: empty/no-bounds/no-offset; single-key forward/back ripple and positive-edge clamp; multi-cell and cross-layer no-ripple; locked source, locked target and mixed partial selection; negative/high destinations; full-record clone preservation; two adjacent tween pairs with sparse/dense inbetweens; arc/easing/override keys; destination selection and render calls. Keep current partial/data-loss outcomes explicit. Assert the caller selection array receives the later-key append, including zero-effective-delta cases; independently verify the grid slice protects its original array until destination selection rebuild. A pure planner must return this effect for its adapter to apply.",
           "depends_on": [
             "C19a.frame-selection",
             "C19a.tween-retime",
@@ -115,12 +115,12 @@
             "tweens.js rekeyTweenPairData"
           ],
           "proposed_module": "src/js/domain/animation/frame-relocation.js",
-          "proposed_api": "planFrameMove(document,selection,target,{clone}) -> {writes,clears,newSelection,keyPairMoves}; application adapter owns undo/save/rekey/retime/render.",
+          "proposed_api": "planFrameMove(document,selection,target,{clone}) -> {writes,clears,newSelection,keyPairMoves,appendedRippleSelection}; the application adapter preserves the public caller-array append effect before locked-layer filtering and owns undo/save/rekey/retime/render.",
           "consumer_matrix": {
             "save": "Calls saveAllLayerFrames after pushUndo; subsequent exportJSON persists moved frame records and global tween metadata.",
             "load": "importJSON/deserialization owns reconstruction. The move must preserve the complete opaque frame record rather than define a new schema.",
             "history": "pushUndo() creates a full layers snapshot before mutation and includes motionArcs/tweenEasing/tweenOverrides through C01; the following saveAllLayerFrames call is redundant but current behavior.",
-            "selection": "Reads explicit sel but computes the offset from global selBounds(); replaces _sel.frames with in-range destinations after the move.",
+            "selection": "Computes the offset from global selBounds rather than the explicit selection. The single-key same-layer ripple path appends later keys directly to the caller array before local filtering, even if the eventual effective delta is clamped to zero. The grid caller at line 5413 supplies _sel.frames.slice(), but other public callers observe this mutation. Replaces _sel.frames with in-range destinations afterward.",
             "animation": "Retimes interpolated frames and calls rekeyTweenPairData, which currently moves only state.motionArcs keys; tweenEasing/tweenOverrides are not rekeyed.",
             "render": "Calls loadFrame(current), renderOS, renderArcs and updateUI after mutation.",
             "export": "All stored frames and tween maps flow through exportJSON and downstream animation exporters via existing C01/C02 consumers.",
