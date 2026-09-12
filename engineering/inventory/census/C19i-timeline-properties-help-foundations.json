@@ -1,0 +1,394 @@
+{
+  "census_id": "C19i",
+  "issue": 1143,
+  "title": "Timeline properties helpers and contextual statusbar help foundations",
+  "status": "draft for independent review; behavioral fixtures are proposed and unrun",
+  "owner": "P03/C19i read-only census; runtime ownership remains with named source owners",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "96733e41bbf32f31741800bf52217874cb344b90",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 2949,
+      "end": 3130
+    }
+  ],
+  "coverage_note": "Exactly 182 assigned lines are covered once by four packets: 103 code and 79 full-line comments, no whitespace. Blank2948 and the complete updatePropsContext router beginning3131 are excluded. The slice contains seven top-level named functions—openPropsSection, getToolHelp, statusbarHelpRender, getStatusbarDefaultSc, updateStatusBarHelp, _captureSlotHome and _restoreSlotHome—plus closure-local tipText/showTitle/clearTitle inside one immediate IIFE.",
+  "source_baselines": {
+    "pinned": "git object 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js is cc4cfd27dc59d797c911d840dc46e2f816942123",
+    "current": "observed origin/main 96733e41bbf32f31741800bf52217874cb344b90 has the same timeline blob",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed for this JSON-only census.",
+    "comments": "Historical source comments and described feature behavior were read as source prose, not treated as freshly executed evidence."
+  },
+  "whole_file_writer_guidance": {
+    "source_access": "timeline.js and every dependency/caller remain read-only; C19i owns only this census JSON artifact.",
+    "serialization": "P30/#1032 retains the whole timeline.js runtime writer. Future extraction or runtime correction must serialize through that reservation.",
+    "reservations": "D01/#1044, T05/Pollen, C01/C02/C03/C04/C05/C06/C07, Motion and all named owners remain separate. Census coverage transfers no runtime authority."
+  },
+  "reconciliation": [
+    {
+      "owner": "C01 document/history",
+      "disposition": "Retains document and history algorithms. tweens.js reads TOOL_LABELS for an action label, but C01 explicitly excludes ownership of this declaration and C19i does not infer command execution from help text."
+    },
+    {
+      "owner": "C02 animation/time",
+      "disposition": "Retains _sel timeline selection, keyframe commands, tween editor behavior and playback. C19i records help reads and openPropsSection callers only."
+    },
+    {
+      "owner": "C03 render/export",
+      "disposition": "Retains render and export. These DOM helpers do not alter scene/output data and no render/export action is performed."
+    },
+    {
+      "owner": "C04a selection",
+      "disposition": "Retains selectedPaths, _fsSel/fsPrimarySel and selection command behavior. C19i records the help planner priority and current guards."
+    },
+    {
+      "owner": "C04b presentation support",
+      "disposition": "Retains ui.js tooltip conversion, title/data-tip producers and panel renderers. C19i maps the root-level statusbar mirror and exact interaction ordering."
+    },
+    {
+      "owner": "C06 bootstrap/preferences",
+      "disposition": "Retains document/bootstrap wiring. C19i records immediate IIFE registration and missing-root permanence without adding retry lifecycle."
+    },
+    {
+      "owner": "later timeline property router",
+      "disposition": "updatePropsContext at3131 and updateSelPropsPanel later own section routing and signature updates. C19i owns only constants/cache initialization and the open helper in2949-2975."
+    },
+    {
+      "owner": "P30/#1032 runtime writer",
+      "disposition": "Retains whole timeline.js write authority; proposed APIs below are future boundaries only."
+    }
+  ],
+  "boundaries": [
+    "2949-3130 is documentation-only coverage; no source symbol changes.",
+    "Help strings and shortcuts are presentation data and cannot establish that their named commands work.",
+    "The statusbar renderer directly assigns innerHTML and provides no escaping or trusted-content validation.",
+    "Tooltip state is one closure variable shared across four roots and exists only for the lifetime of the registered DOM nodes.",
+    "Slot homes retain actual parent/next/previous node references; moving/restoring the same section node preserves its listener and object identity.",
+    "TOOL_LABELS is globally visible under classic script semantics and consumed by history display, but its declaration remains a property-help foundation rather than a history algorithm."
+  ],
+  "exclusions": [
+    "src/js/timeline.js:2948 and3131 onward",
+    "later updatePropsContext/updateSelPropsPanel implementations and routing behavior",
+    "C04a selection primitives and tool command behavior",
+    "C04b ui.js tooltip and title/data-tip producers",
+    "C01 history implementation",
+    "C02 animation/tween commands",
+    "P30 runtime changes",
+    "D01/T05 and unrelated application work"
+  ],
+  "areas": [
+    {
+      "area": "properties-and-contextual-help",
+      "packets": [
+        {
+          "id": "C19i.properties-foundations",
+          "files": [
+            "src/js/timeline.js:2949-2975"
+          ],
+          "coverage_ranges": [
+            [
+              2949,
+              2975
+            ]
+          ],
+          "symbols": [
+            "FILL_STROKE_TOOLS",
+            "TOOL_OPTS_TOOLS",
+            "TOOL_LABELS",
+            "_selPropsSig",
+            "_propsCtxSig",
+            "openPropsSection"
+          ],
+          "signatures": [
+            "openPropsSection(id) -> undefined"
+          ],
+          "responsibility": "Declares the tool membership/label tables and two module-scope signature caches consumed by later property-panel code, and provides a focused panel-opening/scrolling adapter.",
+          "reads": "FILL_STROKE_TOOLS contains draw, pen, eraser, fillbrush, line, rect, ellipse and fill. TOOL_OPTS_TOOLS contains draw, pen, eraser and fillbrush. TOOL_LABELS maps those eight tools to fixed English display labels. _selPropsSig initializes to the empty string; _propsCtxSig initializes to null. openPropsSection looks up the requested id and then .phdr/.pbdy descendants.",
+          "writes_and_returns": "The declarations initialize mutable module-scope bindings immediately. openPropsSection returns undefined on a missing section. When both header and body exist it removes body class hid and header class closed; it then always calls sec.scrollIntoView({block:'nearest',behavior:'smooth'}) and returns undefined.",
+          "guards_and_fallbacks": "Missing section is the only early return. Missing header or body suppresses both class removals together but does not suppress scrolling. id is passed directly to getElementById with no validation. scrollIntoView is required once the section exists.",
+          "effects_and_ordering": "Declarations run during timeline.js evaluation. Later updatePropsContext reads both tool lists/labels and reads then writes _propsCtxSig only on context change; later updateSelPropsPanel resets or compares/writes _selPropsSig. openPropsSection expands before it scrolls.",
+          "callers": [
+            "src/js/ui.js:668,683,699,712 optional calls for camera/Motion/tween-pair/pressure curve editing",
+            "src/js/timeline.js:4681 direct calls for tween-sec then easing-sec",
+            "src/js/tutorial.js:1405 comment reference only",
+            "src/js/tweens.js:4920 reads window.TOOL_LABELS/TOOL_LABELS for history display; it does not make C19i a history owner",
+            "src/js/timeline.js:3213,3224-3225,3478-3479,3548,3566-3567 later constant/signature consumers"
+          ],
+          "ownership_boundaries": "C19i owns only the declarations and open adapter census. The later updatePropsContext/updateSelPropsPanel implementations start outside this range and retain their mapped owners; C01 explicitly does not acquire TOOL_LABELS merely because its history label reader consumes it."
+        },
+        {
+          "id": "C19i.contextual-statusbar-help",
+          "files": [
+            "src/js/timeline.js:2976-3063"
+          ],
+          "coverage_ranges": [
+            [
+              2976,
+              3063
+            ]
+          ],
+          "symbols": [
+            "getToolHelp",
+            "statusbarHelpRender",
+            "getStatusbarDefaultSc",
+            "updateStatusBarHelp"
+          ],
+          "signatures": [
+            "getToolHelp(tool) -> {desc:string, sc:Array<[string,string]>}|undefined",
+            "statusbarHelpRender(desc, sc) -> undefined",
+            "getStatusbarDefaultSc() -> Array<[string,string]>",
+            "updateStatusBarHelp() -> undefined"
+          ],
+          "responsibility": "Builds translated tool-specific and generic shortcut descriptions, renders them into the statusbar, and chooses contextual help from current canvas, fill/stroke, timeline and tool state in strict priority order.",
+          "reads": "getToolHelp creates its map on every call and invokes SM.t when available, otherwise returns translation keys unchanged. It includes select, subselect, fsselect, draw, pen, line, rect, ellipse, fill, fillbrush, eraser, eyedropper, hand, zoom, rotate, camera, comment, text, perspective and rig, with exactly the shortcut pairs embedded in source. getStatusbarDefaultSc similarly creates eight F5/F6/F7/T/D/F/X/Enter pairs. updateStatusBarHelp reads state.tool, selectedPaths, _fsSel, fsPrimarySel and _sel.frames.",
+          "writes_and_returns": "getToolHelp returns the selected entry or undefined for an unknown tool. getStatusbarDefaultSc always returns a new eight-pair array. statusbarHelpRender returns early if statusbar-help is absent; otherwise it concatenates desc plus a space when truthy, maps every pair into '<span class=\"sc\">'+pair[0]+'</span>'+pair[1], joins pairs with spaces, assigns el.innerHTML directly and returns undefined. No escaping, validation or shape guard is performed on desc/sc/pairs. updateStatusBarHelp renders one branch then returns, except generic fallback naturally reaches its end.",
+          "guards_and_fallbacks": "Priority is: (1) select or subselect plus defined nonempty selectedPaths, using selection count and delete/duplicate/move/deselect help; (2) fsselect plus defined nonempty _fsSel, using fsPrimarySel.kind to label stroke versus fill and adding a count only above one; (3) defined _sel.frames with at least one entry, using keyframe count and seven shortcuts; (4) getToolHelp(state.tool) if known; (5) empty-desc generic eight-shortcut fallback. Canvas selection therefore outranks timeline selection; active fsselect content outranks timeline selection; an unknown tool falls through to generic. Help strings document affordances only and do not execute or prove the commands.",
+          "effects_and_ordering": "The renderer's missing-DOM guard makes all planner branches silently no-op visually. selectedPaths/_fsSel/_sel each have typeof guards before their direct reads except state itself and fsPrimarySel. fsPrimarySel is assumed to return an object when _fsSel is nonempty; its kind chooses stroke only for exact 'stroke', otherwise fill. Translation availability is tested independently in each helper call.",
+          "callers": [
+            "src/js/timeline.js:211 selClear after timeline selection clearing",
+            "src/js/timeline.js:229 selApplyCSS after timeline selection CSS projection",
+            "src/js/timeline.js:3093 tooltip clear restores contextual help",
+            "src/js/timeline.js:3502 later updatePropsContext refresh",
+            "No other direct updateStatusBarHelp callers were found in src/js; updateUI reaches it indirectly through updatePropsContext",
+            "getToolHelp/statusbarHelpRender/getStatusbarDefaultSc are called only inside this range"
+          ],
+          "ownership_boundaries": "C19i maps help planning/rendering, not the keyboard/mouse commands named by the strings, not fsPrimarySel selection mechanics, and not the later property-context router."
+        },
+        {
+          "id": "C19i.tooltip-statusbar-mirror",
+          "files": [
+            "src/js/timeline.js:3064-3106"
+          ],
+          "coverage_ranges": [
+            [
+              3064,
+              3106
+            ]
+          ],
+          "symbols": [
+            "immediate delegated-hover IIFE",
+            "hoverEl",
+            "tipText",
+            "showTitle",
+            "clearTitle"
+          ],
+          "signatures": [
+            "(function(){...})() -> undefined",
+            "tipText(el) -> string",
+            "showTitle(e) -> undefined",
+            "clearTitle(e) -> undefined"
+          ],
+          "responsibility": "Immediately registers delegated mouseover/mouseout listeners on four existing roots and temporarily mirrors the nearest title/data-tip text into the shared statusbar, restoring contextual help after a real leave.",
+          "reads": "The IIFE initializes one closure-shared hoverEl=null. tipText reads title first, then el.dataset.tip, then empty string. showTitle uses e.target.closest('[title],[data-tip]'), resolves text and compares the resolved element with shared hoverEl. clearTitle resolves the closest tooltip element from e.target and reads relatedTarget containment. The registration loop looks up props-panel, tl-toolbar, tl-content and layer-ctrls in that exact order.",
+          "writes_and_returns": "showTitle returns without effects for no closest element, empty text or the same element; otherwise it sets shared hoverEl and calls statusbarHelpRender(text,[]). clearTitle returns when no hover is active, the event target does not resolve to that exact active element, or relatedTarget remains a descendant; otherwise it clears hoverEl and calls updateStatusBarHelp. The IIFE itself returns undefined after registration.",
+          "guards_and_fallbacks": "Registration runs immediately at script evaluation, skips each missing root independently and never retries, unregisters or deduplicates. Each present root receives mouseover then mouseout listeners. The same hoverEl is shared across all four roots, so entering a different titled element in another root replaces it. Descendant transitions remain on the same element because clearTitle tests el.contains(relatedTarget). An event whose target no longer resolves to hoverEl cannot clear the active mirror.",
+          "effects_and_ordering": "tipText gives a still-present title precedence over data-tip. ui.js:1175-1195 separately delegates mouseover on document, moving title to data-tip on first hover and suppressing the floating tooltip inside tl-content. timeline.js loads after ui.js, but bubbling invokes a root listener before the document listener on the same event, so first hover can read title; later hover reads data-tip. The adapter renders raw producer text via statusbarHelpRender.innerHTML, so markup-like title/data-tip content is interpreted as HTML. It does not own title/data-tip creation or translation.",
+          "callers": [
+            "IIFE execution during timeline.js load is the sole registrar",
+            "mouseover/mouseout events under props-panel, tl-toolbar, tl-content and layer-ctrls call the closure helpers",
+            "src/js/ui.js:1175-1195 is the separate document tooltip producer/consumer interaction",
+            "src/index.html supplies all four roots and statusbar-help in the observed document"
+          ],
+          "ownership_boundaries": "C04b retains ui.js and title/data-tip/panel producers. C19i owns only census of this mirror and immediate registration; no listener lifecycle or dynamic-root observer exists."
+        },
+        {
+          "id": "C19i.dom-slot-foundations",
+          "files": [
+            "src/js/timeline.js:3107-3130"
+          ],
+          "coverage_ranges": [
+            [
+              3107,
+              3130
+            ]
+          ],
+          "symbols": [
+            "_combineSecHome",
+            "_canvasSecHome",
+            "_captureSlotHome",
+            "_restoreSlotHome"
+          ],
+          "signatures": [
+            "_captureSlotHome(node) -> {parent:Node, next:Node|null, prev:Node|null}",
+            "_restoreSlotHome(node, home) -> undefined"
+          ],
+          "responsibility": "Initializes remembered homes for the combine and canvas property sections and provides identity-preserving capture/restore of their actual DOM nodes around later context-router moves.",
+          "reads": "_combineSecHome and _canvasSecHome initialize to null. _captureSlotHome reads and returns the exact node.parentNode, node.nextSibling and node.previousSibling object references; it does not clone a position or store ids. _restoreSlotHome starts from home.next and may read home.prev.parentNode/home.prev.nextSibling.",
+          "writes_and_returns": "_captureSlotHome returns a new record of real node references. _restoreSlotHome returns undefined after either skipping or calling home.parent.insertBefore(node,anchor). Moving the original node preserves that node's identity and listeners; the helper itself neither creates/replaces nodes nor attaches listeners.",
+          "guards_and_fallbacks": "Neither helper guards null/invalid node or home. If original home.next is null, anchor remains null even if home.prev is attached, so restoration targets the parent's end. If a truthy saved next is now detached from home.parent, fallback is the attached saved previous sibling's current nextSibling, otherwise null. Insertion is skipped only when node.parentNode===home.parent and node.nextSibling===anchor.",
+          "effects_and_ordering": "Capture callers later initialize each home only while its cache is falsy. Restore resolves a possibly stale next reference before comparing node placement. insertBefore uses the saved real parent and selected real anchor; exceptions after invalid/stale parent-anchor combinations are not caught.",
+          "callers": [
+            "src/js/timeline.js:3304 captures canvasSec home once when _canvasSecHome is falsy",
+            "src/js/timeline.js:3326 restores canvasSec",
+            "src/js/timeline.js:3338 captures combineSec home once when _combineSecHome is falsy",
+            "src/js/timeline.js:3361 restores combineSec"
+          ],
+          "ownership_boundaries": "The complete updatePropsContext router starts3131 and remains outside C19i. This packet records only its slot-state dependencies/helpers; later routing, visibility and node moves retain their existing owner."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No document field is written. Tool tables, signature caches, hoverEl, remembered DOM references and statusbar/panel DOM are session/runtime values and are absent from project serialization."
+    },
+    {
+      "consumer": "load",
+      "disposition": "Project load can later trigger updatePropsContext/updateUI and repaint help, but this slice has no load parser or rehydration field. Immediate listener registration depends on roots existing when timeline.js evaluates, not project load."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "No history snapshot is pushed or restored. TOOL_LABELS is read by tweens.js solely to label history entries; help rendering and hover changes do not become undoable document actions."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "The help planner reads canvas selectedPaths first, fsselect _fsSel second and timeline _sel.frames third. Canvas select/subselect wins over timeline selection; fsselect active content wins over timeline selection; selection callers refresh the help after clearing/applying timeline selection."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "Timeline selection help names key/tween/exposure shortcuts and openPropsSection is used by tween/easing UI, but this slice writes no frames, keys, Motion tracks or playback state. Strings do not prove command behavior."
+    },
+    {
+      "consumer": "render",
+      "disposition": "Effects are limited to right-panel classes, scroll position and statusbar innerHTML. No canvas, Paper.js, engine or GPU render port is called."
+    },
+    {
+      "consumer": "export",
+      "disposition": "Neither help metadata nor its DOM output participates in media/project export in this slice. No output capability follows from the displayed descriptions."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "No Tauri/native API is called. Browser DOM census and proposed fixtures do not establish packaged-desktop behavior."
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "C19i.fixture.open-section",
+      "status": "proposed, unrun",
+      "initial_state": "Independent cases with absent section; present section missing either header/body; and a complete closed section with a scroll spy.",
+      "expected_effects": "Absent returns with no effects. Partial section preserves both classes and still scrolls. Complete section removes hid/closed then scrolls once with block nearest and smooth behavior."
+    },
+    {
+      "id": "C19i.fixture.help-priority",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh independent state cases combine canvas select/subselect, fsselect picks, timeline frames and known/unknown active tools while resetting statusbar DOM each time.",
+      "expected_effects": "Assert strict canvas, fsselect, timeline, known-tool, generic order; exact singular/plural counts; and branch shortcut arrays without invoking any command."
+    },
+    {
+      "id": "C19i.fixture.translation-and-unknown-tool",
+      "status": "proposed, unrun",
+      "initial_state": "Run known and unknown tools once with SM.t returning marked values and once with SM/SM.t absent.",
+      "expected_effects": "Known help/default pairs use translations when available and raw keys otherwise; unknown getToolHelp returns undefined and updateStatusBarHelp renders generic fallback."
+    },
+    {
+      "id": "C19i.fixture.statusbar-renderer",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh missing/present statusbar-help nodes; pass empty/nonempty descriptions, empty/multiple shortcut pairs and markup-bearing strings.",
+      "expected_effects": "Missing node returns. Present node receives exact direct innerHTML concatenation, one separator after truthy desc and spaces only between pair fragments; markup is interpreted rather than escaped."
+    },
+    {
+      "id": "C19i.fixture.tooltip-producer-order",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh titled target below each registered root, then repeat after ui.js has moved title to data-tip; include both attributes with different values.",
+      "expected_effects": "First/root-phase hover can read title, later hover reads data-tip, and simultaneous attributes choose title. tl-content receives statusbar text while ui.js suppresses its floating tooltip."
+    },
+    {
+      "id": "C19i.fixture.tooltip-transition-guards",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh nested titled elements across roots with controlled target/relatedTarget transitions and shared hover state reset per case.",
+      "expected_effects": "No-text and same-element mouseover do nothing; moving within a hovered element does not clear; unrelated target that does not resolve to hoverEl does not clear; true leave clears and restores contextual help; entering another root replaces the shared target."
+    },
+    {
+      "id": "C19i.fixture.registration-absence",
+      "status": "proposed, unrun",
+      "initial_state": "For each independent case omit one or more roots at IIFE evaluation, add them later, and spy on listener attachment for present roots.",
+      "expected_effects": "Each present root receives mouseover then mouseout once in declared root order; absent roots are skipped permanently and later insertion creates no listener because there is no retry/observer."
+    },
+    {
+      "id": "C19i.fixture.dom-slot-identity",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh real DOM trees cover attached saved-next, detached saved-next with attached/detached previous, original null-next, already-correct placement and invalid null home; attach a listener/object marker to the moved section.",
+      "expected_effects": "Capture retains exact parent/next/previous identities. Restore uses saved next when still attached, attached prev.currentNext or null when saved next detached, and null when next was originally null; insertion skips only on matching parent and next sibling. The same node/listener identity survives moves; invalid null inputs throw rather than silently returning."
+    },
+    {
+      "id": "C19i.fixture.consumer-nonpersistence",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh document around save/load, undo/redo, selection, animation, render, export and native harness boundaries with changed help/hover/signature runtime state.",
+      "expected_effects": "Only later normal refresh recomputes visible help; no help/hover/cache value is serialized, restored as document history, rendered into scene output or sent to native APIs."
+    }
+  ],
+  "future_proposals": [
+    {
+      "id": "C19i.proposal.dom-slot-adapter",
+      "status": "proposal only; unimplemented",
+      "api": "captureDomSlot(node) -> SlotToken; restoreDomSlot(node, token) -> {moved, anchor}",
+      "boundary": "Preserves real-node identity and current fallback semantics while exposing invalid-token and placement outcomes; the later property router retains move policy."
+    },
+    {
+      "id": "C19i.proposal.panel-open-adapter",
+      "status": "proposal only; unimplemented",
+      "api": "openPropertySection(id, {scroll=true, behavior=\"smooth\", block=\"nearest\"}) -> {found, expanded, scrolled}",
+      "boundary": "Owns DOM opening/observable result only; later property router and curve/tween callers retain their behavior."
+    },
+    {
+      "id": "C19i.proposal.help-planner-renderer",
+      "status": "proposal only; unimplemented",
+      "api": "planContextHelp(selectionSnapshot, tool, translate) -> HelpModel; renderContextHelp(root, model) -> RenderResult",
+      "boundary": "Planner preserves current priority/count/fallback rules. Renderer uses explicit text/shortcut nodes or a declared trusted-markup policy; command implementations remain outside."
+    },
+    {
+      "id": "C19i.proposal.hover-adapter",
+      "status": "proposal only; unimplemented",
+      "api": "registerStatusbarHover({roots, resolveText, onShow, onClear}) -> {registeredRoots, dispose}",
+      "boundary": "Owns root registration and hover identity with explicit retry/disposal policy; C04b retains tooltip attributes/producers and contextual planner owns restoration."
+    }
+  ],
+  "surface_inventory_cross_check": [
+    {
+      "inventory": "C19a-timeline-foundations.json",
+      "disposition": "Confirms earlier selection/frame refresh call sites remain their existing owner."
+    },
+    {
+      "inventory": "C01-document-history.json",
+      "disposition": "Confirms history ownership and its explicit TOOL_LABELS exclusion."
+    },
+    {
+      "inventory": "C04a-editor-tools-selection.json",
+      "disposition": "Confirms canvas/fill-stroke selection primitives remain C04a."
+    },
+    {
+      "inventory": "C04b-editor-presentation-support.json",
+      "disposition": "Confirms ui.js tooltip/title producers and panel renderers remain C04b."
+    },
+    {
+      "inventory": "C19h-timeline-ui-refresh-adapters.json",
+      "disposition": "Confirms updateUI calls later updatePropsContext; C19h ends2947 before this scope."
+    }
+  ],
+  "validation": {
+    "static_commands": [
+      "git rev-parse HEAD && git rev-parse origin/main",
+      "git rev-parse 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js && git rev-parse HEAD:src/js/timeline.js",
+      "node /tmp/nemo-c19i-validate.cjs $PWD engineering/inventory/census/C19i-timeline-properties-help-foundations.json /tmp/nemo-c19i-validation.json"
+    ],
+    "expected": {
+      "assigned_lines": 182,
+      "code_lines": 103,
+      "comment_lines": 79,
+      "whitespace_lines": 0,
+      "packets": 4,
+      "top_level_named_functions": 7,
+      "closure_helpers": 3,
+      "source_consumers": 8,
+      "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123"
+    },
+    "runtime": "Behavioral fixtures remain proposed and unrun; static validation does not claim application behavior."
+  }
+}
