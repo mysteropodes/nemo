@@ -142,29 +142,31 @@ fn validate_fixed_payload(
             "diagnostics.replay expects only request; {expected}"
         )));
     }
-    let request = payload["request"].as_object().ok_or_else(|| {
-        RequestError::MalformedPayload(format!("payload.request must be an object; {expected}"))
-    })?;
-    if request.len() != 2 || !request.contains_key("operation") || !request.contains_key("payload")
-    {
+    let Some(request) = payload["request"].as_object() else {
         return Err(RequestError::MalformedPayload(format!(
-            "payload.request requires operation and payload only; {expected}"
+            "payload.request must be an object; {expected}"
+        )));
+    };
+    if !request.contains_key("operation") || !request.contains_key("payload") {
+        return Err(RequestError::MalformedPayload(format!(
+            "payload.request requires operation and payload; {expected}"
         )));
     }
-    let recorded: Operation =
-        serde_json::from_value(request["operation"].clone()).map_err(|_| {
-            RequestError::MalformedPayload(format!(
+    let recorded: Operation = match serde_json::from_value(request["operation"].clone()) {
+        Ok(operation) => operation,
+        Err(_) => {
+            return Err(RequestError::MalformedPayload(format!(
                 "payload.request.operation is not a registered transport operation; {expected}"
-            ))
-        })?;
-    recorded
-        .check_payload_with(&request["payload"], catalog)
-        .map_err(|error| {
-            RequestError::MalformedPayload(format!(
-                "recorded request payload is invalid: {}",
-                error.message()
-            ))
-        })
+            )));
+        }
+    };
+    match recorded.check_payload_with(&request["payload"], catalog) {
+        Ok(()) => Ok(()),
+        Err(error) => Err(RequestError::MalformedPayload(format!(
+            "recorded request payload is invalid: {}",
+            error.message()
+        ))),
+    }
 }
 
 fn validate_legacy_fixed_fields(
@@ -216,10 +218,10 @@ fn schema_accepts_json_type(schema: &Value, value: &Value) -> bool {
 }
 
 fn declared_types(schema: &Value) -> String {
-    schema
-        .get("type")
-        .map(Value::to_string)
-        .unwrap_or_else(|| "any JSON value".to_owned())
+    match schema.get("type") {
+        Some(types) => types.to_string(),
+        None => "any JSON value".to_owned(),
+    }
 }
 
 pub(crate) fn json_kind(value: &Value) -> &'static str {
@@ -294,15 +296,13 @@ fn property_payload_schema(capability: &CapabilityDescriptor) -> Value {
         .as_object_mut()
         .expect("registered descriptor input is an object");
     let properties = object
-        .entry("properties")
-        .or_insert_with(|| json!({}))
-        .as_object_mut()
+        .get_mut("properties")
+        .and_then(Value::as_object_mut)
         .expect("registered descriptor properties is an object");
     properties.insert("property".to_owned(), json!({"const": capability.id}));
     let required = object
-        .entry("required")
-        .or_insert_with(|| json!([]))
-        .as_array_mut()
+        .get_mut("required")
+        .and_then(Value::as_array_mut)
         .expect("registered descriptor required is an array");
     if !required.iter().any(|key| key == "property") {
         required.push(json!("property"));
@@ -317,7 +317,6 @@ fn replay_payload_schema() -> Value {
         "properties": {
             "request": {
                 "type": "object",
-                "additionalProperties": false,
                 "required": ["operation", "payload"],
                 "properties": {
                     "operation": {"enum": Operation::labels()},

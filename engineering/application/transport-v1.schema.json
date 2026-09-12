@@ -133,7 +133,6 @@
             "additionalProperties": false,
             "properties": {
               "request": {
-                "additionalProperties": false,
                 "properties": {
                   "operation": {
                     "enum": [

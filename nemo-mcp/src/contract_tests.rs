@@ -103,6 +103,124 @@ fn generic_property_projection_accepts_descriptor_owned_string_and_custom_fields
 }
 
 #[test]
+fn fixed_payload_rejections_keep_the_legacy_control_vocabulary_typed() {
+    let unknown = Operation::Snapshot.check_payload(&json!({"layerUid": "layer-1"}));
+    assert_eq!(unknown.unwrap_err().code(), "malformed_payload");
+
+    let wrong_type = Operation::Snapshot.check_payload(&json!({"value": true}));
+    assert_eq!(wrong_type.unwrap_err().code(), "malformed_payload");
+
+    let non_object_replay = Operation::DiagnosticsReplay.check_payload(&json!({"request": false}));
+    assert_eq!(non_object_replay.unwrap_err().code(), "malformed_payload");
+
+    let incomplete_replay = Operation::DiagnosticsReplay.check_payload(&json!({
+        "request": {"operation": "snapshot"}
+    }));
+    assert_eq!(incomplete_replay.unwrap_err().code(), "malformed_payload");
+
+    let unknown_replay_operation = Operation::DiagnosticsReplay.check_payload(&json!({
+        "request": {"operation": "not.an.operation", "payload": {}}
+    }));
+    assert_eq!(
+        unknown_replay_operation.unwrap_err().code(),
+        "malformed_payload"
+    );
+}
+
+#[test]
+fn descriptor_schema_projects_query_and_command_branches() {
+    let mut generator = schemars::SchemaGenerator::default();
+    let command = serde_json::to_value(command_payload_schema(&mut generator)).unwrap();
+    assert!(command["anyOf"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|branch| { branch["properties"]["property"]["const"] == "opacity" }));
+    assert!(command["anyOf"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|branch| { branch["required"] == json!(["request"]) }));
+
+    let mut generator = schemars::SchemaGenerator::default();
+    let query = serde_json::to_value(query_payload_schema(&mut generator)).unwrap();
+    assert_eq!(query["x-nemo-registeredCapabilities"][0]["id"], "opacity");
+}
+
+#[test]
+fn descriptor_projection_accepts_each_declared_primitive_without_a_payload_struct() {
+    let catalog = descriptor(
+        r#"{
+            "id": "metadata",
+            "input": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "layerId": {"type": "string"},
+                    "value": {"type": ["array", "null"]},
+                    "frame": {"type": "integer"},
+                    "animated": {"type": "boolean"}
+                },
+                "required": ["layerId"]
+            },
+            "effects": {"lifecycle": ["property.set", "property.key.set", "property.animation.set"]},
+            "availability": {"state": "available", "reason": null},
+            "fixture": {"input": {"layerId": "layer-1", "value": []}}
+        }"#,
+    );
+    assert!(Operation::PropertySet
+        .check_payload_with(
+            &json!({"layerId": "layer-1", "property": "metadata", "value": []}),
+            &catalog,
+        )
+        .is_ok());
+    assert!(Operation::PropertyKeySet
+        .check_payload_with(
+            &json!({"layerId": "layer-1", "property": "metadata", "value": null, "frame": 1}),
+            &catalog,
+        )
+        .is_ok());
+    assert!(Operation::PropertyAnimationSet
+        .check_payload_with(
+            &json!({"layerId": "layer-1", "property": "metadata", "animated": true}),
+            &catalog,
+        )
+        .is_ok());
+}
+
+#[test]
+fn descriptor_projection_keeps_open_input_fragments_and_nonstring_selectors_distinct() {
+    let catalog = descriptor(
+        r#"{
+            "id": "open.metadata",
+            "input": {"type": "object", "additionalProperties": true, "required": ["layerId"]},
+            "effects": {"lifecycle": ["property.set"]},
+            "availability": {"state": "available", "reason": null},
+            "fixture": {"input": {"layerId": "layer-1", "value": {"tag": "draft"}}}
+        }"#,
+    );
+    assert!(Operation::PropertySet
+        .check_payload_with(
+            &json!({
+                "layerId": "layer-1",
+                "property": "open.metadata",
+                "value": {"tag": "draft"},
+                "owner": "editor"
+            }),
+            &catalog,
+        )
+        .is_ok());
+    let error = Operation::PropertySet
+        .check_payload_with(
+            &json!({"layerId": "layer-1", "property": 42, "value": "ignored"}),
+            &catalog,
+        )
+        .unwrap_err();
+    assert_eq!(error.code(), "malformed_payload");
+    assert!(error.message().contains("missing property"));
+}
+
+#[test]
 fn a_number_literal_out_of_f64_range_never_survives_json_parsing() {
     // The invariant `check_payload_with`'s `.expect()` relies on for
     // `serde_json::to_value(&recorded.payload)`: a value that failed to

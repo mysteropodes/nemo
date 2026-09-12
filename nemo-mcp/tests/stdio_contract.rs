@@ -69,6 +69,18 @@ async fn advertised_payload_schema_names_every_key_and_operation_template() {
         .as_array()
         .unwrap()
         .contains(&json!("layerId")));
+    let replay = payload["anyOf"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|branch| branch["required"] == json!(["request"]))
+        .expect("replay retains its request envelope");
+    assert!(
+        replay["properties"]["request"]
+            .get("additionalProperties")
+            .is_none(),
+        "a trace request keeps its retained identity and revision metadata"
+    );
 
     let description = payload["description"].as_str().unwrap();
     for operation in [
@@ -156,6 +168,19 @@ async fn rejected_payloads_name_the_shape_the_operation_expects() {
             "missing value",
             json!({"layerId": "layer-a", "property": "opacity"}),
             vec!["missing value", "property.set expects"],
+        ),
+        (
+            "descriptor type mismatch",
+            json!({"layerId": "layer-a", "property": "opacity", "value": "forty"}),
+            vec!["payload.value has type", "capability \"opacity\" declares"],
+        ),
+        (
+            "descriptor unknown field",
+            json!({"layerId": "layer-a", "property": "opacity", "value": 37, "mode": "replace"}),
+            vec![
+                "payload contains unsupported field mode",
+                "property.set expects",
+            ],
         ),
         (
             "curve editing",
@@ -246,6 +271,63 @@ async fn replay_payload_validates_the_nested_recorded_command() {
     );
     assert!(message.contains("missing layerId, value"), "{message}");
     assert!(message.contains("property.set expects"), "{message}");
+
+    // Replay owns a fixed transport envelope. Exercise its direct type and
+    // operation rejections through the compiled server, rather than only through
+    // the unit-level descriptor seam.
+    let mut non_object_request = base.clone();
+    non_object_request["payload"] = json!({"request": false});
+    let response = client
+        .call_tool(
+            CallToolRequestParams::new("nemo_command")
+                .with_arguments(arguments(non_object_request)),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        response.structured_content.unwrap()["error"]["code"],
+        "malformed_payload"
+    );
+
+    let mut unknown_operation = base.clone();
+    unknown_operation["payload"] = json!({
+        "request": {"operation": "property.unknown", "payload": {}}
+    });
+    let response = client
+        .call_tool(
+            CallToolRequestParams::new("nemo_command").with_arguments(arguments(unknown_operation)),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        response.structured_content.unwrap()["error"]["code"],
+        "malformed_payload"
+    );
+
+    // A `diagnostics.trace` entry retains the original request identity and
+    // revision fields. Replay consults only operation/payload, so those retained
+    // fields must remain copyable instead of being rejected as unknown metadata.
+    let mut traced = base.clone();
+    traced["payload"] = json!({"request": {
+        "apiVersion": 1,
+        "requestId": "original-edit",
+        "instanceId": "3f1a5f3c-4a05-4a3f-9d59-2f9f1c65b3ad",
+        "documentId": "document-a",
+        "expectedRevision": 4,
+        "revision": 5,
+        "ok": true,
+        "operation": "property.set",
+        "payload": {"layerId": "layer-a", "property": "opacity", "value": 37}
+    }});
+    let response = client
+        .call_tool(CallToolRequestParams::new("nemo_command").with_arguments(arguments(traced)))
+        .await
+        .unwrap();
+    assert_eq!(
+        response.structured_content.unwrap()["error"]["code"],
+        "unavailable",
+        "the complete traced command passes admission before absent-instance lookup"
+    );
 
     // A fully-formed recorded command still passes and fails later on the absent
     // instance, proving the recursive check isn't a false positive.
