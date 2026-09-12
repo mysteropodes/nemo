@@ -92,7 +92,9 @@ async function exportedPixels(page, filename, frame) {
     }
     return { width: canvas.width, height: canvas.height, colors: Object.keys(colors), count, bounds };
   }, 'data:image/svg+xml;base64,' + bytes.toString('base64'));
-  if (await page.locator('#export-close').isVisible()) await page.locator('#export-close').click();
+  // Successful SVG export closes this dialog after 900 ms. Wait for that
+  // transition instead of racing it with a click on the disappearing button.
+  await expect(page.locator('#export-close')).toBeHidden();
   return { ...pixels, sha256: sha(bytes) };
 }
 
@@ -104,7 +106,8 @@ test('opacity commands survive real save/reopen and preserve stored layers durin
     const identity = await fetch(runtime.origin + IDENTITY_PATH).then(r => r.json());
     expect(identity.healthy).toBe(true);
     const sourceHashes = {};
-    for (const file of ['src/index.html', 'src/js/application/opacity-application.js', 'src/js/bootstrap/opacity-application.js',
+    for (const file of ['src/index.html', 'src/js/application/capability-registry.js',
+      'src/js/application/opacity-capability.js', 'src/js/application/opacity-application.js', 'src/js/bootstrap/opacity-application.js',
       'src/js/domain/animation/opacity.js', 'src/js/motion.js', 'src/js/project.js', 'src/js/export.js']) {
       const response = await fetch(runtime.origin + '/' + file.slice(4));
       expect(response.status).toBe(200);
@@ -112,6 +115,14 @@ test('opacity commands survive real save/reopen and preserve stored layers durin
       expect(sha(Buffer.from(await response.arrayBuffer()))).toBe(sourceHashes[file]);
     }
     let { page, context } = await openProject(browser, runtime.origin, fixture, contexts, errors);
+    const canonicalDescriptor = JSON.parse(fs.readFileSync(
+      path.join(root, 'engineering/application/capabilities/opacity.json'), 'utf8'));
+    const discovery = await command(page, 'capabilities');
+    expect(discovery.ok).toBe(true);
+    expect(discovery.result.properties).toEqual([
+      { id: 'opacity', min: 0, max: 100, unit: 'percent', animated: true },
+    ]);
+    expect(discovery.result.descriptors).toEqual([canonicalDescriptor]);
     const layerId = await page.evaluate(() => state.layers[0].layerUid);
     const payload = { layerId, property: 'opacity' };
     expect((await command(page, 'property.set', { ...payload, value: 25 })).ok).toBe(true);
