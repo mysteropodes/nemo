@@ -1,0 +1,1406 @@
+{
+  "census_id": "C19a",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1118",
+  "title": "Timeline foundations — first bounded uncovered ranges",
+  "owner": "Ilya/D1 (read-only draft by Sol; Codexitron/Ilya O owns eventual integration)",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "status": "read-only census and admission proposals; no runtime source writer or implementation claimed",
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 1,
+      "end": 39,
+      "lines": 39,
+      "classification": {
+        "code": 20,
+        "comment": 18,
+        "whitespace": 1
+      }
+    },
+    {
+      "start": 193,
+      "end": 348,
+      "lines": 156,
+      "classification": {
+        "code": 107,
+        "comment": 46,
+        "whitespace": 3
+      }
+    },
+    {
+      "start": 350,
+      "end": 458,
+      "lines": 109,
+      "classification": {
+        "code": 37,
+        "comment": 72,
+        "whitespace": 0
+      }
+    },
+    {
+      "start": 460,
+      "end": 845,
+      "lines": 386,
+      "classification": {
+        "code": 186,
+        "comment": 200,
+        "whitespace": 0
+      }
+    }
+  ],
+  "coverage_note": "Exactly 690 assigned source lines are covered once by packet coverage_ranges: 350 code, 336 full-line // comments, and 4 whitespace lines. Classification is lexical: blank => whitespace; trimmed line beginning // => comment; every other line => code (including code with trailing comments). The omitted boundary lines 192, 349, 459 and 846 are deliberately not claimed; each exposes a clipped construct and is recorded below. No other timeline.js range is claimed.",
+  "whole_file_writer_guidance": {
+    "source_access": "src/js/timeline.js remains read-only for C19a; this census acquires only the eventual new C19a JSON artifact.",
+    "serialization": "Every future implementation touching timeline.js must reserve the whole file and serialize with all C01/C02/C04/C06 owners and executable P20/P24/P30 work, even when packet line ranges differ. Function-level census ranges never authorize concurrent writers.",
+    "publication": "Codexitron/Ilya O may integrate the census after P03A/#1116 releases the writable checkout; independent review validates exact candidate SHA before protected integration.",
+    "reservations": "D01/#1044 stays a separate claim. T05/Pollen and all other current owners remain reserved. Proposed packets transfer no ownership and do not start work."
+  },
+  "reconciliation": [
+    {
+      "range": "17-39",
+      "with": "P24/#1026",
+      "disposition": "advancePlayFrame is already the exact executable leaf; retain C19a as census reference only."
+    },
+    {
+      "range": "193-208",
+      "with": "C02 lines 40-192",
+      "disposition": "updatePlayhead starts at 192; extend/reconcile C02 to the complete function, never extract tail 193-208."
+    },
+    {
+      "range": "350-370",
+      "with": "C06 line 349 and i18n/bootstrap",
+      "disposition": "window.SM object opens at 349; keep fallback translator with C06 namespace/bootstrap ownership."
+    },
+    {
+      "range": "371-372 and 514-516",
+      "with": "C01/C02/C04/C06",
+      "disposition": "facade registrations only; behavior and writer stay with their owning functions."
+    },
+    {
+      "range": "460-463",
+      "with": "C02 line 459 and 846-848",
+      "disposition": "toggleOnion starts at 459; reconcile as one complete C02 onion packet."
+    },
+    {
+      "range": "839-845",
+      "with": "C01/C02/C03/C05 and P20/P30 whole-file reservations",
+      "disposition": "split mixed project timing, canvas document and editor view responsibilities before Ready; the SM object remains open beyond 845."
+    }
+  ],
+  "areas": [
+    {
+      "area": "bootstrap-and-playback-boundaries",
+      "packets": [
+        {
+          "id": "C19a.confirm-adapter",
+          "title": "Tauri/browser confirmation adapter",
+          "files": [
+            "src/js/timeline.js:1-16"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 1,
+              "end": 16
+            }
+          ],
+          "symbols": [
+            "smConfirm"
+          ],
+          "responsibility": "Normalizes Tauri dialog.confirm Promise<boolean> and browser confirm boolean into one async confirmation result.",
+          "writer": "No document state; reads window.__TAURI__.dialog and browser confirm.",
+          "public_api": "Bare global smConfirm(msg,title) -> Promise<boolean> in Tauri and awaitable boolean in browser.",
+          "consumers": [
+            "timeline.js feedback deletion flow near line 9525"
+          ],
+          "oracle": "New adapter test with injected native dialog and browser confirm ports: true/false, default title, and Promise result; current suite has no direct oracle.",
+          "depends_on": [],
+          "entangled_with": [
+            "C05 native/Tauri boundary inventory"
+          ],
+          "proposed_module": "src/js/adapters/confirm.js",
+          "proposed_api": "confirmUser(message, {title}, {nativeConfirm,browserConfirm}) -> Promise<boolean>",
+          "consumer_matrix": {
+            "save": "N/A: no document write",
+            "load": "N/A: no document read",
+            "history": "N/A: confirmation alone has no history effect",
+            "selection": "N/A: does not inspect selection",
+            "animation": "N/A: does not affect playback or keyframes",
+            "render": "N/A: does not render",
+            "export": "N/A: no exported document field",
+            "native": "Required: select native Promise dialog in Tauri and browser confirm otherwise"
+          },
+          "admission": "bounded extraction candidate after C05 boundary reconciliation",
+          "construct_boundary": "complete",
+          "notes": ""
+        },
+        {
+          "id": "C19a.playback-step-wrapper",
+          "title": "Playback transition kernel wrapper and globals",
+          "files": [
+            "src/js/timeline.js:17-39"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 17,
+              "end": 39
+            }
+          ],
+          "symbols": [
+            "playInt",
+            "playRaf",
+            "advancePlayFrame"
+          ],
+          "responsibility": "Computes one work-area playback step, loop/ping-pong direction changes, stop sentinel, and audio loop notification.",
+          "writer": "Writes state.playDir; reads state.waIn/waOut/loopPlayback/pingPongPlayback; invokes SMAudio.onLoop on wrap.",
+          "public_api": "Bare advancePlayFrame(cur) -> next frame or null; playInt/playRaf are file globals used by C02 transport.",
+          "consumers": [
+            "startPlay lines 40-131"
+          ],
+          "oracle": "Use P24 table-driven kernel cases for forward/reverse edge, loop wrap, ping-pong bounce, one-frame range and audio onLoop wrapper; no duplicate C19a implementation.",
+          "depends_on": [
+            "P24/#1026"
+          ],
+          "entangled_with": [
+            "C02 playback transport lines 40-192"
+          ],
+          "proposed_module": "src/js/domain/animation/playback-step.js",
+          "proposed_api": "Existing P24 seam: nextPlaybackFrame({current,direction,inFrame,outFrame,loop,pingPong}) -> {next,direction,event}; wrapper applies state/audio.",
+          "consumer_matrix": {
+            "save": "N/A: playback step does not persist document",
+            "load": "N/A: reads live playback state only",
+            "history": "N/A: playback has no undo entry",
+            "selection": "N/A: frame selection unchanged",
+            "animation": "Primary: determines playback frame/direction/loop event",
+            "render": "Via C02 caller loadFrame/updatePlayhead, not directly",
+            "export": "N/A: export is unaffected",
+            "native": "Optional SMAudio.onLoop consumer on wrap; no native bridge"
+          },
+          "admission": "already covered by executable P24/#1026; reference only, do not admit a duplicate leaf",
+          "construct_boundary": "complete",
+          "notes": ""
+        },
+        {
+          "id": "C19a.playhead-tail",
+          "title": "Clipped updatePlayhead tail",
+          "files": [
+            "src/js/timeline.js:193-208"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 193,
+              "end": 208
+            }
+          ],
+          "symbols": [
+            "updatePlayhead (declaration at line 192, outside assigned span)"
+          ],
+          "responsibility": "Applies camera view, synchronizes frame input/header/playhead/current-cell classes, and paints KEY/TWEEN badge for current frame.",
+          "writer": "DOM writer; reads state.currentFrame, appMode, active layer frame and camera state.",
+          "public_api": "Bare updatePlayhead(); function begins at line 192 in C02 and ends at 207.",
+          "consumers": [
+            "startPlay/C02 transport",
+            "app.js:5173",
+            "timeline-zoom.js:100",
+            "timeline.js render/update paths"
+          ],
+          "oracle": "Characterization DOM harness should verify camera call, current-frame fields/classes, motion offset through playheadLeftPx, and key/tween/no-badge states; retain CLAUDE.md §5bis frameOnly/full-render contract.",
+          "depends_on": [
+            "C02.animation-playback"
+          ],
+          "entangled_with": [
+            "C02 claim lines 40-192",
+            "CLAUDE.md §5bis"
+          ],
+          "proposed_module": "none separately",
+          "proposed_api": "Extend the C02 packet boundary through updatePlayhead line 208; do not extract this tail independently.",
+          "consumer_matrix": {
+            "save": "N/A: view synchronization does not save",
+            "load": "N/A: reads already-loaded frame",
+            "history": "N/A: no history write",
+            "selection": "Reads active frame for badge only; does not change selection",
+            "animation": "Primary playback/current-frame presentation consumer",
+            "render": "Primary DOM/camera presentation update; full content changes still require renderTimeline",
+            "export": "N/A: export unaffected",
+            "native": "Camera bridge may apply native-independent camera view; no native command"
+          },
+          "admission": "reconciliation only; clipped construct makes an independent leaf inadmissible",
+          "construct_boundary": "Assigned span begins one line after the declaration. C02 historical range 40-192 must be reconciled to a complete 192-208 construct.",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "area": "timeline-selection-and-retiming",
+      "packets": [
+        {
+          "id": "C19a.frame-selection",
+          "title": "Timeline frame-selection model and CSS projection",
+          "files": [
+            "src/js/timeline.js:209-240"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 209,
+              "end": 240
+            }
+          ],
+          "symbols": [
+            "_sel",
+            "selClear",
+            "selHas",
+            "selAdd",
+            "selRemove",
+            "selToggle",
+            "selRange",
+            "selApplyCSS",
+            "selBounds"
+          ],
+          "responsibility": "Owns selected timeline cell coordinates and clipboard slots, rectangular range expansion, bounds, and DOM class projection.",
+          "writer": "Sole writer of _sel.frames in this block; _sel.clipboard/clipOp are written by later timeline clipboard code.",
+          "public_api": "Currently bare globals; app.js, tweens.js, Labs and later timeline handlers call selection helpers directly.",
+          "consumers": [
+            "app.js frame deletion/move helpers",
+            "tweens.js generation flows",
+            "labs/retime-exposure.js",
+            "labs/interval-assistant.js",
+            "labs/pingpong-cycle.js",
+            "later timeline pointer/keyboard handlers"
+          ],
+          "oracle": "Focused module/DOM test: add/remove/toggle, rectangular cross-layer range, bounds, clear, missing-cell CSS projection and status refresh; current tests only mock selHas indirectly.",
+          "depends_on": [
+            "C04 selection ownership",
+            "C01 history consumers"
+          ],
+          "entangled_with": [
+            "_sel clipboard operations later in timeline.js"
+          ],
+          "proposed_module": "src/js/domain/animation/frame-selection.js",
+          "proposed_api": "createFrameSelection({findCell,onStatusChange}) -> {clear,has,add,remove,toggle,addRange,applyView,bounds,snapshot}; keep clipboard outside until its later range is censused.",
+          "consumer_matrix": {
+            "save": "N/A: frame selection is session UI state, not project data",
+            "load": "N/A: load should clear/remap through caller policy; this block has no load hook",
+            "history": "N/A: selection changes are not undoable",
+            "selection": "Primary state authority for selected timeline cells",
+            "animation": "Feeds frame/tween move and retime commands",
+            "render": "DOM .fc.sel projection only",
+            "export": "N/A: selection is not exported",
+            "native": "N/A: browser-only state"
+          },
+          "admission": "candidate, but API must exclude uncensused clipboard fields and coordinate with C04",
+          "construct_boundary": "complete",
+          "notes": ""
+        },
+        {
+          "id": "C19a.tween-retime",
+          "title": "Tween in-between capture and span retiming",
+          "files": [
+            "src/js/timeline.js:241-346"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 241,
+              "end": 346
+            }
+          ],
+          "symbols": [
+            "captureTweenInbetweens",
+            "retimeTweenSpans"
+          ],
+          "responsibility": "Snapshots interpolated frames before key movement, clears stale old/new union spans, proportionally relays sparse sequences, fills stretched dense spans, preserves manual edits and never overwrites keys.",
+          "writer": "Writes state.layers[li].frames within caller-owned move transactions; JSON-clones frame payloads.",
+          "public_api": "Bare captureTweenInbetweens(li,keyframes) and retimeTweenSpans(li,pairs,captured).",
+          "consumers": [
+            "timeline frame drag/move at 1758/1779",
+            "timeline key move at 1900/1924"
+          ],
+          "oracle": "Pure fixture oracle over sparse/dense spans, stretch/squash/collision/reversed span, adjacent shared key, manual-edit preservation and real-key non-clobber; assert exact resulting frame flags/content.",
+          "depends_on": [
+            "C02 tween/time ownership",
+            "C01 frame serialization/history"
+          ],
+          "entangled_with": [
+            "tweens.js frame schema",
+            "frame-selection packet"
+          ],
+          "proposed_module": "src/js/domain/animation/tween-retime.js",
+          "proposed_api": "captureTweenFrames(layerFrames,keyframes) -> snapshot; retimeTweenFrames(layerFrames,pairs,snapshot,{totalFrames,clone}) -> changed ranges.",
+          "consumer_matrix": {
+            "save": "Caller saves mutated frames after retime; module returns changes",
+            "load": "Loaded frame schema is input; no loader responsibility",
+            "history": "Caller owns one undo snapshot around the move",
+            "selection": "Consumes selected key pairs from frame-selection caller",
+            "animation": "Primary: rewrites interpolated frame timing",
+            "render": "Caller reloads/renders affected frame",
+            "export": "Export consumes resulting frames through existing C01 serialization",
+            "native": "N/A: pure browser-domain operation"
+          },
+          "admission": "bounded candidate after C02/C01 schema reconciliation",
+          "construct_boundary": "complete",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "area": "global-facade-and-tool-transition",
+      "packets": [
+        {
+          "id": "C19a.tool-transition",
+          "title": "Tool transition coordinator and producer allowlist",
+          "files": [
+            "src/js/timeline.js:347-348",
+            "src/js/timeline.js:373-458"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 347,
+              "end": 348
+            },
+            {
+              "start": 373,
+              "end": 458
+            }
+          ],
+          "symbols": [
+            "PRODUCER_ALLOWED_TOOLS",
+            "SM.setTool"
+          ],
+          "responsibility": "Enforces producer and frozen-tool gates, finalizes/cancels tool-specific transient state, snapshots/restores drawing defaults, changes active tool, refreshes render/UI/cursor and brush-preset availability.",
+          "writer": "Writes state.tool plus numerous tool-private globals/DOM; invokes render, selection, camera, rig, fill and bridge side effects.",
+          "public_api": "window.SM.setTool(tool); PRODUCER_ALLOWED_TOOLS also read by profile UI near line 9072.",
+          "consumers": [
+            "tool buttons and shortcuts in timeline.js",
+            "tools.js",
+            "subselect-bridge.js",
+            "camera.js",
+            "color-manager.js",
+            "shapes-panel.js",
+            "labs/command-palette.js",
+            "labs/lagoon-menu.js"
+          ],
+          "oracle": "First leaf must characterize an injected transition matrix: producer/frozen denial, each exit cleanup, fill engine resume, drawing-default round trip, camera timeline rebuild, active button/cursor/preset state and final props/Labs refresh.",
+          "depends_on": [
+            "C04 tool/selection packets",
+            "C06 profile/bootstrap",
+            "D01 separate claim"
+          ],
+          "entangled_with": [
+            "rig/fill/select/camera bridges",
+            "drawing default helpers at 3512+"
+          ],
+          "proposed_module": "src/js/application/tool-transition.js",
+          "proposed_api": "Phase 1 contract only: transitionTool(previous,next,policy,ports) -> {accepted,next,effects}; adapters execute ordered effects. Split policy, exit cleanup and UI projection before implementation.",
+          "consumer_matrix": {
+            "save": "N/A: active tool/default snapshots are session state here",
+            "load": "N/A: project load does not call this as data loader",
+            "history": "N/A: tool switching is not undoable",
+            "selection": "Clears frame/canvas/fs selection and marquee through ports",
+            "animation": "Stops/finalizes active pen/rig/fill/eraser gestures",
+            "render": "Calls renderArcs/renderTimeline and UI projections",
+            "export": "N/A: tool state is not exported",
+            "native": "N/A: no direct native call"
+          },
+          "admission": "oversized/high-coupling proposal; admissible next step is characterization plus port contract only, followed by separately reviewed implementation splits",
+          "construct_boundary": "Non-contiguous 347-348 belongs here semantically. Lines 349-372 interrupt the declaration and are separate reconciliation packets.",
+          "notes": ""
+        },
+        {
+          "id": "C19a.sm-bootstrap-translator",
+          "title": "Clipped SM namespace bootstrap translator",
+          "files": [
+            "src/js/timeline.js:350-370"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 350,
+              "end": 370
+            }
+          ],
+          "symbols": [
+            "window.SM opener at line 349",
+            "SM.t placeholder"
+          ],
+          "responsibility": "Provides a key-returning translator until i18n.js replaces SM.t after timeline boot.",
+          "writer": "Writes window.SM.t only as part of the object whose assignment starts outside this range; i18n.js later replaces it.",
+          "public_api": "window.SM.t(key) -> key before i18n initialization.",
+          "consumers": [
+            "timeline.js boot paths",
+            "labs-core.js early boot",
+            "i18n.js replacement"
+          ],
+          "oracle": "Bootstrap-order test loads timeline facade before i18n, observes key fallback, then installs real translator and verifies replacement without clobber.",
+          "depends_on": [
+            "C06 bootstrap/i18n"
+          ],
+          "entangled_with": [
+            "entire window.SM object from line 349 onward"
+          ],
+          "proposed_module": "none separately",
+          "proposed_api": "Keep with C06 bootstrap/facade work; any module seam is an injected translator default, not an extracted fragment.",
+          "consumer_matrix": {
+            "save": "N/A: translator does not save",
+            "load": "N/A: translator does not load",
+            "history": "N/A: no history effect",
+            "selection": "N/A: no selection behavior",
+            "animation": "N/A: labels only",
+            "render": "DOM labels consume translations through callers",
+            "export": "N/A: export unaffected",
+            "native": "N/A: no native command"
+          },
+          "admission": "reconciliation only; clipped object property cannot be an independent leaf",
+          "construct_boundary": "Range begins inside window.SM={ opened at line 349, historically claimed by C06. C06 DEF-9 namespace overwrite risk remains baseline debt.",
+          "notes": ""
+        },
+        {
+          "id": "C19a.sm-facade-core",
+          "title": "SM facade core reexports",
+          "files": [
+            "src/js/timeline.js:371-372"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 371,
+              "end": 372
+            }
+          ],
+          "symbols": [
+            "SM.exposeSymbolProperty",
+            "SM.goToFrame",
+            "SM.togglePlay",
+            "SM.stopPlay",
+            "SM.undo",
+            "SM.redo"
+          ],
+          "responsibility": "Publishes existing symbol, playback and history functions through the global SM facade.",
+          "writer": "No independent state; delegates to owners in app/timeline/history.",
+          "public_api": "Global window.SM properties listed in symbols.",
+          "consumers": [
+            "all browser UI and bridges calling SM facade"
+          ],
+          "oracle": "Structural API manifest test should assert each property delegates once with unchanged arguments/results; behavior belongs to owning packets.",
+          "depends_on": [
+            "C01 history",
+            "C02 playback",
+            "C04 symbol/property ownership",
+            "C06 namespace"
+          ],
+          "entangled_with": [
+            "whole SM object"
+          ],
+          "proposed_module": "src/js/application/sm-api.js",
+          "proposed_api": "registerCoreFacade({exposeSymbolProperty,goToFrame,togglePlay,stopPlay,undo,redo})",
+          "consumer_matrix": {
+            "save": "Delegates undo/redo only; no save logic",
+            "load": "Delegates goToFrame only; no loader logic",
+            "history": "Delegates C01 undo/redo",
+            "selection": "N/A: no selection member",
+            "animation": "Delegates C02 playback/frame navigation",
+            "render": "Render occurs in delegated owners",
+            "export": "N/A: no export member",
+            "native": "N/A: browser facade"
+          },
+          "admission": "facade inventory/reference; group with future whole-facade design, not a standalone extraction",
+          "construct_boundary": "complete",
+          "notes": ""
+        },
+        {
+          "id": "C19a.onion-tail",
+          "title": "Clipped toggleOnion tail",
+          "files": [
+            "src/js/timeline.js:460-463"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 460,
+              "end": 463
+            }
+          ],
+          "symbols": [
+            "toggleOnion (property starts line 459)"
+          ],
+          "responsibility": "Synchronizes two onion status badges, toolbar active state and onion marker positions after toggling and rendering.",
+          "writer": "DOM writer; state.onionSkin mutation and renderOS call occur on line 459 outside assigned span.",
+          "public_api": "window.SM.toggleOnion(), but the method starts in C02 at line 459.",
+          "consumers": [
+            "btn-os wiring and onion option UI"
+          ],
+          "oracle": "C02 oracle should verify state flip, renderOS, both badges/colors, active button and updateOmMarkers args.",
+          "depends_on": [
+            "C02 onion controls"
+          ],
+          "entangled_with": [
+            "C02 claim line 459 and 846-848"
+          ],
+          "proposed_module": "none separately",
+          "proposed_api": "Extend/reconcile C02 onion packet to complete lines 459-463 and 846-848.",
+          "consumer_matrix": {
+            "save": "N/A: onion view preference is not project save in this block",
+            "load": "N/A: no load logic",
+            "history": "N/A: view toggle has no undo",
+            "selection": "N/A: canvas/frame selection unchanged",
+            "animation": "Animation preview overlay only",
+            "render": "Primary onion overlay and badge render",
+            "export": "N/A: exported animation unaffected",
+            "native": "N/A: browser UI only"
+          },
+          "admission": "reconciliation only; clipped construct makes independent admission invalid",
+          "construct_boundary": "complete",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "area": "timeline-playback-view-controls",
+      "packets": [
+        {
+          "id": "C19a.timeline-view-toggles",
+          "title": "Timeline and editor overlay view toggles",
+          "files": [
+            "src/js/timeline.js:464-505"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 464,
+              "end": 505
+            }
+          ],
+          "symbols": [
+            "SM.toggleTweenCurves",
+            "SM.toggleGhostAll",
+            "SM.toggleShadowGuides",
+            "SM.selectGhostAll"
+          ],
+          "responsibility": "Toggles tween curve rows, ghost-all onion content and shadow-guide visibility; delegates ghost selection.",
+          "writer": "Writes session view flags showTweenCurves, ghostAllFrames, showShadowGuides and DOM classes; no project data.",
+          "public_api": "Four window.SM methods.",
+          "consumers": [
+            "buttons later in timeline.js",
+            "engine-bridge.js buildSceneJson/onionLayerItems for shadow guides",
+            "renderTimeline/renderLayerList/renderOS"
+          ],
+          "oracle": "DOM/port harness: each flag flips once; tween toggle rebuilds both aligned panes; ghost-off clears ghost selection; shadow toggle calls retained renderer; selectGhostAll delegates.",
+          "depends_on": [
+            "C02 onion/timeline presentation",
+            "C03 renderer consumers"
+          ],
+          "entangled_with": [
+            "CLAUDE.md §11 panel-grid row alignment"
+          ],
+          "proposed_module": "src/js/application/timeline-view-controls.js",
+          "proposed_api": "createTimelineViewControls(state,{renderTimeline,renderLayerList,renderOnion,renderNow,clearGhostSelection,selectGhostAll,dom})",
+          "consumer_matrix": {
+            "save": "N/A: explicitly view-only flags",
+            "load": "N/A: no project load fields",
+            "history": "N/A: view toggles are not undoable",
+            "selection": "Ghost selection only; no document selection mutation",
+            "animation": "Tween curves visualize animation without changing generated tweens",
+            "render": "Primary consumer; shadow flag read by engine and onion renderer",
+            "export": "N/A: display-only controls must not affect export",
+            "native": "N/A: browser renderer ports only"
+          },
+          "admission": "candidate; reconcile onion ownership with C02 and renderer read paths with C03",
+          "construct_boundary": "complete",
+          "notes": ""
+        },
+        {
+          "id": "C19a.playback-mode-controls",
+          "title": "Loop and ping-pong controls",
+          "files": [
+            "src/js/timeline.js:506-513"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 506,
+              "end": 513
+            }
+          ],
+          "symbols": [
+            "SM.toggleLoopPlayback",
+            "SM.togglePingPongPlayback"
+          ],
+          "responsibility": "Changes loop and ping-pong playback modes and paints loop button/title/toast.",
+          "writer": "Writes state.loopPlayback/pingPongPlayback; DOM-only presentation otherwise.",
+          "public_api": "window.SM.toggleLoopPlayback(), window.SM.togglePingPongPlayback().",
+          "consumers": [
+            "btn-loop click/contextmenu",
+            "labs/command-palette.js",
+            "labs/auto-actions.js",
+            "advancePlayFrame/P24"
+          ],
+          "oracle": "Port test verifies independent loop toggle, ping-pong implies loop, button classes, translated title/toast; P24 separately verifies step semantics.",
+          "depends_on": [
+            "P24/#1026",
+            "C02 playback transport"
+          ],
+          "entangled_with": [],
+          "proposed_module": "src/js/application/playback-mode-controls.js",
+          "proposed_api": "createPlaybackModeControls(state,{button,translate,toast}) -> {toggleLoop,togglePingPong}",
+          "consumer_matrix": {
+            "save": "N/A: modes are session playback state",
+            "load": "N/A: no loader in range",
+            "history": "N/A: playback mode is not undoable",
+            "selection": "N/A: selection unaffected",
+            "animation": "Primary input to P24 transition kernel",
+            "render": "DOM button only",
+            "export": "N/A: export unaffected",
+            "native": "N/A: browser-only"
+          },
+          "admission": "candidate after P24 API is fixed; do not bundle with the P24 kernel",
+          "construct_boundary": "complete",
+          "notes": ""
+        },
+        {
+          "id": "C19a.sm-facade-editing",
+          "title": "SM editing command reexports",
+          "files": [
+            "src/js/timeline.js:514-516"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 514,
+              "end": 516
+            }
+          ],
+          "symbols": [
+            "setPointType",
+            "booleanOp",
+            "generateTweens",
+            "harmonizeAfterEdit",
+            "insertFrame",
+            "insertKeyframe",
+            "insertBlankKeyframe",
+            "removeFrame",
+            "clearKeyframe",
+            "convertToKeyframes",
+            "removeFrameSpan",
+            "removeTweenSpan",
+            "duplicateSelectedFrames"
+          ],
+          "responsibility": "Publishes editor and animation mutation commands on window.SM without implementing them.",
+          "writer": "No independent state; delegates to C02/C04-owned functions.",
+          "public_api": "Global window.SM properties listed in symbols.",
+          "consumers": [
+            "timeline DOM actions",
+            "other browser modules using SM commands"
+          ],
+          "oracle": "Structural facade test only; each underlying command requires its owning behavioral oracle.",
+          "depends_on": [
+            "C02 animation",
+            "C04 editor tools",
+            "C06 namespace"
+          ],
+          "entangled_with": [
+            "whole SM facade"
+          ],
+          "proposed_module": "src/js/application/sm-api.js",
+          "proposed_api": "registerEditingFacade(dependencies) preserving names and delegation.",
+          "consumer_matrix": {
+            "save": "Delegated frame mutations are saved by owners",
+            "load": "Delegated frame navigation/load belongs to owners",
+            "history": "Delegated commands own history policy",
+            "selection": "Delegates point/boolean selection edits",
+            "animation": "Delegates tween/frame mutations",
+            "render": "Delegated owners render",
+            "export": "Export reads resulting document only",
+            "native": "N/A: no direct native command"
+          },
+          "admission": "facade inventory/reference; no standalone extraction leaf",
+          "construct_boundary": "complete",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "area": "selection-style-and-drawing-controls",
+      "packets": [
+        {
+          "id": "C19a.selection-brush-width",
+          "title": "Selection-aware brush width update",
+          "files": [
+            "src/js/timeline.js:517-596"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 517,
+              "end": 596
+            }
+          ],
+          "symbols": [
+            "SM.setBrushSize"
+          ],
+          "responsibility": "Updates next-stroke width or selected ordinary/vector/bitmap brush geometry, rescales dense pressure profiles, regenerates texture companions and saves the active frame.",
+          "writer": "Writes state.brushSize and selected Paper paths/data; uses current layer and selectedPaths.",
+          "public_api": "window.SM.setBrushSize(value).",
+          "consumers": [
+            "#p-sw input near 10373",
+            "keyboard width shortcut near 9967",
+            "selection property panel"
+          ],
+          "oracle": "Fixture test for no selection, ordinary path, pressure vector profile peak, vector texture and bitmap texture; assert one undo, texture regeneration, saved frame and rendered UI.",
+          "depends_on": [
+            "C04 selectedPaths/tool geometry",
+            "C01 frame save/history",
+            "C03 retained rendering"
+          ],
+          "entangled_with": [
+            "tools.js brush texture helpers",
+            "bitmap brush module"
+          ],
+          "proposed_module": "src/js/application/selection-stroke-width.js",
+          "proposed_api": "setStrokeWidth(value,{state,getSelection,pushUndo,saveFrame,updateUI,rebuildVectorOutline,regenerateTexture,bitmapBrush})",
+          "consumer_matrix": {
+            "save": "saveActiveLayerFrame persists selected path changes",
+            "load": "Existing desP/frame load must retain strokeWidth, centerSegments, widthProfile and texture specs",
+            "history": "One pushUndo before a selected mutation",
+            "selection": "Primary: applies only for select/subselect selectedPaths",
+            "animation": "Changes authored stroke geometry at current frame",
+            "render": "Rebuilds vector outline/texture then updateUI",
+            "export": "Downstream frame/path exporters consume stored geometry",
+            "native": "N/A: no native bridge"
+          },
+          "admission": "candidate, but split ordinary/vector/bitmap adapters if implementation cannot stay below modularity gate",
+          "construct_boundary": "complete",
+          "notes": ""
+        },
+        {
+          "id": "C19a.selection-paint",
+          "title": "Selection-aware paint colors, enablement and swap",
+          "files": [
+            "src/js/timeline.js:597-681"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 597,
+              "end": 681
+            }
+          ],
+          "symbols": [
+            "routeColorToSelectedMotionRow",
+            "SM.setStrokeColor",
+            "SM.setFillColor",
+            "SM._syncFillEnabledUI",
+            "SM._syncStrokeEnabledUI",
+            "SM.setFillEnabled",
+            "SM.setStrokeEnabled",
+            "SM.swapStrokeFill"
+          ],
+          "responsibility": "Routes color edits to Motion when applicable, edits selected paths or fill/stroke virtual selections, synchronizes duplicate eye controls, and swaps tool colors.",
+          "writer": "Writes state fill/stroke colors and enabled flags, selected path paint, Motion color track through a port, and selection UI.",
+          "public_api": "window.SM paint setters and internal-looking _sync methods are globally exposed.",
+          "consumers": [
+            "color-manager.js",
+            "palette-panel.js",
+            "timeline color/eye controls",
+            "motion.js routing",
+            "tools/select/fsselect paths"
+          ],
+          "oracle": "Cross-mode test matrix: defaults/no selection, select/subselect, fsselect fill region/stroke segment, vector brush alpha, Motion tracked color, enable/disable removal, duplicate controls and swap; assert one history/save per mutation.",
+          "depends_on": [
+            "C04 selection/fsselect",
+            "C02 Motion tracks",
+            "C01 history/save"
+          ],
+          "entangled_with": [
+            "motion.js writeElementColorFromPicker",
+            "tools.js fs realization/deletion"
+          ],
+          "proposed_module": "src/js/application/selection-paint.js",
+          "proposed_api": "createSelectionPaintController(state,{selection,motion,fs,persistence,ui}) -> {setStrokeColor,setFillColor,setFillEnabled,setStrokeEnabled,swap}",
+          "consumer_matrix": {
+            "save": "saveActiveLayerFrame after selected paint mutation",
+            "load": "desP/frame load retains path fill/stroke paint",
+            "history": "One pushUndo before selected mutation; defaults-only changes have none",
+            "selection": "Primary: branches across selectedPaths and _fsSel",
+            "animation": "Motion color tracks updated through existing motion writer when selected row is tracked",
+            "render": "updateUI and paint swatches/eye controls",
+            "export": "Export consumes persisted path/Motion paint via existing exporters",
+            "native": "N/A: no direct native bridge"
+          },
+          "admission": "oversized behavior matrix; admit characterization first, then split Motion routing, fsselect operations and ordinary paint if needed",
+          "construct_boundary": "complete",
+          "notes": ""
+        },
+        {
+          "id": "C19a.brush-preset",
+          "title": "Brush preset and custom saved-size application",
+          "files": [
+            "src/js/timeline.js:682-715"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 682,
+              "end": 715
+            }
+          ],
+          "symbols": [
+            "SM.setFillBrushSize",
+            "SM.setBrushPreset"
+          ],
+          "responsibility": "Sets fill-brush size/preset, restores custom preset diameter, converts eligible selected strokes by stripping and reapplying texture.",
+          "writer": "Writes state.fillBrushSize/brushPreset/brushSize, eligible selected path textures and UI field.",
+          "public_api": "window.SM.setFillBrushSize(value), window.SM.setBrushPreset(key).",
+          "consumers": [
+            "brush-preset-picker.js:216",
+            "#p-brushpreset change near 10774",
+            "brush editor custom presets"
+          ],
+          "oracle": "Fixture test validates size clamp, custom saved-size/UI restore, eligible filter, strip-before-apply ordering, none preset, single undo/save/update.",
+          "depends_on": [
+            "C04 selection/tools texture ownership",
+            "C01 history/save"
+          ],
+          "entangled_with": [
+            "brush editor and preset picker"
+          ],
+          "proposed_module": "src/js/application/brush-preset-controller.js",
+          "proposed_api": "applyBrushPreset(key,{state,selection,stripTexture,applyTexture,persistence,ui})",
+          "consumer_matrix": {
+            "save": "Selected texture conversion saved in active frame",
+            "load": "Loaded texture metadata/custom preset state is consumed, not loaded here",
+            "history": "One pushUndo when eligible selection changes",
+            "selection": "Primary selectedPaths filter",
+            "animation": "Affects authored strokes, not timeline timing",
+            "render": "Texture helper rebuilds visible dabs; updateUI",
+            "export": "Export consumes stored anchor/texture representation through existing path exporters",
+            "native": "N/A: browser-only"
+          },
+          "admission": "candidate after C04 texture API is explicit",
+          "construct_boundary": "complete",
+          "notes": ""
+        },
+        {
+          "id": "C19a.stroke-style",
+          "title": "Stroke defaults and selected stroke styling",
+          "files": [
+            "src/js/timeline.js:716-728"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 716,
+              "end": 728
+            }
+          ],
+          "symbols": [
+            "SM.setSmoothing",
+            "SM.setStabilizer",
+            "SM.setStrokeCap",
+            "SM.setStrokeJoin",
+            "SM.setMiterLimit",
+            "SM.setPaintOrder",
+            "SM.setDashOffset",
+            "SM.setStrokeStyle"
+          ],
+          "responsibility": "Updates drawing defaults and applies cap/join/miter/paint-order/dash/style to selected non-vector paths.",
+          "writer": "Writes state defaults and selected path properties/data.",
+          "public_api": "window.SM setters listed in symbols.",
+          "consumers": [
+            "timeline properties controls near 10541-10576",
+            "drawing tools consume defaults"
+          ],
+          "oracle": "Table-driven selected/unselected and ordinary/vector path test; clamps/parses values and verifies exactly one undo/save where current implementation promises it.",
+          "depends_on": [
+            "C04 tools/selection",
+            "C01 history/save"
+          ],
+          "entangled_with": [
+            "applyStrokeStyle",
+            "drawing-default snapshot/restore later in timeline.js"
+          ],
+          "proposed_module": "src/js/application/stroke-style-controller.js",
+          "proposed_api": "createStrokeStyleController(state,{selection,pushUndo,saveFrame,updateUI,applyStrokeStyle})",
+          "consumer_matrix": {
+            "save": "Selected style changes save active frame",
+            "load": "Loaded path style is adopted elsewhere; defaults are session state",
+            "history": "Current setters push one undo for each selected mutation",
+            "selection": "Primary selectedPaths branch; vector brushes deliberately excluded for several fields",
+            "animation": "Changes current-frame stroke appearance",
+            "render": "Caller/updateUI or retained renderer consumes saved properties",
+            "export": "Path exporters must retain cap/join/miter/dash/paintOrder/style fields",
+            "native": "N/A: no direct native bridge"
+          },
+          "admission": "candidate; oracle must preserve current per-setter updateUI asymmetry as baseline unless separately fixed",
+          "construct_boundary": "complete",
+          "notes": ""
+        },
+        {
+          "id": "C19a.stroke-smoothing",
+          "title": "Apply smoothing to selected strokes",
+          "files": [
+            "src/js/timeline.js:729-784"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 729,
+              "end": 784
+            }
+          ],
+          "symbols": [
+            "SM.smoothSelectedStroke"
+          ],
+          "responsibility": "Simplifies ordinary paths or vector-brush centerlines, preserves pressure profiles, regenerates textures/fills and promotes/saves the active frame.",
+          "writer": "Writes selected path segments and vector brush data; uses _scrubLiveActive to avoid duplicate undo snapshots.",
+          "public_api": "window.SM.smoothSelectedStroke(amount).",
+          "consumers": [
+            "#p-poststroke-smooth change near 10550",
+            "ui.js scrub mechanism"
+          ],
+          "oracle": "Geometry/port test for no selection, ordinary simplify, vector centerline rebuild with preserved profile, texture regeneration, linked-fill regeneration, typed change undo and scrub-live no-extra-undo.",
+          "depends_on": [
+            "C04 geometry/selection",
+            "C01 save/history"
+          ],
+          "entangled_with": [
+            "ui.js scrub transaction",
+            "tools.js brush/fill regeneration"
+          ],
+          "proposed_module": "src/js/application/selection-smoothing.js",
+          "proposed_api": "smoothSelection(amount,{state,selection,isScrubLive,pushUndo,geometry,regenerateTexture,regenerateFill,saveOrPromote,updateUI})",
+          "consumer_matrix": {
+            "save": "saveActiveLayerFrameOrPromote after mutation",
+            "load": "Loaded segments/profile are input",
+            "history": "One undo unless caller scrub transaction is live",
+            "selection": "Primary selectedPaths operation",
+            "animation": "Changes authored current-frame stroke geometry",
+            "render": "Rebuilds outlines/textures/linked fills then updateUI",
+            "export": "Export consumes resulting persisted geometry",
+            "native": "N/A: no native command"
+          },
+          "admission": "candidate after scrub/history transaction contract is pinned",
+          "construct_boundary": "complete",
+          "notes": ""
+        },
+        {
+          "id": "C19a.drawing-defaults",
+          "title": "Drawing-tool default setters",
+          "files": [
+            "src/js/timeline.js:785-798"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 785,
+              "end": 798
+            }
+          ],
+          "symbols": [
+            "SM.setVectorBrush",
+            "SM.setTaperEnds",
+            "SM.setShadowMode",
+            "SM.setMaskMode",
+            "SM.setMaskModeType",
+            "SM.setDrawMode",
+            "SM.setFillBrushMode",
+            "SM.setEraserSize",
+            "SM.setPressureMin",
+            "SM.setPressureMax",
+            "SM.setPressureInvert",
+            "SM.setPressureCurve"
+          ],
+          "responsibility": "Validates/coerces session defaults used by future draw, fill, eraser, pressure and mask gestures.",
+          "writer": "Writes state tool-default fields only, including clearing custom pressureCurvePoints when a formula preset is selected.",
+          "public_api": "window.SM setters listed in symbols.",
+          "consumers": [
+            "timeline tool-option controls near 10808-10817",
+            "C04 drawing tools"
+          ],
+          "oracle": "Pure setter table tests coercion/clamps/boolean conversion/pressure formula allowlist and custom-curve reset, plus one downstream new-stroke consumer test.",
+          "depends_on": [
+            "C04 drawing tools"
+          ],
+          "entangled_with": [
+            "drawing-default snapshot/restore only covers a subset of these fields"
+          ],
+          "proposed_module": "src/js/application/drawing-defaults.js",
+          "proposed_api": "applyDrawingDefault(state,key,value) -> normalized value; controller exposes named compatibility methods.",
+          "consumer_matrix": {
+            "save": "N/A: setters do not save current document",
+            "load": "N/A: project loader does not own these session defaults",
+            "history": "N/A: changing next-tool defaults is not undoable",
+            "selection": "N/A: current selection is not read",
+            "animation": "Future strokes consume these values; no existing frames changed",
+            "render": "N/A: no immediate render",
+            "export": "N/A: defaults are not document export fields",
+            "native": "N/A: browser-only"
+          },
+          "admission": "candidate; keep downstream tool consumers explicit",
+          "construct_boundary": "complete",
+          "notes": ""
+        },
+        {
+          "id": "C19a.selection-fill-opacity",
+          "title": "Selection-aware fill opacity",
+          "files": [
+            "src/js/timeline.js:799-838"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 799,
+              "end": 838
+            }
+          ],
+          "symbols": [
+            "SM.setOpacity"
+          ],
+          "responsibility": "Sets next-stroke opacity and applies fill alpha to selected colored paths, falling back to whole-item opacity for raster/no-fill items, then saves and updates.",
+          "writer": "Writes state.opacity, possibly state.fillColor, selected path fillColor or item.opacity.",
+          "public_api": "window.SM.setOpacity(value).",
+          "consumers": [
+            "#p-opacity input near 10538",
+            "selection properties panel",
+            "retained path renderer"
+          ],
+          "oracle": "Test clamp 0/100, colored fill hex8 replacement without stroke dimming, no-fill/raster item opacity fallback, mixed selection swatch state, one undo/save/update and serialized reload/export parity.",
+          "depends_on": [
+            "C04 selection",
+            "C01 serialization/history",
+            "C03 retained renderer"
+          ],
+          "entangled_with": [
+            "colorHex8",
+            "paintFillSwatches"
+          ],
+          "proposed_module": "src/js/application/selection-fill-opacity.js",
+          "proposed_api": "setFillOpacity(percent,{state,selection,colorToHex8,pushUndo,saveFrame,updateUI,paintFillSwatches})",
+          "consumer_matrix": {
+            "save": "saveActiveLayerFrame persists selected path opacity/paint",
+            "load": "desP/load must retain fill alpha and item opacity",
+            "history": "One pushUndo before selected mutation",
+            "selection": "Primary selectedPaths operation",
+            "animation": "Changes current-frame paint only",
+            "render": "Full color string reassignment invalidates retained render cache; updateUI",
+            "export": "All path/raster exporters must preserve resulting alpha/opacity",
+            "native": "N/A: no native command"
+          },
+          "admission": "bounded candidate after C01/C03 consumer verification",
+          "construct_boundary": "complete",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "area": "project-time-canvas-and-view-tail",
+      "packets": [
+        {
+          "id": "C19a.project-time-view-settings",
+          "title": "Project timing, tween, canvas and viewport facade tail",
+          "files": [
+            "src/js/timeline.js:839-845"
+          ],
+          "coverage_ranges": [
+            {
+              "start": 839,
+              "end": 845
+            }
+          ],
+          "symbols": [
+            "SM.setFps",
+            "SM.setCurve",
+            "SM.setResamplePts",
+            "SM.setTweenStep",
+            "SM.setCanvasSize",
+            "SM.setCanvasBg",
+            "SM.setCanvasClip",
+            "SM.setSafetyZones",
+            "SM.fitCanvas",
+            "SM.resetView"
+          ],
+          "responsibility": "Combines persistent document timing/canvas/tween setters with session view toggles and viewport reexports at the clipped end of the assigned range.",
+          "writer": "Writes state.fps/easingCurve/resamplePts/tweenStep/canvasW/H/Bg/canvasClip/safetyZones; delegates viewport functions.",
+          "public_api": "window.SM methods listed in symbols; object continues beyond line 845.",
+          "consumers": [
+            "project and timeline fields near 10514/10818-10822/11069/11394",
+            "psd-import-bridge.js",
+            "figma-import.js",
+            "color-manager.js",
+            "SMAudio",
+            "SMEngineBridge"
+          ],
+          "oracle": "Split oracle: timing validates clamp/restart/audio invalidation and project save/reload; tween defaults round-trip; canvas validates import setters, sync fields/render and save/reload/export; view validates clip/safety render only; viewport delegates once.",
+          "depends_on": [
+            "C01 project persistence",
+            "C02 animation settings",
+            "C03 render",
+            "C05 import/export/native",
+            "P20/#1022",
+            "P30/#1032"
+          ],
+          "entangled_with": [
+            "C02 onion properties immediately after line 845",
+            "whole SM object"
+          ],
+          "proposed_module": "split before implementation",
+          "proposed_api": "Three seams: projectTiming.setFps/setTweenDefaults; projectCanvas.setSize/setBackground; editorView.setClip/setSafety/fit/reset.",
+          "consumer_matrix": {
+            "save": "exportJSON persists fps, easingCurve, resamplePts, tweenStep, canvasW/H/Bg; clip/safety/viewport are session view state",
+            "load": "importJSON restores the persistent timing/tween/canvas fields; view flags are not loaded here",
+            "history": "No setter in this span pushes history; preserve as baseline and decide policy in leaf acceptance",
+            "selection": "N/A: selection unaffected",
+            "animation": "fps and tween defaults affect playback/generation; changing fps restarts active playback",
+            "render": "drawStage/syncDocFields or SMEngineBridge.renderNow; fit/reset delegate viewport",
+            "export": "Persistent fields are document/export metadata; clip/safety/viewport must remain excluded",
+            "native": "Import bridges call canvas setters; no direct Tauri command"
+          },
+          "admission": "oversized mixed-responsibility packet; split into timing, canvas-document, and editor-view leaves before Ready",
+          "construct_boundary": "Line 845 ends inside window.SM. Lines 846-848 are C02 onion controls and line 849 onward remains for later timeline-gap census. Whole-file serialization still applies.",
+          "notes": ""
+        }
+      ]
+    }
+  ],
+  "known_defects_and_unavailable_evidence": [
+    {
+      "id": "C19a.DEF-1",
+      "evidence": "C02 boundary ends at updatePlayhead declaration line 192 while assigned range begins at body line 193.",
+      "impact": "A stale-range extraction would cut a function."
+    },
+    {
+      "id": "C19a.DEF-2",
+      "evidence": "C06 boundary claims the window.SM opener at line 349 while assigned range starts at its t property line 350.",
+      "impact": "The translator cannot be moved as an independent syntactic unit; namespace overwrite fragility remains C06 baseline debt."
+    },
+    {
+      "id": "C19a.DEF-3",
+      "evidence": "C02 claims toggleOnion opener line 459 and setters 846-848, while C19a receives its body tail 460-463.",
+      "impact": "Onion responsibility must be reconciled as a complete construct."
+    },
+    {
+      "id": "C19a.DEF-4",
+      "evidence": "SM.setTool spans 86 lines plus non-contiguous allowlist and calls many mutable tool internals. No dedicated behavioral test was found.",
+      "impact": "Too broad for one implementation leaf; characterize and define ports first."
+    },
+    {
+      "id": "C19a.DEF-5",
+      "evidence": "No direct behavioral tests were found for frame selection, tween retiming, these SM style setters, view toggles or project-setting setters. Existing references are source-text checks, mocks, or unrelated consumers.",
+      "impact": "Proposed oracles are required before extraction claims behavior preservation."
+    },
+    {
+      "id": "C19a.DEF-6",
+      "evidence": "The assigned end line 845 is a facade property while window.SM closes at line 2695; C02 owns 846-848 and later gaps begin at 849.",
+      "impact": "No whole-facade or whole-timeline completeness claim is possible from C19a."
+    }
+  ],
+  "uncovered_responsibilities": [
+    "All timeline.js ranges outside 1-39, 193-348, 350-458 and 460-845 except already accepted census/leaf claims remain outside C19a and require later gap census.",
+    "The window.SM continuation from line 846 onward is intentionally not absorbed; C02 onion lines 846-848 remain C02 and line 849 onward remains later work.",
+    "Motion gaps are not included in C19a and remain a separate dependency-ordered census/admission sequence.",
+    "Public API facade consolidation across the full window.SM object requires whole-file inventory beyond this bounded leaf."
+  ],
+  "validation": {
+    "expected_assigned_lines": 690,
+    "expected_classification": {
+      "code": 350,
+      "comment": 336,
+      "whitespace": 4
+    },
+    "required_consumer_dimensions": [
+      "save",
+      "load",
+      "history",
+      "selection",
+      "animation",
+      "render",
+      "export",
+      "native"
+    ],
+    "negative_controls": [
+      "remove one assigned source line from packet coverage => omitted-line rejection",
+      "duplicate one assigned source line in a second packet => overlap rejection"
+    ],
+    "symbol_checks": [
+      {
+        "needle": "async function smConfirm(",
+        "ranges": [
+          [
+            1,
+            16
+          ]
+        ]
+      },
+      {
+        "needle": "function advancePlayFrame(",
+        "ranges": [
+          [
+            17,
+            39
+          ]
+        ]
+      },
+      {
+        "needle": "function updatePlayhead(",
+        "ranges": [
+          [
+            192,
+            208
+          ]
+        ],
+        "note": "declaration is the adjacent C02-owned boundary"
+      },
+      {
+        "needle": "var _sel=",
+        "ranges": [
+          [
+            209,
+            240
+          ]
+        ]
+      },
+      {
+        "needle": "function captureTweenInbetweens(",
+        "ranges": [
+          [
+            241,
+            346
+          ]
+        ]
+      },
+      {
+        "needle": "function retimeTweenSpans(",
+        "ranges": [
+          [
+            241,
+            346
+          ]
+        ]
+      },
+      {
+        "needle": "var PRODUCER_ALLOWED_TOOLS=",
+        "ranges": [
+          [
+            347,
+            348
+          ]
+        ]
+      },
+      {
+        "needle": "window.SM={",
+        "ranges": [
+          [
+            349,
+            370
+          ]
+        ],
+        "note": "object opener is adjacent C06-owned boundary"
+      },
+      {
+        "needle": "setTool:function(",
+        "ranges": [
+          [
+            373,
+            458
+          ]
+        ]
+      },
+      {
+        "needle": "toggleOnion:function(",
+        "ranges": [
+          [
+            459,
+            463
+          ]
+        ],
+        "note": "method opener is adjacent C02-owned boundary"
+      },
+      {
+        "needle": "toggleTweenCurves:function(",
+        "ranges": [
+          [
+            464,
+            505
+          ]
+        ]
+      },
+      {
+        "needle": "toggleLoopPlayback:function(",
+        "ranges": [
+          [
+            506,
+            513
+          ]
+        ]
+      },
+      {
+        "needle": "setPointType:setPointType",
+        "ranges": [
+          [
+            514,
+            516
+          ]
+        ]
+      },
+      {
+        "needle": "setBrushSize:function(",
+        "ranges": [
+          [
+            517,
+            596
+          ]
+        ]
+      },
+      {
+        "needle": "setStrokeColor:function(",
+        "ranges": [
+          [
+            597,
+            681
+          ]
+        ]
+      },
+      {
+        "needle": "setBrushPreset:function(",
+        "ranges": [
+          [
+            682,
+            715
+          ]
+        ]
+      },
+      {
+        "needle": "setStrokeCap:function(",
+        "ranges": [
+          [
+            716,
+            728
+          ]
+        ]
+      },
+      {
+        "needle": "smoothSelectedStroke:function(",
+        "ranges": [
+          [
+            729,
+            784
+          ]
+        ]
+      },
+      {
+        "needle": "setVectorBrush:function(",
+        "ranges": [
+          [
+            785,
+            798
+          ]
+        ]
+      },
+      {
+        "needle": "setOpacity:function(",
+        "ranges": [
+          [
+            799,
+            838
+          ]
+        ]
+      },
+      {
+        "needle": "setFps:function(",
+        "ranges": [
+          [
+            839,
+            845
+          ]
+        ]
+      }
+    ],
+    "procedure": "Parse this JSON, load the pinned timeline Git blob, compare assigned_ranges with the union of packet coverage_ranges, check symbols and lexical line counts, then exercise the listed omission and overlap controls. Validation receipts belong to issue #1118."
+  }
+}
