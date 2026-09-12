@@ -246,9 +246,6 @@ impl Operation {
     /// fixture/examples rather than a literal Rust-side value, so a subsequent
     /// property capability is advertised correctly with no new code here.
     pub fn payload_example(&self) -> Value {
-        if self.is_property_operation() {
-            return self.property_payload_example();
-        }
         match self {
             Self::Capabilities
             | Self::Snapshot
@@ -259,30 +256,40 @@ impl Operation {
                 "operation": Self::PropertySet.label(),
                 "payload": Self::PropertySet.payload_example(),
             }}),
-            Self::PropertyGet
-            | Self::PropertySet
-            | Self::PropertyKeySet
-            | Self::PropertyKeyRemove
-            | Self::PropertyAnimationSet => unreachable!("handled by is_property_operation above"),
+            // Every remaining variant answers `is_property_operation`; a wildcard
+            // here (rather than naming all five) avoids a structurally-unreachable
+            // match arm that a coverage report would only ever see as dead.
+            _ => self.property_payload_example_with(capabilities::catalog()),
         }
     }
 
     /// The first registered capability answering to this stage's own example inputs,
     /// with `property` set to that capability's id — a template built from the
-    /// descriptor's reviewed fixture, not a hand-maintained literal.
-    fn property_payload_example(&self) -> Value {
+    /// descriptor's reviewed fixture, not a hand-maintained literal. Takes an
+    /// explicit catalog so a test can exercise the no-capability-registered
+    /// fallback without a matching real descriptor.
+    fn property_payload_example_with(&self, catalog: &capabilities::CapabilityCatalog) -> Value {
         let placeholder = || json!({"property": "<id of a registered property capability>"});
-        let Some(capability) = capabilities::catalog().first_supporting(self.label()) else {
+        let Some(capability) = catalog.first_supporting(self.label()) else {
             return placeholder();
         };
         let required = self.required_payload_keys();
+        // A registered capability's fixture/examples need not individually cover
+        // every verb it supports (opacity's do, but that is not guaranteed) — when
+        // none does, fall back to the fixture anyway rather than the placeholder:
+        // `example_inputs()` always yields at least it, so `.next()` here is
+        // infallible for any descriptor capability-v1.schema.json actually accepts
+        // (fixture is a required field), even though it may be missing this verb's
+        // own keys.
         let chosen = capability
             .example_inputs()
             .find(|input| required.iter().all(|key| input.get(*key).is_some()))
-            .or_else(|| capability.example_inputs().next());
-        let Some(chosen) = chosen else {
-            return placeholder();
-        };
+            .unwrap_or_else(|| {
+                capability
+                    .example_inputs()
+                    .next()
+                    .expect("a registered descriptor always declares a fixture")
+            });
         let mut example = chosen.clone();
         if let Some(object) = example.as_object_mut() {
             object.insert("property".to_string(), json!(capability.id));
@@ -295,6 +302,17 @@ impl Operation {
     /// capability. Value ranges, frame bounds, layer existence and locking stay with
     /// the document owner, so this cannot drift into a second, disagreeing rule set.
     pub fn check_payload(&self, payload: &Value) -> Result<(), RequestError> {
+        self.check_payload_with(payload, capabilities::catalog())
+    }
+
+    /// `check_payload`, against an explicit catalog — a test seam so an unavailable
+    /// or stage-unsupported resolution outcome can be exercised without a matching
+    /// real descriptor under `engineering/application/capabilities/`.
+    fn check_payload_with(
+        &self,
+        payload: &Value,
+        catalog: &capabilities::CapabilityCatalog,
+    ) -> Result<(), RequestError> {
         let expected = format!("{} expects {}", self.label(), self.payload_example());
         if !payload.is_object() {
             return Err(RequestError::MalformedPayload(format!(
@@ -316,7 +334,7 @@ impl Operation {
         let mut missing: Vec<String> = Vec::new();
         if self.is_property_operation() {
             if let Some(property) = parsed.property.as_deref().filter(|value| !value.is_empty()) {
-                let capability = capabilities::catalog()
+                let capability = catalog
                     .find(property)
                     .filter(|capability| capability.supports_stage(self.label()));
                 let Some(capability) = capability else {
@@ -363,17 +381,22 @@ impl Operation {
         // a replay of an incomplete or mismatched command is rejected up front,
         // not silently forwarded to the document owner.
         if let Some(recorded) = parsed.request.as_deref() {
-            let nested = serde_json::to_value(&recorded.payload).map_err(|error| {
-                RequestError::MalformedPayload(format!(
-                    "recorded request payload is not usable: {error}"
-                ))
-            })?;
-            recorded.operation.check_payload(&nested).map_err(|error| {
-                RequestError::MalformedPayload(format!(
-                    "recorded request payload is invalid: {}",
-                    error.message()
-                ))
-            })?;
+            // `recorded.payload` already deserialized successfully above (it came
+            // through the very same `CommandPayload`, possibly nested), and
+            // serde_json's parser rejects a non-finite number at parse time — see
+            // `recorded_command_with_a_non_finite_number_is_malformed` — so no
+            // value reachable here can fail to serialize back out.
+            let nested = serde_json::to_value(&recorded.payload)
+                .expect("a deserialized CommandPayload always reserializes");
+            recorded
+                .operation
+                .check_payload_with(&nested, catalog)
+                .map_err(|error| {
+                    RequestError::MalformedPayload(format!(
+                        "recorded request payload is invalid: {}",
+                        error.message()
+                    ))
+                })?;
         }
         Ok(())
     }
@@ -485,3 +508,7 @@ pub struct ApplicationError {
     pub code: String,
     pub message: String,
 }
+
+#[cfg(test)]
+#[path = "contract_tests.rs"]
+mod tests;

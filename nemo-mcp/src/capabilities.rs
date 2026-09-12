@@ -98,6 +98,23 @@ impl CapabilityCatalog {
     }
 }
 
+impl CapabilityCatalog {
+    /// Builds a catalog from arbitrary descriptor JSON instead of the embedded
+    /// production set — for exercising a resolution outcome (an unavailable or
+    /// stage-unsupported capability) that no currently registered descriptor
+    /// produces, without inventing a fake entry in the real registered set.
+    #[cfg(test)]
+    pub(crate) fn from_sources(sources: &[&str]) -> Self {
+        let descriptors = sources
+            .iter()
+            .map(|source| {
+                serde_json::from_str(source).expect("test capability descriptor is valid JSON")
+            })
+            .collect();
+        CapabilityCatalog { descriptors }
+    }
+}
+
 pub fn catalog() -> &'static CapabilityCatalog {
     static CATALOG: OnceLock<CapabilityCatalog> = OnceLock::new();
     CATALOG.get_or_init(|| {

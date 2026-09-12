@@ -8,6 +8,7 @@
         "build.rs",
         "src/capabilities.rs",
         "src/contract.rs",
+        "src/contract_tests.rs",
         "src/lib.rs",
         "src/main.rs",
         "src/registry.rs",

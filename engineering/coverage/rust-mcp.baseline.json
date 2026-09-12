@@ -9,10 +9,10 @@
   "crate": "nemo-mcp",
   "manifestPath": "nemo-mcp/Cargo.toml",
   "recorded": {
-    "sha": "391f2e347b098e0f7bb68000ebba6fc3119d28a3",
+    "sha": "35d7eac66d2eef69865f02df03fd6de799101a96",
     "treeDirty": true,
-    "crateDirty": false,
-    "date": "2026-09-10",
+    "crateDirty": true,
+    "date": "2026-09-12",
     "issue": "T04/#1053"
   },
   "tool": {
@@ -27,21 +27,30 @@
   },
   "tests": {
     "binaries": 11,
-    "passed": 16,
+    "passed": 22,
     "failed": 0
   },
   "exclusions": [],
   "sourceRoot": "nemo-mcp/src",
   "totals": {
-    "lines": 89.23,
-    "regions": 85.52,
-    "functions": 88.88
+    "lines": 92.29,
+    "regions": 89.04,
+    "functions": 94.59
   },
   "files": {
+    "nemo-mcp/src/capabilities.rs": {
+      "lines": 100,
+      "regions": 100,
+      "functions": 100
+    },
     "nemo-mcp/src/contract.rs": {
-      "lines": 94.44,
-      "regions": 93.39,
-      "functions": 94.11
+      "lines": 96.39,
+      "regions": 95.69,
+      "functions": 100
+    },
+    "nemo-mcp/src/contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report"
     },
     "nemo-mcp/src/lib.rs": {
       "noRegions": true,

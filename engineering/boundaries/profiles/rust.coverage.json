@@ -18,10 +18,10 @@
     "discoveryReport": {
       "ok": true,
       "diagnostics": 0,
-      "repositoryCandidates": 630,
-      "repositoryCandidatesNote": "Measured on this packet's working tree: 629 tracked paths at candidateCommit plus the single new module (nemo-mcp/src/capabilities.rs) this packet adds. The P28/#1030 adoption recorded 629 at its own earlier candidate commit; the difference is ordinary repository growth on main between the two, not a discovery change. Only the Rust figures below are asserted by the gate; the whole-repository total is context, so ordinary growth elsewhere cannot manufacture a failure here.",
-      "rustCandidates": 43,
-      "trackedRustCandidates": 43,
+      "repositoryCandidates": 631,
+      "repositoryCandidatesNote": "Measured on this packet's working tree: 629 tracked paths at candidateCommit plus the two new modules (nemo-mcp/src/capabilities.rs, nemo-mcp/src/contract_tests.rs — the latter split out of contract.rs to keep it under its size ceiling) this packet adds. The P28/#1030 adoption recorded 629 at its own earlier candidate commit; the difference is ordinary repository growth on main between the two, not a discovery change. Only the Rust figures below are asserted by the gate; the whole-repository total is context, so ordinary growth elsewhere cannot manufacture a failure here.",
+      "rustCandidates": 44,
+      "trackedRustCandidates": 44,
       "untrackedRustCandidates": 0
     },
     "lineCounter": "countNonBlankLines (scripts/nemo/lib/boundaries.cjs) — the same counter the size checker uses, so recorded ceilings and enforced ceilings cannot drift.",
@@ -34,7 +34,7 @@
     {
       "path": "engineering/boundaries/profiles/mcp-rust.profile.json",
       "relationship": "stricter overlay",
-      "reason": "The MCP slice (nemo-mcp/** plus src-tauri/src/application_mcp.rs) additionally forbids size waivers entirely, asserted by tests/nemo-mcp-boundaries.test.cjs. P07/#1009 added nemo-mcp/src/capabilities.rs to both profiles together, so this file's declared set stays in step; it now declares 10 paths, still also declared here, and the regression test asserts the two profiles agree on the overlap so they cannot drift apart."
+      "reason": "The MCP slice (nemo-mcp/** plus src-tauri/src/application_mcp.rs) additionally forbids size waivers entirely, asserted by tests/nemo-mcp-boundaries.test.cjs. P07/#1009 added nemo-mcp/src/capabilities.rs and nemo-mcp/src/contract_tests.rs to both profiles together, so this file's declared set stays in step; it now declares 11 paths, still also declared here, and the regression test asserts the two profiles agree on the overlap so they cannot drift apart."
     }
   ],
   "layerEnforcement": {
@@ -61,10 +61,10 @@
     { "path": "src-tauri/src/video_decode.rs", "ceiling": 2266, "nonblankLinesAtAdoption": 2266, "nonblankLinesNow": 2160, "note": "nonblankLinesAtAdoption is the P11/#1013 adoption record and is deliberately not rewritten; nonblankLinesNow records the 106-line reduction P28/#1030 produced by moving the ffmpeg probe parser out to src-tauri/src/media_probe.rs, so the win stays visible instead of being erased. The ceiling stays at the adoption value: an extraction packet changes code, not size policy, and lowering the candidate ceiling without lowering the frozen baseline would give the baseline growth check 106 lines of slack." }
   ],
   "exclusions": [],
-  "exclusionsRationale": "Every one of the 43 discovered Rust candidates is adopted into a module, so the reviewed exclusion list is empty. An empty list is an assertion, not an omission: checkSourceCoverage reports coverage-unprofiled-source for any selected path that is neither declared nor exactly excluded, and the regression test exercises that failure.",
+  "exclusionsRationale": "Every one of the 44 discovered Rust candidates is adopted into a module, so the reviewed exclusion list is empty. An empty list is an assertion, not an omission: checkSourceCoverage reports coverage-unprofiled-source for any selected path that is neither declared nor exactly excluded, and the regression test exercises that failure.",
   "snapshotCounts": {
-    "selectedSources": 43,
-    "declaredSources": 43,
+    "selectedSources": 44,
+    "declaredSources": 44,
     "exclusions": 0,
     "modules": 15,
     "retainedCeilings": 5
