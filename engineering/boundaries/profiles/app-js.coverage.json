@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "d8c316de308c25c212c71c6a6202120c8909d543",
-    "sourceRootTree": "0e4780f86f01cb34089b63700990623520017e64",
+    "candidateCommit": "54e15b6503810607911ae43f7b19ea508790cff0",
+    "sourceRootTree": "713de43ceaa4d64bc40eea0d013a7852ee53c73f",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "1fbdef40f25b583eff4a2871c3b0af482f51ea4f",
-      "lastChangedCommit": "d8c316de308c25c212c71c6a6202120c8909d543"
+      "gitTree": "59c94dfee52e3c3bc19e4dc49fe8a59f28498d35",
+      "lastChangedCommit": "54e15b6503810607911ae43f7b19ea508790cff0"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "f005f30bb321b7c0caa9c419e97f01cf53fa4cd6",
-      "sha256": "e9e0f7fbc09e98ea84cff00a4a76b40b486506e343b2651b2d1e41936d0b7b49",
-      "lastChangedCommit": "9e5daae92a68799c8ba108064ddac8066af209e9"
+      "gitBlob": "6f7c339c832a6ef477dfd987723ee1482f1d1c97",
+      "sha256": "fe2cca7f4cb4e4c54c4cb0292c171f2bf643c8b4a82b7c16ea7ed2f2f37eb7a0",
+      "lastChangedCommit": "54e15b6503810607911ae43f7b19ea508790cff0"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "175ed9a3cf4c80b7cee79dc3b840d87fa654f475dc0910a9a1fcce02d762af7b"
+      "value": "e1a3842bcc846e04a4488cf592332500fce3e36c5badef4f1419de360af0f433"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "f5c738d7e8be6ddd715d7a561f8769fb890d2deb",
-        "sha256": "e15ba1b559a49372ac631f81fb169f6e304bcbc8f06fd74e02c9d0ecc571bbf6",
-        "moduleCount": 149,
-        "basedOnCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1"
+        "gitBlob": "565e19533cc7c65f44e34f69a2bec3ded8981722",
+        "sha256": "e16afcb5831a320331bf51f67cbf20f9174fdd0d594db690e54ceff7df508960",
+        "moduleCount": 152,
+        "basedOnCommit": "54e15b6503810607911ae43f7b19ea508790cff0"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -286,6 +286,18 @@
           "path": "src/index.html",
           "line": 2362,
           "scriptOrdinal": 59
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/shortcut-registry.js",
+      "moduleId": "app.shortcuts.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2358,
+          "scriptOrdinal": 51
         }
       ]
     },
@@ -2578,19 +2590,19 @@
     }
   ],
   "snapshotCounts": {
-    "selectedSources": 163,
+    "selectedSources": 164,
     "bySourceKind": {
-      ".js": 157,
+      ".js": 158,
       ".mjs": 2,
       ".cjs": 0,
       ".ts": 4
     },
-    "retainedSources": 151,
+    "retainedSources": 152,
     "exclusions": 12,
     "vendorExclusions": 6,
     "generatedExclusions": 6,
     "retainedExecutionClasses": {
-      "document-classic": 136,
+      "document-classic": 137,
       "document-module": 2,
       "classic-without-load-site": 12,
       "module-worker": 1
