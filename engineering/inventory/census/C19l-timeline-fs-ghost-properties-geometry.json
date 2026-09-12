@@ -1,0 +1,532 @@
+{
+  "census_id": "C19l",
+  "issue": 1154,
+  "title": "Timeline Fill/Stroke reflection, Ghost All proxies and Properties geometry adapters",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C19l census only; C04/C01/H03/P30 and runtime owners remain separate",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "ce870f36ada22686985105eb0b8de835697b8785",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "codex/c19l-selection-geometry-census-20260912",
+  "assigned_ranges": [
+    {
+      "start": 3760,
+      "end": 3794
+    },
+    {
+      "start": 3795,
+      "end": 3847
+    },
+    {
+      "start": 3848,
+      "end": 3884
+    },
+    {
+      "start": 3885,
+      "end": 3916
+    }
+  ],
+  "coverage_note": "Exactly 157 assigned lines occur once in four complete packets: 106 code, 51 full-line comments and 0 whitespace. Line 3759 closes C19k updateSelPropsPanel; line 3917 is excluded blank, line 3918 is the Timeline drag-state heading and line 3919 declares _tlDrag.",
+  "source_baselines": {
+    "pinned": "59a5a38:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123.",
+    "current": "Observed main ce870f36 has the identical timeline blob.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; historical comments are not fresh execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19l-timeline-fs-ghost-properties-geometry.json and the four complete timeline.js packets at lines 3760-3916.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "owners": "C04 owns selection/geometry/helper implementations; C01 owns codecs/history; H03/#1060 owns the tools.js rotate gesture and rotateCenterSegments; C19l transfers no runtime authority.",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19k/#1148",
+      "disposition": "Retains updateSelPropsPanel through line 3759. C19l begins with the next complete Fill/Stroke reflection unit."
+    },
+    {
+      "owner": "C19h/#1141",
+      "disposition": "Retains updateUI, including its call to updateFsSelPanel at line 2757. C19l maps the callee and cites the caller only."
+    },
+    {
+      "owner": "C04a/#1039",
+      "disposition": "Retains _fsSel/fsPrimarySel, selectedPaths, ensureKeyframe, selection/geometry and proxy helpers. Delegated mutations and selection replacement are recorded, not reassigned."
+    },
+    {
+      "owner": "C01/#1036",
+      "disposition": "Retains pushUndo/pushUndoLayers, frame save/load, ghost proxy writeback and serialization. C19l distinguishes save requests from actual writeback."
+    },
+    {
+      "owner": "H03/#1060 and P25",
+      "disposition": "H03 remains a separate tools.js rotate onMouseDown/onMouseDrag/onMouseUp and rotateCenterSegments mapping. C19l covers timeline numeric/keyboard adapters only and does not take over H03."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "C02/C03/engine",
+      "disposition": "Retain Motion behavior, render/export and engine/native bridges. These packets make no direct Motion or native-bridge call; delegated updateUI, loadFrame and setTool paths can enter separately owned Motion or native behavior."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "The Fill/Stroke adapter projects selected colors to DOM but changes only enabled flags; remembered color state remains distinct.",
+    "Ghost selection mutates state/tool and can render before history. Repeated invocation does not clear existing proxies. Cleanup requests save, but guarded save returns can be followed by unflushed proxy removal.",
+    "Held-frame promotion is delegated before geometry iteration and may replace selectedPaths through loadFrame; helpers iterate the post-promotion global selection.",
+    "Geometry operations and required helper calls are incremental with no catch/rollback. Later failure preserves history, promoted frames, earlier path/adjunct changes and partial cleanup.",
+    "Line 3917 is outside coverage; the Timeline drag-state unit begins with heading at line 3918 and declaration at line 3919."
+  ],
+  "areas": [
+    {
+      "area": "timeline-selection-properties-adapters",
+      "packets": [
+        {
+          "id": "C19l.fsselect-panel-reflection",
+          "files": [
+            "src/js/timeline.js:3760-3794"
+          ],
+          "coverage_ranges": [
+            [
+              3760,
+              3794
+            ]
+          ],
+          "classification": {
+            "code": 20,
+            "comment": 15,
+            "whitespace": 0
+          },
+          "symbols": [
+            "updateFsSelPanel"
+          ],
+          "signature": "updateFsSelPanel() -> undefined",
+          "responsibility": "Reflects the last Fill/Stroke selection aspect into shared color DOM and enables the matching future-drawing channel without mutating selected geometry or remembered color values.",
+          "guards": [
+            "Return unless state.tool is exactly fsselect and _fsSel is nonempty.",
+            "fsPrimarySel is tools.js `_fsSel.length?_fsSel[_fsSel.length-1]:null`; after the guard the result/path is dereferenced without a local null/path guard.",
+            "Fill branch requires kind fill or fillregion, truthy p.fillColor and exclusion of data.isVectorBrush/data.isFillShape. Stroke branch requires exact stroke and truthy p.strokeColor; it has no brush-shape exclusion."
+          ],
+          "projection": [
+            "colorHex8 required. Fill-well/pm-fill or stroke-well/pm-stroke are required nodes.",
+            "setHex8Input helper is required, but each color-fill/pm-fill-c or color-stroke/pm-stroke-c node is optional because setHex8Input null-guards its el argument.",
+            "Fill toggle and Stroke toggle are both queried, but only Fill toggle is optionally used; Stroke synchronization delegates required window.SM._syncStrokeEnabledUI."
+          ],
+          "state_effects": "Fill writes state.fillEnabled=true; Stroke writes state.strokeEnabled=true. It does not assign state.fillColor and does not assign state.strokeColor, so remembered future-drawing colors can differ from reflected wells/inputs.",
+          "non_effects": "No selected path color, _fsSel, history, save/load, canvas render, export or native state mutation.",
+          "returns_and_errors": "Normal/guard completion returns undefined. Required color well/helper/SM failures retain preceding DOM/enabled writes; no rollback.",
+          "caller": "C19h-owned updateUI calls updateFsSelPanel at timeline line 2757."
+        },
+        {
+          "id": "C19l.ghost-proxy-selection-lifecycle",
+          "files": [
+            "src/js/timeline.js:3795-3847"
+          ],
+          "coverage_ranges": [
+            [
+              3795,
+              3847
+            ]
+          ],
+          "classification": {
+            "code": 39,
+            "comment": 14,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_ghostProxyActive",
+            "selectGhostAll",
+            "clearGhostSelection"
+          ],
+          "signatures": [
+            "selectGhostAll() -> undefined",
+            "clearGhostSelection() -> undefined"
+          ],
+          "responsibility": "Self-enables Ghost All, materializes editable proxy items for other keyframes, replaces selection, and later requests writeback/removes tagged proxies before reloading the active frame.",
+          "select_order": [
+            "Capture activeLayerIdx/currentFrame and layer descriptor. Missing layer or symbolId calls required translated toast and returns.",
+            "When ghostAllFrames is false, set it true, require renderOS, optionally add active class. These state/render effects precede tool switch and history.",
+            "Require window.SM.setTool(select); capture userLayers[li] without a live-layer guard; then pushUndo. Tool transition retains C19a effects.",
+            "Iterate every frame except current. Only keyframes with nonempty strokes increment frameCount; this happens before per-stroke raster/revision exclusions.",
+            "For each non-raster/non-revision stroke, required desP into captured layer, required p.data.ghostFrame assignment, increment count.",
+            "Set _ghostProxyActive=count>0; replace selectedPaths and selectedStrokeIndices; require renderArcs/updateUI/toast."
+          ],
+          "selection_identity": [
+            "Existing proxies are not removed first, so repeated selectGhostAll invocation can add duplicates.",
+            "A valid descriptor does not guarantee a live userLayers entry. With an undefined captured layer, no proxy can be created: the first eligible desP fails at layer.activate. With zero eligible strokes, count remains zero and _ghostProxyActive is assigned false before layer.children.filter fails.",
+            "selectedPaths becomes all captured layer children satisfying `instanceof Path && isSelectablePathChild`, including eligible current-frame Paths and old/new proxies. CompoundPath is excluded.",
+            "selectedStrokeIndices maps getSI and filters negative values. Proxy count, frameCount, Path selection count and index count can differ.",
+            "If a new run produces a zero proxy count while older proxies exist, _ghostProxyActive becomes false, potentially making clearGhostSelection guard them out."
+          ],
+          "cleanup_order": [
+            "Falsy _ghostProxyActive returns. Otherwise call saveActiveLayerFrame first as a save request.",
+            "The callee increments scene version and may invalidate symbol bounds before guards. It can normally return before _writeBackGhostProxies for symbol, montage, Null, effect, guide, Widget, LFS, non-source-edit duplicator, live Rig pose, Path FX, invisible, or out-of-range layers. A matching freshly ensured stamp bypasses only the out-of-range guard; unsupported or invisible layers still return before the stamp is consumed. Cleanup then removes proxies unflushed.",
+            "A missing current layer can throw in saveActiveLayerFrame and prevent cleanup. If eligible, _writeBackGhostProxies groups active-layer children by ghostFrame and serializes them to tagged frames before current-frame collection.",
+            "Resolve userLayers[state.activeLayerIdx] after save request. Active-layer changes mean save/writeback/removal target the current layer, not the originally proxied layer.",
+            "Slice children and remove every child whose data.ghostFrame!==undefined. Mid-remove failure retains active flag and partial removal.",
+            "Set flag false; required clearSel replaces path/index/node selection and resets anchors/hover state; required loadFrame(currentFrame), then updateUI. No local undo."
+          ],
+          "callers": [
+            "SM.toggleGhostAll at line 489 calls cleanup when disabling, then updateUI again.",
+            "btn-ghost-select click at line 11235 calls selectGhostAll."
+          ],
+          "returns_and_errors": "Undefined. No catch/rollback; all pre-failure state, proxy, selection, history and DOM effects remain. An undefined captured live layer preserves the earlier ghost flag, render, tool and history effects; frameCount can advance before the first eligible desP failure, while a zero-eligible pass assigns the active flag false before selection filtering throws."
+        },
+        {
+          "id": "C19l.properties-held-frame-and-move",
+          "files": [
+            "src/js/timeline.js:3848-3884"
+          ],
+          "coverage_ranges": [
+            [
+              3848,
+              3884
+            ]
+          ],
+          "classification": {
+            "code": 21,
+            "comment": 16,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_selPropsPromoteHeld",
+            "selPropsApplyMove"
+          ],
+          "signatures": [
+            "_selPropsPromoteHeld() -> undefined",
+            "selPropsApplyMove(dx,dy,skipUndo) -> undefined"
+          ],
+          "responsibility": "Promotes eligible held Animation2D frames and translates current selected geometry with Move-specific linked/vector adjunct handling.",
+          "promotion": [
+            "Skip when appMode motion or ensureKeyframe is absent. Resolve active layer/current frame; call ensureKeyframe only when frame exists and is neither keyframe nor interpolated.",
+            "Delegated ensureKeyframe may return when layer is not editable. On success it clones effective strokes, marks/stores current keyframe, stamps _justEnsuredKeyframeAt, loadFrame replaces live items/selection by stroke identity, and linked folders sync.",
+            "Move subsequently reads global selectedPaths after promotion, so it can operate on a replacement selection."
+          ],
+          "guard_history": "Return when both dx/dy are falsy or entry selectedPaths is empty. Unless skipUndo, pushUndo before promotion. skipUndo does not suppress promotion/mutation/save/render.",
+          "per_path": [
+            "Create new Point(dx,dy) per path and translate path.",
+            "Optionally sync param shape box; required transformFillGradient maps each point via add(d).",
+            "Vector brush centerSegments points are replaced with new [x+dx,y+dy] arrays; no explicit outline rebuild.",
+            "Live linkedFill translates using a separate new Point. Every nonremoved brushCompanion translates."
+          ],
+          "finalization": "After current post-promotion selection loop, require fillRegenerateLinked(userLayers[current active index],null), saveActiveLayerFrame, renderArcs, updateUI in order. Empty replacement selection still reaches finalization.",
+          "failure_semantics": "Required failure preserves history, promotion, earlier paths, gradients and adjunct mutations.",
+          "callers": [
+            "Arrow-key nudge at line 10074.",
+            "Non-vertex activeXformApplyMove wrapper at line 10682; live sp-x/sp-y fields at lines 10685-10686 route through it."
+          ]
+        },
+        {
+          "id": "C19l.properties-scale-and-rotate",
+          "files": [
+            "src/js/timeline.js:3885-3916"
+          ],
+          "coverage_ranges": [
+            [
+              3885,
+              3916
+            ]
+          ],
+          "classification": {
+            "code": 26,
+            "comment": 6,
+            "whitespace": 0
+          },
+          "symbols": [
+            "selPropsApplyScale",
+            "selPropsApplyRotate"
+          ],
+          "signatures": [
+            "selPropsApplyScale(sx,sy,anchor,skipUndo) -> undefined",
+            "selPropsApplyRotate(deltaDeg,center,skipUndo) -> undefined"
+          ],
+          "responsibility": "Scales or rotates post-promotion selected geometry, gradients and vector centerlines, then regenerates linked fills, saves and refreshes.",
+          "shared_order": "Identity/no-selection guard; optional pushUndo; _selPropsPromoteHeld; iterate current global selectedPaths; required linked regeneration/save/arcs/UI.",
+          "scale": [
+            "Only exact sx===1 && sy===1 is identity. Path.scale around supplied anchor; optional param-box sync; gradient coordinates use independent factors.",
+            "Vector centerSegments use required scaleCenterSegments and rebuildVectorBrushOutline. linkedFill and brushCompanions are not directly scaled."
+          ],
+          "rotate": [
+            "Any falsy deltaDeg, including 0 and NaN, is identity. Path.rotate then boxAngle assigned only when p.data exists.",
+            "boxAngle is ((old||0)+deltaDeg)%360. JavaScript negative remainder remains negative; no normalization to 0..359.",
+            "Gradient points rotate; vector centerSegments require rotateCenterSegments and outline rebuild. linkedFill/brushCompanions are not directly rotated."
+          ],
+          "callers": [
+            "Non-vertex activeXformApplyScale/Rotate wrappers at lines 10683-10684.",
+            "Live width/height fields at lines 10698-10717 and rotation field at line 10720 call wrappers. Vertex mode routes to node helpers."
+          ],
+          "ownership": "H03/#1060 retains tools.js rotate gesture and rotateCenterSegments mapping; referencing the helper does not transfer that scope.",
+          "failure_semantics": "No catch/rollback. Required helper failure retains history, promotion and prior geometry/adjunct effects."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "FS reflection saves nothing. Ghost cleanup requests saveActiveLayerFrame, but normal unsupported/invisible/out-of-range guards can return before proxy writeback and cleanup then removes unflushed proxies. Eligible cleanup writes tagged frames. Geometry calls save after mutation, subject to its guards."
+    },
+    {
+      "consumer": "load",
+      "disposition": "Ghost cleanup requires loadFrame after removal. Held promotion can call ensureKeyframe, which loads the promoted frame and replaces live selection. No parser/migration is implemented here."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Ghost selection pushes after state/tool setup; geometry pushes before promotion unless skipUndo. Cleanup has no local undo. Guarded/no-op and partial-failure history differences are explicit; C01 owns replay."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "FS reads last _fsSel. Ghost replaces Path selection and stroke indices, excluding CompoundPath. Promotion may replace selectedPaths by stroke identity; geometry iterates that current selection."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "Ghost proxies write back by ghostFrame to other frames when save guards permit. Held Animation2D frames may promote; interpolated/key/Motion frames do not. Motion transforms remain C02."
+    },
+    {
+      "consumer": "render",
+      "disposition": "FS projects DOM only. Ghost calls onion/arcs/UI; geometry calls linked-fill regeneration/arcs/UI. Renderer implementations and any delegated effects remain owned elsewhere."
+    },
+    {
+      "consumer": "export",
+      "disposition": "No export payload is generated. Only successfully saved frame/geometry changes reach later codecs/exporters; unflushed proxy removal can discard edits before export."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "No direct SMEngineBridge, Tauri command, filesystem or native IPC call occurs in these functions. Delegated updateUI, loadFrame and setTool behavior remains with its existing Motion/native owners."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fs-guard-primary",
+      "status": "proposed, unrun",
+      "initial_state": "Non-fs/fs tools, empty/multiple _fsSel, null primary/path.",
+      "expected_effects": "Guard and verified last-entry ordering; unguarded dereference failure after nonempty malformed primary."
+    },
+    {
+      "id": "fs-color-matrix",
+      "status": "proposed, unrun",
+      "initial_state": "Fill/fillregion/stroke/other kinds, vector/fill shapes, present/missing colors.",
+      "expected_effects": "Exact branch classification and no selected-path color mutation."
+    },
+    {
+      "id": "fs-dom-state-asymmetry",
+      "status": "proposed, unrun",
+      "initial_state": "Required wells, optional hex/toggle nodes, remembered colors distinct, injected helper/SM failures.",
+      "expected_effects": "Optional hex via null-guard; only enabled flags change; remembered colors unchanged; partial DOM/state effects retained."
+    },
+    {
+      "id": "ghost-prehistory-order",
+      "status": "proposed, unrun",
+      "initial_state": "Missing/component/ordinary layer; ghost flag off/on; tool setter/render/button failures.",
+      "expected_effects": "Exact rejection and state/onion/tool effects before history."
+    },
+    {
+      "id": "ghost-materialization-counts",
+      "status": "proposed, unrun",
+      "initial_state": "Current/other key/held/empty frames with raster/revision/Path/CompoundPath outputs.",
+      "expected_effects": "Independent frameCount/proxy count/Path selection/index count and exact tags/exclusions."
+    },
+    {
+      "id": "ghost-repeated-selection",
+      "status": "proposed, unrun",
+      "initial_state": "Existing current selection and proxies, repeat invocation, new pass with zero proxies.",
+      "expected_effects": "Duplicates possible, selection replacement across all eligible Paths, flag derives only current count."
+    },
+    {
+      "id": "ghost-missing-live-layer",
+      "status": "proposed, unrun",
+      "initial_state": "Valid descriptor with undefined userLayers entry, tested separately with an eligible stroke and with zero eligible strokes.",
+      "expected_effects": "Ghost flag/render/tool/history prefixes persist. Eligible input advances frameCount then fails at desP layer.activate before proxy creation; zero-eligible input creates no proxies, assigns _ghostProxyActive false and then fails at layer.children.filter."
+    },
+    {
+      "id": "ghost-cleanup-eligible",
+      "status": "proposed, unrun",
+      "initial_state": "Eligible active layer with edited proxies across tagged frames.",
+      "expected_effects": "Writeback before proxy removal, then flag/selection clear, frame load and UI."
+    },
+    {
+      "id": "ghost-cleanup-save-guards",
+      "status": "proposed, unrun",
+      "initial_state": "Each unsupported layer kind, invisible layer, out-of-range, freshly ensured and missing descriptor.",
+      "expected_effects": "Normal guarded return removes proxies unflushed. A matching freshly ensured stamp bypasses only the out-of-range guard and is consumed only after unsupported/invisible guards pass; those earlier guards still return before writeback. Missing descriptor throw prevents cleanup; scene-version/invalidation prefixes are retained."
+    },
+    {
+      "id": "ghost-cleanup-active-layer-failure",
+      "status": "proposed, unrun",
+      "initial_state": "Active layer changed after proxy creation; removal throws mid-slice; clear/load/UI failures.",
+      "expected_effects": "Current-layer targeting, exact partial removal/flag/selection states and no rollback."
+    },
+    {
+      "id": "held-promotion-selection",
+      "status": "proposed, unrun",
+      "initial_state": "Motion/key/interpolated/held/noneditable/missing ensure cases with loadFrame selection replacement.",
+      "expected_effects": "Exact promotion predicates/delegated frame fields and geometry uses replacement selection."
+    },
+    {
+      "id": "move-adjuncts",
+      "status": "proposed, unrun",
+      "initial_state": "Ordinary, vector, gradient, linkedFill, removed/live companions and zero/partial deltas.",
+      "expected_effects": "Per-path Point identity, center array replacement, direct linked/companion translation and no outline rebuild."
+    },
+    {
+      "id": "scale-rotate-asymmetries",
+      "status": "proposed, unrun",
+      "initial_state": "Identity/nonuniform/negative scales; positive/negative/NaN rotation; vector/gradient/linked companions.",
+      "expected_effects": "Exact guards, gradient transforms, outlines, absent direct companion scale/rotate and negative %360 remainder."
+    },
+    {
+      "id": "geometry-history-finalization-failures",
+      "status": "proposed, unrun",
+      "initial_state": "skipUndo true/false, promotion empties selection, each per-path/final helper throws.",
+      "expected_effects": "Exact history/promotion and retained earlier mutations; finalization still runs for empty replacement selection."
+    },
+    {
+      "id": "consumer-round-trips",
+      "status": "proposed, unrun",
+      "initial_state": "Separately owned save/load/undo/export flows after eligible and guarded operations.",
+      "expected_effects": "Only persisted mutations round-trip; fixtures do not certify runtime behavior."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "planFsSelectionReflection(primary) -> ReflectionPlan",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure aspect/color/enable plan with remembered colors explicitly unchanged; DOM adapter handles optional hex nodes."
+    },
+    {
+      "api": "planGhostProxySelection(layer,frame) -> ProxyPlan",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure frame/stroke exclusions and counts; C04 deserialization/selection remain ports."
+    },
+    {
+      "api": "flushGhostProxies(savePort,cleanupPort,activeContext) -> FlushReceipt",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Distinguishes save request, guard return, actual writeback, removal and active-layer identity."
+    },
+    {
+      "api": "promoteHeldFrame(context,ports) -> PromotionReceipt",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "C04-owned ensure/load behavior exposed explicitly, including replacement selection."
+    },
+    {
+      "api": "applySelectionGeometry(paths,transform,adjunctPorts) -> GeometryReceipt",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Shared Move/Scale/Rotate transaction with operation-specific adjunct rules and injected history/save/render; does not absorb H03 gesture."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "symbols": [
+      "updateFsSelPanel",
+      "_ghostProxyActive",
+      "selectGhostAll",
+      "clearGhostSelection",
+      "_selPropsPromoteHeld",
+      "selPropsApplyMove",
+      "selPropsApplyScale",
+      "selPropsApplyRotate"
+    ],
+    "callers": [
+      "updateUI at line 2757",
+      "toggleGhostAll at line 489",
+      "Ghost Select at line 11235",
+      "arrow nudge at line 10074",
+      "activeXform wrappers at lines 10682-10684",
+      "live fields at lines 10685-10720"
+    ],
+    "helper_anchors": [
+      "tools.js fsPrimarySel at line 64",
+      "tools.js ensureKeyframe at line 1882",
+      "app.js setHex8Input at lines 560-564",
+      "app.js _writeBackGhostProxies at line 4511",
+      "app.js saveActiveLayerFrame at lines 4634-4692"
+    ],
+    "boundary_assertion": "Line 3759 is excluded; line 3760 starts the scope. Line 3916 closes the scope; line 3917 is an excluded blank, and the line 3918 heading and line 3919 _tlDrag declaration are excluded."
+  },
+  "validation": {
+    "expected_assigned_lines": 157,
+    "expected_classification": {
+      "code": 106,
+      "comment": 51,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        3760,
+        3794
+      ],
+      [
+        3795,
+        3847
+      ],
+      [
+        3848,
+        3884
+      ],
+      [
+        3885,
+        3916
+      ]
+    ],
+    "packet_classification": [
+      {
+        "range": [
+          3760,
+          3794
+        ],
+        "code": 20,
+        "comment": 15,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          3795,
+          3847
+        ],
+        "code": 39,
+        "comment": 14,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          3848,
+          3884
+        ],
+        "code": 21,
+        "comment": 16,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          3885,
+          3916
+        ],
+        "code": 26,
+        "comment": 6,
+        "whitespace": 0
+      }
+    ],
+    "coverage_contract": "Validate assigned_ranges and flattened areas[].packets[].coverage_ranges independently, then use the same function for canonical, omission and overlap controls.",
+    "negative_controls": [
+      "omit3760",
+      "overlap3794"
+    ],
+    "required_checks": [
+      "pinned/current blob and base ancestry",
+      "complete symbols/helpers/callers/boundaries",
+      "eight consumers and unrun fixtures",
+      "corrected optional hex and guarded writeback semantics",
+      "H03/P30/C04/C01 preservation",
+      "JSON/private-path/trailing whitespace hygiene",
+      "sole untracked artifact or committed-clean mode"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, runtime correction, source edit or product acceptance claim."
+  }
+}
