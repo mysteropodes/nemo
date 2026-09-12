@@ -1,0 +1,284 @@
+{
+  "census_id": "C20b",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1129",
+  "title": "Motion property edit and context header support",
+  "owner": "Ilya/D1; Sol read-only draft with Codexitron/Ilya O integration and independent Terra review",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_path": "src/js/motion.js",
+  "source_line_count": 13914,
+  "observed_main_sha": "942c64c6560f5ee15f42c1fd3255269d4c3c8437",
+  "status": "read-only census and bounded proposals only; no runtime writer, migration, behavior repair or Ready extraction claim",
+  "scope_files": [
+    "src/js/motion.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 6774,
+      "end": 6831,
+      "lines": 58,
+      "classification": {
+        "code": 48,
+        "comment": 9,
+        "whitespace": 1
+      }
+    },
+    {
+      "start": 6954,
+      "end": 7031,
+      "lines": 78,
+      "classification": {
+        "code": 74,
+        "comment": 4,
+        "whitespace": 0
+      }
+    }
+  ],
+  "coverage_note": "Exactly 136 assigned lines occur once in two packets: 122 code, 13 full-line // comments and one blank line. The accepted first range begins with the blank separator at 6774; the section-header comment is physically at 6775 in the pinned blob. The second range begins immediately after the complete C02 selection-sync block.",
+  "source_range_drift": [
+    {
+      "reference": "C20b admission correction",
+      "observed": "The accepted union is 6774-6831 plus 6954-7031. In the pinned blob line 6774 is blank and the Motion layer-list header is line 6775, so adding 6774 changes the lexical totals to 122 code, 13 comments and one whitespace line."
+    },
+    {
+      "reference": "C02 motion-canvas ownership",
+      "observed": "C02's older numeric range says 6139-6790, but the pinned-source named onUp construct returns at 6772 and closes at 6773. C20b begins at 6774 and does not claim onUp or liveRefreshVisiblePropertyFields. The numeric overlap implied by the older coordinates is drift, not construct overlap."
+    },
+    {
+      "reference": "C02 selection synchronization",
+      "observed": "C02's older numeric range says 6947-6968. In the pinned blob, its named sync block begins with documentation at 6916, contains syncBarSelToLayerSel at 6932-6940 and syncLayerSelFromBarSel at 6948-6953, then closes before C20b begins at 6954."
+    },
+    {
+      "reference": "C02 Motion list renderer",
+      "observed": "C02's older numeric range starts renderLayerListMotion at 7047. The pinned construct starts at 7032; C20b stops at 7031 and records the call from 7033 only as external context."
+    }
+  ],
+  "context_boundaries": [
+    {
+      "assigned": "6774-6831",
+      "context": "C02 retains liveRefreshVisiblePropertyFields and onUp through the complete close at 6773. C20b includes blank separator 6774, header 6775 and seven complete helpers 6776-6831."
+    },
+    {
+      "assigned": "6832-6915",
+      "context": "The enterComponentLayer documentation and implementation are a separate unresolved component-entry/auto-split transaction. They are not C20b coverage."
+    },
+    {
+      "assigned": "6916-6953",
+      "context": "C02 retains the complete two-way layer/bar selection synchronization block. It is excluded despite older numeric references."
+    },
+    {
+      "assigned": "6954-7031",
+      "context": "syncMotionContextHeader and ensureMotionHeaderTools are complete. C02-owned renderLayerListMotion starts at 7032 and is excluded."
+    }
+  ],
+  "whole_file_writer_guidance": {
+    "source_access": "motion.js and every source consumer remain read-only; C20b owns only the eventual new census JSON artifact.",
+    "motion_reservation": "Historical Motion PR #949 is OPEN at f4892037ac0c3e165d21efa40a21aa2c75f0662b and includes motion.js. Reconcile that whole-file claim before any future C20b implementation writer.",
+    "timeline_reservation": "P30 PR #1114 remains OPEN at a0f13e7da2f97248e1e8ab6cb44a1fd399e5f454 and retains timeline.js. C20b conveys no P30 or timeline authority.",
+    "publication": "Codexitron/Ilya O owns the serialized tracked artifact integration after C19d releases the checkout. D01/#1044 and T05/Pollen remain separately owned."
+  },
+  "reconciliation": [
+    {
+      "owner": "C02/#1037",
+      "disposition": "Retain onUp/liveRefreshVisiblePropertyFields, _motionKeySel/_motionPropSel and selection synchronization, setValue/keyframe primitives, renderLayerListMotion, Motion snapping consumers and animation ownership. C20b maps helper calls across those seams without creating another selection or animation authority."
+    },
+    {
+      "owner": "C04/#1039",
+      "disposition": "Retain shared editor presentation, DOM styling and input/scrub infrastructure. C20b maps Motion-owned field/header implementation and DOM lifecycle only."
+    },
+    {
+      "owner": "C06/#1041",
+      "disposition": "Retain browser bootstrap and global preference initialization conventions. C20b records module-load localStorage reads and header event binding as dependencies, not bootstrap ownership."
+    },
+    {
+      "owner": "P03/#1005",
+      "disposition": "Parent admission remains open. C20b neither proves the remaining Motion queue complete nor authorizes either proposed runtime extraction."
+    },
+    {
+      "owner": "PR #949",
+      "disposition": "Retain unresolved whole motion.js writer claim until live reconciliation. Read-only census evidence does not release or supersede it."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retain shortcut persistence and timeline.js writer reservation; Motion filter/column/snap localStorage keys remain a separate UI-preference surface."
+    },
+    {
+      "owner": "D01/#1044",
+      "disposition": "Retain document/time/coordinate compatibility specification. Property vector edits consume existing value conventions without redefining them."
+    },
+    {
+      "owner": "T05/Pollen",
+      "disposition": "Retain diagnostics ownership separately. Header filters include an Errors view but do not acquire diagnostics authority."
+    }
+  ],
+  "areas": [
+    {
+      "area": "motion-layer-list-support",
+      "packets": [
+        {
+          "id": "C20b.property-field-edit-helpers",
+          "title": "Selected-property numeric and vector editing helpers",
+          "files": [
+            "src/js/motion.js:6774-6831"
+          ],
+          "coverage_ranges": [
+            [
+              6774,
+              6831
+            ]
+          ],
+          "classification": {
+            "code": 48,
+            "comment": 9,
+            "whitespace": 1
+          },
+          "symbols": [
+            "fmtVal",
+            "scrubField",
+            "selectedKeysForEditableProperty",
+            "selectedDimensionDisplay",
+            "setSelectedKeyDimension",
+            "offsetSelectedKeyDimension",
+            "setSelectedKeyVector"
+          ],
+          "responsibility": "Create Motion numeric inputs, distinguish typed absolute commits from scrub-relative deltas, discover selected key vectors for one selected holder/property, display mixed dimensions and apply scalar or whole-vector edits across every selected key with the same property name.",
+          "visibility": "All seven functions are closure-internal. There is no SMMotion public export for them.",
+          "internal_api": {
+            "fmtVal": "fmtVal(number) -> number rounded to one decimal; NaN remains NaN.",
+            "scrubField": "scrubField(value,onCommit,mixed) -> HTMLInputElement. Empty/non-finite change is ignored. Valid change calls onCommit(nextValue,{relative,delta}) before updating its private lastScrubValue; click and mousedown propagation are stopped.",
+            "selectedKeysForEditableProperty": "selectedKeysForEditableProperty(holder,prop) -> selected key records. Returns empty unless that exact holder/prop is in _motionPropSel, then filters _motionKeySel across holders by exact prop and truthy key.v.",
+            "selectedDimensionDisplay": "selectedDimensionDisplay(holder,prop,dim,fallback) -> {value,mixed}. Ignores vectors shorter than dim+1, coerces selected values with Number(value)||0 and uses tolerance 1e-9.",
+            "setSelectedKeyDimension": "setSelectedKeyDimension(holder,prop,dim,value) -> eligible key count. Writes value verbatim to each eligible vector dimension.",
+            "offsetSelectedKeyDimension": "offsetSelectedKeyDimension(holder,prop,dim,delta) -> eligible key count. Only mutates when abs(delta)>1e-12; return count is not a mutation count.",
+            "setSelectedKeyVector": "setSelectedKeyVector(holder,prop,values) -> eligible key count. Replaces every target key.v with an independent values.slice()."
+          },
+          "callers": [
+            "C02 liveRefreshVisiblePropertyFields uses fmtVal at motion.js:6752",
+            "scrubField uses fmtVal for initial display at 6786",
+            "generic Motion property rows use selectedDimensionDisplay/scrubField and scalar set/offset helpers at 8861-8904",
+            "scale aspect-lock applies setSelectedKeyDimension to the other dimension at 8881-8892",
+            "checkbox/color expression-control commits use setSelectedKeyVector at 8823-8828",
+            "element color picker uses setSelectedKeyVector at 10118-10124",
+            "trim scalar rows use selectedDimensionDisplay and set/offset helpers at 10179-10196"
+          ],
+          "writer": "setSelectedKeyDimension, offsetSelectedKeyDimension and setSelectedKeyVector mutate selected key.v arrays directly. scrubField mutates only its DOM input/private baseline and invokes a callback. The helpers do not push history, call setValue, save, load or render; each caller owns fallback mutation and side effects.",
+          "consumer_matrix": {
+            "save": "No save call. Direct key-vector writes already live on layer/element holder descriptors and are picked up by later project serialization; callers do not call saveAllLayerFrames for these Motion descriptor edits.",
+            "load": "Operates on already loaded holder.motion key objects and live selection records. It performs no project-load conversion.",
+            "history": "Generic, control, color and trim callers call pushUndo before helper mutation. During UI scrub, the shared scrub lifecycle owns the pre-gesture snapshot and _scrubLiveActive suppresses per-tick snapshots; helpers have no history calls.",
+            "selection": "Reads _motionPropSel through isMotionPropSelected and filters _motionKeySel by exact property across layers/holders. It does not change key, property, layer, bar or canvas selection.",
+            "animation": "Writes key.v values directly. When no eligible selected keys exist, callers fall back to C02 setValue, which writes the current key or motionStatic value. Dimensional filtering skips short vectors; vector replacement clones per target.",
+            "render": "Generic/color/trim callers rebuild list and timeline and request engine render after mutation; generic scalar rows also run reloadIfTimeLinkOffset. Helpers themselves do not render. C02 live refresh uses fmtVal without rebuilding DOM.",
+            "export": "Existing project holder serialization later persists changed motion vectors. No export conversion or external-format policy exists in these helpers.",
+            "native": "No direct native call. Optional SMEngineBridge.renderNow at callers is browser/WASM rendering and remains outside the helpers."
+          },
+          "oracle": "Proposed unrun fixture matrix: selected row absent/present; same property across different holders and a simultaneously selected different property; vectors shorter than the dimension; equal, 1e-9 boundary and mixed values; zero/NaN coercion; typed absolute commit; successive scrub-relative commits including mixed baseline zero; empty/Infinity input; delta at/below/above 1e-12; cloned vector identity; exact eligible-count return; callback-before-baseline ordering; caller fallback and exactly one gesture history boundary plus render/reload order.",
+          "proposed_module": "src/js/domain/animation/selected-property-edit.js",
+          "proposed_api": "planSelectedPropertyEdit({propertySelection,keySelection},request) -> {targets,nextVectors,eligibleCount}; a Motion field adapter owns input creation, scrub state, callback dispatch, history, setValue fallback and rendering.",
+          "admission": "Pending separate executable-leaf admission after C02 selection/value contracts and Motion writer reconciliation. This packet does not authorize a runtime edit."
+        },
+        {
+          "id": "C20b.motion-context-header-tools",
+          "title": "Motion visible-context label and filter controls",
+          "files": [
+            "src/js/motion.js:6954-7031"
+          ],
+          "coverage_ranges": [
+            [
+              6954,
+              7031
+            ]
+          ],
+          "classification": {
+            "code": 74,
+            "comment": 4,
+            "whitespace": 0
+          },
+          "symbols": [
+            "syncMotionContextHeader",
+            "ensureMotionHeaderTools"
+          ],
+          "responsibility": "Update the Motion header label from layer-row scroll geometry; idempotently create the context/filter controls; mirror the column preset into a panel dataset; open, position and close the filter popup; update search/filter/column/snap module state; persist three workstation preferences; bind one scroll listener per list DOM node; schedule a header refresh.",
+          "visibility": "Both functions are closure-internal. renderLayerListMotion calls ensureMotionHeaderTools; ensureMotionHeaderTools and its scroll listener call syncMotionContextHeader.",
+          "internal_api": {
+            "syncMotionContextHeader": "syncMotionContextHeader() -> undefined. Returns early unless label/list exist and appMode is motion; starts from activeLayerIdx, substitutes the first rendered row when any exist, then chooses the last row whose top is at or above list top+2 and writes label text/title.",
+            "ensureMotionHeaderTools": "ensureMotionHeaderTools() -> undefined. Returns if header/panel/list is missing; otherwise sets panel.dataset.motionColumns, creates/binds controls only when absent, binds scroll once using list._motionContextBound and always requests one animation-frame context refresh."
+          },
+          "callers_and_dependencies": [
+            "C02 renderLayerListMotion calls ensureMotionHeaderTools at motion.js:7033",
+            "ensureMotionHeaderTools schedules syncMotionContextHeader at 7030",
+            "layer-list scroll listener calls syncMotionContextHeader at 7028",
+            "module initialization reads filter/column/snap localStorage keys at 619-623",
+            "motionView predicates consume search/filter state at 632-652",
+            "CSS consumes panel data-motion-columns outside this source range",
+            "Motion key dragging consumes _motionSnapEnabled at 12919"
+          ],
+          "writer": "Writes DOM nodes, attributes, text, popup position and the list._motionContextBound expando; writes closure state _motionSearch/_motionFilterMode/_motionColumnPreset/_motionSnapEnabled; writes localStorage for filter/columns/snap inside swallowed try/catch blocks. Search is session-only. It does not mutate project document data.",
+          "lifecycle_caveats": [
+            "The click handler removes an existing popup and returns without immediately removing its document capture listener. That listener removes itself only on a later pointerdown whose target is outside that popup and is not the exact trigger button. SVG/path descendants are not exempt: their pointerdown can close the old popup before the bubbling click creates a new one. This is source-derived event ordering; no live UI result is claimed. Repeated direct button toggles can temporarily accumulate listeners until a qualifying pointerdown occurs.",
+            "The scroll-binding guard is an expando on one list node, so it is idempotent for that node. A replacement node receives a new listener; there is no explicit disposer for a detached old node.",
+            "If rows exist but none has crossed the top threshold, the initial rows[0] assignment labels the first row even if it is below the viewport edge. Malformed data-layer parses to NaN and falls back to Motion text.",
+            "Popup coordinates are computed once at open; resize/scroll repositioning is not installed. requestAnimationFrame is scheduled on every successful ensure call."
+          ],
+          "consumer_matrix": {
+            "save": "No project save. Filter, column and snap changes write workstation localStorage; search text is not persisted.",
+            "load": "Module initialization outside the packet reads nemo-motion-filter, nemo-motion-columns and nemo-motion-snap with defaults and swallowed storage failure. Header creation reads that closure state and current DOM/state.",
+            "history": "No undo/redo or document snapshot because only view preferences, DOM and module UI state change.",
+            "selection": "Reads activeLayerIdx and rendered row data-layer values to label context; it does not mutate layer/bar/key/canvas selection.",
+            "animation": "No animation/document mutation. _motionSnapEnabled is later consumed by C02-owned keyframe drag snapping, but this packet only changes the UI preference.",
+            "render": "Search input and filter selection call renderLayerList then renderTimeline. Column change updates the panel dataset without a rebuild; snap change only updates state/storage. Scroll and animation-frame callbacks update label text/title.",
+            "export": "No project or external export effect; UI preferences are excluded from document serialization.",
+            "native": "No native or engine bridge. All effects are browser DOM, scheduling and localStorage operations."
+          },
+          "oracle": "Proposed unrun DOM/storage fixture matrix: non-Motion and each missing DOM guard; no rows, first row below top, several crossed rows, scroll boundary and malformed data-layer; repeated ensure on one node and replacement node; initial storage success/throw/defaults; search normalization and rerender order; filter persistence success/failure plus rerender; column dataset/storage without rerender; snap state/storage without rerender; popup position clamps; trigger toggle, outside click, inside click and temporarily stale capture-listener cleanup; repeated requestAnimationFrame callbacks. Distinguish direct button targets from nested SVG/path targets and preserve the exact pointerdown exclusion, including capture-before-click ordering.",
+          "proposed_module": "src/js/ui/motion-context-header.js",
+          "proposed_api": "createMotionContextHeader({document,storage,schedule,translate,readState,onFilterChange}) -> {ensure,refresh,dispose}; renderLayerListMotion remains the caller and document animation state remains outside the adapter.",
+          "admission": "Pending separate executable-leaf admission after C04 presentation ownership and Motion writer reconciliation. It must define listener/popup disposal behavior explicitly before implementation."
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "expected_assigned_lines": 136,
+    "expected_classification": {
+      "code": 122,
+      "comment": 13,
+      "whitespace": 1
+    },
+    "required_consumer_dimensions": [
+      "save",
+      "load",
+      "history",
+      "selection",
+      "animation",
+      "render",
+      "export",
+      "native"
+    ],
+    "negative_controls": [
+      "remove line 6774 through the same coverage function => omission rejection",
+      "append a duplicate 6954-6954 range through the same coverage function => overlap rejection"
+    ],
+    "symbol_checks": [
+      "blank separator@6774",
+      "Motion layer-list header@6775",
+      "fmtVal@6776",
+      "scrubField@6777",
+      "selectedKeysForEditableProperty@6800",
+      "selectedDimensionDisplay@6807",
+      "setSelectedKeyDimension@6814",
+      "offsetSelectedKeyDimension@6820",
+      "setSelectedKeyVector@6826",
+      "syncMotionContextHeader@6954",
+      "ensureMotionHeaderTools@6975",
+      "renderLayerListMotion exclusion@7032"
+    ],
+    "fixtures": "All behavioral and DOM fixtures are proposals and were not run for this artifact-only census."
+  },
+  "uncovered_responsibilities": [
+    "enterComponentLayer at 6832-6915 remains separately unmapped.",
+    "C02 selection synchronization at 6916-6953 remains owned and excluded.",
+    "C02 renderLayerListMotion at 7032 onward remains owned and excluded.",
+    "The remaining Motion queue, runtime extraction and browser/native validation remain outside C20b."
+  ]
+}
