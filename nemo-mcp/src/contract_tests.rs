@@ -125,10 +125,53 @@ fn fixed_payload_rejections_keep_the_legacy_control_vocabulary_typed() {
         unknown_replay_operation.unwrap_err().code(),
         "malformed_payload"
     );
+
+    let extra_replay_envelope = Operation::DiagnosticsReplay.check_payload(&json!({
+        "request": {"operation": "snapshot", "payload": {}},
+        "source": "trace"
+    }));
+    let error = extra_replay_envelope.unwrap_err();
+    assert_eq!(error.code(), "malformed_payload");
+    assert!(error.message().contains("expects only request"));
+}
+
+#[test]
+fn fixed_payload_compatibility_accepts_every_legacy_nullable_wire_type() {
+    // Fixed transport operations retain the original nullable field vocabulary.
+    // Exercise both integer representations because JSON can carry values beyond i64.
+    for payload in [
+        json!({
+            "layerId": "layer-1",
+            "property": "opacity",
+            "value": 37.5,
+            "frame": -1,
+            "animated": true,
+            "request": {"operation": "snapshot"}
+        }),
+        json!({
+            "layerId": null,
+            "property": null,
+            "value": null,
+            "frame": u64::MAX,
+            "animated": null,
+            "request": null
+        }),
+        json!({"frame": null}),
+    ] {
+        assert!(
+            Operation::Snapshot.check_payload(&payload).is_ok(),
+            "{payload}"
+        );
+    }
 }
 
 #[test]
 fn descriptor_schema_projects_query_and_command_branches() {
+    assert_eq!(
+        Operation::labels().len(),
+        11,
+        "transport-v1 operation count"
+    );
     let mut generator = schemars::SchemaGenerator::default();
     let command = serde_json::to_value(command_payload_schema(&mut generator)).unwrap();
     assert!(command["anyOf"]
@@ -185,6 +228,41 @@ fn descriptor_projection_accepts_each_declared_primitive_without_a_payload_struc
             &json!({"layerId": "layer-1", "property": "metadata", "animated": true}),
             &catalog,
         )
+        .is_ok());
+}
+
+#[test]
+fn descriptor_projection_accepts_object_and_unconstrained_custom_fields() {
+    // JSON Schema permits both object-valued fields and an unconstrained property
+    // schema. Neither requires a new Rust payload field or operation variant.
+    let catalog = descriptor(
+        r#"{
+            "id": "annotations",
+            "input": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "layerId": {"type": "string"},
+                    "value": {"type": "object"},
+                    "token": {}
+                },
+                "required": ["layerId", "value", "token"]
+            },
+            "effects": {"lifecycle": ["property.set"]},
+            "availability": {"state": "available", "reason": null},
+            "fixture": {"input": {
+                "layerId": "layer-1", "value": {"tag": "draft"}, "token": 7
+            }}
+        }"#,
+    );
+    let payload = json!({
+        "layerId": "layer-1",
+        "property": "annotations",
+        "value": {"tag": "draft"},
+        "token": 7
+    });
+    assert!(Operation::PropertySet
+        .check_payload_with(&payload, &catalog)
         .is_ok());
 }
 
