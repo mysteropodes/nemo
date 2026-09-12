@@ -6,7 +6,10 @@
       "dir": "nemo-mcp",
       "files": [
         "build.rs",
+        "src/capabilities.rs",
+        "src/capability_contract.rs",
         "src/contract.rs",
+        "src/contract_tests.rs",
         "src/lib.rs",
         "src/main.rs",
         "src/registry.rs",
@@ -15,6 +18,7 @@
         "src/wire.rs"
       ],
       "publicApi": [
+        "src/capabilities.rs",
         "src/contract.rs",
         "src/lib.rs",
         "src/registry.rs",

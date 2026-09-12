@@ -5,6 +5,7 @@
 //! schema that types nothing, so the schema and the rejection are asserted here.
 use rmcp::{model::CallToolRequestParams, transport::TokioChildProcess, ServiceExt};
 use serde_json::{json, Map, Value};
+use std::process::Command;
 
 async fn client() -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
     let root = Box::leak(Box::new(tempfile::tempdir().unwrap()));
@@ -19,6 +20,44 @@ async fn client() -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
 
 fn arguments(value: Value) -> Map<String, Value> {
     value.as_object().unwrap().clone()
+}
+
+#[test]
+fn compiled_schema_binary_matches_the_committed_contract_and_descriptors() {
+    let output = Command::new(env!("CARGO_BIN_EXE_nemo-mcp-schema"))
+        .output()
+        .expect("compiled schema binary runs");
+    assert!(
+        output.status.success(),
+        "schema binary failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let generated: Value = serde_json::from_slice(&output.stdout).expect("schema stdout is JSON");
+    let committed: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/transport-v1.schema.json"
+    ))
+    .expect("committed transport schema is JSON");
+    assert_eq!(
+        generated, committed,
+        "run cargo run --manifest-path nemo-mcp/Cargo.toml --bin nemo-mcp-schema --quiet > \
+         engineering/application/transport-v1.schema.json"
+    );
+
+    let descriptors = json!([
+        serde_json::from_str::<Value>(include_str!(
+            "../../engineering/application/capabilities/opacity.json"
+        ))
+        .unwrap(),
+        serde_json::from_str::<Value>(include_str!(
+            "../../engineering/application/capabilities/export-job.json"
+        ))
+        .unwrap(),
+    ]);
+    assert_eq!(
+        generated["request"]["properties"]["payload"]["x-nemo-registeredCapabilities"], descriptors,
+        "the generated contract embeds the canonical descriptors verbatim"
+    );
 }
 
 #[tokio::test]
@@ -42,33 +81,45 @@ async fn advertised_payload_schema_names_every_key_and_operation_template() {
     // The defect verbatim: schemars renders `serde_json::Value` as `true`.
     assert_ne!(payload, &json!(true), "payload must carry a real schema");
     assert_eq!(payload["type"], "object");
-    assert_eq!(payload["additionalProperties"], false);
-    for key in [
-        "layerId", "property", "value", "frame", "animated", "request",
-    ] {
-        assert!(
-            payload["properties"][key].is_object(),
-            "payload advertises {key}"
-        );
-    }
-    // Each key is optional because requiredness is per operation, so schemars types
-    // it as a union with null; what matters is that the primitive is named.
-    for (key, primitive) in [
-        ("layerId", "string"),
-        ("property", "string"),
-        ("value", "number"),
-        ("frame", "integer"),
-        ("animated", "boolean"),
-    ] {
-        let advertised = &payload["properties"][key]["type"];
-        assert!(
-            advertised == primitive
-                || advertised
-                    .as_array()
-                    .is_some_and(|types| types.iter().any(|entry| entry == primitive)),
-            "{key} is typed {advertised}"
-        );
-    }
+    let descriptors = &payload["x-nemo-registeredCapabilities"];
+    let expected = json!([
+        serde_json::from_str::<Value>(include_str!(
+            "../../engineering/application/capabilities/opacity.json"
+        ))
+        .unwrap(),
+        serde_json::from_str::<Value>(include_str!(
+            "../../engineering/application/capabilities/export-job.json"
+        ))
+        .unwrap(),
+    ]);
+    assert_eq!(
+        descriptors, &expected,
+        "all descriptor fields survive schema projection"
+    );
+    let opacity = payload["anyOf"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|branch| branch["properties"]["property"]["const"] == "opacity")
+        .expect("opacity descriptor creates a property payload branch");
+    assert_eq!(opacity["properties"]["value"]["type"], "number");
+    assert_eq!(opacity["properties"]["property"]["const"], "opacity");
+    assert!(opacity["required"]
+        .as_array()
+        .unwrap()
+        .contains(&json!("layerId")));
+    let replay = payload["anyOf"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|branch| branch["required"] == json!(["request"]))
+        .expect("replay retains its request envelope");
+    assert!(
+        replay["properties"]["request"]
+            .get("additionalProperties")
+            .is_none(),
+        "a trace request keeps its retained identity and revision metadata"
+    );
 
     let description = payload["description"].as_str().unwrap();
     for operation in [
@@ -82,9 +133,10 @@ async fn advertised_payload_schema_names_every_key_and_operation_template() {
     ] {
         assert!(description.contains(operation), "{operation} is templated");
     }
-    // Capabilities names the property `id`; the payload key is `property`. The one
-    // client that recovered lost an attempt to exactly this mismatch.
-    assert!(description.contains("capabilities names it `id`"));
+    // The registered capability descriptor names the property `id`; the payload key
+    // is `property`. The one client that recovered lost an attempt to exactly this
+    // mismatch.
+    assert!(description.contains("x-nemo-registeredCapabilities"));
     assert!(description.contains("never a JSON-encoded string"));
     let examples = payload["examples"].as_array().unwrap();
     assert_eq!(examples.len(), 7, "one example per write operation");
@@ -99,6 +151,32 @@ async fn advertised_payload_schema_names_every_key_and_operation_template() {
         .as_str()
         .unwrap()
         .contains("property.get"));
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn compiled_discovery_advertises_complete_registered_descriptors_without_an_instance() {
+    let client = client().await;
+    let discovery = client
+        .call_tool(CallToolRequestParams::new("nemo_discover"))
+        .await
+        .unwrap();
+    let body = discovery.structured_content.unwrap();
+    assert_eq!(body["apiVersion"], 1);
+    assert_eq!(body["instances"], json!([]));
+    assert_eq!(
+        body["registeredCapabilities"],
+        json!([
+            serde_json::from_str::<Value>(include_str!(
+                "../../engineering/application/capabilities/opacity.json"
+            ))
+            .unwrap(),
+            serde_json::from_str::<Value>(include_str!(
+                "../../engineering/application/capabilities/export-job.json"
+            ))
+            .unwrap(),
+        ])
+    );
     client.cancel().await.unwrap();
 }
 
@@ -131,6 +209,19 @@ async fn rejected_payloads_name_the_shape_the_operation_expects() {
             vec!["missing value", "property.set expects"],
         ),
         (
+            "descriptor type mismatch",
+            json!({"layerId": "layer-a", "property": "opacity", "value": "forty"}),
+            vec!["payload.value has type", "capability \"opacity\" declares"],
+        ),
+        (
+            "descriptor unknown field",
+            json!({"layerId": "layer-a", "property": "opacity", "value": 37, "mode": "replace"}),
+            vec![
+                "payload contains unsupported field mode",
+                "property.set expects",
+            ],
+        ),
+        (
             "curve editing",
             json!({"layerId": "layer-a", "property": "opacity", "value": 37,
                 "curvePoints": [[0, 0], [1, 1]]}),
@@ -146,7 +237,10 @@ async fn rejected_payloads_name_the_shape_the_operation_expects() {
             .unwrap();
         assert_eq!(response.is_error, Some(true), "{label}");
         let body = response.structured_content.unwrap();
-        assert_eq!(body["error"]["code"], "invalid_request", "{label}");
+        // A malformed body is its own typed code (P07/#1009), distinct from
+        // unsupported_capability/unavailable below and from invalid_request (the
+        // transport-shape checks in ApplicationRequest::validate itself).
+        assert_eq!(body["error"]["code"], "malformed_payload", "{label}");
         let message = body["error"]["message"].as_str().unwrap();
         for fragment in fragments {
             assert!(message.contains(fragment), "{label}: {message}");
@@ -167,6 +261,23 @@ async fn rejected_payloads_name_the_shape_the_operation_expects() {
         response.structured_content.unwrap()["error"]["code"],
         "unavailable"
     );
+
+    // `property` naming no registered capability is its own typed code (P07/#1009),
+    // distinct from a malformed body — the shape is fine, the target does not exist.
+    let response = client
+        .call_tool(
+            CallToolRequestParams::new("nemo_command").with_arguments(with_payload(
+                json!({"layerId": "layer-a", "property": "banana", "value": 37}),
+            )),
+        )
+        .await
+        .unwrap();
+    let body = response.structured_content.unwrap();
+    assert_eq!(body["error"]["code"], "unsupported_capability");
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("banana"));
     client.cancel().await.unwrap();
 }
 
@@ -189,7 +300,9 @@ async fn replay_payload_validates_the_nested_recorded_command() {
         .unwrap();
     assert_eq!(response.is_error, Some(true));
     let body = response.structured_content.unwrap();
-    assert_eq!(body["error"]["code"], "invalid_request");
+    // The nested command's own body is malformed, same typed code check_payload
+    // reports at the top level (P07/#1009) — replay does not get a weaker check.
+    assert_eq!(body["error"]["code"], "malformed_payload");
     let message = body["error"]["message"].as_str().unwrap();
     assert!(
         message.contains("recorded request payload is invalid"),
@@ -197,6 +310,63 @@ async fn replay_payload_validates_the_nested_recorded_command() {
     );
     assert!(message.contains("missing layerId, value"), "{message}");
     assert!(message.contains("property.set expects"), "{message}");
+
+    // Replay owns a fixed transport envelope. Exercise its direct type and
+    // operation rejections through the compiled server, rather than only through
+    // the unit-level descriptor seam.
+    let mut non_object_request = base.clone();
+    non_object_request["payload"] = json!({"request": false});
+    let response = client
+        .call_tool(
+            CallToolRequestParams::new("nemo_command")
+                .with_arguments(arguments(non_object_request)),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        response.structured_content.unwrap()["error"]["code"],
+        "malformed_payload"
+    );
+
+    let mut unknown_operation = base.clone();
+    unknown_operation["payload"] = json!({
+        "request": {"operation": "property.unknown", "payload": {}}
+    });
+    let response = client
+        .call_tool(
+            CallToolRequestParams::new("nemo_command").with_arguments(arguments(unknown_operation)),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        response.structured_content.unwrap()["error"]["code"],
+        "malformed_payload"
+    );
+
+    // A `diagnostics.trace` entry retains the original request identity and
+    // revision fields. Replay consults only operation/payload, so those retained
+    // fields must remain copyable instead of being rejected as unknown metadata.
+    let mut traced = base.clone();
+    traced["payload"] = json!({"request": {
+        "apiVersion": 1,
+        "requestId": "original-edit",
+        "instanceId": "3f1a5f3c-4a05-4a3f-9d59-2f9f1c65b3ad",
+        "documentId": "document-a",
+        "expectedRevision": 4,
+        "revision": 5,
+        "ok": true,
+        "operation": "property.set",
+        "payload": {"layerId": "layer-a", "property": "opacity", "value": 37}
+    }});
+    let response = client
+        .call_tool(CallToolRequestParams::new("nemo_command").with_arguments(arguments(traced)))
+        .await
+        .unwrap();
+    assert_eq!(
+        response.structured_content.unwrap()["error"]["code"],
+        "unavailable",
+        "the complete traced command passes admission before absent-instance lookup"
+    );
 
     // A fully-formed recorded command still passes and fails later on the absent
     // instance, proving the recursive check isn't a false positive.
@@ -227,10 +397,32 @@ async fn reads_keep_their_own_templates_and_identity_spelling() {
         .await
         .unwrap();
     let body = missing_target.structured_content.unwrap();
-    assert_eq!(body["error"]["code"], "invalid_request");
+    // `property` is unresolved (absent), so only it — not the capability-declared
+    // `layerId` a resolved capability would also require — can be reported yet
+    // (P07/#1009: a property's required keys are no longer knowable before `property`
+    // itself names which registered capability to consult).
+    assert_eq!(body["error"]["code"], "malformed_payload");
     let message = body["error"]["message"].as_str().unwrap();
-    assert!(message.contains("missing layerId, property"), "{message}");
+    assert!(message.contains("missing property"), "{message}");
     assert!(message.contains("property.get expects"), "{message}");
+
+    // Supplying `property` resolves the capability, and the rest of its declared
+    // requirement surfaces on the next attempt.
+    let missing_layer = client
+        .call_tool(
+            CallToolRequestParams::new("nemo_query").with_arguments(arguments(
+                json!({"instanceId": "a68d0f2d-6b4f-4f5b-8a4b-6b8f0f2a4d61",
+                "operation": "property.get", "payload": {"property": "opacity"}}),
+            )),
+        )
+        .await
+        .unwrap();
+    let body = missing_layer.structured_content.unwrap();
+    assert_eq!(body["error"]["code"], "malformed_payload");
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("missing layerId"));
 
     // The pre-camelCase spelling still deserializes, so an existing caller is kept.
     let legacy = client

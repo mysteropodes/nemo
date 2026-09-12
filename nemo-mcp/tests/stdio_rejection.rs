@@ -86,7 +86,11 @@ async fn executable_rejects_invalid_writes_before_application_transport() {
             let response = client.call_tool(CallToolRequestParams::new("nemo_command")
                 .with_arguments(input.as_object().unwrap().clone())).await.unwrap();
             assert_eq!(response.is_error, Some(true), "{label}");
-            assert_eq!(response.structured_content.unwrap()["error"]["code"], "invalid_request", "{label}");
+            // Every case here is a transport-shape fault (a wrong field, or a write
+            // missing its identity trio) except "payload", a null body — its own typed
+            // code since P07/#1009, distinct from a merely-absent transport field.
+            let expected_code = if label == "payload" { "malformed_payload" } else { "invalid_request" };
+            assert_eq!(response.structured_content.unwrap()["error"]["code"], expected_code, "{label}");
             assert_eq!(observed.load(Ordering::SeqCst), 1, "{label} reached document owner");
         }
         let mutation_query = json!({"instance_id": endpoint.instance_id, "operation": "property.set",
