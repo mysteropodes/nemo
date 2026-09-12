@@ -92,7 +92,9 @@ async function exportedPixels(page, filename, frame) {
     }
     return { width: canvas.width, height: canvas.height, colors: Object.keys(colors), count, bounds };
   }, 'data:image/svg+xml;base64,' + bytes.toString('base64'));
-  if (await page.locator('#export-close').isVisible()) await page.locator('#export-close').click();
+  // Successful SVG export closes this dialog after 900 ms. Wait for that
+  // transition instead of racing it with a click on the disappearing button.
+  await expect(page.locator('#export-close')).toBeHidden();
   return { ...pixels, sha256: sha(bytes) };
 }
 
