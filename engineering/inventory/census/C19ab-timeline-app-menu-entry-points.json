@@ -1,0 +1,512 @@
+{
+  "census_id": "C19ab",
+  "issue": 1234,
+  "title": "Timeline.js app menu entry points and team-sync relative time — initAppMenu, openObjReference, clickEl, syncRelTime",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf following C19aa/#1231; the open span between the two C06-owned Settings slices (C06.preferences.settings-modal-shell owns 8997-9077; C06.preferences.* Collaboration owns 9228-9273). Scope is timeline.js:9078-9227 (150 lines: 111 code, 37 comment, 2 blank), four packets, matching the issue's own suggested packet table exactly (no boundary correction — every cut verified against the frozen blob with sed -n/awk: 9078, 9084, 9107/9108, 9132/9133, 9217/9218, 9227/9228 all land exactly where the issue states, and the per-packet classification (24/5/1, 22/3/0, 57/28/0, 8/1/1) was independently re-derived by a Python re-implementation of the validator's own classify() against the frozen blob and matches the issue's own table for all four packets). The nesting fact the issue flags is confirmed by direct read: initAppMenu (9084) does not close until 9216 — openObjReference (9111) and clickEl (9133) are declared at column 0 but are LEXICALLY NESTED inside initAppMenu's own function body (the file's indentation is inconsistent here, which is why they read as top-level at a glance); both are confirmed to reference only globals (document, window.*, SM.t, showToast), not any of initAppMenu's own local variables (btn, tt, r, items, ks), so the nesting has no behavioral consequence beyond scoping their names inside initAppMenu's closure. Cited by name/line only, not re-mapped, per the issue's own instruction: window.showContextMenu (NOT 'elsewhere in timeline.js' as the issue's own prose states — confirmed by a whole-src grep for its own declaration, it is defined once, in src/js/ui.js:1136, and only CALLED from timeline.js; flagged as a citation correction below), window.SM.toggleMotionBlurComp/setMotionBlurSettings/toggleShyMode (the window.SM={...} block opening at timeline.js:349; their own bodies are at timeline.js:1161-1168/1169-1173/1190-1195, which is a SECOND citation correction — these three are owned by C19e-timeline-layer-controls-and-symbol-facades (assigned_ranges 1121-1195, confirmed by direct lookup of every sibling C19*.json's own assigned_ranges), not 'C20/C21' as the issue's own prose states, since they are declared inside timeline.js itself rather than motion.js/app.js), SMProject.getCurrentLabel/open/save/saveAs (project.js:48/214/185/172), the buttons clicked programmatically via clickEl (#btn-export, #btn-history, #btn-import-img/-video/-psd, #btn-settings, #btn-kitsu-open/-publish, #project-tab-add — their own listeners live in export.js/images.js/video/psd/settings/kitsu bridges, cited by file only, not individually re-located here), labs/reference-3d.js (SMLabs.open3DReference at labs/reference-3d.js:354, fed by openObjReference), window.__TAURI__.dialog.open/fs.readTextFile (native bridge; browser fallback = hidden <input type=file>), showToast (timeline.js:7447, C19w, merged), SM.t (window.SM.t assigned at i18n.js:4239), and #app-topbar (index.html:128)/#app-menu-btn (index.html:129)/#btn-mblur (index.html:2182)/#btn-shy (index.html:2183) markup. syncRelTime's sole consumer (renderSyncUpdates, timeline.js:9248, C06) is cited only.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "ca436f2ec2e2edbef2f37c6a330f4c0a4c6a2b69",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19ab-timeline-app-menu-census",
+  "assigned_ranges": [
+    {
+      "start": 9078,
+      "end": 9227
+    }
+  ],
+  "coverage_note": "Exactly 150 assigned lines occur once across four packets (one coverage_range per packet, no gaps, no other-owner exclusions): 111 code, 37 full-line comment, 2 blank — independently re-derived by classifying the frozen blob programmatically (a Python re-implementation of the validator's own classify(), run once per packet and once for the whole span: 9078-9107=(24,5,1); 9108-9132=(22,3,0); 9133-9217=(57,28,0); 9218-9227=(8,1,1); summing to (111,37,2)=150) — equal to the issue's own proposed union and per-packet table exactly, no boundary correction needed. Line 9077 is initSettingsModal's own DOMContentLoaded self-registration (C06.preferences.settings-modal-shell's own last line, assigned_ranges ending 9077 confirmed by direct lookup of that sibling artifact); line 9078 (blank) is included here per the issue's own instruction so no line is orphaned. Line 9227 is syncRelTime's own closing brace; line 9228 opens syncFolderFields, the first line of C06.preferences.* Collaboration's own declared span — confirmed by direct read of 9225-9230.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "This worktree's own branch (claude/c19ab-timeline-app-menu-census) was created from origin/main at ca436f2ec2e2edbef2f37c6a330f4c0a4c6a2b69; `git rev-parse ca436f2:src/js/timeline.js` resolves to the identical blob cc4cfd27dc59d797c911d840dc46e2f816942123 — confirmed directly in the working worktree before authoring (HEAD matches, blob matches, working tree clean).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `grep -rn -P '(^|[^a-zA-Z_.])<symbol>\\(' src/js` (recursive, includes labs/ and adapters/) for the four function symbols this scope defines (initAppMenu, openObjReference, clickEl, syncRelTime), each filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`, plus a separate check of the literal `window.SM={` block (opening at timeline.js:349) confirming none of these four names appear inside it. Field-level and DOM-id claims were derived by a plain-pattern grep restricted to the frozen blob's own lines 9078-9227, cross-checked line-by-line against a direct `sed -n`/`awk` read of the same range.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source design comments (2026-07 burger-menu redesign lead-in, 2026-07 feedback-driven project-label row, 2026-08 New Viewer/AE-audit item, 2026-07-27 SVG-import placement note, 2026-08 OBJ-reference missing-entry-point note, 2026-08 SM_FROZEN_IN_DEV freeze, the v16 Phase 2 team-sync header) are read as authorial intent, not independently re-verified execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19ab-timeline-app-menu-entry-points.json and the four timeline.js packets partitioning lines 9078-9227.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "function_boundary": "This scope is a single coherent feature (the app/burger menu and its own two small helper buttons) plus one unrelated, textually-adjacent utility (syncRelTime), divided into four packets by which construct each covers: the two independent #btn-mblur/#btn-shy IIFEs that share initAppMenu's opening lines, the nested OBJ-reference importer, the nested clickEl helper plus the menu-button click handler that builds and shows the actual menu (by far the largest packet — the menu's own item table, the conditional Kitsu splice, and initAppMenu's own close and self-registration), and finally syncRelTime, which shares no symbol, no module state and no call relationship with initAppMenu — it is grouped into this leaf only because it is the next construct textually and the issue's own proposed union ends at its closing brace (9227), immediately before C06's own syncFolderFields (9228).",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C06.preferences.settings-modal-shell (owns timeline.js:8997-9077, existing owner, out of scope)",
+      "disposition": "Retains initSettingsModal and its own DOMContentLoaded self-registration ending at line 9077. This scope's own boundary begins at line 9078, the blank line immediately following — confirmed by direct sed -n read of 9075-9079."
+    },
+    {
+      "owner": "C06.preferences.* Collaboration (owns timeline.js starting 9228, existing owner, out of scope)",
+      "disposition": "Owns syncFolderFields and the rest of the Team-Sync Settings UI starting at line 9228. This scope's own boundary ends at line 9227, syncRelTime's own closing brace — confirmed by direct read of 9225-9230. syncRelTime's sole caller, renderSyncUpdates (timeline.js:9248), is inside this sibling's own declared span."
+    },
+    {
+      "owner": "src/js/ui.js:1136 window.showContextMenu (existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only. This is a CORRECTION to the issue's own prose ('the shared context-menu renderer elsewhere in timeline.js'): a whole-src grep for `showContextMenu\\s*=\\s*function|function showContextMenu` found exactly one declaration, at ui.js:1136, not anywhere in timeline.js. timeline.js only ever CALLS it (nine call sites across the file, including this scope's own line 9214). `showContextMenu(r.left,r.bottom+4,items)` is called once in this scope, from the #app-menu-btn click handler, after the items array (including any conditional Kitsu splice) is fully built."
+    },
+    {
+      "owner": "C19e-timeline-layer-controls-and-symbol-facades (assigned_ranges 1121-1195, merged, owns toggleMotionBlurComp/setMotionBlurSettings/toggleShyMode inside timeline.js's own window.SM={...} block opening at line 349)",
+      "disposition": "Retains its own bodies in full — cited by name/line only. This is a SECOND correction to the issue's own prose ('window.SM.toggleMotionBlurComp/setMotionBlurSettings/toggleShyMode ... C20/C21'): all three are declared inside timeline.js itself (toggleMotionBlurComp 1161-1168, setMotionBlurSettings 1169-1173, toggleShyMode 1190-1195), inside the sibling artifact's own declared assigned_ranges (1121-1195, confirmed by direct lookup), not motion.js/app.js. `setMotionBlurSettings(samples,shutter)` receives the two RAW prompt strings unparsed from this scope's own bindMotionBlur (9095); the clamping (`Math.max(2,Math.min(16,parseInt(samples,10)||6))` and `Math.max(0.05,Math.min(2,parseFloat(shutter)||0.5))`) happens entirely inside that sibling's own body, not in this scope."
+    },
+    {
+      "owner": "src/js/project.js (SMProject.getCurrentLabel/open/save/saveAs; existing owner, out of scope)",
+      "disposition": "Retains its own bodies in full — cited by name/line only. `getCurrentLabel` (project.js:48-50) carries its own comment confirming this exact consumer: 'Used by the burger menu (timeline.js initAppMenu) now that the old right-panel Projet section ... is gone'. `openDialog`/`save`/`saveAs` (project.js:214/185/172) are called from this scope's own New Project/Open/Save/Save As menu items (9146-9149) — the New Project item does not call SMProject directly, it calls clickEl('project-tab-add') instead (9146)."
+    },
+    {
+      "owner": "labs/reference-3d.js (window.SMLabs.open3DReference at labs/reference-3d.js:354; existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only. Called once in this scope, from openObjReference's own feed(text) closure (9114), after a guard (9113) that toasts a hardcoded 'Visionneuse 3D indisponible' (no SM.t) if window.SMLabs or its own open3DReference is missing."
+    },
+    {
+      "owner": "src/js/kitsu.js (window.SMKitsu.getCurrentShot at kitsu.js:296, returns state.kitsuShot; existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only. Called once in this scope (9209); the returned object's own `.projectName`/`.sequenceName`/`.shotName`/`.taskName` fields (i.e. state.kitsuShot's own fields) are read directly in the conditional splice (9211-9212) to build the disabled shot-label row and the Publish-to-Kitsu item."
+    },
+    {
+      "owner": "second-viewer.js/svg-import.js/render-manager.js/nemo-script.js/nemo-plugin.js (SMSecondViewer.open, SMSvgImport.openFile, SMRenderManager.open, SMScript.openFile, SMPlugin.openFile; existing owners, out of scope)",
+      "disposition": "Retain their own bodies in full — cited by name/file only, one call site each in this scope's own menu items array (9160, 9171, 9191, 9154, 9156)."
+    },
+    {
+      "owner": "export.js/images.js/video/psd/settings/kitsu bridges (the #btn-* targets clickEl clicks; existing owners, out of scope, per the issue's own instruction)",
+      "disposition": "Retain their own listener bodies in full — cited by file only. clickEl(id) itself performs no action beyond `document.getElementById(id).click()` (9133); every behavioral consequence of a menu item that calls clickEl lives entirely in whichever file registered that button's own click listener, none of which is reproduced here."
+    },
+    {
+      "owner": "index.html (#app-topbar:128, #app-menu-btn:129, #btn-mblur:2182, #btn-shy:2183, SM_FROZEN_IN_DEV registry:2297; existing owner, out of scope)",
+      "disposition": "Retains the static DOM/registry in full — cited by line only. #btn-mblur/#btn-shy both carry `style=\"display:none\"` in their own markup (shown/hidden elsewhere, out of this scope's own read boundary). `window.SM_FROZEN_IN_DEV={rig:false,storyboard:true,import3d:true}` (2297) currently freezes import3d, so this scope's own ctx-import-3d menu item renders its disabled in-dev branch (9188) by default rather than its openObjReference-wired branch (9189)."
+    },
+    {
+      "owner": "P30/#1005",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 9077 (C06.preferences.settings-modal-shell's own initSettingsModal self-registration) is outside coverage; line 9078 (blank) begins this scope — confirmed by direct sed -n read of 9075-9079, matching the issue's own boundary exactly (included so no line is orphaned, per the issue's own instruction).",
+    "Line 9227 (syncRelTime's own closing brace) is the last line of this scope; line 9228 opens C06.preferences.* Collaboration's own syncFolderFields — confirmed by direct read of 9225-9230, matching the issue's own boundary exactly.",
+    "No lines inside 9078-9227 are excluded for another owner: every line belongs to exactly one of the four packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "The nesting fact: initAppMenu (9084) does not close until line 9216 ('}' closing its own function body) followed by its own self-registration at 9217. openObjReference (9111-9132) and clickEl (9133) are both declared at column 0 (no leading whitespace) but are LEXICALLY INSIDE initAppMenu's own braces — the file's own indentation is inconsistent at this exact point (bindMotionBlur/bindShy at 9085/9099 ARE indented two spaces, matching initAppMenu's own body, while openObjReference/clickEl are not, despite being equally nested). Confirmed by direct brace-counting read of 9084-9217: the single `var btn=...` guard at 9107 is inside initAppMenu; the click handler that closes at 9215 and initAppMenu's own closing '}' at 9216 are both still inside initAppMenu's own scope.",
+    "Scope check on the two nested functions: openObjReference reads only window.SMLabs/SMLabs.open3DReference, window.__TAURI__.dialog/fs, document.*, showToast, SM.t — no reference to initAppMenu's own locals (btn, tt, r, items, ks) anywhere in its own body (9111-9132), confirmed by direct read. clickEl(id) reads only its own parameter and document.getElementById — confirmed by direct read of its single-line body (9133). Both are therefore usable as if they were top-level functions; the nesting has no behavioral effect beyond scoping their names inside initAppMenu's own closure (a second call to initAppMenu would redeclare both, but zero second caller exists — see the caller-grep results below).",
+    "(a) The complete menu-item table in ORDER, each item's id (if any), label key, and the action's real target — built from a direct line-by-line read of the items array (9138-9204) plus the conditional splice (9210-9213):",
+    "  1. {disabled row} — no id — label: SMProject.getCurrentLabel() live text, or tt('menuUntitledNotSaved') if SMProject/getCurrentLabel missing (9144). No action (disabled:true).",
+    "  2. {sep} (9145).",
+    "  3. no id — tt('menuNewProject'), shortcut ⌘N — action: clickEl('project-tab-add') (9146).",
+    "  4. no id — tt('menuOpen'), shortcut ⌘O — action: SMProject.open() (9147).",
+    "  5. no id — tt('menuSave'), shortcut ⌘S — action: SMProject.save() (9148).",
+    "  6. no id — tt('menuSaveAs'), shortcut ⇧⌘S — action: SMProject.saveAs() (9149).",
+    "  7. id:'ctx-kitsu-open' — tt('menuFromKitsu') — action: clickEl('btn-kitsu-open') (9150).",
+    "  8. id:'ctx-nemo-script' — tt('menuOpenScript') — action: SMScript.openFile() (9153-9154).",
+    "  9. id:'ctx-nemo-plugin' — tt('menuOpenPlugin') — action: SMPlugin.openFile() (9155-9156).",
+    "  10. no id — tt('menuNewView') — action: SMSecondViewer.open() (9160).",
+    "  11. id:'ctx-history' — tt('menuVersionHistory') — action: clickEl('btn-history') (9161).",
+    "  12. {sep} (9162).",
+    "  13. no id — tt('menuImportImg') — action: clickEl('btn-import-img') (9163).",
+    "  14. no id — tt('menuImportVideo') — action: clickEl('btn-import-video') (9164).",
+    "  15. id:'ctx-import-psd' — tt('menuImportPsd') — action: clickEl('btn-import-psd') (9165).",
+    "  16. id:'ctx-import-svg' — tt('menuImportSvg') — action: SMSvgImport.openFile() (9170-9171).",
+    "  17. id:'ctx-import-figma' — tt('menuImportFigma') — action: clickEl('btn-settings') then click the figma settings tab (9176-9180).",
+    "  18. id:'ctx-import-3d' (both branches use this SAME id, see below) — ternary on SM_FROZEN_IN_DEV.import3d: disabled row tt('menuImport3D')+' '+tt('inDevSuffix') (9188, currently the live branch per index.html:2297), OR tt('menuImport3D') with action: openObjReference (9189).",
+    "  19. id:'ctx-export' — tt('menuExport') — action: clickEl('btn-export') (9190).",
+    "  20. id:'ctx-render-manager' — tt('menuRenderManager') — action: SMRenderManager.open() (9191).",
+    "  21. {sep} (9192).",
+    "  22. no id — tt('menuSettings') — action: clickEl('btn-settings') (9193).",
+    "  23. no id — tt('menuKeyboardShortcuts') — action: clickEl('btn-settings') then click the shortcuts settings tab (9194-9198).",
+    "  24. no id — tt('menuAboutNemo') — action: clickEl('btn-settings') then click the about settings tab (9199-9203).",
+    "  Conditional (only if window.SMKitsu.getCurrentShot() truthy, 9209-9213): inserted at index 1 — disabled row 'Kitsu: '+ks.projectName+(ks.sequenceName?' / '+ks.sequenceName:'')+' / '+ks.shotName+(ks.taskName?' ('+ks.taskName+')':'') (9211); inserted at index 2 — id:'ctx-kitsu-publish', tt('menuPublishToKitsu'), action: clickEl('btn-kitsu-publish') (9212).",
+    "  The menu owns NO behavior of its own except openObjReference: every other item's action is either a bare SMProject.*/SM*.open()/openFile() call into an existing module, or clickEl('<button id>') delegating to that button's own pre-existing listener — confirmed by direct read of every action function body in 9138-9213.",
+    "The two ctx-import-3d ids (9188/9189) are NOT simultaneously present — they are the two branches of a single ternary (9187-9189), so exactly one of the two objects is ever in the items array at menu-build time; 'duplicate id' would only become a real collision if both branches were ever included together, which the source does not do. Depends on window.SM_FROZEN_IN_DEV (index.html:2297) for which branch is live, and the openObjReference branch depends on window.SMLabs (guarded inside openObjReference's own feed(), 9113) and, on the Tauri branch only, window.__TAURI__.",
+    "(b) Conditional items and the live project label: `ks=window.SMKitsu&&window.SMKitsu.getCurrentShot&&window.SMKitsu.getCurrentShot()` (9209) reads SMKitsu.getCurrentShot(), which itself returns state.kitsuShot (kitsu.js:296) — so ks.projectName/.sequenceName/.shotName/.taskName are state.kitsuShot's own fields, read directly with no re-shaping. The live project label (9144) reads window.SMProject.getCurrentLabel() (project.js:48-50), which itself formats currentPath?(currentName+' — '+currentPath):(currentName+' (not saved)') — confirmed by direct read of that function's own body.",
+    "(c) bindMotionBlur's contextmenu path (9089-9097): two browser prompt() calls, both hardcoded French, no SM.t. Prompt 1 (9091): 'Échantillons de flou (2-16)', default String(state.motionBlurSamples||6) — advertises a 2-16 range in its own label text only (not enforced by the prompt itself). Prompt 2 (9093): 'Ouverture d\\u2019obturateur, en frames (0.05-2)', default String(state.motionBlurShutter!=null?state.motionBlurShutter:0.5) — advertises 0.05-2. Either prompt returning null (user cancels) aborts the whole handler via an early return (9092, 9094) before any write. window.SM.setMotionBlurSettings(s,sh) (9095) receives the two RAW prompt() return strings, unparsed and unclamped, by this scope's own call; the actual parseInt/parseFloat plus the 2-16/0.05-2 clamping happens entirely inside setMotionBlurSettings's own body (timeline.js:1170-1171, C19e, out of scope). The toast (9096) is composed AFTER the write, reading state.motionBlurSamples/state.motionBlurShutter back off state — so it reports the CLAMPED values setMotionBlurSettings actually stored, not the raw prompt strings.",
+    "(d) openObjReference's two platform branches, in order (9111-9132): Tauri branch first, gated on `typeof window.__TAURI__!=='undefined'` (9116) — window.__TAURI__.dialog.open({title:'Importer une référence 3D (.obj)',multiple:false,filters:[{name:'OBJ',extensions:['obj']}]}) (9117-9118), then on a resolved path, window.__TAURI__.fs.readTextFile(path).then(feed) (9120); a missing path (dialog cancelled) returns without calling feed (9119); any rejection is caught and toasts SM.t('toastObjImportFailedSuffix')+e.message (9121); the branch always returns (9122) before reaching the browser branch. Browser branch (9124-9131, unconditional fallback when __TAURI__ is undefined): creates a hidden `<input type=file accept='.obj'>`, appends it to document.body (9124-9125), wires its own 'change' listener that reads the first selected file and immediately removes the input from the DOM (9127, cleanup happens before the file is even checked for existence), returns if no file was chosen (9128), else reads it via FileReader.readAsText and calls feed(r.result) from onload (9129); the input is finally .click()ed (9131) to open the native file picker. Both branches converge on the same feed(text) closure (9112-9115): guards on window.SMLabs/SMLabs.open3DReference existing, else toasts a hardcoded 'Visionneuse 3D indisponible' (no SM.t, unlike every other toast in this scope) and returns; otherwise calls SMLabs.open3DReference(text) (labs/reference-3d.js:354).",
+    "(e) See the nesting-fact and scope-check boundaries above: clickEl and openObjReference use only globals, confirmed by direct read; neither depends on initAppMenu's own scope for correctness.",
+    "(f) syncRelTime(ts) (9220-9227) output format: s=round((Date.now()-ts)/1000), floored at 0 (9221); s<60 -> 'il y a '+s+'s' (9222); else m=round(s/60); m<60 -> 'il y a '+m+' min' (9224); else h=round(m/60) -> 'il y a '+h+'h'+(m%60?round(m%60)+'min':'') (9226) — all three branches are hardcoded French, never routed through SM.t, confirmed by direct read (a genuine i18n gap, matching the issue's own note). Sole caller confirmed by `grep -rn -P '(^|[^a-zA-Z_.])syncRelTime\\(' src/js`: timeline.js:9248, inside renderSyncUpdates (C06.preferences.* Collaboration, out of scope, cited by line only) — `label.appendChild(document.createTextNode(entry.profileName+' — '+syncRelTime(entry.ts)))`.",
+    "(g) The complete external function/module-call inventory from this span, owning module/census cited by name only, bodies not reproduced: window.SM.toggleMotionBlurComp/setMotionBlurSettings/toggleShyMode (timeline.js 1161-1168/1169-1173/1190-1195, C19e — see the reconciliation correction above). showToast (timeline.js:7447, C19w, merged) — three call sites in this scope (9096, 9113, 9121). SM.t (window.SM.t, assigned i18n.js:4239) — 9096, 9121, and every tt(...) call inside the menu-items array (tt is a local alias set at 9136: `(window.SM&&SM.t)?SM.t:function(k){return k;}`). window.SMLabs.open3DReference (labs/reference-3d.js:354) — openObjReference's own feed(), once. window.__TAURI__.dialog.open/fs.readTextFile (native Tauri bridge) — openObjReference's Tauri branch only. window.SMProject.getCurrentLabel/open/save/saveAs (project.js:48/214/185/172) — the label row and three menu items. window.SMScript.openFile/window.SMPlugin.openFile (nemo-script.js/nemo-plugin.js) — one item each. window.SMSecondViewer.open (second-viewer.js), window.SMSvgImport.openFile (svg-import.js), window.SMRenderManager.open (render-manager.js) — one item each. window.SMKitsu.getCurrentShot (kitsu.js:296) — the conditional splice guard. window.showContextMenu (ui.js:1136, see the reconciliation correction above) — once, after the items array is fully built. document.getElementById/document.createElement/DOM listener APIs, Date.now/Math.round/Math.max (browser/JS built-ins). No other external function is called anywhere in lines 9078-9227 — confirmed by reading every statement in the span directly (reproduced verbatim in each packet's own behavior field below).",
+    "(h) The complete caller list, confirmed by `grep -rn -P '(^|[^a-zA-Z_.])<symbol>\\(' src/js` (recursive, includes labs/ and adapters/), each filtered to exclude the symbol's own declaration line and any `//`-prefixed hit, plus a separate check of the literal `window.SM={` block at timeline.js:349 (none of these four symbols appear inside it): initAppMenu — 1 call site beyond its own declaration, its OWN self-registration (9217, `if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initAppMenu);else initAppMenu();`) — self-registration only, zero external callers found, matching the issue's own expectation exactly. openObjReference — 1 call site beyond its own declaration, internal, 9189 (the ctx-import-3d menu item's own action, when SM_FROZEN_IN_DEV.import3d is falsy) — zero external callers found, matching the issue's own expectation ('internal to the menu') exactly. clickEl — 9 internal call sites (9146, 9150, 9161, 9163, 9164, 9165, 9177, 9190, 9193, 9195, 9200, 9212 — twelve total, all within this same scope's own items array or its own nested tab-click closures), zero external callers found, matching the issue's own expectation ('internal to the menu') exactly. syncRelTime — 1 call site beyond its own declaration, external, timeline.js:9248 (renderSyncUpdates, C06, out of scope) — matching the issue's own citation exactly. bindMotionBlur/bindShy are unnamed-at-call-site IIFEs (`(function bindMotionBlur(){...})()`), invoked exactly once each at their own declaration (9085, 9099); a grep for `bindMotionBlur\\(|bindShy\\(` finds only these two self-invocations, zero other callers, confirmed.",
+    "Render-path confirmation: NONE of this scope's four named symbols (initAppMenu, openObjReference, clickEl, syncRelTime) is ever called from getEffectiveStrokes/getEffectiveStrokesRendered (app.js) or from buildSceneJson/scenePayload (engine-bridge.js) or from export.js/rive-export.js — confirmed by a direct grep of all four names restricted to those four files (zero hits). Every call into this scope is either a user-gesture DOM handler (button click, contextmenu, keydown-free menu build) or an internal call from another function in this same scope — this span is top-bar UI only, matching the issue's own expectation exactly."
+  ],
+  "areas": [
+    {
+      "area": "app-menu-motion-blur-shy-buttons",
+      "packets": [
+        {
+          "id": "C19ab.app-menu-motion-blur-shy-buttons",
+          "files": [
+            "src/js/timeline.js:9078-9107"
+          ],
+          "coverage_ranges": [
+            [
+              9078,
+              9107
+            ]
+          ],
+          "classification": {
+            "code": 24,
+            "comment": 5,
+            "whitespace": 1
+          },
+          "symbols": [
+            "initAppMenu",
+            "bindMotionBlur",
+            "bindShy",
+            "toggleMotionBlurComp",
+            "setMotionBlurSettings",
+            "toggleShyMode",
+            "showToast",
+            "SM"
+          ],
+          "signature": "function initAppMenu(){ (function bindMotionBlur(){...})(); (function bindShy(){...})(); ... }",
+          "responsibility": "Blank line 9078 plus a 5-line lead-in comment (9079-9083) framing the whole burger menu as a Rnote-inspired File menu adapted to Nemo's own entry points. initAppMenu()'s own head (9084-9107): two independent self-invoking IIFEs that each wire ONE small top-bar button — bindMotionBlur (#btn-mblur: click toggles composition motion blur; right-click opens two prompts to edit samples/shutter) and bindShy (#btn-shy: click toggles shy-layer visibility and its own active class) — followed by the guard that gates the rest of initAppMenu's own body on #app-menu-btn and window.showContextMenu both existing (9107).",
+          "callers": [
+            "`initAppMenu` — 1 call site beyond its own declaration, its OWN self-registration at timeline.js:9217 (`if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initAppMenu);else initAppMenu();`). Zero external callers found.",
+            "`bindMotionBlur`/`bindShy` — each is an IIFE invoked exactly once, at its own declaration (9085, 9099). No other call site found by `grep -rn -P '(^|[^a-zA-Z_.])bindMotionBlur\\(|(^|[^a-zA-Z_.])bindShy\\(' src/js`."
+          ],
+          "behavior": [
+            "Line 9078 (blank): trailing blank line after C06's own initSettingsModal registration, included so no line is orphaned.",
+            "Lines 9079-9083 (comment, 5 lines): lead-in — Rnote-inspired File menu adapted to Nemo's actual entry points: window.SMProject for new/open/save, the existing import/export buttons clicked programmatically so their own listeners run unchanged, and the settings modal.",
+            "Line 9084 (code): `function initAppMenu(){`.",
+            "Line 9085 (code): `(function bindMotionBlur(){` — self-invoking IIFE.",
+            "Line 9086 (code): `var b=document.getElementById('btn-mblur');`.",
+            "Line 9087 (code): `if(!b)return;` — guard, button absent.",
+            "Line 9088 (code): `b.addEventListener('click',function(){window.SM.toggleMotionBlurComp();});`.",
+            "Line 9089 (code): `b.addEventListener('contextmenu',function(e){`.",
+            "Line 9090 (code): `e.preventDefault();` — suppresses the native browser context menu.",
+            "Line 9091 (code): `var s=prompt('Échantillons de flou (2-16)',String(state.motionBlurSamples||6));`.",
+            "Line 9092 (code): `if(s===null)return;` — user cancelled, abort before any write.",
+            "Line 9093 (code): `var sh=prompt('Ouverture d\\u2019obturateur, en frames (0.05-2)',String(state.motionBlurShutter!=null?state.motionBlurShutter:0.5));`.",
+            "Line 9094 (code): `if(sh===null)return;` — user cancelled, abort before any write.",
+            "Line 9095 (code): `window.SM.setMotionBlurSettings(s,sh);` — raw prompt strings, unparsed.",
+            "Line 9096 (code): `showToast('Flou : '+state.motionBlurSamples+SM.t('toastSamplesShutterSuffix')+state.motionBlurShutter+' f');` — reads state back AFTER the write, so reports the clamped values.",
+            "Line 9097 (code): `});` closes the contextmenu listener.",
+            "Line 9098 (code): `})();` closes and immediately invokes bindMotionBlur.",
+            "Line 9099 (code): `(function bindShy(){` — self-invoking IIFE.",
+            "Line 9100 (code): `var b=document.getElementById('btn-shy');`.",
+            "Line 9101 (code): `if(!b)return;` — guard, button absent.",
+            "Line 9102 (code): `b.addEventListener('click',function(){`.",
+            "Line 9103 (code): `window.SM.toggleShyMode();`.",
+            "Line 9104 (code): `b.classList.toggle('active',!!state.shyEnabled);` — reads state back AFTER the write to set the button's own active class.",
+            "Line 9105 (code): `});` closes the click listener.",
+            "Line 9106 (code): `})();` closes and immediately invokes bindShy.",
+            "Line 9107 (code): `var btn=document.getElementById('app-menu-btn');if(!btn||!window.showContextMenu)return;` — guard for the rest of initAppMenu's own body (the next packet)."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "app-menu-obj-reference-import",
+      "packets": [
+        {
+          "id": "C19ab.app-menu-obj-reference-import",
+          "files": [
+            "src/js/timeline.js:9108-9132"
+          ],
+          "coverage_ranges": [
+            [
+              9108,
+              9132
+            ]
+          ],
+          "classification": {
+            "code": 22,
+            "comment": 3,
+            "whitespace": 0
+          },
+          "symbols": [
+            "openObjReference",
+            "feed",
+            "SMLabs",
+            "showToast",
+            "SM",
+            "__TAURI__",
+            "FileReader"
+          ],
+          "signature": "function openObjReference()",
+          "responsibility": "3-line lead-in (9108-9110): openObjReference reads an .obj and hands it to the 3D reference viewer (labs/reference-3d.js); Tauri gets a native dialog, the browser preview a hidden input — the same platform split every other importer in this app uses. openObjReference() (9111-9132), lexically nested inside initAppMenu (see this artifact's own boundaries field): a local feed(text) closure guards on window.SMLabs/SMLabs.open3DReference and forwards the .obj text to it; the Tauri branch opens a native file dialog and reads the chosen path; the browser fallback creates, wires and clicks a hidden file input, cleaning itself up on change.",
+          "callers": [
+            "`openObjReference` — 1 call site beyond its own declaration, confirmed by `grep -rn -P '(^|[^a-zA-Z_.])openObjReference(?!\\()' src/js` for the bare reference and a direct read: timeline.js:9189, the ctx-import-3d menu item's own action (this artifact's own next packet), when window.SM_FROZEN_IN_DEV.import3d is falsy. Zero external callers found."
+          ],
+          "behavior": [
+            "Line 9108 (comment): lead-in — reads an .obj, hands it to the 3D reference viewer (labs/reference-3d.js).",
+            "Lines 9109-9110 (comment, 2 lines): Tauri gets a native dialog, the browser preview a hidden input — same split every other importer here uses.",
+            "Line 9111 (code): `function openObjReference(){`.",
+            "Line 9112 (code): `function feed(text){` — local closure, called by both platform branches below.",
+            "Line 9113 (code): `if(!window.SMLabs||!SMLabs.open3DReference){showToast('Visionneuse 3D indisponible');return;}` — hardcoded French toast, no SM.t.",
+            "Line 9114 (code): `SMLabs.open3DReference(text);` — labs/reference-3d.js:354.",
+            "Line 9115 (code): `}` closes feed.",
+            "Line 9116 (code): `if(typeof window.__TAURI__!=='undefined'){` — Tauri branch, checked FIRST.",
+            "Lines 9117-9118 (code, 2 lines): `window.__TAURI__.dialog.open({title:'Importer une référence 3D (.obj)',multiple:false,filters:[{name:'OBJ',extensions:['obj']}]}).then(function(path){`.",
+            "Line 9119 (code): `if(!path)return;` — dialog cancelled, abort before reading any file.",
+            "Line 9120 (code): `return window.__TAURI__.fs.readTextFile(path).then(feed);` — reads the chosen file, hands the text to feed.",
+            "Line 9121 (code): `}).catch(function(e){showToast(SM.t('toastObjImportFailedSuffix')+e.message);});` — the only translated toast in this packet.",
+            "Line 9122 (code): `return;` — Tauri branch always returns here, never falling through to the browser branch.",
+            "Line 9123 (code): `}` closes the Tauri `if`.",
+            "Line 9124 (code): `var inp=document.createElement('input');inp.type='file';inp.accept='.obj';inp.style.display='none';` — browser fallback, unconditional once past the Tauri branch.",
+            "Line 9125 (code): `document.body.appendChild(inp);`.",
+            "Line 9126 (code): `inp.addEventListener('change',function(e){`.",
+            "Line 9127 (code): `var f=e.target.files&&e.target.files[0];inp.remove();` — cleanup happens immediately, before checking whether a file was actually chosen.",
+            "Line 9128 (code): `if(!f)return;` — no file chosen, abort.",
+            "Line 9129 (code): `var r=new FileReader();r.onload=function(){feed(r.result);};r.readAsText(f);`.",
+            "Line 9130 (code): `});` closes the change listener.",
+            "Line 9131 (code): `inp.click();` — programmatically opens the native file picker.",
+            "Line 9132 (code): `}` closing brace of openObjReference."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "app-menu-items-and-registration",
+      "packets": [
+        {
+          "id": "C19ab.app-menu-items-and-registration",
+          "files": [
+            "src/js/timeline.js:9133-9217"
+          ],
+          "coverage_ranges": [
+            [
+              9133,
+              9217
+            ]
+          ],
+          "classification": {
+            "code": 57,
+            "comment": 28,
+            "whitespace": 0
+          },
+          "symbols": [
+            "clickEl",
+            "SMProject",
+            "SMKitsu",
+            "showContextMenu",
+            "openObjReference",
+            "SMScript",
+            "SMPlugin",
+            "SMSecondViewer",
+            "SMSvgImport",
+            "SMRenderManager",
+            "SM_FROZEN_IN_DEV",
+            "initAppMenu"
+          ],
+          "signature": "function clickEl(id); (#app-menu-btn click handler, anonymous, inside initAppMenu)",
+          "responsibility": "clickEl(id) (9133), a one-line nested helper: click a button by id if it exists, so every importer/exporter's own pre-existing listener runs unchanged. The #app-menu-btn click handler (9134-9215): builds the live project-label row, the full menu-item array in display order (new/open/save/save-as, Kitsu open, Nemo script/plugin, new view, version history, four importers plus the frozen 3D reference importer, export, render manager, settings/shortcuts/about), splices in two conditional Kitsu rows when a shot is open, then hands the finished array to window.showContextMenu. initAppMenu's own closing brace (9216) and its DOMContentLoaded-or-immediate self-registration (9217).",
+          "callers": [
+            "`clickEl` — 12 internal call sites (9146, 9150, 9161, 9163, 9164, 9165, 9177, 9190, 9193, 9195, 9200, 9212), all within this same packet's own items array or its own nested settings-tab closures. Zero external callers found by `grep -rn -P '(^|[^a-zA-Z_.])clickEl\\(' src/js`.",
+            "The #app-menu-btn click handler is registered once, via `btn.addEventListener('click',...)` at line 9134 itself (the guard on `btn` comes from the previous packet's own line 9107); it has no name of its own and no other caller."
+          ],
+          "behavior": [
+            "Line 9133 (code): `function clickEl(id){var el=document.getElementById(id);if(el)el.click();}` — nested helper, single statement.",
+            "Line 9134 (code): `btn.addEventListener('click',function(e){` — begins the menu-button click handler.",
+            "Line 9135 (code): `e.stopPropagation();`.",
+            "Line 9136 (code): `var tt=(window.SM&&SM.t)?SM.t:function(k){return k;};` — local i18n alias with an identity fallback.",
+            "Line 9137 (code): `var r=btn.getBoundingClientRect();` — used later to position the menu.",
+            "Line 9138 (code): `var items=[` — begins the item array.",
+            "Lines 9139-9143 (comment, 5 lines): the live-label row replaces the old right-panel #proj-current readout (2026-07 feedback) — everything else in that section already had an entry here or is added below.",
+            "Line 9144 (code): item 1, disabled row — `{label:(window.SMProject&&window.SMProject.getCurrentLabel)?window.SMProject.getCurrentLabel():tt('menuUntitledNotSaved'),disabled:true}`.",
+            "Line 9145 (code): item 2, `{sep:true}`.",
+            "Line 9146 (code): item 3 — New Project, ⌘N — `action:function(){clickEl('project-tab-add');}`.",
+            "Line 9147 (code): item 4 — Open, ⌘O — `action:function(){if(window.SMProject)window.SMProject.open();}`.",
+            "Line 9148 (code): item 5 — Save, ⌘S — `action:function(){if(window.SMProject)window.SMProject.save();}`.",
+            "Line 9149 (code): item 6 — Save As, ⇧⌘S — `action:function(){if(window.SMProject)window.SMProject.saveAs();}`.",
+            "Line 9150 (code): item 7, id:'ctx-kitsu-open' — From Kitsu — `action:function(){clickEl('btn-kitsu-open');}`.",
+            "Lines 9151-9152 (comment, 2 lines): Nemo's own extensibility (nemo-script.js/nemo-plugin.js) ships in this app's own vocabulary.",
+            "Lines 9153-9154 (code, 2 lines): item 8, id:'ctx-nemo-script' — Open Script — `action:function(){if(window.SMScript)SMScript.openFile();}`.",
+            "Lines 9155-9156 (code, 2 lines): item 9, id:'ctx-nemo-plugin' — Open Plugin — `action:function(){if(window.SMPlugin)SMPlugin.openFile();}`.",
+            "Lines 9157-9159 (comment, 3 lines): New View (2026-08, AE feature audit 8.4) — a second panel on the same comp, independently panned/zoomed, optionally frame-locked.",
+            "Line 9160 (code): item 10, no id — New View — `action:function(){if(window.SMSecondViewer)SMSecondViewer.open();}`.",
+            "Line 9161 (code): item 11, id:'ctx-history' — Version History — `action:function(){clickEl('btn-history');}`.",
+            "Line 9162 (code): item 12, `{sep:true}`.",
+            "Line 9163 (code): item 13, no id — Import Image — `action:function(){clickEl('btn-import-img');}`.",
+            "Line 9164 (code): item 14, no id — Import Video — `action:function(){clickEl('btn-import-video');}`.",
+            "Line 9165 (code): item 15, id:'ctx-import-psd' — Import PSD — `action:function(){clickEl('btn-import-psd');}`.",
+            "Lines 9166-9169 (comment, 4 lines): SVG sits with the other importers now (2026-07-27) — the only import path yielding EDITABLE geometry instead of a flat Raster.",
+            "Lines 9170-9171 (code, 2 lines): item 16, id:'ctx-import-svg' — Import SVG — `action:function(){if(window.SMSvgImport)SMSvgImport.openFile();}`.",
+            "Lines 9172-9175 (comment, 4 lines): Figma import (feedback #138) reuses the token-paste UX already established in Réglages, rather than a file picker.",
+            "Lines 9176-9180 (code, 5 lines): item 17, id:'ctx-import-figma' — Import Figma — action clicks #btn-settings then the figma settings tab if found.",
+            "Lines 9181-9186 (comment, 6 lines): the OBJ reference viewer's own loader existed with zero call sites before this menu item; stays a REFERENCE (an overlay, never exported/baked); Freeze (2026-08, PR #209) note pointing at SM_FROZEN_IN_DEV.",
+            "Line 9187 (code): `(window.SM_FROZEN_IN_DEV&&window.SM_FROZEN_IN_DEV.import3d)` — ternary condition.",
+            "Line 9188 (code): item 18a (frozen branch) — `{label:tt('menuImport3D')+' '+tt('inDevSuffix'),id:'ctx-import-3d',disabled:true}` — currently the live branch (index.html:2297 sets import3d:true).",
+            "Line 9189 (code): item 18b (un-frozen branch) — `{label:tt('menuImport3D'),id:'ctx-import-3d',action:openObjReference}`.",
+            "Line 9190 (code): item 19, id:'ctx-export' — Export — `action:function(){clickEl('btn-export');}`.",
+            "Line 9191 (code): item 20, id:'ctx-render-manager' — Render Manager — `action:function(){if(window.SMRenderManager)SMRenderManager.open();}`.",
+            "Line 9192 (code): item 21, `{sep:true}`.",
+            "Line 9193 (code): item 22, no id — Settings — `action:function(){clickEl('btn-settings');}`.",
+            "Lines 9194-9198 (code, 5 lines): item 23, no id — Keyboard Shortcuts — action clicks #btn-settings then the shortcuts settings tab if found.",
+            "Lines 9199-9203 (code, 5 lines): item 24, no id — About Nemo — action clicks #btn-settings then the about settings tab if found.",
+            "Line 9204 (code): `];` closes the items array.",
+            "Lines 9205-9208 (comment, 4 lines): Kitsu publish only makes sense once a shot is open — mirrors the old kitsu-shot-row/kitsu-publish-row's own show/hide condition, decided fresh at menu-open time instead of a persistent DOM row.",
+            "Line 9209 (code): `var ks=window.SMKitsu&&window.SMKitsu.getCurrentShot&&window.SMKitsu.getCurrentShot();`.",
+            "Line 9210 (code): `if(ks){` — conditional splice guard.",
+            "Line 9211 (code): `items.splice(1,0,{label:'Kitsu: '+ks.projectName+(ks.sequenceName?' / '+ks.sequenceName:'')+' / '+ks.shotName+(ks.taskName?' ('+ks.taskName+')':''),disabled:true});` — inserted at index 1, after the project label, before the first separator.",
+            "Line 9212 (code): `items.splice(2,0,{label:tt('menuPublishToKitsu'),id:'ctx-kitsu-publish',action:function(){clickEl('btn-kitsu-publish');}});` — inserted at index 2, immediately after the disabled Kitsu-shot row.",
+            "Line 9213 (code): `}` closes the `if(ks)`.",
+            "Line 9214 (code): `window.showContextMenu(r.left,r.bottom+4,items);` — the sole call, after the array (and any conditional splice) is fully built.",
+            "Line 9215 (code): `});` closes the #app-menu-btn click handler.",
+            "Line 9216 (code): `}` closing brace of initAppMenu.",
+            "Line 9217 (code): `if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initAppMenu);else initAppMenu();` — self-registration."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "team-sync-rel-time",
+      "packets": [
+        {
+          "id": "C19ab.team-sync-rel-time",
+          "files": [
+            "src/js/timeline.js:9218-9227"
+          ],
+          "coverage_ranges": [
+            [
+              9218,
+              9227
+            ]
+          ],
+          "classification": {
+            "code": 8,
+            "comment": 1,
+            "whitespace": 1
+          },
+          "symbols": [
+            "syncRelTime",
+            "Date",
+            "Math"
+          ],
+          "signature": "function syncRelTime(ts)",
+          "responsibility": "Blank line 9218 and a 1-line section header (9219, 'Team sync UI (v16, Phase 2)') opening C06's own Collaboration slice. syncRelTime(ts) (9220-9227): a small, pure, hardcoded-French relative-time formatter (seconds/minutes/hours) with no symbol, module-state or call relationship to initAppMenu — it shares this leaf only because it is the next construct textually and the issue's own proposed union ends at its own closing brace, immediately before C06's own syncFolderFields (9228).",
+          "callers": [
+            "`syncRelTime` — 1 call site beyond its own declaration, confirmed by `grep -rn -P '(^|[^a-zA-Z_.])syncRelTime\\(' src/js`: timeline.js:9248, inside renderSyncUpdates (C06.preferences.* Collaboration, out of scope, cited by line only) — `label.appendChild(document.createTextNode(entry.profileName+' — '+syncRelTime(entry.ts)))`. Zero other callers found."
+          ],
+          "behavior": [
+            "Line 9218 (blank): separates C06's own initAppMenu-adjacent content from the Team Sync UI section below.",
+            "Line 9219 (comment): `// ---- Team sync UI (v16, Phase 2) ----` — section header opening C06's own Collaboration slice (this scope covers only syncRelTime, the last construct before that slice's main body).",
+            "Line 9220 (code): `function syncRelTime(ts){`.",
+            "Line 9221 (code): `var s=Math.max(0,Math.round((Date.now()-ts)/1000));` — floors elapsed seconds at 0 (never negative even if ts is slightly in the future, e.g. clock skew).",
+            "Line 9222 (code): `if(s<60)return 'il y a '+s+'s';` — under a minute: seconds.",
+            "Line 9223 (code): `var m=Math.round(s/60);`.",
+            "Line 9224 (code): `if(m<60)return 'il y a '+m+' min';` — under an hour: minutes.",
+            "Line 9225 (code): `var h=Math.round(m/60);`.",
+            "Line 9226 (code): `return 'il y a '+h+'h'+(m%60?Math.round(m%60)+'min':'');` — an hour or more: hours, plus a trailing minutes remainder only if non-zero.",
+            "Line 9227 (code): `}` closing brace of syncRelTime. All three return branches are hardcoded French literals, never routed through SM.t — an i18n gap, matching the issue's own note."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No `state`/`ld.*`/`project` field is written anywhere in this scope except state.motionBlurSamples/state.motionBlurShutter (written inside setMotionBlurSettings, C19e, out of scope — this scope only calls it with raw prompt strings) and state.shyEnabled (written inside toggleShyMode, C19e, out of scope — this scope only calls it and reads the result back for the button's own active class, 9104). This scope persists nothing of its own to any project field; it is pure UI wiring plus two menu-building/formatting utilities."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No function named importJSON exists anywhere in the codebase at the frozen SHA (confirmed by a whole-src `git grep -n 'function importJSON'`, zero hits, matching prior C19 findings) — none of this scope's four symbols appear in the project-load path either way. Nothing in this scope reads a persisted project field; it reads only live `state.motionBlurSamples`/`state.motionBlurShutter`/`state.shyEnabled` (all three written/owned by C19e, out of scope) for its own two toast/class-toggle reads."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Zero pushUndo()/pushUndoLayers() calls anywhere in this scope's own body — confirmed by direct read of all 150 lines. toggleMotionBlurComp/setMotionBlurSettings/toggleShyMode (C19e, out of scope) are themselves plain state toggles with no undo entry of their own either, per that sibling's own body (not reproduced here); this scope neither adds to nor bypasses undo."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "This scope never reads `_layerSel`/`_layerSelAnchor` (C19q's module-scope selection state) or any per-layer/per-item selection. The Kitsu conditional splice reads `window.SMKitsu.getCurrentShot()` (a global current-shot pointer, not a selection); everything else operates on module-global `state.*` flags or DOM elements by fixed id, never on the current selection."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "No mode branch anywhere in this scope's four functions. The menu, its two small button IIFEs, the OBJ importer and the relative-time formatter are all top-bar/Settings UI, identical in either mode; this scope calls into neither layerElements/elementMotion (motion.js) nor any Animation-2D-specific machinery."
+    },
+    {
+      "consumer": "export",
+      "disposition": "None of this scope's four declared functions are called from export.js, rive-export.js, or engine-bridge.js at the frozen SHA (confirmed: zero matches for any of the four symbol names in any of the three files, and separately in app.js). Every function here is editor-UI-only, reached from a user gesture (menu-button click, contextmenu, menu-item click) or an internal call within this same scope."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "window.__TAURI__.dialog.open/fs.readTextFile are called exactly once each, inside openObjReference's own Tauri branch (9117-9120), gated on `typeof window.__TAURI__!=='undefined'`; the browser fallback (hidden `<input type=file>`) is used unconditionally otherwise. window.SMEngineBridge is never referenced anywhere in this scope — the two toasts (9096, 9113/9121) and the two active-class toggles (9104, and toggleMotionBlurComp/toggleShyMode's own internal button-class writes, C19e) are the only visible side effects; no renderNow()/engine call is made by this scope's own code."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-bind-motion-blur-cancel-either-prompt-aborts",
+      "proposed": "Stub window.prompt to return null on the first call; right-click #btn-mblur; expect window.SM.setMotionBlurSettings to NOT be called and no toast shown — verifies the early return at 9092. Repeat stubbing only the SECOND prompt to return null; expect the same (verifies 9094) — not run."
+    },
+    {
+      "id": "fx-bind-motion-blur-toast-reads-clamped-state",
+      "proposed": "Stub prompt to return '999' then '999'; right-click #btn-mblur; expect the resulting toast string to contain the CLAMPED values (16 and 2, per setMotionBlurSettings' own 2-16/0.05-2 clamps, C19e) rather than the raw '999' strings passed in — verifies 9095-9096 read state back after the write rather than echoing the prompt's own return values — not run."
+    },
+    {
+      "id": "fx-bind-shy-toggle-reflects-state-after-write",
+      "proposed": "Click #btn-shy twice; expect state.shyEnabled to flip each time (via toggleShyMode, C19e) and the button's own 'active' class to match `!!state.shyEnabled` after each click, read back from state rather than tracked independently — verifies 9103-9104 — not run."
+    },
+    {
+      "id": "fx-open-obj-reference-tauri-branch-never-falls-through",
+      "proposed": "Stub window.__TAURI__ present with dialog.open resolving to a path and fs.readTextFile resolving to text; call openObjReference(); expect SMLabs.open3DReference to be called exactly once with that text, and expect no `<input type=file>` element to ever be appended to document.body — verifies the unconditional `return` at 9122 — not run."
+    },
+    {
+      "id": "fx-open-obj-reference-browser-fallback-cleans-up-input",
+      "proposed": "Delete window.__TAURI__; call openObjReference(); simulate a file selection on the created hidden input; expect the input to be removed from document.body BEFORE the file-presence check (9127) fires, and expect it removed from the DOM even if no file was actually chosen (cancelled picker) — verifies the cleanup-then-guard order at 9127-9128 — not run."
+    },
+    {
+      "id": "fx-open-obj-reference-missing-smlabs-toasts-untranslated",
+      "proposed": "Delete window.SMLabs; drive either platform branch to call feed(text); expect showToast called with the literal untranslated string 'Visionneuse 3D indisponible' (not SM.t(...)) and expect SMLabs.open3DReference to never be reached — verifies 9113 — not run."
+    },
+    {
+      "id": "fx-menu-kitsu-splice-inserts-at-fixed-indices",
+      "proposed": "Stub window.SMKitsu.getCurrentShot to return a shot object with all four fields set; open the app menu; expect the resulting items array to have the disabled Kitsu-shot row at index 1 and the Publish-to-Kitsu row at index 2, both inserted ahead of every item present in the base 24-item table — verifies the fixed splice indices at 9211-9212 — not run."
+    },
+    {
+      "id": "fx-menu-import3d-ternary-mutually-exclusive",
+      "proposed": "Toggle window.SM_FROZEN_IN_DEV.import3d between true and false, opening the menu each time; expect exactly ONE object with id 'ctx-import-3d' in the resulting items array in either state (never both, never neither) — verifies the ternary at 9187-9189 never produces a duplicate — not run."
+    },
+    {
+      "id": "fx-sync-rel-time-boundaries",
+      "proposed": "Call syncRelTime(Date.now()-t) for t at 59999ms, 60000ms, 3599999ms and 3600000ms; expect outputs 'il y a 60s'/'il y a 1 min' at the first boundary (round(59.999)=60, still <60 branch since s is computed BEFORE the m<60 check — verify exact branch taken) and the minutes-vs-hours boundary similarly — verifies the three return branches at 9222/9224/9226 including the m%60 remainder suffix — not run."
+    }
+  ],
+  "future_proposals": [
+    "window.showContextMenu is defined once, in src/js/ui.js:1136 — not 'elsewhere in timeline.js' as the issue's own prose states. Flagged as a citation correction for whoever maintains the issue text or a future cross-reference audit; it does not affect this leaf's own assigned range, packet boundaries, or validator result.",
+    "window.SM.toggleMotionBlurComp/setMotionBlurSettings/toggleShyMode are declared inside timeline.js itself (1161-1168/1169-1173/1190-1195), owned by the sibling artifact C19e-timeline-layer-controls-and-symbol-facades (assigned_ranges 1121-1195) — not 'motion.js/app.js, C20/C21' as the issue's own prose states. Flagged as a second citation correction; it does not affect this leaf's own assigned range, packet boundaries, or validator result.",
+    "The two 'ctx-import-3d' ids (9188/9189) are mutually exclusive branches of one ternary, never simultaneously present in the same items array — the issue's own framing ('note the two ctx-import-3d ids ... duplicate id') is confirmed as a textual duplicate (same string literal appears twice in source) but not a runtime collision; flagged in case a future refactor ever includes both branches unconditionally (e.g. an A/B test), which WOULD then produce a real duplicate id inside window.showContextMenu's own item list.",
+    "syncRelTime's three return branches are hardcoded French with no SM.t routing, confirmed directly (matching the issue's own i18n-gap note) — a genuine localization gap for whoever picks up C06's own Collaboration slice next; not remediated here since this leaf is source-read only and timeline.js remains read-only.",
+    "bindMotionBlur's two prompt() strings are also hardcoded French with no SM.t routing, and browser prompt() itself cannot be localized via CSS/markup the way a DOM control can — a second, related i18n gap in the same neighborhood, noted for the same future owner."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A recursive `grep -rn -P '(^|[^a-zA-Z_.])<symbol>\\(' src/js` (includes labs/ and adapters/) was run once for each of the four function symbols this scope defines (initAppMenu, openObjReference, clickEl, syncRelTime), at the frozen SHA's own working-tree content (verified identical blob to the frozen SHA before running), filtering out each symbol's own declaration line and any hit whose trimmed content starts with `//` — results are reproduced verbatim under each packet's own `callers` field and are re-checkable with the same command. A separate check confirmed none of the four symbols appear inside a `window.SM={...}` literal block anywhere in src/js (the block itself opens at timeline.js:349).",
+    "A SEPARATE grep restricted to engine-bridge.js/export.js/rive-export.js/app.js for all four symbol names returned ZERO hits, directly supporting the export/render-path source_consumers entries above.",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's OWN classify() algorithm against a direct `git show 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js` dump, run once per packet and once for the whole span — 111/37/2 over 150 lines, matching the issue's own proposed union exactly and matching the issue's own proposed per-packet table exactly for all four packets; no boundary correction was needed (every cut point named in the issue's own table was verified byte-for-byte against the frozen blob with sed -n/awk before this artifact was written).",
+    "window.showContextMenu's own declaration site was located by `grep -rn 'showContextMenu\\s*=\\s*function\\|function showContextMenu' src/js/` (one hit, ui.js:1136) rather than assumed from the issue's own prose — see the citation correction in future_proposals.",
+    "window.SM.toggleMotionBlurComp/setMotionBlurSettings/toggleShyMode's own owning sibling (C19e, not C20/C21) was produced by loading every C19*.json in this directory and checking which one's own assigned_ranges contains lines 1161/1169/1190 programmatically, not by re-reading the issue's own prose assumption.",
+    "engineering/inventory/census/*.json siblings present at authoring time sharing `source_path: src/js/timeline.js`: C19a through C19z, forming a contiguous run through line 8662 (C19z's own declared end) with zero gaps/overlaps against this scope's own 9078-9227 range (confirmed by listing every sibling's own assigned_ranges); C19aa (proposed 8663-9077, concurrent sibling leaf, not yet merged as a filed artifact in this worktree at authoring time) is the immediately preceding span — this scope's own range begins exactly where C19aa's own issue text (#1231) proposes its range to end, and the validator's own cross-sibling overlap check will confirm no line-level overlap with C19aa once it lands as a file on disk; it is not present in this directory at authoring time and was therefore not checked programmatically, only by reading its own issue text.",
+    "The complete menu-item table (issue's artifact-contract item (a)) was built entirely from a direct line-by-line read of 9138-9213 (verified byte-for-byte against the frozen blob) rather than assumed from the issue's own suggested-packet-table prose."
+  ],
+  "validation": {
+    "expected_assigned_lines": 150,
+    "expected_classification": {
+      "code": 111,
+      "comment": 37,
+      "whitespace": 2
+    },
+    "packet_partition": [
+      [
+        9078,
+        9107
+      ],
+      [
+        9108,
+        9132
+      ],
+      [
+        9133,
+        9217
+      ],
+      [
+        9218,
+        9227
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by script against the frozen blob: 9078-9107=(24,5,1); 9108-9132=(22,3,0); 9133-9217=(57,28,0); 9218-9227=(8,1,1); sums to (111,37,2)=150 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 150 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check_c19ab.py engineering/inventory/census/C19ab-timeline-app-menu-entry-points.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check_c19ab.py engineering/inventory/census/C19z-timeline-text-bake-commit-split.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c19ab.py engineering/inventory/census/C19w-timeline-duplicator-panel.json <candidate-sha> still exits 0"
+    ]
+  }
+}
