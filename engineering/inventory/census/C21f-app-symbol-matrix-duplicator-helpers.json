@@ -1,0 +1,565 @@
+{
+  "census_id": "C21f",
+  "issue": 1197,
+  "title": "app.js component-instance matrices, heavy-field stroke cloning, matrix application and the duplicator's pure helpers",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C21f census only; app.js:1025-1251 (serR/decoded-image cache/desR, C21e/#1193, PR #1196 merged) remains a separate owner, cited by line only. The duplicator's stateful core (_resolveDuplicatorPath 1456, applyLayerDuplicator 1616-1795, getEffectiveStrokesRendered 1796+) is the next leaf C21g, out of scope here and cited by line only where a packet's own callers needed to name a call site living inside it (e.g. app.js:1718/1763/1752/1771/1772/3136/3140, all inside applyLayerDuplicator or getEffectiveStrokes's ld.symbolId branch). getEffectiveStrokes itself (app.js:2949) and its ld.symbolId branch (app.js:3088-3141) are general app.js territory outside both this leaf and C21g, cited by line only. Motion's computeMotionMat/transformSegments (C02/C20) and SMMotion.DUP_TARGET_PROPS/propDim/propLabel (C20) are cited by name only, not re-mapped. select-bridge.js, tools.js, subselect-bridge.js, engine-bridge.js, timeline.js, tweens.js, transplant.js and storyboard.js retain their own bodies in full — cited by call-site only as callers of this scope's nine symbols.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "6c61c057b160980263d3faeafa6fc3b05995a89f",
+  "source_path": "src/js/app.js",
+  "source_blob": "0831959f70612721f80717812838d19940d1f7c1",
+  "source_line_count": 5410,
+  "scope_files": [
+    "src/js/app.js"
+  ],
+  "intended_branch": "claude/c21f-app-symbol-matrix-dup-helpers-census",
+  "assigned_ranges": [
+    {
+      "start": 1252,
+      "end": 1450
+    }
+  ],
+  "coverage_note": "Exactly 199 assigned lines occur once across eight packets (one coverage_range per packet, no gaps, no other-owner overlap): 104 code, 95 full-line `//` comments, 0 blank — matches the issue's own proposed union exactly (independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs: 6+7+15+18+10+24+7+17=104 code; 21+25+3+13+24+6+0+3=95 comment; 0 blank in every packet). Line 1251 (blank, C21e's last line) is out of scope; line 1252 opens this scope's own `// ---- COMPONENTS / SYMBOLS ----` header. Line 1450 is the closing `}` of _boundsCenterOfStrokes; line 1451 opens the lead-in comment for _resolveDuplicatorPath (C21g's own territory).",
+  "source_baselines": {
+    "pinned": "59a5a38c:src/js/app.js resolves to 0831959f70612721f80717812838d19940d1f7c1, 5410 lines.",
+    "current": "origin/main (6c61c057b160980263d3faeafa6fc3b05995a89f) has the identical app.js blob (git rev-parse 6c61c057:src/js/app.js == git rev-parse 59a5a38c:src/js/app.js == 0831959f70612721f80717812838d19940d1f7c1); this artifact branches from origin/main at 6c61c057.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' 59a5a38c -- src/js` for the seven function symbols (symMatrixOf, symMatrixSet, symGestureAccumulate, cloneStrokeForTransform, applyMatrixToStrokeData, effectorChannels, hexHueRotate, dupMatrixFromDescriptor, _boundsCenterOfStrokes) and `git grep -n '_HEAVY_STROKE_FIELDS' 59a5a38c -- src/js` for the one data symbol, each filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`, then reading each surviving hit's line and enclosing function directly (located by scanning backward from the call-site line for the nearest preceding `function <name>(` declaration or object-literal `name:function(` method, confirmed by checking no closer declaration intervenes).",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; the in-source comments (the v17 placement-vs-content separation note, the 2026-07-28 measured-1.9ms-per-call HEAVY-fields rationale, the 2026-07-29/2026-07-30 duplicator/effector-channel migration notes, CLAUDE.md §8 point 2's append-vs-prepend warning) are read as authorial intent and prior-session evidence, not fresh execution evidence produced by this census."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C21f-app-symbol-matrix-duplicator-helpers.json and the eight app.js packets partitioning lines 1252-1450.",
+    "app_js": "app.js retains the whole runtime for these nine symbols; this JSON authoring does not authorize source changes.",
+    "c21e_boundary": "Lines 1025-1251 (serR, the decoded-image cache, desR) belong to C21e/#1193 (PR #1196, merged) — cited by line only; this artifact does not re-describe their bodies.",
+    "c21g_boundary": "Lines 1451+ (_resolveDuplicatorPath's own lead-in) and, within this scope's own line range, the call sites of this scope's symbols that live INSIDE applyLayerDuplicator (1616-1795, app.js:1718/1737/1752/1763/1771/1772) or getEffectiveStrokes's ld.symbolId branch (2949-onward, app.js:3088/3123/3136/3138-3140/3550-ish _duplicatorClonePlacement callers of effectorChannels at 1550) are cited by file:line only in each packet's own `callers` list — none of applyLayerDuplicator's or getEffectiveStrokes's own bodies are reproduced here.",
+    "other_consumers_boundary": "select-bridge.js, tools.js, subselect-bridge.js, engine-bridge.js, timeline.js, tweens.js, transplant.js and storyboard.js retain their own bodies in full — cited by line/call-site only for the specific findings each packet's `callers`/`behavior` needed."
+  },
+  "reconciliation": [
+    {
+      "owner": "C21e / #1193 (existing owner, PR #1196 merged)",
+      "disposition": "Retains app.js:1025-1251 (serR, the decoded-image cache, desR). This scope's own boundary begins at line 1252 (the `// ---- COMPONENTS / SYMBOLS ----` header, immediately after C21e's trailing blank line 1251)."
+    },
+    {
+      "owner": "C21g (next leaf, not yet filed as an issue at authoring time)",
+      "disposition": "Owns app.js:1456+ (_resolveDuplicatorPath) through app.js:1795 (applyLayerDuplicator's own closing brace) and getEffectiveStrokesRendered (1796+) — this scope's helpers (cloneStrokeForTransform/applyMatrixToStrokeData/effectorChannels/hexHueRotate/dupMatrixFromDescriptor/_boundsCenterOfStrokes) are called repeatedly from inside that range; those call sites are cited by file:line only in each packet's own `callers` list, and applyLayerDuplicator's own body is not reproduced."
+    },
+    {
+      "owner": "engine-bridge.js (existing owner, buildSceneJson/buildNodeHandleItems/DUP3D projector consumer)",
+      "disposition": "Retains its own body in full — cited by line only. buildSceneJson's nativeVideo-nested-symbol branch (engine-bridge.js:1324-1326) and buildNodeHandleItems (engine-bridge.js:3820-3841) both call symMatrixOf, defensively guarding on `typeof symMatrixOf==='function'`/`window.symMatrixOf` since app.js may not have loaded yet in some load orders — confirmed by direct read, not reproduced beyond the cited lines."
+    },
+    {
+      "owner": "select-bridge.js / tools.js (existing owners, the two gesture front-ends)",
+      "disposition": "Retain their own bodies in full — cited by line only as the complete caller list of symGestureAccumulate (four box-handle branches in select-bridge.js's engine path, three transform-handle/drag branches in tools.js's Paper-native path). Neither file's own gesture math is re-described beyond the one-line call each makes."
+    },
+    {
+      "owner": "subselect-bridge.js (existing owner, toLocalPoint)",
+      "disposition": "Retains its own body in full — cited by line only. subselect-bridge.js:95-97 inverts symMatrixOf's result to map a screen point back into the symbol's own untransformed local space for vertex-editing inside a Component instance; not reproduced beyond the cited lines."
+    },
+    {
+      "owner": "timeline.js / transplant.js (existing owners, layer-copy/restore/transplant paths)",
+      "disposition": "Retain their own bodies in full — cited by line only as writers/copiers of the persisted `ld.symMatrix` field outside `symMatrixSet` itself: splitLayerAtPlayhead (timeline.js:1218), duplicateLayer's `dupOne` closure (timeline.js:1392), importJSON (timeline.js:2456), exportJSON's own per-layer field list (timeline.js:2117, a READER for persistence, not a writer), and transplant.js's importChecked (transplant.js:277)."
+    },
+    {
+      "owner": "tweens.js (existing owner, _cloneStrokesForUndo/_cloneLayersForUndo)",
+      "disposition": "Retains its own body in full — cited by line only. Both undo-snapshot clones (tweens.js:4808-4820, 4852-onward) read `window._HEAVY_STROKE_FIELDS` (with an inline literal fallback) but use a DIFFERENT technique from this scope's own cloneStrokeForTransform — detach each heavy field to null, run one native JSON.stringify/parse over the WHOLE strokes array, then restore the heavy strings in a `finally` — rather than this scope's split-light/heavy-then-reattach approach; both share the SAME list so a future third heavy field only needs to be added once (CLAUDE.md §1)."
+    },
+    {
+      "owner": "storyboard.js (existing owner, symbolStrokesAt/montageStrokesAt)",
+      "disposition": "Retains its own body in full — cited by line only. storyboard.js:392-395 (`symbolStrokesAt`) is the StoryBoard-side mirror of getEffectiveStrokes's own camera-baking branch, calling `window.applyMatrixToStrokeData`/`window.cloneStrokeForTransform` as app.js globals (storyboard.js loads after app.js) — its own comment states this mirrors a 2026-07-30 gap fix, confirmed by direct read."
+    }
+  ],
+  "boundaries": [
+    "Line 1251 (blank, C21e's last line) is outside coverage; line 1252 (the `// ---- COMPONENTS / SYMBOLS ----` header) begins this scope.",
+    "Line 1450 (`_boundsCenterOfStrokes`'s own closing `}`) is the last line of this scope; line 1451 opens the lead-in comment for `_resolveDuplicatorPath`, C21g's own territory, and is excluded — confirmed by reading through line 1456.",
+    "No lines inside 1252-1450 are excluded for another owner: every line belongs to exactly one of the eight packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "Comment-to-code alignment is NOT one-lead-in-per-function inside this scope: the tail of packet 2 (symbol-gesture-accumulate, lines 1292-1310) is NOT further documentation of symGestureAccumulate itself — lines 1292-1294 are the lead-in comment for applyMatrixToStrokeData (packet 4, defined 37 lines later at 1329), and lines 1295-1310 are the lead-in comment for cloneStrokeForTransform/_HEAVY_STROKE_FIELDS (packet 3, defined immediately after at 1311). Packet 3's OWN range (1311-1328) therefore carries only 3 comment lines (1312-1314, the `window._HEAVY_STROKE_FIELDS` export rationale) — confirmed by direct read of both ranges, not an artifact of the classifier.",
+    "Symmetrically, packet 5's header block (`// ---- MOGRAPH DUPLICATOR ----`, lines 1360-1383) contains the ENTIRE documentation for dupMatrixFromDescriptor's compose order (lines 1367-1373, \"Fourth mirror of the same closed-form affine... Built as ONE expression, never chained Matrix.translate/rotate/scale calls—a bare Matrix's own methods APPEND while Item methods PREPEND, a real shipped-bug class documented in CLAUDE.md §8 point 2\") even though dupMatrixFromDescriptor itself is defined 41-64 lines later, in packet 7 (1424-1430). Packet 7's own range therefore has ZERO comment lines (7/0/0, confirmed) — all of its documentation lives in packet 5's range, not its own.",
+    "`_HEAVY_STROKE_FIELDS` has exactly TWO readers outside app.js itself: tweens.js:4810 (`_cloneStrokesForUndo`) and tweens.js:4853 (`_cloneLayersForUndo`), both via `window._HEAVY_STROKE_FIELDS` with an inline literal fallback (`||['src','bitmapPressureProfile']`) rather than a hard dependency — confirmed by `git grep -n '_HEAVY_STROKE_FIELDS' 59a5a38c -- src` returning only these six hits total (two declarations/exports in app.js, two internal reads in app.js's own cloneStrokeForTransform, two external reads in tweens.js). transplant.js has NO reference to `_HEAVY_STROKE_FIELDS`, `cloneStrokeForTransform`, or `bitmapPressureProfile` at this SHA (`git grep` returns empty) — this CORRECTS a plausible reading of the issue's own prompt (which named \"transplant\" among the readers to check): transplant.js copies whole stroke dicts (including any `src`/`bitmapPressureProfile` they carry) via its own generic `JSON.parse(JSON.stringify(...))` frame copy, never routing through this scope's heavy-field-aware clone path at all.",
+    "`applyMatrixToStrokeData`'s raster branch (app.js:1330-1345) is NOT a no-op fallback for the common case — its own comment (1331-1341) states the early-return that used to be there was found live to silently no-op a symMatrix drag on an imported-video component. The fix computes `scaleX=\\sqrt(a^2+b^2)`, `scaleY=\\sqrt(c^2+d^2)` (the matrix's own linear-part magnitude per axis) and applies translate+scale only — a rotate gesture on a raster-backed component therefore visibly degrades to scale-only, by design, matching the raster schema's real capability (no rotation field, confirmed by the comment's own cross-reference to serR/desR, C21e, and to engine.rs's ItemIn.image handling, cited by name only).",
+    "`applyMatrixToStrokeData`'s vector branch (app.js:1346-1358) transforms exactly two things: every segment's `point` gets the FULL affine (`m.transform(...)`); every segment's `handleIn`/`handleOut` gets the LINEAR-ONLY part (transform the vector, transform the origin, subtract — strips translation per the inline comment at 1351-1352). No other field of a vector stroke dict (fillColor, strokeColor, strokeWidth, opacity, closed, any brush/text tag) is read or written by this function at all — confirmed by reading the full function body: there is no field in the vector branch besides `segments`. A stroke with no `segments` and no `isRaster` (should one ever exist) passes through unchanged via the `if(!sd.segments)return sd;` guard at line 1346."
+  ],
+  "areas": [
+    {
+      "area": "symbol-matrix",
+      "packets": [
+        {
+          "id": "C21f.symbol-matrix",
+          "files": [
+            "src/js/app.js:1252-1278"
+          ],
+          "coverage_ranges": [
+            [
+              1252,
+              1278
+            ]
+          ],
+          "classification": {
+            "code": 6,
+            "comment": 21,
+            "whitespace": 0
+          },
+          "symbols": [
+            "symMatrixOf",
+            "symMatrixSet"
+          ],
+          "signature": "function symMatrixOf(ld){var m=ld.symMatrix;if(!m)return new Matrix(1,0,0,1,0,0);return new Matrix(m[0],m[1],m[2],m[3],m[4],m[5]);} function symMatrixSet(ld,m){ld.symMatrix=[m.a,m.b,m.c,m.d,m.tx,m.ty];}",
+          "responsibility": "Persisted<->live conversion for a component instance's own placement affine (ld.symMatrix, a plain [a,b,c,d,tx,ty] 6-tuple, same convention as paper.Matrix), kept deliberately separate from the symbol's own internal animated content (v17 design note, lines 1259-1268: moving/transforming the placed instance must NOT bake into the symbol's own frame data, or the move would only affect whichever internal frame happened to be resolved at that instant and vanish the moment playback resolves a different frame). symMatrixOf defaults to identity when ld.symMatrix is falsy; symMatrixSet is a one-line field writer with no validation.",
+          "callers": [
+            "app.js:1282 — symGestureAccumulate (this scope's own next packet, app.js:1279-1291): `var m=symMatrixOf(ld);` reads the current placement before appending the gesture's op matrix.",
+            "app.js:3139 — getEffectiveStrokes's ld.symbolId branch (app.js:2949-onward, general app.js territory, cited by line only): `var m=symMatrixOf(ld);` inside `if(ld.symMatrix){...}` (app.js:3138-3141), bakes the instance placement onto every composited stroke via applyMatrixToStrokeData right after.",
+            "engine-bridge.js:1325 — buildSceneJson's nativeVideo-nested-symbol branch (inside buildSceneJson, engine-bridge.js:802): `nvsymRect = SMMotion.transformImageRectByMatrix(nvsymRect, symMatrixOf(nvsymLd));`, guarded by `if (nvsymLd.symMatrix && window.symMatrixOf)` at line 1324 since app.js may load after engine-bridge.js in some orders.",
+            "engine-bridge.js:3837 — buildNodeHandleItems (engine-bridge.js:3778): `var symMat = (symLd && symLd.symMatrix && typeof symMatrixOf === 'function') ? symMatrixOf(symLd) : null;`, applied FIRST (before the Motion point-map) so vertex-handle overlays line up with a dragged/resized component instance — its own comment (3825-3834) cites this as a 2026-08-29 fix, feedback #125.",
+            "subselect-bridge.js:96 — toLocalPoint (subselect-bridge.js:79): `var inv = symMatrixOf(ld).inverted();`, guarded by `if (ld && ld.symMatrix && typeof symMatrixOf === 'function')` at line 95, maps a screen point back into the symbol's own untransformed local space for subselect vertex-dragging inside a placed instance."
+          ],
+          "behavior": [
+            "Lines 1252-1268 (comment, 17 lines): section header. Defines what a component is (a layer whose content lives in state.symbols[id], a full mini-project shape, swapped into state.layers/userLayers by enterSymbol/exitToScene). States the v17 rule this packet exists to enforce: an instance's own placement is stored SEPARATELY from the symbol's internal frames, as a plain 6-number affine on the layer itself, applied fresh on top of the symbol's own untransformed content every composite.",
+            "Lines 1269-1273 (code, 5 lines): symMatrixOf(ld) — reads ld.symMatrix, returns identity Matrix if absent, else reconstructs a paper.Matrix from the 6-tuple in [a,b,c,d,tx,ty] order (paper.Matrix's own field order).",
+            "Line 1274 (code, 1 line): symMatrixSet(ld,m) — writes ld.symMatrix=[m.a,m.b,m.c,m.d,m.tx,m.ty], the inverse mapping. No caller other than symGestureAccumulate (app.js:1284) writes through this function; four other sites (timeline.js:1218/1392/2456, transplant.js:277) write ld.symMatrix directly without going through symMatrixSet — see this artifact's `boundaries`/reconciliation for the complete writer list.",
+            "Lines 1275-1278 (comment, 4 lines): notes symGestureAccumulate (the next packet) is shared by select-bridge.js (engine path) and tools.js (Paper-native path) as one definition so the two gesture front-ends don't drift, cross-referencing CLAUDE.md's duplicated-pair guidance (CLAUDE.md §3, cited by name only)."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "symbol-gesture-accumulate",
+      "packets": [
+        {
+          "id": "C21f.symbol-gesture-accumulate",
+          "files": [
+            "src/js/app.js:1279-1310"
+          ],
+          "coverage_ranges": [
+            [
+              1279,
+              1310
+            ]
+          ],
+          "classification": {
+            "code": 7,
+            "comment": 25,
+            "whitespace": 0
+          },
+          "symbols": [
+            "symGestureAccumulate"
+          ],
+          "signature": "function symGestureAccumulate(opMatrix){var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId)return;var m=symMatrixOf(ld);opMatrix.append(m);symMatrixSet(ld,opMatrix);}",
+          "responsibility": "Folds one gesture-tick's world-space operation matrix into the active layer's persistent symMatrix; a no-op unless the active layer is a component instance (ld.symbolId truthy). Composition order: `opMatrix.append(m)` — a bare paper.Matrix's own `append` composes as opMatrix = opMatrix × m (the EXISTING symMatrix m is applied first/inner, the new gesture opMatrix second/outer) — this is the bare-Matrix APPEND semantics the file's own comment at line 1276 and CLAUDE.md §8 point 2 (cited by name only) warn is the OPPOSITE of Item.rotate/scale/translate's PREPEND semantics; symGestureAccumulate never calls those Item methods, so this is self-consistent, not an instance of the bug class it warns about.",
+          "callers": [
+            "select-bridge.js:2261 — inside the box-handle MOVE branch (engine/select path): `symGestureAccumulate(new Matrix().translate(d));`.",
+            "select-bridge.js:2373 — inside the box-handle SCALE branch: `symGestureAccumulate(new Matrix().scale(stepSx, stepSy, anchor));`.",
+            "select-bridge.js:2424 — inside the box-handle SHEAR branch: `symGestureAccumulate(new Matrix().shear(stepShx, stepShy, anchorK));`.",
+            "select-bridge.js:2499 — inside the box-handle ROTATE branch: `symGestureAccumulate(new Matrix().rotate(stepAngle, rotCenter));`.",
+            "tools.js:7789 — inside the Paper-native transform-handle ROTATE branch: `symGestureAccumulate(new Matrix().rotate(stepAngle,_xform.center));`.",
+            "tools.js:7812 — inside the Paper-native transform-handle SCALE branch: `symGestureAccumulate(new Matrix().scale(stepSx,stepSy,anchor));`.",
+            "tools.js:7836 — inside the Paper-native plain-drag MOVE branch (selectedPaths.forEach position update): `symGestureAccumulate(new Matrix().translate(event.delta));`."
+          ],
+          "behavior": [
+            "Lines 1279-1284 (code, 6 lines): function body — guard on `!ld||!ld.symbolId` (no-op for a non-component layer or no active layer), read the current symMatrix, append the caller's op matrix onto it, write the result back.",
+            "Lines 1285-1290 (comment, 6 lines): explains why there is deliberately NO `_sceneVersion` bump here — symMatrix is materialised by getEffectiveStrokes at loadFrame time, and engine-bridge.js has zero direct references to it (per the comment's own grep claim, re-verified by this packet's own `boundaries` note that engine-bridge.js only ever reads it through `symMatrixOf`, never the raw field, at 1325/3837 in packet 1's caller list) — bumping the version would only force a rebuild producing identical bytes. States what actually makes a component drag visible LIVE: the geometry translate in select-bridge.js's own move branch re-syncing selectedPaths, not this function.",
+            "Line 1291 (code, 1 line): closing brace.",
+            "Lines 1292-1310 (comment, 19 lines): NOT further documentation of symGestureAccumulate — this is the lead-in comment block for the NEXT TWO packets, textually out of definition order (see this artifact's `boundaries`). Lines 1292-1294 describe applyMatrixToStrokeData's own contract (point gets the full affine, handleIn/handleOut get the linear-only delta) — the function itself is defined 37 lines later, in packet 4 (app.js:1329). Lines 1295-1310 describe cloneStrokeForTransform and the HEAVY-field sharing rationale (the measured 1.9ms-per-call cost, the 2026-07-28 'la lecture dans motion de cet élément est saccadée' investigation, CLAUDE.md §5bis, cited by name only) — that function is defined immediately after, in packet 3 (app.js:1316)."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "heavy-fields-clone",
+      "packets": [
+        {
+          "id": "C21f.heavy-fields-clone",
+          "files": [
+            "src/js/app.js:1311-1328"
+          ],
+          "coverage_ranges": [
+            [
+              1311,
+              1328
+            ]
+          ],
+          "classification": {
+            "code": 15,
+            "comment": 3,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_HEAVY_STROKE_FIELDS",
+            "cloneStrokeForTransform"
+          ],
+          "signature": "var _HEAVY_STROKE_FIELDS = ['src', 'bitmapPressureProfile']; window._HEAVY_STROKE_FIELDS = _HEAVY_STROKE_FIELDS; function cloneStrokeForTransform(sd) { var heavy=null,k,i; for(i=0;i<_HEAVY_STROKE_FIELDS.length;i++){k=_HEAVY_STROKE_FIELDS[i]; if(sd[k]!==undefined){(heavy||(heavy={}))[k]=sd[k];}} if(!heavy) return JSON.parse(JSON.stringify(sd)); var light={}; for(k in sd){if(heavy[k]===undefined)light[k]=sd[k];} var out=JSON.parse(JSON.stringify(light)); for(k in heavy) out[k]=heavy[k]; return out; }",
+          "responsibility": "Deep-clones a raw stroke-data dict for the transform sites in this scope (duplicator, Component camera/symMatrix baking, StoryBoard's own mirror), WITHOUT round-tripping its own heavy, immutable-by-contract fields through JSON.stringify/parse — those are copied by REFERENCE instead. _HEAVY_STROKE_FIELDS names exactly two fields: `src` (a raster's base64 data URL, ~190KB each, immutable by contract — desR reads it, nothing rewrites it in place, C21e cited by name only) and `bitmapPressureProfile` (a bitmap-brush stroke's per-dab pressure sampling, ~62KB across the reference project). Measured cost of NOT doing this: 1.9ms per call for one component's 20 strokes, paid twice per frame on every scrub/playback tick (2026-07-28 investigation, cited by the lead-in in packet 2). If `sd` carries neither heavy field, the function short-circuits to a single whole-object JSON.parse(JSON.stringify(sd)) (line 1322) — the split-and-reassemble path (lines 1323-1327) only runs when at least one heavy field is present.",
+          "callers": [
+            "_HEAVY_STROKE_FIELDS readers outside cloneStrokeForTransform's own body (app.js:1318-1319): tweens.js:4810 (`_cloneStrokesForUndo`, tweens.js:4808) and tweens.js:4853 (`_cloneLayersForUndo`, tweens.js:4852) — both via `window._HEAVY_STROKE_FIELDS` with an inline literal fallback, using a DIFFERENT technique (detach-to-null, one native stringify over the WHOLE array, restore in a `finally`) than cloneStrokeForTransform's own split-then-reassemble — see this artifact's `boundaries` for the complete confirmation that transplant.js has NO reference to this symbol at all, correcting a plausible reading of the issue's own prompt.",
+            "cloneStrokeForTransform callers (complete, excluding its own declaration at 1316): app.js:1718 — inside applyLayerDuplicator's Object-mode pool-member recentering (app.js:1616-1795, C21g territory, cited by line only): `pooled=pooled.map(function(sd){return applyMatrixToStrokeData(cloneStrokeForTransform(sd),shiftMat);});`.",
+            "app.js:1763 — inside applyLayerDuplicator's per-clone placement loop (C21g territory, cited by line only): `var sd2=applyMatrixToStrokeData(cloneStrokeForTransform(sd),mat);` — one call per duplicator clone, per frame.",
+            "app.js:3136 — inside getEffectiveStrokes's ld.symbolId branch, the Component-camera-baking step (general app.js territory, cited by line only): `if(camM)out=out.map(function(sd){return applyMatrixToStrokeData(cloneStrokeForTransform(sd),camM);});`.",
+            "app.js:3140 — inside the SAME branch, the instance symMatrix-baking step immediately after (cited by line only, see packet 1's caller list for symMatrixOf at the same site): `out=out.map(function(sd){return applyMatrixToStrokeData(cloneStrokeForTransform(sd),m);});`.",
+            "storyboard.js:395 — inside symbolStrokesAt (storyboard.js:329), the StoryBoard-side mirror of getEffectiveStrokes's own camera-baking branch, accessed as `window.cloneStrokeForTransform`/`window.applyMatrixToStrokeData` app.js globals (storyboard.js loads after app.js): `if (camM) out = out.map(function (sd) { return applyMatrixToStrokeData(cloneStrokeForTransform(sd), camM); });` — its own comment states this is a 2026-07-30 gap fix for the exact same symptom (a Component's internal camera pan/zoom silently lost when viewed through a StoryBoard montage)."
+          ],
+          "behavior": [
+            "Line 1311 (code, 1 line): `_HEAVY_STROKE_FIELDS` array literal — the two-field list.",
+            "Lines 1312-1314 (comment, 3 lines): states the list is exported onto `window` specifically so the undo snapshot (_cloneLayersForUndo, tweens.js) shares the SAME list rather than a second copy that could drift the moment a third heavy field appears — cross-references CLAUDE.md §3 by name only.",
+            "Line 1315 (code, 1 line): `window._HEAVY_STROKE_FIELDS = _HEAVY_STROKE_FIELDS;` — the export itself.",
+            "Lines 1316-1328 (code, 13 lines): cloneStrokeForTransform's own body — collect present heavy fields into a separate `heavy` dict (lines 1317-1321); if none were present, single-shot stringify/parse the whole `sd` (line 1322); otherwise build a `light` dict of every OTHER field (line 1324), stringify/parse ONLY that (line 1325), then re-attach the heavy fields by reference (lines 1326-1327) before returning."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "apply-matrix-stroke-data",
+      "packets": [
+        {
+          "id": "C21f.apply-matrix-stroke-data",
+          "files": [
+            "src/js/app.js:1329-1359"
+          ],
+          "coverage_ranges": [
+            [
+              1329,
+              1359
+            ]
+          ],
+          "classification": {
+            "code": 18,
+            "comment": 13,
+            "whitespace": 0
+          },
+          "symbols": [
+            "applyMatrixToStrokeData"
+          ],
+          "signature": "function applyMatrixToStrokeData(sd,m){ if(sd.isRaster){ var c=m.transform(new Point(sd.x,sd.y)); var scaleX=Math.sqrt(m.a*m.a+m.b*m.b),scaleY=Math.sqrt(m.c*m.c+m.d*m.d); return{isRaster:true,src:sd.src,x:c.x,y:c.y,width:sd.width*scaleX,height:sd.height*scaleY,opacity:sd.opacity}; } if(!sd.segments)return sd; sd.segments=sd.segments.map(function(s){ ... }); return sd; }",
+          "responsibility": "Applies an affine matrix `m` to one raw stroke-data dict's OWN geometry, dispatching on `sd.isRaster`. Raster branch (lines 1330-1345): translates the center (`sd.x`,`sd.y`) by the full affine, and scales `width`/`height` by the matrix's own per-axis linear magnitude (`scaleX=\\sqrt(a²+b²)`, `scaleY=\\sqrt(c²+d²)`) — a rotate component of `m` degrades to scale-only for a raster, matching the persisted raster schema's real capability (no rotation field; see serR/desR, C21e, cited by name only). ONLY `x`,`y`,`width`,`height` are transformed; `src`,`opacity` are copied through unchanged, and every other optional raster tag (isBitmapBrush, linked/linkedPath/linkedHandleId, rotation, brushGroupId, isBrushTextureCopy, meshId, groupId, the text-tool fields) is DROPPED — the returned dict for a raster branch is a fresh literal listing only the six named keys, not a copy-and-patch of `sd`. Vector branch (lines 1346-1358): early-returns `sd` unchanged if it has no `segments`; otherwise MUTATES `sd.segments` IN PLACE (line 1347's `sd.segments=sd.segments.map(...)` reassigns the same object's own field) — every segment's `point` gets the FULL affine; `handleIn`/`handleOut` get the LINEAR-ONLY part (transform the vector, transform the matrix's own origin, subtract — strips translation, keeps rotate/scale/skew, per the inline comment at 1351-1352). No other field (fillColor, strokeColor, strokeWidth, opacity, closed, any brush/text tag) is read or written by this function's vector branch at all.",
+          "callers": [
+            "app.js:1718, 1763 — inside applyLayerDuplicator (app.js:1616-1795, C21g territory, cited by line only), always paired with cloneStrokeForTransform (see packet 3's own caller list for the exact call text at these two sites — applyMatrixToStrokeData is never called on a live/uncloned stroke dict at either site).",
+            "app.js:3136, 3140 — inside getEffectiveStrokes's ld.symbolId branch (general app.js territory, cited by line only), the Component-camera-baking and instance-symMatrix-baking steps respectively — see packet 3's caller list for the exact call text; both are paired with cloneStrokeForTransform in the same `.map(function(sd){...})` expression, per this scope's own invariant that a symbol's own stored strokes are live references that must never be mutated in place (app.js:3123-3130's own comment, cited by line only).",
+            "storyboard.js:395 — inside symbolStrokesAt (storyboard.js:329), paired with cloneStrokeForTransform in the same expression — see packet 3's caller list for the exact call text."
+          ],
+          "behavior": [
+            "Line 1329 (code, 1 line): function declaration, two formal parameters (`sd`, `m`).",
+            "Line 1330 (code, 1 line): `if(sd.isRaster){` — dispatch.",
+            "Lines 1331-1341 (comment, 11 lines): explains why the raster branch exists at all — an early-return here used to silently no-op a symMatrix drag on an imported-video component (confirmed live per the comment: 'dragging the component moved nothing at all'); documents the deliberate rotate-degrades-to-scale-only tradeoff as matching the schema's real capability rather than crashing or silently doing nothing.",
+            "Lines 1342-1344 (code, 3 lines): the raster transform itself — center point, per-axis scale magnitude, return literal.",
+            "Line 1345 (code, 1 line): closing `}` of the isRaster branch.",
+            "Line 1346 (code, 1 line): `if(!sd.segments)return sd;` — guard for a stroke with neither isRaster nor segments (passes through unchanged).",
+            "Lines 1347-1350 (code, 4 lines): begin the `.map` over segments — full-affine point transform, handleIn/handleOut as Points.",
+            "Lines 1351-1352 (comment, 2 lines): explains the linear-only vector-transform technique for the handles (transform vector and origin separately, subtract).",
+            "Lines 1353-1357 (code, 5 lines): origin transform, handle transforms, return the new segment literal.",
+            "Lines 1358-1359 (code, 2 lines): close the `.map` callback and the function, returning the mutated `sd`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "effector-channels",
+      "packets": [
+        {
+          "id": "C21f.effector-channels",
+          "files": [
+            "src/js/app.js:1360-1393"
+          ],
+          "coverage_ranges": [
+            [
+              1360,
+              1393
+            ]
+          ],
+          "classification": {
+            "code": 10,
+            "comment": 24,
+            "whitespace": 0
+          },
+          "symbols": [
+            "effectorChannels"
+          ],
+          "signature": "function effectorChannels(eff){ if(eff.channels)return eff.channels; var ch=[]; if(eff.offsetPos&&(eff.offsetPos[0]||eff.offsetPos[1]))ch.push({prop:'position',value:[eff.offsetPos[0]||0,eff.offsetPos[1]||0]}); if(eff.offsetRot)ch.push({prop:'rotation',value:[eff.offsetRot]}); if(eff.offsetScale&&(eff.offsetScale[0]||eff.offsetScale[1]))ch.push({prop:'scale',value:[eff.offsetScale[0]||0,eff.offsetScale[1]||0]}); if(eff.offsetOpacity)ch.push({prop:'opacity',value:[eff.offsetOpacity]}); eff.channels=ch; return ch; }",
+          "responsibility": "One-time, IN-PLACE migration of a Mograph-duplicator Effector from its pre-2026-07-30 shape (four hardcoded fields: offsetPos/offsetRot/offsetScale/offsetOpacity) to the current arbitrary `channels` list (`{prop,value}` entries, any of SMMotion.DUP_TARGET_PROPS, cited by name only). Writes `eff.channels=ch` onto the LIVE object passed in — since `eff` IS the live `dup.effectors[i]` object (not a clone), this mutation sticks in memory and is saved forward verbatim on the next project save (exportJSON serializes whatever is live on `dup.effectors[i]` at save time, cited by name only, not re-mapped). Idempotent by construction: `eff.channels` is truthy after the first call (even an empty array, for an all-zero legacy effector with none of the four legacy fields set), so `if(eff.channels)return eff.channels;` short-circuits every later call. The legacy fields (offsetPos/offsetRot/offsetScale/offsetOpacity) are NEVER deleted from `eff` by this migration — they are left in place, unread by anything else in this scope after migration (a minor accumulation, not a correctness bug; see this artifact's `future_proposals`).",
+          "callers": [
+            "app.js:1550 — inside the per-effector weight/summation loop (C21g-adjacent territory inside applyLayerDuplicator's own effector pass, cited by line only): `effectorChannels(eff).forEach(function(ch){...switch(ch.prop){case 'position':...case 'positionZ':...case 'rotation':...case 'rotationX':...case 'rotationY':...case 'scale':...case 'opacity':...case 'hue':...}});` — sums every channel's weighted contribution into the clone's own posK/dzK/rotK/drxK/dryK/scaleK/opK/hueK accumulators.",
+            "timeline.js:7383 — inside the duplicator-effectors panel's own per-effector row renderer (UI, not render-time math): `var channels=effectorChannels(eff);` then `channels.forEach(function(ch,ci){...})` builds one editable row per channel using SMMotion.propDim/propDimLabels/propLabel (cited by name only) so a future addition to DUP_TARGET_PROPS needs no new UI code, per the surrounding comment.",
+            "timeline.js:11481 — inside the 'Add effector' button's click handler: calls `_boundsCenterOfStrokes` (packet 8), NOT effectorChannels — included here only to note the SAME handler pre-seeds a freshly created effector with a literal Position channel object directly (not via effectorChannels, since a brand-new effector has no legacy fields to migrate) — see packet 8's own caller list for this site's actual _boundsCenterOfStrokes call."
+          ],
+          "behavior": [
+            "Lines 1360-1365 (comment, 6 lines): `// ---- MOGRAPH DUPLICATOR (2026-07-29) ----` section header — introduces the whole duplicator feature (grid/radial/path array duplication, AE Repeater family), states copies are applied at loadFrame time via getEffectiveStrokesRendered (C21g, cited by line only) and never written into stored frames.",
+            "Line 1366 (comment, 1 line): blank `//` separator.",
+            "Lines 1367-1373 (comment, 7 lines): documents dupMatrixFromDescriptor's OWN compose order (packet 7, defined 51 lines later at 1424) — 'fourth mirror' of the same closed-form affine as affineFromMotion/transformSegments/camera.js (cited by name only), built as ONE expression rather than chained Matrix.translate/rotate/scale calls, citing CLAUDE.md §8 point 2's append-vs-prepend warning. This is the ENTIRE documentation for dupMatrixFromDescriptor in this scope — see this artifact's `boundaries`.",
+            "Lines 1374-1383 (comment, 10 lines): documents effectorChannels' OWN migration rationale — the 'N'importe quel property' 2026-07-30 change from 4 hardcoded fields to an arbitrary channel list, why the migration is safe to run in place (eff IS the live object), and why it is idempotent.",
+            "Lines 1384-1393 (code, 10 lines): the function body itself — short-circuit on existing `channels`, then four independent `if` migrations (position, rotation, scale, opacity), each gated on its own legacy field being truthy/non-zero, writing the migrated array back onto `eff.channels` and returning it."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "hex-hue-rotate",
+      "packets": [
+        {
+          "id": "C21f.hex-hue-rotate",
+          "files": [
+            "src/js/app.js:1394-1423"
+          ],
+          "coverage_ranges": [
+            [
+              1394,
+              1423
+            ]
+          ],
+          "classification": {
+            "code": 24,
+            "comment": 6,
+            "whitespace": 0
+          },
+          "symbols": [
+            "hexHueRotate"
+          ],
+          "signature": "function hexHueRotate(hex,deg){ if(!hex||typeof hex!=='string'||!deg)return hex; var m=/^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(hex); if(!m)return hex; ... standard RGB<->HSL round-trip, hue shifted by deg mod 360 ... return '#'+toHex(r2)+toHex(g2)+toHex(b2)+(m[2]||''); }",
+          "responsibility": "Rotates a hex color string's HUE by `deg` degrees around the color wheel, preserving saturation and lightness exactly, and preserving any trailing 2-hex-digit alpha byte verbatim (accepts both `#rrggbb` and `#rrggbbaa`, CLAUDE.md §2's hex8 convention, cited by name only). A falsy/non-string `hex`, a falsy `deg` (line 1401), or a string that doesn't match the `#`+6-or-8-hex-digit regex (line 1402-1403) passes through UNCHANGED rather than throwing — deliberate, since `fillColor`/`strokeColor` on a stroke dict can legitimately be null (stroke-only or fill-only shapes) and this function is called unconditionally-gated only on the FIELD being present, not on it being a valid color (see packet 7's caller list). Math: standard RGB[0,1]->HSL conversion (max/min/delta, hue by which channel is max), add `deg` to hue and wrap into [0,360) (line 1413), standard HSL->RGB back-conversion via the `hue2rgb` helper (line 1414), re-hex-encode each channel via `toHex` (zero-padded to 2 digits, line 1421), and re-append the ORIGINAL alpha byte `m[2]` (or empty string if the input had none) — alpha itself is never touched by the hue rotation.",
+          "callers": [
+            "app.js:1771 — inside applyLayerDuplicator's per-clone hue-shift step (app.js:1616-1795, C21g territory, cited by line only), gated on `if(hueDeg){` and then on the field itself: `if(sd2.fillColor)sd2.fillColor=hexHueRotate(sd2.fillColor,hueDeg);`.",
+            "app.js:1772 — the same gated block, the stroke-color counterpart: `if(sd2.strokeColor)sd2.strokeColor=hexHueRotate(sd2.strokeColor,hueDeg);` — the surrounding comment (1766-1770, cited by line only) states this is a 2026-09-01 feature ('color value, not a matrix operation, so it's applied here rather than folded into `mat`') and that hexHueRotate's own no-op-on-falsy contract is exactly what lets a stroke-only shape (no fillColor) or fill-only shape (no strokeColor) skip cleanly without hexHueRotate itself needing to guard on color presence."
+          ],
+          "behavior": [
+            "Lines 1394-1399 (comment, 6 lines): lead-in — states the hue-rotate/preserve-SL/preserve-alpha contract and the pass-through-on-invalid-input rationale.",
+            "Lines 1400-1403 (code, 4 lines): declaration, the two early-return guards (falsy hex/non-string/falsy deg; non-matching regex), and the regex capture of the 6 hex digits plus optional 2-digit alpha.",
+            "Lines 1404-1412 (code, 9 lines): RGB[0,1] parse, max/min/delta/lightness, then (only if `d` truthy — a non-gray color) saturation and hue-by-dominant-channel, scaled to degrees.",
+            "Line 1413 (code, 1 line): `h=(h+deg)%360;if(h<0)h+=360;` — the actual rotation, with negative-wrap correction (JS `%` can return negative for a negative left operand).",
+            "Line 1414 (code, 1 line): the `hue2rgb(p,q,t)` helper function declaration — standard piecewise HSL->RGB channel formula.",
+            "Lines 1415-1420 (code, 6 lines): grayscale short-circuit (`if(!s){r2=g2=b2=l;}`) else the standard q/p intermediate values and three `hue2rgb` calls offset by 1/3 for R/G/B.",
+            "Line 1421 (code, 1 line): `toHex(v)` helper — round to nearest byte, zero-pad to 2 hex digits.",
+            "Lines 1422-1423 (code, 2 lines): assemble and return the new `#rrggbb`+original-alpha string; closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "dup-matrix-from-descriptor",
+      "packets": [
+        {
+          "id": "C21f.dup-matrix-from-descriptor",
+          "files": [
+            "src/js/app.js:1424-1430"
+          ],
+          "coverage_ranges": [
+            [
+              1424,
+              1430
+            ]
+          ],
+          "classification": {
+            "code": 7,
+            "comment": 0,
+            "whitespace": 0
+          },
+          "symbols": [
+            "dupMatrixFromDescriptor"
+          ],
+          "signature": "function dupMatrixFromDescriptor(m,pivot){ var rad=(m.rot||0)*Math.PI/180,cs=Math.cos(rad),sn=Math.sin(rad); var a=cs*m.sx,b=sn*m.sx,c=-sn*m.sy,d=cs*m.sy; var tx=pivot.x+(m.dx||0)-a*pivot.x-c*pivot.y; var ty=pivot.y+(m.dy||0)-b*pivot.x-d*pivot.y; return new Matrix(a,b,c,d,tx,ty); }",
+          "responsibility": "Builds ONE closed-form affine — rotate+non-uniform-scale in the pivot's own local frame, translate LAST — from a placement DESCRIPTOR `m` (`{rot,sx,sy,dx,dy}`, the duplicator's per-clone placement shape produced by `_duplicatorClonePlacement`, C21g territory, cited by name only) and a world-space `pivot` point. Per CLAUDE.md §8 point 2 (cited by name only, documented in full in packet 5's own header comment at lines 1367-1373, NOT in this packet's own range — see this artifact's `boundaries`): built as a SINGLE expression rather than chained `Matrix.translate/rotate/scale` calls, because a bare paper.Matrix's own chained methods APPEND (compose in the opposite order Item.rotate/scale/translate would) — this closed-form is the 'fourth mirror' of the same algebra as affineFromMotion (engine-bridge.js), transformSegments (motion.js) and camera.js's own matrix build, all cited by name only, not re-mapped. Math: `a=cos(rad)·sx, b=sin(rad)·sx, c=-sin(rad)·sy, d=cos(rad)·sy` is the standard rotation×non-uniform-scale composition (R·S); `tx`/`ty` are solved so that `pivot` itself maps to `pivot+(dx,dy)` — i.e. the pivot is the fixed point of the rotate/scale part, and the placement's own `dx`/`dy` offset is added on top, last, in world space.",
+          "callers": [
+            "app.js:1752 — the SOLE caller, inside applyLayerDuplicator's per-clone placement loop (app.js:1616-1795, C21g territory, cited by line only): `var mat=dupMatrixFromDescriptor(place,pivotK);`, where `place` is the descriptor returned by `_duplicatorClonePlacement` (cited by name only, not re-mapped) and `pivotK` is either the duplicator's own shared pivot (`_boundsCenterOfStrokes(base)`, packet 8) or a per-member pivot in Object mode / a per-shift pivot under temporal stagger. The comment immediately above the call (1747-1751, cited by line only) states the stagger's rotate/scale-in-place-then-translate-last order mirrors a Component's own camera-then-symMatrix composition order (packets 1-2 of THIS artifact)."
+          ],
+          "behavior": [
+            "Lines 1424-1430 (code, 7 lines, NO comment lines — the function's entire documentation lives in packet 5's header block, see this artifact's `boundaries`): declaration with two formal parameters (`m` the descriptor, `pivot` the world-space anchor); rotation-radians and cos/sin; the 2x2 linear part `a,b,c,d` as rotate-then-nonuniform-scale; the translate solved to fix `pivot` under the linear part plus the descriptor's own `dx`/`dy`; return the constructed Matrix."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "bounds-center-of-strokes",
+      "packets": [
+        {
+          "id": "C21f.bounds-center-of-strokes",
+          "files": [
+            "src/js/app.js:1431-1450"
+          ],
+          "coverage_ranges": [
+            [
+              1431,
+              1450
+            ]
+          ],
+          "classification": {
+            "code": 17,
+            "comment": 3,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_boundsCenterOfStrokes"
+          ],
+          "signature": "function _boundsCenterOfStrokes(strokes){ var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity; strokes.forEach(function(sd){ if(sd.isRaster){...center of the x-width/2..x+width/2, y-height/2..y+height/2 rect...return;} if(!sd.segments)return; sd.segments.forEach(function(s){...min/max of s.point...}); }); if(minX===Infinity)return{x:state.canvasW/2,y:state.canvasH/2}; return{x:(minX+maxX)/2,y:(minY+maxY)/2}; }",
+          "responsibility": "Computes an ANCHOR-POINT bounds center of a set of raw stroke dicts, for use as a pivot (not a render bound) — per its own comment, segment anchor points are precise enough for a pivot, so no bezier-extrema math and no throwaway Paper Path is built. Per-stroke handling: a raster stroke (`sd.isRaster`) contributes its own x±width/2 / y±height/2 rect to the running min/max, then `return`s (skips the segments check below, since a raster has no `segments` field at all — same schema fact packet 4 documents). A vector stroke with NO `segments` field is SKIPPED ENTIRELY via `if(!sd.segments)return;` — contributes nothing to the bounds (this is the one EXCLUSION: any stroke dict that is neither a raster nor carries segments, e.g. a malformed or future stroke-dict shape, is silently invisible to this pivot calculation). A vector stroke WITH segments contributes only each segment's own anchor `point` — handleIn/handleOut bezier control points are NEVER consulted, so a shape with a control handle extending far outside its anchor points' own bounding box will still pivot around the ANCHOR bounds, not the true rendered bounds. If no stroke contributed anything at all (`minX===Infinity`, i.e. `strokes` was empty or every entry was skipped), falls back to the CANVAS center (`state.canvasW/2, state.canvasH/2`) rather than an origin or NaN.",
+          "callers": [
+            "app.js:1621 — inside applyLayerDuplicator (app.js:1616-1795, C21g territory, cited by line only), the very first statement after the `count<=1` early-return: `var pivot=_boundsCenterOfStrokes(base);` — the duplicator's own shared pivot for every clone's placement, computed once from the seed content.",
+            "app.js:1714 — inside applyLayerDuplicator's Object-mode branch (cited by line only): `var memberCenter=_boundsCenterOfStrokes(pooled);` — recenters each pool member onto the shared `pivot` before placing it, so a scattered pool of source layers lays out as a clean pattern rather than scattering across their own original positions (per the surrounding comment, cited by line only).",
+            "app.js:1737 — inside applyLayerDuplicator's temporal-stagger branch (cited by line only): `if(shifted.length){baseK=shifted;pivotK=_boundsCenterOfStrokes(baseK);}` — recomputes a per-shift pivot from the resampled frame's own content when a time-offset copy resolves to a different frame.",
+            "app.js:3088 — inside getEffectiveStrokes's ld.symbolId branch, the layer-level-Motion step (general app.js territory, cited by line only): `var pivot=_boundsCenterOfStrokes(layerStrokes);` — the pivot for composing a sub-layer's own Motion track, mirroring parentChainMats' own bounds-center pivot convention per the surrounding comment (cited by line only).",
+            "timeline.js:11481 — inside the duplicator panel's 'Add effector' button click handler: `var pivot=_boundsCenterOfStrokes(strokes);` where `strokes=getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)` — seeds a freshly created effector's position centered on the active layer's own current content, so it starts immediately visible/draggable rather than off-canvas at the space origin (per the surrounding comment, cited by line only)."
+          ],
+          "behavior": [
+            "Lines 1431-1433 (comment, 3 lines): lead-in — states this is a pivot (not a render bound), so segment anchor points are precise enough and no bezier-extrema math or throwaway Paper Path is needed.",
+            "Lines 1434-1436 (code, 3 lines): declaration, min/max accumulator init to +/-Infinity, begin the `strokes.forEach`.",
+            "Lines 1437-1440 (code, 4 lines): the isRaster branch — expand min/max by the raster's own x/y +/- width/height half-extents, then `return` (skip to next stroke).",
+            "Lines 1441-1446 (code, 6 lines): the segments guard (`if(!sd.segments)return;`) then the inner `sd.segments.forEach` expanding min/max by each segment's own anchor point.",
+            "Line 1447 (code, 1 line): closing `});` of the outer forEach.",
+            "Lines 1448-1449 (code, 2 lines): the empty-input fallback (canvas-center) and the normal-case return (midpoint of min/max).",
+            "Line 1450 (code, 1 line): closing brace of the function."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "engine-bridge.js (buildSceneJson's nativeVideo-nested-symbol branch, buildNodeHandleItems)",
+      "disposition": "Retains its own body in full — cited by line only. Both call symMatrixOf directly (engine-bridge.js:1325, 3837), guarded on the function/field existing at all since load order isn't guaranteed. Neither writes ld.symMatrix; both are readers only."
+    },
+    {
+      "consumer": "select-bridge.js / tools.js (the two gesture front-ends)",
+      "disposition": "Retain their own bodies in full — cited by line only as the complete caller list of symGestureAccumulate (four branches each side: move/scale/shear/rotate in select-bridge.js's engine path; rotate/scale/move in tools.js's Paper-native path). Confirmed these are the ONLY callers by whole-src/js grep."
+    },
+    {
+      "consumer": "subselect-bridge.js (toLocalPoint)",
+      "disposition": "Retains its own body in full — cited by line only. The sole consumer that INVERTS symMatrixOf's result, for mapping a screen point back into a symbol's own local vertex-edit space."
+    },
+    {
+      "consumer": "timeline.js (splitLayerAtPlayhead, duplicateLayer's dupOne, importJSON, exportJSON)",
+      "disposition": "Retains its own body in full — cited by line only. Four independent sites read or write ld.symMatrix directly (bypassing symMatrixSet): a reference copy at split (1218), a deep clone at duplicate (1392), a restore-from-persisted-JSON at import (2456), and a persist-to-JSON read at export (2117). None of the four call symMatrixOf/symMatrixSet — they treat the field as an opaque 6-number array to copy, not as something to compose."
+    },
+    {
+      "consumer": "transplant.js (importChecked)",
+      "disposition": "Retains its own body in full — cited by line only. One site (277) copies `nl.symMatrix = clone.symMatrix` by reference, only inside the branch that also mints a fresh symbol id for the transplanted Component — confirmed this file has NO reference to any of this scope's OTHER eight symbols (_HEAVY_STROKE_FIELDS, cloneStrokeForTransform, applyMatrixToStrokeData, effectorChannels, hexHueRotate, dupMatrixFromDescriptor, _boundsCenterOfStrokes, symGestureAccumulate) by whole-file grep."
+    },
+    {
+      "consumer": "tweens.js (_cloneStrokesForUndo, _cloneLayersForUndo)",
+      "disposition": "Retains its own body in full — cited by line only. Both read `window._HEAVY_STROKE_FIELDS` (with an inline fallback literal) to drive a DIFFERENT heavy-field-sharing technique than cloneStrokeForTransform's own (detach-to-null + single whole-array stringify + restore-in-finally, vs. cloneStrokeForTransform's split-light/heavy-then-reassemble) — same underlying list, two independent implementations, confirmed by direct read of both."
+    },
+    {
+      "consumer": "storyboard.js (symbolStrokesAt)",
+      "disposition": "Retains its own body in full — cited by line only. The one call site OUTSIDE app.js that pairs cloneStrokeForTransform with applyMatrixToStrokeData in the same expression (395), mirroring getEffectiveStrokes's own ld.symbolId/camera-baking branch; its own comment states this is a 2026-07-30 gap fix for the same symptom (a Component's internal camera move lost when viewed through a StoryBoard montage)."
+    },
+    {
+      "consumer": "motion.js (SMMotion.DUP_TARGET_PROPS/propDim/propDimLabels/propLabel/computeMotionMat/transformSegments)",
+      "disposition": "Retains its own body in full — cited by name only, not re-mapped, per the issue's own scope note. Referenced by effectorChannels' own callers (timeline.js:7383's UI row-builder) and by dupMatrixFromDescriptor's own lead-in comment (the 'fourth mirror' cross-reference to transformSegments' closed-form algebra) but never called from within this scope's own 199 lines."
+    },
+    {
+      "consumer": "camera.js (SMCamera.cameraMatrixAtFrame)",
+      "disposition": "Retains its own body in full — cited by name only, not re-mapped. Its own matrix build is the THIRD mirror (alongside affineFromMotion and transformSegments) of the same rotate-in-pivot-frame-then-translate-last algebra dupMatrixFromDescriptor implements as the fourth — called from getEffectiveStrokes/storyboard.js/engine-bridge.js immediately before this scope's own symMatrixOf/applyMatrixToStrokeData composition (packets 1, 3, 4), never from within this scope's own lines."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-symmatrix-default-identity",
+      "proposed": "Call `symMatrixOf({})` (no `symMatrix` field at all); expect an identity Matrix (`a=1,b=0,c=0,d=0... wait d=1`, tx=ty=0) — verifies the default-identity fallback at app.js:1271 — not run."
+    },
+    {
+      "id": "fx-symmatrix-roundtrip",
+      "proposed": "Call `symMatrixSet(ld, new Matrix(2,0,0,3,10,20))` then `symMatrixOf(ld)`; expect the returned Matrix's a/b/c/d/tx/ty to equal 2/0/0/3/10/20 exactly — verifies the 6-tuple round-trip is lossless — not run."
+    },
+    {
+      "id": "fx-symgesture-append-order",
+      "proposed": "Set `ld.symMatrix` to a 90-degree rotation, then call `symGestureAccumulate(new Matrix().translate(10,0))`; expect the RESULT to equal `rotate90.append(translate10x)` — i.e. the gesture's own new translate is applied in WORLD space AFTER the existing rotation, not rotated by it — verifies the append (not prepend) compose order documented at line 1276/CLAUDE.md §8 point 2 — not run."
+    },
+    {
+      "id": "fx-symgesture-noop-non-component",
+      "proposed": "Call `symGestureAccumulate(...)` with `state.layers[state.activeLayerIdx].symbolId` unset; expect `ld.symMatrix` to remain unchanged (untouched, not even reset to identity) — verifies the early-return guard at line 1281 — not run."
+    },
+    {
+      "id": "fx-clonestroke-shares-heavy-by-reference",
+      "proposed": "Clone a stroke dict with a `src` field via `cloneStrokeForTransform`, then check `clone.src === original.src` (same string reference, not just equal value) while `clone.segments !== original.segments` (a genuinely new array) — verifies the split light/heavy behavior at lines 1316-1328 — not run."
+    },
+    {
+      "id": "fx-applymatrix-raster-rotate-degrades-to-scale",
+      "proposed": "Call `applyMatrixToStrokeData({isRaster:true,x:0,y:0,width:100,height:50,opacity:1}, new Matrix().rotate(45))`; expect the returned `width`/`height` to be scaled by sqrt(cos45²+sin45²)=1 each (i.e. UNCHANGED, since a pure rotation has scale magnitude 1 on both axes) and `x`/`y` to move to the rotated center — verifies the raster branch's rotate-degrades-to-scale-only contract at lines 1330-1345 does not silently distort size under a pure rotation — not run."
+    },
+    {
+      "id": "fx-applymatrix-vector-handles-linear-only",
+      "proposed": "Call `applyMatrixToStrokeData({segments:[{point:[0,0],handleIn:[-10,0],handleOut:[10,0]}]}, new Matrix().translate(100,50))`; expect the returned segment's `point` to be `[100,50]` but `handleIn`/`handleOut` to remain `[-10,0]`/`[10,0]` UNCHANGED (translation has no linear part) — verifies the linear-only handle transform at lines 1351-1352 strips translation correctly — not run."
+    },
+    {
+      "id": "fx-effectorchannels-migration-idempotent",
+      "proposed": "Call `effectorChannels({offsetPos:[10,0],offsetRot:0,offsetScale:[0,0],offsetOpacity:0})` twice; expect the FIRST call to return `[{prop:'position',value:[10,0]}]` (only offsetPos was non-zero) and the SECOND call to return the exact SAME array object (`===`, not just deep-equal) — verifies the one-time in-place migration and idempotent short-circuit at line 1385 — not run."
+    },
+    {
+      "id": "fx-hexhuerotate-preserves-alpha-and-sl",
+      "proposed": "Call `hexHueRotate('#ff0000cc', 120)`; expect the result to start with `#00ff00` (pure red rotated 120deg -> pure green, same saturation/lightness) and end with `cc` (the original alpha byte preserved verbatim) — verifies lines 1404-1423's HSL round-trip and alpha pass-through — not run."
+    },
+    {
+      "id": "fx-hexhuerotate-passthrough-invalid",
+      "proposed": "Call `hexHueRotate(null, 90)` and `hexHueRotate('not-a-color', 90)` and `hexHueRotate('#fff', 0)`; expect all three to return their ORIGINAL first argument unchanged — verifies the three distinct early-return guards at line 1401/1402-1403 — not run."
+    },
+    {
+      "id": "fx-dupmatrix-compose-order",
+      "proposed": "Call `dupMatrixFromDescriptor({rot:90,sx:2,sy:1,dx:0,dy:0}, {x:50,y:50})` and confirm the pivot point `(50,50)` maps to `(50,50)` (a fixed point of the rotate/scale-around-pivot part with zero extra offset), while a point OFFSET from the pivot rotates/scales around `(50,50)` rather than around the origin — verifies the pivot-anchored, translate-last algebra at lines 1424-1430 — not run."
+    },
+    {
+      "id": "fx-boundscenter-raster-vs-segments-mixed",
+      "proposed": "Call `_boundsCenterOfStrokes` on a mixed array of one raster stroke and one vector stroke with segments, plus one malformed stroke (`{}`, neither isRaster nor segments); expect the malformed entry to contribute nothing (verified by comparing against the same call with that entry removed — identical result) — verifies the segments-guard exclusion at line 1442 — not run."
+    },
+    {
+      "id": "fx-boundscenter-empty-fallback",
+      "proposed": "Call `_boundsCenterOfStrokes([])`; expect the result to equal `{x:state.canvasW/2,y:state.canvasH/2}` exactly, not `{x:0,y:0}` or `NaN` — verifies the minX===Infinity fallback at line 1448 — not run."
+    }
+  ],
+  "future_proposals": [
+    "`effectorChannels`' one-time migration (app.js:1384-1393) never deletes the legacy `offsetPos`/`offsetRot`/`offsetScale`/`offsetOpacity` fields from `eff` after folding them into `eff.channels` — both the old and new shapes coexist on a migrated effector indefinitely. Not a correctness bug (nothing in this scope reads the legacy fields once `eff.channels` is truthy), but a minor persisted-size/clarity issue worth a follow-up cleanup pass; not changed here (out of this census's write scope).",
+    "`applyMatrixToStrokeData`'s raster branch (app.js:1330-1345) builds a FRESH literal listing only isRaster/src/x/y/width/height/opacity, silently DROPPING every other optional raster tag the input `sd` might carry (isBitmapBrush, linked/linkedPath/linkedHandleId, rotation, brushGroupId, isBrushTextureCopy, meshId, groupId, any text-tool field). Every confirmed caller in this scope (duplicator pool members, Component camera/symMatrix baking, StoryBoard's mirror) happens to operate on plain imported rasters/video frames in practice, so this has not been observed to lose a tag live — but a future caller applying this function to a linked-media or image-mesh raster would silently strip the `linked`/`meshId` tag from the CLONE it returns (the original `sd` passed to cloneStrokeForTransform is unaffected, only the transformed copy loses the tag). Worth either extending the raster branch's return literal or documenting the restriction explicitly; not changed here.",
+    "`_boundsCenterOfStrokes` uses ANCHOR points only, never handleIn/handleOut bezier control points — correct for its own stated purpose (a pivot, not a render bound) but means a shape whose curve bulges far outside its own anchor points' bounding box (e.g. a near-circular path built from 4 anchors with long handles) will pivot around a point that can be visibly offset from where the shape LOOKS centered. Flagged as an inherent approximation of the documented design, not a bug; not changed here.",
+    "The issue's own prompt hints at checking `transplant.js` as a possible `_HEAVY_STROKE_FIELDS` reader; direct grep confirms it is NOT — transplant.js copies whole stroke dicts via its own generic `JSON.parse(JSON.stringify(...))`, so a transplanted raster's `src`/`bitmapPressureProfile` round-trips through JSON like every other field, at whatever cost that implies for a large project. Not a bug (transplant is a one-shot, user-initiated action, not a per-frame/per-scrub hot path this scope's own 1.9ms measurement was about) but worth noting if transplant's own performance is ever profiled."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\('` was run once for each of the seven function symbols (symMatrixOf, symMatrixSet, symGestureAccumulate, cloneStrokeForTransform, applyMatrixToStrokeData, effectorChannels, hexHueRotate, dupMatrixFromDescriptor, _boundsCenterOfStrokes) and a plain `git grep -n '_HEAVY_STROKE_FIELDS'` for the one data symbol, at the frozen SHA, filtering out each symbol's own declaration line and any hit whose trimmed content starts with `//` — results are reproduced verbatim under each packet's own `callers` field and are re-checkable with the same commands.",
+    "Every packet's `classification` (code/comment/whitespace) was independently hand-verified line-by-line against a direct `git show 59a5a38c:src/js/app.js` dump of lines 1252-1450 (reproduced in full during this census's own working notes) before being encoded here — matches the issue's own proposed per-packet and total figures (104/95/0 over 199 lines) exactly; the validator itself independently re-derives and checks the same numbers against the frozen blob.",
+    "The cross-packet lead-in quirk (packet 2's tail documenting packets 3-4; packet 5's header documenting packet 7) was found by comparing each packet's OWN comment content against which function it textually describes, not assumed from the issue's packet table — the issue's table names only the CODE constructs per packet ('lead-in, symGestureAccumulate(opMatrix)' etc.), consistent with this finding once read directly.",
+    "Every writer of `ld.symMatrix` was found by a SEPARATE grep for the bare field assignment (`git grep -n 'symMatrix *='`) rather than assuming `symMatrixSet` is the only writer — this surfaced the four additional writer/copier sites in timeline.js/transplant.js documented in `reconciliation` and packet 1's own caller list, none of which call `symMatrixSet` or `symMatrixOf`.",
+    "`_HEAVY_STROKE_FIELDS`'s complete reader list (six total hits: two declarations in app.js, two internal reads in app.js, two external reads in tweens.js) was confirmed by a repo-relative `git grep -n '_HEAVY_STROKE_FIELDS' 59a5a38c -- src` (not scoped to src/js alone) returning exactly six lines — no Rust, no other JS module, references this symbol at this SHA."
+  ],
+  "validation": {
+    "expected_assigned_lines": 199,
+    "expected_classification": {
+      "code": 104,
+      "comment": 95,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        1252,
+        1278
+      ],
+      [
+        1279,
+        1310
+      ],
+      [
+        1311,
+        1328
+      ],
+      [
+        1329,
+        1359
+      ],
+      [
+        1360,
+        1393
+      ],
+      [
+        1394,
+        1423
+      ],
+      [
+        1424,
+        1430
+      ],
+      [
+        1431,
+        1450
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by manual line-by-line read against the frozen blob: 1252-1278=(6,21,0); 1279-1310=(7,25,0); 1311-1328=(15,3,0); 1329-1359=(18,13,0); 1360-1393=(10,24,0); 1394-1423=(24,6,0); 1424-1430=(7,0,0); 1431-1450=(17,3,0); sums to (104,95,0)=199 — identical to the issue's own proposed union exactly.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 199 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check_c21f.py engineering/inventory/census/C21f-app-symbol-matrix-duplicator-helpers.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check_c21f.py engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21f.py engineering/inventory/census/C21d-app-desp-relink-remote-merge.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21f.py engineering/inventory/census/C21c-app-path-serialisation-serp.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21f.py engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21f.py engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json <candidate-sha> still exits 0"
+    ]
+  }
+}
