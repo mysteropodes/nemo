@@ -1,0 +1,480 @@
+{
+  "census_id": "C19aj",
+  "issue": 1255,
+  "title": "Timeline.js toolbar customization, revision/outline toggles, onion span/popover/tint-shift, lip-sync panel, and transport/add-layer/component-field wiring",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf. Scope is timeline.js:11147-11432 (286 lines: 217 code, 69 comment, 0 blank, independently re-derived by classifying the frozen blob and matching the issue's own proposed table exactly — no boundary correction needed). It starts immediately after the prior (unmerged at authoring time) leaf's own `manualBakeCache`-adjacent wiring at line 11146 (`btn-bake-cache` click handler) with this scope's own `initToolbarCustomization` lead-in comment (11147), and ends at the `#comp-offset` change handler (11432); line 11433 opens C19ak's own '---- Mograph duplicator panel ----' section header (merged, confirmed by direct read of C19ak's own assigned_ranges start). This JSON authoring does not authorize source changes; P30 retains the timeline.js runtime writer.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "9b31fe8edf091ad0247d5b46872e141299437092",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19aj-timeline-toolbar-onion-transport-census",
+  "assigned_ranges": [
+    {
+      "start": 11147,
+      "end": 11432
+    }
+  ],
+  "coverage_note": "Exactly 286 assigned lines occur once across seven packets (one coverage_range per packet, no gaps, no other-owner exclusions): 217 code, 69 full-line/block comment, 0 blank — independently re-derived by classifying the frozen blob programmatically (a Python re-implementation of the validator's own classify(), run once per packet and once for the whole span) — equal to the issue's own proposed table exactly (217/69/0 over 286 lines across the same seven boundaries), no boundary correction needed. Line 11146 (`document.getElementById('btn-bake-cache').addEventListener('click',function(){manualBakeCache();});`) belongs to the prior, disjoint leaf covering the tween/onion/ghost-all toolbar buttons immediately before this scope; line 11147 opens this scope's own `initToolbarCustomization` header comment. Line 11432 is the last statement of this scope (`#comp-offset` change handler); line 11433 opens C19ak's own duplicator-panel section header (merged, `assigned_ranges` start 11433, confirmed by direct read).",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (9b31fe8edf091ad0247d5b46872e141299437092 at authoring time) has the identical timeline.js blob (git rev-parse 9b31fe8...:src/js/timeline.js == git rev-parse 59a5a38c...:src/js/timeline.js == cc4cfd27dc59d797c911d840dc46e2f816942123); this artifact branches from origin/main at that SHA, verified directly in the working worktree before authoring.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All external-symbol claims were derived by `grep -n` against the exact frozen blob for every `window.SM.*`, `window.*`, and bare function call in this span, then cross-checked directly against the defining file (app.js, tweens.js, ui.js, lipsync.js, rig-widget.js, engine-bridge.js, style.css, index.html) with `sed -n`/`grep -n`.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes (2026-07-27, feedback #23, 2026-08-30, 2026-09) are read as authorial intent, not independently re-verified execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19aj-timeline-toolbar-onion-transport-layer-buttons.json and the seven timeline.js packets partitioning lines 11147-11432.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "function_boundary": "This scope is a grab-bag of DOM-wiring `document.getElementById(...).addEventListener(...)` statements plus four IIFEs, grouped into packets by which UI cluster each covers: toolbar show/hide customization plus three simple toggle buttons; the revision-view cycle and the two outline-render toggles; the onion marker-span presets, follow toggle, and loop/ping-pong transport button; the onion options popover and the composite-preview toggle; the lip-sync settings panel; the onion mode/tint/shift/opacity controls; and the frame transport, add/delete/duplicate/component-conversion layer buttons plus the component-instance playback fields. None of these seven packets defines a function that any OTHER packet in this scope calls — each is independently wired to its own DOM ids.",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "prior (unmerged at authoring time) leaf, timeline.js: ... -11146 (tween/onion/ghost-all toolbar buttons)",
+      "disposition": "Retains `btn-tween-curves`'s sibling `btn-os`/`btn-ghost-all`/`btn-bake-cache` wiring immediately before this scope (11141-11146). This scope's own boundary begins at line 11147, the `initToolbarCustomization` lead-in comment, immediately after that leaf's own last statement."
+    },
+    {
+      "owner": "C19ak (existing owner, timeline.js:11433-11666, merged, duplicator/rig/combine panel wiring)",
+      "disposition": "Owns timeline.js:11433+, starting at its own '---- Mograph duplicator panel ----' section header. Confirmed disjoint: none of this scope's own DOM ids or symbols reappear past line 11432 by direct read of C19ak's own first lines (11433-11440)."
+    },
+    {
+      "owner": "C19ak/#1258 (sibling leaf sharing the same frozen blob)",
+      "disposition": "This leaf's own scope (11433-11666) is independent of and disjoint from this artifact's own range (11147-11432); both target the same pinned blob but neither leaf's authoring waited on the other."
+    },
+    {
+      "owner": "app.js (`window.SM={...}` object literal is NOT here — it lives in timeline.js itself, line 349)",
+      "disposition": "Every `window.SM.*` method invoked in this scope (`toggleTweenCurves`, `toggleShadowGuides`, `setOnionMode`, `setOnionRange`, `setOnionPrevOp`, `setOnionNextOp`, `toggleOnion`, `toggleLoopPlayback`, `togglePingPongPlayback`, `setFps`, `setTotalFrames`, `addLayer`, `addNullLayer`, `addFolderLayer`, `addEffectLayer`, `addGuideLayer`, `addJoystickLayer`, `addSliderLayer`, `deleteLayer`, `duplicateLayer`, `convertActiveLayerToComponent`, `enterSymbol`, `convertComponentToLayer`, `setSymbolPlayMode`, `setSymbolSingleFrame`, `setSymbolSpeed`, `setSymbolPlacedAt`) is a property of the `window.SM={...}` object literal declared at timeline.js:349 — NOT app.js as a first read of the code might suggest — cited by name/line only, bodies out of scope of this leaf (a separate census area covers timeline.js:349+)."
+    },
+    {
+      "owner": "tweens.js (`selectGhostAll` is timeline.js-local; `onionTint`/`setOnionTint`/`onionTintColor`/`onionShift`/`setOnionShift`/`renderOS` are tweens.js, existing owner, out of scope)",
+      "disposition": "Retains its own bodies in full — cited by name/line only. `selectGhostAll` is actually declared in timeline.js itself at line 3799 (a separate, already-existing area, out of THIS leaf's scope) and merely called from this scope's own `#btn-ghost-select` handler (11235). `onionTint`(tweens.js:4597), `setOnionTint`(tweens.js:4601), `onionTintColor`(tweens.js:4605), `onionShift`(tweens.js:4608), `setOnionShift`(tweens.js:4616) are read/written by this scope's own `initOnionTintShift` (11366-11386) but defined and persisted entirely in tweens.js."
+    },
+    {
+      "owner": "ui.js (`window._omFollow`/`window.updateOmMarkers`, existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only (ui.js:1041-1058). `window._omFollow` is initialized `true` and `window.updateOmMarkers` is defined there as the function that actually moves/redraws the two onion-marker DOM handles on the timeline ruler; this scope's own `setOnionSpan` (11264-11280) and `p-om-follow` change handler (11285-11292) only read/write `window._omFollow` and call `window.updateOmMarkers(...)`, never redefine it."
+    },
+    {
+      "owner": "lipsync.js (`SMLipSync.settingsOf`/`.analyze`/`.apply`, existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only (lipsync.js:45 `settingsOf`, lipsync.js:149 `analyze`, lipsync.js:177 `apply`, exported at lipsync.js:206-208). This scope's own `initLipSync` (11333-11360) calls all three but performs no analysis or track-matching itself."
+    },
+    {
+      "owner": "rig-widget.js (`SMRigWidget.addWidgetLayer`, existing owner, out of scope, see CLAUDE.md §13)",
+      "disposition": "Retains its own body in full — cited by name/line only (rig-widget.js:441, exported at rig-widget.js:671). This scope's own `SM.addJoystickLayer`/`SM.addSliderLayer` (timeline.js:984-985, out of THIS leaf's coverage but the two menu entries at 11420-11421 call them) both delegate to `addWidgetLayer('joystick'|'slider')`, which is the sole place a widget layer (`ld.isWidgetLayer`/`ld.widget`) is actually constructed."
+    },
+    {
+      "owner": "engine-bridge.js (`buildSceneJson`'s `state.revisionView` reader, existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only (engine-bridge.js:1331/1333 branch on `state.revisionView==='mine'|'revisions'` inside the per-item scene-build loop; engine-bridge.js:3411 is a second, explicit `'mine'` filter noted redundant-but-harmless in its own comment). This scope's own `#btn-revision-view` click handler (11244-11251) only cycles the value through `all`→`mine`→`revisions` and calls `window.SMEngineBridge.renderNow()` — it never touches the document, confirmed by grep: no `saveActiveLayerFrame`/`pushUndo`/document-mutation call appears anywhere in that handler."
+    },
+    {
+      "owner": "app.js (`goToFrame`, existing owner, out of scope; `stopPlay`/`togglePlay` are timeline.js-local, same file, different section, out of THIS leaf's range)",
+      "disposition": "`goToFrame` (app.js:5112) is called from this scope's own transport buttons (11389-11393) and the `#tl-cf` handler (11401-11411); its own guard `if(idx<0||idx>=state.totalFrames)return;` (app.js:5113) is why `#tl-cf` must clamp locally before calling it (see boundaries (g)). `stopPlay`/`togglePlay` are declared in timeline.js itself at lines 169/177 — an earlier, already-existing section of the same file, not part of this leaf's own 11147-11432 span — and are called, not redefined, by this scope."
+    },
+    {
+      "owner": "ui.js (`window.showContextMenu`, existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only (ui.js:1136). This scope's own `#btn-al` click handler (11412-11423) is one of many callers; it supplies a seven-entry menu array and lets `showContextMenu` handle positioning/dismissal."
+    },
+    {
+      "owner": "src/index.html (every DOM id read by this scope) and src/css/style.css (`.toolbar-user-hidden`)",
+      "disposition": "Retain their own markup/rules in full — cited by id/selector only. `#tl-toolbar` (index.html:2115) and its child `.tb` buttons (e.g. `#btn-ff` index.html:2134 through `#btn-ghost-all` index.html:2160) are declared once in markup; `.toolbar-user-hidden{display:none!important}` is scoped `#tl-toolbar .toolbar-user-hidden` (style.css:913), the ONLY place the hide mechanism's visual effect is defined — this scope's own `apply()` only toggles the class."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 11146 (prior leaf's own `#btn-bake-cache` handler) is outside coverage; line 11147 (this scope's own `initToolbarCustomization` lead-in comment) begins this scope.",
+    "Line 11432 (`#comp-offset` change handler) is the last line of this scope; line 11433 opens C19ak's own '---- Mograph duplicator panel ----' section header (merged) — confirmed by direct read of C19ak's own assigned_ranges start.",
+    "No lines inside 11147-11432 are excluded for another owner: every line belongs to exactly one of the seven packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "(a) Control table — every DOM id in this span, its event, the value read, and its target: `btn-toolbar-customize` (click, opens/closes the customization popover, local `apply()`/`close()`); `btn-tween-curves` (click, no value, `SM.toggleTweenCurves`); `btn-ghost-select` (click, no value, local `selectGhostAll`, timeline.js:3799); `btn-shadow-guides` (click, no value, `SM.toggleShadowGuides`); `btn-revision-view` (click, no value read, cycles `state.revisionView` locally then `SMEngineBridge.renderNow()`); `btn-os-outline` (click, no value, toggles `state.onionMode` between `'outline'`/`'tinted'` via `SM.setOnionMode`, also syncs `#p-omode`); `p-current-outline` (change, `this.checked`, writes `state.currentFrameOutline` then `SMEngineBridge.renderNow()`); `om-span-1`/`om-span-2`/`om-span-5`/`om-span-all` (click, no value, local `setOnionSpan(prev,next)`); `p-om-follow` (change, `this.checked`, writes `window._omFollow` then calls `window.updateOmMarkers`, ui.js:1042); `btn-loop` (click, no value, `SM.toggleLoopPlayback`; contextmenu, no value, `SM.togglePingPongPlayback`); `btn-os` (contextmenu, opens `#onion-pop`, local `initOnionPopover`; the `#onion-sec .phdr` header click, no value, `SM.toggleOnion`); `btn-comp-preview` (click, no value, `SMCompPreview.toggle`, guarded `window.SMCompPreview`); `comp-frame-strip` (dblclick, no value, `SMCompPreview.show`, guarded); `lip-start`/`lip-end`/`lip-sens`/`lip-hold` (input, `parseFloat(this.value)`, written onto `SMLipSync.settingsOf(l)`'s own `start`/`end`/`sensitivity`/`hold` fields, each floored/clamped locally); `lip-track` (change, `parseInt(sel.value)`, written onto `settingsOf(l).trackIdx`); `btn-lip-apply` (click, no value read, calls `SMLipSync.analyze`/`.apply`, then `saveAllLayerFrames`/`pushUndoLayers`/`loadFrame`/`updateUI`/`SMEngineBridge.renderNow`); `p-omode` (change, `this.value`, `SM.setOnionMode`); `p-onion-tint-prev`/`p-onion-tint-next` (input, `tp.value`/`tn.value`, tweens.js `setOnionTint('prev'|'next',...)`); `p-onion-tint-reset` (click, no value, removes both tint localStorage keys then re-syncs); `p-onion-shift-x`/`p-onion-shift-y`/`p-onion-shift-next` (input/change, `parseFloat(sx.value)`/`parseFloat(sy.value)`/`sn.checked`, tweens.js `setOnionShift({x,y,next})`); `p-onion-shift-reset` (click, zeroes `sx.value`/`sy.value` then calls `pushShift`); `p-opop`/`p-onop` (input, `parseInt(this.value)`, `SM.setOnionPrevOp`/`SM.setOnionNextOp`); `btn-ff`/`btn-pf`/`btn-play`/`btn-nf`/`btn-lf` (click, no value, `stopPlay`+`goToFrame(...)` or `togglePlay`); `tl-fps` (change, `parseInt(this.value)`, `SM.setFps`); `tl-total` (change, `parseInt(this.value)`, `SM.setTotalFrames`); `tl-cf` (change, `parseInt(this.value)` clamped to `[1,state.totalFrames]`, `stopPlay`+`goToFrame(v-1)`); `btn-al` (click, no value, `window.showContextMenu` with a 7-entry menu calling `SM.addLayer`/`addNullLayer`/`addFolderLayer`/`addEffectLayer`/`addGuideLayer`/`addJoystickLayer`/`addSliderLayer`); `btn-dl` (click, `SM.deleteLayer`); `btn-dupl` (click, `SM.duplicateLayer`); `btn-comp` (click, `SM.convertActiveLayerToComponent`); `btn-comp-enter` (click, reads `state.layers[state.activeLayerIdx].symbolId` as a gate, `SM.enterSymbol(symbolId)`); `btn-comp-detach` (click, `SM.convertComponentToLayer`); `comp-playmode` (change, `this.value`, `SM.setSymbolPlayMode` then `updateCompInstancePanel`); `comp-singleframe`/`comp-speed`/`comp-offset` (change, `this.value`, `SM.setSymbolSingleFrame`/`SM.setSymbolSpeed`/`SM.setSymbolPlacedAt`).",
+    "(b) Toolbar customization mechanism (`initToolbarCustomization`, 11149-11233): storage key `'nemo-timeline-toolbar-hidden'` (`KEY`), JSON shape a flat array of hidden button-id strings (e.g. `[\"btn-tween-curves\",\"btn-shadow-guides\"]`), read via `readHidden()` (`JSON.parse(localStorage.getItem(KEY)||'[]')`, try/caught to `[]`). `candidates()` selects `:scope > button.tb[id]` under `#tl-toolbar`, filtered to exclude the trigger itself (`b!==trigger`) AND any id in `ALWAYS_VISIBLE=['btn-ff','btn-pf','btn-play','btn-nf','btn-lf','btn-loop']` — the transport cluster, excluded by explicit design comment (11151-11157, quoting 2026-07-27 feedback: 'tout ça ne doit pas y apparaître, il reste quoi qu'il arrive') rather than shown disabled. `apply()` (11169-11178) first drops any stored id that has since become protected (a stale localStorage entry from before `ALWAYS_VISIBLE` existed, or hand-edited), persisting the cleaned list back if it changed; it then force-removes `toolbar-user-hidden` from every `ALWAYS_VISIBLE` button and toggles that same class on each `candidates()` button per the (cleaned) hidden list. The class itself is CSS-driven: `#tl-toolbar .toolbar-user-hidden{display:none!important;}` (style.css:913) — `apply()` never touches inline style or `display` directly. The overflow trigger (`#btn-toolbar-customize`) is never a member of `candidates()` (excluded by the `b!==trigger` filter), so it can never receive the hidden class and is never hideable — matching the lead-in comment's own claim (11147-11148: 'the overflow button is intentionally never hideable, so hidden controls always remain recoverable').",
+    "(c) The three localStorage keys touched anywhere in this span, each owned by tweens.js's own read/write functions but exercised here via `initOnionTintShift` (11366-11386): `nemo-onion-tint-prev`/`nemo-onion-tint-next` — written by `setOnionTint('prev'|'next',hex)` (tweens.js:4601-4604) on every `tp`/`tn` `input` event (11373-11374); REMOVED (both, together) by `localStorage.removeItem(...)` inside the `tr` (reset) click handler (11375-11378), which then calls `sync()`+`renderOS()`+`SMEngineBridge.renderNow()` — the only removal point for either tint key anywhere in this scope. `nemo-onion-shift` — written (never removed) by `setOnionShift({x,y,next})` (tweens.js:4616-4619) from `pushShift()` (11383), itself called on every `sx`/`sy`/`sn` input/change (11384) AND from the `sr` (shift-reset) click handler (11385), which zeroes `sx.value`/`sy.value` in the DOM first and then calls `pushShift()` — so a 'reset' of shift is a normal write of `{x:0,y:0,next:sn.checked}`, not a key removal, unlike the tint reset.",
+    "(d) `state.revisionView`'s value cycles `all`→`mine`→`revisions`→`all` via `REVISION_VIEW_ORDER.indexOf`+modulo (11244-11246) on every `#btn-revision-view` click; the button's own label is re-set from `REVISION_VIEW_LABELS` (`{all:'Tout',mine:'Mes traits',revisions:'Corrections'}`, hard-coded French, not routed through `SM.t`/i18n.js) and its `active` class toggled when not `'all'` (11247-11248); the sole side effect is `window.SMEngineBridge.renderNow()` (11248) — no `saveActiveLayerFrame`/`pushUndoLayers`/document mutation call appears anywhere in the handler, confirmed by direct read and by grep restricted to this handler's own four lines. Its single render-side reader is engine-bridge.js's `buildSceneJson`, at two sites: the per-item scene-build loop (engine-bridge.js:1331 `'mine'` branch, 1333 `'revisions'` branch) and a second, explicitly-commented-redundant `'mine'` filter later in the same function (engine-bridge.js:3411, 'filtered out of the scene above anyway, but be explicit') — both are pure read-time filters over which review/correction ghosts are included in the built scene JSON, confirming the lead-in comment's own claim (11238-11239: 'purely a render-time filter ... never touches the document') by direct grep of `revisionView` across `engine-bridge.js` (three hits, all reads) and across `app.js`/`tweens.js` (zero hits).",
+    "(e) Onion subsystem seams: `setOnionSpan(prev,next)` (11264-11280) sets `window._omSpan` to `{prev:9999,next:9999}` when `prev<0` (the 'all' preset) or `{prev,next}` otherwise; computes `inF=prev<0?0:Math.max(0,cf-prev)` and `outF=prev<0?state.totalFrames-1:Math.min(state.totalFrames-1,cf+next)`; writes the two marker DOM elements' `dataset.frame`; calls `window.SM.setOnionRange(inF,outF)` (timeline.js:846, sets `state.onionIn`/`state.onionOut` then `renderOS()` — bodies out of THIS leaf's own scope, cited by line only) with `-1` on either argument having no special meaning to `setOnionRange` itself (the `-1`→`9999`/`0`/`totalFrames-1` translation happens entirely inside `setOnionSpan`, before the call); then calls `window.updateOmMarkers(cf,state.totalFrames)`. `setOnionSpan` is called exactly four times in this scope, all from the four `om-span-*` click handlers (11281-11284) — `setOnionSpan(1,1)`/`(2,2)`/`(5,5)`/`(-1,-1)` — with no other internal or external caller found by a whole-`src` grep restricted to `setOnionSpan(`. `window._omFollow`/`window.updateOmMarkers` are owned by ui.js (ui.js:1041-1058, cited by line only, not redefined here) — this scope only reads/writes `_omFollow` (11287, 11289) and calls `updateOmMarkers` (11280, 11291). `initOnionPopover` (11298-11322): right-click (`contextmenu`, preventDefault+stopPropagation) on `#btn-os` positions and shows `#onion-pop` (`display='block'`, clamped horizontally to the viewport and placed ABOVE the button since the timeline sits at the window's bottom, measured post-`display:block` so `offsetHeight` is real); a document-level `pointerdown` listener hides it on any outside click; left-click on the SAME `#btn-os` is wired separately, OUTSIDE this IIFE, at line 11145 (prior leaf, out of THIS scope) and keeps toggling on/off as before. The popover re-hosts the right-panel's own Onion Skin section header (`#onion-sec .phdr`, 11317) as an identical `SM.toggleOnion()` trigger, and syncs the `#os-st-panel` badge's text/color from `state.onionSkin` once at init (11318-11320) — the badge itself is otherwise updated by `toggleOnion` (timeline.js:459, out of scope). `initOnionTintShift`'s `sync()` (11370-11373) prefills `tp.value`/`tn.value` from `onionTint('prev'|'next')` (tweens.js:4597, reads the localStorage key or `ONION_TINT_DEFAULTS`) and `sx.value`/`sy.value`/`sn.checked` from `onionShift()` (tweens.js:4608, reads `nemo-onion-shift` or `{x:0,y:0,next:false}`); it is called once at IIFE-init (11386) AND again on every `#btn-os` `contextmenu` (11384-11385, via `setTimeout(sync,0)`) — the lead-in comment (11362-11365) states both call points explicitly ('pré-remplis à l'ouverture du popover ET au chargement'). `setOnionShift`'s payload is always the full `{x,y,next}` object, never a partial patch (tweens.js:4616-4619 JSON-stringifies exactly those three keys with `Number(...)||0`/`!!` coercion).",
+    "(f) `initCompPreview` (11323-11332) and `initLipSync` (11333-11360): `initCompPreview` reads nothing from the active layer itself — `#btn-comp-preview` click calls `SMCompPreview.toggle()` (guarded `window.SMCompPreview`) and `#comp-frame-strip` dblclick calls `SMCompPreview.show()` (guarded), both no-argument calls into a module out of scope. `initLipSync`'s own `ld()` helper (11334) is the symbolId gate: it returns `state.layers[state.activeLayerIdx]` only when that layer has BOTH a truthy `.symbolId` AND `window.SMLipSync` is present, else `null` — every settings-field handler and the apply button all early-return through this same gate. The four numeric fields (`lip-start`/`lip-end`/`lip-sens`/`lip-hold`) write onto `SMLipSync.settingsOf(l)` (lipsync.js:45, cited by line only) with local clamps: `start`/`end` floored at 0, `sensitivity` floored at 0.2, `hold` floored at 1. `lip-track` writes `settingsOf(l).trackIdx` from `parseInt(sel.value)||0`. `#btn-lip-apply` calls `SMLipSync.analyze(l)` (lipsync.js:149, cited by line only) with no options argument; on `res.error` it shows a `SM.t('lipNoAudio')` toast and returns without writing anything; otherwise it calls `saveAllLayerFrames()`+`pushUndoLayers(true)` (persistence/undo BEFORE the write), then `SMLipSync.apply(state.activeLayerIdx,res)` (lipsync.js:177, cited by line only, layer index + analysis result, no options argument here either) whose own return value's `.written` count is interpolated into the success toast; finally `loadFrame(state.currentFrame)`+`updateUI()`+`SMEngineBridge.renderNow()` refresh the view. Neither `analyze` nor `apply`'s own bodies are reproduced — both are lipsync.js's own module, out of scope.",
+    "(g) The `#tl-cf` clamp rule (11401-11411): `var v=Math.max(1,Math.min(state.totalFrames,parseInt(this.value)||1));this.value=v;` clamps the typed/scrubbed 1-based frame number into `[1,state.totalFrames]` and writes the clamped value BACK into the input, THEN (if playing) calls `stopPlay()` and calls `goToFrame(v-1)` (0-based). The lead-in comment (11396-11400) explains why the clamp must happen here rather than being left to `goToFrame` itself: `goToFrame` (app.js:5112-5113) reads `if(idx<0||idx>=state.totalFrames)return;` — an out-of-range index is a silent no-op, not a clamp, so a drag-past-the-end without a local clamp would leave the `#tl-cf` input showing a stale/invalid number that nothing ever applied to the actual frame.",
+    "(h) The add-layer menu's seven entries (`#btn-al`, 11412-11423), each an object `{label:SM.t(...),action:function(){window.SM.<method>();}}` passed to `window.showContextMenu(r.left,r.bottom+4,[...])` (ui.js:1136, cited by line only): `ctxInsertLayer`→`SM.addLayer` (timeline.js:862, a plain drawable layer); `ctxInsertLayerNull`→`SM.addNullLayer` (timeline.js:882); `ctxInsertLayerFolder`→`SM.addFolderLayer` (timeline.js:1006); `ctxInsertLayerEffect`→`SM.addEffectLayer` (timeline.js:966); `ctxInsertLayerGuide`→`SM.addGuideLayer` (timeline.js:975); `ctxInsertLayerJoystick`→`SM.addJoystickLayer` (timeline.js:984, one-line delegate to `SMRigWidget.addWidgetLayer('joystick')`, rig-widget.js:441); `ctxInsertLayerSlider`→`SM.addSliderLayer` (timeline.js:985, delegates to `addWidgetLayer('slider')`). All seven `SM.add*Layer` method bodies live in the SAME file (timeline.js, lines 862-1006) but in an EARLIER, already-existing section outside this leaf's own 11147-11432 span — cited by name/line only, not re-mapped here. The lead-in comment (11402-11406) notes the Null/Effect/Guide/Joystick/Slider options were previously reachable ONLY via the layer-list right-click menu and are now also one click away from this '+' button, After Effects' own '+' layer menu shape; an identical seven-entry array is duplicated verbatim at timeline.js:6690-6697 (the layer-list context menu itself, out of this leaf's scope, confirmed by grep as the only other occurrence of this exact menu shape).",
+    "(i) Every `state.*` field read or written in this scope: read — `state.revisionView` (compared/cycled), `state.onionMode`, `state.currentFrameOutline` (read once for initial checkbox sync), `state.currentFrame`, `state.totalFrames`, `state.playing` (five times, transport buttons + `#tl-cf`), `state.waIn`/`state.waOut`, `state.layers`/`state.activeLayerIdx` (`ld()` in `initLipSync`, `#btn-comp-enter`'s symbolId gate), `state.onionSkin` (`initOnionPopover`'s badge sync). Written — `state.revisionView` (cycled), `state.currentFrameOutline` (checkbox change). All other mutation in this span (`window.SM.setOnionMode`/`setOnionRange`/`setOnionPrevOp`/`setOnionNextOp`/`setFps`/`setTotalFrames`/etc.) writes `state.*` fields INSIDE those out-of-scope `SM.*` method bodies (timeline.js:349+), not directly in these 286 lines — cited by name/line only per (a)/reconciliation above.",
+    "(j) Callers/self-wiring, confirmed by grep: `setOnionSpan` — internal only, four calls, all from this scope's own `om-span-*` handlers (11281-11284); zero external callers found by a whole-`src` grep restricted to `setOnionSpan(`. `initToolbarCustomization`/`initOnionPopover`/`initCompPreview`/`initLipSync`/`initOnionTintShift` are all IIFEs (`(function name(){...})()`), invoked exactly once each at their own declaration site, with no external caller possible (the function name is not attached to `window` and is not referenced again anywhere in `src` by grep). `window._omFollow`/`window.updateOmMarkers` are exposed via `window.` by ui.js, not by this scope (this scope only consumes them). None of this scope's own top-level statements or IIFE bodies is ever called from `getEffectiveStrokes`/`getEffectiveStrokesRendered` (app.js) or `buildSceneJson`/`scenePayload` (engine-bridge.js) — confirmed by a whole-src grep of every function/IIFE name declared in this scope restricted to those two files (zero hits, aside from the one-way `state.revisionView` READ documented in (d), which is state-consumption, not a call into this scope) — this is DOM event-wiring only, never itself part of the render path."
+  ],
+  "areas": [
+    {
+      "area": "toolbar-and-revision-outline",
+      "packets": [
+        {
+          "id": "C19aj.toolbar-customization-and-review-toggles",
+          "files": [
+            "src/js/timeline.js:11147-11236"
+          ],
+          "coverage_ranges": [
+            [
+              11147,
+              11236
+            ]
+          ],
+          "classification": {
+            "code": 60,
+            "comment": 30,
+            "whitespace": 0
+          },
+          "symbols": [
+            "initToolbarCustomization",
+            "readHidden",
+            "candidates",
+            "apply",
+            "close",
+            "outside"
+          ],
+          "signature": "IIFE (function initToolbarCustomization(){...})(); plus three top-level addEventListener statements on btn-tween-curves/btn-ghost-select/btn-shadow-guides",
+          "responsibility": "Persistent per-user toolbar customization: a checkbox popover (opened from `#btn-toolbar-customize`) lets the user hide any non-transport `.tb` button under `#tl-toolbar`, persisted as an id array under `localStorage['nemo-timeline-toolbar-hidden']` and re-applied via a CSS class toggle. Followed by three simple one-line toggle-button wirings (tween-curves overlay, ghost-select, shadow-brush guides) that belong to the same toolbar row but have no customization-specific logic of their own.",
+          "callers": [
+            "`initToolbarCustomization` — self-invoking IIFE, no external caller possible.",
+            "`readHidden`/`candidates`/`apply`/`close`/`outside` — internal to the IIFE only; `apply()` is also called once more from inside itself after cleaning a stale hidden id (11172)."
+          ],
+          "behavior": [
+            "11147-11148 (comment): lead-in stating the overflow trigger is intentionally never hideable.",
+            "11149-11157: module setup — grabs `#tl-toolbar`/`#btn-toolbar-customize`, bails silently if either is missing; declares the localStorage key and the `ALWAYS_VISIBLE` transport-cluster exclusion list with its own design-rationale comment.",
+            "11158-11159: `readHidden()` (JSON.parse with try/catch to `[]`) and `candidates()` (filtered `:scope > button.tb[id]` query).",
+            "11160-11177: `apply()` — cleans stale protected ids out of the stored list (persisting if changed), strips the hidden class from every `ALWAYS_VISIBLE` button, then toggles the hidden class on every candidate per the (cleaned) hidden list.",
+            "11178-11179: `close()`/`outside()` — remove/detect-outside-click helpers for the popover.",
+            "11180-11232: `trigger`'s own click handler builds the checkbox popover on demand: one row per candidate button, cloning its icon markup, deriving a short label from its `title`/`aria-label` (cut at the first tooltip separator or word-wrapped past 30 chars), wiring each checkbox's `change` to mutate the stored hidden-id list and re-run `apply()`, then positioning the popover clamped to the viewport near the trigger and arming an outside-click listener after a `setTimeout(0)`.",
+            "11233: initial `apply()` call at IIFE-load time.",
+            "11234-11236: `#btn-tween-curves`→`SM.toggleTweenCurves`, `#btn-ghost-select`→`selectGhostAll` (timeline.js:3799, out of this leaf's scope), `#btn-shadow-guides`→`SM.toggleShadowGuides`."
+          ]
+        },
+        {
+          "id": "C19aj.revision-view-and-outline-toggles",
+          "files": [
+            "src/js/timeline.js:11237-11260"
+          ],
+          "coverage_ranges": [
+            [
+              11237,
+              11260
+            ]
+          ],
+          "classification": {
+            "code": 21,
+            "comment": 3,
+            "whitespace": 0
+          },
+          "symbols": [
+            "REVISION_VIEW_LABELS",
+            "REVISION_VIEW_ORDER"
+          ],
+          "signature": "top-level addEventListener statements on btn-revision-view/btn-os-outline/p-current-outline, plus two module-scope constant objects",
+          "responsibility": "Team-review view filter (cycles state.revisionView through all/mine/revisions, a pure render-time read by engine-bridge.js) and the two 'onion outline mode' controls (a toggle button and a checkbox mirroring state.onionMode/state.currentFrameOutline).",
+          "callers": [
+            "None of this packet's own symbols (REVISION_VIEW_LABELS/REVISION_VIEW_ORDER) are called — they are plain constant lookup objects referenced only by the click handler in the same packet."
+          ],
+          "behavior": [
+            "11237-11239 (comment): lead-in explicitly stating the revision-view filter never touches the document.",
+            "11240-11241: `REVISION_VIEW_LABELS`/`REVISION_VIEW_ORDER` constants, hard-coded French labels.",
+            "11242-11248: `#btn-revision-view` click — cycles `state.revisionView` via index+modulo, updates the button's own text/active class, calls `SMEngineBridge.renderNow()`.",
+            "11249-11252: `#btn-os-outline` click — flips `state.onionMode` between 'outline'/'tinted' via `SM.setOnionMode`, syncs the button's active class and `#p-omode`'s own value.",
+            "11253-11260: `#p-current-outline` checkbox — initial `checked` sync from `state.currentFrameOutline`, then a `change` handler writing that same field and calling `SMEngineBridge.renderNow()`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "onion-span-popover-tint-shift",
+      "packets": [
+        {
+          "id": "C19aj.onion-markers-span-follow-loop",
+          "files": [
+            "src/js/timeline.js:11261-11297"
+          ],
+          "coverage_ranges": [
+            [
+              11261,
+              11297
+            ]
+          ],
+          "classification": {
+            "code": 24,
+            "comment": 13,
+            "whitespace": 0
+          },
+          "symbols": [
+            "setOnionSpan"
+          ],
+          "signature": "function setOnionSpan(prev,next); plus top-level addEventListener statements on om-span-1/2/5/all, p-om-follow, btn-loop",
+          "responsibility": "Animate-style 'Modify Onion Markers' span presets (1/2/5/all frames around the playhead) plus the follow-the-playhead toggle and the loop/ping-pong transport button, all folded into the onion-skin right-click popover per feedback #23.",
+          "callers": [
+            "`setOnionSpan` — internal only, called exactly four times from this packet's own om-span-* handlers (11281-11284); zero external callers found by whole-src grep."
+          ],
+          "behavior": [
+            "11261-11263 (comment): lead-in describing the Animate-parity marker-span feature and the follow/anchor semantics.",
+            "11264-11280: `setOnionSpan(prev,next)` — `prev<0` selects the 'all' preset (`window._omSpan={prev:9999,next:9999}`), else `{prev,next}`; computes clamped in/out frame indices around `state.currentFrame`, writes the two marker elements' `dataset.frame`, calls `SM.setOnionRange(inF,outF)` then `window.updateOmMarkers(cf,state.totalFrames)`.",
+            "11278-11280 (comment + code): design note that this replaced a removed separate toolbar dropdown, folding the same logic into the popover as plain buttons.",
+            "11281-11284: four `om-span-*` click handlers calling `setOnionSpan(1,1)`/`(2,2)`/`(5,5)`/`(-1,-1)`.",
+            "11285-11292: `#p-om-follow` checkbox — initial `checked` sync from `window._omFollow`, `change` handler writing that same global and calling `window.updateOmMarkers` (ui.js:1042, out of scope).",
+            "11293-11297: `#btn-loop` click→`SM.toggleLoopPlayback`; `#btn-loop` contextmenu (preventDefault)→`SM.togglePingPongPlayback`."
+          ]
+        },
+        {
+          "id": "C19aj.onion-popover-and-comp-preview",
+          "files": [
+            "src/js/timeline.js:11298-11332"
+          ],
+          "coverage_ranges": [
+            [
+              11298,
+              11332
+            ]
+          ],
+          "classification": {
+            "code": 26,
+            "comment": 9,
+            "whitespace": 0
+          },
+          "symbols": [
+            "initOnionPopover",
+            "initCompPreview"
+          ],
+          "signature": "IIFE (function initOnionPopover(){...})(); IIFE (function initCompPreview(){...})();",
+          "responsibility": "The onion-skin options popover opened by right-clicking the onion toggle button (feedback #23), which also re-hosts the right-panel Onion Skin section header as an equivalent toggle; and the tiny composite-preview toggle/double-click-to-enlarge wiring.",
+          "callers": [
+            "`initOnionPopover`/`initCompPreview` — self-invoking IIFEs, no external caller possible."
+          ],
+          "behavior": [
+            "11298-11300 (comment): lead-in citing feedback #23 — right-click opens the options popover, left-click keeps the plain on/off toggle (wired elsewhere, out of this scope).",
+            "11301-11322: `initOnionPopover` — grabs `#btn-os`/`#onion-pop`, bails if either is missing; `contextmenu` handler shows and positions the popover (clamped horizontally, placed above the button since the timeline sits at the window bottom, measured post-display for real offsetHeight); a document-level `pointerdown` hides it on outside click; the `#onion-sec` header's `.phdr` click is wired to the same `SM.toggleOnion()` as the toolbar button, with the `#os-st-panel` badge synced once from `state.onionSkin` at init.",
+            "11323-11332: `initCompPreview` — `#btn-comp-preview` click toggles `SMCompPreview` (guarded); `#comp-frame-strip` dblclick opens the enlarged view (guarded)."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "lip-sync-panel",
+      "packets": [
+        {
+          "id": "C19aj.lip-sync-panel",
+          "files": [
+            "src/js/timeline.js:11333-11360"
+          ],
+          "coverage_ranges": [
+            [
+              11333,
+              11360
+            ]
+          ],
+          "classification": {
+            "code": 28,
+            "comment": 0,
+            "whitespace": 0
+          },
+          "symbols": [
+            "initLipSync"
+          ],
+          "signature": "IIFE (function initLipSync(){...})();",
+          "responsibility": "Lip-sync settings panel: reads/writes SMLipSync's own per-layer settings object for a symbol-instance layer, and drives the analyze+apply pipeline on demand.",
+          "callers": [
+            "`initLipSync` — self-invoking IIFE, no external caller possible."
+          ],
+          "behavior": [
+            "11333: `ld()` helper — returns the active layer only if it has a truthy `symbolId` AND `window.SMLipSync` exists, else null (the gate every handler below uses).",
+            "11334: `num(id)` helper — `parseFloat` of a DOM element's `.value`, or null if the element is missing.",
+            "11335-11343: four numeric fields (`lip-start`/`lip-end`/`lip-sens`/`lip-hold`) each wire an `input` handler that fetches `SMLipSync.settingsOf(l)` and clamps/writes `start`/`end`/`sensitivity`/`hold`.",
+            "11344-11345: `lip-track` select `change` handler writes `settingsOf(l).trackIdx`.",
+            "11346-11360: `#btn-lip-apply` click — gated by `ld()`; calls `SMLipSync.analyze(l)`, shows a `lipNoAudio` toast and bails on `res.error`; otherwise `saveAllLayerFrames()`+`pushUndoLayers(true)` before `SMLipSync.apply(state.activeLayerIdx,res)`, then `loadFrame`+`updateUI`+`SMEngineBridge.renderNow()` and a `lipDone` toast interpolating `out.written`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "onion-mode-tint-shift-opacity",
+      "packets": [
+        {
+          "id": "C19aj.onion-mode-tint-shift-opacity",
+          "files": [
+            "src/js/timeline.js:11361-11388"
+          ],
+          "coverage_ranges": [
+            [
+              11361,
+              11388
+            ]
+          ],
+          "classification": {
+            "code": 24,
+            "comment": 4,
+            "whitespace": 0
+          },
+          "symbols": [
+            "initOnionTintShift",
+            "sync",
+            "pushShift"
+          ],
+          "signature": "top-level addEventListener on p-omode; IIFE (function initOnionTintShift(){...})(); top-level addEventListener on p-opop/p-onop",
+          "responsibility": "Onion mode select, and the 2026-09 per-side tint colors + XY shift controls for the onion overlay, all reading/writing through tweens.js's onionTint/onionShift/setOnionTint/setOnionShift, plus the previous/next-frame opacity sliders.",
+          "callers": [
+            "`initOnionTintShift` — self-invoking IIFE, no external caller possible.",
+            "`sync`/`pushShift` — internal to the IIFE only; `sync` is also called once more from the `#btn-os` contextmenu listener registered inside this same IIFE (11384-11385)."
+          ],
+          "behavior": [
+            "11361: `#p-omode` change → `SM.setOnionMode(this.value)`.",
+            "11362-11365 (comment): lead-in citing the 2026-09 tint/shift feature and the 'prefilled at open AND load' requirement.",
+            "11366-11386: `initOnionTintShift` — grabs the tint/shift/reset DOM elements, bails if missing; `sync()` reads `onionTint('prev'|'next')`/`onionShift()` into the fields; tint inputs call `setOnionTint`; the tint reset button removes both tint localStorage keys then calls `sync()`+`renderOS()`+`SMEngineBridge.renderNow()`; `pushShift()` composes `{x,y,next}` from the three shift fields and calls `setOnionShift`; the shift reset button zeroes the x/y DOM values then calls `pushShift()`; a `#btn-os` contextmenu listener re-runs `sync()` via `setTimeout(0)` so a stale popover always shows current values when reopened; `sync()` is also called once at IIFE-load.",
+            "11387-11388: `#p-opop`/`#p-onop` input handlers → `SM.setOnionPrevOp`/`SM.setOnionNextOp` with `parseInt(this.value)`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "transport-and-layer-buttons",
+      "packets": [
+        {
+          "id": "C19aj.transport-frame-fields-add-layer-menu-component-fields",
+          "files": [
+            "src/js/timeline.js:11389-11432"
+          ],
+          "coverage_ranges": [
+            [
+              11389,
+              11432
+            ]
+          ],
+          "classification": {
+            "code": 34,
+            "comment": 10,
+            "whitespace": 0
+          },
+          "symbols": [],
+          "signature": "top-level addEventListener statements on btn-ff/btn-pf/btn-play/btn-nf/btn-lf/tl-fps/tl-total/tl-cf/btn-al/btn-dl/btn-dupl/btn-comp/btn-comp-enter/btn-comp-detach/comp-playmode/comp-singleframe/comp-speed/comp-offset",
+          "responsibility": "Core frame-transport buttons, fps/total-frame fields, the type-to-scrub current-frame field (with its own clamp), the '+' add-layer menu (seven entry types including the two rig-widget kinds), delete/duplicate/convert-to-component/enter-component/detach-component buttons, and the component-instance playback fields.",
+          "callers": [
+            "None of this packet's own statements define a re-callable symbol beyond anonymous inline listeners — all are terminal DOM wiring."
+          ],
+          "behavior": [
+            "11389-11393: `#btn-ff`/`#btn-pf`/`#btn-play`/`#btn-nf`/`#btn-lf` — each (except play) calls `stopPlay()` if playing, then `goToFrame(state.waIn|currentFrame-1|currentFrame+1|waOut)`; `#btn-play` calls `togglePlay()`.",
+            "11394-11395: `#tl-fps`/`#tl-total` change → `SM.setFps(parseInt(this.value))`/`SM.setTotalFrames(parseInt(this.value))`.",
+            "11396-11400 (comment): lead-in explaining the `#tl-cf` clamp is needed because `goToFrame` silently no-ops out of range rather than clamping.",
+            "11401-11411: `#tl-cf` change — clamps the typed value into `[1,state.totalFrames]`, writes it back into the input, stops playback if needed, calls `goToFrame(v-1)`.",
+            "11412-11423: `#btn-al` click — builds a seven-entry menu (`SM.addLayer`/`addNullLayer`/`addFolderLayer`/`addEffectLayer`/`addGuideLayer`/`addJoystickLayer`/`addSliderLayer`) and hands it to `window.showContextMenu` positioned under the button.",
+            "11424-11428: `#btn-dl`→`SM.deleteLayer`; `#btn-dupl`→`SM.duplicateLayer`; `#btn-comp`→`SM.convertActiveLayerToComponent`; `#btn-comp-enter`→ gated on the active layer having a `symbolId`, then `SM.enterSymbol(symbolId)`; `#btn-comp-detach`→`SM.convertComponentToLayer`.",
+            "11429-11432: `#comp-playmode` change → `SM.setSymbolPlayMode(this.value)` then `updateCompInstancePanel()`; `#comp-singleframe`/`#comp-speed`/`#comp-offset` change → `SM.setSymbolSingleFrame`/`SM.setSymbolSpeed`/`SM.setSymbolPlacedAt`."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No `saveActiveLayerFrame`/`saveAllLayerFrames` call exists anywhere in this scope EXCEPT inside `initLipSync`'s own apply handler (11351, `saveAllLayerFrames()` before `pushUndoLayers`/`SMLipSync.apply`) — the sole persistence point in this whole 286-line span. Every other handler (toolbar customization, revision-view cycle, onion span/tint/shift, transport, add/delete/duplicate layer, component fields) mutates `state.*`/localStorage/`window.SM.*` and relies on the callee (`SM.addLayer` etc., out of scope) or the engine's own render-time read (revision-view) to do any further persistence."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No load/import/loadFrame call exists anywhere in this scope's own body except inside `initLipSync`'s apply handler (11359, `loadFrame(state.currentFrame)` after `SMLipSync.apply`, to reflect the newly written keys). No other packet re-triggers a frame load; several call `SM.*` methods that themselves call `loadFrame` internally (out of scope, e.g. `setSymbolPlayMode`/`deleteLayer`/`addLayer`)."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Exactly one `pushUndoLayers(true)` call in this scope's own body (11351, `initLipSync`'s apply handler, immediately after `saveAllLayerFrames()` and before `SMLipSync.apply`). Every other layer-mutating action in this scope (`SM.addLayer`/`deleteLayer`/`duplicateLayer`/`convertActiveLayerToComponent`/etc.) delegates its own undo snapshot to the callee method body (timeline.js:349+, out of scope) rather than pushing one directly in this span."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "No direct read/write of `selectedPaths`/`_layerSel`/`_layerSelAnchor` anywhere in this scope. `#btn-comp-enter`'s own gate reads `state.layers[state.activeLayerIdx]` (the ACTIVE layer, not the shape selection) to decide whether a symbolId exists before calling `SM.enterSymbol`."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "`state.revisionView` is read exclusively at render time by `buildSceneJson` (engine-bridge.js:1331/1333/3411, cited by line only) and never during save/load — confirmed by the 'never touches the document' claim in the lead-in comment and by grep. The onion tint/shift/opacity/mode/span controls all end in either `renderOS()` (tweens.js, redraws the onion overlay) or `SMEngineBridge.renderNow()` (a full engine repaint), never a document mutation. `#tl-cf`/transport buttons call `goToFrame` (app.js:5112, cited by line only), which itself performs the frame-load/render pipeline out of this scope."
+    },
+    {
+      "consumer": "export",
+      "disposition": "No export.js/rive-export.js symbol is called or referenced anywhere in this scope. The onion overlay, revision-view filter, and lip-sync panel are all editor-only UI; none of their outputs (onion tint/shift/markers, revisionView, lip-sync settings) is read by the export pipeline per a whole-src grep of `export.js`/`rive-export.js` restricted to every symbol this scope touches (`state.revisionView`, `onionTint`, `onionShift`, `_omFollow`, `_omSpan`) — zero hits."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-toolbar-hide-show-round-trip",
+      "proposed": "Open the customization popover, uncheck `btn-shadow-guides`; expect it to gain `toolbar-user-hidden` and disappear (CSS `display:none!important`), and `localStorage['nemo-timeline-toolbar-hidden']` to contain `\"btn-shadow-guides\"`. Re-check it; expect the class removed and the stored array to drop the id. Verify `btn-toolbar-customize` and every `ALWAYS_VISIBLE` id never appear as popover rows and never gain the hidden class even if hand-injected into localStorage (apply()'s own cleanup pass) — not run."
+    },
+    {
+      "id": "fx-onion-span-presets",
+      "proposed": "With `state.currentFrame=10`, `state.totalFrames=100`, click `om-span-2`; expect `SM.setOnionRange` called with `(8,12)` and the two marker dataset.frame values set to '8'/'12'. Click `om-span-all`; expect `(0,99)` and `window._omSpan={prev:9999,next:9999}` — not run."
+    },
+    {
+      "id": "fx-tl-cf-clamp",
+      "proposed": "Type '999' into `#tl-cf` with `state.totalFrames=50`; expect the input value clamped to '50' and `goToFrame(49)` called exactly once, never `goToFrame(998)` — not run."
+    },
+    {
+      "id": "fx-onion-tint-reset-vs-shift-reset",
+      "proposed": "Set custom tint colors and a nonzero shift, then click the tint reset button; expect BOTH tint localStorage keys removed and `sync()` to repopulate from `ONION_TINT_DEFAULTS`, while the shift fields/key remain unchanged. Then click the shift reset button; expect `nemo-onion-shift` to be REWRITTEN to `{x:0,y:0,next:<unchanged>}`, not removed — not run."
+    },
+    {
+      "id": "fx-lip-sync-apply-gate",
+      "proposed": "Call the apply flow with the active layer's `symbolId` unset; expect `ld()` to return null and the click handler to no-op (no `analyze`/`apply`/save/undo call). Set a `symbolId` and simulate `SMLipSync.analyze` returning `{error:true}`; expect a `lipNoAudio` toast and no `saveAllLayerFrames`/`pushUndoLayers` call — not run."
+    },
+    {
+      "id": "fx-add-layer-menu-joystick-slider",
+      "proposed": "Click `#btn-al`, select the Joystick entry; expect `SM.addJoystickLayer` to call `SMRigWidget.addWidgetLayer('joystick')` and a new layer with `isWidgetLayer===true` and `widget.kind==='joystick'` to appear, distinct from the Slider entry's `'slider'` kind — not run."
+    }
+  ],
+  "future_proposals": [
+    "The seven-entry add-layer menu array (11412-11423) is duplicated verbatim (same labels, same seven `SM.add*Layer` calls in the same order) at timeline.js:6690-6697 (the layer-list right-click context menu, out of this leaf's scope) — a shared array/builder function is not present; noted for awareness of a maintenance-duplication risk (a new eighth layer kind would need updating in two places) but not confirmed as a defect by execution.",
+    "`REVISION_VIEW_LABELS` (11240) is hard-coded French rather than routed through `SM.t`/i18n.js, unlike most other user-facing strings in this same span (`ctxInsertLayer*`, `toastPlaybackCache*`, `lipNoAudio`/`lipDone`) — noted for awareness as a possible i18n gap, not confirmed as a defect since no other-language build was exercised.",
+    "The onion tint reset (removes localStorage keys) and the onion shift reset (rewrites localStorage keys to zero) use two different persistence strategies for what reads, at the UI level, as the same 'reset to default' gesture on adjacent controls in the same popover — noted for awareness, not flagged as a defect since both produce the same observable default VALUES on next `sync()`."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `grep -n` was run for every DOM id, `window.SM.*` method name, and cross-file symbol this scope touches, at the frozen SHA, then cross-checked directly against the defining file with `sed -n` (app.js:5112-5113 for goToFrame's own guard; tweens.js:4595-4622 for onionTint/onionShift/setOnionTint/setOnionShift; ui.js:1041-1058 for _omFollow/updateOmMarkers and ui.js:1136 for showContextMenu; lipsync.js:45/149/177/206-208 for settingsOf/analyze/apply; rig-widget.js:441-460/671 for addWidgetLayer; engine-bridge.js:1331/1333/3411 for the revisionView reader; style.css:913 for .toolbar-user-hidden).",
+    "A separate whole-src grep restricted to `export.js`/`rive-export.js`/`engine-bridge.js`'s `buildSceneJson`/`scenePayload` for every symbol this scope defines or writes (`initToolbarCustomization`, `setOnionSpan`, `initOnionPopover`, `initCompPreview`, `initLipSync`, `initOnionTintShift`, plus `state.revisionView`/`state.currentFrameOutline`/`window._omFollow`/`window._omSpan`) confirmed only `state.revisionView` and `state.currentFrameOutline` are read on the render path (engine-bridge.js), and only as reads — no write-back from the render path into this scope's own state was found.",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's own `classify()` algorithm against a direct `git show 59a5a38c:src/js/timeline.js` dump, run once per packet and once for the whole span — 217/69/0 over 286 lines, matching the issue's own proposed union exactly and matching the issue's own proposed per-packet table exactly for all seven packets; no boundary correction was needed.",
+    "Sibling `C*.json` files in `engineering/inventory/census/` sharing `source_path: src/js/timeline.js` were enumerated and their `assigned_ranges` sorted: the nearest merged predecessor visible at authoring time is C19af (10217-10392) and the nearest merged successor is C19ak (11433-11666), with C19al immediately after that (11667+); this scope's own 11147-11432 range does not overlap any of them, confirmed by direct range-arithmetic check against every sibling's own declared ranges."
+  ],
+  "validation": {
+    "expected_assigned_lines": 286,
+    "expected_classification": {
+      "code": 217,
+      "comment": 69,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        11147,
+        11236
+      ],
+      [
+        11237,
+        11260
+      ],
+      [
+        11261,
+        11297
+      ],
+      [
+        11298,
+        11332
+      ],
+      [
+        11333,
+        11360
+      ],
+      [
+        11361,
+        11388
+      ],
+      [
+        11389,
+        11432
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by script against the frozen blob: 11147-11236=(60,30,0); 11237-11260=(21,3,0); 11261-11297=(24,13,0); 11298-11332=(26,9,0); 11333-11360=(28,0,0); 11361-11388=(24,4,0); 11389-11432=(34,10,0); sums to (217,69,0)=286 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 286 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C19aj-timeline-toolbar-onion-transport-layer-buttons.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19y-timeline-text-popover-inplace-editors.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19al-timeline-export-modal-panel-rail-bootstrap.json <candidate-sha> still exits 0"
+    ]
+  }
+}
