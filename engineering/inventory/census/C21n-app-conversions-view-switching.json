@@ -1,0 +1,812 @@
+{
+  "census_id": "C21n",
+  "issue": 1214,
+  "title": "app.js component/LFS conversions and view switching — convertComponentToLayer, convertLayerToLFSGroup/convertLFSGroupToLayer, propagateLFSFill, enterSymbol/exitToScene/closeSymbolTab, enterMontageView/exitMontageView",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf, fourteenth app.js slice of the C21 series. Owns app.js:3990-4372 only. C21m/#1211 (splitLayerIntoElements(Core)/mergeLayersIntoOne, app.js:3557-3989) was merged to origin/main as PR #1215 (commit 6c6d5794360f788eb3091e7d425961d2a26ab470) AFTER this worktree's own frozen base (eb96451) — its own artifact engineering/inventory/census/C21m-app-release-to-layers-merge.json is therefore not present in THIS worktree's census directory and is not among the sibling files re-validated below; this scope's own boundary at line 3990 (immediately after C21m's own closing brace at 3989) was confirmed independently by direct `sed -n` read of the frozen blob, not by reading C21m's artifact. Cited by name/line only, not re-mapped: badComponentSourceReason/convertLayerToComponent/convertLayersToComponent/cloneRigForSymbol (app.js:3194-3556, C21l/#1210, merged), getEffectiveStrokes and the module vars _symbolPaperLayers/_sceneSnapshot/_montageViewSnapshot declared at app.js:2882-3193 (C21k/#1212, merged — the two snapshot vars are WRITTEN in this scope, cited by line), getLFSSubStrokes and resolveSymbolFrameIdx (C21j/#1208, merged), loadFrame/saveAllLayerFrames/desP/serP (C21d, merged), fillVectorFind (tools.js:3571) and desP's own scratch-layer usage pattern, SMCamera (camera.js, cited by name only — read via sym.cameraKeys/m.cameraKeys, never called directly in this scope's own body), the timeline symbol tabs (renderSymbolTabs, C19v) and storyboard.js (SMStoryboard.montageById/chainModsForView/montageTotal/addInstanceAuto/invalidateThumb, cited by name only). Next slice C21o should start at line 4373 (blank) / 4374 (_numClose/_deepCloseEqual lead-in).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "eb964510deff4e80c8a80b987b43bc4a411e9cb0",
+  "source_path": "src/js/app.js",
+  "source_blob": "0831959f70612721f80717812838d19940d1f7c1",
+  "source_line_count": 5410,
+  "scope_files": [
+    "src/js/app.js"
+  ],
+  "intended_branch": "claude/c21n-app-conversions-view-switching-census",
+  "assigned_ranges": [
+    {
+      "start": 3990,
+      "end": 4372
+    }
+  ],
+  "coverage_note": "Exactly 383 assigned lines partitioned across nine packets (one coverage_range per packet, no gaps, no other-owner overlap): 239 code, 144 full-line `//` comments, 0 blank — independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs, matching the issue's own proposed union and per-packet table exactly for all nine packets; no boundary correction needed. Line 3989 is C21m's own closing `}` of mergeLayersIntoOne (confirmed by direct read: `return true;` then `}` at 3989, then this scope's own lead-in comment opens at 3990); line 4372 is this scope's own closing `}` of exitMontageView; line 4373 is blank; line 4374 opens the `_numClose`/`_deepCloseEqual` lead-in comment (the engine-bridge tick change-signal, next slice C21o) — all confirmed by direct `sed -n` read of the frozen blob.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js resolves to 0831959f70612721f80717812838d19940d1f7c1, 5410 lines.",
+    "current": "This worktree's own HEAD and origin/main both resolve to eb964510deff4e80c8a80b987b43bc4a411e9cb0 (`git rev-parse HEAD` == `git rev-parse eb96451`, branch reported up to date with origin/main, working tree clean). `git rev-parse 59a5a38c:src/js/app.js` == `git rev-parse eb96451:src/js/app.js` == `git rev-parse HEAD:src/js/app.js` == 0831959f70612721f80717812838d19940d1f7c1 (identical blob, all three) — verified directly in the working worktree.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' 59a5a38c -- src` for each of this scope's nine function symbols, plus a plain-text `grep -rn` across src/js/*.js for `window.<symbol>`/`SM.<symbol>`/`<symbol>:` property-access forms, filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`, then reading each surviving hit's line and enclosing function directly with `sed -n`. One symbol in this scope (convertLayerToLFSGroup) has a real external caller BOTH literal-name grep forms MISS entirely, because the SM-literal wrapper attached in timeline.js uses a DIFFERENT key name than the wrapped function (`convertActiveLayerToLFSGroup:function(){convertLayerToLFSGroup(state.activeLayerIdx);}`, timeline.js:1634) — the real UI entry point (timeline.js:6729, the 'Grouper Ligne/Plein/Ombre' context-menu item) calls `window.SM.convertActiveLayerToLFSGroup()`, a property access on the WRAPPER key, never on the literal string 'convertLayerToLFSGroup'. Found by reading the SM-literal block (timeline.js:1629-1646) directly and then grepping for each wrapper KEY name in turn, not by the issue's own suggested pattern; recorded as a third correction category under `boundaries`, extending C21l's own two categories (bare-call vs `window.`/`SM.`-qualified miss). Separately, the issue's own prompt names color-manager.js as an external caller of enterSymbol; direct read of color-manager.js:61 shows this is a CODE COMMENT explaining why that file needs no extra scoping branch (because enterSymbol already swapped state.layers/userLayers wholesale) — color-manager.js never actually calls enterSymbol; recorded as a false-positive correction under `boundaries`, not silently substituted.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; the in-source comments (convertComponentToLayer's own collapse-identical-frames rationale at 3990-3996, convertLayerToLFSGroup's own three-sub-timeline design note at 4014-4019, convertLFSGroupToLayer's own mirror-of-convertComponentToLayer note at 4041-4044, propagateLFSFill's own propagation-engine rationale at 4061-4070/4098-4103, enterSymbol's own stale-selection-box note at 4156-4164 and its markers/motionArcs/tweenOverrides/tweenEasing 2026-07-30-fix note at 4166-4177, exitToScene's own totalFrames/fps write-back note at 4202-4204, its layers-alias note at 4207-4218, and its cameraKeys 2026-07-30-fix note at 4226-4239, enterMontageView's own section header/design-decision block at 4262-4280, its markers-family note at 4291-4298 and its SEPARATE, later-found cameraKeys note at 4305-4316, and exitMontageView's own write-back note at 4357-4359) are read as authorial intent and prior-session evidence, not fresh execution evidence produced by this census."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C21n-app-conversions-view-switching.json and the nine app.js packets partitioning lines 3990-4372.",
+    "app_js": "app.js retains the whole runtime for these nine symbols (plus the two private module vars _sceneSnapshot/_montageViewSnapshot, declared in C21k's own scope and only WRITTEN here); this JSON authoring does not authorize source changes.",
+    "c21m_boundary": "Lines 3557-3989 (splitLayerIntoElements/splitLayerIntoElementsCore/mergeLayersIntoOne, C21m/#1211, merged as PR #1215 after this worktree's own base) are cited by name/line only. This scope's own boundary begins at line 3990, immediately after C21m's own closing brace.",
+    "c21k_boundary": "getEffectiveStrokes (app.js:2882-3191, C21k/#1212, merged) is the SOLE reader of every sym.layers/sym.cameraKeys/sym.markers/etc field this scope's enterSymbol/exitToScene swap, and of every ld.symbolId/ld.lfsGroup/ld.lfsIds instance field the three converters write/delete. The module vars `_symbolPaperLayers`/`_sceneSnapshot`/`_montageViewSnapshot` are declared at app.js:3192-3193 (C21k) but `_sceneSnapshot`/`_montageViewSnapshot` are exclusively WRITTEN and READ inside this scope's own enterSymbol/exitToScene/enterMontageView/exitMontageView — cited by line for every write/read.",
+    "c21l_boundary": "convertLayerToComponent/convertLayersToComponent (app.js:3266-3470, C21l/#1210) are the CREATE-side siblings this scope's convertComponentToLayer inverts; badComponentSourceReason/cloneRigForSymbol/ensureSymbolPaperLayers are called from packets in THIS scope (enterSymbol:4182) but owned there — cited by line only, no body reproduced.",
+    "c21j_boundary": "getLFSSubStrokes (C21j) is the SOLE reader propagateLFSFill uses to resolve the Ligne sub-symbol's own strokes per frame (app.js:4104/4123, cited by line); resolveSymbolFrameIdx (C21j) is named in enterMontageView's own lead-in comment (4278) as the consumer of symTrimIn/symTrimOut but is never called directly by any function in THIS scope's own body — confirmed by whole-scope grep, cited by name only.",
+    "other_consumers_boundary": "select-bridge.js/motion.js/tools.js/storyboard.js (enterSymbol's real external callers), project.js/timeline.js (exitToScene's real external callers, plus the full symbol-tab-bar/montage-tab-bar UI), color-manager.js (a comment-only false positive, see `boundaries`), and camera.js (SMCamera, read via sym.cameraKeys/m.cameraKeys but never called by name in this scope) retain their own bodies in full — cited by line only for the specific findings each packet's `callers` field needed."
+  },
+  "reconciliation": [
+    {
+      "owner": "C21m / #1211 (existing owner, merged to origin/main as PR #1215 after this worktree's own base)",
+      "disposition": "Owns app.js:3557-3989 (splitLayerIntoElements(Core)/mergeLayersIntoOne). This scope's own boundary begins immediately after its closing brace at line 3989, confirmed by direct read of the frozen blob (not by reading C21m's own artifact, which is not present in this worktree's census directory as of base eb96451)."
+    },
+    {
+      "owner": "C21l / #1210 (existing owner, merged)",
+      "disposition": "Owns app.js:3194-3556 (badComponentSourceReason, cloneRigForSymbol, ensureSymbolPaperLayers, convertLayerToComponent/convertLayersToComponent, cross-project compositions). convertComponentToLayer (this scope) is the documented inverse of convertLayerToComponent, and deletes the EXACT five fields (symbolId, symPlayMode, symSpeed, symPlacedAt, symSingleFrame) convertLayerToComponent stamps (C21l:3302) — confirmed symmetric by direct read of both bodies. ensureSymbolPaperLayers (C21l:3194-3201) is called once from this scope's own enterSymbol (app.js:4182) — its own body retains its cache/Paper-layer-construction logic in full there, cited by line only here."
+    },
+    {
+      "owner": "C21k / #1212 (existing owner, merged)",
+      "disposition": "Owns app.js:2882-3193 (getEffectiveStrokes, module vars). Retains its own body in full — cited by line only. The sole reader of every field this scope's enterSymbol/exitToScene/converters write onto state.symbols entries and ld instances."
+    },
+    {
+      "owner": "C21j / #1208 (existing owner, merged)",
+      "disposition": "Owns getLFSSubStrokes and resolveSymbolFrameIdx. Retains its own body in full — cited by line only. getLFSSubStrokes is this scope's own SOLE source of Ligne-sub-symbol geometry inside propagateLFSFill (app.js:4104/4123)."
+    },
+    {
+      "owner": "timeline.js (existing owner, the SM-literal wrapper block and the layer-list/context-menu/symbol-tab-bar/montage-tab-bar UI)",
+      "disposition": "Retains its own body in full — cited by line only. Attaches a same-named bare-call wrapper for eight of this scope's nine exported symbols (timeline.js:1633/1636/1637/1638/1643/1644/1645/1646) but a DIFFERENTLY-NAMED wrapper key for convertLayerToLFSGroup (`convertActiveLayerToLFSGroup`, timeline.js:1634) — see `boundaries` for the caller-finding correction this required. Provides the complete real UI entry points recorded under each packet's own `callers` field (context-menu items at timeline.js:6723/6727/6729/6730-6735/6733-6734, toolbar buttons at timeline.js:11427-11428, symbol-tab-bar/montage-tab-bar click handlers at timeline.js:6662/6985-7010)."
+    },
+    {
+      "owner": "select-bridge.js / motion.js / tools.js / storyboard.js (existing owners, the canvas double-click-to-enter-a-component paths)",
+      "disposition": "Retain their own bodies in full — cited by line only. select-bridge.js:1616/1650 and tools.js:7452/7473 are two independently-maintained but near-identical double-click handlers (canvas shape-hit vs active-layer) that both call `window.SM.enterSymbol`; motion.js:6868 calls it from inside enterComponentLayer (Motion's own 'double-click a Component layer enters it', CLAUDE.md §8); storyboard.js:689 calls it from a montage-chain thumbnail double-click."
+    },
+    {
+      "owner": "project.js (existing owner, a project-load/new-project guard)",
+      "disposition": "Retains its own body in full — cited by line only. project.js:56 (`if(state.activeSymbolId)exitToScene();`) is a bare-call external caller of exitToScene, guarding against loading/creating a project while still inside a Component."
+    },
+    {
+      "owner": "color-manager.js (existing owner, the context-colors palette scan)",
+      "disposition": "Retains its own body in full — cited by line only. Does NOT call enterSymbol; color-manager.js:61 is a CODE COMMENT citing enterSymbol's own state.layers/userLayers swap as the reason no extra scoping branch is needed there. Recorded as a false-positive correction to the issue's own prompt text under `boundaries`."
+    },
+    {
+      "owner": "camera.js (existing owner, SMCamera)",
+      "disposition": "Retains its own body in full — cited by name only, not called directly anywhere in this scope. sym.cameraKeys/m.cameraKeys (the fields enterSymbol/exitToScene and enterMontageView/exitMontageView swap) are the same arrays SMCamera.setKey/removeKey mutate in place when a camera is edited inside a Component or montage view; camera.js's own 'Supprimer le calque caméra' action's `state.cameraKeys=[]` wholesale-replace is what exitToScene's own cameraKeys write-back (app.js:4240, 2026-07-30 fix) exists to survive."
+    },
+    {
+      "owner": "storyboard.js (existing owner, SMStoryboard)",
+      "disposition": "Retains its own body in full — cited by name only. montageById/chainModsForView/montageTotal (read) and addInstanceAuto/invalidateThumb (write side effects, the latter called from exitToScene at app.js:4255) are all called from this scope but owned there."
+    },
+    {
+      "owner": "next leaf (app.js:4374+, `_numClose`/`_deepCloseEqual`, not yet filed as an issue at authoring time)",
+      "disposition": "Cited by name/line only. This scope's own boundary ends at line 4372, exitMontageView's own closing brace; line 4373 is blank, confirmed by direct read."
+    }
+  ],
+  "boundaries": [
+    "COMPLETE list of `state.*` fields captured/swapped/restored by the enterSymbol/exitToScene pair, with every write and restore cited by line, and the explicit answer to 'any field saved but not restored or vice versa': NONE found — all 13 keys captured in `_sceneSnapshot` at enterSymbol (app.js:4178-4179 — `layers,totalFrames,waIn,waOut,activeLayerIdx,fps,currentFrame,userLayers,cameraKeys,markers,motionArcs,tweenOverrides,tweenEasing`) are restored 1:1 at exitToScene (app.js:4243-4248, same 13 names, verified field-by-field by direct read). Beyond the snapshot pair: `state.activeSymbolId` is SET to symId at enterSymbol (4193, never captured into the snapshot since nesting is refused at 4153 so the prior value is always null/falsy) and explicitly nulled at exitToScene (4250) — a set/clear pair, not a snapshot/restore pair. `state.openSymbolTabs` is a CUMULATIVE list (push-if-absent at enterSymbol:4194) that exitToScene never touches at all — only closeSymbolTab (app.js:4259) removes an entry, and only for the tab actually being closed, independent of whether it is the currently active one. `window._waIn`/`window._waOut`/`window._totalF` are WINDOW-scoped mirrors (4190/4244), not `state.*` fields, kept in lockstep with state.waIn/waOut/totalFrames on both sides. `userLayers` is a bare module var (not `state.*`), reassigned directly (not snapshotted-as-a-state-field) at both ends (4192/4213/4246/4267 depending on function).",
+    "The SAME 13-key shape and the SAME completeness result holds for the enterMontageView/exitMontageView pair: `_montageViewSnapshot` (app.js:4299-4300) captures the IDENTICAL 13 keys (`layers,totalFrames,waIn,waOut,activeLayerIdx,fps,currentFrame,userLayers,cameraKeys,markers,motionArcs,tweenOverrides,tweenEasing`), and exitMontageView (app.js:4363-4368) restores all 13, verified field-by-field. `state.activeMontageViewId` is the montage-view analogue of activeSymbolId (set at 4349, nulled at 4370, no montage-tabs stack equivalent — the entry guards at 4283-4284 refuse a second concurrent montage view outright, so there is only ever zero or one active, unlike symbols' `openSymbolTabs` stack).",
+    "What each snapshot object contains, verbatim (both are plain object literals with the identical 13-key shape, confirmed by diffing the two literal expressions at app.js:4178-4179 and app.js:4299-4300 character-for-character apart from the variable name): `{layers,totalFrames,waIn,waOut,activeLayerIdx,fps,currentFrame,userLayers,cameraKeys,markers,motionArcs,tweenOverrides,tweenEasing}`. `_sceneSnapshot` (module var, declared C21k:3193) holds the OUTER scene's own values for the duration of a Component edit; `_montageViewSnapshot` (module var, declared C21k) holds either the OUTER scene's values (entered directly) or a MONTAGE VIEW's own synthetic values (entered while inside one) — see the nesting finding below.",
+    "Symbol-inside-montage nesting is explicitly SUPPORTED, montage-inside-symbol is explicitly REFUSED — confirmed by reading all four entry guards together, not assumed from either function's own comment in isolation. enterSymbol's own guard (app.js:4152-4154) checks ONLY `state.activeSymbolId`, never `state.activeMontageViewId` — so double-clicking a montage-view segment (itself a real `symbolId` layer, per enterMontageView's own header comment 4268-4270) while inside a montage view correctly swaps into `_sceneSnapshot` a SECOND time, capturing the montage view's own synthetic `state.layers` (the `newLayers` array built at 4326-4340) as the thing exitToScene will later restore — exactly the 'treats the montage view's synthetic layers as the scene to snapshot/restore' design the comment names. Conversely, enterMontageView's own guard (app.js:4282) DOES check `state.activeSymbolId` and refuses with a 'close the Component first' toast, and exitMontageView's own guard (app.js:4354) refuses the same way — so a user must always exit an inner symbol before exiting the montage view that contains it. No corresponding guard exists (or is needed) forcing exit of a montage view before entering a DIFFERENT montage view from inside a symbol, because entering a symbol never sets `state.activeMontageViewId` and montage views are never entered from inside a symbol's own UI surface.",
+    "Every Paper.js side effect in this scope, with lines, and the ASYMMETRY between the two view-switch pairs' own Paper-layer lifecycle: enterSymbol calls `ensureSymbolPaperLayers(symId)` (4182, C21l territory, cited by line) — a MEMOIZED cache keyed by symId (declared in C21k, populated in C21l) that creates each sub-layer's real `paper.Layer` exactly ONCE ever and simply flips `.visible`/`.opacity` on repeat entries (4183); exitToScene mirrors this by only flipping `.visible=false` (4242), never removing. enterMontageView, by contrast, has NO cache at all: it calls `arcLayer.activate()` (4321, Paper.js context activation before constructing new Layers — enterSymbol never calls this directly since ensureSymbolPaperLayers does its own activate() internally, C21l-territory) then constructs a BRAND-NEW `new Layer({name:'montageview-'+montageId+'-'+newUls.length})` (4341) for every chain member on every single call, `.insertBelow(arcLayer)`+`.visible=true` (4348, the actual project-layer-stack insertion — the Layers are constructed but not yet attached/visible until this line) — and exitMontageView unconditionally `.remove()`s every one of them (4362), so a montage view's own Paper layers are a fresh construct/destroy pair every single enter/exit cycle, never cached. propagateLFSFill has its own THIRD, throwaway-scoped Paper.js lifecycle: `new Layer({name:'lfs-propagate-scratch'})` (4116, immediately hidden), `.removeChildren()` once per target frame inside the tfi loop to reuse the same scratch layer (4126), and a final `.remove()` (4146) once the whole function is done — confirmed via direct read, no external caller ever sees this layer.",
+    "Every `pushUndo`/`pushUndoLayers` call in this scope, and the explicit answer to whether view switches are undoable: the four converters (convertComponentToLayer:4001 `pushUndoLayers();`, convertLayerToLFSGroup:4023 `saveAllLayerFrames();pushUndo(true);`, convertLFSGroupToLayer:4048 `pushUndoLayers();`, propagateLFSFill:4115 `saveAllLayerFrames();pushUndoLayers(true);`) EACH push exactly one undo checkpoint — confirmed `pushUndo` is a literal one-line alias for `pushUndoLayers` (`function pushUndo(alreadySaved){pushUndoLayers(alreadySaved);}`, tweens.js:4741), so `pushUndo(true)` and `pushUndoLayers(true)` are behaviorally identical; the two functions that call it bare (no `saveAllLayerFrames()` immediately before) rely on `pushUndoLayers`'s own internal save when `alreadySaved` is falsy (matching C21l's own documented reading of this parameter), while the two that call `saveAllLayerFrames()` explicitly first pass `true` to skip that internal double save. NONE of enterSymbol, exitToScene, closeSymbolTab, enterMontageView, or exitMontageView call `pushUndo`/`pushUndoLayers` ANYWHERE — confirmed by a whole-packet-range grep for `pushUndo` returning zero hits inside 4151-4372. Each of the five calls only `saveAllLayerFrames()` (4155/4199/4289/4355; closeSymbolTab itself calls neither directly, only via exitToScene). This is a deliberate design, not an oversight: entering/exiting a Component or montage view is a NAVIGATION action (persisting whatever edits already happened via the ordinary save), never itself an undoable step — undo instead unwinds the individual edits made before/after the switch, each pushed by its OWN tool action elsewhere (out of scope).",
+    "The `ld.symbolId`/`lfsGroup` fields written by convertLayerToLFSGroup/convertLFSGroupToLayer, and TWO corrections to the issue's own prompt text confirmed by direct read of the whole 3990-4372 range: (1) `symMatrix` does NOT appear anywhere in this scope — a whole-range grep for the literal string returns zero hits; none of the three converters bakes or reads a symMatrix (contrast with C21l's placeComponentInstance, which explicitly leaves symMatrix UNSET for identity placement, cited by name only). (2) `fillWalls` does NOT appear anywhere in this scope either — a whole-range grep returns zero hits; the actual CLAUDE.md §1 tag family present here is `fillSeed`/`fillGapPx` (written at 4139, read at 4096/4107-4108/4130) plus the two EPHEMERAL, never-serialized scratch fields `fracX`/`fracY` (see the next finding). (3) `ld.lfsIds`/`ld.lfsSettings` (convertLayerToLFSGroup:4033-4034) and `state.symbols[symId].name` (4032) are keyed 'line'/'full'/'shadow' — confirmed by the literal `['line','full','shadow'].forEach(...)` at 4025 and the label map `{line:'Ligne',full:'Plein',shadow:'Ombre'}` at 4031 — NOT 'line'/'fill'/'shadow' as the issue's own prompt text states; every external caller confirms the same three keys (timeline.js:6730-6732 read `l4.lfsIds.line`/`.full`/`.shadow`; timeline.js:6733-6734 pass the literal strings 'full'/'shadow' to propagateLFSFill). convertLayerToLFSGroup writes onto `ld` itself: `ld.lfsGroup=true;ld.lfsIds=lfsIds;ld.lfsSettings=lfsSettings;ld.locked=true;` (4036) then wipes `ld.frames` to a fresh blank/keyframe-0 array sized `state.totalFrames` (4037) — no componentFrame-equivalent stamp, same convention C21l documented for the component converters. convertLFSGroupToLayer deletes EXACTLY those three fields (`delete ld.lfsGroup;delete ld.lfsIds;delete ld.lfsSettings;`, 4056) — perfectly symmetric with the create side, unlike the groups/rig gap in the next finding.",
+    "convertLayerToLFSGroup's per-sub-symbol `symLayer` literal (app.js:4030, `{name:'Layer 1',visible:true,locked:false,frames:frames}`) has ONLY FOUR fields — no `groups`, no `rig`, no `motion`, no matte/blend fields — unlike convertLayerToComponent's own symLayer literal (C21l:3284-3285, cited by line only: `{name:'Layer 1',visible:true,locked:false,frames:...,groups:...,rig:cloneRigForSymbol(ld.rig)}`), which explicitly carries both `groups` and a `cloneRigForSymbol`-cloned `rig` into the new symbol and then deletes them from `ld`. convertLayerToLFSGroup does NEITHER: it never reads `ld.groups`/`ld.rig` at all (confirmed by whole-function read), so if the layer being grouped had a fill/shadow region registry (`ld.groups`) or a rig (`ld.rig`), NEITHER is transferred into the 'full' sub-symbol's own symLayer, and NEITHER is deleted from `ld` either — `ld.groups`/`ld.rig` simply remain on `ld` even though `ld.frames` is wiped to content-free placeholder frames at 4037, leaving any `groups` entry's own `groupId` referencing strokes that no longer exist anywhere on `ld`. Not fixed here (census scope only); flagged under `future_proposals`.",
+    "propagateLFSFill's own source-scan pass (app.js:4093-4112) permanently MUTATES the persisted source keyframes' own stroke-dict objects as a side effect of what reads like a read-only scan: `var items=fr.strokes.filter(...)` (4096) returns a NEW ARRAY but containing the SAME OBJECT REFERENCES as `fr.strokes`'s own elements — so `it.fracX=...;it.fracY=...` (4107-4108) writes directly onto the live stroke dict sitting inside `targetLayer.frames[fi].strokes`, i.e. the SAME sub-symbol frame data `saveAllLayerFrames`/serialization will persist. Confirmed by direct read: `.filter()` never clones its elements. The mutation is idempotent (re-running the scan recomputes the same fracX/fracY from the same lineBounds each time) and scoped correctly per `which` target (a 'full' run only touches the 'full' sub-symbol's own frames, never 'shadow's), so this is not a correctness bug, but it IS a genuine 'this function mutates data it was only asked to read' side effect worth a future look — flagged under `future_proposals`, not fixed here.",
+    "propagateLFSFill explicitly does NOT call tools.js's `fillRegenerateLinked` anywhere — confirmed by a whole-range grep returning only the ONE hit inside the lead-in comment itself (4063, '...fillRegenerateLinked's own linked-fill detection...'), which is an ANALOGY (the same `data.fillSeed`-based identification convention is reused) not a call. The actual regeneration mechanism is a direct call to tools.js's `fillVectorFind` (app.js:4136, tools.js:3571, cited by name only) against a throwaway `scratch` Layer rebuilt from that frame's own Ligne geometry via `desP` (app.js:4127, C21d territory, cited by line only) — a separate, independent re-implementation of 'find the fill region containing this seed point', not a shared call path with fillRegenerateLinked.",
+    "`propagateLFSFill` is the only one of the four converter-shaped functions in this scope whose closing sequence (app.js:4148, `loadFrame(...);renderOS();renderArcs();updateUI();`) OMITS the `if(window.renderSymbolTabs)renderSymbolTabs();` call every other function here makes (convertComponentToLayer:4011, convertLayerToLFSGroup:4038, convertLFSGroupToLayer:4058, enterSymbol:4195, exitToScene:4251, closeSymbolTab:4260, enterMontageView:4350, exitMontageView:4371 — eight for eight elsewhere in this scope). Consistent, not a gap: propagateLFSFill never touches `ld.symbolId`/`ld.lfsGroup`/`state.symbols` keys/names/`state.openSymbolTabs`, so nothing about the tab bar's own rendered content could have changed.",
+    "`closeSymbolTab` (app.js:4257-4261) only calls `exitToScene()` (and therefore only `saveAllLayerFrames()`) when the tab being closed IS the currently active one (`if(state.activeSymbolId===symId)exitToScene();`, 4258). Closing a BACKGROUND tab (any other entry in `state.openSymbolTabs`) skips this branch entirely — no save happens as part of closeSymbolTab itself for that case, and none is needed: that tab's own edits were already persisted the last time IT was the active symbol and something else (another enterSymbol/exitToScene cycle) saved over it. `state.symbols[symId]` itself is NEVER deleted by closeSymbolTab — only the UI-list entry in `state.openSymbolTabs` is spliced out (4259); the symbol stays permanently in the library for any other instance to keep referencing, matching convertComponentToLayer's own lead-in language ('The symbol itself stays in the library for any other instance', 3996).",
+    "The wrapper-key-name mismatch finding (see `source_baselines.runtime`) generalizes a pattern the issue's own suggested grep methodology does not anticipate: an SM-literal wrapper's own KEY need not match the wrapped function's own name. Confirmed exhaustively for this scope by reading the whole `window.SM={...}` block at timeline.js:1629-1646: eight of nine symbols use a same-named key (`convertComponentToLayer`, `convertLFSGroupToLayer`, `propagateLFSFill`, `enterSymbol`, `exitToScene`, `closeSymbolTab`, `enterMontageView`, `exitMontageView`) and are therefore correctly found by a plain property-access grep on the literal function name; only `convertLayerToLFSGroup` is wrapped under the differently-named key `convertActiveLayerToLFSGroup` (1634) — and a SIBLING key in the same block, `convertActiveLayerToStrokeFillShadow` (1635), calls an entirely UNRELATED function of a similar name, `convertLayerToStrokeFillShadowFolder` (defined at app.js:5058, far outside this scope, its own separate context-menu item 'ctxSplitStrokeFillShadow' at timeline.js:6727) — confirmed NOT a caller of anything in this scope, recorded here only to rule out confusion between the two similarly-named conversions."
+  ],
+  "areas": [
+    {
+      "area": "convert-component-to-layer",
+      "packets": [
+        {
+          "id": "C21n.convert-component-to-layer",
+          "files": [
+            "src/js/app.js:3990-4013"
+          ],
+          "coverage_ranges": [
+            [
+              3990,
+              4013
+            ]
+          ],
+          "classification": {
+            "code": 17,
+            "comment": 7,
+            "whitespace": 0
+          },
+          "symbols": [
+            "convertComponentToLayer"
+          ],
+          "signature": "function convertComponentToLayer(layerIdx){if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}var ld=state.layers[layerIdx];if(!ld||!ld.symbolId){showToast(SM.t('toastNotAComponent'));return;}if(!state.symbols[ld.symbolId]){showToast('Composant introuvable');return;}pushUndoLayers();var frames=[],prevJson=null;for(var fi=0;fi<state.totalFrames;fi++){var strokes=getEffectiveStrokes(layerIdx,fi);var j=JSON.stringify(strokes);if(j!==prevJson){frames.push({strokes:JSON.parse(j),isKeyframe:true,isInterpolated:false});prevJson=j;}else frames.push({strokes:[],isKeyframe:false,isInterpolated:false});}delete ld.symbolId;delete ld.symPlayMode;delete ld.symSpeed;delete ld.symPlacedAt;delete ld.symSingleFrame;ld.locked=false;ld.frames=frames;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();showToast(SM.t('toastComponentBrokenToLayer'));}",
+          "responsibility": "Lead-in (3990-3996, 7 comment lines): states this is the inverse of convertLayerToComponent (C21l) — bakes what the component instance actually DISPLAYS on each main-timeline frame (play mode, speed, single-frame settings all folded in via getEffectiveStrokes) back into plain layer keyframes, collapsing consecutive identical frames into one real keyframe plus held placeholder frames rather than stamping a keyframe on every frame; the symbol itself stays in the library for any other instance. `convertComponentToLayer(layerIdx)` (3997-4013): guards on already-editing-a-symbol (3998), invalid/non-component `ld` (3999), and a dangling symbolId whose symbol no longer exists (4000, French toast, no SM.t key). `pushUndoLayers()` (4001) — no explicit `saveAllLayerFrames()` first, unlike the LFS pair; relies on pushUndoLayers' own internal save when alreadySaved is omitted. Collapse loop (4002-4008): for every main-timeline frame, serializes `getEffectiveStrokes(layerIdx,fi)` (C21k) to JSON; if it differs from the previous frame's JSON, pushes a real keyframe with the parsed strokes; otherwise pushes a held placeholder `{strokes:[],isKeyframe:false,isInterpolated:false}`. Deletes the five instance fields convertLayerToComponent (C21l:3302) stamps, in the identical order (4009); unlocks and installs the new frames array (4010). Closing sequence + toast (4011-4012).",
+          "callers": [
+            "motion.js:7404 — the layer context menu's 'Break apart Component' action (existing owner, cited by line only): `window.SM.setActiveLayer(li);window.SM.convertComponentToLayer();`.",
+            "timeline.js:6723 — a second layer-list context menu's identical action (existing owner, cited by line only): `window.SM.convertComponentToLayer();`.",
+            "timeline.js:11428 — the `#btn-comp-detach` toolbar button's click handler (existing owner, cited by line only): `window.SM.convertComponentToLayer();`.",
+            "All three reach this function ONLY through the same-named SM-literal wrapper `window.SM.convertComponentToLayer` (timeline.js:1633, `function(){convertComponentToLayer(state.activeLayerIdx);}`), a bare call correctly matched by the issue's own suggested grep pattern for the wrapper itself."
+          ],
+          "behavior": [
+            "Lines 3990-3996 (comment, 7 lines): inverse-of-convertLayerToComponent rationale, collapse-identical-frames design.",
+            "Line 3997 (code): function open.",
+            "Line 3998 (code): active-symbol guard.",
+            "Line 3999 (code): invalid/non-component ld guard.",
+            "Line 4000 (code): dangling-symbolId guard.",
+            "Line 4001 (code): pushUndoLayers() (no explicit save first).",
+            "Line 4002 (code): init frames/prevJson.",
+            "Lines 4003-4008 (code, 6 lines): per-frame getEffectiveStrokes collapse loop.",
+            "Line 4009 (code): delete five instance fields.",
+            "Line 4010 (code): unlock, install frames.",
+            "Line 4011 (code): loadFrame/renderOS/renderArcs/updateUI/renderSymbolTabs.",
+            "Line 4012 (code): success toast.",
+            "Line 4013 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "convert-layer-to-lfs-group",
+      "packets": [
+        {
+          "id": "C21n.convert-layer-to-lfs-group",
+          "files": [
+            "src/js/app.js:4014-4040"
+          ],
+          "coverage_ranges": [
+            [
+              4014,
+              4040
+            ]
+          ],
+          "classification": {
+            "code": 21,
+            "comment": 6,
+            "whitespace": 0
+          },
+          "symbols": [
+            "convertLayerToLFSGroup"
+          ],
+          "signature": "function convertLayerToLFSGroup(layerIdx){if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}var ld=state.layers[layerIdx];if(!ld||ld.symbolId||ld.lfsGroup){showToast(SM.t('toastLayerAlreadyGrouped'));return;}saveAllLayerFrames();pushUndo(true);var lfsIds={},lfsSettings={};['line','full','shadow'].forEach(function(key){var symId=genSymbolId();var frames;if(key==='full')frames=JSON.parse(JSON.stringify(ld.frames));else{frames=[];for(var i=0;i<state.totalFrames;i++)frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});}var symLayer={name:'Layer 1',visible:true,locked:false,frames:frames};var label={line:'Ligne',full:'Plein',shadow:'Ombre'}[key];state.symbols[symId]={name:ld.name+' ('+label+')',totalFrames:state.totalFrames,fps:state.fps,layers:[symLayer]};lfsIds[key]=symId;lfsSettings[key]={symPlayMode:'loop',symSpeed:1,symPlacedAt:0,symSingleFrame:0};});ld.lfsGroup=true;ld.lfsIds=lfsIds;ld.lfsSettings=lfsSettings;ld.locked=true;ld.frames=[];for(var i=0;i<state.totalFrames;i++)ld.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();showToast(SM.t('toastLayerGroupedLFS'));}",
+          "responsibility": "Lead-in (4014-4019, 6 comment lines): groups a plain layer into 3 independent sub-timelines (Ligne/Plein/Ombre), each modeled as its own state.symbols entry so enterSymbol/exitToScene/getEffectiveStrokes' existing symbolId machinery is reused verbatim (see getLFSSubStrokes, C21j) — the layer's current content becomes the 'Plein' (full/flat-color) pass by default since that is normally the bulk of the linework already on a layer being grouped; Ligne/Ombre start empty. `convertLayerToLFSGroup(layerIdx)` (4020-4040): guards on already-editing-a-symbol (4021) and already-a-component-OR-already-grouped (4022, one shared toast for both cases). `saveAllLayerFrames();pushUndo(true);` (4023, explicit save-first, `pushUndo` is a literal alias for `pushUndoLayers`, tweens.js:4741). Per-sub-timeline loop over the literal keys 'line'/'full'/'shadow' (4025-4035, NOT 'fill' — see `boundaries`): mints a fresh symId (4026); for 'full' deep-clones `ld.frames` (4028), for 'line'/'shadow' builds an all-empty/keyframe-0 placeholder array sized `state.totalFrames` (4029); builds a FOUR-FIELD symLayer literal — `name,visible,locked,frames` only, no `groups`/`rig`/`motion` (4030, see `boundaries` for the confirmed drop vs convertLayerToComponent's own richer literal); writes `state.symbols[symId]` (4032, `name:ld.name+' ('+label+')'`); records `lfsIds[key]`/`lfsSettings[key]` (4033-4034, settings default `{symPlayMode:'loop',symSpeed:1,symPlacedAt:0,symSingleFrame:0}`). Stamps `ld.lfsGroup=true;ld.lfsIds;ld.lfsSettings;ld.locked=true` (4036) and wipes `ld.frames` to a fresh blank/keyframe-0 array (4037, no componentFrame-equivalent stamp — same convention C21l documented for the component converters). Closing sequence + toast (4038-4039).",
+          "callers": [
+            "timeline.js:6729 — the layer context menu's 'Grouper Ligne/Plein/Ombre' action (existing owner, cited by line only): `window.SM.convertActiveLayerToLFSGroup();`, disabled when `l4.symbolId||l4.lfsGroup`.",
+            "Reached ONLY through the DIFFERENTLY-NAMED SM-literal wrapper key `convertActiveLayerToLFSGroup` (timeline.js:1634, `function(){convertLayerToLFSGroup(state.activeLayerIdx);}`) — neither a bare call nor a `window.`/`SM.`-qualified property access on the literal string 'convertLayerToLFSGroup' exists anywhere in src/js; see `boundaries`/`source_baselines.runtime` for how this was found and why the issue's own suggested grep patterns miss it."
+          ],
+          "behavior": [
+            "Lines 4014-4019 (comment, 6 lines): three-sub-timeline design rationale.",
+            "Line 4020 (code): function open.",
+            "Line 4021 (code): active-symbol guard.",
+            "Line 4022 (code): already-component-or-grouped guard.",
+            "Line 4023 (code): saveAllLayerFrames + pushUndo(true).",
+            "Line 4024 (code): init lfsIds/lfsSettings.",
+            "Line 4025 (code): forEach(['line','full','shadow']) open.",
+            "Lines 4026-4029 (code, 4 lines): mint symId, build per-key frames (clone for 'full', blank for others).",
+            "Line 4030 (code): four-field symLayer literal.",
+            "Line 4031 (code): label lookup.",
+            "Line 4032 (code): write state.symbols[symId].",
+            "Lines 4033-4034 (code): record lfsIds[key]/lfsSettings[key].",
+            "Line 4035 (code): forEach close.",
+            "Line 4036 (code): stamp lfsGroup/lfsIds/lfsSettings/locked onto ld.",
+            "Line 4037 (code): wipe ld.frames to blank/keyframe-0 array.",
+            "Line 4038 (code): loadFrame/renderOS/renderArcs/updateUI/renderSymbolTabs.",
+            "Line 4039 (code): success toast.",
+            "Line 4040 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "convert-lfs-group-to-layer",
+      "packets": [
+        {
+          "id": "C21n.convert-lfs-group-to-layer",
+          "files": [
+            "src/js/app.js:4041-4060"
+          ],
+          "coverage_ranges": [
+            [
+              4041,
+              4060
+            ]
+          ],
+          "classification": {
+            "code": 16,
+            "comment": 4,
+            "whitespace": 0
+          },
+          "symbols": [
+            "convertLFSGroupToLayer"
+          ],
+          "signature": "function convertLFSGroupToLayer(layerIdx){if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}var ld=state.layers[layerIdx];if(!ld||!ld.lfsGroup){showToast(SM.t('toastNotALFSGroup'));return;}pushUndoLayers();var frames=[],prevJson=null;for(var fi=0;fi<state.totalFrames;fi++){var strokes=getEffectiveStrokes(layerIdx,fi);var j=JSON.stringify(strokes);if(j!==prevJson){frames.push({strokes:JSON.parse(j),isKeyframe:true,isInterpolated:false});prevJson=j;}else frames.push({strokes:[],isKeyframe:false,isInterpolated:false});}delete ld.lfsGroup;delete ld.lfsIds;delete ld.lfsSettings;ld.locked=false;ld.frames=frames;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();showToast(SM.t('toastGroupLFSBrokenToLayer'));}",
+          "responsibility": "Lead-in (4041-4044, 4 comment lines): the inverse of convertLayerToLFSGroup — bakes the COMPOSITED Ligne+Plein+Ombre result of each main-timeline frame (via getEffectiveStrokes, C21k, which already stacks all 3 sub-symbols) back into plain layer keyframes, then detaches the 3 sub-symbols; mirrors convertComponentToLayer's own collapse-identical-frames logic line for line. `convertLFSGroupToLayer(layerIdx)` (4045-4060): guards on already-editing-a-symbol (4046) and not-actually-an-LFS-group (4047). `pushUndoLayers()` (4048) — same no-explicit-save-first shape as convertComponentToLayer. Identical collapse loop over `getEffectiveStrokes(layerIdx,fi)` (4049-4055). Deletes EXACTLY the three fields convertLayerToLFSGroup wrote (`lfsGroup,lfsIds,lfsSettings`, 4056) — perfectly symmetric with the create side, unlike convertLayerToLFSGroup's own asymmetric handling of `groups`/`rig` (see `boundaries`). Unlocks and installs the new frames array (4057). Closing sequence + toast (4058-4059).",
+          "callers": [
+            "timeline.js:6735 — the layer context menu's 'Dissocier le groupe' action (existing owner, cited by line only, `ctxBreakApartGroup`, disabled unless `l4.lfsGroup`): `window.SM.convertLFSGroupToLayer();`.",
+            "Reached through the same-named SM-literal wrapper (timeline.js:1636, `function(){convertLFSGroupToLayer(state.activeLayerIdx);}`), correctly matched by the issue's own suggested grep pattern."
+          ],
+          "behavior": [
+            "Lines 4041-4044 (comment, 4 lines): inverse-of-convertLayerToLFSGroup rationale, mirrors convertComponentToLayer.",
+            "Line 4045 (code): function open.",
+            "Line 4046 (code): active-symbol guard.",
+            "Line 4047 (code): not-an-LFS-group guard.",
+            "Line 4048 (code): pushUndoLayers() (no explicit save first).",
+            "Line 4049 (code): init frames/prevJson.",
+            "Lines 4050-4055 (code, 6 lines): per-frame getEffectiveStrokes collapse loop.",
+            "Line 4056 (code): delete lfsGroup/lfsIds/lfsSettings.",
+            "Line 4057 (code): unlock, install frames.",
+            "Line 4058 (code): loadFrame/renderOS/renderArcs/updateUI/renderSymbolTabs.",
+            "Line 4059 (code): success toast.",
+            "Line 4060 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "line-bounds-from-strokes",
+      "packets": [
+        {
+          "id": "C21n.line-bounds-from-strokes",
+          "files": [
+            "src/js/app.js:4061-4086"
+          ],
+          "coverage_ranges": [
+            [
+              4061,
+              4086
+            ]
+          ],
+          "classification": {
+            "code": 12,
+            "comment": 14,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_lineBoundsFromStrokes"
+          ],
+          "signature": "function _lineBoundsFromStrokes(strokes){var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;strokes.forEach(function(sd){if(!sd.segments)return;sd.segments.forEach(function(s){var x=s.point[0],y=s.point[1];if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;});});if(minX===Infinity)return null;return{x:minX,y:minY,width:maxX-minX,height:maxY-minY};}",
+          "responsibility": "This packet's own 26-line range contains TWO physically-adjacent but logically-distinct comment blocks (matches the issue's own proposed grouping exactly, confirmed by independent reclassification — see `boundaries` for why the FIRST one is misplaced relative to what it describes): block A (4061-4070, 10 lines) is actually propagateLFSFill's OWN lead-in — the propagation-engine rationale (fillSeed-based detection 'exactly like fillRegenerateLinked's own', re-running fillVectorFind per frame so it tracks shape rather than literal geometry) — physically placed here because it precedes propagateLFSFill's own function keyword in the source, not because it describes `_lineBoundsFromStrokes`. Block B (4071-4074, 4 lines) is `_lineBoundsFromStrokes`'s own real lead-in: a bounding box computed from raw stroke JSON segment ANCHOR points only, ignoring bezier handles (an approximation), used to remap a seed point's relative position when the Ligne shape has translated/scaled between frames (e.g. under a motion tween). `_lineBoundsFromStrokes(strokes)` (4075-4086, 12 code lines): a private helper (leading underscore, zero external callers — confirmed by whole-src grep, only 2 internal call sites, both inside propagateLFSFill, next packet). Iterates every stroke's `sd.segments` (skipping strokes with none, 4078) accumulating min/max X/Y from each segment's own `s.point` anchor (4079-4082, no handleIn/handleOut consideration at all); returns `null` if not a single segment was found across every stroke (`minX` still `Infinity`, 4084); otherwise returns `{x,y,width,height}` (4085).",
+          "callers": [
+            "app.js:4104 — propagateLFSFill (this scope, next packet): `_lineBoundsFromStrokes(getLFSSubStrokes(ld,'line',fi))` during the source-fill scan pass.",
+            "app.js:4125 — propagateLFSFill (this scope, next packet): `_lineBoundsFromStrokes(lineStrokes)` during the per-target-frame regeneration pass.",
+            "No external caller anywhere in src/js — confirmed by a whole-repo grep for the literal name; this is a private (leading-underscore) helper scoped entirely to propagateLFSFill's own use."
+          ],
+          "behavior": [
+            "Lines 4061-4070 (comment, 10 lines): propagateLFSFill's OWN lead-in, physically placed before this function — see `responsibility`.",
+            "Lines 4071-4074 (comment, 4 lines): this function's own lead-in — anchor-points-only bounding box, seed-remap rationale.",
+            "Line 4075 (code): function open, init minX/minY/maxX/maxY.",
+            "Lines 4076-4083 (code, 8 lines): per-stroke, per-segment min/max accumulation from anchor points.",
+            "Line 4084 (code): no-segments-found guard, return null.",
+            "Line 4085 (code): return {x,y,width,height}.",
+            "Line 4086 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "propagate-lfs-fill",
+      "packets": [
+        {
+          "id": "C21n.propagate-lfs-fill",
+          "files": [
+            "src/js/app.js:4087-4150"
+          ],
+          "coverage_ranges": [
+            [
+              4087,
+              4150
+            ]
+          ],
+          "classification": {
+            "code": 58,
+            "comment": 6,
+            "whitespace": 0
+          },
+          "symbols": [
+            "propagateLFSFill"
+          ],
+          "signature": "function propagateLFSFill(layerIdx,which){if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}var ld=state.layers[layerIdx];if(!ld||!ld.lfsGroup){showToast(SM.t('toastNotALFSGroup'));return;}var targetSymId=ld.lfsIds[which];var targetSym=targetSymId&&state.symbols[targetSymId];if(!targetSym){showToast('Sous-timeline introuvable');return;}var targetLayer=targetSym.layers[0];var sourceFrames={};targetLayer.frames.forEach(function(fr,fi){if(!fr.isKeyframe)return;var items=fr.strokes.filter(function(sd){return sd.fillSeed;});if(!items.length)return;var lineBounds=_lineBoundsFromStrokes(getLFSSubStrokes(ld,'line',fi));items.forEach(function(it){if(lineBounds&&lineBounds.width>0&&lineBounds.height>0){it.fracX=(it.fillSeed[0]-lineBounds.x)/lineBounds.width;it.fracY=(it.fillSeed[1]-lineBounds.y)/lineBounds.height;}});sourceFrames[fi]=items;});var sourceFis=Object.keys(sourceFrames).map(Number).sort(function(a,b){return a-b;});if(!sourceFis.length){showToast('...');return;}saveAllLayerFrames();pushUndoLayers(true);var scratch=new Layer({name:'lfs-propagate-scratch'});scratch.visible=false;var newFrames=targetLayer.frames.slice();var applied=0;for(var tfi=0;tfi<state.totalFrames;tfi++){var bestFi=null,bestDist=Infinity;sourceFis.forEach(function(sfi){var dd=Math.abs(sfi-tfi);if(dd<bestDist){bestDist=dd;bestFi=sfi;}});if(bestFi===null||bestFi===tfi)continue;var lineStrokes=getLFSSubStrokes(ld,'line',tfi);if(!lineStrokes.length)continue;var targetBounds=_lineBoundsFromStrokes(lineStrokes);scratch.removeChildren();lineStrokes.forEach(function(sd){desP(sd,scratch,1);});var strokeDatas=[];sourceFrames[bestFi].forEach(function(it){var seedX=it.fillSeed[0],seedY=it.fillSeed[1];if(it.fracX!==undefined&&targetBounds&&targetBounds.width>0&&targetBounds.height>0){seedX=targetBounds.x+it.fracX*targetBounds.width;seedY=targetBounds.y+it.fracY*targetBounds.height;}var seedPt=new Point(seedX,seedY);var res=fillVectorFind(seedPt,scratch,null,it.fillGapPx);if(!res)return;res.path.fillColor=it.fillColor;res.path.strokeColor=null;res.path.opacity=it.opacity!==undefined?it.opacity:1;res.path.data.fillSeed=[seedPt.x,seedPt.y];res.path.data.fillGapPx=res.gapPx;strokeDatas.push(serP(res.path));res.path.remove();});if(!strokeDatas.length)continue;newFrames[tfi]={strokes:strokeDatas,isKeyframe:true,isInterpolated:false};applied++;}scratch.remove();targetLayer.frames=newFrames;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(applied+'...');}",
+          "responsibility": "No lead-in comment OF ITS OWN in this packet's own coverage_range (its actual lead-in physically sits in the PREVIOUS packet's range, see that packet's own `responsibility`). `propagateLFSFill(layerIdx,which)` (4087-4150): guards on already-editing-a-symbol (4088) and not-an-LFS-group (4089); resolves `targetSymId=ld.lfsIds[which]`/`targetSym` (4090, 'Sous-timeline introuvable' toast if missing, 4091); `targetLayer=targetSym.layers[0]` (4092). Source-scan pass (4093-4112, own 6-line comment at 4098-4103): for every KEYFRAME of `targetLayer` carrying at least one stroke with `.fillSeed` (4094-4097), resolves that frame's own Ligne bounding box via `_lineBoundsFromStrokes(getLFSSubStrokes(ld,'line',fi))` (4104, C21j cited) and stamps `fracX`/`fracY` (the seed's fractional position inside that box) DIRECTLY onto the live stroke-dict objects (4105-4110 — see `boundaries`, `items` shares references with `fr.strokes`); collects into `sourceFrames[fi]` (4111). Computes sorted `sourceFis`; toast+return if none exist (4113-4114). `saveAllLayerFrames();pushUndoLayers(true);` (4115). Creates an invisible throwaway `scratch` Layer (4116). Main regeneration loop over EVERY main-timeline frame `tfi` (4117-4145): finds the nearest `sourceFi` by `|sfi-tfi|` (4120-4121); skips if none found OR if `tfi` IS ITSELF a source frame (4122); resolves that frame's own Ligne strokes via `getLFSSubStrokes(ld,'line',tfi)` (4123, C21j), skipping if empty (4124); computes `targetBounds` (4125); rebuilds the Ligne geometry into `scratch` via `desP` (4126-4127, C21d cited); for each captured source item, remaps its seed point from the source frame's own fraction into the TARGET frame's own bounding box when `fracX`/`fracY` were captured, else falls back to the literal absolute `fillSeed` point (4129-4135); runs `fillVectorFind(seedPt,scratch,null,it.fillGapPx)` (4136, tools.js:3571, cited by name) — skips this item if no region found (4137); stamps `fillColor`/`strokeColor=null`/`opacity` onto the found path, re-tags it with a FRESH `data.fillSeed`/`data.fillGapPx` (4138-4139), serializes via `serP` (4140, C21d cited) and removes the scratch path. Skips the whole target frame if NOTHING matched, leaving `newFrames[tfi]` as whatever `targetLayer.frames[tfi]` already was (4142); else overwrites it with a fresh keyframe and increments `applied` (4143-4144). Cleanup (4146-4147): removes `scratch`, commits `targetLayer.frames=newFrames`. Closing sequence WITHOUT `renderSymbolTabs` (4148, see `boundaries`); toast with the applied count (4149).",
+          "callers": [
+            "timeline.js:6733 — the layer context menu's 'Propager le Plein sur les autres frames' action (existing owner, cited by line only): `window.SM.propagateLFSFill('full');`.",
+            "timeline.js:6734 — the same menu's 'Propager l'Ombre...' action (existing owner, cited by line only): `window.SM.propagateLFSFill('shadow');`.",
+            "Both confirm `which` is always exactly 'full' or 'shadow', never 'line' — the Ligne sub-symbol is read-only source geometry inside this function, never a propagation target. Reached through the same-named SM-literal wrapper (timeline.js:1637, `function(which){propagateLFSFill(state.activeLayerIdx,which);}`), correctly matched by the issue's own suggested grep pattern."
+          ],
+          "behavior": [
+            "Line 4087 (code): function open.",
+            "Line 4088 (code): active-symbol guard.",
+            "Line 4089 (code): not-an-LFS-group guard.",
+            "Lines 4090-4092 (code, 3 lines): resolve targetSymId/targetSym/targetLayer, missing-sub-timeline toast.",
+            "Line 4093 (code): init sourceFrames, targetLayer.frames.forEach open.",
+            "Lines 4094-4097 (code, 4 lines): keyframe-only, fillSeed-only item filter.",
+            "Lines 4098-4103 (comment, 6 lines): fraction-of-bounding-box seed-remap rationale.",
+            "Line 4104 (code): resolve lineBounds via _lineBoundsFromStrokes(getLFSSubStrokes).",
+            "Lines 4105-4111 (code, 7 lines): per-item fracX/fracY stamp (mutates live stroke dicts, see boundaries), collect into sourceFrames[fi].",
+            "Line 4112 (code): forEach close.",
+            "Lines 4113-4114 (code, 2 lines): sourceFis computed, no-source-found toast+return.",
+            "Line 4115 (code): saveAllLayerFrames + pushUndoLayers(true).",
+            "Lines 4116-4118 (code, 3 lines): scratch Layer, newFrames snapshot, applied counter.",
+            "Lines 4119-4122 (code, 4 lines): tfi loop open, nearest-sourceFi search, self/none skip.",
+            "Lines 4123-4125 (code, 3 lines): resolve lineStrokes/targetBounds for this target frame, skip if empty.",
+            "Lines 4126-4128 (code, 3 lines): rebuild scratch from lineStrokes via desP, init strokeDatas.",
+            "Lines 4129-4141 (code, 13 lines): per-source-item seed remap, fillVectorFind, fill/stroke/opacity stamp, re-tag fillSeed/fillGapPx, serP, remove.",
+            "Lines 4142-4144 (code, 3 lines): skip-if-nothing-matched, else commit keyframe + increment applied.",
+            "Line 4145 (code): tfi loop close.",
+            "Lines 4146-4147 (code, 2 lines): scratch.remove(), commit targetLayer.frames.",
+            "Line 4148 (code): loadFrame/renderOS/renderArcs/updateUI (no renderSymbolTabs, see boundaries).",
+            "Line 4149 (code): applied-count toast.",
+            "Line 4150 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "enter-symbol",
+      "packets": [
+        {
+          "id": "C21n.enter-symbol",
+          "files": [
+            "src/js/app.js:4151-4196"
+          ],
+          "coverage_ranges": [
+            [
+              4151,
+              4196
+            ]
+          ],
+          "classification": {
+            "code": 25,
+            "comment": 21,
+            "whitespace": 0
+          },
+          "symbols": [
+            "enterSymbol"
+          ],
+          "signature": "function enterSymbol(symId){if(state.activeSymbolId===symId)return;if(state.activeSymbolId){showToast(SM.t('toastNestedComponentsUnsupported'));return;}if(!state.symbols[symId])return;saveAllLayerFrames();if(typeof clearSel==='function')clearSel();_sceneSnapshot={layers:state.layers,totalFrames:state.totalFrames,waIn:state.waIn,waOut:state.waOut,activeLayerIdx:state.activeLayerIdx,fps:state.fps,currentFrame:state.currentFrame,userLayers:userLayers,cameraKeys:state.cameraKeys,markers:state.markers,motionArcs:state.motionArcs,tweenOverrides:state.tweenOverrides,tweenEasing:state.tweenEasing};userLayers.forEach(function(l){l.opacity=0.25;});var sym=state.symbols[symId];var symPaperLayers=ensureSymbolPaperLayers(symId);symPaperLayers.forEach(function(l){l.visible=true;l.opacity=1;});state.layers=sym.layers;state.totalFrames=sym.totalFrames;state.waIn=0;state.waOut=sym.totalFrames-1;state.cameraKeys=sym.cameraKeys||(sym.cameraKeys=[]);state.markers=sym.markers||(sym.markers=[]);state.motionArcs=sym.motionArcs||(sym.motionArcs={});state.tweenOverrides=sym.tweenOverrides||(sym.tweenOverrides={});state.tweenEasing=sym.tweenEasing||(sym.tweenEasing={});window._waIn=0;window._waOut=state.waOut;window._totalF=state.totalFrames;state.activeLayerIdx=0;state.currentFrame=0;state.fps=sym.fps||state.fps;userLayers=symPaperLayers;state.activeSymbolId=symId;if(state.openSymbolTabs.indexOf(symId)<0)state.openSymbolTabs.push(symId);activateUL(0);drawStage();loadFrame(0);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();}",
+          "responsibility": "`enterSymbol(symId)` (4151-4196): no-op if already inside this exact symbol (4152); toast+return if already inside a DIFFERENT symbol — nested components unsupported (4153); no-op if the symId doesn't resolve (4154). `saveAllLayerFrames()` (4155). Stale-selection-box comment (4156-4164, 9 lines): explains why `clearSel()` is called on every document-context swap — buildTransformBoxItems (engine-bridge.js, cited by name only) only checks `selectedPaths.length`, not which document is active, so a selection made in the OUTER scene would otherwise keep drawing a stale box/handles for items dimmed but not removed; same fix applies in reverse (exitToScene) and for StoryBoard's own swap (enterMontageView/exitMontageView). `clearSel()` call, guarded (4165). markers/motionArcs/tweenOverrides/tweenEasing comment (4166-4177, 12 lines): the 2026-07-30 fix — these 4 fields need the SAME swap+write-back treatment as cameraKeys because timeline.js/markers.js reassign them WHOLESALE in several places (trimToWorkArea, import, clear-all-markers), severing any live alias the same way undo's restoreLayersSnapshot does for state.layers. Builds `_sceneSnapshot` (4178-4179, 13 keys, see `boundaries`). Dims the OUTER scene's Paper layers (4180, `opacity=0.25`, does not hide/remove). Resolves `sym` and calls `ensureSymbolPaperLayers(symId)` (4181-4182, C21l territory, cited by line — memoized lazy paper.Layer builder). Reveals the symbol's own (cached or freshly built) Paper layers (4183). Swaps into `state`/`userLayers`/`window.*` (4184-4193, see `boundaries` for the complete field-by-field enumeration). Appends `symId` to the CUMULATIVE `state.openSymbolTabs` list if not already present (4194 — not part of the snapshot/restore pair). Closing sequence (4195): `activateUL(0);drawStage();loadFrame(0);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();`.",
+          "callers": [
+            "select-bridge.js:1616 — double-clicking a component-instance layer's own shape on canvas (existing owner, cited by line only): `window.SM.enterSymbol(state.layers[compHit.layerIdx].symbolId);`.",
+            "select-bridge.js:1650 — double-clicking while the ACTIVE layer is a component (existing owner, cited by line only): `window.SM.enterSymbol(activeLd.symbolId);`.",
+            "tools.js:7452/7473 — a second, independently-maintained pair of near-identical double-click handlers in the canvas tool layer (existing owner, cited by line only) mirroring select-bridge.js's own two call sites.",
+            "motion.js:6868 — inside `enterComponentLayer` (existing owner, cited by line only), Motion's own 'double-click a Component layer enters it' (CLAUDE.md §8): `if(window.SM&&window.SM.enterSymbol)window.SM.enterSymbol(ld.symbolId);`.",
+            "storyboard.js:689 — double-clicking a montage-chain thumbnail (existing owner, cited by line only): `window.SM.enterSymbol(m.symbolId);`.",
+            "timeline.js:6662 — double-clicking a layer-list row (existing owner, cited by line only): routes a plain component layer through `l2.symbolId` and an LFS-grouped layer through `l2.lfsIds.full` (confirming the 'full' key name — not 'fill').",
+            "timeline.js:6730/6731/6732 — the 'Modifier Ligne/Plein/Ombre' context-menu items (existing owner, cited by line only), each targeting `l4.lfsIds.line`/`.full`/`.shadow` respectively — three more confirmations of the line/full/shadow key names.",
+            "timeline.js:7009 — clicking a symbol tab in the tab bar (existing owner, cited by line only): `window.SM.enterSymbol(symId);`.",
+            "timeline.js:11427 — the `#btn-comp-enter` toolbar button's click handler (existing owner, cited by line only).",
+            "NOT a real caller: color-manager.js:61 is a CODE COMMENT citing this function's own state-swap as rationale for needing no extra branch there — it never calls enterSymbol. See `boundaries` for this correction to the issue's own prompt."
+          ],
+          "behavior": [
+            "Line 4151 (code): function open.",
+            "Line 4152 (code): already-in-this-symbol no-op.",
+            "Line 4153 (code): already-in-another-symbol toast+return.",
+            "Line 4154 (code): unknown-symId no-op.",
+            "Line 4155 (code): saveAllLayerFrames().",
+            "Lines 4156-4164 (comment, 9 lines): stale-selection-box rationale.",
+            "Line 4165 (code): guarded clearSel().",
+            "Lines 4166-4177 (comment, 12 lines): markers/motionArcs/tweenOverrides/tweenEasing 2026-07-30 fix rationale.",
+            "Lines 4178-4179 (code): build _sceneSnapshot (13 keys).",
+            "Line 4180 (code): dim outer userLayers opacity=0.25.",
+            "Line 4181 (code): resolve sym.",
+            "Line 4182 (code): ensureSymbolPaperLayers(symId) call.",
+            "Line 4183 (code): reveal symPaperLayers visible/opacity.",
+            "Lines 4184-4189 (code, 6 lines): swap layers/totalFrames/waIn/waOut/cameraKeys/markers/motionArcs/tweenOverrides/tweenEasing.",
+            "Line 4190 (code): window._waIn/_waOut/_totalF mirrors.",
+            "Line 4191 (code): activeLayerIdx=0, currentFrame=0, fps.",
+            "Line 4192 (code): userLayers=symPaperLayers.",
+            "Line 4193 (code): state.activeSymbolId=symId.",
+            "Line 4194 (code): push onto state.openSymbolTabs if absent.",
+            "Line 4195 (code): activateUL/drawStage/loadFrame/renderOS/renderArcs/updateUI/renderSymbolTabs.",
+            "Line 4196 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "exit-to-scene",
+      "packets": [
+        {
+          "id": "C21n.exit-to-scene",
+          "files": [
+            "src/js/app.js:4197-4256"
+          ],
+          "coverage_ranges": [
+            [
+              4197,
+              4256
+            ]
+          ],
+          "classification": {
+            "code": 23,
+            "comment": 37,
+            "whitespace": 0
+          },
+          "symbols": [
+            "exitToScene"
+          ],
+          "signature": "function exitToScene(){if(!state.activeSymbolId||!_sceneSnapshot)return;saveAllLayerFrames();if(typeof clearSel==='function')clearSel();var symId=state.activeSymbolId;var sym=state.symbols[symId];if(sym){sym.totalFrames=state.totalFrames;sym.fps=state.fps;sym.layers=state.layers;sym.markers=state.markers;sym.motionArcs=state.motionArcs;sym.tweenOverrides=state.tweenOverrides;sym.tweenEasing=state.tweenEasing;sym.cameraKeys=state.cameraKeys;}var symLayers=_symbolPaperLayers[symId];if(symLayers)symLayers.forEach(function(l){l.visible=false;});state.layers=_sceneSnapshot.layers;state.totalFrames=_sceneSnapshot.totalFrames;state.waIn=_sceneSnapshot.waIn;state.waOut=_sceneSnapshot.waOut;window._waIn=state.waIn;window._waOut=state.waOut;window._totalF=state.totalFrames;state.activeLayerIdx=_sceneSnapshot.activeLayerIdx;state.currentFrame=_sceneSnapshot.currentFrame;state.fps=_sceneSnapshot.fps;userLayers=_sceneSnapshot.userLayers;state.cameraKeys=_sceneSnapshot.cameraKeys;state.markers=_sceneSnapshot.markers;state.motionArcs=_sceneSnapshot.motionArcs;state.tweenOverrides=_sceneSnapshot.tweenOverrides;state.tweenEasing=_sceneSnapshot.tweenEasing;userLayers.forEach(function(l){l.opacity=1;});state.activeSymbolId=null;_sceneSnapshot=null;activateUL(state.activeLayerIdx);drawStage();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();if(window.SMStoryboard&&window.SMStoryboard.invalidateThumb)SMStoryboard.invalidateThumb(symId);}",
+          "responsibility": "`exitToScene()` (4197-4256): no-op guard if not currently in a symbol or the snapshot is missing (4198). `saveAllLayerFrames()` (4199); guarded `clearSel()` (4200, same stale-selection rationale as enterSymbol, cross-referenced rather than repeated). Resolves `symId` (4201). totalFrames/fps write-back comment (4202-4204, 3 lines): these are PRIMITIVES copied into `state` at enterSymbol time, not a live binding back to `state.symbols[symId]` — must be written back explicitly. `if(sym){sym.totalFrames=state.totalFrames;sym.fps=state.fps;` (4205-4206). `layers` write-back comment (4207-4218, 12 lines) — the alias-severing risk: enterSymbol aliases `state.layers` TO `sym.layers`, so in-place mutation (splice/push/per-layer edit) writes straight through, but any code path that REPLACES the array (leading example: `restoreLayersSnapshot`, tweens.js, which does `state.layers=[]` then rebuilds) silently severs the alias — before this write-back existed, EVERY layer-level undo made inside a component was thrown away the moment you left. `sym.layers=state.layers` (4219). markers/motionArcs/tweenOverrides/tweenEasing write-back comment (4220-4224, 5 lines) + write (4225). cameraKeys write-back comment (4226-4239, 14 lines, the FULLEST comment in this packet) — a SEPARATE 2026-07-30 fix: unlike `sym.layers`, this write-back was MISSING until this fix because camera.js's 'Supprimer le calque caméra' action does `state.cameraKeys=[]` (a wholesale replace, not a mutation), silently severing the enterSymbol-time alias; exitMontageView already had the equivalent write-back, only this sibling function was missing it. `sym.cameraKeys=state.cameraKeys` (4240), close `if(sym){` (4241). Hides (not removes) the symbol's cached Paper layers (4242, `_symbolPaperLayers[symId]`, `visible=false` — contrast with exitMontageView's `.remove()`, packet 9). Restores ALL 13 `_sceneSnapshot` keys (4243-4248, see `boundaries`). Restores the OUTER scene's Paper layers' opacity (4249). Clears `state.activeSymbolId`/`_sceneSnapshot` (4250). Closing sequence (4251). StoryBoard thumbnail-cache-invalidation comment (4252-4254, 3 lines) + call (4255): drops the just-edited symbol's cached instance-module thumbnail so the next StoryBoard render re-rasterizes instead of showing stale pre-edit content.",
+          "callers": [
+            "project.js:56 — a project-load/new-project guard (existing owner, cited by line only): `if(state.activeSymbolId)exitToScene();`.",
+            "timeline.js:2375 — a second such guard elsewhere in timeline.js (existing owner, cited by line only): `if(state.activeSymbolId)exitToScene();`.",
+            "timeline.js:6985 — the symbol-tab-bar's own outer-scene-tab click handler (existing owner, cited by line only): `if(state.activeSymbolId)window.SM.exitToScene();`.",
+            "timeline.js:6999 — clicking a montage-tab-bar tab while inside a symbol (existing owner, cited by line only): `if(state.activeSymbolId)window.SM.exitToScene();`.",
+            "timeline.js:7000 — a montage tab's own close 'x' (existing owner, cited by line only): calls `window.SM.exitToScene()` (if in a symbol) THEN unconditionally `window.SM.exitMontageView()`.",
+            "Reached through the same-named SM-literal wrapper (timeline.js:1643, `function(){exitToScene();}`), correctly matched by the issue's own suggested grep pattern for all bare-call sites; the timeline.js:6985/6999/7000 sites are `window.`-qualified property accesses on the same name, also correctly matched."
+          ],
+          "behavior": [
+            "Line 4197 (code): function open.",
+            "Line 4198 (code): no-op guard.",
+            "Line 4199 (code): saveAllLayerFrames().",
+            "Line 4200 (code): guarded clearSel() (inline comment).",
+            "Line 4201 (code): resolve symId.",
+            "Lines 4202-4204 (comment, 3 lines): totalFrames/fps write-back rationale.",
+            "Lines 4205-4206 (code): if(sym){ open, write totalFrames/fps.",
+            "Lines 4207-4218 (comment, 12 lines): layers-alias write-back rationale.",
+            "Line 4219 (code): sym.layers=state.layers.",
+            "Lines 4220-4224 (comment, 5 lines): markers-family write-back rationale.",
+            "Line 4225 (code): write markers/motionArcs/tweenOverrides/tweenEasing.",
+            "Lines 4226-4239 (comment, 14 lines): cameraKeys write-back rationale, the separate 2026-07-30 fix.",
+            "Line 4240 (code): sym.cameraKeys=state.cameraKeys.",
+            "Line 4241 (code): if(sym){ close.",
+            "Line 4242 (code): hide _symbolPaperLayers[symId] (visible=false).",
+            "Lines 4243-4248 (code, 6 lines): restore all 13 _sceneSnapshot keys + window mirrors.",
+            "Line 4249 (code): restore outer userLayers opacity=1.",
+            "Line 4250 (code): clear activeSymbolId/_sceneSnapshot.",
+            "Line 4251 (code): activateUL/drawStage/loadFrame/renderOS/renderArcs/updateUI/renderSymbolTabs.",
+            "Lines 4252-4254 (comment, 3 lines): thumbnail-cache-invalidation rationale.",
+            "Line 4255 (code): conditional SMStoryboard.invalidateThumb(symId).",
+            "Line 4256 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "close-symbol-tab-enter-montage-view",
+      "packets": [
+        {
+          "id": "C21n.close-symbol-tab-enter-montage-view",
+          "files": [
+            "src/js/app.js:4257-4351"
+          ],
+          "coverage_ranges": [
+            [
+              4257,
+              4351
+            ]
+          ],
+          "classification": {
+            "code": 49,
+            "comment": 46,
+            "whitespace": 0
+          },
+          "symbols": [
+            "closeSymbolTab",
+            "enterMontageView"
+          ],
+          "signature": "function closeSymbolTab(symId){if(state.activeSymbolId===symId)exitToScene();var idx=state.openSymbolTabs.indexOf(symId);if(idx>=0)state.openSymbolTabs.splice(idx,1);if(window.renderSymbolTabs)renderSymbolTabs();} function enterMontageView(montageId){if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}if(state.activeMontageViewId===montageId)return;if(state.activeMontageViewId){showToast(SM.t('toastCloseMontageFirst'));return;}if(!window.SMStoryboard)return;var m=SMStoryboard.montageById(montageId);if(!m)return;var mods=SMStoryboard.chainModsForView(m);if(!mods.length){showToast(SM.t('hsMontageEmpty'));return;}saveAllLayerFrames();if(typeof clearSel==='function')clearSel();_montageViewSnapshot={layers:state.layers,totalFrames:state.totalFrames,waIn:state.waIn,waOut:state.waOut,activeLayerIdx:state.activeLayerIdx,fps:state.fps,currentFrame:state.currentFrame,userLayers:userLayers,cameraKeys:state.cameraKeys,markers:state.markers,motionArcs:state.motionArcs,tweenOverrides:state.tweenOverrides,tweenEasing:state.tweenEasing};state.markers=m.markers||(m.markers=[]);state.motionArcs=m.motionArcs||(m.motionArcs={});state.tweenOverrides=m.tweenOverrides||(m.tweenOverrides={});state.tweenEasing=m.tweenEasing||(m.tweenEasing={});state.cameraKeys=m.cameraKeys||(m.cameraKeys=[]);userLayers.forEach(function(l){l.opacity=0.25;});var total=SMStoryboard.montageTotal(m);var newLayers=[],newUls=[],acc=0;arcLayer.activate();mods.forEach(function(mod){var sym=state.symbols[mod.symbolId];var srcLen=mod.trimOut-mod.trimIn+1;var frames=[];for(var i=0;i<total;i++)frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});newLayers.push({name:(sym?sym.name:'Composant')+' — montage',symbolId:mod.symbolId,locked:true,visible:true,symPlayMode:'once',symSpeed:srcLen/mod.duration,symPlacedAt:acc,symTrimIn:mod.trimIn,symTrimOut:mod.trimOut,symSingleFrame:0,inPoint:acc,outPoint:acc+mod.duration-1,frames:frames});newUls.push(new Layer({name:'montageview-'+montageId+'-'+newUls.length}));acc+=mod.duration;});state.layers=newLayers;state.totalFrames=total;state.waIn=0;state.waOut=total-1;window._waIn=0;window._waOut=state.waOut;window._totalF=state.totalFrames;state.activeLayerIdx=0;state.currentFrame=0;userLayers=newUls;userLayers.forEach(function(l){l.insertBelow(arcLayer);l.visible=true;});state.activeMontageViewId=montageId;activateUL(0);drawStage();loadFrame(0);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();}",
+          "responsibility": "`closeSymbolTab(symId)` (4257-4261, no lead-in comment of its own): calls `exitToScene()` FIRST only if the tab being closed IS the currently active symbol (4258 — a background tab close never saves/exits anything by itself, see `boundaries`); splices `symId` out of `state.openSymbolTabs` if present (4259, the ONLY other mutator of that list besides enterSymbol's own push); NEVER deletes `state.symbols[symId]` itself — the symbol stays in the library. Conditional `renderSymbolTabs()` (4260). Section header + design-decision block (4262-4280, 19 comment lines) — enterMontageView's own lead-in: StoryBoard 'entrer dans le montage' builds a TEMPORARY scene of real Component-instance layers, one per chain member in chain order, so the montage view reuses the ordinary Motion/Animation2D timeline read with ZERO new rendering path — each segment IS a real `symbolId` layer, so Motion's own double-click-enters-it (enterComponentLayer/enterSymbol) works unmodified; segment `symPlacedAt`/`symSpeed` reproduce storyboard.js's own montageStrokesAt formula, `symTrimIn`/`symTrimOut` (consumed by resolveSymbolFrameIdx, C21j, cited by name only — NOT called directly anywhere in this scope) carry the member's own trim range. `enterMontageView(montageId)` (4281-4351): guards — already-in-a-symbol toast+return (4282, the mirror-image of exitMontageView's own guard, packet 9; enterSymbol itself has NO equivalent check in the other direction, see `boundaries`); already-viewing-this-montage no-op (4283); already-viewing-ANOTHER-montage toast+return (4284); missing `window.SMStoryboard` no-op (4285). Resolves `m`/`mods`, null/empty-montage guards (4286-4288). `saveAllLayerFrames()`+guarded `clearSel()` (4289-4290). markers-family comment (4291-4298, 8 lines): same swap+write-back pairing as enterSymbol/exitToScene, kept on the montage module `m` itself (already covered by exportJSON's own wholesale `state.storyboard` copy). Builds `_montageViewSnapshot` (4299-4300, the SAME 13 keys as `_sceneSnapshot`). Lazy-inits `state.markers/motionArcs/tweenOverrides/tweenEasing` from `m.*` (4301-4304). cameraKeys comment (4305-4316, 12 lines) — a SEPARATE, LATER-found fix ('found live by a background exploration agent'): unlike the 4 fields above, cameraKeys was previously only CAPTURED by reference, never reassigned, so `state.cameraKeys` stayed the outer scene's own array the whole time inside a montage view, and exitMontageView's restore was a no-op. `state.cameraKeys=m.cameraKeys||(lazy-init)` (4317). Dims the outer scene's Paper layers (4318). Resolves `total`/inits `newLayers,newUls,acc` (4319-4320); `arcLayer.activate()` (4321). Per-chain-member loop (4322-4343): resolves `sym`; computes `srcLen`; builds a blank/keyframe-0 frames array sized to the MONTAGE's own `total` (4325); pushes a synthetic layer literal (4326-4340) with an explicit `inPoint`/`outPoint` window (own 7-line comment at 4331-4337 — `layerOutPoint`'s auto-detect skips symbolId layers entirely, so leaving these unset would draw every segment as a full-width bar; this ALSO makes getEffectiveStrokes hide the layer outside its own window for free via the ordinary early-return every other layer already goes through); constructs (but does not yet insert) a real Paper `Layer` (4341); accumulates `acc`. Commits the swap into `state`/`userLayers`/`window.*` (4344-4349, see `boundaries`); ACTUALLY inserts the new Paper layers into the project (4348, `insertBelow(arcLayer);visible=true` — constructed at 4341 but not attached until here). Closing sequence (4350).",
+          "callers": [
+            "timeline.js:7010 — a symbol tab's own close 'x' (existing owner, cited by line only, `e.stopPropagation()` first so the tab-click handler above it doesn't also fire enterSymbol): `window.SM.closeSymbolTab(symId);`.",
+            "Reached through the same-named SM-literal wrapper (timeline.js:1644, `function(symId){closeSymbolTab(symId);}`), correctly matched by the issue's own suggested grep pattern.",
+            "storyboard.js:661 — double-clicking a montage thumbnail (existing owner, cited by line only): `if(window.SM&&window.SM.enterMontageView)window.SM.enterMontageView(m.id);`.",
+            "Reached through the same-named SM-literal wrapper (timeline.js:1645, `function(montageId){enterMontageView(montageId);}`), correctly matched."
+          ],
+          "behavior": [
+            "Line 4257 (code): closeSymbolTab function open.",
+            "Line 4258 (code): conditional exitToScene() if the active symbol matches.",
+            "Line 4259 (code): splice symId out of state.openSymbolTabs.",
+            "Line 4260 (code): conditional renderSymbolTabs().",
+            "Line 4261 (code): closeSymbolTab function close.",
+            "Lines 4262-4280 (comment, 19 lines): enterMontageView's own section header/design-decision block.",
+            "Line 4281 (code): enterMontageView function open.",
+            "Line 4282 (code): active-symbol guard.",
+            "Line 4283 (code): already-viewing-this-montage no-op.",
+            "Line 4284 (code): already-viewing-another-montage toast+return.",
+            "Line 4285 (code): missing-SMStoryboard no-op.",
+            "Lines 4286-4288 (code, 3 lines): resolve m/mods, null/empty guards.",
+            "Line 4289 (code): saveAllLayerFrames().",
+            "Line 4290 (code): guarded clearSel() (inline comment).",
+            "Lines 4291-4298 (comment, 8 lines): markers-family swap+write-back rationale.",
+            "Lines 4299-4300 (code): build _montageViewSnapshot (13 keys).",
+            "Lines 4301-4304 (code, 4 lines): lazy-init markers/motionArcs/tweenOverrides/tweenEasing from m.*.",
+            "Lines 4305-4316 (comment, 12 lines): cameraKeys separate later-found fix rationale.",
+            "Line 4317 (code): state.cameraKeys=m.cameraKeys||(lazy-init).",
+            "Line 4318 (code): dim outer userLayers opacity=0.25.",
+            "Lines 4319-4321 (code, 3 lines): resolve total, init newLayers/newUls/acc, arcLayer.activate().",
+            "Line 4322 (code): mods.forEach open.",
+            "Lines 4323-4325 (code, 3 lines): resolve sym/srcLen, build blank frames sized to total.",
+            "Lines 4326-4330 (code, 5 lines): synthetic layer literal open — name/symbolId/locked/visible/symPlayMode/symSpeed/symPlacedAt/symTrimIn/symTrimOut/symSingleFrame.",
+            "Lines 4331-4337 (comment, 7 lines): explicit inPoint/outPoint window rationale.",
+            "Lines 4338-4340 (code, 3 lines): inPoint/outPoint/frames, layer literal close.",
+            "Line 4341 (code): construct new Paper Layer (not yet inserted).",
+            "Line 4342 (code): acc+=mod.duration.",
+            "Line 4343 (code): mods.forEach close.",
+            "Lines 4344-4347 (code, 4 lines): commit state.layers/totalFrames/waIn/waOut, window mirrors, activeLayerIdx/currentFrame, userLayers=newUls.",
+            "Line 4348 (code): insertBelow(arcLayer)+visible=true — actual Paper insertion.",
+            "Line 4349 (code): state.activeMontageViewId=montageId.",
+            "Line 4350 (code): activateUL/drawStage/loadFrame/renderOS/renderArcs/updateUI/renderSymbolTabs.",
+            "Line 4351 (code): enterMontageView function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "exit-montage-view",
+      "packets": [
+        {
+          "id": "C21n.exit-montage-view",
+          "files": [
+            "src/js/app.js:4352-4372"
+          ],
+          "coverage_ranges": [
+            [
+              4352,
+              4372
+            ]
+          ],
+          "classification": {
+            "code": 18,
+            "comment": 3,
+            "whitespace": 0
+          },
+          "symbols": [
+            "exitMontageView"
+          ],
+          "signature": "function exitMontageView(){if(!state.activeMontageViewId||!_montageViewSnapshot)return;if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}saveAllLayerFrames();if(typeof clearSel==='function')clearSel();var mWB=window.SMStoryboard?SMStoryboard.montageById(state.activeMontageViewId):null;if(mWB){mWB.markers=state.markers;mWB.motionArcs=state.motionArcs;mWB.tweenOverrides=state.tweenOverrides;mWB.tweenEasing=state.tweenEasing;mWB.cameraKeys=state.cameraKeys;}userLayers.forEach(function(l){l.remove();});state.layers=_montageViewSnapshot.layers;state.totalFrames=_montageViewSnapshot.totalFrames;state.waIn=_montageViewSnapshot.waIn;state.waOut=_montageViewSnapshot.waOut;window._waIn=state.waIn;window._waOut=state.waOut;window._totalF=state.totalFrames;state.activeLayerIdx=_montageViewSnapshot.activeLayerIdx;state.currentFrame=_montageViewSnapshot.currentFrame;state.fps=_montageViewSnapshot.fps;userLayers=_montageViewSnapshot.userLayers;state.cameraKeys=_montageViewSnapshot.cameraKeys;state.markers=_montageViewSnapshot.markers;state.motionArcs=_montageViewSnapshot.motionArcs;state.tweenOverrides=_montageViewSnapshot.tweenOverrides;state.tweenEasing=_montageViewSnapshot.tweenEasing;userLayers.forEach(function(l){l.opacity=1;});state.activeMontageViewId=null;_montageViewSnapshot=null;activateUL(state.activeLayerIdx);drawStage();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();}",
+          "responsibility": "`exitMontageView()` (4352-4372): no-op guard if not currently viewing a montage or the snapshot is missing (4353); toast+return if still inside a Component — mirrors enterMontageView's own entry guard, the user must exit the symbol before exiting the montage view around it (4354). `saveAllLayerFrames()`+guarded `clearSel()` (4355-4356). Write-back comment (4357-4359, 3 lines): markers/motionArcs/tweenOverrides/tweenEasing (and cameraKeys) onto the montage module itself, same pairing as enterMontageView's own swap, same reasoning as exitToScene's `sym.*` write-back. Resolves `mWB` via `SMStoryboard.montageById` (4360); if found, writes all 5 fields in one line (4361) — UNLIKE exitToScene's `sym.*` write-back there is NO `m.layers`/`m.totalFrames`/`m.fps` write-back here, because the montage view's own `state.layers` was always a SYNTHETIC array built fresh by enterMontageView (never an alias into `m`), so there is nothing layers/totalFrames/fps-shaped on `m` to write back to. DESTROYS every synthetic Paper Layer this montage-view session created (4362, `.remove()` — contrast with exitToScene's `.visible=false`, which keeps the symbol's own cached layers alive for the next entry). Restores ALL 13 `_montageViewSnapshot` keys (4363-4368, see `boundaries` — matches enterMontageView's own snapshot 1:1, no gaps either direction). Restores the outer scene's Paper layers' opacity (4369, using the just-restored `userLayers`). Clears `state.activeMontageViewId`/`_montageViewSnapshot` (4370). Closing sequence (4371).",
+          "callers": [
+            "timeline.js:6986 — the symbol/montage-tab-bar's own outer-scene-tab click handler (existing owner, cited by line only): `else if(state.activeMontageViewId)window.SM.exitMontageView();`.",
+            "timeline.js:7000 — a montage tab's own close 'x' (existing owner, cited by line only): calls `window.SM.exitToScene()` (if in a symbol) THEN unconditionally `window.SM.exitMontageView();` — the same call site already cited under exitToScene's own `callers`.",
+            "Reached through the same-named SM-literal wrapper (timeline.js:1646, `function(){exitMontageView();}`), correctly matched by the issue's own suggested grep pattern."
+          ],
+          "behavior": [
+            "Line 4352 (code): function open.",
+            "Line 4353 (code): no-op guard.",
+            "Line 4354 (code): active-symbol guard (mirror of enterMontageView's own entry guard).",
+            "Line 4355 (code): saveAllLayerFrames().",
+            "Line 4356 (code): guarded clearSel() (inline comment).",
+            "Lines 4357-4359 (comment, 3 lines): write-back rationale.",
+            "Line 4360 (code): resolve mWB via SMStoryboard.montageById.",
+            "Line 4361 (code): write all 5 fields onto mWB (markers/motionArcs/tweenOverrides/tweenEasing/cameraKeys) in one line.",
+            "Line 4362 (code): userLayers.forEach(l.remove()) — destroys synthetic Paper layers.",
+            "Lines 4363-4368 (code, 6 lines): restore all 13 _montageViewSnapshot keys + window mirrors.",
+            "Line 4369 (code): restore outer userLayers opacity=1.",
+            "Line 4370 (code): clear activeMontageViewId/_montageViewSnapshot.",
+            "Line 4371 (code): activateUL/drawStage/loadFrame/renderOS/renderArcs/updateUI/renderSymbolTabs.",
+            "Line 4372 (code): function close."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "C21m / #1211 (existing owner, merged as PR #1215 after this worktree's own base)",
+      "disposition": "Owns app.js:3557-3989 (splitLayerIntoElements(Core)/mergeLayersIntoOne). Retains its own body in full — cited by line only. This scope's own boundary begins immediately after its closing brace at line 3989."
+    },
+    {
+      "consumer": "C21l / #1210 (existing owner, merged)",
+      "disposition": "Owns app.js:3194-3556 (badComponentSourceReason, cloneRigForSymbol, ensureSymbolPaperLayers, convertLayerToComponent/convertLayersToComponent). Retains its own body in full — cited by line only. convertComponentToLayer (this scope) is its documented inverse; ensureSymbolPaperLayers is called once from enterSymbol (app.js:4182)."
+    },
+    {
+      "consumer": "C21k / #1212 (existing owner, merged)",
+      "disposition": "Owns app.js:2882-3193 (getEffectiveStrokes, module vars _symbolPaperLayers/_sceneSnapshot/_montageViewSnapshot). Retains its own body in full — cited by line only. The sole reader of every state.symbols/ld field this scope writes; _sceneSnapshot/_montageViewSnapshot are declared there but exclusively written/read in this scope."
+    },
+    {
+      "consumer": "C21j / #1208 (existing owner, merged)",
+      "disposition": "Owns getLFSSubStrokes/resolveSymbolFrameIdx. Retains its own body in full — cited by line only. getLFSSubStrokes is propagateLFSFill's sole source of Ligne geometry (app.js:4104/4123); resolveSymbolFrameIdx is named in enterMontageView's own comment but never called directly in this scope."
+    },
+    {
+      "consumer": "timeline.js (existing owner, the SM-literal wrapper block plus the layer-list/context-menu/symbol-tab-bar/montage-tab-bar UI)",
+      "disposition": "Retains its own body in full — cited by line only. Wraps eight of nine symbols under a same-named bare-call key and ONE (convertLayerToLFSGroup) under the differently-named key convertActiveLayerToLFSGroup (timeline.js:1634) — see boundaries. Provides every real UI entry point recorded under each packet's own callers field."
+    },
+    {
+      "consumer": "select-bridge.js / motion.js / tools.js / storyboard.js (existing owners, canvas/Motion/StoryBoard double-click-to-enter paths)",
+      "disposition": "Retain their own bodies in full — cited by line only. Five independent call sites into enterSymbol (select-bridge.js:1616/1650, tools.js:7452/7473, motion.js:6868 inside enterComponentLayer, storyboard.js:689)."
+    },
+    {
+      "consumer": "project.js (existing owner, project-load/new-project guards)",
+      "disposition": "Retains its own body in full — cited by line only. project.js:56 is a bare-call external caller of exitToScene."
+    },
+    {
+      "consumer": "color-manager.js (existing owner, context-colors palette scan)",
+      "disposition": "Retains its own body in full — cited by line only. Does NOT call enterSymbol despite the issue's own prompt naming it as a caller; color-manager.js:61 is a comment citing enterSymbol's own state swap as rationale for needing no extra branch there — a false-positive correction, see boundaries."
+    },
+    {
+      "consumer": "camera.js (existing owner, SMCamera)",
+      "disposition": "Retains its own body in full — cited by name only, never called directly in this scope. sym.cameraKeys/m.cameraKeys are the same arrays SMCamera.setKey/removeKey mutate in place; camera.js's own 'Supprimer le calque caméra' wholesale-replace is exactly what exitToScene's own cameraKeys write-back (2026-07-30 fix) exists to survive."
+    },
+    {
+      "consumer": "storyboard.js (existing owner, SMStoryboard)",
+      "disposition": "Retains its own body in full — cited by name only. montageById/chainModsForView/montageTotal (read) and addInstanceAuto/invalidateThumb (write side effects) are all called from this scope but owned there."
+    },
+    {
+      "consumer": "next leaf (app.js:4374+, _numClose/_deepCloseEqual, not yet filed as an issue at authoring time)",
+      "disposition": "Cited by name/line only. This scope's own boundary ends at line 4372; line 4373 is blank, confirmed by direct read."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-convertcomponenttolayer-collapses-identical-frames",
+      "proposed": "Convert a component whose instance plays back the SAME composited strokes on frames 3-7 (e.g. symPlayMode='loop' over a 2-frame symbol) and different strokes elsewhere; expect the resulting ld.frames to have isKeyframe:true only at 0 and at the first frame of each new distinct composited value, with every held frame in between as {strokes:[],isKeyframe:false} — verifies 4002-4008 — not run."
+    },
+    {
+      "id": "fx-convertcomponenttolayer-deletes-five-fields-symmetric-with-create",
+      "proposed": "Convert a component instance; expect symbolId/symPlayMode/symSpeed/symPlacedAt/symSingleFrame to be entirely ABSENT (not just falsy) on the resulting ld, exactly the five fields convertLayerToComponent (C21l:3302) stamps — verifies line 4009 — not run."
+    },
+    {
+      "id": "fx-convertcomponenttolayer-blocked-while-in-any-symbol",
+      "proposed": "Set state.activeSymbolId to any truthy value, call convertComponentToLayer; expect a toast and zero mutation of ld/state.symbols — verifies line 3998 — not run."
+    },
+    {
+      "id": "fx-convertlayertolfsgroup-full-gets-content-line-shadow-empty",
+      "proposed": "Group a layer with 5 frames of real strokes; expect state.symbols[lfsIds.full].layers[0].frames to be a byte-identical deep clone of the original ld.frames, while lfsIds.line and lfsIds.shadow each get an all-empty/keyframe-0-only frames array of the SAME length — verifies 4028-4029 — not run."
+    },
+    {
+      "id": "fx-convertlayertolfsgroup-keys-are-line-full-shadow-not-fill",
+      "proposed": "Group a layer; expect ld.lfsIds/ld.lfsSettings to have EXACTLY the keys 'line','full','shadow' — no 'fill' key at all — verifies line 4025/4031/4033-4034, a regression guard for the issue-prompt correction recorded in boundaries — not run."
+    },
+    {
+      "id": "fx-convertlayertolfsgroup-drops-groups-and-rig",
+      "proposed": "Group a layer that has both ld.groups (a fill/shadow region registry) and ld.rig (a bound rig) set; expect NEITHER field to appear anywhere on the new 'full' sub-symbol's own symLayer, AND expect both to remain untouched (not deleted) on ld itself even though ld.frames is now blank placeholders — regression guard for the confirmed drop in boundaries (not a claim this should be fixed here) — not run."
+    },
+    {
+      "id": "fx-convertlfsgrouptolayer-symmetric-delete",
+      "proposed": "Ungroup an LFS-grouped layer; expect lfsGroup/lfsIds/lfsSettings to be entirely ABSENT afterward, and expect state.symbols to still contain (not delete) the three former sub-symbol entries — verifies line 4056 and the undo-orphan-adjacent finding in future_proposals — not run."
+    },
+    {
+      "id": "fx-convertlfsgrouptolayer-composited-via-geteffectivestrokes",
+      "proposed": "Ungroup an LFS layer whose Ligne+Plein+Ombre sub-symbols each contribute a distinct stroke at frame 0; expect the resulting ld.frames[0].strokes to contain strokes from all three (the getEffectiveStrokes stacking, C21k) — verifies lines 4050-4051 — not run."
+    },
+    {
+      "id": "fx-linebounds-null-on-no-segments",
+      "proposed": "Call _lineBoundsFromStrokes([{segments:undefined},{}]); expect null, no exception — verifies line 4078/4084 — not run."
+    },
+    {
+      "id": "fx-linebounds-ignores-bezier-handles",
+      "proposed": "Call _lineBoundsFromStrokes on a single-segment stroke whose handleOut extends far outside [point.x,point.y]; expect the returned {x,y,width,height} to be a degenerate zero-size box at the anchor point alone, NOT expanded by the handle — verifies lines 4079-4081 — not run."
+    },
+    {
+      "id": "fx-propagatelfsfill-only-full-or-shadow-never-line",
+      "proposed": "Call propagateLFSFill(layerIdx,'line'); expect ld.lfsIds.line to resolve to a real sub-symbol but the function to still run (it has no explicit which-value guard) — cross-check against the confirmed caller set (only 'full'/'shadow' ever passed in product UI) — not run."
+    },
+    {
+      "id": "fx-propagatelfsfill-skips-source-frames-and-fills-only-nearest",
+      "proposed": "Set up a target sub-symbol with hand-painted fillSeed keyframes at frames 0 and 10 over a 20-frame timeline; run propagateLFSFill; expect newFrames[0] and newFrames[10] to be UNTOUCHED (still whatever they were, since bestFi===tfi triggers a skip) while frames 1-9 pull from source 0 and frames 11-19 pull from source 10 — verifies lines 4120-4122 — not run."
+    },
+    {
+      "id": "fx-propagatelfsfill-mutates-source-fracxy-in-place",
+      "proposed": "Capture a reference to a hand-painted source stroke dict living in targetLayer.frames[fi].strokes BEFORE calling propagateLFSFill; call it; expect that SAME object reference to now carry .fracX/.fracY fields — verifies the live-mutation finding in boundaries (lines 4096/4107-4108) — not run."
+    },
+    {
+      "id": "fx-propagatelfsfill-no-rendersymboltabs-call",
+      "proposed": "Spy on window.renderSymbolTabs; call propagateLFSFill; expect it NOT to be called, unlike every other function in this scope — verifies line 4148 — not run."
+    },
+    {
+      "id": "fx-propagatelfsfill-does-not-call-fillregeneratelinked",
+      "proposed": "Spy on window.fillRegenerateLinked (if exposed) and on tools.js's fillVectorFind; call propagateLFSFill with at least one valid source; expect fillVectorFind to be called and fillRegenerateLinked to be called ZERO times — verifies line 4136 and the boundaries correction — not run."
+    },
+    {
+      "id": "fx-entersymbol-snapshot-13-keys-all-restored",
+      "proposed": "Enter then exit a symbol after mutating markers/motionArcs/tweenOverrides/tweenEasing/cameraKeys/currentFrame/activeLayerIdx inside it; expect every one of the 13 _sceneSnapshot keys to be restored to its exact pre-entry value on the outer scene, and expect state.activeSymbolId to be null again — verifies 4178-4179 and 4243-4250 — not run."
+    },
+    {
+      "id": "fx-entersymbol-nested-component-blocked",
+      "proposed": "While state.activeSymbolId is set to symA, call enterSymbol(symB) where symB!==symA; expect a toast and zero mutation of state.layers/userLayers/_sceneSnapshot — verifies line 4153 — not run."
+    },
+    {
+      "id": "fx-entersymbol-allowed-while-inside-montage-view",
+      "proposed": "Enter a montage view, then double-click a segment (call enterSymbol on one of the synthetic layers' own symbolId); expect it to succeed (no guard blocks it), state.activeMontageViewId to remain set and untouched, and _sceneSnapshot.layers to equal the montage view's own synthetic newLayers array — verifies the nesting finding in boundaries — not run."
+    },
+    {
+      "id": "fx-entersymbol-exittoscene-no-pushundo",
+      "proposed": "Spy on pushUndo/pushUndoLayers; call enterSymbol then exitToScene; expect ZERO calls to either across both functions — verifies the undoability finding in boundaries (no pushUndo* anywhere in 4151-4372) — not run."
+    },
+    {
+      "id": "fx-exittoscene-writeback-before-restore",
+      "proposed": "Enter a symbol, delete the camera layer inside it (state.cameraKeys=[]), then exitToScene; expect sym.cameraKeys to be [] afterward (write-back survived the wholesale replace) rather than the symbol's original pre-entry camera keys — verifies line 4240, the 2026-07-30 fix — not run."
+    },
+    {
+      "id": "fx-closesymboltab-background-tab-no-exit-no-save",
+      "proposed": "Open two symbol tabs, make symA active, then call closeSymbolTab(symB) (a background tab); spy on exitToScene/saveAllLayerFrames; expect NEITHER to be called, and expect state.activeSymbolId to remain symA — verifies line 4258 — not run."
+    },
+    {
+      "id": "fx-entermontageview-blocked-while-in-symbol",
+      "proposed": "Set state.activeSymbolId to a truthy value, call enterMontageView(montageId); expect a toast and zero mutation of state.layers/_montageViewSnapshot — verifies line 4282 — not run."
+    },
+    {
+      "id": "fx-entermontageview-fresh-paper-layers-every-call-no-cache",
+      "proposed": "Enter, exit, then re-enter the SAME montage view; expect the second enter's own newUls to be a DIFFERENT set of Paper Layer object identities than the first (no _symbolPaperLayers-style cache keyed by montageId) — verifies 4341/4362 and the Paper-lifecycle asymmetry in boundaries — not run."
+    },
+    {
+      "id": "fx-exitmontageview-removes-paper-layers-vs-exittoscene-hides",
+      "proposed": "Enter a montage view, capture project.layers.length, exit it; expect project.layers.length to return to its pre-entry value (layers actually removed) — contrast with the equivalent enterSymbol/exitToScene cycle, where project.layers.length is UNCHANGED across entry/exit (layers only hidden) — verifies line 4362 vs line 4242 — not run."
+    },
+    {
+      "id": "fx-exitmontageview-no-layers-writeback-needed",
+      "proposed": "Enter a montage view, exit it; expect the montage module m to have gained markers/motionArcs/tweenOverrides/tweenEasing/cameraKeys write-backs (line 4361) but NO m.layers/m.totalFrames/m.fps field at all — verifies the asymmetry with exitToScene's sym.* write-back in boundaries — not run."
+    },
+    {
+      "id": "fx-convertactivelayertolfsgroup-wrapper-key-mismatch",
+      "proposed": "Confirm window.SM.convertLayerToLFSGroup is undefined while window.SM.convertActiveLayerToLFSGroup is a function that calls the real convertLayerToLFSGroup at state.activeLayerIdx — verifies the caller-finding correction in boundaries/source_baselines — not run."
+    }
+  ],
+  "future_proposals": [
+    "convertLayerToLFSGroup's per-sub-symbol symLayer literal (app.js:4030) omits `groups` and `rig` entirely, unlike convertLayerToComponent's own richer literal (C21l:3284-3285) which explicitly transfers both via cloneRigForSymbol and then deletes them from `ld`. A future pass should decide whether a grouped layer's own fill/shadow region registry and/or rig binding should travel into the 'full' sub-symbol (mirroring convertLayerToComponent) or be explicitly cleared from `ld` if left behind on purpose — today neither happens, so both fields silently persist on `ld` referencing content (`ld.frames`) that no longer exists. Not changed here (census scope only).",
+    "propagateLFSFill's source-scan pass (app.js:4093-4112) mutates the persisted source keyframes' own stroke-dict objects in place (`items` shares references with `fr.strokes`) as a side effect of a scan that reads, at the call site, like it should be read-only. The mutation is idempotent and correctly scoped per `which`, so this is not a correctness bug today, but a future refactor pass should consider snapshotting fracX/fracY onto separate lookup objects rather than writing them onto the live, persisted stroke dicts — the current shape means every propagateLFSFill run permanently and silently adds two new fields to whatever hand-painted source keyframes already exist, which a future consumer of those same stroke dicts (e.g. a future export/serialize path) would need to know to ignore. Not changed here.",
+    "Same undo-orphan class C21l already documented for state.symbols entries created by convertLayerToComponent/convertLayersToComponent/the foreign-import path applies identically here: convertLayerToLFSGroup mints THREE fresh state.symbols entries (one per line/full/shadow, app.js:4032) inside a single `pushUndo(true)` transaction (4023) — since `layersSnapshotNow`/`restoreLayersSnapshot` (tweens.js, cited by line only per C21l's own direct read) never serialize `state.symbols` at all, undoing a convertLayerToLFSGroup call restores `state.layers` (ungrouping `ld` back to its pre-group shape) while leaving all three newly-minted state.symbols entries as permanent orphans — the identical failure mode C21l flagged for the Component converters, now confirmed to generalize to the LFS converter too. Not changed here; flagged for the same future behavioral pass C21l already proposed.",
+    "`resolveSymbolFrameIdx` (C21j) is named by enterMontageView's own lead-in comment (app.js:4278) as the consumer of the `symTrimIn`/`symTrimOut` fields stamped onto each montage segment (4330), but this scope never traces resolveSymbolFrameIdx's own body to confirm it actually reads them as documented — that function is owned by C21j and was not re-read here beyond its own name/line citation. A future cross-check (already partially covered by C21j's own artifact) should confirm the trim-range fields this scope writes are consumed exactly as the comment describes."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src` `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\('` was run once for each of this scope's nine function symbols, at the frozen SHA, plus a supplementary plain-text `grep -rn` for `window.<symbol>`/`SM.<symbol>`/`<symbol>:` property-access forms across every src/js/*.js file — results reproduced verbatim under each packet's own `callers` field. The SM-literal wrapper block itself (timeline.js:1629-1646) was read directly in full to discover that ONE symbol (convertLayerToLFSGroup) is wrapped under a differently-named key (`convertActiveLayerToLFSGroup`) that neither grep pattern would find by searching for the wrapped function's own name — recorded as a correction to the issue's own suggested methodology in `boundaries`/`source_baselines.runtime`.",
+    "The issue's own prompt text names color-manager.js as an external caller of enterSymbol; a direct read of color-manager.js:50-70 confirms line 61 is a code COMMENT, not a call — recorded as a false-positive correction, not silently substituted.",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's own classify() algorithm against a direct `git show 59a5a38c:src/js/app.js` dump, run once per packet and once for the total — 239/144/0 over 383 lines, matching the issue's own proposed union exactly, and matching the issue's own proposed per-packet table exactly for all nine packets; no boundary correction was needed for any line range.",
+    "`symMatrix` and `fillWalls` — both named in the issue's own artifact-contract prompt text as expected tags in this scope — were confirmed ABSENT from the entire 3990-4372 range by two dedicated whole-range greps (zero hits each); the actual CLAUDE.md §1 tag family present here is `fillSeed`/`fillGapPx` (propagateLFSFill) plus the ephemeral in-memory `fracX`/`fracY` scratch fields. The LFS sub-timeline keys were confirmed to be 'line'/'full'/'shadow' (not 'line'/'fill'/'shadow') by direct read of the literal array at app.js:4025 and cross-checked against every external reader (timeline.js:6662/6730-6732/6733-6734). All three corrections are recorded in `boundaries`.",
+    "The complete 13-key shape of `_sceneSnapshot`/`_montageViewSnapshot` was confirmed identical by a character-level diff of the two object-literal expressions at app.js:4178-4179 and app.js:4299-4300 (both share the literal sequence `layers,totalFrames,waIn,waOut,activeLayerIdx,fps,currentFrame,userLayers,cameraKeys,markers,motionArcs,tweenOverrides,tweenEasing`), and the completeness of both restore sites (app.js:4243-4248 and app.js:4363-4368) was confirmed by matching each of the 13 keys against its own restore assignment one at a time — no field found saved-but-not-restored, or restored-but-never-saved, in either pair.",
+    "Every `pushUndo`/`pushUndoLayers` call site in the whole 3990-4372 range was located by a single grep (`grep -n pushUndo`), returning exactly 4 hits, all inside the four converter functions (packets 1-3, 5) — confirmed zero hits inside enterSymbol/exitToScene/closeSymbolTab/enterMontageView/exitMontageView (packets 6-9), directly supporting the 'view switches are not undo checkpoints' finding in `boundaries`."
+  ],
+  "validation": {
+    "expected_assigned_lines": 383,
+    "expected_classification": {
+      "code": 239,
+      "comment": 144,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        3990,
+        4013
+      ],
+      [
+        4014,
+        4040
+      ],
+      [
+        4041,
+        4060
+      ],
+      [
+        4061,
+        4086
+      ],
+      [
+        4087,
+        4150
+      ],
+      [
+        4151,
+        4196
+      ],
+      [
+        4197,
+        4256
+      ],
+      [
+        4257,
+        4351
+      ],
+      [
+        4352,
+        4372
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by a Python re-implementation of the validator's own classify() run against the frozen blob: 3990-4013=(17,7,0); 4014-4040=(21,6,0); 4041-4060=(16,4,0); 4061-4086=(12,14,0); 4087-4150=(58,6,0); 4151-4196=(25,21,0); 4197-4256=(23,37,0); 4257-4351=(49,46,0); 4352-4372=(18,3,0); sums to (239,144,0)=383 — identical to the issue's own proposed union and per-packet table exactly.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 383 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check_c21n.py engineering/inventory/census/C21n-app-conversions-view-switching.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check_c21n.py engineering/inventory/census/C21l-app-component-creation.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21n.py engineering/inventory/census/C21k-app-get-effective-strokes.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21n.py engineering/inventory/census/C21j-app-symbol-frame-layer-time-model.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21n.py engineering/inventory/census/C21i-app-rig-deform-ik.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21n.py engineering/inventory/census/C21h-app-rig-model-binding.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21n.py engineering/inventory/census/C21g-app-duplicator-runtime.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21n.py engineering/inventory/census/C21f-app-symbol-matrix-duplicator-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21n.py engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21n.py engineering/inventory/census/C21d-app-desp-relink-remote-merge.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21n.py engineering/inventory/census/C21c-app-path-serialisation-serp.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21n.py engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21n.py engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json <candidate-sha> still exits 0"
+    ]
+  }
+}
