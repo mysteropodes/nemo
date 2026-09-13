@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "2b5375d215843cce6e523a54f941bbd2933889ef",
-  "describe": "v0.7.0-alpha.4-330-g2b5375d-dirty"
+  "head": "48ce1a8976a89cb32b723cd2d4503e0ee51167f5",
+  "describe": "v0.7.0-alpha.4-335-g48ce1a8-dirty"
  },
- "inputsDigest": "e2696abb3d5821af8394ed4920903c952286a3a6f1fbc9e6736e6016ece5bdfb",
+ "inputsDigest": "488df74239a077bf88ecc63e8c3fdeb3db479d8dab00c016f6643e2766a88d4c",
  "states": [
   "inventoried",
   "characterized",
@@ -470,7 +470,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 96,
+    "functionsVisited": 98,
     "via": "variable btn",
     "references": []
    },
@@ -3331,7 +3331,7 @@
     "container": "assets-view-presets",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 34,
+    "functionsVisited": 37,
     "via": "chain",
     "references": []
    },
@@ -4719,7 +4719,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 99,
+    "functionsVisited": 100,
     "via": "chain",
     "references": []
    },
@@ -5059,7 +5059,7 @@
     "container": "p-toolpreset-row",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 34,
+    "functionsVisited": 37,
     "via": "variable saveBtn",
     "references": []
    },
@@ -5105,7 +5105,7 @@
     "container": "track-apply-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 89,
+    "functionsVisited": 92,
     "via": "helper el()",
     "references": []
    },
@@ -5148,7 +5148,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 19,
+    "functionsVisited": 22,
     "via": "helper el()",
     "references": []
    },
@@ -5191,7 +5191,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 56,
+    "functionsVisited": 59,
     "via": "helper el()",
     "references": []
    },
@@ -26990,7 +26990,7 @@
    "source": "src/js/motion.js:9876",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 125
+    "functionsVisited": 124
    },
    "fixtures": [
     "static-props",
@@ -27114,7 +27114,7 @@
    "source": "src/js/motion.js:9921",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 351
+    "functionsVisited": 350
    },
    "fixtures": [
     "static-props",
@@ -28328,7 +28328,7 @@
    "source": "src/js/shapes-panel.js:741",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 50
+    "functionsVisited": 49
    },
    "fixtures": [
     "static-props",
@@ -28480,7 +28480,7 @@
    "source": "src/js/shapes-panel.js:861",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 50
+    "functionsVisited": 49
    },
    "fixtures": [
     "static-props",
@@ -28591,7 +28591,7 @@
    "source": "src/js/storyboard.js:1025",
    "meta": {
     "i18n": null,
-    "functionsVisited": 19
+    "functionsVisited": 22
    },
    "fixtures": [
     "components"
@@ -28651,7 +28651,7 @@
    "source": "src/js/storyboard.js:1029",
    "meta": {
     "i18n": null,
-    "functionsVisited": 22
+    "functionsVisited": 25
    },
    "fixtures": [
     "components"
@@ -28681,7 +28681,7 @@
    "source": "src/js/storyboard.js:1030",
    "meta": {
     "i18n": null,
-    "functionsVisited": 21
+    "functionsVisited": 24
    },
    "fixtures": [
     "components"
@@ -28711,7 +28711,7 @@
    "source": "src/js/storyboard.js:1209",
    "meta": {
     "i18n": null,
-    "functionsVisited": 18
+    "functionsVisited": 21
    },
    "fixtures": [
     "components"
@@ -28867,7 +28867,7 @@
    "source": "src/js/storyboard.js:970",
    "meta": {
     "i18n": null,
-    "functionsVisited": 36
+    "functionsVisited": 39
    },
    "fixtures": [
     "components"
@@ -29984,7 +29984,7 @@
    "source": "src/js/timeline.js:5493",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 125
+    "functionsVisited": 124
    },
    "fixtures": [
     "keyed-props",
@@ -30099,7 +30099,7 @@
    "source": "src/js/timeline.js:5524",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 351
+    "functionsVisited": 350
    },
    "fixtures": [
     "keyed-props",
@@ -32583,7 +32583,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 316
+    "functionsVisited": 315
    },
    "fixtures": [
     "media",

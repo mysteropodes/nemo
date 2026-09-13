@@ -1813,6 +1813,30 @@
       ]
     },
     {
+      "id": "app.export.svgsequence.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "export-svg-sequence.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "export-svg-sequence.js"
+      ]
+    },
+    {
+      "id": "app.export.job.application",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "export-job.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "export-job.js"
+      ]
+    },
+    {
       "id": "app.project.document",
       "layer": "app-domain",
       "dir": "src/js",

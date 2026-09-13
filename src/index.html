@@ -2313,6 +2313,8 @@
 <script src="js/brush-editor.js"></script>
 <!-- Adapter consumed by export.js exportFrameSVGString (P17). -->
 <script src="js/adapters/export-svg-frame.js"></script>
+<!-- SVG sequence job binding (P18): consumed by export.js at export time; needs application/export-job.js, loaded later but before any export runs. -->
+<script src="js/adapters/export-svg-sequence.js"></script>
 <script src="js/export.js"></script>
 <script src="js/render-manager.js"></script>
 <script src="js/rive-export.js"></script>
@@ -2373,6 +2375,8 @@
 <script src="js/application/capability-registry.js"></script>
 <script src="js/application/opacity-capability.js"></script>
 <script src="js/application/opacity-application.js"></script>
+<!-- Bounded export job (P18): consumed by export.js at export time, not at parse time. -->
+<script src="js/application/export-job.js"></script>
 <!-- Categorized library of expression snippets (window.SM_EXPR_EXAMPLES) and
      the atomic function reference (window.SM_EXPR_FUNCTIONS), consumed by
      expr-code-panel.js's "Examples"/"Functions" buttons — must load first. -->
