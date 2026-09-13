@@ -1,0 +1,473 @@
+{
+  "census_id": "C21i",
+  "issue": 1203,
+  "title": "app.js rig deformer and IK — applyRigDeform, rigResetPose, rigCommitFrame, rigSetIK/rigAnchorPoint/rigDragIKEnd",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C21i census only; app.js:1884-2289 (the rig MODEL and binding — ensureLayerRig, relinkRigBinds, rigWeighOnePoint/rigWeighOnePointByControl, _rigChordAngle/_rigNormalizeAngle, _boneSegsToPath, rigBindStroke/rigBindMesh, rigAutoAssignLayer, C21h/#1202, merged) is cited by name/line only, not re-mapped, even where THIS scope is the ONLY caller of one of C21h's own symbols (relinkRigBinds at app.js:2549, ensureLayerRig at app.js:2562, _boneSegsToPath at app.js:2299, _rigChordAngle/_rigNormalizeAngle at app.js:2327) — those call sites are recorded verbatim in this artifact's own packet `callers`/`behavior` fields without reproducing C21h's own bodies. resolveSymbolFrameIdx (app.js:2600+, the next leaf C21j, not yet filed as an issue at authoring time), saveActiveLayerFrame/loadFrame/ensureKeyframe (app.js:4634+/tools.js:1882, C21d lineage), pushUndo/pushUndoLayers (tweens.js:4770/4928), canEditActiveLayer (tools.js:1839), the image-mesh store (SMImageMesh, image-mesh.js) and the on-canvas rig UI (rig-bridge.js — bone-draw, influence-circle drag, IK-drag gesture, manual weight popover) are cited by name/line only, not re-mapped.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "d91386f23c7524eb22b6ef881ab2654c0d1170f8",
+  "source_path": "src/js/app.js",
+  "source_blob": "0831959f70612721f80717812838d19940d1f7c1",
+  "source_line_count": 5410,
+  "scope_files": [
+    "src/js/app.js"
+  ],
+  "intended_branch": "claude/c21i-app-rig-deform-ik-census",
+  "assigned_ranges": [
+    {
+      "start": 2290,
+      "end": 2599
+    }
+  ],
+  "coverage_note": "Exactly 310 assigned lines occur once across five packets (one coverage_range per packet, no gaps, no other-owner overlap): 191 code, 119 full-line `//` comments, 0 blank — matches the issue's own proposed union exactly (independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs: 138+9+14+13+17=191 code; 91+0+15+4+9=119 comment; 0 blank in every packet — matching the issue's own per-packet table exactly, no boundary correction needed). Line 2289 is C21h's own closing `}` of rigAutoAssignLayer (out of scope); line 2290 opens this scope's own lead-in comment for applyRigDeform ('Live per-vertex deform — called on every pose drag tick...'). Line 2599 is this scope's own closing `}` of rigDragIKEnd; line 2600 opens `function resolveSymbolFrameIdx(sym,layer,mainFrameIdx){`, C21j's own territory (the next leaf), confirmed by direct read.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js resolves to 0831959f70612721f80717812838d19940d1f7c1, 5410 lines.",
+    "current": "origin/main (d91386f23c7524eb22b6ef881ab2654c0d1170f8, C21h/#1204 merged) has the identical app.js blob (git rev-parse d91386f:src/js/app.js == git rev-parse 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js == 0831959f70612721f80717812838d19940d1f7c1); this artifact branches from origin/main at d91386f23c7524eb22b6ef881ab2654c0d1170f8, verified directly in the working worktree before authoring (HEAD matches, blob matches, working tree clean).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' 59a5a38c -- src` for the six function symbols this scope defines (applyRigDeform, rigResetPose, rigCommitFrame, rigSetIK, rigAnchorPoint, rigDragIKEnd), each filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`, then reading each surviving hit's line and enclosing function directly. Field-level read/write claims (ld.rig/bone/bind fields, `_live`/`_liveRaster`, `_rigPoseLive`/`_rigPoseUndoPushed`, `mesh.offsets`) were derived by a plain-pattern grep restricted to the frozen blob's own lines 2290-2599, cross-checked line-by-line against a direct `sed -n` read of the same range, and (for the two runtime pose flags) a whole-`src` grep to confirm this scope is their SOLE clearer (they are SET only in rig-bridge.js).",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; the in-source comments (the 'live-preview-before-commit' contract at 2290-2292, the anchorFor dual-model comment at 2304-2328, the over-saturation clamp rationale at 2424-2427/2496-2501, the vector-brush companion-sync and centerSegments-sync comments at 2449-2456/2465-2474, the rigCommitFrame ordering rationale at 2528-2535 and its checkpoint-skip rationale at 2540-2545, the IK section header at 2557-2560 and the reachability-clamp rationale at 2588-2594) are read as authorial intent and prior-session evidence, not fresh execution evidence produced by this census."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C21i-app-rig-deform-ik.json and the five app.js packets partitioning lines 2290-2599.",
+    "app_js": "app.js retains the whole runtime for these six symbols; this JSON authoring does not authorize source changes.",
+    "c21h_boundary": "Lines 1884-2289 (the rig MODEL and binding, C21h, merged) are cited by name/line only — including every call FROM inside this scope INTO C21h's own symbols (app.js:2299's `_boneSegsToPath` calls inside applyRigDeform's `bonePaths`, app.js:2327's `_rigChordAngle`/`_rigNormalizeAngle` calls inside applyRigDeform's `anchorFor`, app.js:2549's `relinkRigBinds` call inside rigCommitFrame, app.js:2562's `ensureLayerRig` call inside rigSetIK) — none of `_boneSegsToPath`'s, `_rigChordAngle`'s/`_rigNormalizeAngle`'s, `relinkRigBinds`'s, or `ensureLayerRig`'s own bodies are reproduced here beyond the cited call-site lines.",
+    "c21j_boundary": "Lines 2600+ (`resolveSymbolFrameIdx`, the next leaf C21j, not yet filed as an issue at authoring time) are cited by name only — confirmed by a whole-src grep that none of this scope's six symbols are called from within `resolveSymbolFrameIdx`'s own body and it is never called from within this scope's own lines 2290-2599.",
+    "other_consumers_boundary": "rig-bridge.js (the on-canvas Rig tool: bone-draw, influence-circle radius-drag, the Alt+drag IK gesture, the manual weight-override popover), timeline.js (the Rig panel's Commit/Reset Pose buttons), image-mesh.js (SMImageMesh.get/normalizedOf) and engine-bridge.js (SMEngineBridge.rasterImageRect/renderNow, and the general render pipeline that reads `mesh.offsets` live via `scenePayload`) retain their own bodies in full — cited by line/call-site only for the specific findings each packet's `callers`/`behavior` needed."
+  },
+  "reconciliation": [
+    {
+      "owner": "C21h / #1204 (existing owner, merged)",
+      "disposition": "Owns app.js:1884-2289 (ensureLayerRig, relinkRigBinds, the two weighing models, _boneSegsToPath, _rigChordAngle/_rigNormalizeAngle, rigBindStroke/rigBindMesh, rigAutoAssignLayer). This scope calls four of its symbols repeatedly (see `c21h_boundary`); C21h's own artifact already records the mirror-image citations into this scope's own lines (2299/2327/2549/2562), cross-checked here and found to match exactly. This scope's own boundary begins at line 2290, the lead-in comment for `applyRigDeform`, immediately after C21h's own `rigAutoAssignLayer` closing brace at 2289."
+    },
+    {
+      "owner": "C21j (next leaf, resolveSymbolFrameIdx, not yet filed as an issue at authoring time)",
+      "disposition": "Owns app.js:2600+. Confirmed call-graph-disjoint from this scope in both directions by whole-range grep. This scope's own boundary ends at line 2599, `rigDragIKEnd`'s own closing brace."
+    },
+    {
+      "owner": "rig-bridge.js (existing owner, the on-canvas Rig tool: bone-draw, influence-circle drag, the Alt+drag IK gesture, the manual weight-override popover)",
+      "disposition": "Retains its own body in full — cited by line only. The complete external caller of `applyRigDeform` (rig-bridge.js:433 inside the IK-posing branch, :454 inside the FK-posing branch, :483 on influence-circle radius-drag release, :566 inside the weight-popover's live-update closure) and of `rigDragIKEnd` (rig-bridge.js:425, the IK-posing pointermove branch) and of `rigSetIK` (rig-bridge.js:309, on Alt+click-drag of a chain's own end anchor). Sets `ld._rigPoseLive=true`/`ld._rigPoseUndoPushed=true` at drag-start (rig-bridge.js:317-318) — this scope's own `rigResetPose`/`rigCommitFrame` are the SOLE clearers of both flags (confirmed by whole-src grep), matching rig-bridge.js's own comment at :312-314 ('cleared only by rigCommitFrame/rigResetPose ... since a pose can sit live far longer than one drag gesture')."
+    },
+    {
+      "owner": "timeline.js (existing owner, the Rig panel's Commit/Reset Pose buttons)",
+      "disposition": "Retains its own body in full — cited by line only. `#btn-rig-commit`'s click handler (timeline.js:11566-11568) is `rigCommitFrame`'s other external caller, with no `pushUndo()` of its own (rigCommitFrame pushes its own, conditionally). `#btn-rig-reset`'s click handler (timeline.js:11570-11577) is `rigResetPose`'s SOLE external caller, and — unlike Commit — pushes its OWN unconditional `pushUndo()` (:11574) before calling, and calls `SMEngineBridge.renderNow()` itself afterward (:11576), since `rigResetPose`/`applyRigDeform` never call `renderNow` themselves (see `boundaries`)."
+    },
+    {
+      "owner": "image-mesh.js (SMImageMesh.get/normalizedOf) and engine-bridge.js (SMEngineBridge.rasterImageRect, SMEngineBridge.renderNow, and the general `buildSceneJson`/`scenePayload` render path)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `SMImageMesh.get` (image-mesh.js:73) and `.normalizedOf` (image-mesh.js:408) and `SMEngineBridge.rasterImageRect` (engine-bridge.js:579) are read-only dependencies of applyRigDeform's own mesh-bind branch (packet 1). `mesh.offsets`, WRITTEN by this scope, is read back live and unconditionally on every `buildSceneJson` call via `SMImageMesh.scenePayload` (engine-bridge.js:1488, cited by line only) — no retained-path/materialization identity cache gates this read (see `boundaries`), so a mesh bind's deformation reaches the screen on the very next `renderNow()` with no dirty-flag dependency at all, unlike the boundary/centerSegments Paper-mutation path in the same packet."
+    },
+    {
+      "owner": "tools.js (canEditActiveLayer, ensureKeyframe) and tweens.js (pushUndo/pushUndoLayers)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `canEditActiveLayer` (tools.js:1839) gates `rigCommitFrame` (app.js:2538). `ensureKeyframe` (tools.js:1882, itself calling `getEffectiveStrokes`+`loadFrame`) is called by `rigCommitFrame` (app.js:2548) BEFORE `ld._rigPoseLive` is cleared — see `boundaries` for why this ordering is load-bearing. `pushUndo` (tweens.js:4770, thin wrapper over `pushUndoLayers`, tweens.js:4928) is called conditionally by `rigCommitFrame` (app.js:2546) and unconditionally by timeline.js's own Reset Pose handler."
+    }
+  ],
+  "boundaries": [
+    "Line 2289 (C21h's own closing brace) is outside coverage; line 2290 (the lead-in comment for `applyRigDeform`) begins this scope.",
+    "Line 2599 (`rigDragIKEnd`'s own closing `}`) is the last line of this scope; line 2600 opens `resolveSymbolFrameIdx`, C21j's own territory, and is excluded — confirmed by reading through line 2606.",
+    "No lines inside 2290-2599 are excluded for another owner: every line belongs to exactly one of the five packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "`ld.rig` fields READ by this scope (all field names declared by C21h's own header comment, app.js:1898-1904, cited by name): `rig.binds` (2294 guard, 2362 forEach), `rig.bones[bid]`/`rig.bones[wentry.boneId]`/`rig.bones[ref.boneId]` (2298, 2320, 2570), `bone.restSegments`/`bone.segments`/`bone.closed` (2299, 2321, 2323, 2327, 2571), `rig.ikChains[endKey]` (2575), and every `binds[]` field: `b.meshId` (2368), `b._liveRaster` (2369), `b.rest` (2373, 2383), `b.weights`/`b.weights[i]`/`b.weights[mi]` (2373, 2390), `b.rotate` (2348, 2394, 2483), `b._live`/`b._live.segments` (2380-2381, 2459), `b.restHandles` (2434-2436), `b.centerRest`/`b.centerWeights` (2475, 2478-2479), `wentry.ptIndex`/`wentry.boneId`/`wentry.offset`/`wentry.w` (2311, 2320, 2333-2334, throughout displaceOne/the boundary loop). `chain.root`/`chain.joint`/`chain.end`/`chain.l1`/`chain.l2`/`chain.flip` (2576-2596, rigDragIKEnd, reading the entry `rigSetIK` wrote). `ref.boneId`/`ref.vi` (2570-2571, rigAnchorPoint's own ref-resolution contract, shared by rootRef/jointRef/endRef).",
+    "`ld.rig` / bind fields WRITTEN by this scope: `mesh.offsets[mi]` (2374, 2376 — written into the SMImageMesh store object, not into `ld.rig` itself; a live JS-object write, not a Paper mutation). `rig.ikChains[endRef.boneId+':'+endRef.vi]` (2566, rigSetIK — the SOLE writer of `ikChains` in this scope; C21h's own `ensureLayerRig` only lazy-initialises it to `{}`). `rig.bones[chain.joint.boneId].segments[chain.joint.vi].point` and `rig.bones[chain.end.boneId].segments[chain.end.vi].point` (2585, 2596, rigDragIKEnd — plain `[x,y]` array writes onto the RIG's own bone-pose model, not Paper objects; a bone's `segments` array is plain JSON per C21h's own persisted-shape declaration). `bone.segments=JSON.parse(JSON.stringify(bone.restSegments))` (2523, rigResetPose — the pose-to-rest reset, a deep-clone assignment so the live pose array and the immutable rest array never alias). No field of `ld.rig.binds[i]` itself (`strokeId`/`meshId`/`rest`/`restHandles`/`weights`/`rotate`/`centerRest`/`centerWeights`, all C21h's own writers) is ever written by this scope — this scope only READS the bind list C21h produced and WRITES bone pose/`ikChains`/the mesh store/two runtime flags.",
+    "RUNTIME-ONLY fields (underscore-prefixed, CLAUDE.md §1's 'a live reference never survives save/reload' rule): `ld._rigPoseLive` and `ld._rigPoseUndoPushed` are SET `true` only in rig-bridge.js (317-318, drag-start) and are CLEARED (`=false`) only inside this scope — `_rigPoseLive` at rigResetPose (2526) and rigCommitFrame (2551), `_rigPoseUndoPushed` at rigCommitFrame (2547) — confirmed the SOLE clearers by a whole-src grep returning exactly these five assignment sites for both flags combined. `binds[i]._live`/`._liveRaster` (C21h's own runtime-only fields) are READ here (2369, 2380-2381, 2459) but never written or cleared by this scope — relinking after a fresh `loadFrame` is C21h's own `relinkRigBinds`, called from this scope only as an opaque call (rigCommitFrame, 2549) whose body is not reproduced.",
+    "Every LIVE Paper mutation this scope performs: `segs[i].point=new Point(...)` (2428) and `segs[i].handleIn`/`.handleOut=new Point(...)` (2440-2444, guarded on `b.restHandles`) — real Paper `Segment` property setters on `b._live.segments`, the bound stroke's own live boundary. `bLive.data.linkedFill.segments=segs.map(...)`/`.closed=true` (2461-2462) — an entire fresh `Segment[]` array assigned onto a SEPARATE live Path (the vector-brush's linked-fill companion), copying the just-deformed boundary verbatim rather than re-deforming the companion independently (2449-2456's own comment states why: a prior independent-deform attempt visibly diverged). `centerSegs[ci].point=[...]`/`.handleIn`/`.handleOut=[...]` (2502, 2508-2512) — these are PLAIN JS array/object writes into `bLive.data.centerSegments` (a `path.data` array, not real Paper `Segment` objects: `cRest.handleIn`/`.point` are accessed as plain arrays, never via a Paper accessor), so unlike the 2428/2440-2444 writes above they do NOT themselves invoke Paper's own property setters. THIS scope contains NO reference to `window._sceneVersion` or `_smGeomDirty` anywhere in its own 310 lines (confirmed by grep over the exact assigned range) — `applyRigDeform` never bumps `_sceneVersion` and never touches the `_smGeomDirty` flag directly, the exact CLAUDE.md §5 'the eraser mutates WITHOUT a version bump' family the issue names. What DOES pick the change up: (a) the real Paper `Segment` setter writes at 2428/2440-2444/2461-2462 go through Paper's own instrumented setters, which — per CLAUDE.md §5quater's Path/CompoundPath `_changed`-hook install (engine-bridge.js, out of scope, cited by name only) — mark the owning layer's `_smGeomDirty`, so a SUBSEQUENT `loadFrame` will not incorrectly reuse a stale materialized stroke array for this layer; the plain-array `centerSegs` writes at 2502/2508-2512 do NOT independently trigger this hook, but every caller of this scope that deforms `centerSegments` also deforms the SAME live Path's boundary segments in the SAME call (both live inside `rig.binds.forEach`'s one iteration over `b`), so the dirtying already happens via the boundary write on that Path — see `future_proposals` for the latent fragility if a future bind type ever deformed centerSegments alone. (b) Every OBSERVED caller of `applyRigDeform`/`rigResetPose`/`rigCommitFrame`/`rigDragIKEnd` calls `SMEngineBridge.renderNow()` itself, immediately after, on the OUTSIDE of the call — confirmed for all seven external call sites (rig-bridge.js:433/454/483/566, timeline.js:11568-inside-rigCommitFrame-itself/11576) — and `renderNow`'s own non-viewportOnly branch (engine-bridge.js:4275-4326, cited by line only) ALWAYS calls `buildSceneJson()` fresh rather than being gated on `window._sceneVersion` (its own comment at :4301 states plainly: 'scene may have mutated without a version bump (eraser/select drags) — never let a stale drag-cache survive this'), so the freshly-mutated live geometry is picked up on the very next render regardless of whether `_smGeomDirty` fired.",
+    "`rigCommitFrame`'s own undo hook: `if(!ld._rigPoseUndoPushed)pushUndo();ld._rigPoseUndoPushed=false;` (2546-2547) — pushes ITS OWN undo checkpoint only when no drag-start checkpoint already exists (the flag rig-bridge.js sets to `true` at 317-318), then UNCONDITIONALLY resets the flag to `false` regardless of which branch ran, so the NEXT commit (with no intervening drag) always gets its own fresh checkpoint. This exact skip-if-already-pushed rationale is documented in BOTH files identically (app.js:2540-2545 and rig-bridge.js:296-299, cited by line only): a checkpoint taken AFTER a drag has already live-mutated `bone.segments` would pair an already-posed rig with the frame's still-unbaked (pre-commit) strokes, an internally inconsistent undo snapshot.",
+    "What `rigCommitFrame` writes into which frame store, and the load-bearing ORDER: `ensureKeyframe()` (2548, tools.js:1882, cited by name only) runs FIRST — it captures `getEffectiveStrokes()` for the CURRENT (pre-repose) frame content into a fresh keyframe's `strokes`, then calls `loadFrame()` internally, which REBUILDS the layer's live Paper items from that just-baked (still undeformed-by-THIS-commit) data, discarding the in-progress posed geometry on screen and invalidating the OLD `b._live`/`b._liveRaster` references. `relinkRigBinds(ld,userLayers[state.activeLayerIdx])` (2549, C21h, cited by name only) then re-resolves fresh `_live`/`_liveRaster` pointers onto the items `loadFrame` just created. `applyRigDeform(ld)` (2550, THIS scope's own packet 1) is called a SECOND time, re-applying the SAME pose (still sitting untouched in `rig.bones[...].segments`, since neither `ensureKeyframe` nor `loadFrame` touch `ld.rig`) onto these fresh Paper items. ONLY THEN is `ld._rigPoseLive=false` set (2551) and `saveActiveLayerFrame()` called (2552) — the ordering here is load-bearing for a SEPARATE reason: `saveActiveLayerFrame` (app.js:4634, cited by line only) has its OWN early-return guard at app.js:4663 that includes `||ld._rigPoseLive||` — had `_rigPoseLive` still been `true` at this point, the save would silently no-op and the freshly re-deformed geometry would never reach `ld.frames[i].strokes`. `saveActiveLayerFrame` itself serializes the NOW live-deformed Paper children back into the frame's stored `strokes` array (via its own `serP`-based path, C21d lineage, cited by name only) — so the persisted write is INDIRECT (through the live Paper layer), not a direct `ld.frames[i].strokes=...` assignment inside this scope's own lines.",
+    "Whether `rigCommitFrame` clears the pose afterward: NO. It does not reset `rig.bones[...].segments` to rest (that is exclusively `rigResetPose`'s own job, packet 2, a DIFFERENT user action). `ld._rigPoseLive=false` (2551) is a UI/autosave-guard STATE flag ('the drag is no longer in-progress/uncommitted'), not a geometry reset — the bones remain in their posed positions after Commit, matching the header comment's own framing ('bakes the current LIVE pose into a keyframe'): the posed shape becomes the new frame's baked content, and a subsequent `rigResetPose` call would be needed to return the rig to rest.",
+    "The IK maths, packets 4-5: `rigSetIK(ld,rootRef,jointRef,endRef,flip)` (2561) resolves each of `rootRef`/`jointRef`/`endRef` — each shaped `{boneId,vi}` (confirmed by `rigAnchorPoint`'s own destructuring at 2570-2571 and by rig-bridge.js's own `findIKChain`, out of scope, cited by name only, which constructs these refs) — to a world point via `rigAnchorPoint(rig,ref)` (2569-2573, THIS scope's own packet 4: reads `bone.segments[ref.vi]`, falling back to `bone.restSegments[ref.vi]` if the bone has never been posed, and returns `null` if the bone or that vertex index doesn't exist). It computes the two REST bone-segment lengths `l1`/`l2` (2565, `Math.hypot`) from the CURRENT positions of root/joint/end at the moment `rigSetIK` is called (i.e., whatever pose the rig happens to be in when the chain is first set — this is the chain's fixed 'rigidity' length from then on, not re-derived from `restSegments`), and writes a NEW entry into `rig.ikChains` keyed `boneId+':'+vi` of the END ref (2566), storing `{root,joint,end,l1,l2,flip:!!flip}` — `rigSetIK` never mutates any bone's `segments`/`restSegments` itself, only registers the chain. `rigDragIKEnd(ld,endKey,x,y)` (2574, packet 5) looks up the chain by `endKey` (2575), computes the world delta from the ROOT bone's CURRENT position to the drag target `(x,y)` (2577), clamps the reachable distance to `[|l1-l2|, l1+l2]` (2579-2580, the law-of-cosines chain's own reach limits, epsilon-padded to avoid a degenerate acos domain error at the exact extremes), solves the joint angle via the law of cosines with the `flip` sign choosing which of the two valid elbow solutions (2582-2584), WRITES the joint bone's own vertex point (2585) and the end bone's own vertex point (2596, reconstructed from the SAME clamped distance/angle rather than the raw drag target — 2588-2594's own comment explains why: using the raw unclamped target would silently stretch the joint-end segment past `l2` whenever the drag target was unreachable), then calls `applyRigDeform(ld)` (2597, this scope's own packet 1) to re-deform the bound strokes/meshes from the newly-solved bone positions before returning `true`. `rigDragIKEnd` does NOT touch the coincident 'near end of the END bone' companion vertex some chains have (rig-bridge.js's own `_posing.ld.rig.bones[chain.endNear...]` copy, rig-bridge.js:441-442, cited by line only, done by the CALLER immediately after) — see `future_proposals`.",
+    "Render-path vs gesture-path: NONE of this scope's six symbols is ever called from `getEffectiveStrokes` (app.js:2949, cited by line only) or from `buildSceneJson`/`scenePayload` (engine-bridge.js, cited by name only) — confirmed by a whole-src grep restricted to engine-bridge.js/tools.js/motion.js/select-bridge.js/tweens.js/export.js returning zero hits for any of the six symbol names. Every one of the twelve external+internal call sites found (four inside this scope calling `applyRigDeform` from `rigResetPose`/`rigCommitFrame`/`rigDragIKEnd`; four in rig-bridge.js pointer-gesture handlers; two in timeline.js button-click handlers; one in rig-bridge.js's Alt+drag IK-invocation branch calling `rigSetIK`; one in rig-bridge.js's IK-posing pointermove calling `rigDragIKEnd`) is a USER-GESTURE or explicit-UI-button call, not a render-time call. This is the entire reason the live-mutation-without-`_sceneVersion`-bump pattern above is safe in practice: every gesture path that mutates geometry also explicitly calls `SMEngineBridge.renderNow()` itself afterward (see prior finding), so no automatic/passive render path is ever expected to observe this scope's writes without an explicit render request alongside it.",
+    "The complete caller list of every one of this scope's own six functions is recorded verbatim in each packet's own `callers` field, derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' 59a5a38c -- src`, filtered to exclude `//`-prefixed lines and each symbol's own declaration line — `applyRigDeform` has 7 external+internal callers (3 inside this scope, 4 in rig-bridge.js), `rigResetPose` has exactly 1 (timeline.js's Reset Pose button), `rigCommitFrame` has exactly 1 (timeline.js's Commit button), `rigSetIK` has exactly 1 (rig-bridge.js's Alt+drag IK-invocation branch), `rigAnchorPoint` has exactly 1 (rigSetIK itself, called 3 times on one line for root/joint/end), `rigDragIKEnd` has exactly 1 (rig-bridge.js's IK-posing pointermove branch)."
+  ],
+  "areas": [
+    {
+      "area": "apply-rig-deform",
+      "packets": [
+        {
+          "id": "C21i.apply-rig-deform",
+          "files": [
+            "src/js/app.js:2290-2518"
+          ],
+          "coverage_ranges": [
+            [
+              2290,
+              2518
+            ]
+          ],
+          "classification": {
+            "code": 138,
+            "comment": 91,
+            "whitespace": 0
+          },
+          "symbols": [
+            "applyRigDeform",
+            "bonePaths",
+            "anchorFor",
+            "displaceOne"
+          ],
+          "signature": "function applyRigDeform(ld){ /* var rig=ld.rig; nested bonePaths(bid), anchorFor(wentry), displaceOne(b,restPt,wlist); rig.binds.forEach(function(b){...}); Object.keys(boneCache).forEach(...cleanup); } */",
+          "responsibility": "Lead-in (2290-2292, 3 comment lines): states the live-preview-before-commit contract — called on every pose drag tick AND once more right before rigCommitFrame's own bake, so the committed keyframe always matches exactly what was last seen live. `applyRigDeform(ld)` (2293-2518): the SOLE deformer. Early-returns undefined if `ld.rig` is absent or has no binds (2294). Builds a per-call `boneCache` (2295) memoizing `bonePaths(bid)` (2296-2303, C21h's own `_boneSegsToPath` called twice per bone, once for `restSegments` once for `segments`, cited by line only) so repeated `anchorFor` calls against the same bone in the SAME tick don't rebuild the temp query path — cleaned up at the end (2517) exactly like C21h's own equivalent throwaway paths, never inserted into a layer. `anchorFor(wentry)` (2303-2337, including its own 15-line lead-in comment at 2303-2317) converges BOTH C21h anchoring models into one `{restX,restY,curX,curY,da}` shape: the `ptIndex` branch (2319-2328) reads a bone's own control-point rest/current positions directly (2320-2323) and derives the angle delta from C21h's own chord-angle helpers (2327, cited by line only); the offset branch (2330-2336) samples the bone's own tangent continuously via `getLocationAt` at both the rest and current bone paths. Returns `null` on either branch's unresolvable entry (bone/point missing, or a failed getLocationAt) so callers skip it without folding a bogus zero into their weighted average. `displaceOne(b,restPt,wlist)` (2338-2361, including its own 4-line lead-in comment) factors the SUMMED, weight-normalized per-vertex displacement formula shared by BOTH the mesh-bind branch and — inline, not through this helper, a second near-identical copy — the boundary/centerSegments loops below (rotation-aware when `b.rotate`, plain translation otherwise); divides by `max(1,sumW)` so genuine multi-bone over-saturation is scaled back down without undoing a single bone's own linear falloff taper. `rig.binds.forEach` (2362-2516) is the main per-bind loop: a mesh bind (`b.meshId`, 2368-2379) writes NORMALIZED offsets into the SMImageMesh store via `displaceOne`+`SMImageMesh.normalizedOf`; a stroke bind (2391-2515) walks `b._live.segments` inline (NOT via `displaceOne`, a second copy of the same weighted-sum/rotation logic with its own `sumDaW`/`sumWRot` handle-rotation accumulators), writes `segs[i].point`/`handleIn`/`handleOut` (2428, 2440-2444), then optionally mirrors the just-deformed boundary onto a vector-brush's linked-fill companion (2459-2462) and separately deforms the vector-brush's own `centerSegments` (2475-2515) with the identical weighted-rotation formula a THIRD time, inline again.",
+          "callers": [
+            "app.js:2525 — rigResetPose (this scope, packet 2), after resetting every bone's `segments` to a deep clone of `restSegments`: `applyRigDeform(ld);` re-renders the now-rest pose through the same deformer (a no-op-looking call that still runs the mesh/companion/centerSegments sync paths).",
+            "app.js:2550 — rigCommitFrame (this scope, packet 3), AFTER `ensureKeyframe()`+`relinkRigBinds` have rebuilt fresh live Paper items from the freshly-baked (still undeformed) keyframe: `applyRigDeform(ld);` re-applies the still-live pose (untouched in `ld.rig`) onto those fresh items so the subsequent `saveActiveLayerFrame()` persists the deformed shape.",
+            "app.js:2597 — rigDragIKEnd (this scope, packet 5), after writing the solved joint/end bone positions: `applyRigDeform(ld);` re-deforms the bound strokes/meshes from the new IK solution before returning.",
+            "rig-bridge.js:433 — the IK-posing pointermove branch (inside `if(_posing.ik)`), right after `rigDragIKEnd` has already re-deformed once: `applyRigDeform(_posing.ld);` — a SECOND deform call in the same tick, after the companion 'near end' bone vertex copy (rig-bridge.js:441-442) that rigDragIKEnd itself doesn't perform.",
+            "rig-bridge.js:454 — the plain FK-posing pointermove branch (anchor or handle drag, no IK chain), immediately after writing `poseSeg.point`/`poseSeg[kind]` directly onto `rig.bones[...].segments[...]`: `applyRigDeform(_posing.ld);`.",
+            "rig-bridge.js:483 — the Assigner-mode influence-circle radius-drag release handler, after `rigAutoAssignLayer` (C21h, cited by name only) re-binds every shape at the new radius: `applyRigDeform(_radiusDrag.ld);` shows the new weighting's effect immediately.",
+            "rig-bridge.js:566 — `openRigWeightPopover`'s own `liveUpdate()` closure (the manual per-vertex weight-override popover), called after each slider edit: `applyRigDeform(ld);` followed by its own `SMEngineBridge.renderNow()`."
+          ],
+          "behavior": [
+            "Lines 2290-2292 (comment, 3 lines): live-preview-before-commit contract.",
+            "Lines 2293-2294 (code, 2 lines): function open, `rig`/empty-binds early guard (bare `return`, undefined).",
+            "Lines 2295-2302 (code, 8 lines): `boneCache`/`bonePaths` memoized bone-path builder over C21h's `_boneSegsToPath` (called once for restSegments, once for segments, per bone, per applyRigDeform call).",
+            "Lines 2303-2317 (comment, 15 lines): `anchorFor`'s own lead-in — the two-model convergence rationale (ptIndex control-point vs. offset/tangent).",
+            "Lines 2318-2337 (code, 20 lines): `anchorFor` body — ptIndex branch (2319-2328) vs. offset/getLocationAt branch (2330-2336), null on failure.",
+            "Lines 2338-2341 (comment, 4 lines): `displaceOne`'s own lead-in — factored out 2026-08-30 so a mesh bind shares the exact formula.",
+            "Lines 2342-2361 (code, 20 lines): `displaceOne` body — rotation-aware vs. plain accumulation, sumW>1 clamp, normalized [dx,dy] return.",
+            "Line 2362 (code): `rig.binds.forEach` open.",
+            "Lines 2363-2367 (comment, 5 lines): mesh-bind branch's own lead-in — normalized-offset rationale.",
+            "Lines 2368-2379 (code, 12 lines): mesh-bind branch — per-vertex `displaceOne` call, `SMImageMesh.normalizedOf`, `mesh.offsets[mi]` writes, early `return` back to the forEach callback.",
+            "Lines 2380-2447 (code+comment, 68 lines): stroke-bind boundary loop — live-segments guard, per-vertex inline weighted-rotation accumulation (own `sumDaW`/`sumWRot` accumulators, comment at 2384-2388), the rotation-vs-plain branch (comment at 2395-2404ish explaining the tangent-field LBS model), the sumW>1-only over-saturation clamp and its full rationale (comment at 2413-2426, the 2026-07-30 joint-ballooning fix), `segs[i].point` write (2428), and the restHandles-guarded handle rotation always from the immutable rest handles (2429-2444).",
+            "Lines 2448-2463 (comment+code, 16 lines): vector-brush linked-fill companion sync — comment (2448-2458) plus the verbatim segment-array copy and `.closed=true` (2459-2462).",
+            "Lines 2464-2515 (comment+code, 52 lines): `centerSegments` sync — comment (2464-2474) plus the third inline copy of the weighted-rotation formula on plain-data segment objects (2475-2515), same over-saturation clamp pattern with its own `cTotalW`/`cSumW` accumulators.",
+            "Line 2516 (code): `rig.binds.forEach` close.",
+            "Line 2517 (code): `boneCache` temp-path cleanup (`.remove()` on both `rest`/`cur`).",
+            "Line 2518 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "rig-reset-pose",
+      "packets": [
+        {
+          "id": "C21i.rig-reset-pose",
+          "files": [
+            "src/js/app.js:2519-2527"
+          ],
+          "coverage_ranges": [
+            [
+              2519,
+              2527
+            ]
+          ],
+          "classification": {
+            "code": 9,
+            "comment": 0,
+            "whitespace": 0
+          },
+          "symbols": [
+            "rigResetPose"
+          ],
+          "signature": "function rigResetPose(ld){var rig=ld.rig;if(!rig)return;Object.keys(rig.bones).forEach(function(bid){var bone=rig.bones[bid];bone.segments=JSON.parse(JSON.stringify(bone.restSegments));});applyRigDeform(ld);ld._rigPoseLive=false;}",
+          "responsibility": "No lead-in comment (0 comment lines, all 9 lines code). Early-returns if `ld.rig` is absent (2520). For EVERY bone in `rig.bones` (2521-2524), deep-clones `bone.restSegments` back onto `bone.segments` via `JSON.parse(JSON.stringify(...))` — an explicit deep copy so the live pose array never aliases the immutable rest array (a plain reference assignment would let a later IK/FK drag mutate `restSegments` itself through the shared reference). Calls `applyRigDeform(ld)` (2525, this scope's own packet 1) to re-render every bound stroke/mesh at the now-rest pose — NOT a no-op, since every deformation path (boundary, linked-fill companion, centerSegments, mesh offsets) re-runs and settles back to (effectively) zero displacement. Clears `ld._rigPoseLive=false` (2526) — the ONLY state mutation on `ld` itself besides the bone segments; does NOT clear `ld._rigPoseUndoPushed` (that flag is exclusively rigCommitFrame's own concern, packet 3).",
+          "callers": [
+            "timeline.js:11575 — the Rig panel's `#btn-rig-reset` click handler (11570-11577), the SOLE external caller: guards on `ld&&ld.rig` and `canEditActiveLayer()`, calls its OWN unconditional `pushUndo()` (11574, BEFORE calling rigResetPose — unlike rigCommitFrame's own conditional internal pushUndo), then `rigResetPose(ld);`, then its own `SMEngineBridge.renderNow()` (11576) and a `toastRigPoseReset` toast (11577) — rigResetPose itself never calls renderNow or pushUndo."
+          ],
+          "behavior": [
+            "Line 2519 (code): function open.",
+            "Line 2520 (code): `ld.rig` early guard.",
+            "Lines 2521-2524 (code): per-bone deep-clone of `restSegments` onto `segments`.",
+            "Line 2525 (code): `applyRigDeform(ld)` re-render at rest.",
+            "Line 2526 (code): `ld._rigPoseLive=false`.",
+            "Line 2527 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "rig-commit-frame",
+      "packets": [
+        {
+          "id": "C21i.rig-commit-frame",
+          "files": [
+            "src/js/app.js:2528-2556"
+          ],
+          "coverage_ranges": [
+            [
+              2528,
+              2556
+            ]
+          ],
+          "classification": {
+            "code": 14,
+            "comment": 15,
+            "whitespace": 0
+          },
+          "symbols": [
+            "rigCommitFrame"
+          ],
+          "signature": "function rigCommitFrame(ld){if(!ld.rig||!ld.rig.binds.length){showToast(SM.t('toastNoRiggedStroke'));return false;}if(!canEditActiveLayer())return false;if(!ld._rigPoseUndoPushed)pushUndo();ld._rigPoseUndoPushed=false;ensureKeyframe();relinkRigBinds(ld,userLayers[state.activeLayerIdx]);applyRigDeform(ld);ld._rigPoseLive=false;saveActiveLayerFrame();updateUI();if(window.SMEngineBridge)SMEngineBridge.renderNow();showToast(SM.t('toastRigPoseFrozenOnFrame'));return true;}",
+          "responsibility": "Lead-in (2528-2535, 8 comment lines): states the bake-order rationale up front — the labs prototype called `ensureKeyframe` AFTER the pose was already live, which let `_smGeomDirty` force `loadFrame` to rebuild from the OLD stored data before `saveActiveLayerFrame` ran, silently discarding the pose; this function's own order (ensureKeyframe FIRST, then re-deform, then save) fixes that. `rigCommitFrame(ld)` (2536-2555): guards on no-rig-or-no-binds (toast + `false`, 2537) and `canEditActiveLayer()` (`false`, 2538). A checkpoint-skip comment (2539-2545, 7 lines) explains the conditional undo: a checkpoint taken AFTER a drag has already live-mutated `bone.segments` would pair an already-posed rig with the frame's still-unbaked strokes — an internally inconsistent undo snapshot — so this only pushes its OWN checkpoint (`if(!ld._rigPoseUndoPushed)pushUndo()`, 2546) when no drag-start checkpoint already exists, then UNCONDITIONALLY resets the flag (2547) so the next commit gets a fresh one. `ensureKeyframe()` (2548, tools.js, cited by name only) runs first, promoting/rebuilding the current frame BEFORE the pose is re-applied. `relinkRigBinds(ld,userLayers[state.activeLayerIdx])` (2549, C21h, cited by name only) re-resolves `_live`/`_liveRaster` onto the fresh Paper items `ensureKeyframe`'s own `loadFrame` just created. `applyRigDeform(ld)` (2550, this scope's own packet 1) re-deforms those fresh items from the still-untouched posed `rig.bones[...].segments`. `ld._rigPoseLive=false` (2551) THEN `saveActiveLayerFrame()` (2552) — this order is load-bearing: `saveActiveLayerFrame` (app.js:4663, cited by line only) early-returns when `ld._rigPoseLive` is still true, so clearing it first is what allows the save to actually persist the just-re-deformed geometry. `updateUI()` (2552, timeline.js, cited by name only), a `SMEngineBridge.renderNow()` (2553) and a `toastRigPoseFrozenOnFrame` toast (2554) follow; returns `true` (2555).",
+          "callers": [
+            "timeline.js:11568 — the Rig panel's `#btn-rig-commit` click handler (11566-11568), the SOLE external caller: `if(ld)rigCommitFrame(ld);` — no guard beyond `ld` truthiness, no undo/render of its own (rigCommitFrame does both internally)."
+          ],
+          "behavior": [
+            "Lines 2528-2535 (comment, 8 lines): bake-order rationale (ensureKeyframe-first fix vs. the labs prototype's backwards order).",
+            "Lines 2536-2538 (code): function open, no-rig/no-binds toast+return-false guard, canEditActiveLayer guard.",
+            "Lines 2539-2545 (comment, 7 lines): checkpoint-skip rationale for the drag-already-pushed-one case.",
+            "Lines 2546-2547 (code): conditional own pushUndo, unconditional flag reset.",
+            "Line 2548 (code): ensureKeyframe() — promotes/rebuilds the current frame first.",
+            "Line 2549 (code): relinkRigBinds(ld, active layer) — re-resolves live refs onto the fresh items.",
+            "Line 2550 (code): applyRigDeform(ld) — re-deforms the fresh items from the still-posed rig.",
+            "Line 2551 (code): ld._rigPoseLive=false — clears the save-guard flag BEFORE saving.",
+            "Line 2552 (code): saveActiveLayerFrame(); updateUI() — persists the now-deformed geometry, refreshes UI.",
+            "Line 2553 (code): SMEngineBridge.renderNow() guarded on its own existence.",
+            "Line 2554 (code): success toast.",
+            "Line 2555 (code): return true.",
+            "Line 2556 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "ik-set-and-anchor",
+      "packets": [
+        {
+          "id": "C21i.ik-set-and-anchor",
+          "files": [
+            "src/js/app.js:2557-2573"
+          ],
+          "coverage_ranges": [
+            [
+              2557,
+              2573
+            ]
+          ],
+          "classification": {
+            "code": 13,
+            "comment": 4,
+            "whitespace": 0
+          },
+          "symbols": [
+            "rigSetIK",
+            "rigAnchorPoint"
+          ],
+          "signature": "function rigSetIK(ld,rootRef,jointRef,endRef,flip){var rig=ensureLayerRig(ld);var r=rigAnchorPoint(rig,rootRef),j=rigAnchorPoint(rig,jointRef),e=rigAnchorPoint(rig,endRef);if(!r||!j||!e)return false;var l1=Math.hypot(j.x-r.x,j.y-r.y),l2=Math.hypot(e.x-j.x,e.y-j.y);rig.ikChains[endRef.boneId+':'+endRef.vi]={root:rootRef,joint:jointRef,end:endRef,l1:l1,l2:l2,flip:!!flip};return true;} function rigAnchorPoint(rig,ref){var bone=rig.bones[ref.boneId];if(!bone||!bone.restSegments[ref.vi])return null;var s=bone.segments[ref.vi]||bone.restSegments[ref.vi];return{x:s.point[0],y:s.point[1]};}",
+          "responsibility": "The `// ---- IK` section header (2557-2560, 4 comment lines): a 3-point chain / 2-bone law-of-cosines solver, ported verbatim from the labs prototype's own `rigSetIK`/`rigDragIKEnd`, operating on bone-anchor POSITIONS only — indifferent to whether they're freeform dots (the prototype) or a bone path's own segment points (here). `rigSetIK(ld,rootRef,jointRef,endRef,flip)` (2561-2568): calls C21h's own `ensureLayerRig(ld)` (2562, cited by name only) to guarantee `rig.ikChains` exists, resolves all three refs to world points via `rigAnchorPoint` (2563), returns `false` if any resolution fails (2564), computes the two bone-segment lengths `l1`/`l2` from the CURRENT root/joint/end positions at call time via `Math.hypot` (2565) — these become the chain's fixed rigid lengths from then on, not re-derived from `restSegments` — and writes a new `rig.ikChains` entry keyed by the END ref's own `boneId+':'+vi` (2566), storing `{root,joint,end,l1,l2,flip:!!flip}`; returns `true` (2567). Never mutates any bone's own `segments`/`restSegments`. `rigAnchorPoint(rig,ref)` (2569-2573): resolves a `{boneId,vi}` ref to a world `{x,y}` point, reading the bone's CURRENT `segments[vi]` and falling back to `restSegments[vi]` if the bone has never been posed (2571) — returns `null` if the bone or that vertex index doesn't exist (2570).",
+          "callers": [
+            "app.js:2563 — rigSetIK itself (this packet), three calls on one line resolving rootRef/jointRef/endRef.",
+            "rig-bridge.js:309 — the bone-move pointerdown handler's Alt+drag-an-anchor branch, when the hit anchor is the far end of a 2-bone chain found via `findIKChain` (rig-bridge.js, out of scope, cited by name only): `rigSetIK(ld, ikChain.root, ikChain.joint, ikChain.end, false);` — always with `flip=false`; the flip parameter has no observed caller passing `true` at this SHA."
+          ],
+          "behavior": [
+            "Lines 2557-2560 (comment, 4 lines): `// ---- IK` section header — 3-point chain, 2-bone law-of-cosines, ported verbatim from the labs prototype.",
+            "Lines 2561-2562 (code): rigSetIK open, ensureLayerRig(ld) (C21h).",
+            "Line 2563 (code): resolve root/joint/end via rigAnchorPoint.",
+            "Line 2564 (code): null-guard, return false.",
+            "Line 2565 (code): l1/l2 bone-segment lengths from current positions.",
+            "Line 2566 (code): write the new rig.ikChains entry keyed by the end ref.",
+            "Line 2567 (code): return true.",
+            "Line 2568 (code): rigSetIK close.",
+            "Line 2569 (code): rigAnchorPoint open.",
+            "Line 2570 (code): bone/vertex-index existence guard, return null.",
+            "Line 2571 (code): current-segment-with-rest-fallback resolution.",
+            "Line 2572 (code): return {x,y}.",
+            "Line 2573 (code): rigAnchorPoint close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "ik-drag-end",
+      "packets": [
+        {
+          "id": "C21i.ik-drag-end",
+          "files": [
+            "src/js/app.js:2574-2599"
+          ],
+          "coverage_ranges": [
+            [
+              2574,
+              2599
+            ]
+          ],
+          "classification": {
+            "code": 17,
+            "comment": 9,
+            "whitespace": 0
+          },
+          "symbols": [
+            "rigDragIKEnd"
+          ],
+          "signature": "function rigDragIKEnd(ld,endKey,x,y){var rig=ld.rig;var chain=rig&&rig.ikChains[endKey];if(!chain)return false;var rootS=rig.bones[chain.root.boneId].segments[chain.root.vi];var dx=x-rootS.point[0],dy=y-rootS.point[1],dist=Math.hypot(dx,dy);var l1=chain.l1,l2=chain.l2,maxD=l1+l2,minD=Math.abs(l1-l2);var clamped=Math.max(minD+1e-6,Math.min(maxD-1e-6,dist));var baseAngle=Math.atan2(dy,dx);var cosA=Math.max(-1,Math.min(1,(l1*l1+clamped*clamped-l2*l2)/(2*l1*clamped)));var a=Math.acos(cosA);var jointAngle=baseAngle+(chain.flip?-a:a);var jointX=rootS.point[0]+l1*Math.cos(jointAngle),jointY=rootS.point[1]+l1*Math.sin(jointAngle);rig.bones[chain.joint.boneId].segments[chain.joint.vi].point=[jointX,jointY];var endX=rootS.point[0]+clamped*Math.cos(baseAngle),endY=rootS.point[1]+clamped*Math.sin(baseAngle);rig.bones[chain.end.boneId].segments[chain.end.vi].point=[endX,endY];applyRigDeform(ld);return true;}",
+          "responsibility": "`rigDragIKEnd(ld,endKey,x,y)` solves the chain for a dragged end effector. Looks up the chain by `endKey` in `rig.ikChains`, returns `false` if absent (2575). Reads the root bone's CURRENT segment point `rootS` (2576) and computes the world delta/distance from root to the drag target `(x,y)` (2577). Clamps the reachable distance to `[|l1-l2|+1e-6, l1+l2-1e-6]` (2578-2580) — the epsilon padding keeps the subsequent `Math.acos` argument strictly inside `[-1,1]`'s open interval at the chain's exact fully-extended/fully-folded limits. Solves `jointAngle` via the law of cosines (2581-2584), `flip` choosing which of the two valid elbow solutions (`-a` vs `+a`). WRITES `rig.bones[chain.joint.boneId].segments[chain.joint.vi].point` (2585) as a plain `[x,y]` array. Computes the end point NOT from the raw `(x,y)` target but by re-walking the SAME clamped distance/angle from root (2586-2596, with a 9-line comment at 2586-2594 explaining why: using the raw target would silently stretch the joint-end segment past `l2` whenever the drag target was unreachable, breaking the whole point of a rigid 2-bone solve — this reconstructs the exact raw target when it was already reachable, and the closest reachable point on the same ray otherwise). WRITES `rig.bones[chain.end.boneId].segments[chain.end.vi].point` (2596). Calls `applyRigDeform(ld)` (2597, this scope's own packet 1) to re-deform bound strokes/meshes from the new solution, returns `true` (2598). Does NOT write anything for the chain's own 'near end of the END bone' companion vertex (rig-bridge.js's own separate copy, out of scope, cited by name only in `boundaries`).",
+          "callers": [
+            "rig-bridge.js:425 — the IK-posing pointermove branch (inside `if(_posing.ik)`, the Alt+drag gesture started by rigSetIK's own caller): `rigDragIKEnd(_posing.ld, endKey, localPt.x, localPt.y);` — the SOLE external caller, `endKey` built as `chain.end.boneId+':'+chain.end.vi` from the `_posing.ik` chain object, immediately followed by rig-bridge.js's own companion-vertex copy (441-442) and a SECOND `applyRigDeform(_posing.ld)` call (433, this scope's own packet 1) — i.e. this one gesture tick calls `applyRigDeform` twice: once inside `rigDragIKEnd` itself (2597) before the companion copy exists, and once again in rig-bridge.js after it."
+          ],
+          "behavior": [
+            "Line 2574 (code): function open.",
+            "Line 2575 (code): chain lookup by endKey, return false if absent.",
+            "Line 2576 (code): root bone's current segment point.",
+            "Line 2577 (code): world delta/distance from root to drag target.",
+            "Lines 2578-2580 (code, 3 lines): reach-distance clamp (|l1-l2| to l1+l2, epsilon-padded).",
+            "Lines 2581-2584 (code, 4 lines): law-of-cosines joint-angle solve, flip selects elbow solution.",
+            "Line 2585 (code): write joint bone's own segment point.",
+            "Lines 2586-2594 (comment, 9 lines): why the end point is reconstructed from the clamped ray, not the raw drag target.",
+            "Line 2595 (code): end-point x/y reconstruction from the clamped distance/angle.",
+            "Line 2596 (code): write onto the end bone's own segment point.",
+            "Line 2597 (code): applyRigDeform(ld) re-deform.",
+            "Line 2598 (code): return true.",
+            "Line 2599 (code): function close."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "rig-bridge.js (the on-canvas Rig tool: bone-draw, influence-circle radius-drag, the Alt+drag IK gesture, the manual weight-override popover)",
+      "disposition": "Retains its own body in full — cited by line only. The complete external caller of applyRigDeform (433, 454, 483, 566), rigSetIK (309), and rigDragIKEnd (425). Sets ld._rigPoseLive/_rigPoseUndoPushed=true at drag-start (317-318); this scope's own rigResetPose/rigCommitFrame are the sole clearers."
+    },
+    {
+      "consumer": "timeline.js (the Rig panel's Commit/Reset Pose buttons)",
+      "disposition": "Retains its own body in full — cited by line only. #btn-rig-commit (11566-11568) is rigCommitFrame's sole external caller (no undo/render of its own). #btn-rig-reset (11570-11577) is rigResetPose's sole external caller, with its own pushUndo before and renderNow after — rigResetPose itself does neither."
+    },
+    {
+      "consumer": "app.js:1884-2289 ensureLayerRig/relinkRigBinds/_boneSegsToPath/_rigChordAngle/_rigNormalizeAngle/rigBindStroke/rigBindMesh/rigAutoAssignLayer (C21h, merged)",
+      "disposition": "Retains its own body in full — cited by line only. This scope's own applyRigDeform calls _boneSegsToPath (2299) and _rigChordAngle/_rigNormalizeAngle (2327); rigCommitFrame calls relinkRigBinds (2549); rigSetIK calls ensureLayerRig (2562). None of the four bodies are reproduced here."
+    },
+    {
+      "consumer": "app.js:2600+ resolveSymbolFrameIdx (C21j, the next leaf, not yet filed as an issue at authoring time)",
+      "disposition": "Retains its own body in full — cited by name only. Confirmed call-graph-disjoint from this scope in both directions."
+    },
+    {
+      "consumer": "image-mesh.js (SMImageMesh.get/normalizedOf) and engine-bridge.js (SMEngineBridge.rasterImageRect/renderNow, buildSceneJson/scenePayload)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. get (image-mesh.js:73) and normalizedOf (image-mesh.js:408) are read-only dependencies of applyRigDeform's own mesh-bind branch (packet 1); rasterImageRect (engine-bridge.js:579) likewise. mesh.offsets, WRITTEN by this scope, is read back live and unconditionally by scenePayload (engine-bridge.js:1488) on every buildSceneJson call — no identity/dirty-flag cache gates this read."
+    },
+    {
+      "consumer": "tools.js (canEditActiveLayer, ensureKeyframe) and tweens.js (pushUndo/pushUndoLayers)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. canEditActiveLayer (tools.js:1839) gates rigCommitFrame; ensureKeyframe (tools.js:1882) is called by rigCommitFrame BEFORE ld._rigPoseLive is cleared, load-bearing for the bake order (see boundaries). pushUndo (tweens.js:4770) is called conditionally by rigCommitFrame and unconditionally by timeline.js's own Reset Pose handler."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-applyrigdeform-noop-without-rig",
+      "proposed": "Call applyRigDeform({}) (no .rig) and applyRigDeform({rig:{binds:[]}}) (empty binds); expect both to return undefined with no exception and no mutation — verifies the early guard at line 2294 — not run."
+    },
+    {
+      "id": "fx-applyrigdeform-boundary-displacement",
+      "proposed": "Bind a single-bone rig to a simple square path, move the bone's one control point by (10,0) with rotate=false, call applyRigDeform; expect every bound vertex to move by exactly its own weight*(10,0)/max(1,sumW) — verifies the boundary loop at 2391-2428 against displaceOne's own formula — not run."
+    },
+    {
+      "id": "fx-applyrigdeform-oversaturation-clamp",
+      "proposed": "Construct two overlapping full-influence (w=1 each) bone weights on one vertex, move both bones identically by (10,0); expect the vertex to move by exactly (10,0), not (20,0) — verifies the sumW>1 clamp at line 2428/2496-2502 fixes the documented 2026-07-30 ballooning bug — not run."
+    },
+    {
+      "id": "fx-applyrigdeform-restHandles-idempotent",
+      "proposed": "Call applyRigDeform twice in a row with no bone movement between calls, on a bind with restHandles; expect identical handleIn/handleOut both times (not a compounding rotation) — verifies handles are always rotated FROM the immutable rest handles (line 2436-2444), never from the current live ones — not run."
+    },
+    {
+      "id": "fx-applyrigdeform-mesh-offset-write",
+      "proposed": "Bind a mesh (b.meshId set, b._liveRaster a real Raster), move the bone so displaceOne returns a nonzero [dx,dy]; expect mesh.offsets[mi] to equal SMImageMesh.normalizedOf(rect,...) minus mesh.verts[mi], and mesh.offsets[mi]=[0,0] exactly when the displacement is exactly zero (line 2374) — verifies 2368-2389 — not run."
+    },
+    {
+      "id": "fx-applyrigdeform-linkedfill-mirror",
+      "proposed": "Bind a vector-brush stroke with a linkedFill companion, deform the boundary; expect the companion's own segments array to be a byte-for-byte copy of the just-deformed boundary segments (point/handleIn/handleOut), not an independently-computed deformation — verifies 2461-2462 — not run."
+    },
+    {
+      "id": "fx-rigresetpose-restores-and-clears-flag",
+      "proposed": "Pose a rig (mutate bone.segments away from restSegments), set ld._rigPoseLive=true, call rigResetPose(ld); expect every bone.segments to deep-equal its own restSegments (not the SAME reference) and ld._rigPoseLive===false afterward — verifies 2521-2526 — not run."
+    },
+    {
+      "id": "fx-rigcommitframe-no-rig-toast",
+      "proposed": "Call rigCommitFrame({rig:null}) and rigCommitFrame({rig:{binds:[]}}); expect both to return false and a toastNoRiggedStroke toast, no mutation — verifies line 2537 — not run."
+    },
+    {
+      "id": "fx-rigcommitframe-undo-skip-when-already-pushed",
+      "proposed": "Set ld._rigPoseUndoPushed=true, spy on pushUndo, call rigCommitFrame(ld); expect pushUndo NOT called, and ld._rigPoseUndoPushed===false afterward regardless — verifies the conditional-then-unconditional-reset at 2546-2547 — not run."
+    },
+    {
+      "id": "fx-rigcommitframe-order-saves-deformed-pose",
+      "proposed": "Pose a rig, call rigCommitFrame(ld), then read ld.frames[currentFrame].strokes; expect the persisted stroke geometry to match the POSED (deformed) shape, not the pre-pose rest shape — verifies the ensureKeyframe-then-reapply-then-save order at 2548-2552 actually persists the deform (regression guard for the exact bug the lead-in comment at 2528-2535 describes fixing) — not run."
+    },
+    {
+      "id": "fx-rigcommitframe-does-not-reset-pose",
+      "proposed": "Pose a rig, call rigCommitFrame(ld), then read rig.bones[...].segments; expect it to STILL equal the posed values (not reset to restSegments) — verifies rigCommitFrame never calls the rest-reset rigResetPose performs — not run."
+    },
+    {
+      "id": "fx-rigsetik-computes-lengths-from-current-pose",
+      "proposed": "Set up three bone anchors at known non-rest positions, call rigSetIK; expect rig.ikChains[endKey].l1/l2 to equal the CURRENT (not rest) inter-anchor distances — verifies line 2565 reads current segments, not restSegments — not run."
+    },
+    {
+      "id": "fx-rigsetik-unresolvable-ref-returns-false",
+      "proposed": "Call rigSetIK with a jointRef pointing at a nonexistent boneId; expect false and no rig.ikChains mutation — verifies the null-propagation guard at line 2564 — not run."
+    },
+    {
+      "id": "fx-riganchorpoint-rest-fallback",
+      "proposed": "Call rigAnchorPoint on a bone that has never been posed (segments===restSegments by reference, or segments[vi] undefined for a fresh bone); expect the restSegments[vi] point to be returned — verifies the fallback at line 2571 — not run."
+    },
+    {
+      "id": "fx-rigdragikend-reachability-clamp",
+      "proposed": "Drag an IK end effector to a point 3x the chain's max reach (l1+l2); expect the resulting end-bone distance from root to equal exactly l1+l2 (clamped), not the raw drag distance — verifies 2578-2580/2588-2596 — not run."
+    },
+    {
+      "id": "fx-rigdragikend-flip-selects-elbow",
+      "proposed": "Drag the same target point with chain.flip=false then chain.flip=true; expect two DIFFERENT joint positions (mirrored elbow solutions) both satisfying the same l1/l2 distances from root/end — verifies line 2584's sign choice — not run."
+    },
+    {
+      "id": "fx-rigdragikend-missing-chain-returns-false",
+      "proposed": "Call rigDragIKEnd with an endKey that has no rig.ikChains entry; expect false and no mutation — verifies line 2575 — not run."
+    },
+    {
+      "id": "fx-rigdragikend-reapplies-deform",
+      "proposed": "Spy on applyRigDeform, call rigDragIKEnd with a valid chain and reachable target; expect applyRigDeform to be called exactly once, after both bone-point writes — verifies line 2597 runs after 2585/2596 — not run."
+    },
+    {
+      "id": "fx-livemutation-no-sceneversion-bump",
+      "proposed": "Snapshot window._sceneVersion, call applyRigDeform on a posed rig, re-read window._sceneVersion; expect it UNCHANGED — verifies this scope never references _sceneVersion (boundaries claim), matching the CLAUDE.md §5 eraser-mutates-without-a-bump family — not run."
+    }
+  ],
+  "future_proposals": [
+    "The centerSegments deform (packet 1, lines 2502/2508-2512) writes onto PLAIN data arrays inside `bLive.data.centerSegments`, not real Paper `Segment` objects — unlike the boundary write at line 2428 (a genuine Paper `Segment.point` setter), this write does NOT itself trigger the `_changed` hook the retained-path/materialization dirty-flag mechanism (CLAUDE.md §5quater, engine-bridge.js, cited by name only) relies on to avoid reusing a stale materialized stroke array. It works correctly today only because every current caller ALSO writes the boundary segments of the SAME live Path in the SAME `rig.binds.forEach` iteration, so the Path is already marked dirty by that sibling write. If a future bind type ever deformed `centerSegments` alone (no boundary write in the same tick), the dirty flag would not fire and a subsequent `loadFrame` could silently reuse stale geometry for that layer. Latent, not active at this SHA (confirmed: every reader of `centerSegments`, in-scope and out-of-scope, is inside this SAME forEach body). Not changed here.",
+    "`rigDragIKEnd` (packet 5) writes only the joint bone's own vertex and the end bone's own vertex (lines 2585, 2596) — it does NOT write the coincident 'near end of the END bone' companion vertex some chains carry; that synchronization is done entirely by the CALLER, immediately after, in rig-bridge.js (441-442, out of scope, cited by line only in `boundaries`), which is also why rig-bridge.js calls `applyRigDeform` a second time itself (433) right after `rigDragIKEnd` already called it once internally (2597) — one IK-drag tick currently re-deforms the whole bind list TWICE. A future refactor could fold the companion-vertex copy into `rigDragIKEnd` itself (given it already knows `chain.joint`/`chain.end`) and drop the caller's own duplicate `applyRigDeform` call, but that would require `rigDragIKEnd` to also know about the 'near end' companion ref, which today is a rig-bridge.js-only concept (`chain.endNear`) never read or written by anything in app.js. Only one caller exists (verified by the complete caller-list grep), so the double-deform-per-tick cost is real but bounded and not user-visible at typical bind-list sizes. Not changed here.",
+    "`mesh.offsets` writes (packet 1, lines 2374/2376) bypass the retained-path identity mechanism entirely — `SMImageMesh.scenePayload` (engine-bridge.js:1488, cited by line only) reads the store live on every `buildSceneJson` call, with no per-mesh dirty flag or cache gating the read at all. This is a useful POSITIVE contrast to the centerSegments fragility noted above: the mesh path can never go stale the way a Paper-Segment-cache-keyed path theoretically could, at the cost of always paying a live read. Not a bug; noted for completeness since the issue asked for this contrast explicitly. Not changed here.",
+    "This scope's own six functions all have internally CONSISTENT return shapes (applyRigDeform: always undefined; rigResetPose: always undefined; rigCommitFrame: always boolean; rigSetIK: always boolean; rigAnchorPoint: always {x,y} or null; rigDragIKEnd: always boolean) — unlike C21h's own documented `rigAutoAssignLayer` return-shape inconsistency (its early guard returns a bare `0` instead of `{n,skippedUnsupported}`), no equivalent inconsistency was found in this scope's six functions. Recorded here as a verified-clean finding, not a proposal."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src` `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\('` was run once for each of the six function symbols this scope defines (applyRigDeform, rigResetPose, rigCommitFrame, rigSetIK, rigAnchorPoint, rigDragIKEnd), at the frozen SHA, filtering out each symbol's own declaration line and any hit whose trimmed content starts with `//` — results are reproduced verbatim under each packet's own `callers` field and are re-checkable with the same command.",
+    "A SEPARATE whole-src grep restricted to engine-bridge.js/tools.js/motion.js/select-bridge.js/tweens.js/export.js for all six symbol names returned ZERO hits, directly supporting the render-path-vs-gesture-path claim in `boundaries` (none of the six symbols is reachable from getEffectiveStrokes or buildSceneJson/scenePayload).",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's OWN classify() algorithm against a direct `git show 59a5a38c:src/js/app.js` dump, run once per packet and once for the total — 191/119/0 over 310 lines, matching the issue's own proposed union exactly, and matching the issue's own proposed per-packet table exactly for all five packets; no boundary correction was needed.",
+    "The two runtime-only flags `ld._rigPoseLive`/`ld._rigPoseUndoPushed` were traced with a whole-src grep (not assumed from the issue's own prompt) confirming exactly five assignment sites total across `src`: two SET sites (both rig-bridge.js:317-318, drag-start) and three CLEAR sites (all inside this scope: app.js:2526, 2547, 2551) — this scope is the sole clearer of both flags, and `saveActiveLayerFrame`'s own early-return guard (app.js:4663, cited by line only) reading `ld._rigPoseLive` was located and read directly (not assumed) to confirm the commit-order dependency documented in `boundaries`.",
+    "The `_sceneVersion`/`_smGeomDirty` absence claim in `boundaries` was confirmed by a direct grep over ONLY the assigned range (lines 2290-2599 of the frozen blob), returning zero hits for `_sceneVersion` and one hit for `_smGeomDirty` that is itself inside a COMMENT (line 2530, part of the rigCommitFrame lead-in explaining the labs prototype's own prior bug) — not a live reference from this scope's own code.",
+    "`renderNow`'s own non-viewportOnly behavior (engine-bridge.js:4275-4326, cited by line only) was read directly to confirm it always calls `buildSceneJson()` fresh rather than gating on `window._sceneVersion`, including reading its own in-source comment at line 4301 ('scene may have mutated without a version bump (eraser/select drags)') as corroborating, not assumed, evidence for the CLAUDE.md §5 family citation in `boundaries`."
+  ],
+  "validation": {
+    "expected_assigned_lines": 310,
+    "expected_classification": {
+      "code": 191,
+      "comment": 119,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        2290,
+        2518
+      ],
+      [
+        2519,
+        2527
+      ],
+      [
+        2528,
+        2556
+      ],
+      [
+        2557,
+        2573
+      ],
+      [
+        2574,
+        2599
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by a Python re-implementation of the validator's own classify() run against the frozen blob: 2290-2518=(138,91,0); 2519-2527=(9,0,0); 2528-2556=(14,15,0); 2557-2573=(13,4,0); 2574-2599=(17,9,0); sums to (191,119,0)=310 — identical to the issue's own proposed union and per-packet table exactly.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 310 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C21i-app-rig-deform-ik.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21h-app-rig-model-binding.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21g-app-duplicator-runtime.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21f-app-symbol-matrix-duplicator-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21d-app-desp-relink-remote-merge.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21c-app-path-serialisation-serp.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json <candidate-sha> still exits 0"
+    ]
+  }
+}
