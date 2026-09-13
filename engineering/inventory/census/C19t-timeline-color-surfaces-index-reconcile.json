@@ -1,0 +1,305 @@
+{
+  "census_id": "C19t",
+  "issue": 1189,
+  "title": "Timeline colour-surface writers and the layer-index / frame-selection reconcilers",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C19t census only; P30 (timeline.js runtime writer), C20e/#1152 (motion.js's own `SMMotion.selectedColorProps`/`writeColorToHolder`/`writeElementColorFromPicker`, motion.js:13678-13702, and the Motion property-selection array `_motionPropSel`, motion.js:11404 onward — cited by line only, not re-mapped), `window.SM.setStrokeColor`/`setFillColor` (found to live in this SAME file, timeline.js:608/615, inside the `window.SM={...}` object literal opened at timeline.js:349 — an earlier census leaf's territory, cited by line only, not reproduced here) all remain separate. C19u (timeline.js:6335 onward, `renderLayerList` itself) is the next leaf and is explicitly out of scope; it is this scope's only two callers (`reconcileLayerIndexState`/`reconcileFrameSelection`, called at 6336-6337).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "d0082229fc55ae1d9dd3ca6dfdc662bba009ef6a",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19t-timeline-color-surfaces-index-reconcile",
+  "assigned_ranges": [
+    {
+      "start": 6156,
+      "end": 6334
+    }
+  ],
+  "coverage_note": "Exactly 179 assigned lines occur once across four packets (one coverage_range per packet, no gaps, no other-owner exclusions): 89 code, 90 full-line `//` comments, 0 blank — independently re-derived by classifying the frozen blob programmatically (a Python re-implementation of the validator's own `classify()`), and equal to the issue's proposed table exactly (no boundary correction needed). Line 6155 is C19s's closing brace of `buildParentCell` (out of scope, confirmed against C19s's own `assigned_ranges` end=6155, sole sibling in this directory claiming any part of `src/js/timeline.js`). Line 6156 opens this scope's 'THE single writer for every surface that DISPLAYS the current stroke/fill colour' lead-in comment. Line 6334 is the closing brace of `reconcileFrameSelection`; line 6335 opens the next leaf's (C19u, not yet a merged artifact at authoring time) `function renderLayerList(frameOnly){`. A sweep of every `C*.json` in this directory sharing `source_path: src/js/timeline.js` (C19d through C19s) confirms the existing coverage is contiguous and stops exactly at 6155 — no sibling claims any line in 6156-6334.",
+  "source_baselines": {
+    "pinned": "59a5a38c:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (d0082229fc55ae1d9dd3ca6dfdc662bba009ef6a, the merge of PR #1187) has the identical timeline.js blob (git rev-parse d008222:src/js/timeline.js == git rev-parse 59a5a38c:src/js/timeline.js == cc4cfd27...); this artifact branches from origin/main at d008222.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes (2026-07-25, 2026-08-31, 2026-09) and the 'thirteen different places mutate state.layers' order' claim (6252-6253) are read as authorial intent, not independently re-verified execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19t-timeline-color-surfaces-index-reconcile.json and the four timeline.js packets partitioning lines 6156-6334.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "colour_writer_boundary": "This scope's four functions are the DISPLAY-side of colour changes only — they paint DOM swatches/inputs and, for `routeColorTo*`, decide which live document field a pick should land on. The actual field mutation for the canvas-selection path (`p.strokeColor=v;`/`p.fillColor=v;`) happens in the CALLER (`window.SM.setStrokeColor`/`setFillColor`, timeline.js:608-618, same file but a different, earlier-owned span — cited by line, not reproduced) immediately after it calls `routeColorToMotion`; the Motion-track path's actual field mutation happens entirely inside `SMMotion.writeColorToHolder`/`writeElementColorFromPicker` (motion.js, out of scope) via `setValue`. Neither caller's own body is reproduced here per the issue's 'cite, do not re-map' instruction.",
+    "owners": "motion.js/C20e (#1152, PR merged) retains `selectedColorProps` (13678-13683, reads `_motionPropSel`/`state.appMode`, filters by `prop`, returns `[{holder,prop}]`), `writeColorToHolder` (13688-13693, guards on `hasKeys(holder,prop)||holder.motionStatic[prop]`, writes via `setValue(holder,prop,hexToRgba255(hex))`) and `writeElementColorFromPicker` (13694-13702, resolves `ld.elementMotion[strokeId]` first, then the identical guard/write) — none of these three bodies are reproduced here; each is cited only by line number. `window.SM` (same file, timeline.js:349 opens the object literal; `setStrokeColor`/`setFillColor` at 608/615, out of scope — an earlier census leaf's territory) retains the canvas-selection colour-application loop that calls `routeColorToMotion`; `app.js` retains `colorHex8` (542), `setHex8Input` (560) and `saveActiveLayerFrame` (4634); `tweens.js` retains `pushUndo` (4741, delegates to `pushUndoLayers` 4896). `timeline.js` itself (out of scope, an earlier packet) retains `updateUI` (2727), `hexDisplayValue` (10442) and `alphaPctFromHex` (10449), both of the latter two consumed by this scope's `paintStrokeSwatches`/`paintFillSwatches` and also, independently, by `color-manager.js` (212/263-264, out of scope) for its own per-swatch rows.",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19u (next census leaf, not yet numbered/merged at authoring time)",
+      "disposition": "Retains timeline.js:6335 onward (`renderLayerList` itself). Its own two calls to this scope's reconcilers (`reconcileLayerIndexState()` at 6336, `reconcileFrameSelection()` at 6337 — the FIRST two statements in its body, before the `frameOnly` early-return at 6338) are the ONLY callers of either function found anywhere in `src/js`; cited here as callers by line number only."
+    },
+    {
+      "owner": "motion.js / C20e-#1152 (existing owner, PR merged)",
+      "disposition": "Retains `selectedColorProps` (13678-13683), `writeColorToHolder` (13688-13693) and `writeElementColorFromPicker` (13694-13702) — the three functions `routeColorToSelectedMotionRow`/`routeColorToMotion` call into — plus the `_motionPropSel` array (11404 onward) `selectedColorProps` reads. None of these bodies reproduced; cited by line only."
+    },
+    {
+      "owner": "window.SM.setStrokeColor / setFillColor (existing owner, same file, out of scope)",
+      "disposition": "Retains the two colour-picker entry points (timeline.js:608, 615, inside the `window.SM={...}` object literal opened at 349) that call this scope's `paintStrokeSwatches`/`paintFillSwatches` unconditionally and `routeColorToSelectedMotionRow` FIRST, falling through to `routeColorToMotion` per selected canvas path only if that returns false — the exact precedence this scope's own lead-in comment (6192-6194) documents. Neither setter's own body (the canvas-selection loop, the Fill/Stroke-Select-tool branch, `pushUndo`/`saveActiveLayerFrame`/`updateUI` calls) is reproduced here."
+    },
+    {
+      "owner": "app.js (existing owner)",
+      "disposition": "Retains `colorHex8` (542, the alpha-safe Paper-Color-to-hex8 reader CLAUDE.md §2 documents), `setHex8Input` (560, the paired `.value`/`.dataset.hex8` writer both painters call) and `saveActiveLayerFrame` (4634, called by `routeColorToSelectedMotionRow` only, not by the paint functions)."
+    },
+    {
+      "owner": "tweens.js (existing owner)",
+      "disposition": "Retains `pushUndo` (4741, delegating to `pushUndoLayers` 4896) — called once by `routeColorToSelectedMotionRow` before writing, and not at all by the two paint functions or `routeColorToMotion` (whose own callers push undo instead, out of scope)."
+    },
+    {
+      "owner": "timeline.js (existing owner, earlier packet, out of scope)",
+      "disposition": "Retains `updateUI` (2727, called by `routeColorToSelectedMotionRow` after a successful write), `hexDisplayValue` (10442) and `alphaPctFromHex` (10449) — both read by this scope's `paintStrokeSwatches`/`paintFillSwatches` and, separately, by `color-manager.js`'s own per-swatch rows (212, 263-264, out of scope, a second independent reader)."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 6155 (C19s's closing brace of `buildParentCell`) is outside coverage; line 6156 (this scope's colour-writer lead-in comment) begins this scope, confirmed against C19s's own declared `assigned_ranges` end (6155).",
+    "Line 6334 (closing brace of `reconcileFrameSelection`) is the last line of this scope; line 6335 opens the next leaf's (C19u) `function renderLayerList(frameOnly){` and is excluded — confirmed by reading the frozen blob at 6334-6335.",
+    "No lines inside 6156-6334 are excluded for another owner: every line belongs to exactly one of the four packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "The issue's proposed packet table (four packets, ranges and code/comment/blank counts) was independently re-derived against the frozen blob using the validator's own `classify()` algorithm (whitespace-strip, `//`-prefix, `/*...*/` block tracking) and matches exactly: 6156-6238=(34,49,0); 6239-6275=(7,30,0); 6276-6307=(30,2,0); 6308-6334=(18,9,0); sums to (89,90,0)=179. No boundary correction was needed.",
+    "The `layer-index-shadow` packet's own lead-in (6239-6247) textually documents `renderLayerList`'s `frameOnly` contract — C19u's function, not this scope's — before turning, at 6248, to the index-keyed-state rationale that actually motivates this packet's own code; both halves of that lead-in are included in this packet's coverage_ranges (they are contiguous source lines with no other owner), but the `frameOnly` half is cited as describing C19u, not reproduced as this packet's own responsibility."
+  ],
+  "areas": [
+    {
+      "area": "colour-surface-writers",
+      "packets": [
+        {
+          "id": "C19t.color-surface-writers",
+          "files": [
+            "src/js/timeline.js:6156-6238"
+          ],
+          "coverage_ranges": [
+            [6156, 6238]
+          ],
+          "classification": {"code": 34, "comment": 49, "whitespace": 0},
+          "symbols": ["routeColorToSelectedMotionRow", "routeColorToMotion", "paintStrokeSwatches", "paintFillSwatches"],
+          "signature": "routeColorToSelectedMotionRow(prop, hex); routeColorToMotion(p, prop, hex); paintStrokeSwatches(v); paintFillSwatches(v)",
+          "responsibility": "The single writer for every DOM surface that displays the current stroke/fill colour (`paintStrokeSwatches`/`paintFillSwatches`), plus the two functions that decide which live document field a colour pick should also apply to when the shape is animated in Motion (`routeColorToSelectedMotionRow` for a colour ROW selected in the Motion timeline; `routeColorToMotion` for a shape on canvas with an existing colour track) — so a pick never leaves two colour surfaces disagreeing and never silently misses an animated shape's track.",
+          "behavior": [
+            "42-line lead-in comment (6156-6197), four parts: (1) 6156-6169, the 2026-07-25 two-writers bug this function exists to fix — `setStrokeColor`/`setFillColor` painted all seven surfaces, the selection handler in `updateUI` hand-wrote only four, measured live on a #8bc34a fill where two right-panel widgets adopted the new colour and two others (the hex field, the LEFT panel) kept showing the stale global colour; (2) 6170-6177, why the selection handler can't just call `setStrokeColor`/`setFillColor` directly (those also APPLY the colour to the selection and would rewrite the object just read, double-pushing undo) and a reminder of the 8-digit-hex `.dataset.hex8` convention (CLAUDE.md §2); (3) 6178-6184, `routeColorToMotion`'s own contract — resolves a Paper item to `(layer index, strokeId)`, guarded on the parent still being in `userLayers` for the same reason `image-mesh-bridge.js`'s `singleRaster()` is (CLAUDE.md §12bis: a `selectedPaths` entry outlives the object it names across `loadFrame`/undo/`importJSON`); (4) 6185-6197, `routeColorToSelectedMotionRow`'s own contract — a colour ROW selected in the Motion timeline is a selection too (2026-08-31, feedback #180: \"select couleurs ne prend pas en compte la selection de la propriété\"), checked BEFORE the canvas-selection branches and returning `true` when it acted so the two selections can't both fire on one pick (Motion's row is the more specific intent and the only one that can key), delegating all keyframe-vs-static-write logic to `setValue` (motion.js, out of scope).",
+            "`routeColorToSelectedMotionRow(prop,hex)` (6198-6210): guard `!window.SMMotion||!SMMotion.selectedColorProps||!SMMotion.writeColorToHolder` returns `false` (6199); `rows=SMMotion.selectedColorProps(prop)` (6200), empty return `false` (6201, the overwhelmingly common non-Motion-selection case, no undo pushed); otherwise `pushUndo()` (6202, BEFORE any write) then `rows.forEach` calling `SMMotion.writeColorToHolder(r.holder,prop,hex)` per matched row, tracking `wrote` (6203-6204); if nothing actually wrote, returns `false` WITHOUT having called `saveActiveLayerFrame`/`updateUI` (6205, still after the `pushUndo()` already ran — an undo entry can be pushed even on this early-return path, since the guard is per-row not per-call); on success, `saveActiveLayerFrame();updateUI();` (6206-6207), conditional `SMEngineBridge.renderNow()` (6208), returns `true` (6209).",
+            "`routeColorToMotion(p,prop,hex)` (6211-6217): guards `!p||!p.data||!p.data.strokeId` (6212) and `!window.SMMotion||!SMMotion.writeElementColorFromPicker` (6213) both return `false` with no side effect; `li=userLayers.indexOf(p.parent)` (6214), `li<0` returns `false` (6215, the detached-item guard the lead-in describes); otherwise returns `SMMotion.writeElementColorFromPicker(li,p.data.strokeId,prop,hex)` directly (6216) — no `pushUndo`/`saveActiveLayerFrame`/`updateUI` of its own; the caller (`setStrokeColor`/`setFillColor`, out of scope) always also writes `p.strokeColor`/`p.fillColor=v` itself right after calling this, and owns the undo/save/UI calls for that whole selection loop.",
+            "`paintStrokeSwatches(v)` (6218-6224): writes five surfaces unconditionally-or-guarded: `#stroke-well` background (6219, unconditional if the element exists), `#pm-stroke` background (6220, unconditional), `#color-stroke`/`#pm-stroke-c` via `setHex8Input` (6221, app.js:560, out of scope — the paired `.value`/`.dataset.hex8` writer), `#p-stroke-hex` via `hexDisplayValue(v)` guarded by `document.activeElement!==shex` (6222, skips overwriting a field the user is actively typing into), `#p-stroke-alpha` via `alphaPctFromHex(v)` under the same active-element guard (6223).",
+            "`paintFillSwatches(v)` (6225-6238): same five-surface shape as the stroke sibling — `#fill-well`/`#pm-fill` backgrounds (6229-6230), `#color-fill`/`#pm-fill-c` via `setHex8Input` (6231), `#p-fill-hex` via `hexDisplayValue` under the active-element guard (6232) — plus a SIXTH surface unique to fill: `#p-opacity` via `alphaPctFromHex(v)`, also active-element-guarded (6237), documented by its own comment (6233-6236) as \"now IS the fill's own alpha field\" (feedback #48), kept in sync with whatever change just painted the swatch rather than showing a stale percentage. A 2-line comment (6226-6228) explains the background write is unconditional even while fill is disabled, so re-enabling shows the last-picked colour immediately — the `.none` overlay (out of scope) is what communicates \"off\", not the swatch colour itself."
+          ],
+          "callers": [
+            "src/js/timeline.js:609 — `window.SM.setStrokeColor` (out of scope, same file): `if(routeColorToSelectedMotionRow('strokeColor',v)){}` — checked first, before the canvas-selection/Fill-Stroke-Select branches on the same line group (610, 614).",
+            "src/js/timeline.js:616 — `window.SM.setFillColor` (out of scope, same file): `if(routeColorToSelectedMotionRow('fillColor',v)){}` — identical shape, checked before its own canvas-selection/Fill-Stroke-Select branches (617-618).",
+            "A whole-`src/js` grep for `routeColorToSelectedMotionRow` at the frozen SHA finds exactly these two call sites plus the declaration (6198); no `//`-only mentions; no other file calls it.",
+            "src/js/timeline.js:610 — `setStrokeColor`'s canvas-selection branch (out of scope): `if(p.data&&p.data.isVectorBrush){...}else if(p.strokeColor){routeColorToMotion(p,'strokeColor',v);p.strokeColor=v;}` — called once per selected path with a stroke, immediately before that same path's `p.strokeColor` is overwritten by the caller.",
+            "src/js/timeline.js:617 — `setFillColor`'s canvas-selection branch (out of scope): `if(p.fillColor){routeColorToMotion(p,'fillColor',v);p.fillColor=v;}` — identical shape for fill.",
+            "A whole-`src/js` grep for `routeColorToMotion` at the frozen SHA finds exactly these two call sites plus the declaration (6211); no `//`-only mentions; no other file calls it.",
+            "src/js/timeline.js:608 — `window.SM.setStrokeColor` (out of scope): `setStrokeColor:function(v){state.strokeColor=v;paintStrokeSwatches(v); ...` — the FIRST statement in the setter, before any routing decision.",
+            "src/js/timeline.js:3536 — `_restoreDrawingDefaults` (out of scope, an earlier packet): `paintStrokeSwatches(state.strokeColor);paintFillSwatches(state.fillColor);` — repaints both swatches after restoring the pre-drawing-tool defaults snapshot, since writing `state.*` alone never touches the DOM.",
+            "src/js/timeline.js:3632 — `updateSelPropsPanel` (out of scope, an earlier packet): `state.strokeColor=pressureCss;paintStrokeSwatches(pressureCss);` — reflects a selected Pressure Brush ribbon's actual ink into the stroke controls.",
+            "src/js/timeline.js:3654 — `updateSelPropsPanel` (out of scope): `state.strokeColor=scss;paintStrokeSwatches(scss);` — reflects the first selected path's actual `strokeColor` when re-selecting (the staleness fix the two-writers bug's lead-in describes).",
+            "A whole-`src/js` grep for `paintStrokeSwatches` at the frozen SHA finds exactly these four call sites plus the declaration (6218); no other file calls it.",
+            "src/js/timeline.js:615 — `window.SM.setFillColor` (out of scope): `setFillColor:function(v){state.fillColor=v;paintFillSwatches(v); ...`.",
+            "src/js/timeline.js:835 — `window.SM`'s opacity-apply path (out of scope, an earlier packet): `if(touchedFillHex){state.fillColor=touchedFillHex;paintFillSwatches(touchedFillHex);}` — repaints the fill swatch after an opacity change rewrote a selected path's `fillColor` hex8 string.",
+            "src/js/timeline.js:3536 — `_restoreDrawingDefaults` (out of scope): same call site as `paintStrokeSwatches` above, both on one line.",
+            "src/js/timeline.js:3648 — `updateSelPropsPanel` (out of scope): `paintFillSwatches(css);` — reflects the first selected path's actual `fillColor` (or `state.fillColor` if the path has none), the fill half of the same staleness fix `paintStrokeSwatches`'s 3654 call site addresses for stroke.",
+            "A whole-`src/js` grep for `paintFillSwatches` at the frozen SHA finds exactly these four call sites plus the declaration (6225) and one further textual (`//`) mention at timeline.js:3647 (a comment in `updateSelPropsPanel` reading \"paintFillSwatches for the measurement\", excluded per the issue's instruction to exclude `//` lines); no other file calls it."
+          ],
+          "effects": "`routeColorToSelectedMotionRow` reads `SMMotion.selectedColorProps(prop)` (motion.js, out of scope) and writes via `SMMotion.writeColorToHolder` (out of scope) per matched row; on any successful write it calls `pushUndo()`, `saveActiveLayerFrame()`, `updateUI()` and conditionally `SMEngineBridge.renderNow()` — the only one of the four functions in this packet that touches the undo stack, the frame store or a full UI refresh. `routeColorToMotion` reads `p.data.strokeId`/`userLayers.indexOf(p.parent)` and writes via `SMMotion.writeElementColorFromPicker` (out of scope) only — no undo/save/UI call of its own; its caller does that around the whole selection loop. `paintStrokeSwatches`/`paintFillSwatches` read only their own `v` parameter and `document.activeElement`; they write DOM only (`style.background`, `.value`, `.dataset.hex8` via `setHex8Input`) — no state/document/undo mutation, no `saveActiveLayerFrame`/`saveAllLayerFrames` call, safe to call on every repaint."
+        }
+      ]
+    },
+    {
+      "area": "layer-index-shadow",
+      "packets": [
+        {
+          "id": "C19t.layer-index-shadow",
+          "files": [
+            "src/js/timeline.js:6239-6275"
+          ],
+          "coverage_ranges": [
+            [6239, 6275]
+          ],
+          "classification": {"code": 7, "comment": 30, "whitespace": 0},
+          "symbols": ["_idxShadow", "_layerKeyOf", "_indexOfLayerKey"],
+          "signature": "var _idxShadow = {}; _layerKeyOf(ld); _indexOfLayerKey(key)",
+          "responsibility": "The private, module-scoped memory `reconcileLayerIndexState` (next packet) needs to tell 'the layers shifted under an unchanged index' apart from 'code set a new index on purpose' for every raw-layer-index UI global — never exported on `window`, never read or written outside this packet and the reconciler that consumes it.",
+          "behavior": [
+            "9-line lead-in comment (6239-6247): documents `renderLayerList`'s own `frameOnly` contract (C19u, out of scope, the next leaf's function) — Animation 2D's rows are frame-INDEPENDENT so a scrub used to rebuild every row for nothing (4.2ms/tick at 40 layers measured), Motion's rows are NOT (each property track prints its value at the playhead), so the decision to skip a full rebuild lives inside `renderLayerList` itself next to its existing mode branch.",
+            "28-line lead-in comment continued (6248-6268), the actual rationale for THIS packet's own code: several pieces of UI state hold a raw layer INDEX (`_motionExpandedLayer`, `_perObjBoxes`, `_nvSelectedLayer`, `_motionRevealedLayers`, `_motionRevealedElementLayers`); thirteen different mutation sites (reorder, delete, duplicate, merge, split, undo…) and only two of them remembered to remap any ONE of these globals (dated claim, not independently re-counted by this census — `source_baselines.fixtures`), producing symptoms found while sweeping for the family of bug feedback #798 exposed: the Motion accordion showing another layer's keyframes after a drag-reorder, a video gizmo sitting on whatever slid into a deleted layer's slot. Rather than a 14th ad-hoc remap at each mutation site, the reconciler (next packet) runs ONCE at the single point every mutation already passes through afterwards (`renderLayerList`, via the two calls at 6336-6337). The rule (6263-6268): a global whose value DIFFERS from what was seen last time was written deliberately since (trust it); one whose value is UNCHANGED but now names a different layer has simply been slid under (remap it, by `layerUid` so it survives even an undo's rebuilt layer objects).",
+            "`var _idxShadow={};` (6269) — the per-global memory: for a numeric global, `{idx, key}` (the index last seen and the `layerUid` that index named at that time); for an array global, `{arr, keys}` (the array object identity last seen and the per-entry keys it held then).",
+            "`_layerKeyOf(ld)` (6270): `return ld?(ld.layerUid||ld):null;` — a layer's stable identity is its `layerUid` when present, else the layer object itself (a fallback that survives only as long as the object reference does, e.g. within one session before an object is rebuilt by `loadFrame`/undo).",
+            "`_indexOfLayerKey(key)` (6271-6275): `key==null` returns `-1` (6272); linear scan of `state.layers` matching either object identity (`l===key`) or `l.layerUid===key` (6273), returning the first match's index or `-1` if none found (6274)."
+          ],
+          "callers": [
+            "A whole-`src/js` grep for `_idxShadow` at the frozen SHA finds only this packet's own declaration (6269) and its five uses inside `reconcileLayerIndexState` (next packet, 6279, 6286-6287, 6291, 6304-6305) — never read or written anywhere else, never exported on `window`.",
+            "A whole-`src/js` grep for `_layerKeyOf` at the frozen SHA finds only this packet's own declaration (6270) and seven uses: five inside `reconcileLayerIndexState` (6281, 6286, 6298, 6304) and two inside `reconcileFrameSelection` (6323, 6327, next-next packet) — never called from outside this scope's own three functions.",
+            "A whole-`src/js` grep for `_indexOfLayerKey` at the frozen SHA finds only this packet's own declaration (6271) and three uses: two inside `reconcileLayerIndexState` (6282, 6299) and one inside `reconcileFrameSelection` (6328) — same closed-scope pattern as `_layerKeyOf`.",
+            "None of the three symbols in this packet is called or read from outside timeline.js's own `reconcileLayerIndexState`/`reconcileFrameSelection` (both in this artifact's own remaining two packets); this packet has no external caller of its own."
+          ],
+          "effects": "`_idxShadow` is mutated only by `reconcileLayerIndexState` (next packet); `_layerKeyOf`/`_indexOfLayerKey` are pure functions (`_layerKeyOf` reads only its argument, `_indexOfLayerKey` reads `state.layers`) with no document/undo/DOM side effect of their own. No `pushUndo`/`saveActiveLayerFrame`/`renderLayerList` call anywhere in this packet."
+        }
+      ]
+    },
+    {
+      "area": "index-state-reconcilers",
+      "packets": [
+        {
+          "id": "C19t.reconcile-layer-index-state",
+          "files": [
+            "src/js/timeline.js:6276-6307"
+          ],
+          "coverage_ranges": [
+            [6276, 6307]
+          ],
+          "classification": {"code": 30, "comment": 2, "whitespace": 0},
+          "symbols": ["reconcileLayerIndexState"],
+          "signature": "reconcileLayerIndexState()",
+          "responsibility": "Applies the remap-vs-trust rule (previous packet's lead-in) to every one of the five named raw-layer-index UI globals — three scalar (`_motionExpandedLayer`, `_perObjBoxes`, `_nvSelectedLayer`) and two array (`_motionRevealedLayers`, `_motionRevealedElementLayers`) — once per call, so a layer reorder/delete/duplicate/merge/split/undo never leaves any of them silently pointing at the wrong layer.",
+          "behavior": [
+            "Function declaration (6276): `function reconcileLayerIndexState(){`.",
+            "Scalar globals loop (6277-6288): `['_motionExpandedLayer','_perObjBoxes','_nvSelectedLayer'].forEach(function(name){` — reads `cur=window[name]` (6278) and `sh=_idxShadow[name]` (6279, the previous packet's per-global memory); if `cur` is a number (6280): when the shadow exists, its remembered index equals `cur`, AND the layer currently at `cur` no longer matches the remembered key (6281, `_layerKeyOf(state.layers[cur])!==sh.key`) — the 'slid under an unchanged index' case — remaps via `_indexOfLayerKey(sh.key)` (6282), writing the new index (or `null` if the layer is gone) back onto `window[name]` and re-reading `cur` from it (6283-6284); either way (remapped or not), re-stamps `_idxShadow[name]` with the CURRENT `{idx,key}` pair (6286) so next call's comparison is against this call's result; if `cur` is not a number at all (e.g. `null`/`undefined`), clears the shadow (6287, `_idxShadow[name]=null`) — no reconciliation attempted for a global that isn't currently holding an index.",
+            "Array globals loop (6289-6306): `['_motionRevealedLayers','_motionRevealedElementLayers'].forEach(function(name){` — reads `arr=window[name]` (6290) and `sh=_idxShadow[name]` (6291); if `arr` is an Array (6292): when the shadow's remembered array is the SAME object (6293, `sh.arr===arr` — object-identity check, the comment at 6294-6295 explains nobody reassigned it so its entries are index values that may have slid), remaps in place — for each position `i`, resolves the key `k` from the remembered `sh.keys[i]` if that index existed last time, else falls back to `_layerKeyOf(state.layers[arr[i]])` for a brand-new entry (6296-6298), looks up its current index via `_indexOfLayerKey(k)` (6299), and pushes it into `out` only if found AND not already present (`out.indexOf(ni)<0`, 6300 — de-duplicates, since two stale entries could remap onto the same surviving layer); the array is then cleared and replaced in place (`arr.length=0;Array.prototype.push.apply(arr,out);`, 6302) — mutates the SAME array object the caller holds a reference to, rather than reassigning `window[name]`; either way, re-stamps `_idxShadow[name]` with the array's CURRENT identity and per-entry keys (6304, computed fresh from `state.layers[arr[i]]` after the possible remap) so the next call compares against this call's result; if `arr` is not an Array at all, clears the shadow (6305).",
+            "Closing brace (6307)."
+          ],
+          "callers": [
+            "src/js/timeline.js:6336 — C19u's own `renderLayerList` (out of scope, the next census leaf), the FIRST statement in its body: `reconcileLayerIndexState();` — runs before the `frameOnly` early-return check (6338), so it reconciles on every render including frame-only ticks.",
+            "A whole-`src/js` grep for `reconcileLayerIndexState` at the frozen SHA finds exactly this one call site plus the declaration (6276); no `//`-only mentions; no other file calls it — the ONLY caller of this function anywhere in the codebase."
+          ],
+          "effects": "Reads and conditionally writes five `window`-scoped globals (`_motionExpandedLayer`, `_perObjBoxes`, `_nvSelectedLayer`, `_motionRevealedLayers`, `_motionRevealedElementLayers`) plus `state.layers` (read-only) and the previous packet's `_idxShadow`/`_layerKeyOf`/`_indexOfLayerKey`. No `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/DOM write of any kind — a pure in-memory reconciliation, silent even when it actually remaps something (no toast, no re-render call of its own; the caller's own subsequent render picks up the corrected value)."
+        },
+        {
+          "id": "C19t.reconcile-frame-selection",
+          "files": [
+            "src/js/timeline.js:6308-6334"
+          ],
+          "coverage_ranges": [
+            [6308, 6334]
+          ],
+          "classification": {"code": 18, "comment": 9, "whitespace": 0},
+          "symbols": ["reconcileFrameSelection"],
+          "signature": "reconcileFrameSelection()",
+          "responsibility": "Applies the same remap-vs-drop idea to Animation 2D's frame-cell multi-selection (`_sel.frames`, tweens.js:210, out of scope — entries `{layer, frame}` feeding F5/F6, copy/paste of frames and `generateTweens`' span restriction), found live right after `reconcileLayerIndexState` shipped: cells selected on one layer, that layer moved to the end, and the selection silently sat on whichever layer slid into the old slot.",
+          "behavior": [
+            "9-line lead-in comment (6308-6316): frames as \"the same kind of index\" as the previous packet's globals; the bug found live (`_layerSel` — out of scope — had been remapped by `reorderLayersAtGap`, but this array never was); each `_sel.frames` entry is a plain object living across renders, so it is stamped with its own layer identity the first time it is seen, remapped whenever its index stops naming that layer, and dropped when the layer is gone entirely.",
+            "Function declaration and guard (6317-6318): `function reconcileFrameSelection(){ if(typeof _sel==='undefined'||!Array.isArray(_sel.frames))return; }` — defensive against `_sel` not existing yet (module-load ordering), not a normal-path branch.",
+            "Rebuild loop (6319-6330): `var out=[];` then `_sel.frames.forEach(function(s){` — reads `cur=state.layers[s.layer]` (6321, the layer CURRENTLY at this entry's stored index); if the entry has never been stamped (`s._uid==null`, 6322 — a freshly-added selection entry), stamps `s._uid=_layerKeyOf(cur)` (6323) and keeps it in `out` only if a key was actually resolved (6324, `if(s._uid!=null)out.push(s);`), then returns early for this entry (6325) — no remap attempted on a first-seen entry, only stamping; otherwise, if the layer at the stored index still matches the stamped identity (6327, `_layerKeyOf(cur)===s._uid`), keeps the entry unchanged in `out` and moves to the next; otherwise resolves the entry's CURRENT index via `_indexOfLayerKey(s._uid)` (6328) and, if found, rewrites `s.layer=ni` in place and keeps it (6329) — an entry whose layer is gone entirely (`ni<0`) is silently dropped (not pushed to `out` at all, matching the lead-in's 'dropped when the layer is gone').",
+            "Commit only on actual change (6331-6333): compares `out.length!==_sel.frames.length` (a drop happened) OR any `out[i]!==_sel.frames[i]` (an object was filtered/reordered) — only then does it clear `_sel.frames` and replace its contents in place (`_sel.frames.length=0;Array.prototype.push.apply(_sel.frames,out);`, 6332) — mutates the array the rest of the app already holds a reference to, rather than reassigning `_sel.frames`; when nothing changed, `_sel.frames` is left completely untouched (not even re-assigned to an equal-contents array), avoiding any spurious reference change for callers that may compare it by identity.",
+            "Closing brace (6334)."
+          ],
+          "callers": [
+            "src/js/timeline.js:6337 — C19u's own `renderLayerList` (out of scope, the next census leaf), the SECOND statement in its body, immediately after `reconcileLayerIndexState()`: `reconcileFrameSelection();` — also runs before the `frameOnly` early-return (6338).",
+            "A whole-`src/js` grep for `reconcileFrameSelection` at the frozen SHA finds exactly this one call site plus the declaration (6317); no `//`-only mentions; no other file calls it — the ONLY caller of this function anywhere in the codebase, identical single-caller shape to `reconcileLayerIndexState` right above it."
+          ],
+          "effects": "Reads `_sel.frames` (tweens.js:210, out of scope), `state.layers` and the layer-index-shadow packet's `_layerKeyOf`/`_indexOfLayerKey`. Writes: conditionally mutates `_sel.frames` in place (never reassigns the array reference) and stamps a private `_uid` field onto each surviving entry object the first time it is seen. No `pushUndo`/`saveActiveLayerFrame`/DOM write/toast of any kind — same silent, in-memory-only reconciliation shape as `reconcileLayerIndexState`."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "`routeColorToSelectedMotionRow` is the only function in this scope that calls `saveActiveLayerFrame` (app.js:4634, out of scope) — once, on a successful Motion-row colour write, before `updateUI()`. `routeColorToMotion`/`paintStrokeSwatches`/`paintFillSwatches` never touch the frame store: the first delegates entirely to `SMMotion.writeElementColorFromPicker` (out of scope, whose own save path is not this scope's concern) and the paint functions are pure DOM writers. Neither reconciler (`reconcileLayerIndexState`/`reconcileFrameSelection`) calls any save function — both mutate only in-memory UI-state globals/arrays, never `state.layers[*].frames`."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No function in this scope calls `loadFrame` directly, and none is reachable from `importJSON` at the frozen SHA (confirmed: none of the eight symbol names appears in the import code paths). The two reconcilers' entire purpose is to survive a layer-order change WITHOUT depending on a fresh load — they read `state.layers` as it stands at call time, whatever mutation (including a `loadFrame`-driven undo/redo) most recently produced it."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "`routeColorToSelectedMotionRow` calls `pushUndo()` (tweens.js:4741, out of scope) once, BEFORE writing any matched row — even on the rare path where every row's `writeColorToHolder` call ends up returning false and the function returns `false` without saving/rendering, an undo entry may already have been pushed. `routeColorToMotion` and the two paint functions never call `pushUndo`. Neither reconciler pushes undo — a remap/drop is not itself an undoable user action, it is a consequence of one (the reorder/delete/etc. that triggered `renderLayerList`) that already pushed its own entry elsewhere."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "`routeColorToSelectedMotionRow` reads the MOTION-timeline row selection via `SMMotion.selectedColorProps` (out of scope) — a different selection axis from `selectedPaths` (the canvas selection, read only by this scope's callers, not by this scope itself) and from `_layerSel`/`_sel.frames` (the layer-list/frame-cell selections `reconcileLayerIndexState`/`reconcileFrameSelection` protect). `reconcileFrameSelection` is the one function in this scope that directly mutates a selection: it prunes/remaps `_sel.frames` (tweens.js:210, out of scope) entry-by-entry, dropping any entry whose layer no longer exists and rewriting `.layer` for any entry whose layer merely moved."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "`routeColorToSelectedMotionRow`/`routeColorToMotion` exist specifically to keep an animated shape's colour TRACK (motion.js, out of scope) in sync with the plain document field a Paper.js render still reads — the lead-in's own two-writers bug was exactly this class of drift, just for DISPLAY surfaces rather than the track itself. `reconcileLayerIndexState` is consumed by Motion specifically: three of its five globals (`_motionExpandedLayer`, `_motionRevealedLayers`, `_motionRevealedElementLayers`) are Motion-only UI state (accordion expansion, U-reveal sets); `_perObjBoxes`/`_nvSelectedLayer` are shared/Animation-2D-adjacent state (per-element isolation boxes, the selected video gizmo). `reconcileFrameSelection`'s `_sel.frames` is Animation-2D-only (frame-cell selection has no Motion equivalent)."
+    },
+    {
+      "consumer": "export",
+      "disposition": "None of this scope's four colour functions or two reconcilers is called from export.js or rive-export.js at the frozen SHA (confirmed: no symbol name appears in either file) — all eight are editor-UI-state-only, with no export-path reader of `_idxShadow`, `_motionExpandedLayer`, `_perObjBoxes`, `_nvSelectedLayer`, `_motionRevealedLayers`, `_motionRevealedElementLayers` or `_sel.frames`. The document fields the colour functions eventually help set (`p.strokeColor`/`p.fillColor`, Motion colour tracks) are themselves read at export time through their own out-of-scope consumers, not through anything declared in 6156-6334."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "`routeColorToSelectedMotionRow` conditionally calls `SMEngineBridge.renderNow()` (out of scope) after a successful write, forcing an immediate re-render through the Rust/vello engine when active — the only one of this scope's eight symbols to touch `SMEngineBridge` directly. `routeColorToMotion` and the two paint functions never do; the paint functions are DOM-only and `routeColorToMotion`'s caller (out of scope) handles its own engine refresh. Neither reconciler touches `SMEngineBridge` at all — they run before `renderLayerList`'s own render work, not after it."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-motion-row-precedence-blocks-canvas-path",
+      "proposed": "Stub `SMMotion.selectedColorProps` to return `[{holder:H,prop:'fillColor'}]` and `SMMotion.writeColorToHolder` to return `true`; `state.tool='select'`; `selectedPaths=[somePathWithFillColor]`; call `window.SM.setFillColor('#112233')`; expect `routeColorToSelectedMotionRow` to be the only path taken (`writeColorToHolder` called once with `(H,'fillColor','#112233')`, `saveActiveLayerFrame`/`updateUI` called once) and the canvas-selection `else if` branch (line 617) NEVER entered — i.e. `somePathWithFillColor.fillColor` unchanged and `routeColorToMotion` never called — not run."
+    },
+    {
+      "id": "fx-motion-row-no-selection-falls-through",
+      "proposed": "Stub `SMMotion.selectedColorProps` to return `[]`; `state.tool='select'`; `selectedPaths=[p]` where `p.fillColor` is set; call `window.SM.setFillColor('#445566')`; expect `routeColorToSelectedMotionRow` to return `false` with NO `pushUndo` call (the empty-rows early return at 6201, before `pushUndo` at 6202), then the canvas-selection branch to run instead, calling `routeColorToMotion(p,'fillColor','#445566')` and setting `p.fillColor='#445566'` — not run."
+    },
+    {
+      "id": "fx-route-color-to-motion-detached-parent-guard",
+      "proposed": "`p={data:{strokeId:'s1'},parent:someLayerObject}`; `userLayers=[]` (parent not present); call `routeColorToMotion(p,'strokeColor','#ff0000')`; expect `false` returned and `SMMotion.writeElementColorFromPicker` NEVER called (the `li<0` guard at 6215) — not run."
+    },
+    {
+      "id": "fx-paint-stroke-swatches-skips-focused-hex-field",
+      "proposed": "Create `#p-stroke-hex` in the DOM, focus it (`document.activeElement===shex`); call `paintStrokeSwatches('#8bc34a')`; expect `#stroke-well`/`#pm-stroke` backgrounds AND `#color-stroke`/`#pm-stroke-c` (`.dataset.hex8`) updated unconditionally, but `#p-stroke-hex.value` LEFT UNCHANGED (the `document.activeElement!==shex` guard at 6222) — not run."
+    },
+    {
+      "id": "fx-paint-fill-swatches-writes-p-opacity",
+      "proposed": "Create `#p-opacity` unfocused; call `paintFillSwatches('#0066ff80')`; expect `#p-opacity.value` set to `alphaPctFromHex('#0066ff80')` (≈50) — the sixth, fill-only surface this function paints that `paintStrokeSwatches` has no equivalent for — not run."
+    },
+    {
+      "id": "fx-idx-shadow-remap-unchanged-index",
+      "proposed": "`state.layers=[{layerUid:'b'},{layerUid:'a'}]`; `window._nvSelectedLayer=0`; call `reconcileLayerIndexState()` once so `_idxShadow._nvSelectedLayer={idx:0,key:'a'}` is stamped from a PRIOR state where index 0 held `'a'` (simulate by pre-seeding `_idxShadow` directly); reorder `state.layers=[{layerUid:'a'},{layerUid:'b'}]` (same objects, swapped) WITHOUT changing `window._nvSelectedLayer` (still `0`); call `reconcileLayerIndexState()` again; expect `window._nvSelectedLayer` remapped to `1` (index 0 now names `'b'`, not the remembered `'a'`) — not run."
+    },
+    {
+      "id": "fx-idx-shadow-trust-deliberate-change",
+      "proposed": "Same setup as above, but between the two `reconcileLayerIndexState()` calls, code explicitly sets `window._nvSelectedLayer=1` (a deliberate new selection, not a slide) while `state.layers` order is untouched; expect the second call to LEAVE `window._nvSelectedLayer===1` unchanged (the shadow's remembered `idx` no longer matches `cur`, so the `sh.idx===cur` guard at 6281 is false and no remap is attempted) — not run."
+    },
+    {
+      "id": "fx-reconcile-layer-index-state-array-remap-dedup",
+      "proposed": "`state.layers=[{layerUid:'a'},{layerUid:'b'},{layerUid:'c'}]`; `window._motionRevealedLayers=[0,1]`; call `reconcileLayerIndexState()` once to stamp `_idxShadow._motionRevealedLayers={arr:sameArrayRef,keys:['a','b']}`; reorder `state.layers=[{layerUid:'b'},{layerUid:'a'},{layerUid:'c'}]` (a swap) WITHOUT reassigning the `_motionRevealedLayers` array object; call `reconcileLayerIndexState()` again; expect the SAME array object mutated in place to `[1,0]` (both entries remapped by key, order preserved, no duplicate even though the swap crosses positions) — not run."
+    },
+    {
+      "id": "fx-reconcile-frame-selection-stamp-then-remap-then-drop",
+      "proposed": "`state.layers=[{layerUid:'a'},{layerUid:'b'}]`; `_sel.frames=[{layer:0,frame:3}]` (freshly added, no `_uid`); call `reconcileFrameSelection()`; expect `_sel.frames[0]._uid==='a'` stamped, entry otherwise untouched. Then reorder `state.layers=[{layerUid:'b'},{layerUid:'a'}]` and call again; expect `_sel.frames[0].layer` rewritten to `1`. Then set `state.layers=[{layerUid:'b'}]` (layer `'a'` deleted) and call a third time; expect `_sel.frames` now EMPTY (the entry dropped, `_indexOfLayerKey('a')` returns `-1`) — not run."
+    }
+  ],
+  "future_proposals": [
+    "`routeColorToSelectedMotionRow` can push an undo entry (6202) on a call where every matched row's `writeColorToHolder` ultimately returns `false` (6205's early return happens AFTER `pushUndo()` already ran) — a no-op-looking colour pick against a Motion row selection with no actual writable holder would still leave an undo entry on the stack. Flagged for the eventual runtime-behavior review as a possible spurious-undo-entry source; not exercised or confirmed as a defect by this census (no execution was performed).",
+    "`paintFillSwatches` paints a sixth surface (`#p-opacity`) that `paintStrokeSwatches` has no equivalent for (the stroke side's own alpha field, `#p-stroke-alpha`, is a SEPARATE dedicated element already painted at 6223) — the two functions are otherwise identical in shape (five surfaces each) but this asymmetry means any future new stroke-side surface added by analogy to `#p-opacity` would need its own line, not inherited from the existing five-surface pattern. Noted for awareness, not a defect.",
+    "`reconcileLayerIndexState`'s scalar-global branch only reconciles while `window[name]` currently holds a number (6280); a global that was a number LAST time (shadow present) but has since been set to `null`/`undefined` by other code simply clears its shadow (6287) with no attempt to check whether that clearing was itself due to a stale index rather than a deliberate deselect — consistent with the documented remap-vs-trust rule (only applies when there IS a current index to compare), but worth flagging since it means a global set to `null` by a mutation site that forgot to do so on purpose is indistinguishable from one cleared on purpose. Not claimed as a confirmed defect (no execution was performed)."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep -n -w` was run once per symbol (all eight names declared in this scope, plus every callee they call into: `SMMotion.selectedColorProps`/`writeColorToHolder`/`writeElementColorFromPicker`, `setHex8Input`, `hexDisplayValue`, `alphaPctFromHex`, `colorHex8`, `pushUndo`, `saveActiveLayerFrame`, `updateUI`, `_motionExpandedLayer`, `_perObjBoxes`, `_nvSelectedLayer`, `_motionRevealedLayers`, `_motionRevealedElementLayers`, `_sel`) at the frozen SHA 59a5a38c; results are reproduced verbatim as caller/owner citations above and are re-checkable with `git grep -n -w '<symbol>' 59a5a38c514f5da830dd2f2df4c83c63b1b22fba -- src/js`.",
+    "The five raw-layer-index globals were separately grepped for their total reference COUNT only (not every mutation site individually enumerated, per the issue's dated in-source '13 mutation sites' claim being cited as authorial intent rather than independently re-derived): `_motionExpandedLayer` 41, `_perObjBoxes` 23, `_nvSelectedLayer` 15, `_motionRevealedLayers` 24, `_motionRevealedElementLayers` 19 total matches across `src/js` at the current checkout (blob-identical to the frozen SHA for `timeline.js`; other files' content at the frozen SHA was not independently re-pinned for this count, since these globals are declared and read across many out-of-scope files this census does not otherwise touch).",
+    "engineering/inventory/census/*.json siblings present at authoring time sharing `source_path: src/js/timeline.js`: C19d through C19s, forming a contiguous run from line 862 through line 6155 with zero gaps and zero overlaps (independently confirmed by listing every sibling's own `assigned_ranges` and checking adjacency) — this artifact's own range (6156-6334) is the immediate next contiguous span; the validator's cross-sibling overlap check additionally confirms this programmatically against every `C*.json` in the directory."
+  ],
+  "validation": {
+    "expected_assigned_lines": 179,
+    "expected_classification": {"code": 89, "comment": 90, "whitespace": 0},
+    "packet_partition": [
+      [6156, 6238],
+      [6239, 6275],
+      [6276, 6307],
+      [6308, 6334]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals `classify(coverage_ranges)`, independently re-derived by script against the frozen blob: 6156-6238=(34,49,0); 6239-6275=(7,30,0); 6276-6307=(30,2,0); 6308-6334=(18,9,0); sums to (89,90,0)=179 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 179 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C19t-timeline-color-surfaces-index-reconcile.json d0082229fc55ae1d9dd3ca6dfdc662bba009ef6a exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19s-timeline-layer-link-pickers-parent-cell.json d0082229fc55ae1d9dd3ca6dfdc662bba009ef6a still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19r-timeline-layer-icons-colors-parent-pickwhip.json d0082229fc55ae1d9dd3ca6dfdc662bba009ef6a still exits 0"
+    ]
+  }
+}
