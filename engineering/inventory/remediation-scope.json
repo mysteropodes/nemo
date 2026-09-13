@@ -2754,7 +2754,7 @@
       "id": "C02:10",
       "note": "motion.js:9841-11140 (1300 lines) — per-property row rendering (renderElementsList, renderColorRow/renderFillColorRow/renderStrokeColorRow, renderTrimScalarRow/renderTrimPathsGroup, renderTextAnimatorsList, renderPathVertexGroup/renderPathGroupTrackRow, renderMeshVertexGroup/renderVertexRow, trackRowHtml, renderTracksFor) has no packet owner.",
       "disposition": "needs-reconciliation",
-      "evidence": "Cited 9841-11140 maps to 9826-11125 at 95e4970; rangeCoverage lists it as one open span of 1300 lines with no C20 supplement. Part of the P03C Motion queue (motion.js open spans total 4262 code lines)."
+      "evidence": "Cited 9841-11140 (ded641b) maps to 9826-11125 at the frozen tree; rangeCoverage lists it as one open span of 1300 lines with no C20 supplement yet. Queued for the C20g+ supplement series (P03C Motion queue), alongside the sibling C19s+ timeline queue (C08:1) and C21a/#1180 for app.js."
     },
     {
       "id": "C03:1",
@@ -2793,7 +2793,7 @@
       "id": "C08:1",
       "note": "src/js/timeline.js's real ~11187-line gap (DEF-5) is flagged with full evidence here but NOT sized or packet-split — at over 11,000 lines with CLAUDE.md §11's documented alignment/scroll/zoom invariants, a proper packet-level treatment is itself several leaf tasks' worth of work, which would blow this census's own work-size budget. The orchestrator should treat this as its own multi-leaf mini-program (candidate: C19+), not a single proposed ID.",
       "disposition": "needs-reconciliation",
-      "evidence": "Partly resolved: the accepted C19a-C19q supplements cover timeline.js 1-5709 except spans 2002-2011, 2027-2048 and 2247; 5286 uncovered code lines of 11907 remain from 5710 onward (open spans in rangeCoverage). The remainder is the P03C timeline queue."
+      "evidence": "Partly resolved: the accepted C19a-C19q supplements cover timeline.js 1-5709 except spans 2002-2011, 2027-2048 and 2247; 5286 uncovered code lines of 11907 remain from 5710 onward (open spans in rangeCoverage). Queued for the C19s+ supplement series (P03C timeline queue), alongside the sibling C20g+ Motion queue (C02:10) and C21a/#1180 (app.js, first slice already proposed)."
     },
     {
       "id": "C08:2",
@@ -2876,14 +2876,21 @@
     {
       "id": "C20a:1",
       "note": "taSelectorAt 4033-4047 remains C02 context.",
-      "disposition": "needs-reconciliation",
-      "evidence": "No C02 packet range covers taSelectorAt 4033-4047 at 95e4970 (open span in rangeCoverage): C02.text-animation.selectors-panel must be extended or a leaf admitted in P03C."
+      "disposition": "covered-by-packet",
+      "packets": [
+        "C02.text-animation.selectors-panel"
+      ],
+      "evidence": "P03C-a/#1179: C02.text-animation.selectors-panel now declares src/js/motion.js:4048-4062 (ded641b), which maps to 4033-4047 at the frozen tree — taSelectorAt is fully covered; no open span remains in rangeCoverage."
     },
     {
       "id": "C20a:2",
       "note": "C02 elementMotionAt 4265-4292 and layerOrderAt 4359-4384 excluded.",
-      "disposition": "needs-reconciliation",
-      "evidence": "C02.motion-advanced.transform-application declares 4284-4335 (ded641b) which maps to 4269-4320, leaving elementMotionAt 4265-4268 open; C02.motion-advanced.geometry-motion-integrations declares 4381-4436 which maps to 4366-4421, leaving layerOrderAt 4359-4365 open. Both are open spans in rangeCoverage for P03C range reconciliation."
+      "disposition": "covered-by-packet",
+      "packets": [
+        "C02.motion-advanced.transform-application",
+        "C02.motion-advanced.geometry-motion-integrations"
+      ],
+      "evidence": "P03C-a/#1179: C02.motion-advanced.transform-application now declares 4280-4307 (ded641b), which maps to 4265-4292 at the frozen tree, covering the elementMotionAt doc lead-in; C02.motion-advanced.geometry-motion-integrations now declares 4374-4436 (ded641b), which maps to 4359-4421, covering the layerOrderAt doc lead-in. Neither remains an open span in rangeCoverage."
     },
     {
       "id": "C20a:3",
@@ -2894,8 +2901,11 @@
     {
       "id": "C20b:1",
       "note": "C02.motion-advanced.component-shape-tree retains enterComponentLayer at pinned 6832-6915 (documentation 6832-6854; implementation 6855-6915); its old numeric citation requires range reconciliation, not a new owner.",
-      "disposition": "needs-reconciliation",
-      "evidence": "C02.motion-advanced.component-shape-tree declares 6870-6946 (ded641b), which maps to 6855-6931 at 95e4970; the documentation lines 6832-6854 named here are an open span in rangeCoverage. Packet range amendment pending in P03C, no new owner."
+      "disposition": "covered-by-packet",
+      "packets": [
+        "C02.motion-advanced.component-shape-tree"
+      ],
+      "evidence": "P03C-a/#1179: C02.motion-advanced.component-shape-tree now declares 6847-6946 (ded641b), which maps to 6832-6931 at the frozen tree, covering the enterComponentLayer documentation block 6832-6854; no open span remains in rangeCoverage. No new owner."
     },
     {
       "id": "C20b:2",
