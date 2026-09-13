@@ -7,7 +7,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const { compareSizeBaseline } = require('./lib/boundaries-ratchet.cjs');
-const { checkApplicationPolicy, checkApplicationSize } = require('./lib/boundaries-application.cjs');
+const { checkApplicationPolicy, checkApplicationSize, checkApplicationEdges } = require('./lib/boundaries-application.cjs');
+const { checkProfile } = require('./lib/boundaries.cjs');
 const { checkSourceCoverage } = require('./lib/boundaries-coverage.cjs');
 const { discoverSourcePaths } = require('./lib/boundaries-discovery.cjs');
 const { discoverRepositoryFiles } = require('./lib/boundaries-repository.cjs');
@@ -17,6 +18,7 @@ const PROFILE = 'engineering/boundaries/profiles/scripts-nemo.profile.json';
 const APPLICATION_PROFILE = 'engineering/boundaries/profiles/app-js.profile.json';
 const APPLICATION_SEED = 'engineering/boundaries/profiles/app-js.baseline.json';
 const APPLICATION_POLICY = 'engineering/boundaries/profiles/app-js.coverage.json';
+const APPLICATION_EDGES = 'engineering/boundaries/profiles/app-js.edges.json';
 const LANES = ['quick', 'boundaries', 'surfaces'];
 const QUICK = ['doctor', 'check', 'test:unit', 'test:rust'];
 const SURFACES = ['test:integration', 'test:browser', 'test:rust-tauri', 'build:wasm', 'build:desktop', 'test:desktop'];
@@ -129,7 +131,11 @@ function applicationBoundaries(base, scratch, root = ROOT) {
   const coverage = checkApplicationPolicy(candidate, policy, { root });
   const size = checkApplicationSize(candidate, { root });
   const ratchet = compareSizeBaseline(prior, candidate, { root });
-  return { ok: coverage.ok && size.ok && ratchet.ok, baseline, coverage, size, ratchet };
+  // P10: the profile's edge/global/cycle rules, enforced for the migrated
+  // slice and counted (no-growth) for the unresolved legacy scripts.
+  const edgesPolicy = JSON.parse(fs.readFileSync(path.join(root, APPLICATION_EDGES), 'utf8'));
+  const edges = checkApplicationEdges(candidate, checkProfile(candidate, { root }), edgesPolicy);
+  return { ok: coverage.ok && size.ok && ratchet.ok && edges.ok, baseline, coverage, size, ratchet, edges };
 }
 
 function toolingCoverage(profile, root = ROOT) {
@@ -194,5 +200,5 @@ if (require.main === module) {
   catch (err) { console.error(`CI blocked: ${err.message}`); process.exitCode = 1; }
 }
 module.exports = { LANES, QUICK, SURFACES, PROFILE, APPLICATION_PROFILE, APPLICATION_SEED,
-  APPLICATION_POLICY, aggregate, validateReceipt, applicability, changedFiles, materializeBaseline,
+  APPLICATION_POLICY, APPLICATION_EDGES, aggregate, validateReceipt, applicability, changedFiles, materializeBaseline,
   existsAtRevision, applicationBoundaries, toolingCoverage, verify, boundaries, main };

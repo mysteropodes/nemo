@@ -71,9 +71,9 @@ test('tooling coverage profiles every current scripts/nemo CommonJS source', () 
   const profile = JSON.parse(fs.readFileSync(path.join(ROOT, ci.PROFILE), 'utf8'));
   const result = ci.toolingCoverage(profile, ROOT);
   assert.equal(result.ok, true);
-  // 60 retained tooling sources plus P03A's frozen-census checker.
-  assert.equal(result.sourcePathCount, 61);
-  assert.equal(result.declaredPathCount, 61);
+  // 60 retained tooling sources plus P03A's frozen-census checker and P10's edge-gate test.
+  assert.equal(result.sourcePathCount, 62);
+  assert.equal(result.declaredPathCount, 62);
   const incomplete = structuredClone(profile);
   incomplete.modules = incomplete.modules.filter((module) => module.id !== 'nemo.lib.boundariesApplication');
   const rejected = ci.toolingCoverage(incomplete, ROOT);

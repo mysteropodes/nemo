@@ -99,6 +99,8 @@
       "files": ["boundaries-ratchet.test.cjs"], "publicApi": ["boundaries-ratchet.test.cjs"], "sizeProfile": "Test file" },
     { "id": "nemo.test.boundariesApplication", "layer": "tooling-test", "dir": "scripts/nemo",
       "files": ["boundaries-application.test.cjs"], "publicApi": ["boundaries-application.test.cjs"], "sizeProfile": "Test file" },
+    { "id": "nemo.test.boundariesEdges", "layer": "tooling-test", "dir": "scripts/nemo",
+      "files": ["boundaries-edges.test.cjs"], "publicApi": ["boundaries-edges.test.cjs"], "sizeProfile": "Test file" },
     { "id": "nemo.test.boundariesCli", "layer": "tooling-test", "dir": "scripts/nemo",
       "files": ["boundaries-cli.test.cjs"], "publicApi": ["boundaries-cli.test.cjs"], "sizeProfile": "Test file" },
     { "id": "nemo.test.boundariesCoverage", "layer": "tooling-test", "dir": "scripts/nemo",
