@@ -1,0 +1,528 @@
+{
+  "census_id": "C19aa",
+  "issue": 1231,
+  "title": "Timeline.js Typography panel (textPropsRoot/updateTextPropsPanel/applyTextPropsEdit + wiring IIFE), text-actions row (updateTextActionsPanel), fill-gradient relay button, and cycle/propagate buttons",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf following C19z/#1229 (proposed range timeline.js:8383-8662, not yet merged at authoring time); fourth open slice of the timeline.js tail and the last before the C06-owned Settings tabs block (timeline.js:8997-9077, already merged/owned, out of scope). Scope is five packets across timeline.js:8663-8996 (334 lines: 221 code / 113 comment / 0 blank, independently re-derived by a Python re-implementation of the validator's own classify(), matching the issue's own proposed union exactly): `updateTextActionsPanel` (+lead-in), `textPropsRoot`+`updateTextPropsPanel`, `applyTextPropsEdit`, the anonymous typography-panel wiring IIFE (+ its own local `confirmAddGoogleFont`), and `initFillGradientButton`+`syncFillGradientButton`+`initCycleAndPropagate` (+lead-ins/registrations) — matching the issue's own proposed packet table exactly, boundary-verified with `sed -n` and a direct Python classify() re-run; no boundary correction was needed, so the issue's own optional split of the fifth packet at `initCycleAndPropagate` (8975) was evaluated and NOT taken (both halves are thin init-and-register wrappers with no shared internal structure worth separating, and splitting would not change the union). P30/#1032 retains the timeline.js runtime writer; this JSON authoring does not authorize source changes. Cited by name/line only, not re-mapped (matching the issue's own lead paragraph): `commitText`/`commitVectorText`/`splitTextIntoCharacters` (timeline.js:8383-8662, C19z, not yet merged), `closeInPlaceTextEditor` (timeline.js:8254-8288, C19y, not yet merged — its rebuild is the twin of `applyTextPropsEdit`'s, compared in `boundaries`), `updatePropsContext` (timeline.js:3131, C19j, merged) and `updateUI` (timeline.js:2727-2758, C19h, merged — the ACTUAL sole caller of both `update*Panel`s, at line 2757, which also calls `updatePropsContext` on the same line), `text-animator-panel.js`'s `render()` (owner of `#p-textanim-sec`'s own overall display) and `text-animator.js` (`groupIdForItem`/`openPanel`, exported at lines 428/430), `vector-text-bridge.js` (`buildVectorTextGroup`:208, `vectorTextGroupMembers`:350, `addGoogleFont`:425), `gradient-bridge.js` (owner of `#p-grad-on`'s `change` handler; its lines 73/86 call `syncFillGradientButton`), `effects-panel.js` (`renderEffectsSection`, aliased `window.updateEffectsPanel` at line 871, the note at timeline.js:8924-8927), `window.SM.repeatSelection`/`propagateColorAllFrames` (methods of the `window.SM={...}` object literal opened at timeline.js:349 — that opening line itself is NOT claimed by any existing C19a-C19w census, a genuine gap confirmed by scanning every sibling's `assigned_ranges`, cited by line only, not remedied here; the method bodies themselves are timeline.js:2253/2324, C19f, merged), `pushUndo` (tweens.js:4741, thin wrapper over `pushUndoLayers`), `saveActiveLayerFrame` (app.js:4634, C21o, merged), `showToast` (timeline.js:7447, C19w, merged), `SM.t` (i18n.js, `window.SM.t=t` at 4239), `selBounds` (timeline.js:231, C19a, merged), and the `#text-props-sec`/`#tp-*`/`#text-split-row`/`#p-fill-grad-btn`/`#btn-cycle`/`#btn-propagate-color` markup (src/index.html).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "7e341fa59c6d8f12a0c9680f1aaa8441bdb6990b",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19aa-timeline-typography-panels-census",
+  "assigned_ranges": [
+    {
+      "start": 8663,
+      "end": 8996
+    }
+  ],
+  "coverage_note": "Exactly 334 assigned lines occur once across five packets (one coverage_range per packet, no gaps, no other-owner exclusions): 221 code, 113 full-line comment, 0 blank — independently re-derived by classifying the frozen blob programmatically (a Python re-implementation of the validator's own classify(), run once per packet and once for the whole span: 8663-8996=(221,113,0) both ways) — equal to the issue's own proposed table exactly for every one of the five packets, no boundary correction needed. Line 8662 is C19z's own `window.splitTextIntoCharacters=splitTextIntoCharacters;` registration (out of scope, proposed range 8383-8662, not yet merged — confirmed against the issue's own citation, not against a merged JSON). Line 8663 opens this scope's own lead-in comment for `updateTextActionsPanel`. Line 8996 is the `DOMContentLoaded`-or-immediate registration of `initCycleAndPropagate`; line 8997 opens the Settings-tabs lead-in comment that C06's `preferences.settings-modal-shell` already owns (declared timeline.js:8997-9077) — confirmed by direct read of both lines, not re-mapped.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main at the branch point (7e341fa59c6d8f12a0c9680f1aaa8441bdb6990b, merge of PR #1239/C21q) has the identical timeline.js blob (git rev-parse 7e341fa59c6d8f12a0c9680f1aaa8441bdb6990b:src/js/timeline.js == git rev-parse 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js == cc4cfd27dc59d797c911d840dc46e2f816942123); this artifact's branch was created from origin/main at that same commit, verified directly in the working worktree before authoring (HEAD matches, blob matches, working tree clean). origin/main has since advanced by one further unrelated commit (54e66973ab75f32542713658264ac1aba36dd947); this artifact is not rebased onto it per the assigned task's own instruction to branch from 7e341fa.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -rn -P '(^|[^a-zA-Z_.])<symbol>\\(' src/js` (recursive, includes labs/ and adapters/) for the seven function symbols this scope declares (updateTextActionsPanel, textPropsRoot, updateTextPropsPanel, applyTextPropsEdit, initFillGradientButton, syncFillGradientButton, initCycleAndPropagate), each filtered to exclude the symbol's own comment-only mentions (lines whose trimmed content starts with `//`). A SEPARATE grep restricted to engine-bridge.js/export.js/rive-export.js for all seven names returned zero hits (render-path confirmation). Field-level behavior (the `textPropsRoot` decision table, the `d.*`<->`#tp-*` field map, the `applyTextPropsEdit`/`closeInPlaceTextEditor` twin-rebuild comparison, the wiring IIFE's listener inventory, the gradient-button relay contract) was derived by a direct `sed -n`/`awk` read of the frozen blob's own lines 8663-8996, cross-checked line-by-line, and cross-cited against `closeInPlaceTextEditor` (timeline.js:8254-8288, C19y, not yet merged, read directly — not assumed from a JSON) and `vector-text-bridge.js` (buildVectorTextGroup:208, vectorTextGroupMembers:350, addGoogleFont:425, read directly to confirm the writer/reader argument order agrees).",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes (2026-07-25 UX audit, 2026-07-30 easing-curve pushUndo lesson referenced by analogy, 2026-08-16 panel introduction, 2026-08-28 Google Fonts, feedback #37/#86/#87) are read as authorial intent, not independently re-verified execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19aa-timeline-typography-panels-gradient-button.json and the five timeline.js packets partitioning lines 8663-8996.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "function_boundary": "This scope covers THREE independent panel features that happen to sit adjacent in the file, split into five packets purely by which construct each covers: the shared-section text-actions row (`updateTextActionsPanel`, which toggles two rows inside `#p-textanim-sec` but does not own that section's own overall display), the Typography panel's own selection-resolution + read half (`textPropsRoot`+`updateTextPropsPanel`), its write half (`applyTextPropsEdit`), the static field-wiring IIFE that binds every `#tp-*` control to `applyTextPropsEdit` (plus the Google-Fonts add sub-flow, `confirmAddGoogleFont`, declared and used only inside this IIFE), and the unrelated-by-feature-but-adjacent-by-file-position fill-gradient relay button (`initFillGradientButton`/`syncFillGradientButton`) plus the Cycle/Propagate-color buttons (`initCycleAndPropagate`). None of the five packets calls another OUTSIDE this scope's own IIFE->applyTextPropsEdit and updateTextPropsPanel/applyTextPropsEdit->textPropsRoot internal chains; the gradient and cycle/propagate packet is call-graph-disjoint from the four text packets before it (confirmed by grep: none of `initFillGradientButton`/`syncFillGradientButton`/`initCycleAndPropagate` appears anywhere in the four preceding packets, and vice versa).",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19z (previous leaf, proposed timeline.js:8383-8662, not yet merged)",
+      "disposition": "Owns `commitText`/`commitVectorText`/`splitTextIntoCharacters` immediately before this scope. This scope's own boundary begins at line 8663, the lead-in comment for `updateTextActionsPanel`, immediately after C19z's own proposed `window.splitTextIntoCharacters=splitTextIntoCharacters;` registration at line 8662 — confirmed by direct read of both lines (8662-8663), not against a merged JSON since C19z has none yet."
+    },
+    {
+      "owner": "C06 preferences.settings-modal-shell (next leaf, timeline.js:8997-9077, merged/declared)",
+      "disposition": "Owns the Settings-tabs lead-in and shell beginning immediately after this scope. Confirmed call-graph-disjoint: none of this scope's seven symbols appears past line 8996 in a whole-file grep, and the Settings-tabs section's own header comment begins immediately at 8997 with no shared lead-in. This scope's own boundary ends at line 8996, the `initCycleAndPropagate` registration line."
+    },
+    {
+      "owner": "C19y (in-place text editors, proposed timeline.js:8254-8288 for `closeInPlaceTextEditor`, not yet merged)",
+      "disposition": "Retains `closeInPlaceTextEditor` in full — cited by name/line only, read directly (not from a JSON) to support the twin-rebuild comparison in `boundaries`. Its own remove-then-rebuild sequence is the twin of this scope's `applyTextPropsEdit`; the two rebuild the SAME `buildVectorTextGroup` call but differ in anchor source, isNew/cancel/unchanged-text handling, and failure-mode recovery — full comparison in `boundaries`."
+    },
+    {
+      "owner": "C19h (updateUI, timeline.js:2697-2947, merged) and C19j (updatePropsContext, timeline.js:3131-3511, merged)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `updateUI(frameOnly)` (timeline.js:2727-2758) is the SOLE caller of both `updateTextActionsPanel()` and `updateTextPropsPanel()`, both invoked on the same statement-chain line (2757), which also calls the separate function `updatePropsContext()` (timeline.js:3131, C19j) at the end of that same line — `updatePropsContext` is NOT itself a caller of either `update*Panel`, it is merely adjacent on the same source line; confirmed by reading updateUI's own enclosing function boundary (2727-2758) directly."
+    },
+    {
+      "owner": "text-animator-panel.js (render(), owner of #p-textanim-sec's own display) and text-animator.js (groupIdForItem/openPanel, exported lines 428/430)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `updateTextActionsPanel`'s own lead-in (8663-8673) states explicitly it does NOT own `#p-textanim-sec`'s overall show/hide — that decision belongs to text-animator-panel.js's `render()`, which runs LATER in the same `updateUI`->panel-refresh chain, using its own layer/stored-frame detection; this scope's function only ever toggles its own two CHILD rows (`#text-split-row`, `#btn-text-animate`) inside that section. `SMTextAnimator.groupIdForItem` (text-animator.js:86) is called twice (8691, 8692) to resolve/verify the shared group id of the current selection; `SMTextAnimator.openPanel` (text-animator.js:275) is called once (8700), from the animate-icon's own click handler, passing `state.activeLayerIdx` and the resolved `animGroupId`."
+    },
+    {
+      "owner": "vector-text-bridge.js (buildVectorTextGroup:208, vectorTextGroupMembers:350, addGoogleFont:425)",
+      "disposition": "Retains its own body in full — cited by name/line only, read directly to confirm argument order. `vectorTextGroupMembers(root)` is called from `textPropsRoot` (8726, to resolve the whole group and its `isTextRoot` member) and from `applyTextPropsEdit` (8820, 8824 — ink-bounds fallback and the remove-before-rebuild step). `buildVectorTextGroup(text,fontKey,size,color,align,fixedWidthWorld,topLeftWorld,layer,opts)` (vector-text-bridge.js:208, exact positional signature) is called once from this scope (8825, `applyTextPropsEdit`), matching the SAME positional order `closeInPlaceTextEditor` (C19y, out of scope) uses at its own call site — the two callers agree on argument order with no discrepancy found. `addGoogleFont(family)` is called once, from the wiring IIFE's own `confirmAddGoogleFont` (8888)."
+    },
+    {
+      "owner": "gradient-bridge.js (owner of #p-grad-on's own 'change' handler and gradient state)",
+      "disposition": "Retains its own body in full — cited by name/line only. `initFillGradientButton`'s click handler NEVER reads or writes gradient state directly — it only flips `#p-grad-on`'s `.checked` and dispatches a real bubbling `change` Event on it (8952-8953), so gradient-bridge.js's OWN `change` listener (its body, out of scope) performs the actual apply/remove. `syncFillGradientButton` is called from gradient-bridge.js's `renderGradientPanel()` at TWO sites — line 73 (the no-target early-return branch, after resetting `cb.checked=false;cb.disabled=true`) and line 86 (the normal branch, after `cb.checked=!!grad`) — both guarded `if (window.syncFillGradientButton)`, confirming gradient-bridge.js is the sole source of truth this button only mirrors."
+    },
+    {
+      "owner": "effects-panel.js (renderEffectsSection, aliased window.updateEffectsPanel at line 871)",
+      "disposition": "Retains its own body in full — cited by name/line only. The 4-line note at timeline.js:8924-8927 records that the separate `#effect-layer-sec`-specific rendering that used to live at this file position has been replaced by effects-panel.js's own unified renderer; no call from this scope reaches it."
+    },
+    {
+      "owner": "C19f (window.SM.repeatSelection/propagateColorAllFrames method bodies, timeline.js:2248-2353, merged)",
+      "disposition": "Retains its own body in full — cited by name/line only. `window.SM.repeatSelection(n)` (method body timeline.js:2253) and `window.SM.propagateColorAllFrames()` (method body timeline.js:2324) are both called once from this scope's own `initCycleAndPropagate` (8991, 8994). The enclosing `window.SM={` object-literal OPENING line (timeline.js:349) is NOT itself claimed by any existing C19a-C19w census sibling present at authoring time — confirmed by scanning every sibling's own `assigned_ranges` for line 349 (zero matches) — a genuine pre-existing gap in the census run, cited by line only and not remedied by this artifact (out of this scope's own 8663-8996 range)."
+    },
+    {
+      "owner": "tweens.js (pushUndo, tweens.js:4741), app.js (saveActiveLayerFrame, app.js:4634, C21o), timeline.js (showToast, timeline.js:7447, C19w), i18n.js (window.SM.t=t, i18n.js:4239), timeline.js (selBounds, timeline.js:231, C19a)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `pushUndo()` is called once in this scope, from `applyTextPropsEdit` (8823, immediately before removing the group's members). `saveActiveLayerFrame()` is called once, from `applyTextPropsEdit`'s own rebuild success callback (8833). `showToast` is called three times UNGUARDED directly (8837, 8948, 8986) and three times guarded via `window.showToast` from inside the wiring IIFE's Google-Fonts flow (8887, 8909, 8913) — see `boundaries` for the full toast-key inventory. `SM.t(key)` supplies every translated string this scope's dynamic handlers use. `selBounds()` (timeline.js:231, C19a, merged) is called once, from `initCycleAndPropagate`'s own Cycle-button handler (8985), as the moved-earlier precondition check (2026-07-25 UX audit, 8978-8984)."
+    },
+    {
+      "owner": "src/index.html (#text-props-sec/#tp-*/#text-split-row/#p-fill-grad-btn/#btn-cycle markup)",
+      "disposition": "Retains the static DOM structure in full — cited by line only (`#text-props-sec` 544, `#tp-content` 547, `#tp-font`+add-row 549-568, `#tp-size`/`#tp-color` 563-564, `#tp-letter-spacing`/`#tp-line-height`/`#tp-word-spacing`/`#tp-fixed-width` 590-606, `.tp-align-btn`/`.tp-style-btn`/`.tp-case-btn`/`.tp-width-btn` 571-605, `#p-fill-grad-btn` 895, `#p-fill-gradient-editor`/`#p-grad-on` 902-903, `#text-split-row`/`#btn-text-split-chars` 1120-1122, `#btn-text-animate` 1130, `#btn-cycle` 2171). This scope only reads/writes these elements' `.value`/`.checked`/`.disabled`/`.style.display`/`.classList`/`.title`/`.textContent` properties and appends dynamic `<option>` children into `#tp-font`; it declares no markup of its own. **`#btn-propagate-color` (referenced timeline.js:8993) has NO markup anywhere in src/index.html or elsewhere in the repository** — confirmed by a whole-repository grep (`grep -rn 'btn-propagate-color' src/`) returning only the one `getElementById` call site itself — flagged in `future_proposals`, not fixed (read-only census)."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 8662 (C19z's own proposed `window.splitTextIntoCharacters=splitTextIntoCharacters;` registration, not yet merged) is outside coverage; line 8663 (this scope's `updateTextActionsPanel` lead-in comment) begins this scope.",
+    "Line 8996 (the `initCycleAndPropagate` registration) is the last line of this scope; line 8997 opens C06's own Settings-tabs lead-in comment — confirmed by reading the frozen blob at 8990-9000.",
+    "No lines inside 8663-8996 are excluded for another owner: every line belongs to exactly one of the five packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "(a) `textPropsRoot()`'s decision table (tool, isVectorText, groupId, member-count equality, allMatch) -> result, all short-circuit `return null` except the final line: `state.tool!=='select'` -> null (8715); `!selectedPaths.length` -> null (8715); `!first||!first.data||!first.data.isVectorText||!first.data.groupId||!window.SMVectorText` -> null (8717, `first=selectedPaths[0]`); else `members=SMVectorText.vectorTextGroupMembers(first)` (8726), `root=members.filter(isTextRoot)[0]` (8727); `!root||selectedPaths.length!==members.length` -> null (8728, a PARTIAL pick — e.g. Shift-click removed one glyph, or a marquee that only grazed some members — has fewer selected paths than the group has members); else `allMatch=selectedPaths.every(p=>p.data.groupId===first.data.groupId)` (8729) -> `allMatch?root:null` (8730). The comment at 8718-8725 states WHY a partial/mixed pick returns null rather than the root anyway: it 'has no single coherent set of typography values to show or edit' — editing would silently apply to only some of the glyphs a plain click would otherwise have selected as one unit.",
+    "(b) The complete `d.*`<->`#tp-*` field map. READ direction (`updateTextPropsPanel`, mirrors `d.*` into DOM, each guarded by a focus check `if(document.activeElement!==el)` except the four button-class toggles which have no such guard): `d.text`->`#tp-content`.value, default `''` (8745); `d.vectorFont`->`#tp-font`.value with the `-Bold`/`-Regular` suffix stripped via regex, default `'Roboto-Regular'` before stripping (8751-8752, feedback #86 fix — was never synced before); `d.size`->`#tp-size`.value, default `48` (8754); `d.color`->`#tp-color`.value, default `'#000000'` (8756); `d.align`->`.tp-align-btn` `'ac'` class where `dataset.val===(d.align||'left')` (8757); `d[b.dataset.flag]` (bold/italic/underline/strike)->`.tp-style-btn` `'ac'` class, one per flag (8758); `d.textCase`->`.tp-case-btn` `'ac'` class where `dataset.val===(d.textCase||'none')` (8759); `d.letterSpacing`->`#tp-letter-spacing`.value, default `0` (8761); `d.lineHeightMult`->`#tp-line-height`.value, default `1.25` (8763); `d.wordSpacing`->`#tp-word-spacing`.value, default `0` (8765); `d.fixedWidth` (truthy)->`isFixed`, drives `.tp-width-btn` `'ac'` class (`'fixed'` vs implicit `'auto'`, 8767) and `#tp-fixed-width`'s own `display` (8769) and, if fixed, its `.value` default `300` (8770). WRITE direction (`applyTextPropsEdit`, reads DOM into `opts`/positional args): `#tp-content`.value->`text`, guarded non-empty via `.trim()` (8784-8785, `return` with NO write if empty — comment: 'same guard commitText uses', confirmed against `commitText`'s own identical `if(!txt.trim()||...)` guard at timeline.js:8503, C19z); `#tp-font`.value->`fontKey`, fallback `d.vectorFont||'Roboto'` (8789); `#tp-size`.value->`size` via `parseInt(...,10)`, fallback `d.size||48` (8790); `#tp-color`.value->`color`, fallback `d.color` (8791); `.tp-align-btn.ac`'s `dataset.val`->`align`, fallback `d.align||'left'` (8792-8793); `.tp-style-btn[data-flag=\"bold\"|\"italic\"|\"underline\"|\"strike\"].ac`->`opts.bold`/`.italic`/`.underline`/`.strike` (booleans, 8795-8798); `#tp-letter-spacing`.value->`opts.letterSpacing` via `parseFloat`, default `0` (8799); `#tp-line-height`.value->`opts.lineHeightMult` via `parseFloat`, default `1.25` (8800); `#tp-word-spacing`.value->`opts.wordSpacing` via `parseFloat`, default `0` (8801); `.tp-case-btn.ac`'s `dataset.val`->`opts.textCase`, default `'none'` (8802); `.tp-width-btn.ac`'s `dataset.val==='fixed'` plus `#tp-fixed-width`.value->`fixedWidthWorld` via `parseFloat`, default `300`, else `null` (8804-8805). All nine fields (`text` excepted, passed positionally) plus `topLeft`/`layer` feed `buildVectorTextGroup(text,fontKey,size,color,align,fixedWidthWorld,topLeft,layer,opts)` (8825) in the EXACT positional order `buildVectorTextGroup`'s own signature declares (vector-text-bridge.js:208: `function buildVectorTextGroup(text, fontKey, size, color, align, fixedWidthWorld, topLeftWorld, layer, opts)`) — confirmed by direct read, no mismatch found.",
+    "(c) `applyTextPropsEdit`'s rebuild sequence in order, with lines: 1) `textPropsRoot()`, bail if null or no `SMVectorText` (8781-8782). 2) read `#tp-content`, bail (return, no write) if empty after trim (8784-8785). 3-9) read font/size/color/align/opts{bold,italic,underline,strike,letterSpacing,lineHeightMult,wordSpacing,textCase}/fixedWidthWorld from the live DOM (8789-8805). 10) `layer=root.parent` (8806). 11) `topLeft`: prefer `d.anchorTopLeft` (a `Point`), else derive from the CURRENT ink bounds of the group via `vectorTextGroupMembers(root).reduce(unite)` (8817-8822, comment 8807-8816 explains this is the feedback #37 anti-drift fix — ink bounds and the nominal-ascent anchor formula are NOT the same point, so re-deriving from ink bounds on every edit fed a drifted reference back into itself and visibly sank the text each time). 12) `pushUndo()` (8823). 13) remove every current group member (8824). 14) `buildVectorTextGroup(...).then(res=>{ if(res.paths.length) selectedPaths=res.paths.slice(); saveActiveLayerFrame(); updateUI(); if(SMEngineBridge) renderNow(); }).catch(e=>{ console.warn(...); showToast(SM.t('toastTextEditRebuildFailed')); })` (8825-8838) — on success, re-points `selectedPaths` at every fresh glyph (not just the root) so `textPropsRoot`'s own 'selection===whole group' contract still holds the instant `updateUI()`'s own re-render calls back into this panel; on failure, the OLD glyphs are already gone (step 13) and nothing is restored. TWIN comparison against `closeInPlaceTextEditor` (C19y, timeline.js:8254-8288, read directly): both share the identical core `pushUndo()`->remove-members->`buildVectorTextGroup(...)`->on-success set `selectedPaths`+`saveActiveLayerFrame()`+`updateUI()`+`renderNow()`->on-failure `console.warn`+`showToast(SM.t('toastTextEditRebuildFailed'))` (SAME toast key) shape (CLAUDE.md §3 twin hazard). What DIFFERS: (i) anchor source — `closeInPlaceTextEditor` (8274-8275) ALWAYS derives `topLeft` from current ink bounds, with NO `d.anchorTopLeft` check at all, i.e. it does NOT carry the feedback #37 anti-drift fix `applyTextPropsEdit` has; re-editing text CONTENT via the in-place/popover path can therefore still sink the text on every edit the way the panel used to before the fix (not confirmed as a live defect, no execution performed — flagged in `future_proposals`). (ii) isNew/cancel/unchanged-text handling — `closeInPlaceTextEditor` manages a create-vs-re-edit distinction (`isNew`, `discardNew()`/`restore()` closures, and a combined bail condition at 8269 covering `cancel`, missing root, empty text, OR '`!isNew` and text unchanged') that `applyTextPropsEdit` has no equivalent of — the Typography panel only ever edits an EXISTING selected root (via `textPropsRoot()`), never creates one, and rebuilds on EVERY `change`/`click`/`blur` event unconditionally (no 'did anything actually change' check). (iii) opts source — `applyTextPropsEdit` reads bold/italic/underline/strike/letterSpacing/lineHeightMult/wordSpacing/textCase FRESH from the panel's own live DOM state (8795-8802, since editing exactly these fields is the whole point) and separately re-reads fontKey/color/align/fixedWidth live (8789-8792, 8804-8805); `closeInPlaceTextEditor` (8271, 8278-8279) passes ALL of these straight through UNCHANGED from `d.*` (only the text content itself changed) and additionally sets `opts.fixedHeight=d.fixedHeight||null`, a field `applyTextPropsEdit`'s own `opts` object never sets. (iv) failure-mode recovery — `applyTextPropsEdit`'s `.catch` only warns+toasts, with nothing left to restore (the original glyphs were already `.remove()`d in step 13); `closeInPlaceTextEditor`'s `.catch` ALSO calls `restore()` (8286), because it keeps the pre-existing glyphs hidden via an opacity trick (a separate `hidden` array) rather than removing them outright until success — a genuine difference in failure-mode safety between the two twins.",
+    "(d) The wiring IIFE's (8840-8923) exact listener inventory (element/selector, event, handler): `#tp-content` -> `blur` -> `applyTextPropsEdit` (8843); each of `['tp-font','tp-size','tp-color','tp-letter-spacing','tp-line-height','tp-word-spacing','tp-fixed-width']` -> `change` -> `applyTextPropsEdit` (8844-8846); `.tp-align-btn` (each) -> `click` -> toggle `'ac'` EXCLUSIVELY across the group then `applyTextPropsEdit` (8847-8852); `.tp-style-btn` (each) -> `click` -> toggle OWN `'ac'` class (non-exclusive, multi-select) then `applyTextPropsEdit` (8853-8855); `.tp-case-btn` (each) -> `click` -> toggle `'ac'` exclusively then `applyTextPropsEdit` (8856-8861); `.tp-width-btn` (each) -> `click` -> toggle `'ac'` exclusively, toggle `#tp-fixed-width` display, then `applyTextPropsEdit` (8862-8868); `#tp-font-add-btn` -> `click` -> toggle `#tp-font-add-row` display, clear+focus the input on reveal (8878-8882); `#tp-font-add-confirm` -> `click` -> `confirmAddGoogleFont` (8916); `#tp-font-add-input` -> `keydown` -> ALWAYS `stopPropagation()`, `Enter`->preventDefault+`confirmAddGoogleFont`, `Escape`->preventDefault+hide the add-row (8917-8921). Google-Fonts add flow (`confirmAddGoogleFont`, 8883-8915, local to this IIFE, no caller outside it): 1) trim `#tp-font-add-input`.value into `family`, bail if empty or no `SMVectorText` (8884-8885). 2) disable confirm-button+input (8886). 3) toast `toastGoogleFontFetching` (family-interpolated), via GUARDED `window.showToast` (8887). 4) `SMVectorText.addGoogleFont(family)` (8888). 5) on success: re-enable both controls, hide the add-row, build option value `'Google:'+family` (bare, no `-Regular`/`-Bold` suffix — comment 8892-8899 explains why: `applyTextPropsEdit` passes this value straight into `buildVectorTextGroup`, which itself strips/reattaches any suffix based on the Bold toggle; passing an already-suffixed key would mismatch and 404 on the next rebuild), append the `<option>` to `#tp-font` if not already present, set `#tp-font`.value to it, call `applyTextPropsEdit()` to commit immediately, toast `toastGoogleFontAdded` (8889-8909). 6) on failure: re-enable both controls, `console.warn`, toast `toastGoogleFontFailed` (8910-8913). Complete toast-key inventory for this whole scope, each cited with its guard style: `toastTextEditRebuildFailed` (8837, UNGUARDED `showToast`), `toastSelectSingleShapeForGradient` (8948, UNGUARDED), `toastSelectFrameRangeFirst` (8986, UNGUARDED), `toastGoogleFontFetching`/`toastGoogleFontAdded`/`toastGoogleFontFailed` (8887/8909/8913, all GUARDED `if(window.showToast)`) — the wiring IIFE's own Google-Fonts sub-flow is the ONLY place in this scope that guards the call; every other call site in this scope calls the plain global `showToast` unguarded.",
+    "(e) `updateTextActionsPanel`'s (8674-8704) two-row decision: `#text-split-row` shown (`splitRow.style.display=isWholeText?'':'none'`, 8693) when `isWholeText` — a SINGLE selected Path (`state.tool==='select'&&selectedPaths.length===1`, 8677) whose `data.isText&&!data.isTextChar&&!data.isVectorText` (8678, i.e. a whole, not-yet-split RASTER text block); its own `#btn-text-split-chars` click wires to `splitTextIntoCharacters(p)` (8694, C19z). `#btn-text-animate` shown (8697) when `animGroupId` resolves — requires `window.SMTextAnimator` present, `state.tool==='select'`, at least one selected path, AND `SMTA.groupIdForItem` agreeing across EVERY selected path (8690-8692) — covers vector text of any glyph count OR an already-split raster character group (the comment at 8679-8689 records this was fixed from an earlier version that only ever fired for an exact single-Path pick, 'effectively never in practice', mirroring `textPropsRoot`'s own whole-group contract); its click wires to `SMTextAnimator.openPanel(state.activeLayerIdx,animGroupId)` (8699-8701). Ownership boundary, stated explicitly in this function's own lead-in (8663-8673): it does NOT own `#p-textanim-sec`'s own overall show/hide — that belongs to text-animator-panel.js's `render()`, which runs LATER in the SAME `updateUI` panel-refresh chain (from `updatePropsContext`'s own call ordering), using its own layer/stored-frame detection; this function only ever touches its own two CHILD rows, so the order between the two functions cannot stomp either one's decision.",
+    "(f) The gradient button is a pure relay, confirmed by direct read of `initFillGradientButton` (8938-8957): its click handler never reads or writes any `data.fillGradient`/gradient-state field — on click it only shows the disabled-toast if `cb.disabled` (8945-8949), else reveals `#p-fill-gradient-editor`, flips `cb.checked`, and dispatches a real bubbling `change` `Event` on the SAME `#p-grad-on` checkbox gradient-bridge.js owns (8952-8953) so that file's own `change` listener performs the actual apply/remove — 'one implementation, no second path to keep in sync' (comment 8935-8937) — then calls `syncFillGradientButton()` to refresh this button's own look. `syncFillGradientButton` (8960-8972) contract: INPUTS read = `cb.checked`, `cb.disabled` (both off the same `#p-grad-on`); OUTPUTS written = `btn`'s `'on'` class (`=checked`), `'off'` class (`=disabled`), `#p-fill-gradient-editor`'s `display` (`'block'` iff `!disabled&&checked`, else `'none'`), and `btn.title` — one of three hard-coded FRENCH strings (8969-8971) chosen by disabled/checked state, NOT routed through `SM.t` (i18n gap, every other user-facing string in this scope uses `SM.t`). Two gradient-bridge.js callers of `syncFillGradientButton`, both cited by line and both guarded `if (window.syncFillGradientButton)`: line 73 (inside `renderGradientPanel`'s no-target early-return branch, AFTER resetting `cb.checked=false;cb.disabled=true`) and line 86 (the normal branch, AFTER computing `grad=target.data.fillGradient` and setting `cb.checked=!!grad`) — in both cases gradient-bridge.js's own renderer runs FIRST and this button only resyncs after, confirming it never originates a gradient-state change of its own.",
+    "(g) `initCycleAndPropagate`'s (8975-8995) two buttons and the `window.SM` methods they call: `#btn-cycle` click (8977-8992) checks the precondition `selBounds()` (timeline.js:231, C19a) BEFORE prompting (2026-07-25 UX-audit comment, 8978-8984, explains the OLD order silently discarded a click with nothing selected, or made the user type a count first and only THEN learn they needed a selection) — if falsy, `showToast(SM.t('toastSelectFrameRangeFirst'))` and return (8985-8988); else a native `prompt('Repeter la plage selectionnee combien de fois ?','2')` (8989, hard-coded French, not via `SM.t`), bail on cancel (`n===null`, 8990), else `window.SM.repeatSelection(n)` (8991) — the `window.SM={` object literal opened at timeline.js:349 (itself an uncensused gap, see `reconciliation`), whose `repeatSelection:function(times){...}` method body lives at timeline.js:2253 (C19f, merged). `#btn-propagate-color` click (8993-8994) unconditionally calls `window.SM.propagateColorAllFrames()`, method body timeline.js:2324 (also C19f). Both `window.SM={...}`-block entries are cited by name/line only per the issue's own instruction, bodies not reproduced here. `#btn-propagate-color` itself has NO markup anywhere in the codebase — see `reconciliation`'s index.html entry.",
+    "(h) Complete external function-call inventory from this span (owning module/census cited by name only, bodies not reproduced): browser built-ins (`document.getElementById`/`querySelector`/`querySelectorAll`/`addEventListener`/`classList`/`createElement`/`Event`/`prompt`/`console.warn`/`Array.prototype.find`). `state.tool`/`state.activeLayerIdx`/`selectedPaths` (module/global state, this file's own, not re-owned here). `SMTextAnimator.groupIdForItem` (text-animator.js:86, exported 428) and `.openPanel` (text-animator.js:275, exported 430). `splitTextIntoCharacters` (timeline.js:8591, C19z, not yet merged). `SMVectorText.vectorTextGroupMembers` (vector-text-bridge.js:350), `.buildVectorTextGroup` (208), `.addGoogleFont` (425). `pushUndo` (tweens.js:4741). `saveActiveLayerFrame` (app.js:4634, C21o). `updateUI` (timeline.js:2727, C19h). `SMEngineBridge.renderNow` (engine-bridge.js, guarded, cited by name only). `showToast` (timeline.js:7447, C19w). `SM.t` (i18n.js, `window.SM.t=t` at 4239). `Point` (Paper.js, vendored). `selBounds` (timeline.js:231, C19a). `window.SM.repeatSelection`/`.propagateColorAllFrames` (timeline.js:2253/2324, C19f). No other external function is called anywhere in lines 8663-8996 — confirmed by reading every statement in the span directly (reproduced verbatim in each packet's own `behavior` field below).",
+    "(i) Complete caller inventory (each derived by `git grep -rn -P '(^|[^a-zA-Z_.])<symbol>\\(' src/js`, recursive over src/js incl. labs/ and adapters/, filtered to exclude comment-only mentions): `updateTextActionsPanel` — ONE caller beyond its own declaration (8674): `updateUI` (timeline.js:2757, unguarded, same file, C19h). `textPropsRoot` — TWO internal callers beyond its own declaration (8714): `updateTextPropsPanel` (8735) and `applyTextPropsEdit` (8781), both this same scope, no cross-file caller found. `updateTextPropsPanel` — ONE caller beyond its own declaration (8732): `updateUI` (timeline.js:2757, same call chain as `updateTextActionsPanel`). `applyTextPropsEdit` — FIVE callers beyond its own declaration (8780), ALL inside this scope's own wiring IIFE (8850, 8854, 8859, 8866, 8908) — no cross-file caller found. `initFillGradientButton` — ONE caller beyond its own declaration (8938): its own `DOMContentLoaded`-or-immediate self-registration (8973-8974) — no cross-file caller. `syncFillGradientButton` — THREE callers beyond its own declaration (8960): two self-recursive within this scope (8954, 8956) plus TWO cross-file callers, gradient-bridge.js:73 and gradient-bridge.js:86 (both guarded `if(window.syncFillGradientButton)`) — confirming this is the ONLY one of this scope's seven symbols with an external caller. `initCycleAndPropagate` — ONE caller beyond its own declaration (8975): its own self-registration (8996) — no cross-file caller. `confirmAddGoogleFont` (local to the wiring IIFE) — ONE caller beyond its own declaration (8883): its own IIFE's `#tp-font-add-confirm` click and `#tp-font-add-input` Enter-key handlers (8916, 8919) — not reachable from outside the IIFE at all (not a `function` statement hoisted to file scope; declared inside the IIFE's own closure). None of these seven symbols is ever called from `getEffectiveStrokes`/`getEffectiveStrokesRendered` (app.js) or `buildSceneJson`/`scenePayload` (engine-bridge.js) — confirmed by a separate whole-src grep of all seven names restricted to engine-bridge.js/export.js/rive-export.js (zero hits) and by the caller list above (every cross-file caller found — gradient-bridge.js twice — sits inside a panel-refresh function, not a render/export pass): panel/UI only, matching the issue's own expectation."
+  ],
+  "areas": [
+    {
+      "area": "text-actions-panel",
+      "packets": [
+        {
+          "id": "C19aa.text-actions-panel",
+          "files": [
+            "src/js/timeline.js:8663-8713"
+          ],
+          "coverage_ranges": [
+            [
+              8663,
+              8713
+            ]
+          ],
+          "classification": {
+            "code": 20,
+            "comment": 31,
+            "whitespace": 0
+          },
+          "symbols": [
+            "updateTextActionsPanel",
+            "splitTextIntoCharacters",
+            "SMTextAnimator",
+            "groupIdForItem",
+            "openPanel"
+          ],
+          "signature": "function updateTextActionsPanel()",
+          "responsibility": "11-line lead-in (8663-8673): toggles the two rows this function owns inside the SHARED `#p-textanim-sec` (merged 2026-08-31); does NOT own the section's own overall display (text-animator-panel.js's `render()` does, running later in the same update chain). `updateTextActionsPanel()` (8674-8704): decides `#text-split-row` visibility from a whole-not-yet-split-raster-text single selection, and `#btn-text-animate` visibility from a whole-group-agreement check on vector text or an already-split raster character group (feedback #87 multi-glyph fix, documented 8679-8689), wiring each row's own click handler.",
+          "callers": [
+            "`updateTextActionsPanel` — ONE caller beyond its own declaration (8674): `updateUI` (timeline.js:2757, C19h, merged, unguarded)."
+          ],
+          "behavior": [
+            "Lines 8663-8673 (comment, 11 lines): lead-in — two owned rows inside the shared `#p-textanim-sec`; section's own display owned by text-animator-panel.js's `render()`, which runs later in the same chain from `updatePropsContext`; order between the two functions cannot stomp either decision.",
+            "Line 8674 (code): `function updateTextActionsPanel(){`.",
+            "Lines 8675-8676 (code): `#text-split-row` DOM-existence guard.",
+            "Line 8677 (code): `p=(state.tool==='select'&&selectedPaths.length===1)?selectedPaths[0]:null;`.",
+            "Line 8678 (code): `isWholeText=!!(p&&p.data&&p.data.isText&&!p.data.isTextChar&&!p.data.isVectorText);` — a whole, not-yet-split RASTER text block.",
+            "Lines 8679-8689 (comment, 11 lines, feedback #87): multi-glyph selection fix — a plain click on vector text/an already-split raster block selects EVERY glyph sharing its groupId, so the old exact-single-Path check for the animate button almost never fired; mirrors `textPropsRoot`'s own whole-selection-matches-one-group contract.",
+            "Line 8690 (code): `SMTA=window.SMTextAnimator;`.",
+            "Line 8691 (code): `animGroupId=(SMTA&&state.tool==='select'&&selectedPaths.length)?SMTA.groupIdForItem(selectedPaths[0]):null;`.",
+            "Line 8692 (code): `if(animGroupId&&!selectedPaths.every(sp=>SMTA.groupIdForItem(sp)===animGroupId))animGroupId=null;` — every selected path must agree.",
+            "Line 8693 (code): `splitRow.style.display=isWholeText?'':'none';`.",
+            "Line 8694 (code): `if(isWholeText)` wires `#btn-text-split-chars`.onclick to `splitTextIntoCharacters(p)` (C19z).",
+            "Lines 8695-8703 (code, 9 lines): `#btn-text-animate` display from `animGroupId`; if present, wires `.onclick` to `SMTextAnimator.openPanel(state.activeLayerIdx,animGroupId)`.",
+            "Line 8704 (code): `}` closing brace of `updateTextActionsPanel`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "text-props-root-and-panel",
+      "packets": [
+        {
+          "id": "C19aa.text-props-root-and-panel",
+          "files": [
+            "src/js/timeline.js:8714-8779"
+          ],
+          "coverage_ranges": [
+            [
+              8714,
+              8779
+            ]
+          ],
+          "classification": {
+            "code": 40,
+            "comment": 26,
+            "whitespace": 0
+          },
+          "symbols": [
+            "textPropsRoot",
+            "updateTextPropsPanel",
+            "SMVectorText",
+            "vectorTextGroupMembers"
+          ],
+          "signature": "function textPropsRoot(); function updateTextPropsPanel()",
+          "responsibility": "9-line lead-in (8705-8713, dated 2026-08-16): live, persistent Typography panel, VECTOR text roots only (raster text deliberately excluded — no per-character glyph outlines, no letter/word-spacing equivalent in the Canvas2D fillText path; keeps the existing double-click popover instead). `textPropsRoot()` (8714-8731): resolves the current selection to its single `isTextRoot` member, requiring the selection to be EXACTLY the whole combine-group, else null — full decision table in `boundaries`(a). `updateTextPropsPanel()` (8732-8771): show/hide `#text-props-sec` from `textPropsRoot()`, then mirrors every `d.*` field into its `#tp-*` counterpart with a focus guard — full field map in `boundaries`(b).",
+          "callers": [
+            "`textPropsRoot` — TWO internal callers beyond its own declaration (8714): `updateTextPropsPanel` (8735) and `applyTextPropsEdit` (8781, next packet) — no cross-file caller found.",
+            "`updateTextPropsPanel` — ONE caller beyond its own declaration (8732): `updateUI` (timeline.js:2757, C19h, merged, unguarded, same statement chain as `updateTextActionsPanel`)."
+          ],
+          "behavior": [
+            "Lines 8705-8713 (comment, 9 lines): lead-in — live persistent alternative to the popover, VECTOR TEXT ROOTS ONLY; raster text excluded (no glyph outlines, no Canvas2D letter/word-spacing equivalent); raster keeps its existing popover unchanged.",
+            "Line 8714 (code): `function textPropsRoot(){`.",
+            "Line 8715 (code): early return null if `state.tool!=='select'||!selectedPaths.length`.",
+            "Line 8716 (code): `first=selectedPaths[0];`.",
+            "Line 8717 (code): early return null if `!first||!first.data||!first.data.isVectorText||!first.data.groupId||!window.SMVectorText`.",
+            "Lines 8718-8725 (comment, 8 lines): a plain click selects every glyph sharing groupId, not just the root; resolve to the root only when the CURRENT selection is exactly the whole group; a partial pick has no coherent value set to show/edit.",
+            "Line 8726 (code): `members=window.SMVectorText.vectorTextGroupMembers(first);`.",
+            "Line 8727 (code): `root=members.filter(p=>p.data&&p.data.isTextRoot)[0];`.",
+            "Line 8728 (code): early return null if `!root||selectedPaths.length!==members.length`.",
+            "Line 8729 (code): `allMatch=selectedPaths.every(p=>p.data&&p.data.groupId===first.data.groupId);`.",
+            "Line 8730 (code): `return allMatch?root:null;`.",
+            "Line 8731 (code): `}` closing brace of `textPropsRoot`.",
+            "Line 8732 (code): `function updateTextPropsPanel(){`.",
+            "Lines 8733-8734 (code): `#text-props-sec` DOM-existence guard.",
+            "Line 8735 (code): `root=textPropsRoot();`.",
+            "Line 8736 (code): `sec.style.display=root?'':'none';`.",
+            "Line 8737 (code): early return if `!root`.",
+            "Line 8738 (code): `d=root.data;`.",
+            "Lines 8739-8743 (comment, 5 lines): skip re-populating a focused field — this same edit's own rebuild (`updateUI`, from `applyTextPropsEdit`'s `.then`) must not yank the cursor or overwrite a mid-drag value.",
+            "Lines 8744-8745 (code): `#tp-content`, focus-guarded, from `d.text||''`.",
+            "Lines 8746-8750 (comment, 5 lines, feedback #86): `#tp-font` was never synced from `d.vectorFont` at all before this fix; strip the `-Regular`/`-Bold` suffix `buildVectorTextGroup`'s own `resolvedFontKey` stores, since `<option>` values are bare family names.",
+            "Lines 8751-8752 (code): `#tp-font`, focus-guarded, from `(d.vectorFont||'Roboto-Regular').replace(/-(Bold|Regular)$/,'')`.",
+            "Lines 8753-8756 (code, 4 lines): `#tp-size` from `d.size||48`; `#tp-color` from `d.color||'#000000'`, both focus-guarded.",
+            "Line 8757 (code): `.tp-align-btn` `'ac'` toggle where `dataset.val===(d.align||'left')`.",
+            "Line 8758 (code): `.tp-style-btn` `'ac'` toggle from `d[b.dataset.flag]`.",
+            "Line 8759 (code): `.tp-case-btn` `'ac'` toggle where `dataset.val===(d.textCase||'none')`.",
+            "Lines 8760-8765 (code, 6 lines): `#tp-letter-spacing`/`#tp-line-height`/`#tp-word-spacing`, focus-guarded, from `d.letterSpacing||0`/`d.lineHeightMult||1.25`/`d.wordSpacing||0`.",
+            "Line 8766 (code): `isFixed=!!d.fixedWidth;`.",
+            "Line 8767 (code): `.tp-width-btn` `'ac'` toggle where `(dataset.val==='fixed')===isFixed`.",
+            "Lines 8768-8770 (code, 3 lines): `#tp-fixed-width` display from `isFixed`; value, focus-guarded, from `d.fixedWidth||300`.",
+            "Line 8771 (code): `}` closing brace of `updateTextPropsPanel`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "apply-text-props-edit",
+      "packets": [
+        {
+          "id": "C19aa.apply-text-props-edit",
+          "files": [
+            "src/js/timeline.js:8780-8839"
+          ],
+          "coverage_ranges": [
+            [
+              8780,
+              8839
+            ]
+          ],
+          "classification": {
+            "code": 41,
+            "comment": 19,
+            "whitespace": 0
+          },
+          "symbols": [
+            "applyTextPropsEdit",
+            "textPropsRoot",
+            "SMVectorText",
+            "buildVectorTextGroup",
+            "pushUndo",
+            "saveActiveLayerFrame",
+            "updateUI",
+            "SMEngineBridge",
+            "showToast",
+            "SM"
+          ],
+          "signature": "function applyTextPropsEdit()",
+          "responsibility": "8-line lead-in (8772-8779): commits every field by rebuilding the vector glyph group, the same remove-then-rebuild `closeInPlaceTextEditor`/`commitVectorText` already do, one `pushUndo` per call, always bound to 'change'/'click'/'blur' (never 'input') so a scrub-drag or keystroke run commits once at gesture end. `applyTextPropsEdit()` (8780-8839): reads every `#tp-*` field, builds `opts`, resolves the re-anchor point (feedback #37 fix), then removes and rebuilds the whole glyph group — full rebuild-sequence and twin-comparison in `boundaries`(c).",
+          "callers": [
+            "`applyTextPropsEdit` — FIVE callers beyond its own declaration (8780), ALL inside the next packet's own wiring IIFE (8850, 8854, 8859, 8866, 8908) — no cross-file caller found."
+          ],
+          "behavior": [
+            "Lines 8772-8779 (comment, 8 lines): lead-in — commits by rebuilding, same remove-then-rebuild `commitVectorText`/`closeInPlaceTextEditor` use; one `pushUndo` per call; bound to change/click/blur, never input, so a drag/keystroke run commits once at gesture end (analogous fix already applied once this session to the easing-curve drag).",
+            "Line 8780 (code): `function applyTextPropsEdit(){`.",
+            "Lines 8781-8782 (code): `root=textPropsRoot();` bail if `!root||!window.SMVectorText`.",
+            "Line 8783 (code): `d=root.data;`.",
+            "Line 8784 (code): `text=document.getElementById('tp-content').value;`.",
+            "Line 8785 (code): bail (return, no write) if `!text.trim()` — same empty-block guard `commitText` uses (timeline.js:8503, C19z).",
+            "Lines 8786-8788 (comment, 3 lines): `#tp-font` bare family name; `buildVectorTextGroup` itself strips any `-Bold`/`-Regular` suffix before resolving against `opts.bold`.",
+            "Line 8789 (code): `fontKey=document.getElementById('tp-font').value||d.vectorFont||'Roboto';`.",
+            "Line 8790 (code): `size=parseInt(document.getElementById('tp-size').value,10)||d.size||48;`.",
+            "Line 8791 (code): `color=document.getElementById('tp-color').value||d.color;`.",
+            "Lines 8792-8793 (code): `alignBtn=document.querySelector('.tp-align-btn.ac'); align=alignBtn?alignBtn.dataset.val:(d.align||'left');`.",
+            "Lines 8794-8803 (code, 10 lines): `opts={bold,italic,underline,strike}` from the four `.tp-style-btn[data-flag=...].ac` checks, `letterSpacing`/`lineHeightMult`/`wordSpacing` via `parseFloat` with defaults, `textCase` from `.tp-case-btn.ac` or `'none'`.",
+            "Lines 8804-8805 (code, 2 lines): `widthBtn=document.querySelector('.tp-width-btn.ac'); fixedWidthWorld=(widthBtn&&widthBtn.dataset.val==='fixed')?(parseFloat(#tp-fixed-width.value)||300):null;`.",
+            "Line 8806 (code): `layer=root.parent;`.",
+            "Lines 8807-8816 (comment, 10 lines, feedback #37): re-anchor at `d.anchorTopLeft` (stamped by `buildVectorTextGroup`) rather than the group's own ink-bounds top — the two are NOT the same point (baselineY is a nominal-ascent approximation), so re-deriving from ink bounds fed a drifted reference back into itself and visibly sank the text on every edit; ink-bounds derivation kept only as a fallback for pre-existing blocks saved before this field existed.",
+            "Lines 8817-8822 (code, 6 lines): `topLeft` — `new Point(d.anchorTopLeft.x,d.anchorTopLeft.y)` if present, else derived from the group's own united ink bounds via `vectorTextGroupMembers(root).reduce(unite)`.",
+            "Line 8823 (code): `pushUndo();`.",
+            "Line 8824 (code): `vectorTextGroupMembers(root).forEach(p=>p.remove());` — removes every current group member.",
+            "Lines 8825-8838 (code, 14 lines): `buildVectorTextGroup(text,fontKey,size,color,align,fixedWidthWorld,topLeft,layer,opts).then(res=>{ if(res.paths.length) selectedPaths=res.paths.slice(); saveActiveLayerFrame(); updateUI(); if(SMEngineBridge) renderNow(); }).catch(e=>{ console.warn(...); showToast(SM.t('toastTextEditRebuildFailed')); });` — success re-points `selectedPaths` at every fresh glyph so `textPropsRoot`'s whole-group contract still holds when `updateUI` re-renders this same panel; failure only warns+toasts (the old glyphs are already gone, nothing left to restore).",
+            "Line 8839 (code): `}` closing brace of `applyTextPropsEdit`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "typography-panel-wiring-iife",
+      "packets": [
+        {
+          "id": "C19aa.typography-panel-wiring-iife",
+          "files": [
+            "src/js/timeline.js:8840-8923"
+          ],
+          "coverage_ranges": [
+            [
+              8840,
+              8923
+            ]
+          ],
+          "classification": {
+            "code": 72,
+            "comment": 12,
+            "whitespace": 0
+          },
+          "symbols": [
+            "applyTextPropsEdit",
+            "confirmAddGoogleFont",
+            "SMVectorText",
+            "addGoogleFont",
+            "SM",
+            "showToast"
+          ],
+          "signature": "(function(){ ... })()",
+          "responsibility": "Anonymous IIFE (8840-8923), no lead-in comment of its own (the feature-level lead-in is the previous packet's 8705-8713): wires every static `#tp-*` field/button to `applyTextPropsEdit`, plus a self-contained Google-Fonts add sub-flow (`confirmAddGoogleFont`, local to this closure) — full listener inventory and Google-Fonts flow in `boundaries`(d).",
+          "callers": [
+            "Self-invoking; no external caller. Guards itself with `if(!contentEl)return;` (8842) — 'this file is also loaded in contexts without the full panel markup' — so a load without the Typography DOM simply no-ops the whole IIFE.",
+            "`confirmAddGoogleFont` (local) — ONE caller beyond its own declaration (8883): its own enclosing IIFE's `#tp-font-add-confirm` click and `#tp-font-add-input` Enter-key handlers (8916, 8919) — not reachable from outside this closure at all."
+          ],
+          "behavior": [
+            "Line 8840 (code): `(function(){`.",
+            "Lines 8841-8842 (code): `contentEl=document.getElementById('tp-content'); if(!contentEl)return;` — comment: this file also loads in contexts without the full panel markup.",
+            "Line 8843 (code): `contentEl.addEventListener('blur',applyTextPropsEdit);`.",
+            "Lines 8844-8846 (code, 3 lines): the seven `#tp-*` fields' own `change` listener, each `-> applyTextPropsEdit`.",
+            "Lines 8847-8852 (code, 6 lines): `.tp-align-btn` click — exclusive `'ac'` toggle across the group, then `applyTextPropsEdit`.",
+            "Lines 8853-8855 (code, 3 lines): `.tp-style-btn` click — own (non-exclusive) `'ac'` toggle, then `applyTextPropsEdit`.",
+            "Lines 8856-8861 (code, 6 lines): `.tp-case-btn` click — exclusive `'ac'` toggle, then `applyTextPropsEdit`.",
+            "Lines 8862-8868 (code, 7 lines): `.tp-width-btn` click — exclusive `'ac'` toggle, `#tp-fixed-width` display toggle, then `applyTextPropsEdit`.",
+            "Lines 8869-8872 (comment, 4 lines, 2026-08-28): Live Google Fonts — '+' reveals a name field instead of a modal; `addGoogleFont` (vector-text-bridge.js) is the one place that fetches/parses/registers it (desktop only for now).",
+            "Lines 8873-8876 (code, 4 lines): resolve `#tp-font-add-btn`/`#tp-font-add-row`/`#tp-font-add-input`/`#tp-font-add-confirm`.",
+            "Lines 8877-8882 (code, 6 lines): guard all four exist; `#tp-font-add-btn` click toggles the add-row's display, clearing+focusing the input on reveal.",
+            "Line 8883 (code): `function confirmAddGoogleFont(){`.",
+            "Lines 8884-8885 (code, 2 lines): `family=fontAddInput.value.trim();` bail if empty or no `SMVectorText`.",
+            "Line 8886 (code): disable confirm-button+input.",
+            "Line 8887 (code): guarded `window.showToast` — `toastGoogleFontFetching`, family-interpolated, 'info'.",
+            "Line 8888 (code): `SMVectorText.addGoogleFont(family).then(...)`.",
+            "Lines 8889-8891 (code, 3 lines): on success — re-enable controls, hide add-row, resolve `#tp-font`.",
+            "Lines 8892-8899 (comment, 8 lines): option value is the bare `'Google:<family>'` base (no suffix) — same convention every built-in `<option>` uses; `applyTextPropsEdit` reads this straight into `buildVectorTextGroup`, which strips/reattaches the suffix itself from the Bold toggle; using the already-suffixed key `addGoogleFont` resolved to would mismatch and silently 404 on the next rebuild.",
+            "Lines 8900-8907 (code, 8 lines): build `value='Google:'+family`; append a new `<option>` only if not already present; set `#tp-font`.value to it.",
+            "Line 8908 (code): `applyTextPropsEdit();` — commits immediately.",
+            "Line 8909 (code): guarded `window.showToast` — `toastGoogleFontAdded`, success.",
+            "Lines 8910-8913 (code, 4 lines): `.catch` — re-enable controls, `console.warn`, guarded `window.showToast` — `toastGoogleFontFailed`, error.",
+            "Line 8914 (code): `});` closes the `.then/.catch` chain.",
+            "Line 8915 (code): `}` closing brace of `confirmAddGoogleFont`.",
+            "Line 8916 (code): `fontAddConfirm.addEventListener('click',confirmAddGoogleFont);`.",
+            "Lines 8917-8921 (code, 5 lines): `fontAddInput` `keydown` — always `stopPropagation()`; `Enter`->preventDefault+`confirmAddGoogleFont`; `Escape`->preventDefault+hide the add-row.",
+            "Line 8922 (code): `}` closes the four-controls-exist guard.",
+            "Line 8923 (code): `})();` closing the IIFE."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "fill-gradient-button-cycle-propagate",
+      "packets": [
+        {
+          "id": "C19aa.fill-gradient-button-cycle-propagate",
+          "files": [
+            "src/js/timeline.js:8924-8996"
+          ],
+          "coverage_ranges": [
+            [
+              8924,
+              8996
+            ]
+          ],
+          "classification": {
+            "code": 48,
+            "comment": 25,
+            "whitespace": 0
+          },
+          "symbols": [
+            "initFillGradientButton",
+            "syncFillGradientButton",
+            "initCycleAndPropagate",
+            "selBounds",
+            "showToast",
+            "SM",
+            "repeatSelection",
+            "propagateColorAllFrames"
+          ],
+          "signature": "function initFillGradientButton(); function syncFillGradientButton(); function initCycleAndPropagate()",
+          "responsibility": "4-line effects-stack relocation note (8924-8927) plus a 10-line gradient-toggle lead-in (8928-8937, 2026-07-25) explaining the button drives the SAME `#p-grad-on` checkbox by dispatching a real `change` (one implementation, CLAUDE.md §3). `initFillGradientButton()` (8938-8957) and `syncFillGradientButton()` (8960-8972): a pure relay/reflector pair for the gradient checkbox — full contract in `boundaries`(f). `initCycleAndPropagate()` (8975-8995): wires `#btn-cycle`/`#btn-propagate-color` to `window.SM.repeatSelection`/`.propagateColorAllFrames` — full detail in `boundaries`(g).",
+          "callers": [
+            "`initFillGradientButton` — ONE caller beyond its own declaration (8938): its own self-registration (8973-8974) — no cross-file caller.",
+            "`syncFillGradientButton` — THREE callers beyond its own declaration (8960): self-recursive within this packet (8954, 8956) plus gradient-bridge.js:73 and gradient-bridge.js:86 (both guarded `if(window.syncFillGradientButton)`) — the only one of this scope's seven symbols with an external caller.",
+            "`initCycleAndPropagate` — ONE caller beyond its own declaration (8975): its own self-registration (8996) — no cross-file caller."
+          ],
+          "behavior": [
+            "Lines 8924-8927 (comment, 4 lines): effects-stack panel relocation note — the old `#effect-layer-sec`-specific rendering that lived here is replaced by effects-panel.js's own unified `updateEffectsPanel()` (aliased `renderEffectsSection`, effects-panel.js:871).",
+            "Lines 8928-8937 (comment, 10 lines, 2026-07-25 feedback): gradient toggle rationale — feature was fully working but only reachable via a mislabelled checkbox inside a section headed 'Effects'; this button drives that SAME checkbox via a real dispatched `change` so there is one implementation, not a second path.",
+            "Line 8938 (code): `function initFillGradientButton(){`.",
+            "Lines 8939-8942 (code, 4 lines): resolve `#p-fill-grad-btn`/`#p-grad-on`/`#p-fill-gradient-editor`; bail if button or checkbox missing.",
+            "Lines 8943-8944 (code): click listener open; `preventDefault`+`stopPropagation`.",
+            "Lines 8945-8950 (code+comment, 6 lines): if `cb.disabled` (no single shape selected), toast `toastSelectSingleShapeForGradient` and return.",
+            "Lines 8951-8954 (code, 4 lines): show the editor, flip `cb.checked`, dispatch a real bubbling `change` Event, call `syncFillGradientButton()`.",
+            "Line 8955 (code): `});` closes the click listener.",
+            "Line 8956 (code): `syncFillGradientButton();` — initial sync at wiring time.",
+            "Line 8957 (code): `}` closing brace of `initFillGradientButton`.",
+            "Lines 8958-8959 (comment, 2 lines): reflects the selection's real state, so the button reads ON when the selected shape actually carries a gradient.",
+            "Line 8960 (code): `function syncFillGradientButton(){`.",
+            "Lines 8961-8964 (code, 4 lines): resolve `#p-fill-grad-btn`/`#p-grad-on`/`#p-fill-gradient-editor`; bail if button or checkbox missing.",
+            "Lines 8965-8967 (code, 3 lines): `btn` `'on'` class from `cb.checked`, `'off'` class from `cb.disabled`; editor display from `!disabled&&checked`.",
+            "Lines 8968-8971 (code, 4 lines): `btn.title` — one of three HARD-CODED French strings by disabled/checked state, NOT via `SM.t` (i18n gap).",
+            "Line 8972 (code): `}` closing brace of `syncFillGradientButton`.",
+            "Lines 8973-8974 (code, 2 lines): `DOMContentLoaded`-or-immediate self-registration of `initFillGradientButton`.",
+            "Line 8975 (code): `function initCycleAndPropagate(){`.",
+            "Lines 8976-8992 (code+comment, 17 lines): `#btn-cycle` click — a 6-line 2026-07-25 UX-audit comment (precondition moved before the prompt), `selBounds()` check -> toast `toastSelectFrameRangeFirst`+return if falsy, else native `prompt(...)`, bail on cancel, else `window.SM.repeatSelection(n)`.",
+            "Lines 8993-8994 (code, 2 lines): `#btn-propagate-color` click -> `window.SM.propagateColorAllFrames()` unconditionally (guarded only on the button existing).",
+            "Line 8995 (code): `}` closing brace of `initCycleAndPropagate`.",
+            "Line 8996 (code): `DOMContentLoaded`-or-immediate self-registration of `initCycleAndPropagate`."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "`saveActiveLayerFrame()` is called exactly once in this scope's own body, inside `applyTextPropsEdit`'s success callback (8833) — the ONLY document-mutating write path in this whole scope (a full remove-then-rebuild of the vector glyph group). No other function in this scope calls `saveActiveLayerFrame`/`saveAllLayerFrames` — `updateTextActionsPanel`/`textPropsRoot`/`updateTextPropsPanel` are read-only panel renderers, and `initFillGradientButton`/`syncFillGradientButton`/`initCycleAndPropagate` mutate DOM/dispatch events or call OTHER modules' own save paths (gradient-bridge.js's `change` handler; `window.SM.repeatSelection`/`propagateColorAllFrames`, C19f) rather than saving directly."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No function in this scope calls `loadFrame`/`importJSON` directly. `updateUI`/`updatePropsContext` (the caller chain reaching `updateTextActionsPanel`/`updateTextPropsPanel`) are themselves reload/refresh adapters (C19h/C19j, out of scope) triggered after a frame change elsewhere, not by anything in this scope."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Exactly ONE `pushUndo()` call in this scope's own body (a thin wrapper over `pushUndoLayers`, tweens.js:4741): `applyTextPropsEdit` (8823), immediately before removing the group's current members and rebuilding. Every other write in this scope (DOM class toggles, checkbox flips, `window.SM.repeatSelection`/`propagateColorAllFrames` calls) either mutates only presentation state or delegates undo responsibility to the callee it invokes (`window.SM.repeatSelection`/`.propagateColorAllFrames`, C19f, out of scope, whose own bodies were not read as part of this census beyond citing their line numbers)."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "Reads `state.tool`/`selectedPaths` extensively (`textPropsRoot`, `updateTextActionsPanel`) but never reads or writes `_layerSel`/`_layerSelAnchor` (C19q's own module-scope multi-layer selection state) — this scope operates entirely off the Select tool's own `selectedPaths` array. `applyTextPropsEdit` WRITES `selectedPaths` once, on rebuild success (8832), re-pointing it at every freshly built glyph so `textPropsRoot`'s own whole-group contract still holds when the very same edit's `updateUI()` call re-renders this panel."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "None of this scope's seven functions branches on `state.appMode`; all seven are called identically regardless of mode via the shared `updateUI`/panel-refresh chain (C19h/C19j, out of scope) or DOM event listeners. `state.currentFrame`/`state.activeLayerIdx` are read but never cached across a frame boundary — `state.activeLayerIdx` is read once, passed straight to `SMTextAnimator.openPanel` (8700)."
+    },
+    {
+      "consumer": "export",
+      "disposition": "None of this scope's seven declared functions are called from `export.js`, `rive-export.js`, or `engine-bridge.js`'s `buildSceneJson`/`scenePayload` at the frozen SHA (confirmed: zero matches for any of the seven symbol names in all three files) — every function here is editor-UI-only, reached from user pointer/keyboard gestures on the Typography/text-actions/gradient/cycle panels or from `updateUI`'s own panel-refresh chain, never from a render/export pass."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "`window.SMEngineBridge.renderNow()` is called exactly once in this scope's own body: inside `applyTextPropsEdit`'s success callback (8834, guarded on `window.SMEngineBridge`), forcing an immediate repaint after a successful glyph-group rebuild. This is the scope's ONLY native/bridge call — no Tauri-specific API, no `window.__TAURI__` reference, no other bridge module is touched anywhere in 8663-8996."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-text-props-root-partial-pick-returns-null",
+      "proposed": "Build a vector-text group of 3 glyph Paths sharing `groupId='g1'`, one flagged `isTextRoot`; select only 2 of the 3 (a partial pick); call `textPropsRoot()`; expect `null` (the `selectedPaths.length!==members.length` guard at 8728) and `updateTextPropsPanel()` to hide `#text-props-sec`. Then select all 3; expect the `isTextRoot` Path returned — verifies the full decision table in `boundaries`(a) — not run."
+    },
+    {
+      "id": "fx-text-props-panel-mirrors-every-field-both-directions",
+      "proposed": "Construct a vector-text root `d={text:'Hi',vectorFont:'Roboto-Bold',size:60,color:'#ff0000',align:'center',bold:true,letterSpacing:2,lineHeightMult:1.5,wordSpacing:1,textCase:'upper',fixedWidth:400}`, select its whole group, call `updateTextPropsPanel()`; expect every `#tp-*` field/button-class cited in `boundaries`(b) to read back the exact source value (`#tp-font` stripped to `'Roboto'`, `.tp-style-btn[data-flag=bold].ac` present, `#tp-fixed-width` visible at 400). Then edit `#tp-size` to 80 via a real `change` event; expect `applyTextPropsEdit` to call `pushUndo` once, rebuild via `buildVectorTextGroup` with `size===80` and every OTHER field unchanged from the panel's current state — not run."
+    },
+    {
+      "id": "fx-apply-text-props-edit-empty-guard-and-anchor-fix",
+      "proposed": "Select a vector-text root with `d.anchorTopLeft={x:100,y:200}`; clear `#tp-content` to whitespace-only and dispatch `blur`; expect NO `pushUndo`/rebuild (the 8785 empty guard) and the root's existing glyphs untouched. Then set `#tp-content` to a non-empty value and blur; expect `buildVectorTextGroup`'s own `topLeftWorld` argument to equal `new Point(100,200)` EXACTLY (not re-derived from the new content's own ink bounds) — verifies the feedback #37 anti-drift fix at 8817-8822 — not run."
+    },
+    {
+      "id": "fx-apply-text-props-edit-vs-close-in-place-anchor-divergence",
+      "proposed": "Same root as above (`d.anchorTopLeft` set); trigger a content-only edit via `closeInPlaceTextEditor` (C19y) instead of the Typography panel; expect its own `topLeft` to be derived from CURRENT ink bounds (8274-8275, no `anchorTopLeft` check) — i.e. potentially DIFFERENT from `d.anchorTopLeft` if the ink bounds have drifted from a prior edit — confirming the asymmetry recorded in `boundaries`(c) is real and not just a reading error. Not run; flagged in `future_proposals` pending this fixture's actual execution."
+    },
+    {
+      "id": "fx-google-font-add-round-trip",
+      "proposed": "Click `#tp-font-add-btn`; expect the add-row to show and the input to be focused/cleared. Type 'Poppins', click `#tp-font-add-confirm`; expect the confirm button+input disabled during the call, `SMVectorText.addGoogleFont('Poppins')` invoked once, and on resolve: the row hidden, a NEW `<option value=\"Google:Poppins\">` appended to `#tp-font` (not duplicated on a second add of the same family), `#tp-font`.value set to it, `applyTextPropsEdit()` invoked once more, and the success toast fired — verifies 8883-8915 — not run."
+    },
+    {
+      "id": "fx-gradient-button-relay-never-touches-gradient-state",
+      "proposed": "Spy on `target.data.fillGradient` (read/write) and on the `#p-grad-on` checkbox's own dispatched `change` event; select a single shape, click `#p-fill-grad-btn`; expect ZERO direct reads/writes of `fillGradient` from `initFillGradientButton`'s own handler, exactly ONE dispatched `change` event on `#p-grad-on`, and `syncFillGradientButton` called once AFTER that dispatch resolves — verifies the pure-relay claim in `boundaries`(f) — not run."
+    },
+    {
+      "id": "fx-cycle-button-precondition-before-prompt",
+      "proposed": "With no frame range selected (`selBounds()` returns falsy), click `#btn-cycle`; expect the toast `toastSelectFrameRangeFirst` and NO native `prompt()` call at all (the 2026-07-25 fix moved the check before the prompt, 8978-8988) — then select a frame range and click again; expect `prompt()` invoked, and cancelling it (return null) to result in NO call to `window.SM.repeatSelection` — verifies 8977-8992 — not run."
+    },
+    {
+      "id": "fx-propagate-color-button-orphaned-markup",
+      "proposed": "Confirm `document.getElementById('btn-propagate-color')` returns `null` against the shipped `src/index.html` DOM (no fixture needed to prove the ABSENCE — a direct grep of the whole repository already found zero markup hits, recorded in `boundaries`(g)/`reconciliation`); this fixture would only be meaningful if/when markup is added, to confirm the click handler at 8994 then correctly reaches `window.SM.propagateColorAllFrames()` — not run, and not currently exercisable."
+    }
+  ],
+  "future_proposals": [
+    "`closeInPlaceTextEditor` (C19y, timeline.js:8254-8288, not yet merged) does NOT carry the feedback #37 anti-drift anchor fix `applyTextPropsEdit` has (`d.anchorTopLeft`, 8817-8822) — it ALWAYS re-derives `topLeft` from the group's own current ink bounds (8274-8275). Per the same reasoning `applyTextPropsEdit`'s own comment records (8807-8816: ink bounds and the nominal-ascent anchor formula are NOT the same point, so re-deriving on every edit visibly sank the text), a content-only edit made via the in-place/popover path could still exhibit the SAME sinking behavior the panel edit was fixed for. Flagged for the eventual runtime-behavior review as a possible missing-fix-propagation source; not exercised or confirmed as a live defect by this census (no execution performed, and C19y's own artifact does not yet exist to cross-check against).",
+    "`#btn-propagate-color` (timeline.js:8993-8994) has NO corresponding markup anywhere in `src/index.html` or elsewhere in the repository (confirmed by a whole-repository grep returning only the `getElementById` call site itself) — the `if(prop)` guard means this handler NEVER WIRES in the current shipped UI; `window.SM.propagateColorAllFrames()` (C19f) is therefore unreachable from any button today, though it may still be reachable from elsewhere (not investigated — out of this scope's own symbol set). Noted for awareness, not fixed (read-only census); worth a follow-up check on whether the button was removed from markup after a redesign or was never added.",
+    "The `window.SM={` object-literal OPENING line (timeline.js:349) is not claimed by any existing C19a-C19w census sibling present at authoring time (confirmed by scanning every sibling's own `assigned_ranges`) — a pre-existing gap in the P03 census run, unrelated to this scope's own five packets but discovered while tracing `window.SM.repeatSelection`/`.propagateColorAllFrames` back to their enclosing object literal. Flagged for whichever future leaf's proposed range is expected to cover line 349 (likely an early C19 slice given the object literal's own position relative to C19a's 1-39/193-348/350-458 ranges) to confirm it is picked up rather than permanently skipped.",
+    "The hard-coded French `btn.title` strings in `syncFillGradientButton` (8969-8971) are NOT routed through `SM.t`, unlike every other user-facing string in this scope (`SM.t('toastSelectSingleShapeForGradient')`, `SM.t('toastSelectFrameRangeFirst')`, the six Google-Fonts toast keys) — an i18n gap noted in the artifact contract's own instruction (g), not fixed here."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep -rn -P '(^|[^a-zA-Z_.])<symbol>\\('` (recursive, includes labs/ and adapters/) was run once for each of the seven function symbols this scope defines (updateTextActionsPanel, textPropsRoot, updateTextPropsPanel, applyTextPropsEdit, initFillGradientButton, syncFillGradientButton, initCycleAndPropagate) plus the local `confirmAddGoogleFont`, at the current worktree HEAD (7e341fa, identical timeline.js blob to the frozen SHA), filtering out each symbol's own comment-only mentions — results are reproduced verbatim under each packet's own `callers` field and are re-checkable with the same command.",
+    "A SEPARATE whole-src grep restricted to `engine-bridge.js`/`export.js`/`rive-export.js` for all seven symbol names returned ZERO hits, directly supporting the export/render-path `source_consumers` entries above (none of the seven is reachable from getEffectiveStrokes, buildSceneJson/scenePayload, or either export module).",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's OWN classify() algorithm against a direct `git show 59a5a38c:src/js/timeline.js` dump, run once per packet and once for the whole span — 221/113/0 over 334 lines, matching the issue's own proposed union exactly and matching the issue's own proposed per-packet table exactly for all five packets; no boundary correction was needed.",
+    "The `buildVectorTextGroup` positional-argument-order claim was cross-checked directly against its own declaration (vector-text-bridge.js:208, read verbatim via `grep -n`, not assumed) and against `closeInPlaceTextEditor`'s own call site (timeline.js:8279, C19y, read directly) — both callers agree on argument order with no discrepancy found.",
+    "The `#btn-propagate-color` orphaned-markup finding was confirmed by a whole-repository `grep -rn 'btn-propagate-color' src/` returning exactly one line (the `getElementById` call site itself, timeline.js:8993) — not merely a search restricted to `src/index.html`.",
+    "The `window.SM={` line-349 gap finding was confirmed by iterating every `C19*.json` sibling present at authoring time (C19a through C19w) and checking whether any `assigned_ranges` entry contains line 349 — zero matches.",
+    "engineering/inventory/census/*.json siblings present at authoring time sharing `source_path: src/js/timeline.js`: C19a through C19w (C19x/C19y/C19z proposed but not yet merged, cited by name/line only per the issue's own instruction, not read as JSON). This artifact's own range (8663-8996) does not overlap any of them, confirmed by the validator's own cross-sibling overlap check against every `C*.json` present in the directory at run time."
+  ],
+  "validation": {
+    "expected_assigned_lines": 334,
+    "expected_classification": {
+      "code": 221,
+      "comment": 113,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        8663,
+        8713
+      ],
+      [
+        8714,
+        8779
+      ],
+      [
+        8780,
+        8839
+      ],
+      [
+        8840,
+        8923
+      ],
+      [
+        8924,
+        8996
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by script against the frozen blob: 8663-8713=(20,31,0); 8714-8779=(40,26,0); 8780-8839=(41,19,0); 8840-8923=(72,12,0); 8924-8996=(48,25,0); sums to (221,113,0)=334 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 334 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check_c19aa.py engineering/inventory/census/C19aa-timeline-typography-panels-gradient-button.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check_c19aa.py engineering/inventory/census/C19w-timeline-duplicator-panel.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c19aa.py engineering/inventory/census/C19v-timeline-layer-reorder-symbol-tabs-side-panels.json <candidate-sha> still exits 0"
+    ]
+  }
+}
