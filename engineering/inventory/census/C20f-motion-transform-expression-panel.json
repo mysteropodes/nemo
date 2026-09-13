@@ -1,0 +1,421 @@
+{
+  "census_id": "C20f",
+  "issue": 1156,
+  "title": "Motion Transform and expression-panel adapters",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C20f census only; C02/C01/C19g/P30 and other runtime owners remain separate",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "61e3366fe4e776bb26716a4a6b4d156967265786",
+  "source_path": "src/js/motion.js",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_line_count": 13914,
+  "scope_files": [
+    "src/js/motion.js"
+  ],
+  "assigned_ranges": [
+    { "start": 8649, "end": 8654 },
+    { "start": 8655, "end": 8699 },
+    { "start": 8700, "end": 8938 },
+    { "start": 8939, "end": 8971 },
+    { "start": 8972, "end": 9331 },
+    { "start": 9332, "end": 9428 }
+  ],
+  "coverage_note": "Exactly 780 assigned lines occur once in six complete packets: 548 code, 232 full-line comments and 0 whitespace. The preceding time-link pickwhip closes at line 8648; the next Elements construct starts with comments at line 9429 and layerElements at line 9436.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/motion.js resolves to 6617bac29042c22399cac202bf054c09e4fdf30e.",
+    "current": "Allocated base 61e3366fe4e776bb26716a4a6b4d156967265786 has the identical Motion blob.",
+    "runtime": "No browser, Tauri, expression runtime, export, native, GPU or application behavior was executed.",
+    "fixtures": "Every behavioral fixture is source-derived, proposed and unrun."
+  },
+  "writer_guidance": {
+    "artifact": "Only engineering/inventory/census/C20f-motion-transform-expression-panel.json is writable for this outcome.",
+    "runtime": "Historical Motion ownership retains motion.js runtime writing; P30 retains timeline.js. C20f transfers no implementation authority.",
+    "owners": "C02 retains track, key, expression evaluator, active-target, Time Link and Motion semantics; C01 retains history; C19g retains document codecs.",
+    "reservations": "D01, T05/Pollen, C04, historical Motion and every named reservation remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C02.motion-advanced.canvas-drag-interactions",
+      "disposition": "Retains setLayerTimeLink/startTimeLinkPickwhip. Its historical raw 8569-8666 citation overlaps C20f at 8649-8666, although the complete Time Link pickwhip ends at 8648. Record this 18-line raw overlap and require successor consolidation; do not claim global C02/C20 disjointness."
+    },
+    {
+      "owner": "C02:9 historical Transform/expression gap",
+      "disposition": "The approximate 8667-9450 wording is refined to the exact complete 8649-9428 union. This is a successor mapping, not an edit to C02."
+    },
+    {
+      "owner": "C02.motion-advanced.component-shape-tree / C02:10",
+      "disposition": "Retains layerElements and the next Elements/property-row responsibility. C20f excludes the leading comments at 9429 and function start at 9436."
+    },
+    {
+      "owner": "C02 keyframe/property/selection packets",
+      "disposition": "Retain transformRowPlan, trackFor, toggleAnimated, key/value/static readers and selected-key/setValue mutations. C20f owns only their panel callers, guards and ordering."
+    },
+    {
+      "owner": "C02 expressions.expression-runtime and expressions.expr-code-split-editor",
+      "disposition": "Retain evaluation/compiler/sandbox behavior and the separate split-pane implementation. C20f records delegated evaluator effects and the inline handoff only."
+    },
+    {
+      "owner": "C01/#1036 and C19g/#1136",
+      "disposition": "Retain undo/save and expression/track persistence. C20f distinguishes exact history/save omissions and maps their consumers."
+    },
+    {
+      "owner": "P30/#1032 and historical Motion ownership",
+      "disposition": "P30 retains timeline.js runtime writing and historical Motion ownership retains motion.js. This artifact authoring permits no source or behavior change."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 8648 closes startTimeLinkPickwhip; C20f begins at stopwatchTitle's leading comment on line 8649.",
+    "Line 9428 closes startExprPickwhip; line 9429 starts excluded Elements comments and layerElements begins at line 9436.",
+    "Rendering is not pure: row construction can allocate expression state and evaluate code, which can mutate compiler caches and error/timeout fields.",
+    "Callbacks have no catch or rollback. History, identity, model, selection, DOM and delegated effects before a failure remain."
+  ],
+  "areas": [
+    {
+      "area": "motion-transform-expression-panel",
+      "packets": [
+        {
+          "id": "C20f.stopwatch-title",
+          "files": ["src/js/motion.js:8649-8654"],
+          "coverage_ranges": [[8649, 8654]],
+          "classification": { "code": 3, "comment": 3, "whitespace": 0 },
+          "symbols": ["stopwatchTitle"],
+          "signature": "stopwatchTitle(offKey,swOn,hasKeyHere) -> translated string",
+          "responsibility": "Selects one of three localized stopwatch titles for Transform and later fill/property/path/vertex/audio consumers.",
+          "behavior": "Falsy swOn calls SM.t(offKey); otherwise truthy hasKeyHere selects motionKeyRemove and falsy selects motionKeyAdd. SM and t are required and errors propagate.",
+          "callers": "Within scope renderTransformProps uses it. Later out-of-scope Motion rows reuse it, it is exported as SMMotion.stopwatchTitle, and audio-bridge.js consumes that public helper; those row implementations remain with their owners.",
+          "effects": "No direct state or DOM mutation beyond the delegated translation call."
+        },
+        {
+          "id": "C20f.transform-group-headers",
+          "files": ["src/js/motion.js:8655-8699"],
+          "coverage_ranges": [[8655, 8699]],
+          "classification": { "code": 32, "comment": 13, "whitespace": 0 },
+          "symbols": ["renderTransformGroup", "renderTransformHeader", "renderDupGroupHeader"],
+          "signatures": [
+            "renderTransformGroup(list,holder,groupLabel) -> undefined",
+            "renderTransformHeader(list,groupLabel) -> undefined",
+            "renderDupGroupHeader(list,holder) -> undefined"
+          ],
+          "responsibility": "Dispatches optional Transform headers, constructs the shared filter header, and builds the Duplicator accordion header while keeping panel and grid rebuilds paired.",
+          "behavior": [
+            "renderTransformGroup calls showsGroupHeader; when truthy it builds the header, then always calls renderTransformProps. A header or property failure stops later work.",
+            "Transform header snapshots _hideUnanimated for class/title. Click stops propagation, toggles the live global, then requires renderLayerList and renderTimeline in order; no history/save/bridge.",
+            "Duplicator header snapshots expansion only for arrow text. Click stops, re-evaluates isDupGroupExpanded(holder), assigns window._motionExpandedDupHolder to null or captured holder, then requires both rebuilds; no history/save/bridge.",
+            "Required DOM, SM translation and list append failures retain earlier node or global effects."
+          ],
+          "callers": "renderTransformGroup is used by layer-list/right-properties paths at lines 7500, 7610 and 7653 and element rows at line 9945."
+        },
+        {
+          "id": "C20f.transform-property-rows",
+          "files": ["src/js/motion.js:8700-8938"],
+          "coverage_ranges": [[8700, 8938]],
+          "classification": { "code": 164, "comment": 75, "whitespace": 0 },
+          "symbols": ["renderTransformProps", "commitControlValue"],
+          "signature": "renderTransformProps(list,holder) -> undefined",
+          "responsibility": "Builds every Transform/property row, its animation diamond, expression and anchor accordions, expression-control widgets, numeric scrub fields and Scale ratio lock.",
+          "construction": [
+            "Require transformRowPlan(holder) and iterate its render-time entries. dupHeader delegates and returns for that entry; other rows stamp captured holder/prop on _smHolder/_smProp for pickwhip targeting.",
+            "Animation state and current-key presence are captured as swOn/hasKeyHere. Label HTML uses PROP_LABEL[prop] directly. Expression enabled/error display is a render-time snapshot.",
+            "The expression button toggles global _exprEditorOpen by captured holder/prop identity, captures the clicked container before rebuilding both panel and grid, then only on opening queries the captured container for the rebuilt editor and optionally scrolls it into view.",
+            "Anchor button exists only for prop anchor and toggles _anchorGridOpenFor by captured holder identity, then rebuilds both surfaces.",
+            "After the property row is appended, exact live accordion identities conditionally append buildExprEditorRow or buildAnchorGridRow. Row construction can therefore allocate/evaluate expression state."
+          ],
+          "stopwatch_action": [
+            "Click stops and pushUndo runs before any branch. The branch uses captured swOn/hasKeyHere with live holder tracks and currentFrame.",
+            "Captured off delegates toggleAnimated. For timeRemap: a current key with more than one key removes it; a current last key delegates toggleAnimated to turn remapping off; no current key inserts the evaluated current value.",
+            "For other current keys, exactly one key directly freezes the current value: replace holder.motion[prop] with {keys:[]}, lazily allocate motionStatic and write its prop. More keys delegate removal. Captured on with no current key delegates insertion.",
+            "Then require list and timeline rebuilds and, when SMEngineBridge is truthy, call required renderNow. There is no equality/no-op guard, explicit post-write save, catch or rollback."
+          ],
+          "controls_and_scrub": [
+            "displayValueFor and dimension metadata are read at construction. Checkbox display uses (Number(vals[0])||0)>=0.5. Its change calls shared commitControlValue with 1/0; color swatch clamps no values, builds rgba from render-time vals, and its click returns unless openLayerColorSwatches exists. The optional picker callback converts hex and uses the same commit.",
+            "commitControlValue pushes undo, prefers live selected-key vector mutation, falls back to setValue, rebuilds list/timeline and conditionally bridges. Unlike numeric scrub, it does not call reloadIfTimeLinkOffset.",
+            "Each numeric scrub callback pushes undo, prefers relative offset or absolute selected-key dimension mutation, and falls back to a fresh animated/static vector passed to setValue. Those delegated setters can change selection/active layer before writing.",
+            "Scale lock is a WeakSet-like identity set. For a two-dimensional Scale row, lock click toggles captured holder membership and rebuilds without history/save/bridge. During scrub, the other dimension uses render-time vals and multiplicative nv/beforeThis only when beforeThis is nonzero; it again prefers selected keys then setValue.",
+            "Numeric scrub requires list/timeline, reloadIfTimeLinkOffset(prop), and conditional bridge after mutations. Unit and stopwatch presence use PROP_UNIT and PROP_NO_STOPWATCH."
+          ],
+          "failure_semantics": "Every callback is incremental. pushUndo can be suppressed by separately owned scrub state; later helper or bridge failure leaves history attempts, direct static freeze, selected-key writes, selection changes, globals and partial DOM intact."
+        },
+        {
+          "id": "C20f.anchor-grid-picker",
+          "files": ["src/js/motion.js:8939-8971"],
+          "coverage_ranges": [[8939, 8971]],
+          "classification": { "code": 26, "comment": 7, "whitespace": 0 },
+          "symbols": ["buildAnchorGridRow"],
+          "signature": "buildAnchorGridRow(holder) -> DOM row",
+          "responsibility": "Builds nine captured row/column buttons that snap Anchor to the active target bounds.",
+          "behavior": [
+            "Construction has no holder guard and returns a row after appending all nine buttons.",
+            "Click stops propagation and calls activeMotionTarget before the holder/bounds guard. That separately owned resolver can call ensureElementHolder for a different currently expanded element, allocating its motion/motionStatic identity before this handler returns stale.",
+            "If target is absent, target holder differs, or bounds are absent, return with no local history or anchor-track write; pre-guard delegated allocation remains.",
+            "Success pushes undo, derives ax/ay as (column-1)*width/2 and (row-1)*height/2, delegates setValue(holder,anchor,[ax,ay]), rebuilds list/timeline, then conditionally calls bridge renderNow."
+          ],
+          "failure_semantics": "Required target resolver/DOM/helper failures propagate. A post-history failure retains pre-action allocation, history, possible selection changes and anchor mutation."
+        },
+        {
+          "id": "C20f.inline-expression-editor",
+          "files": ["src/js/motion.js:8972-9331"],
+          "coverage_ranges": [[8972, 9331]],
+          "classification": { "code": 250, "comment": 110, "whitespace": 0 },
+          "symbols": ["exprPanelLabelFor", "buildExprEditorRow", "fmtVals", "paintResult", "insert", "pair", "errorLine", "paintGutter", "commit", "paintError", "mv", "up"],
+          "signatures": [
+            "exprPanelLabelFor(holder,prop) -> string",
+            "buildExprEditorRow(holder,prop) -> DOM row"
+          ],
+          "label_and_allocation": [
+            "Label resolution delegates resolveHolderLayer, includes layer name or Layer, then appends PROP_LABEL[prop] or raw prop and joins with the breadcrumb separator.",
+            "For an element holder, exprPanelLabelFor calls layerElements(r.ld) with the layer descriptor as the first argument, although the later callee signature is layerElements(li,ld) and passes that first argument to getEffectiveStrokes. resolveHolderLayer separately returned an index but the caller does not pass it. The ordinary descriptor object therefore resolves no strokes through app.js getEffectiveStrokes and the intended Shape N breadcrumb is normally omitted; the source comment is not observed behavior.",
+            "buildExprEditorRow immediately calls ensureExpr(holder,prop) before DOM construction. It can allocate holder.expressions and a default {code:'',enabled:false,lastError:null} record without local undo or save, even when the caller is only rendering."
+          ],
+          "enable_and_result": [
+            "Checkbox change pushes undo, writes enabled from live checked state, optionally calls saveActiveLayerFrame, then requires list/timeline rebuilds, calls reloadIfTimeLinkOffset and conditionally bridge renderNow.",
+            "Raw value display reads rawValueAtFrame at construction. paintResult clears its error class; disabled/empty code displays a dash without evaluation. Otherwise it rereads raw current value and calls evalExpressionFor.",
+            "Delegated evaluation/compiler behavior can allocate or replace holder._exprCompiled, update lastError/errorLine, lazily seed expression data, and on timeout disable the expression and delete its cache. Null result marks the output error; nonnull values are formatted. Rendering is therefore not a pure projection."
+          ],
+          "globals_examples_split": [
+            "Globals click prevents/stops, prompts with fps-or-24 and current globals, returns on null, otherwise pushes undo then calls required window.SMMotion.setExprGlobals. That setter writes state.exprGlobals, invalidates compiled caches across layer and element holders, rebuilds list/timeline and may bridge; this handler has no direct frame save.",
+            "Examples require showContextMenu. Dimensional snippets branch on PROP_DIM. Other layers are chosen by strict state.layers entry !== holder identity, so an element holder does not exclude its owner. Layer names are inserted into single-quoted source without escaping, whereas expression-control names use JSON.stringify. Menu comments do not prove all generated layer-name examples compile.",
+            "Control example resolves the owner layer and first control; multi-dimensional controls insert the bare read, scalar controls use property-dimensional pairing.",
+            "When SMExprPanel exists, holderRefOf captures only an existing layerUid or null; it creates no identity. Click commits inline changes first, then reevaluates isShowing and closes or opens the separate panel, and rebuilds only the layer list. Split-panel apply/close behavior remains separately owned."
+          ],
+          "editor_commit_resize": [
+            "Textarea starts from expr.code. Gutter line count follows current text; errorLine prefers positive numeric expr.errorLine, otherwise parses translated line/ligne text, and highlights by generated innerHTML.",
+            "commit returns when text equals expr.code. Otherwise pushUndo precedes code assignment; it clears lastError, sets errorLine=-1, deletes only holder._exprCompiled[prop] when the cache exists, optionally saves the active frame, reloads Time Link offset, conditionally bridges, then repaints result/error/gutter. Evaluation during repaint can immediately recreate cache/error state.",
+            "Blur and Meta/Ctrl+Enter commit; Escape restores captured expr.code, repaints gutter and blurs, whose commit then sees equality. Tab replaces the current selection with two spaces and moves the caret without committing.",
+            "Resize mousedown installs document mousemove/mouseup listeners. Move clamps textarea height to 38..420 and mirrors gutter height. Mouseup removes listeners, writes expr.editorHeight from parsed style height or undefined, and calls only renderTimeline. There is no local undo, save, list rebuild, bridge, pointer-cancel or lost-mouseup cleanup."
+          ],
+          "failure_semantics": "No catch/rollback. Default allocation, history, code/enabled/editorHeight, cache/error, DOM and delegated effects remain after later failures. Truthy SMEngineBridge with missing renderNow throws."
+        },
+        {
+          "id": "C20f.expression-pickwhip",
+          "files": ["src/js/motion.js:9332-9428"],
+          "coverage_ranges": [[9332, 9428]],
+          "classification": { "code": 73, "comment": 24, "whitespace": 0 },
+          "symbols": ["startExprPickwhip", "paint", "targetUnder", "onMove", "cleanup", "onUp", "onKey"],
+          "signature": "startExprPickwhip(holder,prop,ta,commit,fromEl,ev) -> undefined",
+          "responsibility": "Runs the document-capture expression pickwhip, validates tagged property targets, clones source code on Alt or inserts a resolvable layer/control reference at the caret, then commits.",
+          "start_and_target": [
+            "Start stops/prevents, requires source geometry, appends a line to document.body, installs capture mousemove/mouseup/keydown listeners, and paints immediately from the initiating coordinates.",
+            "targetUnder uses document.elementFromPoint and closest over property/track rows. It requires truthy _smHolder/_smProp and rejects the exact source holder+prop pair; other properties on the same holder remain valid.",
+            "Move repaints line geometry, removes prior highlight when identity changes, adds the current target highlight, and stores the latest target. DOM/class failures can strand listeners/line because cleanup is not in finally."
+          ],
+          "release": [
+            "Mouseup resolves a fresh target and Alt state, then cleanup always removes all capture listeners, current highlight and line before validating the target or mutating text.",
+            "Alt requires a truthy source expression and nonempty code; otherwise optional toast and return. It clones code without owner-layer resolution or UID creation.",
+            "Normal mode first searches state.layers by exact holder identity. If absent, it scans every layer elementMotion value; the last match wins because loops do not break. Unresolved owner optionally toasts and returns.",
+            "For expression-control properties, controlsOf(target holder) resolves a matching definition. Control references use JSON.stringify for ensured layer UID and control name. Ordinary references use layer with a double-quoted ensured UID and append raw target prop.",
+            "ensureLayerUid can stamp the referenced owner before text insertion and before commit/history. Caret/selection null fallback inserts or replaces, dispatches input, calls required commit, then rebuilds list/timeline and optionally toasts. commit may no-op if inserted text yields equality; UID stamping remains.",
+            "Escape calls cleanup only. It does not commit or restore textarea content. Multiple Escape/release calls can attempt line removal again if externally invoked; no explicit active flag exists."
+          ],
+          "failure_semantics": "Cleanup precedes release mutations, but no later rollback exists. UID stamping, text/caret/input effects, commit history/save/evaluation and rebuilds can be partial."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "Checkbox and changed-code commit optionally call saveActiveLayerFrame after mutation. Stopwatch/control/scrub/anchor callbacks rely on pushUndo's pre-snapshot save behavior and have no explicit post-write save. ensureExpr render allocation, globals changes, Scale-lock state, accordion globals and editorHeight resize have no local save. Absence of a local frame-save call does not prevent a later exportJSON from serializing expression records/editorHeight or exprGlobals."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No parser is implemented. C19g exportJSON writes l.expressions and the entire l.elementMotion at timeline lines 2117-2125 and state.exprGlobals at line 2245; import restores layer expressions at line 2410, elementMotion at line 2482 and globals at line 2643. Value/code/checkbox paths may call reloadIfTimeLinkOffset after writes; custom control commit and resize do not."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Stopwatch, custom control, numeric scrub, successful anchor, checkbox, globals and changed-code commit call pushUndo before their main writes. Filter/accordions/Scale lock, ensureExpr allocation, resize editorHeight and pickwhip UID stamping before commit have no new local history. Stale anchor returns after activeMotionTarget but before pushUndo."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "Rows capture holder/prop but selected-key edits consult live selection. Selected vector/dimension operations win over setValue; delegated setValue/activeMotionTarget can activate or allocate another holder before later guards/writes. Pickwhip targets live tagged DOM rows and resolves owner identity at release."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "Stopwatch toggles/adds/removes tracks, with direct last-key static freeze for non-Time-Remap and distinct Time Remap off behavior. Controls/scrubs write selected keys or property values. Expressions store enabled/code/error/editorHeight and evaluator cache state; globals invalidate caches."
+    },
+    {
+      "consumer": "render",
+      "disposition": "Panel and grid rebuilds are paired where specified; expression open also scrolls the clicked container. Row construction evaluates enabled code and can mutate evaluator state. Guarded bridge renderNow calls request canvas refresh, but a truthy malformed bridge throws after prior effects and proves no output correctness."
+    },
+    {
+      "consumer": "export",
+      "disposition": "No export payload is emitted here, but later C19g-owned exportJSON directly serializes l.expressions, the whole l.elementMotion object and state.exprGlobals. Thus ensureExpr allocation, editorHeight and globals can reach a later document export without a local saveActiveLayerFrame call. Layer-root _exprSeed and _exprCompiled are absent from the layer whitelist; nested element-holder properties ride through elementMotion subject to JSON serialization semantics. UI-only expansion/filter/Scale-lock state and transient pickwhip DOM are not made export fields here."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "Several successful callbacks conditionally call SMEngineBridge.renderNow, testing object truthiness only. This is a shared render bridge and not proof of native IPC; no Tauri command/filesystem call or native ownership is established."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "stopwatch-title-and-consumers",
+      "status": "proposed, unrun",
+      "matrix": "off/on-without-key/on-with-key, missing translation, in-scope and later/audio consumers",
+      "expected": "Exact keys and no transfer of later renderer ownership."
+    },
+    {
+      "id": "transform-header-filter-accordion",
+      "status": "proposed, unrun",
+      "matrix": "header shown/hidden, filter both states, Duplicator holder identity, rebuild failures",
+      "expected": "Exact globals, captured presentation, live toggle and dual rebuild order without history/save."
+    },
+    {
+      "id": "stopwatch-track-matrix",
+      "status": "proposed, unrun",
+      "matrix": "captured off/on, current/absent key, one/many keys, Time Remap versus ordinary, stale tracks",
+      "expected": "Last ordinary key freezes static; last Time Remap follows off behavior; exact history and partial failures."
+    },
+    {
+      "id": "custom-control-selected-keys",
+      "status": "proposed, unrun",
+      "matrix": "checkbox threshold/interpolation, color swatch absent/present picker, selected vector accepted/rejected",
+      "expected": "Selected-key mutation precedes setValue fallback, optional swatch callback, no Time Link reload in shared custom commit."
+    },
+    {
+      "id": "numeric-scrub-scale-lock",
+      "status": "proposed, unrun",
+      "matrix": "relative/absolute, live mixed selection, lock on/off, zero/nonzero reference dimension, stale render-time vals",
+      "expected": "Exact two-dimension multiplicative ratio and selected-key versus setValue paths, followed by reload and dual refresh."
+    },
+    {
+      "id": "anchor-stale-preallocation",
+      "status": "proposed, unrun",
+      "matrix": "current/stale/absent/bounds-missing target and another expanded element requiring ensureElementHolder",
+      "expected": "Resolver/pre-guard allocation can occur, but stale cases create no anchor write or local history; success uses exact nine bounds points."
+    },
+    {
+      "id": "expression-render-allocation-evaluation",
+      "status": "proposed, unrun",
+      "matrix": "missing expression bag/record, disabled/empty/enabled code, compile success/error/timeout/cache replacement",
+      "expected": "Default allocation without undo/save and exact evaluator cache/error/disable side effects during render."
+    },
+    {
+      "id": "expression-breadcrumb-argument-mismatch",
+      "status": "proposed, unrun",
+      "matrix": "Ordinary layer holder and element holder with a resolvable strokeId and known resolveHolderLayer index.",
+      "expected": "Layer label and property label render; the element path passes the descriptor instead of index to layerElements, so the intended Shape N breadcrumb is normally absent."
+    },
+    {
+      "id": "expression-persistence-history-asymmetry",
+      "status": "proposed, unrun",
+      "matrix": "checkbox, unchanged/changed code, globals cancel/accept, resize normal/lost mouseup",
+      "expected": "Exact pushUndo/save/reload/bridge differences; globals invalidate all holder caches; editorHeight has no local undo/save."
+    },
+    {
+      "id": "split-panel-handoff",
+      "status": "proposed, unrun",
+      "matrix": "existing layerUid versus null ref, showing/not showing, dirty/clean inline text, close/open failures",
+      "expected": "Existing UID-or-null capture without creation, inline commit before split action, close/open routing and list-only tail."
+    },
+    {
+      "id": "examples-generation",
+      "status": "proposed, unrun",
+      "matrix": "one/two dimensions, layer holder/element holder, layer names containing quote/backslash, absent/present scalar/vector controls",
+      "expected": "Identity-based other-layer selection, expose unescaped layer-name source while control names remain JSON escaped, exact dimensional snippets."
+    },
+    {
+      "id": "pickwhip-normal-control-alt",
+      "status": "proposed, unrun",
+      "matrix": "normal layer/element/control target, self/invalid target, Alt with/without source code, no owner, caret/range insertion",
+      "expected": "Exact target guards, last owner match, layerControl versus layer syntax, no-source/no-owner toast and cleanup."
+    },
+    {
+      "id": "pickwhip-uid-cleanup-failures",
+      "status": "proposed, unrun",
+      "matrix": "UID absent, commit/rebuild/toast failure, Escape, release, target/highlight DOM failures",
+      "expected": "UID may stamp before commit/history; normal release cleans listeners/line before mutation; Escape cleanup without commit."
+    },
+    {
+      "id": "dual-panel-grid-refresh",
+      "status": "proposed, unrun",
+      "matrix": "layer list and right-panel copies, expression/anchor accordions, each required helper and malformed bridge",
+      "expected": "Exact refresh pairs, clicked-container scroll behavior and retained partial effects."
+    },
+    {
+      "id": "consumer-round-trips",
+      "status": "proposed, unrun",
+      "matrix": "Separately owned save/load/undo/export flows for layer and element expression allocation, editorHeight, globals, _exprSeed and _exprCompiled.",
+      "expected": "Layer expressions/editorHeight, whole elementMotion JSON state and globals follow C19g codecs even without local frame save; layer-root seed/cache stay outside the whitelist, while nested holder extras follow JSON semantics. Fixtures do not certify browser, native, export or product behavior."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "planTransformRows(holder,frame,selection) -> RowPlan",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure row/stopwatch/control/accordion plan; C02 track and selection writers remain ports."
+    },
+    {
+      "api": "applyTransformPanelAction(action,historyPort,trackPort,refreshPort) -> ActionReceipt",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Makes static-freeze, Time Remap, selected-key fallback, reload and partial ordering explicit."
+    },
+    {
+      "api": "planAnchorSnap(holder,target,row,column) -> AnchorPlan|null",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Bounds math and stale-target decision separated from active-target allocation/history/setValue."
+    },
+    {
+      "api": "createExpressionEditor(holder,prop,domPort,evaluatorPort,persistencePort) -> EditorAdapter",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Inline editor DOM with explicit allocation/evaluation, commit, globals, resize and split-pane ports."
+    },
+    {
+      "api": "runExpressionPickwhip(source,hitTestPort,identityPort,commitPort) -> PickwhipReceipt",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Target resolution, UID stamping, syntax insertion and cleanup without absorbing expression runtime or owner discovery."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "packet_symbols": [
+      "stopwatchTitle",
+      "renderTransformGroup",
+      "renderTransformHeader",
+      "renderDupGroupHeader",
+      "renderTransformProps",
+      "buildAnchorGridRow",
+      "exprPanelLabelFor",
+      "buildExprEditorRow",
+      "startExprPickwhip"
+    ],
+    "caller_anchors": [
+      "renderTransformGroup at motion.js lines 7500, 7610, 7653 and 9945",
+      "SMMotion.stopwatchTitle public export and audio-bridge.js line 328",
+      "expression pickwhip wired by buildExprEditorRow at line 9328"
+    ],
+    "helper_anchors": [
+      "activeMotionTarget and ensureElementHolder lines 6163-6165",
+      "holderRefOf lines 1104-1108",
+      "ensureExpr, evalExpressionFor and setExprGlobals",
+      "toggleAnimated, setKeyAtCurrentFrame, removeKeyAtCurrentFrame, setValue and selected-key writers",
+      "renderLayerList, renderTimeline, reloadIfTimeLinkOffset and SMEngineBridge.renderNow"
+    ],
+    "boundary_assertion": "Line 8648 closes Time Link; line 8649 starts C20f. Line 9428 closes C20f; comments at line 9429 and layerElements at line 9436 are excluded."
+  },
+  "validation": {
+    "expected_assigned_lines": 780,
+    "expected_classification": { "code": 548, "comment": 232, "whitespace": 0 },
+    "packet_partition": [[8649,8654],[8655,8699],[8700,8938],[8939,8971],[8972,9331],[9332,9428]],
+    "packet_classification": [
+      { "range": [8649,8654], "code": 3, "comment": 3, "whitespace": 0 },
+      { "range": [8655,8699], "code": 32, "comment": 13, "whitespace": 0 },
+      { "range": [8700,8938], "code": 164, "comment": 75, "whitespace": 0 },
+      { "range": [8939,8971], "code": 26, "comment": 7, "whitespace": 0 },
+      { "range": [8972,9331], "code": 250, "comment": 110, "whitespace": 0 },
+      { "range": [9332,9428], "code": 73, "comment": 24, "whitespace": 0 }
+    ],
+    "coverage_contract": "Validate assigned_ranges and flattened areas[].packets[].coverage_ranges independently with the same function; reject actual artifact omission at line 8649 and overlap at line 8654.",
+    "required_checks": [
+      "frozen/current Motion blob and allocated-base ancestry",
+      "six unique packet IDs, exact ranges, counts, symbols, helpers, callers and boundaries",
+      "raw C02 overlap 8649-8666 and semantic Time Link end 8648",
+      "eight consumer dispositions and proposed, unrun fixtures",
+      "pre-action allocation and exact history/save/render differences",
+      "JSON, private-path, secret, placeholder and trailing-whitespace hygiene",
+      "sole untracked artifact or committed-clean mode"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, GPU, runtime edit, export or product acceptance claim."
+  }
+}
