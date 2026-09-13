@@ -1,0 +1,681 @@
+{
+  "census_id": "C19n",
+  "issue": 1161,
+  "title": "Timeline tween easing curve strips, shared curve-editor SVG, inline curve inset and keyframe cells",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C19n census only; P30 (timeline.js runtime writer), tweens.js's existing C02/tween owners (generateTweens, tweenSpanKey, curve evaluation) and other named owners remain separate",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "48ce1a8976a89cb32b723cd2d4503e0ee51167f5",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19n-timeline-tween-curve-strips",
+  "assigned_ranges": [
+    {
+      "start": 4344,
+      "end": 4787
+    }
+  ],
+  "coverage_note": "Exactly 444 assigned lines occur once across six packets (one coverage_range per packet, no gaps and no C02/other-owner exclusions in this span): 285 code, 156 full-line // comments and 3 blank. Line 4343 closes C19m's renderTimeline; line 4344 is the `// ---- TWEEN EASING CURVE STRIPS` section header and begins this scope. Line 4787 is the trailing blank line after renderKeyframeCellsInto's closing brace (4786); line 4788 opens the next leaf's `// ---- HELD-KEYFRAME SPAN SHRINK/TRIM HANDLE ----` section and is excluded.",
+  "source_baselines": {
+    "pinned": "59a5a38c:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "Current origin/main (48ce1a8976a89cb32b723cd2d4503e0ee51167f5, PR #1159/C19m merged) has the identical timeline.js blob; the job's originally stated base 61e3366fe4e776bb26716a4a6b4d156967265786 is an ancestor of this tip (git merge-base --is-ancestor confirms 61e3366 -> origin/main true, the reverse false) and also resolves to the same blob — confirmed directly (git rev-parse 48ce1a8:src/js/timeline.js == git rev-parse 61e3366:src/js/timeline.js == git rev-parse 0e6b555:src/js/timeline.js == cc4cfd27...). This artifact branches from origin/main at 48ce1a8 per the issue body's explicit instruction, which supersedes the job wrapper's earlier-snapshot base field.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; historical comments (dated feedback quotes embedded in the source) are read as authorial intent, not fresh execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19n-timeline-tween-curve-strips.json and the six timeline.js packets partitioning lines 4344-4787.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "owners": "tweens.js's existing C02/tween owner retains tweenSpanKey (tweens.js:1604, called at 4472, 4621, 4684, 4702, 4707), generateTweens (called once at 4659 inside onTweenPairCurveChanged) and the whole autoMatch/interpStroke tween-generation pipeline this scope regenerates but never implements. app.js retains ROW_H (app.js:77, the constant frameGridRowHeight adds layerCurveRowExtraHeight to) and the state object/showTweenCurves/tweenEasing field declarations (app.js:216 `showTweenCurves:false`) themselves. Selection-geometry census leaves (C19a-C19l) retain selClear/selAdd/selHas/_sel.frames, called from onTweenPairCurveChanged (4658, 4660) and editTweenSegForCell (4692); this packet cites only the call sites. C19m retains renderTimeline itself (the caller of renderTweenCurveStrips at line 4334, outside this scope) and the SM.toggleTweenCurves toggle handler (timeline.js:467-479, also outside this scope) plus its click binding (11234).",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19m/#1158 (PR #1159)",
+      "disposition": "Retains renderTimeline through line 4343 (its trailing `_tlScrollRestore(_scroll)` and closing brace), including renderTimeline's own call to renderTweenCurveStrips() at line 4334 (a caller-side reference into this scope, not claimed by C19m) and its call to the SM.toggleTweenCurves button-state toggle at lines 467-479/11234 (outside both censuses' assigned ranges). C19n begins with the next line, the section-header comment at 4344."
+    },
+    {
+      "owner": "tweens.js (existing C02/tween owner)",
+      "disposition": "Retains tweenSpanKey (tweens.js:1604), generateTweens and the whole autoMatch/interpStroke/resamplePairFeatureAware tween-generation and curve-evaluation pipeline. This packet's buildTweenCurveSVG/onTweenPairCurveChanged/applyTweenCurveToSelection call into tweenSpanKey and generateTweens (and window._curveEditor.evalPointsCurve, ui.js-owned) but do not define or modify them; call sites are cited with exact line numbers, not claimed."
+    },
+    {
+      "owner": "app.js",
+      "disposition": "Retains ROW_H (app.js:77, =34) and the state object's showTweenCurves/tweenEasing field declarations (app.js:216 and the state.tweenEasing lazy-init pattern this packet reads/writes into). frameGridRowHeight (4392) reads the global ROW_H constant but does not declare it."
+    },
+    {
+      "owner": "selection-geometry census leaves (C19a-C19l)",
+      "disposition": "Retain selClear/selAdd/selHas and _sel.frames. onTweenPairCurveChanged (4657-4664) calls selClear()/selAdd(li,fA) at 4658 to scope generateTweens() to exactly the touched pair before immediately calling selClear() again at 4660; editTweenSegForCell (4680-4694) reads _sel.frames.slice() at 4692 (captured before onTweenPairCurveChanged's own selClear/selAdd dance would otherwise clobber it, per the in-source comment at 4687-4691). This packet cites the call/read sites only."
+    },
+    {
+      "owner": "ui.js (window._curveEditor, existing owner)",
+      "disposition": "Retains the shared #curve-canvas Easing Curve widget singleton: window._curveEditor.getState() (read once at 4479 for the default curve-point fallback), window._curveEditor.evalPointsCurve (read at 4478 inside buildTweenCurveSVG's redraw()) and window._curveEditor.editTweenPair (called at 4700 by editTweenSegForCell to hand the shared widget a tween-pair-scoped seg plus an apply callback). This packet calls into that surface but does not implement it."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 4343 is outside coverage (C19m's renderTimeline closing brace); line 4344 (the `// ---- TWEEN EASING CURVE STRIPS` section header) begins this scope.",
+    "Line 4787 (trailing blank after renderKeyframeCellsInto's closing brace at 4786) is the last line of this scope; line 4788 opens the next leaf's `// ---- HELD-KEYFRAME SPAN SHRINK/TRIM HANDLE ----` section header and is excluded.",
+    "No lines inside 4344-4787 are excluded for another owner: unlike C19m's renderTimeline (which had two embedded C02-owned gaps), this span has zero embedded foreign-owner code — every line belongs to exactly one of the six packets below, confirmed by the validator's packet-partition-equals-assigned-union check."
+  ],
+  "areas": [
+    {
+      "area": "tween-curve-geometry-editing-and-keyframe-cells",
+      "packets": [
+        {
+          "id": "C19n.tween-span-geometry",
+          "files": [
+            "src/js/timeline.js:4344-4425"
+          ],
+          "coverage_ranges": [
+            [
+              4344,
+              4425
+            ]
+          ],
+          "classification": {
+            "code": 46,
+            "comment": 36,
+            "whitespace": 0
+          },
+          "symbols": [
+            "layerKeyframeList",
+            "layerTweenSpans",
+            "layerHasTweenSpans",
+            "TWEEN_ROW_EXTRA_H",
+            "layerCurveRowExtraHeight",
+            "frameGridRowHeight",
+            "visualTopOfLayer",
+            "frameGridTotalRowsHeight",
+            "layerIndexAtGridY"
+          ],
+          "signature": "layerKeyframeList(li)->number[]; layerTweenSpans(li)->[number,number][]; layerHasTweenSpans(li)->boolean; var TWEEN_ROW_EXTRA_H=92; layerCurveRowExtraHeight(li)->number; frameGridRowHeight(li)->number; visualTopOfLayer(li)->number; frameGridTotalRowsHeight()->number; layerIndexAtGridY(yRel)->number",
+          "responsibility": "Pure geometry layer for the tween-curve-strip feature: which frames on a layer are keyframes, which consecutive keyframe pairs actually have a generated tween between them, how much extra row height (if any) a layer's row needs to show its strip, and the row-height-aware pixel<->layer-index conversions (visualTopOfLayer/frameGridTotalRowsHeight/layerIndexAtGridY) that replace the old flat li*ROW_H arithmetic now that rows can have unequal heights.",
+          "behavior": [
+            "Section header (4344) plus a long lead-in comment (4345-4356) records the feature's origin (was a thin 8px sparkline, became the same rich draggable-point editor as the floating popup per explicit request) and the non-overlap invariant: only layers with an actual tween span grow taller (TWEEN_ROW_EXTRA_H), others stay at plain ROW_H.",
+            "layerKeyframeList (4356-4361): reads state.layers[li]; returns [] if the layer is missing; otherwise scans ld.frames[0..state.totalFrames-1] and collects every frame index whose frame has isKeyframe truthy, in ascending order.",
+            "layerTweenSpans (4366-4377, preceded by an explanatory comment at 4362-4365 naming this the single definition of 'this layer has a tween to show'): calls layerKeyframeList(li); for each consecutive pair of keyframes [fA,fB], scans every frame strictly between them and marks hasTween true the moment any frame has isInterpolated truthy (first-match break, no further scanning of that pair); collects [fA,fB] into spans only when hasTween is true. A keyframe pair with a gap but no generated interpolated frame between them (e.g. two adjacent keyframes with fB===fA+1) is silently omitted from the result.",
+            "layerHasTweenSpans (4378): one-line boolean wrapper, `layerTweenSpans(li).length>0`.",
+            "TWEEN_ROW_EXTRA_H (4379): module-level constant, 92 (pixels) — the fixed extra height a qualifying row grows by.",
+            "layerCurveRowExtraHeight (4380-4382, with a one-line comment at 4380): returns 0 immediately if state.showTweenCurves is falsy (feature toggled off); otherwise returns TWEEN_ROW_EXTRA_H if layerHasTweenSpans(li) else 0. This is the single decision point both the row-height formula below and renderTimeline's own row-building loop (outside this packet, C19m-owned, lines 4270-4300) must agree on for the two to never desync.",
+            "frameGridRowHeight (4392, preceded by a five-line comment at 4383-4391 naming it the single source of truth for a layer's current total row height): `ROW_H+layerCurveRowExtraHeight(li)` — reads the app.js-owned global ROW_H constant (=34) and adds the per-layer extra from above. Reduces to plain ROW_H whenever the toggle is off or the layer has no tween span.",
+            "visualTopOfLayer (4401-4404, preceded by an eight-line comment at 4393-4400 explaining why a flat li*ROW_H formula no longer holds): sums frameGridRowHeight(li2) for every layer index li2 strictly greater than li, down to n-1, since rows render top-to-bottom from the HIGHEST layer index. Returns 0 for the topmost-rendered layer (the one with the highest index).",
+            "frameGridTotalRowsHeight (4406-4409): sums frameGridRowHeight(i) over every layer index 0..n-1 — the grid's total content height given the current per-layer heights.",
+            "layerIndexAtGridY (4415-4425, preceded by a four-line comment at 4410-4414 framing it as the reverse of visualTopOfLayer and noting it replaces `state.layers.length-1-Math.floor(yRel/ROW_H)`): clamps yRel to >=0; walks layer indices from n-1 down to 0 (via `p` from 0..n-1, `li=n-1-p`), accumulating each layer's frameGridRowHeight until the running total would exceed y, returning that li; returns 0 if state.layers.length is 0 or if the loop falls through (walked every layer without y landing inside any row's span — the fallback the comment describes as identical to the old formula whenever every row is still plain ROW_H tall)."
+          ],
+          "callers": [
+            "layerKeyframeList: called by layerTweenSpans (4364, in-packet) and by tweenPairForCell (4700, in this scope's C19n.tween-cell-selection-apply packet). No caller outside timeline.js was found by a whole-repo git grep at the frozen SHA (only tests/performance-regressions.test.cjs and src/css/style.css mention the neighboring renderKeyframeCellsInto in comments/test scaffolding, not this function).",
+            "layerTweenSpans: called by layerHasTweenSpans (4378, in-packet) and by renderTweenCurveStrips (4426-4462, this scope's next packet, line 4432).",
+            "layerHasTweenSpans: called by layerCurveRowExtraHeight (4382, in-packet) only.",
+            "layerCurveRowExtraHeight: called by frameGridRowHeight (4392, in-packet) only. Also cited (not called) by C19m's own render-timeline packet at line 4277, outside this scope, where a row's extra height is added to the DOM row style.",
+            "frameGridRowHeight: called in-packet by visualTopOfLayer (4403) and frameGridTotalRowsHeight (4408) and layerIndexAtGridY (4420). Outside this packet, called once by the out-of-scope frame-cell drag-preview ghost sizing at timeline.js:5368 (`d.style.cssText=...+frameGridRowHeight(gl)+...`). A whole-repo git grep at the frozen SHA for `frameGridRowHeight` found no matches in any file other than timeline.js.",
+            "visualTopOfLayer: not called anywhere in the frozen tree outside its own declaration — a whole-repo grep finds only the declaration line and this packet's own header comment mentioning it by name (line 4397); it is not yet wired to any pixel-position consumer.",
+            "frameGridTotalRowsHeight: likewise not called anywhere in the frozen tree outside its own declaration.",
+            "layerIndexAtGridY: called once, outside this packet, by the out-of-scope frame-cell drag mousemove handler at timeline.js:5300 (`var toL=layerIndexAtGridY(yRel);`). A whole-repo git grep at the frozen SHA for `layerIndexAtGridY` found exactly the declaration (4415), this packet's own comment mentioning it (4397) and that one call site — no other file in the repository references it."
+          ],
+          "effects": "Pure reads of state.layers/state.totalFrames/state.showTweenCurves and the app.js-owned ROW_H global; no DOM access, no state mutation, no history/save/load interaction anywhere in this packet."
+        },
+        {
+          "id": "C19n.tween-curve-strips-render",
+          "files": [
+            "src/js/timeline.js:4426-4462"
+          ],
+          "coverage_ranges": [
+            [
+              4426,
+              4462
+            ]
+          ],
+          "classification": {
+            "code": 34,
+            "comment": 3,
+            "whitespace": 0
+          },
+          "symbols": [
+            "renderTweenCurveStrips"
+          ],
+          "signature": "renderTweenCurveStrips() -> undefined; window.renderTweenCurveStrips=renderTweenCurveStrips",
+          "responsibility": "DOM adapter that draws the persistent inline curve-editor strip under every qualifying layer row in #frame-grid, rebuilding it from scratch on every call — the render half of the tween-curve-strips feature, paired with the geometry packet above and the shared SVG builder in the next packet.",
+          "behavior": [
+            "Guards on `#frame-grid` existing (4427-4428, returns undefined if missing).",
+            "Removes every existing `.tw-curve-strip` element first (4429-4430), unconditionally, before checking the toggle — so turning the feature off (state.showTweenCurves falsy, checked at 4431) still cleans up any strips left over from when it was on, then returns.",
+            "Iterates every `.frow` element in the grid (4432-4433, `grid.querySelectorAll('.frow')` then `.forEach`, a live DOM query against whatever renderTimeline already built for this frame). For each row, reads its first `.fc` cell's `dataset.layer` to recover the layer index `li` (4434-4437, skipping the row entirely if the cell/dataset is missing or li is NaN or state.layers[li] doesn't exist).",
+            "Calls layerTweenSpans(li) (4438, this scope's previous packet); skips the row if there are no spans (4439).",
+            "Creates one `.tw-curve-strip` wrapper div per qualifying row (4440-4442): absolutely positioned at left:0/bottom:0, width = state.totalFrames*FC, height = TWEEN_ROW_EXTRA_H, translucent dark background, sets the row's own `position:relative` (4443) so the absolutely-positioned strip anchors to it, and appends the wrapper to the row (4444).",
+            "For each span [fA,fB] (4445-4459): computes x0=fA*FC, w=(fB-fA)*FC; creates a `.tw-curve-strip-box` div absolutely positioned at that x/width spanning the wrapper's full height with a right border separating spans; sets pad=6 (4451); builds the actual curve editor via `buildTweenCurveSVG(li,fA,fB,Math.max(20,w-2*pad),TWEEN_ROW_EXTRA_H-2*pad)` (4455, this scope's next-packet function — the same builder the floating popup uses, per the in-source comment at 4452-4454) and absolutely positions the returned svg at (pad,pad) inside the box; appends the svg to the box (4457) and the box to the wrapper (4458).",
+            "Exports the function as `window.renderTweenCurveStrips` (4462) immediately after its closing brace, so other modules (and this same file's own out-of-packet callers) can invoke it via the window global as well as the bare identifier."
+          ],
+          "callers": [
+            "In-packet: none (this is the function's own definition and export).",
+            "Outside this packet, all within timeline.js: called unconditionally at the end of every renderTimeline() call (line 4334, C19m-owned) so every full timeline rebuild redraws the strips; called by onTweenPairCurveChanged (line 4663, this scope's C19n.inline-curve-inset packet) after a curve edit regenerates the affected tween, so the strip reflects the new curve immediately; mentioned (not called) in two comments, at line 466 (SM.toggleTweenCurves's own doc comment, out of scope) and at line 4645 (this scope's next packet, noting buildTweenCurveSVG is shared with the floating popup).",
+            "A whole-repo git grep at the frozen SHA for `renderTweenCurveStrips` found matches ONLY inside src/js/timeline.js (8 total: 3 comment mentions at 466/472-473 outside this scope, the renderTimeline call at 4334 outside this scope, the declaration at 4426, the window export at 4462, a comment mention at 4645 and the onTweenPairCurveChanged call at 4663, both inside this scope) — no other file in src/js (or the wider repository) calls or references it."
+          ],
+          "effects": "DOM writes only: removes/creates `.tw-curve-strip`/`.tw-curve-strip-box` elements and sets a row's inline `position` style. Reads state.showTweenCurves/state.totalFrames/state.layers and the module-level FC (frame-width) constant. No state mutation, no history/save/load call anywhere in this packet — it is a pure render pass over data the geometry packet and buildTweenCurveSVG already own."
+        },
+        {
+          "id": "C19n.shared-curve-editor-svg",
+          "files": [
+            "src/js/timeline.js:4463-4586"
+          ],
+          "coverage_ranges": [
+            [
+              4463,
+              4586
+            ]
+          ],
+          "classification": {
+            "code": 76,
+            "comment": 46,
+            "whitespace": 2
+          },
+          "symbols": [
+            "buildTweenCurveSVG"
+          ],
+          "signature": "buildTweenCurveSVG(li,fA,fB,svgW,svgH) -> {svg:SVGElement, redraw:function, seg:object}",
+          "responsibility": "The single implementation of the draggable-control-point easing-curve editor surface, shared byte-for-byte by both the persistent inline strips (previous packet) and the floating popup (next packet) so the drag/redraw/regenerate logic can never drift between the two call sites (CLAUDE.md §3). Reads and lazily initializes `state.tweenEasing[li+':'+fA+'-'+fB]`, and is the ONLY place in this scope's assigned lines that directly mutates a curve's control points.",
+          "behavior": [
+            "Section header (4463) plus a long lead-in comment (4464-4470) states the sharing rationale and that both call sites read/write the same state.tweenEasing entry, keeping inline and popup edits always in agreement.",
+            "Setup (4471-4479): computes `key=tweenSpanKey(li,fA,fB)` (tweens.js-owned, called not defined here); lazily creates `state.tweenEasing={}` if absent (4474) and `seg=state.tweenEasing[key]=state.tweenEasing[key]||{}` (4474, a write into document state on first access for any given pair); if `seg.points` is empty/missing, seeds it (4475-4479) from whatever curve is CURRENTLY effective globally (`window._curveEditor.getState().points`, read-only call into ui.js) falling back to a hardcoded default cubic-bezier-style four-point array `[{0,0},{.42,0},{.58,1},{1,1}]` when no global editor state exists yet — explicitly NOT a hardcoded default when a global curve does exist, per the in-source comment.",
+            "SVG scaffold (4480-4483): creates an `<svg>` in the SVG namespace sized svgW x svgH with `cursor:crosshair;touch-action:none`.",
+            "Coordinate mapping (4486-4504, with a 13-line comment at 4488-4500 explaining a 2026 fix, feedback #99): `toSX`/`toSY` map the logical [0,1] x domain and an OVERSHOOT-aware [Y_LO=-0.3, Y_HI=1.3] y domain (Y_SPAN=1.6) onto pixel space with a 6px inner pad on every side; `fromSX`/`fromSY` are the inverse, used to interpret pointer positions during drag, with `fromSY` clamping to the same [-0.3,1.3] range so back/elastic-style overshoot curves (routinely placing a point above y=1 or below y=0) always have a reachable on-screen handle at every SVG width/height, fixing a previously genuinely off-canvas point position rather than merely a cramped one.",
+            "redraw() (4506-4565): clears all SVG children; draws two dashed reference lines at y=0 and y=1 (the domain's 'neutral' bounds, not the SVG's own edges since Y_LO/Y_HI extend past them); samples the curve at 49 points (N=48) via `window._curveEditor.evalPointsCurve(pts,t)` (falls back to the identity `t` if the global evaluator is absent) and draws it as a single blue polyline; then, for each control point (loop from 4521), draws a draggable white/blue circle (r=5.5) wired with two listeners: `pointerdown` (4526-4558) captures the pointer ON THE SVG ELEMENT ITSELF rather than the circle (a 2026 fix, feedback #124, documented in an 11-line comment at 4528-4538, because redraw() destroys and recreates every circle on each move, and re-capturing a freshly created element mid-drag is unreliable across browsers), calls `pushUndo()` once per gesture if available (4546, with a comment at 4540-4545 noting this closes a bug where state.tweenEasing was written with no undo snapshot), then defines `move` (4547-4553, clamps the dragged point's x between its neighbors' x +/-0.001, or pins to exactly 0/1 for the first/last point; writes `p.x`/`p.y` directly onto the live `seg.points` array element at 4552, calls redraw() and scheduleRegen()) and `up` (4556, releases pointer capture, detaches both listeners, calls regenNow() so the FINAL position is always applied even if the debounce below hasn't fired) — both installed as SVG-level pointermove/pointerup listeners inside the pointerdown handler (4557), self-removing on `up`; and `dblclick` (4559-4562) removes the point (pts.splice at 4561) when it is neither the first nor last point and at least 3 points remain, then redraws and regenerates immediately.",
+            "Debounced regeneration (4566-4574, with a six-line comment at 4566-4571 explaining the tradeoff): `scheduleRegen` (4573) clears any pending timer and sets a new 120ms one calling `regenNow`; `regenNow` (4574) clears the timer and calls `onTweenPairCurveChanged(li,fA)` (next packet) — so continuous dragging redraws the curve every pointermove but only re-triggers the expensive tween regeneration once per 120ms of stillness, with `up`'s own regenNow() call guaranteeing the last position is never lost to a pending debounce.",
+            "Click-to-insert-point handler (4575-4583): attached directly to the svg element; ignored if the click target isn't the svg itself (i.e. a click on an existing circle doesn't also insert a new point); otherwise computes the clicked point's logical (nx,ny) via fromSX/fromSY, finds the correct sorted insertion index by x (first existing point whose x exceeds nx, or the end), inserts the new point via `pts.splice(idx,0,{x:nx,y:ny})` (4581), then redraws and regenerates immediately (4582, no debounce for insertion).",
+            "Initial `redraw()` call (4584) before returning `{svg, redraw, seg}` (4585) so the curve is drawn once synchronously before any interaction."
+          ],
+          "callers": [
+            "renderTweenCurveStrips (this scope's previous packet, line 4455) — one call per qualifying tween span, per full timeline render.",
+            "openTweenCurveInset (this scope's next packet, line 4647) — one call per popup open.",
+            "A whole-repo git grep at the frozen SHA for `buildTweenCurveSVG` found matches only inside src/js/timeline.js: the declaration (4471), its own two call sites above (4455, 4647) and two comment mentions citing it as the shared builder (line 4452-4454 in the previous packet's renderTweenCurveStrips, and line 4645-4646 in the next packet's openTweenCurveInset) — no other file in the repository references it."
+          ],
+          "effects": "Mutates `state.tweenEasing[key]` in place (lazy-init at 4474, default-seed at 4475-4479, and every point-array edit thereafter: drag writes at 4552, dblclick delete-splice at 4561, click-insert-splice at 4581 — all mutate the SAME object referenced by `seg`, which IS the state.tweenEasing entry, so every edit is a live document-state write, not a local copy). Calls `pushUndo()` once per drag gesture (4546) — the only history-pushing call in this entire scope. Calls `onTweenPairCurveChanged` (next packet) via `regenNow`, both debounced (during drag) and immediately (on pointerup/dblclick/click-insert), which is this scope's sole path to `generateTweens()`. Builds/mutates SVG DOM nodes; reads `window._curveEditor` (ui.js-owned) for both the default-curve fallback and the curve evaluator, tolerating its absence in both cases."
+        },
+        {
+          "id": "C19n.inline-curve-inset",
+          "files": [
+            "src/js/timeline.js:4587-4664"
+          ],
+          "coverage_ranges": [
+            [
+              4587,
+              4664
+            ]
+          ],
+          "classification": {
+            "code": 58,
+            "comment": 20,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_tweenCurveInset",
+            "closeTweenCurveInset",
+            "findLayerRow",
+            "openTweenCurveInset",
+            "onTweenPairCurveChanged"
+          ],
+          "signature": "var _tweenCurveInset=null; closeTweenCurveInset()->undefined; findLayerRow(li)->Element|null; openTweenCurveInset(li,fA,fB)->undefined; onTweenPairCurveChanged(li,fA)->undefined",
+          "responsibility": "A second, floating (document.body-appended) instance of the same curve editor for quick in-place edits without turning the persistent strips on, anchored directly under the clicked tween span's own row/column position; plus the single shared regeneration-and-refresh routine (onTweenPairCurveChanged) both this popup and the next packet's selection-apply path funnel through after any curve edit.",
+          "behavior": [
+            "Section header and 8-line comment (4587-4595) frame the popup as independent of the shared #curve-canvas singleton (which shows only one curve at a time in a fixed panel spot), floating on document.body so it isn't clipped by #frame-grid's own overflow, and sharing the same state.tweenEasing/evalPointsCurve as the main widget.",
+            "`_tweenCurveInset` (4596): module-level singleton reference, null when no inset is open, else `{el, outsideHandler}`.",
+            "closeTweenCurveInset (4597-4602): no-ops if `_tweenCurveInset` is already null; otherwise removes the document-level capture-phase pointerdown outside-click listener, removes the inset's DOM element, and resets the singleton to null.",
+            "findLayerRow (4609-4616, preceded by a 6-line comment at 4603-4608 on why exact on-screen alignment matters): linear scan of every `#frame-grid .frow`, returning the first whose `.fc` cell's `dataset.layer` parses to the requested `li`, or null if none match.",
+            "openTweenCurveInset (4617-4653): calls closeTweenCurveInset() first (single-inset invariant); finds the row via findLayerRow(li), returning early if not found; computes `key=tweenSpanKey(li,fA,fB)` (tweens.js-owned) and the row's bounding rect; sizes the popup box to `W=max(140,(fB-fA)*FC)` wide and a fixed `H=110` tall, clamps its left position to stay on-screen (`Math.max(4,Math.min(window.innerWidth-W-4, rowRect.left+fA*FC))`) and positions its top at `rowRect.bottom+2`; builds a fixed-position styled div with an inline header (span reading 'Tween A -> B' 1-based, a 'réinitialiser' button and a '✕' close button) via innerHTML; wires the close button to closeTweenCurveInset() and the reset button to delete `state.tweenEasing[key]` then close the inset and call onTweenPairCurveChanged(li,fA) (below); calls `buildTweenCurveSVG(li,fA,fB,svgW,svgH)` (previous packet, the same builder the persistent strips use) and appends its svg into the box; appends the box to document.body; installs a deferred (setTimeout 0) capture-phase document pointerdown listener that closes the inset on any click outside the box; and stores `{el:box, outsideHandler}` as the new `_tweenCurveInset`.",
+            "onTweenPairCurveChanged (4654-4664, preceded by a 4-line comment at 4654-4657 naming it shared by this inset and the next packet's tween-pair selection-apply path): calls `selClear();selAdd(li,fA)` (selection-geometry-owned) to scope the regeneration to exactly this one pair, calls `generateTweens()` (tweens.js-owned — the actual tween-frame regeneration this whole feature exists to re-trigger after a curve edit), calls `selClear()` again immediately after (restoring the pre-call selection state), conditionally calls `renderOS()` (onion-skin refresh, only `if(state.activeLayerIdx===li)`), unconditionally calls `updateUI()` and `renderTweenCurveStrips()` (this scope's earlier packet, so the persistent strip reflects the regenerated curve even if the toggle was already on)."
+          ],
+          "callers": [
+            "closeTweenCurveInset: called by its own outsideHandler (in-packet, 4650-4651 setTimeout-installed listener), by openTweenCurveInset's own single-inset guard (4618) and by the inset's own close-button click handler (4638) and reset-button handler (4639-4644, before regenerating). A whole-repo git grep at the frozen SHA found no call to `closeTweenCurveInset` outside timeline.js.",
+            "findLayerRow: called only by openTweenCurveInset (4619, in-packet). No other caller anywhere in the frozen tree.",
+            "openTweenCurveInset: not called anywhere within this packet's own assigned lines. A whole-repo git grep at the frozen SHA for `openTweenCurveInset` found only its own declaration (4617) and the comment in its section header (4589) — the intended call site (a frame-cell right-click context-menu action, per the section comment's mention of 'still available when the toggle is off') was not found in the currently assigned scope, meaning either the wiring lives in an out-of-scope part of timeline.js this leaf did not search, or the function is not yet wired to any UI trigger in the frozen source; flagged here rather than asserted either way, since confirming absence across the whole repository (not just timeline.js) was out of this packet's grep scope.",
+            "onTweenPairCurveChanged: called by openTweenCurveInset's reset-button handler (4643, in-packet) and, outside this packet, by buildTweenCurveSVG's regenNow (line 4574, this scope's previous packet) and by applyTweenCurveToSelection (this scope's next packet, line 4714). A whole-repo git grep at the frozen SHA for `onTweenPairCurveChanged` found matches only inside timeline.js: the declaration (4657), its own comment header (4654-4656), and the three call sites just listed — no other file references it."
+          ],
+          "effects": "closeTweenCurveInset/openTweenCurveInset/findLayerRow are DOM-only (element creation/removal, listener add/remove, bounding-rect reads); openTweenCurveInset's reset button additionally deletes a `state.tweenEasing[key]` entry (a document-state write) before regenerating. onTweenPairCurveChanged is this scope's single shared regeneration entry point: it calls generateTweens() (tweens.js, document-state/frame-data mutation), touches selection state transiently (selClear/selAdd/selClear, restoring the prior selection), and calls updateUI()/renderOS()/renderTweenCurveStrips() to refresh every display that could be showing the affected span."
+        },
+        {
+          "id": "C19n.tween-cell-selection-apply",
+          "files": [
+            "src/js/timeline.js:4665-4724"
+          ],
+          "coverage_ranges": [
+            [
+              4665,
+              4724
+            ]
+          ],
+          "classification": {
+            "code": 36,
+            "comment": 24,
+            "whitespace": 0
+          },
+          "symbols": [
+            "tweenPairForCell",
+            "editTweenSegForCell",
+            "applyTweenCurveToSelection",
+            "hexToRgbTriplet"
+          ],
+          "signature": "tweenPairForCell(li,fi)->{a:number,b:number}|null; editTweenSegForCell(li,fi,fr0)->undefined; applyTweenCurveToSelection(li,pair,seg,selSnapshot)->undefined; hexToRgbTriplet(hex)->string",
+          "responsibility": "Bridges a clicked frame-grid cell to the shared #curve-canvas Easing Curve widget (ui.js) in tween-pair-scoped mode, and propagates one curve edit to every OTHER selected frame's own tween pair at once (a 2026-07-30 feature request: curve edits should apply automatically to whatever else is selected, not just the clicked pair). `hexToRgbTriplet` is an unrelated small color utility that closes out this packet immediately before the next packet's renderKeyframeCellsInto (which uses it).",
+          "behavior": [
+            "Lead-in comment (4665-4670) frames tweenPairForCell as shared by the frame-grid click handler and its context menu so both agree on which span a cell belongs to (both call sites are outside this scope).",
+            "tweenPairForCell (4669-4673): calls layerKeyframeList(li) (this scope's first packet); linear-scans consecutive keyframe pairs, returning `{a:keys[i], b:keys[i+1]}` for the first pair where `fi>=keys[i] && fi<=keys[i+1]` (inclusive both ends, so a cell exactly on a keyframe boundary matches the pair it starts); returns null if no such pair exists (e.g. before the first keyframe or after the last).",
+            "Lead-in comment (4674-4679) for editTweenSegForCell explains it puts the shared widget into tween-pair mode instead of leaving it on the global default curve — the actual bug this helper exists to close — and that callers fall back to `exitTweenPair` when the cell isn't inside a span (not shown, out of scope).",
+            "editTweenSegForCell (4680-4694): opens the 'tween-sec'/'easing-sec' property panel sections (openPropsSection, out-of-scope UI helper) unconditionally (4681); computes `pair=tweenPairForCell(li,fi)` (4682); returns early (no-op) if there is no pair, or if `window._curveEditor`/`window._curveEditor.editTweenPair` is absent (4683); otherwise computes `key=tweenSpanKey(li,pair.a,pair.b)` (4684, tweens.js-owned) and lazily creates/reads `seg=state.tweenEasing[key]=state.tweenEasing[key]||{}` (4685-4686, a document-state write on first access, same lazy-init pattern as buildTweenCurveSVG); captures `selSnapshot=_sel.frames.slice()` (4692) BEFORE calling into the widget — captured early specifically because onTweenPairCurveChanged's own selClear/selAdd dance (previous packet) would otherwise clobber `_sel.frames` first, per the in-source comment at 4687-4691 citing a 2026-07-30 feedback request; finally calls `window._curveEditor.editTweenPair(seg, 'Tween A -> B' (1-based), applyCallback)` (4693) where applyCallback is a closure invoking `applyTweenCurveToSelection(li,pair,seg,selSnapshot)` (next function) once the widget commits an edit.",
+            "Lead-in comment (4692-4698) for applyTweenCurveToSelection: applies seg's already-mutated curve (the widget's own commit point) to every OTHER tween pair implied by selSnapshot, deduplicated so multiple selected frames landing in the same span only regenerate once; falls back to the single-pair path when nothing else was selected.",
+            "applyTweenCurveToSelection (4701-4715): seeds a `seen` dedup map with the clicked pair's own key already marked true, and a `touched` list starting with `{li,fA:pair.a}`; for every entry in `selSnapshot` (skipped entirely if empty/falsy), computes that selected cell's own pair via `tweenPairForCell(s.layer,s.frame)` (skipping cells with no pair), dedups by key, and — for each new pair — WRITES a brand-new `state.tweenEasing[k2]` entry (4711) whose `points` array is a deep-ish copy of `seg.points` (each point copied as `{x,y}` plus `tx`/`ty` overshoot-handle fields when `p.tx` is a number) rather than a shared reference, then adds `{li:s.layer, fA:p2.a}` to `touched`; finally calls `onTweenPairCurveChanged(t.li,t.fA)` (previous packet) once per entry in `touched`, regenerating every affected pair in turn.",
+            "hexToRgbTriplet (4719-4724, preceded by a 3-line comment at 4716-4718 attributing it to the next packet's renderKeyframeCellsInto): strips a leading '#', expands a 3-digit hex to 6 digits by doubling each character, parses r/g/b as 2-hex-digit substrings (defaulting each to 0 on NaN via `||0`), and returns them comma-joined as a CSS rgb-triplet string (e.g. '255,0,128') suitable for a CSS custom property."
+          ],
+          "callers": [
+            "tweenPairForCell: called in-packet by editTweenSegForCell (4682) and applyTweenCurveToSelection (4705). A whole-repo git grep at the frozen SHA found no caller outside timeline.js; the 'frame-grid click handler and its context menu' mentioned in the lead-in comment as callers were not located inside this packet's own assigned lines (they are elsewhere in timeline.js, out of this scope, or the comment describes intended-not-yet-wired call sites — flagged rather than asserted).",
+            "editTweenSegForCell: not called anywhere within this packet's assigned lines. A whole-repo git grep at the frozen SHA for `editTweenSegForCell` found only its own declaration (4680) and no other reference in any file — its caller (the frame-grid click/context-menu path the lead-in comment describes) lies outside this leaf's assigned scope or is not yet wired in the frozen source; flagged rather than asserted.",
+            "applyTweenCurveToSelection: called only via the closure editTweenSegForCell passes to `window._curveEditor.editTweenPair` (4693, in-packet) — i.e. invoked by ui.js's shared widget when the user commits an edit, not directly by any timeline.js code. A whole-repo git grep at the frozen SHA found no other caller.",
+            "hexToRgbTriplet: called once, outside this packet, by renderKeyframeCellsInto (this scope's next packet, line 4760 — see that packet) to set the `--dot-rgb` CSS custom property. A whole-repo git grep at the frozen SHA for `hexToRgbTriplet` found matches only inside timeline.js: the declaration (4719) and that one call site — no other file references it."
+          ],
+          "effects": "tweenPairForCell/hexToRgbTriplet are pure. editTweenSegForCell writes `state.tweenEasing[key]` on first access (lazy-init, 4685-4686) and opens property-panel UI sections (openPropsSection, out-of-scope DOM side effect, 4681) but otherwise only reads `_sel.frames` and hands control to ui.js's widget. applyTweenCurveToSelection writes a brand-new `state.tweenEasing[k2]` entry per touched OTHER pair (4711, document-state mutation, one write per selected frame's own span, deduplicated) and calls `onTweenPairCurveChanged` (this scope's previous packet, 4714) once per touched pair, which is this packet's only path to `generateTweens()`/`pushUndo` (indirectly, via whichever gesture originally triggered the widget commit — no direct pushUndo call exists in this packet itself)."
+        },
+        {
+          "id": "C19n.keyframe-cells-render",
+          "files": [
+            "src/js/timeline.js:4725-4787"
+          ],
+          "coverage_ranges": [
+            [
+              4725,
+              4787
+            ]
+          ],
+          "classification": {
+            "code": 35,
+            "comment": 27,
+            "whitespace": 1
+          },
+          "symbols": [
+            "renderKeyframeCellsInto"
+          ],
+          "signature": "renderKeyframeCellsInto(rowEl,li,contentLayerIdxs) -> undefined",
+          "responsibility": "Builds one row's worth of per-frame `.fc` keyframe/tween/held-span cells for layer `li` into a given row element — shared by a normal per-layer row and a collapsed folder's representative row (both call sites are in C19m's out-of-scope renderTimeline) so both stay pixel- and class-identical.",
+          "behavior": [
+            "Lead-in comment (4725-4727, spanning into the function's own first lines) states the sharing rationale between normal rows and collapsed-folder representative rows.",
+            "Setup (4725-4734): reads `ld=state.layers[li]` (4726); a 6-line comment (4727-4732) explains that a component-instance layer's row must show only its OUTER placement/blank keys (`ld.frames`), never the symbol's internal drawing keyframes, because mirroring internal keys here previously made one instance look like unrelated parent keys and made selecting/moving the instance's timing ambiguous; resolves `sym=ld.symbolId?state.symbols[ld.symbolId]:null` (4733); defines `frOf(fi)` returning `ld.frames[fi]` (4734).",
+            "hasContentAt(fi) (4738-4745, preceded by a 3-line comment at 4735-4737 on the contentLayerIdxs contract): for a component-instance layer (`sym` truthy), returns true only if the frame is a keyframe AND not `blankOverride` (ignores contentLayerIdxs entirely in this branch, 4739-4742); otherwise, without contentLayerIdxs, returns whether `ld.frames[fi].strokes.length>0` (4743); with contentLayerIdxs (a collapsed Stroke/Fill/Shadow folder head row, per the comment), returns true if ANY sibling layer index in the list has strokes at that frame (4744).",
+            "Held-cell forward-scan state (4751, preceded by a 5-line comment at 4746-4750 documenting a perf fix): `heldSourceFound`/`heldSourceHasContent` are updated once per real keyframe encountered and carried forward through subsequent held cells, replacing a prior O(frames^2) backward-scan-per-held-cell implementation (the previous version rescanned backward from every held cell on every full timeline rebuild) with an O(frames) single forward pass producing identical CSS classes.",
+            "Per-frame cell loop (4752-4785, `for fi=0..state.totalFrames-1`): creates one `div.fc` per frame with `dataset.frame=fi`/`dataset.layer=li` (4752); adds `.cur` if `fi===state.currentFrame`, `.outside-wa` if outside the work-area bounds (`state.waIn`/`state.waOut`) (4753), `.sel` if `selHas(li,fi)` (4754, selection-geometry-owned, called not defined here); if `ld.color` is set, writes both `--dot-color` and `--dot-rgb` (via hexToRgbTriplet, previous packet) as inline CSS custom properties on the cell itself (not just a child dot) at 4760 so CSS-inherited backgrounds on the whole span read in the layer's own color rather than a generic gray, per the in-source comment at 4755-4759; then branches three ways on the frame's own flags (4761): (a) `fr.isKeyframe` (4762-4772) — computes `full=hasContentAt(fi)` (4763), updates the held-scan state (4764), appends a `div.km` child classed `fl` (full) or `hl` (hollow) (4765-4766), and classes the cell itself `kf-full`/`kf-empty` (4771, so the span-tint band visually starts AT the key rather than one cell later, and a lone keyframe shows only its dot, matching Animate's convention per the in-source comment at 4767-4770); (b) `fr.isInterpolated` (4773) — classes the cell `tw-manual` or plain `tw` depending on `fr.isManualEdit`, and appends a `div.km.td` child (with an extra `manual` class when manually edited); (c) otherwise (4774-4784, a plain held/extended frame) — if a prior keyframe has been seen in this forward scan (4779), classes the cell `span-full`/`span-empty` per the carried-forward content state (4780), and additionally adds `span-end` (4782) if the NEXT frame is absent, a keyframe, or interpolated (4781-4782, marking the last extended cell before the next event with an end-of-span tick, a distinction the in-source comment at 4775-4778 attributes to matching Animate's own display and closing a previous omission in this app); appends the fully-classed cell to `rowEl` (4785).",
+            "The function's closing brace (4786) and a single trailing blank line (4787) end both the function and this packet/scope."
+          ],
+          "callers": [
+            "Called twice, both outside this packet, inside C19m's own out-of-scope renderTimeline: line 4254 (`renderKeyframeCellsInto(frow,entry.keyLayerIdx)` — a collapsed folder's representative row, no contentLayerIdxs argument, so hasContentAt falls back to the plain single-layer branch) and line 4300 (`renderKeyframeCellsInto(row,li,contentIdxs)` — a normal or collapsed-link-group-head row, contentIdxs populated only in the latter case).",
+            "A whole-repo git grep at the frozen SHA for `renderKeyframeCellsInto` found: the two call sites above (both in timeline.js, both outside this scope), the declaration (4725, in-packet), a comment mention inside this same scope's own C19n.tween-span-geometry-adjacent code (none actually — the only other in-file comment mention is at timeline.js:5116, outside every packet in this scope, describing a symbolId-branch placement stub), one comment mention in src/css/style.css:1726 (documenting the `--dot-color`/`--dot-rgb` CSS custom properties this function sets, not a code caller), and two references in tests/performance-regressions.test.cjs (lines 42 and 72, which extract this function's own source text via `source.indexOf('function renderKeyframeCellsInto(')` and `vm.runInNewContext` to benchmark it in isolation — a test harness that reads the function's source, not a runtime caller of it in the shipped application). No other file anywhere in the repository calls this function."
+          ],
+          "effects": "Pure DOM construction (creates and appends `.fc`/`.km` elements with classes and inline CSS custom properties) plus reads of state.layers/state.symbols/state.currentFrame/state.waIn/state.waOut and a call into selHas (selection-geometry-owned). No state mutation, no history/save/load call, no return value (writes directly into the passed-in rowEl)."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No pushUndo-adjacent save*-prefixed writer call appears in this scope. The one document-state writes that persist (state.tweenEasing entries, written in buildTweenCurveSVG at 4474/4540/4550/4564, in editTweenSegForCell at 4686, in applyTweenCurveToSelection at 4711, and deleted in openTweenCurveInset's reset handler at 4641) are plain in-memory state mutations; whatever persists state.tweenEasing to a project file happens entirely outside this scope (not searched here)."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No loadFrame call anywhere in this scope (verified by direct text search). Every function here operates on the already-loaded state.layers/state.tweenEasing/state.symbols in memory."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Exactly one pushUndo() call in this entire scope, at buildTweenCurveSVG's circle pointerdown handler (line 4537, one push per drag GESTURE, not per pointermove tick — a 2026-09 QA-sweep fix documented in-source). No other function in this scope calls pushUndo, undo, or redo directly; applyTweenCurveToSelection's multi-pair propagation and editTweenSegForCell's widget-commit path rely on whatever undo snapshot the ORIGINAL gesture (the drag, or the widget's own commit flow in ui.js, out of scope) already captured."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "onTweenPairCurveChanged transiently calls selClear()/selAdd(li,fA)/selClear() (selection-geometry-owned, lines 4658-4660) purely to scope generateTweens() to one pair, restoring the caller's own selection state immediately after. editTweenSegForCell reads (never writes) `_sel.frames.slice()` (line 4692) to snapshot the user's current selection before it could be clobbered by the above dance. renderKeyframeCellsInto reads `selHas(li,fi)` (line 4754) to add the `.sel` class per cell. No function in this scope otherwise mutates the persistent selection."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "This scope reads state.layers[li].frames extensively (isKeyframe/isInterpolated/isManualEdit/blankOverride/strokes) to classify each cell and to decide which keyframe pairs have a tween, but its only path to actually regenerating animation frame data is generateTweens() (tweens.js-owned), called exactly once at line 4659 inside onTweenPairCurveChanged, itself reachable only from a curve-editing gesture (drag/dblclick/click-insert in buildTweenCurveSVG, the popup's reset button, or applyTweenCurveToSelection's multi-pair propagation)."
+    },
+    {
+      "consumer": "render",
+      "disposition": "The dominant consumer of this scope: renderTweenCurveStrips (persistent inline strips), buildTweenCurveSVG (the shared SVG curve-editor surface, used both inline and in the popup), openTweenCurveInset/closeTweenCurveInset/findLayerRow (the floating popup), and renderKeyframeCellsInto (per-frame cell DOM) are all pure DOM-construction/adapter functions with no separate persistence path of their own."
+    },
+    {
+      "consumer": "export",
+      "disposition": "No export/SMEngineBridge/Tauri/native reference anywhere in this scope (verified by direct text search of the full 4344-4787 span). Export reads persisted state.tweenEasing/frame data independently of this DOM/editing layer."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "No direct SMEngineBridge, Tauri command, filesystem or native IPC call occurs anywhere in this scope."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "tween-span-detection-first-match-break",
+      "status": "proposed, unrun",
+      "initial_state": "A layer with keyframes at frames 0, 5, 10; frames 1-4 all isInterpolated=true; frames 6-9 all isInterpolated=false.",
+      "expected_effects": "layerTweenSpans returns exactly [[0,5]]; the [5,10] pair is omitted since no frame between 6 and 9 is isInterpolated; layerHasTweenSpans(li) is true only because of the first pair."
+    },
+    {
+      "id": "row-height-toggle-and-emptiness-independence",
+      "status": "proposed, unrun",
+      "initial_state": "state.showTweenCurves true/false, crossed with a layer that has a tween span vs. one that has only keyframes with no generated interpolation between them.",
+      "expected_effects": "frameGridRowHeight returns exactly ROW_H+92 only when BOTH the toggle is on AND the layer has a tween span; all three other combinations return plain ROW_H."
+    },
+    {
+      "id": "visual-top-and-index-at-y-round-trip",
+      "status": "proposed, unrun",
+      "initial_state": "A mix of layers with and without extra tween-curve row height, in a stable render order.",
+      "expected_effects": "For every layer li, layerIndexAtGridY(visualTopOfLayer(li)) === li (a point exactly at a row's own top resolves back to that row), and frameGridTotalRowsHeight() equals the sum of every layer's own frameGridRowHeight()."
+    },
+    {
+      "id": "curve-strip-cleanup-on-toggle-off",
+      "status": "proposed, unrun",
+      "initial_state": "Several `.tw-curve-strip` elements present from a prior render; state.showTweenCurves flips to false.",
+      "expected_effects": "renderTweenCurveStrips() removes every existing `.tw-curve-strip` element and returns before creating any new one; a subsequent toggle back to true rebuilds them fresh from the current layerTweenSpans data."
+    },
+    {
+      "id": "curve-strip-row-lookup-skip-conditions",
+      "status": "proposed, unrun",
+      "initial_state": "A `.frow` with no `.fc` child; a `.fc` with a non-numeric `dataset.layer`; a `.fc` whose layer index no longer exists in state.layers (a stale row after a layer delete).",
+      "expected_effects": "All three cases are skipped with no strip created and no thrown error; only rows resolving to a valid, still-existing layer index with at least one tween span get a strip."
+    },
+    {
+      "id": "curve-editor-default-seed-vs-global-fallback",
+      "status": "proposed, unrun",
+      "initial_state": "A brand-new tween pair with no state.tweenEasing entry, exercised with window._curveEditor present (returning a specific getState().points) vs. absent.",
+      "expected_effects": "When present, the new segment's points are a value-copied (not reference-shared) clone of the global editor's current points; when absent, the hardcoded four-point default [{0,0},{.42,0},{.58,1},{1,1}] is used instead — either way, mutating the new segment's points afterward never mutates the global editor's own points array."
+    },
+    {
+      "id": "curve-editor-y-domain-overshoot-reachability",
+      "status": "proposed, unrun",
+      "initial_state": "A control point at y=1.2 and one at y=-0.2 (both legal per fromSY's clamp range), rendered at several different svgH values.",
+      "expected_effects": "toSY(1.2) and toSY(-0.2) both land strictly inside [0,svgH] at every tested svgH (never negative, never exceeding svgH) — the reachability property the 2026 Y-domain fix specifically targets."
+    },
+    {
+      "id": "curve-editor-drag-capture-survives-redraw",
+      "status": "proposed, unrun",
+      "initial_state": "A pointerdown on a control-point circle, followed by several synthetic pointermove events dispatched after each intervening redraw() call has destroyed and recreated that circle element.",
+      "expected_effects": "Every pointermove after the first is still delivered (capture was set on the persistent `svg` element, not the recreated circle), and `up` on pointerup reliably detaches both listeners and calls regenNow() exactly once."
+    },
+    {
+      "id": "curve-editor-endpoint-x-pinning-and-neighbor-clamp",
+      "status": "proposed, unrun",
+      "initial_state": "A drag of the first point, the last point, and a middle point, in each case attempting to move it past a neighboring point's x.",
+      "expected_effects": "The first point's x is always forced to exactly 0 and the last point's x to exactly 1 regardless of pointer position; a middle point's x is clamped to stay strictly between its immediate neighbors (+/-0.001), never crossing or coinciding with either."
+    },
+    {
+      "id": "curve-editor-debounced-vs-immediate-regen",
+      "status": "proposed, unrun",
+      "initial_state": "A drag producing 20 pointermove events within 120ms, followed by a pointerup; separately, a dblclick delete and a click-to-insert.",
+      "expected_effects": "The drag triggers at most one onTweenPairCurveChanged call from the debounce timer (coalescing all 20 moves) PLUS exactly one more from pointerup's own immediate regenNow() (guaranteeing the final position always applies); dblclick and click-insert each trigger exactly one immediate call with no debounce delay."
+    },
+    {
+      "id": "inset-single-instance-and-outside-click-close",
+      "status": "proposed, unrun",
+      "initial_state": "openTweenCurveInset called twice in succession for different spans; then a pointerdown dispatched outside the open inset's bounding box.",
+      "expected_effects": "The second call closes the first inset (via its own closeTweenCurveInset() guard) before opening the new one — never two insets simultaneously; the outside pointerdown closes the currently open inset via its capture-phase document listener, and a pointerdown INSIDE the inset's own box does not close it."
+    },
+    {
+      "id": "inset-position-clamped-onscreen",
+      "status": "proposed, unrun",
+      "initial_state": "A tween span whose row is near the right edge of the viewport, such that rowRect.left+fA*FC+W would exceed window.innerWidth.",
+      "expected_effects": "The inset's computed left is clamped to `window.innerWidth-W-4`, never rendering partially off the right edge of the screen; a span near the left edge is clamped to a minimum left of 4."
+    },
+    {
+      "id": "inset-reset-restores-global-fallback",
+      "status": "proposed, unrun",
+      "initial_state": "A tween pair with a custom state.tweenEasing entry; the popup's 'réinitialiser' button is clicked.",
+      "expected_effects": "The custom entry is deleted from state.tweenEasing, the popup closes, and onTweenPairCurveChanged regenerates the pair — after which a fresh buildTweenCurveSVG call for the same pair reseeds from the current global curve (or the hardcoded default) rather than any trace of the deleted custom curve."
+    },
+    {
+      "id": "on-tween-pair-curve-changed-selection-round-trip",
+      "status": "proposed, unrun",
+      "initial_state": "A pre-existing multi-frame selection unrelated to the pair being edited; onTweenPairCurveChanged(li,fA) is called.",
+      "expected_effects": "generateTweens() is called with the selection scoped to exactly [li,fA] (via the transient selClear/selAdd), and the ORIGINAL selection is fully restored (both in content and order-independent membership) immediately after generateTweens returns, before renderOS/updateUI/renderTweenCurveStrips run."
+    },
+    {
+      "id": "apply-tween-curve-to-selection-dedup-and-copy-semantics",
+      "status": "proposed, unrun",
+      "initial_state": "A selSnapshot containing several selected frames, two of which fall inside the SAME tween pair as each other (but not the clicked pair), one with no pair (before any keyframe), and one identical to the clicked pair itself.",
+      "expected_effects": "The clicked pair is regenerated exactly once (pre-seeded into `seen`); the two same-pair selected frames produce exactly one additional regeneration (deduplicated), not two; the no-pair frame contributes nothing; every newly-written state.tweenEasing[k2] entry is a value copy of the clicked seg's points (including tx/ty when present), never a shared array reference, so a later drag on ONE pair never silently mutates another pair's points array."
+    },
+    {
+      "id": "edit-tween-seg-for-cell-selection-capture-order",
+      "status": "proposed, unrun",
+      "initial_state": "editTweenSegForCell(li,fi,fr0) called with a non-empty _sel.frames and a cell that IS inside a tween span, exercised with window._curveEditor present vs. absent, and with the cell OUTSIDE any span.",
+      "expected_effects": "selSnapshot is captured as a full copy of _sel.frames BEFORE window._curveEditor.editTweenPair (and therefore before any downstream onTweenPairCurveChanged selClear/selAdd) can run; the function no-ops cleanly (still having opened the property panel sections) when there is no pair or no global curve editor available."
+    },
+    {
+      "id": "keyframe-cell-classification-three-way-branch",
+      "status": "proposed, unrun",
+      "initial_state": "A layer with a keyframe with content, a keyframe with no content (blank), an isInterpolated frame (auto and isManualEdit variants), and a run of held/extended frames following each, ending exactly at the next keyframe/interpolated frame vs. at the end of the timeline.",
+      "expected_effects": "Keyframe cells get exactly one of kf-full/kf-empty plus a `.km.fl` or `.km.hl` child; interpolated cells get `tw` or `tw-manual` plus a `.km.td` child (with `.manual` added only for isManualEdit); held cells get `span-full`/`span-empty` matching the MOST RECENT real keyframe's content state (not the immediately preceding cell's), and exactly the last held cell before the next keyframe/interpolated frame (or the timeline's own end) additionally gets `span-end`."
+    },
+    {
+      "id": "keyframe-cell-component-instance-vs-folder-head-content",
+      "status": "proposed, unrun",
+      "initial_state": "A component-instance layer (ld.symbolId set) with an outer keyframe marked blankOverride=true; a plain layer queried with contentLayerIdxs naming three sibling layers, only one of which has strokes at the tested frame.",
+      "expected_effects": "The component-instance branch ignores contentLayerIdxs entirely and reports hasContentAt=false solely because of blankOverride, even if the frame is otherwise a keyframe; the folder-head branch reports hasContentAt=true because at least one named sibling has strokes, regardless of this layer's own strokes array."
+    },
+    {
+      "id": "keyframe-cell-render-perf-forward-scan",
+      "status": "proposed, unrun",
+      "initial_state": "A layer with 2000+ frames and a single early keyframe, instrumented to count backward-scan operations vs. the documented O(frames) forward-carry implementation.",
+      "expected_effects": "Total classification work scales linearly with state.totalFrames regardless of how far the nearest preceding keyframe is, consistent with the in-source claim that this replaced a prior O(frames^2) implementation."
+    },
+    {
+      "id": "consumer-round-trips",
+      "status": "proposed, unrun",
+      "initial_state": "The two renderKeyframeCellsInto call sites (plain row, collapsed-folder representative row) and the ~4 call sites into renderTweenCurveStrips/onTweenPairCurveChanged, each exercised through their own separately-owned rendering/mutation paths.",
+      "expected_effects": "Only the caller's own already-materialized frame data and tween-easing entries are reflected on the next call; this artifact does not certify any individual caller's correctness."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "planLayerTweenSpans(layerFrames,totalFrames) -> [number,number][]",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure keyframe/interpolated-frame scan extracted from layerKeyframeList/layerTweenSpans, taking a plain frames array instead of reading state.layers directly; the state.layers[li] lookup and the DOM/row consumers remain adapters."
+    },
+    {
+      "api": "planFrameGridRowLayout(layerIds,rowHeightFn) -> {top:Map,total:number,indexAtY:function}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Generalizes visualTopOfLayer/frameGridTotalRowsHeight/layerIndexAtGridY into one precomputed layout table (currently each is an independent O(n) or O(n) walk recomputed per call with no caching), leaving frameGridRowHeight itself (and its ROW_H/toggle dependency) as the injected per-row height function."
+    },
+    {
+      "api": "planCurveEditorGeometry(svgW,svgH,yDomain) -> {toSX,toSY,fromSX,fromSY}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure coordinate-mapping closure factory extracted from buildTweenCurveSVG, parameterizing the currently-hardcoded Y_LO/Y_HI/ipad constants; the SVG DOM construction, drag-gesture wiring and undo/regen scheduling remain in the adapter."
+    },
+    {
+      "api": "planTweenCurveSelectionPropagation(clickedPair,selectionSnapshot,pairLookupFn) -> {pair,touched}[]",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure dedup-and-map logic extracted from applyTweenCurveToSelection, taking a lookup function instead of reading layer/frame state directly; the actual state.tweenEasing writes and onTweenPairCurveChanged calls remain in the adapter."
+    },
+    {
+      "api": "planKeyframeCellClass(frame,prevHeldState,nextFrame,isComponentInstance,hasContent) -> {cellClasses,markerClass}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure per-cell classification extracted from renderKeyframeCellsInto's three-way branch and held-state carry-forward, separated from DOM element creation and from the row-level hasContentAt/contentLayerIdxs resolution, which remain a separate out-of-scope port."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "symbols": [
+      "layerKeyframeList",
+      "layerTweenSpans",
+      "layerHasTweenSpans",
+      "TWEEN_ROW_EXTRA_H",
+      "layerCurveRowExtraHeight",
+      "frameGridRowHeight",
+      "visualTopOfLayer",
+      "frameGridTotalRowsHeight",
+      "layerIndexAtGridY",
+      "renderTweenCurveStrips",
+      "buildTweenCurveSVG",
+      "_tweenCurveInset",
+      "closeTweenCurveInset",
+      "findLayerRow",
+      "openTweenCurveInset",
+      "onTweenPairCurveChanged",
+      "tweenPairForCell",
+      "editTweenSegForCell",
+      "applyTweenCurveToSelection",
+      "hexToRgbTriplet",
+      "renderKeyframeCellsInto"
+    ],
+    "callers": {
+      "renderTweenCurveStrips": [
+        "src/js/timeline.js:4334 (renderTimeline, C19m-owned, out-of-scope caller)",
+        "src/js/timeline.js:4663 (onTweenPairCurveChanged, this scope's own in-packet caller)",
+        "no other file in the repository references renderTweenCurveStrips (whole-repo git grep at the frozen SHA confirms every one of its 8 total matches lies inside src/js/timeline.js)"
+      ],
+      "frameGridRowHeight": [
+        "src/js/timeline.js:4403 (visualTopOfLayer, in-packet)",
+        "src/js/timeline.js:4408 (frameGridTotalRowsHeight, in-packet)",
+        "src/js/timeline.js:4420 (layerIndexAtGridY, in-packet)",
+        "src/js/timeline.js:5368 (frame-cell drag-preview ghost sizing, out-of-scope, later timeline.js leaf)",
+        "no other file in the repository references frameGridRowHeight (whole-repo git grep at the frozen SHA confirms all 6 total matches lie inside src/js/timeline.js)"
+      ],
+      "layerIndexAtGridY": [
+        "src/js/timeline.js:5300 (frame-cell drag mousemove handler, out-of-scope, later timeline.js leaf)",
+        "no other file in the repository references layerIndexAtGridY (whole-repo git grep at the frozen SHA confirms all 3 total matches — the declaration, one comment mention at 4397, and this one call site — lie inside src/js/timeline.js)"
+      ],
+      "renderKeyframeCellsInto": [
+        "src/js/timeline.js:4254 (renderTimeline's collapsed-folder representative row, C19m-owned, out-of-scope caller)",
+        "src/js/timeline.js:4300 (renderTimeline's normal/collapsed-link-group-head row, C19m-owned, out-of-scope caller)",
+        "src/css/style.css:1726 (comment only, documenting the --dot-color/--dot-rgb custom properties this function sets — not a code caller)",
+        "tests/performance-regressions.test.cjs:42,72 (test harness that extracts this function's own source text via string slicing and vm.runInNewContext to benchmark it in isolation — reads the function's source, not a shipped-application caller)",
+        "no other file in the repository calls renderKeyframeCellsInto"
+      ]
+    },
+    "grep_method": "For each of the four functions named in the issue, ran `git grep -n \"<name>\" 59a5a38c514f5da830dd2f2df4c83c63b1b22fba -- src/js` (whole src/js tree at the frozen SHA) and separately `git grep -n \"<name>\" 59a5a38c514f5da830dd2f2df4c83c63b1b22fba -- .` (entire repository, no path restriction) to also catch tests/CSS/docs references; then manually excluded every match whose trimmed line starts with `//` and the function's own declaration line, classifying every remaining match as a genuine call site with its exact file and line number.",
+    "writers_vs_pure_helpers": {
+      "document_state_writers": [
+        "buildTweenCurveSVG (timeline.js:4471-4586): lazy-inits state.tweenEasing[key] (4474) and its default points (4475-4479); mutates seg.points in place on drag (p.x/p.y writes at 4552), dblclick-delete (pts.splice at 4561) and click-insert (pts.splice at 4581); calls pushUndo() once per drag gesture (4546) — the ONLY pushUndo call in this entire scope.",
+        "onTweenPairCurveChanged (timeline.js:4657-4664): calls generateTweens() at 4659 — the ONLY generateTweens() call in this entire scope — after a transient selClear()/selAdd(li,fA) at 4658 and a restoring selClear() at 4660; also calls renderOS() (4661, conditional) and updateUI() (4662).",
+        "openTweenCurveInset's reset-button handler (timeline.js:4639-4644, inline closure inside openTweenCurveInset): deletes state.tweenEasing[key] (4641) then calls closeTweenCurveInset (4642) and onTweenPairCurveChanged (4643, chains to generateTweens).",
+        "editTweenSegForCell (timeline.js:4680-4694): lazy-inits state.tweenEasing[key] (4685-4686) identically to buildTweenCurveSVG's pattern, then hands it to ui.js's shared widget via editTweenPair (4693).",
+        "applyTweenCurveToSelection (timeline.js:4701-4715): writes a brand-new state.tweenEasing[k2] entry per touched OTHER pair (4711), then calls onTweenPairCurveChanged once per touched pair (chains to generateTweens for each)."
+      ],
+      "pure_helpers": [
+        "layerKeyframeList, layerTweenSpans, layerHasTweenSpans, layerCurveRowExtraHeight, frameGridRowHeight, visualTopOfLayer, frameGridTotalRowsHeight, layerIndexAtGridY (timeline.js:4356-4425): pure reads of state.layers/state.totalFrames/state.showTweenCurves and the app.js ROW_H global; no state assignment anywhere.",
+        "renderTweenCurveStrips (timeline.js:4426-4462): DOM-only (creates/removes .tw-curve-strip elements); reads state but writes none of it.",
+        "findLayerRow, closeTweenCurveInset (timeline.js:4609-4616, 4597-4602): DOM-only (element lookup, removal, listener detachment); no state.* write.",
+        "tweenPairForCell, hexToRgbTriplet (timeline.js:4669-4673, 4719-4724): pure computations with no side effects at all.",
+        "renderKeyframeCellsInto (timeline.js:4725-4786): pure DOM cell construction from already-materialized state.layers/state.symbols/state.currentFrame/state.waIn/state.waOut data; no state mutation, no history/save/load call."
+      ]
+    },
+    "row_height_contract_note": "layerCurveRowExtraHeight/frameGridRowHeight (this scope) define the per-layer row-height contract that C19m's render-timeline packet consumes directly at timeline.js:4277 (`layerCurveRowExtraHeight(li)` added to a row's DOM style) and that the out-of-scope frame-cell drag mousemove handler (timeline.js:5300, next leaf) consumes via layerIndexAtGridY to map a cursor y-position back to a layer index — both existing out-of-scope call sites are cited here only as boundary/consumer evidence, not claimed.",
+    "toggle_and_singleton_lifecycle_note": "The `btn-tween-curves` DOM toggle button is wired entirely outside this scope: its click listener (timeline.js:11234) calls `window.SM.toggleTweenCurves()` (timeline.js:467-479), which flips `state.showTweenCurves` (468), updates the button's `.active` class (469), and calls `renderTimeline()`+`renderLayerList()` (477-478, both out-of-scope) to reflow every row's height — this scope's own layerCurveRowExtraHeight/frameGridRowHeight read the resulting `state.showTweenCurves` flag but do not declare or flip it. The `_tweenCurveInset` singleton (this scope, 4596-4664) has exactly one live instance at a time by construction: openTweenCurveInset always calls closeTweenCurveInset() first (4618), and closeTweenCurveInset is idempotent (no-ops when already null, 4598)."
+  },
+  "validation": {
+    "expected_assigned_lines": 444,
+    "expected_classification": {
+      "code": 285,
+      "comment": 156,
+      "whitespace": 3
+    },
+    "packet_partition": [
+      [
+        4344,
+        4425
+      ],
+      [
+        4426,
+        4462
+      ],
+      [
+        4463,
+        4586
+      ],
+      [
+        4587,
+        4664
+      ],
+      [
+        4665,
+        4724
+      ],
+      [
+        4725,
+        4787
+      ]
+    ],
+    "packet_classification": [
+      {
+        "range": [
+          4344,
+          4425
+        ],
+        "code": 46,
+        "comment": 36,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          4426,
+          4462
+        ],
+        "code": 34,
+        "comment": 3,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          4463,
+          4586
+        ],
+        "code": 76,
+        "comment": 46,
+        "whitespace": 2
+      },
+      {
+        "range": [
+          4587,
+          4664
+        ],
+        "code": 58,
+        "comment": 20,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          4665,
+          4724
+        ],
+        "code": 36,
+        "comment": 24,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          4725,
+          4787
+        ],
+        "code": 35,
+        "comment": 27,
+        "whitespace": 1
+      }
+    ],
+    "coverage_contract": "Validate assigned_ranges and flattened areas[].packets[].coverage_ranges independently, then use the same function for canonical, omission and overlap controls.",
+    "negative_controls": [
+      "omit4344",
+      "overlap4425"
+    ],
+    "required_checks": [
+      "pinned/current blob and base ancestry",
+      "complete symbols/helpers/callers/boundaries",
+      "eight consumers and unrun fixtures",
+      "the four issue-named functions' complete caller lists (whole-repo grep, excluding comments and declarations)",
+      "writers (pushUndo/generateTweens/state.tweenEasing mutation) vs. pure helpers named with exact line numbers",
+      "no sibling overlap with C19m/C19l/other census artifacts",
+      "P30/tweens.js/app.js/ui.js/selection-geometry-leaf preservation",
+      "JSON/private-path/trailing whitespace hygiene",
+      "sole untracked artifact or committed-clean mode"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, runtime correction, source edit or product acceptance claim."
+  }
+}
