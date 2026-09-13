@@ -1,0 +1,470 @@
+{
+  "census_id": "C19o",
+  "issue": 1164,
+  "title": "Held-keyframe span shrink/trim handle gesture (arm/drag/commit)",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C19o census only; P30 (timeline.js runtime writer), app.js's existing insertKeyframeAt/pushUndo/pushUndoLayers/saveAllLayerFrames/loadFrame owner and other named owners remain separate",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "79599414c33ec30e53e7c4cc5fd882c928c043d2",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19o-timeline-span-shrink-handle",
+  "assigned_ranges": [
+    {
+      "start": 4788,
+      "end": 5027
+    }
+  ],
+  "coverage_note": "Exactly 240 assigned lines occur once across four packets (one coverage_range per packet, no gaps, no other-owner exclusions): 104 code, 135 full-line // comments, 1 blank. Line 4787 is C19n's trailing blank after renderKeyframeCellsInto's closing brace (4786, out of scope); line 4788 is the `// ---- HELD-KEYFRAME SPAN SHRINK/TRIM HANDLE ----` section header and begins this scope. Line 5027 is the trailing blank line after the mouseup listener's closing `});` (5026); line 5028 opens the next leaf's `// ---- FRAME GRID MOUSE HANDLERS (multi-select + drag) ----` section and is excluded.",
+  "source_baselines": {
+    "pinned": "59a5a38c:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (79599414c33ec30e53e7c4cc5fd882c928c043d2, PR #1162/C19n merged) has the identical timeline.js blob (git rev-parse 79599414:src/js/timeline.js == git rev-parse 59a5a38c:src/js/timeline.js == cc4cfd27...); this artifact branches from origin/main at 7959941 per the issue body's explicit instruction.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes are read as authorial intent, not fresh execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19o-timeline-span-shrink-handle.json and the four timeline.js packets partitioning lines 4788-5027.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "owners": "app.js retains insertKeyframeAt (app.js:5299, called once at timeline.js:5024) together with its own internal saveAllLayerFrames()/pushUndoLayers()/loadFrame()/renderOS()/renderArcs()/updateUI() calls (app.js:5300,5304,5306,5307) — this scope cites only the single call site at 5024, not insertKeyframeAt's body. app.js also retains the bare pushUndo/saveAllLayerFrames/loadFrame/renderOS/renderArcs/updateUI globals this scope calls directly in its own commit path (timeline.js:4993,5021) without defining any of them. C19m/#1158 (PR #1159) retains `_tlDrag` (declared timeline.js:3919, armed at 5126/5201-5202, read/written throughout 5287-5360, all out of scope) — this scope's arm-condition packet only cites the in-source rationale comment naming it (4799) and the stopImmediatePropagation() mechanism (4830) that keeps the two mousedown listeners' state machines from running concurrently on the same gesture. The next leaf (`// ---- FRAME GRID MOUSE HANDLERS ----`, timeline.js:5028 onward) retains the sibling `#frame-grid` mousedown listener (5091) that this scope's arm listener (4819, capture phase) suppresses via stopImmediatePropagation() for any mousedown landing on a `.fc.span-end` cell.",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19n/#1161 (PR #1162)",
+      "disposition": "Retains renderKeyframeCellsInto through line 4786 (its closing brace) and line 4787 (trailing blank). C19o begins with the next line, the section-header comment at 4788. renderKeyframeCellsInto is the (out-of-scope) source of the `.fc.span-end`/`.fc.span-full`/`.fc.span-empty` classes this scope's arm/preview packets hit-test and re-apply during a drag; it is cited, not claimed, here."
+    },
+    {
+      "owner": "app.js (existing owner)",
+      "disposition": "Retains insertKeyframeAt (app.js:5299-5308, called once at timeline.js:5024, this scope's commit packet) and the bare pushUndo/saveAllLayerFrames/loadFrame/renderOS/renderArcs/updateUI/showToast globals this scope calls by name (timeline.js:4993,5021,4833) without declaring any of them."
+    },
+    {
+      "owner": "C19m/#1158 (PR #1159, existing owner)",
+      "disposition": "Retains `_tlDrag` (timeline.js:3919, out of scope) and the frame-grid drag-to-move/range-select state machine it drives (timeline.js:5126,5201-5360, out of scope, all in the next leaf's assigned range). This scope's arm listener (4819-4887) cites `_tlDrag` only in its own rationale comment (4799) and relies on stopImmediatePropagation() (4830) to prevent C19m's sibling mousedown listener (next leaf, 5091) from also arming `_tlDrag` on the same mousedown that arms `_spanShrink`."
+    },
+    {
+      "owner": "next leaf (`// ---- FRAME GRID MOUSE HANDLERS (multi-select + drag) ----`, timeline.js:5028 onward, unassigned as of this census)",
+      "disposition": "Retains the sibling `#frame-grid` mousedown listener (5091-5202, bubble phase, no third `true` argument) that is the 'existing mousedown handler below' this scope's own section-header comment (4791-4803) describes and that this scope's capture-phase listener (4819) suppresses via stopImmediatePropagation() for any mousedown whose target is inside a `.fc.span-end` cell. Both listeners are registered on the identical `#frame-grid` element; per the in-source comment, at-target listeners on one element fire in registration order regardless of capture flag, so only stopImmediatePropagation() (not stopPropagation() alone) skips the later sibling. This scope cites the sibling listener's existence, registration phase and line range only; it does not describe its internal branches."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 4787 is outside coverage (C19n's trailing blank after renderKeyframeCellsInto's closing brace); line 4788 (the `// ---- HELD-KEYFRAME SPAN SHRINK/TRIM HANDLE ----` section header) begins this scope.",
+    "Line 5027 (trailing blank after the mouseup listener's closing `});` at 5026) is the last line of this scope; line 5028 opens the next leaf's `// ---- FRAME GRID MOUSE HANDLERS (multi-select + drag) ----` section header and is excluded.",
+    "No lines inside 4788-5027 are excluded for another owner: every line belongs to exactly one of the four packets below, confirmed by the validator's packet-partition-equals-assigned-union check. The scope is entirely self-contained (one module-level var, one function, two window-level event listeners) with zero embedded foreign-owner code, unlike C19n's tween-curve scope."
+  ],
+  "areas": [
+    {
+      "area": "held-keyframe-span-shrink-trim-gesture",
+      "packets": [
+        {
+          "id": "C19o.span-shrink-state-and-arm",
+          "files": [
+            "src/js/timeline.js:4788-4887"
+          ],
+          "coverage_ranges": [
+            [
+              4788,
+              4887
+            ]
+          ],
+          "classification": {
+            "code": 27,
+            "comment": 73,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_spanShrink"
+          ],
+          "signature": "var _spanShrink={active:boolean,li:number,srcFi:number,maxFi:number,nextKeyFi:number,dragMax:number,laterKeys?:number[]}; document.getElementById('frame-grid').addEventListener('mousedown',function(e){...},true)",
+          "responsibility": "Declares the gesture's module-level drag state and the capture-phase `#frame-grid` mousedown listener that arms it: hit-tests the grab zone, computes every bound the drag will be constrained to, snapshots the tail keyframes that will ripple, and dims the source/next-keyframe markers for the drag's duration.",
+          "behavior": [
+            "Section header (4788) plus a 30-line lead-in comment (4789-4817, spanning two topics separated by a blank comment line at 4804): the first block (4789-4803) explains WHY this listener must be capture-phase AND call stopImmediatePropagation() — a held span's visual end has no stored length (always wherever the next real keyframe sits), so grabbing it must intercept before the plain-cell mousedown handler below (next leaf, 5091) can also fire and start an unrelated `_tlDrag` range-select on the same press (mere stopPropagation() did not stop it, since both listeners sit on `#frame-grid` and at-target listeners on one element fire in registration order regardless of capture flag — only stopImmediatePropagation() skips a later sibling); also documents the grab zone as the whole `.fc.span-end` cell (14px wide, ~7px of hit area historically). The second block (4805-4817) explains the trim-not-insert semantics: if a real keyframe borders the span right after it (nextKeyFi), dragging relocates that keyframe's own content (video-editor-style trim) rather than always inserting a new keyframe at the drop point (the pre-fix behavior, which left the original next keyframe in place); with no bordering keyframe, there is nothing to trim, so it falls back to inserting a new keyframe (the only way to shrink an open-ended hold).",
+            "`_spanShrink` (4818): module-level var, initial value `{active:false,li:-1,srcFi:-1,maxFi:-1,nextKeyFi:-1,dragMax:-1}` — no `laterKeys` key present in the initial literal (only added by the first arm, 4875).",
+            "Listener registration (4819): `document.getElementById('frame-grid').addEventListener('mousedown',function(e){...},true)` — capture phase (third argument `true`).",
+            "Arm condition, guard 1 (4820): `if(e.button!==0)return;` — left button only, no modifier-key (shift/ctrl/meta) checks anywhere in this listener.",
+            "Arm condition, guard 2/hit-test (4821): `var cell=e.target.closest('.fc.span-end');if(!cell)return;` — the sole hit-test; any mousedown whose event target is not inside a `.fc.span-end` cell falls through to the sibling listener untouched.",
+            "v8 comment (4822-4829): documents that the hit zone was progressively widened across earlier passes (7px -> 65% -> the whole cell) because a `.fc.span-end` cell's only useful single-cell action was ever this resize, so claiming the whole cell loses no competing gesture; the matching CSS grab-bar (`.fc.span-end::after`, style.css, out of scope) was resized to match.",
+            "Propagation suppression (4830): `e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();` — three calls on one line; per the section comment, stopImmediatePropagation() is the one that actually matters for suppressing the sibling `#frame-grid` mousedown listener (next leaf, 5091).",
+            "Coordinate/layer resolution (4831): `var fi=parseInt(cell.dataset.frame),li=parseInt(cell.dataset.layer);` from the grabbed cell's own dataset.",
+            "Locked-layer guard (4832-4833): `var ld=state.layers[li];if(ld.locked){showToast(SM.t('toastLayerLocked'));return;}` with an inline comment ('span-end drag is a keyframe edit like any other (feedback #18)') — a locked layer aborts the whole arm sequence: `_spanShrink` is never reassigned, no DOM class is added, and (because stopImmediatePropagation already ran at 4830) the sibling mousedown listener never fires either, so a locked layer's span-end cell is fully inert to this gesture.",
+            "srcFi resolution (4834): backward scan `for(var pi=fi;pi>=0;pi--){if(ld.frames[pi].isKeyframe){srcFi=pi;break;}}`, initialized to `fi` — finds the nearest real keyframe at or before the grabbed cell (the span's own start).",
+            "nextKeyFi resolution (4835-4836): `-1` unless `ld.frames[fi+1]` exists and `isKeyframe` is true, in which case `nextKeyFi=fi+1` — this is what selects the trim-vs-insert branch everywhere else in the gesture.",
+            "dragMax computation (4837-4867, preceded by two comments: a short one at 4837-4840 stating the raw bound, and a 15-line one at 4841-4856 explaining the 2026-07-28 ripple fix — a third occurrence of a bug already fixed for Motion's layer-bar drag and Animation 2D's keyframe-dot drag): if `nextKeyFi>=0` (4858-4866), forward-scans from `nextKeyFi+1` to the end of `ld.frames` tracking `lastKeyInChain` (the LAST keyframe in the tail, 4859-4860), then sets `dragMax=nextKeyFi+((state.totalFrames-1)-lastKeyInChain)` (4865, with an in-source note at 4861-4864 that this bound is relative to `nextKeyFi`, the thing that actually moves, not the grabbed cell's own `fi`, called out as a bug caught before shipping); else (4867) `dragMax=fi` — the pre-existing shrink-only cap, no bordering keyframe to relocate.",
+            "laterKeys snapshot (4868-4874, preceded by a 5-line comment at 4868-4872 on why this is captured ONCE here and not recomputed per mousemove tick): `var laterKeys=[];if(nextKeyFi>=0)for(var lki=nextKeyFi+1;lki<ld.frames.length;lki++){if(ld.frames[lki].isKeyframe)laterKeys.push(lki);}` — every keyframe strictly after `nextKeyFi`, in ascending order; empty array when `nextKeyFi<0`.",
+            "`_spanShrink` arm write (4875): whole-object replacement (not a partial/field-by-field mutation) — `_spanShrink={active:true,li:li,srcFi:srcFi,maxFi:fi,nextKeyFi:nextKeyFi,dragMax:dragMax,laterKeys:laterKeys};`. Note `maxFi` is assigned the grabbed cell's own `fi` (the span-end cell's frame, i.e. `nextKeyFi-1` when a bordering keyframe exists), distinct from `dragMax` (the actual drag ceiling).",
+            "Arm-time DOM feedback (4876-4886, preceded by a 3-line comment at 4876-4878 on why dimmed rather than hidden): `cell.classList.add('tl-outdrag-source-end')` (4879) keeps the original span-end marker visible-but-dimmed as a reference during the drag; a second comment (4880-4882) frames the next block as the trim-path-only counterpart — if `nextKeyFi>=0` (4883-4886), looks up the bordering keyframe's own cell via `document.querySelector('.fc[data-layer=\"'+li+'\"][data-frame=\"'+nextKeyFi+'\"]')` and, if found, adds `tl-outdrag-source-key` to dim its dot too.",
+            "This packet performs no `ld.frames[...]`/`isKeyframe`/`strokes` write and calls no `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`loadFrame`/`renderTimeline`/`updateUI` — it only arms in-memory drag state and adds two CSS classes."
+          ],
+          "callers": [
+            "Not a function; this is a top-level var declaration plus a DOM event listener registration, evaluated once at module load (script execution order, not called by other application code). The listener itself fires on every left-button mousedown anywhere inside `#frame-grid`, gated to a no-op past the two guards (4820-4821) for anything outside a `.fc.span-end` cell.",
+            "A whole-repo git grep at the frozen SHA for `_spanShrink` found every match inside src/js/timeline.js, entirely within this scope's own 4788-5027 range (listed exhaustively in surface_inventory_cross_check below) — no other file in the repository references `_spanShrink`."
+          ],
+          "effects": "Reads state.layers[li]/ld.frames/ld.locked/state.totalFrames. Writes: the module-level `_spanShrink` var (whole-object replacement at 4875) and two DOM classList additions (`tl-outdrag-source-end`, `tl-outdrag-source-key`). Calls `showToast` (locked-layer guard only, 4833) and three propagation-control DOM API calls (preventDefault/stopPropagation/stopImmediatePropagation, 4830). No document-state (ld.frames) write, no history/save/load/render call."
+        },
+        {
+          "id": "C19o.span-shrink-frame-at",
+          "files": [
+            "src/js/timeline.js:4888-4904"
+          ],
+          "coverage_ranges": [
+            [
+              4888,
+              4904
+            ]
+          ],
+          "classification": {
+            "code": 6,
+            "comment": 11,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_spanShrinkFrameAt"
+          ],
+          "signature": "_spanShrinkFrameAt(e) -> number",
+          "responsibility": "The single pointer-position-to-frame-index resolver shared by the drag-preview and commit listeners, so both always agree on exactly which frame a given pointer event corresponds to.",
+          "behavior": [
+            "Function declaration (4888).",
+            "Pixel-x resolution (4889-4890): `var wrap=document.getElementById('fg-wrap');var rect=wrap.getBoundingClientRect();var x=e.clientX-rect.left+wrap.scrollLeft;` — pointer x relative to the scrollable frame-grid wrap's own content origin (accounts for horizontal scroll).",
+            "HIT_TOLERANCE_PX comment (4891-4901, 11 lines): explains that `Math.floor(x/FC)` alone would put the ambiguous cell boundary exactly at each cell's LEFT edge, which is where a user aiming to drop on frame N naturally releases, so an unadjusted floor silently lands one frame short (feedback quoted verbatim); a few pixels of forward tolerance fixes this without materially changing a deliberate drop several cells earlier, given FC is only ~16px at default zoom.",
+            "`var HIT_TOLERANCE_PX=4;` (4902).",
+            "Return (4903): `return Math.max(_spanShrink.srcFi+1,Math.min(_spanShrink.dragMax,Math.floor((x+HIT_TOLERANCE_PX)/FC)));` — clamps the tolerance-adjusted floored frame index between a hard floor of `_spanShrink.srcFi+1` (never resolves onto or before the source keyframe) and a hard ceiling of `_spanShrink.dragMax` (the bound computed once at arm time, previous packet).",
+            "Closing brace (4904)."
+          ],
+          "callers": [
+            "Called by the mousemove listener (this scope's next packet, line 4907) and the mouseup listener (this scope's last packet, line 4987) — both this file, both this scope, the only two call sites.",
+            "A whole-repo git grep at the frozen SHA for `_spanShrinkFrameAt` found exactly these three matches (the declaration at 4888 and the two call sites at 4907/4987), all inside src/js/timeline.js and all inside this scope's own assigned range — no other file in the repository references it, and no call site lies outside 4788-5027."
+          ],
+          "effects": "Pure function: reads `_spanShrink.srcFi`/`_spanShrink.dragMax` (never writes any `_spanShrink` field), `document.getElementById('fg-wrap')`'s bounding rect and scrollLeft (read-only DOM query, no mutation), and the module-level `FC` frame-width constant (declared elsewhere in timeline.js, out of scope). No DOM write, no state.* write, no history/save/load/render call."
+        },
+        {
+          "id": "C19o.span-shrink-drag",
+          "files": [
+            "src/js/timeline.js:4905-4974"
+          ],
+          "coverage_ranges": [
+            [
+              4905,
+              4974
+            ]
+          ],
+          "classification": {
+            "code": 43,
+            "comment": 27,
+            "whitespace": 0
+          },
+          "symbols": [],
+          "signature": "window.addEventListener('mousemove',function(e){...})",
+          "responsibility": "Global mousemove listener that, while a span-shrink drag is active, rebuilds a full live DOM preview of the prospective new span extent, the relocating keyframe's own marker at its true drop frame, and (trim path only) every rippled downstream keyframe's own preview marker — every tick, no diffing against the previous frame's preview.",
+          "behavior": [
+            "Guard (4906): `if(!_spanShrink.active)return;` — this global listener is a no-op for every mousemove that isn't part of an active span-shrink drag.",
+            "Frame resolution (4907): `var fi=_spanShrinkFrameAt(e);` (previous packet).",
+            "Full preview-DOM sweep (4908-4911): removes `.span-drag-band`, `.span-drag-preview`, `.span-drag-dot-cell` classes from every element currently carrying them, and removes every `.km.drag-key-preview` element outright — an unconditional clear-and-rebuild on every tick, not an incremental diff.",
+            "v8 comment (4912-4916): explains the band-tint change from a single cursor-cell marker to tinting the WHOLE prospective span, so the held region visibly grows/shrinks live instead of a single small marker teleporting with no sense of extent until release.",
+            "Band tint (4917-4920): `for(var bf=_spanShrink.srcFi+1;bf<=fi;bf++){var bandCell=document.querySelector('.fc[data-layer=\"'+_spanShrink.li+'\"][data-frame=\"'+bf+'\"]');if(bandCell)bandCell.classList.add('span-drag-band');}` — one DOM query per frame in the prospective span, from just after the source keyframe up to the current pointer-resolved frame.",
+            "Drop-target bar (4921-4922): looks up the `.fc` cell at `data-frame=fi` on the same layer and adds `span-drag-preview` to it.",
+            "Trim-path preview intro comment (4923-4929): the relocating keyframe's own dot (matching its eventual full/hollow appearance) rides one cell to the RIGHT of the drag bar, matching the adjacency a committed span-end bar and its bordering keyframe dot already have at rest; notes a previous version appended it into the SAME cell as the bar instead.",
+            "Trim-path branch (4930-4973, `if(_spanShrink.nextKeyFi>=0)`): reads `var ld=state.layers[_spanShrink.li];` (4938) and looks up `dotCell` at `data-frame=fi` (4939); if found (4940-4953), adds `span-drag-dot-cell` to it (4941); a bug-fix comment (4930-4937) explains the dot must show at the SAME frame the drop will actually use (fixed a previous one-frame-later display bug, verified empirically per the comment); the actual relocating-dot append is gated on `fi!==_spanShrink.nextKeyFi` (4946, with a 4-line comment at 4942-4945 explaining that when `fi===nextKeyFi` — still sitting at the original spot — the real `.km` dot is already there, just dimmed via `tl-outdrag-source-key` from arm time, and the CSS opacity override brings it back to full instead of stacking a redundant second dot): when the gate passes, reads `movedFr=ld.frames[_spanShrink.nextKeyFi]` (4947), computes `full=movedFr&&movedFr.strokes.length>0` (4948), creates a `div.km.drag-key-preview` classed `fl`/`hl` (4949-4950) and appends it to `dotCell` (4951).",
+            "Ripple preview (4954-4973, preceded by a 4-line comment at 4954-4957 explaining without it only the bordering keyframe appeared to move while the tail silently teleported on release): `delta=fi-_spanShrink.nextKeyFi` (4958); if `delta!==0` (4959-4972), iterates `_spanShrink.laterKeys.forEach` (4960, the array snapshotted once at arm time, previous packet) — for each `origFi`, computes `newFi=origFi+delta` (4961), skips defensively if `newFi<0||newFi>=state.totalFrames` (4962, commented as already prevented in practice by `dragMax` but defensive here), looks up the `.fc` cell at `data-frame=newFi` (4963), skips if not found (4964), adds `span-drag-dot-cell` to it (4965), reads `lFr=ld.frames[origFi]` — the frame's ORIGINAL (not-yet-moved) content — computes `lFull=lFr&&lFr.strokes.length>0` (4966-4967), creates and appends another `div.km.drag-key-preview` classed `fl`/`hl` (4968-4970)."
+          ],
+          "callers": [
+            "Not a function; a `window`-level `mousemove` event listener registered once at module load, invoked by the browser on every mousemove while the listener is attached (i.e. for the lifetime of the page, gated to a no-op by the `_spanShrink.active` guard at 4906 outside an active drag).",
+            "A whole-repo git grep at the frozen SHA confirms this listener's body is the sole reader of `_spanShrink.srcFi`/`_spanShrink.li`/`_spanShrink.nextKeyFi`/`_spanShrink.laterKeys` at lines 4906,4907,4917,4918,4921,4930,4938,4939,4946,4947,4958,4960,4963 — all inside this packet, no external caller invokes this listener's body directly (it can only be triggered via a real or synthetic `mousemove` DOM event)."
+          ],
+          "effects": "DOM-only: adds/removes `span-drag-band`/`span-drag-preview`/`span-drag-dot-cell` classes and creates/removes `.km.drag-key-preview` elements every tick. Reads `_spanShrink.active/srcFi/li/nextKeyFi/laterKeys` (via `_spanShrinkFrameAt` and directly) and `state.layers[li].frames[...].strokes`/`state.totalFrames` — never writes any `_spanShrink` field, `ld.frames[...]` entry, or document/persisted state. No `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`loadFrame`/`renderTimeline`/`updateUI` call anywhere in this packet — it is a pure live-preview render pass, entirely undone by the next full re-render or by this same listener's own next tick."
+        },
+        {
+          "id": "C19o.span-shrink-commit",
+          "files": [
+            "src/js/timeline.js:4975-5027"
+          ],
+          "coverage_ranges": [
+            [
+              4975,
+              5027
+            ]
+          ],
+          "classification": {
+            "code": 28,
+            "comment": 24,
+            "whitespace": 1
+          },
+          "symbols": [],
+          "signature": "window.addEventListener('mouseup',function(e){...})",
+          "responsibility": "Global mouseup listener that tears down every preview/dim DOM artifact the arm and drag packets left behind, resolves the final drop frame, and either commits the trim (moving the bordering keyframe and rippling every keyframe after it by the same delta, via a three-pass write) or the insert (delegating to app.js's insertKeyframeAt), or no-ops on any of three distinct cancel conditions.",
+          "behavior": [
+            "Guard (4976): `if(!_spanShrink.active)return;` — mirrors the drag listener's own guard; a mouseup with no active span-shrink drag (arm never fired, or the layer was locked) is a full no-op, including skipping the DOM cleanup below.",
+            "Unconditional preview/dim cleanup (4977-4986), run BEFORE the drop frame is even computed: removes `.span-drag-band`/`.span-drag-preview`/`.span-drag-dot-cell` classes and every `.km.drag-key-preview` element (4977-4980, identical sweep to the drag listener's own 4908-4911), plus a 3-line comment (4981-4984) explaining this is explicit rather than relying on 'a re-render will replace it' because several branches below return early on a no-op drop with no re-render at all, then removes `.fc.tl-outdrag-source-end` (4985) and `.fc.tl-outdrag-source-key` (4986) — the two dim classes the arm packet added.",
+            "Drop-frame resolution (4987): `var fi=_spanShrinkFrameAt(e);` (packet 2, same resolver the drag listener used).",
+            "Local capture (4988-4989): `var li=_spanShrink.li,nextKeyFi=_spanShrink.nextKeyFi;` captures both BEFORE `_spanShrink.active=false;` (4989) is set — every subsequent branch reads these locals, not `_spanShrink` directly (except the still-live `_spanShrink.srcFi`/`_spanShrink.maxFi` reads below). Setting `.active=false` is the only field this packet resets; `li`/`srcFi`/`maxFi`/`nextKeyFi`/`dragMax`/`laterKeys` are left at their last-armed values until the next mousedown's whole-object replacement (arm packet, 4875) overwrites them.",
+            "Cancel path 1 (4990): `if(fi<=_spanShrink.srcFi)return; // dropped back on the source key — no-op` — dropped at or before the span's own start; no document write, `_spanShrink.active` is already false from 4989.",
+            "Trim branch (4991-5021, `if(nextKeyFi>=0){...}`):",
+            "  Cancel path 2 (4992): `if(fi===nextKeyFi)return; // dropped right back where it already was` — no-op, no document write.",
+            "  Commit start (4993): `pushUndo();saveAllLayerFrames();` — both called, in this order, before any `ld.frames` write; the only `pushUndo`/`saveAllLayerFrames` calls in this packet's trim branch.",
+            "  `var ld=state.layers[li];` and `var delta=fi-nextKeyFi;` (4994-4995).",
+            "  Ripple rationale comment (4996-5008, 13 lines): restates the 2026-07-28 ripple fix (every keyframe after `nextKeyFi` moves by the identical delta, proven collision-free the same way as `moveFrames`' own ripple since every rippled frame's original position exceeds `nextKeyFi`) and explains the three-separate-passes write below exists for the same reason `moveFrames` uses three passes: a naive in-order single-pass write with `delta>0` could overwrite a not-yet-read LATER frame whose target position coincides with an EARLIER frame's source position.",
+            "  Tail-chain re-scan (5009-5010): `var toMove=[nextKeyFi];for(var ri=nextKeyFi+1;ri<ld.frames.length;ri++){if(ld.frames[ri].isKeyframe)toMove.push(ri);}` — re-walks `ld.frames` fresh at commit time (does not reuse the drag packet's `laterKeys` snapshot, which was scoped to the mousemove preview only).",
+            "  Snapshot (5011): `var captured=toMove.map(function(f){return {from:f,to:f+delta,content:ld.frames[f]};});` — captures each moving keyframe's current `ld.frames[f]` object reference before any mutation.",
+            "  Three-pass write (5012-5013): pass 1, `captured.forEach(function(c){ld.frames[c.from]={strokes:[],isKeyframe:false,isInterpolated:false};});` — blanks every FROM slot; pass 2 (only after every blank is done), `captured.forEach(function(c){if(c.to>=0&&c.to<ld.frames.length)ld.frames[c.to]=c.content;});` — writes each TO slot from the object captured in pass 0, bounds-guarded per entry.",
+            "  Non-fix disclosure (5014-5020, 7 lines): tween/arc rekeying (`captureTweenInbetweens`/`rekeyTweenPairData`, both out of scope) is explicitly NOT called here — unlike `moveFrames`, which already does — so any interpolated span crossing a rippled keyframe was already silently orphaned before this gesture existed; documented as an unfixed pre-existing gap, not newly introduced.",
+            "  Commit finish (5021): `loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();` — four calls on one line, unconditional once the trim commits.",
+            "Insert branch (5022-5025, `else{...}`, `nextKeyFi<0`):",
+            "  Cancel path 3 (5023): `if(fi>=_spanShrink.maxFi)return; // dropped on the existing (open-ended) end — no-op` — reads `_spanShrink.maxFi` directly (the value armed at 4875, unchanged by this listener), not the `fi`/`li`/`nextKeyFi` locals captured above.",
+            "  Commit (5024): `insertKeyframeAt(li,fi);` — the sole call in this branch; unlike the trim branch, this packet issues no `pushUndo`/`saveAllLayerFrames`/`loadFrame`/`renderOS`/`renderArcs`/`updateUI` call of its own here — `insertKeyframeAt` (app.js:5299, out of scope) is confirmed (by direct read of its body) to call `saveAllLayerFrames()`, `pushUndoLayers()`, conditionally `loadFrame()`, and unconditionally `renderOS()`/`renderArcs()`/`updateUI()`/`showToast()` internally, but that internal behavior is app.js's own and is cited, not claimed, here.",
+            "Listener closing (5026) and trailing blank line (5027) end both the listener and this packet/scope."
+          ],
+          "callers": [
+            "Not a function; a `window`-level `mouseup` event listener registered once at module load, invoked by the browser on every mouseup for the lifetime of the page, gated to a no-op by the `_spanShrink.active` guard at 4976 outside an active drag.",
+            "Calls `_spanShrinkFrameAt` (packet 2, in-scope, 4987) and `insertKeyframeAt` (app.js:5299, out of scope, 5024) — the only two named-function calls in this packet; `pushUndo`/`saveAllLayerFrames`/`loadFrame`/`renderOS`/`renderArcs`/`updateUI` are also called (4993, 5021) but are bare app.js-owned globals, not functions this packet or scope declares."
+          ],
+          "effects": "DOM cleanup (removes 6 distinct classes/elements, 4977-4986). Trim-commit path: mutates `ld.frames[...]` for every entry in `toMove` via the three-pass blank-then-write (5012-5013, a genuine document-state mutation — the only one in this whole scope written directly rather than delegated); calls `pushUndo()`/`saveAllLayerFrames()` (4993, the only such calls in this scope outside `insertKeyframeAt`'s own internals) and `loadFrame()`/`renderOS()`/`renderArcs()`/`updateUI()` (5021). Insert-commit path: delegates the entire document-state write plus its own undo/save/load/render calls to `insertKeyframeAt` (app.js, out of scope), doing nothing further itself. Sets `_spanShrink.active=false` (4989) — the only `_spanShrink` field this packet resets; every other field is left stale until the next arm."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "Two of this scope's four packets never call a `save*`-prefixed function (arm, drag-preview). The commit packet's trim branch calls `saveAllLayerFrames()` once (4993), before its own `ld.frames` writes; its insert branch calls no `save*` function directly but delegates to `insertKeyframeAt` (app.js:5299-5308, out of scope), which itself calls `saveAllLayerFrames()` (app.js:5300) before mutating."
+    },
+    {
+      "consumer": "load",
+      "disposition": "One `loadFrame` call in this entire scope, at the trim-commit path's finish (timeline.js:5021, `loadFrame(state.currentFrame)`), unconditional once a trim commits. The insert-commit path calls no `loadFrame` directly; `insertKeyframeAt` (app.js:5306, out of scope) calls it conditionally, only `if(layerIdx===state.activeLayerIdx)`."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "One `pushUndo()` call in this entire scope, at the trim-commit path (timeline.js:4993, paired with the same-line `saveAllLayerFrames()`), called once per completed trim gesture, not per mousemove tick. The insert-commit path calls no undo function directly; `insertKeyframeAt` (app.js:5304, out of scope) calls `pushUndoLayers()` internally. Neither this scope's own `pushUndo` nor `insertKeyframeAt`'s `pushUndoLayers` fires on any of the three cancel paths (4990, 4992, 5023) — a cancelled drag leaves no undo entry."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "No `selClear`/`selAdd`/`selHas`/`_sel.frames` reference anywhere in this scope (verified by direct text search of the full 4788-5027 span) — this gesture is entirely orthogonal to the frame-selection system C19a-C19l/C19n's own selection consumers own."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "The trim-commit path directly rewrites `ld.frames[...]` entries (isKeyframe/isInterpolated/strokes, 5012-5013) — a genuine frame-data mutation, not delegated. The insert-commit path delegates its own frame-data mutation entirely to `insertKeyframeAt` (app.js, out of scope). Neither commit path calls `generateTweens()` or any tween-regeneration function; the trim path's own non-fix disclosure (5014-5020) explicitly notes tween/arc rekeying is NOT attempted for a rippled keyframe, unlike `moveFrames`."
+    },
+    {
+      "consumer": "render",
+      "disposition": "The drag-preview packet (4905-4974) is a pure, fully self-contained DOM preview layer with no persisted effect — every class/element it adds is removed by its own next tick or by the mouseup listener's identical cleanup sweep (4977-4980). The commit packet calls `renderOS()`/`renderArcs()`/`updateUI()` unconditionally on the trim path (5021) and relies on `insertKeyframeAt`'s own identical calls (app.js:5307) on the insert path; neither commit path calls `renderTimeline()` directly (the next full timeline rebuild, wherever triggered, will re-derive the `.fc.span-end`/`.fc.span-full`/`.fc.span-empty` classes from the now-updated `ld.frames` via C19n's renderKeyframeCellsInto, out of scope)."
+    },
+    {
+      "consumer": "export",
+      "disposition": "No export/SMEngineBridge/Tauri/native reference anywhere in this scope (verified by direct text search of the full 4788-5027 span). Export reads the persisted `ld.frames` data this gesture eventually writes (trim path directly, insert path via `insertKeyframeAt`) independently of this DOM/gesture layer."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "No direct SMEngineBridge, Tauri command, filesystem or native IPC call occurs anywhere in this scope."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "arm-hit-test-and-locked-layer-no-op",
+      "status": "proposed, unrun",
+      "initial_state": "A left-button mousedown dispatched at four targets: a `.fc.span-end` cell on an unlocked layer, a `.fc.span-end` cell on a locked layer, a plain `.fc` cell that is not `.span-end`, and a non-`.fc` element inside `#frame-grid`.",
+      "expected_effects": "Only the unlocked `.fc.span-end` case sets `_spanShrink.active=true` and calls `stopImmediatePropagation()`; the locked-layer case calls `showToast` and leaves `_spanShrink.active` false without ever calling `stopImmediatePropagation()`; the other two cases leave `_spanShrink` untouched and let the sibling `#frame-grid` mousedown listener (next leaf) run normally."
+    },
+    {
+      "id": "stop-immediate-propagation-suppresses-sibling-listener",
+      "status": "proposed, unrun",
+      "initial_state": "Both the capture-phase span-shrink arm listener (4819) and the bubble-phase sibling mousedown listener (next leaf, 5091) registered on the identical `#frame-grid` element; a mousedown dispatched on a `.fc.span-end` cell.",
+      "expected_effects": "The sibling listener's own body never executes for this event (confirmable by a spy/counter) because `stopImmediatePropagation()` (4830) runs first, in registration/phase order — `_tlDrag.active` remains false/unchanged throughout the gesture."
+    },
+    {
+      "id": "drag-max-relative-to-next-key-fi-not-grabbed-fi",
+      "status": "proposed, unrun",
+      "initial_state": "A layer with keyframes at frames 10 (grabbed span-end at 14, nextKeyFi=15) and 30 (the sole later keyframe), totalFrames=40.",
+      "expected_effects": "dragMax = nextKeyFi + ((totalFrames-1) - lastKeyInChain) = 15 + (39-30) = 24, NOT `14 + (39-30)=23` — confirming the bound is anchored to nextKeyFi (what moves) and not the grabbed cell's own fi, per the in-source correction comment."
+    },
+    {
+      "id": "frame-at-tolerance-and-clamp",
+      "status": "proposed, unrun",
+      "initial_state": "A pointer x landing exactly on a cell's left edge (the pre-tolerance floor boundary), and separately, pointer positions computed to resolve below srcFi+1 and above dragMax.",
+      "expected_effects": "The left-edge case resolves to the cell the user visually released on (not one frame short) because of the +4px tolerance; out-of-range raw floors are clamped to exactly srcFi+1 (lower) or dragMax (upper), never producing a frame outside that closed interval."
+        },
+    {
+      "id": "drag-preview-rebuilds-every-tick-no-diff",
+      "status": "proposed, unrun",
+      "initial_state": "Two consecutive mousemove events during an active drag, five frames apart in resolved fi.",
+      "expected_effects": "Every `.span-drag-band`/`.span-drag-preview`/`.span-drag-dot-cell` class and every `.km.drag-key-preview` element present after the first event is fully removed before the second event's own band/preview/dot classes and elements are added — no stale marker from the first tick survives into the second."
+    },
+    {
+      "id": "trim-preview-dot-matches-actual-commit-frame",
+      "status": "proposed, unrun",
+      "initial_state": "A trim drag (nextKeyFi>=0) with the pointer resolving to fi=20 mid-drag.",
+      "expected_effects": "The relocating keyframe's own preview dot (`.km.drag-key-preview`) appears in the `.fc[data-frame=20]` cell (the SAME frame `_spanShrinkFrameAt` will return on mouseup for an unchanged pointer position), not frame 21 — regression guard for the documented 2026-07-28 one-frame-late preview bug."
+    },
+    {
+      "id": "ripple-preview-uses-original-not-shifted-content",
+      "status": "proposed, unrun",
+      "initial_state": "A trim drag with two later keyframes in `laterKeys` (origFi=30 and 45), dragged so delta=+3.",
+      "expected_effects": "The ripple preview dots appear at newFi=33 and 48, each classed full/hollow according to `ld.frames[origFi]` (30 and 45's OWN original strokes), not `ld.frames[newFi]` (whatever those target slots currently hold) and not mutated during the preview — `ld.frames` is byte-identical before and after any number of mousemove ticks until mouseup commits."
+    },
+    {
+      "id": "three-cancel-paths-are-true-no-ops",
+      "status": "proposed, unrun",
+      "initial_state": "Three separate drags, each ended with a mouseup satisfying exactly one of: fi<=srcFi; nextKeyFi>=0 and fi===nextKeyFi; nextKeyFi<0 and fi>=maxFi.",
+      "expected_effects": "In all three cases, `ld.frames` is byte-identical to its pre-drag state, `pushUndo`/`saveAllLayerFrames`/`insertKeyframeAt` are never called, and every preview/dim DOM class and element added during arm/drag is still fully removed by the cleanup sweep (4977-4986) that runs before any cancel check."
+    },
+    {
+      "id": "trim-commit-three-pass-write-no-clobber",
+      "status": "proposed, unrun",
+      "initial_state": "A trim commit with toMove=[15,30] (two keyframes to ripple) and delta=+5, where the target slot for one moving keyframe (20) coincides with the CURRENT (pre-move) position of the other's neighborhood.",
+      "expected_effects": "Every `captured[i].content` is read from `ld.frames` BEFORE any `ld.frames[from]` is blanked (pass 1 completes for all entries before pass 2 writes any `to` slot) — the final `ld.frames` state matches applying the full delta shift atomically, with no entry silently overwritten by another entry's blank-write mid-sequence."
+    },
+    {
+      "id": "trim-commit-no-tween-rekey",
+      "status": "proposed, unrun",
+      "initial_state": "A trim commit where an interpolated (isInterpolated=true) frame lies strictly between the original nextKeyFi and its post-ripple destination.",
+      "expected_effects": "That interpolated frame's own isInterpolated/strokes content is left completely untouched by the three-pass write (it is not in `toMove`, only real keyframes are) — consistent with the in-source disclosure that tween/arc rekeying is not attempted for this gesture, so the frame becomes orphaned relative to the moved keyframe pair it used to sit between."
+    },
+    {
+      "id": "insert-path-delegates-full-commit-to-insert-keyframe-at",
+      "status": "proposed, unrun",
+      "initial_state": "An open-ended-hold drag (nextKeyFi<0) with a valid drop fi < maxFi, on a layer whose target frame is not already a keyframe.",
+      "expected_effects": "`insertKeyframeAt(li,fi)` is called exactly once (timeline.js:5024) and this packet itself calls no `pushUndo`/`saveAllLayerFrames`/`loadFrame`/`renderOS`/`renderArcs`/`updateUI`/`showToast` of its own — any such call observed during this gesture originates from inside `insertKeyframeAt` (app.js:5299-5308), not from timeline.js's own commit packet."
+    },
+    {
+      "id": "spanshrink-state-staleness-between-drags",
+      "status": "proposed, unrun",
+      "initial_state": "Complete one span-shrink drag through to a cancel path (so `_spanShrink.active` becomes false without the object being reset), then inspect `_spanShrink` before the next mousedown re-arms it.",
+      "expected_effects": "`_spanShrink.li`/`srcFi`/`maxFi`/`nextKeyFi`/`dragMax`/`laterKeys` retain the PREVIOUS drag's values (only `.active` was set false at 4989) until the next arm's whole-object replacement (4875) overwrites all of them — a reader that checks `_spanShrink.active` before trusting any other field observes correct behavior; one that does not would see stale data."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "planSpanShrinkBounds(layerFrames,totalFrames,grabbedFi) -> {srcFi,nextKeyFi,dragMax,laterKeys}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure bound/snapshot computation extracted from the arm listener's srcFi/nextKeyFi/dragMax/laterKeys derivation (4834-4874), taking a plain frames array instead of reading state.layers directly; the DOM hit-test, propagation suppression, locked-layer guard and dim-class side effects remain in the adapter."
+    },
+    {
+      "api": "planSpanShrinkFrameAt(pointerX,fgWrapLeft,fgWrapScrollLeft,frameWidthPx,srcFi,dragMax) -> number",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure coordinate-to-frame mapping extracted verbatim from _spanShrinkFrameAt, parameterizing the DOM-read inputs (wrap rect/scrollLeft, FC) instead of reading them directly — identical logic, testable without a live #fg-wrap element."
+    },
+    {
+      "api": "planSpanShrinkRipplePlan(nextKeyFi,laterKeys,delta,totalFrames) -> {li,to}[]",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure delta-application/bounds-filter extracted from the drag-preview's ripple loop (4958-4972) and reused as-is by the commit path's own toMove/captured construction (5009-5013), which currently re-derives an equivalent list independently by re-scanning ld.frames rather than sharing this plan; the DOM marker creation and the actual ld.frames three-pass write remain in their respective adapters."
+    },
+    {
+      "api": "planSpanShrinkCommit(toMoveFrom[],delta,framesLength) -> {from,to}[]",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure pairing/bounds-guard logic extracted from the commit path's captured/three-pass-write construction (5009-5013), separated from the actual ld.frames reads/writes and from pushUndo/saveAllLayerFrames/loadFrame/renderOS/renderArcs/updateUI, which remain a separate out-of-scope port."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "symbols": [
+      "_spanShrink",
+      "_spanShrinkFrameAt"
+    ],
+    "callers": {
+      "_spanShrink": [
+        "src/js/timeline.js:4818 (declaration, in-packet, this scope's arm-and-state packet)",
+        "src/js/timeline.js:4875 (arm listener, whole-object write, in-packet)",
+        "src/js/timeline.js:4903 (_spanShrinkFrameAt, reads .srcFi/.dragMax, in-scope, next packet)",
+        "src/js/timeline.js:4906,4907,4917,4918,4921,4930,4938,4939,4946,4947,4958,4960,4963 (mousemove drag-preview listener, all reads, in-scope, third packet)",
+        "src/js/timeline.js:4976,4987,4988,4989,4990,4992,5023 (mouseup commit listener, reads plus the single .active=false write, in-scope, fourth packet)",
+        "no other file in the repository references _spanShrink (whole-repo git grep at the frozen SHA, path-unrestricted, confirms every match lies inside src/js/timeline.js and inside this scope's own 4788-5027 range — none outside it)"
+      ],
+      "_spanShrinkFrameAt": [
+        "src/js/timeline.js:4888 (declaration, in-packet)",
+        "src/js/timeline.js:4907 (mousemove drag-preview listener, in-scope)",
+        "src/js/timeline.js:4987 (mouseup commit listener, in-scope)",
+        "no other file in the repository references _spanShrinkFrameAt (whole-repo git grep at the frozen SHA confirms exactly these three matches, all inside src/js/timeline.js and inside this scope's own range)"
+      ]
+    },
+    "grep_method": "For each symbol declared in this scope, ran `git grep -n \"<name>\" 59a5a38c514f5da830dd2f2df4c83c63b1b22fba -- src/js` (whole src/js tree at the frozen SHA) and separately `git grep -n \"<name>\" 59a5a38c514f5da830dd2f2df4c83c63b1b22fba -- .` (entire repository, no path restriction) to also catch tests/CSS/docs references; every returned match was manually inspected — none had a trimmed line starting with `//`, and every match's line number falls inside 4788-5027, so no exclusion of a comment-only or declaration-only match was needed to produce the caller lists above.",
+    "cross_gesture_note": "This gesture reads `ld.frames`/`state.layers`/`state.totalFrames` exactly like the next leaf's own drag-to-move machinery (`_tlDrag`, timeline.js:3919, out of scope) but the two never share mutable state: `_spanShrink` and `_tlDrag` are two separate module-level vars, armed by two separate (though co-located, same-element) mousedown listeners, and this scope's own listener's stopImmediatePropagation() (4830) guarantees at most one of the two is ever armed by a single mousedown. `insertKeyframeAt` (app.js:5299, this scope's sole cross-file call, line 5024) is also called from other gestures elsewhere in the app (not searched here, out of scope) — this scope cites only its own single call site."
+  },
+  "validation": {
+    "expected_assigned_lines": 240,
+    "expected_classification": {
+      "code": 104,
+      "comment": 135,
+      "whitespace": 1
+    },
+    "packet_partition": [
+      [
+        4788,
+        4887
+      ],
+      [
+        4888,
+        4904
+      ],
+      [
+        4905,
+        4974
+      ],
+      [
+        4975,
+        5027
+      ]
+    ],
+    "packet_classification": [
+      {
+        "range": [
+          4788,
+          4887
+        ],
+        "code": 27,
+        "comment": 73,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          4888,
+          4904
+        ],
+        "code": 6,
+        "comment": 11,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          4905,
+          4974
+        ],
+        "code": 43,
+        "comment": 27,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          4975,
+          5027
+        ],
+        "code": 28,
+        "comment": 24,
+        "whitespace": 1
+      }
+    ],
+    "coverage_contract": "Validate assigned_ranges and flattened areas[].packets[].coverage_ranges independently, then use the same function for canonical, omission and overlap controls.",
+    "negative_controls": [
+      "omit4788",
+      "overlap4887"
+    ],
+    "required_checks": [
+      "pinned/current blob and base ancestry",
+      "complete symbols/helpers/callers/boundaries",
+      "eight consumers and unrun fixtures",
+      "the gesture's arm condition, per-listener _spanShrink field writes, DOM-preview vs document-write separation at commit, cancel paths and interaction with _tlDrag/the next leaf, with exact line numbers",
+      "every reader of _spanShrink outside this range across the whole src/js tree (none found)",
+      "no sibling overlap with C19n/C19m/other census artifacts",
+      "P30/app.js/C19m preservation",
+      "JSON/private-path/trailing whitespace hygiene",
+      "sole untracked artifact or committed-clean mode"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, runtime correction, source edit or product acceptance claim."
+  }
+}
