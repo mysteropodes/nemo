@@ -1,0 +1,416 @@
+{
+  "census_id": "C19q",
+  "issue": 1172,
+  "title": "Layer-panel selection state, rename, shape-tree rows, folder maps and render order",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C19q census only; P30 (timeline.js runtime writer), P20's NemoFolderCodec (domain/document/folder-codec.js, folder-metadata serialization boundary), C19p/#1167 (PR #1169, `syncLayerSelFromFrameSel` at 5076 and the whole frame-grid mouse-handler leaf, 5028-5420), C19m/#1158 (`_tlDrag` and Motion's own drag machinery), app.js/motion.js/select-bridge.js/nemo-script.js (every other `_layerSel`/`_layerSelAnchor` writer named below), group-bridge.js (`SMGroup.renameGroup`), and every other named owner remain separate",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "b4a4fe249821bc534dd1a63dbb4b037df6455ec3",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19q-timeline-layer-panel-folders",
+  "assigned_ranges": [
+    {
+      "start": 5421,
+      "end": 5709
+    }
+  ],
+  "coverage_note": "Exactly 289 assigned lines occur once across seven packets (one coverage_range per packet, no gaps, no other-owner exclusions): 197 code, 92 full-line `//` comments, 0 blank. Line 5420 is C19p's trailing blank after its own window `mouseup` commit listener's closing `});` (out of scope, C19p's last line); line 5421 opens this scope's `_layerSel` lead-in comment (`// Multi-selection of layer rows...`). Line 5709 is the closing brace of `startFolderRename`; line 5710 begins the next leaf's icon-SVG constants block (`var ICO_EYE=...`) and is excluded.",
+  "source_baselines": {
+    "pinned": "59a5a38c:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (b4a4fe249821bc534dd1a63dbb4b037df6455ec3, PR #1171/P21 merged) has the identical timeline.js blob (git rev-parse b4a4fe2:src/js/timeline.js == git rev-parse 59a5a38c:src/js/timeline.js == cc4cfd27...); this artifact branches from origin/main at b4a4fe2.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes are read as authorial intent, not fresh execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19q-timeline-layer-panel-selection-folders.json and the seven timeline.js packets partitioning lines 5421-5709.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "folder_codec_boundary": "P20's NemoFolderCodec (domain/document/folder-codec.js) is a consumer boundary, not a target: a whole-file grep at the frozen SHA finds NemoFolderCodec called from timeline.js only at 2117 (exportFolderId, inside the scene-save layer-serialization map), 2170 (exportFolderMap), 2458 (applyFolderId, inside JSON import) and 2562 (importFolderMap) — all four strictly outside 5421-5709 — plus tweens.js:4892/4957 (snapshotFolderMap/restoreFolderMap, undo). None of this scope's own nine symbols (`_layerSel`, `_layerSelAnchor`, `startLayerRename`, `renderShapeTreeRowsInto`, `folderLayerChildMap`, `folderLayerParentIdx`, `computeLayerRenderOrder`, `groupSelectionIntoFolder`, `folderMemberIndices`, `ungroupFolder`, `startFolderRename`) calls NemoFolderCodec, and no line inside 5421-5709 references it by name — confirmed absent, as the issue anticipated. This scope's own folder writes (`groupSelectionIntoFolder`/`ungroupFolder`, packet 7) mutate `ld.folderId`/`state.layerFolders[fid]` directly and rely on the save/load path (out of scope) to run them through the codec at serialization time.",
+    "owners": "C19p/#1167 (PR #1169) retains the whole frame-grid mouse-handler leaf (timeline.js:5028-5420, out of scope) including `syncLayerSelFromFrameSel` (declared 5076, this scope's own state var's most important external writer, cited throughout the `_layerSel` contract below) and the four call sites that invoke it (5098,5103,5123,5137,5330, all out of scope, all inside C19p's own range). C19m/#1158 (PR #1159) retains `_tlDrag` (timeline.js:3919, not read or written anywhere in this scope). app.js retains `reorderLayersAtGap` (438, `_layerSel` write at 479), `mergeLayersIntoOne` (3767, write at 3980), `convertLayersToComponent` (3325, write at 3466) and `splitLayerIntoElementsCore` (3600, write at 3732) — four more `_layerSel` writers outside this file, cited by call site only in the state-contract discussion below, never claimed. motion.js retains `renderLayerListMotion` (7032, writes at 7051,7264-7266,7285-7286,7292 inside its own row mousedown listener), `selectLayerForEdit` (2794, write at 2799), `syncLayerSelFromBarSel` (6948, write at 6949), `selectLayerFromGrid` (11126, write at 11128), `syncLayerSelToKeySel` (11451, write at 11468), `endMarquee` (12723, write at 12757 and, at 12795, an anonymous click handler in the same area), and `setAppMode` (13125, write at 13202) — all out of scope. select-bridge.js retains `syncMotionLayerSelection` (315, writes at 319,331) and the Select tool's Null-marker mousedown branch (write at 1590, inside an anonymous `onMouseDown`-style handler, not itself named). nemo-script.js retains its scripting-API `setLayers`/`clear` methods (590,603, writes at 591,605). group-bridge.js retains `renameGroup` (364, called once from this scope's shape-tree-rows packet at 5486 and again from its own delete/rename action closures via `commitGroupRename`). motion.js also retains `shapeTreeRowPlan` (9699), `elementLabel` (9533), `layerElements` (9436), `liveItemByStrokeId` (9732), `startShapeTreeRename` (9814), `toggleShapesSectionCollapsed` (9724), `toggleShapeGroupExpanded` (9718), `selectShapesByStrokeIds` (9764) and `ensureLayerUid` (3519) — all nine called by name from this scope's shape-tree-rows and folder-child-map packets, cited only by call site, bodies not reproduced.",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19p/#1167 (PR #1169, existing owner)",
+      "disposition": "Retains timeline.js:5028-5420 including `syncLayerSelFromFrameSel` (5076) and its four call sites (5098,5103,5123,5137) plus one more inside the mousemove drag packet (5330) — all five write `_layerSel` indirectly by calling this scope's own state var's contract-setting function, itself out of scope. This scope's own `_layerSel`/`_layerSelAnchor` declarations (5423,5432) are the variables C19p's function reads/writes; this scope claims only the declarations and their own lead-in comment, not C19p's reader/writer body."
+    },
+    {
+      "owner": "app.js (existing owner)",
+      "disposition": "Retains `reorderLayersAtGap` (438, `_layerSel` write at 479), `convertLayersToComponent` (3325, write at 3466), `splitLayerIntoElementsCore` (3600, write at 3732) and `mergeLayersIntoOne` (3767, write at 3980) — four `_layerSel` whole-array-replacement writers, none of them called from this scope's own 5421-5709 lines (they are reached from layer-panel buttons/menus declared elsewhere in timeline.js, out of scope); cited only in the `_layerSel` session-state contract below, bodies not reproduced."
+    },
+    {
+      "owner": "motion.js (existing owner)",
+      "disposition": "Retains `renderLayerListMotion` (7032), `selectLayerForEdit` (2794), `syncLayerSelFromBarSel` (6948), `selectLayerFromGrid` (11126), `syncLayerSelToKeySel` (11451), `endMarquee` (12723) and `setAppMode` (13125) — seven functions that together account for every remaining `_layerSel`/`_layerSelAnchor` write site this census found outside timeline.js and app.js. Also retains `shapeTreeRowPlan`/`elementLabel`/`layerElements`/`liveItemByStrokeId`/`startShapeTreeRename`/`toggleShapesSectionCollapsed`/`toggleShapeGroupExpanded`/`selectShapesByStrokeIds`/`ensureLayerUid`, all called by name from this scope's shape-tree-rows and folder-child-map packets and none reproduced beyond the call site."
+    },
+    {
+      "owner": "select-bridge.js (existing owner)",
+      "disposition": "Retains `syncMotionLayerSelection` (315, `_layerSel` writes at 319,331) and the Select tool's Null-marker mousedown branch (write at 1590) — both out of scope, cited only in the state-contract discussion."
+    },
+    {
+      "owner": "nemo-script.js (existing owner)",
+      "disposition": "Retains its scripting-API layer-selection setter/clear methods (590,603, `window._layerSel` writes at 591,605) — out of scope, cited only in the state-contract discussion."
+    },
+    {
+      "owner": "group-bridge.js (existing owner)",
+      "disposition": "Retains `renameGroup` (364, called once from this scope's shape-tree-rows packet at timeline.js:5486 inside `commitGroupRename`) — this scope cites only the one call site, not the body."
+    },
+    {
+      "owner": "P20's NemoFolderCodec (domain/document/folder-codec.js, existing owner, consumer boundary not a target)",
+      "disposition": "Owns folder-metadata serialization (`exportFolderId`/`exportFolderMap`/`applyFolderId`/`importFolderMap`, all called from timeline.js only outside 5421-5709 at 2117/2170/2458/2562). This scope's own folder writes (`groupSelectionIntoFolder`/`ungroupFolder`) never call it directly — they write `ld.folderId`/`state.layerFolders` in memory and rely on the out-of-scope save/load path to route through the codec."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 5420 is outside coverage (C19p's trailing blank after its own window `mouseup` commit listener's closing `});` at 5419); line 5421 (the `_layerSel` lead-in comment, `// Multi-selection of layer rows...`) begins this scope.",
+    "Line 5709 (closing brace of `startFolderRename`) is the last line of this scope; line 5710 opens the next leaf's icon-SVG constants block (`var ICO_EYE='<svg ...'` and following) and is excluded.",
+    "No lines inside 5421-5709 are excluded for another owner: every line belongs to exactly one of the seven packets below, confirmed by the validator's packet-partition-equals-assigned-union check. `_layerSel`/`_layerSelAnchor` (declared inside this scope, 5423/5432) are READ and WRITTEN by many out-of-scope functions across app.js/motion.js/select-bridge.js/nemo-script.js/select-bridge.js/timeline.js's own C19p leaf; this scope claims only the two declarations and their own lead-in comments, not any external reader/writer body. `NemoFolderCodec` (P20, domain/document/folder-codec.js) is never referenced by name anywhere inside 5421-5709 (confirmed by grep) even though this scope's own `groupSelectionIntoFolder`/`ungroupFolder` mutate the exact fields (`ld.folderId`, `state.layerFolders`) that codec later serializes at save time, out of scope."
+  ],
+  "areas": [
+    {
+      "area": "layer-panel-selection-and-rename",
+      "packets": [
+        {
+          "id": "C19q.layer-selection-state",
+          "files": [
+            "src/js/timeline.js:5421-5432"
+          ],
+          "coverage_ranges": [
+            [5421, 5432]
+          ],
+          "classification": {"code": 2, "comment": 10, "whitespace": 0},
+          "symbols": ["_layerSel", "_layerSelAnchor"],
+          "signature": "var _layerSel=[]; var _layerSelAnchor=-1;",
+          "responsibility": "Declares the two module-level session-state variables that back the layer panel's multi-selection: `_layerSel` (the array of selected layer indices, read by F5/F6 in app.js, Delete, folder grouping and Motion's stagger/skew box) and `_layerSelAnchor` (the frozen Shift-range anchor, added 2026-07-31 so a Shift-click range never drifts toward a lower index after the array itself is rewritten).",
+          "behavior": [
+            "2-line lead-in comment (5421-5422): `_layerSel` is a multi-selection of layer rows (Cmd/Ctrl+click toggles, Shift+click ranges); operations like Delete apply to the whole set.",
+            "Declaration (5423): `var _layerSel=[];` — module-level (function-scope-free, script top-level `var`), starts empty.",
+            "8-line comment (5424-5431) documents the 2026-07-31 unification pass that added `_layerSelAnchor`: both row handlers (Animation 2D's own, and Motion's `renderLayerListMotion`) previously derived the Shift-range anchor from `_layerSel[0]` — the CURRENT first element of the live array — which silently relocates after any Shift-click toward a LOWER index (the rebuilt range's `[0]` is `min(anchor,idx)`, not the original anchor); layer-inout.js's own `_barAnchorLi` already avoided this exact drift with a dedicated variable Shift never touches, and this declaration is the same contract for the layer list: set on every plain click and Ctrl-toggle, read-only for Shift.",
+            "Declaration (5432): `var _layerSelAnchor=-1;` — sentinel `-1` means \"no anchor frozen yet\"."
+          ],
+          "callers": [
+            "Not a function; these are the sole declaration sites of `_layerSel` and `_layerSelAnchor`. A word-boundary grep across src/js at the frozen SHA finds 145 further references to `_layerSel` (reads and writes combined) and 19 further references to `_layerSelAnchor`, spread across app.js, motion.js, select-bridge.js, nemo-script.js and timeline.js's own C19p leaf (5028-5420) and later layer-panel code (6600-6660s, out of scope) — every one of them is a READ or WRITE of the variable declared here, not a caller of a function; the full writer enumeration is under `_layerSel_session_state_contract` in `source_consumers` below."
+          ],
+          "effects": "Declares (does not read or write any other state): `_layerSel=[]`, `_layerSelAnchor=-1`. No document write, no `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`renderLayerList`/`renderTimeline`/`updateUI` call — a bare `var` statement pair executed once at script load."
+        },
+        {
+          "id": "C19q.layer-rename",
+          "files": [
+            "src/js/timeline.js:5433-5447"
+          ],
+          "coverage_ranges": [
+            [5433, 5447]
+          ],
+          "classification": {"code": 13, "comment": 2, "whitespace": 0},
+          "symbols": ["startLayerRename"],
+          "signature": "startLayerRename(idx)",
+          "responsibility": "Swaps a layer row's name label for a real `<input>` element and wires commit-on-blur/Enter and cancel-on-Escape, because `window.prompt()` is silently ignored by Tauri's WKWebView.",
+          "behavior": [
+            "2-line lead-in comment (5433-5434): inline rename exists because `window.prompt()` is silently ignored by Tauri's WKWebView, so the row's label swaps to a real text input instead.",
+            "Function declaration (5435): `function startLayerRename(idx){`.",
+            "Row/label lookup (5436-5437): `var row=document.querySelector('.lrow[data-layer=\"'+idx+'\"]');if(!row)return;var nm=row.querySelector('.lnm');if(!nm)return;` — bails silently if the row isn't currently rendered.",
+            "Input creation (5438-5440): builds an `<input type=\"text\">` pre-filled with `state.layers[idx].name`, inline-styled to match the row, swaps it into `nm.innerHTML`, then `input.focus();input.select();`.",
+            "Commit guard (5441): `var done=false;` — a closure flag so blur-after-Enter/Escape doesn't double-commit.",
+            "Commit function (5442): `function commit(){if(done)return;done=true;var v=input.value.trim();if(v)window.SM.renameLayer(idx,v);else updateUI();}` — a non-empty trimmed value calls the out-of-scope `window.SM.renameLayer(idx,v)` (timeline.js:1612, `state.layers[idx].name=n;updateUI();`); an empty value just re-renders (`updateUI()`) to restore the label, discarding the edit.",
+            "Keydown handler (5443): `input.addEventListener('keydown',function(e){e.stopPropagation();if(e.key==='Enter')commit();else if(e.key==='Escape'){done=true;updateUI();}});` — Enter commits, Escape discards by setting `done=true` (so a following blur is a no-op) and re-rendering directly.",
+            "Blur handler (5444): `input.addEventListener('blur',commit);` — clicking away commits.",
+            "Click/dblclick swallow (5445-5446): `input.addEventListener('mousedown',function(e){e.stopPropagation();});input.addEventListener('dblclick',function(e){e.stopPropagation();});` — stops a click/dblclick on the input itself from bubbling to the row's own click/dblclick handlers (out of scope, declared later in the file) while editing.",
+            "Closing brace (5447)."
+          ],
+          "callers": [
+            "src/js/timeline.js:6662 — row dblclick handler (`row.addEventListener('dblclick',function(){...startLayerRename(idx3);})`), reached only when the layer isn't a Component instance (`symbolId`) or an LFS group head (both of those instead call `window.SM.enterSymbol`).",
+            "src/js/timeline.js:6707 — a row's right-click context-menu item `{label:SM.t('elementsRename'),action:function(){startLayerRename(idx4);}}`.",
+            "src/js/timeline.js:7523 — the `F2`/`cmdRenameLayer` global keyboard shortcut: `run:function(e){e.preventDefault();if(state.layers[state.activeLayerIdx])startLayerRename(state.activeLayerIdx);}`.",
+            "src/js/motion.js:7388 — Motion's own equivalent row context-menu item, `{ label: SM.t('elementsRename') + '  (F2)', action: function () { startLayerRename(li); } }`; motion.js:7385 has a comment noting Motion previously lacked this entry.",
+            "A whole-`src/js` grep for `startLayerRename` at the frozen SHA finds exactly these four call sites plus the declaration (5435) and two further textual (`//` comment) mentions — motion.js:9813 (\"timeline.js's startLayerRename, targeting this row's own .lnm instead\") and shapes-panel.js:234 (\"Same inline input-swap idiom as timeline.js's startLayerRename\") — both excluded per the issue's instruction to exclude `//` lines; no other file calls it."
+          ],
+          "effects": "Reads `state.layers[idx].name`. Writes: swaps DOM (`nm.innerHTML=''`, appends an `<input>`), and on commit calls `window.SM.renameLayer(idx,v)` (out of scope, itself writes `state.layers[idx].name` and calls `updateUI()`) or, on an empty value or Escape, calls `updateUI()` directly. No `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames` call anywhere in this function or in `renameLayer` itself — a layer rename is not snapshotted for undo by either function."
+        }
+      ]
+    },
+    {
+      "area": "shape-tree-rows-and-folder-maps",
+      "packets": [
+        {
+          "id": "C19q.shape-tree-rows",
+          "files": [
+            "src/js/timeline.js:5448-5542"
+          ],
+          "coverage_ranges": [
+            [5448, 5542]
+          ],
+          "classification": {"code": 78, "comment": 17, "whitespace": 0},
+          "symbols": ["renderShapeTreeRowsInto"],
+          "signature": "renderShapeTreeRowsInto(list,li,ld)",
+          "responsibility": "Appends the per-shape disclosure rows (a 'Shapes' group header plus one row per SMMotion.shapeTreeRowPlan entry — combine-group headers and individual shape/element rows) into the Animation-2D `#layer-list`, when the layer's own disclosure arrow has it expanded (`window._layerShapesExpanded[li]`); each row wires click-to-select, dblclick-to-rename and a right-click context menu (rename / select members / ungroup or delete).",
+          "behavior": [
+            "9-line lead-in comment (5448-5457): the disclosure arrow wired above (out of scope, timeline.js:6602-6608) toggles `window._layerShapesExpanded[li]`; when open, this appends one row per `SMMotion.buildShapeTree(li,ld)`-derived entry (group headers + ungrouped shapes) into `#layer-list`; `renderTimeline`'s own layer loop calls the same row-plan the SAME way to emit matching blank spacers (out of scope, timeline.js:4307) — the 'two independent readers of one enumerator' contract Motion's own `renderElementsList`/`renderTimelineMotion` pair already established (motion.js, out of scope); unlike Motion's element list, a row here never expands further, so the row count is fixed.",
+            "Function declaration (5459): `function renderShapeTreeRowsInto(list,li,ld){`.",
+            "Guard (5460): `if(!window.SMMotion||!SMMotion.shapeTreeRowPlan)return;` — no-op if the Motion module or the row-plan function isn't loaded.",
+            "3-line comment (5461-5463): the shared row plan (2026-09, #746) is why all four renderers of this list read `SMMotion.shapeTreeRowPlan` instead of walking the tree themselves — see that function's own comment in motion.js (9699, out of scope).",
+            "Plan fetch and early-out (5464-5465): `var plan=SMMotion.shapeTreeRowPlan(li,ld);if(!plan.length)return;`.",
+            "Label-index carry (5466): `var tree={labelIdx:plan.labelIdx};` — `plan.labelIdx` maps a `strokeId` to its stable draw-order label, produced by `shapeTreeRowPlan` (out of scope) and consulted at 5507.",
+            "Section-header row (5467-5472): builds a `.lrow.motion-group-row` with a disclosure arrow glyph (`▸`/`▾` from `window._motionShapesCollapsed`, out of scope) and the localized `SM.t('hdrShapes')` label; its click handler (5471) calls `SMMotion.toggleShapesSectionCollapsed()` (out of scope, motion.js:9724) and `e.stopPropagation()`; appended to `list` at 5472.",
+            "Row loop (5473-5541, `plan.slice(1).forEach(...)`, skipping the header entry already consumed): `var shapeIdx=0;` (5473) then per `planRow` with `node=planRow.node,depth=planRow.depth||0`.",
+            "  Group-row branch (5476-5506, `if(planRow.kind==='group'){...}`): builds a `.lrow.motion-elem-row.motion-elem-group` row, indented by `depth*14px` (5478); its own disclosure arrow (5479-5481) reads `window._motionExpandedShapeGroups[node.gid]` and toggles it via `SMMotion.toggleShapeGroupExpanded(node.gid)` (out of scope, motion.js:9718) on click; a swatch (5482) and name label (5483) are appended (5484); `memberIds` (5485) is `node.memberIds` if present, else derived live via `SMMotion.layerElements(li,ld).filter(...)` (out of scope, motion.js:9436) matching `sd.groupId===node.gid`; `commitGroupRename(v)` (5486) is a local closure: `pushUndo();if(window.SMGroup&&SMGroup.renameGroup)SMGroup.renameGroup(node.gid,ld,v,memberIds);saveActiveLayerFrame();renderLayerList();renderTimeline();` — the ONLY document write reachable from a click that lands on this function's own DOM by the time this call executes (group-bridge.js:364, out of scope); the row's own click (5487) selects every member via `SMMotion.selectShapesByStrokeIds(li,memberIds)` (out of scope, motion.js:9764); dblclick (5488) starts a rename via `SMMotion.startShapeTreeRename(grow,node.name,commitGroupRename)` (out of scope, motion.js:9814); a contextmenu handler (5489-5503) offers Rename/Select members/Ungroup, the last of which (5495-5501) does `pushUndo();` then strips `data.groupId` from every member via `SMMotion.liveItemByStrokeId` (out of scope, motion.js:9732), `delete ld.groups[node.gid];`, `saveActiveLayerFrame();renderLayerList();renderTimeline();` and conditionally `SMEngineBridge.renderNow()`; the row is appended (5504) and the loop iteration returns (5505) without falling into the shape-row branch below.",
+            "  Shape-row branch (5507-5540, reached only when `planRow.kind!=='group'`): `idx` (5507) is `tree.labelIdx[node.strokeId]` if defined, else the running `shapeIdx++` (a trailing `//` comment notes this is the stable draw-order label, see `buildShapeTree`'s own comment, out of scope); builds a `.lrow.motion-elem-row` (5508-5509, same depth-indent), a color swatch from `node.sd.fillColor||node.sd.strokeColor||'transparent'` (5510), and a name label via `SMMotion.elementLabel(node,idx,ld)` (out of scope, motion.js:9533) (5511-5512); click (5513) selects the one shape via `SMMotion.selectShapesByStrokeIds(li,[node.strokeId])`; dblclick (5514-5519) starts a rename whose commit closure (5516-5518) does `pushUndo();if(!ld.shapeNames)ld.shapeNames={};ld.shapeNames[node.strokeId]=v;saveActiveLayerFrame();renderLayerList();renderTimeline();` — a second, distinct document write (per-shape custom name, `ld.shapeNames`, as opposed to the group-rename branch's `ld.groups`); a contextmenu handler (5520-5539) offers Rename/Select/Delete, the last (5526-5537) resolving the live item via `SMMotion.liveItemByStrokeId` (out of scope), bailing if not found, then `pushUndo();` followed by a 3-line comment (5530-5532) documenting a 2026-07-31 stale-selection fix (deleting the current canvas selection without clearing `selectedPaths` left a detached `.parent===null` reference behind — found live via screenshot) implemented as `if(window.selectedPaths&&selectedPaths.indexOf(item)>=0)clearSel(true);item.remove();saveActiveLayerFrame();renderLayerList();renderTimeline();renderArcs();` and conditionally `SMEngineBridge.renderNow()`; the row is appended (5540).",
+            "Loop/function closing braces (5541-5542)."
+          ],
+          "callers": [
+            "src/js/timeline.js:6784 — `renderLayerList`'s own layer loop: `if(window._layerShapesExpanded&&window._layerShapesExpanded[i])renderShapeTreeRowsInto(list,i,ld);` (out of scope, the sole call site inside timeline.js proper).",
+            "A whole-`src/js` grep for `renderShapeTreeRowsInto` at the frozen SHA finds exactly this one call site plus the declaration (5459) and two further textual (`//` comment) mentions — motion.js:9691 (\"timeline panel (renderShapeTreeRowsInto) and ITS grid mirror\") and timeline.js:4302 (\"Mirrors renderLayerList's renderShapeTreeRowsInto exactly — one blank...\", inside `renderTimeline`'s own layer loop at 4307, out of scope) — both excluded per the issue's instruction to exclude `//` lines; no other file calls it."
+          ],
+          "effects": "Reads `window.SMMotion`/`SMMotion.shapeTreeRowPlan(li,ld)` (and, transitively through it, `ld`'s live shape data), `window._motionShapesCollapsed`, `window._motionExpandedShapeGroups`, `node.sd.fillColor`/`strokeColor`, `ld.groups`, `ld.shapeNames`. The function CALL ITSELF performs no document write — it only builds DOM rows and registers event listeners. Every document write happens later, deferred to a listener firing on user interaction: group rename (`commitGroupRename`, `pushUndo();SMGroup.renameGroup(...);saveActiveLayerFrame();renderLayerList();renderTimeline();`), group ungroup (`pushUndo();` strip `data.groupId` from members; `delete ld.groups[gid];saveActiveLayerFrame();renderLayerList();renderTimeline();` plus conditional `SMEngineBridge.renderNow()`), shape rename (`pushUndo();ld.shapeNames[strokeId]=v;saveActiveLayerFrame();renderLayerList();renderTimeline();`) and shape delete (`pushUndo();` conditional `clearSel(true);item.remove();saveActiveLayerFrame();renderLayerList();renderTimeline();renderArcs();` plus conditional `SMEngineBridge.renderNow()`) — four distinct deferred document-write paths, each gated behind its own context-menu item or dblclick, none firing merely from calling this function."
+        },
+        {
+          "id": "C19q.folder-child-map",
+          "files": [
+            "src/js/timeline.js:5543-5587"
+          ],
+          "coverage_ranges": [
+            [5543, 5587]
+          ],
+          "classification": {"code": 23, "comment": 22, "whitespace": 0},
+          "symbols": ["folderLayerChildMap"],
+          "signature": "folderLayerChildMap()",
+          "responsibility": "Pure reader shared by `renderLayerList()` and `renderTimeline()` (and, transitively, `computeLayerRenderOrder` below) that resolves every real Folder-layer (`ld.isFolderLayer`) to the set of OTHER layer indices whose `parentLayerUid` points at it, so both renderers agree on which rows nest under which folder — independent of physical array adjacency.",
+          "behavior": [
+            "20-line lead-in comment (5543-5564): shared by `renderLayerList()`/`renderTimeline()` so the layer list and the frame grid always agree on visible rows; a folder header entry appears once, right before the first of its consecutive member layers, a collapsed folder's members are marked `hidden:true` rather than omitted so callers needing the real layer index (frame-grid columns) can still find it. Folder LAYER (2026-08, `ld.isFolderLayer` — distinct from the plain `ld.folderId`/`state.layerFolders` UI-only grouping declared later in this scope) is a real `state.layers[]` entry whose children are every OTHER layer with `parentLayerUid===` this folder's own uid, wherever they physically sit in the array (SMMotion's existing parenting mechanism doesn't require adjacency); resolved once up front so the main high-to-low loop in `computeLayerRenderOrder` can splice a folder's children in as nested entries right after it. A layer that is ITSELF a folder is never absorbed as someone else's child — nested folders are v1-unsupported (mirrors engine.rs's `is_folder_layer` doc comment, out of scope); the UI drop handler `moveLayerReorder` (out of scope) additionally refuses to let a drag create this situation.",
+            "Function declaration (5565): `function folderLayerChildMap(){`.",
+            "State init (5566): `var folderUidByIdx={},childrenOf={},childOf={};`.",
+            "Pass 1, folder discovery (5567-5573, high-to-low `for(var k=state.layers.length-1;k>=0;k--)`): for each `lk` with `lk.isFolderLayer`, resolves its uid via `(window.SMMotion&&SMMotion.ensureLayerUid)?SMMotion.ensureLayerUid(lk):lk.layerUid` (out of scope, motion.js:3519) and records `folderUidByIdx[k]=fuid` if truthy.",
+            "Pass 2, child resolution (5574-5585, high-to-low `for(var k2=...)`): skips any `lk2` with no `parentLayerUid` or that is itself a folder (5576); for each remaining layer, scans `folderUidByIdx` for a matching `parentLayerUid` (5577-5584) and, on the first match, records `childrenOf[fidx].push(k2)` and `childOf[k2]=fidx`, then `break`s — a layer can be the child of at most one folder in this map (first match by folder-index-iteration-order wins, not by any declared priority).",
+            "Return (5586): `return {childrenOf:childrenOf,childOf:childOf};` — a fresh object literal on every call, no caching.",
+            "Closing brace (5587)."
+          ],
+          "callers": [
+            "src/js/timeline.js:5602 — this scope's own `computeLayerRenderOrder` (packet 6 below): `var flMap=folderLayerChildMap(),flChildrenOf=flMap.childrenOf,flChildOf=flMap.childOf;`.",
+            "src/js/layer-inout.js:659,666 — `typeof folderLayerChildMap==='function'` guard then `(folderLayerChildMap().childrenOf[m.li]||[]).forEach(...)` (Motion's in/out-point bar rendering, out of scope).",
+            "src/js/layer-inout.js:709-710 — a second call site: `if(type==='both'&&ld.isFolderLayer&&typeof folderLayerChildMap==='function'){var flChildrenOf=folderLayerChildMap().childrenOf[li]||[];...}`.",
+            "A whole-`src/js` grep for `folderLayerChildMap` at the frozen SHA finds exactly these three call sites (5602, 659, 666, 709-710 — layer-inout.js calls it twice) plus the declaration (5565) and three further textual (`//` comment) mentions — layer-inout.js:701,707 and timeline.js:6905,6956 — all excluded per the issue's instruction to exclude `//` lines; no other file calls it."
+          ],
+          "effects": "Reads `state.layers[k].isFolderLayer`/`.layerUid`/`.parentLayerUid`, and calls `SMMotion.ensureLayerUid(lk)` (out of scope — this call CAN write a layer's `layerUid` field the first time it's needed, since `ensureLayerUid` lazily assigns one if missing; `folderLayerChildMap` itself never assigns a uid, it only triggers the lazy-assignment inside the out-of-scope helper). No `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`renderLayerList`/`renderTimeline`/`updateUI` call anywhere in this function — a pure reader (module the ID assignment side-effect above) returning a fresh map."
+        },
+        {
+          "id": "C19q.folder-parent-index",
+          "files": [
+            "src/js/timeline.js:5588-5599"
+          ],
+          "coverage_ranges": [
+            [5588, 5599]
+          ],
+          "classification": {"code": 7, "comment": 5, "whitespace": 0},
+          "symbols": ["folderLayerParentIdx"],
+          "signature": "folderLayerParentIdx(idx)",
+          "responsibility": "Resolves layer `idx`'s parent index IF that parent is specifically a Folder layer (`ld.isFolderLayer`), not just any `parentLayerUid` target — a layer parented to an ordinary Null must NOT show \"Retirer du dossier\" or be un-parented by the plain drag-out gesture; single source of truth for that distinction.",
+          "behavior": [
+            "12-line lead-in comment (5588-5592): resolves `idx`'s parent, IF that parent is a Folder layer, not just any `parentLayerUid` target; single source of truth for the menu item's disabled state, the context-menu action, and `finishLayerReorder`'s drag-out un-parent (both out of scope).",
+            "Function declaration (5593): `function folderLayerParentIdx(idx){`.",
+            "Guard (5594): `var ld=state.layers[idx];if(!ld||!ld.parentLayerUid)return -1;` — no layer, or no parent uid at all, is `-1`.",
+            "Scan (5595-5597): `for(var pi=0;pi<state.layers.length;pi++){if(pi!==idx&&state.layers[pi].layerUid===ld.parentLayerUid)return state.layers[pi].isFolderLayer?pi:-1;}` — low-to-high scan (unlike `folderLayerChildMap`'s high-to-low), returns on the FIRST layer (other than itself) whose `layerUid` matches; that match's own index if it IS a folder, else `-1` (an ordinary Null/other parent is deliberately not resolved further even if a folder exists elsewhere with a matching id — there can only be one layer with a given uid).",
+            "Fallback (5598): `return -1;` — no layer had a matching uid at all.",
+            "Closing brace (5599)."
+          ],
+          "callers": [
+            "src/js/timeline.js:951 — inside an out-of-scope function: `if(folderLayerParentIdx(idx)<0)return;` (guard: not parented to a folder, or not parented at all — leave it alone).",
+            "src/js/timeline.js:6721 — a row context-menu item: `{label:SM.t('ctxRemoveFromFolderParent'),disabled:folderLayerParentIdx(idx4)<0,action:function(){window.SM.removeLayerFromFolder(idx4);}}`.",
+            "src/js/timeline.js:6966 — `var unparenting=moving.some(function(mi){return window.SMMotion&&folderLayerParentIdx(mi)>=0;});` (drag-reorder, deciding whether any dragged layer needs un-parenting).",
+            "src/js/timeline.js:6969 — `if(window.SMMotion&&folderLayerParentIdx(mi)>=0)SMMotion.setLayerParent(mi,null);` (the actual un-parent call, inside the same drag-reorder function as 6966).",
+            "src/js/motion.js:7393 — Motion's own row context-menu item: `{ label: SM.t('ctxRemoveFromFolder'), disabled: (typeof folderLayerParentIdx !== 'function' || folderLayerParentIdx(li) < 0), action: function () { window.SM.removeLayerFromFolder(li); } }`.",
+            "A whole-`src/js` grep for `folderLayerParentIdx` at the frozen SHA finds exactly these five call sites plus the declaration (5593) and one further textual (`//` comment) mention — motion.js:7392 (\"see folderLayerParentIdx, timeline.js\") — excluded per the issue's instruction to exclude `//` lines; no other file calls it."
+          ],
+          "effects": "Reads `state.layers[idx].parentLayerUid`, `state.layers[*].layerUid`/`.isFolderLayer`. No write of any kind, no `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`renderLayerList`/`renderTimeline`/`updateUI` call — a pure reader, one full scan of `state.layers` worst case."
+        }
+      ]
+    },
+    {
+      "area": "layer-render-order-and-folder-commands",
+      "packets": [
+        {
+          "id": "C19q.layer-render-order",
+          "files": [
+            "src/js/timeline.js:5600-5664"
+          ],
+          "coverage_ranges": [
+            [5600, 5664]
+          ],
+          "classification": {"code": 39, "comment": 26, "whitespace": 0},
+          "symbols": ["computeLayerRenderOrder"],
+          "signature": "computeLayerRenderOrder()",
+          "responsibility": "The single shared reader (per its own callers' comments, both `renderLayerList()` and `renderTimeline()` — and Motion's `renderLayerListMotion`/`renderTimelineMotion` via a `typeof` guard fallback) that walks `state.layers` high-to-low and produces the exact ordered, folder-nested, link-group-aware, shy-aware row list every layer-panel/frame-grid renderer displays — folder headers inserted once before their first member, collapsed-folder/link-group/shy members marked `hidden:true` rather than omitted.",
+          "behavior": [
+            "Function declaration (5600): `function computeLayerRenderOrder(){`.",
+            "State init (5601): `var order=[],seenFolder={},folderEntry={},seenLinkGroup={};`.",
+            "Folder-child-map resolution (5602): `var flMap=folderLayerChildMap(),flChildrenOf=flMap.childrenOf,flChildOf=flMap.childOf;` (this scope's own function, previous packet).",
+            "Main loop (5603-5654, high-to-low `for(var i=state.layers.length-1;i>=0;i--)`): skips any `i` already claimed as a folder-layer child (5604, `if(flChildOf.hasOwnProperty(i))continue;` — placed under its folder layer below instead).",
+            "  `ld.folderId` branch (5606-5621, `var fid=ld.folderId;if(fid&&state.layerFolders[fid]){...}`): on first encounter of a given `fid` (5608-5613, high-to-low so this is the TOPMOST member), pushes a `{type:'folder',id:fid,keyLayerIdx:i}` header entry into `order` and records it in `folderEntry[fid]`; a 5-line comment (5614-5617) explains `folderEntry[fid].keyLayerIdx=i` (5618) is updated on EVERY member visited, so — since the loop runs top-down (highest index first) — the LAST member visited (lowest index) is whichever one sticks as the 'key' layer whose frame data represents the collapsed group in `renderTimeline()`; the member's own row is then pushed (5619) as `{type:'layer',idx:i,hidden:!!state.layerFolders[fid].collapsed}`; `continue` (5620) skips the link-group/folder-layer-child logic below for this `i`.",
+            "  `ld.linkGroupId` branch (5622-5641, reached only when `fid` was falsy or `state.layerFolders[fid]` didn't exist): a 10-line comment (5624-5633) explains Stroke/Fill/Shadow link groups (`app.js convertLayerToStrokeFillShadowFolder`, out of scope) are deliberately NOT `layerFolders` — each member stays fully normal and independently controlled; this is only the collapse/expand space-saving affordance, where the first member encountered (topmost, high-index-first) is the permanent 'head' row that always shows its own real eye/lock/solo (never an aggregate); `isHead=!seenLinkGroup[gid]` (5635) then `if(isHead)seenLinkGroup[gid]=true;` (5636); `collapsed=!!state.layerLinkGroups[gid].collapsed` (5637); pushes `{type:'layer',idx:i,hidden:collapsed&&!isHead,linkGroupId:gid,linkGroupHead:isHead}` (5638) — else (5639-5641, no folder, no link group) pushes a plain `{type:'layer',idx:i,hidden:false}`.",
+            "  Folder-layer-child splice (5642-5653, `if(ld.isFolderLayer&&flChildrenOf[i]){...}`, reached for ANY of the three branches above since it's outside the `if/else` chain): a 6-line comment (5642-5647) explains this splices a real Folder layer's (2026-08) children in as nested entries directly below its own row, in their existing high-to-low order among themselves, `hidden` mirroring `ld.folderCollapsed` exactly like the `folderId`/`linkGroupId` collapse above, and `folderLayerParent` letting row renderers indent without re-deriving the relationship; `flCollapsed=!!ld.folderCollapsed` (5649) then `flChildrenOf[i].forEach(function(ci){order.push({type:'layer',idx:ci,hidden:flCollapsed,folderLayerParent:i});});` (5650-5652).",
+            "Shy pass (5655-5662, `if(state.shyEnabled)order.forEach(...)`): a 4-line comment (5655-5658) explains Shy (AE's own switch, 2026-07-25, a per-layer flag plus one global toggle) is marked `hidden` here rather than filtered out, so it rides the SAME mechanism folders and link-groups already use — every consumer that already honours `hidden` gets shy for free; the forEach body (5660-5662) sets `e.hidden=true` for any `type==='layer'` entry whose `state.layers[e.idx].shy` is truthy.",
+            "Return (5663): `return order;`.",
+            "Closing brace (5664)."
+          ],
+          "callers": [
+            "src/js/timeline.js:4239 — `renderTimeline`'s own layer loop: `var order=computeLayerRenderOrder();` (out of scope; a lead-in comment at 4234 calls it 'Same folder-aware order as renderLayerList()').",
+            "src/js/timeline.js:6357 — `renderLayerList`'s own layer loop: `var order=computeLayerRenderOrder();` (out of scope).",
+            "src/js/timeline.js:9623-9624 — an out-of-scope helper (near a 2-line comment at 9617 about highest-index-first ordering): `if(typeof computeLayerRenderOrder==='function'){idxs=computeLayerRenderOrder()...}`.",
+            "src/js/motion.js:7064 — `var order = (typeof computeLayerRenderOrder === 'function') ? computeLayerRenderOrder() : state.layers.map(function (_l, i) { return { type: 'layer', idx: i }; });` (Motion's own layer-list renderer, with a flat fallback if the function isn't loaded).",
+            "src/js/motion.js:11137 — an identical `typeof`-guarded call/fallback pattern in a second Motion renderer.",
+            "A whole-`src/js` grep for `computeLayerRenderOrder` at the frozen SHA finds exactly these five call sites (4239, 6357, 9623-9624 counted once as one call site, 7064, 11137) plus the declaration (5600) and five further textual (`//` comment) mentions — timeline.js:914,4395,5666(this scope's own next packet's lead-in comment),6425,9617 and layer-inout.js:156,702,716 — all excluded per the issue's instruction to exclude `//` lines; no other file calls it."
+          ],
+          "effects": "Reads `state.layers[*]` (`.folderId`,`.linkGroupId`,`.isFolderLayer`,`.folderCollapsed`,`.shy`), `state.layerFolders`, `state.layerLinkGroups`, `state.shyEnabled`, and calls `folderLayerChildMap()` (this scope's own function, previous packet, which itself can trigger a lazy `layerUid` assignment via `SMMotion.ensureLayerUid`, out of scope). No `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`renderLayerList`/`renderTimeline`/`updateUI` call anywhere in this function — a pure reader, returning a freshly-built `order` array on every call, no caching."
+        },
+        {
+          "id": "C19q.folder-group-ungroup-rename",
+          "files": [
+            "src/js/timeline.js:5665-5709"
+          ],
+          "coverage_ranges": [
+            [5665, 5709]
+          ],
+          "classification": {"code": 35, "comment": 10, "whitespace": 0},
+          "symbols": ["groupSelectionIntoFolder", "folderMemberIndices", "ungroupFolder", "startFolderRename"],
+          "signature": "groupSelectionIntoFolder(); folderMemberIndices(fid); ungroupFolder(fid); startFolderRename(fid)",
+          "responsibility": "Four small commands for the `ld.folderId`/`state.layerFolders` UI-only grouping (distinct from the real `ld.isFolderLayer` layer kind read by the previous two packets): create a folder from the current consecutive multi-selection, list a folder's member layer indices, dissolve a folder back to plain layers, and inline-rename a folder's display label.",
+          "behavior": [
+            "4-line lead-in comment (5665-5668) precedes `groupSelectionIntoFolder`: groups the current multi-selection (`_layerSel`) into a new folder — only when they're already CONSECUTIVE in layer order, because `computeLayerRenderOrder` derives a folder's membership purely from adjacency (a non-contiguous selection would render wrong; reorder first, like Animate requires too).",
+            "`groupSelectionIntoFolder` declaration (5669): guards — fewer than 2 selected (5670, toast `toastSelectAtLeast2LayersCap` and return), non-consecutive sorted indices (5671-5672, toast `toastLayersMustBeConsecutive` and return), any selected layer already in a folder (5673, toast `toastSelectedLayerAlreadyInFolder` and return).",
+            "5-line comment (5674-5677): no undo entry existed at all until now (2026-09 QA sweep, measured 0 entries pushed, Cmd+Z gave back the previous action instead) — every other structural layer action snapshots; all guards above run first so a refused grouping still costs nothing.",
+            "Snapshot and folder creation (5678-5681): `saveAllLayerFrames();pushUndoLayers(true);` then `var fid='folder-'+Date.now()+'-'+Math.floor(Math.random()*1000);state.layerFolders[fid]={name:SM.t('layerKindFolder'),collapsed:false};sorted.forEach(function(i){state.layers[i].folderId=fid;});`.",
+            "Re-render (5682): `renderLayerList();renderTimeline();`.",
+            "Closing brace (5683).",
+            "`folderMemberIndices(fid)` (5684-5688): `var idxs=[];state.layers.forEach(function(ld,i){if(ld.folderId===fid)idxs.push(i);});return idxs;` — a pure linear scan, no ordering guarantee beyond `state.layers`' own array order (ascending index, unlike `computeLayerRenderOrder`'s descending walk).",
+            "`ungroupFolder(fid)` (5689-5696): a 2-line comment (5690-5691) notes the same missing-snapshot history as `groupSelectionIntoFolder`; body: `saveAllLayerFrames();pushUndoLayers(true);state.layers.forEach(function(ld){if(ld.folderId===fid)delete ld.folderId;});delete state.layerFolders[fid];renderLayerList();renderTimeline();`.",
+            "`startFolderRename(fid)` (5697-5709): looks up `state.layerFolders[fid]`, bails if missing (5698); finds the folder's own row via `document.querySelector('.lrow.lfolder')` then narrows to the row whose `.lnm` text matches `fmeta.name` (5699-5701, `frows[0]||row` as the target, bail if still nothing) — a NAME-text match rather than a `data-folder-id` attribute lookup, so a folder whose label collides with another folder's current label could resolve the wrong DOM row (not guarded here); swaps in an `<input>` pre-filled with `fmeta.name` (5702-5705), commit closure (5706) `fmeta.name=input.value.trim()||fmeta.name;renderLayerList();` (an empty trim falls back to the OLD name, unlike `startLayerRename`'s own commit which instead skips the rename call and re-renders), blur commits (5707), keydown (5708) Enter blurs to commit / Escape restores `input.value=fmeta.name` then blurs."
+          ],
+          "callers": [
+            "`groupSelectionIntoFolder`: src/js/timeline.js:6709, a row context-menu item `{label:SM.t('ctxGroupIntoFolder'),disabled:_layerSel.length<2,action:function(){groupSelectionIntoFolder();}}`; src/js/timeline.js:9815, an out-of-scope keyboard-shortcut handler (a 3-line comment at 9808 notes this action was previously reachable ONLY via that right-click menu). A whole-`src/js` grep finds exactly these two call sites plus the declaration (5669) and one further textual mention at 5690 (`//` comment, excluded); no other file calls it.",
+            "`folderMemberIndices`: src/js/timeline.js:6366, `var members=folderMemberIndices(fid);` inside an out-of-scope folder-row renderer. A whole-`src/js` grep finds exactly this one call site plus the declaration (5684); no other file calls it.",
+            "`ungroupFolder`: src/js/timeline.js:6392, a folder row's context-menu item `{label:'Dissoudre le dossier',action:function(){ungroupFolder(fid);}}`. A whole-`src/js` grep finds exactly this one call site plus the declaration (5689); no other file calls it.",
+            "`startFolderRename`: src/js/timeline.js:6387, a folder row's dblclick (`frow.addEventListener('dblclick',function(){startFolderRename(fid);});`); src/js/timeline.js:6391, the same row's context-menu item `{label:'Renommer le dossier',action:function(){startFolderRename(fid);}}`. A whole-`src/js` grep finds exactly these two call sites plus the declaration (5697); no other file calls it."
+          ],
+          "effects": "`groupSelectionIntoFolder`: reads `_layerSel`/`state.layers`; writes `state.layerFolders[fid]` (new entry) and `state.layers[i].folderId` for every selected index; calls `saveAllLayerFrames()` and `pushUndoLayers(true)` BEFORE any mutation, then `renderLayerList()`/`renderTimeline()` after. `folderMemberIndices`: reads `state.layers[*].folderId` only, no write, no render call — a pure reader. `ungroupFolder`: reads `state.layers`/`state.layerFolders`; writes by `delete`-ing `folderId` off every member and `delete`-ing the folder entry itself; same `saveAllLayerFrames()`/`pushUndoLayers(true)` snapshot pattern as `groupSelectionIntoFolder`, then `renderLayerList()`/`renderTimeline()`. `startFolderRename`: reads `state.layerFolders[fid].name` and the live DOM; writes `fmeta.name` directly (no `pushUndo`/`saveAllLayerFrames` snapshot — a folder label is not undo-tracked, unlike group/ungroup) and calls `renderLayerList()` (only, not `renderTimeline()` — a folder rename never changes the frame grid's own columns)."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "`groupSelectionIntoFolder` and `ungroupFolder` (folder-group-ungroup-rename packet) each call `saveAllLayerFrames();pushUndoLayers(true);` BEFORE mutating `state.layerFolders`/`ld.folderId` — the only two direct `save*`/`pushUndo*` calls anywhere in this scope. `renderShapeTreeRowsInto`'s four deferred action closures (group rename/ungroup, shape rename/delete) each call `pushUndo();...saveActiveLayerFrame();` at click time, not at render time. `startLayerRename` and `startFolderRename` write directly (`state.layers[idx].name`/`fmeta.name`) with NO `pushUndo`/save call at all — a layer or folder rename is not undo-snapshotted by this scope (nor, for `startLayerRename`, by its delegate `window.SM.renameLayer`, out of scope). `folderLayerChildMap`, `folderLayerParentIdx`, `computeLayerRenderOrder` and `folderMemberIndices` are pure readers and touch no save path."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No packet in this scope calls `loadFrame` directly. `window.SM.renameLayer` (out of scope, called from `startLayerRename`) does not call it either (its own body is just `state.layers[idx].name=n;updateUI();`). None of the nine functions in this scope reads or reaches a load path."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "`groupSelectionIntoFolder`/`ungroupFolder` push an undo entry (`pushUndoLayers(true)`) before mutating `state.layerFolders`/`ld.folderId` — both explicitly called out in-source (5674-5677, 5690-5691) as a 2026-09 QA-sweep fix for a previously MISSING snapshot (Cmd+Z used to return the wrong prior action). `renderShapeTreeRowsInto`'s four deferred closures each call `pushUndo()` before their own mutation. `startLayerRename`/`startFolderRename` push NO undo entry — a rename is not currently undoable via either path in this scope."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "`_layerSel`/`_layerSelAnchor` (this scope's own declarations) ARE the layer-panel batch-selection state; `groupSelectionIntoFolder` reads `_layerSel` to decide its membership set. `renderShapeTreeRowsInto`'s rows call `SMMotion.selectShapesByStrokeIds` (out of scope, canvas/shape selection, distinct from `_layerSel`) on click. Neither `folderLayerChildMap`, `folderLayerParentIdx`, `computeLayerRenderOrder`, `folderMemberIndices`, `startLayerRename` nor `startFolderRename` reads or writes `_layerSel`/`_layerSelAnchor`."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "`computeLayerRenderOrder`'s nesting/collapsed/hidden output is consumed by both `renderTimeline()` (frame grid, timeline.js:4239, out of scope) and `renderLayerList()` (layer panel, timeline.js:6357, out of scope), plus Motion's own `renderLayerListMotion`/`renderTimelineMotion` (motion.js:7064,11137) via a `typeof`-guarded fallback to a flat unfoldered order if the function isn't loaded — so a Motion-only build (function stripped) degrades to showing every layer ungrouped rather than erroring. `renderShapeTreeRowsInto`'s row output is a pure Animation-2D layer-panel addition; it has no frame-grid analogue of its own (the disclosure state it reads, `window._layerShapesExpanded`, is consulted by `renderTimeline`'s own layer loop at 4307, out of scope, to keep blank-spacer row counts in sync, per its own lead-in comment)."
+    },
+    {
+      "consumer": "export",
+      "disposition": "None of the nine functions in this scope is called from export.js or rive-export.js (confirmed: none of the nine names appears in either file at the frozen SHA). Export reads `state.layers`/`getEffectiveStrokes` directly; layer-panel UI state (`_layerSel`, folder collapse/expand, shape-tree disclosure) has no bearing on rendered/exported pixels."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "`startLayerRename`'s own lead-in comment (5433-5434) is itself a native-bridge fact: `window.prompt()` is silently ignored by Tauri's WKWebView, which is WHY this function exists instead of a bare `prompt()` call. `renderShapeTreeRowsInto`'s delete/ungroup closures conditionally call `SMEngineBridge.renderNow()` (out of scope) after their own document write. No packet in this scope calls into Rust/WASM directly."
+    },
+    {
+      "consumer": "P20 NemoFolderCodec boundary",
+      "disposition": "None expected, and none found: a grep for `NemoFolderCodec` inside 5421-5709 returns zero matches. This scope's `groupSelectionIntoFolder`/`ungroupFolder` write `ld.folderId`/`state.layerFolders` directly in memory; the codec is only invoked from timeline.js's save/load code outside this range (2117,2170,2458,2562, out of scope) and from tweens.js's undo snapshot code (4892,4957, out of scope)."
+    },
+    {
+      "consumer": "_layerSel/_layerSelAnchor session-state contract",
+      "disposition": "Declared here (5423,5432), reset/written from many out-of-scope sites. Full writer enumeration (`_layerSel`, whole-array assignment or `.push`/`.splice` mutation, frozen-SHA `src/js` grep): app.js — `reorderLayersAtGap` (479), `convertLayersToComponent` (3466), `splitLayerIntoElementsCore` (3732), `mergeLayersIntoOne` (3980); motion.js — `selectLayerForEdit` (2799), `syncLayerSelFromBarSel` (6949-6950), `renderLayerListMotion`'s row mousedown listener (7051, 7264-7266, 7285-7286, 7292), `selectLayerFromGrid` (11128), `syncLayerSelToKeySel` (11468), `endMarquee` and a neighboring anonymous click handler (12757, 12795), `setAppMode` (13202); nemo-script.js — its scripting-API setter/clear methods (591,605, `window._layerSel`); select-bridge.js — `syncMotionLayerSelection` (319,330-331) and the Select tool's Null-marker mousedown branch (1590); timeline.js's own C19p leaf (out of scope, 5028-5420) — the plain-click/ctrl-toggle/shift-range branches of the grid mousedown listener (6631-6632,6640-6642, actually part of a LATER out-of-scope layer-row click handler, not C19p's frame-grid one) and, most centrally, C19p's `syncLayerSelFromFrameSel` (declared 5076, whole-array replacement at 5080, called from 5098,5103,5123,5137,5330 — the function this scope's own lead-in and boundaries notes name explicitly as the frame-selection-to-layer-selection sync point). No function inside THIS scope's own 5421-5709 range writes `_layerSel` or `_layerSelAnchor` at all — this scope only declares them; every reset/mutation is an external reader-writer relationship, consistent with the issue's framing of `_layerSel` as a cross-file session-state contract rather than a value this scope's own functions manage."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-layer-rename-commit",
+      "proposed": "Call `startLayerRename(0)` with `state.layers[0].name='Layer 1'` and a rendered `.lrow[data-layer=\"0\"] .lnm`; set the injected input's value to `'Renamed'` and dispatch `blur`; expect `state.layers[0].name==='Renamed'` via the `window.SM.renameLayer` delegate, and `updateUI` called once (via `renameLayer`'s own body, out of scope) — not run."
+    },
+    {
+      "id": "fx-layer-rename-empty-discards",
+      "proposed": "Same setup; set the input's value to `'   '` (whitespace only) and dispatch `blur`; expect `state.layers[0].name` UNCHANGED and `updateUI()` called directly (the `if(v)` branch's else) rather than `window.SM.renameLayer` — not run."
+    },
+    {
+      "id": "fx-folder-child-map-nested-uid",
+      "proposed": "Three layers: `state.layers=[{isFolderLayer:true,layerUid:'f1'},{parentLayerUid:'f1'},{parentLayerUid:'f1'}]`; call `folderLayerChildMap()`; expect `childrenOf[0]` to contain indices `[2,1]` in that order (high-to-low pass 2 visits index 2 before 1) and `childOf={1:0,2:0}` — not run."
+    },
+    {
+      "id": "fx-folder-parent-idx-non-folder-parent",
+      "proposed": "Two layers: `state.layers=[{isNullLayer:true,layerUid:'n1'},{parentLayerUid:'n1'}]`; call `folderLayerParentIdx(1)`; expect `-1` (parent exists and matches by uid, but is not `isFolderLayer`) — not run."
+    },
+    {
+      "id": "fx-render-order-collapsed-folder-key-layer",
+      "proposed": "`state.layers=[{folderId:'g1'},{folderId:'g1'},{folderId:'g1'}]` (indices 0,1,2), `state.layerFolders={g1:{collapsed:true}}`; call `computeLayerRenderOrder()`; expect one `{type:'folder',id:'g1',keyLayerIdx:0}` entry (the LOWEST member index, per the loop's high-to-low overwrite) followed by three `{type:'layer',hidden:true}` entries for indices 2,1,0 in that order — not run."
+    },
+    {
+      "id": "fx-render-order-nested-folder-layer-children",
+      "proposed": "`state.layers=[{isFolderLayer:true,layerUid:'fl1',folderCollapsed:false},{parentLayerUid:'fl1'}]` (indices 0,1); call `computeLayerRenderOrder()`; expect `[{type:'layer',idx:0,hidden:false},{type:'layer',idx:1,hidden:false,folderLayerParent:0}]` — the folder-layer's own row immediately followed by its spliced-in child, `hidden` false since `folderCollapsed` is false — not run."
+    },
+    {
+      "id": "fx-render-order-shy-hides-any-branch",
+      "proposed": "`state.layers=[{shy:true}]`, `state.shyEnabled=true`; call `computeLayerRenderOrder()`; expect the single entry's `hidden===true` regardless of it having no `folderId`/`linkGroupId` — the shy pass runs unconditionally over the whole `order` array after the main loop — not run."
+    },
+    {
+      "id": "fx-group-selection-rejects-non-consecutive",
+      "proposed": "`_layerSel=[0,2]` (non-adjacent), `state.layers=[{},{},{}]`; call `groupSelectionIntoFolder()`; expect `state.layerFolders` UNCHANGED (no new entry), a `toastLayersMustBeConsecutive` toast, and no `saveAllLayerFrames`/`pushUndoLayers` call (the guard runs before the snapshot) — not run."
+    },
+    {
+      "id": "fx-ungroup-restores-flat",
+      "proposed": "`state.layers=[{folderId:'g1'},{folderId:'g1'}]`, `state.layerFolders={g1:{name:'F',collapsed:false}}`; call `ungroupFolder('g1')`; expect both layers' `folderId` deleted and `state.layerFolders.g1` deleted — not run."
+    },
+    {
+      "id": "fx-folder-rename-empty-keeps-old-name",
+      "proposed": "`state.layerFolders={g1:{name:'Original'}}`; simulate `startFolderRename('g1')`'s commit closure with an empty/whitespace input value; expect `fmeta.name==='Original'` (the `||fmeta.name` fallback), unlike `startLayerRename`'s sibling behavior which instead SKIPS the rename call entirely on an empty value — not run."
+    }
+  ],
+  "future_proposals": [
+    "startFolderRename's DOM target lookup (5699-5701) resolves the folder row by matching `.lnm` TEXT CONTENT against `fmeta.name`, not a `data-folder-id` attribute — two folders with an identical current label (e.g. both freshly created and never renamed, sharing the localized default `SM.t('layerKindFolder')`) would both match `frows` and only `frows[0]` (DOM order, not necessarily the folder actually clicked) receives the rename input. Not exercised or fixed here — flagged for the eventual runtime-behavior review, not claimed as a defect by this census.",
+    "folderLayerChildMap()'s child-to-folder resolution (5577-5584) breaks on the FIRST folder whose uid matches — if `state.layers` ever contained two folder layers sharing the same `layerUid` (an invariant this scope's own scan assumes never happens, enforced elsewhere out of scope), a child would silently attach to whichever folder's index the inner `for...in` visits first, which for a plain object is insertion order, not layer-array order. Not exercised here."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep` was run once per symbol (all nine functions plus `_layerSel`/`_layerSelAnchor`) at the frozen SHA 59a5a38c; results are reproduced verbatim as caller lists above and are re-checkable with `git grep -n -w '<symbol>' 59a5a38c514f5da830dd2f2df4c83c63b1b22fba -- src/js`.",
+    "engineering/inventory/census/*.json siblings present at authoring time: C19o (timeline.js:4788-5027) and C19p (timeline.js:5028-5420) — both immediately adjacent to this scope's own 5421 start, zero overlap confirmed by the validator's cross-sibling check."
+  ],
+  "validation": {
+    "expected_assigned_lines": 289,
+    "expected_classification": {"code": 197, "comment": 92, "whitespace": 0},
+    "packet_partition": [
+      [5421, 5432],
+      [5433, 5447],
+      [5448, 5542],
+      [5543, 5587],
+      [5588, 5599],
+      [5600, 5664],
+      [5665, 5709]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals `classify(coverage_ranges)`, verified above: 5421-5432=(2,10,0); 5433-5447=(13,2,0); 5448-5542=(78,17,0); 5543-5587=(23,22,0); 5588-5599=(7,5,0); 5600-5664=(39,26,0); 5665-5709=(35,10,0); sums to (197,92,0)=289.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 289 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C19q-timeline-layer-panel-selection-folders.json 1e6a19d exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19p-timeline-frame-grid-mouse.json 1e6a19d still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19o-timeline-span-shrink-handle.json 1e6a19d still exits 0"
+    ]
+  }
+}
