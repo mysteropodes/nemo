@@ -1,0 +1,400 @@
+{
+  "census_id": "C19ak",
+  "issue": 1258,
+  "title": "Timeline.js static panel wiring IIFEs: mograph duplicator field wiring, rig tool 3-step panel (renderRigModeUI), combine-group panel (updateCombinePanel)",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf following C19aj/#1255. Scope is three module-load IIFEs/functions across timeline.js:11433-11666 (234 lines: the STATIC field-wiring half of the mograph duplicator panel that C19w/#1216 explicitly deferred as \"the wiring IIFE further down, 11447\"; the rig tool's 3-step Tracer/Assigner/Déplacer panel, `renderRigModeUI`; the combine-group panel, `updateCombinePanel`). Cited by name/line only, not re-mapped: `updateDuplicatorPanel`/`renderDuplicatorSourcePool`/`renderDuplicatorEffectors`/`dupRefreshFromPanel` (timeline.js:7193-7448, C19w, merged — the DYNAMIC half of the duplicator UI this scope's own lead-in comment and `dupRefresh` divergence cross-cite), `ld.duplicator` shape and its runtime reader `applyLayerDuplicator`/`_duplicatorCount`/`_boundsCenterOfStrokes` (app.js:1616+, C21g), `effectorChannels` (app.js:1384, C21g), `SMMotion.setDuplicatorEditSource`/`SMMotion.invalidateSymbolUnionBounds`/`SMMotion.findLayerIndexByUid` (motion.js), `loadFrame` (app.js, C21p), rig runtime (`ensureLayerRig` app.js:1905, `rigBindStroke` app.js:2032, `rigAutoAssignLayer` app.js:2188, `applyRigDeform` app.js:2293, `rigResetPose` app.js:2519, `rigCommitFrame` app.js:2536 — app.js C21h/C21i; `canEditActiveLayer` tools.js:1839), rig-bridge.js's own `state.rigSubMode` reader (rig-bridge.js:247,462, `onDown`/preview-gating, cited by line only — the issue's own preamble names \"tools.js\" as a `state.rigSubMode` reader but a whole-file grep of tools.js at the frozen SHA found zero hits; the actual out-of-scope readers are rig-bridge.js:247,462 and this scope's own timeline.js:3155/3202/11523/11532, corrected here with grep evidence, see `boundaries`), `SMGroup.combineSelection`/`setGroupCombineMode`/`resolveGroupMembers`/`removeMemberFromGroup`/`flattenGroup` (group-bridge.js:321,350,303,376,399, exposed via the `window.SMGroup=` literal at group-bridge.js:836), `updatePropsContext` (timeline.js:3131, the sole caller of `updateCombinePanel`/`renderRigModeUI` — cite by line only), `pushUndo` (tweens.js:4770, a thin wrapper over `pushUndoLayers`), `textPropsRoot` (timeline.js:8714, C19aa, merged — the sibling selection-rule this scope's own combine-panel gid check is mirrored BY, see `boundaries` item d), and the `#dup-*`/`#btn-dup-*`, `#btn-rig-mode-*`/`#rig-*`/`#btn-rig-*`, `#btn-combine-*`/`#combine-existing-row` markup (src/index.html). This JSON authoring does not authorize source changes; timeline.js and every caller remain read-only.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "0af70a3003a2c24fd476b169827b9e5115e77dfe",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19ak-timeline-duplicator-rig-combine-census",
+  "assigned_ranges": [
+    {
+      "start": 11433,
+      "end": 11666
+    }
+  ],
+  "coverage_note": "Exactly 234 assigned lines occur once across three packets (one coverage_range per packet, no gaps, no other-owner exclusions): 156 code, 77 full-line comment, 1 blank — independently re-derived by classifying the frozen blob programmatically (an awk re-implementation of the validator's own classify(), run once per packet and once for the whole span, 11433-11666=(156,77,1) both ways) — equal to the issue's own proposed table exactly, no boundary correction needed. Line 11432 is C19aj's own closing brace for the `#comp-offset` `change` listener (the last of the component-instance field group; not yet merged to main at authoring time but the issue's own boundary statement and a direct `sed -n` read of the frozen blob both confirm it, and no local sibling claims any line in 11433-11666). Line 11433 opens this scope's own `// ---- Mograph duplicator panel (2026-07-29) ----` header. Line 11666 is the blank line immediately preceding the `// ---- EXPORT MODAL ----` header at 11667 (next leaf C19al, not yet filed as an issue at authoring time); a sweep of every C*.json in this directory sharing source_path: src/js/timeline.js confirms no existing sibling claims any line in 11433-11666.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (0af70a3003a2c24fd476b169827b9e5115e77dfe) has the identical timeline.js blob (git rev-parse 0af70a3003a2c24fd476b169827b9e5115e77dfe:src/js/timeline.js == git rev-parse 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js == cc4cfd27dc59d797c911d840dc46e2f816942123); this artifact branches from origin/main at 0af70a3003a2c24fd476b169827b9e5115e77dfe, verified directly in the working worktree before authoring (HEAD matches, blob matches, working tree clean).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' 59a5a38c -- src/js` for the two named function symbols this scope declares (renderRigModeUI, updateCombinePanel), each filtered to exclude the symbol's own declaration/export line and any hit whose trimmed content starts with `//`, run recursively over src/js (including labs/ and adapters/, both present at the frozen SHA and returning zero hits for either symbol). Field-level read/write claims (ld.duplicator.* write set, DOM ids, pushUndo pairing, rig field targets, combine-panel selection rule) were derived by a plain-pattern grep restricted to the frozen blob's own lines 11433-11666, cross-checked line-by-line against a direct `sed -n` read of the same range, and cross-cited against `applyLayerDuplicator` (app.js:1616-1700ish, C21g), the rig runtime functions (app.js:1905-2536, C21h/C21i) and `SMGroup.*` (group-bridge.js:303-836) all read directly, not assumed from their own census artifacts.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes (2026-07-29 x3, 2026-07-30, 2026-08-30, 2026-08-31 #192) are read as authorial intent, not independently re-verified execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19ak-timeline-duplicator-rig-combine-panel-wiring.json and the three timeline.js packets partitioning lines 11433-11666.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "function_boundary": "This scope is three UNRELATED, module-load-time panel-wiring constructs that merely sit adjacent in the file — split into three packets exactly at the issue's own `// ----` section headers, matching the issue's own suggested table exactly: the mograph duplicator's STATIC field-wiring IIFE (11433-11503, a closure of local helpers `dupOf`/`dupRefresh`/`wireNum`/`tOffOf`/`wireRand` plus their field-listener call sites — no exported symbol, the whole packet is an anonymous `(function(){...})()` that runs once at module load and registers DOM listeners as its only effect); the rig tool's 3-step panel (11504-11579, module-scope `state.rigSubMode` init, two module-scope constant objects `RIG_MODE_BTN_IDS`/`RIG_HINTS`, the exported `renderRigModeUI` function, and a second anonymous IIFE wiring the mode buttons and the auto-assign/commit/reset buttons); the combine-group panel (11580-11666, a module-scope constant `COMBINE_MODE_BTN_IDS`, the exported `updateCombinePanel` function, and a third anonymous IIFE wiring the four mode buttons plus remove/flatten, followed by a 3-line project.js note that is NOT part of any of the three constructs but has nowhere else to attach and is folded into the third packet per the issue's own boundary statement (11663-11666)).",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19aj (existing owner, timeline.js:~11432 and earlier, not yet merged to main at authoring time)",
+      "disposition": "Retains the component-instance field group (`#comp-singleframe`/`#comp-speed`/`#comp-offset`) immediately before this scope. This scope's own boundary begins at line 11433, the lead-in header comment for the duplicator panel, immediately after C19aj's own `#comp-offset` listener close — confirmed against the issue's own boundary statement and a direct `sed -n` read of the frozen blob (11430-11433 shows the three C19aj listeners then this scope's header, no gap)."
+    },
+    {
+      "owner": "C19al (next leaf, `// ---- EXPORT MODAL ----`, timeline.js:11667+, not yet filed as an issue at authoring time)",
+      "disposition": "Owns timeline.js:11667+. Confirmed disjoint: this scope's own last packet ends at the blank line 11666 immediately preceding that header, read directly from the frozen blob (11663-11670 span checked with `sed -n`)."
+    },
+    {
+      "owner": "C19w (existing owner, timeline.js:7193-7448, merged) — `updateDuplicatorPanel`/`renderDuplicatorSourcePool`/`renderDuplicatorEffectors`/`dupRefreshFromPanel`",
+      "disposition": "Retains its own body in full — cited by name/line only. This scope's OWN `dupRefresh` (11447) is the wiring IIFE C19w's own lead-in comment (7441-7444) and `owner` field name explicitly as 'timeline.js:11447, cited by line only' — see `boundaries` for the exact call-sequence divergence between the two refresh helpers, restated here from THIS scope's side with lines from both files (C19w already recorded it from its own side). `renderDuplicatorEffectors` (C19w's own packet 3, timeline.js:7314) has exactly one caller OUTSIDE its own declaring span, and it is inside THIS scope: the '+ Effector' button handler at 11494, immediately after this scope's own `d.effectors.push(...)` at 11493 — confirmed by reading both sides."
+    },
+    {
+      "owner": "app.js:1616+ `applyLayerDuplicator`/`_duplicatorCount`/`_boundsCenterOfStrokes` (C21g, merged) and app.js:1384 `effectorChannels`",
+      "disposition": "Retains its own body in full — cited by name/line only. `applyLayerDuplicator` (app.js:1616) is the RUNTIME READER of every `ld.duplicator.*` field this scope's own STATIC IIFE writes: `dup.mode`/`.cols`(app.js:1618,1692 read directly), `dup.sourceLayerUids`(app.js:1634-1636), `dup.timeOffset`/`.enabled`/`.offsetFrames`(app.js:1660, `tOffOn`), `dup.staggerRandom`(app.js:1691, `randMode`) — matching field-for-field what this scope's own `wireNum`/`wireRand`/`tOffOf` write (see `boundaries` item a). `_boundsCenterOfStrokes` is called both by `applyLayerDuplicator` (app.js:1620, the duplicator's own pivot) and by this scope's own '+ Effector' handler (11481, a NEW effector's default `pos`) — same helper, not reproduced twice, confirming the two features agree on what 'centered on the layer' means."
+    },
+    {
+      "owner": "app.js:1905-2536 `ensureLayerRig`/`rigBindStroke`/`rigAutoAssignLayer`/`applyRigDeform`/`rigResetPose`/`rigCommitFrame` (C21h/C21i, merged) and tools.js:1839 `canEditActiveLayer`",
+      "disposition": "Retain their own bodies in full — cited by name/line only. This scope's own auto-assign button handler (11537-11565) is the SOLE caller of `rigAutoAssignLayer` found inside timeline.js:11433-11666, passing `radius`/`rotate`/`softness` read live off `#rig-weight-radius`/`#rig-rotate-mode`/`#rig-falloff-softness` (11543-11545, never mirrored into a state field — see this scope's own lead-in comment 11505-11508) plus a `{paths,meshes}` opts object from `#rig-drive-shapes`/`#rig-drive-meshes` (11550-11553). `rigCommitFrame`/`rigResetPose` are each called from exactly one button handler in this scope (11566-11569, 11570-11578). `canEditActiveLayer()` gates both the auto-assign and reset handlers (11540, 11573) but NOT the commit handler (11566-11569 has no such guard) — flagged in `future_proposals`, not confirmed as a defect."
+    },
+    {
+      "owner": "rig-bridge.js (existing owner, out of scope) and its own `state.rigSubMode` reader",
+      "disposition": "Retains its own body in full — cited by line only. `rig-bridge.js:247` reads `state.rigSubMode||'draw'` to decide what a pointer-down click means (bone-draw vs. assign vs. move-pose), and `rig-bridge.js:462` gates an influence-circle preview repaint on `(state.rigSubMode||'draw')==='draw'` — both READ-only, neither writes `state.rigSubMode`. This scope's own mode-button click handler (11531-11536) and its own module-scope init (11511) are the ONLY writers of `state.rigSubMode` found in a whole-src grep at the frozen SHA."
+    },
+    {
+      "owner": "group-bridge.js:303-836 `SMGroup.combineSelection`/`.setGroupCombineMode`/`.resolveGroupMembers`/`.removeMemberFromGroup`/`.flattenGroup` (existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by line only. This scope's own combine-panel gid-resolution logic (11594-11604) is a READ-ONLY mirror of `combineSelection`'s own `existingGid` check (group-bridge.js:328-334, `pushUndo()` at 335 then either `ld.groups[existingGid].combineMode=mode` or a brand-new group) — this scope never re-implements the WRITE side, it only calls `SMGroup.combineSelection(mode)` (11644) or `SMGroup.setGroupCombineMode(gid,...,mode)` (11643) and lets group-bridge.js decide which. `resolveGroupMembers` (group-bridge.js:303) is called once by this scope (11600) to confirm a full-group selection, exactly mirroring `combineSelection`'s own internal call to the same function (group-bridge.js:329) — both sides agree on the 'same set' definition (`members.length===sel.length && members.every(...)`, byte-identical logic at both call sites)."
+    },
+    {
+      "owner": "C19aa (existing owner, timeline.js:8714+, merged) — `textPropsRoot`",
+      "disposition": "Retains its own body in full — cited by line only. `textPropsRoot` (timeline.js:8714) explicitly cross-references 'updateCombinePanel's own \"selection === group members\" check' in its own comment (timeline.js:8722) as the pattern it mirrors for vector-text glyph-group selection — confirmed by reading both sides: `textPropsRoot`'s own full-group-match test (`selectedPaths.length!==members.length` / `allMatch=selectedPaths.every(...)`) has the identical shape to this scope's own gid resolution (11600-11601, `members.length===sel.length&&members.every(...)`). Neither function calls the other; the relationship is a documented pattern mirror only."
+    },
+    {
+      "owner": "timeline.js:3131+ `updatePropsContext` (existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by line only. Confirmed the SOLE cross-call-site owner of both this scope's exported symbols: `renderRigModeUI` is called from `updatePropsContext` at timeline.js:3155 (unconditional inside the `state.tool==='rig'` branch) and timeline.js:3202 (conditional, inside the `hasSel`/selection branch, only when the active layer already has 1+ rig bones) — both guarded `if(window.renderRigModeUI)`. `updateCombinePanel` is called from `updatePropsContext` at timeline.js:3207 (unconditional inside the same `hasSel` branch, immediately after the rig-bind surfacing), guarded `if(window.updateCombinePanel)`. A whole-src grep (including labs/ and adapters/) for both symbol names, property forms included, found no OTHER caller anywhere in the codebase — this scope's own two module-load-time exports (11528, 11626) exist solely to let `updatePropsContext`, defined earlier in the same file, reach code defined later in the same file."
+    },
+    {
+      "owner": "tweens.js:4770 `pushUndo`",
+      "disposition": "Retains its own body in full (`function pushUndo(alreadySaved){pushUndoLayers(alreadySaved);}`) — cited by line only. Called 13 times across this scope's own three packets — see `boundaries` item e for the complete per-write pairing and the one write found WITHOUT a preceding `pushUndo()`."
+    },
+    {
+      "owner": "src/index.html (`#dup-*`/`#btn-dup-*`, `#btn-rig-mode-*`/`#rig-*`/`#btn-rig-*`, `#btn-combine-*`/`#combine-existing-row` markup)",
+      "disposition": "Retains the static DOM structure in full — cited by name only, not line-surveyed in this pass (index.html was not read for this leaf; every element id this scope references is listed in `boundaries` items a/c/d). This scope only reads/writes `.value`/`.checked`/`.textContent`/`.classList`/`.style.display`/`.disabled` on these elements and adds `click`/`change` listeners; it declares no markup of its own."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 11432 (C19aj's own close of the `#comp-offset` listener) is outside coverage; line 11433 (this scope's own duplicator-panel header comment) begins this scope — confirmed against the issue's own boundary statement and a direct `sed -n` read of the frozen blob.",
+    "Line 11666 (the blank line before `// ---- EXPORT MODAL ----`) is the last line of this scope; line 11667 opens the next leaf's (C19al) export-modal section — confirmed by reading the frozen blob at 11660-11670.",
+    "No lines inside 11433-11666 are excluded for another owner: every line belongs to exactly one of the three packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "(a) The complete `ld.duplicator.*` field set WRITTEN by packet 1's IIFE, one row per DOM id, with the event, the parse/clamp (`wireNum`'s min/max where applicable), the `d.<key>` written, the `pushUndo()` call that precedes it, and the refresh that runs (ALWAYS `dupRefresh`, never a panel-only update — this IIFE never calls `updateDuplicatorPanel`/`renderDuplicatorSourcePool`/`renderDuplicatorEffectors` directly, only through `dupRefresh`'s own trailing `updateDuplicatorPanel()` call): `#dup-mode`(change)->`d.mode`(11459, no clamp, string); `#dup-rows`(change)->`d.rows`(via `wireNum('dup-rows','rows',1,30)`, 11460, clamped [1,30]); `#dup-cols`(change)->`d.cols`(11460, clamped [1,30]); `#dup-spacingx`(change)->`d.spacingX`(11461, unclamped); `#dup-spacingy`(change)->`d.spacingY`(11461, unclamped); `#dup-count`(change)->`d.count`(11462, clamped [1,500]); `#dup-radius`(change)->`d.radius`(11463, unclamped); `#dup-startangle`(change)->`d.startAngle`(11463, unclamped); `#dup-seed`(change)->`d.seed`(11464, unclamped); `#dup-radial-orient`(change)->`d.radialOrient`(11465, `.checked` boolean, own handler not `wireNum`); `#dup-path-align`(change)->`d.pathAlignTangent`(11466, `.checked`); `#dup-path-layer`(change)->`d.pathLayerUid`(11467, `this.value||null`); `#btn-dup-reseed`(click)->`d.seed`(11468, `Math.floor(Math.random()*1e6)`, no user-typed value). Every one of these 13 sites is preceded by `pushUndo()` on the same statement/line and followed by `dupRefresh()`. Cross-cited to C19w's own READ table (C19w `boundaries`, the panel that mirrors every one of these fields back into the same DOM ids at timeline.js:7219-7236) and to `applyLayerDuplicator`'s own reads (app.js:1618 `mode`, app.js:1692 `cols`, cited by line only, C21g) — the three together (this scope's write, C19w's read-for-display, C21g's read-for-render) agree on every field name with no discrepancy found. The `timeOffset` sub-object shape CREATED by `tOffOf()` (11470): `{enabled:false,offsetFrames:1,direction:'forward'}`, lazily assigned onto `d.timeOffset` only on first access if absent — its three fields are then written by `#dup-anim-enabled`(change)->`t.enabled`(11471, `.checked`), `#dup-anim-offset`(change)->`t.offsetFrames`(11472, unclamped float), `#dup-anim-direction`(change)->`t.direction`(11473, string) — all three `pushUndo()`-then-`dupRefresh()`. Matches `applyLayerDuplicator`'s own read shape (app.js:1660, `tOff.enabled`/`tOff.offsetFrames`, cited by line only).",
+    "(a, continued) Two more write sites in packet 1 outside `wireNum`/`tOffOf`: the '+ Effector' button (`#btn-dup-add-effector`, click, 11477-11495) reads the live seed content via `getEffectiveStrokes(state.activeLayerIdx,state.currentFrame)` (11480) and `_boundsCenterOfStrokes` (11481, both C21g, cited by line only) to compute a centered default pivot, `pushUndo()` (11482), lazily inits `d.effectors=[]` if absent (11483), then `d.effectors.push({pos:{x,y},radius:200,falloff:'radial',angle:0,strength:100,channels:[{prop:'position',value:[0,0]}]})` (11493) — the SAME entry shape C19w's own `renderDuplicatorEffectors` reads/writes field-by-field (C19w `boundaries`, cited by name only), followed by `renderDuplicatorEffectors(d);dupRefresh();` (11494, the one external call site into C19w's own scope found by C19w's own caller inventory). `wireRand(id,key)` (11496) plus its 5 calls (11497: `dup-rand-pos`->`position`, `dup-rand-rot`->`rotation`, `dup-rand-scale`->`scale`, `dup-rand-op`->`opacity`, `dup-rand-hue`->`hue`) each write `(d.staggerRandom||(d.staggerRandom={}))[key]=this.checked` — same `pushUndo()`-then-`dupRefresh()` pattern, lazy-inits `staggerRandom` in place. `#btn-dup-edit-source`(click, 11498-11502) is the ONE write-adjacent site with NO `pushUndo()` and NO `dupRefresh()`: it toggles `ld._dupEditSource` (a plain `ld` field, not under `ld.duplicator`) by calling `SMMotion.setDuplicatorEditSource(state.activeLayerIdx,!ld._dupEditSource)` (11501, motion.js, cited by name only) — a UI-mode toggle (enter/exit source-shape edit mode), not a persisted config value, consistent with it having no undo checkpoint of its own.",
+    "(b) `dupRefresh` (packet 1, 11447) vs C19w's own `dupRefreshFromPanel` (timeline.js:7445, C19w, cited by line only, restated here from this scope's side with both bodies read directly): `dupRefresh`=`function dupRefresh(){loadFrame(state.currentFrame);if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();if(window.SMEngineBridge)SMEngineBridge.renderNow();updateDuplicatorPanel();}` — FOUR calls. `dupRefreshFromPanel`=`function dupRefreshFromPanel(){loadFrame(state.currentFrame);if(window.SMEngineBridge)SMEngineBridge.renderNow();}` (C19w's own body, cited by line only) — TWO calls, the same `loadFrame`+guarded `renderNow` pair, but NEITHER the guarded `SMMotion.invalidateSymbolUnionBounds()` call NOR the trailing unconditional `updateDuplicatorPanel()` call. Every STATIC field write in THIS scope's own packet 1 (all 15 sites in items a/a-continued) reaches the FULLER `dupRefresh` — meaning every static-field edit DOES invalidate the union-bounds cache and DOES re-run the full panel mirror, unlike C19w's own dynamic-field handlers (source-pool add/remove, effector edits), which reach only the narrower `dupRefreshFromPanel` and skip both. This is the exact divergence C19w's own `boundaries` already flagged from its own side (as a possible missing-invalidation gap on ITS OWN fields); restated here confirms the STATIC side of the panel does NOT share that gap — it is the fuller of the two refresh helpers, by design (per this scope's own 11440-11446 comment, written specifically to fix the union-bounds staleness for `rows`/`cols`/`spacing` edits).",
+    "(c) The rig panel's mode model: `state.rigSubMode` takes exactly three string values — `'draw'` (default, also the fallback on every `||'draw'` read), `'assign'`, `'move'` — initialized once at module load (11511, `state.rigSubMode=state.rigSubMode||'draw'`, a no-op after the first script load unless something externally clears it) and written ONLY by this scope's own mode-button click handler (11532, inside the `RIG_MODE_BTN_IDS.forEach` at 11530-11536). `RIG_MODE_BTN_IDS` (11512, a plain `{draw,assign,move}`->DOM-id map) drives both the button `.ac`(active) class toggle (11524, inside `renderRigModeUI`) and which button's click handler sets which mode (11531-11532). `RIG_HINTS` (11513-11517, hard-coded FRENCH i18n KEYS, not French TEXT — `rigHint`/`rigHintAssign`/`rigHintMove` are translation-table keys passed to `SM.t`, i18n.js, not hard-coded strings; the 'hard-coded French' gap the issue's own suggested-table wording anticipates is instead in `future_proposals`, since the keys themselves ARE i18n-routed via `SM.t(RIG_HINTS[mode])` at 11526, guarded `window.SM&&SM.t`, with the DOM's own pre-existing textContent as a silent fallback when `SM.t` is unavailable). `renderRigModeUI()` (11518-11527): a DOM-existence guard over all THREE mode buttons plus `#rig-assign-row`/`#rig-hint` (11519-11522, returns silently if any is missing — no throw), toggles each mode button's `.ac` class (11524), shows `#rig-assign-row` only in `assign` mode (11525), sets `#rig-hint`'s textContent from `RIG_HINTS[mode]` via `SM.t` (11526). Every rig field's target, by DOM id, all read directly at BIND/ACTION time rather than mirrored into a persisted state field (per this scope's own 11505-11508 lead-in comment): `#rig-weight-radius`(value, parsed float, default 200)->passed as `radius` param into `rigAutoAssignLayer` (app.js:2188, C21h, cited by line only, 11543,11552); `#rig-rotate-mode`(checked)->passed as `rotate` param, same call (11544,11552); `#rig-falloff-softness`(value, parsed float /100, default 0)->passed as `softness` param, same call (11545,11552); `#rig-drive-shapes`/`#rig-drive-meshes`(checked, default true when the element is absent — `!driveShapes||driveShapes.checked`)->passed as the `{paths,meshes}` opts object, same call (11550-11553). None of these four fields is ever written by this scope — they are read-only inputs to a single button action. `renderRigModeUI`'s own callers: `rig-bridge.js:536` (out of scope, cited by line only) plus this scope's own internal call (11533) and `updatePropsContext`'s two external calls (timeline.js:3155,3202, cited by line only, see `reconciliation`) — matching the issue's own grep expectation exactly (tools.js mode switches are NOT among the callers found; `updatePropsContext` is, as expected).",
+    "(d) The combine panel's selection rule mirrors `textPropsRoot`'s own full-group-match test (timeline.js:8714, C19aa, cited by line only — see `reconciliation` for the byte-level comparison) AND `SMGroup.combineSelection`'s own `existingGid` check (group-bridge.js:328-334, cited by line only): `updateCombinePanel` (11588-11625) resolves `gid` by reading `sel[0].data.groupId` (11596, the first selected path's own group tag), then only trusting it as 'already grouped' if `ld.groups[firstGid].combineMode!=='none'` (11597) AND EITHER `sel.length===1` (11598, a single member selected counts as 'is the group') OR (for 2+) `SMGroup.resolveGroupMembers(firstGid,ld,layer)` (11600, group-bridge.js:303, cited by line only) returns a member set of the SAME length whose every member is present in the current selection (11601) — an exact-set match, not a subset/superset. The mode-button semantics are two-state, decided at click time by `activeCombineGid()` (11628-11635, a near-duplicate of `updateCombinePanel`'s own gid resolution restricted to the `sel.length===1||resolveGroupMembers` check without the length-1 special case spelled out separately — both branches converge on the same `firstGid`/`combineMode!=='none'` test): if a gid is already active, clicking a mode button calls `SMGroup.setGroupCombineMode(gid,ld,mode)` (11643, group-bridge.js:350, cited by line only, RE-MODES the existing group); otherwise it calls `SMGroup.combineSelection(mode)` (11644, group-bridge.js:321, cited by line only, CREATES a brand-new group from the current 2+-shape selection, per `combineSelection`'s own guard `selectedPaths.length<2` returning early with a toast otherwise). `#btn-combine-remove`(click, 11648-11654) calls `SMGroup.removeMemberFromGroup(sel[0],ld,layer)` (11652, group-bridge.js:376, cited by line only) only when exactly one path is selected (11650). `#btn-combine-flatten`(click, 11655-11661) calls `SMGroup.flattenGroup(gid,ld,layer)` (11659, group-bridge.js:399, cited by line only) only when `activeCombineGid()` returns non-null. All four `SMGroup.*` calls in this scope are followed by `updateCombinePanel()` (11645,11653,11660, a self-refresh of THIS scope's own display) but none of them call `pushUndo()` directly — see item (e).",
+    "(e) Every `pushUndo()` site in the span, 13 total, ALL in packet 1 (the duplicator IIFE): 11459 (`dup-mode`), 11460 (inside `wireNum`, shared by rows/cols/spacingx/spacingy/count/radius/startangle/seed — 8 call sites through ONE listener body, so 8 of the 13 are the SAME source line 11458's own `pushUndo()` executing once per field's own `change` event, not 8 distinct source lines), 11465 (`dup-radial-orient`), 11466 (`dup-path-align`), 11467 (`dup-path-layer`), 11468 (`btn-dup-reseed`), 11471 (`dup-anim-enabled`), 11472 (`dup-anim-offset`), 11473 (`dup-anim-direction`), 11482 (`btn-dup-add-effector`), 11496 (inside `wireRand`, shared by the 5 `dup-rand-*` checkboxes — 1 source line, 5 field-level executions). Writes WITHOUT a preceding `pushUndo()`: `#btn-dup-edit-source` (11498-11502, packet 1, a UI-mode toggle not a persisted value, see item a-continued) and ALL FOUR `SMGroup.*` write calls in packet 3 (11643,11644,11652,11659) — `combineSelection`/`setGroupCombineMode`/`removeMemberFromGroup`/`flattenGroup` each call `pushUndo()` INSIDE their own group-bridge.js body (e.g. group-bridge.js:335, inside `combineSelection` itself, cited by line only) rather than the caller doing it — so every combine-panel action IS undo-checkpointed, just not by a `pushUndo()` call visible inside this scope's own 11580-11666 span; flagged for clarity, not a defect. Packet 2 (rig panel) has exactly 2 `pushUndo()` sites: 11546 (auto-assign button) and 11574 (reset button) — the mode-switch click handler (11531-11536) and the commit button (11566-11569) have NEITHER a `pushUndo()` of their own NOR (for commit) a visible call into a function that itself checkpoints undo within this scope's own citation depth; `rigCommitFrame` (app.js:2536, C21i, cited by line only) is a persistence/frame-bake operation, not a pose-mutation, but whether it checkpoints undo internally is outside this scope's own read depth and is flagged in `future_proposals`.",
+    "(f) Every `state.*`/`ld.*` field read or written in the span, in packet order: packet 1 reads `state.layers[state.activeLayerIdx]`(11439,11479,11499, via `dupOf`/inline), `state.currentFrame`(11447,11480), writes `ld.duplicator.*`/`ld.duplicator.timeOffset.*`/`ld.duplicator.staggerRandom.*`/`ld.duplicator.effectors`(all of item a), reads/writes `ld._dupEditSource`(11501, read for the toggle argument, written inside `SMMotion.setDuplicatorEditSource` itself, out of scope). Packet 2 reads/writes `state.rigSubMode`(11511 init, 11523 read, 11532 write), reads `state.layers[state.activeLayerIdx]`(11538,11567,11571), `ld.rig`/`ld.rig.bones`(11541-11542,11571-11572, existence/emptiness checks), writes nothing under `ld.*` directly (all rig-pose mutation happens inside the cited app.js functions, out of scope). Packet 3 reads `window.selectedPaths`(11589,11629, aliased `sel`), `state.activeLayerIdx`(11593,11632,11643,11651,11658), `state.layers[li]`(11593, aliased `ld`), `userLayers[li]`(11593, aliased `layer`), `ld.groups`/`ld.groups[gid].combineMode`(11595-11605,11633), reads `sel[0].data.groupId`(11596,11631), writes nothing under `ld.*` directly (every `ld.groups` mutation happens inside the cited `SMGroup.*` functions, out of scope).",
+    "(g) Callers of `updateCombinePanel`/`renderRigModeUI`, derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' 59a5a38c -- src/js` run recursively (src/js/labs/ and src/js/adapters/ both present at the frozen SHA, zero hits in either for either symbol), plus a separate property-form sweep (`grep -n '\\.renderRigModeUI\\|\\.updateCombinePanel'`, zero hits — neither symbol is ever accessed as an object property, only as a bare/`window.`-prefixed call) and the `window.SM={...}` object-literal block (app.js:3267+, cited by line only per the issue's own methodology note — confirmed NOT to reference either symbol, it is i18n's own `t`/locale-switch surface): `renderRigModeUI` — declared 11518, exported 11528; external callers rig-bridge.js:536 (cited by line only) and `updatePropsContext` at timeline.js:3155,3202 (this file, out of scope, cited by line only); internal self-call 11533 (this scope's own mode-button handler). `updateCombinePanel` — declared 11588, exported 11626; the SOLE external caller is `updatePropsContext` at timeline.js:3207 (cited by line only); internal self-calls 11645,11653,11660 (this scope's own three action handlers). Confirmed neither symbol runs on the render path: `applyLayerDuplicator`'s own render-time effect (`getEffectiveStrokesRendered`/`buildSceneJson`, C21g/engine-bridge.js, cited by name only) is triggered via `loadFrame` (called from `dupRefresh`, packet 1, and separately from `rigCommitFrame`/rig runtime, out of scope) — NEITHER `renderRigModeUI` NOR `updateCombinePanel` is called from `loadFrame`, `getEffectiveStrokes(Rendered)`, `buildSceneJson`, `scenePayload`, `export.js` or `rive-export.js` (a whole-src grep of both symbol names restricted to engine-bridge.js/export.js/rive-export.js returns zero hits) — every call into either function is a panel-refresh (`updatePropsContext`, a UI-selection-change handler) or a direct user-gesture handler (button click, tool switch), matching the issue's own instruction."
+  ],
+  "areas": [
+    {
+      "area": "duplicator-static-field-wiring",
+      "packets": [
+        {
+          "id": "C19ak.duplicator-static-field-wiring",
+          "files": [
+            "src/js/timeline.js:11433-11503"
+          ],
+          "coverage_ranges": [
+            [
+              11433,
+              11503
+            ]
+          ],
+          "classification": {
+            "code": 36,
+            "comment": 35,
+            "whitespace": 0
+          },
+          "symbols": [
+            "dupOf",
+            "dupRefresh",
+            "wireNum",
+            "tOffOf",
+            "wireRand",
+            "pushUndo",
+            "loadFrame",
+            "SMEngineBridge",
+            "updateDuplicatorPanel",
+            "renderDuplicatorEffectors",
+            "invalidateSymbolUnionBounds",
+            "getEffectiveStrokes",
+            "SMMotion"
+          ],
+          "signature": "(function(){ ... })() — anonymous module-load IIFE, no exported symbol",
+          "responsibility": "5-line header+lead-in comment (11433-11437): dates the panel (2026-07-29), states every field writes into `ld.duplicator.*` then reloads the frame, that the multiplication itself lives in `applyLayerDuplicator` (app.js, out of scope), and that `change` (not `input`) is used so a scrub gesture commits once per settle, matching the component-instance fields immediately above (C19aj). The IIFE body (11438-11502) declares four local helpers — `dupOf()` (the active layer's own `.duplicator` or null), `dupRefresh()` (reload+invalidate-union-bounds+renderNow+full-panel-mirror, see `boundaries` item b), `wireNum(id,key,min,max)` (a generic clamped-number `change`-listener factory, called 8 times) and `tOffOf()` (lazy-inits+returns `dup.timeOffset`) — plus `wireRand(id,key)` declared later (11496) — and wires every static duplicator field's own listener inline, ending with the '+ Effector' button and the source-shape edit-mode toggle button.",
+          "callers": [
+            "This packet declares no exported symbol — it is a self-invoking closure with no external caller by construction. Its own internal helpers (`dupOf`, `dupRefresh`, `wireNum`, `tOffOf`, `wireRand`) are called only from within this same closure — confirmed by their closure scope (declared with `var`/`function` inside the IIFE body, never assigned to `window.*`)."
+          ],
+          "behavior": [
+            "Lines 11433-11437 (comment, 5 lines): header + lead-in — dated 2026-07-29; every field writes `ld.duplicator.*` then reloads; multiplication itself is `applyLayerDuplicator` (app.js, out of scope); `change` not `input`, matching the component-instance fields above.",
+            "Line 11438 (code): `(function(){` — IIFE open.",
+            "Line 11439 (code): `dupOf()` — returns the active layer's own `ld.duplicator` or `null`.",
+            "Lines 11440-11446 (comment, 7 lines): union-bounds cache invalidation rationale — same fix class as `symbolUnionBounds`'s `getEffectiveStrokesRendered` switch (motion.js, out of scope); the cache's key has no way to detect a duplicator-config change on its own.",
+            "Line 11447 (code): `dupRefresh()` — `loadFrame`+guarded `SMMotion.invalidateSymbolUnionBounds`+guarded `SMEngineBridge.renderNow`+unconditional `updateDuplicatorPanel()`; see `boundaries` item b for the full divergence from C19w's own `dupRefreshFromPanel`.",
+            "Lines 11448-11457 (comment, 10 lines): `pushUndo()`-before-mutation rationale, dated 2026-07-29 QA fix, quoting the bug report verbatim (\"aucun champ du panneau Duplicator ne pousse d'undo…\") — only the scrub-drag path got a free undo checkpoint via ui.js's generic drag handler; every other input path (click/type/select) bypassed `pushUndo` entirely before this fix; matches group-bridge.js's own convention.",
+            "Line 11458 (code): `wireNum(id,key,min,max)` — generic clamped-number listener factory; `pushUndo()` then `d[key]=v` then `dupRefresh()`.",
+            "Line 11459 (code): `#dup-mode` change listener — `pushUndo();d.mode=this.value;dupRefresh();`.",
+            "Lines 11460-11464 (code, 5 lines): 8 `wireNum` call sites — rows[1,30], cols[1,30], spacingX, spacingY, count[1,500], radius, startAngle, seed.",
+            "Line 11465 (code): `#dup-radial-orient` change — `d.radialOrient=this.checked`.",
+            "Line 11466 (code): `#dup-path-align` change — `d.pathAlignTangent=this.checked`.",
+            "Line 11467 (code): `#dup-path-layer` change — `d.pathLayerUid=this.value||null`.",
+            "Line 11468 (code): `#btn-dup-reseed` click — `d.seed=Math.floor(Math.random()*1e6)`.",
+            "Line 11469 (comment, 1 line): temporal stagger section marker, dated 2026-07-29.",
+            "Line 11470 (code): `tOffOf()` — lazy-inits `d.timeOffset={enabled:false,offsetFrames:1,direction:'forward'}` on first access.",
+            "Line 11471 (code): `#dup-anim-enabled` change — `t.enabled=this.checked`.",
+            "Line 11472 (code): `#dup-anim-offset` change — `t.offsetFrames=parseFloat(this.value)`.",
+            "Line 11473 (code): `#dup-anim-direction` change — `t.direction=this.value`.",
+            "Lines 11474-11476 (comment, 3 lines): effectors section marker — a new effector starts centered on the layer's own seed content so it is immediately visible/draggable.",
+            "Lines 11477-11495 (code, 19 lines): `#btn-dup-add-effector` click handler — reads live seed strokes (`getEffectiveStrokes`) and their bounds center (`_boundsCenterOfStrokes`), `pushUndo()`, lazy-inits `d.effectors=[]`, an 8-line 'n'importe quel property' comment (11484-11492) explaining the pre-seeded single Position channel default and the legacy-migration note for pre-existing effectors, `d.effectors.push({...})` (11493, full entry shape in `boundaries` item a-continued), then `renderDuplicatorEffectors(d);dupRefresh();` (11494, C19w's own scope, the one external call site into it from this file).",
+            "Line 11496 (code): `wireRand(id,key)` — `pushUndo()` then `(d.staggerRandom||(d.staggerRandom={}))[key]=this.checked` then `dupRefresh()`.",
+            "Line 11497 (code): 5 `wireRand` call sites — position, rotation, scale, opacity, hue.",
+            "Lines 11498-11502 (code, 5 lines): `#btn-dup-edit-source` click — guards on `ld&&ld.duplicator&&window.SMMotion`, calls `SMMotion.setDuplicatorEditSource(state.activeLayerIdx,!ld._dupEditSource)` (motion.js, out of scope) — NO `pushUndo()`, NO `dupRefresh()`, a UI-mode toggle not a persisted value.",
+            "Line 11503 (code): `})();` — IIFE close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "rig-tool-panel",
+      "packets": [
+        {
+          "id": "C19ak.rig-tool-panel",
+          "files": [
+            "src/js/timeline.js:11504-11579"
+          ],
+          "coverage_ranges": [
+            [
+              11504,
+              11579
+            ]
+          ],
+          "classification": {
+            "code": 58,
+            "comment": 18,
+            "whitespace": 0
+          },
+          "symbols": [
+            "RIG_MODE_BTN_IDS",
+            "RIG_HINTS",
+            "renderRigModeUI",
+            "rigAutoAssignLayer",
+            "rigCommitFrame",
+            "rigResetPose",
+            "canEditActiveLayer",
+            "showToast",
+            "pushUndo",
+            "SMEngineBridge",
+            "rigSubMode",
+            "userLayers"
+          ],
+          "signature": "function renderRigModeUI(); window.renderRigModeUI=renderRigModeUI; (function(){ ... })()",
+          "responsibility": "8-line header+lead-in (11504-11511, dated 2026-07-29): names the 3-step model (Tracer/Assigner/Déplacer), states weight-radius/rotate-mode are read live at BIND time rather than mirrored into a persisted field, and that `state.rigSubMode` is transient (resets to 'draw' on reload), read directly by rig-bridge.js's own `onDown`. Declares the mode-model constants (`RIG_MODE_BTN_IDS`, `RIG_HINTS`), the exported `renderRigModeUI()` (active-mode button highlight + assign-row visibility + translated hint text), then a second anonymous IIFE wiring the three mode buttons and the auto-assign/commit/reset action buttons, each reaching into the app.js rig runtime (C21h/C21i).",
+          "callers": [
+            "`renderRigModeUI` — external callers rig-bridge.js:536 and `updatePropsContext` (timeline.js:3155, 3202, out of scope, cited by line only); internal self-call at 11533 (this packet's own mode-button click handler) — see `boundaries` item g for the full grep-derived inventory."
+          ],
+          "behavior": [
+            "Line 11504 (comment, 1 line): header — 3-step Tracer/Assigner/Déplacer, dated 2026-07-29.",
+            "Lines 11505-11508 (comment, 4 lines): weight-radius/rotate-mode are bind-time params read directly off the panel, not mirrored into a state field.",
+            "Lines 11509-11510 (comment, 2 lines): `state.rigSubMode` is transient, read directly by rig-bridge.js's own `onDown`.",
+            "Line 11511 (code): `state.rigSubMode=state.rigSubMode||'draw'` — module-load init, idempotent after first load.",
+            "Line 11512 (code): `RIG_MODE_BTN_IDS={draw:'btn-rig-mode-draw',assign:'btn-rig-mode-assign',move:'btn-rig-mode-move'}`.",
+            "Lines 11513-11517 (code, 5 lines): `RIG_HINTS={draw:'rigHint',assign:'rigHintAssign',move:'rigHintMove'}` — i18n translation-table KEYS, not hard-coded text (see `boundaries` item c).",
+            "Line 11518 (code): `function renderRigModeUI(){` open.",
+            "Lines 11519-11521 (code, 3 lines): resolve the three mode buttons + `#rig-assign-row` + `#rig-hint`.",
+            "Line 11522 (code): DOM-existence guard — returns silently if any element above is missing.",
+            "Line 11523 (code): `var mode=state.rigSubMode||'draw'`.",
+            "Line 11524 (code): toggle each mode button's `.ac` class.",
+            "Line 11525 (code): `#rig-assign-row` display — `'flex'` only in `assign` mode.",
+            "Line 11526 (code): `#rig-hint` textContent from `SM.t(RIG_HINTS[mode])`, guarded, with DOM's own existing text as silent fallback.",
+            "Line 11527 (code): `}` closing brace of `renderRigModeUI`.",
+            "Line 11528 (code): `window.renderRigModeUI=renderRigModeUI;` — the cross-file export.",
+            "Line 11529 (code): `(function(){` — second IIFE open.",
+            "Lines 11530-11536 (code, 7 lines): per-mode-button click listener — sets `state.rigSubMode=mode`, calls `renderRigModeUI()`, guarded `SMEngineBridge.renderNow()` with an inline comment (11534) that influence circles only draw in Assigner and must repaint on mode switch.",
+            "Lines 11537-11565 (code, 29 lines): `#btn-rig-auto-assign` click handler — guards on an active layer, `canEditActiveLayer()`, and the layer having 1+ rig bones (else a `rigNeedBoneToast`); reads `#rig-weight-radius`/`#rig-rotate-mode`/`#rig-falloff-softness` live (11543-11545); `pushUndo()` (11546); a 3-line comment (11547-11549) on the drive-shapes/drive-meshes checkboxes being the artist's own call, defaulting to both; reads `#rig-drive-shapes`/`#rig-drive-meshes` (11550-11551); calls `rigAutoAssignLayer(ld,userLayers[state.activeLayerIdx],radius,rotate,softness,{paths,meshes})` (11552-11553); guarded `SMEngineBridge.renderNow()` (11554); an 8-line comment (11555-11562) on the 2026-07-29 CompoundPath-unsupported fix (QA-confirmed, quoted verbatim); two-branch `showToast` on the result (11563-11564, `skippedUnsupported` vs. plain assigned-count).",
+            "Lines 11566-11569 (code, 4 lines): `#btn-rig-commit` click — `if(ld)rigCommitFrame(ld);` — no `pushUndo()`, no `canEditActiveLayer()` guard (see `future_proposals`).",
+            "Lines 11570-11578 (code, 9 lines): `#btn-rig-reset` click — guards on `ld&&ld.rig` and `canEditActiveLayer()`; `pushUndo()` (11574); `rigResetPose(ld)` (11575); guarded `SMEngineBridge.renderNow()` (11576); `showToast(SM.t('toastRigPoseReset'))` (11577, UNGUARDED `SM.t` call, unlike every other `SM.t` site in this scope which guards `window.SM&&SM.t`).",
+            "Line 11579 (code): `})();` — second IIFE close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "combine-group-panel",
+      "packets": [
+        {
+          "id": "C19ak.combine-group-panel",
+          "files": [
+            "src/js/timeline.js:11580-11666"
+          ],
+          "coverage_ranges": [
+            [
+              11580,
+              11666
+            ]
+          ],
+          "classification": {
+            "code": 62,
+            "comment": 24,
+            "whitespace": 1
+          },
+          "symbols": [
+            "COMBINE_MODE_BTN_IDS",
+            "updateCombinePanel",
+            "SMGroup",
+            "combineSelection",
+            "setGroupCombineMode",
+            "removeMemberFromGroup",
+            "flattenGroup",
+            "selectedPaths",
+            "activeCombineGid"
+          ],
+          "signature": "function updateCombinePanel(); window.updateCombinePanel=updateCombinePanel; (function(){ ... })()",
+          "responsibility": "7-line header+lead-in (11580-11586, dated 2026-07-29 UX fix): states the panel resolves whether the CURRENT canvas selection already IS one existing combine-group, mirroring group-bridge.js's own `combineSelection` `existingGid` check so the panel and Alt+click never disagree, and that it is exposed on `window` so `updatePropsContext` can call it on every selection change. Declares the mode-id map (`COMBINE_MODE_BTN_IDS`), the exported `updateCombinePanel()` (gid resolution + mode-button highlight + `#sp-boolean-row` mirror + existing-row visibility + enable/disable), then an anonymous IIFE wiring the four mode buttons (combine-or-remode) plus remove/flatten, followed by a 3-line project.js pointer note that closes out the span.",
+          "callers": [
+            "`updateCombinePanel` — the sole external caller is `updatePropsContext` (timeline.js:3207, out of scope, cited by line only); internal self-calls at 11645, 11653, 11660 (this packet's own three action handlers) — see `boundaries` item g for the full grep-derived inventory."
+          ],
+          "behavior": [
+            "Line 11580 (comment, 1 line): header — combine-group panel, 2026-07-29 UX fix.",
+            "Lines 11581-11586 (comment, 6 lines): resolves whether the current selection already IS one existing combine-group (single member, or full matching set); mirrors group-bridge.js's own `combineSelection` `existingGid` check; exposed on `window` for `updatePropsContext`.",
+            "Line 11587 (code): `COMBINE_MODE_BTN_IDS={unite:'btn-combine-unite',subtract:'btn-combine-subtract',intersect:'btn-combine-intersect',exclude:'btn-combine-exclude'}`.",
+            "Line 11588 (code): `function updateCombinePanel(){` open.",
+            "Lines 11589-11592 (code, 4 lines): resolve `window.selectedPaths`, `#combine-existing-row`, the four mode buttons; DOM-existence guard.",
+            "Line 11593 (code): `var li=state.activeLayerIdx,ld=state.layers[li],layer=userLayers[li];`.",
+            "Lines 11594-11604 (code, 11 lines): gid resolution — `firstGid` from `sel[0].data.groupId`, trusted only if `ld.groups[firstGid].combineMode!=='none'`, then EITHER `sel.length===1` OR (2+) `SMGroup.resolveGroupMembers` returns an exact-set match — see `boundaries` item d.",
+            "Line 11605 (code): `activeMode=gid?ld.groups[gid].combineMode:'unite'`.",
+            "Line 11606 (code): toggle each mode button's `.ac` class by `m===activeMode`.",
+            "Lines 11607-11617 (comment+code, 11 lines): `#sp-boolean-row` mirror — an 8-line 2026-08-31 #192 UX comment (the Combined-Shape/boolean icon 'doublon' report, quoted) explaining why the active mode is ALSO mirrored onto `#btn-bool-<mode>`'s own `.ac` class (11615-11618), since that row's own icons already reach combine via Alt+click.",
+            "Line 11619 (code): `existingRow.style.display=gid?'flex':'none'`.",
+            "Lines 11620-11624 (comment+code, 5 lines): a 3-line comment on disabled-not-hidden semantics (2+ shapes needed to CREATE, but re-moding an EXISTING group only needs it to be the current selection even at 1 member), then `canAct=gid||(sel&&sel.length>=2)` and `btns.forEach(b=>b.disabled=!canAct)`.",
+            "Line 11625 (code): `}` closing brace of `updateCombinePanel`.",
+            "Line 11626 (code): `window.updateCombinePanel=updateCombinePanel;` — the cross-file export.",
+            "Line 11627 (code): `(function(){` — IIFE open.",
+            "Lines 11628-11635 (code, 8 lines): `activeCombineGid()` — a near-duplicate of `updateCombinePanel`'s own gid test, used by the click handlers below.",
+            "Lines 11636-11638 (comment, 3 lines): 'one click = combine or re-mode' UX-fix rationale, dated 2026-07-29.",
+            "Lines 11639-11647 (code, 9 lines): per-mode-button click — guards on `window.SMGroup`; if `activeCombineGid()` returns a gid, `SMGroup.setGroupCombineMode(gid,ld,mode)`, else `SMGroup.combineSelection(mode)`; `updateCombinePanel()` self-refresh.",
+            "Lines 11648-11654 (code, 7 lines): `#btn-combine-remove` click — guards on exactly one selected path and `window.SMGroup`; `SMGroup.removeMemberFromGroup(sel[0],ld,layer)`; self-refresh.",
+            "Lines 11655-11661 (code, 7 lines): `#btn-combine-flatten` click — guards on a resolved gid and `window.SMGroup`; `SMGroup.flattenGroup(gid,ld,layer)`; self-refresh.",
+            "Line 11662 (code): `})();` — IIFE close.",
+            "Lines 11663-11665 (comment, 3 lines): Save/Save As/Open/New and the legacy download/upload fallback are wired in project.js (out of scope), which also owns the start screen and recent-projects list — not part of this scope's own three constructs, folded into this packet per the issue's own boundary statement.",
+            "Line 11666 (blank): the one blank line in this scope's own 234-line union, immediately preceding `// ---- EXPORT MODAL ----` at 11667 (C19al, next leaf)."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "NO `saveAllLayerFrames()`/`saveActiveLayerFrame()` call exists anywhere in this scope's own 234 lines (confirmed by grep restricted to 11433-11666). Every `ld.duplicator.*` write (packet 1) and every `ld.rig`-adjacent action (packet 2, delegated into app.js) and every `ld.groups` mutation (packet 3, delegated into group-bridge.js) mutates a live object reference held on the layer's own state, or delegates the persistence decision entirely to the cited out-of-scope function — matching C19w's own documented convention for `ld.duplicator` (a per-layer config object, not a per-frame `strokes` array, so `loadFrame` alone makes a mutation visible with no separate save step)."
+    },
+    {
+      "consumer": "load",
+      "disposition": "`loadFrame(state.currentFrame)` is called exactly once in this scope's own body: inside packet 1's `dupRefresh` (11447). Packets 2 and 3 never call `loadFrame` directly — every rig/combine action delegates any frame-reload need to its own cited out-of-scope function (`rigCommitFrame`, `SMGroup.combineSelection`, etc.) or relies solely on `SMEngineBridge.renderNow()` for a visual repaint without a full `loadFrame` reconstruction. No function named `importJSON` exists anywhere in the codebase at the frozen SHA (confirmed, matching C19w's own finding) — none of this scope's symbols appear in the project-load path either way."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "13 `pushUndo()` call sites in packet 1 (see `boundaries` item e for the complete list), all immediately preceding their own mutation. 2 `pushUndo()` call sites in packet 2 (11546, 11574) — the mode-switch handler and the commit button have no visible `pushUndo()` of their own within this scope (see `boundaries` item e and `future_proposals`). 0 `pushUndo()` call sites in packet 3 — every write is delegated to a `SMGroup.*` function that checkpoints undo INSIDE its own body (confirmed for `combineSelection`, group-bridge.js:335, cited by line only), not visible from this scope's own citation depth for the other three."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "Packet 3 reads `window.selectedPaths` (11589, 11629, aliased `sel`) — the SAME module-scope selection array C19q (out of scope) owns — but never mutates it; the combine panel is purely a reader of the current selection, driving its own gid/mode display and gating which action buttons are enabled. Packets 1 and 2 never read or write `selectedPaths`/`_layerSel` at all — both operate entirely off `state.activeLayerIdx`, not the canvas selection."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "None of this scope's own three constructs branches on Motion vs. Animation 2D mode — `updatePropsContext` (the sole caller of two of the three exported symbols) is itself mode-agnostic per its own citation in C19w. `state.currentFrame` is read exactly once, synchronously, inside packet 1's own `dupRefresh` (11447, via `loadFrame`) — never cached across a frame boundary."
+    },
+    {
+      "consumer": "export",
+      "disposition": "None of this scope's declared symbols (`renderRigModeUI`, `updateCombinePanel`, and the two anonymous IIFEs' own local helpers) are called from `export.js` or `rive-export.js` at the frozen SHA (confirmed: zero matches for either named symbol in either file). Confirmed by `boundaries` item g: neither symbol is reachable from `loadFrame`/`getEffectiveStrokes(Rendered)`/`buildSceneJson`/`scenePayload` — every call path is panel-refresh or user-gesture only."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "`window.SMEngineBridge.renderNow()` is called 5 times across this scope's own body: once inside packet 1's `dupRefresh` (11447, guarded), once in packet 2's mode-switch handler (11534, guarded, 'influence circles only draw in Assigner'), once each in packet 2's auto-assign (11554) and reset (11576) handlers (both guarded). Packet 3 never calls `SMEngineBridge` directly — a combine action relies on the cited `SMGroup.*` function's own `renderNow()` call (confirmed for `combineSelection`, group-bridge.js, cited by line only). No Tauri-specific API (`window.__TAURI__`) appears anywhere in this scope's own 234 lines."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-duplicator-static-fields-pushundo-and-refresh",
+      "proposed": "Construct `ld.duplicator={mode:'grid',rows:2,cols:2,...}` as the active layer; spy on `pushUndo`, `loadFrame`, `SMMotion.invalidateSymbolUnionBounds`, `SMEngineBridge.renderNow`, `updateDuplicatorPanel`. Dispatch a `change` event on `#dup-rows` with value `5`; expect `pushUndo` called once BEFORE `d.rows===5`, then all four of `loadFrame`/`invalidateSymbolUnionBounds`/`renderNow`/`updateDuplicatorPanel` called exactly once each (the fuller `dupRefresh` sequence, `boundaries` item b) — not run."
+    },
+    {
+      "id": "fx-duplicator-add-effector-centers-on-seed-bounds",
+      "proposed": "Active layer with duplicator, seed content bounds center at `(120,80)`; click `#btn-dup-add-effector`; expect `pushUndo` called, `d.effectors` to contain exactly one new entry `{pos:{x:120,y:80},radius:200,falloff:'radial',angle:0,strength:100,channels:[{prop:'position',value:[0,0]}]}`, and `renderDuplicatorEffectors`+`dupRefresh` both called once — verifies 11477-11495 — not run."
+    },
+    {
+      "id": "fx-rig-mode-switch-toggles-assign-row-and-hint",
+      "proposed": "With the rig panel's DOM present, click `#btn-rig-mode-assign`; expect `state.rigSubMode==='assign'`, `#btn-rig-mode-assign` to carry the `.ac` class and the other two mode buttons not to, `#rig-assign-row`'s display to be `'flex'`, `#rig-hint`'s textContent to equal `SM.t('rigHintAssign')`, and `SMEngineBridge.renderNow` called once — verifies 11518-11536 — not run."
+    },
+    {
+      "id": "fx-rig-auto-assign-blocks-without-bones-and-without-edit-permission",
+      "proposed": "Active layer with `ld.rig.bones={}` (empty); click `#btn-rig-auto-assign`; expect `showToast(SM.t('rigNeedBoneToast'))` called, `rigAutoAssignLayer` NOT called, `pushUndo` NOT called. Then with 1+ bones present but `canEditActiveLayer()` stubbed to return false; expect the handler to return before `pushUndo`/`rigAutoAssignLayer` — verifies the two-guard sequence at 11540-11542 — not run."
+    },
+    {
+      "id": "fx-combine-panel-single-vs-multi-member-gid-resolution",
+      "proposed": "A layer with `ld.groups={g1:{combineMode:'unite',order:['s1']}}` and `selectedPaths=[pathWithData({groupId:'g1'})]` (the sole member); call `updateCombinePanel()`; expect `gid==='g1'` (the `sel.length===1` branch, 11598) and `#btn-combine-unite` to carry `.ac`. Then select TWO paths where only one carries `groupId:'g1'`; expect `SMGroup.resolveGroupMembers` to be called and `gid` to resolve to `null` (member-set mismatch) — verifies 11594-11604 — not run."
+    },
+    {
+      "id": "fx-combine-button-creates-vs-remodes",
+      "proposed": "Selection of 2 ungrouped paths; click `#btn-combine-subtract`; expect `activeCombineGid()` to return `null`, `SMGroup.combineSelection('subtract')` called, `SMGroup.setGroupCombineMode` NOT called. Then with that same selection now grouped (gid resolves non-null); click `#btn-combine-unite`; expect `SMGroup.setGroupCombineMode(gid,ld,'unite')` called, `SMGroup.combineSelection` NOT called — verifies the two-branch dispatch at 11642-11644 — not run."
+    }
+  ],
+  "future_proposals": [
+    "`#btn-rig-commit` (11566-11569) has neither a `pushUndo()` of its own nor a `canEditActiveLayer()` guard, unlike its sibling auto-assign (11540,11546) and reset (11573-11574) buttons in the SAME packet — whether `rigCommitFrame` (app.js:2536, C21i, cited by line only) checkpoints undo or enforces edit-permission internally is outside this scope's own citation depth. Flagged for the eventual runtime-behavior review as a possible asymmetry; not exercised or confirmed as a defect by this census (no execution was performed).",
+    "`RIG_HINTS` (11513-11517) routes through `SM.t`, but `#rig-hint`'s own fallback when `window.SM||!SM.t` is unavailable is the DOM element's own PRE-EXISTING textContent (11526, `hintEl.textContent=...?SM.t(...):hintEl.textContent`) rather than a hard-coded French string — this is a SELF-referential fallback (keep whatever was already there) rather than the 'hard-coded French, i18n gap' pattern the issue's own suggested table anticipated for this construct; the actual hard-coded-fallback pattern (an inline French string) appears instead on `#btn-rig-auto-assign`'s own toast (11542, `'Dessine au moins un os avant d'assigner'`) and inconsistently elsewhere in packet 2 (`toastShapesWithHolesNotSupportedByRig`/`toastShapesAutoAssignedSuffix` are looked up via `SM.t` even in the UNGUARDED else-branch at 11563-11564, meaning a missing `SM.t` would throw there rather than fall back) — noted for awareness, not flagged as a defect requiring a fix; not confirmed by execution.",
+    "The combine panel's four `SMGroup.*` write calls (11643,11644,11652,11659) have no `pushUndo()` visible in THIS scope's own span, relying entirely on each `SMGroup.*` function checkpointing undo internally — this differs from packet 1's own convention (every write in packet 1 has an explicit, LOCAL `pushUndo()` immediately preceding it) and from packet 2's partial convention (2 of 4 action buttons have a local `pushUndo()`). Confirmed for `combineSelection` only (group-bridge.js:335, cited by line only) that an internal checkpoint exists; `setGroupCombineMode`/`removeMemberFromGroup`/`flattenGroup` were not read deeply enough in this pass to confirm the same for each individually — noted for awareness, not flagged as a defect; not confirmed by execution."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\('` (recursive, including labs/ and adapters/) was run once for each of the two exported function symbols this scope declares (renderRigModeUI, updateCombinePanel), at the frozen SHA, filtering out each symbol's own declaration/export line and any hit whose trimmed content starts with `//`, plus a separate property-form sweep for `.renderRigModeUI`/`.updateCombinePanel` (zero hits for either) — results are reproduced verbatim under each packet's own `callers` field and `boundaries` item g, and are re-checkable with the same commands.",
+    "A SEPARATE whole-src grep restricted to `engine-bridge.js`/`export.js`/`rive-export.js` for both symbol names returned ZERO hits, directly supporting the export/render-path source_consumers entries above.",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by an awk re-implementation of the validator's own classify() algorithm against a direct `git show 59a5a38c:src/js/timeline.js` dump, run once per packet and once for the whole span — 156/77/1 over 234 lines, matching the issue's own proposed union exactly and matching the issue's own proposed per-packet table exactly for all three packets; no boundary correction was needed.",
+    "The `ld.duplicator.*` field-write claims (item a) were cross-checked directly against the reader `applyLayerDuplicator` (app.js:1616-1700ish, C21g, read verbatim via `sed -n`, not assumed from that artifact's own JSON) for `mode`/`cols`/`timeOffset`/`staggerRandom`; every field name this scope writes has a matching read in C21g's own body with no discrepancy found.",
+    "The `dupRefresh` vs. C19w's own `dupRefreshFromPanel` divergence in `boundaries` item b was confirmed by reading BOTH function bodies verbatim (timeline.js:11447 in this scope, and timeline.js:7445 per C19w's own artifact and a direct `sed -n` re-read against the frozen blob), not assumed from either function's own name or comment.",
+    "The `renderRigModeUI`/`updateCombinePanel` caller claims (item g) were corroborated by reading `updatePropsContext`'s own body directly (timeline.js:3131-3210ish) rather than trusting the grep hits in isolation — both guarded call sites for each symbol were located and read in context.",
+    "The `state.rigSubMode` reader correction (owner/boundaries) was produced by `git grep -n 'rigSubMode' 59a5a38c -- src/js/tools.js src/js/rig-bridge.js`, which returned zero hits in tools.js and two hits (rig-bridge.js:247,462) — contradicting the issue's own preamble wording ('state.rigSubMode readers in tools.js'); reported as a correction with grep evidence per the issue's own instruction to adjust boundary claims only with evidence.",
+    "engineering/inventory/census/*.json siblings present at authoring time sharing `source_path: src/js/timeline.js`: C19a through C19af, C19w, C19x, C19y, C19z, C19aa (24 files), forming coverage up to line 10392 with no local sibling claiming any line in 11433-11666 (C19aj, the issue's own named immediate predecessor covering up to 11432, is not yet merged to main in this worktree) — independently confirmed by listing every present sibling's own `assigned_ranges`; the validator's cross-sibling overlap check additionally confirms this programmatically against every C*.json present in the directory at commit time."
+  ],
+  "validation": {
+    "expected_assigned_lines": 234,
+    "expected_classification": {
+      "code": 156,
+      "comment": 77,
+      "whitespace": 1
+    },
+    "packet_partition": [
+      [
+        11433,
+        11503
+      ],
+      [
+        11504,
+        11579
+      ],
+      [
+        11580,
+        11666
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived against the frozen blob: 11433-11503=(36,35,0); 11504-11579=(58,18,0); 11580-11666=(62,24,1); sums to (156,77,1)=234 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 234 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 census_check.py engineering/inventory/census/C19ak-timeline-duplicator-rig-combine-panel-wiring.json <candidate-sha> exits 0",
+      "python3 census_check.py engineering/inventory/census/C19w-timeline-duplicator-panel.json <candidate-sha> still exits 0",
+      "python3 census_check.py engineering/inventory/census/C19af-timeline-keyup-cmdhold-shape-flyout-colour-fields.json <candidate-sha> still exits 0"
+    ]
+  }
+}
