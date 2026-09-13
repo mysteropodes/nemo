@@ -92,9 +92,11 @@ function refreeze(root, previous, { commit, id, issue, reason }) {
   const censuses = loadCensuses(root, commit, source);
   const rows = census.declarations(censuses);
   const oldFiles = new Map(previous.files.map((entry) => [entry.path, entry]));
-  // Reviewed references survive; only censuses pinned for the first time add mechanical ones.
-  const newCensusIds = new Set(censuses.map((entry) => entry.document.census_id)
-    .filter((id) => !(previous.censuses || []).some((pin) => pin.id === id)));
+  // Reviewed references survive; censuses pinned for the first time or re-pinned with a
+  // different blob add their mechanical references.
+  const newCensusIds = new Set(censuses.filter((entry) => !(previous.censuses || [])
+    .some((pin) => pin.id === entry.document.census_id && pin.blob === entry.blob))
+    .map((entry) => entry.document.census_id));
   const mechanicalRefs = (file, old) => {
     const refs = new Set(old?.censusRefs || []);
     for (const row of rows) if (row.path === file && (!old || newCensusIds.has(row.census))) refs.add(row.packet);

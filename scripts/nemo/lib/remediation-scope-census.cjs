@@ -76,12 +76,16 @@ function parseHunks(diffText) {
 }
 
 // Map one old line number through hunks; null when the line was deleted or rewritten.
+// Git anchors a zero-length side one line early (`-5,0 +6,3` inserts after old 5,
+// `-5,2 +4,0` deletes 5-6), so a zero-length side is normalised to the next line.
 function mapLine(hunks, line) {
   let offset = 0;
   for (const [oldStart, oldLen, newStart, newLen] of hunks) {
-    if (line < oldStart) return line + offset;
-    if (line < oldStart + oldLen) return null;
-    offset = newStart + newLen - (oldStart + oldLen);
+    const from = oldLen === 0 ? oldStart + 1 : oldStart;
+    const to = newLen === 0 ? newStart + 1 : newStart;
+    if (line < from) return line + offset;
+    if (line < from + oldLen) return null;
+    offset = to + newLen - (from + oldLen);
   }
   return line + offset;
 }

@@ -187,15 +187,22 @@ test('census declarations parse every recorded shape without inventing paths', (
   assert.deepEqual(parse('engineering/remediation/** (14 files)'), [{ path: 'engineering/remediation/**', ranges: null }]);
 });
 
-test('line ranges written against an older tree are mapped through diff hunks', () => {
-  const hunks = census.parseHunks('@@ -5,2 +5,0 @@\n-x\n-y\n@@ -10 +8,3 @@\n-z\n+a\n+b\n+c\n');
-  assert.deepEqual(hunks, [[5, 2, 5, 0], [10, 1, 8, 3]]);
+test('line ranges written against an older tree are mapped through real git hunk shapes', () => {
+  const hunks = census.parseHunks('@@ -5,2 +4,0 @@\n-x\n-y\n@@ -10 +8,3 @@\n-z\n+a\n+b\n+c\n');
+  assert.deepEqual(hunks, [[5, 2, 4, 0], [10, 1, 8, 3]]);
   assert.equal(census.mapLine(hunks, 4), 4);
   assert.equal(census.mapLine(hunks, 5), null);
   assert.equal(census.mapLine(hunks, 7), 5);
   assert.equal(census.mapLine(hunks, 10), null);
   assert.equal(census.mapLine(hunks, 11), 11);
   assert.deepEqual(census.mapRanges(hunks, [[3, 8]]), [[3, 6]]);
+  // Insert-only after old line 5 (`-5,0 +6,3`): 5 stays, 6 shifts by the three new lines.
+  assert.equal(census.mapLine([[5, 0, 6, 3]], 5), 5);
+  assert.equal(census.mapLine([[5, 0, 6, 3]], 6), 9);
+  // Insert at the top (`-0,0 +1`) and delete the first line (`-1 +0,0`).
+  assert.equal(census.mapLine([[0, 0, 1, 1]], 1), 2);
+  assert.equal(census.mapLine([[1, 1, 0, 0]], 1), null);
+  assert.equal(census.mapLine([[1, 1, 0, 0]], 2), 1);
 });
 
 test('range coverage reports code gaps, ignores layout-only spans and whole-file claims', () => {

@@ -38,7 +38,7 @@ An unpinned census file in the tree fails integrity. The pins yield **449 packet
 the original partitions (C08 keeps only its documentation map) and 120 from the supplements.
 
 `censusRefs` on a path are P03A's reviewed references plus the mechanical references of
-censuses pinned for the first time. Declarations are parsed as written (`path`, `path:12-46`,
+censuses pinned for the first time or re-pinned with a different blob. Declarations are parsed as written (`path`, `path:12-46`,
 `path:20,25-30 (symbols)`, `path: symbol list`, comma lists); glob, brace and directory
 declarations match no tracked path literally and add nothing.
 
@@ -51,8 +51,8 @@ rewritten lines drop out), then every line with no packet is reported. Spans mad
 blank lines or closing brackets are dropped; `uncovered` counts code lines inside the kept
 spans; `overlap` counts lines claimed by more than one packet.
 
-At `95e4970`, **61 files** carry range declarations, **34** have gaps, and **21 932 code lines in
-168 spans** have no packet. This is the honest size of the remaining census work and the input
+At `95e4970`, **61 files** carry range declarations, **34** have gaps, and **21 933 code lines in
+171 spans** have no packet. This is the honest size of the remaining census work and the input
 of the P03C queue:
 
 | File | Lines | Uncovered code lines | Spans |
@@ -63,9 +63,9 @@ of the P03C queue:
 | `src/css/style.css` | 2 850 | 2 707 | 4 |
 | `src/index.html` | 2 483 | 2 248 | 4 |
 | `src/js/tweens.js` | 5 249 | 509 | 11 |
-| `src/js/engine-bridge.js` | 4 678 | 224 | 16 |
-| `src/js/export.js` | 1 389 | 185 | 7 |
-| `src-tauri/src/lib.rs` | 284 | 154 | 4 |
+| `src/js/engine-bridge.js` | 4 678 | 226 | 17 |
+| `src/js/export.js` | 1 389 | 186 | 8 |
+| `src-tauri/src/lib.rs` | 284 | 151 | 4 |
 | `nemo-mcp/src/contract.rs` | 340 | 134 | 23 |
 
 `src/js/app.js` is the largest finding: it has file-level references, so the C08 set-difference
