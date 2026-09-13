@@ -1,0 +1,623 @@
+{
+  "census_id": "C19m",
+  "issue": 1158,
+  "title": "Timeline drag state, camera-row offset, playhead/scroll/resize adapters and renderTimeline",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C19m census only; P30 (timeline.js runtime writer), C02 (camera/markers/bpm playback integration) and other named owners remain separate",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "1c9ce3ab8e199ace7db4f721f54c517841d7f39e",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19m-timeline-drag-playhead-render",
+  "assigned_ranges": [
+    {
+      "start": 3917,
+      "end": 4192
+    },
+    {
+      "start": 4230,
+      "end": 4330
+    },
+    {
+      "start": 4333,
+      "end": 4343
+    }
+  ],
+  "coverage_note": "Exactly 388 assigned lines occur once across six packets (eight coverage_ranges, the last packet spanning three of them around two C02-owned gaps): 144 code, 242 full-line // comments and 2 blank. Line 3916 closes C19l's selPropsApplyRotate; line 3917 is the first excluded-by-C19l blank line and begins this scope. Lines 4193-4229 and 4331-4332 are C02-owned SMCamera/SMMotion/SMAudio and SMMarkers/SMBpm playback-integration calls embedded inside renderTimeline's body and are NOT claimed here — the render-timeline packet's coverage_ranges skip both gaps exactly. Line 4343 closes renderTimeline; line 4344 opens the next leaf's tween-easing curve strips section and is excluded.",
+  "source_baselines": {
+    "pinned": "59a5a38c:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "Observed main 1c9ce3ab (C20f/#1156 merged via PR #1157) has the identical timeline.js blob; the job's stated base 61e3366fe4e776bb26716a4a6b4d156967265786 also resolves to the same blob, confirmed directly (git rev-parse 1c9ce3ab:src/js/timeline.js == git rev-parse 61e3366:src/js/timeline.js == cc4cfd27...).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; historical comments (dated feedback quotes embedded in the source) are read as authorial intent, not fresh execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19m-timeline-drag-playhead-render.json and the six timeline.js packets partitioning lines 3917-4192, 4230-4330 and 4333-4343.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "owners": "C02 owns the playback-integration calls inside renderTimeline at lines 4193-4229 (SMCamera.renderGridRow/SMMotion.renderTimelineMotion/playhead field writes/SMAudio.renderStrip on the Motion early-return branch) and 4331-4332 (SMMarkers.render/SMBpm.render on the Animation2D tail); C19m maps the surrounding renderTimeline body and cites these calls as boundary lines only. C04/C01/H03/P25 own selection, geometry, history and the tools.js rotate gesture referenced by earlier C19 leaves and are untouched here. Motion's own renderTimelineMotion/shapeTreeRowPlan implementations stay with motion.js's existing owner; this packet cites only the call sites inside renderTimeline.",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19l/#1154",
+      "disposition": "Retains selPropsApplyScale/selPropsApplyRotate through line 3916. C19m begins with the next line, the excluded blank 3917, and the drag-state heading/declaration at 3918-3919."
+    },
+    {
+      "owner": "C02/playback-integration",
+      "disposition": "Retains the camera/motion-render/playhead-field/audio calls at lines 4193-4229 (Motion early-return branch inside renderTimeline) and the marker/BPM calls at lines 4331-4332 (Animation2D tail). Both spans are embedded inside renderTimeline's own body; C19m's render-timeline packet uses three coverage_ranges (4026-4192, 4230-4330, 4333-4343) specifically to exclude them rather than splitting renderTimeline into a separate C02 function."
+    },
+    {
+      "owner": "C19h/#1141",
+      "disposition": "Retains updateUI, including the frameOnly/updatePlayhead contract at timeline lines 2713-2745 (`if(frameOnly)updatePlayhead();else renderTimeline();`, CLAUDE.md §5bis). C19m cites this caller-side contract and the callee boundary only; it does not claim updateUI or updatePlayhead (lines 191-208, C02-owned per C19a's reconciliation)."
+    },
+    {
+      "owner": "C02 (playheadLeftPx/updatePlayhead)",
+      "disposition": "playheadLeftPx (line 191) and updatePlayhead (lines 192-207) are C02-owned per C19a's existing reconciliation. renderTimeline calls playheadLeftPx twice (lines 4196 inside the omitted Motion branch, and 4327 inside this packet's Animation2D tail); C19m records the call sites only."
+    },
+    {
+      "owner": "motion.js / SMMotion, SMTimelineZoom, SMMotionGraph, SMAudio, SMMarkers, SMBpm, SMCamera (existing owners)",
+      "disposition": "renderTimeline delegates to SMMotion.renderTimelineMotion/shapeTreeRowPlan, SMTimelineZoom.redraw, SMMotionGraph.isOn/render, SMAudio.renderStrip, SMMarkers.render, SMBpm.render and SMCamera.renderGridRow. C19m maps only the call sites and guard conditions inside timeline.js; the callee implementations remain with their existing files/owners and are not examined here."
+    },
+    {
+      "owner": "later timeline.js census leaves (layer-render helpers)",
+      "disposition": "computeLayerRenderOrder (line 5600), renderKeyframeCellsInto (line 4725), layerCurveRowExtraHeight (line 4382) and installLayerReorderGrip (line 6818) are called from inside the render-timeline packet (lines 4239, 4254, 4270, 4277, 4300) but are themselves defined outside this packet's assigned ranges via forward reference (function-declaration hoisting) and remain for a later census leaf."
+    },
+    {
+      "owner": "later timeline.js census leaf (_tlDrag consumers, frame-cell drag gesture)",
+      "disposition": "_tlDrag (declared line 3919) is read/written extensively by a mousedown/mousemove/mouseup drag-to-move/select gesture at lines 5122-5418 (grid.addEventListener('mousedown'/'mousemove'/'mouseup')), and camGridRowOffset (declared 3920-3930) is re-read at line 5293 inside that same gesture's mousemove handler to correct the cursor-to-row mapping for camera-row height. Both consumer sites are outside this packet's assigned ranges and remain for a later leaf; C19m maps only the declarations/definitions and their in-range behavior."
+    },
+    {
+      "owner": "later timeline.js census leaf (renderLayerList)",
+      "disposition": "_tlScrollSnapshot/_tlScrollRestore (declared 4015-4025) are reused by renderLayerList at lines 6348 (snapshot) and 6355/6792 (restore) — the same CLAUDE.md §11 invariant applied to the left-hand layer-list panel. That function's body is outside this packet's assigned ranges and remains for a later leaf."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 3916 is outside coverage (C19l's selPropsApplyRotate closing brace); line 3917 (blank) begins this scope, followed by the drag-state heading (3918) and _tlDrag declaration (3919).",
+    "Lines 4193-4229 are outside coverage: the Motion-mode early-return branch's SMCamera.renderGridRow/SMMotion.renderTimelineMotion calls, its own playhead left/flag field writes, its own syncPlayheadToViewport() call, and its SMAudio.renderStrip() call plus `return;` — all C02-owned playback-integration per the issue. The render-timeline packet's first coverage_range ends at 4192 and its second resumes at 4230, immediately after the Animation2D branch's own (also C02-owned) SMCamera.renderGridRow(grid) call at line 4229.",
+    "Lines 4331-4332 are outside coverage: SMMarkers.render()/SMBpm.render(), also C02-owned. The render-timeline packet's second coverage_range ends at 4330 and its third resumes at 4333 with SMAudio.renderStrip().",
+    "Line 4343 closes renderTimeline and is the last line of this scope; line 4344 opens the next leaf's tween-easing curve strip section (`// ---- TWEEN EASING CURVE STRIPS ----`) and is excluded."
+  ],
+  "areas": [
+    {
+      "area": "timeline-drag-state-and-viewport-adapters",
+      "packets": [
+        {
+          "id": "C19m.timeline-drag-state",
+          "files": [
+            "src/js/timeline.js:3917-3919"
+          ],
+          "coverage_ranges": [
+            [
+              3917,
+              3919
+            ]
+          ],
+          "classification": {
+            "code": 1,
+            "comment": 1,
+            "whitespace": 1
+          },
+          "symbols": [
+            "_tlDrag"
+          ],
+          "signature": "var _tlDrag = {active:false, startL:-1, startF:-1, ghost:null, moved:false, mode:null}",
+          "responsibility": "Declares the module-level frame-cell drag-state object used by a later mousedown/mousemove/mouseup gesture (lines 5122-5418, outside this packet) that implements select/move dragging of frame cells across the grid.",
+          "behavior": [
+            "Line 3917 is blank (the boundary line C19l's coverage_note already excludes).",
+            "Line 3918 is a section-heading comment `// ---- TIMELINE DRAG STATE ----`.",
+            "Line 3919 declares _tlDrag with active=false, startL=startF=-1 (sentinel 'no cell'), ghost=null (drag-preview DOM element, created lazily), moved=false (drag-vs-click disambiguation) and mode=null ('move' or 'select', chosen on first movement past a distance threshold at line 5303-5306).",
+            "Two more fields (_toL/_toF, cursorDot) are added dynamically by the out-of-scope gesture handler (lines 5331, 5341) rather than declared here."
+          ],
+          "callers": [
+            "Not itself invoked; consumed by the mousedown handler at line 5126 (sets active/startL/startF/moved/ghost), the mousedown at line 5201-5202 (same shape, sets mode), the mousemove handler starting at line 5287 (guards on active, drives moved/mode/ghost/cursorDot), and the mouseup handler starting at line 5406 (reads moved/ghost/_toL/_toF, then resets active/moved/mode) — all outside this packet's assigned ranges."
+          ],
+          "effects": "Declaration only; no DOM, state, history or render effect at this line. All mutation happens in the out-of-scope gesture handlers."
+        },
+        {
+          "id": "C19m.camera-row-offset",
+          "files": [
+            "src/js/timeline.js:3920-3930"
+          ],
+          "coverage_ranges": [
+            [
+              3920,
+              3930
+            ]
+          ],
+          "classification": {
+            "code": 4,
+            "comment": 6,
+            "whitespace": 1
+          },
+          "symbols": [
+            "camGridRowOffset"
+          ],
+          "signature": "camGridRowOffset() -> number",
+          "responsibility": "Reads the live DOM height of the prepended camera row so that row-index<->pixel conversions elsewhere in the grid can correct for its presence, since the row's own height varies (16px compact / 34px active, per the comment, camera.js-driven) rather than being a fixed constant.",
+          "behavior": [
+            "Queries `#frame-grid .frow.camrow` once per call (no caching).",
+            "Returns `r.getBoundingClientRect().height` when the row exists, else 0 — a pure DOM read with no fallback constant."
+          ],
+          "callers": [
+            "renderTimeline itself never calls camGridRowOffset in this packet's assigned ranges.",
+            "The out-of-scope frame-cell drag mousemove handler calls it at line 5293 to compute `yRel=e.clientY-gridRect.top-camOff` for cursor-to-row mapping."
+          ],
+          "effects": "Pure read; no DOM write, no state mutation."
+        },
+        {
+          "id": "C19m.playhead-viewport-sync",
+          "files": [
+            "src/js/timeline.js:3931-3983"
+          ],
+          "coverage_ranges": [
+            [
+              3931,
+              3983
+            ]
+          ],
+          "classification": {
+            "code": 19,
+            "comment": 34,
+            "whitespace": 0
+          },
+          "symbols": [
+            "syncPlayheadToViewport",
+            "bindPlayheadScrollSync"
+          ],
+          "signature": "syncPlayheadToViewport() -> undefined; (function bindPlayheadScrollSync(){ function bind(){...} ... })()",
+          "responsibility": "Implements the CLAUDE.md §11 playhead pin: because #playhead is position:absolute inside the scrollable #fg-wrap, pinning ONLY the vertical axis (top=scrollTop, height=clientHeight) keeps the line spanning exactly the visible viewport at any scroll position, while `left` is deliberately left content-relative (set elsewhere, currentFrame*FC) so it still scrolls sideways with the frame it points at.",
+          "behavior": [
+            "syncPlayheadToViewport (3954-3958): reads #fg-wrap and #playhead; returns undefined immediately if either is missing (no throw). Otherwise sets ph.style.top=wrap.scrollTop+'px' and ph.style.height=Math.max(0,wrap.clientHeight)+'px'.",
+            "bindPlayheadScrollSync is an immediately-invoked function (3960-3983) whose inner bind() (3961-3979): re-fetches #fg-wrap and returns if missing; attaches a 'scroll' listener calling syncPlayheadToViewport; observes #fg-wrap with a ResizeObserver when available (feedback #177: dragging #tl-resize taller, a window resize, or a panel-collapse reflow all changed the wrap's box WITHOUT firing a scroll event, so the line kept its old shorter height) and falls back to a window 'resize' listener inside a try/catch if the ResizeObserver constructor throws, or directly if ResizeObserver is undefined; then calls syncPlayheadToViewport() once immediately so the initial state is correct before any scroll/resize fires.",
+            "bind() itself runs either on 'DOMContentLoaded' (if document.readyState==='loading') or synchronously right away — the same conditional-bootstrap idiom used by the grid-resize-resync and scroll-restore-adjacent IIFEs elsewhere in this file."
+          ],
+          "callers": [
+            "Invoked once by bind() at line 3980 (part of this packet).",
+            "Invoked by the DOM 'scroll' listener on #fg-wrap (line 3966) and by the ResizeObserver callback / window 'resize' fallback (lines 3975-3978) — all part of this packet's own wiring.",
+            "Invoked again at line 4215, inside the C02-owned Motion early-return branch (outside this packet, cited as a boundary), and at line 4328 inside this packet's own render-timeline Animation2D tail."
+          ],
+          "effects": "DOM style writes only (ph.style.top/height); listener/observer registration on module load. No state, history or render-pipeline mutation."
+        },
+        {
+          "id": "C19m.grid-resize-resync",
+          "files": [
+            "src/js/timeline.js:3984-4014"
+          ],
+          "coverage_ranges": [
+            [
+              3984,
+              4014
+            ]
+          ],
+          "classification": {
+            "code": 19,
+            "comment": 12,
+            "whitespace": 0
+          },
+          "symbols": [
+            "resync",
+            "bindResize"
+          ],
+          "signature": "(function(){ var pending=0; function resync(){...} function bindResize(){...} ... })()",
+          "responsibility": "Re-lays out the grid (via a full renderTimeline() call) when #fg-wrap's box changes, fixing feedback #767 ('quand on resize la fenêtre du navigateur et que l'on vient d'ouvrir un projet la timeline de motion à droite ne s'adapte pas') — #frame-grid/#frame-hdr/#bars-row all get an explicit pixel width computed at render time that previously never recomputed on a bare window resize.",
+          "behavior": [
+            "Module-scoped `pending` flag coalesces bursts of resize notifications into a single requestAnimationFrame callback (resync, 3986-3992): if a frame is already pending it no-ops; otherwise it schedules one rAF callback that clears `pending` and calls `renderTimeline()` only if `typeof renderTimeline==='function'`.",
+            "bindResize (3993-4000): re-fetches #fg-wrap, returns if missing; when ResizeObserver is available, tries `new ResizeObserver(resync).observe(wrap)` inside a try/catch and returns on success (silently falling through to the window-resize fallback below if the constructor throws, since the catch body is empty); otherwise (or if the try failed) attaches a window 'resize' listener calling resync.",
+            "Bootstrap: runs bindResize() on 'DOMContentLoaded' or immediately, same conditional idiom as the playhead-sync packet above."
+          ],
+          "callers": [
+            "resync/bindResize are private to this IIFE and are not called from outside it.",
+            "bindResize's own bootstrap call at line 4013 is the only invocation of bindResize.",
+            "resync is invoked only by the ResizeObserver callback or the window 'resize' listener it installs."
+          ],
+          "effects": "Registers an observer/listener at module load. Its rAF-scheduled callback calls the full renderTimeline() render pipeline (see the render-timeline packet below) — this is the one call site inside C19m's own assigned ranges where renderTimeline is invoked, rather than merely defined."
+        },
+        {
+          "id": "C19m.scroll-snapshot-restore",
+          "files": [
+            "src/js/timeline.js:4015-4025"
+          ],
+          "coverage_ranges": [
+            [
+              4015,
+              4025
+            ]
+          ],
+          "classification": {
+            "code": 11,
+            "comment": 0,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_tlScrollSnapshot",
+            "_tlScrollRestore"
+          ],
+          "signature": "_tlScrollSnapshot() -> {wrap, panel, top, left, panelTop}; _tlScrollRestore(s) -> undefined",
+          "responsibility": "Implements the CLAUDE.md §11 scroll-preservation invariant: every render below wipes #frame-grid/#layer-list with innerHTML='', which drops scrollTop/scrollLeft to 0; capturing before and restoring after keeps a drag/edit from snapping the timeline back to the top mid-gesture.",
+          "behavior": [
+            "_tlScrollSnapshot (4015-4019): reads #fg-wrap and #layer-list by id (may be null) and returns an object carrying both DOM refs plus wrap.scrollTop/scrollLeft (0 if wrap is null) and panel.scrollTop (0 if panel is null) at call time.",
+            "_tlScrollRestore (4021-4025): returns immediately if passed a falsy snapshot; otherwise, if s.wrap exists, writes scrollTop/scrollLeft back onto it, and if s.panel exists, writes scrollTop back onto it. No return value."
+          ],
+          "callers": [
+            "renderTimeline (this packet) snapshots at line 4027 (its very first statement) and restores at line 4342 (its very last statement before the closing brace) — the pattern this packet's own coverage_note attributes to CLAUDE.md §11.",
+            "renderLayerList (outside this packet, later in timeline.js) snapshots at line 6348 and restores at lines 6355 and 6792 — the same invariant applied to the left-hand layer-list panel."
+          ],
+          "effects": "Snapshot is a pure read (plus object allocation); restore is a DOM scrollTop/scrollLeft write only. Neither touches state, history or the render pipeline."
+        },
+        {
+          "id": "C19m.render-timeline",
+          "files": [
+            "src/js/timeline.js:4026-4192",
+            "src/js/timeline.js:4230-4330",
+            "src/js/timeline.js:4333-4343"
+          ],
+          "coverage_ranges": [
+            [
+              4026,
+              4192
+            ],
+            [
+              4230,
+              4330
+            ],
+            [
+              4333,
+              4343
+            ]
+          ],
+          "classification": {
+            "code": 90,
+            "comment": 189,
+            "whitespace": 0
+          },
+          "symbols": [
+            "renderTimeline"
+          ],
+          "signature": "renderTimeline() -> undefined",
+          "responsibility": "Full rebuild of the right-hand timeline ruler (#frame-hdr) and grid (#frame-grid) from state, split by state.appMode into a Motion early return and an Animation2D tail; wraps the whole rebuild in the §11 scroll-snapshot/restore pair and delegates row content, playhead position, marker/BPM/audio overlays and the tween-curve/graph-editor post-passes to their existing owners.",
+          "behavior": [
+            "Snapshot/ruler (4026-4051 in-scope): `_tlScrollSnapshot()` first; clears #frame-hdr and #frame-grid via innerHTML=''; computes an adaptive frame-number/second tick step (`_frameStep`/`_secStep`/`_tickStep`) from a fixed ladder [1,2,5,...,5000] so ruler labels keep >=46px apart regardless of zoom or timeline length (2026-09-03 fix for overlapping labels on long timelines), preferring an fps divisor for the frame step once frame and second labels must coexist so ticks don't fall unevenly against second boundaries.",
+            "Ruler cell loop (4052-4090ish, in-scope): for i in 0..state.totalFrames-1, creates one `.fhc` div per frame, marks the current-frame cell '.cur', and classifies each cell as a labeled second ('sec', text `Ns` using 1-based `i/fps` rounding so the boundary lands exactly at frame index `fps`, not `fps-1` — a 2026-07-25 off-by-one fix noted as previously misaligning every external frame/seconds conversion by one frame), a major frame-number tick ('tick tickMaj', 1-based i+1, only when far enough from the nearest labeled second via `_farFromSec`), or a minor tick ('tick').",
+            "Explicit width sizing (4091-4176, in-scope): computes `gridMinWidth=Math.max(state.totalFrames*FC, fgWrap.clientWidth)` and applies it to #bars-row, #frame-hdr and #frame-grid explicitly, because each is cross-axis-sized by flexbox (column-direction children) rather than by its own content — three separate 2026-07 bugs (seam between ruler and dark background, layers bleeding through the ruler area, selected-row highlight not reaching the timeline's real end) all traced to the same root cause and fixed the same way. Calls `SMTimelineZoom.redraw()` (line 4170, resyncing the custom zoom scrollbar's thumb against a totalFrames change from elsewhere, e.g. frame insert/delete or project load) and `window.updateWaBar()` (line 4171).",
+            "Mode branch (4177-4192, in-scope prologue only): `if(state.appMode==='motion')` opens a block whose SMCamera/SMMotion render calls, its own playhead left/flag writes and its own SMAudio.renderStrip() call (lines 4193-4228) plus the block's `return;` sit at lines 4193-4229, which are C02-owned and excluded (see boundaries). The branch's own explanatory comments (4177-4192) — documenting why Motion needs an early return, why it lacks a fixed rowCount formula, and three dated bugs the branch previously caused by omission (frozen playhead, missing camera row, missing audio strip) — are in-scope as comment lines even though the code they describe starts at 4193.",
+            "Animation2D branch resumes at 4230 after the omitted 4193-4229 gap and the omitted single line 4229 (SMCamera.renderGridRow(grid) for this branch, also C02-owned, the last line before this packet's second coverage_range begins): iterates `computeLayerRenderOrder()` (line 4239, folder-aware order matching renderLayerList so both panels' rows line up); for a 'folder' entry, appends a `.frow.ffolder` spacer row, optionally populating it with the representative member's own keyframe cells via `renderKeyframeCellsInto` (line 4254) when the folder is collapsed (so a collapsed Stroke/Fill/Shadow folder shows its synced keyframes instead of appearing empty); for a hidden entry, skips it entirely; otherwise appends a real `.frow` (marked '.act' if it is the active layer), sets `row.dataset.layer=li` (so DOM-index-based lookups work in both modes, a 2026-07-25 fix), calls `installLayerReorderGrip(row,li)` (line 4270) for the drag-to-reorder grip, adds extra row height from `layerCurveRowExtraHeight(li)` (line 4277) when a tween-curve strip needs it, computes `contentIdxs` (a sibling-layer index list) when the entry is a collapsed link-group head so its keyframe dots reflect ANY member's content rather than only the topmost-rendered member's (another 2026-07 fix), and calls `renderKeyframeCellsInto(row,li,contentIdxs)` (line 4300) to populate the row's per-frame cells.",
+            "Shape-tree spacer rows (4301-4314, in-scope): when `window._layerShapesExpanded[li]` is set and `SMMotion.shapeTreeRowPlan` exists, appends one `.frow.motion-group-row` header spacer plus one blank `.frow` per remaining plan entry, mirroring renderLayerList's own renderShapeTreeRowsInto row count with no content (frame data is per-layer, not per-shape).",
+            "Playhead/marker/audio tail (4315-4333, split by the omitted 4331-4332 gap): after the layer loop, sets #playhead's left via `playheadLeftPx(state.currentFrame)` (line 4327), calls `syncPlayheadToViewport()` (line 4328, this packet's own playhead-viewport-sync function) to set top/height, and sets #playhead-flag's text to the 1-based current frame. `SMMarkers.render()`/`SMBpm.render()` (lines 4331-4332) are C02-owned and excluded. `SMAudio.renderStrip()` (line 4333, in-scope again) resumes the tail, drawing the same waveform/name/mute/level rows as the Motion branch's own (excluded) call.",
+            "Post-passes and restore (4334-4343, in-scope): calls `renderTweenCurveStrips()` unconditionally (line 4334); when `SMMotionGraph.isOn()`, hides #frame-grid (`style.visibility='hidden'`) and calls `SMMotionGraph.render()` over the same box, since renderTimeline's own innerHTML wipe would otherwise silently drop the graph editor on every rebuild; finally calls `_tlScrollRestore(_scroll)` (line 4342) as the function's last statement."
+          ],
+          "callers": [
+            "Called from within this packet's own grid-resize-resync IIFE at (out-of-packet) line 4002 (`if(typeof renderTimeline==='function')renderTimeline();`).",
+            "Called from timeline.js itself at 37 other sites outside this packet (e.g. lines 433, 477, 918, 942, 954, 1034, 1117, 1126...6766, 10121, 10131, 10941) after layer/tool/folder/matte/frame-link mutations.",
+            "Called extensively (118 sites) from src/js/motion.js after almost every Motion-mode edit (key add/delete/move, parent/effects/blend changes, layer rename, shape-tree operations, expression edits, etc.) — representative sites: 341, 691, 712, 819, 872, 890, 1024, 1061, 1077, ... 13736.",
+            "Called from src/js/camera.js (2 sites: 397 context-menu delete-camera-layer, 624 after camera edits), src/js/layer-inout.js (6 sites: 504, 1301, 1317, 1510, 1557, 1565, after in/out-point edits and time-link changes), src/js/nemo-script.js (4 sites: 102, 107, 594, 665), src/js/tools.js (2 sites: 8438, 8467), src/js/app.js (3 sites: 1879, 4978, 5109), src/js/select-bridge.js (1 site: 950), src/js/markers.js (1 site: 86), src/js/motion-graph.js (1 site: 444), src/js/rig-widget.js (1 site: 547), src/js/text-animator.js (1 site: 244), src/js/text-animator-panel.js (1 site: 85), src/js/timeline-zoom.js (1 site: 99), src/js/bootstrap/opacity-application.js (1 site: 12), and one call site each in src/js/labs/boil-effect.js (61), follow-path.js (105), interval-assistant.js (61), labs/timeline-zoom.js (44), multiframe-draw.js (77), pingpong-cycle.js (54), retime-exposure.js (61) and rig-deform.js (231) after their respective per-frame/per-layer edits.",
+            "Grep of the entire src/js tree at the frozen SHA (git ls-tree -r src/js, 157 files) for the literal `renderTimeline(` found 218 total text matches; after excluding lines whose trimmed text starts with `//` (comment mentions) and the `function renderTimeline(` declaration itself, 188 are genuine call sites across 23 files, with the count-by-file distribution given above (37 in timeline.js itself, 118 in motion.js, the remainder spread one-to-ten per file across camera.js/layer-inout.js/nemo-script.js/tools.js/app.js and 16 single-call-site files)."
+          ],
+          "effects": "Rebuilds #frame-hdr/#frame-grid DOM from scratch every call (measured elsewhere in this file's own comments at 9.9ms/10 layers, 27.7ms/40 layers, CLAUDE.md §5bis); writes #playhead/#playhead-flag/#bars-row/#frame-hdr/#frame-grid inline styles; calls into SMTimelineZoom, SMMotion, SMMotionGraph, SMAudio, SMCamera and (in the excluded C02 gaps only) SMMarkers/SMBpm. Reads state.fps/totalFrames/currentFrame/appMode/activeLayerIdx/layers/layerFolders/layerLinkGroups and window._layerShapesExpanded but performs no assignment to any of them (verified: no `state.` or `window._layerShapesExpanded` assignment appears anywhere in lines 4026-4343 outside the excluded gaps). A direct text search of the full function body (4026-4343, both excluded gaps included) for `pushUndo`, any `save`-prefixed identifier, `loadFrame`, `undo`, `redo` or `history` found zero real matches (one false-positive substring, French `redondants` containing `redo`) — renderTimeline is confirmed history/save/load-free end to end, consistent with it being a pure render adapter that other code calls AFTER mutating and (where applicable) saving/pushing history itself."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "None of the six packets calls pushUndo or any save*-prefixed writer. renderTimeline's full body (including the two C02-owned embedded gaps) was searched directly and contains no such call; it is invoked only after other code has already mutated and, where required, saved state."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No loadFrame call anywhere in this scope. The scroll-snapshot/restore pair and playhead sync operate purely on DOM scroll/style properties, independent of frame loading."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "No pushUndo/undo/redo reference anywhere in this scope (verified by direct text search of the full 3917-4343 span). History effects are entirely the responsibility of the ~190 call sites that invoke renderTimeline after their own mutation/undo bookkeeping."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "No selectedPaths/_fsSel/selection reference in this scope beyond one unrelated comment mentioning a 'selected layer' highlight bug. renderTimeline reads state.activeLayerIdx only to mark one row '.act' and to size the ruler."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "Reads state.currentFrame/totalFrames/fps/layers/layerFolders/layerLinkGroups to build ruler ticks and per-layer rows, and delegates actual per-frame cell content to renderKeyframeCellsInto (outside this packet). It performs no animation-data mutation itself; the Motion-mode keyframe row implementation stays with SMMotion.renderTimelineMotion (called only inside the excluded C02 gap at line 4194)."
+    },
+    {
+      "consumer": "render",
+      "disposition": "This scope IS the render/DOM-sync layer: ruler tick computation, explicit grid width sizing (three related 2026-07 bugs fixed the same way), row DOM construction with folder/link-group/shape-tree awareness, playhead viewport pinning (§11), resize-triggered re-render coalesced via rAF, and post-pass integration with SMTimelineZoom/SMMotionGraph. All are DOM writers with no separate persistence path."
+    },
+    {
+      "consumer": "export",
+      "disposition": "No export/SMEngineBridge/Tauri/native reference anywhere in this scope (verified by direct text search; the one textual match was an unrelated comment about 'camera export' timing semantics). Export reads persisted state independently of this DOM render layer."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "No direct SMEngineBridge, Tauri command, filesystem or native IPC call occurs in any of these six packets."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "drag-state-initial-shape",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh module load, no drag yet started.",
+      "expected_effects": "_tlDrag exactly {active:false,startL:-1,startF:-1,ghost:null,moved:false,mode:null}; _toL/_toF/cursorDot absent until the out-of-scope gesture handler adds them."
+    },
+    {
+      "id": "camera-row-offset-presence",
+      "status": "proposed, unrun",
+      "initial_state": "Camera row present (compact 16px / active 34px per camera.js) vs. absent from #frame-grid.",
+      "expected_effects": "Returns the live measured height when `.frow.camrow` exists, else exactly 0; no caching across camera-tool toggles."
+    },
+    {
+      "id": "playhead-sync-guard-and-pin",
+      "status": "proposed, unrun",
+      "initial_state": "#fg-wrap/#playhead present/absent in isolation; a range of scrollTop/clientHeight values including 0 and a resize mid-scroll.",
+      "expected_effects": "Missing either element returns undefined with no write; otherwise top===scrollTop and height===max(0,clientHeight) exactly, `left` never touched."
+    },
+    {
+      "id": "playhead-sync-observer-fallback",
+      "status": "proposed, unrun",
+      "initial_state": "ResizeObserver available/unavailable/throwing on construction; a #tl-resize drag, a window resize, and a panel-collapse reflow, none of which fire a native scroll event.",
+      "expected_effects": "ResizeObserver path re-syncs on all three triggers; unavailable/throwing path falls back to a window resize listener only (panel-collapse without a window resize would NOT resync in that fallback, an asymmetry worth flagging in a future oracle)."
+    },
+    {
+      "id": "grid-resize-resync-coalescing",
+      "status": "proposed, unrun",
+      "initial_state": "N resize notifications fired within one animation frame window.",
+      "expected_effects": "Exactly one renderTimeline() call per rAF tick regardless of N (pending-flag coalescing), and zero calls if renderTimeline is not yet a function at fire time."
+    },
+    {
+      "id": "grid-resize-observer-fallback",
+      "status": "proposed, unrun",
+      "initial_state": "ResizeObserver unavailable, or its constructor throws inside the try/catch.",
+      "expected_effects": "Falls back to a window 'resize' listener; a thrown constructor is swallowed silently (empty catch body) with no re-throw and no secondary registration beyond the fallback."
+    },
+    {
+      "id": "scroll-snapshot-restore-round-trip",
+      "status": "proposed, unrun",
+      "initial_state": "#fg-wrap/#layer-list present with nonzero scrollTop/scrollLeft/panel scrollTop; one or both absent; renderTimeline's own innerHTML wipe in between snapshot and restore.",
+      "expected_effects": "Present elements restore their exact prior scrollTop/scrollLeft/panelTop after the wipe and rebuild; absent elements are silently skipped on both snapshot and restore with no throw."
+    },
+    {
+      "id": "render-timeline-ruler-tick-ladder",
+      "status": "proposed, unrun",
+      "initial_state": "A range of fps (e.g. 12/24/30/60) and FC (pixel-per-frame zoom) values, including ones requiring the >=46px ladder fallback beyond 5000.",
+      "expected_effects": "Second labels land at exact multiples of fps (not fps-1); frame-number ticks appear only when far enough from the nearest labeled second; minor ticks disappear once the computed tick step reaches half a second."
+    },
+    {
+      "id": "render-timeline-explicit-width-sizing",
+      "status": "proposed, unrun",
+      "initial_state": "state.totalFrames*FC less than vs. greater than #fg-wrap.clientWidth.",
+      "expected_effects": "#bars-row/#frame-hdr/#frame-grid all receive the same Math.max(...) width; a short scene fills the panel and a long/zoomed one scrolls to its true end, with no seam between #bars-row and the ruler background."
+    },
+    {
+      "id": "render-timeline-mode-branch-and-omitted-gaps",
+      "status": "proposed, unrun",
+      "initial_state": "state.appMode 'motion' vs. any other value, each exercised with and without window.SMCamera/SMMotion/SMAudio present.",
+      "expected_effects": "Motion branch executes lines 4193-4229 (C02-owned, not asserted here beyond call presence) and returns before reaching the Animation2D layer loop; Animation2D branch executes the omitted single line 4229 then resumes in-scope behavior at 4230; both branches eventually call syncPlayheadToViewport and set #playhead-flag text, closing the 2026-07 'frozen Motion playhead' bug this file's own comments describe."
+        },
+    {
+      "id": "render-timeline-folder-linkgroup-shapetree-rows",
+      "status": "proposed, unrun",
+      "initial_state": "computeLayerRenderOrder entries mixing plain layers, hidden layers, collapsed/expanded folders, collapsed linked Stroke/Fill/Shadow groups, and layers with window._layerShapesExpanded set.",
+      "expected_effects": "Folder entries add exactly one spacer row (plus a populated one when collapsed with a keyLayerIdx); hidden entries add none; collapsed link-group heads pass every sibling index as contentIdxs so keyframe dots reflect any member's content; shape-tree-expanded layers add one header spacer plus one blank spacer per remaining plan entry, matching renderLayerList's row count exactly."
+    },
+    {
+      "id": "render-timeline-no-history-save-load",
+      "status": "proposed, unrun",
+      "initial_state": "Instrumented pushUndo/save*/loadFrame/undo/redo to detect any call during a full renderTimeline() invocation across both mode branches.",
+      "expected_effects": "Zero invocations of any of the above across both branches and every row/folder/shape-tree/graph-editor code path — consistent with the direct source-text search recorded in this artifact."
+    },
+    {
+      "id": "render-timeline-post-pass-integration",
+      "status": "proposed, unrun",
+      "initial_state": "SMMotionGraph.isOn() true/false; SMTimelineZoom/SMAudio/SMMarkers/SMBpm present/absent.",
+      "expected_effects": "Graph-editor branch hides #frame-grid and re-renders the graph over the same box every single call (since innerHTML='' would otherwise silently drop it); each optional integration is skipped cleanly (no throw) when its window global is absent."
+    },
+    {
+      "id": "consumer-round-trips",
+      "status": "proposed, unrun",
+      "initial_state": "The ~188 real call sites across 22 files, exercised through their own separately-owned mutation/save/undo paths before calling renderTimeline.",
+      "expected_effects": "Only the caller's own persisted mutations are reflected on the next renderTimeline() call; this artifact does not certify any individual caller's correctness."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "planTimelineRulerTicks(fps,FC,totalFrames) -> TickPlan",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure ladder/divisor computation extracted from the ruler-cell loop; DOM cell creation stays an adapter."
+    },
+    {
+      "api": "planPlayheadViewportPin(wrapMetrics) -> {top,height}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure function of scrollTop/clientHeight; the DOM read/write and observer wiring remain adapters, matching the existing guard-then-write split."
+    },
+    {
+      "api": "planGridResizeResync(pendingFlag,hasRenderTimeline) -> ResyncDecision",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Coalescing decision only; rAF scheduling and the renderTimeline() call itself stay in the adapter."
+    },
+    {
+      "api": "planScrollPreservation(before,rebuildFn) -> after",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Generalizes the snapshot/restore pair already shared by renderTimeline and (out-of-scope) renderLayerList into one higher-order helper; does not change either caller's own DOM ids."
+    },
+    {
+      "api": "planTimelineRowOrder(order,folderState,linkGroupState,shapeTreeState) -> RowPlan[]",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure per-row classification (folder spacer / hidden / real row / shape-tree spacer, plus contentIdxs) separated from DOM construction and from computeLayerRenderOrder's own ordering, which remains a separate out-of-scope port."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "symbols": [
+      "_tlDrag",
+      "camGridRowOffset",
+      "syncPlayheadToViewport",
+      "bindPlayheadScrollSync",
+      "resync",
+      "bindResize",
+      "_tlScrollSnapshot",
+      "_tlScrollRestore",
+      "renderTimeline"
+    ],
+    "callers": [
+      "grid-resize-resync's own resync() at line 4002 (in-file, out-of-packet)",
+      "timeline.js itself, 37 sites (representative: 433, 477, 918, 942, 954, 1034, 1117, 1126, 5682, 6150, 6766, 10121, 10131, 10941)",
+      "motion.js, 118 sites (representative: 341, 691, 819, 6770, 8519, 11660, 12829, 13736)",
+      "camera.js:397,624; layer-inout.js:504,1301,1317,1510,1557,1565; nemo-script.js:102,107,594,665; tools.js:8438,8467; select-bridge.js:950; markers.js:86; motion-graph.js:444; rig-widget.js:547; text-animator.js:244; text-animator-panel.js:85; timeline-zoom.js:99; bootstrap/opacity-application.js:12",
+      "labs/*.js single call sites: boil-effect.js:61, follow-path.js:105, interval-assistant.js:61, multiframe-draw.js:77, pingpong-cycle.js:54, retime-exposure.js:61, rig-deform.js:231",
+      "frame-cell drag mousemove (out-of-packet) reads camGridRowOffset at line 5293 and _tlDrag throughout 5122-5418",
+      "renderLayerList (out-of-packet) reuses _tlScrollSnapshot/_tlScrollRestore at lines 6348, 6355, 6792",
+      "updateUI's frameOnly contract at line 2745 (C19h-owned) chooses updatePlayhead() over renderTimeline() when only state.currentFrame changed, per CLAUDE.md §5bis"
+    ],
+    "helper_anchors": [
+      "timeline.js playheadLeftPx at line 191 and updatePlayhead at lines 192-207 (C02-owned per C19a)",
+      "timeline.js computeLayerRenderOrder at line 5600 (out-of-packet, forward-referenced from line 4239)",
+      "timeline.js renderKeyframeCellsInto at line 4725 (out-of-packet, forward-referenced from lines 4254, 4300)",
+      "timeline.js layerCurveRowExtraHeight at line 4382 (out-of-packet, forward-referenced from line 4277)",
+      "timeline.js installLayerReorderGrip at line 6818 (out-of-packet, forward-referenced from line 4270)",
+      "timeline.js renderTweenCurveStrips at line 4426 (out-of-packet, forward-referenced from line 4334)",
+      "motion.js SMMotion.renderTimelineMotion/shapeTreeRowPlan (called at lines 4194 [excluded] and 4307-4309 [in-scope call site only])"
+    ],
+    "boundary_assertion": "Line 3916 is excluded (C19l); line 3917 starts this scope. Lines 4193-4229 and 4331-4332 are excluded (C02); the render-timeline packet's three coverage_ranges (4026-4192, 4230-4330, 4333-4343) skip both exactly. Line 4343 closes the scope; line 4344 (tween-easing curve strips heading) is excluded."
+  },
+  "validation": {
+    "expected_assigned_lines": 388,
+    "expected_classification": {
+      "code": 144,
+      "comment": 242,
+      "whitespace": 2
+    },
+    "packet_partition": [
+      [
+        3917,
+        3919
+      ],
+      [
+        3920,
+        3930
+      ],
+      [
+        3931,
+        3983
+      ],
+      [
+        3984,
+        4014
+      ],
+      [
+        4015,
+        4025
+      ],
+      [
+        4026,
+        4192
+      ],
+      [
+        4230,
+        4330
+      ],
+      [
+        4333,
+        4343
+      ]
+    ],
+    "packet_classification": [
+      {
+        "range": [
+          3917,
+          3919
+        ],
+        "code": 1,
+        "comment": 1,
+        "whitespace": 1
+      },
+      {
+        "range": [
+          3920,
+          3930
+        ],
+        "code": 4,
+        "comment": 6,
+        "whitespace": 1
+      },
+      {
+        "range": [
+          3931,
+          3983
+        ],
+        "code": 19,
+        "comment": 34,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          3984,
+          4014
+        ],
+        "code": 19,
+        "comment": 12,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          4015,
+          4025
+        ],
+        "code": 11,
+        "comment": 0,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          4026,
+          4192
+        ],
+        "code": 42,
+        "comment": 125,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          4230,
+          4330
+        ],
+        "code": 40,
+        "comment": 61,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          4333,
+          4343
+        ],
+        "code": 8,
+        "comment": 3,
+        "whitespace": 0
+      }
+    ],
+    "coverage_contract": "Validate assigned_ranges and flattened areas[].packets[].coverage_ranges independently, then use the same function for canonical, omission and overlap controls.",
+    "negative_controls": [
+      "omit3917",
+      "overlap4192"
+    ],
+    "required_checks": [
+      "pinned/current blob and base ancestry",
+      "complete symbols/helpers/callers/boundaries",
+      "eight consumers and unrun fixtures",
+      "renderTimeline confirmed free of pushUndo/save/loadFrame/undo/redo calls by direct text search",
+      "C02 embedded-gap exclusion (4193-4229, 4331-4332) recorded as boundaries, not claimed",
+      "P30/C02/C19l/C19h preservation",
+      "JSON/private-path/trailing whitespace hygiene",
+      "sole untracked artifact or committed-clean mode"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, runtime correction, source edit or product acceptance claim."
+  }
+}
