@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "f29e7926ddef0a1527e1b36385069865cfd36cb8",
-  "describe": "v0.7.0-alpha.4-339-gf29e792-dirty"
+  "head": "579bfe814427f39478083ab91fcf96d8559aec7a",
+  "describe": "v0.7.0-alpha.4-343-g579bfe8-dirty"
  },
- "inputsDigest": "353248624054b6439c11ef027c43f61488d8a51b6f97b95f8c91fbbcdbc8f66c",
+ "inputsDigest": "c1e609b02844fd45478979aa6e072d0b362c156f0f72bda22c63babdd53adb31",
  "states": [
   "inventoried",
   "characterized",
@@ -151,7 +151,7 @@
   },
   "SMEngineBridge": {
    "file": "src/js/engine-bridge.js",
-   "line": 4524,
+   "line": 4493,
    "members": 21
   },
   "SMExprPanel": {
@@ -679,7 +679,7 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 174,
+    "functionsVisited": 175,
     "via": "variable _btnAlphaBg",
     "references": []
    },
@@ -1039,7 +1039,7 @@
     "container": "camera-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 209,
+    "functionsVisited": 210,
     "via": "variable addKey",
     "references": [
      "src/js/camera.js:596 updateCameraPanel()"
@@ -1135,7 +1135,7 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 516,
+    "functionsVisited": 517,
     "via": "variable btn",
     "references": [
      "src/js/motion.js:7405 action()"
@@ -2106,7 +2106,7 @@
     "container": "ellipse-arc-convert-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 197,
+    "functionsVisited": 198,
     "via": "chain",
     "references": []
    },
@@ -2237,7 +2237,7 @@
     "container": "p-fillpropagate-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 427,
+    "functionsVisited": 428,
     "via": "variable propBtn",
     "references": []
    },
@@ -2458,7 +2458,7 @@
     "container": "p-grad-addstop-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 218,
+    "functionsVisited": 219,
     "via": "chain",
     "references": []
    },
@@ -2548,7 +2548,7 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 179,
+    "functionsVisited": 180,
     "via": "helper el()",
     "references": []
    },
@@ -2853,7 +2853,7 @@
     "container": "comp-instance-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 424,
+    "functionsVisited": 425,
     "via": "variable btn",
     "references": []
    },
@@ -2942,7 +2942,7 @@
     "container": "mask-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 382,
+    "functionsVisited": 383,
     "via": "chain",
     "references": []
    },
@@ -4260,7 +4260,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 174,
+    "functionsVisited": 175,
     "via": "chain",
     "references": []
    },
@@ -4305,7 +4305,7 @@
     "container": "rig-assign-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 203,
+    "functionsVisited": 204,
     "via": "chain",
     "references": []
    },
@@ -4398,7 +4398,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 168,
+    "functionsVisited": 169,
     "via": "chain",
     "references": [
      "src/js/timeline.js:11519 renderRigModeUI()",
@@ -4447,7 +4447,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 168,
+    "functionsVisited": 169,
     "via": "chain",
     "references": [
      "src/js/timeline.js:11519 renderRigModeUI()",
@@ -4496,7 +4496,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 168,
+    "functionsVisited": 169,
     "via": "chain",
     "references": [
      "src/js/timeline.js:11519 renderRigModeUI()",
@@ -4547,7 +4547,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 204,
+    "functionsVisited": 205,
     "via": "chain",
     "references": []
    },
@@ -5513,7 +5513,7 @@
     "container": "comment-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 384,
+    "functionsVisited": 385,
     "via": "variable delBtn",
     "references": [
      "src/js/timeline.js:7869 openCommentPopover()"
@@ -5744,7 +5744,7 @@
     "container": "comment-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 390,
+    "functionsVisited": 391,
     "via": "variable saveBtn",
     "references": []
    },
@@ -8030,7 +8030,7 @@
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 221,
+    "functionsVisited": 222,
     "via": "variable sel",
     "references": []
    },
@@ -10279,7 +10279,7 @@
     "container": "onion-pop",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 163,
+    "functionsVisited": 164,
     "via": "variable currentOutlineChk",
     "references": []
    },
@@ -10724,7 +10724,7 @@
     "container": "p-fillgapclose-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 360,
+    "functionsVisited": 361,
     "via": "variable gcSel",
     "references": [
      "src/js/timeline.js:3449 updatePropsContext()"
@@ -10772,7 +10772,7 @@
     "container": "p-fillgapsize-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 165,
+    "functionsVisited": 166,
     "via": "variable gsInp",
     "references": [
      "src/js/timeline.js:3451 updatePropsContext()"
@@ -10820,7 +10820,7 @@
     "container": "p-grad-kind-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 210,
+    "functionsVisited": 211,
     "via": "chain",
     "references": [
      "src/js/gradient-bridge.js:88 renderGradientPanel()"
@@ -10959,7 +10959,7 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 187,
+    "functionsVisited": 188,
     "via": "helper el()",
     "references": [
      "src/js/image-mesh-bridge.js:317 renderImageMeshPanel()",
@@ -11008,7 +11008,7 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 163,
+    "functionsVisited": 164,
     "via": "helper el()",
     "references": [
      "src/js/image-mesh-bridge.js:311 renderImageMeshPanel()"
@@ -11106,7 +11106,7 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 187,
+    "functionsVisited": 188,
     "via": "helper el()",
     "references": [
      "src/js/image-mesh-bridge.js:317 renderImageMeshPanel()",
@@ -11209,7 +11209,7 @@
     "container": "mask-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 183,
+    "functionsVisited": 184,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2779 updateMaskPanel()"
@@ -11255,7 +11255,7 @@
     "container": "mask-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 191,
+    "functionsVisited": 192,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2775 updateMaskPanel()"
@@ -11467,7 +11467,7 @@
     "container": "p-nib-row",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 165,
+    "functionsVisited": 166,
     "via": "variable nibA",
     "references": [
      "src/js/timeline.js:3439 updatePropsContext()"
@@ -11515,7 +11515,7 @@
     "container": "p-nib-row",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 165,
+    "functionsVisited": 166,
     "via": "variable nibF",
     "references": [
      "src/js/timeline.js:3441 updatePropsContext()"
@@ -11883,7 +11883,7 @@
     "container": "onion-pop",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 204,
+    "functionsVisited": 205,
     "via": "variable tr",
     "references": []
    },
@@ -15044,7 +15044,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/engine-bridge.js:3690 buildRigPreviewItems())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/engine-bridge.js:3659 buildRigPreviewItems())",
    "source": "src/index.html:1577",
    "meta": {
     "data": {
@@ -15056,7 +15056,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/engine-bridge.js:3690 buildRigPreviewItems()",
+     "src/js/engine-bridge.js:3659 buildRigPreviewItems()",
      "src/js/rig-bridge.js:192 panelDefaultRadius()",
      "src/js/timeline.js:11543"
     ]
@@ -16169,7 +16169,7 @@
     "container": "text-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 426,
+    "functionsVisited": 427,
     "via": "variable save",
     "references": []
    },
@@ -16648,7 +16648,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 435,
+    "functionsVisited": 436,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8755 updateTextPropsPanel()",
@@ -16697,7 +16697,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 435,
+    "functionsVisited": 436,
     "via": "variable contentEl",
     "references": [
      "src/js/timeline.js:8744 updateTextPropsPanel()",
@@ -16748,7 +16748,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 435,
+    "functionsVisited": 436,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8768 updateTextPropsPanel()",
@@ -16798,7 +16798,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 435,
+    "functionsVisited": 436,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8751 updateTextPropsPanel()",
@@ -16979,7 +16979,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 435,
+    "functionsVisited": 436,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8760 updateTextPropsPanel()",
@@ -17030,7 +17030,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 435,
+    "functionsVisited": 436,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8762 updateTextPropsPanel()",
@@ -17081,7 +17081,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 435,
+    "functionsVisited": 436,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8753 updateTextPropsPanel()",
@@ -17132,7 +17132,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 435,
+    "functionsVisited": 436,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8764 updateTextPropsPanel()",
@@ -17527,7 +17527,7 @@
     "container": "canvas-zoom-pills",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 215,
+    "functionsVisited": 216,
     "via": "chain",
     "references": [
      "src/js/app.js:527 updZoom()"
@@ -19700,7 +19700,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 206,
+    "functionsVisited": 207,
     "via": "callback btn",
     "references": []
    },
@@ -19746,7 +19746,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 206,
+    "functionsVisited": 207,
     "via": "callback btn",
     "references": []
    },
@@ -19792,7 +19792,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 206,
+    "functionsVisited": 207,
     "via": "callback btn",
     "references": []
    },
@@ -19838,7 +19838,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 206,
+    "functionsVisited": 207,
     "via": "callback btn",
     "references": []
    },
@@ -19884,7 +19884,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 206,
+    "functionsVisited": 207,
     "via": "callback btn",
     "references": []
    },
@@ -19930,7 +19930,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 206,
+    "functionsVisited": 207,
     "via": "callback btn",
     "references": []
    },
@@ -19976,7 +19976,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 206,
+    "functionsVisited": 207,
     "via": "callback btn",
     "references": []
    },
@@ -20022,7 +20022,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 206,
+    "functionsVisited": 207,
     "via": "callback btn",
     "references": []
    },
@@ -20068,7 +20068,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 206,
+    "functionsVisited": 207,
     "via": "callback btn",
     "references": []
    },
@@ -23142,7 +23142,7 @@
    "source": "src/js/layer-inout.js:1557",
    "meta": {
     "i18n": null,
-    "functionsVisited": 274
+    "functionsVisited": 275
    },
    "fixtures": [
     "static-props",
@@ -24199,7 +24199,7 @@
    "source": "src/js/motion.js:10579",
    "meta": {
     "i18n": "ctxDeleteThisKey",
-    "functionsVisited": 461
+    "functionsVisited": 462
    },
    "fixtures": [
     "static-props",
@@ -24241,7 +24241,7 @@
    "source": "src/js/motion.js:10974",
    "meta": {
     "i18n": "ctxDeleteThisKey",
-    "functionsVisited": 253
+    "functionsVisited": 254
    },
    "fixtures": [
     "static-props",
@@ -24283,7 +24283,7 @@
    "source": "src/js/motion.js:10977",
    "meta": {
     "i18n": "ctxAddKeyHere",
-    "functionsVisited": 473
+    "functionsVisited": 474
    },
    "fixtures": [
     "static-props",
@@ -24517,7 +24517,7 @@
    "source": "src/js/motion.js:11010",
    "meta": {
     "i18n": "ctxDistributeEvenly",
-    "functionsVisited": 259
+    "functionsVisited": 260
    },
    "fixtures": [
     "static-props",
@@ -24559,7 +24559,7 @@
    "source": "src/js/motion.js:11011",
    "meta": {
     "i18n": "ctxFlipOrder",
-    "functionsVisited": 259
+    "functionsVisited": 260
    },
    "fixtures": [
     "static-props",
@@ -24601,7 +24601,7 @@
    "source": "src/js/motion.js:11012",
    "meta": {
     "i18n": "ctxSubdivideMidpoint",
-    "functionsVisited": 476
+    "functionsVisited": 477
    },
    "fixtures": [
     "static-props",
@@ -26247,7 +26247,7 @@
    "source": "src/js/motion.js:8323",
    "meta": {
     "i18n": "menuRemoveThisParent",
-    "functionsVisited": 457
+    "functionsVisited": 458
    },
    "fixtures": [
     "static-props",
@@ -26289,7 +26289,7 @@
    "source": "src/js/motion.js:8400",
    "meta": {
     "i18n": "ctxUnlinkTime",
-    "functionsVisited": 471
+    "functionsVisited": 472
    },
    "fixtures": [
     "static-props",
@@ -27072,7 +27072,7 @@
    "source": "src/js/motion.js:9878",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 475
+    "functionsVisited": 476
    },
    "fixtures": [
     "static-props",
@@ -27196,7 +27196,7 @@
    "source": "src/js/motion.js:9923",
    "meta": {
     "i18n": "elementsDelete",
-    "functionsVisited": 522
+    "functionsVisited": 523
    },
    "fixtures": [
     "static-props",
@@ -27905,7 +27905,7 @@
    "source": "src/js/select-bridge.js:3095",
    "meta": {
     "i18n": null,
-    "functionsVisited": 192
+    "functionsVisited": 193
    },
    "fixtures": [
     "static-props",
@@ -27945,7 +27945,7 @@
    "source": "src/js/select-bridge.js:3102",
    "meta": {
     "i18n": null,
-    "functionsVisited": 192
+    "functionsVisited": 193
    },
    "fixtures": [
     "static-props",
@@ -27985,7 +27985,7 @@
    "source": "src/js/select-bridge.js:3118",
    "meta": {
     "i18n": null,
-    "functionsVisited": 376
+    "functionsVisited": 377
    },
    "fixtures": [
     "static-props",
@@ -28558,7 +28558,7 @@
    "source": "src/js/shapes-panel.js:870",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 282
+    "functionsVisited": 283
    },
    "fixtures": [
     "static-props",
@@ -29909,7 +29909,7 @@
    "source": "src/js/timeline.js:5265",
    "meta": {
     "i18n": null,
-    "functionsVisited": 427
+    "functionsVisited": 428
    },
    "fixtures": [
     "keyed-props",
@@ -30060,7 +30060,7 @@
    "source": "src/js/timeline.js:5495",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 475
+    "functionsVisited": 476
    },
    "fixtures": [
     "keyed-props",
@@ -30175,7 +30175,7 @@
    "source": "src/js/timeline.js:5526",
    "meta": {
     "i18n": "fxDelete",
-    "functionsVisited": 522
+    "functionsVisited": 523
    },
    "fixtures": [
     "keyed-props",
@@ -30214,7 +30214,7 @@
    "source": "src/js/timeline.js:5951",
    "meta": {
     "i18n": null,
-    "functionsVisited": 192
+    "functionsVisited": 193
    },
    "fixtures": [
     "keyed-props",
@@ -30253,7 +30253,7 @@
    "source": "src/js/timeline.js:5958",
    "meta": {
     "i18n": null,
-    "functionsVisited": 192
+    "functionsVisited": 193
    },
    "fixtures": [
     "keyed-props",
@@ -30292,7 +30292,7 @@
    "source": "src/js/timeline.js:5974",
    "meta": {
     "i18n": null,
-    "functionsVisited": 181
+    "functionsVisited": 182
    },
    "fixtures": [
     "keyed-props",
@@ -30331,7 +30331,7 @@
    "source": "src/js/timeline.js:5981",
    "meta": {
     "i18n": null,
-    "functionsVisited": 181
+    "functionsVisited": 182
    },
    "fixtures": [
     "keyed-props",
@@ -30370,7 +30370,7 @@
    "source": "src/js/timeline.js:6001",
    "meta": {
     "i18n": null,
-    "functionsVisited": 178
+    "functionsVisited": 179
    },
    "fixtures": [
     "keyed-props",
@@ -30409,7 +30409,7 @@
    "source": "src/js/timeline.js:6009",
    "meta": {
     "i18n": null,
-    "functionsVisited": 178
+    "functionsVisited": 179
    },
    "fixtures": [
     "keyed-props",
@@ -30448,7 +30448,7 @@
    "source": "src/js/timeline.js:6032",
    "meta": {
     "i18n": "ctxTimeNoneUnlink",
-    "functionsVisited": 179
+    "functionsVisited": 180
    },
    "fixtures": [
     "keyed-props",
@@ -30525,7 +30525,7 @@
    "source": "src/js/timeline.js:6080",
    "meta": {
     "i18n": null,
-    "functionsVisited": 173
+    "functionsVisited": 174
    },
    "fixtures": [
     "keyed-props",
@@ -30564,7 +30564,7 @@
    "source": "src/js/timeline.js:6090",
    "meta": {
     "i18n": null,
-    "functionsVisited": 173
+    "functionsVisited": 174
    },
    "fixtures": [
     "keyed-props",
@@ -32736,7 +32736,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:290",
    "meta": {
-    "functionsVisited": 165
+    "functionsVisited": 166
    },
    "fixtures": [
     "media",
@@ -33269,7 +33269,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:294",
    "meta": {
-    "functionsVisited": 165
+    "functionsVisited": 166
    },
    "fixtures": [
     "media",

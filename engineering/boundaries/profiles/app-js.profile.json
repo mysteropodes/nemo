@@ -1837,6 +1837,18 @@
       ]
     },
     {
+      "id": "app.render.imagebudget.application",
+      "layer": "application",
+      "dir": "src/js/application/render",
+      "files": [
+        "image-budget.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "image-budget.js"
+      ]
+    },
+    {
       "id": "app.export.job.application",
       "layer": "application",
       "dir": "src/js/application",

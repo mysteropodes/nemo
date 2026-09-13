@@ -20,28 +20,28 @@
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
     "candidateCommit": "35bcb02392bdd44c8d341c94c3ae6b505eb3379a",
-    "sourceRootTree": "09b3d66bf98ab42fde21bbf8e11d1a0da838cbf3",
+    "sourceRootTree": "426f049b1f83c5a5cd088126433aa19f16073cb8",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "34ddd16a79b607db3894c9075fc372780a2824ed",
+      "gitTree": "1c680644eac1fc3682d51e7e08cc9f469d9a52c9",
       "lastChangedCommit": "35bcb02392bdd44c8d341c94c3ae6b505eb3379a"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "9a337340211ef6d15557ba4c87286509a34de64a",
-      "sha256": "61449ebf812effc55c9811b943a49563b6b6a03271a3f21522daec610eba3e37",
+      "gitBlob": "79ed8f039c4f4b5f4cc987de546aa0cbc6076184",
+      "sha256": "b602c29bbc55e44141483b21ca0ac556474cc1f0ef0789273bfe2a68ec98d4c8",
       "lastChangedCommit": "9e5daae92a68799c8ba108064ddac8066af209e9"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "c49e975e2de7943500abe6df110cac95543649d32e8f5dabf8126afa901ab5a2"
+      "value": "dd6d922b7f3cfec29898211c7ca0116e50a963175994a95b94f5f98f62b42a97"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "29b40973ff32ee3e0e594e348c6f71b696ca887d",
-        "sha256": "ace9a4cca71409b23bbdf1f3ae616f55db5b4dbdd673699b9df388786416f688",
+        "gitBlob": "bcdb94c9b0d8b4243dd42d638ad006d8b599df56",
+        "sha256": "2894497c6ed8fb3a3298911e5882074f3f63fce0a65dcd4e8c9bf0d13c62b9fb",
         "moduleCount": 149,
         "basedOnCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1"
       },
@@ -334,6 +334,18 @@
           "path": "src/index.html",
           "line": 2372,
           "scriptOrdinal": 63
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/render/image-budget.js",
+      "moduleId": "app.render.imagebudget.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2456,
+          "scriptOrdinal": 124
         }
       ]
     },
@@ -2638,19 +2650,19 @@
     }
   ],
   "snapshotCounts": {
-    "selectedSources": 168,
+    "selectedSources": 169,
     "bySourceKind": {
-      ".js": 162,
+      ".js": 163,
       ".mjs": 2,
       ".cjs": 0,
       ".ts": 4
     },
-    "retainedSources": 156,
+    "retainedSources": 157,
     "exclusions": 12,
     "vendorExclusions": 6,
     "generatedExclusions": 6,
     "retainedExecutionClasses": {
-      "document-classic": 141,
+      "document-classic": 142,
       "document-module": 2,
       "classic-without-load-site": 12,
       "module-worker": 1

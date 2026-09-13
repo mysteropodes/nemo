@@ -625,55 +625,25 @@
   //
   // Policy: least-recently-USED (as in, last emitted into a scene), never
   // touching anything the CURRENT build references, down to a byte budget.
-  var _imgBytes = new Map();       // id -> decoded bytes held by the engine
-  var _imgLastUsed = new Map();    // id -> build tick when last emitted
-  var _imgUsedThisBuild = null;    // Set, non-null only during a scene build
-  var _imgTick = 0;
-  var _imgBudgetBytes = 384 * 1024 * 1024;
-  var _imgEvictions = 0;
-
-  function _noteImageRegistered(id, w, h) {
-    _imgBytes.set(id, w * h * 4);
-    // Counts as a USE, not merely a registration: an image is uploaded
-    // because the frame being built needs it, so it must join
-    // _imgUsedThisBuild or it becomes an eviction candidate the instant it
-    // arrives — measured, it evicted everything including what was on screen.
-    _touchImage(id);
-  }
+  // Bookkeeping + LRU policy live in application/render/image-budget.js
+  // (P26); this side keeps the two things only it can do: the
+  // `registeredImageIds` upload gate and the engine.retire_images call.
+  var _imageBudget = NemoImageBudget.create({ budgetBytes: 384 * 1024 * 1024 });
+  function _noteImageRegistered(id, w, h) { _imageBudget.noteRegistered(id, w, h); }
   // Called wherever an image id is emitted into the scene being built.
-  function _touchImage(id) {
-    _imgLastUsed.set(id, ++_imgTick);
-    if (_imgUsedThisBuild) _imgUsedThisBuild.add(id);
+  function _touchImage(id) { _imageBudget.touch(id); }
+  function _retireImages(ids) {
+    if (!engine || !engine.retire_images) return false;
+    engine.retire_images(JSON.stringify(ids));
+    return true;
   }
-  function _imgTotalBytes() {
-    var t = 0;
-    _imgBytes.forEach(function (b) { t += b; });
-    return t;
-  }
-  // Run at the END of a scene build, when `_imgUsedThisBuild` is exactly the
-  // set of ids this frame draws. Anything else is a candidate, oldest first.
+  // Run at the END of a scene build, when the current-build set is exactly
+  // the ids this frame draws. Dropping the JS-side gate is what makes the
+  // next use re-upload — registerRasterIfNeeded/registerCachedImage both
+  // early-out on it; the gate is cleared only for ids the engine retired.
   function enforceImageBudget() {
-    var total = _imgTotalBytes();
-    if (total <= _imgBudgetBytes || !engine || !engine.retire_images) return;
-    var cands = [];
-    _imgBytes.forEach(function (bytes, id) {
-      if (_imgUsedThisBuild && _imgUsedThisBuild.has(id)) return;   // on screen now
-      cands.push({ id: id, t: _imgLastUsed.get(id) || 0, b: bytes });
-    });
-    cands.sort(function (a, b) { return a.t - b.t; });
-    var drop = [];
-    for (var i = 0; i < cands.length && total > _imgBudgetBytes; i++) {
-      drop.push(cands[i].id); total -= cands[i].b;
-    }
-    if (!drop.length) return;
-    try { engine.retire_images(JSON.stringify(drop)); } catch (e) { return; }
-    for (var k = 0; k < drop.length; k++) {
-      // Dropping the JS-side gate is what makes the next use re-upload —
-      // registerRasterIfNeeded/registerCachedImage both early-out on it.
-      delete registeredImageIds[drop[k]];
-      _imgBytes.delete(drop[k]); _imgLastUsed.delete(drop[k]);
-    }
-    _imgEvictions += drop.length;
+    var dropped = _imageBudget.endBuild(_retireImages);
+    for (var k = 0; k < dropped.length; k++) delete registeredImageIds[dropped[k]];
   }
 
   function registerCachedImage(id, source) {
@@ -804,7 +774,7 @@
     // Opened here and closed at the return below: while a build is in flight
     // this collects every image id the frame actually draws, which is what
     // makes eviction safe (nothing on screen is ever a candidate).
-    _imgUsedThisBuild = new Set();
+    _imageBudget.beginBuild();
     var renderFrame = renderContext.frame != null ? renderContext.frame
       : (_fxFrameOverride != null ? _fxFrameOverride : state.currentFrame);
     var includeEditorOverlays = renderContext.includeEditorOverlays !== false;
@@ -2648,10 +2618,9 @@
     var frameForFx = renderFrame || 0;
     var fpsForFx = Math.max(1, state.fps || 24);
     var _sceneOut = JSON.stringify({ time: frameForFx / fpsForFx, layers: layers });
-    // Closes the build: `_imgUsedThisBuild` is now exactly what this frame
+    // Closes the build: the current-build set is now exactly what this frame
     // draws, which is the only moment eviction can be decided safely.
     enforceImageBudget();
-    _imgUsedThisBuild = null;
     return _sceneOut;
   }
 
@@ -4584,18 +4553,16 @@
     // Exposed so a project can be sized against a machine, and so the
     // eviction policy can be observed rather than assumed.
     imageStoreStats: function () {
+      var s = _imageBudget.stats();
       return {
-        jsBytes: _imgTotalBytes(),
+        jsBytes: s.jsBytes,
         engineBytes: (engine && engine.image_store_bytes) ? engine.image_store_bytes() : -1,
         engineCount: (engine && engine.image_store_size) ? engine.image_store_size() : -1,
-        budgetBytes: _imgBudgetBytes,
-        evictions: _imgEvictions,
+        budgetBytes: s.budgetBytes,
+        evictions: s.evictions,
       };
     },
-    // Math.floor, NOT `| 0`: bitwise coercion wraps at 2^31, so any budget
-    // above ~2.1GB silently became a tiny number (a 4GB budget landed on 1
-    // byte and evicted the whole store on the first frame).
-    setImageBudgetBytes: function (n) { _imgBudgetBytes = Math.max(1, Math.floor(n)); return _imgBudgetBytes; },
+    setImageBudgetBytes: function (n) { return _imageBudget.setBudgetBytes(n); },
     // Diagnostics: times the scene serialization in isolation. fps probes
     // aggregate loadFrame + Paper rebuild + engine render + browser paint,
     // which swamped the signal this change actually moves.
