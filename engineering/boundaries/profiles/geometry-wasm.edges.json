@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "kind": "rust-crate",
+  "policyId": "nemo.rust.geometry-wasm.edges",
+  "status": "adopted",
+  "purpose": "P12/#1014: permitted module edges, exported port and Cargo feature configuration of the geometry engine crate, enforced through the normal local boundaries lane by a Rust-aware analyzer (scripts/nemo/lib/boundaries-rust.cjs). Module identity and layers come from rust.profile.json; this policy adds the rules that rust.coverage.json deliberately left unclaimed for the crate.",
+  "crate": "geometry-wasm",
+  "root": "geometry-wasm/src/lib.rs",
+  "sourceDir": "geometry-wasm/src",
+  "profileModules": [
+    "rust.geometry.api",
+    "rust.geometry.engine",
+    "rust.geometry.shapes",
+    "rust.geometry.animation"
+  ],
+  "profileModulesNote": "The four modules under sourceDir. rust.geometry.tests (geometry-wasm/tests) is an integration-test crate that reaches the port as `geometry_wasm::…`, an external path the intra-crate analyzer does not resolve; it stays covered by rust.coverage.json's discovery/size checks only.",
+  "layerRules": {
+    "adapters": {
+      "allowedLayers": [
+        "engine"
+      ],
+      "meaning": "lib.rs is the wasm-bindgen API: it declares the modules and re-exports the port; it may depend on the engine modules and on nothing else inside the crate"
+    },
+    "engine": {
+      "allowedLayers": [
+        "engine"
+      ],
+      "meaning": "engine.rs (renderer), shapes (eraser/fill/hit/shapes) and animation (interp/track/tween/tweenmatch/timeline/strokemodeler) may depend on each other but never on the API root or on tests"
+    },
+    "tests": {
+      "allowedLayers": [
+        "engine",
+        "adapters"
+      ],
+      "meaning": "integration tests may reach the port and the engine"
+    }
+  },
+  "permittedEdges": {
+    "note": "Observed at adoption from `use crate::…` and inline `crate::…` paths (analyzer output). Layer rules are the enforced contract; this list documents which edges exist so a new one is a visible diff.",
+    "edges": [
+      "rust.geometry.api -> rust.geometry.engine (mod engine; pub use engine::{VelloEngine, create_engine})",
+      "rust.geometry.api -> rust.geometry.shapes (mod fill/hit/eraser/shapes; pub use …)",
+      "rust.geometry.api -> rust.geometry.animation (mod tween/tweenmatch/track/interp/timeline/strokemodeler; pub use …)",
+      "rust.geometry.shapes -> rust.geometry.engine (crate::engine::{build_bezpath, build_bezpath_from_segments, ItemIn, SceneIn, SegIn})",
+      "rust.geometry.engine -> rust.geometry.shapes (inline crate::hit::hit_test_scene in engine.rs — see the cycle exception)",
+      "rust.geometry.shapes -> rust.geometry.api (eraser.rs use crate::{from_multipolygon, to_polygon, PolygonIn} — see the layer-violation exception)"
+    ]
+  },
+  "exportedPort": {
+    "source": "geometry-wasm/src/lib.rs `pub use` re-exports; the wasm-bindgen free functions defined in lib.rs itself (boolean_op, boolean_op_multi, …) are the root's own API and are not re-exports",
+    "items": [
+      "fill::fill_find",
+      "engine::VelloEngine",
+      "engine::create_engine",
+      "hit::hit_test",
+      "tween::interp_stroke",
+      "tweenmatch::align_pair",
+      "tweenmatch::auto_match",
+      "tweenmatch::resample_stroke",
+      "eraser::erase_at_point",
+      "shapes::ellipse_segments",
+      "shapes::line_segments",
+      "shapes::rect_segments",
+      "track::track_points",
+      "interp::compute_flow",
+      "interp::interpolate_at",
+      "interp::FlowField",
+      "timeline::effective_frame_index",
+      "timeline::resolve_symbol_frame"
+    ]
+  },
+  "features": {
+    "declared": [],
+    "declaredNote": "geometry-wasm/Cargo.toml has no [features] table; any cfg(feature = \"…\") in the crate is therefore a reference to an undeclared feature and fails. The only cfg predicates the crate uses are the two below; adding another predicate is a policy change, not a silent pass.",
+    "allowedCfgs": [
+      "test",
+      "target_arch = \"wasm32\""
+    ]
+  },
+  "exceptions": [
+    {
+      "path": "geometry-wasm/src/eraser.rs",
+      "rule": "layer-violation",
+      "owner": "ivg-design",
+      "issue": "1014",
+      "reason": "Known debt recorded at adoption, not repaired: eraser.rs imports the polygon conversion helpers (to_polygon, from_multipolygon, PolygonIn) that live in the API root lib.rs instead of an engine module. Moving those helpers into the engine layer is a separate bounded extraction; until then the edge is visible here and expires.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "geometry-wasm/src/eraser.rs",
+      "rule": "cycle",
+      "owner": "ivg-design",
+      "issue": "1014",
+      "reason": "Same debt as the layer-violation above: eraser.rs -> lib.rs root helpers closes a cycle with lib.rs's own `mod eraser;` declaration. Removed together with that import.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "geometry-wasm/src/engine.rs",
+      "rule": "cycle",
+      "owner": "ivg-design",
+      "issue": "1014",
+      "reason": "Known debt recorded at adoption, not repaired: engine.rs calls crate::hit::hit_test_scene while hit.rs uses crate::engine::{build_bezpath, SceneIn}, a module cycle inside the engine layer. Splitting the shared scene-input types out of engine.rs is a separate bounded extraction; until then the cycle is visible here and expires.",
+      "expires": "2026-12-05"
+    }
+  ]
+}

@@ -9,6 +9,7 @@ const { spawnSync } = require('node:child_process');
 const { compareSizeBaseline } = require('./lib/boundaries-ratchet.cjs');
 const { checkApplicationPolicy, checkApplicationSize, checkApplicationEdges } = require('./lib/boundaries-application.cjs');
 const { checkProfile } = require('./lib/boundaries.cjs');
+const { checkRustCrate } = require('./lib/boundaries-rust.cjs');
 const { checkSourceCoverage } = require('./lib/boundaries-coverage.cjs');
 const { discoverSourcePaths } = require('./lib/boundaries-discovery.cjs');
 const { discoverRepositoryFiles } = require('./lib/boundaries-repository.cjs');
@@ -19,6 +20,9 @@ const APPLICATION_PROFILE = 'engineering/boundaries/profiles/app-js.profile.json
 const APPLICATION_SEED = 'engineering/boundaries/profiles/app-js.baseline.json';
 const APPLICATION_POLICY = 'engineering/boundaries/profiles/app-js.coverage.json';
 const APPLICATION_EDGES = 'engineering/boundaries/profiles/app-js.edges.json';
+const RUST_PROFILE = 'engineering/boundaries/profiles/rust.profile.json';
+// Rust crate edge policies (P12/#1014): one per crate whose intra-crate module graph is enforced.
+const RUST_CRATE_POLICIES = ['engineering/boundaries/profiles/geometry-wasm.edges.json'];
 const LANES = ['quick', 'boundaries', 'surfaces'];
 const QUICK = ['doctor', 'check', 'test:unit', 'test:rust'];
 const SURFACES = ['test:integration', 'test:browser', 'test:rust-tauri', 'build:wasm', 'build:desktop', 'test:desktop'];
@@ -138,6 +142,22 @@ function applicationBoundaries(base, scratch, root = ROOT) {
   return { ok: coverage.ok && size.ok && ratchet.ok && edges.ok, baseline, coverage, size, ratchet, edges };
 }
 
+// P12: Rust-aware intra-crate module edges, exported port and feature gates,
+// per adopted crate policy. Rust is never fed to the JavaScript lexer.
+function rustBoundaries(root = ROOT) {
+  const profilePath = path.join(root, RUST_PROFILE);
+  if (!fs.existsSync(profilePath)) return null;   // a checkout without the Rust profile has nothing to enforce
+  const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+  const crates = RUST_CRATE_POLICIES.map((file) => {
+    const policyPath = path.join(root, file);
+    // Once a crate policy is adopted its absence is a removal, not a skip.
+    if (!fs.existsSync(policyPath)) throw new Error(`${file} was removed from the candidate`);
+    const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
+    return { policy: file, ...checkRustCrate(profile, policy, { root }) };
+  });
+  return { ok: crates.every((c) => c.ok), crates };
+}
+
 function toolingCoverage(profile, root = ROOT) {
   const sourcePaths = discoverSourcePaths({ root, sourceRoots: ['scripts/nemo'], extensions: ['.cjs'] });
   return checkSourceCoverage(profile, { root, sourcePaths, exclusions: [] });
@@ -166,11 +186,12 @@ function boundaries(base, root = ROOT) {
     const toolingOk = result.status === 0 && report?.ok === true && report?.ratchet?.ok === true
       && toolingSourceCoverage.ok;
     const application = applicationBoundaries(base, scratch, root);
+    const rust = rustBoundaries(root);
     const repository = discoverRepositoryFiles({ root });
-    const ok = repository.ok && toolingOk && (!application || application.ok);
-    return { ok, problems: ok ? [] : ['repository inventory, boundary checker, source coverage, current size, or protected baseline ratchet did not pass'],
+    const ok = repository.ok && toolingOk && (!application || application.ok) && (!rust || rust.ok);
+    return { ok, problems: ok ? [] : ['repository inventory, boundary checker, source coverage, current size, protected baseline ratchet, or Rust crate edges did not pass'],
       baseline: { base: baseline.base, sourcePath: baseline.sourcePath, sha256: baseline.sha256 },
-      report: report || null, toolingSourceCoverage, application, repository, stderr: result.stderr || null };
+      report: report || null, toolingSourceCoverage, application, rust, repository, stderr: result.stderr || null };
   } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 }
 
@@ -201,4 +222,4 @@ if (require.main === module) {
 }
 module.exports = { LANES, QUICK, SURFACES, PROFILE, APPLICATION_PROFILE, APPLICATION_SEED,
   APPLICATION_POLICY, APPLICATION_EDGES, aggregate, validateReceipt, applicability, changedFiles, materializeBaseline,
-  existsAtRevision, applicationBoundaries, toolingCoverage, verify, boundaries, main };
+  RUST_PROFILE, RUST_CRATE_POLICIES, existsAtRevision, applicationBoundaries, rustBoundaries, toolingCoverage, verify, boundaries, main };
