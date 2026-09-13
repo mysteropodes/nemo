@@ -1,0 +1,370 @@
+{
+  "census_id": "C20q",
+  "issue": 1247,
+  "title": "Motion.js key marquee selection and the key selection box: skew/space edges, move fill, key rows (11925-12174)",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf on the src/js/motion.js open span [11412,12405] of remediation-scope.json rangeCoverage (frozen index at 4bbe332), which the C20o-C20r series closes in four slices: C20o 11412-11682 (key/property selection model, row decoration, widget wiring, batch key ops, MERGED PR #1276/258d427), C20p 11683-11924 (ease influence, ease boxes, selection ops, not yet filed at the time of this artifact), C20q 11925-12174 (marquee and the key selection box — this artifact, the third of the four slices), C20r 12175-12405 (layer stagger/skew boxes, not yet filed). This artifact's own 250-line union does not by itself close the parent [11412,12405] span (994 lines total: 271+242+250+231). Sole artifact: engineering/inventory/census/C20q-motion-key-marquee-selection-box.json; src/js/motion.js and all callers remain read-only. Cited by name/line only, not re-mapped: trackRowHtml/renderTracksFor (C20i, motion.js:10677/11077), renderDiscreteKeyGridRow/renderPathGroupTrackRow (C20h, motion.js:10482/10406), the panel rows (C20g/C20f), trackFor/valueAtFrame/setKeyAtFrame/toggleAnimated (C20n/C02, motion.js:443/2639/2705/2781), layer-inout.js (SMLayerInOut.marqueeSelect, group-bar drag — CLAUDE.md §11 \"one gesture, one rectangle\"), ui.js global pointer handlers and curve editor, rig-widget.js (§13 widget wiring menu — cited for completeness only: grep-confirmed zero references from this span), timeline-zoom.js (FC), pushUndo* (tweens.js), showToast (C19w, timeline.js:7447), window.showContextMenu (ui.js, not called directly from this span — see boundaries), SM.t (i18n.js), everything before 11412 and after 12405/13124 (_keyAnchor, _motionKeySel, _layerSel, enableTimeRemap, setAppMode — sibling-covered).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "f279f73df0e2d9d3133339270eecf8ae5a18a759",
+  "source_path": "src/js/motion.js",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_line_count": 13914,
+  "scope_files": [
+    "src/js/motion.js"
+  ],
+  "intended_branch": "claude/c20q-motion-key-marquee-selection-box-census",
+  "assigned_ranges": [
+    {
+      "start": 11925,
+      "end": 12174
+    }
+  ],
+  "coverage_note": "Exactly 250 assigned lines in one contiguous range and three complete packets: 170 code, 80 full-line comments, 0 blank — independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs (a Python re-implementation executed directly against `git show 59a5a38...:src/js/motion.js`), and it matches the issue's own proposed union AND per-packet table exactly for all three packets (76=55/21/0, 102=63/39/0, 72=52/20/0) with zero discrepancy. No boundary correction was needed: line 11924 (`}`, the closing brace of invertKeySelection, C20p territory, confirmed by direct `awk 'NR==11924'` read) precedes this scope; line 11925 opens this scope's own `var _motionMarquee = null; // {startX, startY, rectEl, moved, layer}`. Line 12174 (`}`, the closing brace of updateKeySelectionBox) closes this scope; line 12175 opens `// ---- layer-level stagger (2026-07) ----`, C20r's own section header — both re-verified with `awk 'NR==<n>'` against the frozen blob.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/motion.js resolves to 6617bac29042c22399cac202bf054c09e4fdf30e, 13914 lines.",
+    "current": "This worktree's branch was created at the assigned base f279f73 (origin/main at task start, docs(C19ah) #1275). origin/main has since advanced by exactly one commit, 258d427 (docs(C20o) #1276, merging the C20o sibling artifact), which adds only engineering/inventory/census/C20o-motion-key-property-selection-widget-wiring.json and touches zero lines of src/js/motion.js — verified directly: `git rev-parse f279f73:src/js/motion.js` == `git rev-parse 258d427:src/js/motion.js` == `git rev-parse 59a5a38...:src/js/motion.js` == 6617bac29042c22399cac202bf054c09e4fdf30e, and `git diff --stat f279f73 258d427` shows only that one added JSON file. The candidate commit is built on f279f73; the merged C20o artifact was copied into engineering/inventory/census/ temporarily (never staged) for the validator's own sibling-overlap check, then deleted. The C20p sibling branch (claude/c20p-motion-ease-influence-key-ease-boxes-census) does not yet exist on origin — `git fetch origin claude/c20p-motion-ease-influence-key-ease-boxes-census` returned 'couldn't find remote ref', confirmed not filed at the time of this artifact.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `grep -rnE \"(^|[^a-zA-Z_.])<symbol>\\(\" --include=\"*.js\" src` over the recursive src/js tree (excluding node_modules/dist/build), filtered to exclude each symbol's own declaration line and comment-only hits, then reading each surviving hit directly with `sed -n`/`awk 'NR==<n>'` against this worktree's copy of motion.js and layer-inout.js — confirmed byte-identical to the frozen blob above (git rev-parse match), so its line numbers are valid frozen-blob citations.",
+    "fixtures": "Every behavioral fixture is source-derived, proposed and unrun."
+  },
+  "writer_guidance": {
+    "artifact": "Only engineering/inventory/census/C20q-motion-key-marquee-selection-box.json is writable for this outcome.",
+    "runtime": "Historical Motion ownership retains motion.js runtime writing; P30 retains timeline.js. C20q transfers no implementation authority.",
+    "owners": "C20o (motion.js:11412-11682, merged PR #1276/258d427) retains isKeySelected/setKeySel/selectMotionProperty/decorateMotionPropertyRow/widgetWiringMenuItems/batch key ops in full — setKeySel (motion.js:11473) is this artifact's own applyMarqueeSelection's SOLE selection-model writer (called at motion.js:11955); selectMotionProperty (11498) and renderTimelineMotion (11136) are two of updateKeySelectionBox's three pre-span callers (11517, 11379). C20p (motion.js:11683-11924, not yet filed) retains openEaseInfluenceMenu/addStaggerEdges's ease-box namesakes if any/invertKeySelection/selectEveryNthKey in full — invertKeySelection's closing brace (11924) is this artifact's own immediate predecessor line, cited by name/line only, not re-mapped. C20r (motion.js:12175-12405, not yet filed) retains _layerStaggerBoxEl/buildLayerRows/startLayerSkewDrag/dragLayerBars/removeLayerStaggerBox/noKeysGuard in full — C20r's own addSpaceEdges callback (motion.js:12347) is the ONE cross-boundary caller of THIS artifact's startSkewDrag (12070) outside this span itself; C20r's own addMoveFill callback (12333, dragLayerBars) and addStaggerEdges callback (12356, startLayerSkewDrag) do NOT call this artifact's startSkewDrag — only the Space gesture is actually shared between the key box and the layer box, confirmed by direct read of both call sites (not assumed from the 'ONE skew-drag engine' lead-in comment at 12010, which describes only the THREE gestures inside the key-selection-box itself). This artifact (C20q, 11925-12174) declares and retains _motionMarquee, startMarquee, applyMarqueeSelection, marqueeLayersIn, addStaggerEdges, addSpaceEdges, addMoveFill, startSkewDrag, buildKeyRows, _keySelBoxEl, removeKeySelectionBox, updateKeySelectionBox. Sibling-covered past 12405/13124: updateMarquee (motion.js:12700-12722, the drag-move handler that calls THIS artifact's applyMarqueeSelection at 12710 and forwards to SMLayerInOut.marqueeSelect at 12719), endMarquee (12723-12760ish), onDragMove (12934+), onDragUp (13101+, calls endMarquee at 13104), motionDragScrollLeft (12832), previewKeyframeShift (12487, calls updateKeySelectionBox at 12605), setAppMode (13125, calls removeKeySelectionBox at 13189). C02/pre-11412 retains trackFor (motion.js:443), keyAt (motion.js:1189) in full — both called from this artifact's own applyMarqueeSelection (11950-11951) but not duplicated. timeline.js/P30 retains _layerSel (timeline.js:5423), renderTimeline, renderLayerList, showToast (timeline.js:7447) in full — this artifact reads/calls all four but declares none of them. tweens.js retains pushUndo (tweens.js:4741, called once, at startSkewDrag's own arm-time, motion.js:12073) in full. i18n.js retains SM.t (i18n.js:4185, exported at 4239) in full. layer-inout.js retains its own, differently-scoped startMarquee (layer-inout.js:402), applyMarqueeSelection (463), updateMarquee (479), endMarquee (497) — four namesakes of this artifact's own functions, confirmed by reading both modules' declarations directly: they operate on `.layer-inout-bar` elements and a separate `_marquee` closure variable, share no code, and are wired through two DIFFERENT event-registration sites (layer-inout.js:1587/1623, bubble phase; this artifact's own initGridMarquee, motion.js:13322-13348, capture phase, sibling-covered)."
+  },
+  "reconciliation": [
+    {
+      "owner": "P03/#1005 rangeCoverage",
+      "disposition": "remediation-scope.json lists src/js/motion.js 11412-12405 as one open 994-line span (frozen index at 4bbe332), which the C20o-C20r series closes in four slices: C20o 11412-11682 (merged PR #1276/258d427, 271 lines), C20p 11683-11924 (242 lines, not yet filed), C20q 11925-12174 (this artifact, 250 lines, the third slice), C20r 12175-12405 (231 lines, not yet filed). 271+242+250+231=994, matching the parent span exactly. This artifact's own merge does not by itself close the parent span — C20p and C20r remain outstanding; P03's own board update tracks closure of the full series."
+    },
+    {
+      "owner": "C20o (existing owner, motion.js:11412-11682, merged PR #1276/258d427)",
+      "disposition": "Retains its own body in full — cited by name/line only. setKeySel (motion.js:11473) is this artifact's own applyMarqueeSelection's sole selection-model writer (11955); selectMotionProperty (11498) and renderTimelineMotion (11136) are two of updateKeySelectionBox's three pre-span callers. No line of C20o's own 11412-11682 range is claimed by this artifact; no line of this artifact's 11925-12174 range appears in the merged C20o-motion-key-property-selection-widget-wiring.json (validator-confirmed, zero overlap)."
+    },
+    {
+      "owner": "C20p (motion.js:11683-11924, not yet filed at the time of this artifact)",
+      "disposition": "Retains its own territory (ease influence, ease boxes, selection ops, including invertKeySelection, motion.js:11905-11924, whose closing brace at 11924 is this artifact's own immediate predecessor line) in full — cited by name/line only, not re-mapped. This artifact does not depend on any C20p-owned symbol; it is purely downstream in file order."
+    },
+    {
+      "owner": "C20r (motion.js:12175-12405, not yet filed at the time of this artifact)",
+      "disposition": "Retains its own territory (_layerStaggerBoxEl, buildLayerRows, startLayerSkewDrag, dragLayerBars, removeLayerStaggerBox, noKeysGuard) in full — cited by name/line only. C20r's own addStaggerEdges/addSpaceEdges/addMoveFill calls (12356/12341/12333) reuse THIS artifact's declared helpers (12014/12038/12052) to wire a second, layer-level selection box; C20r's own addSpaceEdges callback (12347) additionally reuses this artifact's startSkewDrag (12070) with C20r's own buildLayerRows() rows — the ONLY one of C20r's three gestures that does so (its move-fill calls dragLayerBars, its stagger-edges call startLayerSkewDrag, both C20r-owned, not this artifact's startSkewDrag). This artifact does not declare or duplicate any C20r symbol."
+    },
+    {
+      "owner": "C02/pre-11412 (existing owner, motion.js:1-11411)",
+      "disposition": "Retains trackFor (motion.js:443) and keyAt (motion.js:1189) in full — both called from this artifact's own applyMarqueeSelection (motion.js:11950-11951) as external same-file calls, cited by line only, not duplicated."
+    },
+    {
+      "owner": "timeline.js (P30, existing owner)",
+      "disposition": "Retains _layerSel (timeline.js:5423), renderTimeline, renderLayerList, and showToast (timeline.js:7447) in full. This artifact's updateKeySelectionBox reads `_layerSel.length` (motion.js:12111) without declaring it; none of this artifact's own three packets calls renderTimeline/renderLayerList directly (both are called only by this span's CALLERS, e.g. applyMarqueeSelection's own callers in renderDiscreteKeyGridRow/trackRowHtml, sibling-covered). Correcting the issue's own stated expectation ('expect motion.js-internal plus layer-inout.js for applyMarqueeSelection/marqueeLayersIn and timeline.js for the box rebuild; confirm or correct'): a full-repo grep (`grep -rlE \"(^|[^a-zA-Z_.])<symbol>\\(\" --include=\"*.js\"`) for all ten of this artifact's declared symbols found ZERO references anywhere in timeline.js — updateKeySelectionBox ('the box rebuild') is called only from within motion.js itself, on both sides of this span (pre-span: renderTimelineMotion:11379, setKeySel:11478, selectMotionProperty:11517; post-span: previewKeyframeShift:12605). No correction to the assigned union or classification follows from this — it narrows a caller-list expectation stated in the issue's own prose, not a line-range boundary."
+    },
+    {
+      "owner": "tweens.js (existing owner, pushUndo/pushUndoLayers, tweens.js:4741)",
+      "disposition": "Retains pushUndo in full. Called exactly once from this artifact, at startSkewDrag's own arm-time (motion.js:12073), BEFORE any key mutation — the actual per-tick key-frame writes happen later, in onDragMove (sibling-covered, motion.js:12934+), not in this artifact."
+    },
+    {
+      "owner": "i18n.js (existing owner, SM.t, i18n.js:4185, exported at 4239)",
+      "disposition": "Retains SM.t in full. Called 4x from this artifact (motion.js:12018, 12042, 12163, 12168) for edge/menu titles and toast text, never duplicated."
+    },
+    {
+      "owner": "layer-inout.js (existing owner)",
+      "disposition": "Retains its own startMarquee (layer-inout.js:402), applyMarqueeSelection (463), updateMarquee (479), endMarquee (497) — four namesakes of this artifact's own functions, confirmed distinct declarations by reading both modules directly: they close over layer-inout.js's own `_marquee` var and operate on `.layer-inout-bar` elements, sharing no code with this artifact's `_motionMarquee`/`.motion-key` machinery. layer-inout.js also retains the bidirectional forward: its own updateMarquee (layer-inout.js:479-496) calls `SMMotion.marqueeSelect(x0,y0,x1,y1)` at line 494, which IS a direct call into this artifact's applyMarqueeSelection (exported verbatim as `SMMotion.marqueeSelect`, motion.js:13787, sibling-covered export table) — the single cross-file caller of this artifact's own applyMarqueeSelection. The reverse direction (motion.js's own updateMarquee, sibling-covered 12700-12722, calling `SMLayerInOut.marqueeSelect(x0,y0,x0+w,y0+h)` at motion.js:12719, which resolves to layer-inout.js's own applyMarqueeSelection, exported as `marqueeSelect: applyMarqueeSelection` at layer-inout.js:1640) is entirely outside this artifact's own assigned range, cited by line only."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This artifact declares no writer authority transfer, proposes fixtures unrun, and makes no runtime/browser/native/export acceptance claim. Source and direct-read grep evidence settle every citation in this artifact; no prose from the parent issue is taken on faith where it could be checked against the frozen blob."
+    }
+  ],
+  "boundaries": [
+    "Line 11924 (`}`, the closing brace of invertKeySelection, C20p territory, confirmed by direct `awk 'NR==11924'` read) precedes this scope; line 11925 opens this scope's own `var _motionMarquee = null;` declaration. Line 12174 (`}`, the closing brace of updateKeySelectionBox) closes this scope; line 12175 opens `// ---- layer-level stagger (2026-07) ----`, C20r's own section header (confirmed by direct read). All four boundary lines re-verified with `awk 'NR==<n>'` against the frozen blob.",
+    "Both internal packet cuts in the issue's own suggested table land exactly on a construct's own lead-in: line 12001 opens `// ---- visible selection box: skew edges + move fill (2026-07) ----`, and line 12103 opens `var _keySelBoxEl = null;` — both re-verified with `awk 'NR==<n>'` before accepting the table; no correction was needed.",
+    "startSkewDrag (motion.js:12070-12085) writes `window._motionSkewDrag` (12084), NOT `window._motionKeyDrag` as the parent issue's own prose states ('what it writes to window._motionKeyDrag'). Grep-confirmed: `window._motionKeyDrag` is written only by sibling-covered code (motion.js:10438/10560/10567/10943/10954, all outside this span, single-key/group-key drag, distinct from the skew/space/move/liquify drag this artifact arms); `window._motionSkewDrag` is written only by this artifact's own startSkewDrag (12084) and once more by sibling-covered trackRowHtml's own inline Alt+drag shortcut (motion.js:10941, which builds the SAME shape directly rather than calling startSkewDrag — a duplication, not a call). onDragMove/onDragUp (C20s territory, motion.js:12934+/13101+) read `window._motionSkewDrag`, not `window._motionKeyDrag`, when servicing this artifact's own drag. This is a factual correction to the issue's own variable name, not a line-range or classification correction — no assigned range or count changes.",
+    "The edge/fill → mode-STRING mapping (top/bottom/left/right/move/liquify) is decided entirely within this artifact, in addStaggerEdges/addSpaceEdges/addMoveFill (motion.js:12014-12067): each edge's mousedown handler calls `onStart(e, pos)` with the literal string 'top'/'bottom'/'left'/'right', and addMoveFill's fill handler calls `onStart(e, (e.metaKey || e.ctrlKey) ? 'liquify' : 'move')` (12064). startSkewDrag (12070-12085, also this artifact) stores that mode string VERBATIM in `window._motionSkewDrag.mode` and does no mode-to-behavior translation itself — the actual per-row/per-key fraction formula that turns a mode string into key movement (the lead-in comment's own 'move=1 everywhere, top=(n-1-r)/(n-1), bottom=r/(n-1)', motion.js:12010-12012) is applied in onDragMove (C20s territory, motion.js:12934+, cited by line only, not inspected further here).",
+    "buildKeyRows (motion.js:12089-12102) produces its 'top→bottom document order' by relying on `document.querySelectorAll('#frame-grid .motion-track-row')`'s own native document-order traversal (12091) — there is no explicit `.sort()` call anywhere in this function or its callers. Correcting the parent issue's own wording ('cite the sort'): the ordering guarantee is DOM traversal order, not an algorithmic sort, as the function's own lead-in comment (12086-12088, 'in rendered (document) order') states; the rows this traversal walks are rendered by trackRowHtml/renderTracksFor (C20i, sibling-covered, cited by name/line only)."
+  ],
+  "areas": [
+    {
+      "area": "marquee-start-and-apply",
+      "packets": [
+        {
+          "id": "C20q.marquee-start-and-apply",
+          "files": [
+            "src/js/motion.js:11925-12000"
+          ],
+          "coverage_ranges": [
+            [
+              11925,
+              12000
+            ]
+          ],
+          "classification": {
+            "code": 55,
+            "comment": 21,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_motionMarquee",
+            "startMarquee",
+            "applyMarqueeSelection",
+            "marqueeLayersIn"
+          ],
+          "signature": "startMarquee(e) -> void (arms _motionMarquee); applyMarqueeSelection(x0, y0, x1, y1) -> void (DOM-rect coords, mutates DOM .sel classes + selection model via setKeySel); marqueeLayersIn(y0, y1, x0, x1) -> number[] (layer indices swept by the rectangle).",
+          "responsibility": "_motionMarquee (11925) is the module-level drag-state var, commented with its own shape `{startX, startY, rectEl, moved, layer}`. startMarquee(e) (11926-11935): creates one `.motion-marquee-rect` div appended to `document.body` (11927-11928, NOT inside #frame-grid, so it overlays the whole viewport during the drag); reads, at mousedown time (comment 11929-11931 explains WHY here rather than at mouseup: 'by mouseup the pointer has usually left it'), the `.frow[data-layer]` ancestor of the press target to capture which layer row (if any) was pressed into `_motionMarquee.layer` (11932-11934, null for empty grid space — later read by endMarquee, sibling-covered, as the deselect signal). applyMarqueeSelection(x0,y0,x1,y1) (11936-11957): iterates every `.motion-track-row, .motion-group-row` (11939, a comment at 11938 cites feedback #221, cross-referencing invertKeySelection's identical scan just above in C20p territory), skips untagged rows (`if (!holder) return`, 11941), then for each `.motion-key` diamond inside computes its screen-space center via `getBoundingClientRect()` (11943-11944) and tests it against the caller-supplied rectangle bounds (11945) — geometry is PURELY the rendered diamond's own rect, never frame-index math. `dia.classList.toggle('sel', hit)` (11946) paints the diamond immediately regardless of whether it resolves to a real key. For a hit, it reads `cell.dataset.frame` (11949), calls `trackFor(holder, prop)` (motion.js:443, pre-11412) and `keyAt(track, frame)` (motion.js:1189, pre-11412, binary search for an EXACT frame match) to recover the actual key object, pushing `{holder, prop, key}` (11952) only if `keyAt` found one — a diamond with no backing key (shouldn't normally exist, but the hit-test is purely visual) is silently excluded from the selection while still getting painted '.sel'. `setKeySel(sel)` (11955, motion.js:11473, C20o) is called unconditionally at the end — the comment notes it 'also refreshes the selection box (updateKeySelectionBox below)', i.e. setKeySel's own body (C20o) calls this artifact's own updateKeySelectionBox (packet 3) as part of its selection-model update. Finally, if `_motionMarquee` is still set, `_motionMarquee.layers = marqueeLayersIn(y0,y1,x0,x1)` (11956) — side-channel state for endMarquee's own layer-selection mirror (sibling-covered). marqueeLayersIn(y0,y1,x0,x1) (11975-12000, preceded by a 17-line lead-in 11958-11974 documenting feedback #769 and a 2026-09-03 follow-up in French, both quoted verbatim in the source): walks `#frame-grid`'s DIRECT children in document order (11979-11997), tracking the LAST-seen `.frow[data-layer]` row as `cur`/`curRow` for every subsequent property/element track row that carries no `data-layer` of its own (11981-11985, 'the owning layer is the last .frow[data-layer] seen ABOVE them'); for each candidate row, tests vertical overlap against the swept rect (`b.bottom < y0 || b.top > y1`, 11989) and, if x0/x1 were supplied and the owning row has a rendered `.layer-inout-bar`, ALSO requires horizontal overlap against that BAR's own rect rather than the full-width row (11990-11996, documented at 11966-11972 as a 2026-09-03 fix: a row spans the full timeline width but the visible bar stops at the in/out points, so a rectangle that misses the bar must not select that layer — 'Sans barre rendue (Animation 2D, ligne de propriété), on garde l'ancien comportement: la ligne suffit', i.e. without a rendered bar the plain row-overlap rule still applies). Returns a de-duplicated (`if (out.indexOf(cur) < 0)`, 11997) array of layer indices in first-encountered order.",
+          "render_path": "NO — grep-confirmed zero references to any of these four symbols in engine-bridge.js or export.js; this is Motion timeline selection UI only, never reached from buildSceneJson/getEffectiveStrokes.",
+          "callers": "startMarquee: 3 same-file callers, all pre-span/sibling — motion.js:10600 (renderDiscreteKeyGridRow's own numeric-row empty-cell mousedown handler, C20h), motion.js:10964 (trackRowHtml's own diamond-click handler's plain-click else-branch, C20i), and motion.js:13347 (this artifact's OWN capture-phase registration site, initGridMarquee, motion.js:13322-13348, sibling-covered: `wrap.addEventListener('mousedown', ..., true)` on `#fg-wrap`, the CLAUDE.md §11 'one gesture, one rectangle' capture-phase entry point, self-invoked via `if (document.readyState==='loading') ... else initGridMarquee();` at load, motion.js:13348). Cross-file: layer-inout.js declares an UNRELATED same-named startMarquee (layer-inout.js:402) with its own `_marquee` closure over `.layer-inout-bar` elements — confirmed a distinct declaration by reading both modules; it is called from layer-inout.js's own BUBBLE-phase listeners (1587 row mousedown, 1623 wrap mousedown), never from this artifact and never calling into it. applyMarqueeSelection: 3 same-file callers — motion.js:10546 (renderDiscreteKeyGridRow's own Shift-click range-select, C20h, synthesizes a bbox from the `_keyAnchor` cell to the clicked cell), motion.js:10907 (trackRowHtml's own Shift-click range-select, C20i, same pattern), motion.js:12710 (updateMarquee, sibling-covered 12700-12722, forwards the live drag rectangle on every mousemove once `_motionMarquee.moved` is true). One cross-file caller: layer-inout.js:494, inside its OWN updateMarquee, calls `SMMotion.marqueeSelect(x0,y0,x1,y1)` — `SMMotion.marqueeSelect` is this artifact's own applyMarqueeSelection exported verbatim (motion.js:13787, sibling-covered export table: `marqueeSelect: applyMarqueeSelection`), so this IS a direct call into this artifact's own function, not a namesake. marqueeLayersIn: exactly ONE caller anywhere in src/js (full-repo grep-confirmed), motion.js:11956, inside this same packet's own applyMarqueeSelection — zero external or even other-same-file callers.",
+          "external_calls": [
+            "trackFor — motion.js:443 (pre-11412, C02/C20a-j)",
+            "keyAt — motion.js:1189 (pre-11412, C02/C20a-j)",
+            "setKeySel — motion.js:11473 (C20o, merged PR #1276)"
+          ],
+          "effects": "Zero project-document writes (no ld.motion/motionStatic/frame mutation, no pushUndo). startMarquee creates one DOM overlay div and sets `_motionMarquee` (this artifact's own module-level state, not persisted). applyMarqueeSelection toggles `.sel` DOM classes on diamond elements and calls setKeySel(sel) (C20o, a SELECTION-model write — `_motionKeySel`/`_motionPropSel`, not project data) plus sets `_motionMarquee.layers`. marqueeLayersIn is a pure read/return, zero writes of any kind."
+        }
+      ]
+    },
+    {
+      "area": "selection-box-edges",
+      "packets": [
+        {
+          "id": "C20q.selection-box-edges",
+          "files": [
+            "src/js/motion.js:12001-12102"
+          ],
+          "coverage_ranges": [
+            [
+              12001,
+              12102
+            ]
+          ],
+          "classification": {
+            "code": 63,
+            "comment": 39,
+            "whitespace": 0
+          },
+          "symbols": [
+            "addStaggerEdges",
+            "addSpaceEdges",
+            "addMoveFill",
+            "startSkewDrag",
+            "buildKeyRows"
+          ],
+          "signature": "addStaggerEdges(boxEl, onStart) -> void; addSpaceEdges(boxEl, onStart) -> void; addMoveFill(boxEl, onStart) -> void (all three append DOM handle elements to boxEl and wire mousedown to call onStart(e, mode)); startSkewDrag(rows, mode, e) -> void (arms window._motionSkewDrag); buildKeyRows() -> Array<Array<{track, key, orig}>>.",
+          "responsibility": "Section header + 13-line lead-in (12001-12013) frames the whole packet's own feature history (hidden Alt+drag → unclickable centered handle → full-width rank-cascade edges → current design) and states the governing invariant: 'All three gestures now go through ONE skew-drag engine (fraction per row: move=1 everywhere, top=(n-1-r)/(n-1), bottom=r/(n-1)) computing absolute per-row offsets from each key's ORIGINAL frame at mousedown — no incremental re-baselining'. addStaggerEdges(boxEl, onStart) (12014-12032): for each of ['top','bottom'] creates a `.motion-keysel-edge motion-keysel-edge-<pos>` div titled via `SM.t('titleSkewKeysHint')` (12018), wires mousedown to stop propagation/prevent default, toggle a `.grabbing` class removed on the NEXT mouseup via a `{once:true}` listener (12026-12027, commented 12021-12025 as a self-contained 2026-08-16 thickening effect, independent of startSkewDrag/onDragUp), then calls `onStart(e, pos)` with the literal string 'top' or 'bottom' (12028). addSpaceEdges (12038-12051) is the structurally identical twin for ['left','right'] (`SM.t('titleSpaceKeysHint')`, 12042), preceded by its own 5-line lead-in (12033-12037) distinguishing 'Space' (rescales the selection's own timing, opposite edge anchored) from the top/bottom skew (slides whole rows). addMoveFill(boxEl, onStart) (12052-12067): one `.motion-keysel-fill` div, title built from `SM.t('titleMoveAllSelectedKeysHint')` plus a literal '⌘/Ctrl + glisser : liquify…' hint line (12055-12056) appended in French; its mousedown handler (12057-12065) calls `onStart(e, (e.metaKey || e.ctrlKey) ? 'liquify' : 'move')` — THIS is the single decision point for the whole liquify/move mode split, gated purely on the Cmd/Ctrl key at the moment of grabbing the fill, documented at 12059-12063 as Skew Pro's own 'Liquify' (falloff by distance from the grab point, vs. a rigid uniform slide for plain move). startSkewDrag(rows, mode, e) (12070-12085, preceded by a 2-line comment on `rows`'/`mode`'s own shape, 12068-12069): filters `rows` with a no-op predicate (`r.length || true`, 12071, always true — dead filter, kept as written) and bails if empty (12072); calls `pushUndo()` (tweens.js:4741, 12073) BEFORE any state change; computes `fMin`/`fMax` across every entry's `.orig` frame (12078-12079, captured ONCE at mousedown per the comment 12074-12077, so Space's anchored-edge placement doesn't drift as keys spread mid-drag); computes `grabFrame` from the mousedown's own clientX relative to `#frame-grid`'s bounding rect divided by `FC` (12082-12083, `FC` = the global frame-cell-width var, app.js:76, kept in sync by timeline-zoom.js:107/270, cited by name/line only) — falls back to the selection midpoint if no grid element is found; then assigns `window._motionSkewDrag = {startX, startScrollLeft: motionDragScrollLeft(), mode, rows, fMin, fMax, grabFrame}` (12084, motionDragScrollLeft is motion.js:12832, sibling-covered past this span) — `mode` is stored VERBATIM from whatever string the caller passed (see boundaries: this is NOT window._motionKeyDrag, correcting the parent issue's own prose). No fraction-per-row computation and no key mutation happens in startSkewDrag itself; that translation is onDragMove's own job (C20s, sibling-covered, motion.js:12934+). buildKeyRows() (12089-12102, preceded by a 3-line lead-in 12086-12088 stating the ordering contract): queries `#frame-grid .motion-track-row` (12091) and for each row with a live `trackFor(holder, prop)` result, filters `_motionKeySel` (C20o/C20p state) down to entries matching that exact holder+prop pair into `{track: bkTrack, key: s.key, orig: s.key.frame}` (12096-12098), pushing the row's own entries array only if non-empty (12099). Returns an array of arrays, ONE per property track that has at least one selected key, in the DOM's own document-traversal order — there is no explicit sort() call anywhere in this function (see boundaries).",
+          "render_path": "NO — grep-confirmed zero references to any of these five symbols in engine-bridge.js or export.js; DOM-handle construction and drag-arming only, never reached from the render path.",
+          "callers": "addStaggerEdges: 2 callers — motion.js:12166 (this artifact's own updateKeySelectionBox, packet 3, wiring the key-selection-box's top/bottom skew edges) and motion.js:12356 (C20r sibling territory, wiring a SEPARATE `_layerStaggerBoxEl`'s top/bottom edges with its OWN callback that calls `startLayerSkewDrag` — a C20r-owned function, NOT this artifact's startSkewDrag). addSpaceEdges: 2 callers — motion.js:12159 (this artifact, packet 3) and motion.js:12341 (C20r sibling, wiring `_layerStaggerBoxEl`'s left/right edges, whose callback DOES call this artifact's own startSkewDrag at 12347 with C20r's own `buildLayerRows()` rows — the one place C20r actually reuses this artifact's drag engine). addMoveFill: 2 callers — motion.js:12158 (this artifact, packet 3) and motion.js:12333 (C20r sibling, whose callback calls `dragLayerBars(e)`, a C20r-owned function, NOT this artifact's startSkewDrag). startSkewDrag: 4 callers total — 3 same-packet (motion.js:12158 via addMoveFill's own closure, 12164 via addSpaceEdges's own closure, 12169 via addStaggerEdges's own closure, all inside this artifact's own updateKeySelectionBox, packet 3) plus exactly 1 cross-boundary caller, C20r sibling territory at motion.js:12347 (its own addSpaceEdges callback, reusing this engine with `buildLayerRows()`'s rows instead of this artifact's own buildKeyRows()). Zero external-file (outside motion.js) callers. buildKeyRows: 4 callers total — 1 pre-span sibling (motion.js:10939, inside trackRowHtml's, C20i, own Alt+drag-on-diamond shortcut, which builds `window._motionSkewDrag` INLINE itself with a hardcoded `mode:'bottom'` rather than calling startSkewDrag — a duplication of the drag-arm shape, not a call into this artifact's startSkewDrag) plus 3 same-packet (12158, 12160, 12167, all inside this artifact's own updateKeySelectionBox, packet 3). Zero external-file callers of buildKeyRows.",
+          "external_calls": [
+            "pushUndo — tweens.js:4741 (called once, inside startSkewDrag, 12073)",
+            "SM.t — i18n.js:4185, exported i18n.js:4239 (titleSkewKeysHint 12018, titleSpaceKeysHint 12042)",
+            "motionDragScrollLeft — motion.js:12832 (sibling-covered, past this span)",
+            "FC (global frame-cell-width var) — app.js:76, kept in sync by timeline-zoom.js:107/270",
+            "trackFor — motion.js:443 (pre-11412, C02/C20a-j, called from buildKeyRows)"
+          ],
+          "effects": "addStaggerEdges/addSpaceEdges/addMoveFill: DOM-only — append edge/fill divs and wire mousedown handlers; zero project-document writes, zero undo checkpoints. startSkewDrag: calls pushUndo() (tweens.js) ONCE, before any mutation — this is the single undo checkpoint anywhere in this artifact's 250 lines; sets window._motionSkewDrag (a global drag-ARM object, not project/document data) with the caller's rows/mode plus fMin/fMax/grabFrame/startX/startScrollLeft. No ld.motion/motionStatic/frame write happens in startSkewDrag itself — the actual per-tick key mutation happens later, in onDragMove (sibling-covered, motion.js:12934+), confirmed by reading startSkewDrag's own body end to end. buildKeyRows: pure read over `_motionKeySel` (C20o/C20p state) and trackFor (pre-span); returns a freshly-built array, zero writes."
+        }
+      ]
+    },
+    {
+      "area": "key-selection-box",
+      "packets": [
+        {
+          "id": "C20q.key-selection-box",
+          "files": [
+            "src/js/motion.js:12103-12174"
+          ],
+          "coverage_ranges": [
+            [
+              12103,
+              12174
+            ]
+          ],
+          "classification": {
+            "code": 52,
+            "comment": 20,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_keySelBoxEl",
+            "removeKeySelectionBox",
+            "updateKeySelectionBox"
+          ],
+          "signature": "removeKeySelectionBox() -> void; updateKeySelectionBox() -> void (creates-once/repositions-always the cross-track key-selection overlay box).",
+          "responsibility": "_keySelBoxEl (12103) is the module-level singleton DOM handle for the overlay box. removeKeySelectionBox() (12104-12106): removes and nulls it if present — idempotent, safe to call when already absent. updateKeySelectionBox() (12107-12174): FIRST guard (12108-12111, lead-in explains priority): `if (_layerSel.length >= 2) { removeKeySelectionBox(); return; }` — a direct multi-LAYER selection (`_layerSel`, timeline.js:5423, P30-owned, read here without being declared here) takes priority over the key box, 'no point showing both boxes at once'. SECOND guard (12112-12113): collects `#frame-grid .motion-key.sel` diamonds; fewer than 2 — remove and bail. THIRD guard, the '2+ property tracks' threshold the parent issue asks to confirm (12114-12128, an 8-line lead-in quotes Cyril's own 2026-07-25 feedback verbatim: 'quand on select sur une seule propriété des keyframes pas besoin de la box c'est pour plusieurs keyframes les unes en dessous des autres'): walks the same selected diamonds, collects each one's OWN `.closest('.motion-track-row')` into a de-duplicated `rowsHit` array (12124-12127); if `rowsHit.length < 2` (all selected keys sit on the SAME single track) — remove and bail, with the comment explaining why: skew is undefined on one row (its own handler already refuses under 2 rows) and the box would otherwise just occlude the diamonds and steal their clicks; single-track keys are already draggable as a group by grabbing one. GEOMETRY (12129-12134, answers the parent issue's own question): computed by taking the min/max of `getBoundingClientRect()` over the SAME selected diamonds (`x0=Math.min(x0,b.left)` etc.) — rendered pixel bounds, NEVER frame-index/time math. LAZY DOM CREATION (12135-12171, only when `_keySelBoxEl` doesn't already exist): creates a `div.motion-keysel-box` appended to `document.body` (12136-12137); installs ONE 'contextmenu' listener (12146-12157) implementing a pass-through trick documented at 12138-12145 (found 2026-07-25: the box's own pointer-events:auto surfaces swallow right-clicks meant for the batch-op context menu on the diamonds underneath) — temporarily sets the box AND every child's `pointerEvents` to 'none', calls `document.elementFromPoint(e.clientX, e.clientY)` to find what's really under the cursor (12151), restores pointerEvents (12152-12153), then re-dispatches a synthetic `new MouseEvent('contextmenu', ...)` at the SAME client coordinates onto that element (12156) — this is a re-DISPATCH of a native event, NOT a call to `window.showContextMenu` (which this artifact never calls directly; whatever menu the under-element's own listener chooses to open, e.g. the batch-op cell menu, is that element's own responsibility, sibling-covered). Then wires all THREE gesture families declared in packet 2, each with its own closure: `addMoveFill(_keySelBoxEl, function(e, mode) { startSkewDrag(buildKeyRows(), mode, e); })` (12158); `addSpaceEdges(_keySelBoxEl, function(e, mode) {...})` (12159-12165) which first computes `f0`/`f1` across `buildKeyRows()`'s own rows and shows a toast (`SM.t('toastSelectKeysOn2DifferentFramesToSpace')`, 12163) and BAILS (no startSkewDrag call) if the selection spans only one frame (`!(f1 > f0)`, 12163); `addStaggerEdges(_keySelBoxEl, function(e, mode) {...})` (12166-12170) which bails with a DIFFERENT toast (`SM.t('toastSelectKeysOn2TracksToSkew')`, 12168) if `buildKeyRows().length < 2` — note this is a SEPARATE, narrower re-check of the same 2-track condition the caller (the third guard above) already enforced before ever creating the box, defensive against the selection having changed underneath an already-open box. FINAL step, run on EVERY call (not just first creation, 12172-12173): unconditionally repositions `_keySelBoxEl.style.{left,top,width,height}` from the just-computed x0/y0/x1/y1 — this is the re-measure-on-every-call contract that lets a live drag (previewKeyframeShift, sibling-covered, motion.js:12605) keep the box glued to diamonds that moved without a full renderTimeline().",
+          "render_path": "NO — grep-confirmed zero references to removeKeySelectionBox/updateKeySelectionBox in engine-bridge.js or export.js; pure timeline-editing overlay, no scene/render involvement.",
+          "callers": "removeKeySelectionBox: 3 internal callers, all inside THIS SAME packet's own updateKeySelectionBox (12111, 12113, 12128, its own three early-return guards) plus 1 cross-boundary sibling caller: motion.js:13189, inside setAppMode (13125+, sibling-covered per the parent issue's own preamble), called on leaving Motion mode alongside removeLayerStaggerBox() — pure cleanup, no other behavior. updateKeySelectionBox: 4 callers total, ALL inside motion.js, NONE in timeline.js (see reconciliation/boundaries for the correction of the parent issue's own stated expectation) — 3 pre-span sibling callers (motion.js:11379 inside renderTimelineMotion, C20o territory, re-measuring the box after a full grid rebuild; motion.js:11478 inside setKeySel, C20o, called on every selection-model write; motion.js:11517 inside selectMotionProperty, C20o, called after a property-row click) and 1 post-span sibling caller (motion.js:12605, inside previewKeyframeShift, sibling-covered past 12405, re-measuring the box mid-drag as keys visibly translate). Full-repo grep (`grep -rlE` over all `*.js` under src) confirms zero callers of either function outside motion.js.",
+          "external_calls": [
+            "_layerSel (module/global-scoped selection array, timeline.js:5423, P30) — read at 12111, not declared here",
+            "SM.t — i18n.js:4185/4239 (toastSelectKeysOn2DifferentFramesToSpace 12163, toastSelectKeysOn2TracksToSkew 12168)",
+            "window.showToast — timeline.js:7447 (C19w), guarded by `if (window.showToast)` at 12163/12168",
+            "addMoveFill / addSpaceEdges / addStaggerEdges / startSkewDrag / buildKeyRows — same file, packet 2 of this artifact (12052/12038/12014/12070/12089), not external"
+          ],
+          "effects": "removeKeySelectionBox: one DOM removal (`_keySelBoxEl.remove()`), nulls the module var; zero project-document writes. updateKeySelectionBox: builds/repositions a DOM overlay and, ONLY on first creation, registers one 'contextmenu' listener and wires three mousedown chains (whose eventual callbacks, when actually dragged, arm window._motionSkewDrag via startSkewDrag — packet 2's own effect, not re-counted here); may show a toast (window.showToast/SM.t) on a stale-selection edge case. Zero ld.motion/motionStatic/frame writes and zero pushUndo calls anywhere in this function."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No frame-save call (saveActiveLayerFrame/saveAllLayerFrames) occurs anywhere in motion.js:11925-12174 (grep-verified). This span never mutates `ld.motion`/`ld.motionStatic` directly — it only mutates the SELECTION model (`_motionKeySel` via setKeySel, C20o) and DOM overlay state; the one project-affecting side effect it arms (`window._motionSkewDrag`) is consumed and turned into an actual keyframe write by onDragMove (sibling-covered, motion.js:12934+), which this span never calls."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No parser is implemented in this span. This span reads nothing that importJSON restores beyond the already-loaded `ld.motion`/`ld.motionStatic` tracks via trackFor/keyAt (pre-11412); it owns no persisted field of its own."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Exactly ONE pushUndo() call in this entire span, inside startSkewDrag (motion.js:12073), fired at drag-ARM time before any mutation — the checkpoint exists so the drag that onDragMove (sibling-covered) is about to perform is undoable as a single step. Every other function in this span (startMarquee, applyMarqueeSelection, marqueeLayersIn, addStaggerEdges/addSpaceEdges/addMoveFill, buildKeyRows, removeKeySelectionBox, updateKeySelectionBox) makes zero pushUndo/pushUndoLayers/pushUndoActiveFrame calls, consistent with all of them being selection/overlay-only."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "This span IS the selection consumer for two independent selection models simultaneously: the KEY selection (`_motionKeySel`, mutated only via setKeySel, C20o, called from applyMarqueeSelection at 11955) and the LAYER selection (read via `_layerSel.length >= 2` at 12111, mutated by sibling-covered endMarquee using `_motionMarquee.layers`, itself produced by this span's own marqueeLayersIn). CLAUDE.md §11's 'one gesture, one rectangle' contract is implemented by the bidirectional forward documented in reconciliation/boundaries: this span's own applyMarqueeSelection is exported as `SMMotion.marqueeSelect` (motion.js:13787) and called from layer-inout.js's own updateMarquee (layer-inout.js:494); the reverse call (motion.js's own sibling-covered updateMarquee calling `SMLayerInOut.marqueeSelect`, motion.js:12719) is outside this span, cited by line only."
+    },
+    {
+      "consumer": "render/export",
+      "disposition": "None of this span's ten declared symbols is referenced in engine-bridge.js or export.js (grep-confirmed). This is timeline-editing UI exclusively; buildSceneJson/getEffectiveStrokes never call into any function declared in motion.js:11925-12174."
+    },
+    {
+      "consumer": "layer-inout.js cross-module contract",
+      "disposition": "layer-inout.js declares four namesake functions (startMarquee:402, applyMarqueeSelection:463, updateMarquee:479, endMarquee:497) operating on a wholly separate `_marquee` closure and `.layer-inout-bar` DOM — confirmed distinct by direct read, not merely by name (same namesake pattern already documented for segmentLeftKey/camera.js in C20n and rotPt/rotVec/tools.js in C20n). The only real cross-module coupling is the bidirectional `SMMotion.marqueeSelect`/`SMLayerInOut.marqueeSelect` forward described above."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "marquee-hit-test-and-selection-model",
+      "status": "proposed, unrun",
+      "matrix": "A marquee drawn over (a) zero diamonds, (b) diamonds on one track only, (c) diamonds across 3 tracks with Shift held vs. not held, (d) a rectangle that visually touches a diamond's cell but not the diamond's own painted center.",
+      "expected": "(a) setKeySel([]) is still called (clears prior selection unless Shift); (b)/(c) selected diamonds get `.sel` and their {holder,prop,key} triples land in `_motionKeySel` via setKeySel, additive under Shift per the caller passing the accumulated `sel`; (d) the diamond is NOT selected — the hit test is the diamond's own getBoundingClientRect() center, not the cell's."
+    },
+    {
+      "id": "marquee-layers-in-bar-vs-row-overlap",
+      "status": "proposed, unrun",
+      "matrix": "A marquee whose Y-range crosses a layer row that HAS a rendered `.layer-inout-bar` trimmed to a sub-range of the timeline, with X-range (i) fully overlapping the bar, (ii) fully to the right of the bar's own rect, (iii) with x0/x1 omitted (null).",
+      "expected": "(i) the layer index is included in marqueeLayersIn's return; (ii) it is EXCLUDED even though the row's own bounding rect overlaps Y — the 2026-09-03 bar-only fix; (iii) falls back to row-only overlap (the pre-fix behavior), included."
+    },
+    {
+      "id": "key-selection-box-threshold-and-geometry",
+      "status": "proposed, unrun",
+      "matrix": "0/1/2+ selected diamonds on 1 track vs. 2+ tracks; then, with the box shown, one selected key's row scrolled/animated so its diamond moves without a full renderTimeline().",
+      "expected": "Box only appears at 2+ diamonds on 2+ DISTINCT tracks (rowsHit.length>=2); box's left/top/width/height always equal the selected diamonds' own getBoundingClientRect() min/max, re-measured on every updateKeySelectionBox() call including the moved-without-rebuild case."
+    },
+    {
+      "id": "edge-fill-mode-dispatch",
+      "status": "proposed, unrun",
+      "matrix": "Mousedown on each of the box's 5 surfaces (top, bottom, left, right, fill) with and without Cmd/Ctrl held on the fill; then Space/Stagger attempted with a selection that spans only 1 frame or only 1 track respectively.",
+      "expected": "top/bottom arm mode 'top'/'bottom'; left/right arm mode 'left'/'right'; fill arms 'move' (no modifier) or 'liquify' (Cmd/Ctrl); the 1-frame Space attempt shows toastSelectKeysOn2DifferentFramesToSpace and does NOT call startSkewDrag; the 1-track Stagger attempt shows toastSelectKeysOn2TracksToSkew and does NOT call startSkewDrag — in both bail cases, `pushUndo()` is never called (no checkpoint for a drag that never starts)."
+    },
+    {
+      "id": "skew-drag-arm-state-and-undo",
+      "status": "proposed, unrun",
+      "matrix": "startSkewDrag called with 1 row (only-move-relevant) vs. 3 rows of varying frame ranges; grabFrame computed with #frame-grid present vs. absent (detached DOM).",
+      "expected": "pushUndo() fires exactly once per successful arm (never on the empty-rows bail at 12072); window._motionSkewDrag.fMin/fMax equal the true min/max of all rows' `.orig` frames regardless of row order; grabFrame falls back to `(fMin+fMax)/2` when `#frame-grid` is missing, per the ternary at 12083."
+    },
+    {
+      "id": "cross-box-engine-sharing-with-C20r",
+      "status": "proposed, unrun",
+      "matrix": "Once C20r is filed: drag the layer-stagger box's Space edges vs. its Move fill vs. its Stagger edges, each with a distinct rows-source and inspect which drag-arm function actually runs.",
+      "expected": "Space edges call THIS artifact's startSkewDrag (12070) with C20r's own buildLayerRows() rows; Move fill calls C20r's own dragLayerBars, NOT startSkewDrag; Stagger edges call C20r's own startLayerSkewDrag, NOT startSkewDrag — confirming the asymmetric reuse already read directly from source (only 1 of C20r's 3 gestures shares this artifact's engine)."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "marqueeHitResult(x0,y0,x1,y1) -> {keys: Array<{holder,prop,key}>, layers: number[], rowsTouched: number}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "applyMarqueeSelection today folds 'which keys got selected' and 'which diamonds got painted .sel' into one pass with no return value — a caller that wants to know whether the marquee actually TOUCHED anything (e.g. to skip an unnecessary updateKeySelectionBox re-measure) must re-derive it from `_motionKeySel`'s own length delta rather than reading it off the call itself."
+    },
+    {
+      "api": "skewDragEngine(rows, mode, e) -> {handle}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "startSkewDrag/onDragMove/onDragUp today communicate purely through the ambient global `window._motionSkewDrag` — documented and functional, but every consumer (this span, C20r's own addSpaceEdges callback, and the drag lifecycle itself) must know that exact global name and shape by convention. A returned handle object would make the coupling explicit and testable without inspecting `window` directly, and would let C20r's own Space-edge reuse (the one gesture it actually shares) be expressed as passing the SAME handle rather than re-deriving fMin/fMax/grabFrame from a second row set."
+    },
+    {
+      "api": "keySelectionBoxState() -> {visible: boolean, tracks: number, keys: number, rect: DOMRect|null}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "The 2-track/2-key threshold that decides whether the box exists at all is currently only observable by querying the DOM for `_keySelBoxEl`'s presence from outside this module — a bounded read-only introspection API would make the threshold's outcome directly assertable without depending on internal class names."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "packet_symbols": [
+      "_motionMarquee",
+      "startMarquee",
+      "applyMarqueeSelection",
+      "marqueeLayersIn",
+      "addStaggerEdges",
+      "addSpaceEdges",
+      "addMoveFill",
+      "startSkewDrag",
+      "buildKeyRows",
+      "_keySelBoxEl",
+      "removeKeySelectionBox",
+      "updateKeySelectionBox"
+    ],
+    "caller_anchors": [
+      "applyMarqueeSelection: exported as SMMotion.marqueeSelect (motion.js:13787) with exactly ONE cross-file caller (layer-inout.js:494) plus 3 same-file callers (10546, 10907, 12710) — not exported under its own bare name.",
+      "startMarquee: NOT exported on SMMotion; 3 same-file callers (10600, 10964, 13347, the last being this artifact's own capture-phase registration site) plus one unrelated namesake in layer-inout.js:402.",
+      "marqueeLayersIn/addStaggerEdges/addSpaceEdges/addMoveFill/startSkewDrag/buildKeyRows/removeKeySelectionBox/updateKeySelectionBox: NOT exported on SMMotion; every caller of each is inside motion.js (grep-confirmed zero cross-file callers for all eight), split between same-packet, cross-packet-within-this-artifact, and sibling C20o/C20r call sites as detailed per-packet above — addStaggerEdges/addSpaceEdges/addMoveFill/startSkewDrag additionally have C20r-sibling callers reusing them for a second (layer-level) selection box.",
+      "updateKeySelectionBox in particular has ZERO callers in timeline.js, correcting the parent issue's own stated expectation (see reconciliation/boundaries) — all 4 of its callers are motion.js-internal, 3 pre-span (C20o) and 1 post-span (sibling-covered)."
+    ],
+    "helper_anchors": "trackFor:443, keyAt:1189 (both pre-11412, C02/C20a-j); setKeySel:11473, selectMotionProperty:11498, renderTimelineMotion:11136 (C20o, merged PR #1276); invertKeySelection:11905-11924 (C20p, not yet filed, this artifact's own immediate predecessor); _layerStaggerBoxEl/buildLayerRows/startLayerSkewDrag/dragLayerBars/removeLayerStaggerBox (C20r, not yet filed, motion.js:12175-12405); updateMarquee:12700-12722, endMarquee:12723ish, onDragMove:12934, onDragUp:13101, motionDragScrollLeft:12832, previewKeyframeShift:12487, setAppMode:13125 (all sibling-covered, physically outside 11412-12405 or in the still-open no-man's-land 12406-13124); pushUndo (tweens.js:4741); SM.t (i18n.js:4185, exported 4239); showToast (timeline.js:7447, C19w); _layerSel (timeline.js:5423, P30); FC (app.js:76, timeline-zoom.js:107/270); layer-inout.js's own startMarquee:402/applyMarqueeSelection:463/updateMarquee:479/endMarquee:497 and its export marqueeSelect:1640 — all pre-existing, cited by line only, none re-derived.",
+    "render_path_summary": "None of this artifact's twelve symbols is on the render path. Grep-confirmed zero references in engine-bridge.js and export.js for every one of _motionMarquee, startMarquee, applyMarqueeSelection, marqueeLayersIn, addStaggerEdges, addSpaceEdges, addMoveFill, startSkewDrag, buildKeyRows, _keySelBoxEl, removeKeySelectionBox, updateKeySelectionBox. This is exclusively Motion-timeline selection/drag-arming UI; buildSceneJson/getEffectiveStrokes reach the project's actual keyframe data through valueAtFrame (C20n) and the writers this span never calls directly (onDragMove, sibling-covered, is the eventual mutator of whatever this span arms)."
+  },
+  "validation": {
+    "expected_assigned_lines": 250,
+    "expected_classification": {
+      "code": 170,
+      "comment": 80,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        11925,
+        12000
+      ],
+      [
+        12001,
+        12102
+      ],
+      [
+        12103,
+        12174
+      ]
+    ],
+    "packet_classification": [
+      {
+        "range": [
+          11925,
+          12000
+        ],
+        "code": 55,
+        "comment": 21,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          12001,
+          12102
+        ],
+        "code": 63,
+        "comment": 39,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          12103,
+          12174
+        ],
+        "code": 52,
+        "comment": 20,
+        "whitespace": 0
+      }
+    ],
+    "coverage_contract": "Validate assigned_ranges and flattened areas[].packets[].coverage_ranges independently with the same function; reject actual artifact omission at line 11925 and overlap at line 12174.",
+    "required_checks": [
+      "frozen/current motion.js blob and allocated-base ancestry",
+      "three unique packet IDs, exact ranges, counts, symbols, helpers, callers and boundaries",
+      "before-11925 (C20p, invertKeySelection) preceding boundary and after-12174 (C20r, layer stagger header) following boundary",
+      "seven consumer dispositions and proposed, unrun fixtures",
+      "the 'one gesture, one rectangle' bidirectional forward (SMMotion.marqueeSelect <-> SMLayerInOut.marqueeSelect) against the actual export/call-site lines; the 2-track threshold and rendered-diamond geometry source for the key selection box; the edge/fill mode-string mapping and its separation from onDragMove's own mode-to-behavior translation; the window._motionSkewDrag (not _motionKeyDrag) drag-arm shape; the asymmetric C20r reuse (Space only) against the actual source lines",
+      "JSON, private-path, secret, placeholder and trailing-whitespace hygiene",
+      "sole untracked artifact or committed-clean mode",
+      "no overlap with any merged C20* sibling artifact in the same census directory"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, GPU, runtime edit, export or product acceptance claim."
+  }
+}
