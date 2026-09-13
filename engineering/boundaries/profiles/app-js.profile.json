@@ -1777,6 +1777,18 @@
       ]
     },
     {
+      "id": "app.tween.assignment.domain",
+      "layer": "domain",
+      "dir": "src/js/domain/tween",
+      "files": [
+        "assignment.js"
+      ],
+      "sizeProfile": "Domain kernel",
+      "publicApi": [
+        "assignment.js"
+      ]
+    },
+    {
       "id": "app.expression.random.domain",
       "layer": "domain",
       "dir": "src/js/domain/animation",
