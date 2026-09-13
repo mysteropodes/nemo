@@ -1,0 +1,525 @@
+{
+  "census_id": "C19ad",
+  "issue": 1243,
+  "title": "Timeline.js onKeyDown field guards, undo/save, clipboard chords, select-all/duplicate/group/lock/zoom, generic field guard, and Motion-only P/A/R/S/T/U/E/M/graph-toggle/key-selection/work-area overrides",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf following C19ac/#1240. `onKeyDown` (9641-10216) is the app-wide keyboard handler; C06.preferences.shortcuts-system already owns its signature line 9641 and the reconfigurable-shortcut dispatch lines 9935-9949 (`runToolShortcut`/`runCommandShortcut`). This leaf maps the body BEFORE that dispatch (9642-9934, 293 lines: 102 code, 191 comment, 0 blank, independently re-derived by script against the frozen blob, matching the issue's own proposed union and per-packet table exactly, no boundary correction needed); C19ae maps the body after it (9950-10216). It starts at the first body line of `onKeyDown` (9642, the `inField` rationale comment; line 9641 `function onKeyDown(event){` is C06's) and ends at the closing brace of the N work-area branch (9934); line 9935 `if(runToolShortcut(k)){}` opens C06's own dispatch, confirmed by direct read and by `runToolShortcut`'s declaration at timeline.js:7606 (`TOOL_SHORTCUTS` 7457, `COMMAND_SHORTCUTS` 7508, `runCommandShortcut` 7570 — all C06, cited by name/line only). Cited by name/line only, not re-mapped: `TOOL_SHORTCUTS`/`COMMAND_SHORTCUTS`/`runToolShortcut`/`runCommandShortcut` (7457/7508/7570/7606 + 9935-9949, C06); `undo` (tweens.js:4964)/`redo` (tweens.js:4982) — this scope calls them by name only, it never calls `pushUndo` itself anywhere in its own 293 lines (confirmed by grep restricted to this range — zero hits for `pushUndo(`); `SMProject.save`(project.js:185)/`.saveAs`(project.js:172); the clipboard helpers `copySelection`/`cutSelection`/`pasteSelection` (tools.js:1661/1673/1679, and `_canvasClip`, tools.js:1660, the module-local clipboard var they share) and `window.SM.copyFrames`/`.cutFrames`/`.pasteFrames` (timeline.js:1789/1802/1819, inside the large `window.SM={...}` object literal opened at timeline.js:349, same file, out of scope, earlier census leaf); `duplicateSelection`(tools.js:1636)/`window.SM.duplicateLayer`(timeline.js:1271)/`duplicateSelectedFrames`(app.js:5403); `groupSelection`/`ungroup`(group-bridge.js) — actually `SMGroup.groupSelection`(group-bridge.js:91)/`.ungroupSelection`(group-bridge.js:194), exported at group-bridge.js:836, and `groupSelectionIntoFolder`(timeline.js:5669, same file, out of scope, earlier census leaf); `toggleLayerLock` → `window.SM.toggleLayerLock`(timeline.js:1592); the zoom setters `setZoom`/`fitToWindow` → this scope's own inline `view.zoom=...;updZoom()`(app.js:519) for in/out and `window.SM.fitCanvas`(dispatching to app.js:510) for reset-to-fit, `updZoom`/`fitCanvas` both out of scope; `SMMotion.handlePropShortcut`(motion.js:675)/`.revealAnimated`(→ `handleRevealAnimatedShortcut`, motion.js:787)/`.revealEffects`(→`handleRevealEffectsShortcut`, motion.js:894)/`.revealMattes`(→`handleRevealMattesShortcut`, motion.js:899)/`.hasKeySelection`(motion.js:1151)/`.applyEasyEase`(motion.js:1028)/`.setKeyInterp`(motion.js:1027)/`.deleteSelectedKeys`(motion.js:1065)/`.nudgeSelectedKeys`(motion.js:1033)/`.copySelectedKeys`(motion.js:1117, called earlier in THIS scope's own Cmd+C branch, 9683)/`.pasteKeys`(motion.js:1126, called earlier in THIS scope's own Cmd+V branch, 9704)/`.hasKeyClipboard`(motion.js:1152) — all exported at `window.SMMotion={...}` (motion.js:13352, C20 lineage); `SMMotionGraph.toggle`(motion-graph.js:450, exported motion-graph.js:512, C09); `_pointerOverTimeline`(declared timeline.js:9608, C19ac's own scope, read-only here); `updateWaBar` → `window.updateWaBar`(ui.js:975); `state.waIn`/`state.waOut` writers elsewhere (app.js: symbol/montage view-snapshot save/restore at 4178-4184/4243-4244/4299-4344/4363-4364, frame-count-change clamps at 5226-5227/5336/5397, all out of scope) and readers (export.js:372-373, the exported range's DEFAULT start/end — see `source_consumers`); `window._layerActiveExplicit`(written by `window.SM.setActiveLayer`, timeline.js:1552-1552's own comment; cleared at motion.js:9777 and shapes-panel.js:103, out-of-scope writers)/`_layerSel`(declared timeline.js:5423, an earlier C19 slice, layer-panel row selection); `onKeyUp`(C19af, per the issue, paired at the same `addEventListener` line as this scope's own registration). The `document.addEventListener('keydown', onKeyDown)` registration is at timeline.js:10251 (`document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);`), confirmed by grep to be the ONLY call site for `onKeyDown` anywhere in the codebase — every other `onKeyDown` hit in src/js is either this scope's own declaration/comments (timeline.js:7452,7500,9605,9641,10222,10260) or an unrelated same-named LOCAL closure function in fill-bridge.js:191/draw-bridge.js:1073/layer-inout.js:341 (each its own separate scope, not this one, confirmed by reading each declaration directly). This JSON authoring does not authorize source changes.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "da00405b447bfc621d9963bb48173c739e2d519d",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19ad-timeline-onkeydown-part1-census",
+  "assigned_ranges": [
+    {
+      "start": 9642,
+      "end": 9934
+    }
+  ],
+  "coverage_note": "293 assigned lines occur once across four packets (one coverage_range per packet, no gaps, no other-owner exclusions): 102 code, 191 full-line comment, 0 blank — independently re-derived by running a Python re-implementation of the validator's own classify() against `git show 59a5a38c:src/js/timeline.js`, once per packet and once for the whole span. Result equals the issue's own proposed table exactly (102/191/0 over 293 lines) and the issue's own proposed per-packet breakdown exactly (79(25/54/0), 128(49/79/0), 24(2/22/0), 62(26/36/0)) — no boundary correction needed. Line 9641 (`function onKeyDown(event){`) is C06's own signature line (out of scope, confirmed by the issue's own text and by `onKeyDown`'s single call site at timeline.js:10251 being unrelated to the signature itself). Line 9935 (`if(runToolShortcut(k)){}`) opens C06's own reconfigurable-shortcut dispatch (confirmed by direct read of 9935-9949 and by `runToolShortcut`'s declaration at timeline.js:7606, well before this scope's own range).",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (da00405b447bfc621d9963bb48173c739e2d519d at authoring time) has the identical timeline.js blob (git rev-parse da00405...:src/js/timeline.js == git rev-parse 59a5a38c...:src/js/timeline.js == cc4cfd27dc59d797c911d840dc46e2f816942123); this artifact branches from origin/main at 350e3faf9d89a324a96b9e117b172f74214cc763 (also identical timeline.js blob), verified directly in the working worktree before authoring (worktree at /Users/ivg/github/nemo-worktrees/c19ad-census-20260913, working tree clean).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller/reader findings were derived by `grep -n` against the frozen blob and the current worktree for every symbol this scope reads or dispatches to (`inField`, `_hasInternalClip`, `_canvasClip`, `_sel`, `_gLayerRows`, `_layerSel`, `window._layerActiveExplicit`, `window._lastClipKind`, `_pointerOverTimeline`, `state.waIn`/`waOut`/`activeLayerIdx`/`appMode`/`currentFrame`/`selectedStrokeIndices`/`tool`/`totalFrames`), each cross-checked by a direct `sed -n`/Read of the same range and, for every external symbol, of its own defining file via `grep -n 'function <name>'`/`<name>:function` declaration forms rather than trusting a call site's apparent file.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun. In-source feedback quotes (feedback #213/#749/#803, and the 2026-07-17/2026-07-31/2026-08-27/2026-09 dated comments) are read as authorial intent, not independently re-verified execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19ad-timeline-onkeydown-chords-motion-overrides.json and the four timeline.js packets partitioning lines 9642-9934.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "function_boundary": "Four packets by construct, each a contiguous slice of `onKeyDown`'s own body at 2-space indentation: (1) the two field-guard variables plus Enter-blur, Undo/Redo, Save/SaveAs, and the four clipboard chords (Cmd+Shift+C precompose, Cmd+C, Cmd+X, Cmd+V with its SVG-passthrough branch); (2) Select All, Cmd+Shift+D split-at-playhead, Cmd+D duplicate (three-way selection-priority branch), the three Cmd+G variants (canvas group / ungroup / folder group) plus the layer-row-selection gate, Cmd+L lock, and the three Ctrl+Alt zoom chords; (3) the generic editable-field early return plus `var k=event.key` and the P/A/R/S/T scoping-rationale comment block that precedes the first Motion override; (4) every Motion-only override that follows — P/A/R/S/T via `handlePropShortcut`, U/E/M reveal shortcuts, Shift+F3 graph toggle, the five keyframe-editing chords gated on `hasKeySelection()`, and the B/N work-area chords gated on `_pointerOverTimeline`.",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C06.preferences.shortcuts-system (existing owner, timeline.js:9641 signature + 9935-9949 dispatch, and 7457-7723 tables/dispatchers, merged, out of scope)",
+      "disposition": "Retains `function onKeyDown(event){` (9641), `TOOL_SHORTCUTS` (7457)/`COMMAND_SHORTCUTS` (7508)/`runCommandShortcut` (7570)/`runToolShortcut` (7606), and the 9935-9949 dispatch (`if(runToolShortcut(k)){}...else if(runCommandShortcut(k,event)){}...`) in full — cited by name/line only. This scope's own boundary begins at 9642 (the `inField` rationale, the very next line after C06's signature) and ends at 9934; 9935 is confirmed C06's by direct read (it calls `runToolShortcut`, declared at 7606, well outside this scope's own 9642-9934 range)."
+    },
+    {
+      "owner": "C19ae (next leaf, timeline.js:9950-10216, sibling worktree at authoring time, not yet merged)",
+      "disposition": "Owns timeline.js:9950-10216 in full — the remainder of `onKeyDown` after C06's 9935-9949 dispatch (letter shortcuts for tools not covered by TOOL_SHORTCUTS, transport, pen-editing Delete/Escape, per the issue's own text). Confirmed disjoint by construction: this scope's own declared range ends at 9934, C06 owns 9935-9949, C19ae's range begins at 9950 per the issue; none of this scope's own declared symbols appears past 9934 by a whole-scope grep restricted to 9950-10216."
+    },
+    {
+      "owner": "C19ac (existing owner, `_pointerOverTimeline`, timeline.js:9608, merged, out of scope)",
+      "disposition": "Retains its own declaration and hover-tracking listeners (9608, 9612-9613) in full — cited by name/line only. This scope's own B/N work-area branches (9921, 9928) read `_pointerOverTimeline` as a hover gate but declare nothing about it themselves."
+    },
+    {
+      "owner": "tools.js (`copySelection`/`cutSelection`/`pasteSelection`/`duplicateSelection`/`clearSel`/`getSI`/`_canvasClip`, existing owner, out of scope)",
+      "disposition": "Retains its own bodies in full — cited by name/line only: `copySelection` (1661), `cutSelection` (1673), `pasteSelection` (1679), `duplicateSelection` (1636), `clearSel` (1475), `getSI` (1487), the module-local `_canvasClip` clipboard var (1660). This scope's own Cmd+C/X/V/D and Select-All branches call these by name only; no body is reproduced here. `pasteSelection`'s own decision of WHICH stored clip to apply is entirely internal to tools.js — this scope only decides WHETHER to call it, per the priority chain in `boundaries` (c)."
+    },
+    {
+      "owner": "app.js (`isSelectablePathChild`/`updZoom`/`fitCanvas`/`duplicateSelectedFrames`, existing owner, out of scope)",
+      "disposition": "Retains its own bodies in full — cited by name/line only: `isSelectablePathChild` (576, `c.visible!==false&&!(c.data&&(c.data.isLinkedFillCompanion||c.data.isBrushTextureCopy))` — this scope's own Select-All branch (9724) calls it as the `.filter()` predicate alongside an `instanceof Path||Raster` check), `updZoom` (519, called from this scope's own three zoom chords, 9846-9847, but NOT from the reset chord 9848 which calls `fitCanvas` only), `fitCanvas` (510, dispatched via `window.SM.fitCanvas()` at 9848 and, out of scope, timeline.js's own SM object), `duplicateSelectedFrames` (5403, this scope's own Cmd+D fallback at 9772 when there is no canvas selection but `_sel.frames.length`)."
+    },
+    {
+      "owner": "the large `window.SM={...}` object literal (timeline.js:349) and the per-property bodies this scope's own branches dispatch to by name, existing owner, out of scope",
+      "disposition": "Retains its own bodies in full — cited by name/line only: `copyFrames` (1789), `cutFrames` (1802), `pasteFrames` (1819), `duplicateLayer` (1271), `splitLayerAtPlayhead` (1200), `toggleLayerLock` (1592), `setActiveLayer` (1534), `convertActiveLayerToComponent` (1629). This scope's own eight distinct call sites (9684/9706/9708, 9685, 9707, 9741, 9759/9770/9773, 9824, 9681 respectively) invoke these by name only."
+    },
+    {
+      "owner": "group-bridge.js (`SMGroup.groupSelection`/`.ungroupSelection`) and timeline.js's own `groupSelectionIntoFolder` (5669, out of scope, earlier census leaf)",
+      "disposition": "Retain their own bodies in full — cited by name/line only: `groupSelection` (91)/`ungroupSelection` (194), exported at `window.SMGroup={...}` (836). This scope's own three Cmd+G-family branches (9794/9802/9813) each call exactly one of these three by name — see `boundaries` (d) for the precedence and gating between them."
+    },
+    {
+      "owner": "motion.js (`SMMotion.handlePropShortcut`/`.hasKeySelection`/`.applyEasyEase`/`.setKeyInterp`/`.deleteSelectedKeys`/`.nudgeSelectedKeys`/`.hasKeyClipboard`/`.copySelectedKeys`/`.pasteKeys`/`.revealAnimated`(→`handleRevealAnimatedShortcut`)/`.revealEffects`(→`handleRevealEffectsShortcut`)/`.revealMattes`(→`handleRevealMattesShortcut`), existing owner, C20 lineage, out of scope)",
+      "disposition": "Retain their own bodies in full — cited by name/line only: `handlePropShortcut` (675), `hasKeySelection` (1151), `applyEasyEase` (1028), `setKeyInterp` (1027), `deleteSelectedKeys` (1065), `nudgeSelectedKeys` (1033), `hasKeyClipboard` (1152), `copySelectedKeys` (1117), `pasteKeys` (1126), `handleRevealAnimatedShortcut` (787, exported as `revealAnimated`), `handleRevealEffectsShortcut` (894, exported as `revealEffects`), `handleRevealMattesShortcut` (899, exported as `revealMattes`) — all exported via `window.SMMotion={...}` (13352). Two of these (`copySelectedKeys`, `pasteKeys`) are called from EARLIER in this same scope's own body (9683, inside the Cmd+C branch; 9704, inside the Cmd+V branch), not from packet 4's Motion-override section — see `boundaries` (e) for the full inventory restricted to the Motion-override packet itself."
+    },
+    {
+      "owner": "motion-graph.js (`SMMotionGraph.toggle`), existing owner, C09, out of scope",
+      "disposition": "Retains its own body in full — cited by name/line only (450, exported at 512). This scope's own sole call site is the Shift+F3 branch (9887)."
+    },
+    {
+      "owner": "ui.js (`window.updateWaBar`), existing owner, out of scope",
+      "disposition": "Retains its own body in full — cited by line only (975: `window.updateWaBar=function(){...}`, reads `state.waIn`/`waOut` directly as the single source of truth per its own in-source comment at 963-972, distinguishing it from the separate `window._waIn`/`_waOut` copy `initWaDrag`'s own mouse-drag keeps synced). This scope's own B/N branches (9925, 9932) call it after writing `state.waIn`/`waOut` directly, guarded by existence."
+    },
+    {
+      "owner": "export.js (the exported range's default start/end, existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by line only (372-373: `var start=(opts&&opts.start!==undefined)?opts.start:state.waIn; var end=...:state.waOut;`). This scope's own B/N chords are therefore export-relevant in the same indirect sense C19ai's blend/matte fields were: no function this scope declares is called from export.js, but the FIELDS it writes (`state.waIn`/`state.waOut`) ARE read there as the default export frame range — see `source_consumers`."
+    },
+    {
+      "owner": "app.js (`state.waIn`/`state.waOut` other writers: symbol/montage view-snapshot save-restore, frame-count-change clamps), existing owner, out of scope",
+      "disposition": "Retains its own bodies in full — cited by line only (4178/4184/4243-4244/4299/4344/4363-4364, 5226-5227/5336/5397). Not this scope's concern beyond noting the same two fields have several other writers outside this span; none of them is called FROM this scope."
+    },
+    {
+      "owner": "window._layerActiveExplicit (written by `window.SM.setActiveLayer`, timeline.js:1552; cleared at motion.js:9777/shapes-panel.js:103) and `_layerSel` (declared timeline.js:5423, an earlier C19 slice), existing owners, out of scope",
+      "disposition": "Retain their own writers in full — cited by name/line only. This scope's own Cmd+D branch (9770) and the `_gLayerRows` gate feeding the Cmd+G precedence (9793) both READ `window._layerActiveExplicit`; this scope's own Cmd+L branch (9824) and `_gLayerRows` (9793) both READ `_layerSel`. Neither is written anywhere in this scope's own 293 lines."
+    },
+    {
+      "owner": "fill-bridge.js/draw-bridge.js/layer-inout.js (unrelated same-named local `onKeyDown` closures), existing owners, out of scope",
+      "disposition": "Retain their own bodies in full — cited by line only (fill-bridge.js:191, draw-bridge.js:1073, layer-inout.js:341). Each is its OWN separate closure-scoped function, confirmed by direct read of each declaration; none is the `onKeyDown` this scope documents, and none is called from or calls into this scope's own body."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 9641 (C06's own `function onKeyDown(event){` signature) is outside coverage; line 9642 (this scope's own `inField` rationale comment) begins this scope. Line 9934 (the N work-area branch's own closing brace) is the last line of this scope; line 9935 opens C06's own `if(runToolShortcut(k)){}` dispatch, confirmed disjoint by direct read (it calls `runToolShortcut`, declared timeline.js:7606, well outside 9642-9934).",
+    "No lines inside 9642-9934 are excluded for another owner: every line belongs to exactly one of the four packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "(a) The complete ORDERED chord table for 9642-9934 — every `if`/branch that can consume the keydown, in source order, with its exact predicate, guard, `preventDefault`/`return`, and callee(s) (owner file:line in `boundaries` (h) unless noted inline). 1. Enter-in-INPUT (9661): `event.key==='Enter'&&event.target.tagName==='INPUT'` (targets INPUT only, not SELECT/TEXTAREA/contentEditable — deliberately narrower than `inField`) — no `preventDefault`, `return` yes, calls `event.target.blur()`. 2. Undo/Redo (9662): `(metaKey||ctrlKey)&&key==='z'` — `if(inField)return` FIRST, then `preventDefault()`, `return` yes; `shiftKey`→`redo()`(tweens.js:4982) else `undo()`(tweens.js:4964). 3. Save/SaveAs (9663): `(metaKey||ctrlKey)&&key==='s'` — NO `inField` guard (deliberate, comment 9653-9654: 'Ctrl+S stays global'), `preventDefault()` unconditional, `return` yes; `shiftKey`→`SMProject.saveAs()`(project.js:172) else `SMProject.save()`(project.js:185). 4. Precompose (9681): `(metaKey||ctrlKey)&&shiftKey&&(key==='c'||'C')` — checked BEFORE plain Cmd+C so shiftKey isn't silently swallowed there; `if(inField)return`, `preventDefault()`, `return` yes; calls `window.SM.convertActiveLayerToComponent()`(timeline.js:1629). 5. Copy (9682-9684): `(metaKey||ctrlKey)&&key==='c'` — `if(inField)return`, `preventDefault()`; nested: Motion key-selection→`SMMotion.copySelectedKeys()`(motion.js:1117)+`return`; else `selectedPaths.length`→`copySelection()`(tools.js:1661) else `window.SM.copyFrames()`(timeline.js:1789); `return` yes either path. 6. Cut (9685): `(metaKey||ctrlKey)&&key==='x'` — `if(inField)return`, `preventDefault()`, `return` yes; `selectedPaths.length`→`cutSelection()`(tools.js:1673) else `window.SM.cutFrames()`(timeline.js:1802). 7. Paste (9686-9709): `(metaKey||ctrlKey)&&key==='v'` — `if(inField)return` FIRST, before any of the SVG logic; see `boundaries` (c) for the full decision tree that follows (this branch's own `preventDefault`/`return` are conditional, not both unconditional at entry, unlike every other chord in this table). 8. Select All (9721-9729): `(metaKey||ctrlKey)&&(key==='a'||'A')&&(tool==='select'||'subselect')&&userLayers[activeLayerIdx]` — NO `inField` guard (tool-gated instead), `preventDefault()` unconditional, `return` yes; calls `clearSel()`(tools.js:1475), builds `selectedPaths` via `.filter(instanceof Path||Raster && isSelectablePathChild)`(app.js:576), `state.selectedStrokeIndices` via `.map(getSI)`(tools.js:1487), `renderArcs()`+`updateUI()`, `SMEngineBridge.renderNow()` if present. 9. Split-at-playhead (9739-9743): `(metaKey||ctrlKey)&&shiftKey&&(key==='d'||'D')` — checked BEFORE plain Cmd+D; NO `inField` guard; `preventDefault()`, `return` yes; calls `window.SM.splitLayerAtPlayhead()`(timeline.js:1200). 10. Duplicate (9751-9775): `(metaKey||ctrlKey)&&(key==='d'||'D')` — `if(inField)return`, `preventDefault()`; three-way priority (see `boundaries` (d)'s sibling logic and the packet-2 behavior notes): Motion mode→`duplicateLayer()`; else `window._layerActiveExplicit`→`duplicateLayer()`; else `selectedPaths.length`→`duplicateSelection()`(tools.js:1636); else `_sel.frames.length`→`duplicateSelectedFrames()`(app.js:5403); else→`duplicateLayer()`(timeline.js:1271); `return` yes on every path. 11. Group-canvas (9794-9798): `(metaKey||ctrlKey)&&(key==='g'||'G')&&!shiftKey&&!_gLayerRows&&window.selectedPaths&&selectedPaths.length>=2` — NO `inField` guard; `preventDefault()`, `return` yes; calls `SMGroup.groupSelection()`(group-bridge.js:91) if `window.SMGroup`. 12. Ungroup (9802-9806): `(metaKey||ctrlKey)&&(key==='g'||'G')&&shiftKey&&window.selectedPaths&&selectedPaths.length` — NO `inField` guard; `preventDefault()`, `return` yes; calls `SMGroup.ungroupSelection()`(group-bridge.js:194). 13. Group-into-folder (9813-9817): `(metaKey||ctrlKey)&&(key==='g'||'G')&&!shiftKey` — the fallback when #11's extra clauses fail; NO `inField` guard; `preventDefault()`, `return` yes; calls `groupSelectionIntoFolder()`(timeline.js:5669). 14. Lock (9821-9826): `(metaKey||ctrlKey)&&(key==='l'||'L')` — `if(inField)return`, `preventDefault()`, `return` yes; `forEach` over `_layerSel.length?_layerSel.slice():[state.activeLayerIdx]`→`window.SM.toggleLayerLock(idx)`(timeline.js:1592) per index — see `boundaries` (d) for what this locks. 15. Zoom-in (9846): `(metaKey||ctrlKey)&&altKey&&(code==='Equal'||code==='NumpadAdd')` (event.code, layout-proof) — NO `inField` guard; `preventDefault()`, `return` yes; inline `view.zoom=Math.min(20,view.zoom*1.1)`, `updZoom()`(app.js:519), `renderArcs()`, `SMEngineBridge.renderNow()` if present. 16. Zoom-out (9847): same shape, `code==='Minus'||'NumpadSubtract'`, `view.zoom=Math.max(.05,view.zoom/1.1)`. 17. Zoom-reset (9848): `code==='Digit0'||'Numpad0'` — `preventDefault()`, `return` yes; calls `window.SM.fitCanvas()`(dispatching to app.js:510) ONLY — no `updZoom`/`renderArcs`/`renderNow` call at this call site itself, unlike #15/#16. [9849: generic editable-field early return, not a chord — see `boundaries` (b).] 18. Motion P/A/R/S/T (9873): `state.appMode==='motion'&&window.SMMotion&&SMMotion.handlePropShortcut(k,event.shiftKey)` — the CALL's truthy return IS the gate; `preventDefault()`+`return` only if truthy. 19. Motion U (9879): `(k==='u'||'U')&&appMode==='motion'&&window.SMMotion&&SMMotion.revealAnimated()` — same truthy-return-is-the-gate shape. 20. Motion E (9883): `(k==='e'||'E')&&!metaKey&&!ctrlKey&&!altKey&&appMode==='motion'&&SMMotion.revealEffects()` — the ONLY reveal chord with an explicit modifier-exclusion. 21. Motion M (9884): same shape as E, `SMMotion.revealMattes()`. 22. Motion-graph toggle (9887): `k==='F3'&&shiftKey&&appMode==='motion'&&window.SMMotionGraph` — `preventDefault()` UNCONDITIONAL once the predicate matches (not gated on a truthy call return, unlike 18-21); calls `SMMotionGraph.toggle()`(motion-graph.js:450). 23-27, inside `if(SMMotion.hasKeySelection())`(9899): F9 Easy Ease (9901, `applyEasyEase`), Cmd+Alt+K linear (9904, `setKeyInterp('linear')`), Cmd+Alt+H hold (9906, `setKeyInterp('hold')`), Delete/Backspace (9907, `deleteSelectedKeys`), Alt+Left/Right nudge (9910, `nudgeSelectedKeys`) — see `boundaries` (e) for the full table. 29. Work-area-in 'B' (9921-9927): `(k==='b'||'B')&&_pointerOverTimeline` — `preventDefault()`, `return` yes; see `boundaries` (f) for the exact math. 30. Work-area-out 'N' (9928-9934): `(k==='n'||'N')&&_pointerOverTimeline` — same shape, see `boundaries` (f).",
+    "(b) The two field guards. `inField` (9655, computed ONCE at function entry) = `event.target.tagName==='INPUT'||'SELECT'||'TEXTAREA'||event.target.isContentEditable`. It is explicitly checked (`if(inField)return;`) in exactly SEVEN of this scope's own branches: Undo/Redo (9662), Precompose (9681), Copy (9682), Cut (9685), Paste (9686), Duplicate (9752), Lock (9822). EIGHT branches sit BETWEEN the two guards (9655 and the generic 9849 one) that do NOT check `inField` at all, and therefore still fire while a text/number field has focus: Save/SaveAs (9663, deliberate per its own comment), Select-All (9721, gated on `state.tool` instead), Split-at-playhead (9739), the three Cmd+G variants (9794/9802/9813), and the three Ctrl+Alt zoom chords (9846-9848). The GENERIC guard (9849): `if(event.target.tagName==='INPUT'||'SELECT'||'TEXTAREA'||event.target.isContentEditable)return;` — same predicate as `inField` but re-evaluated fresh rather than reusing the `inField` variable, and unconditional (no per-branch opt-out) for every single-letter shortcut and every Motion override from 9850 onward. Net effect: the eight branches above 9849 fire from inside a text field; nothing from 9850-9934 (P/A/R/S/T, U/E/M, F3, the five keyframe-editing chords, B/N) ever can.",
+    "(c) The Cmd+V paste decision tree (9686-9709). Entry guard: `if(inField)return` (9686). `_hasInternalClip` (9696-9697) = Motion key-clipboard (`appMode==='motion'&&SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard()`, motion.js:1152) OR canvas clip (`_canvasClip&&_canvasClip.snaps.length`, tools.js:1660) OR frame-cell clip (`_sel.clipboard&&_sel.clipboard.length`, `_sel` declared timeline.js:210). Branch 1 (9698-9702): `!_hasInternalClip&&window.SMSvgImport` — Nemo's own clipboard is empty AND the SVG-import bridge exists: does NOT call `preventDefault()` (deliberately, so the browser's native paste event still fires for svg-import.js's own listener to catch system-clipboard SVG/Illustrator-or-Figma-'Copy as SVG' data with no clipboard-read permission needed); arms an 80ms `setTimeout` (`window._svgPasteFallback`, cleared if one is already pending) that falls back to `window.SM.pasteFrames()`(timeline.js:1819) if nothing SVG actually arrived; `return`. Branch 2 (9703-9709): otherwise (internal clip exists, or no SVG bridge) — `preventDefault()` (9703) THEN: Motion key-clipboard→`SMMotion.pasteKeys()`(motion.js:1126)+`return`; else `window._lastClipKind==='canvas'&&_canvasClip.snaps.length`→`pasteSelection()`(tools.js:1679); else `window._lastClipKind==='frames'&&_sel.clipboard.length`→`window.SM.pasteFrames()`; else `_canvasClip.snaps.length` (kind-tag stale/missing but a canvas clip still exists)→`pasteSelection()`; else→`window.SM.pasteFrames()`; `return` (9709) unconditional after the chain. `window._lastClipKind` is written by `copySelection`/`cutSelection` ('canvas', tools.js:1670) and by `window.SM.copyFrames`/`cutFrames` ('frames', timeline.js:1799/1815) — none of those writers is in this scope's own body, this scope only READS the flag.",
+    "(d) The three Cmd+G variants' precedence and the Cmd+L lock target. Order of the `if`s exactly as written: canvas-group (9794) is checked FIRST, then ungroup (9802, disambiguated from canvas-group purely by `shiftKey`), then folder-group (9813) LAST as the catch-all for any `(metaKey||ctrlKey)&&g&&!shiftKey` the first branch's own extra clauses rejected. The `_gLayerRows` gate (9793): `!!window._layerActiveExplicit&&typeof _layerSel!=='undefined'&&_layerSel.length>=2` — true exactly when 2+ LAYER ROWS are explicitly selected in the timeline panel (not a canvas selection); canvas-group's own predicate requires `!_gLayerRows`, so a multi-layer-row selection always falls through past canvas-group to folder-group even when `selectedPaths` also happens to be non-empty (the 'clicking a row auto-selects its content' interaction the comment at 9786-9791 describes). The second gate, `window.selectedPaths&&selectedPaths.length>=2` (canvas-group) / `.length` (ungroup, just non-empty) — canvas-group additionally requires AT LEAST TWO selected paths (a single selected shape can't be grouped with nothing), ungroup requires only a non-empty selection (its own body, `SMGroup.ungroupSelection`, out of scope, no-ops if nothing is actually grouped). Cmd+L (9821-9826) locks LAYERS, never a canvas/shape selection: `(_layerSel.length?_layerSel.slice():[state.activeLayerIdx]).forEach(idx=>window.SM.toggleLayerLock(idx))` — every layer-panel row currently selected (`_layerSel`), or just the active layer if no explicit row multi-selection exists; there is no branch anywhere in this chord that locks a canvas shape.",
+    "(e) The Motion-only section (9873-9934): every `SMMotion.*`/`SMMotionGraph.*` method called, its own motion.js/motion-graph.js line, and the `state.appMode==='motion'` gating per branch. `SMMotion.handlePropShortcut(k,shiftKey)` (motion.js:675) — 9873, gated `appMode==='motion'`. `SMMotion.revealAnimated()` → `handleRevealAnimatedShortcut` (motion.js:787) — 9879, gated `appMode==='motion'`. `SMMotion.revealEffects()` → `handleRevealEffectsShortcut` (motion.js:894) — 9883, gated `appMode==='motion'` AND `!metaKey&&!ctrlKey&&!altKey`. `SMMotion.revealMattes()` → `handleRevealMattesShortcut` (motion.js:899) — 9884, same double gating as E. `SMMotionGraph.toggle()` (motion-graph.js:450) — 9887, gated `appMode==='motion'&&window.SMMotionGraph` (existence, not a feature-flag). `SMMotion.hasKeySelection()` (motion.js:1151) — 9899, the ENTRY gate for the five keyframe-editing chords that follow, itself ALSO gated `appMode==='motion'`; every branch inside this block therefore carries the SAME 'appMode==='motion'' + 'a keyframe selection exists' double condition, checked once at the block's own entry rather than per-branch: `SMMotion.applyEasyEase(which)` (motion.js:1028, itself `applyCurveToSelection(which||'ease')`) — 9901, F9/Shift+F9/Cmd+Shift+F9 select `which` among `'ease'`/`'easeIn'`/`'easeOut'`. `SMMotion.setKeyInterp('linear')` (motion.js:1027) — 9904. `SMMotion.setKeyInterp('hold')` — 9906. `SMMotion.deleteSelectedKeys()` (motion.js:1065) — 9907. `SMMotion.nudgeSelectedKeys(delta)` (motion.js:1033) — 9910, `delta=+1` for ArrowRight, `-1` for ArrowLeft. None of the B/N work-area chords (9921-9934) references `SMMotion` or `appMode` at all — they are gated purely on `_pointerOverTimeline`, active in BOTH Animation 2D and Motion (per the issue's and this scope's own comment at 9915-9920: 'unlike real AE, these letters are already real tool shortcuts here').",
+    "(f) The B/N work-area branches' exact math (9921-9934) and the `_pointerOverTimeline` read (declared/maintained by C19ac, timeline.js:9608/9612-9613, read-only here). B (9921-9927): guard `_pointerOverTimeline`; `curOut=(state.waOut!=null)?state.waOut:state.totalFrames-1` (falls back to the last frame if no out-point is set yet); `state.waIn=Math.max(0,Math.min(state.currentFrame,curOut-1))` — clamps the new in-point to `[0, curOut-1]`, i.e. it can never reach or pass the current out-point; `window.updateWaBar()` if present (ui.js:975, redraws the work-area bar from `state.waIn`/`waOut` directly, its own comment calling this the single source of truth over the separate `window._waIn`/`_waOut` drag-only copy `initWaDrag` keeps synced). N (9928-9934): symmetric — `curIn=(state.waIn!=null)?state.waIn:0`; `state.waOut=Math.min(state.totalFrames-1,Math.max(state.currentFrame,curIn+1))` — clamps to `[curIn+1, totalFrames-1]`, never at or before the in-point; same `updateWaBar()` call. Both branches `preventDefault()` and `return`. Per `boundaries` (b), neither has any field guard of its own beyond the generic 9849 one already passed.",
+    "(g) Every `state.*` field read or written in 9642-9934, confirmed by a whole-span grep for `state\\.[A-Za-z_]+` and classified by direct read of each site: READ-ONLY — `state.activeLayerIdx` (9721, 9824 default target), `state.appMode` (9759, 9873, 9879, 9883, 9884, 9887, 9899), `state.currentFrame` (9924, 9931), `state.tool` (9721), `state.totalFrames` (9923, 9931). WRITTEN — `state.selectedStrokeIndices` (9725, `.map(getSI).filter(...)`, Select-All's own selection-index rebuild). READ-AND-WRITTEN — `state.waIn` (read 9930, written 9924), `state.waOut` (read 9923, written 9931). No other `state.*` field appears anywhere in this scope's own 293 lines.",
+    "(h) Every external function called from 9642-9934, owning module cited by name/line only, bodies not reproduced (superset of the per-branch citations in (a)-(f), collected here for completeness): `document`/`window`/DOM built-ins (`getBoundingClientRect` not used in this scope; `blur`, `setTimeout`, `clearTimeout` are browser built-ins). `redo`/`undo` (tweens.js:4982/4964). `SMProject.saveAs`/`.save` (project.js:172/185). `window.SM.convertActiveLayerToComponent` (timeline.js:1629). `SMMotion.copySelectedKeys` (motion.js:1117) / `.hasKeySelection` (1151) / `.pasteKeys` (1126) / `.hasKeyClipboard` (1152) / `.handlePropShortcut` (675) / `.revealAnimated` (→787) / `.revealEffects` (→894) / `.revealMattes` (→899) / `.applyEasyEase` (1028) / `.setKeyInterp` (1027) / `.deleteSelectedKeys` (1065) / `.nudgeSelectedKeys` (1033) — all exported via `window.SMMotion={...}` (motion.js:13352). `copySelection`/`cutSelection`/`pasteSelection` (tools.js:1661/1673/1679). `window.SM.copyFrames`/`.cutFrames`/`.pasteFrames` (timeline.js:1789/1802/1819). `clearSel` (tools.js:1475). `isSelectablePathChild` (app.js:576). `getSI` (tools.js:1487). `renderArcs` (timeline.js, out of scope, earlier). `updateUI` (timeline.js, out of scope, earlier). `window.SMEngineBridge.renderNow` (out of scope, called guarded-by-existence at 9727/9846/9847). `window.SM.splitLayerAtPlayhead` (timeline.js:1200). `window.SM.duplicateLayer` (timeline.js:1271). `duplicateSelection` (tools.js:1636). `window.SM.duplicateSelectedFrames` (app.js:5403). `SMGroup.groupSelection`/`.ungroupSelection` (group-bridge.js:91/194, exported 836). `groupSelectionIntoFolder` (timeline.js:5669). `window.SM.toggleLayerLock` (timeline.js:1592). `updZoom` (app.js:519). `window.SM.fitCanvas` (dispatching to app.js:510). `SMMotionGraph.toggle` (motion-graph.js:450, exported 512). `window.updateWaBar` (ui.js:975). No other external function is called anywhere in lines 9642-9934 — confirmed by reading every statement in the span directly.",
+    "(i) Callers: `onKeyDown` is registered exactly once, at `document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);` (timeline.js:10251) — confirmed the ONLY call site anywhere in the codebase by a whole-src grep for `onKeyDown` filtered to exclude this scope's own declaration/comments (timeline.js:7452, 7500, 9605, 9641, 10222, 10260, all either comments referencing it or its own signature) and the unrelated same-named local closures in fill-bridge.js:191, draw-bridge.js:1073 and layer-inout.js:341 (each independently declared and scoped, not this function, confirmed by reading each declaration). None of this scope's own 293 lines is on the render or export CALL path: a targeted grep of `getEffectiveStrokes` (app.js:2949) and `buildSceneJson` (engine-bridge.js:772) for every symbol this scope declares or calls returns zero hits — this scope only WRITES into `state.selectedStrokeIndices`/`state.waIn`/`state.waOut`, fields that OTHER, out-of-scope code later reads for rendering/export purposes (Select-All's own selection rebuild is read by the render/selection-overlay path elsewhere, out of scope; `state.waIn`/`waOut` are read as the export range default at export.js:372-373 — see `source_consumers`). This scope itself only dispatches BY NAME to other owners; it contains no rendering, persistence, or export logic of its own."
+  ],
+  "areas": [
+    {
+      "area": "field-guards-undo-save-clipboard",
+      "packets": [
+        {
+          "id": "C19ad.onkeydown-field-guards-undo-save-clipboard",
+          "files": [
+            "src/js/timeline.js:9642-9720"
+          ],
+          "coverage_ranges": [
+            [
+              9642,
+              9720
+            ]
+          ],
+          "classification": {
+            "code": 25,
+            "comment": 54,
+            "whitespace": 0
+          },
+          "symbols": [
+            "inField",
+            "event",
+            "preventDefault",
+            "shiftKey",
+            "redo",
+            "undo",
+            "SMProject",
+            "saveAs",
+            "save",
+            "convertActiveLayerToComponent",
+            "SMMotion",
+            "hasKeySelection",
+            "copySelectedKeys",
+            "selectedPaths",
+            "copySelection",
+            "copyFrames",
+            "cutSelection",
+            "cutFrames",
+            "_hasInternalClip",
+            "hasKeyClipboard",
+            "_canvasClip",
+            "_sel",
+            "SMSvgImport",
+            "_svgPasteFallback",
+            "setTimeout",
+            "clearTimeout",
+            "pasteFrames",
+            "pasteKeys",
+            "_lastClipKind",
+            "pasteSelection"
+          ],
+          "signature": "function onKeyDown(event){ var inField=...; if(...Enter...)...; if(...Ctrl+Z...)...; if(...Ctrl+S...)...; if(...Cmd+Shift+C...)...; if(...Cmd+C...)...; if(...Cmd+X...)...; if(...Cmd+V...){ ...SVG fallback... } ...",
+          "responsibility": "The two field-guard building blocks (`inField`, and the Enter-blur convenience) plus five clipboard chords: Undo/Redo, Save/SaveAs, Precompose (Cmd+Shift+C), Copy, Cut, and Paste with its SVG-passthrough branch. Establishes the 'field focused means text-level shortcuts, not app-level ones' convention every later `inField`-checking branch in this scope relies on. See `boundaries` (a)/(b)/(c).",
+          "callers": [
+            "No external caller — this is a contiguous slice of `onKeyDown`'s own body, itself registered once at timeline.js:10251 (see `boundaries` (i))."
+          ],
+          "behavior": [
+            "Lines 9642-9654 (comment, 13 lines): `inField` rationale — dated 2026-07-17, quotes the feedback ('les paramètres de valeurs de properties doivent aussi pouvoir être ctrl+z') that motivated the guard: without it, typing in a Motion scrub field then hitting Ctrl+Z fired the APP undo against an earlier action while the field's own uncommitted text later committed on blur anyway. States the convention explicitly: field focused → Ctrl+Z is text-level undo, blur/Esc first for app-level undo; Ctrl+S stays global on purpose.",
+            "Line 9655 (code): `var inField=event.target.tagName==='INPUT'||event.target.tagName==='SELECT'||event.target.tagName==='TEXTAREA'||event.target.isContentEditable;`.",
+            "Lines 9656-9660 (comment, 5 lines): Enter-blur rationale — the necessary complement to the `inField` guard: without releasing focus on Enter, the very next Ctrl+Z would still be text-level undo instead of undoing the just-committed value.",
+            "Line 9661 (code): `if(event.key==='Enter'&&event.target.tagName==='INPUT'){event.target.blur();return;}` — targets INPUT only (narrower than `inField`), no `preventDefault`.",
+            "Line 9662 (code): Undo/Redo — `if((event.metaKey||event.ctrlKey)&&event.key==='z'){if(inField)return;event.preventDefault();if(event.shiftKey)redo();else undo();return;}`.",
+            "Line 9663 (code): Save/SaveAs — `if((event.metaKey||event.ctrlKey)&&event.key==='s'){event.preventDefault();if(event.shiftKey)window.SMProject.saveAs();else window.SMProject.save();return;}` — no `inField` guard, deliberate (native browser save is never wanted here regardless of focus).",
+            "Lines 9664-9676 (comment, 13 lines): clipboard-priority rationale — canvas selection beats a timeline keyframe-cell selection when both are non-empty (same rule Cmd+D/Delete already use); paste has no 'current selection' to disambiguate from so it follows whichever clipboard was most recently filled; a Motion keyframe selection is the MOST specific thing Cmd+C can mean and wins over both.",
+            "Lines 9677-9680 (comment, 4 lines): Cmd+Shift+C precompose rationale — checked BEFORE plain Cmd+C, which never excluded `shiftKey` and would otherwise silently swallow this combo as a copy (2026-07-31 sweep).",
+            "Line 9681 (code): Precompose — `if((event.metaKey||event.ctrlKey)&&event.shiftKey&&(event.key==='c'||event.key==='C')){if(inField)return;event.preventDefault();window.SM.convertActiveLayerToComponent();return;}`.",
+            "Lines 9682-9684 (code, 3 lines): Copy — outer guard `if(inField)return;event.preventDefault();` (9682); Motion key-selection branch `if(state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection()){SMMotion.copySelectedKeys();return;}` (9683); fallback `if(selectedPaths.length)copySelection();else window.SM.copyFrames();return;` (9684).",
+            "Line 9685 (code): Cut — `if((event.metaKey||event.ctrlKey)&&event.key==='x'){if(inField)return;event.preventDefault();if(selectedPaths.length)cutSelection();else window.SM.cutFrames();return;}`.",
+            "Line 9686 (code): Paste opens — `if((event.metaKey||event.ctrlKey)&&event.key==='v'){if(inField)return;`.",
+            "Lines 9687-9695 (comment, 9 lines): SVG-on-system-clipboard rationale (2026-09, feedback #749) — reaching Figma's/Illustrator's 'Copy as SVG' data needs the browser's OWN paste event (which never fires if this handler calls `preventDefault`), and `navigator.clipboard.readText` is refused without permission (confirmed live: `NotAllowedError`) — so when Nemo's own clipboard is empty, the default is let through and a short timer restores the ordinary frame-paste fallback if nothing SVG arrived.",
+            "Lines 9696-9697 (code, 2 lines): `var _hasInternalClip = (state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeyClipboard&&SMMotion.hasKeyClipboard()) || !!(_canvasClip&&_canvasClip.snaps.length) || !!(_sel.clipboard&&_sel.clipboard.length);`.",
+            "Lines 9698-9702 (code, 5 lines): SVG-fallback branch — `if(!_hasInternalClip&&window.SMSvgImport){if(window._svgPasteFallback)clearTimeout(window._svgPasteFallback);window._svgPasteFallback=setTimeout(function(){window._svgPasteFallback=null;window.SM.pasteFrames();},80);return;}` — no `preventDefault`, lets the native paste event through.",
+            "Lines 9703-9709 (code, 7 lines): real paste routing — `event.preventDefault();` (9703); Motion key-clipboard branch (9704); `window._lastClipKind==='canvas'` branch (9705); `window._lastClipKind==='frames'` branch (9706); `_canvasClip.snaps.length` fallback (9707); final `else window.SM.pasteFrames();` (9708); `return;` (9709).",
+            "Line 9710 (code): `}` — closes the Cmd+V branch.",
+            "Lines 9711-9720 (comment, 10 lines): Select-All rationale (2026-07 UI/UX audit) — a near-universal convention that existed nowhere in the app; selects every path/raster on the active layer at the current frame mirroring select-bridge.js's own 'click on empty layer space' filter (isLinkedFill companions and brush-texture dab copies excluded as rendering artifacts, not independently selectable); scoped to Select/Subselect tools only to avoid a silent side effect on other tools."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "select-all-duplicate-group-lock-zoom",
+      "packets": [
+        {
+          "id": "C19ad.onkeydown-select-all-duplicate-group-lock-zoom",
+          "files": [
+            "src/js/timeline.js:9721-9848"
+          ],
+          "coverage_ranges": [
+            [
+              9721,
+              9848
+            ]
+          ],
+          "classification": {
+            "code": 49,
+            "comment": 79,
+            "whitespace": 0
+          },
+          "symbols": [
+            "event",
+            "preventDefault",
+            "clearSel",
+            "selectedPaths",
+            "userLayers",
+            "activeLayerIdx",
+            "Path",
+            "Raster",
+            "isSelectablePathChild",
+            "selectedStrokeIndices",
+            "getSI",
+            "renderArcs",
+            "updateUI",
+            "SMEngineBridge",
+            "renderNow",
+            "splitLayerAtPlayhead",
+            "inField",
+            "duplicateLayer",
+            "_layerActiveExplicit",
+            "duplicateSelection",
+            "_sel",
+            "duplicateSelectedFrames",
+            "_gLayerRows",
+            "_layerSel",
+            "SMGroup",
+            "groupSelection",
+            "ungroupSelection",
+            "groupSelectionIntoFolder",
+            "toggleLayerLock",
+            "altKey",
+            "code",
+            "view",
+            "zoom",
+            "updZoom",
+            "fitCanvas"
+          ],
+          "signature": "if(...Cmd+A...){...} if(...Cmd+Shift+D...){...} if(...Cmd+D...){...} var _gLayerRows=...; if(...Cmd+G...){...} if(...Cmd+Shift+G...){...} if(...Cmd+G...){...} if(...Cmd+L...){...} if(...Ctrl+Alt+=/-/0...){...}",
+          "responsibility": "Select All, split-layer-at-playhead, the three-way-priority Duplicate chord, the three Cmd+G-family variants (canvas group / ungroup / folder group) with their `_gLayerRows` precedence gate, layer Lock, and the three Ctrl+Alt zoom chords. See `boundaries` (a)/(d).",
+          "callers": [
+            "No external caller — a contiguous slice of `onKeyDown`'s own body, registered once at timeline.js:10251 (see `boundaries` (i))."
+          ],
+          "behavior": [
+            "Lines 9721-9729 (code, 9 lines): Select All — guard `(event.metaKey||event.ctrlKey)&&(event.key==='a'||event.key==='A')&&(state.tool==='select'||state.tool==='subselect')&&userLayers[state.activeLayerIdx]` (9721); `preventDefault()` (9722); `clearSel()` (9723); `selectedPaths=userLayers[state.activeLayerIdx].children.filter(c=>(c instanceof Path||c instanceof Raster)&&isSelectablePathChild(c))` (9724); `state.selectedStrokeIndices=selectedPaths.map(getSI).filter(i2=>i2>=0)` (9725); `renderArcs();updateUI();` (9726); `SMEngineBridge.renderNow()` if present (9727); `return;}` (9728-9729).",
+            "Lines 9730-9735 (comment, 6 lines): Cmd+D rationale, part 1 — the footer hint had long claimed this combo for object duplication but nothing was wired to it; plain 'd' stays bound to the distinct, still-useful `duplicateKeyframe`.",
+            "Lines 9736-9738 (comment, 3 lines): Cmd+Shift+D rationale — AE's 'split layer at the playhead', checked BEFORE plain Cmd+D so it isn't swallowed by a canvas selection.",
+            "Lines 9739-9743 (code, 5 lines): Split-at-playhead — `if((event.metaKey||event.ctrlKey)&&event.shiftKey&&(event.key==='d'||event.key==='D')){event.preventDefault();window.SM.splitLayerAtPlayhead();return;}`.",
+            "Lines 9744-9750 (comment, 7 lines): Cmd+D rationale, part 2 — same 'most specific selection wins' priority the Delete chain uses (canvas shapes > selected frame cells > active layer); previously duplicateLayer/duplicateSelectedFrames were keyboard-unreachable without a canvas selection (2026-07-31 sweep, confirmed w/ Cyril).",
+            "Line 9751 (code): Duplicate opens — `if((event.metaKey||event.ctrlKey)&&(event.key==='d'||event.key==='D')){`.",
+            "Lines 9752-9753 (code, 2 lines): `if(inField)return;event.preventDefault();`.",
+            "Lines 9754-9758 (comment, 5 lines): Motion QA-sweep rationale (2026-09) — a canvas selection in Motion stands for the LAYER (its drag writes Position, its nudge too), so Cmd+D there must duplicate the layer; it previously fell into `duplicateSelection` and cloned the drawing INSIDE the layer instead (measured: 1→2 children, layer count unchanged).",
+            "Line 9759 (code): `if(state.appMode==='motion'){window.SM.duplicateLayer();return;}`.",
+            "Lines 9760-9769 (comment, 10 lines): Animation 2D rationale (feedback #803) — clicking a layer row auto-selects that row's whole content, so `selectedPaths` was never empty after a row click and Cmd+D cloned the DRAWING instead (measured: 3→6 shapes, layer count unchanged); `window._layerActiveExplicit` distinguishes 'this selection came from a timeline row click' from a real canvas selection.",
+            "Line 9770 (code): `if(window._layerActiveExplicit){window.SM.duplicateLayer();return;}`.",
+            "Lines 9771-9774 (code, 4 lines): `if(selectedPaths.length)duplicateSelection();else if(_sel.frames.length)window.SM.duplicateSelectedFrames();else window.SM.duplicateLayer();return;`.",
+            "Line 9775 (code): `}` — closes the Duplicate branch.",
+            "Lines 9776-9792 (comment, 17 lines): Cmd+G canvas-group rationale (2026-07 feedback) — takes priority over the pre-existing folder-group binding when there's an actual canvas selection; falls through to folder-grouping when there isn't; same 'where did this selection come from' rule as Cmd+D (#803) and Delete — a multi-layer timeline-row selection always looked like a canvas selection here and grouped the active layer's shapes instead of foldering the selected layers, which is the only thing that gesture can mean.",
+            "Line 9793 (code): `var _gLayerRows=!!window._layerActiveExplicit&&typeof _layerSel!=='undefined'&&_layerSel.length>=2;`.",
+            "Lines 9794-9798 (code, 5 lines): canvas-group — `if((event.metaKey||event.ctrlKey)&&(event.key==='g'||event.key==='G')&&!event.shiftKey&&!_gLayerRows&&window.selectedPaths&&selectedPaths.length>=2){event.preventDefault();if(window.SMGroup)SMGroup.groupSelection();return;}`.",
+            "Lines 9799-9801 (comment, 3 lines): ungroup rationale — a free shortcut, only acts when the current selection actually has grouped members, otherwise falls through.",
+            "Lines 9802-9806 (code, 5 lines): ungroup — `if((event.metaKey||event.ctrlKey)&&(event.key==='g'||event.key==='G')&&event.shiftKey&&window.selectedPaths&&selectedPaths.length){event.preventDefault();if(window.SMGroup)SMGroup.ungroupSelection();return;}`.",
+            "Lines 9807-9812 (comment, 6 lines): folder-group rationale — the action already existed (`groupSelectionIntoFolder`, right-click menu only); every other grouping-adjacent action already had a keyboard path, this one didn't; same 2+ consecutive ungrouped-layers guard as the menu entry.",
+            "Lines 9813-9817 (code, 5 lines): folder-group — `if((event.metaKey||event.ctrlKey)&&(event.key==='g'||event.key==='G')&&!event.shiftKey){event.preventDefault();groupSelectionIntoFolder();return;}`.",
+            "Lines 9818-9820 (comment, 3 lines): Cmd+L rationale — AE's 'lock selected layers', applies to the layer-panel multi-selection when there is one, else the active layer, same multi-target pattern as `deleteLayer` (2026-07-31 sweep).",
+            "Lines 9821-9826 (code, 6 lines): Lock — `if((event.metaKey||event.ctrlKey)&&(event.key==='l'||event.key==='L')){if(inField)return;event.preventDefault();(_layerSel.length?_layerSel.slice():[state.activeLayerIdx]).forEach(function(idx){window.SM.toggleLayerLock(idx);});return;}`.",
+            "Lines 9827-9845 (comment, 19 lines): zoom rationale — three rounds of live feedback, each a different collision: plain Ctrl+=/-/0 is the OS/browser page-zoom accelerator, Ctrl+Shift+=/-/0 (round 2's fix) turned out to be Safari's own alternate zoom-in accelerator, bare +/-/0 was rejected because '+'/'=' is already bound to `extendExposure(1)`; Ctrl+Alt is the remaining safe choice; `event.code` (not `event.key`) keeps it AZERTY-proof.",
+            "Line 9846 (code): zoom-in — `if((event.metaKey||event.ctrlKey)&&event.altKey&&(event.code==='Equal'||event.code==='NumpadAdd')){event.preventDefault();view.zoom=Math.min(20,view.zoom*1.1);updZoom();renderArcs();if(window.SMEngineBridge)SMEngineBridge.renderNow();return;}`.",
+            "Line 9847 (code): zoom-out — same shape, `event.code==='Minus'||'NumpadSubtract'`, `view.zoom=Math.max(.05,view.zoom/1.1)`.",
+            "Line 9848 (code): zoom-reset — `if((event.metaKey||event.ctrlKey)&&event.altKey&&(event.code==='Digit0'||event.code==='Numpad0')){event.preventDefault();window.SM.fitCanvas();return;}`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "generic-field-guard-and-k",
+      "packets": [
+        {
+          "id": "C19ad.onkeydown-generic-field-guard-and-k",
+          "files": [
+            "src/js/timeline.js:9849-9872"
+          ],
+          "coverage_ranges": [
+            [
+              9849,
+              9872
+            ]
+          ],
+          "classification": {
+            "code": 2,
+            "comment": 22,
+            "whitespace": 0
+          },
+          "symbols": [
+            "event",
+            "target",
+            "tagName",
+            "isContentEditable",
+            "key",
+            "handlePropShortcut"
+          ],
+          "signature": "if(event.target.tagName==='INPUT'||...)return; var k=event.key; // rationale for the Motion-only overrides that follow",
+          "responsibility": "The generic editable-field early return (re-evaluates the same predicate `inField` captured once at 9655, rather than reusing that variable) that gates every single-letter shortcut and every Motion-only override below it, `var k=event.key`, and the two-paragraph rationale comment explaining why the Motion P/A/R/S/T/U overrides that immediately follow are allowed to shadow the ordinary tool-shortcut letters. See `boundaries` (b).",
+          "callers": [
+            "No external caller — a contiguous slice of `onKeyDown`'s own body, registered once at timeline.js:10251 (see `boundaries` (i))."
+          ],
+          "behavior": [
+            "Line 9849 (code): `if(event.target.tagName==='INPUT'||event.target.tagName==='SELECT'||event.target.tagName==='TEXTAREA'||event.target.isContentEditable)return;` — same predicate as `inField` (9655) but re-evaluated fresh and unconditional (no branch below this line can opt out of it, unlike the seven `inField`-checking branches above), see `boundaries` (b).",
+            "Line 9850 (code): `var k=event.key;` — the local alias every single-letter shortcut and Motion override below reads.",
+            "Lines 9851-9864 (comment, 14 lines): P/A/R/S/T scoping rationale, part 1 — Motion mode's property-reveal shortcuts (After Effects convention, explicitly requested) deliberately take priority over the normal tool shortcuts below (p/r/a are otherwise Pen/Rectangle/Subselect, s is Rig, `TOOL_SHORTCUTS`; t is hardcoded to `generateTweens` further down) — found missing from this comment by a UI/UX audit, the collision itself was already correct in code, only the explanation was incomplete; scoped to Motion mode AND (originally) an expanded Transform group so toolbar buttons for those tools are unaffected everywhere else.",
+            "Lines 9865-9872 (comment, 8 lines): P/A/R/S/T scoping rationale, part 2 — the 'Transform group expanded' half of that scoping is GONE (2026-07-27 feedback: pressing P showed every layer's Position properties instead of the selection's); `handlePropShortcut` now reveals its own targets, so requiring a group to be pre-opened meant the key did nothing from a clean timeline — exactly when it's reached for; Motion mode alone is scope enough, Pen/Rect/Subselect toolbar buttons stay untouched."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "motion-overrides-key-selection-work-area",
+      "packets": [
+        {
+          "id": "C19ad.onkeydown-motion-overrides-key-selection-work-area",
+          "files": [
+            "src/js/timeline.js:9873-9934"
+          ],
+          "coverage_ranges": [
+            [
+              9873,
+              9934
+            ]
+          ],
+          "classification": {
+            "code": 26,
+            "comment": 36,
+            "whitespace": 0
+          },
+          "symbols": [
+            "state",
+            "appMode",
+            "SMMotion",
+            "handlePropShortcut",
+            "shiftKey",
+            "preventDefault",
+            "revealAnimated",
+            "metaKey",
+            "ctrlKey",
+            "altKey",
+            "revealEffects",
+            "revealMattes",
+            "SMMotionGraph",
+            "toggle",
+            "hasKeySelection",
+            "applyEasyEase",
+            "setKeyInterp",
+            "deleteSelectedKeys",
+            "ArrowLeft",
+            "ArrowRight",
+            "nudgeSelectedKeys",
+            "_pointerOverTimeline",
+            "waOut",
+            "waIn",
+            "currentFrame",
+            "totalFrames",
+            "updateWaBar"
+          ],
+          "signature": "if(appMode==='motion'&&SMMotion.handlePropShortcut(k,shiftKey)){...} if(k==='u'&&...revealAnimated()){...} ... if(SMMotion.hasKeySelection()){ if(k==='F9'){...} ... } if(k==='b'&&_pointerOverTimeline){...} if(k==='n'&&_pointerOverTimeline){...}",
+          "responsibility": "Every Motion-only keyboard override in `onKeyDown`: the P/A/R/S/T property-reveal dispatch, the U/E/M reveal-shortcuts, the Shift+F3 Motion Graph toggle, the five keyframe-editing chords gated on an actual keyframe selection, and the B/N work-area-in/out chords gated on timeline hover. See `boundaries` (a)/(e)/(f).",
+          "callers": [
+            "No external caller — a contiguous slice of `onKeyDown`'s own body, registered once at timeline.js:10251 (see `boundaries` (i))."
+          ],
+          "behavior": [
+            "Line 9873 (code): `if(state.appMode==='motion'&&window.SMMotion&&SMMotion.handlePropShortcut(k,event.shiftKey)){event.preventDefault();return;}` — the call's own truthy return is the gate.",
+            "Lines 9874-9878 (comment, 5 lines): AE's 'U' rationale — reveal animated properties on the selected layer(s), or every layer if none selected; takes priority over the Line tool's 'u' for the same reason P/A/R/S/T does, only inside Motion mode.",
+            "Line 9879 (code): `if((k==='u'||k==='U')&&state.appMode==='motion'&&window.SMMotion&&SMMotion.revealAnimated()){event.preventDefault();return;}`.",
+            "Lines 9880-9882 (comment, 3 lines): E/M rationale — Van Dijk 5.1's siblings of U, guarded on Motion mode like U and checked AFTER the tool shortcuts they would otherwise shadow ('e' is only a reveal here, never a tool letter as it may be in Animation 2D).",
+            "Line 9883 (code): `if((k==='e'||k==='E')&&!event.metaKey&&!event.ctrlKey&&!event.altKey&&state.appMode==='motion'&&window.SMMotion&&SMMotion.revealEffects()){event.preventDefault();return;}`.",
+            "Line 9884 (code): `if((k==='m'||k==='M')&&!event.metaKey&&!event.ctrlKey&&!event.altKey&&state.appMode==='motion'&&window.SMMotion&&SMMotion.revealMattes()){event.preventDefault();return;}`.",
+            "Lines 9885-9886 (comment, 2 lines): Shift+F3 rationale — AE's own Graph Editor toggle, Motion-only like every other binding in this block.",
+            "Line 9887 (code): `if(k==='F3'&&event.shiftKey&&state.appMode==='motion'&&window.SMMotionGraph){event.preventDefault();SMMotionGraph.toggle();return;}` — `preventDefault` is unconditional here once the predicate matches, unlike 9873-9884 which gate it on the callee's own truthy return.",
+            "Line 9888 (comment, 1 line): `// ---- Motion keyframe keyboard layer (2026-07-25) ----` section divider.",
+            "Lines 9889-9893 (comment, 5 lines): AE-keyboard-first rationale — the Motion timeline already had drag-retime, marquee multi-select, hold, distribute/flip/select-every-2nd and a per-segment ease editor, but every one was reachable ONLY by right-click; After Effects is keyboard-first for exactly these operations.",
+            "Line 9894 (comment, 1 line): blank `//` separator.",
+            "Lines 9895-9898 (comment, 4 lines): scoping note — every branch below is gated on an actual keyframe selection, so with nothing selected these keys keep their existing meanings untouched (Delete still deletes canvas objects, arrows still step the playhead, Cmd+C/V still route to shapes or frame cells).",
+            "Line 9899 (code): `if(state.appMode==='motion'&&window.SMMotion&&SMMotion.hasKeySelection&&SMMotion.hasKeySelection()){` — the shared entry gate for the five chords that follow.",
+            "Line 9900 (comment, 1 line): F9 rationale — Easy Ease, Easy Ease In, Easy Ease Out.",
+            "Line 9901 (code): `if(k==='F9'){event.preventDefault();SMMotion.applyEasyEase(event.shiftKey?((event.metaKey||event.ctrlKey)?'easeOut':'easeIn'):'ease');return;}`.",
+            "Lines 9902-9903 (comment, 2 lines): Ctrl/Cmd+Alt+K rationale — AE has no single default binding for this; K is free here and reads as 'keyframe interpolation'.",
+            "Line 9904 (code): `if((event.metaKey||event.ctrlKey)&&event.altKey&&(k==='k'||k==='K')){event.preventDefault();SMMotion.setKeyInterp('linear');return;}`.",
+            "Line 9905 (comment, 1 line): Ctrl/Cmd+Alt+H rationale — toggle hold, AE's own binding.",
+            "Line 9906 (code): `if((event.metaKey||event.ctrlKey)&&event.altKey&&(k==='h'||k==='H')){event.preventDefault();SMMotion.setKeyInterp('hold');return;}`.",
+            "Line 9907 (code): `if(k==='Delete'||k==='Backspace'){event.preventDefault();SMMotion.deleteSelectedKeys();return;}`.",
+            "Lines 9908-9909 (comment, 2 lines): Alt+Left/Right rationale — nudges the SELECTED KEYS in time; bare arrows keep moving the playhead, the same distinction AE draws.",
+            "Line 9910 (code): `if(event.altKey&&(k==='ArrowLeft'||k==='ArrowRight')){event.preventDefault();SMMotion.nudgeSelectedKeys(k==='ArrowRight'?1:-1);return;}`.",
+            "Lines 9911-9913 (comment, 3 lines): note that Cmd+C/Cmd+V are claimed much earlier in this handler (packet 1, 9683/9704) — the Motion branch lives there, not in this block.",
+            "Line 9914 (code): `}` — closes the `hasKeySelection()` block.",
+            "Lines 9915-9920 (comment, 6 lines): AE's B/N rationale — 'Set Work Area Start/End' at the current frame, hover-scoped (via `_pointerOverTimeline`, C19ac) rather than global because, unlike real AE, these letters are already real tool shortcuts here; same clamp rules as dragging `#wa-bar`'s own handles (`ui.js initWaDrag`) — in can't cross past out-1 and vice versa.",
+            "Lines 9921-9927 (code, 7 lines): work-area-in 'B' — `if((k==='b'||k==='B')&&_pointerOverTimeline){event.preventDefault();var curOut=(state.waOut!=null)?state.waOut:state.totalFrames-1;state.waIn=Math.max(0,Math.min(state.currentFrame,curOut-1));if(window.updateWaBar)updateWaBar();return;}` — see `boundaries` (f) for the exact clamp math.",
+            "Lines 9928-9934 (code, 7 lines): work-area-out 'N' — `if((k==='n'||k==='N')&&_pointerOverTimeline){event.preventDefault();var curIn=(state.waIn!=null)?state.waIn:0;state.waOut=Math.min(state.totalFrames-1,Math.max(state.currentFrame,curIn+1));if(window.updateWaBar)updateWaBar();return;}` — symmetric clamp, see `boundaries` (f)."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No `saveActiveLayerFrame`/`saveAllLayerFrames` call exists anywhere in this scope's own 293 lines (confirmed by grep). The only persistent-shaped field this scope writes directly is `state.waIn`/`state.waOut` (B/N chords) — their persistence across a save, if any, is handled entirely by whichever out-of-scope save path serializes `state` itself (not traced here). `state.selectedStrokeIndices` (Select-All) is a live selection cache, not a persisted document field."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No load/import function is called anywhere in this scope's own body. Every branch reads live `state`/`userLayers`/`selectedPaths` — none re-triggers a frame or project load."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "This scope never calls `pushUndo` itself (confirmed by grep restricted to 9642-9934 — zero hits). Undo coverage for the mutating chords in this scope is entirely delegated to the out-of-scope functions it dispatches to by name: `duplicateLayer`/`duplicateSelection`/`duplicateSelectedFrames` each call their own undo snapshot internally (e.g. `duplicateLayer` calls `pushUndoLayers(true)` itself, timeline.js:1271, out of scope); `SMMotion`'s keyframe-editing chords (Easy Ease, interpolation, delete, nudge) manage their own undo inside motion.js, out of scope. By contrast, Select-All's own `state.selectedStrokeIndices` write, and the B/N work-area writes to `state.waIn`/`state.waOut`, have NO undo snapshot associated with them anywhere in this scope's own body — consistent with them being selection/session state rather than document content."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "This is the ONE packet group in the whole `onKeyDown` scope that directly manipulates the global `selectedPaths`/`state.selectedStrokeIndices` selection state: Select-All (9723-9725, via `clearSel()` then a fresh build) and, indirectly, Duplicate/Group/Ungroup/Lock, which all READ `selectedPaths`/`_layerSel`/`window._layerActiveExplicit` to decide their own target but never mutate the selection themselves (their own effects are on layer/shape DATA, not on what is selected)."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "Packet 4 is entirely Motion-gated (`state.appMode==='motion'` on every branch except B/N). It dispatches to `SMMotion`'s own property-reveal, keyframe-interpolation, and keyframe-selection machinery but performs no rendering or frame materialization itself — every visual update after one of these chords is left to the callee (`SMMotion.*`, out of scope) or to the ambient render loop. Packets 1-3 have no animation-specific branch except the Cmd+C/Cmd+D Motion-vs-canvas priority checks already covered in `boundaries` (a)."
+    },
+    {
+      "consumer": "export",
+      "disposition": "None of this scope's own function/variable symbols are called from `export.js`/`rive-export.js` directly (confirmed: zero matches for every declared/read symbol in either file). However, the B/N work-area chords (packet 4, 9921-9934) write `state.waIn`/`state.waOut`, and export.js:372-373 reads EXACTLY those two fields as the DEFAULT start/end of an export range (`var start=(opts&&opts.start!==undefined)?opts.start:state.waIn; var end=...:state.waOut;`) — so pressing B/N while hovering the timeline changes what an unqualified export renders, even though no code in this scope is itself called from the export path. This is the same class of indirect-but-real export dependency C19ai documented for `ld.blendMode`/`matteMode`."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "`window.SMEngineBridge.renderNow()` is called three times across this scope's own body, all guarded by existence: 9727 (Select-All's own post-selection repaint), 9846 and 9847 (the two zoom chords). The zoom-reset chord (9848) does NOT call it directly — it dispatches entirely to `window.SM.fitCanvas()`, whose own out-of-scope body (app.js:510) presumably issues its own repaint. No Tauri-specific API and no other bridge module is referenced anywhere in 9642-9934."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-inField-guard-partition",
+      "proposed": "Focus a text `<input>`; fire each of the eight branches identified in `boundaries` (b) as lacking an `inField` check (Save/SaveAs, Select-All, Split-at-playhead, the three Cmd+G variants, the two extra zoom chords) and each of the seven that DO check it (Undo/Redo, Precompose, Copy, Cut, Paste, Duplicate, Lock); expect the first eight to fire their normal app-level action even with the field focused, and the seven to silently return with no app-level effect — verifies the exact partition in `boundaries` (b) — not run."
+    },
+    {
+      "id": "fx-cmdD-three-way-priority",
+      "proposed": "Construct three fixtures on the same layer: (1) Motion mode active — expect `duplicateLayer` called regardless of any canvas selection; (2) Animation 2D, `window._layerActiveExplicit=true` — expect `duplicateLayer` called even with `selectedPaths` non-empty; (3) Animation 2D, `_layerActiveExplicit=false`, `selectedPaths` non-empty — expect `duplicateSelection` called, `duplicateLayer` NOT called — verifies the three-way priority chain in `boundaries` (a) item 10 — not run."
+    },
+    {
+      "id": "fx-cmdG-precedence-and-gLayerRows",
+      "proposed": "With 2+ layer rows explicitly selected (`_layerActiveExplicit=true`, `_layerSel.length>=2`) AND a non-empty canvas `selectedPaths`, press Cmd+G; expect `_gLayerRows` true and `groupSelectionIntoFolder` called, `SMGroup.groupSelection` NOT called (the canvas-group branch's own guard rejects it). With `_gLayerRows` false and `selectedPaths.length>=2`, press Cmd+G; expect `SMGroup.groupSelection` called instead — verifies the precedence in `boundaries` (d) — not run."
+    },
+    {
+      "id": "fx-cmdV-clip-kind-priority",
+      "proposed": "Populate all three clipboard stores (`SMMotion`'s key-clipboard, `_canvasClip`, `_sel.clipboard`) simultaneously; set `window._lastClipKind='frames'`; fire Cmd+V; expect `SMMotion.pasteKeys()` called (Motion-clipboard wins unconditionally, checked before `_lastClipKind` at all). Clear the Motion clipboard, keep `_lastClipKind='canvas'` with both remaining clips populated; expect `pasteSelection()` called, not `window.SM.pasteFrames()` — verifies the priority chain in `boundaries` (c) — not run."
+    },
+    {
+      "id": "fx-svg-paste-no-preventDefault-when-clipboard-empty",
+      "proposed": "With all three internal clipboards empty and `window.SMSvgImport` present, fire a synthetic Cmd+V `KeyboardEvent`; spy `event.preventDefault`; expect it NEVER called and a native `paste` event dispatched on the same target to still reach svg-import.js's own listener unobstructed, while `window.SM.pasteFrames()` fires exactly once after an 80ms delay if no SVG data arrived in that window — verifies `boundaries` (c)'s branch-1 no-preventDefault claim — not run."
+    },
+    {
+      "id": "fx-waIn-waOut-clamp-and-export-default",
+      "proposed": "With `state.totalFrames=24`, `state.waOut=10`, `state.currentFrame=15` (past the current out-point), press B while hovering the timeline; expect `state.waIn` clamped to `9` (`curOut-1`), never to `15`. Then call `exportMP4ToPath`/the PNG-sequence export with no explicit `opts.start`/`opts.end`; expect the exported range to start at the just-set `state.waIn` — verifies both the clamp math in `boundaries` (f) and the export-default dependency in `source_consumers` — not run."
+    },
+    {
+      "id": "fx-motion-override-gating-outside-motion-mode",
+      "proposed": "In Animation 2D mode (`state.appMode!=='motion'`), press p/a/r/s/t/u/e/m and Shift+F3 in turn; expect every one of packet 4's Motion-only branches to be skipped entirely (none of `SMMotion.handlePropShortcut`/`.revealAnimated`/`.revealEffects`/`.revealMattes`/`SMMotionGraph.toggle` called) and control falling through to C06's own `runToolShortcut`/`runCommandShortcut` dispatch instead — verifies the `appMode==='motion'` gate on every branch in `boundaries` (e) — not run."
+    }
+  ],
+  "future_proposals": [
+    "The generic field guard (9849) re-evaluates the exact same four-clause predicate `inField` (9655) already computed, rather than reusing the `inField` variable — a one-line simplification (`if(inField)return;`) with no behavioral difference, since neither `event.target` nor its `tagName`/`isContentEditable` can change between 9655 and 9849 within a single synchronous keydown dispatch. Flagged for awareness only, not a defect under this remediation's baseline-preservation rule.",
+    "Eight branches (`boundaries` (b): Save/SaveAs, Select-All, Split-at-playhead, the three Cmd+G variants, and the two extra zoom chords) fire even while a text/number field has focus, unlike the seven `inField`-checking siblings they sit between. Save/SaveAs is explicitly deliberate per its own comment; the other seven are not accompanied by any comment explaining whether their own field-transparency is intentional or simply never revisited when the `inField` guard was introduced (2026-07-17, per 9642-9654's own dated comment, evidently after some of these chords already existed). Not confirmed as a defect — several (zoom, split-at-playhead) plausibly SHOULD remain field-transparent — but the inconsistency itself is a direct-read fact worth a product decision.",
+    "The zoom-reset chord (9848, Ctrl+Alt+0) dispatches to `window.SM.fitCanvas()` alone, while its two zoom-in/out siblings (9846-9847) additionally call `updZoom()`/`renderArcs()`/`SMEngineBridge.renderNow()` inline at the call site itself. Whether `fitCanvas`'s own out-of-scope body (app.js:510) already performs the equivalent of those three calls was not established by this census (its body was not read, per the reservation on out-of-scope function bodies) — flagged for awareness, not confirmed as an asymmetry requiring a fix.",
+    "The five keyframe-editing chords (F9/Cmd+Alt+K/Cmd+Alt+H/Delete/Alt+Arrow, 9899-9914) all live inside one shared `if(SMMotion.hasKeySelection())` block, but the four Motion-reveal chords immediately above them (P/A/R/S/T at 9873, U at 9879, E at 9883, M at 9884) each re-check `state.appMode==='motion'&&window.SMMotion` individually rather than sharing a single outer gate the way the keyframe-editing block does. Purely a style observation from direct reading — no behavioral difference, since all four conditions are identical — not flagged as a defect.",
+    "Both work-area chords (B/N, 9921-9934) are unconditionally active whenever `_pointerOverTimeline` is true, in BOTH Animation 2D and Motion — the only two chords in this whole scope with no `appMode` gate at all despite sitting in the same file region as several Motion-only ones. This is stated as deliberate in the chords' own comment (9915-9920: 'unlike real AE, these letters are already real tool shortcuts here'), so not flagged as a gap, but noted as the one place in 9642-9934 where a reader might otherwise expect Motion-gating by pattern-matching the surrounding code and be wrong."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `grep -n` was run for every external symbol this scope reads or dispatches to by name (`SMMotion.*`, `SMMotionGraph.toggle`, `SMGroup.groupSelection`/`ungroupSelection`, `copySelection`/`cutSelection`/`pasteSelection`/`duplicateSelection`, `window.SM.*` property names, `isSelectablePathChild`, `getSI`, `clearSel`, `updZoom`, `groupSelectionIntoFolder`, `updateWaBar`), each resolved to its own defining file:line by grepping for the literal `function <name>`/`<name>:function`/`<name> = function` declaration form rather than trusting a call site's apparent module — results are reproduced under `boundaries` (h) and the `reconciliation` entries.",
+    "A SEPARATE whole-src grep restricted to `getEffectiveStrokes` (app.js:2949) and `buildSceneJson` (engine-bridge.js:772) for every symbol this scope declares or calls returned ZERO hits — directly supporting the `source_consumers`/`boundaries` (i) claim that this scope's own code never runs on the render/export call path; the two fields it writes that DO have a render/export-relevant reader (`state.waIn`/`state.waOut` → export.js:372-373) were located by a separate targeted grep of `export.js`, not assumed.",
+    "Every packet's own `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's own `classify()` algorithm against a direct `git show 59a5a38c:src/js/timeline.js` dump, run once per packet and once for the whole span — 102/191/0 over 293 lines, matching the issue's own proposed union exactly and matching the issue's own proposed per-packet table exactly for all four packets (79(25/54/0), 128(49/79/0), 24(2/22/0), 62(26/36/0)); no boundary correction was needed.",
+    "`onKeyDown`'s own single call site (timeline.js:10251) and the absence of any other call site anywhere in the src tree were confirmed by a whole-src grep for the literal string `onKeyDown`, manually classifying every hit as either this scope's own declaration/comments, the single registration line, or one of three unrelated same-named local closures in fill-bridge.js/draw-bridge.js/layer-inout.js (each independently declared, confirmed by reading each declaration directly).",
+    "`state.waIn`/`state.waOut`'s other writers (app.js, six additional sites across symbol/montage view-snapshot save-restore and frame-count-change clamps) and export.js's own reader of the same two fields were located by grepping `waIn\\b|waOut\\b` restricted to app.js/export.js/ui.js, distinguishing `ui.js`'s OWN separate `window._waIn`/`_waOut` drag-mirror copy (a different pair of globals, not `state.waIn`/`waOut`) from the actual single-source-of-truth fields this scope itself reads/writes.",
+    "engineering/inventory/census/*.json siblings present at authoring time sharing `source_path: src/js/timeline.js`: C19a through C19ai are merged (including C19ac, this scope's own `_pointerOverTimeline` dependency, and C19ai, the most recent timeline.js sibling at authoring time); C19ae (this scope's own immediate successor, timeline.js:9950-10216) was not confirmed present in a sibling worktree at authoring time — its own range is disjoint from and adjacent to this artifact's own 9642-9934 by direct read regardless (the issue's own text establishes the boundary at 9935/9949/9950). The validator's own cross-sibling overlap check binds against whichever C19*.json files are ACTUALLY present in the directory at validation time."
+  ],
+  "validation": {
+    "expected_assigned_lines": 293,
+    "expected_classification": {
+      "code": 102,
+      "comment": 191,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        9642,
+        9720
+      ],
+      [
+        9721,
+        9848
+      ],
+      [
+        9849,
+        9872
+      ],
+      [
+        9873,
+        9934
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by script against the frozen blob: 9642-9720=(25,54,0); 9721-9848=(49,79,0); 9849-9872=(2,22,0); 9873-9934=(26,36,0); sums to (102,191,0)=293 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 293 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C19ad-timeline-onkeydown-chords-motion-overrides.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19ac-timeline-feedback-inbox-avatars-dashboard.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19ab-timeline-app-menu-entry-points.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19ai-timeline-blend-matte-dropdowns-view-tween-buttons.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19aj-timeline-toolbar-onion-transport-layer-buttons.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19w-timeline-duplicator-panel.json <candidate-sha> still exits 0"
+    ]
+  }
+}
