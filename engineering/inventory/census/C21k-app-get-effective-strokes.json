@@ -1,0 +1,510 @@
+{
+  "census_id": "C21k",
+  "issue": 1207,
+  "title": "app.js getEffectiveStrokes — the single scene-content reader: gates, montage/LFS/component branches, camera bake, exposed-property overrides, plain-layer hot path",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C21k census only; app.js:2929-3193 (getEffectiveStrokes itself and the two module-level declarations immediately after it). The helpers this function CALLS are cited by name/line only, not re-mapped: layerHasTimeRange/layerInPoint/layerOutPoint/resolveSymbolFrameIdx/getLFSSubStrokes (C21j/#1206, merged to main), cloneStrokeForTransform/applyMatrixToStrokeData/symMatrixOf (C21f/#1197, merged), applyLayerDuplicator/getEffectiveStrokesRendered (C21g/#1198, merged — including that scope's own explicit finding that getEffectiveStrokes' own ld.symbolId branch calls applyLayerDuplicator directly at line 3111 with a custom opts.resample, general app.js territory relative to C21g but read here as the calling context), the montage reader (SMStoryboard.montageById/montageTotal/montageStrokesAt, storyboard.js, out of scope), SMCamera.cameraMatrixAtFrame (camera.js, out of scope), and SMMotion.valueAtFrame/elementMotionAt/computeMotionMatFor/transformImageRect/transformSegments/registerExposedPropMeta (motion.js, C20 lineage, out of scope). The function immediately AFTER this scope's own closing brace and module vars, ensureSymbolPaperLayers (app.js:3194+, next leaf C21l, not yet filed as an issue at authoring time), is cited by name/line only.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "42a905e3291aa9f4bc094c25148e58e7d09553ce",
+  "source_path": "src/js/app.js",
+  "source_blob": "0831959f70612721f80717812838d19940d1f7c1",
+  "source_line_count": 5410,
+  "scope_files": [
+    "src/js/app.js"
+  ],
+  "intended_branch": "claude/c21k-app-get-effective-strokes-census",
+  "assigned_ranges": [
+    {
+      "start": 2929,
+      "end": 3193
+    }
+  ],
+  "coverage_note": "Exactly 265 assigned lines occur once across five packets (one coverage_range per packet, no gaps, no other-owner overlap): 128 code, 137 full-line `//`/`/*...*/` comment lines, 0 blank — matches the issue's own proposed union exactly (independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs: lead-in-and-gates 17/48/0, component-own-frames-and-resolve 9/14/0, component-composite-loop 68/38/0, component-camera-matrix-exposed 27/21/0, plain-layer-hot-path-module-vars 7/16/0 — summing to 128/137/0 over 265 lines, matching the issue's own per-packet table exactly for all five packets, no boundary correction needed). Line 2928 is the closing `}` of C21j's own unlinkTimeLinkPreserveRange; line 2929 opens getEffectiveStrokes' own lead-in comment; line 2949 opens the function declaration itself; line 3191 is the function's own closing `}`; lines 3192-3193 are the two trailing module-level declarations (_symbolPaperLayers/_sceneSnapshot on 3192, _montageViewSnapshot on 3193); line 3194 opens `function ensureSymbolPaperLayers(symId){`, C21l's own territory and out of scope here — all five boundaries confirmed by direct `sed -n` read, not assumed from the issue's own table.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js resolves to 0831959f70612721f80717812838d19940d1f7c1, 5410 lines.",
+    "current": "This artifact branches from origin/main at 42a905e3291aa9f4bc094c25148e58e7d09553ce (the merge commit of C21j/#1208 into main); git rev-parse 42a905e3291aa9f4bc094c25148e58e7d09553ce:src/js/app.js == git rev-parse 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js == 0831959f70612721f80717812838d19940d1f7c1, verified directly in the working worktree before authoring (HEAD matches, blob matches, working tree clean).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. Every line-range boundary claim was confirmed by `sed -n '2920,3200p' src/js/app.js` read directly, not assumed from the issue's own proposed table. The complete external caller list of getEffectiveStrokes was derived by `git grep -rnE '(^|[^a-zA-Z_.])getEffectiveStrokes\\(' src/js`, filtered to exclude the declaration line (app.js:2949) and any hit whose trimmed content starts with `//`. A second grep pass (`getEffectiveStrokes([^)]*,\\s*true\\s*)`) found the complete countOnly=true caller (timeline.js:2730, updateUI). A third pass cross-referenced the already-merged C21g/#1198 artifact's own getEffectiveStrokesRendered caller-list finding (app.js:4783 loadFrame; export.js:58,1114; motion.js:5809; rive-export.js:582; tweens.js:4719,4720) against this scope's own direct-getEffectiveStrokes caller list, to determine which callers legitimately bypass the Rendered wrapper by design versus which (if any) should not. A fourth pass (`grep -noE` restricted to lines the same classify() algorithm marks 'code') enumerated every distinct ld.*/sym.*/f.*/state.* field this scope's own body reads, with the line of first read. A fifth pass (`grep -nE '\\b(ld|sym|state)\\.[A-Za-z_]+\\s*='` over the assigned range) found zero persistent-field assignments, confirming the function writes nothing to `ld`/`sym`/`state` — only to its own local `out`/`sd2`/`epByStroke` variables and via the one call OUT to SMMotion.registerExposedPropMeta (motion.js, out of scope) for exposed-property metadata. A sixth pass (`grep -n 'new Path(\\|new Segment(\\|new Point(\\|\\.children\\b'` over the range) found the element-motion sub-block's own detached-Path construction (lines 3063-3067, `{insert:false}`, never inserted, never touching `.children`) as the only Paper-item access in this scope. A seventh pass grepped `_symbolPaperLayers`/`_sceneSnapshot`/`_montageViewSnapshot` across src/js/*.js for every reader/writer of the two trailing module vars.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; the in-source comments (the 2026-07-28 countOnly perf note and its own explicit \"1:1 map\" claim, the 2026-07-28 multi-layer-component compositing fix, the 2026-07-29 layer-level Motion fix found live while beta-testing, the 2026-07-30 duplicator-inside-a-component fix, the 2026-08-18 exposed-property override design note, the 2026-09 native-video mask-strokes note, and the 2026-09-03 path-fx-inside-a-component fix) are read as authorial intent and prior-session evidence, not fresh execution evidence produced by this census."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C21k-app-get-effective-strokes.json and the five app.js packets partitioning lines 2929-3193.",
+    "app_js": "app.js retains the whole runtime for getEffectiveStrokes and the two trailing module vars; this JSON authoring does not authorize source changes.",
+    "c21j_boundary": "Lines 2600-2928 (C21j/#1206, merged) are cited by name/line only. This scope's own render gate (line 2951) calls INTO C21j's own layerHasTimeRange/layerInPoint/layerOutPoint; the ld.symbolId branch (line 3011) calls INTO C21j's own resolveSymbolFrameIdx; the ld.lfsGroup branch (lines 2990-2992) calls INTO C21j's own getLFSSubStrokes three times. None of C21j's own body is reproduced here beyond these cited call-site lines.",
+    "c21l_boundary": "Line 3194 (`function ensureSymbolPaperLayers(symId){`) opens the next leaf, C21l, not yet filed as an issue at authoring time — cited by name/line only. ensureSymbolPaperLayers reads `_symbolPaperLayers` (this scope's own trailing module var, packet 5) at its own line 3195/3199; its own body is not reproduced here.",
+    "other_consumers_boundary": "engine-bridge.js (loadFrame's own render/materialization consumer via getEffectiveStrokesRendered, C21g territory), export.js/rive-export.js (PNG/video/Lottie/Rive export frame builders), motion.js (Text Animator, Follow Path, symbolUnionBounds, layerElements — all C20 lineage), timeline.js (updateUI's own countOnly=true status-bar read, duplicate-frame, comp panels), storyboard.js (the montage reader called INTO by this scope's own ld.montageId branch), tweens.js (onion-skin ghosts), and a long tail of one-shot Labs/tool bake actions (tools.js, text-animator-panel.js, vectorize-bridge.js, media-library.js, images.js, labs/*.js) all retain their own bodies in full — cited by line/name only for the specific findings each packet's own `callers`/`behavior` needed."
+  },
+  "reconciliation": [
+    {
+      "owner": "C21j / #1206 (existing owner, merged to main)",
+      "disposition": "Owns app.js:2600-2928 (resolveSymbolFrameIdx through unlinkTimeLinkPreserveRange's own closing brace, immediately before this scope's own line 2929). This scope's own render gate (2951) and its ld.symbolId/ld.lfsGroup branches (3011, 2990-2992) call directly into C21j's own layerHasTimeRange/layerInPoint/layerOutPoint/resolveSymbolFrameIdx/getLFSSubStrokes — the two leaves are call-graph-adjacent by design (C21j's own `c21k_boundary` writer_guidance field anticipated exactly these three call sites), not merely line-adjacent. C21j's own body is not reproduced here."
+    },
+    {
+      "owner": "C21l (next leaf, ensureSymbolPaperLayers and friends, not yet filed as an issue at authoring time)",
+      "disposition": "Owns app.js:3194+ through ensureSymbolPaperLayers' own body. Reads this scope's own trailing module var `_symbolPaperLayers` (3195/3199) — see `boundaries` for the complete reader/writer list of all three trailing module vars. Not reproduced here."
+    },
+    {
+      "owner": "C21f / #1197 (existing owner, merged to main) and C21g / #1198 (existing owner, merged to main)",
+      "disposition": "C21f owns cloneStrokeForTransform/applyMatrixToStrokeData/symMatrixOf (called at 3136/3140/3139, the camera-bake and symMatrix sub-blocks) — cited by name/line only. C21g owns applyLayerDuplicator/getEffectiveStrokesRendered — this scope's own ld.symbolId branch calls applyLayerDuplicator directly (line 3111, with a custom `opts.resample`/`spanStart`/`spanLen` since a symLayer has no index into state.layers), which C21g's own artifact already documents as its packet 5/6's own second caller (`app.js:3111 — getEffectiveStrokes's ld.symbolId branch, general app.js territory, cited by line only`). getEffectiveStrokesRendered itself (app.js:1796) wraps this scope's own getEffectiveStrokes (base seed, line 1797) with path-fx and the top-level duplicator — see `boundaries` for the full caller-list cross-check between the two functions."
+    },
+    {
+      "owner": "engine-bridge.js (existing owner, buildSceneJson/loadFrame's Paper-item materialization) and export.js/rive-export.js (existing owners, PNG/video/Lottie/Rive export)",
+      "disposition": "Retain their own bodies in full — cited by line/name only. None of these three files call getEffectiveStrokes OR getEffectiveStrokesRendered directly in code — confirmed by grep restricted to non-comment lines (engine-bridge.js's own many references to `getEffectiveStrokes` are all in comments explaining WHY buildSceneJson never needs to call it: the Paper layer.children it reads were already materialized by loadFrame's own call to getEffectiveStrokesRendered, app.js:4783, C21g's own chokepoint). export.js:58/1114 and rive-export.js:582 call getEffectiveStrokesRendered directly (C21g territory, cited by line only) for their own per-frame stroke gather."
+    },
+    {
+      "owner": "motion.js (existing owner, C20 lineage — Text Animator, Follow Path, Component union-bounds/gizmo, per-shape Éléments list)",
+      "disposition": "Retains its own body in full — cited by name/line only. Calls getEffectiveStrokes directly at motion.js:3434 (sampleFollowPathAt, a per-frame Follow-Path constraint sample), 4067 (taUnitCount, the Text Animator's per-character weight divisor — its own `_taCountCache` relies on this scope's own STORED-array identity contract for the plain-layer branch, see `boundaries`), 9437/9745 (layerElements and its own live-item resolver, the Motion \"Éléments\" per-shape list); calls getEffectiveStrokesRendered at motion.js:5809 (symbolUnionBounds, C21g territory, deliberately NOT the bare function so a Component's cached gizmo/pivot tracks every duplicator copy)."
+    },
+    {
+      "owner": "storyboard.js (existing owner, the StoryBoard montage engine)",
+      "disposition": "Retains its own body in full — cited by name/line only. This scope's own ld.montageId branch (lines 2979-2986) calls INTO storyboard.js's own SMStoryboard.montageById/montageTotal/montageStrokesAt (storyboard.js:1277/309/312); montageStrokesAt itself delegates to storyboard.js's own symbolStrokesAt (storyboard.js:329, a fresh `out=[]` built via `sym.layers.forEach`+concat, never a stored `f.strokes` reference), confirming the montage branch's own RETURN IDENTITY is always a NEW synthesized array — see `boundaries`."
+    },
+    {
+      "owner": "timeline.js (existing owner, updateUI's own status-bar stroke count, duplicate-frame, comp panels) and tweens.js (existing owner, onion-skin ghosts)",
+      "disposition": "Retain their own bodies in full — cited by line only. timeline.js:2730 (updateUI) is the ONLY caller anywhere in src/js that passes `countOnly=true`, reading only `.length` — exactly the function's own header-comment rationale (2026-07-28, avoiding a doubled per-frame transform cost). timeline.js:2015/11480 call the ordinary two-argument form. tweens.js:4719/4720 (onion-skin previous/next-frame ghost loops) call getEffectiveStrokesRendered (C21g territory)."
+    },
+    {
+      "owner": "A long tail of one-shot Labs/tool bake actions (tools.js, text-animator-panel.js, vectorize-bridge.js, media-library.js, images.js, labs/follow-path.js, labs/boil-effect.js, labs/layer-effects-bake.js, labs/shader-effects-bake.js, labs/interval-assistant.js, labs/multiframe-draw.js, labs/oca-export.js, labs/move-to-layer.js, labs/storyboard-mode.js)",
+      "disposition": "Retain their own bodies in full — cited by line only. Every one of these is a discrete, explicitly user-triggered action (F6 keyframe insert, a Labs panel's own \"Bake\"/\"Export\"/\"Apply\" button, a menu conversion command) reading the CURRENT frame's effective content once, not a per-frame render-path caller — see `boundaries`' own render-path-vs-UI-gesture classification. Complete list recorded verbatim in packet 1's own `callers` field."
+    }
+  ],
+  "boundaries": [
+    "Boundary lines confirmed by direct `sed -n` read, not assumed from the issue's own table: line 2928 (C21j's own `unlinkTimeLinkPreserveRange` closing `}`) is outside coverage; line 2929 opens this scope's own lead-in comment; line 2949 opens `function getEffectiveStrokes(layerIdx,frameIdx,countOnly){`; line 3191 is the function's own closing `}`; lines 3192-3193 are the two trailing module-var declarations; line 3194 (`function ensureSymbolPaperLayers(symId){`) begins C21l, out of scope. No lines inside 2929-3193 are excluded for another owner: every line belongs to exactly one of the five packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "RETURN IDENTITY contract, the central fact every downstream identity-based cache (CLAUDE.md §5ter/§5quater) keys on: the PLAIN-LAYER tail (packet 5, lines 3187-3190) is the ONLY branch that returns a STORED array by reference — `return f.strokes;` (3188) or `return ld.frames[i].strokes;` (3189) hand back the exact array object living in `ld.frames[frameIdx].strokes` (or an inherited earlier keyframe's), the same identity `loadFrame`'s own `_canReuseMaterialized(lyr,strokes)` (app.js:4784, general territory, cited by line only) tests with `===`. Every OTHER branch synthesizes a NEW array object on every call, never matching that identity: the two top early-return `[]` literals (2951/2973) are trivially fresh; the montageId branch (2979-2986) returns whatever storyboard.js's own `montageStrokesAt`→`symbolStrokesAt` builds (storyboard.js:309-335, out of scope, cited by name/line only) — confirmed by direct read that `symbolStrokesAt` itself builds a fresh `out=[]` via `sym.layers.forEach`+`.concat`, never a stored `f.strokes` reference; the lfsGroup branch (2990-2992) is a three-way `.concat()` chain — `Array.prototype.concat` always allocates a NEW wrapping array even when every element it copies is an unmodified reference into a stored frame's own `strokes` (this is why `layerRetainable`-style identity guards, C21g's own citation, must exclude non-plain-layer branches even though the individual stroke DICTS inside an LFS/montage result may still be live references to stored data); the symbolId branch (2994-3170) builds `var out=[]` (3017) and only ever grows it via `.concat`/`.map`/`.filter` (3028-3029, 3121, 3136, 3140, 3156-3167), and every stroke dict that survives a transform stage is itself deep-cloned first (`JSON.parse(JSON.stringify(sd))` at 3062/3091/3163, or `cloneStrokeForTransform` at 3136/3140, C21f territory) specifically because, per the sub-block's own comment (3123-3127), the returned strokes are \"live references into the SYMBOL'S OWN stored frame data\" and transforming in place would permanently corrupt the symbol itself.",
+    "WRITES: confirmed by `grep -nE '\\b(ld|sym|state)\\.[A-Za-z_]+\\s*='` restricted to the assigned range — zero hits. The function writes NOTHING to `ld`/`sym`/`state` anywhere in its own body; every assignment target is a local variable (`out`, `sd2`, `epByStroke`, `layerStrokes`, `pivot`, `layerMat`, `camM`, `m`) or a field of a value this scope itself just deep-cloned (`sd2.segments=`/`sd2.opacity=`/etc., never the original `sd`). The one call OUT that looks like a registration/side-effect is `SMMotion.registerExposedPropMeta(ep.key,ep.label,ep.default)` (line 3153, inside the exposedProps block) — this writes metadata into motion.js's own namespace (out of scope, not a `ld`/`sym`/`state` field), and is re-run on EVERY invocation of this branch (once per exposed prop per frame a Component instance with exposedProps is read), which the source's own comment (3142-3151) calls \"cheap, idempotent\" and explicitly likens to `propsFor`'s identical per-call re-registration pattern elsewhere in the Motion property system — flagged for profiling attention in `future_proposals` given CLAUDE.md §5bis's general per-frame-overhead lessons, not changed here.",
+    "The countOnly fast path's own header comment (lines 2941-2948, immediately before the function declaration) claims countOnly \"skips the transform stage (element motion, component camera, instance matrix)... every one of those is a 1:1 map — they rewrite geometry, never add or drop a stroke — so the COUNT is identical either way\". Reading the actual code (packet 3's own `if(countOnly){...return out;}` at 3018-3032) against the full path (3033-3169) shows the comment's own list is INCOMPLETE, not wrong about the three items it does name: countOnly returns immediately after its own `sym.layers.forEach` loop (which applies visibility filtering, held-frame walk-back, and per-symLayer path-fx via the local `_fx` helper, 3019-3030) and BEFORE it ever reaches two stages the comment never mentions — the per-symLayer DUPLICATOR (`symLayer.duplicator`, 3110-3120, only present in the full-path forEach at 3033) and the exposedProps block's own `__visible` HIDE filter (3160-3161, `.filter(function(sd){return sd;})` at 3167). Both CAN change the stroke count: a symLayer with an active duplicator returns N seed-multiplied strokes in the full path but only its single un-duplicated seed's worth in countOnly (undercount); an exposed property currently driving a stroke's `__visible` target below 50 removes that stroke from the full path's own `out` via the trailing `.filter` but countOnly never reaches that filter at all (overcount). Confirmed by direct code read, not assumed from the comment's own claim — this is a genuine, currently-live divergence between the documented invariant and the actual branch structure, not merely stale documentation (contrast C21j's own similarly-shaped finding about a stale getEffectiveStrokesRendered comment, which WAS harmless). See `future_proposals`; not changed here (read-only scope).",
+    "The early-return layer-kind list at line 2973 (`if(ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer||ld.isEffectorLayer)return[];`) is preceded by two comment blocks (2952-2964, 2965-2972) that together explain what is DELIBERATELY NOT on this list: a `nativeVideo` layer. Per the EXPERIMENTAL 2026-09 comment, a natively-decoded video layer's PICTURE is engine-side (buildSceneJson, never frame data) but the layer CAN now legitimately carry MASK strokes (Cyril: \"on ne peut pas masquer directement sur la vidéo ?\"), so it deliberately falls all the way through this function's own gates (none of montageId/lfsGroup/symbolId ever apply to it, by construction of its mutually-exclusive creation path) and lands in the ordinary plain-layer tail (packet 5), which returns exactly the mask children `_collectLayerStrokes`/editRefusalReason (tools.js, out of scope, cited by name only) populate for it — the comment's own words: \"No special-casing needed beyond just NOT early-returning here\". The comment further notes Null/Effect layers reuse the SAME \"no strokes to speak of\" early-return pattern nativeVideo itself used to have before this 2026-09 change (an explicit historical contrast, not a currently-live code path).",
+    "Fallback behavior when `window.SMCamera`/`window.SMMotion` are absent, confirmed by direct read of every guard: the camera bake (`sym.cameraKeys&&sym.cameraKeys.length&&window.SMCamera`, 3134) and the exposedProps block (`sym.exposedProps&&sym.exposedProps.length&&window.SMMotion`, 3152) are both fully short-circuited — skipped entirely, `out` unchanged, no error. Element-level Motion (`if(window.SMMotion){...}`, 3058) is likewise a full skip. Layer-level Motion uses an explicit ternary instead of an `if`-guard (`var layerMat=window.SMMotion?SMMotion.computeMotionMatFor(symLayer,ii):null;`, 3086) — `layerMat` resolves to `null` and the subsequent `if(layerMat){...}` block is skipped identically. In every case the composite loop's own base content (path-fx'd, duplicator-applied strokes) still returns correctly; only the SMCamera/SMMotion-dependent transform/override layers are absent — this function never throws or returns `[]` merely because one of those two globals is missing.",
+    "The complete caller list of getEffectiveStrokes (direct calls, not through getEffectiveStrokesRendered) across src/js, derived by `git grep -rnE '(^|[^a-zA-Z_.])getEffectiveStrokes\\(' src/js` filtered to exclude the declaration (app.js:2949) and any `//`-prefixed hit: app.js:1461 (_resolveDuplicatorPath, C21g territory — deliberately the bare function, since \"a duplicator can't reference another duplicator\", per C21g's own comment), 1703/1736 (applyLayerDuplicator's own pool-member/temporal-stagger resampling, C21g territory), 1797 (getEffectiveStrokesRendered's own seed read, C21g territory — this scope IS what that wrapper wraps), 4004 (convertComponentToLayer), 4051 (convertLFSGroupToLayer), 5246 (_insertKeyframeCore), 5382 (convertToKeyframes) — all seven in app.js, general territory, cited by line only; tools.js:1882 (ensureKeyframe, the F6 UI gesture); text-animator-panel.js:44; vectorize-bridge.js:38; timeline.js:2015 (duplicate-frame), 2730 (updateUI, the ONLY countOnly=true call site, read only for `.length`), 11480; motion.js:3434 (sampleFollowPathAt), 4067 (taUnitCount — its own `_taCountCache.arr===strokes` cache relies directly on this scope's own plain-layer STORED-array identity contract above), 9437/9745 (layerElements and its own live-item resolver); media-library.js:197; images.js:330; labs/follow-path.js:62, labs/boil-effect.js:32, labs/layer-effects-bake.js:29/86, labs/interval-assistant.js:55, labs/shader-effects-bake.js:177/273, labs/multiframe-draw.js:59, labs/oca-export.js:116, labs/move-to-layer.js:39, labs/storyboard-mode.js:147. Cross-referenced against the ALREADY-MERGED C21g/#1198 artifact's own complete caller list for getEffectiveStrokesRendered (app.js:4783 loadFrame; export.js:58,1114; motion.js:5809 symbolUnionBounds; rive-export.js:582; tweens.js:4719,4720) and against that same artifact's own explicit responsibility text — \"getEffectiveStrokes itself stays untouched by this function — its own many other call sites (tween baking, ensureKeyframe, onion-ghost geometry sampling, status-bar counts…) must keep seeing the single real seed shape, never a duplicator's N-way expansion\" — every direct caller found above is one of exactly those legitimate by-design bare-seed readers (an F6 keyframe bake, a Labs one-shot conversion/export tool, a status-bar count, a Motion constraint sampling a REFERENCED layer's undecorated content, or C21g's own internal plumbing). No caller was found that reads getEffectiveStrokes directly where it should instead read getEffectiveStrokesRendered — this corrects/confirms rather than contradicts the issue's own prompt, which anticipated needing to flag such cases.",
+    "Render-path vs UI-gesture classification of the caller list above: RENDER-PATH (evaluated on essentially every scrub/playback/export tick for an affected layer) — app.js:1797/1703/1736/1461 (all inside the getEffectiveStrokesRendered/applyLayerDuplicator machinery C21g owns, itself invoked from loadFrame on every frame load), motion.js:3434 (sampleFollowPathAt, evaluated whenever Motion resolves a constrained layer's transform), motion.js:4067 (taUnitCount, evaluated per Text Animator weight calc), motion.js:9437/9745 (layerElements, the Motion \"Éléments\" per-shape list, rebuilt on panel refresh and Motion evaluation), timeline.js:2730 (updateUI's countOnly=true status-bar read — explicitly optimized via countOnly BECAUSE it runs on every frame change, per that call site's own header comment). UI-GESTURE (a single discrete user action, not a per-tick evaluation) — tools.js:1882 (F6 keyframe insert), app.js:4004/4051/5246/5382 (component/LFS-to-layer conversion, keyframe-insert-core, batch convertToKeyframes — all explicit menu/panel actions), text-animator-panel.js:44, vectorize-bridge.js:38, timeline.js:2015/11480, media-library.js:197, images.js:330, and the entire labs/*.js list (each a Labs panel's own explicit \"Bake\"/\"Export\"/\"Apply\" button click). This split is not itself asserted anywhere in-source; derived here by reading each call site's own enclosing function and trigger.",
+    "Every distinct `ld.*`/`sym.*`/`f.*`/`state.*` field this scope's own body reads on a classified-`code` line, with the line of first read (derived by a script implementing the same classify() algorithm the validator runs, restricted to code lines only, to avoid false hits inside this function's own many comments that MENTION these same field names): `state.layers[layerIdx]` (2950); `ld.isNullLayer`/`isEffectLayer`/`isGuideLayer`/`isWidgetLayer`/`isEffectorLayer` (2973); `ld.montageId` (2979, reread 2981); `ld.symPlacedAt` (2983); `ld.lfsGroup` (2987); `ld.symbolId` (2994); `state.symbols[ld.symbolId]` (2995); `ld.frames` (3005, reread 3187/3189 in the plain-layer tail); `ownF.isKeyframe`/`ownF.blankOverride` (3007-3008); `sym.layers` (3019, reread 3033); `symLayer.visible` (3020, reread 3034); `symLayer.frames` (3021, reread 3035); `sf.isKeyframe`/`sf.isInterpolated`/`sf.strokes` (3028, reread 3037-3038); `symLayer.duplicator`/`symLayer._dupEditSource` (3110); `sym.cameraKeys` (3134); `state.canvasW`/`state.canvasH` (3135); `ld.symMatrix` (3138); `sym.exposedProps` (3152); `f.isKeyframe`/`f.isInterpolated`/`f.strokes` (3188). Transient per-stroke-dict fields (`sd.isRaster`/`sd.strokeId`, `sd2.segments`/`.closed`/`.opacity`/`.x`/`.y`/`.width`/`.height`/`.rotation`, `ep.key`/`.label`/`.default`/`.targetStrokeId`/`.targetField`) are read/written on LOCAL clones or forEach-loop parameters, not on the persisted `ld`/`sym`/`f` shape itself, and are recorded in each packet's own `behavior` field rather than here.",
+    "The two module-level trailing declarations' complete reader/writer list, derived by `grep -rn '_symbolPaperLayers\\|_sceneSnapshot\\b\\|_montageViewSnapshot' src/js/*.js`: `_symbolPaperLayers` (a per-symbol cache of throwaway Paper Layer objects, declared 3192) is WRITTEN by `ensureSymbolPaperLayers` (app.js:3199, C21l, the memoizing write) and CLEARED wholesale by `project.js:58` (a fresh-project reset, `Object.keys(...).forEach(...l.remove());_symbolPaperLayers={}`) and `timeline.js:2380` (an identical clear, a different reset site); READ by `ensureSymbolPaperLayers` itself (3195, the memo-hit check) and by an `exitSymbol`-shaped function at app.js:4242 (general app.js territory, cited by line only: `var symLayers=_symbolPaperLayers[symId];if(symLayers)symLayers.forEach(function(l){l.visible=false;});`). `_sceneSnapshot` (declared 3192, `null` at rest) is WRITTEN by `enterSymbol` (app.js:4178, the full state snapshot before swapping into a Component's own layers) and CLEARED by `exitSymbol` (app.js:4250, `state.activeSymbolId=null;_sceneSnapshot=null;` after restoring every field it snapshotted, 4243-4248); READ by `exitSymbol`'s own restore guard (4198) and by timeline.js:2069-2071 (a montage-vs-symbol view-source disambiguator, general timeline.js territory, cited by line only). `_montageViewSnapshot` (declared 3193, `null` at rest) mirrors the identical pattern one level over: WRITTEN by `enterMontageView` (app.js:4299) and CLEARED by `exitMontageView` (app.js:4370); READ by `exitMontageView`'s own restore guard (4353) and the same timeline.js:2069-2071 disambiguator. None of the three is read or written from outside app.js/project.js/timeline.js.",
+    "Paper-item access: a literal grep of the assigned range for `new Path(`/`new Segment(`/`new Point(`/`.children` found exactly one cluster, lines 3063-3067, inside the element-motion sub-block (packet 3) — a DETACHED Path (`{insert:false}`, never added to any layer, matching the `buildXxxPath()` convention CLAUDE.md's own testing-methodology section documents for this codebase) built purely to reuse Paper's own `.bounds.center`/`.scale`/`.rotate`/`.translate` math, then immediately read back out into plain segment arrays (3068) and discarded (no `.remove()` call needed since it was never inserted). Zero `.children` access anywhere in this scope — unlike the rig scopes (C21h/C21i), this leaf never walks a live Paper layer's own child list; it operates entirely on the plain-JSON `ld`/`sym`/stroke-dict shape, using Paper only as a disposable calculator for one small piece of geometry math."
+  ],
+  "areas": [
+    {
+      "area": "lead-in-and-gates",
+      "packets": [
+        {
+          "id": "C21k.lead-in-and-gates",
+          "files": [
+            "src/js/app.js:2929-2993"
+          ],
+          "coverage_ranges": [
+            [
+              2929,
+              2993
+            ]
+          ],
+          "classification": {
+            "code": 17,
+            "comment": 48,
+            "whitespace": 0
+          },
+          "symbols": [
+            "getEffectiveStrokes",
+            "montageId",
+            "lfsGroup"
+          ],
+          "signature": "function getEffectiveStrokes(layerIdx,frameIdx,countOnly){var ld=state.layers[layerIdx];if(!ld)return[];if(layerHasTimeRange(ld)&&(frameIdx<layerInPoint(ld)||frameIdx>layerOutPoint(ld)))return[];if(ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer||ld.isEffectorLayer)return[];if(ld.montageId){if(!window.SMStoryboard)return[];var mtg=SMStoryboard.montageById(ld.montageId);if(!mtg)return[];var mtot=SMStoryboard.montageTotal(mtg);if(!mtot)return[];var mlf=frameIdx-(ld.symPlacedAt||0);if(mlf<0)return[];return SMStoryboard.montageStrokesAt(mtg,mlf%mtot);}if(ld.lfsGroup){return getLFSSubStrokes(ld,'shadow',frameIdx).concat(getLFSSubStrokes(ld,'full',frameIdx)).concat(getLFSSubStrokes(ld,'line',frameIdx));}",
+          "responsibility": "THE single scene-content reader every render/save/export path resolves a layer's current-frame content through (loadFrame via getEffectiveStrokesRendered, C21g; saveActiveLayerFrame/saveAllLayerFrames; every Labs/tool bake action). Lead-in (2929-2948, two comment blocks): documents that the four mutually-exclusive branches below (nativeVideo-implicit/montageId/lfsGroup/symbolId) are each set by its own distinct creation path, so a first-match-wins reading order is safe by construction, not a defensive assert; and documents the countOnly contract (skips element motion/component camera/instance matrix, a claim this scope's own packet 3/4 boundaries note qualifies as INCOMPLETE — see `boundaries`). Signature/first gate (2949-2951): resolve `ld` from `state.layers[layerIdx]`, early-return `[]` for a missing layer; the render/save chokepoint itself — `layerHasTimeRange(ld)` (C21j) short-circuits the common unranged case, only then does an out-of-[layerInPoint,layerOutPoint] frame return `[]`. nativeVideo note (2952-2964, comment only, no code): explains why nativeVideo is deliberately NOT in the kind list at 2973 — see `boundaries`. Null/Effect/Guide/Widget/Effector gate (2973): these five layer kinds never have real content by design, single early-return. StoryBoard montage branch (2979-2986): a montage layer's content at `frameIdx` IS the montage's own resolved (looping) frame, offset by `symPlacedAt` and gated to `[]` before the montage's own placement; delegates entirely to storyboard.js (out of scope). LFS branch (2987-2993): traditional cel stacking (shadow/full/line), a fixed three-way `.concat()` of C21j's own getLFSSubStrokes, back-to-front paint order.",
+          "callers": [
+            "The complete direct-caller list of getEffectiveStrokes (excluding getEffectiveStrokesRendered, C21g territory) across src/js, from `git grep -rnE '(^|[^a-zA-Z_.])getEffectiveStrokes\\(' src/js` filtered to exclude the declaration line and any `//`-prefixed hit:",
+            "app.js:1461 — _resolveDuplicatorPath (C21g territory, cited by line only): reads a Duplicator path-mode source layer's undecorated seed, deliberately NOT getEffectiveStrokesRendered (a duplicator can't reference another duplicator).",
+            "app.js:1703 — applyLayerDuplicator's own Object-mode pool-member read (C21g territory, cited by line only).",
+            "app.js:1736 — applyLayerDuplicator's own temporal-stagger resample fallback (C21g territory, cited by line only).",
+            "app.js:1797 — getEffectiveStrokesRendered's own base-seed read (C21g territory, cited by line only): this scope IS what that wrapper wraps with path-fx and the top-level duplicator.",
+            "app.js:4004 — convertComponentToLayer (general app.js territory, cited by line only): bakes every frame of a component instance into a plain layer's own keyframes.",
+            "app.js:4051 — convertLFSGroupToLayer (general app.js territory, cited by line only): the LFS-group mirror of the same bake.",
+            "app.js:5246 — _insertKeyframeCore (general app.js territory, cited by line only): `f.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(layerIdx,frameIdx)))`.",
+            "app.js:5382 — convertToKeyframes (general app.js territory, cited by line only): an identical per-frame bake across a batch conversion.",
+            "tools.js:1882 — ensureKeyframe (cited by line only): the F6 \"insert keyframe from current content\" UI gesture.",
+            "text-animator-panel.js:44, vectorize-bridge.js:38 — panel/tool one-shot reads of the current layer's current-frame content (cited by line only).",
+            "timeline.js:2015 — duplicate-frame action (cited by line only); timeline.js:2730 — updateUI, the ONLY countOnly=true call site anywhere in src/js, read only for `.length` (the status-bar stroke count, per this function's own header comment); timeline.js:11480 (cited by line only).",
+            "motion.js:3434 — sampleFollowPathAt (cited by line only): reads a Follow-Path constraint's REFERENCED target layer's undecorated content.",
+            "motion.js:4067 — taUnitCount (cited by line only): the Text Animator's per-character weight divisor; its own `_taCountCache.arr===strokes` cache relies on this scope's own plain-layer STORED-array identity contract (see `boundaries`).",
+            "motion.js:9437, 9745 — layerElements and its own live-item resolver (cited by line only): the Motion \"Éléments\" per-shape list.",
+            "media-library.js:197, images.js:330 — media/image tool one-shot reads (cited by line only).",
+            "labs/follow-path.js:62, labs/boil-effect.js:32, labs/layer-effects-bake.js:29/86, labs/interval-assistant.js:55, labs/shader-effects-bake.js:177/273, labs/multiframe-draw.js:59, labs/oca-export.js:116, labs/move-to-layer.js:39, labs/storyboard-mode.js:147 — one-shot Labs bake/export tool actions (cited by line only).",
+            "See `boundaries` for the render-path-vs-UI-gesture classification of this complete list, and for the cross-check against C21g's own complete caller list for getEffectiveStrokesRendered."
+          ],
+          "behavior": [
+            "Lines 2929-2940 (comment, 12 lines): lead-in — the four mutually-exclusive branches, first-match-wins by construction, audited 2026-07, not a runtime assert.",
+            "Lines 2941-2948 (comment, 8 lines): the countOnly contract's own header claim (skips element motion/component camera/instance matrix, all claimed 1:1) — see `boundaries` for the qualification.",
+            "Line 2949 (code, 1 line): `function getEffectiveStrokes(layerIdx,frameIdx,countOnly){`.",
+            "Line 2950 (code, 1 line): resolve `ld`, early-return `[]` if missing.",
+            "Line 2951 (code, 1 line): the render/save time-range gate — `layerHasTimeRange`/`layerInPoint`/`layerOutPoint` (C21j).",
+            "Lines 2952-2964 (comment, 13 lines): the EXPERIMENTAL native-video-decode note — nativeVideo deliberately NOT early-returned, falls through to the plain-layer tail for its own mask strokes.",
+            "Lines 2965-2967 (comment, 3 lines): Null/Effect layer note.",
+            "Lines 2968-2972 (comment, 5 lines): Widget (rig control) layer note — this one line keeps it out of every export at once.",
+            "Line 2973 (code, 1 line): the five-kind early-return gate.",
+            "Lines 2974-2978 (comment, 5 lines): StoryBoard montage layer note.",
+            "Lines 2979-2986 (code, 8 lines): the `ld.montageId` branch.",
+            "Lines 2987-2989 (comment+code interleaved as classified; code line 2987 opens the branch, 2988-2989 comment, code resumes 2990-2992): the `ld.lfsGroup` branch — traditional cel stacking order.",
+            "Line 2993 (code, 1 line): closing `}` of the lfsGroup branch."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "component-own-frames-and-resolve",
+      "packets": [
+        {
+          "id": "C21k.component-own-frames-and-resolve",
+          "files": [
+            "src/js/app.js:2994-3016"
+          ],
+          "coverage_ranges": [
+            [
+              2994,
+              3016
+            ]
+          ],
+          "classification": {
+            "code": 9,
+            "comment": 14,
+            "whitespace": 0
+          },
+          "symbols": [
+            "symbolId",
+            "blankOverride",
+            "resolveSymbolFrameIdx"
+          ],
+          "signature": "if(ld.symbolId){var sym=state.symbols[ld.symbolId];if(!sym)return[];for(var ownFi=Math.min(frameIdx,ld.frames.length-1);ownFi>=0;ownFi--){var ownF=ld.frames[ownFi];if(!ownF||!ownF.isKeyframe)continue;if(ownF.blankOverride)return[];break;}var ii=resolveSymbolFrameIdx(sym,ld,frameIdx);",
+          "responsibility": "Opens the Component-instance branch (`ld.symbolId`, the largest and last of the four mutually-exclusive branches), resolving `sym` from `state.symbols` (early-return `[]` if the symbol was deleted). A user-placed blank keyframe (F7) on the COMPONENT INSTANCE's own main-timeline row (distinct from any blank keyframe inside the symbol's own sub-layers) now genuinely hides the whole component for that span, exactly like an ordinary layer's own blank-keyframe gate — the ONE deliberate exception to the rule (stated in the packet's own comment) that a component instance's `frames[]` array is otherwise pure timing decoration, never read for content elsewhere. The scan (3005-3010) walks BACKWARD from `frameIdx` to the nearest preceding outer keyframe (held-span semantics identical to ordinary Animation 2D keys, not an exact-frame check — the packet's own comment states the former exact-frame version made an F7 component flicker for one frame and reappear across what the timeline displayed as a blank span) and returns `[]` immediately if that keyframe carries `blankOverride`. `resolveSymbolFrameIdx` (C21j, line 3011) then resolves which internal frame of the symbol to composite — the single chokepoint the packet 3 comment above `var out=[]` (3012-3016) explains is about to be read from EVERY visible sub-layer, not just the first.",
+          "callers": [
+            "Same callers as packet 1 (C21k.lead-in-and-gates) — this packet is a direct continuation of getEffectiveStrokes' own body, not independently callable; see packet 1's own `callers` field for the complete list."
+          ],
+          "behavior": [
+            "Line 2994 (code, 1 line): `if(ld.symbolId){`.",
+            "Line 2995 (code, 1 line): resolve `sym=state.symbols[ld.symbolId]`, early-return `[]` if the symbol was deleted.",
+            "Lines 2996-3000 (comment, 5 lines): the blankOverride design note — F7 on the INSTANCE's own row, the one deliberate exception to \"frames[] is pure timing decoration\".",
+            "Lines 3001-3004 (comment, 4 lines): held-until-next-outer-key rationale — fixes the former exact-frame flicker.",
+            "Lines 3005-3010 (code, 6 lines): the backward scan to the nearest preceding outer keyframe; `blankOverride` early-return `[]`; `break` once a keyframe is found.",
+            "Line 3011 (code, 1 line): `var ii=resolveSymbolFrameIdx(sym,ld,frameIdx);` — C21j's own chokepoint.",
+            "Lines 3012-3016 (comment, 5 lines): the composite-every-visible-sub-layer rationale — a multi-layer component used to silently drop every sub-layer but the first."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "component-composite-loop",
+      "packets": [
+        {
+          "id": "C21k.component-composite-loop",
+          "files": [
+            "src/js/app.js:3017-3122"
+          ],
+          "coverage_ranges": [
+            [
+              3017,
+              3122
+            ]
+          ],
+          "classification": {
+            "code": 68,
+            "comment": 38,
+            "whitespace": 0
+          },
+          "symbols": [
+            "countOnly",
+            "symLayer",
+            "applyLayerDuplicator"
+          ],
+          "signature": "var out=[];if(countOnly){sym.layers.forEach(function(symLayer){if(!symLayer||symLayer.visible===false)return;var sf=symLayer.frames[ii];if(!sf)return;var _fx=function(arr){return (window.SMPathFx&&SMPathFx.hasAny(symLayer))?SMPathFx.apply(arr,symLayer,ii):arr;};if(sf.isKeyframe||sf.isInterpolated){out=out.concat(_fx(sf.strokes));return;}for(var k=ii-1;k>=0;k--){if(symLayer.frames[k].isKeyframe){out=out.concat(_fx(symLayer.frames[k].strokes));break;}}});return out;}sym.layers.forEach(function(symLayer){if(!symLayer||symLayer.visible===false)return;var sf=symLayer.frames[ii];if(!sf)return;var layerStrokes=null;if(sf.isKeyframe||sf.isInterpolated){layerStrokes=sf.strokes;}else{for(var k=ii-1;k>=0;k--){if(symLayer.frames[k].isKeyframe){layerStrokes=symLayer.frames[k].strokes;break;}}}if(!layerStrokes)return;if(window.SMPathFx&&SMPathFx.hasAny(symLayer))layerStrokes=SMPathFx.apply(layerStrokes,symLayer,ii);if(window.SMMotion){layerStrokes=layerStrokes.map(function(sd){if(sd.isRaster||!sd.strokeId)return sd;var elMat=SMMotion.elementMotionAt(layerIdx,sd.strokeId,frameIdx,sd);if(!elMat)return sd;var sd2=JSON.parse(JSON.stringify(sd));var tmp=new Path({insert:false});for(var si=0;si<sd2.segments.length;si++){var s=sd2.segments[si];tmp.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));}if(sd2.closed)tmp.closed=true;var epc=tmp.bounds.center;var elPivot=new Point(epc.x+elMat.ax,epc.y+elMat.ay);tmp.scale(elMat.sx,elMat.sy,elPivot);tmp.rotate(elMat.rot,elPivot);tmp.translate(elMat.dx,elMat.dy);sd2.segments=tmp.segments.map(function(s){return{point:[s.point.x,s.point.y],handleIn:[s.handleIn.x,s.handleIn.y],handleOut:[s.handleOut.x,s.handleOut.y]};});sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*elMat.op;return sd2;});}var layerMat=window.SMMotion?SMMotion.computeMotionMatFor(symLayer,ii):null;if(layerMat){var pivot=_boundsCenterOfStrokes(layerStrokes);pivot={x:pivot.x+layerMat.ax,y:pivot.y+layerMat.ay};layerStrokes=layerStrokes.map(function(sd){var sd2=JSON.parse(JSON.stringify(sd));if(sd2.isRaster){var rb=SMMotion.transformImageRect({x:sd2.x-sd2.width/2,y:sd2.y-sd2.height/2,width:sd2.width,height:sd2.height,rotation:sd2.rotation||0},pivot,layerMat);sd2.x=rb.x+rb.width/2;sd2.y=rb.y+rb.height/2;sd2.width=rb.width;sd2.height=rb.height;if(rb.rotation)sd2.rotation=rb.rotation;else delete sd2.rotation;}else if(sd2.segments){sd2.segments=SMMotion.transformSegments(sd2.segments,pivot,layerMat);}sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*layerMat.op;return sd2;});}if(symLayer.duplicator&&!symLayer._dupEditSource&&layerStrokes.length){layerStrokes=applyLayerDuplicator(symLayer,layerStrokes,ii,null,{spanStart:0,spanLen:symLayer.frames.length,resample:function(shiftedIdx){var rf=symLayer.frames[shiftedIdx];if(!rf)return[];if(rf.isKeyframe||rf.isInterpolated)return rf.strokes||[];for(var kk=shiftedIdx-1;kk>=0;kk--){if(symLayer.frames[kk].isKeyframe)return symLayer.frames[kk].strokes||[];}return[];}});}out=out.concat(layerStrokes);});",
+          "responsibility": "The heart of the Component branch: composites EVERY visible sub-layer of `sym.layers` into a single flat `out` array, in two structurally different paths gated by `countOnly`. The countOnly fast path (3018-3032) exists purely because `updateUI` (timeline.js:2730) was calling the FULL path once per frame solely to print a status-bar stroke count, doubling the per-frame transform cost of every scrub/playback tick (2026-07-28 fix, per the function's own header comment) — it applies only per-symLayer visibility filtering, held-frame walk-back (identical local pattern to C21j's own getLFSSubStrokes, an independent near-duplicate of the same small loop per `future_proposals`), and per-symLayer path-fx (the local `_fx` closure, 2026-09-03 fix — path-fx posed INSIDE a component belongs to the symLayer, not the outer instance `ld` that getEffectiveStrokesRendered's own path-fx check reads, so without this the component's own thumbnail would show a zigzag that the placed instance never did), then returns immediately — see `boundaries` for why this makes the header's own \"COUNT is identical either way\" claim incomplete (the duplicator and the exposedProps hide-filter, both capable of changing stroke count, are NOT reached by this fast path at all). The full path (3033-3122) repeats the same visibility/held-frame/path-fx steps, then layers on: element-level Motion (3057-3075, a per-shape animated Position/Anchor/Rotation/Scale/Opacity sampled via `SMMotion.elementMotionAt`, applied through a throwaway detached Paper Path purely for its `.scale`/`.rotate`/`.translate` math, pivoted around each shape's OWN bounds — same nesting order exportBuildFrame already uses for plain layers); layer-level Motion (3086-3102, a 2026-07-29 fix found live while beta-testing: a multi-layer component's sub-layer can carry its own layer-level Motion track set while editing inside via enterSymbol, which previously silently did nothing once composited from outside — one nesting level further out than element motion, pivoted around the whole sub-layer's own bounds via `_boundsCenterOfStrokes`, C21f); and the Duplicator (3110-3120, applied AFTER both motion stages — the seed animates first, then multiplies — via a direct `applyLayerDuplicator` call, C21g, with a custom `opts` object since a symLayer has no index into `state.layers` to resample through normally; guarded by `!symLayer._dupEditSource` so a mid-edit-source session shows its single seed, mirroring getEffectiveStrokesRendered's own identical guard on the outer instance). Each sub-layer's final `layerStrokes` is concatenated onto `out` (3121).",
+          "callers": [
+            "Same callers as packet 1 (C21k.lead-in-and-gates) — this packet is a direct continuation of getEffectiveStrokes' own body, not independently callable; see packet 1's own `callers` field for the complete list."
+          ],
+          "behavior": [
+            "Line 3017 (code, 1 line): `var out=[];`.",
+            "Line 3018 (code, 1 line): `if(countOnly){`.",
+            "Lines 3019-3021 (code, 3 lines): the countOnly forEach head — visibility filter, resolve `sf`, early-return if absent.",
+            "Lines 3022-3026 (comment, 5 lines, French): the 2026-09-03 path-fx-inside-a-component fix rationale.",
+            "Lines 3027-3030 (code, 4 lines): the local `_fx` closure; the keyframe/interpolated direct return; the held-frame walk-back loop; closing the forEach.",
+            "Lines 3031-3032 (code, 2 lines): `return out;` closing the `if(countOnly)` block.",
+            "Lines 3033-3039 (code, 7 lines): the full-path forEach head — visibility filter, resolve `sf`, resolve `layerStrokes` (direct or held-frame walk-back), early-return if absent.",
+            "Lines 3040-3041 (comment, 2 lines): \"Même raison que la branche ci-dessus\" — path-fx belongs to the internal symLayer.",
+            "Line 3042 (code, 1 line): apply path-fx to `layerStrokes` if any is configured.",
+            "Lines 3043-3056 (comment, 14 lines): the element-level Motion design note — same descriptor/nesting order exportBuildFrame uses for plain layers, applied per sub-layer (not on the flattened `out`) so each element's pivot reflects its own current position, `elementMotionAt` lifted alongside this change.",
+            "Lines 3057-3075 (code, 19 lines): the element-motion `.map()` — per-stroke `elementMotionAt` sample, deep clone, detached-Path scale/rotate/translate, segment/opacity write-back.",
+            "Lines 3076-3085 (comment, 10 lines): the layer-level Motion design note — the 2026-07-29 fix found live while beta-testing, one nesting level further out than element motion.",
+            "Lines 3086-3102 (code, 17 lines): `layerMat` resolution (ternary, `null` if `window.SMMotion` absent); the pivot computation; the `.map()` applying image-rect or segment transform plus opacity.",
+            "Lines 3103-3109 (comment, 7 lines): the Duplicator design note — applied AFTER element/layer motion, `_dupEditSource` mirrors getEffectiveStrokesRendered's own guard.",
+            "Lines 3110-3120 (code, 11 lines): the `symLayer.duplicator` guard and `applyLayerDuplicator` call with its custom `opts.resample`/`spanStart`/`spanLen`.",
+            "Lines 3121-3122 (code, 2 lines): `out=out.concat(layerStrokes);` closing the full-path forEach."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "component-camera-matrix-exposed",
+      "packets": [
+        {
+          "id": "C21k.component-camera-matrix-exposed",
+          "files": [
+            "src/js/app.js:3123-3170"
+          ],
+          "coverage_ranges": [
+            [
+              3123,
+              3170
+            ]
+          ],
+          "classification": {
+            "code": 27,
+            "comment": 21,
+            "whitespace": 0
+          },
+          "symbols": [
+            "symMatrix",
+            "exposedProps",
+            "cameraKeys"
+          ],
+          "signature": "if(sym.cameraKeys&&sym.cameraKeys.length&&window.SMCamera){var camM=SMCamera.cameraMatrixAtFrame(sym.cameraKeys,ii,state.canvasW,state.canvasH);if(camM)out=out.map(function(sd){return applyMatrixToStrokeData(cloneStrokeForTransform(sd),camM);});}if(ld.symMatrix){var m=symMatrixOf(ld);out=out.map(function(sd){return applyMatrixToStrokeData(cloneStrokeForTransform(sd),m);});}if(sym.exposedProps&&sym.exposedProps.length&&window.SMMotion){sym.exposedProps.forEach(function(ep){if(SMMotion.registerExposedPropMeta)SMMotion.registerExposedPropMeta(ep.key,ep.label,ep.default);});var epByStroke={};sym.exposedProps.forEach(function(ep){(epByStroke[ep.targetStrokeId]=epByStroke[ep.targetStrokeId]||[]).push(ep);});out=out.map(function(sd){if(!sd.strokeId||!epByStroke[sd.strokeId])return sd;var sd2=null,hide=false;epByStroke[sd.strokeId].forEach(function(ep){var val=SMMotion.valueAtFrame(ld,ep.key,frameIdx)[0];if(ep.targetField==='__visible'){if(val<50)hide=true;return;}if(!sd2)sd2=JSON.parse(JSON.stringify(sd));if(ep.targetField==='opacity')sd2.opacity=Math.max(0,Math.min(1,val/100));else sd2[ep.targetField]=val;});return hide?null:(sd2||sd);}).filter(function(sd){return sd;});}return out;}",
+          "responsibility": "Closes the Component branch with three transforms applied to the flattened `out` array, STRICTLY in this order, each independently guarded and skipped when inapplicable: (1) camera bake (3134-3137) — a Component with its own camera keys (set while inside it via enterSymbol's own `cameraKeys` swap, CLAUDE.md §8) bakes that camera's pan/zoom/roll into the rendered content HERE, at the one chokepoint every consumer (buildSceneJson, StoryBoard thumbnails, export) already shares — via C21j-adjacent `SMCamera.cameraMatrixAtFrame` (camera.js, out of scope) and C21f's `applyMatrixToStrokeData(cloneStrokeForTransform(sd),camM)`, so the camera's move travels with the instance wherever it's placed; (2) the instance transform (3138-3141) — `ld.symMatrix` (the instance's own scale/rotate/position gesture, C21f's `symMatrixOf`), identically cloned-then-transformed, skipped entirely when `ld.symMatrix` itself is falsy (the identity case, per the preceding comment's own \"skip entirely... when it's identity\" claim — this scope's own code is a plain truthiness check, so the skip is enforced by whatever sets `ld.symMatrix` never assigning it for an identity gesture, C21f territory); (3) exposed-property overrides (3152-3168, 2026-08-18) — resolved LAST, after every geometric transform above, since these touch paint/visibility fields a matrix never does. `ld` (the INSTANCE layer, not the symbol) carries each exposed property's actual current value, read via `SMMotion.valueAtFrame(ld,ep.key,frameIdx)` (animated→static→PROP_DEFAULT fallback already built into that evaluator, reused rather than re-derived here). Metadata (`registerExposedPropMeta`) is re-registered on EVERY call, per the comment \"cheap, idempotent... see propsFor's identical reasoning\". Each exposed prop targets one `ep.targetStrokeId` (grouped via `epByStroke`) and one `ep.targetField` — `__visible` sets a local `hide` flag (dropping the stroke via the trailing `.filter`) when the driven value falls below 50, `opacity` clamps to `[0,1]` from a 0-100 value, any other field is written directly; a stroke is only ever deep-cloned (`sd2=JSON.parse(JSON.stringify(sd))`) the first time one of its own exposed props actually needs to write something. `return out;` (3169) is the ld.symbolId branch's own final return, closing the branch at 3170.",
+          "callers": [
+            "Same callers as packet 1 (C21k.lead-in-and-gates) — this packet is a direct continuation of getEffectiveStrokes' own body, not independently callable; see packet 1's own `callers` field for the complete list."
+          ],
+          "behavior": [
+            "Lines 3123-3127 (comment, 5 lines): the instance-transform design note — skip entirely when identity, strokes are live symbol-owned references so every one is deep-cloned first.",
+            "Lines 3128-3133 (comment, 6 lines): the camera-bake design note — the one chokepoint every consumer already shares.",
+            "Lines 3134-3137 (code, 4 lines): the camera-bake `if` block.",
+            "Lines 3138-3141 (code, 4 lines): the `ld.symMatrix` instance-transform `if` block.",
+            "Lines 3142-3151 (comment, 10 lines): the exposed-property-overrides design note — resolved last, `ld` carries the value, SMMotion.valueAtFrame's own fallback chain reused, re-registers metadata every call per propsFor's identical reasoning.",
+            "Line 3152 (code, 1 line): the exposedProps guard `if`.",
+            "Line 3153 (code, 1 line): the metadata re-registration forEach.",
+            "Lines 3154-3155 (code, 2 lines): build `epByStroke`, grouped by `targetStrokeId`.",
+            "Lines 3156-3167 (code, 12 lines): the per-stroke `.map()` — per-exposed-prop value read, `__visible`/`opacity`/arbitrary-field branches, lazy clone, `hide?null:(sd2||sd)`.",
+            "Line 3167 continued / 3168 (code): `.filter(function(sd){return sd;});` drops hidden strokes; closing `}` of the exposedProps guard.",
+            "Line 3169 (code, 1 line): `return out;` — the ld.symbolId branch's own final return.",
+            "Line 3170 (code, 1 line): closing `}` of `if(ld.symbolId){`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "plain-layer-hot-path-module-vars",
+      "packets": [
+        {
+          "id": "C21k.plain-layer-hot-path-module-vars",
+          "files": [
+            "src/js/app.js:3171-3193"
+          ],
+          "coverage_ranges": [
+            [
+              3171,
+              3193
+            ]
+          ],
+          "classification": {
+            "code": 7,
+            "comment": 16,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_symbolPaperLayers",
+            "_sceneSnapshot",
+            "_montageViewSnapshot"
+          ],
+          "signature": "var f=ld.frames[frameIdx];if(!f)return[];if(f.isKeyframe||f.isInterpolated)return f.strokes;for(var i=frameIdx-1;i>=0;i--){if(ld.frames[i].isKeyframe)return ld.frames[i].strokes;}return [];}var _symbolPaperLayers={},_sceneSnapshot=null;var _montageViewSnapshot=null;",
+          "responsibility": "The plain-layer tail — reached only when none of montageId/lfsGroup/symbolId applied (the overwhelmingly common case, and also nativeVideo's own deliberate fall-through per packet 1's own `boundaries` note) — is THE hot path, called every frame load/scrub/playback tick for every ordinary layer. Deliberately NOT cloned, unlike the symbolId branch: returns a LIVE reference into the stored frame's own `strokes` array (the current keyframe's, or an inherited earlier keyframe's via the backward walk at 3189) — this is the ONLY branch in the whole function whose RETURN IDENTITY is the stored array itself, the exact identity `_canReuseMaterialized` (loadFrame, app.js:4784) and the retained-geometry engine store (CLAUDE.md §5ter/§5quater) depend on. Safe only as long as every caller treats it read-only or clones before mutating — the function's own comment states every CURRENT caller does (loadFrame's own desR/desP build new Paper objects from it) and warns that a future in-place-mutating caller would corrupt the STORED keyframe (or, for the inherited-frame branch, corrupt the keyframe at `frameIdx-i`, not the frame the caller thinks it's touching). Closes the function at 3191. The two trailing module-level declarations (3192-3193) are unrelated state belonging to the Component/montage-view-entry system directly below this function — `_symbolPaperLayers` (a per-symbol memoized array of throwaway Paper Layer objects, written by C21l's own `ensureSymbolPaperLayers`) and `_sceneSnapshot`/`_montageViewSnapshot` (full state snapshots taken by `enterSymbol`/`enterMontageView`, general app.js territory, restored by `exitSymbol`/`exitMontageView`) — see `boundaries` for the complete reader/writer list of all three.",
+          "callers": [
+            "Same callers as packet 1 (C21k.lead-in-and-gates) for the function body (lines 3171-3191); the two trailing module-var declarations (3192-3193) have no callers of their own — see `boundaries` for their complete reader/writer list (ensureSymbolPaperLayers/enterSymbol/exitSymbol/enterMontageView/exitMontageView/project.js/timeline.js)."
+          ],
+          "behavior": [
+            "Lines 3171-3186 (comment, 16 lines): the plain-layer hot-path design note — deliberately not cloned, live reference contract, safe only if read-only/cloned-before-mutation, corruption warning for the inherited-frame branch.",
+            "Line 3187 (code, 1 line): `var f=ld.frames[frameIdx];if(!f)return[];`.",
+            "Line 3188 (code, 1 line): `if(f.isKeyframe||f.isInterpolated)return f.strokes;` — the STORED-array return.",
+            "Line 3189 (code, 1 line): the held-keyframe backward-walk, returning `ld.frames[i].strokes` — also a STORED-array return.",
+            "Line 3190 (code, 1 line): `return [];` — the fallback (no preceding keyframe at all, an invariant violation elsewhere).",
+            "Line 3191 (code, 1 line): closing `}` of `getEffectiveStrokes`.",
+            "Line 3192 (code, 1 line): `var _symbolPaperLayers={},_sceneSnapshot=null;`.",
+            "Line 3193 (code, 1 line): `var _montageViewSnapshot=null;` with a same-line trailing comment pointing to enterMontageView/exitMontageView."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "app.js:3194+ ensureSymbolPaperLayers and friends (C21l, next leaf, not yet filed as an issue at authoring time)",
+      "disposition": "Retains its own body in full — cited by line only. Reads this scope's own trailing `_symbolPaperLayers` (3195/3199). None of C21l's own body is reproduced here."
+    },
+    {
+      "consumer": "engine-bridge.js (buildSceneJson/loadFrame's Paper-item materialization) — C21g territory for the call itself",
+      "disposition": "Retains its own body in full — cited by line/name only. Never calls getEffectiveStrokes or getEffectiveStrokesRendered directly in code (confirmed: every `getEffectiveStrokes` hit in engine-bridge.js is inside a `//` comment). Consumes the already-materialized Paper `layer.children` that loadFrame (app.js:4783-4795, general app.js territory) built by calling getEffectiveStrokesRendered once per layer per frame and feeding the result through desP/desR."
+    },
+    {
+      "consumer": "export.js and rive-export.js (PNG/video/Lottie/Rive export)",
+      "disposition": "Retain their own bodies in full — cited by line only. Both call getEffectiveStrokesRendered directly (export.js:58/1114, rive-export.js:582 — C21g territory), never the bare getEffectiveStrokes this scope defines; export.js:58's own comment states this is \"identical to getEffectiveStrokes for every other layer\" (a documented no-op for non-duplicator/non-path-fx layers)."
+    },
+    {
+      "consumer": "motion.js (Follow Path, Text Animator, Component union-bounds/gizmo, per-shape Éléments list — C20 lineage)",
+      "disposition": "Retains its own body in full — cited by name/line only. Four direct getEffectiveStrokes callers (3434, 4067, 9437, 9745) and one getEffectiveStrokesRendered caller (5809, C21g territory) — see `boundaries` for the full breakdown and the taUnitCount identity-cache dependency."
+    },
+    {
+      "consumer": "storyboard.js (the StoryBoard montage engine)",
+      "disposition": "Retains its own body in full — cited by name/line only. This scope's own ld.montageId branch (2979-2986) calls INTO storyboard.js's own montageById/montageTotal/montageStrokesAt; montageStrokesAt delegates to storyboard.js's own symbolStrokesAt, confirmed (by direct read) to build a fresh array, never a stored reference — see `boundaries`'s own RETURN IDENTITY note."
+    },
+    {
+      "consumer": "timeline.js (updateUI's status-bar count, duplicate-frame, comp panels) and tweens.js (onion-skin ghosts)",
+      "disposition": "Retain their own bodies in full — cited by line only. timeline.js:2730 (updateUI) is the sole countOnly=true caller anywhere in src/js. tweens.js:4719/4720 call getEffectiveStrokesRendered (C21g territory), not the bare function."
+    },
+    {
+      "consumer": "tools.js, text-animator-panel.js, vectorize-bridge.js, media-library.js, images.js, and every labs/*.js one-shot bake/export tool",
+      "disposition": "Retain their own bodies in full — cited by line only. Each is a discrete, explicitly user-triggered action reading the CURRENT frame's effective content once (an F6 keyframe insert, a Labs panel's own bake/export/apply button, a menu conversion) — the complete list is recorded verbatim in packet 1's own `callers` field, classified render-path-vs-UI-gesture in `boundaries`."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-render-gate-blocks-outside-inpoint-outpoint",
+      "proposed": "Set ld.inPoint=10,ld.outPoint=20 with no timeLink; call getEffectiveStrokes(idx,5) and getEffectiveStrokes(idx,25); expect [] for both, and a non-[] result at frame 15 — verifies the render/save gate at line 2951 delegates correctly to C21j's own layerHasTimeRange/layerInPoint/layerOutPoint — not run."
+    },
+    {
+      "id": "fx-null-effect-guide-widget-effector-return-empty",
+      "proposed": "Set each of ld.isNullLayer/isEffectLayer/isGuideLayer/isWidgetLayer/isEffectorLayer true in turn on an otherwise-normal layer with real stroke content; call getEffectiveStrokes; expect [] in all five cases — verifies the early-return gate at line 2973 — not run."
+    },
+    {
+      "id": "fx-nativevideo-falls-through-to-plain-tail-with-mask",
+      "proposed": "Build a nativeVideo layer (none of isNullLayer/montageId/lfsGroup/symbolId set) with a mask stroke keyframed at frame 0; call getEffectiveStrokes(idx,0); expect the mask stroke array to be returned (the plain-layer tail), not [] — verifies the deliberate non-early-return documented in the 2952-2964 comment — not run."
+    },
+    {
+      "id": "fx-montage-before-placement-returns-empty",
+      "proposed": "Set ld.montageId to a valid montage with ld.symPlacedAt=10; call getEffectiveStrokes(idx,5); expect [] (mlf<0) — verifies line 2984 — not run."
+    },
+    {
+      "id": "fx-montage-loops-via-modulo",
+      "proposed": "Set ld.symPlacedAt=0 on a montage whose montageTotal is 10; call getEffectiveStrokes at frameIdx=23; expect the SAME result as frameIdx=13 and frameIdx=3 (23%10===13%10===3) — verifies line 2985's own modulo loop — not run."
+    },
+    {
+      "id": "fx-blankoverride-hides-component-held-until-next-key",
+      "proposed": "Set a blankOverride keyframe at frame 5 on a symbolId layer and a normal keyframe at frame 10; call getEffectiveStrokes at frames 5,7,9; expect [] for all three (held through frame 9) and a non-[] result at frame 10 — verifies the backward scan at lines 3005-3010 uses HELD semantics, not an exact-frame check — not run."
+    },
+    {
+      "id": "fx-multilayer-component-composites-all-visible-sublayers",
+      "proposed": "Build a two-sub-layer symbol with distinct single-stroke content on each, both visible; call getEffectiveStrokes on an instance; expect BOTH strokes present in the result, not just sym.layers[0]'s — verifies the 2026-07-28 multi-layer compositing fix (lines 3033-3122) — not run."
+    },
+    {
+      "id": "fx-invisible-sublayer-skipped",
+      "proposed": "Set symLayer.visible=false on one of two sub-layers with content; call getEffectiveStrokes on the instance; expect only the visible sub-layer's content — verifies line 3034's own visibility guard — not run."
+    },
+    {
+      "id": "fx-pathfx-applied-to-symlayer-not-instance",
+      "proposed": "Add an SMPathFx stack to a symbol's own internal sub-layer (not the placed instance ld); call getEffectiveStrokes on the instance; expect the path-fx-deformed geometry — verifies the 2026-09-03 fix at line 3042 (and the identical countOnly-path `_fx` closure at line 3027) — not run."
+    },
+    {
+      "id": "fx-element-motion-applied-per-shape-before-layer-motion",
+      "proposed": "Set an elementMotionAt-resolvable Position keyframe on one stroke's own strokeId inside a symLayer, AND a layer-level Motion Rotation on the same symLayer; call getEffectiveStrokes; expect the stroke's own element-level offset to be applied FIRST (visible in its own local position) then rotated as part of the whole sub-layer's own bounds-pivoted rotation — verifies the nesting order at lines 3057-3102 — not run."
+    },
+    {
+      "id": "fx-duplicator-applied-after-both-motion-stages",
+      "proposed": "Set symLayer.duplicator with count=3 AND an element-level Motion offset on the seed stroke; call getEffectiveStrokes; expect exactly 3 output strokes, each showing the ALREADY-motion-offset seed's position as ITS OWN base before the duplicator's own per-clone placement is added — verifies \"the seed is animated first, then multiplied\" at lines 3103-3120 — not run."
+    },
+    {
+      "id": "fx-camera-bake-applied-when-cameraKeys-present",
+      "proposed": "Set sym.cameraKeys with a pan of (50,0) at the resolved internal frame; call getEffectiveStrokes on a placed instance; expect every returned stroke's own geometry shifted by (50,0) relative to the un-cameraed symbol content — verifies lines 3134-3137 — not run."
+    },
+    {
+      "id": "fx-symmatrix-skipped-when-falsy",
+      "proposed": "Call getEffectiveStrokes on a symbolId instance whose ld.symMatrix is unset/falsy; expect the returned strokes' own geometry to be byte-identical to the pre-instance-transform composite (no cloneStrokeForTransform pass applied) — verifies the truthiness gate at line 3138 — not run."
+    },
+    {
+      "id": "fx-exposedprops-visible-hides-stroke",
+      "proposed": "Set an exposed prop with targetField='__visible' on a strokeId, driven to a value of 20 (below 50) via SMMotion.valueAtFrame; call getEffectiveStrokes; expect that stroke ABSENT from the returned array (removed by the trailing .filter) — verifies lines 3160-3161/3167 — not run."
+    },
+    {
+      "id": "fx-exposedprops-opacity-and-arbitrary-field",
+      "proposed": "Set two exposed props on the SAME strokeId — one targetField='opacity' driven to 40, one targetField='fillColor' driven to a hex value; call getEffectiveStrokes; expect the returned stroke's opacity clamped to 0.4 AND fillColor overwritten, both on the SAME single deep-cloned dict (not two separate clones) — verifies the lazy single-clone-per-stroke pattern at lines 3159-3165 — not run."
+    },
+    {
+      "id": "fx-exposedprops-registers-metadata-every-call-idempotent",
+      "proposed": "Call getEffectiveStrokes twice in a row on the same symbolId instance with exposedProps set; spy on SMMotion.registerExposedPropMeta; expect it called once per exposed prop on EACH of the two getEffectiveStrokes calls (re-registration every call, not memoized) — verifies line 3153's own re-registration comment — not run."
+    },
+    {
+      "id": "fx-countOnly-diverges-from-full-path-with-sublayer-duplicator",
+      "proposed": "Build a symLayer with duplicator count=4 on a single seed stroke; call getEffectiveStrokes(idx,frameIdx,true).length and getEffectiveStrokes(idx,frameIdx,false).length; expect the countOnly length (1, the undecorated seed) to be LESS than the full-path length (4) — verifies and documents the divergence found in `boundaries`, contradicting the header comment's own \"COUNT is identical either way\" claim — not run."
+    },
+    {
+      "id": "fx-countOnly-diverges-from-full-path-with-exposedprops-hide",
+      "proposed": "Set an exposed __visible prop currently hiding one of two strokes (value<50); call getEffectiveStrokes(idx,frameIdx,true).length and getEffectiveStrokes(idx,frameIdx,false).length; expect countOnly's length (2, both strokes counted) to be GREATER than the full-path length (1, one hidden) — verifies the second half of the same `boundaries` divergence — not run."
+    },
+    {
+      "id": "fx-countOnly-still-applies-pathfx",
+      "proposed": "Add an SMPathFx stack to a symLayer that changes its own stroke count (e.g. a stamp-along-path effect); compare getEffectiveStrokes(idx,frameIdx,true) against a hand-computed path-fx'd count; expect countOnly's own count to already reflect path-fx (the `_fx` closure at line 3027 runs inside the countOnly branch itself) — verifies path-fx is NOT one of the divergences, only duplicator/exposedProps are — not run."
+    },
+    {
+      "id": "fx-plain-layer-returns-stored-array-identity",
+      "proposed": "Read ld.frames[5].strokes by direct reference, then call getEffectiveStrokes(idx,5) on a plain (non-symbolId/montageId/lfsGroup) layer; expect `===` identity between the two — verifies the CLAUDE.md §5ter/§5quater STORED-array contract at line 3188 — not run."
+    },
+    {
+      "id": "fx-plain-layer-held-frame-walkback-identity",
+      "proposed": "Set a keyframe at frame 3 with content and no keyframe at frames 4-6; call getEffectiveStrokes(idx,6); expect `===` identity with ld.frames[3].strokes directly (the SAME stored array, not a copy) — verifies line 3189 — not run."
+    },
+    {
+      "id": "fx-symbolid-branch-never-returns-stored-identity",
+      "proposed": "Call getEffectiveStrokes twice in a row at the same frame on the same symbolId instance with no relevant state change; expect the two returned arrays to be DIFFERENT objects (`!==`) even though their CONTENTS are deep-equal — verifies the montage/lfsGroup/symbolId branches always synthesize fresh arrays, per `boundaries`'s own RETURN IDENTITY contract — not run."
+    }
+  ],
+  "future_proposals": [
+    "The countOnly fast path's own header comment (lines 2941-2948) claims the three skipped stages (element motion, component camera, instance matrix) are collectively a 1:1 map so \"the COUNT is identical either way\" — but the actual code (packet 3's own early `return out;` at line 3031) also skips two stages the comment never names: the per-symLayer Duplicator (which CAN multiply a seed's stroke count) and the exposedProps `__visible` hide-filter (which CAN drop a stroke). Confirmed live-code divergence, not merely stale documentation (contrast C21j's own similarly-shaped but harmless getEffectiveStrokesRendered comment-drift finding). Concretely: a Component whose internal sub-layer has an active Duplicator, or whose current frame has an exposed visibility property hiding a shape, will show a status-bar stroke count (timeline.js:2730, updateUI, the only countOnly=true caller) that does NOT match what actually renders. Low blast radius today (a cosmetic status-bar number, not a render/save/export correctness issue — every OTHER caller of getEffectiveStrokes uses the ordinary two-argument form), but worth a one-line header-comment correction, or extending the countOnly fast path to also count through the duplicator/exposedProps stages, the next time this function is touched. Not changed here (read-only scope). See `proposed_behavioral_fixtures` for two fixtures that would pin this down.",
+    "The symbolId branch's own held-frame-inheritance loop (packet 3, both the countOnly variant at lines 3028-3029 and the full-path variant at lines 3037-3038) is now the THIRD independent copy of the identical small \"walk backward from the resolved internal frame to the nearest preceding keyframe\" pattern — C21j's own getLFSSubStrokes (app.js:2662, already flagged by C21j's own future_proposals as a near-duplicate of this scope's copy) and storyboard.js's own symbolStrokesAt (out of scope, cited by name only) both implement the same loop shape independently, with no shared helper across any of the three. None was found to actually diverge in this census (all three walk backward identically), but a fourth copy inline of a small, easy-to-get-subtly-wrong loop is worth consolidating into one `_nearestKeyframeStrokes(layerArr,ii)` helper the next time any of the three is touched — not changed here.",
+    "SMMotion.registerExposedPropMeta (line 3153) re-registers metadata for every exposed prop on EVERY invocation of the exposedProps block — once per visible Component instance with exposedProps, per frame read (render tick, export frame, or one-shot tool call). The source's own comment calls this \"cheap, idempotent\" and cites propsFor's identical reasoning elsewhere in the Motion property system, and no per-call cost was measured in this read-only census — flagged here only because CLAUDE.md §5bis's general lesson (\"a garde bon marché doit passer avant un accès qui ne l'est pas\") makes any unconditional per-call registration worth a quick profile if a future scene has many Components with many exposed props each, not because a problem was found. Not changed here.",
+    "Path-fx (SMPathFx) is now applied at TWO different levels for a Component instance: once per-symLayer INSIDE this scope's own composite loop (lines 3042/3027, the 2026-09-03 fix, targeting the symbol's own internal sub-layer's stack), and once again on the outer placed instance `ld` inside getEffectiveStrokesRendered (C21g territory, app.js:1803) AFTER this function returns. Confirmed by direct read that the two target different objects (`symLayer` vs `ld`) so they cannot double-apply the SAME stack to the SAME geometry — but the two-level existence of path-fx application points is easy to miss when reasoning about \"where does path-fx run for a Component\", and worth a one-line cross-reference comment at each site the next time either is touched. Not changed here."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep -rnE '(^|[^a-zA-Z_.])getEffectiveStrokes\\('` was run once, filtering out the declaration line and any `//`-prefixed hit, and cross-referenced against the already-merged C21g/#1198 artifact's own complete caller list for getEffectiveStrokesRendered — reproduced verbatim in packet 1's own `callers` field and `boundaries`, re-checkable with the same command.",
+    "A second grep (`getEffectiveStrokes\\([^)]*,\\s*true\\s*\\)`) confirmed timeline.js:2730 (updateUI) as the ONLY countOnly=true call site in the entire src tree.",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's own classify() algorithm against a direct `git show 59a5a38c:src/js/app.js` dump, run once per packet and once for the total — 128/137/0 over 265 lines, matching the issue's own proposed union exactly, and matching the issue's own proposed per-packet figures exactly for all five packets (no boundary correction needed).",
+    "Every `ld.*`/`sym.*`/`f.*`/`state.*` field this scope reads was enumerated by a script restricted to lines the SAME classify() algorithm marks 'code' (excluding this function's own many comments that mention the same field names in prose), with the line of first read — recorded in `boundaries`.",
+    "The \"function writes nothing persistent\" claim was confirmed by `grep -nE '\\b(ld|sym|state)\\.[A-Za-z_]+\\s*='` restricted to the assigned range, returning zero hits, rather than assumed from the function's own read-heavy appearance.",
+    "The \"zero .children / minimal Paper-item access\" claim was confirmed by a literal grep of the assigned range for `new Path(`/`new Segment(`/`new Point(`/`.children`, finding exactly the one detached-Path cluster (lines 3063-3067) inside the element-motion sub-block, never inserted and never touching `.children`.",
+    "The countOnly-vs-full-path divergence in `boundaries` (the duplicator and exposedProps hide-filter are skipped by countOnly, contradicting the header comment's own \"COUNT is identical either way\" claim) was found by direct structural comparison of the `if(countOnly){...return out;}` block's own early return (line 3031) against the full path's own later stages (3110-3168), not assumed from the header comment's own claim alone.",
+    "The three trailing module vars' complete reader/writer list (_symbolPaperLayers/_sceneSnapshot/_montageViewSnapshot) was derived by `grep -rn` across src/js/*.js, not assumed from this scope's own declaration line alone."
+  ],
+  "validation": {
+    "expected_assigned_lines": 265,
+    "expected_classification": {
+      "code": 128,
+      "comment": 137,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        2929,
+        2993
+      ],
+      [
+        2994,
+        3016
+      ],
+      [
+        3017,
+        3122
+      ],
+      [
+        3123,
+        3170
+      ],
+      [
+        3171,
+        3193
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by a Python re-implementation of the validator's own classify() run against the frozen blob: 2929-2993=(17,48,0); 2994-3016=(9,14,0); 3017-3122=(68,38,0); 3123-3170=(27,21,0); 3171-3193=(7,16,0); sums to (128,137,0)=265 — identical to the issue's own proposed union and per-packet table exactly.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 265 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C21k-app-get-effective-strokes.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21j-app-symbol-frame-layer-time-model.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21h-app-rig-model-binding.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21g-app-duplicator-runtime.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21f-app-symbol-matrix-duplicator-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21d-app-desp-relink-remote-merge.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21c-app-path-serialisation-serp.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json <candidate-sha> still exits 0",
+      "C21i-app-rig-deform-ik-census.json (#1203) was not present on main at authoring time (its own PR/branch was still being authored concurrently in a sibling worktree, per this task's own instructions) and is therefore not included in this artifact's own required_checks list; per the issue's own acceptance criterion 2, it should be added to this check list once merged."
+    ]
+  }
+}
