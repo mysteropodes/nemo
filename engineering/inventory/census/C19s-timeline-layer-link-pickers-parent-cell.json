@@ -1,0 +1,384 @@
+{
+  "census_id": "C19s",
+  "issue": 1185,
+  "title": "Timeline layer-panel link pickers (parent / follow-path / time-link / matte menus) and the parent cell",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C19s census only; P30 (timeline.js runtime writer), C20e/#1152 (motion.js's own copies of these surfaces — renderParentRow 8083-8284, the Follow Path pill 8025-8062, the Time-link menu call sites 7420-7432/11030-11045, the pill-and-menu matte row 7670-7938 — cited by call site/line only, not re-mapped), the link SETTERS this scope's menus call (motion.js setLayerParent/setLayerParentB 3618/3673, setLayerFollowPath 3692, setLayerTimeLink 8554), export.js (matteSourceIndicesInUse's second JS reader), geometry-wasm/src/engine.rs (resolve_matte_source, the Rust mirror), engine-bridge.js (the matteSourceLayerUid-to-wire-index mapping consumed by the engine), and every other named owner remain separate. C19t (timeline.js 6156 onward, colour-swatch writer/index reconciliation/renderLayerList) is the next leaf and is explicitly out of scope.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "2e81bb62f14eb192e2b02822bfd58e7300ecec57",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19s-timeline-link-pickers-parent-cell",
+  "assigned_ranges": [
+    {
+      "start": 5942,
+      "end": 6155
+    }
+  ],
+  "coverage_note": "Exactly 214 assigned lines occur once across six packets (one coverage_range per packet, no gaps, no other-owner exclusions): 168 code, 46 full-line `//` comments, 0 blank — independently re-derived by classifying the frozen blob programmatically (a Python re-implementation of the validator's own `classify()`), and equal to the issue's proposed table exactly (no boundary correction needed). Line 5941 is C19r's closing brace of `startParentPickwhip` (out of scope, C19r's last line, confirmed against C19r's own `assigned_ranges` end=5941). Line 5942 opens this scope's `buildParentMenuItems` lead-in comment. Line 6155 is the closing brace of `buildParentCell`; line 6156 opens the next leaf's (C19t, not yet a merged artifact at authoring time) lead-in comment for 'the single writer for every surface that DISPLAYS the current stroke/fill colour'. A sweep of every `C*.json` in this directory sharing `source_path: src/js/timeline.js` (C19d through C19r) confirms the existing coverage is contiguous and stops exactly at 5941 — no sibling claims any line in 5942-6155.",
+  "source_baselines": {
+    "pinned": "59a5a38c:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (2e81bb62f14eb192e2b02822bfd58e7300ecec57, the merge of PR #1183) has the identical timeline.js blob (git rev-parse 2e81bb6:src/js/timeline.js == git rev-parse 59a5a38c:src/js/timeline.js == cc4cfd27...); this artifact branches from origin/main at 2e81bb6.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes are read as authorial intent, not fresh execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19s-timeline-layer-link-pickers-parent-cell.json and the six timeline.js packets partitioning lines 5942-6155.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "link_semantics_boundary": "Every document field this scope's six functions read or write belongs, semantically, to Motion (motion.js) or is a plain layer field with no dedicated owner file; this scope cites the reader/writer and its line number only and does not re-describe chain composition, path-sampling or time-remap algorithms — per the issue's explicit 'cite, do not re-map' instruction. Three of the four link kinds funnel through exactly ONE shared motion.js setter function, reachable from every UI surface (this scope's menus, C20e's `renderParentRow`/pill, and — for time-link — layer-inout.js's on-bar pickwhip): `ld.parentLayerUid`/`ld.parentLayerUidB` through `SMMotion.setLayerParent` (motion.js:3618, field write at 3659) / `setLayerParentB` (motion.js:3673, field write at 3684); `ld.followPath` through `SMMotion.setLayerFollowPath` (motion.js:3692, field write at 3697, or `null` at 3695); `ld.timeLink` (+ `timeLinkInOffset`/`timeLinkOutOffset` via `setValue`) through `SMMotion.setLayerTimeLink` (motion.js:8554, field write at 8568). The FOURTH link kind, matte, does NOT have an equivalent shared setter: `ld.matteMode`/`ld.matteSourceLayerUid`/`ld.mattesMore` are written directly inline by TWO independent call sites — this scope's own `buildMatteMenuItems` (timeline.js:6079-6104, writes at 6082/6095-6096) and motion.js's own `openMatteConfigMenu` (motion.js:7883-7939, writes at 7896/7900/7911/7918-7923) — both mutate the same fields with the same rules but through separately-maintained code, not a single `setLayerMatte`-shaped function; flagged verbatim in `future_proposals` below as a verified asymmetry from the other three link kinds, not claimed as a functional defect (both call sites' `onChanged`/`matteChanged` postludes converge on the same re-render, and no drift in the FIELD VALUES themselves was found).",
+    "owners": "motion.js/C20e (#1152, PR merged) retains `renderParentRow` (8083-8284, its own pickwhip-icon mousedown at motion.js:8160 and its own Parent A/B dropdown calling `window.buildParentMenuItems` at motion.js:8216 — this scope's own function, cited by call site only, body not reproduced there), the Follow Path pill (motion.js:8025-8062, calling `window.buildFollowPathMenuItems` at motion.js:8055), the three Time-link menu call sites (motion.js:7431 and motion.js:11041, plus layer-inout.js:1565, all calling this scope's `buildTimeLinkMenuItems`) and the pill-and-menu matte row (`renderMatteRow`/`openMatteConfigMenu`, motion.js:7670-7939, writing `ld.matteMode`/`ld.matteSourceLayerUid` directly, NOT calling this scope's `buildMatteMenuItems`). motion.js also retains every setter this scope's menus call (`setLayerParent` 3618, `setLayerParentB` 3673, `setLayerFollowPath` 3692, `setLayerTimeLink` 8554, `timeLinkWouldCycle` 8439, `wouldCreateParentCycle` 3575 — the last never called from inside 5942-6155, only from the setters themselves) and `unlinkTimeLinkPreserveRange` lives in app.js (2923, called from this scope's `buildTimeLinkMenuItems` at 6033). export.js retains its own `matteSourceIndicesInUse` reader (export.js:32/55, the skip-consumed-source check in the plain-Paper fallback export path) — cited by call site, body not reproduced. engine-bridge.js retains the uid-to-final-wire-index mapping (2544-2562) that turns `ld.matteSourceLayerUid` into the numeric `matteSourceIndex` the Rust engine actually receives — cited by line, not reproduced. geometry-wasm/src/engine.rs retains `resolve_matte_source` (1460-1476) and `resolve_all_mattes` (1433-1458), the Rust-side mirror of this scope's `matteSourceIndicesInUse` rule — cited by line, not reproduced (Rust is out of scope entirely for a JS-source census; this artifact only asserts textual/structural equivalence of the two rules, not that both were executed).",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19t (next census leaf, not yet numbered/merged at authoring time)",
+      "disposition": "Retains timeline.js:6156 onward (the single colour-swatch-display writer lead-in, `paintStrokeSwatches`/`paintFillSwatches`/`routeColorTo…`, `_idxShadow`/`reconcileLayerIndexState`/`reconcileFrameSelection`, then `renderLayerList` itself at 6335+) — `renderLayerList`'s own call to this scope's `buildParentCell` (6614) and its own computation of `_matteSrcMap=matteSourceIndicesInUse()` (6362) are therefore OUT of this scope's own coverage but cited here as callers by line number only."
+    },
+    {
+      "owner": "motion.js / C20e-#1152 (existing owner, PR merged)",
+      "disposition": "Retains `renderParentRow` (8083-8284, pickwhip mousedown at 8160, dropdown at 8215-8216), the Follow Path pill (8025-8062, menu open at 8054-8055), the three external Time-link menu call sites (7431, 11041, and layer-inout.js:1565) and the entire pill-and-menu matte UI (`renderMatteRow`/`openMatteConfigMenu`/`firstFreeMatteLayer`, 7670-7950-ish) plus every setter this scope's menus call: `setLayerParent` (3618, field write 3659), `setLayerParentB` (3673, field write 3684), `setLayerFollowPath` (3692, field write 3695/3697), `setLayerTimeLink` (8554, field write 8568), `timeLinkWouldCycle` (8439), `wouldCreateParentCycle` (3575, never called from inside this scope), `ensureLayerUid` (3519) and `findLayerIndexByUid` (3564). None of these bodies are reproduced here; each is cited only by line number, per the issue's explicit 'cite, do not re-map' instruction."
+    },
+    {
+      "owner": "app.js (existing owner)",
+      "disposition": "Retains `unlinkTimeLinkPreserveRange` (2923, this scope's `buildTimeLinkMenuItems` calls it at 6033) and the shared re-render/undo primitives (`pushUndo`, `renderLayerList`, `renderTimeline`, `showToast`) this scope's five state-writing functions call — none of these primitives' own bodies are reproduced."
+    },
+    {
+      "owner": "export.js (existing owner)",
+      "disposition": "Retains its own `_matteSrcMap=window.matteSourceIndicesInUse?matteSourceIndicesInUse():{}` call (export.js:32) and the skip-consumed-source check (export.js:55, `if(_matteSrcMap[li])continue;`) — cited by call site, not reproduced; this is the second of exactly two JS-side readers of this scope's `matteSourceIndicesInUse` (the first being C19t's `renderLayerList`, timeline.js:6362, out of scope)."
+    },
+    {
+      "owner": "engine-bridge.js (existing owner)",
+      "disposition": "Retains the uid-to-wire-index resolution pass (2544-2562) that reads `state.layers[i].matteSourceLayerUid` directly (NOT through this scope's `matteSourceIndicesInUse`, which is JS-display-only) and writes the numeric `matteSourceIndex` onto the scene payload entry the Rust engine consumes — a separate, parallel implementation of the same 'uid wins, else i+1-adjacent legacy fallback is NOT applied here (only in engine.rs)' rule, not a call site of this scope's function; cited by line, not reproduced."
+    },
+    {
+      "owner": "geometry-wasm/src/engine.rs (existing owner)",
+      "disposition": "Retains `resolve_matte_source` (1460-1476) and `resolve_all_mattes` (1433-1458) — the Rust mirror this scope's own lead-in comment (6049-6055) explicitly cross-references ('or from engine.rs's resolve_matte_source: same rule'); this artifact documents the correspondence by reading both sides' source text, not by executing either. Not reproduced; Rust source is out of this JS census's scope_files."
+    },
+    {
+      "owner": "layer-inout.js (existing owner)",
+      "disposition": "Retains its own on-bar Time-link context-menu wiring (1563-1565, `window.showContextMenu(...,window.buildTimeLinkMenuItems(li,state.layers[li],function(){...}))`) — a third external caller of this scope's `buildTimeLinkMenuItems`, cited by call site only."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 5941 (C19r's closing brace of `startParentPickwhip`) is outside coverage; line 5942 (this scope's `buildParentMenuItems` lead-in comment) begins this scope, confirmed against C19r's own declared `assigned_ranges` end (5941).",
+    "Line 6155 (closing brace of `buildParentCell`) is the last line of this scope; line 6156 opens the next leaf's (C19t) lead-in comment for the colour-swatch writer and is excluded — confirmed by reading the frozen blob at 6156-6157 ('THE single writer for every surface that DISPLAYS the current stroke/fill colour').",
+    "No lines inside 5942-6155 are excluded for another owner: every line belongs to exactly one of the six packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "The issue's proposed packet table (six packets, ranges and code/comment/blank counts) was independently re-derived against the frozen blob using the validator's own `classify()` algorithm (whitespace-strip, `//`-prefix, `/*...*/` block tracking) and matches exactly: 5942-5993=(44,8,0); 5994-6020=(23,4,0); 6021-6048=(20,8,0); 6049-6071=(16,7,0); 6072-6104=(26,7,0); 6105-6155=(39,12,0); sums to (168,46,0)=214. No boundary correction was needed.",
+    "Matte is the one link kind of the four with NO single shared setter function (see `writer_guidance.link_semantics_boundary` above): `buildMatteMenuItems` (this scope, timeline.js:6079-6104) and motion.js's `openMatteConfigMenu` (7883-7939) each write `ld.matteMode`/`ld.matteSourceLayerUid`/`ld.mattesMore` directly rather than through a shared `motion.js` function analogous to `setLayerParent`/`setLayerFollowPath`/`setLayerTimeLink`. Both call sites apply the same value rules (explicit uid wins; defaulting a fresh source pick to `matteMode='alpha'`; a full removal deletes all three fields) but are two maintained copies, not one — a verified structural fact, not a claimed runtime defect (no evidence either has drifted in its actual field values)."
+  ],
+  "areas": [
+    {
+      "area": "layer-panel-link-pickers",
+      "packets": [
+        {
+          "id": "C19s.parent-menu",
+          "files": [
+            "src/js/timeline.js:5942-5993"
+          ],
+          "coverage_ranges": [
+            [5942, 5993]
+          ],
+          "classification": {"code": 44, "comment": 8, "whitespace": 0},
+          "symbols": ["buildParentMenuItems"],
+          "signature": "buildParentMenuItems(li, ld, onChanged)",
+          "responsibility": "Builds the context-menu item list for the Parent A / Parent B pickers shown from `buildParentCell`'s click handler (this scope) AND from motion.js's `renderParentRow` (C20e/#1152) — the SAME menu-shape function serving both the Animation 2D layer-list row and Motion's Layer Properties panel, so the two surfaces cannot drift apart (explicit in-source citation of CLAUDE.md §3).",
+          "behavior": [
+            "5-line lead-in comment (5942-5946): shared by `buildParentCell` (this scope) and motion.js's `renderParentRow` — ONE implementation of what the Parent A/Parent B menu contains; `onChanged()` fires after every write, before the caller's own re-render, so each surface refreshes only what it actually shows.",
+            "Function declaration (5947): `function buildParentMenuItems(li,ld,onChanged){`.",
+            "Guard (5948-5949): `var M=window.SMMotion; if(!M||!M.setLayerParent)return [{label:'Parentage indisponible',disabled:true}];` — an untranslated literal label (unlike most user-facing strings elsewhere in this scope, which go through `SM.t`), a single disabled placeholder item if Motion isn't loaded.",
+            "Descendant precompute (5950): `var bad=parentDescendants(li);` — C19r's own function (timeline.js:5845, out of scope), computed once per menu build, not per item.",
+            "Parent A 'Aucun' item (5951-5954): `disabled:!ld.parentLayerUid` (already unparented ⇒ disabled); `action` calls `pushUndo(); M.setLayerParent(li,null); onChanged();` then conditionally `SMEngineBridge.renderNow()` — writes `ld.parentLayerUid` to `null` via the shared setter (motion.js:3618, field write inside at 3659).",
+            "Parent A per-layer items (5955-5966): `state.layers.forEach` skipping `oi===li` (self-exclusion, 5956, comment: \"a layer can't parent itself\"); resolves `uid=M.ensureLayerUid(other)` (5957, motion.js:3519, out of scope, may lazily write a `layerUid` onto `other`); label appends '(descendant)' if `bad[oi]` and '(déjà Parent B)' if `ld.parentLayerUidB===uid` (5959); `disabled` is the OR of being a descendant, already Parent A, or already Parent B (5960) — three independent reasons a candidate can't be picked, all pre-computed rather than left for `setLayerParent`'s own refusal to surface after the click; `action` (5961-5964) writes via `M.setLayerParent(li,uid)` then `onChanged()`.",
+            "Parent B section gate (5967-5973): a 3-line comment explains Parent B is only reachable once Parent A exists ('crossfading needs two endpoints; a lone Parent B with no A would just silently do nothing, per blendedAncestorMat's own guard'); a `{sep:true}` divider (5970) then, if `!ld.parentLayerUid`, a single disabled 'Parent B (choisir d'abord un Parent A)' placeholder (5972) — no per-layer items are even built in this branch.",
+            "Parent B 'Aucun' item (5974-5977): same shape as Parent A's, writing via `M.setLayerParentB(li,null)` (motion.js:3673, field write inside at 3684).",
+            "Parent B per-layer items (5978-5989): identical structure to the Parent A loop, self-exclusion (5979), label appends '(descendant)'/'(déjà Parent A)' (5982), `disabled` is the same three-reason OR (5983, note: `bad[oi]` — computed for `li`, i.e. descendants of `li` — is reused unchanged for the Parent-B loop, since a descendant of `li` cannot legally be either of `li`'s parents), `action` writes via `M.setLayerParentB(li,uid)` (5985) then `onChanged()`.",
+            "Return (5991): `return items;` — a fresh array, no caching.",
+            "Export (5993): `window.buildParentMenuItems=buildParentMenuItems;` — makes the function reachable from motion.js's own IIFE scope."
+          ],
+          "callers": [
+            "src/js/timeline.js:6132 — this scope's own `buildParentCell` (packet 6, below): `var items=buildParentMenuItems(li,ld,function(){renderLayerList();renderTimeline();});` — `onChanged` refreshes both the layer list and the timeline grid.",
+            "src/js/motion.js:8216 — `renderParentRow` (C20e/#1152, out of scope): `var items = window.buildParentMenuItems(li, ld, function () { renderLayerList(); renderTimeline(); });` — the IDENTICAL `onChanged` callback as the timeline.js call site, guarded at 8215 by `if (!window.showContextMenu || !window.buildParentMenuItems) return;`.",
+            "A whole-`src/js` grep for `buildParentMenuItems` at the frozen SHA finds exactly these two call sites plus the declaration (5947), the export (5993) and three further textual (`//` comment) mentions — motion.js:8131 (lead-in to `renderParentRow`, \"same context menu (buildParentMenuItems, timeline.js)\"), timeline.js:5995/6024/6074 (this scope's own follow-path/time-link/matte lead-in comments referencing it as a design precedent) — excluded per the issue's instruction to exclude `//` lines; no other file calls it."
+          ],
+          "effects": "Reads `state.layers[*].parentLayerUid`/`.parentLayerUidB`/`.layerUid` and calls `parentDescendants(li)` (C19r, out of scope) once. Writes NOTHING itself until an item's `action` fires (menu construction is pure); each `action` calls `pushUndo()` BEFORE the mutation, then the shared setter (`M.setLayerParent`/`M.setLayerParentB`, motion.js, out of scope — the actual `ld.parentLayerUid`/`ld.parentLayerUidB` field writes happen inside those, not here), then `onChanged()` (caller-supplied — both known callers re-render `renderLayerList`/`renderTimeline`), then a conditional `SMEngineBridge.renderNow()`. No `saveActiveLayerFrame`/`saveAllLayerFrames` call anywhere — both fields are layer-level (`state.layers[]`), not per-frame data."
+        },
+        {
+          "id": "C19s.follow-path-menu",
+          "files": [
+            "src/js/timeline.js:5994-6020"
+          ],
+          "coverage_ranges": [
+            [5994, 6020]
+          ],
+          "classification": {"code": 23, "comment": 4, "whitespace": 0},
+          "symbols": ["buildFollowPathMenuItems"],
+          "signature": "buildFollowPathMenuItems(li, ld, onChanged)",
+          "responsibility": "Builds the context-menu item list for picking a Follow Path target layer — same click-to-choose menu shape as `buildParentMenuItems`, but with NO cycle guard, because a follow-path cycle (A follows B follows A) is harmless by construction (each side's `computeMotionMat` sampling ignores the other's contribution rather than recursing).",
+          "behavior": [
+            "4-line lead-in comment (5994-5997): same click-to-choose menu shape as `buildParentMenuItems`; explicitly states no cycle guard is needed, per `setLayerFollowPath`'s own comment explaining why a cycle here means each side just ignores the other's contribution rather than infinite recursion (matches motion.js:3688-3691 verbatim in spirit).",
+            "Function declaration (5998): `function buildFollowPathMenuItems(li,ld,onChanged){`.",
+            "Guard (5999-6000): `var M=window.SMMotion; if(!M||!M.setLayerFollowPath)return [{label:'Chemin indisponible',disabled:true}];` — same untranslated-literal-label pattern as the parent menu's guard.",
+            "'Aucun' item (6001-6004): `disabled:!(ld.followPath&&ld.followPath.targetLayerUid)` — disabled only if there is genuinely no current target; `action` calls `pushUndo(); M.setLayerFollowPath(li,null); onChanged();` then conditional `SMEngineBridge.renderNow()` — writes `ld.followPath` to `null` via the shared setter (motion.js:3692, the `null` branch at 3695).",
+            "Current-target snapshot (6005): `var curUid=ld.followPath?ld.followPath.targetLayerUid:null;` — read once before the loop.",
+            "Per-layer items (6006-6017): `state.layers.forEach` skipping `oi===li` (6007, self-exclusion, comment \"a layer can't follow itself\"); resolves `uid=M.ensureLayerUid(other)` (6008); label is the plain target name with NO descendant/'already picked' annotation (unlike the parent menu — there is no `parentDescendants`-equivalent walk here, consistent with the 'no cycle guard needed' lead-in); `disabled:curUid===uid` (6011) — the ONLY disable reason, already-selected; `action` (6012-6015) writes via `M.setLayerFollowPath(li,uid)` then `onChanged()`.",
+            "Return (6018): `return items;`.",
+            "Export (6020): `window.buildFollowPathMenuItems=buildFollowPathMenuItems;`."
+          ],
+          "callers": [
+            "src/js/motion.js:8055 — the Follow Path pill's click handler (motion.js:8025-8062, out of scope): `var items = window.buildFollowPathMenuItems(li, ld, function () { renderMotionPropsPanel(); renderLayerList(); renderTimeline(); });` — guarded at 8054 by `if (!window.showContextMenu || !window.buildFollowPathMenuItems) return;`; this `onChanged` additionally re-renders `renderMotionPropsPanel()` (Motion's own right-hand panel), unlike the parent menu's two known callers.",
+            "A whole-`src/js` grep for `buildFollowPathMenuItems` at the frozen SHA finds exactly this one call site plus the declaration (5998) and the export (6020); no `//` comment mentions and no other caller — this is the ONLY UI entry point that opens this menu (the on-canvas follow-path is otherwise only ever read, not picked, elsewhere)."
+          ],
+          "effects": "Reads `ld.followPath`/`ld.followPath.targetLayerUid` and `state.layers[*].layerUid`. Writes NOTHING itself until an item's `action` fires; each `action` calls `pushUndo()` then the shared setter `M.setLayerFollowPath` (motion.js:3692, out of scope — the actual `ld.followPath` field write happens inside it, either `null` at 3695 or `{targetLayerUid,align}` at 3697), then `onChanged()` (caller-supplied), then a conditional `SMEngineBridge.renderNow()`. No `saveActiveLayerFrame`/`saveAllLayerFrames` call — `followPath` is a layer-level field."
+        },
+        {
+          "id": "C19s.time-link-menu",
+          "files": [
+            "src/js/timeline.js:6021-6048"
+          ],
+          "coverage_ranges": [
+            [6021, 6048]
+          ],
+          "classification": {"code": 20, "comment": 8, "whitespace": 0},
+          "symbols": ["buildTimeLinkMenuItems"],
+          "signature": "buildTimeLinkMenuItems(li, ld, onChanged)",
+          "responsibility": "Builds the context-menu item list for the Parent-in-Time picker (2026-07-31, the menu-based sibling of the on-bar pickwhip drag) — same shape as `buildParentMenuItems`, with a per-candidate cycle check (`timeLinkWouldCycle`) rather than a precomputed descendant map, and a fixed `'both'` mode (the finer in/out-only refinement stays on the existing Temps-row select and on-bar anchor dots, out of scope).",
+          "behavior": [
+            "8-line lead-in comment (6021-6028): the menu-based sibling of the pickwhip drag (2026-07-31, quotes Cyril: \"gestion du clic droit pour parent in time sur select keyframe + layer, keyframe + in/out point\"); same shape as `buildParentMenuItems`; the actual write goes through the ONE shared setter `SMMotion.setLayerTimeLink` (extracted from the pickwhip's own `onUp`) so the two creation paths can never drift; mode fixed to `'both'` here.",
+            "Function declaration (6029): `function buildTimeLinkMenuItems(li,ld,onChanged){`.",
+            "Guard (6030-6031): `var M=window.SMMotion; if(!M||!M.setLayerTimeLink)return [{label:SM.t('ctxParentInTimeUnavailable'),disabled:true}];` — this guard's label DOES go through `SM.t`, unlike the parent/follow-path guards' literal strings.",
+            "'None/unlink' item (6032-6035): `disabled:!ld.timeLink`; `action` calls `pushUndo();unlinkTimeLinkPreserveRange(ld);onChanged();` then conditional `SMEngineBridge.renderNow()` — `unlinkTimeLinkPreserveRange` (app.js:2923, out of scope) is a DIFFERENT function from the other three menus' plain-`null` writes, named for preserving the layer's current in/out RANGE across the unlink rather than just clearing `ld.timeLink`.",
+            "Per-layer items (6036-6045): `state.layers.forEach` skipping `oi===li` (6037, self-exclusion, comment \"a layer can't follow its own time\"); `isCur=!!(ld.timeLink&&ld.timeLink.uid&&other.layerUid===ld.timeLink.uid)` (6038, the currently-linked-target check); `cyc=M.timeLinkWouldCycle?M.timeLinkWouldCycle(li,oi):false` (6039, motion.js:8439, out of scope — computed PER CANDIDATE inside the loop, unlike `buildParentMenuItems`'s single `parentDescendants` precompute before the loop); label appends a checkmark if `isCur` and '(cycle)' if `cyc` (6041); `disabled:isCur||cyc` (6042); `action:function(){M.setLayerTimeLink(li,oi,'both');onChanged();}` (6043) — notably NO `pushUndo()` call here (unlike every other action in this scope): `setLayerTimeLink` itself calls `pushUndo()` internally (motion.js:8558), so calling it again here would double-push.",
+            "Return (6046): `return items;`.",
+            "Export (6048): `window.buildTimeLinkMenuItems=buildTimeLinkMenuItems;`."
+          ],
+          "callers": [
+            "src/js/layer-inout.js:1565 — an on-bar context-menu handler (out of scope): `window.showContextMenu(e.clientX+8,e.clientY+8,window.buildTimeLinkMenuItems(li,state.layers[li],function(){if(window.renderLayerList)renderLayerList();if(window.renderTimeline)renderTimeline();}));`, guarded at 1563 by `if(window.buildTimeLinkMenuItems){`.",
+            "src/js/motion.js:7431 — a layer-row context-menu handler (out of scope): `window.showContextMenu(e.clientX+8,e.clientY+8,window.buildTimeLinkMenuItems(li,ld,function(){renderLayerList();renderTimeline();}));`.",
+            "src/js/motion.js:11041 — a second context-menu handler on the active layer (out of scope): `window.showContextMenu(e.clientX+8,e.clientY+8,window.buildTimeLinkMenuItems(state.activeLayerIdx,state.layers[state.activeLayerIdx],function(){renderLayerList();renderTimeline();}));`, guarded at 11038 by `if (window.buildTimeLinkMenuItems && state.layers[state.activeLayerIdx]) {`.",
+            "A whole-`src/js` grep for `buildTimeLinkMenuItems` at the frozen SHA finds exactly these three call sites plus the declaration (6029), the export (6048) and four further textual (`//` comment) mentions — motion.js:8455/8468/8475/13405 (all describing the menu-based-vs-pickwhip creation-path split for time-link) — excluded per the issue's instruction to exclude `//` lines; no other file calls it. Three independent surfaces (an on-bar anchor menu, a layer-row context menu, and a properties-panel context menu) all converge on this one function, more entry points than any of the other three menu builders in this scope."
+          ],
+          "effects": "Reads `ld.timeLink`/`ld.timeLink.uid` and `state.layers[*].layerUid`, and calls `M.timeLinkWouldCycle` (motion.js:8439, out of scope, a pure reader) once per candidate layer. Writes NOTHING itself until an item's `action` fires; the 'unlink' action calls `pushUndo()` then `unlinkTimeLinkPreserveRange(ld)` (app.js, out of scope) directly (not through `SMMotion`); each per-layer action calls `M.setLayerTimeLink(li,oi,'both')` (motion.js:8554, out of scope — internally calls its OWN `pushUndo()` at 8558, writes `ld.timeLink` at 8568, and `setValue(ld,'timeLinkInOffset'/...)`, plus its own `renderLayerList()`/`renderTimeline()`/`loadFrame()`/`SMEngineBridge.renderNow()`/`showToast` — meaning this scope's own `onChanged()` callback and conditional `SMEngineBridge.renderNow()` after the per-layer action are LARGELY REDUNDANT with work `setLayerTimeLink` already did, unlike the parent/follow-path setters which do no rendering of their own). No `saveActiveLayerFrame`/`saveAllLayerFrames` call directly in this scope's own code."
+        },
+        {
+          "id": "C19s.matte-sources-in-use",
+          "files": [
+            "src/js/timeline.js:6049-6071"
+          ],
+          "coverage_ranges": [
+            [6049, 6071]
+          ],
+          "classification": {"code": 16, "comment": 7, "whitespace": 0},
+          "symbols": ["matteSourceIndicesInUse"],
+          "signature": "matteSourceIndicesInUse()",
+          "responsibility": "THE shared, uid-based answer to 'which layer indices are currently consumed as a matte source' for every JS-side reader — the layer-row badge (C19t's `renderLayerList`, out of scope) and export.js's skip-consumed-source check — so neither can drift from the other or from `geometry-wasm/src/engine.rs`'s `resolve_matte_source`, which applies the textually identical rule.",
+          "behavior": [
+            "7-line lead-in comment (6049-6055): which layer indices are consumed as a matte SOURCE (2026-07-31, uid-based mattes) — THE shared answer for every JS-side reader (the layer-row badge, export.js's skip-consumed-source check); explicitly cross-references engine.rs's `resolve_matte_source` as applying the same rule: explicit `matteSourceLayerUid` wins, missing uid falls back to legacy implicit i+1 adjacency, dangling/self references resolve to nothing (matte is a no-op, source paints normally).",
+            "Function declaration (6056): `function matteSourceIndicesInUse(){`.",
+            "Init (6057): `var used={};`.",
+            "Outer scan (6058, `for(var i=0;i<state.layers.length;i++){`): every layer `ld=state.layers[i]` (6059).",
+            "Mode gate (6060): `if(!ld.matteMode||ld.matteMode==='none')continue;` — a layer with no matte set contributes nothing.",
+            "Source resolution (6061-6066): `var si=-1;` (6061); if `ld.matteSourceLayerUid` is set (6062), an inner linear scan (6063-6065) finds `j!==i` with `state.layers[j].layerUid===ld.matteSourceLayerUid`, setting `si=j` and breaking on the first match — an unresolved (dangling or self, since `j!==i` excludes self) uid leaves `si=-1`; else (6066, no explicit uid) `if(i+1<state.layers.length)si=i+1` — the legacy implicit-adjacency fallback, bounds-checked so the LAST layer never falls back to an out-of-range index.",
+            "Record (6067): `if(si>=0)used[si]=1;` — a dangling/self/out-of-range reference (si stays -1) records nothing, matching the lead-in's 'dangling/self → nothing' rule.",
+            "Return (6069): `return used;` — a fresh `{index: 1, ...}` map, no caching, O(n²) worst case (one inner scan per matted layer).",
+            "Export (6071): `window.matteSourceIndicesInUse=matteSourceIndicesInUse;`."
+          ],
+          "callers": [
+            "src/js/export.js:32 — `var _matteSrcMap=window.matteSourceIndicesInUse?matteSourceIndicesInUse():{};`, consumed at export.js:55 (`if(_matteSrcMap[li])continue;`, out of scope) inside the plain-Paper.js export fallback's per-layer loop — skips painting a layer already consumed as a matte source, per the comment at export.js:51-54 explicitly citing this function as the shared helper 'the layer-row badge uses ... so the two readers can't drift'.",
+            "src/js/timeline.js:6362 — C19t's own `renderLayerList` (out of scope, the next census leaf): `var _matteSrcMap=matteSourceIndicesInUse();`, computed once per render and consumed by the per-row matte badge further down (out of scope).",
+            "A whole-`src/js` grep for `matteSourceIndicesInUse` at the frozen SHA finds exactly these two call sites plus the declaration (6056) and the export (6071); no other caller and no `//`-only mentions beyond its own lead-in cross-reference.",
+            "geometry-wasm/src/engine.rs:1460 `resolve_matte_source` (Rust, a separate implementation, NOT a JS caller of this function) applies the textually identical rule against `layers[i].matte_source_index`/`layers[i].matte_mode` — a numeric index engine-bridge.js (2544-2562, out of scope) resolves from `ld.matteSourceLayerUid` in a SEPARATE pass before the scene payload reaches Rust; engine.rs's own comment at line 243 ('see resolve_matte_source, the single reader of both conventions') and line 1429 confirm the cross-language rule equivalence this scope's lead-in comment (6052) asserts."
+          ],
+          "effects": "Reads `state.layers[*].matteMode`/`.matteSourceLayerUid`/`.layerUid` only. No write of any kind, no `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`renderLayerList`/`renderTimeline`/`updateUI` call — a pure reader, called fresh on demand by each of its two JS callers (no shared cache between them)."
+        },
+        {
+          "id": "C19s.matte-menu",
+          "files": [
+            "src/js/timeline.js:6072-6104"
+          ],
+          "coverage_ranges": [
+            [6072, 6104]
+          ],
+          "classification": {"code": 26, "comment": 7, "whitespace": 0},
+          "symbols": ["buildMatteMenuItems"],
+          "signature": "buildMatteMenuItems(li, ld, onChanged)",
+          "responsibility": "Builds the context-menu item list for picking a matte SOURCE layer for `li` (2026-07-31, decoupled from index adjacency — any other layer, above or below, can be the source, and one source can matte several consumers at once). Unlike the other three menus in this scope, writes `ld.matteMode`/`ld.matteSourceLayerUid` DIRECTLY rather than through a shared motion.js setter function (see `boundaries`).",
+          "behavior": [
+            "6-line lead-in comment (6072-6078): matte-source picker (2026-07-31, quotes Cyril: \"Gestion des matte de layer pas au même index comme pour parentage\"); same shared-menu shape as `buildParentMenuItems`/`buildTimeLinkMenuItems` above; any other layer (above OR below) can be the source — the point of decoupling from adjacency — and one source can matte several consumers at once (both confirmed with Cyril); picking a source with no mode set defaults the mode to `'alpha'` so the pick has a visible effect immediately.",
+            "Function declaration (6079): `function buildMatteMenuItems(li,ld,onChanged){`.",
+            "'None/remove' item (6080-6085): `disabled:!ld.matteMode`; `action` (6081-6084) calls `pushUndo();` then `delete ld.matteMode;delete ld.matteSourceLayerUid;delete ld.mattesMore;` (6082, all THREE fields cleared directly, not via a setter — note this does NOT also clear `ld.motion.matteOn`/`ld.motionStatic.matteOn`/`ld.expressions.matteOn` the way motion.js's own `openMatteConfigMenu` removal path does at 7932-7934, a difference from the out-of-scope sibling implementation, flagged in `future_proposals`), `onChanged();`, then conditional `SMEngineBridge.renderNow()`.",
+            "Per-layer items (6086-6101): `state.layers.forEach` skipping `oi===li` (6087, self-exclusion, comment \"a layer can't matte itself\"); resolves `uid` via `SMMotion.ensureLayerUid(other)` if available, ELSE an inline fallback that reads `other.layerUid` or lazily generates one (`'ly_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6)`, 6088) — the ONLY one of this scope's four menus with its own inline uid-generation fallback rather than requiring `window.SMMotion` up front (this menu has no top-level `if(!M...)` guard at all, unlike the other three); `isCur=ld.matteSourceLayerUid===uid` (6089); label appends a checkmark if `isCur` (6091); `disabled:isCur` (6092) — the ONLY disable reason (no descendant/cycle concept for mattes); `action` (6093-6099) calls `pushUndo();` then `ld.matteSourceLayerUid=uid;` (6095, direct field write) then, if no mode is set or it's `'none'`, defaults `ld.matteMode='alpha'` (6096, direct field write) — so PICKING a source always leaves the layer with an active, visible matte, then `onChanged();` and conditional `SMEngineBridge.renderNow()`.",
+            "Return (6102): `return items;`.",
+            "Export (6104): `window.buildMatteMenuItems=buildMatteMenuItems;`."
+          ],
+          "callers": [
+            "src/js/timeline.js:6766 — a layer-row context-menu handler (out of scope): `window.showContextMenu(e.clientX+8,e.clientY+8,buildMatteMenuItems(idx4,l4,function(){renderLayerList();renderTimeline();}));`.",
+            "A whole-`src/js` grep for `buildMatteMenuItems` at the frozen SHA finds exactly this one call site plus the declaration (6079), the export (6104) and one further textual (`//` comment) mention — timeline.js:11010 (an unrelated inspector row's comment, \"'Source de la matte…' in the row's context menu / buildMatteMenuItems\") — excluded per the issue's instruction to exclude `//` lines; no other file calls it. Note motion.js's own `openMatteConfigMenu` (7883-7939, out of scope) is a SEPARATE menu-building function for the same fields, not a caller of this one — the two never call each other."
+          ],
+          "effects": "Reads `ld.matteMode`/`ld.matteSourceLayerUid`/`state.layers[*].layerUid`/`.name`. Writes NOTHING itself until an item's `action` fires; unlike the other three menus in this scope, both the 'remove' and per-layer 'pick' actions write `ld.matteMode`/`ld.matteSourceLayerUid`/`ld.mattesMore` DIRECTLY (6082, 6095-6096) rather than delegating to a shared setter function — `pushUndo()` runs before each mutation, `onChanged()` (caller-supplied) and a conditional `SMEngineBridge.renderNow()` run after. No `saveActiveLayerFrame`/`saveAllLayerFrames` call — matte fields are layer-level."
+        }
+      ]
+    },
+    {
+      "area": "parent-cell",
+      "packets": [
+        {
+          "id": "C19s.parent-cell",
+          "files": [
+            "src/js/timeline.js:6105-6155"
+          ],
+          "coverage_ranges": [
+            [6105, 6155]
+          ],
+          "classification": {"code": 39, "comment": 12, "whitespace": 0},
+          "symbols": ["buildParentCell"],
+          "signature": "buildParentCell(row, ld, li)",
+          "responsibility": "Builds and appends the `.lparent` DOM cell (pickwhip icon + label) each Animation 2D layer row shows for parentage — resolves both Parent A/B names for display, wires the pickwhip icon to C19r's `startParentPickwhip`, wires a click to open this scope's own `buildParentMenuItems`, and wires right-click to an instant full un-parent shortcut. Reused verbatim by Motion's own layer rows (motion.js:7246-7248, out of scope) so the parent column never needs a second implementation.",
+          "behavior": [
+            "Function declaration (6105): `function buildParentCell(row,ld,li){`.",
+            "Cell shell (6106-6107): `var cell=document.createElement('div'); cell.className='lparent';`.",
+            "Parent A name resolution (6108-6109): `var pIdx=_layerIndexByUid(ld.parentLayerUid);` (C19r's own function, timeline.js:5875, out of scope) then `var pName=(pIdx>=0&&state.layers[pIdx])?(state.layers[pIdx].name||('Layer '+(pIdx+1))):null;` — a fallback synthetic name if the target has none.",
+            "6-line comment (6110-6116) on multi-parent crossfade: Parent B is picked from the SAME cell's context menu rather than a second pick-whip/column — the layer-list row is already tight and a second parent is a rare/advanced case; the label grows to show both once B is set.",
+            "Parent B name resolution (6117-6118): identical shape to Parent A's, via `_layerIndexByUid(ld.parentLayerUidB)`.",
+            "Pickwhip icon (6119-6123): `var pick=document.createElement('span'); pick.className='lpick';` then a localized (or literal-fallback) title (6121, `SM.t('titleDragLayerSetParentA')` or `'Drag onto a layer to set it as the parent (A)'`); `pick.addEventListener('mousedown',function(e){startParentPickwhip(li,pick,e);});` (6122, C19r's own function, timeline.js:5892, out of scope) — appended to `cell` (6123).",
+            "Label (6124-6126): `var lbl=...; lbl.textContent=pbName?(pName||'—')+' + '+pbName:(pName||'—');` — shows both names joined with ' + ' once Parent B is set, else just Parent A (or an em-dash placeholder), appended to `cell`.",
+            "Visual 'none' state (6127): `cell.classList.toggle('none',!pName);` — styled as empty only when Parent A itself is unset (Parent B alone, without A, can't exist per the gate in the parent-menu packet above).",
+            "Tooltip (6128-6129): a three-way ternary building either a 'Parent A : X + Parent B : Y (blend animable)', a plain 'Parent : X', or 'Aucun parent — cliquer pour en choisir un' hint.",
+            "`open(e)` handler (6130-6135): `e.stopPropagation(); e.preventDefault();` then `var items=buildParentMenuItems(li,ld,function(){renderLayerList();renderTimeline();});` (6132, this scope's own packet 1 function, the SAME `onChanged` shape as its other known callers) then positions and opens `showContextMenu` just below the cell's own bounding rect (6133-6134).",
+            "Click wiring (6136-6137): `cell.addEventListener('click',open);` then a SEPARATE `mousedown` listener that only calls `e.stopPropagation()` — prevents the row's own drag/selection mousedown handling from firing when the user is about to click the parent cell, without interfering with the pickwhip icon's own `mousedown` (registered on the icon `pick`, a child of `cell`, which fires first and does its own `stopPropagation`/`preventDefault` inside `startParentPickwhip`).",
+            "5-line comment (6138-6142) on the right-click shortcut: instant full un-parent, both A and B (2026-07-30, quotes Cyril: \"ça peut être un raccourci ou clic droit sur les boutons de parent\") — the menu's own per-slot 'Aucun' entries still work for clearing just one, but a full unlink previously needed the menu twice.",
+            "`contextmenu` handler (6143-6153): `e.preventDefault();e.stopPropagation();` then `if(!pName&&!pbName)return;` (6145, nothing to clear — no undo pushed, no setter called); guards `var M=window.SMMotion;if(!M||!M.setLayerParent)return;` (6146); `pushUndo();` (6147, BEFORE mutation); `M.setLayerParent(li,null);` (6148, the shared setter, out of scope) then, if available, `M.setLayerParentB(li,null);` (6149) — clears BOTH slots in one gesture, unlike the menu which clears one slot per click; `renderLayerList();renderTimeline();` (6150); conditional `SMEngineBridge.renderNow();` (6151); conditional toast `SM.t('toastParentRemoved')` (6152) — this is the ONLY writer in this scope's six functions that shows a toast on every successful write regardless of how many targets were affected (contrast `applyLayerColor`'s C19r sibling, which only toasts when `targets.length>1`).",
+            "Append (6154): `row.appendChild(cell);` — the sole DOM side-effect visible to the caller; `buildParentCell` never returns a value."
+          ],
+          "callers": [
+            "src/js/timeline.js:6614 — C19t's own `renderLayerList` (out of scope, the next census leaf): `buildParentCell(row,ld,i);` — called once per Animation 2D layer row, immediately after the layer-name cell (`row.appendChild(nm);`, 6613).",
+            "src/js/motion.js:7247 — `renderLayerListMotion` (out of scope): `buildParentCell(row, ld, li);` inside `if (typeof buildParentCell === 'function') {` (7246), immediately followed by `if (row.lastElementChild && row.lastElementChild.classList.contains('lparent')) row.lastElementChild.classList.add('motion-col-parent');` (7248) — Motion tags the SAME cell with an extra class for its own layout rather than building a second cell; the surrounding comment (7237-7245) explicitly frames this as reuse so 'the cycle refusal, the descendant greying and the new pickwhip come along for free rather than being reimplemented (and drifting) per timeline'.",
+            "A whole-`src/js` grep for `buildParentCell` at the frozen SHA finds exactly these two call sites plus the declaration (6105) and three further textual (`//` comment) mentions — timeline.js:362 (an unrelated list of function names in a load-order guard comment), timeline.js:5942 (this scope's own parent-menu lead-in, 'Shared by buildParentCell...'), motion.js:8130 (a comment in `renderMatteRow`'s own lead-in comparing its pill idiom to 'buildParentCell/timeline.js') — excluded per the issue's instruction to exclude `//` lines; no other file calls it."
+          ],
+          "effects": "Reads `ld.parentLayerUid`/`.parentLayerUidB` (via `_layerIndexByUid`, C19r, out of scope) and `state.layers[*].name`. Writes: DOM only during normal rendering (creates `cell`/`pick`/`lbl`, appends to `row`) — no document write on render. On a `click`, opens a menu (this scope's own `buildParentMenuItems`) whose ITEMS may write `ld.parentLayerUid`/`.parentLayerUidB` (out of scope, delegated). On `mousedown` on the pickwhip icon specifically, delegates the entire drag gesture to `startParentPickwhip` (C19r, out of scope) — no direct write from `buildParentCell` itself in that path either. On `contextmenu`, DIRECTLY calls `pushUndo()` then `M.setLayerParent(li,null)`/`M.setLayerParentB(li,null)` (the shared setters, out of scope, actual field writes happen inside them) — the only code path in this whole scope where a top-level DOM event handler calls a setter without going through one of this scope's own menu-builder functions first. No `saveActiveLayerFrame`/`saveAllLayerFrames` call — parent fields are layer-level."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "Every document write in this scope (`ld.parentLayerUid`/`.parentLayerUidB` via `setLayerParent`/`setLayerParentB`; `ld.followPath` via `setLayerFollowPath`; `ld.timeLink`/`timeLinkInOffset`/`timeLinkOutOffset` via `setLayerTimeLink`/`unlinkTimeLinkPreserveRange`; `ld.matteMode`/`.matteSourceLayerUid`/`.mattesMore` written directly by `buildMatteMenuItems`) is preceded by `pushUndo()` EXCEPT the per-layer time-link action (timeline.js:6043), which omits it because `setLayerTimeLink` pushes its own undo entry internally (motion.js:8558) — calling both would double-push. None of the six functions calls `saveActiveLayerFrame`/`saveAllLayerFrames` directly: every field touched is layer-level (`state.layers[]`), not per-frame data (`ld.frames[i]`), so no frame-store write is needed for persistence. `matteSourceIndicesInUse` is a pure reader with no save-path interaction."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No packet in this scope calls `loadFrame` directly, and none of the six named functions is reachable from JSON import (`importJSON`) at the frozen SHA (confirmed: none of the symbol names appears in the import code paths). `setLayerTimeLink` (motion.js, out of scope, called BY this scope) does call `loadFrame(state.currentFrame)` internally (motion.js:8575) as part of its own post-write refresh — a side effect of the callee, not this scope's own code."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "`buildParentMenuItems`'s and `buildFollowPathMenuItems`'s every action pushes exactly one `pushUndo()` entry per write. `buildTimeLinkMenuItems`'s 'unlink' action pushes its own `pushUndo()`; its per-layer action relies on `setLayerTimeLink`'s internal `pushUndo()` (motion.js:8558) instead. `buildMatteMenuItems`'s both actions push their own `pushUndo()` (this scope's own direct field writes, not delegated). `buildParentCell`'s `contextmenu` handler pushes its own `pushUndo()` before calling `setLayerParent`/`setLayerParentB` directly. `matteSourceIndicesInUse` pushes nothing (pure reader)."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "None of this scope's six functions reads or writes `_layerSel`/`_layerSelAnchor` (C19q, out of scope) — parent/follow-path/time-link/matte assignment is entirely independent of the current multi-selection, unlike C19r's `applyLayerColor`/`selectLayersByColor`. `buildParentCell`'s own `mousedown`/`click`/`contextmenu` handlers each call `e.stopPropagation()` specifically so the row's own selection-click handling (out of scope, elsewhere in `renderLayerList`) doesn't ALSO fire when the user is interacting with the parent cell."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "All six functions are consumed identically by BOTH Animation 2D's `renderLayerList` (C19t, out of scope, `buildParentCell` call at 6614, `matteSourceIndicesInUse` call at 6362) and Motion's `renderLayerListMotion`/`renderParentRow`/Follow-Path-pill/Time-link-menu/matte-row (motion.js, out of scope) — three of the four menu builders (`buildParentMenuItems`, `buildFollowPathMenuItems`, `buildTimeLinkMenuItems`) and `buildParentCell` itself are called from BOTH surfaces via the exact same function; `buildMatteMenuItems` is the one exception, called ONLY from timeline.js's own layer-row context menu (6766) — Motion's matte row (`openMatteConfigMenu`, motion.js, out of scope) is a structurally similar but separately-maintained implementation, not a shared call. Each field's actual per-frame RENDER consumption (`parentChainMats`/`legacyParentChainMats` for parent, `sampleFollowPathAt` for follow-path, whatever consumes `timeLink`/offsets for time-remapping, `resolve_all_mattes`/`resolve_matte_source` in engine.rs for matte) lives entirely outside this scope — cited by name/line only, per the issue's 'cite, do not re-map' instruction."
+    },
+    {
+      "consumer": "export",
+      "disposition": "None of `buildParentMenuItems`/`buildFollowPathMenuItems`/`buildTimeLinkMenuItems`/`buildMatteMenuItems`/`buildParentCell` is called from export.js or rive-export.js at the frozen SHA (confirmed: no symbol name appears in either file). `matteSourceIndicesInUse` IS called directly from export.js (32/55, the plain-Paper.js fallback's skip-consumed-source check) — the one function in this scope with a direct export-path caller. The fields these functions write (`parentLayerUid`, `followPath`, `timeLink`, `matteMode`/`matteSourceLayerUid`) are themselves read at export/render time only through their own out-of-scope consumers (`parentChainMats`, `sampleFollowPathAt`, time-remap code, `resolve_all_mattes`/engine-bridge's uid-to-index mapping) — no function declared inside 5942-6155 other than `matteSourceIndicesInUse` sits on any export read path."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "Every action across all four menu builders and `buildParentCell`'s `contextmenu` handler conditionally calls `SMEngineBridge.renderNow()` (out of scope) after its own document/setter write, to force an immediate re-render through the Rust/vello engine when active. `matteSourceIndicesInUse` never touches `SMEngineBridge`. Separately, `resolve_matte_source`/`resolve_all_mattes` (geometry-wasm/src/engine.rs:1433-1476, out of scope) implement the Rust-side mirror of `matteSourceIndicesInUse`'s own rule against a `matte_source_index` engine-bridge.js (2544-2562, out of scope) resolves from `ld.matteSourceLayerUid` in a pass that runs AFTER this scope's own code, at scene-serialization time, not from any call inside 5942-6155."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-parent-menu-clear-a",
+      "proposed": "`state.layers=[{layerUid:'a',parentLayerUid:'x'},{layerUid:'x'}]`; call `buildParentMenuItems(0,state.layers[0],onChanged)`; expect the 'Aucun (parentage libre)' item NOT disabled (`ld.parentLayerUid` is truthy); invoking its `action` calls `pushUndo` once, `M.setLayerParent(0,null)` once, then `onChanged` — not run."
+    },
+    {
+      "id": "fx-parent-menu-b-gated-without-a",
+      "proposed": "`state.layers=[{layerUid:'a'},{layerUid:'b'}]` (layer 0 has no `parentLayerUid`); call `buildParentMenuItems(0,state.layers[0],onChanged)`; expect exactly one Parent-B-section item, disabled, labelled 'Parent B (choisir d'abord un Parent A)' — no per-layer Parent B items built at all — not run."
+    },
+    {
+      "id": "fx-parent-menu-descendant-disabled-both-slots",
+      "proposed": "`state.layers=[{layerUid:'a'},{parentLayerUid:'a',layerUid:'b'}]`; call `buildParentMenuItems(0,state.layers[0],onChanged)` with `ld.parentLayerUid` pre-set to something so the B section builds; expect the Parent-A item for layer 1 (a descendant of 0) to have `disabled:true` labelled with '(descendant)', AND the Parent-B item for layer 1 to also be disabled for the same reason — verifying `bad` is reused unchanged across both loops — not run."
+    },
+    {
+      "id": "fx-follow-path-no-cycle-annotation",
+      "proposed": "`state.layers=[{layerUid:'a',followPath:{targetLayerUid:'b'}},{layerUid:'b',followPath:{targetLayerUid:'a'}}]` (a mutual cycle already exists); call `buildFollowPathMenuItems(0,state.layers[0],onChanged)`; expect the item for layer 1 to be `disabled:true` ONLY because `curUid===uid` (already selected), with NO '(descendant)'/'(cycle)' annotation anywhere in the built items — confirming no cycle-detection code runs in this function at all — not run."
+    },
+    {
+      "id": "fx-time-link-cycle-disables-and-no-undo-double-push",
+      "proposed": "Stub `SMMotion.timeLinkWouldCycle` to return `true` for `(0,1)`; `state.layers=[{},{}]`; call `buildTimeLinkMenuItems(0,state.layers[0],onChanged)`; expect the layer-1 item `disabled:true` labelled with '(cycle)'; separately, with the stub returning `false`, invoke that item's `action` and expect `pushUndo` NOT called directly by `buildTimeLinkMenuItems` itself (only `M.setLayerTimeLink` is called, which internally pushes) — not run."
+    },
+    {
+      "id": "fx-time-link-unlink-preserves-range",
+      "proposed": "`state.layers=[{timeLink:{uid:'x',mode:'both'}}]`; call `buildTimeLinkMenuItems(0,state.layers[0],onChanged)`; invoke the 'unlink' item's `action`; expect `pushUndo` called once, `unlinkTimeLinkPreserveRange(ld)` called once with the same `ld`, then `onChanged` — `M.setLayerTimeLink` NOT called on this path — not run."
+    },
+    {
+      "id": "fx-matte-menu-pick-defaults-mode-to-alpha",
+      "proposed": "`state.layers=[{layerUid:'a'},{layerUid:'b'}]` (layer 0 has no `matteMode`); call `buildMatteMenuItems(0,state.layers[0],onChanged)`; invoke the item for layer 1's `action`; expect `state.layers[0].matteSourceLayerUid==='b'` AND `state.layers[0].matteMode==='alpha'` (defaulted, since none was set) — not run."
+    },
+    {
+      "id": "fx-matte-menu-remove-clears-three-fields-only",
+      "proposed": "`state.layers=[{matteMode:'luma',matteSourceLayerUid:'b',mattesMore:[{uid:'c',mode:'alpha'}],motion:{matteOn:[1]}}]`; call `buildMatteMenuItems(0,state.layers[0],onChanged)`; invoke the 'Aucune (retirer)' item's `action`; expect `matteMode`/`matteSourceLayerUid`/`mattesMore` all deleted, but `state.layers[0].motion.matteOn` UNCHANGED (still `[1]`) — this scope's removal path does not clear the `matteOn` track the way motion.js's `openMatteConfigMenu` removal does — not run."
+    },
+    {
+      "id": "fx-matte-sources-in-use-explicit-uid-wins",
+      "proposed": "`state.layers=[{layerUid:'a',matteMode:'alpha',matteSourceLayerUid:'c'},{layerUid:'b'},{layerUid:'c'}]`; call `matteSourceIndicesInUse()`; expect `{2:1}` — index 2 (uid 'c'), NOT index 1 (the legacy i+1 adjacency), because an explicit uid is set and resolves — not run."
+    },
+    {
+      "id": "fx-matte-sources-in-use-legacy-fallback-and-dangling",
+      "proposed": "`state.layers=[{matteMode:'alpha'},{},{matteMode:'luma',matteSourceLayerUid:'does-not-exist'}]`; call `matteSourceIndicesInUse()`; expect `{1:1}` only — layer 0 (no explicit uid) falls back to `i+1=1`; layer 2's dangling uid resolves to nothing (not recorded, not falling back to `i+1=3` which would be out of bounds anyway) — not run."
+    },
+    {
+      "id": "fx-parent-cell-context-menu-clears-both-slots",
+      "proposed": "`state.layers=[{layerUid:'a',parentLayerUid:'x',parentLayerUidB:'y'},{layerUid:'x'},{layerUid:'y'}]`; build the cell via `buildParentCell(row,state.layers[0],0)` then dispatch a synthetic `contextmenu` event on `cell`; expect `pushUndo` called once, `M.setLayerParent(0,null)` called once, `M.setLayerParentB(0,null)` called once (both in a single gesture, unlike the menu which needs one click per slot), then `renderLayerList()`/`renderTimeline()` and a `toastParentRemoved` toast — not run."
+    },
+    {
+      "id": "fx-parent-cell-context-menu-noop-when-unparented",
+      "proposed": "`state.layers=[{layerUid:'a'}]` (no `parentLayerUid`/`parentLayerUidB`); build the cell and dispatch `contextmenu`; expect NEITHER `pushUndo` NOR `M.setLayerParent` called (the `if(!pName&&!pbName)return;` early exit at 6145) — not run."
+    }
+  ],
+  "future_proposals": [
+    "Matte is the one link kind of the four in this scope with no single shared setter function: `buildMatteMenuItems` (this scope) and motion.js's `openMatteConfigMenu` (out of scope) independently write `ld.matteMode`/`.matteSourceLayerUid`/`.mattesMore` with slightly different removal completeness — this scope's own 'remove' action (6082) clears only the three fields named in its own comment, while motion.js's equivalent (7918-7934) additionally clears `ld.motion.matteOn`/`ld.motionStatic.matteOn`/`ld.expressions.matteOn` (a Motion-only per-frame on/off track that doesn't exist as a concept in this scope's own code). This is flagged for the eventual runtime-behavior review as a possible source of a stale `matteOn` track surviving a matte removed from the Animation 2D layer-row menu (this scope) rather than Motion's own row — not claimed as a confirmed defect by this census (no execution was performed).",
+    "`buildParentMenuItems`'s and `buildFollowPathMenuItems`'s empty-state guard labels ('Parentage indisponible', 'Chemin indisponible') are untranslated literals, unlike `buildTimeLinkMenuItems`'s equivalent guard (`SM.t('ctxParentInTimeUnavailable')`) and unlike every toast in this scope's own action callbacks (`SM.t('toastParentRemoved')`, etc.) — the same untranslated-literal-toast inconsistency C19r already flagged for `startParentPickwhip`'s own 'Parentage indisponible' toast (motion.js/timeline.js, out of scope there), now found to recur in two more places inside this scope. Not exercised or fixed here.",
+    "`buildTimeLinkMenuItems`'s per-layer `action` omits its own `pushUndo()` call (relying on `setLayerTimeLink`'s internal one) while its sibling 'unlink' action calls `pushUndo()` directly — both are correct (neither double-pushes) but the asymmetry means a future edit to either branch that doesn't account for where the undo entry actually comes from could silently break undo for one path and not the other. Flagged for awareness, not a defect as observed."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep` was run once per symbol (all six functions declared in this scope, plus every setter/helper they call: `setLayerParent`, `setLayerParentB`, `setLayerFollowPath`, `setLayerTimeLink`, `timeLinkWouldCycle`, `wouldCreateParentCycle`, `unlinkTimeLinkPreserveRange`, `matteSourceLayerUid`, `matteMode`) at the frozen SHA 59a5a38c; results are reproduced verbatim as caller lists above and are re-checkable with `git grep -n -w '<symbol>' 59a5a38c514f5da830dd2f2df4c83c63b1b22fba -- src/js`.",
+    "A separate `git grep -n resolve_matte_source` against `geometry-wasm/src/engine.rs` at the same frozen SHA locates the Rust mirror (1460-1476) and its sole internal caller `resolve_all_mattes` (1433-1458); re-checkable the same way against `-- geometry-wasm/src/engine.rs`.",
+    "engineering/inventory/census/*.json siblings present at authoring time sharing `source_path: src/js/timeline.js`: C19d through C19r, forming a contiguous run from line 862 through line 5941 with zero gaps and zero overlaps (independently confirmed by listing every sibling's own `assigned_ranges` and checking adjacency) — this artifact's own range (5942-6155) is the immediate next contiguous span; the validator's cross-sibling overlap check additionally confirms this programmatically against every `C*.json` in the directory."
+  ],
+  "validation": {
+    "expected_assigned_lines": 214,
+    "expected_classification": {"code": 168, "comment": 46, "whitespace": 0},
+    "packet_partition": [
+      [5942, 5993],
+      [5994, 6020],
+      [6021, 6048],
+      [6049, 6071],
+      [6072, 6104],
+      [6105, 6155]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals `classify(coverage_ranges)`, independently re-derived by script against the frozen blob: 5942-5993=(44,8,0); 5994-6020=(23,4,0); 6021-6048=(20,8,0); 6049-6071=(16,7,0); 6072-6104=(26,7,0); 6105-6155=(39,12,0); sums to (168,46,0)=214 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 214 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C19s-timeline-layer-link-pickers-parent-cell.json 2e81bb62f14eb192e2b02822bfd58e7300ecec57 exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19r-timeline-layer-icons-colors-parent-pickwhip.json 2e81bb62f14eb192e2b02822bfd58e7300ecec57 still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19q-timeline-layer-panel-selection-folders.json 2e81bb62f14eb192e2b02822bfd58e7300ecec57 still exits 0"
+    ]
+  }
+}
