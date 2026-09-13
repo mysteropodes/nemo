@@ -1,0 +1,852 @@
+{
+  "census_id": "C21p",
+  "issue": 1222,
+  "title": "app.js frame materialisation and visibility — `loadFrame`, element eye/solo (`_elemSolo`, `setElemHidden`/`setElemSolo`), `layerIsEffectivelyVisible`, `saveActiveLayerFrameOrPromote`, `syncLinkedKeyframeFolder`, `enforceChannelStrip`, `convertLayerToStrokeFillShadowFolder`",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf, sixteenth app.js slice of the C21 series (after C21o/#1220, merged as PR #1221 commit a155706476b26b0bd03dc502a7e4168d5e941f20). Owns app.js:4729-5111 only: the sole materialiser of `ld.frames` into live Paper.js items (`loadFrame`), the element-level eye/solo model (`_elemSolo`, `applyElemVisibility*`, `setElemHidden`/`setElemSolo`, `elemIsHidden`/`elemIsSoloed`), the layer/folder visibility resolver `layerIsEffectivelyVisible`, the held-frame promotion helper `saveActiveLayerFrameOrPromote` (and its own `_reanchorMaterialized` companion), the Stroke/Fill/Shadow link-group timing sync `syncLinkedKeyframeFolder`, and the channel-split enforcement/conversion pair `enforceChannelStrip`/`convertLayerToStrokeFillShadowFolder`. Cited by name/line only, not re-mapped: `saveActiveLayerFrame`/`saveAllLayerFrames`/`_canReuseMaterialized`/`_collectLayerStrokes`/`_maybePromoteInterpolated` (C21o/#1220, merged), `desP`/`desR`/`relinkBrushCompanions`/`relinkLinkedFills` (C21d/C21e), `relinkRigBinds` (C21h), `getEffectiveStrokes`/`getEffectiveStrokesRendered` (C21k/C21g), `applyLayerDuplicator` (C21g — see `boundaries` for why it is NOT actually called anywhere in this scope despite the issue's own prompt text naming it as part of loadFrame's sequence), `_layerFolderParent` (C21j), `ensureKeyframe`/`canEditActiveLayer` (tools.js, cited by name only), `goToFrame`/`insertKeyframe*` (app.js:5112+, next slice C21q, not yet filed as an issue at authoring time), `registerRasterIfNeeded`/`renderNow`/`buildSceneJson`/`onionLayerItems` (engine-bridge.js), `SMImageMesh` (image-mesh.js).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "a155706476b26b0bd03dc502a7e4168d5e941f20",
+  "source_path": "src/js/app.js",
+  "source_blob": "0831959f70612721f80717812838d19940d1f7c1",
+  "source_line_count": 5410,
+  "scope_files": [
+    "src/js/app.js"
+  ],
+  "intended_branch": "claude/c21p-app-frame-materialisation-visibility-census",
+  "assigned_ranges": [
+    {
+      "start": 4729,
+      "end": 5111
+    }
+  ],
+  "coverage_note": "Exactly 383 assigned lines partitioned across ten packets (one coverage_range per packet, no gaps, no other-owner overlap): 185 code, 198 full-line `//` comments, 0 blank — independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs (a standalone Python port of the validator's classify(), run against `git show 59a5a38c:src/js/app.js`), matching the issue's own proposed union AND per-packet table exactly for all ten packets (verified boundary-by-boundary with `sed -n` against the frozen blob); no boundary correction was needed anywhere in this scope. Line 4728 is C21o's own closing `}` of `_canReuseMaterialized` (confirmed by direct read); line 4729 opens this scope's own `dupOnly` lead-in comment for `loadFrame`; line 5111 is this scope's own closing `}` of `convertLayerToStrokeFillShadowFolder`; line 5112 opens `function goToFrame(idx){` (next slice C21q) — all confirmed by direct `sed -n` read of the frozen blob at the exact boundary lines.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js resolves to 0831959f70612721f80717812838d19940d1f7c1, 5410 lines.",
+    "current": "This worktree's own HEAD, origin/main, and the base commit a155706 all resolve to the identical `a155706476b26b0bd03dc502a7e4168d5e941f20` (`git rev-parse HEAD` == `git rev-parse a155706` == `git rev-parse origin/main`, branch reported up to date, working tree clean). `git rev-parse 59a5a38c:src/js/app.js` == `git rev-parse a155706:src/js/app.js` == `git rev-parse HEAD:src/js/app.js` == 0831959f70612721f80717812838d19940d1f7c1 (identical blob, all three) — verified directly in the working worktree.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `grep -rnE '(^|[^a-zA-Z_.])<symbol>\\(' --include='*.js' src` (a RECURSIVE scan that includes `labs/` and `adapters/`) filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`, PLUS a separate broad `grep -rln` pass (no trailing-paren anchor) to catch `window.<name>`/`SM.<name>` property forms — this second pass is what surfaced the element eye/solo functions' REAL external caller (shapes-panel.js, via `window.setElemHidden(...)`/`window.setElemSolo(...)`/`window.elemIsHidden(...)`/`window.elemIsSoloed(...)`), which the bare-paren grep alone reports as zero external callers. No literal `window.SM={...}` object-literal assignment in app.js or index.html was found to wrap any symbol in this scope (grep for `window.SM\\s*=` in app.js matches only a COMMENT at line 3267 describing index.html's own unrelated SM object; `convertLayerToStrokeFillShadowFolder`'s own real external call arrives through a DIFFERENT wrapper shape instead — a property method on timeline.js's own command-table object literal, `convertActiveLayerToStrokeFillShadow:function(){convertLayerToStrokeFillShadowFolder(state.activeLayerIdx);}`, timeline.js:1635 — recorded on that packet's own `callers`).",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; the in-source comments (loadFrame's own `dupOnly` rationale at 4729-4745, the `_smGeomDirty`/reuse-skip rationale at 4765-4782, the opacity-fallthrough rationale at 4786-4794, the `selectedPaths` re-resolution rationale at 4802-4809, the SMCamera rationale at 4824-4827, the element eye/solo model's own three-paragraph header at 4836-4852, `setElemHidden`'s own held-frame rationale at 4885-4892, `layerIsEffectivelyVisible`'s own folder-propagation rationale at 4924-4941, `saveActiveLayerFrameOrPromote`'s own two-paragraph promotion rationale at 4947-4968, `_reanchorMaterialized`'s own anchor-drift rationale at 4990-5000, `enforceChannelStrip`'s own exclusion-list rationale at 5024-5033, and `convertLayerToStrokeFillShadowFolder`'s own two-paragraph split rationale at 5044-5057) are read as authorial intent and prior-session evidence, not fresh execution evidence produced by this census."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C21p-app-frame-materialisation-visibility.json and the ten app.js packets partitioning lines 4729-5111.",
+    "app_js": "app.js retains the whole runtime for every symbol in this scope; this JSON authoring does not authorize source changes.",
+    "c21o_boundary": "Lines 4373-4728 (C21o, merged) — `_numClose`/`_deepCloseEqual`/`_normStrokeForCompare`/`strokesEqual`, `_writeBackGhostProxies`, `_flattenCompoundChildren`, `_collectLayerStrokes`, `_maybePromoteInterpolated`, `_invalidateSymbolUnionIfEditingSymbol`, `saveActiveLayerFrame`, `saveAllLayerFrames`, `_canReuseMaterialized` — are cited by name/line only, not re-mapped. This scope's own boundary begins immediately after C21o's own closing brace at line 4728 (confirmed by direct read: line 4728 is `_canReuseMaterialized`'s own `}`, line 4729 opens loadFrame's own `dupOnly` lead-in). `loadFrame` (this scope) is the sole external caller of `_canReuseMaterialized` (line 4784, C21o) and the sole writer of the `_smGeomDirty=false`/`_matStrokes=strokes` pair C21o's own guard reads (line 4796, and this scope's own second materialize helper `_reanchorMaterialized` at lines 5004-5005) — C21o's own `boundaries` already names both facts; this scope is where the actual write sites live.",
+    "c21q_boundary": "Lines 5112+ (goToFrame and the insertKeyframe* family, next slice C21q, not yet filed as an issue at authoring time) are cited by name/line only. This scope's own boundary ends at line 5111, `convertLayerToStrokeFillShadowFolder`'s own closing `}`; line 5112 opens `function goToFrame(idx){`, confirmed by direct read. `goToFrame` is loadFrame's single most important external caller (it wraps `saveAllLayerFrames()` immediately before calling loadFrame on the new frame) but its own body is not reproduced here beyond the caller-list line citation on the load-frame packet.",
+    "other_consumers_boundary": "engine-bridge.js (buildSceneJson's and onionLayerItems' own `c.visible===false` reads, both READERS of the item-level flag `applyElemVisibility` sets — see `source_consumers`), export.js (a DICT-level `sd.elemHidden` reader, bypassing the live-item `visible` flag entirely since export never touches live Paper items), group-bridge.js (a second DICT-level `sd.elemHidden` reader, inside its own boolean-combine operand builder), select-bridge.js (relies on Paper.js's own built-in hit-test skip of invisible items — confirmed to have NO explicit `elemHidden`/element-level-`visible` code of its own, correcting the issue's own prompt hint that named it as an expected reader — see `boundaries`), tweens.js (confirmed by whole-file grep to have ZERO references to `elemHidden` at all, a second correction to the same prompt hint), shapes-panel.js (the REAL external caller of all four public eye/solo functions, via `window.<name>` property forms — a THIRD correction, since the issue's own prompt hint named timeline.js instead), tools.js (`ensureKeyframe`, the other producer of `_justEnsuredKeyframeAt` besides this scope's own `saveActiveLayerFrameOrPromote`, and the other direct external caller of `syncLinkedKeyframeFolder`) all retain their own bodies in full — cited by line only for the specific findings each packet's `callers` field needed."
+  },
+  "reconciliation": [
+    {
+      "owner": "C21o / #1220 (existing owner, merged as PR #1221 commit a155706)",
+      "disposition": "Owns app.js:4373-4728 (change-signal/epsilon-compare helpers, ghost-proxy write-back, CompoundPath flattening, `_collectLayerStrokes`, `_maybePromoteInterpolated`, `_invalidateSymbolUnionIfEditingSymbol`, `saveActiveLayerFrame`/`saveAllLayerFrames`, `_canReuseMaterialized`). Retains its own body in full — cited by line only. This scope's own `loadFrame` is the sole caller of `_canReuseMaterialized` (C21o:4784) and the sole writer of the `_smGeomDirty=false`/`_matStrokes=strokes` pair C21o's own guard reads — see `writer_guidance.c21o_boundary`."
+    },
+    {
+      "owner": "next leaf (app.js:5112+, `goToFrame`, next slice C21q, not yet filed as an issue at authoring time)",
+      "disposition": "Cited by name/line only. This scope's own boundary ends at line 5111, `convertLayerToStrokeFillShadowFolder`'s own closing `}`; line 5112 opens `function goToFrame(idx){`, confirmed by direct read. `goToFrame` is recorded as `loadFrame`'s single heaviest-weight external caller on that packet's own `callers` field, but its own body (the frame-navigation save/reload sequence, the interrupted-Subselect-drag guard) is not reproduced here."
+    },
+    {
+      "owner": "engine-bridge.js (existing owner, buildSceneJson's and onionLayerItems' own `c.visible===false` reads, and the `_changed` hook that sets `_smGeomDirty`)",
+      "disposition": "Retains its own body in full — cited by line only. Both `buildSceneJson` (engine-bridge.js:1348, its own comment explicitly: \"Element eye/solo (2026-09, app.js's applyElemVisibility) — one guard covers both: the model resolves everything onto the live item's own `visible`\") and `onionLayerItems` (engine-bridge.js:2657, its own comment: \"// element eye/solo, same as buildSceneJson\") read the LIVE item's `.visible` flag `applyElemVisibility` (this scope) sets — neither reads `data.elemHidden` directly. `engine-bridge.js`'s own `_changed` hook (cited by line only, CLAUDE.md §5quater) is the sole writer of `_smGeomDirty=true`, the flag `_canReuseMaterialized` (C21o) reads and this scope's own `loadFrame`/`_reanchorMaterialized` clear."
+    },
+    {
+      "owner": "export.js and group-bridge.js (existing owners, both DICT-level `elemHidden` readers)",
+      "disposition": "Retain their own bodies in full — cited by line only. export.js:78 (`strokes=strokes.filter(function(sd){return!sd.elemHidden;});`, preceded by its own comment at line 71 naming `app.js's elemHidden`) filters a hidden element out of the exported stroke set entirely, bypassing the live-item `.visible` mechanism (export never touches live Paper items — see C21o's own `getEffectiveStrokesRendered` boundary). group-bridge.js:689/695 (its own comment: \"Element eye, dict side (2026-09) — twin of the live guard above. Solo deliberately does NOT reach this path\") excludes an `elemHidden`-tagged member from its boolean-combine operand list AND from its own group-member-count check, on the SERIALIZED dict rather than the live item — the two together are the complete dict-side reader set, confirmed by whole-src grep of `elemHidden`."
+    },
+    {
+      "owner": "select-bridge.js and tweens.js — corrections to the issue's own expected-reader hint, NOT consumers of `elemHidden`",
+      "disposition": "Retain their own bodies in full — cited by line only. A whole-file grep of tweens.js for `elemHidden` returns ZERO hits. select-bridge.js has no `elemHidden` or element-level `c.visible` check of its own; its many `.visible` reads (e.g. select-bridge.js:52/344/1375/1426/1456/1533/1574/2737/2805) are all LAYER-level (`ld.visible`/`ld2.visible`, etc.), never item-level — the app.js comment at 4843-4847 (this scope) already predicts exactly this: \"hitTest already skips invisible items (so a hidden element can't be clicked or box-selected — no new guard needed in select-bridge)\", i.e. Paper.js's OWN built-in hit-test behavior does the work implicitly, with no explicit reader anywhere in select-bridge.js. This corrects the issue's own prompt text naming both files as expected readers."
+    },
+    {
+      "owner": "shapes-panel.js (existing owner) — the REAL external caller of the public eye/solo API, correcting the issue's own \"expect timeline.js\" hint",
+      "disposition": "Retains its own body in full — cited by line only. `appendVisIcons(row,li,ids)` (shapes-panel.js:644-666, its own comment: \"the model itself lives in app.js next to anyLayerSoloed (setElemHidden/setElemSolo)\") is the SOLE external caller of all four public functions, exclusively through `window.`-prefixed property forms: `window.elemIsHidden(li,sid)` (line 646), `window.elemIsSoloed(li,sid)` (line 647), `window.setElemHidden(li,ids)` (line 655, on an eye-icon click), `window.setElemSolo(li,ids)` (line 664, on an 'S' solo-icon click) — a per-row Elements-panel eye/solo pair, deliberately styled identically to the timeline's own LAYER-level eye/`.solo-btn` (per its own comment). A whole-src grep of these four names (with and without the trailing-paren anchor) confirms timeline.js has ZERO occurrences of any of them — the issue's own prompt hint naming timeline.js as the expected caller is incorrect; shapes-panel.js is the actual and only one."
+    },
+    {
+      "owner": "tools.js (existing owner, `ensureKeyframe` — the other `_justEnsuredKeyframeAt` producer and the other direct `syncLinkedKeyframeFolder` caller)",
+      "disposition": "Retains its own body in full — cited by line only. `ensureKeyframe` (tools.js:1882, its own lead-in comment at tools.js:1866 dated 2026-08-16) sets `ldk._justEnsuredKeyframeAt=state.currentFrame` for the IDENTICAL downstream reason this scope's own `saveActiveLayerFrameOrPromote` sets it at line 4974 — both exist so C21o's `saveActiveLayerFrame` (app.js:4683-4684) does not reject the very save meant to persist a just-minted keyframe against the trim-range gate. `ensureKeyframe` also calls `syncLinkedKeyframeFolder` directly (tools.js:1882, same line) — the second of two DIRECT external-to-app.js callers alongside the five `labs/` files recorded on that packet's own `callers` field; `saveActiveLayerFrameOrPromote` (this scope, line 4977) is the third, in-scope caller."
+    }
+  ],
+  "boundaries": [
+    "`loadFrame` does NOT call `applyLayerDuplicator` anywhere in its own body, despite the issue's own prompt text asking to record \"the duplicator pass (`applyLayerDuplicator` / `isDuplicatorCopy` synthesis and forced lock)\" as part of loadFrame's sequence. A whole-range grep of app.js:4729-5111 for both `applyLayerDuplicator` and `isDuplicatorCopy` returns zero hits. The duplicator's N-way expansion happens entirely INSIDE `getEffectiveStrokesRendered` (C21g, cited by name only), which loadFrame calls once per layer at line 4783 as an ordinary function call whose OWN internals this scope does not re-derive (C21o's own lead-in comment at 4778-4782 already states this precisely: \"getEffectiveStrokesRendered = getEffectiveStrokes + the mograph duplicator's N-way expansion\"). loadFrame's own `dupOnly` parameter (line 4746, 4763) only decides WHICH layers get visited by the per-layer loop at all (skip every non-duplicator layer's rebuild entirely when true) — it never itself synthesizes or forces-locks anything. This is a correction to the issue's own prompt text, not a gap in this census.",
+    "`loadFrame` does NOT mirror layer-level `visible`/`locked`/`opacity` onto the live Paper Layer object anywhere in its own body, despite the issue's own prompt text asking to record \"Paper layer visibility/lock/opacity mirroring\" as part of loadFrame's sequence. A line-by-line read of 4762-4796 (the per-layer loop) finds exactly one visibility-related action: `if(!layerIsEffectivelyVisible(i)){userLayers[i].removeChildren();userLayers[i]._matStrokes=null;continue;}` (line 4764) — emptying the live layer and clearing its materialize stamp when the LAYER (not element) is not effectively visible, never an assignment of the form `userLayers[i].visible=...`/`.locked=...`/`.opacity=...`. Every `opacity` mention in this range (the comment block at 4786-4794) is about the PER-STROKE opacity desR/desP apply to individual children, not any layer-level mirroring. Consumers that need `ld.visible`/`ld.locked` read `state.layers[i]` directly (e.g. `layerIsEffectivelyVisible` itself, this scope) rather than through any mirrored Paper Layer property — a second correction to the issue's own prompt text.",
+    "loadFrame has NO `renderNow`/`updateUI` call of its own anywhere in its body (4746-4829) — confirmed by a line-by-line read of the whole function. Every render/UI-refresh call sits in loadFrame's OWN CALLERS (e.g. this scope's own `convertLayerToStrokeFillShadowFolder`, line 5108: `loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();`), never inside loadFrame itself — its only render-adjacent action is the unconditional `if(window.SMCamera)SMCamera.applyCameraView();` at line 4828 (a camera VIEW update, not a scene re-render). A third correction to the issue's own prompt text, which asked to record \"any `renderNow`/`updateUI` call\" as part of loadFrame's own sequence.",
+    "The `_canReuseMaterialized` fast path vs. rebuild-only split (contract item a), read directly off the per-layer loop body (lines 4762-4796): steps shared by BOTH paths for a given layer are the `dupOnly` skip test (4763), the effective-visibility empty/continue branch (4764, its own separate early exit — a layer that fails this never reaches the reuse test at all), and resolving `strokes=getEffectiveStrokesRendered(i,idx)` (4783). The reuse test itself (`_canReuseMaterialized(userLayers[i],strokes)`, 4784) then branches: on the FAST PATH (returns true) the loop `continue`s immediately — `removeChildren()` (4785), the `desR`/`desP` dispatch forEach plus `relinkBrushCompanions`/`relinkLinkedFills`/`relinkRigBinds` (4795), and the `_matStrokes`/`_smGeomDirty` stamp (4796) are ALL skipped for that layer. On the REBUILD PATH (returns false) all four of those run in the stated order. Outside the per-layer loop entirely (lines 4797-4828), and therefore UNCONDITIONAL regardless of which path any individual layer took: `applyElemVisibilityAll()` (4800, re-derives element-level visibility for every layer every load, cheap enough that it was never worth gating), `userLayers[state.activeLayerIdx].activate()` (4801), the `selectedPaths` re-resolution block (4810-4823), and `SMCamera.applyCameraView()` (4828). The four lines BEFORE the per-layer loop (`window._sceneVersion++`, `window._tweenFrameDirty=false`, the `SMReference`/`SMNativeVideo` playhead-follow hooks, 4747-4761) are likewise unconditional, run exactly once per `loadFrame` call regardless of any layer's own fast/rebuild outcome.",
+    "The element eye/solo model's persisted-vs-session split (contract item b), confirmed by a complete cross-file `elemHidden` grep: the ONLY writer anywhere in the codebase is serP (app.js:762, C21c territory, cited by line only) — `elemHidden:(p.data&&p.data.elemHidden)?true:undefined`, an explicit-undefined-when-absent field exactly like the other optional fields C21o's own `_deepCloseEqual` key-union rationale describes. The complete reader set: desP (app.js:853, C21d territory, cited by line only) — `if(d.elemHidden){p.data.elemHidden=true;p.visible=false;}`, the ONE place a persisted flag becomes a live item's own `visible=false`; engine-bridge.js's `buildSceneJson` (line 1348) and `onionLayerItems` (line 2657), both reading the resulting LIVE `c.visible===false`, never `data.elemHidden` directly; export.js:78 and group-bridge.js:689/695, both reading the SERIALIZED dict's `sd.elemHidden` directly (export and the boolean-combine operand builder never touch live Paper items — see `reconciliation`). Two files the issue's own prompt text named as expected readers (select-bridge.js, tweens.js) have ZERO occurrences of the flag or of any element-level `.visible` check — see `reconciliation` for the corrected explanation (select-bridge relies on Paper.js's own built-in hit-test skip of invisible items, with no code of its own needed). `_elemSolo` (this scope, line 4853, declared `var _elemSolo={}` with its own inline comment \"session-only\") is confirmed by a whole-src grep to be referenced ONLY inside app.js (`anyElemSoloed`, `applyElemVisibility`, `elemIsSoloed`, `setElemSolo` — all this scope) plus a single COMMENT-only mention in group-bridge.js:688 (\"documented in app.js next to _elemSolo\") — never written by serP, never read by desP, never appearing in exportJSON's own field list (confirmed by the fact that serP, the sole writer of anything into a persisted stroke dict for this scope's own concerns, never references `_elemSolo` at all). `_elemBlockOf(d)` (this scope) groups a linked-fill companion or a brush-texture dab with its own ribbon anchor by `d.linkedFillId||d.brushGroupId` — so hiding/soloing the ribbon row in shapes-panel.js hides/solos its whole visual block, matching CLAUDE.md §1's own framing of a vector-brush element as \"not ONE item but a visual BLOCK\".",
+    "The eye/solo public functions' REAL external caller is shapes-panel.js, not timeline.js — see `reconciliation` for the full evidence (a bare-paren recursive grep over the whole of `src` for `setElemHidden(`/`setElemSolo(`/`elemIsHidden(`/`elemIsSoloed(` returns ZERO external hits; only a second, broader `grep -rln` without the trailing-paren anchor surfaces shapes-panel.js's `window.setElemHidden(...)`/`window.setElemSolo(...)`/`window.elemIsHidden(...)`/`window.elemIsSoloed(...)` property-form calls). `applyElemVisibility`/`applyElemVisibilityAll`/`anyElemSoloed`/`anyLayerSoloed`/`_elemBlockOf` have NO external callers anywhere in the codebase (confirmed by the same whole-src grep) — they are purely internal to this scope's own model: `applyElemVisibilityAll` is called once by `loadFrame` (this scope, line 4800); `applyElemVisibility` is called by `applyElemVisibilityAll`, `setElemHidden`, and `setElemSolo` (all this scope); `anyElemSoloed`/`_elemBlockOf` are called only from within `applyElemVisibility` itself; `anyLayerSoloed` is called only from `layerIsEffectivelyVisible` (this scope, line 4944).",
+    "`saveActiveLayerFrameOrPromote`'s promotion rule (contract item c) is structurally DIFFERENT from `_maybePromoteInterpolated` (C21o), despite both existing to turn an interpolated/held frame into a real keyframe on a genuine edit: `_maybePromoteInterpolated` (C21o, app.js:4597-4599) is a passive, content-diff-gated check invoked FROM INSIDE `saveActiveLayerFrame`/`saveAllLayerFrames` on every save, requiring BOTH `window._tweenFrameDirty` AND a `strokesEqual` mismatch before flipping `f.isKeyframe=true;f.isInterpolated=false` — it never runs on a genuinely HELD (non-keyframe, non-interpolated) frame at all, because those saves already early-return before reaching it (C21o's own gate at app.js:4688/4706). `saveActiveLayerFrameOrPromote` (this scope) is the function that handles the HELD-frame case those early-returns create: called explicitly by a caller that wants to guarantee SOME write lands even on a hold (`if(!f||f.isKeyframe||f.isInterpolated){saveActiveLayerFrame();return;}` at line 4971 delegates the keyframe/interpolated case straight to the ordinary save — `_maybePromoteInterpolated` still applies there, unchanged), but for a genuinely held frame it takes ONE of two mode-specific actions instead: in Animation 2D (`state.appMode!=='motion'`), it unconditionally promotes the CURRENT frame itself to a real keyframe (`f.isKeyframe=true;f.isInterpolated=false`, line 4974) — no content-diff gate at all, promotion happens on every call regardless of whether anything actually changed, because the function's own callers (tools.js flip/align/distribute/boolean-op, timeline.js flip) are only ever invoked as the DIRECT result of a real edit gesture; in Motion, it instead walks BACKWARD to the hold's own origin keyframe (`for(var o=state.currentFrame;o>=0;o--)`, lines 4981-4987) and overwrites THAT frame's `strokes` directly via `_collectLayerStrokes`, never minting a new keyframe at the current frame — consistent with Motion's own semantics where a hold's whole duration belongs to one keyframe. `saveActiveLayerFrameOrPromote` itself calls NO `pushUndo`/`pushUndoLayers` of any kind (confirmed by a line-by-line read of its own body) — unlike `setElemHidden` (this scope, which calls `pushUndoLayers()` directly), its own callers (tools.js:1321/1365/1645/6031, confirmed by reading tools.js:1319 immediately before the first call site: `if(!moved){state.undoStack.pop();return;}`, evidence that the undo snapshot was already captured earlier in the SAME gesture) are expected to have already pushed undo themselves before the gesture completes.",
+    "`saveActiveLayerFrameOrPromote` is the SECOND producer of `_justEnsuredKeyframeAt` (contract item c cross-reference) — alongside `ensureKeyframe` (tools.js:1882, C21o's own citation), this scope's own line 4974 sets `ld._justEnsuredKeyframeAt=state.currentFrame` immediately before calling `saveActiveLayerFrame()` (line 4975) for the IDENTICAL reason: C21o's own trim-range gate (app.js:4685) would otherwise reject the very save meant to persist a frame that was JUST promoted from a hold to a keyframe, if that frame happens to sit outside the layer's own in/out trim range. A whole-src grep of `_justEnsuredKeyframeAt` confirms exactly these two producers and one consumer (C21o's `saveActiveLayerFrame`, app.js:4683-4684) exist anywhere in the codebase.",
+    "`syncLinkedKeyframeFolder` (contract item d) copies ONLY keyframe TIMING, never `strokes` content, between siblings in the same `state.layerLinkGroups[gid].linkedKeyframes` group — confirmed by direct read of its own body (lines 5014-5022): when the source frame IS a keyframe and the sibling's frame is NOT, it sets `f.isKeyframe=true;f.isInterpolated=false` and only initializes `f.strokes=[]` IF THE SIBLING FRAME HAD NO STROKES ARRAY AT ALL (`if(!f.strokes)f.strokes=[]`) — never overwriting an existing array with the source's own content. When the source frame is NOT a keyframe but the sibling's IS, it DEMOTES the sibling (`f.isKeyframe=false;f.strokes=[];f.isInterpolated=false`) — an unconditional wipe of that sibling's OWN content back to empty, matching each channel's own independent-content invariant (the comment header at 5044-5049 states this explicitly: \"Each channel keeps its OWN independent content\"). It follows `ld.linkGroupId` (NOT `lfsGroup`, deliberately — the comment header at 4947-4958 in this scope draws the distinction from `state.layers[i].lfsGroup`, a completely separate symbol-based per-channel-mini-timeline system with no shared timing at all) into `state.layerLinkGroups[gid]`, gated on `gmeta.linkedKeyframes` being truthy.",
+    "`enforceChannelStrip`/`convertLayerToStrokeFillShadowFolder` (contract item e): the created shape is exactly 3 independent, ordinary sibling layers (Stroke/Fill/Shadow, `createUserLayer(src.name+' '+ch.suffix)` per channel, lines 5093-5096) sharing ONLY a `linkGroupId` (`gid='lg-'+Date.now()+'-'+Math.floor(Math.random()*1000)`, line 5098, registered into `state.layerLinkGroups[gid]={linkedKeyframes:true,collapsed:false}`, line 5099) — deliberately NOT a `layerFolders` group (no collapse header, no aggregate eye/lock/solo per the function's own header comment at 5044-5049), each layer tagged `state.layers[idx].channel=ch.key` (line 5094), which is what `enforceChannelStrip` (this scope) and C21o's own `_collectLayerStrokes` (via `enforceChannelStrip(ld,c)` at C21o:4574) key off of going forward. Order, confirmed by direct read of `convertLayerToStrokeFillShadowFolder`'s own body: (1) guard against `symbolId`/`lfsGroup` sources (line 5061), (2) `saveAllLayerFrames()` (line 5062, C21o territory, cited by line only — flushes the SOURCE layer's live content into `src.frames` before it is read by `splitFrame`), (3) `pushUndoLayers(true)` (line 5063, tweens.js, cited by name only — the ONLY `pushUndo*` call anywhere in this whole packet's own body, unlike `saveActiveLayerFrameOrPromote`'s complete absence of one), (4) build the 3 new layers via `splitFrame` per channel per existing frame (lines 5091-5097, a full deep-clone-then-filter-then-null-a-channel pass over EVERY frame of the source, not just the current one), (5) register the link group (5098-5100), (6) remove the ORIGINAL layer (`userLayers[origIdx].remove();userLayers.splice(...);state.layers.splice(...)`, lines 5103-5104, \"same removal pattern deleteLayer() already uses\" per its own comment), (7) re-point `state.activeLayerIdx` to the new Stroke layer and `activateUL` (lines 5105-5107), (8) `loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();` (line 5108) — THIS scope's own `loadFrame` (packet 1) materialising the 3 brand-new layers for the first time, (9) conditional `renderLayerList`/`renderTimeline` refresh (line 5109), (10) `showToast` (line 5110). `enforceChannelStrip` itself has no `pushUndo*`/render call of its own — it is a pure per-item mutator called only from C21o's `_collectLayerStrokes` (cited by line only), never directly from this function.",
+    "`enforceChannelStrip`'s exclusion list (`c instanceof Raster`, `isVectorBrush||brushTexturePreset||isBrushTextureCopy||isLinkedFillCompanion`, `ld.channel==='shadow'`) is IDENTICAL in kind to CLAUDE.md §1's own list of tags that need cross-checking whenever a new one appears — confirmed here that all four are already excluded consistently, and the Shadow channel is explicitly exempted from BOTH stroke-null and fill-null (its own comment at line 5038-5039: \"Shadow channel content can be a real shadow-boundary stroke, a shadow fill, or both — unlike Fill, nothing gets forced off here\").",
+    "The complete `loadFrame` caller list (contract item f) was derived by a recursive `grep -rnE '(^|[^a-zA-Z_.])loadFrame\\(' --include='*.js' src`, excluding the declaration line (app.js:4746) and every comment-only hit: 34 distinct calling files total (33 external + app.js itself), matching the issue's own `~34 files` estimate exactly. Per-file counts (file:count, excluding app.js's own 26 internal call sites) recorded on that packet's own `callers` field. Every `window.loadFrame` guarded call site (e.g. `if(window.loadFrame)loadFrame(state.currentFrame);` in nemo-script.js/native-video-bridge.js/layer-inout.js/timeline.js/linked-media.js/motion.js/media-library.js/markers.js/text-animator.js) is ALREADY counted by the bare-paren regex — the guard's own `window.loadFrame` reference and the actual call `loadFrame(...)` are two separate tokens on the same line, and the regex matches the second; no double-count and no separate property-form pass was needed for this particular symbol (unlike the eye/solo functions above, where the property form WAS the only call form that exists)."
+  ],
+  "areas": [
+    {
+      "area": "load-frame",
+      "packets": [
+        {
+          "id": "C21p.load-frame",
+          "files": [
+            "src/js/app.js:4729-4829"
+          ],
+          "coverage_ranges": [
+            [
+              4729,
+              4829
+            ]
+          ],
+          "classification": {
+            "code": 31,
+            "comment": 70,
+            "whitespace": 0
+          },
+          "symbols": [
+            "loadFrame",
+            "_canReuseMaterialized",
+            "_matStrokes",
+            "_smGeomDirty",
+            "relinkBrushCompanions",
+            "relinkLinkedFills",
+            "relinkRigBinds",
+            "applyElemVisibilityAll",
+            "selectedPaths"
+          ],
+          "signature": "function loadFrame(idx,dupOnly){window._sceneVersion++;window._tweenFrameDirty=false;if(window.SMReference)SMReference.onFrameChanged(idx);if(window.SMNativeVideo)SMNativeVideo.onFrameChanged(idx);for(var i=0;i<state.layers.length;i++){if(dupOnly&&!state.layers[i].duplicator)continue;if(!layerIsEffectivelyVisible(i)){userLayers[i].removeChildren();userLayers[i]._matStrokes=null;continue;}var strokes=getEffectiveStrokesRendered(i,idx);if(_canReuseMaterialized(userLayers[i],strokes))continue;userLayers[i].removeChildren();strokes.forEach(function(sd){if(sd.isRaster)desR(sd,userLayers[i]);else desP(sd,userLayers[i]);});relinkBrushCompanions(userLayers[i]);relinkLinkedFills(userLayers[i]);if(state.layers[i].rig)relinkRigBinds(state.layers[i],userLayers[i]);userLayers[i]._matStrokes=strokes;userLayers[i]._smGeomDirty=false;}applyElemVisibilityAll();userLayers[state.activeLayerIdx].activate();if(typeof selectedPaths!=='undefined'&&selectedPaths.length){/* re-resolve selection by strokeId on the rebuilt twin */}if(window.SMCamera)SMCamera.applyCameraView();}",
+          "responsibility": "THE sole materialiser of `ld.frames` into live Paper.js items — every frame navigation (scrub, playback, `goToFrame`) and every duplicator-only refresh (`renderNow`'s guard, engine-bridge.js, cited by name only) goes through this one function. Lead-in (4729-4745, 17 comment lines): states the `dupOnly` parameter's own origin — `renderNow()`'s duplicator-refresh guard used to call `loadFrame(idx)` UNSCOPED, rebuilding EVERY layer including any layer with a live, uncommitted drag (Subselect/Eraser/Rig), silently reverting it on every pointermove across the WHOLE document the instant ANY duplicator-enabled layer existed anywhere — `dupOnly=true` (line 4763) skips every non-duplicator layer's rebuild entirely, eliminating that blast radius. Body (4746-4829): (1) `window._sceneVersion++` (4747, unconditional). (2) `window._tweenFrameDirty=false` (4754, preceded by its own 6-line rationale at 4748-4753 — cleared here so a stale dirty flag from the frame just left never survives into whatever gets saved next; C21o's `_maybePromoteInterpolated` and this scope's own `saveActiveLayerFrameOrPromote` both depend on this being freshly false on pure navigation). (3)/(4) `SMReference.onFrameChanged(idx)`/`SMNativeVideo.onFrameChanged(idx)` (4758/4761, each preceded by a short rationale — rotoscopy reference and experimental native-video-decode layers both follow the playhead through this one choke point). (5) The per-layer loop (4762-4796, see `boundaries` for the complete fast-path-vs-rebuild breakdown): `dupOnly` skip (4763); effective-visibility empty+continue (4764); resolve `strokes` via `getEffectiveStrokesRendered` (4783, preceded by an 18-line rationale at 4765-4782 explaining the whole reuse-skip optimisation this scope inherits from C21o — measured 83% of layer-frames hold on a keyframe, rebuilding them was 88% of loadFrame's own cost); the `_canReuseMaterialized` reuse test and its `continue` (4784, C21o's own function, called from nowhere else in the codebase — see `boundaries`); on the rebuild path only: `removeChildren()` (4785), the opacity-preserving `desR`/`desP` dispatch by `sd.isRaster` (4795, preceded by a 9-line rationale at 4786-4794 on why no hardcoded opacity override is passed, unlike `renderOS()`'s onion-skin ghosts) plus `relinkBrushCompanions`/`relinkLinkedFills`(both cited by name only, C21d/C21e)/conditional `relinkRigBinds` (cited by name only, C21h) in that exact order, then the `_matStrokes`/`_smGeomDirty` stamp (4796). (6) `applyElemVisibilityAll()` (4800, this scope's own next area, preceded by a 3-line rationale at 4797-4799 — re-derived after EVERY frame build, unconditionally, so a regenerated brush companion keeps following its own ribbon's hidden/soloed state). (7) `activate()` the active layer (4801). (8) The `selectedPaths` re-resolution block (4810-4823, preceded by an 8-line rationale at 4802-4809 — a 2026-09 QA-sweep fix: rebuilt layers detach old selected Paper objects, so each selected item is re-resolved by `strokeId` on its rebuilt twin via `_selLayer.getItem({match:...})`, or dropped if no twin exists). (9) `SMCamera.applyCameraView()` (4828, preceded by a 4-line French-language rationale at 4824-4827 — v18 camera-view hook, same choke-point reasoning as `SMReference` above).",
+          "callers": [
+            "34 distinct calling files, confirmed by a recursive `grep -rnE '(^|[^a-zA-Z_.])loadFrame\\(' --include='*.js' src`, excluding the declaration line and comment-only hits (matches the issue's own `~34 files` estimate exactly — see `boundaries`):",
+            "src/js/app.js: 26 (internal, next-slice C21q's `goToFrame` and the `insertKeyframe*`/frame-management family among them, cited by line only)",
+            "src/js/comp-preview.js: 1",
+            "src/js/effector-layer.js: 1",
+            "src/js/effects-panel.js: 1",
+            "src/js/engine-bridge.js: 3",
+            "src/js/images.js: 7",
+            "src/js/kitsu.js: 1",
+            "src/js/labs/boil-effect.js: 1",
+            "src/js/labs/follow-path.js: 1",
+            "src/js/labs/interval-assistant.js: 1",
+            "src/js/labs/move-to-layer.js: 1",
+            "src/js/labs/pingpong-cycle.js: 1",
+            "src/js/labs/retime-exposure.js: 1",
+            "src/js/labs/rig-deform.js: 2",
+            "src/js/layer-inout.js: 6",
+            "src/js/linked-media.js: 1",
+            "src/js/markers.js: 1",
+            "src/js/media-library.js: 2",
+            "src/js/motion-preset-picker.js: 1",
+            "src/js/motion.js: 13",
+            "src/js/native-video-bridge.js: 4",
+            "src/js/nemo-script.js: 2",
+            "src/js/palette-panel.js: 1",
+            "src/js/project.js: 1",
+            "src/js/rig-widget.js: 1",
+            "src/js/select-bridge.js: 3",
+            "src/js/storyboard.js: 1",
+            "src/js/text-animator.js: 1",
+            "src/js/timeline.js: 36",
+            "src/js/tools.js: 3",
+            "src/js/tracker.js: 1",
+            "src/js/transplant.js: 1",
+            "src/js/tweens.js: 4"
+          ],
+          "behavior": [
+            "Lines 4729-4745 (comment, 17 lines): dupOnly rationale — renderNow()'s duplicator-refresh guard used to call loadFrame unscoped, reverting every other layer's live drag.",
+            "Line 4746 (code): function open.",
+            "Line 4747 (code): window._sceneVersion++.",
+            "Lines 4748-4753 (comment, 6 lines): _tweenFrameDirty clear rationale.",
+            "Line 4754 (code): window._tweenFrameDirty=false.",
+            "Lines 4755-4757 (comment, 3 lines): SMReference rotoscopy-follow rationale.",
+            "Line 4758 (code): SMReference.onFrameChanged(idx).",
+            "Lines 4759-4760 (comment, 2 lines): SMNativeVideo experimental-branch rationale.",
+            "Line 4761 (code): SMNativeVideo.onFrameChanged(idx).",
+            "Line 4762 (code): for-loop open.",
+            "Line 4763 (code): dupOnly skip.",
+            "Line 4764 (code): effective-visibility empty+continue.",
+            "Lines 4765-4782 (comment, 18 lines): identity-reuse-skip optimisation rationale (measured 83% hold rate, 88% of cost).",
+            "Line 4783 (code): resolve strokes via getEffectiveStrokesRendered.",
+            "Line 4784 (code): _canReuseMaterialized test, continue on true (FAST PATH boundary).",
+            "Line 4785 (code): removeChildren() (rebuild path only).",
+            "Lines 4786-4794 (comment, 9 lines): no-hardcoded-opacity rationale.",
+            "Line 4795 (code): desR/desP dispatch forEach + relinkBrushCompanions/relinkLinkedFills/conditional relinkRigBinds (rebuild path only).",
+            "Line 4796 (code): _matStrokes/_smGeomDirty stamp, loop close (rebuild path only).",
+            "Lines 4797-4799 (comment, 3 lines): applyElemVisibilityAll re-derivation rationale.",
+            "Line 4800 (code): applyElemVisibilityAll() — unconditional, outside the loop.",
+            "Line 4801 (code): activate the active layer.",
+            "Lines 4802-4809 (comment, 8 lines): selectedPaths re-resolution rationale (2026-09 QA sweep).",
+            "Lines 4810-4823 (code, 14 lines): selectedPaths re-resolution block by strokeId.",
+            "Lines 4824-4827 (comment, 4 lines): SMCamera v18 choke-point rationale (French).",
+            "Line 4828 (code): SMCamera.applyCameraView().",
+            "Line 4829 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "any-layer-soloed-elem-solo-header",
+      "packets": [
+        {
+          "id": "C21p.any-layer-soloed-elem-solo-header",
+          "files": [
+            "src/js/app.js:4830-4853"
+          ],
+          "coverage_ranges": [
+            [
+              4830,
+              4853
+            ]
+          ],
+          "classification": {
+            "code": 2,
+            "comment": 22,
+            "whitespace": 0
+          },
+          "symbols": [
+            "anyLayerSoloed",
+            "_elemSolo"
+          ],
+          "signature": "function anyLayerSoloed(){for(var i=0;i<state.layers.length;i++)if(state.layers[i].solo)return true;return false;}var _elemSolo={};",
+          "responsibility": "Two one-line declarations bracketing the element eye/solo model's own three-paragraph design header. `anyLayerSoloed()` (4830-4835, preceded by a 5-line rationale): the LAYER-level twin of solo — After Effects-style, while ANY layer has `ld.solo` set, only soloed layers render, overriding each layer's own eye toggle entirely (not combined with it); explicitly transient view-only state, `state.layers[i].solo` is never read by serialize/save-project. Element eye/solo header (4836-4852, 17 comment lines, three paragraphs): paragraph one states the per-ELEMENT twin exists because Cyril asked for \"eyes et solo pour chaque layer dans ce panel\" (shapes-panel.js's Elements panel, see `reconciliation`); paragraph two restates the SAME persisted-vs-session split this scope's own `elemHidden`/`_elemSolo` pair implements, matching the layer-level pair just above (eye is document data, serP writes it/desP restores it; solo is session-only); paragraph three states BOTH resolve onto the live Paper item's own `visible` flag rather than being re-tested by each renderer, so Paper.js draws nothing for a hidden item, Paper's own hit-test already skips invisible items (no new select-bridge guard needed), and engine-bridge only had to learn ONE thing (\"skip visible===false\") — and that a vector-brush element is a visual BLOCK (ribbon + linked-fill backdrop + texture dabs, per shapes-panel's own `_visualBlock`), re-derived onto the whole block on every frame load so a regenerated brush companion still follows its ribbon. `var _elemSolo={};` (4853, with its own inline comment \"li -> { strokeId:true }, session-only\"): the module-level store itself, keyed by layer index `li` to a set of soloed `strokeId`s.",
+          "callers": [
+            "app.js:4944 — layerIsEffectivelyVisible (this scope, packet 5): anyLayerSoloed's SOLE caller anywhere in the codebase (confirmed by whole-src grep).",
+            "_elemSolo readers/writers, all internal to this scope: anyElemSoloed (packet 3, line 4854), applyElemVisibility (packet 3, line 4858), elemIsSoloed (packet 3, line 4876), setElemSolo (packet 5, line 4918) — confirmed by whole-src grep to have no reference outside app.js except a single COMMENT-only mention in group-bridge.js:688 (see `boundaries`)."
+          ],
+          "behavior": [
+            "Lines 4830-4834 (comment, 5 lines): layer-level solo rationale — AE-style override, transient/unpersisted.",
+            "Line 4835 (code): anyLayerSoloed — one-line loop over state.layers[i].solo.",
+            "Lines 4836-4837 (comment, 2 lines): element eye/solo section header, Cyril's own request quoted.",
+            "Lines 4838-4842 (comment, 5 lines): persisted-eye/session-solo split rationale, paired with the layer-level pair above.",
+            "Lines 4843-4847 (comment, 5 lines): resolves onto live item's own visible flag — Paper hit-test/engine-bridge single-flag rationale.",
+            "Lines 4848-4852 (comment, 5 lines): vector-brush visual-BLOCK rationale, re-derivation-on-load rationale.",
+            "Line 4853 (code): var _elemSolo={} declaration, inline session-only comment."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "elem-visibility-helpers",
+      "packets": [
+        {
+          "id": "C21p.elem-visibility-helpers",
+          "files": [
+            "src/js/app.js:4854-4876"
+          ],
+          "coverage_ranges": [
+            [
+              4854,
+              4876
+            ]
+          ],
+          "classification": {
+            "code": 23,
+            "comment": 0,
+            "whitespace": 0
+          },
+          "symbols": [
+            "anyElemSoloed",
+            "_elemBlockOf",
+            "applyElemVisibility",
+            "applyElemVisibilityAll",
+            "elemIsHidden",
+            "elemIsSoloed"
+          ],
+          "signature": "function anyElemSoloed(li){var s=_elemSolo[li];if(!s)return false;for(var k in s)if(s[k])return true;return false;}function _elemBlockOf(d){return(d&&(d.linkedFillId||d.brushGroupId))||null;}function applyElemVisibility(li){var layer=window.userLayers&&userLayers[li];if(!layer)return;var solo=anyElemSoloed(li)?_elemSolo[li]:null;var hiddenBlk={},soloBlk={};layer.children.forEach(function(c){var d=c.data||{},blk=_elemBlockOf(d);if(!blk)return;if(d.elemHidden)hiddenBlk[blk]=1;if(solo&&d.strokeId&&solo[d.strokeId])soloBlk[blk]=1;});layer.children.forEach(function(c){var d=c.data||{},blk=_elemBlockOf(d);c.visible=solo?!!((d.strokeId&&solo[d.strokeId])||(blk&&soloBlk[blk])):!(d.elemHidden||(blk&&hiddenBlk[blk]));});}function applyElemVisibilityAll(){for(var i=0;i<state.layers.length;i++)applyElemVisibility(i);}function elemIsHidden(li,strokeId){var it=window.SMMotion&&SMMotion.liveItemByStrokeId?SMMotion.liveItemByStrokeId(li,strokeId):null;return !!(it&&it.data&&it.data.elemHidden);}function elemIsSoloed(li,strokeId){var s=_elemSolo[li];return !!(s&&s[strokeId]);}",
+          "responsibility": "No lead-in comment of its own — the previous packet's own header already covers this packet's rationale. Six tightly-coupled one-liners implementing the element visibility model over a live Paper layer's children. `anyElemSoloed(li)` (4854): true if ANY strokeId is soloed for layer `li`. `_elemBlockOf(d)` (4855): the block-grouping key for a stroke dict — `d.linkedFillId||d.brushGroupId`, or null for a standalone item; this is what makes a linked-fill companion or a brush-texture dab follow its own ribbon anchor's hidden/soloed state (see `boundaries`). `applyElemVisibility(li)` (4856-4870): the actual visibility resolver, run per layer. Resolves `solo` to the layer's own soloed-id map if `anyElemSoloed(li)`, else null (4858). FIRST pass over `layer.children` (4860-4864): for every child with a `blk` (block key), records `hiddenBlk[blk]=1` if `d.elemHidden`, and `soloBlk[blk]=1` if `solo` is active AND this child's OWN `strokeId` is in the soloed set — so soloing ONE member of a block marks the WHOLE block as soloed. SECOND pass (4865-4869): sets each child's LIVE `c.visible` — under solo mode, visible iff this child's own strokeId is soloed OR its block is soloed; under normal (non-solo) mode, visible iff NOT (`d.elemHidden` OR its block is in `hiddenBlk`). `applyElemVisibilityAll()` (4871): loops every layer in `state.layers`, calling `applyElemVisibility` on each — this scope's own `loadFrame` (packet 1) is its sole caller. `elemIsHidden(li,strokeId)` (4872-4875): a LIVE lookup via `SMMotion.liveItemByStrokeId` (cited by name only) — returns the CURRENT `data.elemHidden` off the live item, not a cached value, so a query always reflects the latest state even mid-drag. `elemIsSoloed(li,strokeId)` (4876): a direct `_elemSolo[li][strokeId]` lookup, no live-item resolution needed since solo state lives entirely in the module-level map.",
+          "callers": [
+            "app.js:4800 — loadFrame (this scope, packet 1): applyElemVisibilityAll's SOLE external-to-this-area caller, once per frame load, unconditional.",
+            "app.js:4905/4920 — setElemHidden/setElemSolo (this scope, packets 4/5): applyElemVisibility's two callers besides applyElemVisibilityAll itself, each re-deriving visibility for the ONE layer just toggled.",
+            "app.js:4883/4917 — setElemHidden/setElemSolo (this scope, packets 4/5): elemIsHidden/elemIsSoloed's own two in-scope callers, each resolving the FIRST id's current state to decide toggle-vs-explicit semantics.",
+            "shapes-panel.js:646/647 (existing owner, cited by line only) — elemIsHidden/elemIsSoloed's ONLY external callers, both via the `window.` property form (`window.elemIsHidden(li,sid)`/`window.elemIsSoloed(li,sid)`) — see `boundaries`/`reconciliation` for the correction to the issue's own \"expect timeline.js\" hint.",
+            "applyElemVisibility/applyElemVisibilityAll/anyElemSoloed/_elemBlockOf: NO external callers anywhere in the codebase (confirmed by whole-src grep, both with and without the trailing-paren anchor) — purely internal to this scope's own model."
+          ],
+          "behavior": [
+            "Line 4854 (code): anyElemSoloed — any strokeId soloed for this layer.",
+            "Line 4855 (code): _elemBlockOf — block-grouping key (linkedFillId or brushGroupId).",
+            "Line 4856 (code): applyElemVisibility function open, resolve layer.",
+            "Line 4857 (code): missing-layer guard.",
+            "Line 4858 (code): resolve solo map if anyElemSoloed.",
+            "Line 4859 (code): init hiddenBlk/soloBlk accumulators.",
+            "Lines 4860-4864 (code, 5 lines): first pass — accumulate per-block hidden/solo state.",
+            "Lines 4865-4869 (code, 5 lines): second pass — assign live c.visible per child.",
+            "Line 4870 (code): applyElemVisibility function close.",
+            "Line 4871 (code): applyElemVisibilityAll — loop every layer.",
+            "Line 4872 (code): elemIsHidden function open.",
+            "Line 4873 (code): resolve live item via SMMotion.liveItemByStrokeId.",
+            "Line 4874 (code): return elemHidden off the live item's data.",
+            "Line 4875 (code): elemIsHidden function close.",
+            "Line 4876 (code): elemIsSoloed — direct _elemSolo[li][strokeId] lookup."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "set-elem-hidden",
+      "packets": [
+        {
+          "id": "C21p.set-elem-hidden",
+          "files": [
+            "src/js/app.js:4877-4914"
+          ],
+          "coverage_ranges": [
+            [
+              4877,
+              4914
+            ]
+          ],
+          "classification": {
+            "code": 23,
+            "comment": 15,
+            "whitespace": 0
+          },
+          "symbols": [
+            "setElemHidden",
+            "elemHidden",
+            "pushUndoLayers"
+          ],
+          "signature": "function setElemHidden(li,strokeIds,hide){if(!strokeIds||!strokeIds.length)return;if(hide===undefined)hide=!elemIsHidden(li,strokeIds[0]);pushUndoLayers();var ld=state.layers[li],f=ld&&ld.frames[state.currentFrame];var heldOrigin=-1;if(f&&!f.isKeyframe&&!f.isInterpolated){if(state.appMode!=='motion'&&li===state.activeLayerIdx&&typeof ensureKeyframe==='function'){ensureKeyframe();f=ld.frames[state.currentFrame];}if(!f.isKeyframe&&!f.isInterpolated){for(var o=state.currentFrame;o>=0;o--){if(ld.frames[o]&&ld.frames[o].isKeyframe){heldOrigin=o;break;}}}}strokeIds.forEach(function(sid){var it=window.SMMotion&&SMMotion.liveItemByStrokeId?SMMotion.liveItemByStrokeId(li,sid):null;if(!it)return;it.data=it.data||{};if(hide)it.data.elemHidden=true;else delete it.data.elemHidden;});applyElemVisibility(li);if(heldOrigin>=0){ld.frames[heldOrigin].strokes=_collectLayerStrokes(li,ld);window._sceneVersion++;}else if(li===state.activeLayerIdx)saveActiveLayerFrame();else if(f&&(f.isKeyframe||f.isInterpolated)){f.strokes=_collectLayerStrokes(li,ld);window._sceneVersion++;}if(window.SMEngineBridge)SMEngineBridge.renderNow();if(window.updateUI)updateUI();}",
+          "responsibility": "Lead-in (4877-4880, 4 comment lines): the toggle-when-`hide===undefined` semantics — resolved by the FIRST id's current state, so a group row (multiple member strokeIds) resolves ALL its members the SAME direction rather than flipping each independently, \"same 'all follow the row you clicked' semantics the timeline's own folder eye uses\". `setElemHidden(li,strokeIds,hide)` (4881-4914): guards an empty `strokeIds` (4882); resolves toggle semantics off `elemIsHidden(li,strokeIds[0])` (4883); `pushUndoLayers()` unconditionally (4884, the ONLY `pushUndo*` call in this whole scope besides `convertLayerToStrokeFillShadowFolder`'s own `pushUndoLayers(true)`); the held-frame promotion dance (4893-4898, preceded by its own 8-line rationale at 4885-4892 — a 2026-09 QA-sweep fix: setting the flag on the LIVE items alone is silently reverted on the next scrub if the current frame is a HELD one, since `saveActiveLayerFrame` no-ops on holds; Animation 2D promotes via `ensureKeyframe()` FIRST so the flags land on a real keyframe, Motion instead walks backward to find the hold's own origin keyframe index `heldOrigin`); the per-id live-item mutation loop (4899-4904) resolving each id to its live item via `SMMotion.liveItemByStrokeId` (cited by name only) and setting/deleting `it.data.elemHidden`; `applyElemVisibility(li)` (4905, this scope's own previous packet, re-deriving the live `visible` flags immediately); the three-way persistence branch (4906-4911, preceded by its own 3-line rationale at 4906-4908 — persist on the layer the flag was set on, which is NOT always the active layer since the Elements panel takes an arbitrary `li`): `heldOrigin>=0` writes directly into that ORIGIN keyframe's `strokes` via `_collectLayerStrokes` (C21o, cited by line only) plus a manual `window._sceneVersion++` (since it bypasses `saveActiveLayerFrame` entirely, matching C21o's own two external `_collectLayerStrokes` callers' pattern); `li===state.activeLayerIdx` calls the ordinary `saveActiveLayerFrame()` (C21o, cited by line only); otherwise, if the CURRENT frame on the target layer is itself a keyframe/interpolated frame, writes directly into IT the same way. `SMEngineBridge.renderNow()`/`updateUI()` (4912-4913) refresh the canvas and UI unconditionally at the end.",
+          "callers": [
+            "shapes-panel.js:655 (existing owner, cited by line only) — the SOLE external caller anywhere in the codebase, via `window.setElemHidden(li,ids)` on an eye-icon click in the Elements panel — see `boundaries`/`reconciliation` for the correction to the issue's own \"expect timeline.js\" hint (a bare-paren whole-src grep finds ZERO external callers; only a broader property-form grep surfaces this one)."
+          ],
+          "behavior": [
+            "Lines 4877-4880 (comment, 4 lines): toggle-by-first-id, all-follow-the-row rationale.",
+            "Line 4881 (code): function open.",
+            "Line 4882 (code): empty strokeIds guard.",
+            "Line 4883 (code): resolve hide via toggle when undefined.",
+            "Line 4884 (code): pushUndoLayers() — unconditional.",
+            "Lines 4885-4892 (comment, 8 lines): held-frame QA-sweep rationale, two mode-specific answers.",
+            "Lines 4893-4898 (code, 6 lines): held-frame promotion dance — ensureKeyframe (2D) or heldOrigin backward search (Motion).",
+            "Lines 4899-4904 (code, 6 lines): per-id live-item mutation loop — set/delete data.elemHidden.",
+            "Line 4905 (code): applyElemVisibility(li) — immediate re-derivation.",
+            "Lines 4906-4908 (comment, 3 lines): persist-on-target-layer rationale (not always the active layer).",
+            "Lines 4909-4911 (code, 3 lines): three-way persistence branch — heldOrigin write / active-layer save / target-frame write.",
+            "Line 4912 (code): SMEngineBridge.renderNow().",
+            "Line 4913 (code): updateUI().",
+            "Line 4914 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "set-elem-solo-layer-effectively-visible",
+      "packets": [
+        {
+          "id": "C21p.set-elem-solo-layer-effectively-visible",
+          "files": [
+            "src/js/app.js:4915-4946"
+          ],
+          "coverage_ranges": [
+            [
+              4915,
+              4946
+            ]
+          ],
+          "classification": {
+            "code": 14,
+            "comment": 18,
+            "whitespace": 0
+          },
+          "symbols": [
+            "setElemSolo",
+            "layerIsEffectivelyVisible",
+            "_layerFolderParent"
+          ],
+          "signature": "function setElemSolo(li,strokeIds,on){if(!strokeIds||!strokeIds.length)return;if(on===undefined)on=!elemIsSoloed(li,strokeIds[0]);var s=_elemSolo[li]=_elemSolo[li]||{};strokeIds.forEach(function(sid){if(on)s[sid]=true;else delete s[sid];});applyElemVisibility(li);if(window.SMEngineBridge)SMEngineBridge.renderNow();if(window.updateUI)updateUI();}function layerIsEffectivelyVisible(i){var ld=state.layers[i];if(!ld)return false;var fp=_layerFolderParent(ld);if(anyLayerSoloed())return !!(ld.solo||(fp&&fp.solo));if(fp&&!fp.visible)return false;return !!ld.visible;}",
+          "responsibility": "`setElemSolo(li,strokeIds,on)` (4915-4923): the SESSION-ONLY twin of `setElemHidden`, structurally simpler because there is no persisted flag to write and no held-frame promotion dance needed — guards empty `strokeIds` (4916); resolves toggle semantics off `elemIsSoloed(li,strokeIds[0])` (4917); lazily initializes `_elemSolo[li]` (4918); sets/deletes each id in that map (4919); `applyElemVisibility(li)` (4920) re-derives immediately; `renderNow()`/`updateUI()` (4921-4922) refresh unconditionally — no `pushUndoLayers()` call (soloing is a view-only session concept, matching `anyLayerSoloed`'s own documented rationale that layer-level solo is likewise never part of undo/save). Folder-propagation lead-in (4924-4941, 18 comment lines, in French — Cyril's own 2026-08-29 audit, piloted and confirmed by direct pixel test): a Dossier (folder) layer propagates BOTH eye and solo to its sub-tree — hiding the folder previously left its children rendered unchanged (pixels identical before/after, a confirmed bug), soloing the folder previously rendered an EMPTY canvas (non-solo children emitted empty scene entries while the folder itself had no items of its own) — matching the standard DCC convention (AE/Animate/Photoshop): a group's own eye hides its WHOLE sub-tree, its solo isolates the WHOLE sub-tree. `_layerFolderParent` (C21j, cited by name only) already resolves \"is my parent a folder\" by uid; since nested folders don't exist in v1 (per engine.rs `is_folder_layer`, cited by name only), ONE level suffices, no recursion. A child's OWN eye stays independent (hidden-in-a-visible-folder = hidden, unchanged from before). Solo keeps its existing \"ignore the eye\" semantics (per `anyLayerSoloed`'s own comment), extended to the sub-tree: solo on the folder means its children count as soloed too. On the render side, a hidden folder emits an empty entry WITHOUT `isFolderLayer` (buildSceneJson, cited by name only — the visibility guard runs BEFORE the folder branch), so its children are never marked `is_folder_child` on the Rust side without this filter — otherwise they would render as independent layers. `layerIsEffectivelyVisible(i)` (4942-4946): resolves `ld` (missing → false); resolves the folder parent `fp` via `_layerFolderParent(ld)`; if ANY layer is soloed anywhere (`anyLayerSoloed()`, this scope's own earlier packet), returns true iff EITHER this layer's own `ld.solo` OR its folder parent's `fp.solo` is set — SOLO PRECEDENCE: while any solo is active, the ordinary `ld.visible`/`fp.visible` eye state is not consulted at all; otherwise (no solo active anywhere), returns false if the folder parent exists and is itself not visible (`!fp.visible`), else falls through to the layer's own `!!ld.visible`.",
+          "callers": [
+            "shapes-panel.js:664 (existing owner, cited by line only) — setElemSolo's SOLE external caller anywhere in the codebase, via `window.setElemSolo(li,ids)` on an 'S' solo-icon click — see `boundaries`/`reconciliation`.",
+            "layerIsEffectivelyVisible: complete external caller list (contract item f) confirmed by a recursive whole-src grep, matching the issue's own named list exactly: export.js (2: lines 42/1080), engine-bridge.js (2: lines 838/3404), select-bridge.js (4: lines 3393/3452/3523/3540), labs/reference-fill.js (1: line 39, guarded `typeof layerIsEffectivelyVisible==='function'`), labs/storyboard-mode.js (1: line 145, same guard), labs/oca-export.js (1: line 114, same guard), plus app.js's own 3 internal callers (C21o's saveActiveLayerFrame at line 4664, saveAllLayerFrames at line 4700, and this scope's own loadFrame at line 4764)."
+          ],
+          "behavior": [
+            "Line 4915 (code): setElemSolo function open, empty-strokeIds guard folded in.",
+            "Line 4916 (code): empty strokeIds guard.",
+            "Line 4917 (code): resolve on via toggle when undefined.",
+            "Line 4918 (code): lazily initialize _elemSolo[li].",
+            "Line 4919 (code): per-id set/delete in the solo map.",
+            "Line 4920 (code): applyElemVisibility(li) — immediate re-derivation.",
+            "Line 4921 (code): SMEngineBridge.renderNow().",
+            "Line 4922 (code): updateUI().",
+            "Line 4923 (code): setElemSolo function close.",
+            "Lines 4924-4941 (comment, 18 lines, French): folder eye/solo propagation rationale, 2026-08-29 audit, piloted and pixel-confirmed.",
+            "Line 4942 (code): layerIsEffectivelyVisible function open, resolve ld, missing guard.",
+            "Line 4943 (code): resolve folder parent fp.",
+            "Line 4944 (code): solo-precedence branch — any layer soloed anywhere.",
+            "Line 4945 (code): folder-hidden guard (no solo active).",
+            "Line 4946 (code): fallthrough to own ld.visible, function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "save-active-layer-frame-or-promote",
+      "packets": [
+        {
+          "id": "C21p.save-active-layer-frame-or-promote",
+          "files": [
+            "src/js/app.js:4947-4989"
+          ],
+          "coverage_ranges": [
+            [
+              4947,
+              4989
+            ]
+          ],
+          "classification": {
+            "code": 21,
+            "comment": 22,
+            "whitespace": 0
+          },
+          "symbols": [
+            "saveActiveLayerFrameOrPromote",
+            "_justEnsuredKeyframeAt"
+          ],
+          "signature": "function saveActiveLayerFrameOrPromote(){var li=state.activeLayerIdx,ld=state.layers[li],f=ld&&ld.frames[state.currentFrame];if(!f||f.isKeyframe||f.isInterpolated){saveActiveLayerFrame();return;}if(state.appMode!=='motion'){if(typeof canEditActiveLayer==='function'&&!canEditActiveLayer())return;f.isKeyframe=true;f.isInterpolated=false;ld._justEnsuredKeyframeAt=state.currentFrame;saveActiveLayerFrame();_reanchorMaterialized(li,f.strokes);syncLinkedKeyframeFolder(li,state.currentFrame);if(window.renderTimeline)renderTimeline();return;}for(var o=state.currentFrame;o>=0;o--){if(ld.frames[o]&&ld.frames[o].isKeyframe){ld.frames[o].strokes=_collectLayerStrokes(li,ld);_reanchorMaterialized(li,ld.frames[o].strokes);window._sceneVersion=(window._sceneVersion||0)+1;return;}}saveActiveLayerFrame();}",
+          "responsibility": "Lead-in (4947-4968, 22 comment lines, two paragraphs): paragraph one (4947-4958) states `syncLinkedKeyframeFolder`'s own scope — a keyframe TIMING sync across `state.layerLinkGroups[id].linkedKeyframes` siblings, deliberately NOT `layerFolders` (these 3 channel layers render as ordinary independent rows, own working eye/lock/solo, no collapse arrow at all), each channel keeping its OWN independent content, only whether `frameIdx` IS a keyframe stays synced — explicitly distinguished from `lfsGroup`, a separate symbol-based per-channel-mini-timeline system with NO shared timing. Paragraph two (4959-4968) states THIS function's own reason to exist: C21o's `saveActiveLayerFrame` deliberately no-ops on a HELD frame (a scrub must never mint keyframes), but a REAL edit made on one (feedback #752, then #823/#824/#825 — flip, align, distribute, duplicate, smooth all had the identical hole) has to land somewhere or it snaps back on the next scrub; Animation 2D promotes the held frame AFTER the fact from the live content loadFrame already materialised (by flagging it a keyframe and letting the ordinary save path store it), Motion instead writes into the keyframe the hold inherits from. `saveActiveLayerFrameOrPromote()` (4969-4989): resolves `li`/`ld`/`f` (4970); on a keyframe, an interpolated frame, or a missing frame, delegates straight to `saveActiveLayerFrame()` and returns (4971) — this is the ONLY branch where `saveActiveLayerFrame`'s own `_maybePromoteInterpolated` (C21o) still applies, since the OTHER two branches never reach it. Animation 2D branch (4972-4980, `state.appMode!=='motion'`): guards `canEditActiveLayer()` (cited by name only); unconditionally promotes the CURRENT frame — `f.isKeyframe=true;f.isInterpolated=false` — no content-diff gate at all (see `boundaries` for why this is structurally different from `_maybePromoteInterpolated`); sets `ld._justEnsuredKeyframeAt=state.currentFrame` (the SECOND producer of this flag besides `ensureKeyframe`, see `boundaries`); calls `saveActiveLayerFrame()` (C21o); `_reanchorMaterialized(li,f.strokes)` (this scope's next packet — re-stamps the materialize anchor now that the live items belong to the freshly-written keyframe, not the hold's origin); `syncLinkedKeyframeFolder(li,state.currentFrame)` (this scope's own later packet); conditional `renderTimeline()` refresh; returns. Motion branch (4981-4988): walks BACKWARD from the current frame to find the hold's own origin keyframe (`for(var o=state.currentFrame;o>=0;o--)`), and once found, overwrites THAT frame's `strokes` directly via `_collectLayerStrokes` (C21o, cited by line only), re-anchors, bumps `window._sceneVersion` manually (bypassing `saveActiveLayerFrame`'s own increment entirely, matching C21o's own two external `_collectLayerStrokes` callers' pattern), and returns — never minting a NEW keyframe at the current frame, consistent with a hold's whole duration belonging to one Motion keyframe. Falls through to plain `saveActiveLayerFrame()` (4988) only if no origin keyframe was found at all (a malformed/frame-0-less layer).",
+          "callers": [
+            "tools.js: 4 (lines 1321/1365/1645/6031 — move-selection commit, boolean-op result, and other content-editing gestures)",
+            "gradient-bridge.js: 7 (lines 108/117/128/153/173/293/306 — gradient stop/handle edits)",
+            "timeline.js: 3 (lines 783/2036/2047 — a generic commit path plus Flip Horizontal/Flip Vertical)",
+            "Matches the issue's own named caller list exactly: tools.js, gradient-bridge.js, timeline.js. None of these 14 call sites push undo themselves adjacent to the call (confirmed for tools.js:1321 by reading the line immediately before it, `if(!moved){state.undoStack.pop();return;}` — evidence the undo snapshot was captured earlier in the same gesture, before this function's own body, which itself calls no pushUndo* — see `boundaries`)."
+          ],
+          "behavior": [
+            "Lines 4947-4958 (comment, 12 lines): syncLinkedKeyframeFolder scope rationale — timing-only, NOT layerFolders, distinct from lfsGroup.",
+            "Lines 4959-4968 (comment, 10 lines): held-frame promotion rationale — feedback #752/#823/#824/#825, two mode-specific answers.",
+            "Line 4969 (code): function open.",
+            "Line 4970 (code): resolve li/ld/f.",
+            "Line 4971 (code): delegate to saveActiveLayerFrame on keyframe/interpolated/missing frame, return.",
+            "Line 4972 (code): Animation 2D branch open.",
+            "Line 4973 (code): canEditActiveLayer guard.",
+            "Line 4974 (code): promote current frame — isKeyframe/isInterpolated flip, _justEnsuredKeyframeAt set.",
+            "Line 4975 (code): saveActiveLayerFrame().",
+            "Line 4976 (code): _reanchorMaterialized(li,f.strokes).",
+            "Line 4977 (code): syncLinkedKeyframeFolder(li,state.currentFrame).",
+            "Line 4978 (code): conditional renderTimeline().",
+            "Line 4979 (code): return.",
+            "Line 4980 (code): Animation 2D branch close.",
+            "Lines 4981-4987 (code, 7 lines): Motion branch — backward search for hold origin, direct strokes write, re-anchor, manual _sceneVersion bump, return.",
+            "Line 4988 (code): fallthrough saveActiveLayerFrame().",
+            "Line 4989 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "reanchor-materialized",
+      "packets": [
+        {
+          "id": "C21p.reanchor-materialized",
+          "files": [
+            "src/js/app.js:4990-5006"
+          ],
+          "coverage_ranges": [
+            [
+              4990,
+              5006
+            ]
+          ],
+          "classification": {
+            "code": 6,
+            "comment": 11,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_reanchorMaterialized",
+            "_matStrokes",
+            "_smGeomDirty"
+          ],
+          "signature": "function _reanchorMaterialized(li,strokes){var lyr=window.userLayers&&userLayers[li];if(!lyr||!strokes)return;lyr._matStrokes=strokes;lyr._smGeomDirty=false;}",
+          "responsibility": "Lead-in (4990-5000, 11 comment lines): states the exact anchor-drift bug this function fixes. `loadFrame` skips rebuilding a layer whose materialised items still match the strokes array it was built from (`_canReuseMaterialized`, C21o). On a HELD frame, that array IS the hold origin's own array — so after `saveActiveLayerFrameOrPromote` promotes the hold to a keyframe (previous packet), the live items now belong to the FRESHLY WRITTEN keyframe, not to the origin any more, but `_matStrokes` still points at the origin's array unless re-stamped. Leaving the anchor behind made the reuse test wrongly claim the edited layer still represented the ORIGIN frame — measured live: a gradient enabled on held frame 3 came back on keyframe 0 too, because navigating there reused the (still-anchored-to-origin) edited items and the NEXT frame change wrote them back onto the wrong frame. Only bites edits that change no geometry (`_smGeomDirty` already forces a rebuild otherwise) — exactly the class the promotion helper opened up. `_reanchorMaterialized(li,strokes)` (5001-5006): resolves the live layer `lyr` (5002); guards missing layer or missing `strokes` (5003); re-stamps `lyr._matStrokes=strokes` (5004) and clears `lyr._smGeomDirty=false` (5005) — the IDENTICAL pair `loadFrame` (this scope's own packet 1, line 4796) writes on a normal rebuild, called here OUTSIDE of `loadFrame` because the promotion already materialised correct content without going through a full rebuild pass.",
+          "callers": [
+            "app.js:4976 — saveActiveLayerFrameOrPromote (this scope, previous packet, Animation 2D branch): re-anchors to the newly-promoted keyframe's own strokes.",
+            "app.js:4984 — saveActiveLayerFrameOrPromote (this scope, previous packet, Motion branch): re-anchors to the hold-origin keyframe's freshly-collected strokes.",
+            "No external callers anywhere in the codebase (confirmed by whole-src grep) — purely internal to this scope's own promotion helper."
+          ],
+          "behavior": [
+            "Lines 4990-4998 (comment, 9 lines): anchor-drift bug rationale — held-frame promotion leaves _matStrokes pointing at the wrong (origin) array.",
+            "Lines 4999-5000 (comment, 2 lines): scope-of-effect — only bites geometry-unchanged edits, since _smGeomDirty already forces a rebuild otherwise.",
+            "Line 5001 (code): function open.",
+            "Line 5002 (code): resolve live layer.",
+            "Line 5003 (code): missing-layer/missing-strokes guard.",
+            "Line 5004 (code): re-stamp _matStrokes=strokes.",
+            "Line 5005 (code): clear _smGeomDirty=false.",
+            "Line 5006 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "sync-linked-keyframe-folder",
+      "packets": [
+        {
+          "id": "C21p.sync-linked-keyframe-folder",
+          "files": [
+            "src/js/app.js:5007-5023"
+          ],
+          "coverage_ranges": [
+            [
+              5007,
+              5023
+            ]
+          ],
+          "classification": {
+            "code": 17,
+            "comment": 0,
+            "whitespace": 0
+          },
+          "symbols": [
+            "syncLinkedKeyframeFolder",
+            "linkGroupId",
+            "linkedKeyframes"
+          ],
+          "signature": "function syncLinkedKeyframeFolder(sourceLayerIdx,frameIdx){var srcLd=state.layers[sourceLayerIdx];var gid=srcLd&&srcLd.linkGroupId;if(!gid)return;var gmeta=state.layerLinkGroups[gid];if(!gmeta||!gmeta.linkedKeyframes)return;var srcFrame=srcLd.frames[frameIdx];if(!srcFrame)return;state.layers.forEach(function(ld,i){if(i===sourceLayerIdx||ld.linkGroupId!==gid)return;var f=ld.frames[frameIdx];if(!f)return;if(srcFrame.isKeyframe&&!f.isKeyframe){f.isKeyframe=true;f.isInterpolated=false;if(!f.strokes)f.strokes=[];}else if(!srcFrame.isKeyframe&&f.isKeyframe){f.isKeyframe=false;f.strokes=[];f.isInterpolated=false;}});}",
+          "responsibility": "No lead-in comment of its own (this scope's own previous packet's lead-in already states the full rationale). `syncLinkedKeyframeFolder(sourceLayerIdx,frameIdx)` (5007-5023): resolves the source layer and its `linkGroupId` (5008-5009), early-returning if the source layer has none (5010); resolves the group's own metadata from `state.layerLinkGroups[gid]` and early-returns unless `gmeta.linkedKeyframes` is truthy (5011-5012); resolves the source's own frame at `frameIdx`, early-returning if it doesn't exist (5013). Iterates EVERY layer in `state.layers` (5014-5022), skipping the source itself and any layer NOT in the same link group (5015); for each sibling, resolves its own frame at the SAME `frameIdx`, skipping if missing (5016); if the source frame IS a keyframe and the sibling's is NOT, PROMOTES the sibling frame (`isKeyframe=true;isInterpolated=false`) and, ONLY if the sibling had no `strokes` array at all yet, initializes it to `[]` — never overwriting existing content (5017-5018, see `boundaries` for why this is TIMING-only, never a content copy); if the source is NOT a keyframe but the sibling IS, DEMOTES the sibling (`isKeyframe=false;strokes=[];isInterpolated=false`) — an unconditional content wipe back to empty for that one sibling frame (5019-5021).",
+          "callers": [
+            "tools.js:1882 — ensureKeyframe (existing owner, cited by line only): the OTHER direct external caller besides the 5 labs files below, called immediately after minting a fresh keyframe from held content.",
+            "app.js:4977 — saveActiveLayerFrameOrPromote (this scope, packet 6): the in-scope caller, Animation 2D branch only.",
+            "5 labs files, matching the issue's own \"tools.js + 5 labs\" estimate exactly, all guarded `typeof syncLinkedKeyframeFolder === 'function'`:",
+            "src/js/labs/interval-assistant.js: 1 (line 58)",
+            "src/js/labs/layer-effects-bake.js: 1 (line 88)",
+            "src/js/labs/move-to-layer.js: 1 (line 42)",
+            "src/js/labs/shader-effects-bake.js: 1 (line 275)",
+            "src/js/labs/multiframe-draw.js: 1 (line 68)",
+            "app.js:5243/5248/5345 (this file, next slice C21q — goToFrame/insertKeyframe* family — cited by name/line only, not reproduced here)."
+          ],
+          "behavior": [
+            "Line 5007 (code): function open.",
+            "Line 5008 (code): resolve source layer.",
+            "Line 5009 (code): resolve source's linkGroupId.",
+            "Line 5010 (code): no-group early return.",
+            "Line 5011 (code): resolve group metadata.",
+            "Line 5012 (code): no-metadata/not-linkedKeyframes early return.",
+            "Line 5013 (code): resolve source frame, missing guard.",
+            "Line 5014 (code): forEach over state.layers open.",
+            "Line 5015 (code): skip source itself and non-group-members.",
+            "Line 5016 (code): resolve sibling frame at same index, missing guard.",
+            "Lines 5017-5018 (code, 2 lines): promote sibling if source is keyframe and sibling isn't — timing only, strokes=[] only if absent.",
+            "Lines 5019-5021 (code, 3 lines): demote sibling if source isn't a keyframe and sibling is — unconditional content wipe.",
+            "Line 5022 (code): forEach close.",
+            "Line 5023 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "enforce-channel-strip",
+      "packets": [
+        {
+          "id": "C21p.enforce-channel-strip",
+          "files": [
+            "src/js/app.js:5024-5043"
+          ],
+          "coverage_ranges": [
+            [
+              5024,
+              5043
+            ]
+          ],
+          "classification": {
+            "code": 8,
+            "comment": 12,
+            "whitespace": 0
+          },
+          "symbols": [
+            "enforceChannelStrip",
+            "channel"
+          ],
+          "signature": "function enforceChannelStrip(ld,c){if(!ld.channel)return;if(c instanceof Raster)return;if(c.data&&(c.data.isVectorBrush||c.data.brushTexturePreset||c.data.isBrushTextureCopy||c.data.isLinkedFillCompanion))return;if(ld.channel==='shadow')return;if(ld.channel==='stroke')c.fillColor=null;else c.strokeColor=null;}",
+          "responsibility": "Lead-in (5024-5033, 10 comment lines): states the enforcement's own scope and purpose — strips whichever paint channel doesn't belong to `ld`'s own declared `channel`, called from C21o's `_collectLayerStrokes` on the LIVE Paper.js item (so the canvas itself, not just persisted data, reflects the constraint the instant a stroke commits), enforcing the split ON GOING FORWARD, not just at the one-time conversion moment (`convertLayerToStrokeFillShadowFolder`, this scope's next packet). Skipped for item kinds where fillColor/strokeColor don't mean \"two independent paint channels\": rasters (no stroke concept at all), vector-brush ribbons (fillColor IS the ribbon's own paint, not a separate fill region), brush-texture anchors/dabs and linked-fill companions (each already has its own valid color model — cited by name only, tools.js `applyBrushTexture`/draw-bridge.js `linkedFill`). `enforceChannelStrip(ld,c)` (5034-5043): no-ops if the layer has no `channel` at all (5035, ordinary non-split layers are entirely unaffected); no-ops for a `Raster` (5036); no-ops for any of the four excluded tag combinations (5037, one compound OR test); no-ops entirely for the Shadow channel (5040, preceded by its own 2-line rationale at 5038-5039 — \"unlike Fill, nothing gets forced off here\", since a Shadow-channel item can legitimately be a boundary stroke, a fill, or both); otherwise nulls `fillColor` on the Stroke channel (5041) or `strokeColor` on everything else, i.e. the Fill channel (5042, the trailing `// 'fill'` comment names the implicit else branch explicitly).",
+          "callers": [
+            "app.js:4574 — _collectLayerStrokes (C21o, cited by line only): enforceChannelStrip's SOLE caller anywhere in the codebase (confirmed by whole-src grep), applied to every qualifying `Path` child immediately BEFORE `serP(c)` inside both save writers' shared collector."
+          ],
+          "behavior": [
+            "Lines 5024-5033 (comment, 10 lines): scope/purpose rationale — live-item mutation, ongoing enforcement, four excluded tag kinds.",
+            "Line 5034 (code): function open.",
+            "Line 5035 (code): no-channel guard.",
+            "Line 5036 (code): Raster guard.",
+            "Line 5037 (code): four-tag exclusion guard.",
+            "Lines 5038-5039 (comment, 2 lines): Shadow-channel exemption rationale.",
+            "Line 5040 (code): Shadow-channel guard.",
+            "Line 5041 (code): Stroke channel — null fillColor.",
+            "Line 5042 (code): else (Fill channel) — null strokeColor.",
+            "Line 5043 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "convert-layer-to-stroke-fill-shadow-folder",
+      "packets": [
+        {
+          "id": "C21p.convert-layer-to-stroke-fill-shadow-folder",
+          "files": [
+            "src/js/app.js:5044-5111"
+          ],
+          "coverage_ranges": [
+            [
+              5044,
+              5111
+            ]
+          ],
+          "classification": {
+            "code": 40,
+            "comment": 28,
+            "whitespace": 0
+          },
+          "symbols": [
+            "convertLayerToStrokeFillShadowFolder",
+            "splitFrame",
+            "linkGroupId",
+            "channelTag"
+          ],
+          "signature": "function convertLayerToStrokeFillShadowFolder(layerIdx){var src=state.layers[layerIdx];if(!src)return;if(src.symbolId||src.lfsGroup){showToast(SM.t('hsNotOnComponentOrLfs'));return;}saveAllLayerFrames();pushUndoLayers(true);function splitFrame(f,channel){var strokes=f.strokes.map(function(sd){return JSON.parse(JSON.stringify(sd));}).filter(function(sd){if(sd.channelTag==='shadow')return channel==='shadow';if(channel==='shadow')return false;if(sd.isRaster)return channel==='fill';var hasStroke=sd.hasRealStroke!==undefined?sd.hasRealStroke:!!sd.strokeColor,hasFill=!!sd.fillColor;return channel==='stroke'?hasStroke:hasFill;}).map(function(sd){if(sd.isRaster||sd.channelTag==='shadow')return sd;if(channel==='stroke')sd.fillColor=null;if(channel==='fill')sd.strokeColor=null;return sd;});return{strokes:strokes,isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated,isManualEdit:f.isManualEdit||false};}var channels=[{suffix:'Stroke',key:'stroke'},{suffix:'Fill',key:'fill'},{suffix:'Shadow',key:'shadow'}];var newLayers=channels.map(function(ch){var idx=createUserLayer(src.name+' '+ch.suffix);state.layers[idx].channel=ch.key;state.layers[idx].frames=src.frames.map(function(f){return splitFrame(f,ch.key);});return state.layers[idx];});var gid='lg-'+Date.now()+'-'+Math.floor(Math.random()*1000);state.layerLinkGroups[gid]={linkedKeyframes:true,collapsed:false};newLayers.forEach(function(ld){ld.linkGroupId=gid;});var origIdx=state.layers.indexOf(src);userLayers[origIdx].remove();userLayers.splice(origIdx,1);state.layers.splice(origIdx,1);var newActiveIdx=state.layers.indexOf(newLayers[0]);state.activeLayerIdx=Math.max(0,newActiveIdx);activateUL(state.activeLayerIdx);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderLayerList)window.renderLayerList();if(window.renderTimeline)window.renderTimeline();showToast(SM.t('toastLayerSplitSFS'));}",
+          "responsibility": "Lead-in (5044-5057, 14 comment lines, two paragraphs): paragraph one states the created shape's own design contract — 3 real, fully ordinary independent layers linked ONLY by keyframe timing (`syncLinkedKeyframeFolder`) and the auto-strip enforcement (`enforceChannelStrip`, previous packet), deliberately NOT a `layerFolders` group: no collapse header, no aggregate eye/lock/solo, each behaves exactly like any other layer, matching what a \"channel split\" should feel like (3 sibling layers, not a sub-timeline). Paragraph two states the per-frame split rule: each keyframe's existing strokes are duplicated into stroke-only (fillColor stripped) and fill-only (strokeColor stripped) clones for their respective channels; Shadow starts EMPTY on every frame (\"à définir plus tard\" per the request this was built from — no shadow-generation algorithm exists yet, just the channel/slot for one to land in later); a raster (bitmap) has no stroke at all, so it goes to the Fill channel by convention (closest analogue: a bitmap IS a filled region, no separate outline). `convertLayerToStrokeFillShadowFolder(layerIdx)` (5058-5111, see `boundaries` for the complete 10-step order): guards a missing source layer (5060) and a component/LFS source (`symbolId||lfsGroup`, 5061, with a user-facing toast — `showToast(SM.t('hsNotOnComponentOrLfs'))`); `saveAllLayerFrames()`/`pushUndoLayers(true)` (5062-5063, C21o/tweens.js, cited by name/line only); the nested `splitFrame(f,channel)` helper (5070-5090, preceded by its own 6-line per-item rationale at 5064-5069 about the Shadow-tagged-item routing rule): deep-clones every stroke via `JSON.parse(JSON.stringify(sd))` (5071, so mutating one channel's clone never touches another's or the source's own live dict), FILTERS per channel (5072-5082, preceded by its own 6-line rationale at 5075-5080 about `hasRealStroke` vs. the legacy `!!strokeColor` fallback — a shadow-tagged item routes to Shadow wholesale and is excluded from stroke/fill classification entirely so it never ALSO duplicates into Stroke; a raster only ever goes to Fill; otherwise classified by `hasRealStroke`/`!!fillColor`), then MAPS to null the OTHER channel's paint (5083-5088, skipping rasters and shadow-tagged items, which keep both channels intact); returns a fresh frame object preserving `isKeyframe`/`isInterpolated`/`isManualEdit` (5089). The 3-channel array (5091) drives `newLayers=channels.map(...)` (5092-5097): `createUserLayer` per channel (cited by name only), stamping `state.layers[idx].channel=ch.key` and replacing `.frames` wholesale with the per-frame `splitFrame` output. A fresh `gid` (5098) registers `state.layerLinkGroups[gid]={linkedKeyframes:true,collapsed:false}` (5099) and stamps `linkGroupId` onto all 3 new layers (5100). The ORIGINAL layer is removed via the SAME pattern `deleteLayer()` already uses (5101-5104, its own 2-line comment): `userLayers[origIdx].remove()` (live Paper layer), then `.splice()` out of both `userLayers`/`state.layers`. Active-layer re-pointing to the new Stroke layer, `activateUL`, then `loadFrame`/`renderOS`/`renderArcs`/`updateUI` (5105-5108) — this scope's own `loadFrame` (packet 1) materialising the 3 brand-new layers for the very first time — conditional `renderLayerList`/`renderTimeline` refresh (5109), and a final `showToast` (5110).",
+          "callers": [
+            "timeline.js:1635 (existing owner, cited by line only) — the SOLE external caller, wrapped in a property-method literal on timeline.js's own command-table object: `convertActiveLayerToStrokeFillShadow:function(){convertLayerToStrokeFillShadowFolder(state.activeLayerIdx);}` — matching the issue's own \"timeline.js\" caller list exactly, though via a property-wrapper form rather than a bare call (see `source_baselines.runtime` for why a literal `window.SM={...}` search found nothing but this DIFFERENT wrapper shape does exist)."
+          ],
+          "behavior": [
+            "Lines 5044-5049 (comment, 6 lines): 3-independent-layers, timing-only-link, no-collapse-header design contract.",
+            "Lines 5050-5057 (comment, 8 lines): per-frame split rule — stroke/fill clones, Shadow starts empty, raster-to-Fill convention.",
+            "Line 5058 (code): function open.",
+            "Line 5059 (code): resolve src.",
+            "Line 5060 (code): missing-source guard.",
+            "Line 5061 (code): component/LFS-source guard with toast.",
+            "Line 5062 (code): saveAllLayerFrames().",
+            "Line 5063 (code): pushUndoLayers(true).",
+            "Line 5064 (code): splitFrame helper open (nested function).",
+            "Lines 5065-5069 (comment, 5 lines): shadow-tagged-item routing rationale.",
+            "Line 5070 (code): deep-clone every stroke via JSON round-trip.",
+            "Lines 5071-5074 (code, 4 lines): filter — shadow-tag routing, raster-to-Fill.",
+            "Lines 5075-5080 (comment, 6 lines): hasRealStroke vs legacy strokeColor-fallback rationale.",
+            "Lines 5081-5082 (code, 2 lines): hasStroke/hasFill classification, channel filter.",
+            "Lines 5083-5088 (code, 6 lines): map — null the other channel's paint, skip rasters/shadow.",
+            "Line 5089 (code): return new frame object preserving isKeyframe/isInterpolated/isManualEdit.",
+            "Line 5090 (code): splitFrame helper close.",
+            "Line 5091 (code): channels array declaration.",
+            "Lines 5092-5097 (code, 6 lines): newLayers = channels.map — createUserLayer, stamp channel, replace frames.",
+            "Line 5098 (code): fresh gid.",
+            "Line 5099 (code): register layerLinkGroups[gid].",
+            "Line 5100 (code): stamp linkGroupId onto all 3 new layers.",
+            "Lines 5101-5102 (comment, 2 lines): deleteLayer()-pattern removal rationale.",
+            "Lines 5103-5104 (code, 2 lines): remove original layer from userLayers/state.layers.",
+            "Lines 5105-5107 (code, 3 lines): re-point activeLayerIdx, activateUL.",
+            "Line 5108 (code): loadFrame/renderOS/renderArcs/updateUI.",
+            "Line 5109 (code): conditional renderLayerList/renderTimeline refresh.",
+            "Line 5110 (code): showToast.",
+            "Line 5111 (code): function close."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "next leaf (goToFrame, app.js:5112+, C21q, not yet filed as an issue at authoring time)",
+      "disposition": "loadFrame's single heaviest-weight external caller (wraps a `saveAllLayerFrames()` call immediately before navigating) — cited by name/line only, not reproduced here."
+    },
+    {
+      "consumer": "engine-bridge.js (existing owner, buildSceneJson/onionLayerItems' `c.visible===false` reads, and the `_changed` hook writing `_smGeomDirty`)",
+      "disposition": "A full round trip with this scope: reads the LIVE item-level `visible` flag `applyElemVisibility` (this scope) sets (buildSceneJson:1348, onionLayerItems:2657, both with an explicit in-line comment naming `applyElemVisibility`); separately writes `_smGeomDirty=true` on any live mutation, the flag this scope's own `loadFrame`/`_reanchorMaterialized` clear."
+    },
+    {
+      "consumer": "export.js and group-bridge.js (existing owners, DICT-level `elemHidden` readers)",
+      "disposition": "Both read the SERIALIZED `sd.elemHidden` directly rather than any live item's `visible` — export.js filters a hidden element out of the exported stroke set (line 78); group-bridge.js excludes it from its own boolean-combine operand/member-count logic (lines 689/695). Full evidence in `boundaries`/`reconciliation`."
+    },
+    {
+      "consumer": "shapes-panel.js (existing owner) — the REAL external caller of the public eye/solo API",
+      "disposition": "The Elements panel's per-row eye/solo icons (`appendVisIcons`, shapes-panel.js:644-666) call `window.elemIsHidden`/`window.elemIsSoloed`/`window.setElemHidden`/`window.setElemSolo` exclusively via the `window.` property form — corrects the issue's own \"expect timeline.js\" hint (see `boundaries`/`reconciliation`)."
+    },
+    {
+      "consumer": "select-bridge.js and tweens.js — confirmed NOT consumers of elemHidden, a correction to the issue's own hint",
+      "disposition": "select-bridge.js relies entirely on Paper.js's own built-in hit-test skip of invisible items, with no explicit element-level code of its own; tweens.js has zero references to `elemHidden` anywhere in the file (whole-file grep)."
+    },
+    {
+      "consumer": "tools.js (existing owner, ensureKeyframe and the 14 saveActiveLayerFrameOrPromote/syncLinkedKeyframeFolder call sites)",
+      "disposition": "`ensureKeyframe` (tools.js:1882) is the OTHER `_justEnsuredKeyframeAt` producer and the OTHER direct `syncLinkedKeyframeFolder` caller besides this scope's own `saveActiveLayerFrameOrPromote`; tools.js is also the heaviest external caller of `saveActiveLayerFrameOrPromote` itself (4 sites)."
+    },
+    {
+      "consumer": "gradient-bridge.js and timeline.js (existing owners, the remaining saveActiveLayerFrameOrPromote callers, plus timeline.js's own convertActiveLayerToStrokeFillShadow wrapper and 5 labs files calling syncLinkedKeyframeFolder)",
+      "disposition": "gradient-bridge.js (7 sites) commits gradient stop/handle edits through the held-frame-safe promotion path; timeline.js (3 sites, plus the convertLayerToStrokeFillShadowFolder wrapper at line 1635) covers Flip Horizontal/Vertical and the channel-split command; the 5 labs files (interval-assistant.js, layer-effects-bake.js, move-to-layer.js, shader-effects-bake.js, multiframe-draw.js) each guard `typeof syncLinkedKeyframeFolder==='function'` before calling it, matching the issue's own \"tools.js + 5 labs\" caller estimate exactly."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-loadframe-dedupes-non-duplicator-layers-on-duponly",
+      "proposed": "Call loadFrame(idx,true) with a document containing one duplicator layer and one ordinary layer, both with pending live edits; expect the ordinary layer's live items to remain UNTOUCHED (no removeChildren, no _matStrokes/_smGeomDirty change) while the duplicator layer rebuilds — verifies line 4763 — not run."
+    },
+    {
+      "id": "fx-loadframe-hidden-layer-empties-and-clears-anchor",
+      "proposed": "Call loadFrame on a layer where layerIsEffectivelyVisible returns false; expect userLayers[i].children.length===0 and userLayers[i]._matStrokes===null — verifies line 4764 — not run."
+    },
+    {
+      "id": "fx-loadframe-fastpath-skips-rebuild-side-effects",
+      "proposed": "Pre-materialize a layer so _canReuseMaterialized returns true, spy on removeChildren/desP/desR/relinkBrushCompanions/relinkRigBinds; call loadFrame; expect ZERO calls to any of them for that layer, while applyElemVisibilityAll/activate/SMCamera.applyCameraView still fire exactly once each — verifies the fast-path-vs-unconditional-tail split in `boundaries` — not run."
+    },
+    {
+      "id": "fx-loadframe-reresolves-selectedpaths-by-strokeid",
+      "proposed": "Select a Path by strokeId, force a rebuild (mutate the stored strokes array reference), call loadFrame; expect selectedPaths to now reference the REBUILT twin object (not the detached original) with the same strokeId, and state.selectedStrokeIndices recomputed — verifies lines 4810-4823 — not run."
+    },
+    {
+      "id": "fx-applyelemvisibility-block-propagation",
+      "proposed": "Tag two Paths with the same brushGroupId, set elemHidden on only one; call applyElemVisibility; expect BOTH to end up with visible===false (block-wide propagation via hiddenBlk) — verifies lines 4860-4868 — not run."
+    },
+    {
+      "id": "fx-applyelemvisibility-solo-overrides-hidden",
+      "proposed": "Set elemHidden=true AND solo the same strokeId via setElemSolo; call applyElemVisibility; expect visible===true (solo mode ignores the hidden flag entirely, per the ternary at line 4867) — verifies the solo-precedence branch — not run."
+    },
+    {
+      "id": "fx-setelemhidden-toggle-by-first-id",
+      "proposed": "Call setElemHidden(li,[idA,idB]) with hide omitted where idA is currently hidden and idB is not; expect BOTH to become visible (hide resolved to false from idA's own current state, idB simply follows) — verifies line 4883 — not run."
+    },
+    {
+      "id": "fx-setelemhidden-held-frame-2d-promotes-via-ensurekeyframe",
+      "proposed": "In Animation 2D on a held (non-keyframe, non-interpolated) active-layer frame, call setElemHidden; expect ensureKeyframe to have been invoked (the frame becomes isKeyframe=true) BEFORE the elemHidden flag is written, and the flag to survive a subsequent loadFrame — verifies lines 4893-4898/4906-4911 — not run."
+    },
+    {
+      "id": "fx-setelemhidden-held-frame-motion-writes-hold-origin",
+      "proposed": "In Motion on a held frame N whose origin keyframe is frame M<N, call setElemHidden on a non-active layer; expect ld.frames[M].strokes to be rewritten via _collectLayerStrokes and window._sceneVersion bumped, with ld.frames[N] untouched as a frame object — verifies the heldOrigin branch, lines 4893-4897/4909 — not run."
+    },
+    {
+      "id": "fx-setelemsolo-no-pushundo",
+      "proposed": "Spy on pushUndoLayers; call setElemSolo; expect zero calls (session-only state is deliberately not undoable) — verifies the absence of any pushUndo* call in setElemSolo's own body — not run."
+    },
+    {
+      "id": "fx-layeriseffectivelyvisible-solo-precedence-over-hidden-folder",
+      "proposed": "Set a folder's own ld.visible=false AND ld.solo=true on ONE child inside it, with no other solo active; expect layerIsEffectivelyVisible on that child to return true (solo overrides the folder's own hidden eye entirely) — verifies line 4944 — not run."
+    },
+    {
+      "id": "fx-layeriseffectivelyvisible-folder-hidden-cascades-when-no-solo",
+      "proposed": "With no solo active anywhere, hide a folder (ld.visible=false) whose child has its OWN ld.visible=true; expect layerIsEffectivelyVisible on the child to return false — verifies line 4945 — not run."
+    },
+    {
+      "id": "fx-saveactivelayerframeorpromote-2d-unconditional-promotion",
+      "proposed": "On a held Animation-2D frame with NO actual content change from its hold origin, call saveActiveLayerFrameOrPromote; expect f.isKeyframe to become true regardless (no content-diff gate, unlike _maybePromoteInterpolated) — verifies line 4974 and the boundaries note distinguishing this from C21o's own promotion helper — not run."
+    },
+    {
+      "id": "fx-saveactivelayerframeorpromote-motion-never-mints-new-keyframe",
+      "proposed": "On a held Motion frame, call saveActiveLayerFrameOrPromote; expect the CURRENT frame's own isKeyframe to remain false/unchanged, and the origin keyframe's strokes to be the ones rewritten — verifies lines 4981-4987 — not run."
+    },
+    {
+      "id": "fx-saveactivelayerframeorpromote-sets-justensuredkeyframeat",
+      "proposed": "Call saveActiveLayerFrameOrPromote on a held 2D frame outside the layer's own trim range; expect the underlying saveActiveLayerFrame call to NOT be rejected by C21o's own trim-range gate, because _justEnsuredKeyframeAt was set immediately before it — verifies line 4974's cross-reference to C21o app.js:4683-4685 — not run."
+    },
+    {
+      "id": "fx-reanchormaterialized-fixes-stale-anchor-after-promotion",
+      "proposed": "Promote a held frame via saveActiveLayerFrameOrPromote, then navigate to the ORIGIN frame and back; expect the promoted keyframe's own content to be preserved (not silently reverted to the origin's content) — verifies the exact regression _reanchorMaterialized's own lead-in describes — not run."
+    },
+    {
+      "id": "fx-synclinkedkeyframefolder-promotes-without-overwriting-existing-strokes",
+      "proposed": "Two layers in the same linkGroupId; sibling frame already has non-empty strokes but isKeyframe=false; promote the source frame to a keyframe; call syncLinkedKeyframeFolder; expect the sibling's isKeyframe to become true WITHOUT its existing strokes being cleared or replaced — verifies line 4918's `if(!f.strokes)f.strokes=[]` guard — not run."
+    },
+    {
+      "id": "fx-synclinkedkeyframefolder-demotes-and-wipes-sibling",
+      "proposed": "Demote the source frame from keyframe to non-keyframe; call syncLinkedKeyframeFolder; expect the sibling's isKeyframe to become false AND its strokes array to become [] — verifies lines 5019-5021 — not run."
+    },
+    {
+      "id": "fx-enforcechannelstrip-skips-four-tag-kinds",
+      "proposed": "Call enforceChannelStrip on a layer with ld.channel='stroke' against a Path tagged isLinkedFillCompanion with both fillColor and strokeColor set; expect NEITHER color to be nulled — verifies line 5037 — not run."
+    },
+    {
+      "id": "fx-enforcechannelstrip-shadow-channel-never-strips",
+      "proposed": "Call enforceChannelStrip on a layer with ld.channel='shadow' against a Path with both colors set; expect both colors UNCHANGED — verifies line 5040 — not run."
+    },
+    {
+      "id": "fx-convertlayertostrokefillshadowfolder-creates-three-linked-siblings",
+      "proposed": "Call convertLayerToStrokeFillShadowFolder on a layer with one keyframe containing a stroked+filled Path; expect 3 new sibling layers (Stroke/Fill/Shadow suffix names), each with the SAME linkGroupId, the original layer removed, and the Shadow layer's own frame strokes empty — verifies lines 5091-5104 — not run."
+    },
+    {
+      "id": "fx-convertlayertostrokefillshadowfolder-raster-routes-to-fill",
+      "proposed": "Convert a layer whose only content is a Raster; expect it to appear ONLY in the Fill channel's frames, absent from Stroke and Shadow — verifies splitFrame's `if(sd.isRaster)return channel==='fill'` at line 5074 — not run."
+    },
+    {
+      "id": "fx-convertlayertostrokefillshadowfolder-shadowtag-excludes-from-stroke-fill",
+      "proposed": "Convert a layer with one item tagged channelTag='shadow' (both stroke and fill colors set) alongside one ordinary stroked-and-filled item; expect the shadow-tagged item to appear ONLY in Shadow (both colors intact) and the ordinary item to appear in BOTH Stroke (fill nulled) and Fill (stroke nulled), never in Shadow — verifies lines 5072-5088 — not run."
+    },
+    {
+      "id": "fx-convertlayertostrokefillshadowfolder-refuses-component-or-lfs-source",
+      "proposed": "Call convertLayerToStrokeFillShadowFolder on a layer with symbolId set; expect an early return (showToast called, zero new layers created, state.layers unchanged in length) — verifies line 5061 — not run."
+    }
+  ],
+  "future_proposals": [
+    "The issue's own prompt text asked to record loadFrame's own duplicator pass (`applyLayerDuplicator`/`isDuplicatorCopy`) and Paper-layer visibility/lock/opacity mirroring as part of this function's sequence; neither exists in loadFrame's own body (see `boundaries`). A future pass across the C21 series should double-check whether any OTHER slice's own prompt text makes a similar assumption about where a cross-cutting concern actually lives, since getting this wrong here cost a re-read of the whole function body to confirm the negative. Not changed here.",
+    "The eye/solo public API (`setElemHidden`/`setElemSolo`/`elemIsHidden`/`elemIsSoloed`) has exactly ONE external caller (shapes-panel.js) reached exclusively through `window.`-prefixed property forms, never a bare call. A future maintainer adding a SECOND caller (e.g. a timeline.js per-element row, if that feature is ever built) should keep using the same `window.` form for consistency, or the next census leaf reading this function will need the SAME two-pass grep methodology (bare-paren AND property-form) this census needed. Not changed here.",
+    "`saveActiveLayerFrameOrPromote`'s Animation-2D branch promotes a held frame to a keyframe UNCONDITIONALLY, with no content-diff gate analogous to C21o's own `_maybePromoteInterpolated` — every one of its 14 call sites is already gated behind a real edit gesture (flip/align/distribute/gradient-edit/etc.), so this is very likely correct, but it means calling this function from a FUTURE, less-obviously-edit-gated site (a read-only preview action, say) would silently mint a real keyframe with no way to tell afterward whether anything actually changed. Not changed here — flagged for whoever adds the next caller.",
+    "`syncLinkedKeyframeFolder`'s sibling-frame `strokes=[]` initialization on promotion (line 5018) only fires when the sibling frame had NO strokes array at all — an already-non-empty sibling frame that gets promoted from held to keyframe keeps whatever content it already had, which is correct for the Stroke/Fill/Shadow use case (each channel keeps its own content) but was not verified against every OTHER caller of this function (the 5 labs files, none of which were read beyond their own single call site) — out of this census's read-only scope."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "All ten proposed packet boundaries (contract item, `sed -n` verification) matched the issue's own proposed table EXACTLY on both range and classification (code/comment/blank) — independently re-derived with a standalone Python port of the validator's own classify() algorithm run against `git show 59a5a38c:src/js/app.js`, once per packet and once for the 383-line total (185/198/0). No boundary correction was needed anywhere in this scope.",
+    "`loadFrame`'s complete caller list was derived by a recursive `grep -rnE '(^|[^a-zA-Z_.])loadFrame\\(' --include='*.js' src`, returning 34 distinct calling files (33 external + app.js) — matching the issue's own `~34 files` estimate exactly, with no separate property-form pass needed since every `window.loadFrame` GUARD's own bare call is already caught by the same regex on the same line.",
+    "The element eye/solo public functions required a SECOND, broader grep pass (`grep -rln` with no trailing-paren anchor) beyond the standard bare-call regex, because their real and only external caller (shapes-panel.js) uses `window.`-prefixed property forms exclusively — the bare-call regex alone reports zero external callers for all four functions, which would have been a false negative. This directly matches the issue's own warning (\"C21n showed bare-call grep misses SM-literal wrappers\") though the actual wrapper shape found here (a `window.<name>(...)` property access, not a `window.SM={...}` object literal) differs from that warning's own literal example — see `boundaries`/`reconciliation` for the full correction, including that the issue's own guess of `timeline.js` as the caller was itself incorrect (shapes-panel.js is the real one).",
+    "`layerIsEffectivelyVisible`'s complete caller list was independently re-derived and matches the issue's own named list EXACTLY: export.js, engine-bridge.js, select-bridge.js, labs/reference-fill.js, labs/oca-export.js, labs/storyboard-mode.js, plus app.js's own 3 internal callers.",
+    "`saveActiveLayerFrameOrPromote`'s and `syncLinkedKeyframeFolder`'s complete caller lists were independently re-derived and match the issue's own named lists EXACTLY: tools.js/gradient-bridge.js/timeline.js for the former, tools.js (ensureKeyframe) + exactly 5 labs files for the latter.",
+    "`convertLayerToStrokeFillShadowFolder`'s complete caller list was independently re-derived and matches the issue's own named list (timeline.js) exactly — the actual call arrives through a property-method literal on timeline.js's own command-table object, not a bare call.",
+    "`elemHidden`'s complete cross-file reader/writer list was independently re-derived by a whole-src grep: one writer (serP, C21c), and readers split into a LIVE-item group (desP which converts it to `visible=false`, plus engine-bridge.js's buildSceneJson/onionLayerItems reading that resulting `visible` flag) and a DICT-side group (export.js, group-bridge.js) — with select-bridge.js and tweens.js, both named in the issue's own prompt text as expected readers, confirmed to have ZERO references to the flag at all (see `boundaries` for the corrected explanation of why select-bridge needs no explicit reader).",
+    "`_justEnsuredKeyframeAt`'s complete cross-file set/read site list was located by a single grep (`grep -rn _justEnsuredKeyframeAt`), confirming exactly two producers (tools.js's ensureKeyframe, and this scope's own saveActiveLayerFrameOrPromote) and one consumer (C21o's saveActiveLayerFrame) exist anywhere in the codebase."
+  ],
+  "validation": {
+    "expected_assigned_lines": 383,
+    "expected_classification": {
+      "code": 185,
+      "comment": 198,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        4729,
+        4829
+      ],
+      [
+        4830,
+        4853
+      ],
+      [
+        4854,
+        4876
+      ],
+      [
+        4877,
+        4914
+      ],
+      [
+        4915,
+        4946
+      ],
+      [
+        4947,
+        4989
+      ],
+      [
+        4990,
+        5006
+      ],
+      [
+        5007,
+        5023
+      ],
+      [
+        5024,
+        5043
+      ],
+      [
+        5044,
+        5111
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by a standalone Python port of the validator's own classify() run against the frozen blob: 4729-4829=(31,70,0); 4830-4853=(2,22,0); 4854-4876=(23,0,0); 4877-4914=(23,15,0); 4915-4946=(14,18,0); 4947-4989=(21,22,0); 4990-5006=(6,11,0); 5007-5023=(17,0,0); 5024-5043=(8,12,0); 5044-5111=(40,28,0); sums to (185,198,0)=383 — identical to the issue's own proposed union and per-packet table exactly; no boundary correction needed.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 383 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21p-app-frame-materialisation-visibility.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21o-app-frame-persistence-core.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21n-app-conversions-view-switching.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21m-app-release-to-layers-merge.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21l-app-component-creation.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21k-app-get-effective-strokes.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21j-app-symbol-frame-layer-time-model.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21i-app-rig-deform-ik.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21h-app-rig-model-binding.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21g-app-duplicator-runtime.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21f-app-symbol-matrix-duplicator-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21d-app-desp-relink-remote-merge.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21c-app-path-serialisation-serp.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21p.py engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json <candidate-sha> still exits 0"
+    ]
+  }
+}
