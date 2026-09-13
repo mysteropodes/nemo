@@ -1,0 +1,420 @@
+{
+  "census_id": "C19r",
+  "issue": 1177,
+  "title": "Layer-panel icon SVG constants, colour labels, parent descendants and the parent pickwhip",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C19r census only; P30 (timeline.js runtime writer), C20e/#1152 (motion.js `renderParentRow`'s dropdown-and-pickwhip Layer Properties panel, 8083-8284, and Motion's `setLayerParent`/`setLayerParentB`/`wouldCreateParentCycle`/`parentChainMats`/`ensureLayerUid`/`findLayerIndexByUid`, 3519-3990ish — cited by call site only, not re-mapped), the next census leaf covering `buildParentMenuItems`/`buildParentCell` (timeline.js:5942 onward, the dropdown counterpart to this scope's pickwhip), app.js (`LAYER_COLOR_PALETTE`/`nextLayerColor`, 375-376), color-picker.js (`window.ColorPicker.open`), shapes-panel.js (`ICO_COMBINE_*`/`ICO_EYE`/`ICO_IMAGE`/`ICO_GROUP` consumers), camera.js and layer-kind.js (`ICO_EYE`/`ICO_3D` references), and every other named owner remain separate",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "1bfcbad1eea9ab810ee87cfd6bc18306b2533ee8",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19r-timeline-layer-icons-colors-pickwhip",
+  "assigned_ranges": [
+    {
+      "start": 5710,
+      "end": 5941
+    }
+  ],
+  "coverage_note": "Exactly 232 assigned lines occur once across six packets (one coverage_range per packet, no gaps, no other-owner exclusions): 132 code, 100 full-line `//` comments, 0 blank — matches the issue's proposed union exactly (independently re-derived by classifying the frozen blob programmatically, not merely copied from the issue table). Line 5709 is C19q's closing brace of `startFolderRename` (out of scope, C19q's last line); line 5710 opens this scope's icon-SVG lead-in comment (`// Real icon-handoff SVGs (v5)...`). Line 5941 is the closing brace of `startParentPickwhip`; line 5942 begins the next leaf's lead-in comment for `buildParentMenuItems` (excluded). The issue's own prose says 'the eight functions' while its packet table enumerates nine named function symbols (`icoCombineSubtract`, `icoCombineIntersect`, `openLayerColorSwatches`, `layerColorTargets`, `applyLayerColor`, `selectLayersByColor`, `parentDescendants`, `_layerIndexByUid`, `startParentPickwhip`); this artifact documents callers for all nine rather than guessing which one the prose meant to drop — see `boundaries`.",
+  "source_baselines": {
+    "pinned": "59a5a38c:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (1bfcbad1eea9ab810ee87cfd6bc18306b2533ee8, PR #1174/C19q merged) has the identical timeline.js blob (git rev-parse 1bfcbad:src/js/timeline.js == git rev-parse 59a5a38c:src/js/timeline.js == cc4cfd27...); this artifact branches from origin/main at 1bfcbad.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes are read as authorial intent, not fresh execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19r-timeline-layer-icons-colors-parent-pickwhip.json and the six timeline.js packets partitioning lines 5710-5941.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "parent_semantics_boundary": "`ld.parentLayerUid` semantics belong to Motion (motion.js `parentChainMats`/`legacyParentChainMats`, 3929/3937, C20e/#1152's territory) — this scope cites the reader and its sole writer by line number only and does not re-describe the chain-composition algorithm or the multi-parent crossfade (`parentLayerUidB`, `blendedAncestorMat`) it also feeds. The ONE writer of `ld.parentLayerUid` from either UI surface is `SMMotion.setLayerParent` (motion.js:3618, the field assignment itself at 3654: `ld.parentLayerUid = parentUid || null;`), confirmed by grep: no line inside 5710-5941 assigns `.parentLayerUid` directly — `startParentPickwhip`'s own `onUp` (5932) calls `M.setLayerParent(li, M.ensureLayerUid(state.layers[t.idx]))`, exactly the same call the dropdown path (`buildParentMenuItems`, next leaf, timeline.js:5951-5952 `M.setLayerParent(li,null)`, and its per-layer items further down, out of scope) and Motion's own Layer Properties panel (`renderParentRow`, motion.js:8083-8284, C20e/#1152) both make — three UI surfaces, one writer.",
+    "owners": "The next census leaf (not yet numbered at authoring time) retains `buildParentMenuItems` (timeline.js:5947, declaration) and `buildParentCell` (timeline.js:6104, out of scope) — the 'dropdown path' `startParentPickwhip`'s own lead-in comment (5889) refers to; this scope cites only `buildParentCell`'s pickwhip-icon mousedown call site (timeline.js:6122, `pick.addEventListener('mousedown',function(e){startParentPickwhip(li,pick,e);});`) and `buildParentMenuItems`'s own call to `parentDescendants` (timeline.js:5950, out of scope), not either function's body. motion.js/C20e (#1152, PR merged) retains `renderParentRow` (8083-8284) including its own pickwhip-icon mousedown (motion.js:8160, `pick.addEventListener('mousedown', function (e) { startParentPickwhip(li, pick, e); });`) and its Parent A/B dropdown items calling `SMMotion.setLayerParent`/`setLayerParentB` directly (out of scope, not this scope's own call sites); motion.js also retains `setLayerParent` (3618, the sole `ld.parentLayerUid` writer, at 3654), `setLayerParentB` (3673), `wouldCreateParentCycle` (3575, the cycle guard `setLayerParent`/`setLayerParentB` call, NOT called from this scope — `startParentPickwhip`'s own cycle avoidance is purely the disabled/skip-hit-test behavior driven by this scope's own `parentDescendants`, a client-side convenience so a doomed drop never even highlights a row; the actual refusal backstop lives in `setLayerParent`), `ensureLayerUid` (3519, called from `startParentPickwhip` at 5932 and from `parentDescendants` transitively via `findLayerIndexByUid`, 3564), and `parentChainMats`/`legacyParentChainMats` (3929/3937, the chain-composition reader wired into engine-bridge/export/native-video, never called from anywhere in 5710-5941). app.js retains `LAYER_COLOR_PALETTE`/`nextLayerColor` (375-376, the swatch list `openLayerColorSwatches` iterates and the auto-assignment new layers already use, matched by design per the packet's own lead-in comment) and `pushUndoLayers`/`pushUndo`/`renderLayerList`/`renderTimeline`/`showToast`/`SM.setActiveLayer` (all out of scope, called by this scope's functions but declared elsewhere). color-picker.js retains `window.ColorPicker.open`/`.wireColorSwatches`/`.close` (276, the full SV/hue/hex picker `openLayerColorSwatches`'s own '+' custom button falls through to, out of scope). shapes-panel.js retains its own consumers of `ICO_COMBINE_UNITE`/`ICO_COMBINE_EXCLUDE`/`ICO_COMBINE_NONE` (225-229, the group-row combine-mode indicator) and of `ICO_EYE`/`ICO_EYE_CLOSED`/`ICO_IMAGE`/`ICO_GROUP` (640-802, the Elements panel's own eye/raster/group icons) plus `icoCombineSubtract`/`icoCombineIntersect` (226-227, the only external callers of either function). camera.js retains its own `ICO_EYE`/`ICO_EYE_CLOSED` reference (368, the camera-view toggle icon) and layer-kind.js a `//` comment mention only (56, no runtime reference).",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "next census leaf (buildParentMenuItems/buildParentCell, not yet numbered, existing timeline.js territory)",
+      "disposition": "Retains timeline.js:5942 onward (`buildParentMenuItems`, declared 5947) and `buildParentCell` (6104, out of scope) — the dropdown counterpart this scope's `startParentPickwhip` lead-in comment (5889) calls 'the dropdown path below.' This scope cites only `buildParentCell`'s pickwhip mousedown call site (6122) and `buildParentMenuItems`'s own `parentDescendants` call (5950), never reproducing either body."
+    },
+    {
+      "owner": "motion.js / C20e-#1152 (existing owner, PR merged)",
+      "disposition": "Retains `renderParentRow` (8083-8284, its own pickwhip mousedown at 8160 is this scope's second external caller of `startParentPickwhip`) and the entire parent data model this scope's own `startParentPickwhip`/`parentDescendants` read/write through: `setLayerParent` (3618, sole `ld.parentLayerUid` writer at 3654), `setLayerParentB` (3673), `wouldCreateParentCycle` (3575), `ensureLayerUid` (3519), `findLayerIndexByUid` (3564) and `parentChainMats`/`legacyParentChainMats` (3929/3937). None of these six functions' bodies are reproduced here; each is cited only by line number, per the issue's explicit 'cite C20e, do not re-map' instruction."
+    },
+    {
+      "owner": "app.js (existing owner)",
+      "disposition": "Retains `LAYER_COLOR_PALETTE`/`nextLayerColor` (375-376, consumed by `openLayerColorSwatches`'s swatch loop, packet 2) and the shared re-render/undo primitives (`pushUndoLayers`, `pushUndo`, `renderLayerList`, `renderTimeline`, `showToast`, `SM.setActiveLayer`) this scope's five state-writing functions call — none of these primitives' own bodies are reproduced."
+    },
+    {
+      "owner": "color-picker.js (existing owner)",
+      "disposition": "Retains `window.ColorPicker.open`/`.wireColorSwatches`/`.close` (276) — `openLayerColorSwatches`'s '+' custom-swatch button (5779) falls through to `.open` only; cited by call site, not reproduced."
+    },
+    {
+      "owner": "shapes-panel.js (existing owner)",
+      "disposition": "Retains its own consumers of `ICO_COMBINE_UNITE`/`ICO_COMBINE_EXCLUDE`/`ICO_COMBINE_NONE` (225,228,229) and `icoCombineSubtract`/`icoCombineIntersect` (226,227 — the only two call sites of either function anywhere in src/js) plus `ICO_EYE`/`ICO_EYE_CLOSED`/`ICO_IMAGE`/`ICO_GROUP` (640,652,696,802) for the Elements panel's own rows — none of shapes-panel.js's own row-building code is reproduced here."
+    },
+    {
+      "owner": "camera.js / layer-kind.js (existing owners)",
+      "disposition": "camera.js retains its own `ICO_EYE`/`ICO_EYE_CLOSED` camera-view-toggle consumer (368, plus a `//` comment at 363); layer-kind.js has only a `//` comment mention of `ICO_3D` (56, excluded per the issue's instruction to exclude `//` lines) and no runtime reference. Neither file's own code is reproduced."
+    },
+    {
+      "owner": "motion.js (existing owner, icon/color consumers outside C20e's own range)",
+      "disposition": "Retains `renderLayerListMotion`'s own icon-dot rendering (7171-7196, `ICO_EYE`/`ICO_EYE_CLOSED`/`ICO_LOCK`/`ICO_UNLOCK`/`ICO_3D`/`ICO_DUP` and the `openLayerColorSwatches`/`applyLayerColor`/`selectLayersByColor` call sites at 7171-7172,7180) and a rig-widget expression-control colour swatch (8850-8852, `openLayerColorSwatches` reused for a non-layer colour value, `commitControlValue`) — neither reproduced, cited by call site only."
+    },
+    {
+      "owner": "timeline.js (existing owner, same-file consumers outside 5710-5941)",
+      "disposition": "Retains its own eye/lock icon renderers for the frame-grid folder-header row (6379,6381), the Animation 2D layer row (6453,6458,6469,6472) and the master-toggle helper (638,644) — all `ICO_*` consumers, none reproduced; also retains `_layerIndexByUid`'s three in-file callers (6108,6117,6576) and `parentDescendants`'s second in-file caller (5950, inside `buildParentMenuItems`, next leaf) as call sites only."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 5709 (C19q's closing brace of `startFolderRename`) is outside coverage; line 5710 (the icon-SVG lead-in comment) begins this scope.",
+    "Line 5941 (closing brace of `startParentPickwhip`) is the last line of this scope; line 5942 opens the next leaf's `buildParentMenuItems` lead-in comment and is excluded.",
+    "No lines inside 5710-5941 are excluded for another owner: every line belongs to exactly one of the six packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "The issue's prose says 'the eight functions' but its own packet table names nine functions (`icoCombineSubtract`, `icoCombineIntersect`, `openLayerColorSwatches`, `layerColorTargets`, `applyLayerColor`, `selectLayersByColor`, `parentDescendants`, `_layerIndexByUid`, `startParentPickwhip`). Rather than silently drop one, this artifact documents callers for all nine (see each packet's `callers` and the `ICO_/function caller inventory` below) and flags the count mismatch here with source evidence (the packet table itself) for the reviewer to reconcile — no source or scope change follows from this note.",
+    "`wouldCreateParentCycle` (motion.js:3575) is NOT called from anywhere inside 5710-5941: `parentDescendants` (this scope) independently walks the reverse parent graph to pre-disable/skip-hit-test candidate drop targets in the UI, while `setLayerParent`/`setLayerParentB` (motion.js, out of scope) independently call `wouldCreateParentCycle` as the actual refusal backstop before writing `ld.parentLayerUid`. The two mechanisms are complementary, not the same code path — confirmed by grep, `wouldCreateParentCycle` has zero references inside this scope's own lines."
+  ],
+  "areas": [
+    {
+      "area": "layer-panel-icon-svg-constants",
+      "packets": [
+        {
+          "id": "C19r.icon-svg-constants",
+          "files": [
+            "src/js/timeline.js:5710-5763"
+          ],
+          "coverage_ranges": [
+            [5710, 5763]
+          ],
+          "classification": {"code": 13, "comment": 41, "whitespace": 0},
+          "symbols": ["ICO_EYE", "ICO_EYE_CLOSED", "ICO_LOCK", "ICO_UNLOCK", "ICO_3D", "ICO_DUP", "ICO_GROUP", "ICO_IMAGE", "ICO_COMBINE_UNITE", "ICO_COMBINE_EXCLUDE", "ICO_COMBINE_NONE", "icoCombineSubtract", "icoCombineIntersect"],
+          "signature": "var ICO_EYE, ICO_EYE_CLOSED, ICO_LOCK, ICO_UNLOCK, ICO_3D, ICO_DUP, ICO_GROUP, ICO_IMAGE, ICO_COMBINE_UNITE, ICO_COMBINE_EXCLUDE, ICO_COMBINE_NONE; function icoCombineSubtract(uid); function icoCombineIntersect(uid)",
+          "responsibility": "Eleven inline-SVG string constants plus two id-suffixed SVG-string factory functions, replacing an earlier Material Symbols icon-font codepoint scheme across every layer-row/Elements-panel icon in the app — chosen specifically because the embedded font is a subsetted build containing only already-referenced codepoints, so an unreferenced glyph renders silently blank.",
+          "behavior": [
+            "3-line lead-in comment (5710-5712): real icon-handoff SVGs (v5) replace Material Symbols codepoints — no risk of a codepoint missing from the subsetted embedded font; cross-references 'the lock-icon comment below' (timeline.js:6454-6457, out of scope, the actual bug narrative: Material Symbols' `lock_open` codepoint wasn't in the subset and rendered totally blank).",
+            "`ICO_EYE` (5713): open-eye outline + solid pupil circle, `stroke-width=1.8`.",
+            "8-line comment (5714-5721): v11 added a distinct closed-eye icon for the hidden state instead of dimming the same open-eye glyph via `.off`, so 'hidden' reads at a glance; v14 added an explicit `fill=\"currentColor\"` because SVG's own spec default fill (black) was silently overriding the CSS `color` this icon is meant to follow (`.lico.off{color:var(--text-dark)}`), which is exactly why the closed-eye icon had rendered solid black instead of the dim gray every other 'off' icon uses.",
+            "`ICO_EYE_CLOSED` (5722): a single multi-segment `fill=\"currentColor\"` path (crossed-out-eye glyph).",
+            "`ICO_LOCK` (5723): filled rounded body rect + open-shackle stroke path.",
+            "`ICO_UNLOCK` (5724): identical body, shackle path rotated open (`M8 11V8a4 4 0 017.6-1.8`).",
+            "4-line comment (5725-5728): 3D layer toggle (2026-07-28, After-Effects-style) — isometric cube wireframe, plain inline SVG like every other row icon, not an icon-font glyph, per this project's own subsetted-font constraint (CLAUDE.md).",
+            "`ICO_3D` (5729): isometric cube outline (hexagon perimeter path + three internal edges).",
+            "3-line comment (5730-5732): Mograph duplicator toggle (2026-07-29) — 2×2 grid of squares, one filled (the seed) and three outlined (the copies), same inline-SVG convention as `ICO_3D`.",
+            "`ICO_DUP` (5733): four `<rect>` elements, one `fill=currentColor` (seed) and three `fill=none stroke=currentColor` (copies).",
+            "4-line comment (5734-5737): Elements panel (2026-08, shapes-panel.js) group/raster-entry icons, same inline-SVG convention, replacing text/emoji glyphs (▤/🖼) that were font/emoji-rendering-dependent — quotes Cyril: \"les icônes aussi sont flat design ?\".",
+            "2-line comment (5738-5739): frame-corner brackets for 'group' — the same shorthand Figma's own layers panel uses for a group row.",
+            "`ICO_GROUP` (5740): four corner-bracket path segments, `stroke-linecap/linejoin=round`.",
+            "`ICO_IMAGE` (5741): rounded-rect frame + small filled circle (sun) + a mountain-silhouette path.",
+            "8-line comment (5742-5751): Combined Shape mode icons (2026-08, Elements panel group row) — EXACT SAME markup as the toolbar's own `#btn-combine-*` buttons (index.html), copied verbatim (not read from the DOM) so the panel's indicator always matches the toolbar even though they are two separate elements; `ICO_COMBINE_NONE` is new (the toolbar itself has no 'no combine' button) — two plain outlined circles, no fill relationship, for `combineMode==='none'`.",
+            "`ICO_COMBINE_UNITE` (5752): two overlapping filled circles via a single compound `<path>` (non-zero fill-rule, both circle interiors solid).",
+            "`ICO_COMBINE_EXCLUDE` (5753): the identical two-circle compound path with `fill-rule=\"evenodd\"` — the overlap punches out instead of merging.",
+            "`ICO_COMBINE_NONE` (5754): two separate outlined circles, `opacity=0.55`, no shared path/mask/clip.",
+            "5-line comment (5755-5759): Subtract/Intersect reference an SVG `<mask>`/`<clipPath>` by id — a plain constant string would collide the instant two-or-more groups show this icon at once (duplicate DOM ids resolve to whichever element the browser finds first, silently rendering the WRONG icon on every group after the first); solved by functions taking a caller-supplied unique suffix.",
+            "2-line comment continuation (5760-5761): group-bridge.js/shapes-panel.js pass the group's own `gid`, already unique per document by construction.",
+            "`icoCombineSubtract(uid)` (5762): builds `m='ic-csub-'+uid`, returns an SVG with a `<mask id=m>` (white filled circle minus black filled circle) applied to a `currentColor` circle, plus an outlined second circle at `opacity=0.45`.",
+            "`icoCombineIntersect(uid)` (5763): builds `c='ic-cint-'+uid`, returns an SVG with a `<clipPath id=c>` (second circle) applied to a `currentColor` first circle, plus two outlined circles at `opacity=0.4`."
+          ],
+          "callers": [
+            "ICO_EYE/ICO_EYE_CLOSED: src/js/timeline.js:638,644 (a master-toggle icon helper, out of scope), 6379,6381 (folder-header row eye/lock icons — 6381 is ICO_LOCK/ICO_UNLOCK, listed under that constant below), 6453 (Animation 2D layer row eye icon); src/js/motion.js:7177 (`renderLayerListMotion`'s own eye icon); src/js/shapes-panel.js:652 (Elements panel row eye icon, ternary reversed: `hidden ? ICO_EYE_CLOSED : ICO_EYE`); src/js/camera.js:368 (camera-view toggle, `state.cameraView ? ICO_EYE : ICO_EYE_CLOSED`).",
+            "ICO_LOCK/ICO_UNLOCK: src/js/timeline.js:6381 (folder-header row lock icon), 6458 (Animation 2D layer row lock icon); src/js/motion.js:7180 (`renderLayerListMotion`'s own lock icon).",
+            "ICO_3D: src/js/timeline.js:6469 (Animation 2D layer row 3D toggle); src/js/motion.js:7190 (`renderLayerListMotion`'s own 3D toggle).",
+            "ICO_DUP: src/js/timeline.js:6472 (Animation 2D layer row duplicator toggle); src/js/motion.js:7196 (`renderLayerListMotion`'s own duplicator toggle).",
+            "ICO_GROUP: src/js/shapes-panel.js:802 (Elements panel group-row swatch, `else gswatch.innerHTML = ICO_GROUP;`).",
+            "ICO_IMAGE: src/js/shapes-panel.js:696 (Elements panel raster-entry swatch, `if (entry.sd.isRaster) { swatch.classList.add('icon'); swatch.innerHTML = ICO_IMAGE; }`).",
+            "ICO_COMBINE_UNITE/ICO_COMBINE_EXCLUDE/ICO_COMBINE_NONE: src/js/shapes-panel.js:225,228,229 (a group-row combine-mode-icon selector function, `if (mode === 'unite') return ICO_COMBINE_UNITE;` etc., out of scope).",
+            "icoCombineSubtract: src/js/shapes-panel.js:226 (`if (mode === 'subtract') return icoCombineSubtract(uid);`) — the only call site anywhere in src/js besides the declaration.",
+            "icoCombineIntersect: src/js/shapes-panel.js:227 (`if (mode === 'intersect') return icoCombineIntersect(uid);`) — the only call site anywhere in src/js besides the declaration.",
+            "Comment-only mentions (excluded per the issue's instruction to exclude `//` lines): src/js/camera.js:363 (`ICO_EYE`/`ICO_EYE_CLOSED`, explaining the no-color-emoji choice); src/js/layer-kind.js:56 (`ICO_3D`, describing an unrelated wireframe render at the same 12px size); src/js/shapes-panel.js:640 (`ICO_EYE`/`ICO_EYE_CLOSED`, lead-in to its own eye-icon row); src/js/timeline.js:5732 (self-referential, `ICO_3D` inside the `ICO_DUP` lead-in comment), 5746 (self-referential, `ICO_COMBINE_NONE` inside its own lead-in comment), 6487 (a diamond-glyph comment noting visual similarity to `ICO_3D`'s hexagon)."
+          ],
+          "effects": "No document write of any kind — eleven `var` string-literal assignments and two pure string-building functions with no side effects (no DOM mutation, no `state` read/write, no `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`renderLayerList`/`renderTimeline`/`updateUI` call). Executed once at script load (the eleven `var`s) or on demand with no persistent effect (the two functions, called fresh per render by shapes-panel.js)."
+        }
+      ]
+    },
+    {
+      "area": "layer-color-labels",
+      "packets": [
+        {
+          "id": "C19r.layer-color-swatches",
+          "files": [
+            "src/js/timeline.js:5764-5790"
+          ],
+          "coverage_ranges": [
+            [5764, 5790]
+          ],
+          "classification": {"code": 22, "comment": 5, "whitespace": 0},
+          "symbols": ["openLayerColorSwatches"],
+          "signature": "openLayerColorSwatches(anchorEl, currentHex, onPick)",
+          "responsibility": "Opens a small predefined-swatch popover ('nuancier') anchored under a layer's colour dot, so a colour change is one click against `LAYER_COLOR_PALETTE` (app.js:375) instead of the full SV/hue/hex `ColorPicker`; a trailing '+' cell falls through to that full picker for an arbitrary custom colour.",
+          "behavior": [
+            "6-line lead-in comment (5764-5769 minus the declaration line): v5 predefined-swatch picker instead of jumping straight to the full picker; reuses `LAYER_COLOR_PALETTE` (app.js) so the choices match the colours new layers already auto-get (`nextLayerColor`, app.js:376); a '+' cell falls through to the full picker.",
+            "Function declaration (5769): `function openLayerColorSwatches(anchorEl,currentHex,onPick){`.",
+            "Stale-popover removal (5770): `var old=document.getElementById('layer-color-swatches');if(old)old.remove();` — at most one instance of this popover exists at a time.",
+            "Popover shell (5771): creates a `div#layer-color-swatches.lcs-pop`.",
+            "Swatch loop (5772-5777): `LAYER_COLOR_PALETTE.forEach(...)` builds one `button.lcs-swatch` per palette colour, marking the currently-selected one with a `.sel` class via a case-insensitive hex compare (5773), sets `style.background`/`title` to the hex, and wires `click` (5775) to `e.stopPropagation();onPick(hex);pop.remove();` — dismissing the popover on pick.",
+            "Custom '+' cell (5778-5780): a `button.lcs-swatch.lcs-custom` with text `'+'`, whose click (5779) removes this popover and calls `window.ColorPicker.open(anchorEl,currentHex,onPick)` (color-picker.js:276, out of scope) — the SAME `onPick` callback the caller supplied, so both paths converge on one write site in the caller.",
+            "Insertion and positioning (5781-5784): appends `pop` to `document.body`, then clamps its left position to stay on-screen (`Math.min(r.left,window.innerWidth-pop.offsetWidth-8)`) and places it just below the anchor (`r.bottom+4`).",
+            "Outside-click dismissal (5785-5789): deferred via `setTimeout(...,0)` (so the triggering click itself doesn't immediately close the popover it just opened) — registers a one-shot `mousedown` listener on `document` that removes `pop` and itself when the click lands outside it."
+          ],
+          "callers": [
+            "src/js/timeline.js:6450 — a layer row's colour-dot click handler: `openLayerColorSwatches(cdot,state.layers[myLi]&&state.layers[myLi].color||'#8b8b9e',function(hex){applyLayerColor(myLi,hex);});` (out of scope; the `onPick` callback is this scope's own `applyLayerColor`).",
+            "src/js/motion.js:7171-7174 — `renderLayerListMotion`'s own colour-dot click handler: `openLayerColorSwatches(cdot, ld.color || '#8b8b9e', function (hex) { if (window.applyLayerColor) applyLayerColor(li, hex); else { ld.color = hex; renderTimeline(); } });` — the same `applyLayerColor` delegate with an inline fallback if it isn't loaded.",
+            "src/js/motion.js:8852 — a rig-widget expression-control colour swatch (out of scope, unrelated to layer colour): `openLayerColorSwatches(csw, rgba255ToHex(crgba), function (hex) { commitControlValue(hexToRgba255(hex)); });` — reuses the same popover for an arbitrary RGBA control value, not `ld.color`.",
+            "A whole-`src/js` grep for `openLayerColorSwatches` at the frozen SHA finds exactly these three call sites plus the declaration (5769) and one further textual (`//` comment) mention — motion.js:10112 (\"openLayerColorSwatches offers 8 fixed label...\") — excluded per the issue's instruction to exclude `//` lines; no other file calls it."
+          ],
+          "effects": "Reads `LAYER_COLOR_PALETTE` (app.js:375, out of scope) and `currentHex`/`anchorEl`. Writes only DOM (creates/removes the popover element and its swatch buttons); the actual `ld.color`/`state.layers[i].color` document write happens later, inside whichever `onPick` callback the caller supplied (this scope's own `applyLayerColor` in both layer-colour call sites) — `openLayerColorSwatches` itself never touches `state`, never calls `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`renderLayerList`/`renderTimeline`/`updateUI`."
+        },
+        {
+          "id": "C19r.layer-color-apply-select",
+          "files": [
+            "src/js/timeline.js:5791-5829"
+          ],
+          "coverage_ranges": [
+            [5791, 5829]
+          ],
+          "classification": {"code": 23, "comment": 16, "whitespace": 0},
+          "symbols": ["layerColorTargets", "applyLayerColor", "selectLayersByColor"],
+          "signature": "layerColorTargets(li); applyLayerColor(li, hex); selectLayersByColor(hex)",
+          "responsibility": "Two behaviours hung off the one colour dot every layer row already has (2026-09, feedback #776, quoted in-source): assign a picked colour to the whole current multi-selection when the clicked row is part of it, and Shift+click a dot to select every layer sharing that same colour — mirroring After Effects' own label-colour column, shared verbatim by Animation 2D's rows (`renderLayerList`) and Motion's (`motion.js`).",
+          "behavior": [
+            "9-line lead-in comment (5791-5799, split across two comment blocks): introduces both behaviours as a pair hung off the same dot, both already present in AE's own label column; shared by Animation 2D and Motion 'because it is the same control on the same layers seen from two views.'",
+            "3-line comment (5799-5802) directly preceding `layerColorTargets`: a colour picked while several layers are selected AND the clicked row is one of them paints the WHOLE selection; a dot clicked outside the selection still means just that one layer — otherwise recolouring one row's dot would silently repaint layers the user forgot were selected.",
+            "`layerColorTargets(li)` (5803-5805): `return (_layerSel.length>1&&_layerSel.indexOf(li)>=0)?_layerSel.slice():[li];` — the ENTIRE targeting rule is membership in the current explicit multi-selection (`_layerSel`, declared in C19q's scope, timeline.js:5423, out of scope): there is no automatic cascade to a folder's members or a component's instances beyond whatever the user has already selected via `_layerSel` — a folder row or a component instance is targeted only if it is itself one of the selected indices, identically to any other layer.",
+            "`applyLayerColor(li,hex)` (5806-5813): resolves `targets=layerColorTargets(li)` (5807); `pushUndoLayers()` (5808, BEFORE any mutation); `targets.forEach(function(i){if(state.layers[i])state.layers[i].color=hex;})` (5809) — the sole document write, one `.color` field per targeted layer index, guarded by an existence check; `renderLayerList();renderTimeline();` (5810); a toast (5811) `SM.t('toastLayerColorApplied').replace('{n}',targets.length)` only `if(targets.length>1)` — a single-layer recolour is silent; returns `targets.length` (5812).",
+            "2-line comment (5814-5815) directly preceding `selectLayersByColor`: Shift+click on a dot selects every layer wearing that same colour, so a label doubles as a saved selection (quotes the feedback: \"les personnages en rouge\").",
+            "2-line comment continuation (5816-5817): `setActiveLayer` is called FIRST, then the list is built — because `setActiveLayer` collapses `_layerSel` to the layer it activates, the same ordering trap already documented for Motion's own marquee (feedback #769, out of scope).",
+            "`selectLayersByColor(hex)` (5818-5829): case-insensitive `want` (5819); linear scan `state.layers.forEach` collecting every index whose `.color` matches (5820); early-return 0 if no hits (5821); `SM.setActiveLayer(hits[0],true)` if available (5822, guarded — MUST run before the next line per the ordering comment above); `_layerSel=hits.slice();_layerSelAnchor=hits[0];` (5823) — the actual selection-state write; `SMMotion.syncBarSelToLayerSel()` if available (5824, keeps Motion's in/out bars in sync); `renderLayerList();renderTimeline();` (5825); `SMEngineBridge.renderNow()` if available (5826); a toast `toastLayersSelectedByColor` with the hit count (5827); returns `hits.length` (5828)."
+          ],
+          "callers": [
+            "layerColorTargets: src/js/timeline.js:5807 (its own sole caller, inside `applyLayerColor`) — a whole-`src/js` grep at the frozen SHA finds no other reference; not called from motion.js despite motion.js reusing `applyLayerColor` itself.",
+            "applyLayerColor: src/js/timeline.js:6450 (layer-row colour-dot `onPick` callback, `function(hex){applyLayerColor(myLi,hex);}`); src/js/motion.js:7172 (`renderLayerListMotion`'s own colour-dot `onPick` callback, guarded `if (window.applyLayerColor) applyLayerColor(li, hex);` with an inline `ld.color=hex;renderTimeline();` fallback). A whole-`src/js` grep finds exactly these two call sites plus the declaration (5806); no other file calls it.",
+            "selectLayersByColor: src/js/timeline.js:6449 (layer-row colour-dot click, `if(e.shiftKey){selectLayersByColor(state.layers[myLi]&&state.layers[myLi].color);return;}`); src/js/motion.js:7170 (`renderLayerListMotion`'s own Shift+click branch, guarded `if (e.shiftKey) { if (window.selectLayersByColor) selectLayersByColor(ld.color); return; }`). A whole-`src/js` grep finds exactly these two call sites plus the declaration (5818); no other file calls it."
+          ],
+          "effects": "`layerColorTargets`: reads `_layerSel` only, no write, no render call — a pure reader. `applyLayerColor`: reads `_layerSel` (via `layerColorTargets`) and `state.layers`; writes `state.layers[i].color` for every targeted index; calls `pushUndoLayers()` BEFORE the mutation, then `renderLayerList()`/`renderTimeline()` after, plus a conditional `showToast`. No `saveActiveLayerFrame`/`saveAllLayerFrames` call in either function — `color` is a layer-level field (`state.layers[i].color`), not per-frame data, so no frame-store write is needed for it to persist. `selectLayersByColor`: reads `state.layers[*].color`; writes `_layerSel`/`_layerSelAnchor` (selection state, not a layer document field) and calls `SM.setActiveLayer`/`SMMotion.syncBarSelToLayerSel`/`renderLayerList`/`renderTimeline`/`SMEngineBridge.renderNow`/`showToast`; no `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames` call — selecting layers is never undo-snapshotted, consistent with every other pure-selection writer in this codebase."
+        }
+      ]
+    },
+    {
+      "area": "parent-descendants-and-pickwhip",
+      "packets": [
+        {
+          "id": "C19r.parent-descendants",
+          "files": [
+            "src/js/timeline.js:5830-5874"
+          ],
+          "coverage_ranges": [
+            [5830, 5874]
+          ],
+          "classification": {"code": 19, "comment": 26, "whitespace": 0},
+          "symbols": ["parentDescendants"],
+          "signature": "parentDescendants(li)",
+          "responsibility": "Computes the set of every OTHER layer index that has `li` somewhere up its own parent chain (through EITHER parent slot) — layers that cannot legally become `li`'s parent without forming a cycle — so the pickwhip/dropdown UI can pre-disable or skip-hit-test those rows before the click, rather than only refusing after.",
+          "behavior": [
+            "10-line lead-in comment (5830-5839): restores AE's 'Parent & Link' column directly on the layer rows (2026-07-25, quotes feedback: \"il manque le système de parentage directement sur les calques comme dans after\"); the data model (`ld.parentLayerUid`), cycle refusal (`SMMotion.setLayerParent`) and chain composition (`parentChainMats`, wired into engine-bridge/export/native-video) already existed — the only way to reach them was a dropdown inside Motion's property panel, one layer at a time, only while expanded; motion.js's own comment calls that row \"AE's Parent & Link column reimagined\", which is exactly what this restores.",
+            "4-line comment (5841-5844): a context menu rather than a `<select>` — the layer panel is narrow and user-resizable, a native select would either clip its label or force the column wider than the panel; `showContextMenu` already gives dimmed disabled entries, outside-click dismissal and Escape for free.",
+            "Function declaration (5845): `function parentDescendants(li){`.",
+            "3-line comment (5846-5848): every layer with `li` somewhere up its own parent chain can't become its parent without a cycle; `setLayerParent` refuses those anyway, listing them as disabled here explains WHY before the click instead of after it.",
+            "Guard (5850): `var M=window.SMMotion; if(!M||!M.findLayerIndexByUid)return {};` — an empty result (nothing disabled) if Motion isn't loaded.",
+            "Init (5851): `var out={};`.",
+            "6-line comment (5852-5858): walks BOTH parent slots (2026-07-30, multi-parent) — a layer reachable only through someone's Parent B is just as much a descendant as one reachable through Parent A; missing this half wouldn't let an actual cycle through (the real backstop is `setLayerParent`/`setLayerParentB`'s own `wouldCreateParentCycle` guard, out of scope), but it WOULD leave that option un-greyed-out here, looking valid until the click refused it.",
+            "Outer scan (5859, `state.layers.forEach(function(other,oi){...})`): for every OTHER layer `other` at index `oi`.",
+            "Per-layer BFS-ish walk (5860-5871): `var queue=[other.parentLayerUid,other.parentLayerUidB].filter(Boolean),guard=0,seen={};` (5860, both slots seeded); `while(queue.length&&guard++<256){` (5861, a hard iteration cap against any already-broken cycle in the data); dequeue `cur` (5862), skip if already `seen[cur]` (5863-5864, cycle-safety inside the walk itself); resolve `pi=M.findLayerIndexByUid(cur)` (5865, motion.js:3564, out of scope); if `pi===li`, record `out[oi]=true` and `break` (5866) — `other` is a descendant of `li`; else if `pi>=0`, push that layer's OWN `parentLayerUid`/`parentLayerUidB` onto the queue to continue walking upward (5867-5870).",
+            "Return (5873): `return out;` — a fresh `{oi: true, ...}` map, no caching."
+          ],
+          "callers": [
+            "src/js/timeline.js:5895 — this scope's own `startParentPickwhip` (next packet): `var bad=parentDescendants(li);`.",
+            "src/js/timeline.js:5950 — the next census leaf's `buildParentMenuItems` (out of scope, dropdown path): `var bad=parentDescendants(li);`.",
+            "A whole-`src/js` grep for `parentDescendants` at the frozen SHA finds exactly these two call sites plus the declaration (5845) and one further textual (`//` comment) mention — app.js:2749 (\"(SMMotion.setLayerParent / parentDescendants): a visited set plus a hard...\", describing the cycle-guard family generally) — excluded per the issue's instruction to exclude `//` lines; no other file calls it."
+          ],
+          "effects": "Reads `state.layers[*].parentLayerUid`/`.parentLayerUidB` and calls `SMMotion.findLayerIndexByUid` (motion.js:3564, out of scope, itself a pure reader — a linear scan for a matching `layerUid`, no write). No document write, no `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`renderLayerList`/`renderTimeline`/`updateUI` call — a pure reader, worst case O(n²) over `state.layers` (one BFS-ish walk per layer, guarded at 256 iterations each)."
+        },
+        {
+          "id": "C19r.layer-index-by-uid",
+          "files": [
+            "src/js/timeline.js:5875-5886"
+          ],
+          "coverage_ranges": [
+            [5875, 5886]
+          ],
+          "classification": {"code": 5, "comment": 7, "whitespace": 0},
+          "symbols": ["_layerIndexByUid"],
+          "signature": "_layerIndexByUid(uid)",
+          "responsibility": "A local, dependency-free linear-scan resolver from a `layerUid` string to its current `state.layers` index, deliberately NOT delegating to `SMMotion.findLayerIndexByUid` because this function is called from render-time code paths that run before `motion.js` has finished defining `SMMotion`.",
+          "behavior": [
+            "6-line lead-in comment (5875-5880): resolved locally rather than through `SMMotion.findLayerIndexByUid` because this runs at RENDER time and `renderLayerList` fires during boot BEFORE motion.js has defined `SMMotion`; an early return on a missing `SMMotion` had made the whole parent column vanish on first paint and never come back until something else happened to re-render the list — silently, which is how it survived testing (every test called `renderLayerList` itself, long after load); the lookup is two lines, the dependency wasn't worth it.",
+            "Function declaration (5882): `function _layerIndexByUid(uid){`.",
+            "Guard (5883): `if(!uid)return -1;` — no uid at all is `-1`, same sentinel convention as `SMMotion.findLayerIndexByUid`.",
+            "Scan (5884): `for(var i=0;i<state.layers.length;i++)if(state.layers[i].layerUid===uid)return i;` — first (and, by construction, only) match by `layerUid`.",
+            "Fallback (5885): `return -1;` — no layer had a matching uid."
+          ],
+          "callers": [
+            "src/js/timeline.js:6108 — `buildParentCell` (next leaf, out of scope): `var pIdx=_layerIndexByUid(ld.parentLayerUid);`.",
+            "src/js/timeline.js:6117 — `buildParentCell`, second slot: `var pbIdx=_layerIndexByUid(ld.parentLayerUidB);`.",
+            "src/js/timeline.js:6576 — an out-of-scope time-link row builder: `var tlIdx=_layerIndexByUid(ld.timeLink.uid);`.",
+            "src/js/motion.js:8138 — `renderParentRow` (C20e/#1152, out of scope): `var pIdx = _layerIndexByUid(layerParentUidAt(li, state.currentFrame));` — resolves through the frame-aware `layerParentUidAt` (keyed re-parenting, feedback #207) rather than the static field directly.",
+            "src/js/motion.js:8140 — `renderParentRow`, second slot: `var pbIdx = _layerIndexByUid(ld.parentLayerUidB);`.",
+            "src/js/motion.js:8269 — an out-of-scope extra-parent-stack row builder: `var xi = _layerIndexByUid(pe.uid);`.",
+            "A whole-`src/js` grep for `_layerIndexByUid` at the frozen SHA finds exactly these six call sites plus the declaration (5882); no `//` comment mentions and no other caller."
+          ],
+          "effects": "Reads `state.layers[*].layerUid` only. No write of any kind, no `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`renderLayerList`/`renderTimeline`/`updateUI` call — a pure reader, one full linear scan of `state.layers` worst case."
+        },
+        {
+          "id": "C19r.parent-pickwhip",
+          "files": [
+            "src/js/timeline.js:5887-5941"
+          ],
+          "coverage_ranges": [
+            [5887, 5941]
+          ],
+          "classification": {"code": 50, "comment": 5, "whitespace": 0},
+          "symbols": ["startParentPickwhip"],
+          "signature": "startParentPickwhip(li, fromEl, ev)",
+          "responsibility": "After Effects' parent pickwhip gesture, shared verbatim by both the Animation 2D layer panel and Motion's Layer Properties panel: drag the dot onto any layer row to parent `li` to it; drop outside/on itself/on a descendant cancels with no write. Deliberately calls the same `SMMotion.setLayerParent` the dropdown path also calls, so there remains exactly ONE writer of `ld.parentLayerUid` across both UI surfaces.",
+          "behavior": [
+            "4-line lead-in comment (5887-5891): AE's parent pickwhip, shared by BOTH timelines (2026-07-25); drag the dot onto any layer row to parent to it, drop outside/on itself/on a descendant cancels; deliberately the same code as 'the dropdown path below' (the next census leaf's `buildParentMenuItems`/`buildParentCell`) — both call `SMMotion.setLayerParent`, which owns the cycle refusal, so there is still exactly ONE writer of `ld.parentLayerUid`.",
+            "Function declaration (5892): `function startParentPickwhip(li,fromEl,ev){`.",
+            "Gesture arm (5893): `ev.stopPropagation(); ev.preventDefault();` — the pickwhip icon's own `mousedown` never bubbles to the row's own click/select handler.",
+            "Guard (5894): `var M=window.SMMotion; if(!M||!M.setLayerParent){showToast('Parentage indisponible');return;}` — an untranslated literal toast string (unlike most other user-facing strings in this scope, which go through `SM.t`), shown only if Motion failed to load.",
+            "Descendant precompute (5895): `var bad=parentDescendants(li);` (this scope's own function, previous packet) — computed ONCE per gesture, not per mousemove.",
+            "Anchor point (5896-5897): `var r0=fromEl.getBoundingClientRect(); var ox=r0.left+r0.width/2, oy=r0.top+r0.height/2;` — the pickwhip icon's own screen-space center, fixed for the whole drag.",
+            "Visual line element (5898): `var line=document.createElement('div'); line.className='lpick-line'; document.body.appendChild(line);` — a single rubber-band line, reused (repositioned, never recreated) for every mousemove.",
+            "State (5899): `var hover=null;` — the currently-highlighted candidate-drop row, if any.",
+            "`paint(x,y)` (5900-5905): repositions/resizes/rotates `line` so it always spans from the fixed anchor `(ox,oy)` to the current pointer `(x,y)`: `left`/`top` pinned to the anchor, `width` set to the Euclidean distance, `transform:rotate(atan2(dy,dx)rad)` for the angle.",
+            "`rowUnder(x,y)` (5906-5912) — hit-test: `document.elementFromPoint(x,y)` then `.closest('.lrow[data-layer]')`; returns `null` if no element, no matching row, the row's own `data-layer` doesn't parse as a number, the index equals `li` itself (self-rejection), or `bad[idx]` is truthy (descendant rejection, via the precomputed `parentDescendants` map) — otherwise `{row,idx}`.",
+            "`onMove(e)` (5913-5919): calls `paint` unconditionally; re-hit-tests via `rowUnder`; toggles a `.pick-target` CSS class off the previous `hover.row` if the target changed, and onto the new `t.row` if it's a valid new target — so exactly zero or one row is ever highlighted at a time; updates `hover=t`.",
+            "`cleanup()` (5920-5926): removes all three `document`-level listeners (`mousemove`/`mouseup`/`keydown`, all registered in the CAPTURE phase per the calls at 5937-5939), clears any lingering `.pick-target` class, and removes the `line` element from the DOM — the single teardown path shared by both a successful drop and a cancel.",
+            "`onUp(e)` (5927-5935) — the drop handler: re-hit-tests one final time via `rowUnder` (5928, `e` is the mouseup event, may differ from the last mousemove position); calls `cleanup()` (5929); `if(!t)return;` (5930, comment: 'dropped on nothing / itself / a descendant — no-op, no undo entry') — cancellation performs ZERO document writes and pushes no undo entry; otherwise `pushUndo()` (5931, BEFORE the mutation); `M.setLayerParent(li,M.ensureLayerUid(state.layers[t.idx]))` (5932, motion.js:3618/3519, out of scope — the sole `ld.parentLayerUid` write happens inside `setLayerParent` itself, at motion.js:3654); `renderLayerList(); renderTimeline();` (5933); `if(window.SMEngineBridge)SMEngineBridge.renderNow();` (5934, conditional).",
+            "`onKey(e)` (5936): `if(e.key==='Escape'){cleanup();}` — the only other cancel path besides dropping on an invalid target; both converge on the same `cleanup()`, neither writes anything.",
+            "Listener registration (5937-5939): `document.addEventListener('mousemove',onMove,true); document.addEventListener('mouseup',onUp,true); document.addEventListener('keydown',onKey,true);` — all three in the CAPTURE phase, on `document` rather than the originating element, so the drag tracks the pointer anywhere on screen, not just over the pickwhip icon or the layer panel.",
+            "Initial paint (5940): `paint(ev.clientX,ev.clientY);` — draws the line at zero length from the anchor to the mousedown's own position, before any mousemove has fired."
+          ],
+          "callers": [
+            "src/js/timeline.js:6122 — `buildParentCell` (next leaf, out of scope): `pick.addEventListener('mousedown',function(e){startParentPickwhip(li,pick,e);});` — the Animation 2D layer-row pickwhip icon.",
+            "src/js/motion.js:8160 — `renderParentRow` (C20e/#1152, out of scope): `pick.addEventListener('mousedown', function (e) { startParentPickwhip(li, pick, e); });` — the identical wiring inside Motion's own Layer Properties panel row.",
+            "A whole-`src/js` grep for `startParentPickwhip` at the frozen SHA finds exactly these two call sites plus the declaration (5892) and one further textual (`//` comment) mention — motion.js:9333 (\"Deliberately the same shape as startParentPickwhip (timeline.js) — same line, same highlighted target...\", describing `startExprPickwhip`'s own design lineage) — excluded per the issue's instruction to exclude `//` lines; no other file calls it."
+          ],
+          "effects": "Reads `state.layers[t.idx]` (to resolve the drop target's uid) and calls `parentDescendants(li)` (this scope's own function) once at gesture start. Writes: DOM only during the drag (`line` element, `.pick-target` class toggling) with NO document write until `mouseup`; on a successful drop (a valid, non-cancelled target), writes `ld.parentLayerUid` INDIRECTLY via `M.setLayerParent(li, M.ensureLayerUid(...))` (motion.js:3618, the field assignment itself at motion.js:3654) — `ensureLayerUid` (motion.js:3519, out of scope) may itself lazily write a `layerUid` onto the target layer the first time one is needed. `pushUndo()` (5931) is called BEFORE `setLayerParent`, so a successful re-parent is undoable; a cancelled drag (drop on nothing/self/descendant, or Escape) calls neither `pushUndo` nor `setLayerParent` and leaves `state` untouched. After a successful drop: `renderLayerList()`, `renderTimeline()`, and a conditional `SMEngineBridge.renderNow()` — no `saveActiveLayerFrame`/`saveAllLayerFrames` call anywhere in this function (`parentLayerUid` is a layer-level field, not per-frame data, mirroring `applyLayerColor`'s own no-frame-save pattern in the previous area)."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "`applyLayerColor` and `startParentPickwhip`'s successful-drop path each call `pushUndoLayers()`/`pushUndo()` BEFORE their own single-field mutation (`state.layers[i].color`, `ld.parentLayerUid` via `setLayerParent`) — neither calls `saveActiveLayerFrame`/`saveAllLayerFrames`, because both fields are layer-level (`state.layers[]`), not per-frame data (`ld.frames[i]`), so there is no frame store to write. `selectLayersByColor` mutates only selection state (`_layerSel`/`_layerSelAnchor`) with no snapshot call at all — selection is never undo-tracked in this codebase. `openLayerColorSwatches`, `layerColorTargets`, `parentDescendants` and `_layerIndexByUid` are pure readers/DOM-builders and touch no save path. The icon-SVG constants packet has no save-path interaction whatsoever."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No packet in this scope calls `loadFrame` or any load path directly, and none of the eight/nine named functions is reachable from JSON import (`importJSON`) at the frozen SHA (confirmed: none of the symbol names appears in the import code paths)."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "`applyLayerColor` pushes one `pushUndoLayers()` entry per colour change (covering however many layers `layerColorTargets` resolved). `startParentPickwhip`'s `onUp` pushes one `pushUndo()` entry per SUCCESSFUL drop only — a cancelled drag (invalid target or Escape) pushes nothing, matching the explicit in-source comment at 5930. `selectLayersByColor` pushes no undo entry (selection change). None of the other five symbols in this scope calls `pushUndo`/`pushUndoLayers`."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "`layerColorTargets` reads `_layerSel` (declared in C19q's scope, timeline.js:5423, out of scope) to decide whether a colour change fans out beyond the single clicked layer. `selectLayersByColor` WRITES `_layerSel`/`_layerSelAnchor` directly (a colour-based saved-selection feature) and additionally calls `SM.setActiveLayer`/`SMMotion.syncBarSelToLayerSel` to keep Motion's own selection mirrors (in/out bars) in sync. `parentDescendants`/`startParentPickwhip`/`_layerIndexByUid`/`openLayerColorSwatches`/the icon-SVG constants never read or write `_layerSel`/`_layerSelAnchor`."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "Every icon constant, `openLayerColorSwatches`, `applyLayerColor`, `selectLayersByColor`, `_layerIndexByUid`, `parentDescendants` and `startParentPickwhip` are consumed identically by BOTH `renderLayerList()`/Animation 2D's own layer row (timeline.js, out of scope) and `renderLayerListMotion()`/Motion's Layer Properties panel (motion.js, out of scope, C20e/#1152 for the parent-row half) — the same functions, the same DOM idioms, called from two independent row-builder functions rather than a shared row-renderer, per this scope's own in-source framing ('the same control on the same layers seen from two views'). `ld.parentLayerUid`'s actual RENDER consumer is `parentChainMats`/`legacyParentChainMats` (motion.js:3929/3937, out of scope, C20e/#1152's territory), wired into `computeMotionMat`'s chain composition for every frame's transform — cited by line number only, not re-described, per the issue's explicit instruction."
+    },
+    {
+      "consumer": "export",
+      "disposition": "None of the nine named functions in this scope is called from export.js or rive-export.js at the frozen SHA (confirmed: no symbol name from this scope appears in either file). `ld.color` and `ld.parentLayerUid` themselves ARE read at export time, but only through `parentChainMats` (motion.js, out of scope) and the layer-colour field's own consumers elsewhere (also out of scope) — no function declared inside 5710-5941 sits on that read path."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "`applyLayerColor`, `selectLayersByColor` (via `SMEngineBridge.renderNow()`) and `startParentPickwhip`'s successful-drop path each conditionally call `SMEngineBridge.renderNow()` (out of scope) after their own document/selection write, to force an immediate re-render through the Rust/vello engine when it's active. No packet in this scope calls into Rust/WASM directly or reads/writes any WASM-side state itself."
+    },
+    {
+      "consumer": "Motion parent-model boundary (C20e/#1152)",
+      "disposition": "This scope's `parentDescendants` and `startParentPickwhip` are UI-only: they read `state.layers[*].parentLayerUid`/`.parentLayerUidB` for descendant-detection and hit-testing, and delegate the actual write to `SMMotion.setLayerParent` (motion.js:3618, field write at 3654). `wouldCreateParentCycle` (motion.js:3575), `parentChainMats`/`legacyParentChainMats` (motion.js:3929/3937) and the multi-parent crossfade (`parentLayerUidB`, `blendedAncestorMat`) are never called from anywhere inside 5710-5941 — confirmed by grep — and are cited here only to document the boundary, per the issue's 'cite C20e, do not re-map' instruction."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-layer-color-single-target",
+      "proposed": "`_layerSel=[]`, `state.layers=[{color:'#111'}]`; call `applyLayerColor(0,'#ABCDEF')`; expect `layerColorTargets(0)` to return `[0]`, `state.layers[0].color==='#ABCDEF'`, `pushUndoLayers` called once, no toast (targets.length===1) — not run."
+    },
+    {
+      "id": "fx-layer-color-multi-select-fanout",
+      "proposed": "`_layerSel=[0,2]`, `state.layers=[{color:'#a'},{color:'#b'},{color:'#c'}]`; call `applyLayerColor(0,'#FFF')`; expect `layerColorTargets(0)` to return `[0,2]` (li is IN the selection), both `state.layers[0].color` and `state.layers[2].color` become `'#FFF'`, `state.layers[1].color` UNCHANGED, and a `toastLayerColorApplied` toast fires (targets.length===2) — not run."
+    },
+    {
+      "id": "fx-layer-color-click-outside-selection",
+      "proposed": "`_layerSel=[0,1]`, `state.layers=[{color:'#a'},{color:'#b'},{color:'#c'}]`; call `applyLayerColor(2,'#FFF')` (li=2 is NOT in `_layerSel`); expect `layerColorTargets(2)` to return `[2]` only, `state.layers[0]`/`[1]`.color UNCHANGED — not run."
+    },
+    {
+      "id": "fx-select-layers-by-color-anchor-order",
+      "proposed": "`state.layers=[{color:'#f00'},{color:'#0f0'},{color:'#f00'}]`; call `selectLayersByColor('#f00')`; expect `hits=[0,2]`, `_layerSel` equal to `[0,2]`, `_layerSelAnchor===0` (the FIRST hit, set via `SM.setActiveLayer(hits[0],true)` before `_layerSel` itself is assigned, per the ordering comment) and return value `2` — not run."
+    },
+    {
+      "id": "fx-select-layers-by-color-no-hits",
+      "proposed": "`state.layers=[{color:'#f00'}]`; call `selectLayersByColor('#0f0')`; expect return `0`, `_layerSel`/`_layerSelAnchor` UNCHANGED (the function returns before touching either) — not run."
+    },
+    {
+      "id": "fx-parent-descendants-both-slots",
+      "proposed": "`state.layers=[{layerUid:'a'},{parentLayerUid:'a',layerUid:'b'},{parentLayerUidB:'b',layerUid:'c'}]` (index 0='a', 1 parents to 'a', 2 parents-B to 'b'); with `SMMotion.findLayerIndexByUid` resolving by `layerUid`, call `parentDescendants(0)`; expect `{1:true,2:true}` — layer 2 is a descendant of 0 only through its PARENT-B slot, exercising the 'walks BOTH parent slots' comment (5852-5858) — not run."
+    },
+    {
+      "id": "fx-parent-descendants-self-excluded",
+      "proposed": "`state.layers=[{layerUid:'a'},{parentLayerUid:'a',layerUid:'b'}]`; call `parentDescendants(1)` (a leaf layer with no children); expect `{}` (empty — nothing has layer 1 in its own ancestor chain) — not run."
+    },
+    {
+      "id": "fx-layer-index-by-uid-missing",
+      "proposed": "`state.layers=[{layerUid:'x'}]`; call `_layerIndexByUid('does-not-exist')`; expect `-1`, and `_layerIndexByUid(undefined)`/`_layerIndexByUid('')` both also `-1` via the `if(!uid)` early guard — not run."
+    },
+    {
+      "id": "fx-pickwhip-cancel-on-self",
+      "proposed": "Simulate `startParentPickwhip(2,fromEl,ev)` then a synthetic `mouseup` whose `elementFromPoint` resolves to layer row index 2 itself (`.closest('.lrow[data-layer]')` returns `data-layer=\"2\"`); expect `rowUnder` to return `null` (self-rejection, `idx===li`), `onUp` to call `cleanup()` and return before `pushUndo`/`setLayerParent` — `ld.parentLayerUid` UNCHANGED, no undo entry pushed — not run."
+    },
+    {
+      "id": "fx-pickwhip-cancel-on-descendant",
+      "proposed": "`state.layers=[{layerUid:'a'},{parentLayerUid:'a',layerUid:'b'}]`; `startParentPickwhip(0,fromEl,ev)` (dragging layer 0's pickwhip, `bad=parentDescendants(0)={1:true}`); synthetic `mouseup` over row index 1; expect `rowUnder` to return `null` (`bad[1]` truthy), `setLayerParent` NEVER called — not run."
+    },
+    {
+      "id": "fx-pickwhip-escape-cancels",
+      "proposed": "`startParentPickwhip(0,fromEl,ev)`; dispatch a `keydown` with `key:'Escape'` on `document`; expect `onKey` to call `cleanup()` (removing all three listeners and the `.lpick-line` element) with no `pushUndo`/`setLayerParent` call — the SAME cleanup path as a successful drop, verified by both tearing down identically but only one calling `setLayerParent` — not run."
+    },
+    {
+      "id": "fx-pickwhip-successful-drop",
+      "proposed": "`state.layers=[{layerUid:'a'},{}]` (no cycle); `startParentPickwhip(1,fromEl,ev)`; synthetic `mouseup` over row index 0 (valid, non-self, non-descendant); expect `pushUndo()` called once, `M.setLayerParent(1,'a')` called once (via `M.ensureLayerUid(state.layers[0])` resolving to `'a'`), then `renderLayerList()`/`renderTimeline()` — not run, `setLayerParent`'s own body (motion.js, out of scope) not exercised, only the call arguments."
+    }
+  ],
+  "future_proposals": [
+    "`layerColorTargets`'s all-or-nothing membership rule (`_layerSel.length>1&&_layerSel.indexOf(li)>=0`) means a colour change never automatically cascades to a folder's other members or a component's placed instances unless those layers happen to already be part of the current explicit `_layerSel` — the issue's own prompt suggested 'a folder's members, a component's instances' as example targets, but no code path in this scope (or, so far as this census's grep found, elsewhere) implements either cascade. Flagged for the eventual runtime-behavior review, not claimed as a defect by this census.",
+    "`startParentPickwhip`'s untranslated literal toast (`showToast('Parentage indisponible')`, 5894) is the only user-facing string in this scope that doesn't go through `SM.t(...)`, unlike every other toast in the same six packets (`toastLayerColorApplied`, `toastLayersSelectedByColor`) — inconsistent with the rest of the file's i18n convention. Not exercised or fixed here."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep` was run once per symbol (all nine functions, all eleven `ICO_*` constants, `wouldCreateParentCycle` and `parentChainMats`) at the frozen SHA 59a5a38c; results are reproduced verbatim as caller lists above and are re-checkable with `git grep -n -w '<symbol>' 59a5a38c514f5da830dd2f2df4c83c63b1b22fba -- src/js`.",
+    "engineering/inventory/census/*.json siblings present at authoring time: C19q (timeline.js:5421-5709, immediately adjacent to this scope's own 5710 start) and C20e (motion.js:7996-8434, cited by line number for `renderParentRow`'s pickwhip wiring and the parent data model, zero line overlap since it targets a different source file/path) — zero overlap with C19q confirmed by the validator's cross-sibling check; C20e is a different `source_path` so the validator's overlap check does not apply to it, confirmed manually (motion.js:8083-8284 vs this artifact's own timeline.js:5710-5941 share no file)."
+  ],
+  "validation": {
+    "expected_assigned_lines": 232,
+    "expected_classification": {"code": 132, "comment": 100, "whitespace": 0},
+    "packet_partition": [
+      [5710, 5763],
+      [5764, 5790],
+      [5791, 5829],
+      [5830, 5874],
+      [5875, 5886],
+      [5887, 5941]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals `classify(coverage_ranges)`, independently re-derived by script against the frozen blob: 5710-5763=(13,41,0); 5764-5790=(22,5,0); 5791-5829=(23,16,0); 5830-5874=(19,26,0); 5875-5886=(5,7,0); 5887-5941=(50,5,0); sums to (132,100,0)=232 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 232 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C19r-timeline-layer-icons-colors-parent-pickwhip.json 1bfcbad1eea9ab810ee87cfd6bc18306b2533ee8 exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19q-timeline-layer-panel-selection-folders.json 1bfcbad1eea9ab810ee87cfd6bc18306b2533ee8 still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19p-timeline-frame-grid-mouse.json 1bfcbad1eea9ab810ee87cfd6bc18306b2533ee8 still exits 0"
+    ]
+  }
+}
