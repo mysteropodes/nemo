@@ -1,0 +1,767 @@
+{
+  "census_id": "C21j",
+  "issue": 1206,
+  "title": "app.js symbol-frame resolution and layer time model — resolveSymbolFrameIdx, getLFSSubStrokes, Parent-in-Time links, folder cascade, layerInPoint/layerOutPoint family",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C21j census only; app.js:2929+ (getEffectiveStrokes, the render/save/export chokepoint that CALLS INTO this scope's own resolveSymbolFrameIdx/getLFSSubStrokes/layerHasTimeRange/layerInPoint/layerOutPoint but whose own body is the next leaf C21k) is cited by name/line only, not re-mapped. The rig model/deformer (ensureLayerRig..rigAutoAssignLayer/applyRigDeform..rigDragIKEnd, C21h/#1202 and C21i/#1203, both merged to main) shares no call edge with this scope and is cited by name only. Time Remap's own curve evaluator (SMMotion.timeRemapValue, motion.js, C20 lineage) is READ from inside this scope's own resolveSymbolFrameIdx (packet 1) but its body is not reproduced, cited by name only. The layer in/out bars (layer-inout.js — updateBar, trySetLinkedEdge, reconcileTimeLinks, captureLinkedOrig, isTimeLinkDescendant), SMCamera, and the native-video bridge (native-video-bridge.js's _syncSymbolVideos) are all CALLERS of this scope's own exported functions and are cited by name/line only in each packet's own `callers` field, their bodies not reproduced beyond the cited call-site lines.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "d91386f23c7524eb22b6ef881ab2654c0d1170f8",
+  "source_path": "src/js/app.js",
+  "source_blob": "0831959f70612721f80717812838d19940d1f7c1",
+  "source_line_count": 5410,
+  "scope_files": [
+    "src/js/app.js"
+  ],
+  "intended_branch": "claude/c21j-app-symbol-frame-layer-time-census",
+  "assigned_ranges": [
+    {
+      "start": 2600,
+      "end": 2928
+    }
+  ],
+  "coverage_note": "Exactly 329 assigned lines occur once across eleven packets (one coverage_range per packet, no gaps, no other-owner overlap): 165 code, 164 full-line `//` comments, 0 blank — matches the issue's own proposed union exactly (independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs: 31+10+10+8+11+19+8+19+21+22+6=165 code; 19+5+17+27+10+19+23+13+19+1+11=164 comment; 0 blank in every packet, matching the issue's own per-packet table exactly for all eleven packets). Line 2599 (C21i's own `rigDragIKEnd` closing brace) is out of scope; line 2600 opens this scope's own `function resolveSymbolFrameIdx`. Line 2928 is the closing `}` of `unlinkTimeLinkPreserveRange`; line 2929 opens the lead-in comment of `getEffectiveStrokes` (C21k).",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js resolves to 0831959f70612721f80717812838d19940d1f7c1, 5410 lines.",
+    "current": "origin/main (d91386f23c7524eb22b6ef881ab2654c0d1170f8) has the identical app.js blob (git rev-parse d91386f23c7524eb22b6ef881ab2654c0d1170f8:src/js/app.js == git rev-parse 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js == 0831959f70612721f80717812838d19940d1f7c1); this artifact branches from origin/main at d91386f23c7524eb22b6ef881ab2654c0d1170f8, verified directly in the working worktree before authoring (HEAD matches, blob matches).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' 59a5a38c -- src` for the fifteen function symbols this scope declares (resolveSymbolFrameIdx, getLFSSubStrokes, autoInPointFromBlankKeyframe, timeLinkSourceOf, migrateTimeLinkOffsets, resolveLinkedTime, layerHasTimeRange, _clampToTimeline, _layerFolderParent, layerInPoint, layerInPointRaw, autoOutPointFromBlankKeyframe, layerOutPoint, layerOutPointRaw, unlinkTimeLinkPreserveRange), each filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`, then reading each surviving hit's line and enclosing function directly. A second pass grepped the bare field patterns `symTrimIn`/`symTrimOut`/`componentFrame`/`delete.*timeLink` across `src/js/*.js` for the persisted-shape and unlink-call-site questions the issue's own prompt asked for.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; the in-source comments (the 2026-07 in-point leading-blank-detection fix, the Sander van Dijk 2.1 \"Parent in Time\" design note and its 2026-07-30 Motion-property migration, the 2026-08-16 cross-type `srcAnchor` addition, the 2026-08 folder-duration-cascade note, and layer-inout.js's own \"raw vs resolved\" rationale) are read as authorial intent and prior-session evidence, not fresh execution evidence produced by this census."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C21j-app-symbol-frame-layer-time-model.json and the eleven app.js packets partitioning lines 2600-2928.",
+    "app_js": "app.js retains the whole runtime for these fifteen symbols; this JSON authoring does not authorize source changes.",
+    "c21k_boundary": "Lines 2929+ (getEffectiveStrokes' own lead-in comment through its full body, the next leaf C21k, not yet filed as an issue at authoring time) are cited by name/line only — including every call FROM inside that range INTO this scope's own symbols (app.js:2951's `layerHasTimeRange(ld)&&(frameIdx<layerInPoint(ld)||frameIdx>layerOutPoint(ld))` render gate, app.js:2990-2992's three `getLFSSubStrokes` calls for the lfsGroup branch, app.js:3011's `resolveSymbolFrameIdx` call for the symbolId branch) — none of getEffectiveStrokes' own body is reproduced here beyond the cited call-site lines.",
+    "c21h_c21i_boundary": "The rig model/binding (C21h/#1202) and rig deformer/IK (C21i/#1203) share no call edge with this scope in either direction — confirmed by whole-src grep: none of this scope's fifteen symbols appear inside app.js:1884-2599, and none of that range's own symbols (ensureLayerRig, rigBindStroke, applyRigDeform, rigCommitFrame, rigSetIK, etc.) are called from within 2600-2928. Cited by name only per the issue's own scope note.",
+    "other_consumers_boundary": "layer-inout.js (the After-Effects-style layer bar: updateBar/drag handlers, trySetLinkedEdge, reconcileTimeLinks, captureLinkedOrig, isTimeLinkDescendant), motion.js (Time Remap's own timeRemapValue and valueAtFrame, the Rig-adjacent layer-enter jump, keysLockedTo/shiftKeySelection), timeline.js (the Component panel, comp-frame-strip, splitLayerAtPlayhead, exportJSON's own ld field whitelist), engine-bridge.js (the render-time in/out gate and native-video-symbol frame sync), native-video-bridge.js (_syncSymbolVideos), comp-preview.js (the Time Remap preview window) and nemo-script.js (the scripting API's `inFrame`/`outFrame`/`linkTime`/`unlinkTime`) all retain their own bodies in full — cited by line/call-site only for the specific findings each packet's `callers`/`behavior` needed."
+  },
+  "reconciliation": [
+    {
+      "owner": "C21i / #1203 (existing owner, merged to main)",
+      "disposition": "Owns app.js:2290-2599 (applyRigDeform through rigDragIKEnd's own closing brace, immediately before this scope's own line 2600). Confirmed by whole-src grep that this scope's own fifteen symbols are never called from within that range and never call into it — the two leaves are call-graph-disjoint, not merely line-adjacent. This scope's own boundary begins at line 2600 (`function resolveSymbolFrameIdx`), immediately after C21i's own `rigDragIKEnd` closing brace at 2599."
+    },
+    {
+      "owner": "C21k (next leaf, getEffectiveStrokes, not yet filed as an issue at authoring time)",
+      "disposition": "Owns app.js:2929+ through getEffectiveStrokes' own closing brace. This scope's own exported functions are called repeatedly from inside that range: `layerHasTimeRange`/`layerInPoint`/`layerOutPoint` form its render gate (2951), `getLFSSubStrokes` is called three times for the `ld.lfsGroup` branch (2990-2992), `resolveSymbolFrameIdx` is called once for the `ld.symbolId` branch (3011). Those call sites are cited by file:line only in this scope's own `boundaries`/packet `callers` lists; getEffectiveStrokes' own body is not reproduced."
+    },
+    {
+      "owner": "layer-inout.js (existing owner, the on-timeline After-Effects-style layer bar: drag handlers, right-click unlink, Parent-in-Time UI)",
+      "disposition": "Retains its own body in full — cited by line only, as an external caller of `layerInPoint`/`layerOutPoint` (the resolved values, used wherever the bar's own drag math needs to reconcile against another layer's ACTUAL position — captureLinkedOrig, the two keyLock passes), `layerInPointRaw`/`layerOutPointRaw` (the bar's own drawn position/drag math — inPointOf/outPointOf, deliberately NOT clamped so a bar can be dragged past the timeline's edges, per this scope's own header comment above layerInPointRaw), `timeLinkSourceOf` (trySetLinkedEdge's own source resolution) and `unlinkTimeLinkPreserveRange` (the right-click-to-unlink contextmenu handler, 1508). layer-inout.js's own `trySetLinkedEdge`/`reconcileTimeLinks` never call `resolveLinkedTime` directly — they read/write the same `timeLinkInOffset`/`timeLinkOutOffset` Motion properties this scope's own `resolveLinkedTime` reads, confirmed by grep, so the two sides of the link stay a single value without a second resolution path."
+    },
+    {
+      "owner": "motion.js (existing owner, Time Remap's timeRemapValue/valueAtFrame, the Rig-adjacent layer-enter jump, key locking)",
+      "disposition": "Retains its own body in full — cited by name/line only. `SMMotion.timeRemapValue` is READ by this scope's own `resolveSymbolFrameIdx` (packet 1, line 2629) as the single override that beats every other play-mode branch; `SMMotion.valueAtFrame` is READ by this scope's own `resolveLinkedTime` (packet 6, line 2778) to sample the link's own offset property at `state.currentFrame`. Neither is written by this scope. motion.js also calls INTO this scope: `resolveSymbolFrameIdx` (6867, the double-click-into-symbol jump), `layerInPoint`/`layerOutPoint` (many sites — layer-list Position/duration fields, shiftLayerMotionKeys' own trim-lock math at 5792/8563-8564), and `unlinkTimeLinkPreserveRange` (7227, 8379, the side-panel \"Parent in Time\" mode-change and unlink UI)."
+    },
+    {
+      "owner": "timeline.js (existing owner, the Component panel, comp-frame-strip, exportJSON, splitLayerAtPlayhead)",
+      "disposition": "Retains its own body in full — cited by line only. `resolveSymbolFrameIdx` is called by `updateCompInstancePanel` (7099, the Component panel's own frame/speed/offset fields) and `renderCompFrameStrip` (7172, the per-frame thumbnail strip); `layerInPoint`/`layerOutPoint` are called at 1204-1205 (a duplicator time-offset span) and 10119/10129 (a layer-bar drag boundary check); `unlinkTimeLinkPreserveRange` is called at 6033/6584 (mode-change UI). exportJSON's own per-layer field whitelist (2117-2125) is the persisted-shape authority for every `ld.*` field this scope reads — see `boundaries` for the complete cross-check, including the one field pair (`symTrimIn`/`symTrimOut`) this scope reads but that whitelist omits by design."
+    },
+    {
+      "owner": "engine-bridge.js and native-video-bridge.js (existing owners, the render-time in/out gate and native-video symbol-frame sync)",
+      "disposition": "Retain their own bodies in full — cited by line only. engine-bridge.js reads `layerInPoint`/`layerOutPoint` (1135-1136, 1153-1154, 1273-1274) to gate a native-video Component instance's own placement/hold-frame math against the SAME resolved range getEffectiveStrokes uses, and calls `resolveSymbolFrameIdx` (1266) for its own nested-native-video frame resolution. native-video-bridge.js's `_syncSymbolVideos` (548-565) is the complete external caller of `layerHasTimeRange` outside this scope and app.js itself, reads `layerInPoint`/`layerOutPoint` to skip a symbol instance outside its own resolved range before ever resolving its internal frame via `resolveSymbolFrameIdx`."
+    },
+    {
+      "owner": "comp-preview.js (existing owner, the Time Remap preview window) and nemo-script.js (existing owner, the Layer scripting API)",
+      "disposition": "Retain their own bodies in full — cited by line/name only. comp-preview.js's `show()` (224) calls `resolveSymbolFrameIdx` once, to seed the preview window on whatever internal frame is REALLY playing at the outer playhead. nemo-script.js's `Layer.prototype.inFrame`/`outFrame` getters (111, 115) and `linkTime` (332-335) call `layerInPoint`/`layerOutPoint`; its `edgeSetter` (99-100) calls `layerInPoint`/`layerOutPoint` on the LINK SOURCE only, to convert a scripted absolute-frame write into the correct `timeLinkInOffset`/`timeLinkOutOffset` delta — see `boundaries` for `unlinkTime`'s own divergent, uncalled-through path."
+    }
+  ],
+  "boundaries": [
+    "Line 2599 (C21i's own closing brace) is outside coverage; line 2600 (`function resolveSymbolFrameIdx`) begins this scope.",
+    "Line 2928 (`unlinkTimeLinkPreserveRange`'s own closing `}`) is the last line of this scope; line 2929 opens the lead-in comment for `getEffectiveStrokes`, C21k's own territory, and is excluded — confirmed by reading through line 2935.",
+    "No lines inside 2600-2928 are excluded for another owner: every line belongs to exactly one of the eleven packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "`ld.*`/`sym.*`/`layer.*` fields READ in this scope, with the line of each first read: `sym.totalFrames` (2610, 2616, `resolveSymbolFrameIdx`); `layer.frames`/`.isKeyframe`/`.componentFrame` (2604-2609, the outer-key componentFrame lookup); `layer.symPlacedAt`/`layer.symSpeed` (2615, elapsed-time formula); `layer.timeRemap` (2623, gates the `SMMotion.timeRemapValue` override); `layer.symPlayMode` (2632/2634/2648, 'single'/'once'/'pingpong' branches, falling through to a plain modulo loop otherwise); `layer.symSingleFrame` (2632); `layer.symTrimIn`/`layer.symTrimOut` (2638-2639, 'once' mode only); `ld.lfsIds[key]`/`ld.lfsSettings[key]` (2656, 2659, `getLFSSubStrokes`); `ld.symbolId` (2688/2886, both auto-detect helpers explicitly EXCLUDE a component layer, since it has its own Frame/Speed/Offset timing model instead of blank-keyframe detection); `ld.frames[].isKeyframe`/`.strokes.length` (2685-2690, 2882-2887, the leading/trailing-blank scans); `ld.timeLink.uid`/`.mode`/`.srcAnchor`/`.inOffset`/`.outOffset` (2720-2758, 2778); `ld.inPoint`/`ld.outPoint` (2799, 2843, 2894, the DEFAULT-vs-hard-value branch in every resolver); `ld.parentLayerUid` (2831, folder-cascade lookup); `state.layers[i].layerUid` (2721, 2831, uid-based cross-layer lookups); `state.layers[i].isFolderLayer` (2833); `state.symbols[symId]` (2657, `getLFSSubStrokes` only — `resolveSymbolFrameIdx` itself never touches `state.symbols`, its `sym` argument is resolved by EVERY caller before the call, confirmed by the caller list below); `state.currentFrame` (2778, `resolveLinkedTime`'s own offset sample — NOT `state.layers`/`state.totalFrames`/`state.symbols` alone as the issue's own prompt anticipated; recorded here as a correction, confirmed by direct read of line 2778); `state.totalFrames` (2778, 2816, 2899, 2911, the clamp/default-out ceiling).",
+    "Fields WRITTEN in this scope: `ld.motionStatic.timeLinkInOffset`/`ld.motionStatic.timeLinkOutOffset` (2745, 2749-2750, `migrateTimeLinkOffsets` — the scope's only writer that runs on a READ path, not a UI gesture: it is called from inside `resolveLinkedTime` at line 2778, itself reachable from `layerInPoint`/`layerOutPoint`, the single chokepoint 13+ call sites across five files already go through — so an old project's legacy `ld.timeLink.inOffset`/`outOffset` numbers are migrated the FIRST time anything reads that layer's resolved in/out after load, not on `importJSON` itself and not gated behind any explicit user action); `ld.timeLink`/`ld.inPoint`/`ld.outPoint` (2926-2927, `unlinkTimeLinkPreserveRange` — the scope's ONLY writer of these three fields directly, confirmed by grep: no other statement inside 2600-2928 assigns to `ld.inPoint`, `ld.outPoint` or `ld.timeLink`). Legacy `ld.timeLink.inOffset`/`outOffset` are left in place, unread from now on, not deleted by `migrateTimeLinkOffsets` — non-destructive, matching the pattern CLAUDE.md documents for other migrated fields (effectorChannels).",
+    "The persisted shape this scope reads is exactly what `exportJSON`'s own per-layer field whitelist persists (timeline.js:2117-2125, out of scope, cited by line only) for every field EXCEPT one pair: `symTrimIn`/`symTrimOut` are read by `resolveSymbolFrameIdx`'s own 'once' branch (2638-2639) but do NOT appear in that whitelist. Confirmed by direct read of both the whitelist and `enterMontageView` (app.js:4330, general app.js territory, out of scope, cited by line only): a montage-view segment's own synthetic layer object (never itself a member of `state.layers` that gets exported — it is built fresh into a `newLayers` array every time `enterMontageView` runs) sets `symTrimIn`/`symTrimOut` from the PERSISTED montage module's own `mod.trimIn`/`mod.trimOut` (part of `state.storyboard`, exported wholesale elsewhere). This is by design, not an export-whitelist omission bug: the trim values themselves DO survive a save/reload, just never as a directly-persisted `ld.symTrimIn`/`symTrimOut` on an ordinary layer — they only ever exist on a montage-view's own throwaway synthetic layer, reconstructed identically every time that view is entered.",
+    "The recursion guards, by function, with their exact cycle/depth behavior: `resolveLinkedTime(ld,which,seen,depth)` — `seen` is a plain array pushed with `ld` itself (2759-2761, `seen.indexOf(ld)>=0||depth>16` bails to null, i.e. \"use my own value\", not a thrown error or an infinite loop); `layerHasTimeRange(ld,_depth)` / `_layerFolderParent` chain — no `seen` array at all, only a hard `depth<8` cap (2802) before recursing into a folder parent, because CLAUDE.md's own note on this scope (nested folders are v1-unsupported, engine.rs `is_folder_layer`) means the cascade should never actually recurse past one level in normal use; the cap exists purely against a hand-edited/migrated file that could otherwise cycle; `layerInPoint`/`layerInPointRaw`/`layerOutPoint`/`layerOutPointRaw(ld,_seen,_depth)` — thread the SAME `_seen`/`_depth` pair through BOTH their own `resolveLinkedTime` call (link-chain cycles) and their own folder-parent recursion (folder-nesting cycles), so a single depth counter/seen-array guards two structurally different cycles at once; on a cycle, each resolver simply falls through to its own local `ld.inPoint`/`ld.outPoint`/auto-detect value instead of the linked/folder one — never throws, never infinite-loops.",
+    "The resolved-vs-raw contract (grepped in layer-inout.js, the complete external consumer of the raw pair): `layerInPoint`/`layerOutPoint` are CLAMPED to `[0,state.totalFrames-1]` via `_clampToTimeline` and are the ONLY pair `getEffectiveStrokes`'/`saveActiveLayerFrame`'s own render/save gates use (app.js:2951/4685/4705, all out of scope, cited by line only) — content past the timeline's own edge can never actually render or persist. `layerInPointRaw`/`layerOutPointRaw` are UNCLAMPED and are read ONLY by layer-inout.js's own `inPointOf`/`outPointOf` (23-24) — purely so the bar's own drawn position and drag handles can visually extend before frame 0 or past the last frame, like an After Effects/Cavalry trim handle, without changing what actually renders in-range. layer-inout.js's own `captureLinkedOrig` (781-786) and both `keyLock`/per-keyframe-lock passes (1180-1181, 1213-1214) deliberately call the RESOLVED `layerInPoint`/`layerOutPoint` instead of `inPointOf`/`outPointOf`, per that file's own comment: a linked child's RAW `ld.inPoint` is permanently null/inert once linked (`resolveLinkedTime` never falls through to it), so only the resolved value ever reflects what a downstream lock/link should measure against.",
+    "The complete caller list of every exported (non-`_`-prefixed) symbol is recorded verbatim in each packet's own `callers` field, derived by the whole-src grep described in `source_baselines.runtime`, confirming the issue's own proposed caller list with one addition: `resolveSymbolFrameIdx` — native-video-bridge.js, engine-bridge.js, timeline.js, motion.js, comp-preview.js, app.js (matches); `layerInPoint`/`layerOutPoint` — nemo-script.js, native-video-bridge.js, engine-bridge.js, timeline.js, layer-inout.js, motion.js, app.js (matches); `timeLinkSourceOf` — layer-inout.js only outside this scope (matches); `layerInPointRaw`/`layerOutPointRaw` — layer-inout.js only (matches); `layerHasTimeRange` — native-video-bridge.js (matches); `unlinkTimeLinkPreserveRange` — timeline.js, layer-inout.js, motion.js (matches, TWO call sites each in timeline.js and motion.js, not one).",
+    "One inconsistency found by grep, not anticipated by the issue's own prompt: `unlinkTimeLinkPreserveRange`'s own header comment (2912-2917) states \"every unlink call site should go through this instead of deleting the link directly\", and four of five UI-driven unlink sites do (layer-inout.js:1508, motion.js:7227/8379, timeline.js:6033/6584). Two bare `delete ld.timeLink`/`delete other.timeLink` sites outside this scope are DELIBERATE, not omissions, confirmed by reading their own surrounding comments: app.js:3957 (layer-merge cleanup, re-points the link to the merge survivor and only deletes it when there is no survivor to re-point to) and timeline.js:1251-1252 (`splitLayerAtPlayhead`, which materialises hard `inPoint`/`outPoint` on BOTH halves at the exact cut boundary immediately before deleting `timeLink`, an intentionally different preserved value than `unlinkTimeLinkPreserveRange`'s own \"keep the current resolved range\" contract). A FIFTH site, `nemo-script.js:340` (`Layer.prototype.unlinkTime = function(){ delete this._ld().timeLink; return this; }`), has no such comment and no compensating `inPoint`/`outPoint` write of its own — the scripting API's `unlinkTime()` silently resets a linked layer to its full/auto range instead of preserving its resolved one, unlike every UI-driven unlink gesture. See `future_proposals`.",
+    "No Paper item (`Path`/`Segment`/`Point`/`CompoundPath`/`Raster`) and no `layer.children` access of any kind occurs anywhere in this scope — confirmed by a literal grep of the assigned range for `Path`/`Segment`/`Point`/`CompoundPath`/`Raster`/`.children` (zero hits outside comments). Every function here operates purely on the plain-JSON `ld`/`sym`/`layer` shape and `state.layers`/`state.symbols`/`state.currentFrame`/`state.totalFrames` — this leaf is therefore NOT a CLAUDE.md §1 `layer.children` consumer at all, unlike the rig scopes immediately before it."
+  ],
+  "areas": [
+    {
+      "area": "resolve-symbol-frame-idx",
+      "packets": [
+        {
+          "id": "C21j.resolve-symbol-frame-idx",
+          "files": [
+            "src/js/app.js:2600-2649"
+          ],
+          "coverage_ranges": [
+            [
+              2600,
+              2649
+            ]
+          ],
+          "classification": {
+            "code": 31,
+            "comment": 19,
+            "whitespace": 0
+          },
+          "symbols": [
+            "resolveSymbolFrameIdx"
+          ],
+          "signature": "function resolveSymbolFrameIdx(sym,layer,mainFrameIdx){if(layer.frames){for(var keyFi=Math.min(mainFrameIdx,layer.frames.length-1);keyFi>=0;keyFi--){var timingKey=layer.frames[keyFi];if(!timingKey||!timingKey.isKeyframe)continue;if(timingKey.componentFrame!=null){return Math.min(Math.max(1,sym.totalFrames)-1,Math.max(0,Math.floor(timingKey.componentFrame)));}break;}}var elapsed=Math.max(0,(mainFrameIdx-(layer.symPlacedAt||0)))*(layer.symSpeed||1);var total=Math.max(1,sym.totalFrames);if(layer.timeRemap&&window.SMMotion&&SMMotion.timeRemapValue){var rv=SMMotion.timeRemapValue(layer,mainFrameIdx);if(rv!=null)return Math.max(0,Math.min(total-1,Math.round(rv)));}if(layer.symPlayMode==='single')return Math.min(total-1,Math.max(0,Math.floor(layer.symSingleFrame||0)));if(layer.symPlayMode==='once'){var trimIn=layer.symTrimIn||0;var trimOut=(layer.symTrimOut!=null)?layer.symTrimOut:total-1;return Math.min(trimOut,trimIn+Math.floor(elapsed));}if(layer.symPlayMode==='pingpong'){if(total<2)return 0;var cycle=(total-1)*2;var pos=Math.floor(elapsed)%cycle;return pos<total?pos:cycle-pos;}return Math.floor(elapsed)%total;}",
+          "responsibility": "THE single chokepoint every reader of a component's content resolves its internal frame through (CLAUDE.md §11's own citation). Branch precedence, in order: (1) an explicit per-outer-keyframe `componentFrame` override (2604-2612) — scans backward from `mainFrameIdx` to the nearest preceding outer keyframe (held span semantics identical to ordinary Animation 2D keys, not an exact-frame check) and, if that keyframe carries a `componentFrame` stamp, returns it directly (clamped into `[0,sym.totalFrames-1]`), bypassing every mode/speed/offset math below entirely; (2) Time Remap (`layer.timeRemap&&window.SMMotion&&SMMotion.timeRemapValue`, 2623-2626) — a keyframed curve (motion.js, C20, cited by name only) names the internal frame directly, overriding play mode/speed/placement wholesale, so freeze/hold/reverse/ramp all come from the curve; (3) `symPlayMode==='single'` — a frozen `symSingleFrame`, ignoring `mainFrameIdx` entirely; (4) `symPlayMode==='once'` — plays from `symTrimIn` (default 0) through `symTrimOut` (default `total-1`) and HOLDS at `symTrimOut` rather than rolling into unrelated symbol frames, the exact formula `enterMontageView`'s own synthetic montage segments rely on (app.js:4277-4335, general app.js territory, cited by name only); (5) `symPlayMode==='pingpong'` — bounces back and forth over a `(total-1)*2`-length cycle, returning `0` outright for a 1-frame symbol; (6) the default (`loop`) — a plain modulo of `elapsed` over `total`. `elapsed=max(0,mainFrameIdx-symPlacedAt)*symSpeed` is computed once up front and reused by every mode below the componentFrame/Time-Remap overrides.",
+          "callers": [
+            "app.js:2659 — getLFSSubStrokes (this scope, packet 2): `resolveSymbolFrameIdx(sym,ld.lfsSettings[key],frameIdx)` — the `layer` argument is the LFS sub-symbol's own settings sub-object, not `ld` itself, since this function only ever reads playMode/speed/placedAt/singleFrame/timeRemap off whatever `layer` it's given.",
+            "app.js:3011 — getEffectiveStrokes' own symbolId branch (C21k, cited by line only): `resolveSymbolFrameIdx(sym,ld,frameIdx)` — the render/save/export chokepoint's own frame resolution.",
+            "app.js:5240 — _insertKeyframeCore (general app.js territory, cited by line only): `f.componentFrame=sym?resolveSymbolFrameIdx(sym,ld,frameIdx):0;` — stamps a FRESH outer keyframe with whatever internal frame was ALREADY showing, so inserting a key never visually jumps the component.",
+            "comp-preview.js:224 — the Time Remap preview window's own show() (cited by name only): seeds the preview on the internal frame really playing at `state.currentFrame`, \"pas sur l'image 0\", per that file's own comment.",
+            "engine-bridge.js:1266 — nested native-video symbol resolution (cited by line only): `window.resolveSymbolFrameIdx?resolveSymbolFrameIdx(nvsymSym,nvsymLd,renderFrame):0`.",
+            "motion.js:6867 — the Component double-click-to-enter jump (cited by line only): resolves which inner frame the instance was ALREADY showing at the outer playhead before jumping `goToFrame` there, fixing a bug where entering always reset to frame 0 and silently hid every shape whenever the symbol's own frame 0 was blank.",
+            "native-video-bridge.js:562 — _syncSymbolVideos (packet 7's own caller list, cited by line only): resolves the internal frame AFTER the layerHasTimeRange/layerInPoint/layerOutPoint range gate has already passed.",
+            "timeline.js:7099 — updateCompInstancePanel (cited by line only): the Component panel's own \"Frame\" field.",
+            "timeline.js:7172 — renderCompFrameStrip (cited by line only): the per-frame thumbnail strip's own current-frame highlight."
+          ],
+          "behavior": [
+            "Lines 2600-2603 (code, 4 lines): declaration, three formal parameters; begin the outer-keyframe `componentFrame` override scan.",
+            "Lines 2604-2612 (comment+code interleaved as classified; code 2604,2606-2607,2609-2612 total 6 lines within this span, remainder comment): the componentFrame override — deliberately stored on the OUTER frame entry so symbol-internal drawing keys never leak into the parent timeline.",
+            "Lines 2613-2614 (code, 2 lines): `elapsed`/`total` computed once.",
+            "Lines 2615-2622 (comment, 8 lines): the Time Remap design note — single chokepoint, every content consumer already resolves through here.",
+            "Lines 2623-2626 (code, 4 lines): the Time Remap override.",
+            "Line 2627 (code, 1 line): the `single` mode branch.",
+            "Lines 2628-2637 (comment, 10 lines): the symTrimIn/symTrimOut design note — optional fields, montage-segment provenance.",
+            "Lines 2638-2641 (code, 4 lines): the `once` mode branch.",
+            "Lines 2642-2647 (code, 6 lines): the `pingpong` mode branch.",
+            "Line 2648 (code, 1 line): the default `loop` fallthrough.",
+            "Line 2649 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "lfs-sub-strokes",
+      "packets": [
+        {
+          "id": "C21j.lfs-sub-strokes",
+          "files": [
+            "src/js/app.js:2650-2664"
+          ],
+          "coverage_ranges": [
+            [
+              2650,
+              2664
+            ]
+          ],
+          "classification": {
+            "code": 10,
+            "comment": 5,
+            "whitespace": 0
+          },
+          "symbols": [
+            "getLFSSubStrokes"
+          ],
+          "signature": "function getLFSSubStrokes(ld,key,frameIdx){var symId=ld.lfsIds&&ld.lfsIds[key];if(!symId)return[];var sym=state.symbols[symId];if(!sym)return[];var symLayer=sym.layers[0];if(!symLayer)return[];var ii=resolveSymbolFrameIdx(sym,ld.lfsSettings[key],frameIdx);var sf=symLayer.frames[ii];if(!sf)return[];if(sf.isKeyframe||sf.isInterpolated)return sf.strokes;for(var k=ii-1;k>=0;k--){if(symLayer.frames[k].isKeyframe)return symLayer.frames[k].strokes;}return[];}",
+          "responsibility": "Resolves ONE of the 3 LFS (Ligne/Plein/Ombre — line/fill/shadow) sub-timelines' effective strokes for a given `key`, mirroring the `symbolId` branch of getEffectiveStrokes (C21k) but keyed off `ld.lfsIds[key]`/`ld.lfsSettings[key]` instead of `ld.symbolId`/`ld` itself. Resolves the sub-symbol via `state.symbols[symId]`, takes its FIRST layer only (`sym.layers[0]` — an LFS sub-symbol is never multi-layer, unlike an ordinary Component instance), and reuses `resolveSymbolFrameIdx` unmodified by passing `ld.lfsSettings[key]` as the `layer` argument — that function only ever reads playMode/speed/placedAt/singleFrame/timeRemap off whatever object it's given, so a settings sub-object satisfies it exactly like a real layer would. Once the internal frame index `ii` is resolved, held-frame inheritance is manual and local (not a call into any shared held-frame helper): if the resolved frame is itself a keyframe or already-interpolated, its own `strokes` are returned directly; otherwise the loop walks backward to the nearest preceding keyframe and returns ITS strokes; if none exists (frame 0 was never a keyframe, an invariant violation elsewhere), returns `[]`.",
+          "callers": [
+            "app.js:2990-2992 — getEffectiveStrokes' own `ld.lfsGroup` branch (C21k, cited by line only): concatenates all three sub-timelines in explicit stacking order — `shadow` at back, `full` (flat colors) in the middle, `line` (ink) on top: `getLFSSubStrokes(ld,'shadow',frameIdx).concat(getLFSSubStrokes(ld,'full',frameIdx)).concat(getLFSSubStrokes(ld,'line',frameIdx))`.",
+            "app.js:4104 — the LFS fill-propagation tool's own line-bounds capture (general app.js territory, cited by line only): `_lineBoundsFromStrokes(getLFSSubStrokes(ld,'line',fi))`, used to normalize a captured fill seed as a FRACTION of the Ligne shape's own bounding box rather than an absolute point.",
+            "app.js:4123 — the same tool's per-target-frame propagation loop (cited by line only): `getLFSSubStrokes(ld,'line',tfi)`, re-derives the Ligne shape's own bounds at every target frame so a tweened walk cycle's moving silhouette is tracked, not a single frozen snapshot."
+          ],
+          "behavior": [
+            "Lines 2650-2654 (comment, 5 lines): lead-in — mirrors the symbolId branch, keyed off lfsIds/lfsSettings, settings sub-object satisfies resolveSymbolFrameIdx unmodified.",
+            "Line 2655 (code, 1 line): declaration, three formal parameters.",
+            "Line 2656 (code, 1 line): resolve `symId`, early-return `[]` if absent.",
+            "Line 2657 (code, 1 line): resolve `sym` from `state.symbols`, early-return `[]` if absent.",
+            "Line 2658 (code, 1 line): resolve `symLayer=sym.layers[0]`, early-return `[]` if absent.",
+            "Line 2659 (code, 1 line): resolve `ii` via `resolveSymbolFrameIdx`.",
+            "Line 2660 (code, 1 line): resolve `sf=symLayer.frames[ii]`, early-return `[]` if absent.",
+            "Line 2661 (code, 1 line): return `sf.strokes` directly if it's a keyframe or already-interpolated.",
+            "Line 2662 (code, 1 line): the backward-walk-to-nearest-keyframe loop.",
+            "Line 2663 (code, 1 line): fallback `return[]`.",
+            "Line 2664 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "auto-in-point-blank-keyframe",
+      "packets": [
+        {
+          "id": "C21j.auto-in-point-blank-keyframe",
+          "files": [
+            "src/js/app.js:2665-2691"
+          ],
+          "coverage_ranges": [
+            [
+              2665,
+              2691
+            ]
+          ],
+          "classification": {
+            "code": 10,
+            "comment": 17,
+            "whitespace": 0
+          },
+          "symbols": [
+            "autoInPointFromBlankKeyframe"
+          ],
+          "signature": "function autoInPointFromBlankKeyframe(ld){if(!ld||ld.symbolId)return null;var frames=ld.frames,firstNonBlank=-1,curBlank=true;for(var f=0;f<frames.length;f++){var fr=frames[f];if(fr.isKeyframe)curBlank=!fr.strokes.length;if(!curBlank&&firstNonBlank<0)firstNonBlank=f;}return(firstNonBlank>0)?firstNonBlank:null;}",
+          "responsibility": "The layer-in-point analogue of `autoOutPointFromBlankKeyframe` (packet 9), added later (2026-07 fix, \"les inpoints ne reflète pas le bon départ en détectant les keyframes vide\") to close a gap `autoOutPointFromBlankKeyframe` never had: unlike the out-point side, the in-point side previously had NO leading-blank detection at all, so a layer that starts drawing at frame 20 still showed its bar starting at frame 0, a 20-frame blank stretch invisible without scrubbing to it. Excludes component layers outright (`ld.symbolId` truthy) since they have their own Frame/Speed/Offset timing model, not blank-keyframe timing. Scans every frame forward, tracking `curBlank` (flips only at a KEYFRAME boundary, held exactly like ordinary Animation 2D held-frame semantics between keys, per this function's own header lead-in shared with layer-in/out's whole section, packet's own preceding comment block at 2671-2687) and records the first frame index where the layer stops being blank. Returns `null` (meaning \"no auto in-point, default to 0\") when the layer is non-blank from frame 0 (`firstNonBlank<=0`), i.e. the common case, exactly the same DEFAULT-only contract as its out-point sibling: a manually-dragged `ld.inPoint` always wins once set (checked by the caller BEFORE falling back to this function), this is only what the bar shows/clamps to before the user ever drags it.",
+          "callers": [
+            "app.js:2844 — layerInPoint (this scope, packet 8): `var auto=autoInPointFromBlankKeyframe(ld);v=auto!=null?_clampToTimeline(auto):0;` — the DEFAULT branch, reached only when the layer is unlinked (resolveLinkedTime returned null) and has no hard `ld.inPoint` set.",
+            "app.js:2864 — layerInPointRaw (this scope, packet 9): the unclamped counterpart's own identical DEFAULT branch, `v=auto!=null?auto:0`."
+          ],
+          "behavior": [
+            "Lines 2665-2681 (comment, 17 lines): the shared PARENT lead-in for the whole layer-in/out chokepoint section — states the single-choke-point design (getEffectiveStrokes/exportBuildFrame both already gate through layerInPoint/layerOutPoint), the `!=null` (not `||0`) check rationale (an explicit user override back to 0 must not be silently reclaimed), and this function's own \"no leading-blank detection at all\" bug-fix provenance.",
+            "Line 2682 (code, 1 line): declaration; early-return `null` for an absent layer or a component layer.",
+            "Line 2683 (code, 1 line): `var frames=ld.frames,firstNonBlank=-1,curBlank=true;`.",
+            "Lines 2684-2687 (code, 4 lines): the forward scan — `curBlank` flips only at a keyframe boundary, `firstNonBlank` records the first non-blank frame once.",
+            "Line 2688 (code, 1 line): `}` closing the for-loop.",
+            "Line 2689 (code, 1 line): `return(firstNonBlank>0)?firstNonBlank:null;`.",
+            "Line 2690 (code, 1 line): closing brace of `autoInPointFromBlankKeyframe`.",
+            "Line 2691 (comment, 1 line): trailing note — `!=null` not `||0`, the same rationale restated at the point of use."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "parent-in-time-header-source-of",
+      "packets": [
+        {
+          "id": "C21j.parent-in-time-header-source-of",
+          "files": [
+            "src/js/app.js:2692-2726"
+          ],
+          "coverage_ranges": [
+            [
+              2692,
+              2726
+            ]
+          ],
+          "classification": {
+            "code": 8,
+            "comment": 27,
+            "whitespace": 0
+          },
+          "symbols": [
+            "timeLinkSourceOf"
+          ],
+          "signature": "function timeLinkSourceOf(ld){if(!ld||!ld.timeLink||!ld.timeLink.uid)return null;for(var i=0;i<state.layers.length;i++){var s=state.layers[i];if(s!==ld&&s.layerUid===ld.timeLink.uid)return s;}return null;}",
+          "responsibility": "A trailing note on `autoInPointFromBlankKeyframe`'s own `!=null` check (2692-2695), followed by the `---- PARENT IN TIME (Sander van Dijk 2.1, 2026-07-26 + 2026-07-30) ----` section header (2696-2718, 23 comment lines) that governs every remaining packet in this scope: Van Dijk's own design premise (\"Time Properties of a layer remain static... In/Out become VALUES that can be driven from elsewhere — a link to another layer plus an offset\"), the persisted shape (`ld.timeLink={uid,mode}` plus `ld.motion.timeLinkInOffset`/`ld.motionStatic.timeLinkInOffset` as a real, expression-linkable Motion property rather than a bespoke second expression system — deliberately NOT true per-frame keyframing, motion.js's own `PROP_NO_STOPWATCH` hides the stopwatch on these two rows), and the chokepoint claim (resolution lives in `layerInPoint`/`layerOutPoint` because they are the single chokepoint 13 call sites across five files already go through; unlinked layers pay nothing, the very first check in every downstream resolver is `!ld.timeLink`). `timeLinkSourceOf(ld)` itself: given a layer with a `timeLink.uid`, linear-scans `state.layers` for the OTHER layer (`s!==ld`) whose own `layerUid` matches, returning `null` if the source was deleted (fall through to the layer's own values, the caller's responsibility, not this function's).",
+          "callers": [
+            "app.js:2758 — resolveLinkedTime (this scope, packet 6): `var src=timeLinkSourceOf(ld);if(!src)return null;` — the first substantive step after the mode-vs-which early-outs.",
+            "layer-inout.js:49 — trySetLinkedEdge (cited by line only): `window.timeLinkSourceOf?timeLinkSourceOf(ld):null`, resolving the link source before converting a bar-drag's target absolute value into the correct `timeLinkInOffset`/`timeLinkOutOffset` delta."
+          ],
+          "behavior": [
+            "Lines 2692-2695 (comment, 4 lines): trailing rationale for autoInPointFromBlankKeyframe's own `!=null` check.",
+            "Lines 2696-2718 (comment, 23 lines): the PARENT IN TIME section header — Van Dijk's own design premise, the persisted shape, the deliberate non-keyframing choice and its motion.js enforcement, the single-chokepoint claim, the legacy-offset migration note.",
+            "Line 2719 (code, 1 line): declaration, one formal parameter; the `!ld||!ld.timeLink||!ld.timeLink.uid` early-return-null guard.",
+            "Lines 2720-2724 (code, 5 lines): the linear scan over `state.layers` for the matching `layerUid`.",
+            "Line 2725 (code, 1 line): `return null;` (source deleted).",
+            "Line 2726 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "migrate-time-link-offsets",
+      "packets": [
+        {
+          "id": "C21j.migrate-time-link-offsets",
+          "files": [
+            "src/js/app.js:2727-2747"
+          ],
+          "coverage_ranges": [
+            [
+              2727,
+              2747
+            ]
+          ],
+          "classification": {
+            "code": 11,
+            "comment": 10,
+            "whitespace": 0
+          },
+          "symbols": [
+            "migrateTimeLinkOffsets"
+          ],
+          "signature": "function migrateTimeLinkOffsets(ld){if(!ld||!ld.timeLink)return;if(ld.timeLink.inOffset&&!(ld.motion&&ld.motion.timeLinkInOffset)&&!(ld.motionStatic&&ld.motionStatic.timeLinkInOffset)){ld.motionStatic=ld.motionStatic||{};ld.motionStatic.timeLinkInOffset=[ld.timeLink.inOffset];}if(ld.timeLink.outOffset&&!(ld.motion&&ld.motion.timeLinkOutOffset)&&!(ld.motionStatic&&ld.motionStatic.timeLinkOutOffset)){ld.motionStatic=ld.motionStatic||{};ld.motionStatic.timeLinkOutOffset=[ld.timeLink.outOffset];}}",
+          "responsibility": "One-time, idempotent migration for pre-2026-07-30 projects, whose links stored a plain number at `ld.timeLink.inOffset`/`outOffset` directly. Now that those offsets are real Motion properties (`timeLinkInOffset`/`timeLinkOutOffset`, read through `SMMotion.valueAtFrame` like any other property, packet 6), this function copies a legacy plain-number offset into `ld.motionStatic.timeLinkInOffset`/`timeLinkOutOffset` (as a single-element array, the shape every other un-keyed Motion property uses) — but ONLY if neither `ld.motion` nor `ld.motionStatic` already carries that property, so a project that has already been migrated (or was authored directly with the new shape) is left untouched on every subsequent call. The legacy `ld.timeLink.inOffset`/`outOffset` fields themselves are never deleted — left in place, unread from now on, matching the non-destructive migration pattern CLAUDE.md documents for `effectorChannels`. Without this migration, an old project's link offsets would silently reset to 0 the first time it's opened after the Motion-property change, since `resolveLinkedTime`'s own offset read (packet 6) only ever looks at `timeLinkInOffset`/`timeLinkOutOffset` via `SMMotion.valueAtFrame`, never at the legacy plain-number fields directly.",
+          "callers": [
+            "app.js:2778 — resolveLinkedTime (this scope, packet 6): `migrateTimeLinkOffsets(ld);` — called unconditionally on EVERY resolution of a linked edge, immediately before reading the (now-guaranteed-current-shape) `timeLinkInOffset`/`timeLinkOutOffset` property. This is the function's ONLY caller in the entire codebase (confirmed by whole-src grep) — it runs on a READ path (any of the 13+ layerInPoint/layerOutPoint call sites), not on `importJSON`/load and not behind any explicit UI migration action; see `boundaries`."
+          ],
+          "behavior": [
+            "Lines 2727-2736 (comment, 10 lines): lead-in — the pre-2026-07-30 plain-number shape, why the migration is one-time/idempotent, the non-destructive \"leave legacy fields in place\" contract, cross-referencing effectorChannels' own identical pattern.",
+            "Line 2737 (code, 1 line): declaration; early-return for an absent layer or no `timeLink`.",
+            "Lines 2738-2741 (code, 4 lines): the `inOffset` migration guard and write.",
+            "Lines 2742-2746 (code, 5 lines): the identical `outOffset` migration guard and write.",
+            "Line 2747 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "resolve-linked-time",
+      "packets": [
+        {
+          "id": "C21j.resolve-linked-time",
+          "files": [
+            "src/js/app.js:2748-2785"
+          ],
+          "coverage_ranges": [
+            [
+              2748,
+              2785
+            ]
+          ],
+          "classification": {
+            "code": 19,
+            "comment": 19,
+            "whitespace": 0
+          },
+          "symbols": [
+            "resolveLinkedTime"
+          ],
+          "signature": "function resolveLinkedTime(ld,which,seen,depth){var link=ld.timeLink;if(!link)return null;var mode=link.mode||'both';if(which==='in'&&mode==='out')return null;if(which==='out'&&mode==='in')return null;var src=timeLinkSourceOf(ld);if(!src)return null;seen=seen||[];if(seen.indexOf(ld)>=0||depth>16)return null;seen.push(ld);var srcWhich=(link.srcAnchor==='in'||link.srcAnchor==='out')?link.srcAnchor:which;var base=srcWhich==='in'?layerInPoint(src,seen,depth+1):layerOutPoint(src,seen,depth+1);migrateTimeLinkOffsets(ld);var offProp=which==='in'?'timeLinkInOffset':'timeLinkOutOffset';var offVals=window.SMMotion?SMMotion.valueAtFrame(ld,offProp,state.currentFrame):null;var off=(offVals&&offVals[0])||0;return Math.max(0,Math.min(state.totalFrames-1,base+off));}",
+          "responsibility": "Resolves ONE edge (`which`: 'in' or 'out') of a linked layer's time range, or `null` if this edge isn't linked at all — the function every `layerInPoint`/`layerOutPoint`/raw-variant call funnels through FIRST, before ever looking at `ld.inPoint`/`ld.outPoint` directly. Guard order: no `ld.timeLink` at all → null immediately (unlinked layers pay nothing, per the section header's own claim); the link's own `mode` ('both'/'in'/'out') gates which edge(s) it actually covers — an 'in'-only link returns null for `which==='out'` so the OUT edge falls through to the layer's own value, and vice versa; no resolvable source (`timeLinkSourceOf` returned null, i.e. deleted) → null, fall through. Cycle guard: a plain `seen` array (created fresh on the outermost call, threaded through every recursive `layerInPoint`/`layerOutPoint` call on the source) plus a hard `depth>16` cap, mirroring the spatial-parenting guard's own shape (`SMMotion.setLayerParent`/`parentDescendants`, cited by name only) — a cycle degrades to \"use my own value\", never an infinite recursion. `srcAnchor` (2026-08-16, \"un in-point peut suivre un out-point\") lets a same-type default be overridden so an 'in' edge can be driven by the SOURCE's own out-point or vice versa — absent for every link created before this existed and for every 'both'-mode link (which never sets it, since \"my whole range follows your single point\" has no same/cross-type distinction to make). `base` is the SOURCE's own RESOLVED edge (recursive `layerInPoint`/`layerOutPoint` call, `depth+1`) — deliberately the clamped/resolved value, not the source's raw `ld.inPoint`/`outPoint`, so a chain of links composes correctly. `migrateTimeLinkOffsets(ld)` runs unconditionally here (packet 5) before the offset itself is read via `SMMotion.valueAtFrame(ld,offProp,state.currentFrame)` — expression-only, evaluated off `state.currentFrame` (confirmed scope with Cyril per the comment): neither `layerInPoint` nor `layerOutPoint` carries a frame parameter at any of their 13+ call sites, so an export pass that never advances `state.currentFrame` resolves every exported frame with the SAME offset, an accepted limitation of the small-scope option rather than a bug. Final result is clamped to `[0,state.totalFrames-1]` regardless of which resolver (clamped or raw) called it — the RAW resolvers still get a clamped `base+off` here; only their OWN fallback-to-`ld.inPoint`/`outPoint` branch stays unclamped, see packet 9's own header comment.",
+          "callers": [
+            "app.js:2840 — layerInPoint (this scope, packet 8): `resolveLinkedTime(ld,'in',_seen,depth)`.",
+            "app.js:2860 — layerInPointRaw (this scope, packet 9): `resolveLinkedTime(ld,'in',_seen,depth)`.",
+            "app.js:2891 — layerOutPoint (this scope, packet 10): `resolveLinkedTime(ld,'out',_seen,depth)`.",
+            "app.js:2903 — layerOutPointRaw (this scope, packet 10): `resolveLinkedTime(ld,'out',_seen,depth)`.",
+            "No caller outside app.js was found by a whole-src grep for `resolveLinkedTime\\(` — layer-inout.js's own trySetLinkedEdge/reconcileTimeLinks read/write the SAME `timeLinkInOffset`/`timeLinkOutOffset` Motion properties this function reads, rather than calling it directly; see `reconciliation`."
+          ],
+          "behavior": [
+            "Lines 2748-2751 (comment, 4 lines): lead-in — a link chain must terminate, same shape as the spatial-parenting guard.",
+            "Line 2752 (code, 1 line): declaration, four formal parameters.",
+            "Lines 2753-2756 (code, 4 lines): `link`/`mode` resolution, the two mode-vs-which early-outs.",
+            "Lines 2757-2758 (code, 2 lines): resolve `src`, early-return null if absent.",
+            "Lines 2759-2761 (code, 3 lines): `seen=seen||[]`, the cycle/depth guard, `seen.push(ld)`.",
+            "Lines 2762-2768 (comment, 7 lines): the cross-type `srcAnchor` design note.",
+            "Line 2769 (code, 1 line): `srcWhich` resolution.",
+            "Line 2770 (comment, 1 line): boundary note continuing into the base-resolution line.",
+            "Line 2771 (code, 1 line): `base` — recursive layerInPoint/layerOutPoint call on `src`.",
+            "Lines 2772-2777 (comment, 6 lines): the expression-only / state.currentFrame-scope design note.",
+            "Line 2778 (code, 1 line): `migrateTimeLinkOffsets(ld);`.",
+            "Line 2779 (code, 1 line): `offProp` resolution.",
+            "Lines 2780-2783 (code, 4 lines): `offVals` via `SMMotion.valueAtFrame`, `off` default-to-0.",
+            "Lines 2784-2785 (code, 2 lines): the final clamp `Math.max(0,Math.min(state.totalFrames-1,base+off))`, closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "layer-has-time-range-clamp",
+      "packets": [
+        {
+          "id": "C21j.layer-has-time-range-clamp",
+          "files": [
+            "src/js/app.js:2786-2816"
+          ],
+          "coverage_ranges": [
+            [
+              2786,
+              2816
+            ]
+          ],
+          "classification": {
+            "code": 8,
+            "comment": 23,
+            "whitespace": 0
+          },
+          "symbols": [
+            "layerHasTimeRange",
+            "_clampToTimeline"
+          ],
+          "signature": "function layerHasTimeRange(ld,_depth){if(!ld)return false;if(ld.inPoint!=null||ld.outPoint!=null||ld.timeLink)return true;var depth=_depth||0;var fp=depth<8?_layerFolderParent(ld):null;return !!(fp&&layerHasTimeRange(fp,depth+1));}function _clampToTimeline(f){var last=state.totalFrames-1;return f<0?0:(f>last?last:f);}",
+          "responsibility": "`layerHasTimeRange(ld,_depth)`: true when the layer's visible range comes from anywhere OTHER than the full timeline — the guard `getEffectiveStrokes`/`saveActiveLayerFrame`/`saveAllLayerFrames` (all out of scope, cited by line only) test BEFORE ever calling `layerInPoint`/`layerOutPoint` themselves, so an unranged layer (the overwhelmingly common case) skips the resolution entirely. Direct case: any of `ld.inPoint`/`ld.outPoint`/`ld.timeLink` set. Folder-cascade case (2026-08 addition): a child with NO explicit range of its own still needs gating whenever its FOLDER PARENT has one — recurses into `_layerFolderParent` (packet 8) up to a `depth<8` cap, per the header comment's own warning that the two folder-cascade checks (this one and `layerInPoint`/`layerOutPoint`'s own clamp) MUST agree on \"does a range apply here at all\", or the downstream clamp silently never fires for the common unranged-child case — a textbook CLAUDE.md §1 new-field-not-checked-everywhere risk, closed here by construction rather than by convention. `_clampToTimeline(f)`: clamps `f` into `[0,state.totalFrames-1]` — the ONE chokepoint every in/out-consuming reader (the bar, `saveActiveLayerFrame`'s range guard, getEffectiveStrokes) shares, added 2026-08-16 after a stored `ld.outPoint` of 100 kept RESOLVING to 100 on a shrunk 30-frame timeline and inflated layer-inout.js's own bar/scroll width by the overflow — `ld.inPoint`/`ld.outPoint` themselves are never rewritten by shrinking the timeline (`SM.setTotalFrames`, out of scope), so growing it back restores the original range exactly.",
+          "callers": [
+            "app.js:2803 — layerHasTimeRange's own recursive self-call (this scope): `!!(fp&&layerHasTimeRange(fp,depth+1))`.",
+            "app.js:2951 — getEffectiveStrokes' own render gate (C21k, cited by line only): `if(layerHasTimeRange(ld)&&(frameIdx<layerInPoint(ld)||frameIdx>layerOutPoint(ld)))return[];`.",
+            "app.js:4685 — saveActiveLayerFrame's own range guard (general app.js territory, cited by line only): skips saving the active layer's current frame outside its own resolved range, unless a keyframe was JUST ensured at this exact frame (`freshlyEnsured`, so a content-creating tool's own save is never treated as a stale out-of-range read).",
+            "app.js:4705 — saveAllLayerFrames' own identical per-OTHER-layer guard (cited by line only): each layer can have its own independent range while sharing the single global `state.currentFrame`.",
+            "native-video-bridge.js:555 — _syncSymbolVideos (cited by line only): `if(window.layerHasTimeRange&&layerHasTimeRange(ld)){...}` — the complete external caller of `layerHasTimeRange` outside this scope and app.js itself.",
+            "`_clampToTimeline` callers: app.js:2842-2844 (layerInPoint, packet 8), app.js:2893-2895 (layerOutPoint, packet 10) — all in-scope, no external caller found by whole-src grep."
+          ],
+          "behavior": [
+            "Lines 2786-2790 (comment, 5 lines): lead-in — true when the range comes from anywhere but the full timeline, used by getEffectiveStrokes' own gate.",
+            "Line 2791 (code, 1 line): declaration; `!ld` early-return false.",
+            "Line 2792 (code, 1 line): the direct-range check.",
+            "Lines 2793-2799 (comment, 7 lines): the folder-cascade rationale — the two checks must agree, or the clamp silently never fires.",
+            "Lines 2800-2803 (code, 4 lines): `depth` resolution, folder-parent lookup capped at depth<8, the recursive return.",
+            "Line 2804 (code, 1 line): closing brace of layerHasTimeRange.",
+            "Lines 2805-2815 (comment, 11 lines): the _clampToTimeline design note — both resolvers clamp into the CURRENT timeline, the 2026-08-16 overflow bug and fix.",
+            "Line 2816 (code, 1 line): `_clampToTimeline` — single-expression declaration."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "folder-parent-and-in-point",
+      "packets": [
+        {
+          "id": "C21j.folder-parent-and-in-point",
+          "files": [
+            "src/js/app.js:2817-2848"
+          ],
+          "coverage_ranges": [
+            [
+              2817,
+              2848
+            ]
+          ],
+          "classification": {
+            "code": 19,
+            "comment": 13,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_layerFolderParent",
+            "layerInPoint"
+          ],
+          "signature": "function _layerFolderParent(ld){if(!ld||!ld.parentLayerUid)return null;for(var i=0;i<state.layers.length;i++){var o=state.layers[i];if(o!==ld&&o.layerUid===ld.parentLayerUid)return o.isFolderLayer?o:null;}return null;}function layerInPoint(ld,_seen,_depth){var depth=_depth||0;var linked=resolveLinkedTime(ld,'in',_seen,depth);var v;if(linked!=null)v=_clampToTimeline(linked);else if(ld.inPoint!=null)v=_clampToTimeline(ld.inPoint);else{var auto=autoInPointFromBlankKeyframe(ld);v=auto!=null?_clampToTimeline(auto):0;}var fp=depth<8?_layerFolderParent(ld):null;if(fp)v=Math.max(v,layerInPoint(fp,_seen,depth+1));return v;}",
+          "responsibility": "`_layerFolderParent(ld)`: resolves a layer's own FOLDER parent (not any parent — `o.isFolderLayer` must hold) by scanning `state.layers` for the other layer whose `layerUid` matches `ld.parentLayerUid`, returning `null` if that parent exists but isn't itself a folder (spatial parenting and folder-duration cascading share the SAME `parentLayerUid` field, so this is the one place that discriminates the two). Depth-capped by every caller at `depth<8` — nested folders are v1-unsupported (engine.rs `is_folder_layer`, out of scope, cited by name only) so normal use never recurses past one level; the cap exists purely against a hand-edited/migrated file. `layerInPoint(ld,_seen,_depth)`: the CLAMPED, canonical in-point resolver and one half of the scope's own central chokepoint. Resolution order: (1) `resolveLinkedTime(ld,'in',_seen,depth)` — a linked edge wins unconditionally, clamped; (2) a hard `ld.inPoint` (checked with `!=null`, not `||0`, so an explicit drag back to frame 0 is never reclaimed); (3) `autoInPointFromBlankKeyframe`'s own DEFAULT/display value, or `0` if even that returns null. After the layer's OWN value is settled, folder-duration cascading (2026-08) intersects it non-destructively: if a folder parent exists (`depth<8`), the RESOLVED value is raised to at least the folder parent's OWN resolved in-point (`Math.max`, recursing with `depth+1`) — `ld.inPoint` itself is never rewritten, so removing the child from the folder later restores its original numbers exactly, per the header's own \"non-destructive by design\" claim.",
+          "callers": [
+            "_layerFolderParent callers (all in-scope, no external caller found by whole-src grep): app.js:2802 (layerHasTimeRange, packet 7), app.js:2845/2865/2896/2908 (layerInPoint/layerInPointRaw/layerOutPoint/layerOutPointRaw, packets 8-10), app.js:4943 (general app.js territory, cited by line only, a folder-collapse/visibility helper reusing the same parent lookup).",
+            "layerInPoint callers, complete list from the whole-src grep: app.js:1663 (a mograph duplicator's timeOffset span, general app.js territory, cited by line only), app.js:2771 (resolveLinkedTime, this scope, packet 6), app.js:2846 (its own folder-cascade recursion), app.js:2925/2951/4685/4705 (unlinkTimeLinkPreserveRange packet 11, getEffectiveStrokes/saveActiveLayerFrame/saveAllLayerFrames, all out of scope, cited by line only), engine-bridge.js:1135/1153/1273 (the render-time in/out gate and nested native-video resolution), layer-inout.js:785/1180/1213 (captureLinkedOrig and both keyLock passes — the RESOLVED value, per this scope's own resolved-vs-raw contract in `boundaries`), motion.js:1969/2234/2330/5792/8563-8564/12420 (the Position/duration layer-list fields, shiftLayerMotionKeys' own trim-lock math), native-video-bridge.js:556 (_syncSymbolVideos), nemo-script.js:99/111/332/334 (the scripting API's edgeSetter, inFrame getter, linkTime), timeline.js:1204/10129 (a layer-bar drag boundary check)."
+          ],
+          "behavior": [
+            "Lines 2817-2822 (comment, 6 lines): the folder-duration-cascading design note — resolved here, non-destructive, depth guard mirrors resolveLinkedTime's own convention, nested folders v1-unsupported.",
+            "Lines 2823-2829 (comment, 7 lines): continuation — a child's own ld.inPoint/outPoint is never rewritten, only the resolved value is intersected.",
+            "Line 2830 (code, 1 line): `_layerFolderParent` declaration; `!ld||!ld.parentLayerUid` early-return null.",
+            "Lines 2831-2835 (code, 5 lines): the linear scan for the matching `layerUid`, `o.isFolderLayer?o:null` discrimination.",
+            "Line 2836 (code, 1 line): `return null;`.",
+            "Line 2837 (code, 1 line): closing brace of `_layerFolderParent`.",
+            "Line 2838 (code, 1 line): `layerInPoint` declaration, three formal parameters.",
+            "Lines 2839-2844 (code, 6 lines): `depth` resolution, `resolveLinkedTime` call, the linked/hard-value/auto-detect precedence chain.",
+            "Line 2845 (code, 1 line): folder-parent lookup, depth-capped.",
+            "Line 2846 (code, 1 line): the folder-cascade intersection, `Math.max`.",
+            "Line 2847 (code, 1 line): `return v;`.",
+            "Line 2848 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "in-point-raw-and-auto-out",
+      "packets": [
+        {
+          "id": "C21j.in-point-raw-and-auto-out",
+          "files": [
+            "src/js/app.js:2849-2888"
+          ],
+          "coverage_ranges": [
+            [
+              2849,
+              2888
+            ]
+          ],
+          "classification": {
+            "code": 21,
+            "comment": 19,
+            "whitespace": 0
+          },
+          "symbols": [
+            "layerInPointRaw",
+            "autoOutPointFromBlankKeyframe"
+          ],
+          "signature": "function layerInPointRaw(ld,_seen,_depth){var depth=_depth||0;var linked=resolveLinkedTime(ld,'in',_seen,depth);var v;if(linked!=null)v=linked;else if(ld.inPoint!=null)v=ld.inPoint;else{var auto=autoInPointFromBlankKeyframe(ld);v=auto!=null?auto:0;}var fp=depth<8?_layerFolderParent(ld):null;if(fp)v=Math.max(v,layerInPointRaw(fp,_seen,depth+1));return v;}function autoOutPointFromBlankKeyframe(ld){if(!ld||ld.symbolId)return null;var frames=ld.frames,lastNonBlank=-1,curBlank=true;for(var f=0;f<frames.length;f++){var fr=frames[f];if(fr.isKeyframe)curBlank=!fr.strokes.length;if(!curBlank)lastNonBlank=f;}return(lastNonBlank>=0&&lastNonBlank<frames.length-1)?lastNonBlank:null;}",
+          "responsibility": "`layerInPointRaw`: the UNCLAMPED counterpart of `layerInPoint` (2026-08, \"les layer dans motion doivent pouvoir aller au delà de la timeline ou en amont comme sur cavalry\") — identical resolution order (linked edge, then hard `ld.inPoint`, then the auto-detect default) but every value is used as-is, without `_clampToTimeline`'s own floor/ceiling; the folder-cascade intersection recurses into `layerInPointRaw` itself rather than the clamped sibling. `layerInPoint` itself is untouched by this addition: every CONTENT-affecting reader (getEffectiveStrokes, saveActiveLayerFrame's own range guard) keeps clamping to what can actually render — only the BAR (layer-inout.js's `updateBar`/drag handlers, via its own `inPointOf`) needs the raw value, purely so a layer can visibly start before frame 0 or run past the timeline's end, like an AE/Cavalry trim handle, without changing what actually renders in-range (see `boundaries`' own resolved-vs-raw contract). `autoOutPointFromBlankKeyframe`: the out-point mirror of `autoInPointFromBlankKeyframe` (packet 3, the ORIGINAL of the pair — this one predates it): defaults to where the layer's own drawing actually stops (its last blank keyframe with no non-blank keyframe after it) rather than always the full project length, purely a DEFAULT/display value — content past a blank keyframe was already invisible regardless (getEffectiveStrokes naturally returns `[]` for that whole tail), so this changes nothing about what renders, only what the bar honestly shows by default. Excludes component layers (`ld.symbolId`) — they have their own Frame/Speed/Offset timing model, not blank-keyframe timing. A manually-dragged `ld.outPoint` always wins over this once set (checked by the caller first).",
+          "callers": [
+            "app.js:2866 — layerInPointRaw's own folder-cascade recursion (this scope): `Math.max(v,layerInPointRaw(fp,_seen,depth+1))`.",
+            "layer-inout.js:23 — inPointOf (cited by line only): `window.layerInPointRaw?layerInPointRaw(ld):(ld.inPoint!=null?ld.inPoint:0)` — the COMPLETE external caller of `layerInPointRaw` outside this scope, confirmed by whole-src grep; the bar's own drawn position and drag math read exclusively through this wrapper.",
+            "autoOutPointFromBlankKeyframe callers: app.js:2895 (layerOutPoint, packet 10) and app.js:2907 (layerOutPointRaw, packet 10) — both in-scope, its own DEFAULT-value fallback branch; no caller outside app.js found by whole-src grep."
+          ],
+          "behavior": [
+            "Lines 2849-2857 (comment, 9 lines): lead-in — the 2026-08 \"beyond the timeline like Cavalry\" design note, this whole file (layer-inout.js) is UI-only, the render/content gate stays the clamped pair.",
+            "Line 2858 (code, 1 line): `layerInPointRaw` declaration, three formal parameters.",
+            "Lines 2859-2864 (code, 6 lines): `depth` resolution, `resolveLinkedTime` call, the linked/hard-value/auto-detect precedence chain, unclamped.",
+            "Line 2865 (code, 1 line): folder-parent lookup, depth-capped.",
+            "Line 2866 (code, 1 line): the folder-cascade intersection into the RAW recursive call.",
+            "Line 2867 (code, 1 line): `return v;`.",
+            "Line 2868 (code, 1 line): closing brace of `layerInPointRaw`.",
+            "Lines 2869-2878 (comment, 10 lines): lead-in for autoOutPointFromBlankKeyframe — the DEFAULT-value-only contract, purely a display default since content past a blank keyframe was already invisible, a manual override always wins.",
+            "Line 2879 (code, 1 line): declaration; early-return null for an absent layer or a component layer (with a trailing same-line comment on why: components have their own Frame/Speed/Offset timing model).",
+            "Line 2880 (code, 1 line): `var frames=ld.frames,lastNonBlank=-1,curBlank=true;`.",
+            "Lines 2881-2884 (code, 4 lines): the forward scan tracking the LAST non-blank frame.",
+            "Line 2885 (code, 1 line): `}` closing the for-loop.",
+            "Line 2886 (code, 1 line): `return(lastNonBlank>=0&&lastNonBlank<frames.length-1)?lastNonBlank:null;`.",
+            "Line 2887 (code, 1 line): closing brace.",
+            "Line 2888 (code, 1 line, counted within the 21-code total above): trailing brace/whitespace accounted for in the range's own classification total."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "out-point-and-raw",
+      "packets": [
+        {
+          "id": "C21j.out-point-and-raw",
+          "files": [
+            "src/js/app.js:2889-2911"
+          ],
+          "coverage_ranges": [
+            [
+              2889,
+              2911
+            ]
+          ],
+          "classification": {
+            "code": 22,
+            "comment": 1,
+            "whitespace": 0
+          },
+          "symbols": [
+            "layerOutPoint",
+            "layerOutPointRaw"
+          ],
+          "signature": "function layerOutPoint(ld,_seen,_depth){var depth=_depth||0;var linked=resolveLinkedTime(ld,'out',_seen,depth);var v;if(linked!=null)v=_clampToTimeline(linked);else if(ld.outPoint!=null)v=_clampToTimeline(ld.outPoint);else{var auto=autoOutPointFromBlankKeyframe(ld);v=auto!=null?_clampToTimeline(auto):state.totalFrames-1;}var fp=depth<8?_layerFolderParent(ld):null;if(fp)v=Math.min(v,layerOutPoint(fp,_seen,depth+1));return v;}function layerOutPointRaw(ld,_seen,_depth){var depth=_depth||0;var linked=resolveLinkedTime(ld,'out',_seen,depth);var v;if(linked!=null)v=linked;else if(ld.outPoint!=null)v=ld.outPoint;else{var auto=autoOutPointFromBlankKeyframe(ld);v=auto!=null?auto:state.totalFrames-1;}var fp=depth<8?_layerFolderParent(ld):null;if(fp)v=Math.min(v,layerOutPointRaw(fp,_seen,depth+1));return v;}",
+          "responsibility": "`layerOutPoint`: the exact mirror of `layerInPoint` (packet 8) for the OUT edge — same three-way precedence (linked, hard `ld.outPoint` via `!=null`, auto-detect default falling back to `state.totalFrames-1` rather than `0`), same folder-cascade intersection except `Math.min` instead of `Math.max` (a folder can only SHRINK a child's effective out-point, never extend it past its own). `layerOutPointRaw`: the unclamped mirror, same relationship to `layerOutPoint` that `layerInPointRaw` (packet 9) has to `layerInPoint` — read exclusively by layer-inout.js's own `outPointOf` wrapper for the bar's own drawn/drag math. Both functions share `layerInPoint`/`layerInPointRaw`'s own recursion-guard shape exactly (`_seen`/`depth` threaded through both the `resolveLinkedTime` call and the folder-parent recursion) — the ONLY structural asymmetry between the in-point and out-point families in this entire scope is the `Math.max`-vs-`Math.min` folder intersection and the `0`-vs-`state.totalFrames-1` no-value default, both directly following from \"in\" and \"out\" being opposite ends of a range.",
+          "callers": [
+            "layerOutPoint callers, complete list from the whole-src grep: app.js:1664 (the same mograph duplicator timeOffset span as layerInPoint's own caller, cited by line only), app.js:2771 (resolveLinkedTime, packet 6), app.js:2897 (its own folder-cascade recursion), app.js:2925/2951/4685/4705 (unlinkTimeLinkPreserveRange packet 11, getEffectiveStrokes/saveActiveLayerFrame/saveAllLayerFrames, out of scope, cited by line only), engine-bridge.js:1136/1154/1274, layer-inout.js:786/1181/1214 (the resolved value, per the resolved-vs-raw contract), motion.js:1970/2237/2331/5792/8563-8564/12421, native-video-bridge.js:557, nemo-script.js:100/115/332/335, timeline.js:1205/10119.",
+            "layerOutPointRaw's own folder-cascade recursion (this scope): app.js:2909.",
+            "layer-inout.js:24 — outPointOf (cited by line only): `window.layerOutPointRaw?layerOutPointRaw(ld):(ld.outPoint!=null?ld.outPoint:state.totalFrames-1)` — the COMPLETE external caller of `layerOutPointRaw` outside this scope, confirmed by whole-src grep."
+          ],
+          "behavior": [
+            "Line 2889 (code, 1 line): `layerOutPoint` declaration, three formal parameters.",
+            "Lines 2890-2895 (code, 6 lines): `depth` resolution, `resolveLinkedTime` call, the linked/hard-value/auto-detect precedence chain, defaulting to `state.totalFrames-1`.",
+            "Line 2896 (code, 1 line): folder-parent lookup, depth-capped.",
+            "Line 2897 (code, 1 line): the folder-cascade intersection, `Math.min`.",
+            "Line 2898 (code, 1 line): `return v;`.",
+            "Line 2899 (code, 1 line): closing brace of `layerOutPoint`.",
+            "Line 2900 (comment, 1 line): \"Unclamped counterpart — see layerInPointRaw's own comment just above.\".",
+            "Line 2901 (code, 1 line): `layerOutPointRaw` declaration, three formal parameters.",
+            "Lines 2902-2907 (code, 6 lines): identical precedence chain, unclamped.",
+            "Line 2908 (code, 1 line): folder-parent lookup, depth-capped.",
+            "Line 2909 (code, 1 line): the folder-cascade intersection into the RAW recursive call, `Math.min`.",
+            "Line 2910 (code, 1 line): `return v;`.",
+            "Line 2911 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "unlink-time-link-preserve-range",
+      "packets": [
+        {
+          "id": "C21j.unlink-time-link-preserve-range",
+          "files": [
+            "src/js/app.js:2912-2928"
+          ],
+          "coverage_ranges": [
+            [
+              2912,
+              2928
+            ]
+          ],
+          "classification": {
+            "code": 6,
+            "comment": 11,
+            "whitespace": 0
+          },
+          "symbols": [
+            "unlinkTimeLinkPreserveRange"
+          ],
+          "signature": "function unlinkTimeLinkPreserveRange(ld){if(!ld||!ld.timeLink)return;var effIn=layerInPoint(ld),effOut=layerOutPoint(ld);delete ld.timeLink;ld.inPoint=effIn;ld.outPoint=effOut;}",
+          "responsibility": "The scope's ONLY writer of `ld.inPoint`/`ld.outPoint`/`ld.timeLink` directly (confirmed by grep — see `boundaries`). Right-click unlink (2026-07-30, on-timeline anchors/badges/the \"Temps\" row) must leave the layer exactly where it LOOKED while linked — a bare `delete ld.timeLink` makes `layerInPoint`/`layerOutPoint` fall through to `ld.inPoint`/`ld.outPoint`, which are UNSET on a linked layer (neither `trySetLinkedEdge` nor `reconcileTimeLinks`, layer-inout.js, ever write them while a link covers that edge) — so deleting the link alone used to silently reset the layer to its full range (found live, Cyril: \"le calque se reset alors qu'il doit rester comme il était en étant parent, juste le parent in time désactivé\"). Captures the CURRENT resolved values via `layerInPoint(ld)`/`layerOutPoint(ld)` (the CLAMPED resolvers, not the raw pair — an unlink should bake in exactly what the bar was actually showing) BEFORE deleting the link, then bakes them as the new hard `ld.inPoint`/`ld.outPoint` — every unlink call site is documented as needing to go through this instead of deleting the link directly. Four of five UI-driven unlink sites do; a fifth, nemo-script.js's own scripting-API `unlinkTime()`, does not — see `boundaries`/`future_proposals`.",
+          "callers": [
+            "layer-inout.js:1508 — the bar's own right-click contextmenu handler (cited by line only): `if(window.unlinkTimeLinkPreserveRange)unlinkTimeLinkPreserveRange(ld2);else delete ld2.timeLink;` — the fallback branch only fires if this function is somehow unavailable on `window`.",
+            "motion.js:7227 — the side-panel Parent-in-Time mode-change UI (cited by line only): `pushUndo();unlinkTimeLinkPreserveRange(ld);`.",
+            "motion.js:8379 — a second Parent-in-Time UI site (cited by line only): identical `pushUndo();unlinkTimeLinkPreserveRange(ld);` pairing.",
+            "timeline.js:6033 — a Rig/Component-adjacent unlink action (cited by line only): `pushUndo();unlinkTimeLinkPreserveRange(ld);onChanged();`.",
+            "timeline.js:6584 — a second timeline.js unlink site (cited by line only): `pushUndo();unlinkTimeLinkPreserveRange(ld);`."
+          ],
+          "behavior": [
+            "Lines 2912-2922 (comment, 11 lines): lead-in — the right-click-unlink-must-preserve-appearance bug, found live, the fix's own before/after contract.",
+            "Line 2923 (code, 1 line): declaration, one formal parameter.",
+            "Line 2924 (code, 1 line): early-return for an absent layer or no `timeLink`.",
+            "Line 2925 (code, 1 line): capture `effIn=layerInPoint(ld),effOut=layerOutPoint(ld)` BEFORE deleting the link.",
+            "Line 2926 (code, 1 line): `delete ld.timeLink;`.",
+            "Line 2927 (code, 1 line): `ld.inPoint=effIn;ld.outPoint=effOut;`.",
+            "Line 2928 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "app.js:2929+ getEffectiveStrokes (C21k, the render/save/export chokepoint, not yet filed as an issue at authoring time)",
+      "disposition": "Retains its own body in full — cited by line only. The complete reader of this scope's own render-gate exports: `layerHasTimeRange`/`layerInPoint`/`layerOutPoint` (2951, its own frame-visibility guard), `getLFSSubStrokes` (2990-2992, the `ld.lfsGroup` stacking branch), `resolveSymbolFrameIdx` (3011, the `ld.symbolId` branch). None of getEffectiveStrokes' own body is reproduced here."
+    },
+    {
+      "consumer": "layer-inout.js (the on-timeline After-Effects-style layer bar: updateBar/drag handlers, right-click unlink, Parent-in-Time UI)",
+      "disposition": "Retains its own body in full — cited by line only. The complete external caller of `layerInPointRaw`/`layerOutPointRaw` (its own `inPointOf`/`outPointOf` wrappers, 23-24) and `timeLinkSourceOf` (49, trySetLinkedEdge); an external caller of the RESOLVED `layerInPoint`/`layerOutPoint` wherever a drag needs to reconcile against another layer's actual position rather than its raw bar-drawing value (captureLinkedOrig 785-786, both keyLock passes 1180-1181/1213-1214); the ONLY external caller of `unlinkTimeLinkPreserveRange` outside timeline.js/motion.js (1508, the right-click contextmenu). Its own `trySetLinkedEdge`/`reconcileTimeLinks` read/write `timeLinkInOffset`/`timeLinkOutOffset` directly rather than calling `resolveLinkedTime`; both sides of a link stay a single value because they share the same underlying Motion property, not because either calls the other's resolver."
+    },
+    {
+      "consumer": "motion.js (Time Remap's timeRemapValue/valueAtFrame, the Component-enter frame jump, key/trim locking, Parent-in-Time UI)",
+      "disposition": "Retains its own body in full — cited by name/line only. `SMMotion.timeRemapValue` and `SMMotion.valueAtFrame` are READ by this scope's own `resolveSymbolFrameIdx` (2623-2626) and `resolveLinkedTime` (2778/2783) respectively; neither is written by this scope. motion.js calls INTO this scope at `resolveSymbolFrameIdx` (6867), `layerInPoint`/`layerOutPoint` (1969-1970, 2234, 2237, 2330-2331, 5792, 8563-8564, 12420-12421), and `unlinkTimeLinkPreserveRange` (7227, 8379)."
+    },
+    {
+      "consumer": "timeline.js (the Component panel, comp-frame-strip, exportJSON's own ld field whitelist, splitLayerAtPlayhead, Parent-in-Time UI)",
+      "disposition": "Retains its own body in full — cited by line only. Calls `resolveSymbolFrameIdx` (7099, 7172), `layerInPoint`/`layerOutPoint` (1204-1205, 10119, 10129), `unlinkTimeLinkPreserveRange` (6033, 6584). exportJSON's own per-layer field whitelist (2117-2125) is the persisted-shape authority for every `ld.*` field this scope reads except `symTrimIn`/`symTrimOut` — see `boundaries` for why that omission is by design, not a gap. `splitLayerAtPlayhead`'s own bare `delete ld.timeLink`/`delete dst.timeLink` (1251-1252) is a deliberate divergence from `unlinkTimeLinkPreserveRange`'s own contract — see `boundaries`."
+    },
+    {
+      "consumer": "engine-bridge.js and native-video-bridge.js (the render-time in/out gate and native-video symbol-frame sync)",
+      "disposition": "Retain their own bodies in full — cited by line only. engine-bridge.js reads `layerInPoint`/`layerOutPoint` (1135-1136, 1153-1154, 1273-1274) and calls `resolveSymbolFrameIdx` (1266). native-video-bridge.js's `_syncSymbolVideos` (548-565) is the complete external caller of `layerHasTimeRange` outside this scope and app.js, and also reads `layerInPoint`/`layerOutPoint`/`resolveSymbolFrameIdx`."
+    },
+    {
+      "consumer": "comp-preview.js (the Time Remap preview window) and nemo-script.js (the Layer scripting API)",
+      "disposition": "Retain their own bodies in full — cited by line/name only. comp-preview.js's `show()` (224) calls `resolveSymbolFrameIdx` once. nemo-script.js's `inFrame`/`outFrame` getters (111, 115), `edgeSetter` (99-100, on the link SOURCE), and `linkTime` (332, 334-335) call `layerInPoint`/`layerOutPoint`; its `unlinkTime` (340) does NOT call `unlinkTimeLinkPreserveRange` — see `boundaries`/`future_proposals`."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-resolvesymbolframeidx-componentframe-overrides-mode",
+      "proposed": "Set an outer keyframe's `componentFrame` to 5 on a layer whose `symPlayMode` is 'loop' with a totally different implied frame; call resolveSymbolFrameIdx at that outer frame; expect exactly 5 (clamped into [0,sym.totalFrames-1]) regardless of the play-mode math — verifies the componentFrame override's own precedence at lines 2604-2612 — not run."
+    },
+    {
+      "id": "fx-resolvesymbolframeidx-timeremap-overrides-playmode",
+      "proposed": "Set `layer.timeRemap` truthy with a stubbed `SMMotion.timeRemapValue` returning 7, and `layer.symPlayMode='once'` with trim bounds that would otherwise clamp to a different value; expect resolveSymbolFrameIdx to return 7 — verifies Time Remap's own unconditional override at lines 2623-2626 — not run."
+    },
+    {
+      "id": "fx-resolvesymbolframeidx-once-holds-at-trimout",
+      "proposed": "Call resolveSymbolFrameIdx with symPlayMode='once', symTrimIn=2, symTrimOut=6, and mainFrameIdx far enough past symPlacedAt that elapsed exceeds (trimOut-trimIn); expect the return value to equal trimOut (6), not roll over into frames beyond it — verifies the hold-at-trimOut clamp at line 2641 — not run."
+    },
+    {
+      "id": "fx-resolvesymbolframeidx-pingpong-bounces",
+      "proposed": "Call resolveSymbolFrameIdx with symPlayMode='pingpong', total=5, at elapsed values 0,4,5,8,9; expect 0,4,0,3,0 (a full up-down cycle of length (total-1)*2=8) — verifies the pingpong formula at lines 2642-2647 — not run."
+    },
+    {
+      "id": "fx-getlfssubstrokes-composites-shadow-full-line-order",
+      "proposed": "Build an ld with lfsGroup set and distinct single-stroke content on each of shadow/full/line sub-symbols at a given frame; call the lfsGroup branch's own concat chain; expect the resulting array's order to be [shadow-stroke, full-stroke, line-stroke] — verifies the explicit back-to-front stacking order at app.js:2990-2992 — not run."
+    },
+    {
+      "id": "fx-getlfssubstrokes-inherits-held-frame",
+      "proposed": "Call getLFSSubStrokes(ld,'line',frameIdx) where frameIdx is a non-keyframe, non-interpolated frame held from an earlier keyframe with non-empty strokes; expect the returned strokes to equal that earlier keyframe's own strokes array, not [] — verifies the backward-walk fallback at line 2662 — not run."
+    },
+    {
+      "id": "fx-autoinpoint-null-when-nonblank-from-zero",
+      "proposed": "Call autoInPointFromBlankKeyframe on a layer whose frame 0 keyframe already has non-empty strokes; expect null (the caller then defaults to 0) — verifies the firstNonBlank<=0 branch at line 2689 — not run."
+    },
+    {
+      "id": "fx-autoinpoint-finds-first-nonblank-keyframe",
+      "proposed": "Build a layer with a blank keyframe at frame 0 and a non-blank keyframe at frame 20; call autoInPointFromBlankKeyframe; expect 20 — verifies the forward scan at lines 2684-2687 — not run."
+    },
+    {
+      "id": "fx-timelinksourceof-null-when-source-deleted",
+      "proposed": "Set ld.timeLink.uid to a uid not present on any state.layers entry; call timeLinkSourceOf(ld); expect null — verifies the fall-through-to-own-values contract at line 2725 — not run."
+    },
+    {
+      "id": "fx-migratetimelinkoffsets-idempotent",
+      "proposed": "Set ld.timeLink.inOffset=5 with no ld.motion/ld.motionStatic.timeLinkInOffset; call migrateTimeLinkOffsets(ld) twice; expect ld.motionStatic.timeLinkInOffset to equal [5] after the first call and be UNCHANGED (not doubled/re-migrated) after the second — verifies the idempotent guard at lines 2738-2741 — not run."
+    },
+    {
+      "id": "fx-resolvelinkedtime-mode-gates-edge",
+      "proposed": "Set ld.timeLink.mode='in'; call resolveLinkedTime(ld,'out',...); expect null (falls through to the layer's own out-point) — call resolveLinkedTime(ld,'in',...) on the same ld; expect a resolved number — verifies the mode guard at lines 2755-2756 — not run."
+    },
+    {
+      "id": "fx-resolvelinkedtime-cycle-guard",
+      "proposed": "Link two layers to each other (A.timeLink.uid=B's uid, B.timeLink.uid=A's uid); call layerInPoint(A); expect it to terminate (not stack-overflow) and fall through to A's own ld.inPoint/auto-detect value once the cycle is detected — verifies the seen/depth guard at lines 2759-2761 — not run."
+    },
+    {
+      "id": "fx-resolvelinkedtime-cross-type-srcanchor",
+      "proposed": "Set ld.timeLink={uid:srcUid,mode:'in',srcAnchor:'out'}; call layerInPoint(ld); expect the resolved base to come from the SOURCE's own layerOutPoint, not layerInPoint — verifies the srcWhich override at line 2769 — not run."
+    },
+    {
+      "id": "fx-layerhastimerange-folder-cascade-agreement",
+      "proposed": "Build a folder layer with an explicit outPoint and an unranged child inside it; call layerHasTimeRange(child); expect true; then call layerOutPoint(child) at a frame beyond the folder's own outPoint; expect it to be clamped down to the folder's resolved out-point — verifies the two folder-cascade checks agree per the boundaries note — not run."
+    },
+    {
+      "id": "fx-clamptotimeline-floor-and-ceiling",
+      "proposed": "Call _clampToTimeline(-5) and _clampToTimeline(state.totalFrames+50); expect 0 and state.totalFrames-1 respectively — verifies the floor/ceiling at line 2816 — not run."
+    },
+    {
+      "id": "fx-layerfolderparent-rejects-non-folder",
+      "proposed": "Set ld.parentLayerUid to a layer's uid whose isFolderLayer is false; call _layerFolderParent(ld); expect null, not that non-folder layer — verifies the o.isFolderLayer?o:null discrimination at line 2833 — not run."
+    },
+    {
+      "id": "fx-layerinpoint-vs-raw-diverge-past-timeline",
+      "proposed": "Set ld.inPoint=-10 on a layer with no timeLink; call layerInPoint(ld) and layerInPointRaw(ld); expect 0 and -10 respectively — verifies the clamped-vs-unclamped divergence between packets 8 and 9 — not run."
+    },
+    {
+      "id": "fx-layeroutpoint-folder-cascade-uses-min",
+      "proposed": "Build a folder with outPoint=50 and a child with its own outPoint=80 inside it; call layerOutPoint(child); expect 50 (Math.min), not 80 — verifies the folder intersection at line 2897 — not run."
+    },
+    {
+      "id": "fx-unlinktimelinkpreserverange-bakes-resolved-values",
+      "proposed": "Link a layer with an in-offset that resolves to frame 12; call unlinkTimeLinkPreserveRange(ld); expect ld.timeLink to be gone AND ld.inPoint===12 (the RESOLVED value at the moment of unlink), not 0 or the pre-link value — verifies the capture-before-delete order at lines 2925-2927 — not run."
+    },
+    {
+      "id": "fx-unlinktime-script-api-diverges-from-preserve-range",
+      "proposed": "Link a layer via nemo-script's linkTime() so its resolved inPoint is 12, then call Layer.prototype.unlinkTime(); expect (per the current source) ld.inPoint/outPoint to remain UNSET rather than baked to 12/its resolved out-point, contrasting with unlinkTimeLinkPreserveRange's own contract — verifies and documents the divergence noted in boundaries/future_proposals — not run."
+    }
+  ],
+  "future_proposals": [
+    "nemo-script.js's own `Layer.prototype.unlinkTime` (line 340: `delete this._ld().timeLink; return this;`) bypasses `unlinkTimeLinkPreserveRange` entirely, unlike every UI-driven unlink gesture (layer-inout.js:1508, motion.js:7227/8379, timeline.js:6033/6584) — confirmed by direct read, no accompanying `ld.inPoint`/`ld.outPoint` write and no comment explaining the divergence, unlike the two OTHER bare-delete sites in the codebase (app.js:3957's merge-cleanup re-point, timeline.js:1251-1252's split-cut hard-value bake), both of which have their own explicit rationale. A script calling `unlinkTime()` on a linked layer therefore silently resets it to its full/auto range instead of preserving the range it visually had while linked — exactly the class of bug `unlinkTimeLinkPreserveRange`'s own header comment (2912-2917) was written to prevent for UI call sites. Not changed here (out of this census's read-only scope); a one-line fix would route `unlinkTime` through `window.unlinkTimeLinkPreserveRange` the same way layer-inout.js's own contextmenu handler already does.",
+    "`symTrimIn`/`symTrimOut` (read by `resolveSymbolFrameIdx`'s own 'once' branch, packet 1) are absent from exportJSON's per-layer field whitelist (timeline.js:2117-2125) — confirmed by design, not a bug: they only ever exist on `enterMontageView`'s own throwaway synthetic layers (app.js:4330), reconstructed fresh from the PERSISTED montage module's own `mod.trimIn`/`mod.trimOut` every time that view is entered. Worth flagging explicitly for whoever next touches montage persistence or the export whitelist, since the absence looks identical to a missed field at a glance — see `boundaries` for the full trace. Not changed here.",
+    "`resolveLinkedTime`'s own offset read (`SMMotion.valueAtFrame(ld,offProp,state.currentFrame)`, line 2783) is explicitly `state.currentFrame`-scoped rather than frame-parametrized, per its own comment (\"confirmed scope with Cyril\"): an export pass that renders every frame without ever moving `state.currentFrame` would resolve a Parent-in-Time-linked layer's in/out with the SAME offset on every exported frame, even if the offset were ever keyframed in the future (it currently cannot be — motion.js's own `PROP_NO_STOPWATCH` hides the stopwatch on these two properties). Currently harmless (the offset is static in practice), but a plausible correctness gap the moment true per-frame time-link keyframing is considered — flagged here since this scope is the one place the design tradeoff is visible in code, not changed.",
+    "`getLFSSubStrokes` (packet 2) and the `ld.symbolId` branch of getEffectiveStrokes (C21k, cited by name only) implement the SAME held-frame-inheritance pattern (walk backward from the resolved internal frame to the nearest preceding keyframe) independently, with no shared helper between them — a third near-identical copy of a small, easy-to-get-subtly-wrong loop (CLAUDE.md §3's duplicated-pair caution, though neither copy was found to actually diverge in this census). Not changed here; a shared `_nearestKeyframeStrokes(symLayer,ii)` helper would remove the duplication if a future edit ever needs to touch this logic."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src` `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\('` was run once for each of the fifteen function symbols this scope declares, at the frozen SHA, filtering out each symbol's own declaration line and any hit whose trimmed content starts with `//` — results are reproduced verbatim under each packet's own `callers` field and are re-checkable with the same commands. This confirmed the issue's own proposed caller list exactly, with one correction noted in `boundaries` (state.currentFrame is also read, inside resolveLinkedTime, not only state.layers/state.totalFrames/state.symbols) and one addition (unlinkTimeLinkPreserveRange has two call sites each in timeline.js and motion.js, not one).",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a small Python script implementing the validator's OWN classify() algorithm (blank/`//`-prefixed/`/*...*/`-block line counting) against a direct `git show 59a5a38c:src/js/app.js` dump, run once per packet and once for the total — 165/164/0 over 329 lines, matching the issue's own proposed union exactly, and matching the issue's own proposed per-packet figures exactly for all eleven packets.",
+    "Every persisted `ld.*` field this scope reads was cross-checked against `exportJSON`'s own per-layer field whitelist (timeline.js:2117-2125) by direct read of that literal, rather than assumed — this surfaced the one field pair (`symTrimIn`/`symTrimOut`) this scope reads but that whitelist omits by design (montage-view synthetic layers only, never a persisted ordinary layer field), documented in `boundaries`/`future_proposals`.",
+    "The unlink-call-site claim in `boundaries` (four of five UI-driven call sites route through `unlinkTimeLinkPreserveRange`, one scripting-API site does not) was confirmed by a separate whole-src grep for `delete.*timeLink` across `src/js/*.js`, reading each of the five hits' own surrounding code/comments to distinguish a deliberate divergence (app.js:3957, timeline.js:1251-1252, both explained by their own comments) from an apparent oversight (nemo-script.js:340, no comment, no compensating write) — not assumed from the header comment's own \"every call site should\" claim alone.",
+    "The \"no Paper item access\" claim in `boundaries` was confirmed by a literal grep of the assigned range for `Path`/`Segment`/`Point`/`CompoundPath`/`Raster`/`.children` (zero hits outside comments), not assumed from this scope's plain-JSON-looking function signatures alone."
+  ],
+  "validation": {
+    "expected_assigned_lines": 329,
+    "expected_classification": {
+      "code": 165,
+      "comment": 164,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        2600,
+        2649
+      ],
+      [
+        2650,
+        2664
+      ],
+      [
+        2665,
+        2691
+      ],
+      [
+        2692,
+        2726
+      ],
+      [
+        2727,
+        2747
+      ],
+      [
+        2748,
+        2785
+      ],
+      [
+        2786,
+        2816
+      ],
+      [
+        2817,
+        2848
+      ],
+      [
+        2849,
+        2888
+      ],
+      [
+        2889,
+        2911
+      ],
+      [
+        2912,
+        2928
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by a Python re-implementation of the validator's own classify() run against the frozen blob: 2600-2649=(31,19,0); 2650-2664=(10,5,0); 2665-2691=(10,17,0); 2692-2726=(8,27,0); 2727-2747=(11,10,0); 2748-2785=(19,19,0); 2786-2816=(8,23,0); 2817-2848=(19,13,0); 2849-2888=(21,19,0); 2889-2911=(22,1,0); 2912-2928=(6,11,0); sums to (165,164,0)=329 — identical to the issue's own proposed union and per-packet table exactly.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 329 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C21j-app-symbol-frame-layer-time-model.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21h-app-rig-model-binding.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21g-app-duplicator-runtime.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21f-app-symbol-matrix-duplicator-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21d-app-desp-relink-remote-merge.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21c-app-path-serialisation-serp.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json <candidate-sha> still exits 0",
+      "C21i-app-rig-deform-ik-census.json (#1203) was not present on main at authoring time (its own PR/branch was still being authored concurrently in a sibling worktree) and is therefore not included in this artifact's own required_checks list; per the issue's own acceptance criterion 2, it should be added to this check list once merged."
+    ]
+  }
+}
