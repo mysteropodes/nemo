@@ -1,0 +1,909 @@
+{
+  "census_id": "C21a",
+  "issue": 1180,
+  "title": "app.js canvas backing size, timeline row metrics and the `state` declaration head",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C21a census only; C21b (app.js:360-599, Paper layers/createUserLayer/reorderLayers*/drawStage/zoom-view/colorHex8/applyBrushKeyline — cited by call site only where syncCanvasSize's relation to fitCanvas/updZoom is mentioned, not re-mapped), C21c (app.js:600-836, serP), C06 (app.js:1-9 storage-key-migration lead-in reconciled by P03C-a/#1179, and app.js:314-359 preferences.user-profile — userProfile/revisionView/comments fields and initUserProfile/saveUserProfile, cited by line only), P30 (timeline.js runtime writer for every setXxx/toggleXxx mutator cited under callers), motion.js/C20e-family (the state.appMode sole writer at motion.js:13204 and motion.js's own unrelated local ROW_H=22, cited by line only), and every other named module (rulers-bridge.js, palette-panel.js, shadow-brush-bridge.js, symmetry-bridge.js, perspective-bridge.js, audio-bridge.js, reference-bridge.js, media-library.js, linked-media.js, image-mesh.js, select-bridge.js, timeline-zoom.js, engine-bridge.js) remain separate owners, cited by call site only",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "45cd7289c603d3d8598968e1c608d7e51edf79a3",
+  "source_path": "src/js/app.js",
+  "source_blob": "0831959f70612721f80717812838d19940d1f7c1",
+  "source_line_count": 5410,
+  "scope_files": [
+    "src/js/app.js"
+  ],
+  "intended_branch": "claude/c21a-app-state-head-census",
+  "assigned_ranges": [
+    {
+      "start": 41,
+      "end": 313
+    }
+  ],
+  "coverage_note": "Exactly 273 assigned lines occur once across ten packets (one coverage_range per packet, no gaps, no other-owner overlap): 71 code, 200 full-line `//` comments, 2 blank — matches the issue's proposed union exactly (independently re-derived by classifying the frozen blob programmatically per-packet and summed, not merely copied from the issue table: 9+2+4+2+7+6+7+9+17+8=71 code; 16+8+0+3+33+22+26+35+11+46=200 comment; 2+0*9=2 blank). Line 40 (C06's `paper.setup(document.getElementById('drawing-canvas'));`) is out of scope; line 41 (a blank line) opens this scope. Line 313 (`layerLinkGroups:{},`) is the last line of this scope; line 314 opens C06's own 'Team review (Phase 1)' lead-in comment for `userProfile`, confirmed by reading source through line 359 (`initUserProfile();`) and line 360 (`var stageLayer=new Layer({name:'stage'});`, C21b's first line) — matches the issue's own stated boundary exactly.",
+  "source_baselines": {
+    "pinned": "59a5a38c:src/js/app.js resolves to 0831959f70612721f80717812838d19940d1f7c1, 5410 lines.",
+    "current": "origin/main (45cd7289c603d3d8598968e1c608d7e51edf79a3) has the identical app.js blob (git rev-parse 45cd7289:src/js/app.js == git rev-parse 59a5a38c:src/js/app.js == 0831959f70612721f80717812838d19940d1f7c1); this artifact branches from origin/main at 45cd7289.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All writer/reader/persistence findings were derived by `git grep -n -E` against the frozen blob and by reading exportJSON (timeline.js:2049-2246, the literal object-literal keys of the `return JSON.stringify({...})` call) and importJSON (timeline.js:2354-2694) directly, per-field, rather than trusting each field's own in-source comment.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes are read as authorial intent, not fresh execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json and the ten app.js packets partitioning lines 41-313.",
+    "app_js": "app.js retains the whole runtime writer for every field/function in this scope; this JSON authoring does not authorize source changes.",
+    "c21b_boundary": "syncCanvasSize's relation to fitCanvas/updZoom (both declared at app.js:360+, inside C21b's own 360-599 range) is cited by name only per the issue's explicit instruction — this artifact does not re-describe either function's body. Likewise `colorHex8`, `createUserLayer`, `reorderLayers*`, `drawStage` and the zoom/view helpers remain C21b's territory.",
+    "c06_boundary": "Lines 1-9 (the storage-key-migration IIFE lead-in) are reconciled by P03C-a/#1179, not by this leaf. Lines 314-359 (`userProfile`/`revisionView`/`comments` fields plus `initUserProfile`/`saveUserProfile`) belong to C06.preferences.user-profile's pre-existing claim — cited by line number only where a field in THIS scope's persistence check needed to distinguish itself from that continuation (e.g. confirming `comments` is NOT one of this scope's 118 fields), never re-mapped or re-described.",
+    "motion_js_boundary": "`state.appMode`'s sole writer (`SMMotion.setAppMode`, motion.js:13204, the assignment itself) and motion.js's own unrelated local `var ROW_H=22` (motion.js:43, inside its own top-level IIFE, motion.js:27-13914) are cited by line number only — this artifact does not re-describe `setAppMode`'s own body or any of Motion's property-row layout math built on its local ROW_H.",
+    "timeline_js_boundary": "P30/timeline.js retains every `setXxx`/`toggleXxx` mutator cited under each packet's `callers` (e.g. `setBrushSize`, `setStrokeColor`, `toggleOnion`, `setWorkArea`, `exportJSON`, `importJSON`) — this artifact cites their field-assignment call sites only, never reproduces their bodies beyond the single cited line.",
+    "named_module_owners": "rulers-bridge.js (rulersOn/guidesLocked/guidesSnap/guides/smartGuides/pixelGridSnap), palette-panel.js (palettes/activePaletteIdx), shadow-brush-bridge.js (shadowPalette/shadowActiveId/shadowMode), symmetry-bridge.js (symmetryEnabled/Mode/Axis/RadialCenter/RadialSectors/Extend), perspective-bridge.js (perspectiveEnabled/Mode/Density/VPs), audio-bridge.js (audioTracks), reference-bridge.js (refMedia), media-library.js (mediaLibrary), linked-media.js (mediaMode), image-mesh.js (imageMeshes), select-bridge.js (trackRoles, selectedStrokeIndices, xformAnchorCustom), timeline-zoom.js (FC's own persistence/apply()), engine-bridge.js (render-time consumption of outlineView/previewAlphaBg/canvasClip/safetyZones/canvasRotation/etc.), brush-editor.js and brush-tool-presets.js (customBrushPresets vs. the separate cross-project preset library), NemoFolderCodec (layerFolders serialization) each retain their own module — this artifact cites their writer/reader call sites only, per field, and never reproduces a named module's own function bodies.",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "P03C-a / #1179 (existing owner, PR merged)",
+      "disposition": "Retains app.js:1-9, the storage-key-migration IIFE lead-in comment. This scope's own boundary begins at line 41 (the blank line after C06's `paper.setup(...)` at line 40); lines 10-40 belong to other, already-reconciled census leaves per the issue body and are not re-examined here."
+    },
+    {
+      "owner": "C06.preferences.user-profile (existing owner, pre-existing claim)",
+      "disposition": "Retains app.js:314-359 — the tail of the SAME `var state={...}` object literal this scope's packet 8 (`state-media-symbols-registries`) partitions up to line 313. The literal itself runs 78-329 continuously (opens at 78, `};` closes at 326, followed by `initUserProfile()`/`saveUserProfile()`/the `initUserProfile();` call through 359); the 313/314 split is C06's own pre-existing boundary, not a new decision made here. Confirmed by reading source through line 360 (`var stageLayer=new Layer({name:'stage'});`, C21b's own first line): line 313 is `layerLinkGroups:{},`, line 314 opens C06's 'Team review (Phase 1)' comment for `userProfile`, and the three fields declared in 314-325 (`userProfile`, `revisionView`, `comments`) were independently confirmed absent from this artifact's own 118-field extraction of lines 78-313 (a bracket-depth-aware parse of the literal's top-level `key:value,` entries found exactly 121 total across 78-325, of which exactly 3 — `userProfile`, `revisionView`, `comments` — fall outside 78-313)."
+    },
+    {
+      "owner": "C21b (next leaf, not yet numbered at authoring time beyond the issue's own forward reference)",
+      "disposition": "Retains app.js:360-599 (Paper layers, `createUserLayer`/`reorderLayers*`, `drawStage`, zoom/view, `colorHex8`, `applyBrushKeyline`) — this scope's `syncCanvasSize` packet cites `fitCanvas`/`updZoom` (both declared inside 360-599) by name only, per the issue's explicit instruction, and does not describe either function's body or read their source."
+    },
+    {
+      "owner": "C21c (next leaf, not yet numbered at authoring time beyond the issue's own forward reference)",
+      "disposition": "Retains app.js:600-836 (`serP`) — no packet in this scope reproduces or reads that range; not cited from any packet here."
+    },
+    {
+      "owner": "motion.js / SMMotion (existing owner)",
+      "disposition": "Retains `setAppMode` (motion.js:13204, the sole `state.appMode=` writer, confirmed by grep — every other reference to `state.appMode` anywhere in src/js is a read guard) and motion.js's own entirely separate, function-scoped local `var ROW_H=22` (motion.js:43, inside motion.js's own top-level IIFE spanning motion.js:27-13914) — a naming collision with app.js's global `ROW_H=34` (this scope's own packet 2), not a shared consumer; motion.js's 4 code + 9 comment references to `ROW_H` all resolve to ITS OWN local, never to app.js's global. Neither symbol's own body/surrounding logic is reproduced here beyond the single cited line."
+    },
+    {
+      "owner": "timeline.js / P30 (existing owner, runtime writer)",
+      "disposition": "Retains every `SM.setXxx`/`toggleXxx` mutator method cited under each state-field packet's `callers` (e.g. `setBrushSize` timeline.js:520, `setWorkArea` timeline.js:849, `toggleOnion` timeline.js:459) plus `exportJSON` (timeline.js:2049-2246) and `importJSON` (timeline.js:2354-2694) in full — this artifact cites only the single line inside each that assigns/reads the specific `state.<field>` this census tracks, and does not reproduce either function's surrounding per-layer serialization loop, migration logic, or any other field outside this scope's own 118."
+    },
+    {
+      "owner": "rulers-bridge.js / palette-panel.js / shadow-brush-bridge.js / symmetry-bridge.js / perspective-bridge.js / audio-bridge.js / reference-bridge.js / media-library.js / linked-media.js / image-mesh.js / select-bridge.js / timeline-zoom.js / engine-bridge.js / brush-editor.js / brush-tool-presets.js / NemoFolderCodec (existing owners)",
+      "disposition": "Each retains its own module body; this artifact cites only the writer/reader call sites of the specific `state.<field>` each module owns per its own in-source comment (verified against exportJSON/importJSON/localStorage rather than trusted from the comment alone), never reproducing a named module's function bodies."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 40 (C06's `paper.setup(document.getElementById('drawing-canvas'));`) is outside coverage; line 41 (a blank line) begins this scope.",
+    "Line 313 (`layerLinkGroups:{},`) is the last line of this scope; line 314 opens C06's own 'Team review (Phase 1)' lead-in comment for `userProfile` and is excluded — confirmed by reading through line 360 (C21b's own first line, `var stageLayer=new Layer({name:'stage'});`).",
+    "No lines inside 41-313 are excluded for another owner: every line belongs to exactly one of the ten packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "The `var state={...}` object literal itself is NOT bounded by this scope — it opens at line 78 (inside packet 3) and its closing `};` is at line 326 (inside C06's own 314-359 claim), so packet 8 (`state-media-symbols-registries`, ending at line 313) does not close the literal; the split is C06's pre-existing boundary, not a new one drawn by this artifact.",
+    "`state.appMode` has exactly ONE writer anywhere in src/js at the frozen SHA (motion.js:13204) despite 86 total references to the field — every other reference is a read guard (`if(state.appMode!=='motion')...` and similar), confirmed by an `-E` regex grep requiring an assignment operator not preceded by `=`/`!`/`<`/`>` and not followed by a second `=`.",
+    "`ROW_H` is declared TWICE in src/js at the frozen SHA with two different values in two different scopes — app.js:77 (`var ROW_H=34;`, global, this scope) and motion.js:43 (`var ROW_H=22;`, local to motion.js's own top-level IIFE) — and the two are never the same binding. A naive whole-file grep for the bare symbol `ROW_H` without checking each hit's enclosing scope would silently conflate app.js's Animation-2D timeline row height with Motion's own unrelated property-row height; this artifact treats them as two separate findings under the `timeline-row-metrics` packet rather than one merged reader count.",
+    "`guidesLocked` and `maxUndo` each have ZERO writer anywhere in src/js at the frozen SHA (confirmed by the same regex used for every other field in this scope) — both are read-only constants/dead toggles in this codebase snapshot, flagged under `future_proposals`, not claimed as defects.",
+    "`activeMontageViewId` is read inside `exportJSON` (timeline.js:2069, `var inMontage=!!(state.activeMontageViewId&&_montageViewSnapshot);`) but is NEVER one of the literal object-literal keys of that function's own `return JSON.stringify({...})` call, and `importJSON` never restores it either — it is read-for-decision-making only, not persisted, despite `state.activeMontageViewId` textually appearing inside the body of the function that writes the project file. A naive substring search over `exportJSON`'s function body (rather than the literal's own top-level keys) would have misclassified this field as persisted; this artifact parsed the `return JSON.stringify({...})` object literal's top-level keys with a bracket-depth-aware script to avoid that false positive, and applied the same distinction to `activeSymbolId` (also read, not exported, inside the same conditional)."
+  ],
+  "areas": [
+    {
+      "area": "canvas-backing-size",
+      "packets": [
+        {
+          "id": "C21a.canvas-backing-size",
+          "files": [
+            "src/js/app.js:41-67"
+          ],
+          "coverage_ranges": [
+            [
+              41,
+              67
+            ]
+          ],
+          "classification": {
+            "code": 9,
+            "comment": 16,
+            "whitespace": 2
+          },
+          "symbols": [
+            "syncCanvasSize"
+          ],
+          "signature": "function syncCanvasSize()",
+          "responsibility": "Keeps Paper.js's view.viewSize (canvas.width/height, the backing resolution) in sync with the #canvas-area container's actual CSS box, via a ResizeObserver plus a window resize listener — Paper's own `resize` attribute on the canvas can get stuck at whatever size the container happened to have the instant paper.setup() ran (before the app's flex layout settled) and never recover on a later resize.",
+          "behavior": [
+            "Line 41: blank line (the first line of this scope, immediately after C06's paper.setup() call at line 40).",
+            "14-line lead-in comment (42-57): reported directly by the user as a resize bug; also the root cause behind the Rust-engine mirror (engine-bridge.js) computing wrong world coordinates for an intercepted tool's live preview, since it derives its own canvas size from the same stuck view.viewSize value. A ResizeObserver is more reliable than Paper's own listener because it fires for ANY container size change (window resize, side-panel drag-resize, etc.); assigning view.viewSize directly is the documented Paper.js way to recompute the canvas's backing resolution without touching zoom/center, so only the visible viewport area changes on a resize, matching what the `resize` attribute was always supposed to do.",
+            "`syncCanvasSize()` (58-64): reads #canvas-area's clientWidth/clientHeight (59-60); if both are positive AND either dimension differs (rounded) from the current view.viewSize (61), assigns `view.viewSize=new Size(w,h)` (62) — a no-op guard so an unrelated repaint doesn't thrash Paper's own resize machinery every call.",
+            "ResizeObserver wiring (65): `if(window.ResizeObserver)new ResizeObserver(syncCanvasSize).observe(document.getElementById('canvas-area'));` — feature-detected, no fallback if the browser lacks ResizeObserver (none needed, since the resize listener below still covers the window-resize case).",
+            "Resize listener wiring (66): `window.addEventListener('resize',syncCanvasSize);` — a second, independent trigger (window-level resize, not container-level), covering the case a ResizeObserver might miss or as a redundant safety net.",
+            "Line 67: blank line before the next packet's own lead-in comment."
+          ],
+          "callers": [
+            "syncCanvasSize has NO external callers anywhere in src/js at the frozen SHA — a whole-src/js grep for the symbol finds exactly three references: the declaration (app.js:58), the ResizeObserver registration (app.js:65), and the resize-listener registration (app.js:66), both of which are inside THIS SAME packet, not called from another file/module.",
+            "One further textual (`//`) mention, excluded per the C19r exemplar's convention of excluding comment-only references: src/js/expr-code-panel.js:20 (\"which app.js (syncCanvasSize) and engine-bridge.js (handleResize) already...\", describing the general resize-handling family, not a call)."
+          ],
+          "effects": "Writes `view.viewSize` (Paper.js Project/View API, not a `state.*` field) exactly once per invocation, guarded so an unchanged size performs no write. Never touches `state.*` directly. The write's downstream consequence — engine-bridge.js's own viewport/world-coordinate math depending on view.viewSize being current — is engine-bridge.js's own territory, cited by name only per the issue's instruction not to re-map syncCanvasSize's relation to fitCanvas/updZoom (both declared at app.js:360+, C21b's scope)."
+        }
+      ]
+    },
+    {
+      "area": "timeline-row-metrics",
+      "packets": [
+        {
+          "id": "C21a.timeline-row-metrics",
+          "files": [
+            "src/js/app.js:68-77"
+          ],
+          "coverage_ranges": [
+            [
+              68,
+              77
+            ]
+          ],
+          "classification": {
+            "code": 2,
+            "comment": 8,
+            "whitespace": 0
+          },
+          "symbols": [
+            "FC",
+            "ROW_H"
+          ],
+          "signature": "var FC=30; var ROW_H=34;",
+          "responsibility": "Two module-global pixel constants mirroring the timeline's own CSS custom properties (--fc and .lrow/.frow/.fc's height) — every click/drag position computation in timeline.js is derived from these, so a mismatch here silently desyncs ALL timeline pointer math from what is actually on screen.",
+          "behavior": [
+            "8-line lead-in comment (68-75): confirmed real historical bug cited directly — FC was left at the old value 14 after the CSS --fc custom property moved to 16 in a redesign pass, producing a growing left-right drift the further right the user clicked/dragged in the timeline. The two constants must be kept in lockstep with style.css BY HAND — there is no single source of truth shared between CSS and JS in this codebase.",
+            "`var FC=30;` (76): static fallback matching timeline-zoom.js's own `DEFAULT_FC` (timeline-zoom.js:50) — overwritten on load by that module's `init()` (persisted localStorage value, or this same 30 default if none/stale) so there is no flash-of-wrong-zoom before timeline-zoom.js has run. Because `var FC=...` is a top-level script declaration, `FC` and `window.FC` are the SAME global binding — timeline-zoom.js's own `window.FC=` writes (see callers) reassign this exact variable, not a separate one.",
+            "`var ROW_H=34;` (77): mirrors the Animation 2D timeline's own CSS row height (.lrow/.frow/.fc). Unlike FC, this constant has NO counterpart writer anywhere — it is set once here and never reassigned in src/js at the frozen SHA (confirmed by grep)."
+          ],
+          "callers": [
+            "FC — sole writer: timeline-zoom.js's `apply(px)` (timeline-zoom.js:107, `window.FC=px;`), called from `init()` (timeline-zoom.js:357/361, on load — either the version-migration default or the persisted localStorage value) and from `window.SMTimelineZoom.set(px)` (timeline-zoom.js:312-315, itself called by `zoomIn`/`zoomOut`/`reset` and the mouse-wheel handler, timeline-zoom.js:343). A SECOND direct writer exists outside `apply`: the zoom-scrollbar drag handler's `onMove` (timeline-zoom.js:270, `window.FC=newFC;`) — a live-drag preview write that skips `apply`'s own `localStorage.setItem`; the drag's `onUp` (timeline-zoom.js:298) persists the final value to localStorage separately once the gesture ends, matching the CLAUDE.md §5bis rAF-coalescing convention for expensive live-drag rebuilds.",
+            "FC — readers (code, excluding `//` lines), by file: src/js/timeline.js 12, src/js/motion.js 24, src/js/layer-inout.js 13, src/js/timeline-zoom.js 10, src/js/labs/timeline-zoom.js 11 (a separate/older labs copy of the module, not the shipped src/js/timeline-zoom.js), src/js/ui.js 9, src/js/audio-bridge.js 7, src/js/camera.js 4, src/js/markers.js 3, src/js/app.js 1 (the declaration line itself, not a re-read), src/js/bpm-grid.js 1, src/js/motion-graph.js 1. Representative reader: timeline.js:191 `function playheadLeftPx(frame){return frame*FC+(state.appMode==='motion'?FC/2:0);}` — the exact pointer-math class the lead-in comment's drift bug describes.",
+            "ROW_H — sole declaration/writer: app.js:77 (`var ROW_H=34;`), never reassigned anywhere in src/js at the frozen SHA (confirmed by grep for `ROW_H\\s*=`).",
+            "ROW_H — readers of THIS global (code, excluding `//` lines): src/js/timeline.js 3 (4278 `row.style.height=(ROW_H+extraH)+'px';`, 4392 `function frameGridRowHeight(li){return ROW_H+layerCurveRowExtraHeight(li);}`, 6410 `row.style.height=(ROW_H+lrowExtraH)+'px';`). app.js itself has zero re-reads beyond the declaration.",
+            "ROW_H — CRITICAL naming collision, not a shared consumer: motion.js:43 declares its OWN `var ROW_H = 22;` inside motion.js's top-level IIFE (`(function(){...})()`, motion.js:27-13914) — a function-scoped local variable that SHADOWS the global and is never written back to `window.ROW_H`. All 4 code references inside motion.js (and 9 comment-only mentions) resolve to this local 22, a value belonging to Motion's own property-row layout, NOT app.js's 34-px Animation-2D timeline row height. Confirmed by grep (`var\\s+ROW_H\\s*=` finds exactly these two declarations, nowhere else) and by locating motion.js's IIFE boundaries. effects-panel.js:555 has one `//`-comment-only mention of \"motion.js's ROW_H header\", correctly attributing it to motion.js's own local, not app.js's."
+          ],
+          "effects": "Two plain module-global numeric constants with no side effects of their own — every consequence lives in each reader's own file (timeline.js's pointer-math functions, timeline-zoom.js's persistence of FC, motion.js's unrelated local ROW_H). Neither FC nor ROW_H is part of exportJSON/importJSON or localStorage directly (FC's PERSISTED value lives under timeline-zoom.js's own `KEY`/`KEY_VER` localStorage keys, written/read entirely inside that module, not through app.js)."
+        }
+      ]
+    },
+    {
+      "area": "state-playback-mode",
+      "packets": [
+        {
+          "id": "C21a.state-playback-mode",
+          "files": [
+            "src/js/app.js:78-81"
+          ],
+          "coverage_ranges": [
+            [
+              78,
+              81
+            ]
+          ],
+          "classification": {
+            "code": 4,
+            "comment": 0,
+            "whitespace": 0
+          },
+          "symbols": [
+            "totalFrames",
+            "currentFrame",
+            "fps",
+            "playing",
+            "loopPlayback",
+            "pingPongPlayback",
+            "playDir",
+            "tool",
+            "appMode"
+          ],
+          "signature": "var state={totalFrames,currentFrame,fps,playing,loopPlayback,pingPongPlayback,playDir,tool,appMode,...}",
+          "responsibility": "Playback/document-length scalars and the mode/tool discriminators every other module gates on.",
+          "behavior": [
+            "`totalFrames` (app.js:79, default `24`): Project length in frames. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`currentFrame` (app.js:79, default `0`): Playhead frame index. Persisted: no — importJSON resets this to a fixed value (timeline.js:2688 or :2381/:2381) rather than reading it from the file; exportJSON never writes it either.",
+            "`fps` (app.js:79, default `12`): Project frame rate. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`playing` (app.js:79, default `false`): True while playback (startPlay/stopPlay, timeline.js) is running. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`loopPlayback` (app.js:79, default `true`): Loop the work area on playback. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`pingPongPlayback` (app.js:79, default `false`): Reverse direction at each work-area bound instead of looping forward only; forces loopPlayback true when enabled (timeline.js:513). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`playDir` (app.js:79, default `1`): +1/-1 direction of the current playback tick, only meaningful with pingPongPlayback. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`tool` (app.js:80, default `'draw'`): Active tool id ('draw','select',...), read across almost every tool bridge module to decide which one intercepts pointer events. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`appMode` (app.js:81, default `'anim2d'`): 'anim2d'|'motion'|'storyboard' — see #app-mode-switch (index.html)/motion.js. Sole writer is SMMotion.setAppMode's field assignment (motion.js:13204); every other reference is a read guard. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem)."
+          ],
+          "callers": [
+            "`totalFrames`: src/js/app.js:4184: state.layers=sym.layers;state.totalFrames=sym.totalFrames;state.waIn=0;state.waOut=sym.totalFrames-1; | src/js/app.js:4243: state.layers=_sceneSnapshot.layers;state.totalFrames=_sceneSnapshot.totalFrames;state.waIn=_sceneSnapshot.waIn;state.waOut=_sceneSnapshot.waOut; | src/js/app.js:4344: state.layers=newLayers;state.totalFrames=total;state.waIn=0;state.waOut=total-1; | src/js/app.js:4363: state.layers=_montageViewSnapshot.layers;state.totalFrames=_montageViewSnapshot.totalFrames;state.waIn=_montageViewSnapshot.waIn;state.waOut=_montageViewSnapshot.waOut; | src/js/app.js:5396: state.totalFrames-=count; | src/js/kitsu.js:132: state.totalFrames = meta.frameCount; | src/js/labs/boil-effect.js:41: state.totalFrames = needed; window._totalF = needed; | src/js/labs/follow-path.js:83: state.totalFrames = needed; window._totalF = needed; | src/js/labs/pingpong-cycle.js:36: state.totalFrames = needed; window._totalF = needed; | src/js/labs/retime-exposure.js:49: state.totalFrames = totalNeeded; window._totalF = totalNeeded; | src/js/project.js:69: state.totalFrames=defFrames;state.waIn=0;state.waOut=defFrames-1; | src/js/timeline.js:850: setTotalFrames:function(v){v=Math.max(1,Math.min(999,v));saveAllLayerFrames();for(var i=0;i<state.layers.length;i++){while(state.layers[i].frames.length<v)state.layers[i].frames.push({strokes:[],is... | src/js/timeline.js:1114: state.totalFrames=n;window._totalF=n; | src/js/timeline.js:2264: state.totalFrames=needed;window._totalF=needed; | src/js/timeline.js:2376: state.totalFrames=d.totalFrames||d.layers[0].frames.length;state.fps=d.fps||12;state.canvasW=d.canvasW||1920;state.canvasH=d.canvasH||1080;state.canvasBg=d.canvasBg||'#ffffff'; | src/js/tweens.js:4951: state.totalFrames=s.totalFrames;window._totalF=s.totalFrames;. Readers — 200 reader references across 35 files: src/js/timeline.js(62), src/js/app.js(35), src/js/motion.js(24), src/js/images.js(6), src/js/layer-inout.js(6), src/js/tweens.js(6), src/js/markers.js(5), src/js/nemo-script.js(5), src/js/timeline-zoom.js(5), src/js/native-video-bridge.js(4), src/js/motion-graph.js(3), src/js/playback-cache.js(3), src/js/render-manager.js(3), src/js/bpm-grid.js(2), src/js/camera.js(2), src/js/engine-bridge.js(2), src/js/labs/boil-effect.js(2), src/js/labs/follow-path.js(2), src/js/labs/oca-export.js(2), src/js/labs/pingpong-cycle.js(2), src/js/labs/retime-exposure.js(2), src/js/labs/storyboard-mode.js(2), src/js/tracker-panel.js(2), src/js/transplant.js(2), src/js/application/opacity-application.js(1), src/js/audio-bridge.js(1), src/js/bootstrap/opacity-application.js(1), src/js/labs/flip-roll.js(1), src/js/labs/rig-deform.js(1), src/js/labs/timeline-zoom.js(1), src/js/labs/xsheet-panel.js(1), src/js/lipsync.js(1), src/js/select-bridge.js(1), src/js/text-animator.js(1), src/js/tracker.js(1).",
+            "`currentFrame`: src/js/app.js:4191: state.activeLayerIdx=0;state.currentFrame=0;state.fps=sym.fps||state.fps; | src/js/app.js:4245: state.activeLayerIdx=_sceneSnapshot.activeLayerIdx;state.currentFrame=_sceneSnapshot.currentFrame;state.fps=_sceneSnapshot.fps; | src/js/app.js:4346: state.activeLayerIdx=0;state.currentFrame=0; | src/js/app.js:4365: state.activeLayerIdx=_montageViewSnapshot.activeLayerIdx;state.currentFrame=_montageViewSnapshot.currentFrame;state.fps=_montageViewSnapshot.fps; | src/js/app.js:5153: saveAllLayerFrames();state.currentFrame=idx;window._curFrame=idx; | src/js/app.js:5336: state.totalFrames--;if(state.waOut>=state.totalFrames)state.waOut=state.totalFrames-1;window._waOut=state.waOut;window._totalF=state.totalFrames;if(state.currentFrame>=state.totalFrames)state.curre... | src/js/app.js:5398: if(state.currentFrame>=state.totalFrames)state.currentFrame=state.totalFrames-1; | src/js/app.js:5408: state.currentFrame=b.minF+span;window._curFrame=state.currentFrame; | src/js/labs/rig-deform.js:215: state.currentFrame = f; window._curFrame = f; | src/js/labs/rig-deform.js:228: state.currentFrame = cf; window._curFrame = cf; | src/js/markers.js:81: else { state.currentFrame = target.frame; if (window.loadFrame) loadFrame(target.frame); } | src/js/project.js:71: state.motionArcs={};state.tweenOverrides={};state.tweenEasing={};state.currentFrame=0; | src/js/text-animator.js:394: state.currentFrame=f; | src/js/timeline.js:72: saveAllLayerFrames();state.currentFrame=next;window._curFrame=next; | src/js/timeline.js:1116: state.currentFrame=Math.max(0,Math.min(n-1,state.currentFrame-inF)); | src/js/timeline.js:2688: state.currentFrame=0;state.activeLayerIdx=0;activateUL(0);drawStage();loadFrame(0);renderOS();renderArcs();updateUI();renderSymbolTabs(); | src/js/tweens.js:4953: if(state.currentFrame>=s.totalFrames)state.currentFrame=s.totalFrames-1; | src/js/tweens.js:5009: var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),i... | src/js/tweens.js:5022: var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),i.... Readers — 501 reader references across 59 files: src/js/motion.js(134), src/js/timeline.js(100), src/js/app.js(47), src/js/tools.js(15), src/js/camera.js(13), src/js/effects-panel.js(12), src/js/engine-bridge.js(12), src/js/select-bridge.js(12), src/js/tweens.js(12), src/js/images.js(11), src/js/nemo-script.js(11), src/js/audio-bridge.js(9), src/js/comp-preview.js(8), src/js/native-video-bridge.js(8), src/js/media-library.js(7), src/js/bootstrap/opacity-application.js(6), src/js/layer-inout.js(6), src/js/markers.js(6), src/js/reference-bridge.js(6), src/js/rig-widget.js(6), src/js/labs/move-to-layer.js(4), src/js/second-viewer.js(3), src/js/subselect-bridge.js(3), src/js/text-animator-panel.js(3), src/js/text-animator.js(3), src/js/effector-layer.js(2), src/js/feedback-bridge.js(2), src/js/labs/boil-effect.js(2), src/js/labs/follow-path.js(2), src/js/labs/rig-deform.js(2), src/js/labs/vector-sculpt.js(2), src/js/labs/xsheet-panel.js(2), src/js/storyboard.js(2), src/js/tracker.js(2), src/js/tutorial.js(2), src/js/application/opacity-application.js(1), src/js/color-manager.js(1), src/js/domain/animation/opacity.js(1), src/js/fill-bridge.js(1), src/js/group-bridge.js(1), src/js/history-panel.js(1), src/js/image-mesh-bridge.js(1), src/js/labs/flip-roll.js(1), src/js/labs/interval-assistant.js(1), src/js/labs/layer-effects-bake.js(1), src/js/labs/lipsync-assistant.js(1), src/js/labs/multiframe-draw.js(1), src/js/labs/pingpong-cycle.js(1), src/js/labs/retime-exposure.js(1), src/js/labs/shader-effects-bake.js(1), src/js/labs/storyboard-mode.js(1), src/js/linked-media.js(1), src/js/motion-graph.js(1), src/js/motion-preset-picker.js(1), src/js/palette-panel.js(1), src/js/playback-cache.js(1), src/js/tracker-panel.js(1), src/js/transplant.js(1), src/js/vectorize-bridge.js(1).",
+            "`fps`: src/js/app.js:4191: state.activeLayerIdx=0;state.currentFrame=0;state.fps=sym.fps||state.fps; | src/js/app.js:4245: state.activeLayerIdx=_sceneSnapshot.activeLayerIdx;state.currentFrame=_sceneSnapshot.currentFrame;state.fps=_sceneSnapshot.fps; | src/js/app.js:4365: state.activeLayerIdx=_montageViewSnapshot.activeLayerIdx;state.currentFrame=_montageViewSnapshot.currentFrame;state.fps=_montageViewSnapshot.fps; | src/js/project.js:62: state.canvasW=cfg.w;state.canvasH=cfg.h;state.canvasBg='#ffffff';state.fps=cfg.fps; | src/js/timeline.js:839: setFps:function(v){state.fps=Math.max(1,Math.min(60,v));if(state.playing){stopPlay();startPlay();}if(window.SMAudio)SMAudio.invalidateWaveforms();syncDocFields();}, | src/js/timeline.js:2376: state.totalFrames=d.totalFrames||d.layers[0].frames.length;state.fps=d.fps||12;state.canvasW=d.canvasW||1920;state.canvasH=d.canvasH||1080;state.canvasBg=d.canvasBg||'#ffffff';. Readers — 77 reader references across 22 files: src/js/audio-bridge.js(16), src/js/timeline.js(10), src/js/app.js(8), src/js/export.js(8), src/js/images.js(5), src/js/labs/storyboard-mode.js(4), src/js/motion.js(4), src/js/reference-bridge.js(3), src/js/storyboard.js(3), src/js/nemo-script.js(2), src/js/project.js(2), src/js/rive-export.js(2), src/js/ae-camera-export.js(1), src/js/bpm-grid.js(1), src/js/engine-bridge.js(1), src/js/labs/lipsync-assistant.js(1), src/js/labs/oca-export.js(1), src/js/labs/rig-deform.js(1), src/js/labs/xsheet-panel.js(1), src/js/lipsync.js(1), src/js/render-manager.js(1), src/js/ui.js(1).",
+            "`playing`: src/js/timeline.js:47: state.playing=true;state.playDir=1; | src/js/timeline.js:169: function stopPlay(){if(!state.playing)return;state.playing=false;. Readers — 52 reader references across 22 files: src/js/timeline.js(22), src/js/app.js(3), src/js/audio-bridge.js(3), src/js/tools.js(3), src/js/draw-bridge.js(2), src/js/engine-bridge.js(2), src/js/select-bridge.js(2), src/js/eraser-bridge.js(1), src/js/fill-bridge.js(1), src/js/gradient-bridge.js(1), src/js/image-mesh-bridge.js(1), src/js/labs/flip-roll.js(1), src/js/labs/vector-sculpt.js(1), src/js/labs/vector-trim.js(1), src/js/pen-bridge.js(1), src/js/perspective-bridge.js(1), src/js/rig-bridge.js(1), src/js/rig-widget.js(1), src/js/shape-bridge.js(1), src/js/subselect-bridge.js(1), src/js/symmetry-bridge.js(1), src/js/viewtools-bridge.js(1).",
+            "`loopPlayback`: src/js/timeline.js:506: toggleLoopPlayback:function(){state.loopPlayback=!state.loopPlayback;var b=document.getElementById('btn-loop');if(b)b.classList.toggle('active',state.loopPlayback);}, | src/js/timeline.js:513: togglePingPongPlayback:function(){state.pingPongPlayback=!state.pingPongPlayback;if(state.pingPongPlayback)state.loopPlayback=true;var b=document.getElementById('btn-loop');if(b){b.classList.toggle.... Readers — 3 reader references across 1 files: src/js/timeline.js(3).",
+            "`pingPongPlayback`: src/js/timeline.js:513: togglePingPongPlayback:function(){state.pingPongPlayback=!state.pingPongPlayback;if(state.pingPongPlayback)state.loopPlayback=true;var b=document.getElementById('btn-loop');if(b){b.classList.toggle.... Readers — 2 reader references across 1 files: src/js/timeline.js(2).",
+            "`playDir`: src/js/timeline.js:31: if(state.loopPlayback&&state.pingPongPlayback){state.playDir=-1;next=cur-1;if(next<state.waIn)next=state.waIn;} | src/js/timeline.js:35: if(state.loopPlayback&&state.pingPongPlayback){state.playDir=1;next=cur+1;if(next>state.waOut)next=state.waOut;} | src/js/timeline.js:47: state.playing=true;state.playDir=1; | src/js/timeline.js:148: state.playDir=savedDir;. Readers — 3 reader references across 1 files: src/js/timeline.js(3).",
+            "`tool`: src/js/timeline.js:431: state.tool=t;renderArcs();. Readers — 207 reader references across 30 files: src/js/timeline.js(79), src/js/tools.js(60), src/js/camera.js(10), src/js/engine-bridge.js(8), src/js/viewtools-bridge.js(5), src/js/feedback-bridge.js(4), src/js/select-bridge.js(4), src/js/bitmap-brush.js(3), src/js/draw-bridge.js(3), src/js/motion.js(3), src/js/shape-bridge.js(3), src/js/shapes-panel.js(3), src/js/group-bridge.js(2), src/js/image-mesh-bridge.js(2), src/js/storyboard.js(2), src/js/tweens.js(2), src/js/audio-bridge.js(1), src/js/brush-menu-bridge.js(1), src/js/brush-preset-picker.js(1), src/js/effects-panel.js(1), src/js/eraser-bridge.js(1), src/js/fill-bridge.js(1), src/js/gradient-bridge.js(1), src/js/labs/labs-float-panel.js(1), src/js/labs/vector-sculpt.js(1), src/js/pen-bridge.js(1), src/js/perspective-bridge.js(1), src/js/rig-bridge.js(1), src/js/subselect-bridge.js(1), src/js/symmetry-bridge.js(1).",
+            "`appMode`: src/js/motion.js:13204: state.appMode = mode;. Readers — 85 reader references across 11 files: src/js/select-bridge.js(23), src/js/motion.js(21), src/js/timeline.js(21), src/js/tools.js(7), src/js/layer-inout.js(4), src/js/engine-bridge.js(3), src/js/app.js(2), src/js/bootstrap/opacity-application.js(1), src/js/labs/canvas-grid.js(1), src/js/nemo-script.js(1), src/js/subselect-bridge.js(1)."
+          ],
+          "effects": "Of 9 fields in this packet, 2 round-trip via exportJSON/importJSON (timeline.js:2049,2354); the rest are session-only or (rulersOn) localStorage-only. No field in this packet is itself a function — all effects are plain state reads/writes; render/document consequences belong to each field's own reader sites (see callers)."
+        }
+      ]
+    },
+    {
+      "area": "state-onion",
+      "packets": [
+        {
+          "id": "C21a.state-onion",
+          "files": [
+            "src/js/app.js:82-86"
+          ],
+          "coverage_ranges": [
+            [
+              82,
+              86
+            ]
+          ],
+          "classification": {
+            "code": 2,
+            "comment": 3,
+            "whitespace": 0
+          },
+          "symbols": [
+            "onionSkin",
+            "onionPrevOpacity",
+            "onionNextOpacity",
+            "onionMode",
+            "onionIn",
+            "onionOut"
+          ],
+          "signature": "var state={onionSkin,onionPrevOpacity,onionNextOpacity,onionMode,onionIn,onionOut,...}",
+          "responsibility": "Onion-skin overlay toggle, tint opacities, mode and frame range, all consumed by renderOS (tweens.js).",
+          "behavior": [
+            "`onionSkin` (app.js:85, default `false`): Onion-skin overlay toggle. OFF by default since 2026-07 (feedback: \"désactive l'onion skin par default\") — #btn-os's static HTML class was updated to match so there is no flash of an active toolbar icon before this state loads. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`onionPrevOpacity` (app.js:85, default `30`): Previous-frame onion tint opacity (0-100). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`onionNextOpacity` (app.js:85, default `30`): Next-frame onion tint opacity (0-100). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`onionMode` (app.js:85, default `'tinted'`): 'tinted'|other onion render style, consumed by renderOS (tweens.js). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`onionIn` (app.js:86, default `0`): Onion range lower frame bound. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`onionOut` (app.js:86, default `23`): Onion range upper frame bound. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem)."
+          ],
+          "callers": [
+            "`onionSkin`: src/js/timeline.js:459: toggleOnion:function(){state.onionSkin=!state.onionSkin;renderOS();. Readers — 8 reader references across 5 files: src/js/timeline.js(3), src/js/ui.js(2), src/js/engine-bridge.js(1), src/js/tutorial.js(1), src/js/tweens.js(1).",
+            "`onionPrevOpacity`: src/js/timeline.js:847: setOnionPrevOp:function(v){state.onionPrevOpacity=v;renderOS();},setOnionNextOp:function(v){state.onionNextOpacity=v;renderOS();},. Readers — 1 reader references across 1 files: src/js/tweens.js(1).",
+            "`onionNextOpacity`: src/js/timeline.js:847: setOnionPrevOp:function(v){state.onionPrevOpacity=v;renderOS();},setOnionNextOp:function(v){state.onionNextOpacity=v;renderOS();},. Readers — 1 reader references across 1 files: src/js/tweens.js(1).",
+            "`onionMode`: src/js/timeline.js:848: setOnionMode:function(v){state.onionMode=v;renderOS();},. Readers — 3 reader references across 2 files: src/js/tweens.js(2), src/js/timeline.js(1).",
+            "`onionIn`: src/js/timeline.js:846: setOnionRange:function(inF,outF){state.onionIn=inF;state.onionOut=outF;renderOS();},. Readers — 2 reader references across 1 files: src/js/tweens.js(2).",
+            "`onionOut`: src/js/timeline.js:846: setOnionRange:function(inF,outF){state.onionIn=inF;state.onionOut=outF;renderOS();},. Readers — 2 reader references across 1 files: src/js/tweens.js(2)."
+          ],
+          "effects": "Of 6 fields in this packet, 0 round-trip via exportJSON/importJSON (timeline.js:2049,2354); the rest are session-only or (rulersOn) localStorage-only. No field in this packet is itself a function — all effects are plain state reads/writes; render/document consequences belong to each field's own reader sites (see callers)."
+        }
+      ]
+    },
+    {
+      "area": "state-brush-stroke-defaults",
+      "packets": [
+        {
+          "id": "C21a.state-brush-stroke-defaults",
+          "files": [
+            "src/js/app.js:87-126"
+          ],
+          "coverage_ranges": [
+            [
+              87,
+              126
+            ]
+          ],
+          "classification": {
+            "code": 7,
+            "comment": 33,
+            "whitespace": 0
+          },
+          "symbols": [
+            "brushSize",
+            "fillBrushSize",
+            "strokeColor",
+            "fillColor",
+            "fillEnabled",
+            "strokeEnabled",
+            "shadowMode",
+            "brushPreset",
+            "smoothing",
+            "stabilizer",
+            "strokeCap",
+            "strokeJoin",
+            "opacity",
+            "miterLimit",
+            "dashOffset",
+            "paintOrder",
+            "strokeStyle",
+            "vectorBrush",
+            "taperEnds",
+            "drawMode",
+            "fillBrushMode",
+            "fillGapCloseMode",
+            "fillGapCloseSize",
+            "brushAngle",
+            "brushAngleFactor",
+            "trimStrokeEnds",
+            "trimStrokeEndsMax",
+            "pressureMin",
+            "pressureMax",
+            "pressureInvert",
+            "pressureCurve",
+            "eraserSize",
+            "selRotAccum",
+            "tweenSkipManual",
+            "tweenHarmonizeEdits",
+            "resamplePts",
+            "tweenStep"
+          ],
+          "signature": "var state={brushSize,fillBrushSize,strokeColor,fillColor,fillEnabled,strokeEnabled,shadowMode,brushPreset,smoothing,stabilizer,strokeCap,strokeJoin,opacity,miterLimit,dashOffset,paintOrder,strokeStyle,vectorBrush,taperEnds,drawMode,fillBrushMode,fillGapCloseMode,fillGapCloseSize,brushAngle,brushAngleFactor,trimStrokeEnds,trimStrokeEndsMax,pressureMin,pressureMax,pressureInvert,pressureCurve,eraserSize,selRotAccum,tweenSkipManual,tweenHarmonizeEdits,resamplePts,tweenStep,...}",
+          "responsibility": "Draw/Pen/Fill/Eraser tool defaults and stroke-style parameters — the largest single group, all session-only tool state, none persisted to the project file.",
+          "behavior": [
+            "`brushSize` (app.js:87, default `3`): Default brush stroke width. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`fillBrushSize` (app.js:87, default `40`): Fill-brush tool's own brush width, independent of brushSize. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`strokeColor` (app.js:87, default `'#000000'`): Current stroke color (hex, alpha-capable — see CLAUDE.md §2 on .dataset.hex8). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`fillColor` (app.js:87, default `'#ff0000'`): Current fill color. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`fillEnabled` (app.js:87, default `true`): Whether the fill channel is applied to new strokes. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`strokeEnabled` (app.js:87, default `true`): Whether the stroke channel is applied to new strokes. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`shadowMode` (app.js:87, default `false`): Shadow-brush guide-line mode toggle (shadow-brush-bridge.js) — tags new strokes data.channelTag='shadow'. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`brushPreset` (app.js:87, default `'none'`): Selected procedural brush preset id, 'none' when off. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`smoothing` (app.js:101, default `10`): Draw-tool smoothing amount (legacy trailing-average parameter, distinct from stabilizer). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`stabilizer` (app.js:101, default `4`): Draw-tool stabilizer tier. Default bumped 2->4 (2026-09, brush audit #3): a physical spring-damper model (Google ink-stroke-modeler tier, 'Plume') replacing the old trailing moving-average default because averaging lags the hand at speed (cross-referenced against draw-bridge.js's own pressure-smoothing tradeoff comment). Comment explicitly states 'Not persisted anywhere (neither exportJSON nor localStorage)' — verified true, absent from both. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`strokeCap` (app.js:101, default `'round'`): Paper.js stroke cap style. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`strokeJoin` (app.js:101, default `'round'`): Paper.js stroke join style. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`opacity` (app.js:101, default `100`): Default new-stroke opacity (0-100). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`miterLimit` (app.js:102, default `10`): Paper.js miter-limit for strokeJoin='miter'. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`dashOffset` (app.js:102, default `0`): Paper.js dash pattern offset. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`paintOrder` (app.js:102, default `'fillFirst'`): 'fillFirst'|other — paint order of fill vs stroke for a new shape. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`strokeStyle` (app.js:113, default `'solid'`): 'solid'|other stroke rendering style. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`vectorBrush` (app.js:113, default `true`): Pressure-driven vector-width Draw tool mode, default true since 2026-07 (feedback: Moho-style taper in/out driven by stylus pressure) — P.min lowered to 5 elsewhere in this same default set so a light touch tapers near zero instead of floor-ing at 30%. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`taperEnds` (app.js:113, default `false`): Whether stroke ends taper (vs. flat pressure at the very tip). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`drawMode` (app.js:114, default `'front'`): 'front'|other layering mode for the Draw tool's live preview. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`fillBrushMode` (app.js:114, default `'below'`): 'below'|other compositing mode for the fill brush. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`fillGapCloseMode` (app.js:114, default `'off'`): 'off'|other auto-close mode for fillAutoCloseWalls (fill-bridge.js/tools.js). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`fillGapCloseSize` (app.js:114, default `24`): Gap-closing search radius (px) for the fill tool's wall auto-close. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`brushAngle` (app.js:114, default `0`): Nib angle (degrees, wrapped 0-180) for angle-sensitive brush width. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`brushAngleFactor` (app.js:114, default `0`): 0-100 strength of the angle-to-width response; brushAngleWidths (draw-bridge.js) only applies when >0. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`trimStrokeEnds` (app.js:114, default `false`): Whether a finished stroke's ends are auto-trimmed. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`trimStrokeEndsMax` (app.js:114, default `24`): Max trim length (px) applied by trimStrokeEnds (draw-bridge.js:1045). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`pressureMin` (app.js:114, default `5`): Lower bound (%) of the pressure-to-width curve. Lowered 30->5 (2026-07 feedback: Moho-style tapering) so a feather-light touch can taper close to a point. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`pressureMax` (app.js:114, default `170`): Upper bound (%) of the pressure-to-width curve. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`pressureInvert` (app.js:114, default `false`): Whether the pressure curve is inverted (light=wide). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`pressureCurve` (app.js:114, default `'linear'`): Named response curve ('linear'|'sqrt'|'cbrt'|'pow2'|'pow3') for pressure-to-width mapping; setPressureCurve (timeline.js:798) also clears the cached pressureCurvePoints. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`eraserSize` (app.js:125, default `14`): Eraser tool capsule/circle diameter. Lowered 24->14 (source's own comment): at the old default a single click's capsule was ~8x a typical 3px stroke's width, so a real vector-boolean subtract (Paper .subtract()/Rust erase_at_point) fully consumed the stroke's remaining fill in one hit — visually indistinguishable from full deletion though technically a correct empty-result subtract. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`selRotAccum` (app.js:125, default `0`): Accumulated rotation (deg) for the live rotate-selection numeric field's relative-delta math (timeline.js:10720). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`tweenSkipManual` (app.js:125, default `true`): Whether autoMatch (tweens.js) skips pairs that already have a manual tweenOverrides entry. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`tweenHarmonizeEdits` (app.js:125, default `false`): Whether editing one inbetween harmonizes neighboring tween frames. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`resamplePts` (app.js:126, default `50`): Point-count target for tween resampling (resamplePairFeatureAware, tweens.js). Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`tweenStep` (app.js:126, default `1`): Tween generation step size (every Nth frame). Persisted: yes, round-trips via exportJSON/importJSON (timeline.js)."
+          ],
+          "callers": [
+            "`brushSize`: src/js/draw-bridge.js:634: state.brushSize = ns; | src/js/timeline.js:520: setBrushSize:function(v){state.brushSize=v; | src/js/timeline.js:690: state.brushSize=_customP.savedBrushSize; | src/js/timeline.js:3531: state.paintOrder=d.paintOrder;state.brushSize=d.brushSize; | src/js/timeline.js:3718: state.brushSize=swVal; | src/js/tools.js:7624: if(ep.strokeWidth){state.brushSize=ep.strokeWidth;document.getElementById('p-sw').value=Math.round(ep.strokeWidth);} | src/js/viewtools-bridge.js:166: state.brushSize = avgW; | src/js/viewtools-bridge.js:169: state.brushSize = ep.strokeWidth;. Readers — 55 reader references across 10 files: src/js/tools.js(20), src/js/draw-bridge.js(11), src/js/timeline.js(8), src/js/bitmap-brush.js(5), src/js/brush-menu-bridge.js(3), src/js/brush-editor.js(2), src/js/labs/french-curve.js(2), src/js/shape-bridge.js(2), src/js/labs/speed-lines.js(1), src/js/pen-bridge.js(1).",
+            "`fillBrushSize`: src/js/timeline.js:682: setFillBrushSize:function(v){state.fillBrushSize=Math.max(1,parseInt(v)||40);},. Readers — 1 reader references across 1 files: src/js/draw-bridge.js(1).",
+            "`strokeColor`: src/js/timeline.js:608: setStrokeColor:function(v){state.strokeColor=v;paintStrokeSwatches(v); | src/js/timeline.js:3527: state.strokeColor=d.strokeColor;state.strokeEnabled=d.strokeEnabled; | src/js/timeline.js:3632: state.strokeColor=pressureCss;paintStrokeSwatches(pressureCss); | src/js/timeline.js:3654: if(hasStroke){var scss=colorHex8(ref.strokeColor);state.strokeColor=scss;paintStrokeSwatches(scss);} | src/js/tools.js:7619: if(isVB&&ep.fillColor){state.strokeColor=colorHex8(ep.fillColor);setHex8Input(document.getElementById('color-stroke'),state.strokeColor);setHex8Input(document.getElementById('pm-stroke-c'),state.st... | src/js/tools.js:7621: if(ep.strokeColor){state.strokeColor=colorHex8(ep.strokeColor);setHex8Input(document.getElementById('color-stroke'),state.strokeColor);setHex8Input(document.getElementById('pm-stroke-c'),state.stro... | src/js/viewtools-bridge.js:112: state.strokeColor = css;. Readers — 45 reader references across 10 files: src/js/tools.js(15), src/js/timeline.js(12), src/js/draw-bridge.js(6), src/js/bitmap-brush.js(3), src/js/labs/french-curve.js(2), src/js/shape-bridge.js(2), src/js/tutorial.js(2), src/js/brush-menu-bridge.js(1), src/js/labs/speed-lines.js(1), src/js/pen-bridge.js(1).",
+            "`fillColor`: src/js/timeline.js:615: setFillColor:function(v){state.fillColor=v;paintFillSwatches(v); | src/js/timeline.js:835: if(touchedFillHex){state.fillColor=touchedFillHex;paintFillSwatches(touchedFillHex);} | src/js/timeline.js:3528: state.fillColor=d.fillColor;state.fillEnabled=d.fillEnabled; | src/js/timeline.js:3643: state.fillColor=css;state.fillEnabled=hasFill; | src/js/tools.js:7622: if(ep.fillColor){state.fillColor=colorHex8(ep.fillColor);state.fillEnabled=true;setHex8Input(document.getElementById('color-fill'),state.fillColor);setHex8Input(document.getElementById('pm-fill-c')... | src/js/viewtools-bridge.js:120: state.fillColor = css; state.fillEnabled = true;. Readers — 42 reader references across 8 files: src/js/tools.js(16), src/js/draw-bridge.js(9), src/js/timeline.js(9), src/js/fill-bridge.js(3), src/js/shape-bridge.js(2), src/js/labs/french-curve.js(1), src/js/labs/reference-fill.js(1), src/js/tutorial.js(1).",
+            "`fillEnabled`: src/js/timeline.js:647: setFillEnabled:function(v){state.fillEnabled=v;window.SM._syncFillEnabledUI(v); | src/js/timeline.js:3528: state.fillColor=d.fillColor;state.fillEnabled=d.fillEnabled; | src/js/timeline.js:3608: // so selecting any of them force-set state.fillEnabled=true) — same | src/js/timeline.js:3643: state.fillColor=css;state.fillEnabled=hasFill; | src/js/timeline.js:3785: state.fillEnabled=true; | src/js/tools.js:7622: if(ep.fillColor){state.fillColor=colorHex8(ep.fillColor);state.fillEnabled=true;setHex8Input(document.getElementById('color-fill'),state.fillColor);setHex8Input(document.getElementById('pm-fill-c')... | src/js/viewtools-bridge.js:120: state.fillColor = css; state.fillEnabled = true;. Readers — 34 reader references across 6 files: src/js/timeline.js(11), src/js/tools.js(10), src/js/draw-bridge.js(8), src/js/palette-panel.js(2), src/js/shape-bridge.js(2), src/js/labs/french-curve.js(1).",
+            "`strokeEnabled`: src/js/timeline.js:625: // (state.strokeEnabled=false, see the adopt-from-selection block further | src/js/timeline.js:654: setStrokeEnabled:function(v){state.strokeEnabled=v;window.SM._syncStrokeEnabledUI(v); | src/js/timeline.js:3527: state.strokeColor=d.strokeColor;state.strokeEnabled=d.strokeEnabled; | src/js/timeline.js:3633: state.strokeEnabled=ref.fillColor.alpha>0; | src/js/timeline.js:3650: var hasStroke=!!ref.strokeColor;state.strokeEnabled=hasStroke; | src/js/timeline.js:3791: state.strokeEnabled=true;. Readers — 43 reader references across 7 files: src/js/tools.js(15), src/js/draw-bridge.js(12), src/js/timeline.js(11), src/js/shape-bridge.js(2), src/js/engine-bridge.js(1), src/js/labs/french-curve.js(1), src/js/labs/speed-lines.js(1).",
+            "`shadowMode`: src/js/project.js:79: state.shadowActiveId='sh1';state.shadowMode=false; | src/js/shadow-brush-bridge.js:66: state.shadowMode = true; | src/js/shadow-brush-bridge.js:70: state.shadowMode = false; | src/js/timeline.js:785: setVectorBrush:function(v){state.vectorBrush=v;},setTaperEnds:function(v){state.taperEnds=v;},setShadowMode:function(v){state.shadowMode=v;},. Readers — 22 reader references across 6 files: src/js/tools.js(9), src/js/draw-bridge.js(7), src/js/labs/labs-float-panel.js(2), src/js/shadow-brush-bridge.js(2), src/js/app.js(1), src/js/shape-bridge.js(1).",
+            "`brushPreset`: src/js/brush-preset-picker.js:290: if (state.brushPreset === key) { state.brushPreset = 'none'; paintButton('none'); } | src/js/timeline.js:683: setBrushPreset:function(v){state.brushPreset=v||'none';. Readers — 17 reader references across 5 files: src/js/draw-bridge.js(6), src/js/brush-menu-bridge.js(4), src/js/brush-preset-picker.js(4), src/js/timeline.js(2), src/js/brush-tool-presets.js(1).",
+            "`smoothing`: src/js/timeline.js:716: setSmoothing:function(v){state.smoothing=v;},setStabilizer:function(v){state.stabilizer=parseInt(v);},. Readers — 15 reader references across 5 files: src/js/tools.js(8), src/js/draw-bridge.js(4), src/js/brush-menu-bridge.js(1), src/js/labs/french-curve.js(1), src/js/timeline.js(1).",
+            "`stabilizer`: src/js/timeline.js:716: setSmoothing:function(v){state.smoothing=v;},setStabilizer:function(v){state.stabilizer=parseInt(v);},. Readers — 9 reader references across 4 files: src/js/draw-bridge.js(3), src/js/brush-menu-bridge.js(2), src/js/eraser-bridge.js(2), src/js/tools.js(2).",
+            "`strokeCap`: src/js/timeline.js:717: setStrokeCap:function(v){state.strokeCap=v; | src/js/timeline.js:3529: state.strokeCap=d.strokeCap;state.strokeJoin=d.strokeJoin; | src/js/timeline.js:3675: state.strokeCap=ref.strokeCap||'round';state.strokeJoin=ref.strokeJoin||'round';. Readers — 13 reader references across 6 files: src/js/timeline.js(4), src/js/tools.js(4), src/js/draw-bridge.js(2), src/js/labs/french-curve.js(1), src/js/pen-bridge.js(1), src/js/shape-bridge.js(1).",
+            "`strokeJoin`: src/js/timeline.js:719: setStrokeJoin:function(v){state.strokeJoin=v; | src/js/timeline.js:3529: state.strokeCap=d.strokeCap;state.strokeJoin=d.strokeJoin; | src/js/timeline.js:3675: state.strokeCap=ref.strokeCap||'round';state.strokeJoin=ref.strokeJoin||'round';. Readers — 10 reader references across 5 files: src/js/timeline.js(4), src/js/draw-bridge.js(2), src/js/tools.js(2), src/js/labs/french-curve.js(1), src/js/pen-bridge.js(1).",
+            "`opacity`: src/js/timeline.js:799: setOpacity:function(v){state.opacity=parseInt(v);. Readers — 42 reader references across 8 files: src/js/tools.js(19), src/js/draw-bridge.js(13), src/js/fill-bridge.js(3), src/js/shape-bridge.js(3), src/js/labs/french-curve.js(1), src/js/labs/reference-fill.js(1), src/js/labs/speed-lines.js(1), src/js/pen-bridge.js(1).",
+            "`miterLimit`: src/js/timeline.js:721: setMiterLimit:function(v){state.miterLimit=Math.max(1,parseFloat(v)||10); | src/js/timeline.js:3530: state.miterLimit=d.miterLimit;state.dashOffset=d.dashOffset; | src/js/timeline.js:3676: state.miterLimit=ref.miterLimit||10;state.dashOffset=ref.dashOffset||0;. Readers — 6 reader references across 3 files: src/js/timeline.js(4), src/js/draw-bridge.js(1), src/js/tools.js(1).",
+            "`dashOffset`: src/js/timeline.js:725: setDashOffset:function(v){state.dashOffset=parseFloat(v)||0; | src/js/timeline.js:3530: state.miterLimit=d.miterLimit;state.dashOffset=d.dashOffset; | src/js/timeline.js:3676: state.miterLimit=ref.miterLimit||10;state.dashOffset=ref.dashOffset||0;. Readers — 6 reader references across 3 files: src/js/timeline.js(4), src/js/draw-bridge.js(1), src/js/tools.js(1).",
+            "`paintOrder`: src/js/timeline.js:723: setPaintOrder:function(v){state.paintOrder=v; | src/js/timeline.js:3531: state.paintOrder=d.paintOrder;state.brushSize=d.brushSize; | src/js/timeline.js:3677: state.paintOrder=(ref.data&&ref.data.paintOrder)||'fillFirst';. Readers — 7 reader references across 4 files: src/js/timeline.js(4), src/js/draw-bridge.js(1), src/js/shapes-panel.js(1), src/js/tools.js(1).",
+            "`strokeStyle`: src/js/timeline.js:727: setStrokeStyle:function(v){state.strokeStyle=v;. Readers — 3 reader references across 2 files: src/js/tools.js(2), src/js/draw-bridge.js(1).",
+            "`vectorBrush`: src/js/timeline.js:785: setVectorBrush:function(v){state.vectorBrush=v;},setTaperEnds:function(v){state.taperEnds=v;},setShadowMode:function(v){state.shadowMode=v;},. Readers — 18 reader references across 5 files: src/js/draw-bridge.js(10), src/js/brush-menu-bridge.js(3), src/js/tools.js(3), src/js/engine-bridge.js(1), src/js/timeline.js(1).",
+            "`taperEnds`: src/js/timeline.js:785: setVectorBrush:function(v){state.vectorBrush=v;},setTaperEnds:function(v){state.taperEnds=v;},setShadowMode:function(v){state.shadowMode=v;},. Readers — 6 reader references across 3 files: src/js/tools.js(4), src/js/brush-menu-bridge.js(1), src/js/draw-bridge.js(1).",
+            "`drawMode`: src/js/timeline.js:787: setDrawMode:function(v){state.drawMode=v;},. Readers — 5 reader references across 3 files: src/js/draw-bridge.js(3), src/js/timeline.js(1), src/js/tools.js(1).",
+            "`fillBrushMode`: src/js/timeline.js:788: setFillBrushMode:function(v){state.fillBrushMode=v;},. Readers — 3 reader references across 2 files: src/js/tools.js(2), src/js/timeline.js(1).",
+            "`fillGapCloseMode`: src/js/fill-bridge.js:246: state.fillGapCloseMode = this.value;. Readers — 5 reader references across 3 files: src/js/timeline.js(2), src/js/tools.js(2), src/js/fill-bridge.js(1).",
+            "`fillGapCloseSize`: src/js/fill-bridge.js:253: if (!isNaN(v)) state.fillGapCloseSize = Math.max(1, Math.min(400, v));. Readers — 4 reader references across 3 files: src/js/tools.js(2), src/js/fill-bridge.js(1), src/js/timeline.js(1).",
+            "`brushAngle`: src/js/fill-bridge.js:228: if (!isNaN(v)) state.brushAngle = ((v % 180) + 180) % 180;. Readers — 3 reader references across 2 files: src/js/tools.js(2), src/js/timeline.js(1).",
+            "`brushAngleFactor`: src/js/fill-bridge.js:234: if (!isNaN(v)) state.brushAngleFactor = Math.max(0, Math.min(100, v));. Readers — 4 reader references across 3 files: src/js/tools.js(2), src/js/draw-bridge.js(1), src/js/timeline.js(1).",
+            "`trimStrokeEnds`: src/js/fill-bridge.js:238: if (teChk) teChk.addEventListener('change', function () { state.trimStrokeEnds = this.checked; });. Readers — 2 reader references across 2 files: src/js/draw-bridge.js(1), src/js/timeline.js(1).",
+            "`trimStrokeEndsMax`: src/js/fill-bridge.js:242: if (!isNaN(v)) state.trimStrokeEndsMax = Math.max(1, Math.min(200, v));. Readers — 2 reader references across 2 files: src/js/draw-bridge.js(1), src/js/timeline.js(1).",
+            "`pressureMin`: src/js/timeline.js:790: setPressureMin:function(v){state.pressureMin=Math.max(0,Math.min(100,parseInt(v)||0));},. Readers — 3 reader references across 3 files: src/js/draw-bridge.js(1), src/js/eraser-bridge.js(1), src/js/tools.js(1).",
+            "`pressureMax`: src/js/timeline.js:791: setPressureMax:function(v){state.pressureMax=Math.max(50,Math.min(300,parseInt(v)||170));},. Readers — 3 reader references across 3 files: src/js/draw-bridge.js(1), src/js/eraser-bridge.js(1), src/js/tools.js(1).",
+            "`pressureInvert`: src/js/timeline.js:792: setPressureInvert:function(v){state.pressureInvert=!!v;},. Readers — 2 reader references across 2 files: src/js/draw-bridge.js(1), src/js/tools.js(1).",
+            "`pressureCurve`: src/js/timeline.js:798: setPressureCurve:function(v){state.pressureCurve=['linear','sqrt','cbrt','pow2','pow3'].indexOf(v)>=0?v:'linear';state.pressureCurvePoints=null;},. Readers — 1 reader references across 1 files: src/js/tools.js(1).",
+            "`eraserSize`: src/js/eraser-bridge.js:227: state.eraserSize = ns; | src/js/timeline.js:789: setEraserSize:function(v){state.eraserSize=Math.max(2,parseInt(v)||24);},. Readers — 14 reader references across 4 files: src/js/tools.js(6), src/js/eraser-bridge.js(5), src/js/timeline.js(2), src/js/engine-bridge.js(1).",
+            "`selRotAccum`: src/js/timeline.js:3567: state.selRotAccum=0;_selPropsSig=sig; | src/js/timeline.js:10720: wireLiveXformField('sp-rot',function(el,started){var b=activeXformBounds();if(!b)return;var nv=parseFloat(el.value)||0;var delta=nv-(state.selRotAccum||0);state.selRotAccum=nv;activeXformApplyRotat.... Readers — 1 reader references across 1 files: src/js/timeline.js(1).",
+            "`tweenSkipManual`: src/js/timeline.js:11141: document.getElementById('p-skipmanual').addEventListener('change',function(){state.tweenSkipManual=this.checked;});. Readers — 2 reader references across 1 files: src/js/tweens.js(2).",
+            "`tweenHarmonizeEdits`: src/js/timeline.js:11142: document.getElementById('p-harmonize-tween').addEventListener('change',function(){state.tweenHarmonizeEdits=this.checked;});. Readers — 2 reader references across 1 files: src/js/tweens.js(2).",
+            "`resamplePts`: src/js/timeline.js:841: setResamplePts:function(v){state.resamplePts=v;},setTweenStep:function(v){state.tweenStep=parseInt(v);}, | src/js/timeline.js:2683: if(d.resamplePts)state.resamplePts=d.resamplePts;if(d.tweenStep)state.tweenStep=d.tweenStep;. Readers — 2 reader references across 2 files: src/js/timeline.js(1), src/js/tweens.js(1).",
+            "`tweenStep`: src/js/timeline.js:841: setResamplePts:function(v){state.resamplePts=v;},setTweenStep:function(v){state.tweenStep=parseInt(v);}, | src/js/timeline.js:2683: if(d.resamplePts)state.resamplePts=d.resamplePts;if(d.tweenStep)state.tweenStep=d.tweenStep;. Readers — 2 reader references across 2 files: src/js/timeline.js(1), src/js/tweens.js(1)."
+          ],
+          "effects": "Of 37 fields in this packet, 2 round-trip via exportJSON/importJSON (timeline.js:2049,2354); the rest are session-only or (rulersOn) localStorage-only. No field in this packet is itself a function — all effects are plain state reads/writes; render/document consequences belong to each field's own reader sites (see callers)."
+        }
+      ]
+    },
+    {
+      "area": "state-canvas-rulers-guides-display",
+      "packets": [
+        {
+          "id": "C21a.state-canvas-rulers-guides-display",
+          "files": [
+            "src/js/app.js:127-154"
+          ],
+          "coverage_ranges": [
+            [
+              127,
+              154
+            ]
+          ],
+          "classification": {
+            "code": 6,
+            "comment": 22,
+            "whitespace": 0
+          },
+          "symbols": [
+            "canvasW",
+            "canvasH",
+            "canvasBg",
+            "canvasClip",
+            "safetyZones",
+            "ghostAllFrames",
+            "currentFrameOutline",
+            "rulersOn",
+            "guidesLocked",
+            "guidesSnap",
+            "guides",
+            "smartGuides",
+            "pixelGridSnap",
+            "outlineView",
+            "previewAlphaBg"
+          ],
+          "signature": "var state={canvasW,canvasH,canvasBg,canvasClip,safetyZones,ghostAllFrames,currentFrameOutline,rulersOn,guidesLocked,guidesSnap,guides,smartGuides,pixelGridSnap,outlineView,previewAlphaBg,...}",
+          "responsibility": "Document canvas size/background plus a run of live display-mode toggles (rulers, guides, safety zones, onion Ghost-All, outline view, alpha preview).",
+          "behavior": [
+            "`canvasW` (app.js:127, default `1920`): Document canvas width (px). Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`canvasH` (app.js:127, default `1080`): Document canvas height (px). Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`canvasBg` (app.js:127, default `'#ffffff'`): Document background color. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`canvasClip` (app.js:127, default `false`): Whether rendering clips to the canvas bounds. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`safetyZones` (app.js:127, default `false`): Broadcast safety-zone overlay toggle. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`ghostAllFrames` (app.js:127, default `false`): Ghost-All onion mode (all frames superimposed), distinct from onionSkin's prev/next-only mode. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`currentFrameOutline` (app.js:127, default `false`): Illustrator-style hairline outline overlay of the current frame's own geometry. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`rulersOn` (app.js:130, default `false`): Ruler overlay toggle. OFF by default (2026-08-31, feedback #189); rulers-bridge.js restores the user's own prior choice from localStorage (RULERS_KEY) at init if one exists — confirmed by grep (rulers-bridge.js:376 writes, :380 reads), the only state.* field in this whole scope backed by localStorage rather than exportJSON. Persisted: no (not in exportJSON) but restored from localStorage at init (rulers-bridge.js:376 write, :380 read).",
+            "`guidesLocked` (app.js:130, default `false`): Guide-editing lock. Declared and read twice (rulers-bridge.js:155,207 as an early-return guard) but has ZERO writer anywhere in src/js at the frozen SHA — no UI control ever sets it true; permanently false in practice (flagged under future_proposals, not claimed as a defect). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`guidesSnap` (app.js:130, default `true`): Snap-to-guide toggle, ON by default. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`guides` (app.js:130, default `{h:[],v:[]}`): {h:[],v:[]} arrays of world-space ruler-guide line positions (rulers-bridge.js). Persisted (exportJSON/importJSON, timeline.js:2645) — the only field in the rulers/guides group that round-trips into the project file; the toggle fields around it (rulersOn/guidesLocked/guidesSnap) are all display-only and do not. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`smartGuides` (app.js:135, default `true`): Illustrator-style smart alignment guides, ON by default (2026-09, feedback #747) since they read the canvas itself and need no setup, unlike ruler guides. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`pixelGridSnap` (app.js:140, default `false`): Snap-to-pixel-grid toggle, OFF by default — rounds a moved object's position to the nearest world pixel, which fights smooth sub-pixel animation if left on. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`outlineView` (app.js:145, default `false`): Illustrator-style hairline rendering mode (2026-09) — see engine-bridge.js buildSceneJson's own AE-vs-Illustrator distinction comment. A pure display mode, confirmed absent from exportJSON. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`previewAlphaBg` (app.js:154, default `false`): Live 'show transparency' preview (2026-08-27, feedback: \"il manque un bouton pour afficher ou pas le fond en alpha\") — the same underlying capability as the Export panel's own alpha-background checkbox (engine-bridge.js renderContext.alphaBg), just toggleable live while editing. Session-only, confirmed absent from exportJSON. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem)."
+          ],
+          "callers": [
+            "`canvasW`: src/js/project.js:62: state.canvasW=cfg.w;state.canvasH=cfg.h;state.canvasBg='#ffffff';state.fps=cfg.fps; | src/js/timeline.js:842: setCanvasSize:function(w,h){state.canvasW=w;state.canvasH=h;drawStage();syncDocFields();},setCanvasBg:function(c){state.canvasBg=c;drawStage();syncDocFields();}, | src/js/timeline.js:2376: state.totalFrames=d.totalFrames||d.layers[0].frames.length;state.fps=d.fps||12;state.canvasW=d.canvasW||1920;state.canvasH=d.canvasH||1080;state.canvasBg=d.canvasBg||'#ffffff';. Readers — 147 reader references across 34 files: src/js/engine-bridge.js(24), src/js/timeline.js(15), src/js/motion.js(13), src/js/export.js(10), src/js/images.js(10), src/js/rive-export.js(9), src/js/app.js(6), src/js/camera.js(5), src/js/second-viewer.js(5), src/js/labs/french-curve.js(4), src/js/media-library.js(4), src/js/effector-layer.js(3), src/js/labs/storyboard-mode.js(3), src/js/playback-cache.js(3), src/js/storyboard.js(3), src/js/symmetry-bridge.js(3), src/js/labs/speed-lines.js(2), src/js/native-video-bridge.js(2), src/js/nemo-script.js(2), src/js/perspective-bridge.js(2), src/js/project.js(2), src/js/reference-bridge.js(2), src/js/rig-widget.js(2), src/js/rulers-bridge.js(2), src/js/svg-import.js(2), src/js/ae-camera-export.js(1), src/js/figma-import.js(1), src/js/labs/canvas-grid.js(1), src/js/labs/oca-export.js(1), src/js/psd-import-bridge.js(1), src/js/render-manager.js(1), src/js/select-bridge.js(1), src/js/tracker-panel.js(1), src/js/viewtools-bridge.js(1).",
+            "`canvasH`: src/js/project.js:62: state.canvasW=cfg.w;state.canvasH=cfg.h;state.canvasBg='#ffffff';state.fps=cfg.fps; | src/js/timeline.js:842: setCanvasSize:function(w,h){state.canvasW=w;state.canvasH=h;drawStage();syncDocFields();},setCanvasBg:function(c){state.canvasBg=c;drawStage();syncDocFields();}, | src/js/timeline.js:2376: state.totalFrames=d.totalFrames||d.layers[0].frames.length;state.fps=d.fps||12;state.canvasW=d.canvasW||1920;state.canvasH=d.canvasH||1080;state.canvasBg=d.canvasBg||'#ffffff';. Readers — 141 reader references across 34 files: src/js/engine-bridge.js(23), src/js/motion.js(13), src/js/timeline.js(13), src/js/export.js(10), src/js/images.js(10), src/js/rive-export.js(8), src/js/app.js(6), src/js/camera.js(4), src/js/labs/french-curve.js(4), src/js/media-library.js(4), src/js/second-viewer.js(4), src/js/effector-layer.js(3), src/js/labs/storyboard-mode.js(3), src/js/playback-cache.js(3), src/js/storyboard.js(3), src/js/symmetry-bridge.js(3), src/js/labs/speed-lines.js(2), src/js/native-video-bridge.js(2), src/js/nemo-script.js(2), src/js/perspective-bridge.js(2), src/js/project.js(2), src/js/reference-bridge.js(2), src/js/rig-widget.js(2), src/js/rulers-bridge.js(2), src/js/svg-import.js(2), src/js/ae-camera-export.js(1), src/js/figma-import.js(1), src/js/labs/canvas-grid.js(1), src/js/labs/oca-export.js(1), src/js/psd-import-bridge.js(1), src/js/render-manager.js(1), src/js/select-bridge.js(1), src/js/tracker-panel.js(1), src/js/viewtools-bridge.js(1).",
+            "`canvasBg`: src/js/project.js:62: state.canvasW=cfg.w;state.canvasH=cfg.h;state.canvasBg='#ffffff';state.fps=cfg.fps; | src/js/timeline.js:842: setCanvasSize:function(w,h){state.canvasW=w;state.canvasH=h;drawStage();syncDocFields();},setCanvasBg:function(c){state.canvasBg=c;drawStage();syncDocFields();}, | src/js/timeline.js:2376: state.totalFrames=d.totalFrames||d.layers[0].frames.length;state.fps=d.fps||12;state.canvasW=d.canvasW||1920;state.canvasH=d.canvasH||1080;state.canvasBg=d.canvasBg||'#ffffff';. Readers — 16 reader references across 10 files: src/js/color-manager.js(3), src/js/export.js(2), src/js/labs/storyboard-mode.js(2), src/js/storyboard.js(2), src/js/timeline.js(2), src/js/app.js(1), src/js/engine-bridge.js(1), src/js/nemo-script.js(1), src/js/perspective-bridge.js(1), src/js/rive-export.js(1).",
+            "`canvasClip`: src/js/timeline.js:843: setCanvasClip:function(v){state.canvasClip=!!v;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();},. Readers — 3 reader references across 2 files: src/js/timeline.js(2), src/js/engine-bridge.js(1).",
+            "`safetyZones`: src/js/timeline.js:844: setSafetyZones:function(v){state.safetyZones=!!v;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();},. Readers — 3 reader references across 2 files: src/js/timeline.js(2), src/js/engine-bridge.js(1).",
+            "`ghostAllFrames`: src/js/timeline.js:481: state.ghostAllFrames=!state.ghostAllFrames; | src/js/timeline.js:3809: state.ghostAllFrames=true;. Readers — 5 reader references across 3 files: src/js/timeline.js(3), src/js/engine-bridge.js(1), src/js/tweens.js(1).",
+            "`currentFrameOutline`: src/js/timeline.js:11257: state.currentFrameOutline=this.checked;. Readers — 3 reader references across 2 files: src/js/engine-bridge.js(2), src/js/timeline.js(1).",
+            "`rulersOn`: src/js/rulers-bridge.js:383: state.rulersOn = v === '1'; | src/js/rulers-bridge.js:387: state.rulersOn = on != null ? !!on : !state.rulersOn;. Readers — 15 reader references across 2 files: src/js/rulers-bridge.js(10), src/js/timeline.js(5).",
+            "`guidesLocked`: no writer anywhere in src/js at the frozen SHA. Readers — 2 reader references across 1 files: src/js/rulers-bridge.js(2).",
+            "`guidesSnap`: src/js/timeline.js:11109: state.guidesSnap=!state.guidesSnap;. Readers — 3 reader references across 2 files: src/js/timeline.js(2), src/js/rulers-bridge.js(1).",
+            "`guides`: src/js/project.js:88: state.guides={h:[],v:[]}; | src/js/rulers-bridge.js:26: if (!state.guides) state.guides = { h: [], v: [] }; | src/js/timeline.js:2645: state.guides=d.guides||{h:[],v:[]};. Readers — 16 reader references across 2 files: src/js/rulers-bridge.js(15), src/js/timeline.js(1).",
+            "`smartGuides`: src/js/timeline.js:11112: state.smartGuides=!state.smartGuides;. Readers — 3 reader references across 2 files: src/js/timeline.js(2), src/js/rulers-bridge.js(1).",
+            "`pixelGridSnap`: src/js/timeline.js:11124: state.pixelGridSnap=!state.pixelGridSnap;. Readers — 4 reader references across 3 files: src/js/rulers-bridge.js(2), src/js/select-bridge.js(1), src/js/timeline.js(1).",
+            "`outlineView`: src/js/timeline.js:11134: state.outlineView=!state.outlineView;. Readers — 2 reader references across 2 files: src/js/engine-bridge.js(1), src/js/timeline.js(1).",
+            "`previewAlphaBg`: src/js/timeline.js:10842: state.previewAlphaBg=!state.previewAlphaBg;. Readers — 4 reader references across 2 files: src/js/engine-bridge.js(2), src/js/timeline.js(2)."
+          ],
+          "effects": "Of 15 fields in this packet, 4 round-trip via exportJSON/importJSON (timeline.js:2049,2354); the rest are session-only or (rulersOn) localStorage-only. No field in this packet is itself a function — all effects are plain state reads/writes; render/document consequences belong to each field's own reader sites (see callers)."
+        }
+      ]
+    },
+    {
+      "area": "state-palettes-shadow-guides",
+      "packets": [
+        {
+          "id": "C21a.state-palettes-shadow-guides",
+          "files": [
+            "src/js/app.js:155-187"
+          ],
+          "coverage_ranges": [
+            [
+              155,
+              187
+            ]
+          ],
+          "classification": {
+            "code": 7,
+            "comment": 26,
+            "whitespace": 0
+          },
+          "symbols": [
+            "palettes",
+            "activePaletteIdx",
+            "shadowPalette",
+            "shadowActiveId",
+            "showShadowGuides",
+            "exportIncludeShadowGuides",
+            "customBrushPresets"
+          ],
+          "signature": "var state={palettes,activePaletteIdx,shadowPalette,shadowActiveId,showShadowGuides,exportIncludeShadowGuides,customBrushPresets,...}",
+          "responsibility": "Multi-palette swatch library, the separate Shadow Brush guide-line palette, and the custom brush-preset registry.",
+          "behavior": [
+            "`palettes` (app.js:160, default `[{id:'p0',name:'Palette 1',colors:['#000000','#ffffff','#ff0000','#ff8800','#ffee00','#00cc44','#0088ff','#8833ff']}]`): Multi-palette swatch library (palette-panel.js), array so tab order is display order. Legacy colorPalette (flat array) is read only as an importJSON migration fallback (timeline.js:2658), never written going forward. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`activePaletteIdx` (app.js:161, default `0`): Index of the currently shown palette tab. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`shadowPalette` (app.js:175, default `[{id:'sh1',color:'#ff3355'},{id:'sh2',color:'#ff8800'},{id:'sh3',color:'#ffdd00'},{id:'sh4',color:'#22cc55'},{id:'sh5',color:'#2288ff'},{id:'sh6',color:'#aa33ff'}]`): Shadow Brush's own dedicated 6-swatch palette (shadow-brush-bridge.js), separate from the main palette above so a stroke can be tagged data.shadowSwatchId against a stable swatch id rather than just a hex value. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`shadowActiveId` (app.js:176, default `'sh1'`): Currently selected shadow-palette swatch id. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`showShadowGuides` (app.js:181, default `true`): Live-view-only visibility toggle for every data.channelTag==='shadow' item across all layers/components — like onionSkin, never persisted to the project file (confirmed absent from exportJSON). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`exportIncludeShadowGuides` (app.js:186, default `false`): Export-time equivalent of showShadowGuides, OFF by default so a fresh project's export doesn't need to be told to hide the shadow guide lines. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`customBrushPresets` (app.js:187, default `{}`): User-saved procedural brush presets, keyed by generated id (brush-editor.js) — project-level and persisted (exportJSON/importJSON), distinct from the separate cross-project localStorage-backed preset library in brush-tool-presets.js (LS_KEY, unrelated storage). Persisted: yes, round-trips via exportJSON/importJSON (timeline.js)."
+          ],
+          "callers": [
+            "`palettes`: src/js/palette-panel.js:10: function palettes() { return state.palettes || (state.palettes = [{ id: 'p0', name: 'Palette 1', colors: [] }]); } | src/js/project.js:76: state.palettes=[{id:'p0',name:'Palette 1',colors:['#000000','#ffffff','#ff0000','#ff8800','#ffee00','#00cc44','#0088ff','#8833ff']}]; | src/js/timeline.js:2657: if(d.palettes&&d.palettes.length)state.palettes=d.palettes; | src/js/timeline.js:2658: else if(d.colorPalette)state.palettes=[{id:'p0',name:'Palette 1',colors:d.colorPalette}]; | src/js/timeline.js:2659: else state.palettes=[{id:'p0',name:'Palette 1',colors:['#000000','#ffffff','#ff0000','#ff8800','#ffee00','#00cc44','#0088ff','#8833ff']}];. Readers — 1 reader references across 1 files: src/js/timeline.js(1).",
+            "`activePaletteIdx`: src/js/palette-panel.js:13: if (state.activePaletteIdx == null || state.activePaletteIdx >= list.length) state.activePaletteIdx = 0; | src/js/palette-panel.js:218: tab.addEventListener('click', function () { state.activePaletteIdx = idx; cancelReplace(); }); | src/js/palette-panel.js:237: state.activePaletteIdx = palettes().length - 1; | src/js/palette-panel.js:250: state.activePaletteIdx = idx + 1; | src/js/palette-panel.js:256: if (state.activePaletteIdx >= palettes().length) state.activePaletteIdx = palettes().length - 1; | src/js/project.js:77: state.activePaletteIdx=0; | src/js/timeline.js:2660: state.activePaletteIdx=d.activePaletteIdx||0;. Readers — 3 reader references across 2 files: src/js/palette-panel.js(2), src/js/timeline.js(1).",
+            "`shadowPalette`: src/js/project.js:78: state.shadowPalette=[{id:'sh1',color:'#ff3355'},{id:'sh2',color:'#ff8800'},{id:'sh3',color:'#ffdd00'},{id:'sh4',color:'#22cc55'},{id:'sh5',color:'#2288ff'},{id:'sh6',color:'#aa33ff'}]; | src/js/shadow-brush-bridge.js:33: state.shadowPalette = [{ id: 'sh1', color: '#ff3355' }, { id: 'sh2', color: '#ff8800' }, { id: 'sh3', color: '#ffdd00' }, { id: 'sh4', color: '#22cc55' }, { id: 'sh5', color: '#2288ff' }, { id: 'sh... | src/js/timeline.js:2661: state.shadowPalette=(d.shadowPalette&&d.shadowPalette.length)?d.shadowPalette:[{id:'sh1',color:'#ff3355'},{id:'sh2',color:'#ff8800'},{id:'sh3',color:'#ffdd00'},{id:'sh4',color:'#22cc55'},{id:'sh5',.... Readers — 6 reader references across 3 files: src/js/shadow-brush-bridge.js(3), src/js/timeline.js(2), src/js/tools.js(1).",
+            "`shadowActiveId`: src/js/project.js:79: state.shadowActiveId='sh1';state.shadowMode=false; | src/js/shadow-brush-bridge.js:65: state.shadowActiveId = swatchId; | src/js/timeline.js:2662: state.shadowActiveId=d.shadowActiveId||state.shadowPalette[0].id;. Readers — 3 reader references across 2 files: src/js/shadow-brush-bridge.js(2), src/js/timeline.js(1).",
+            "`showShadowGuides`: src/js/timeline.js:501: state.showShadowGuides=!state.showShadowGuides;. Readers — 3 reader references across 2 files: src/js/engine-bridge.js(2), src/js/timeline.js(1).",
+            "`exportIncludeShadowGuides`: src/js/timeline.js:11759: state.exportIncludeShadowGuides=document.getElementById('exp-include-shadow').checked;. Readers — 3 reader references across 2 files: src/js/export.js(2), src/js/timeline.js(1).",
+            "`customBrushPresets`: src/js/brush-editor.js:249: if (!state.customBrushPresets) state.customBrushPresets = {}; | src/js/project.js:80: state.customBrushPresets={}; | src/js/timeline.js:2663: state.customBrushPresets=d.customBrushPresets||{};. Readers — 15 reader references across 7 files: src/js/brush-preset-picker.js(4), src/js/brush-editor.js(3), src/js/brush-menu-bridge.js(2), src/js/timeline.js(2), src/js/tools.js(2), src/js/motion-preset-picker.js(1), src/js/rive-export.js(1)."
+          ],
+          "effects": "Of 7 fields in this packet, 5 round-trip via exportJSON/importJSON (timeline.js:2049,2354); the rest are session-only or (rulersOn) localStorage-only. No field in this packet is itself a function — all effects are plain state reads/writes; render/document consequences belong to each field's own reader sites (see callers)."
+        }
+      ]
+    },
+    {
+      "area": "state-layers-tween-undo",
+      "packets": [
+        {
+          "id": "C21a.state-layers-tween-undo",
+          "files": [
+            "src/js/app.js:188-231"
+          ],
+          "coverage_ranges": [
+            [
+              188,
+              231
+            ]
+          ],
+          "classification": {
+            "code": 9,
+            "comment": 35,
+            "whitespace": 0
+          },
+          "symbols": [
+            "layers",
+            "activeLayerIdx",
+            "motionArcs",
+            "easingCurve",
+            "tweenOverrides",
+            "tweenEasing",
+            "showTweenCurves",
+            "selectedStrokeIndices",
+            "undoStack",
+            "redoStack",
+            "maxUndo",
+            "undoLabels",
+            "redoLabels",
+            "actionLog"
+          ],
+          "signature": "var state={layers,activeLayerIdx,motionArcs,easingCurve,tweenOverrides,tweenEasing,showTweenCurves,selectedStrokeIndices,undoStack,redoStack,maxUndo,undoLabels,redoLabels,actionLog,...}",
+          "responsibility": "The document's own layer array plus the tween/easing override maps and the undo/redo snapshot stacks.",
+          "behavior": [
+            "`layers` (app.js:188, default `[]`): The document's own layer array — the single most-read field in this scope (1000+ references across src/js). Not itself a literal exportJSON key: exportJSON re-maps sceneLayers.map(...) into a per-layer field allowlist rather than serializing the array wholesale, and importJSON reconstructs it the same way (per-layer, timeline.js's import loop). Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`activeLayerIdx` (app.js:188, default `0`): Index of the active layer, reset to 0 on importJSON/new-project rather than restored from the file's own value. Persisted: no — importJSON resets this to a fixed value (timeline.js:2688 or :2381/:2381) rather than reading it from the file; exportJSON never writes it either.",
+            "`motionArcs` (app.js:200, default `{}`): Per-frame Motion-path arc data ({} map), swapped alongside layers whenever entering/exiting a Component or montage view (app.js enterSymbol/exitToScene family) so it stays in sync with whichever layer set is currently live. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`easingCurve` (app.js:200, default `{points:[{x:0,y:0},{x:.3,y:.05},{x:.7,y:.95},{x:1,y:1}]}`): Global tween easing curve ({points:[...]}) Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`tweenOverrides` (app.js:206, default `{}`): Manual inbetween/tween reassignment map (v16) — {layer+':'+fA+'-'+fB:[{aId,bId},...]} forcing autoMatch (tweens.js generateTweens) to pair specific strokes by stable data.strokeId when the auto-matcher misidentifies correspondence. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`tweenEasing` (app.js:212, default `{}`): Per-keyframe-pair easing override map, complementing (never replacing) easingCurve — a pair with no entry falls back to the global curve (getEasingForPair, tweens.js). Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`showTweenCurves` (app.js:216, default `false`): Per-project timeline display toggle for the inline mini-curve strip under layers with a tween span; purely display, never affects generateTweens() output. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`selectedStrokeIndices` (app.js:217, default `[]`): Index-based mirror of the live selectedPaths array, written from ~40 sites across select-bridge.js/tools.js/timeline.js/subselect-bridge.js/color-manager.js/group-bridge.js/motion.js/shapes-panel.js whenever the live Paper.js selection changes. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`undoStack` (app.js:218, default `[]`): Undo snapshot stack (layersSnapshotNow() results), capped at maxUndo. Session-only (confirmed absent from exportJSON) — populated via .push()/.shift() in pushUndoLayers (tweens.js:4928), not literal '=' writer sites. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`redoStack` (app.js:218, default `[]`): Redo snapshot stack, cleared whenever a new undo entry is pushed (tweens.js:4928) since a fresh action invalidates any pending redo. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`maxUndo` (app.js:218, default `60`): Undo depth cap (60). Read twice (tweens.js:4845,4928) as a comparison bound; has ZERO writer anywhere in src/js at the frozen SHA — a de facto constant, no UI ever changes it. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`undoLabels` (app.js:223, default `[]`): Human-readable {label,tool,frame,layer,t} entries parallel to undoStack (History Panel), kept in sync by hand alongside the stack's own push/pop. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`redoLabels` (app.js:223, default `[]`): Parallel labels for redoStack. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`actionLog` (app.js:231, default `[]`): Rolling action trail feeding feedback-bridge.js's debug-log system so a bug report carries real repro context. Deliberately excluded from exportJSON's field list per its own comment — verified: absent from the export key list. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem)."
+          ],
+          "callers": [
+            "`layers`: src/js/app.js:4184: state.layers=sym.layers;state.totalFrames=sym.totalFrames;state.waIn=0;state.waOut=sym.totalFrames-1; | src/js/app.js:4212: // restoreLayersSnapshot (tweens.js), which does `state.layers=[]` then | src/js/app.js:4232: // exactly like restoreLayersSnapshot's own `state.layers=[]` did for | src/js/app.js:4243: state.layers=_sceneSnapshot.layers;state.totalFrames=_sceneSnapshot.totalFrames;state.waIn=_sceneSnapshot.waIn;state.waOut=_sceneSnapshot.waOut; | src/js/app.js:4344: state.layers=newLayers;state.totalFrames=total;state.waIn=0;state.waOut=total-1; | src/js/app.js:4363: state.layers=_montageViewSnapshot.layers;state.totalFrames=_montageViewSnapshot.totalFrames;state.waIn=_montageViewSnapshot.waIn;state.waOut=_montageViewSnapshot.waOut; | src/js/project.js:57: while(userLayers.length>0)userLayers.pop().remove();state.layers=[]; | src/js/timeline.js:2379: while(userLayers.length>0)userLayers.pop().remove();state.layers=[]; | src/js/tweens.js:4949: state.layers=[]; | src/js/tweens.js:4962: // The `state.layers=[]` above replaces the array, which breaks the alias. Readers — 1040 reader references across 76 files: src/js/timeline.js(330), src/js/motion.js(187), src/js/app.js(116), src/js/engine-bridge.js(69), src/js/layer-inout.js(42), src/js/select-bridge.js(39), src/js/tweens.js(21), src/js/nemo-script.js(16), src/js/images.js(15), src/js/native-video-bridge.js(15), src/js/tools.js(15), src/js/rig-widget.js(12), src/js/export.js(11), src/js/effector-layer.js(8), src/js/rig-bridge.js(8), src/js/playback-cache.js(7), src/js/media-library.js(6), src/js/color-manager.js(5), src/js/group-bridge.js(5), src/js/image-mesh.js(5), src/js/storyboard.js(5), src/js/labs/pingpong-cycle.js(4), src/js/labs/storyboard-mode.js(4), src/js/labs/xsheet-panel.js(4), src/js/text-animator-panel.js(4), src/js/bootstrap/opacity-application.js(3), src/js/kitsu.js(3), src/js/labs/oca-export.js(3), src/js/labs/retime-exposure.js(3), src/js/labs/rig-deform.js(3), src/js/subselect-bridge.js(3), src/js/text-animator.js(3), src/js/tracker-panel.js(3), src/js/audio-bridge.js(2), src/js/camera.js(2), src/js/domain/animation/opacity.js(2), src/js/fill-bridge.js(2), src/js/image-mesh-bridge.js(2), src/js/labs/boil-effect.js(2), src/js/labs/follow-path.js(2), src/js/labs/layer-effects-bake.js(2), src/js/labs/reference-fill.js(2), src/js/labs/shader-effects-bake.js(2), src/js/labs/vector-sculpt.js(2), src/js/linked-media.js(2), src/js/markers.js(2), src/js/motion-graph.js(2), src/js/motion-preset-picker.js(2), src/js/palette-panel.js(2), src/js/psd-import-bridge.js(2), src/js/rive-export.js(2), src/js/tracker.js(2), src/js/vectorize-bridge.js(2), src/js/application/opacity-application.js(1), src/js/comp-preview.js(1), src/js/effects-panel.js(1), src/js/eraser-bridge.js(1), src/js/feedback-bridge.js(1), src/js/history-panel.js(1), src/js/labs/clip-mask-bake.js(1), src/js/labs/french-curve.js(1), src/js/labs/interval-assistant.js(1), src/js/labs/labs-panel.js(1), src/js/labs/move-to-layer.js(1), src/js/labs/multiframe-draw.js(1), src/js/labs/pose-library.js(1), src/js/labs/screentone-bake.js(1), src/js/labs/speed-lines.js(1), src/js/lipsync.js(1), src/js/pen-bridge.js(1), src/js/project.js(1), src/js/render-manager.js(1), src/js/shapes-panel.js(1), src/js/svg-import.js(1), src/js/transplant.js(1), src/js/tutorial.js(1).",
+            "`activeLayerIdx`: src/js/app.js:410: function activateUL(idx){state.activeLayerIdx=idx;if(userLayers[idx])userLayers[idx].activate();} | src/js/app.js:477: state.activeLayerIdx=newActiveIdx>=0?newActiveIdx:0; | src/js/app.js:3466: state.activeLayerIdx=insertAt;_layerSel=[insertAt]; | src/js/app.js:3731: state.activeLayerIdx=li; | src/js/app.js:3979: state.activeLayerIdx=target; | src/js/app.js:4191: state.activeLayerIdx=0;state.currentFrame=0;state.fps=sym.fps||state.fps; | src/js/app.js:4245: state.activeLayerIdx=_sceneSnapshot.activeLayerIdx;state.currentFrame=_sceneSnapshot.currentFrame;state.fps=_sceneSnapshot.fps; | src/js/app.js:4346: state.activeLayerIdx=0;state.currentFrame=0; | src/js/app.js:4365: state.activeLayerIdx=_montageViewSnapshot.activeLayerIdx;state.currentFrame=_montageViewSnapshot.currentFrame;state.fps=_montageViewSnapshot.fps; | src/js/app.js:5106: state.activeLayerIdx=Math.max(0,newActiveIdx); | src/js/motion.js:7315: // window.SM.setActiveLayer(li), not a raw state.activeLayerIdx=li — | src/js/select-bridge.js:1548: state.activeLayerIdx = nvHit; | src/js/select-bridge.js:1588: state.activeLayerIdx = nullHit; | src/js/select-bridge.js:1609: state.activeLayerIdx = compHit.layerIdx; | src/js/select-bridge.js:1627: state.activeLayerIdx = hitOtherLayerIdx; | src/js/select-bridge.js:2821: state.activeLayerIdx = nvMarq; | src/js/select-bridge.js:2990: state.activeLayerIdx = compHit.layerIdx; activateUL(compHit.layerIdx); | src/js/storyboard.js:1287: state.activeLayerIdx = i; activateUL(i); updateUI(); | src/js/storyboard.js:1297: state.activeLayerIdx = idx; activateUL(idx); | src/js/timeline.js:1061: if(state.activeLayerIdx>=state.layers.length)state.activeLayerIdx=state.layers.length-1; | src/js/timeline.js:2688: state.currentFrame=0;state.activeLayerIdx=0;activateUL(0);drawStage();loadFrame(0);renderOS();renderArcs();updateUI();renderSymbolTabs(); | src/js/timeline.js:6561: if(ld.matteMode){mb.style.cursor='pointer';mb.addEventListener('click',function(e){e.stopPropagation();state.activeLayerIdx=i;activateUL(i);updatePropsContext();openMatteDropdownAt(mb);});} | src/js/tools.js:7448: state.activeLayerIdx=compHit.layerIdx;activateUL(compHit.layerIdx); | src/js/tools.js:7457: if(hitOtherLayerIdx>=0){state.activeLayerIdx=hitOtherLayerIdx;activateUL(hitOtherLayerIdx);} | src/js/tweens.js:4954: state.activeLayerIdx=Math.max(0,Math.min(s.active,state.layers.length-1));. Readers — 511 reader references across 52 files: src/js/timeline.js(109), src/js/select-bridge.js(80), src/js/tools.js(74), src/js/app.js(32), src/js/motion.js(29), src/js/engine-bridge.js(22), src/js/tweens.js(21), src/js/subselect-bridge.js(15), src/js/draw-bridge.js(10), src/js/rig-bridge.js(10), src/js/color-manager.js(6), src/js/image-mesh-bridge.js(6), src/js/text-animator-panel.js(6), src/js/eraser-bridge.js(5), src/js/fill-bridge.js(5), src/js/nemo-script.js(5), src/js/pen-bridge.js(5), src/js/images.js(4), src/js/labs/vector-sculpt.js(4), src/js/media-library.js(4), src/js/vectorize-bridge.js(4), src/js/group-bridge.js(3), src/js/labs/rig-deform.js(3), src/js/palette-panel.js(3), src/js/rig-widget.js(3), src/js/shape-bridge.js(3), src/js/bitmap-brush.js(2), src/js/effects-panel.js(2), src/js/labs/follow-path.js(2), src/js/labs/french-curve.js(2), src/js/labs/pose-library.js(2), src/js/labs/screentone-bake.js(2), src/js/labs/speed-lines.js(2), src/js/labs/storyboard-mode.js(2), src/js/labs/vector-trim.js(2), src/js/motion-preset-picker.js(2), src/js/shapes-panel.js(2), src/js/svg-import.js(2), src/js/tracker-panel.js(2), src/js/viewtools-bridge.js(2), src/js/comp-preview.js(1), src/js/feedback-bridge.js(1), src/js/figma-import.js(1), src/js/history-panel.js(1), src/js/labs/boil-effect.js(1), src/js/labs/interval-assistant.js(1), src/js/labs/labs-panel.js(1), src/js/labs/layer-effects-bake.js(1), src/js/labs/move-to-layer.js(1), src/js/labs/multiframe-draw.js(1), src/js/labs/reference-fill.js(1), src/js/rulers-bridge.js(1).",
+            "`motionArcs`: src/js/app.js:4187: state.motionArcs=sym.motionArcs||(sym.motionArcs={}); | src/js/app.js:4248: state.markers=_sceneSnapshot.markers;state.motionArcs=_sceneSnapshot.motionArcs;state.tweenOverrides=_sceneSnapshot.tweenOverrides;state.tweenEasing=_sceneSnapshot.tweenEasing; | src/js/app.js:4302: state.motionArcs=m.motionArcs||(m.motionArcs={}); | src/js/app.js:4368: state.markers=_montageViewSnapshot.markers;state.motionArcs=_montageViewSnapshot.motionArcs;state.tweenOverrides=_montageViewSnapshot.tweenOverrides;state.tweenEasing=_montageViewSnapshot.tweenEasing; | src/js/project.js:71: state.motionArcs={};state.tweenOverrides={};state.tweenEasing={};state.currentFrame=0; | src/js/timeline.js:2563: state.motionArcs=d.motionArcs||{};state.tweenOverrides=d.tweenOverrides||{};state.tweenEasing=d.tweenEasing||{}; | src/js/timeline.js:2614: state.motionArcs=out; | src/js/tweens.js:4959: if(s.motionArcs)state.motionArcs=JSON.parse(JSON.stringify(s.motionArcs));. Readers — 20 reader references across 4 files: src/js/tweens.js(13), src/js/app.js(4), src/js/timeline.js(2), src/js/select-bridge.js(1).",
+            "`easingCurve`: src/js/timeline.js:840: setCurve:function(points){state.easingCurve={points:points};}, | src/js/timeline.js:2629: state.easingCurve=_ec;if(window._curveEditor)window._curveEditor.setState(_ec);. Readers — 6 reader references across 5 files: src/js/ui.js(2), src/js/app.js(1), src/js/camera.js(1), src/js/timeline.js(1), src/js/tutorial.js(1).",
+            "`tweenOverrides`: src/js/app.js:4188: state.tweenOverrides=sym.tweenOverrides||(sym.tweenOverrides={}); | src/js/app.js:4248: state.markers=_sceneSnapshot.markers;state.motionArcs=_sceneSnapshot.motionArcs;state.tweenOverrides=_sceneSnapshot.tweenOverrides;state.tweenEasing=_sceneSnapshot.tweenEasing; | src/js/app.js:4303: state.tweenOverrides=m.tweenOverrides||(m.tweenOverrides={}); | src/js/app.js:4368: state.markers=_montageViewSnapshot.markers;state.motionArcs=_montageViewSnapshot.motionArcs;state.tweenOverrides=_montageViewSnapshot.tweenOverrides;state.tweenEasing=_montageViewSnapshot.tweenEasing; | src/js/project.js:71: state.motionArcs={};state.tweenOverrides={};state.tweenEasing={};state.currentFrame=0; | src/js/timeline.js:2563: state.motionArcs=d.motionArcs||{};state.tweenOverrides=d.tweenOverrides||{};state.tweenEasing=d.tweenEasing||{}; | src/js/timeline.js:2586: state.tweenOverrides=migrate(state.tweenOverrides); | src/js/tweens.js:4961: if(s.tweenOverrides)state.tweenOverrides=JSON.parse(JSON.stringify(s.tweenOverrides));. Readers — 20 reader references across 3 files: src/js/tweens.js(15), src/js/app.js(4), src/js/timeline.js(1).",
+            "`tweenEasing`: src/js/app.js:4189: state.tweenEasing=sym.tweenEasing||(sym.tweenEasing={}); | src/js/app.js:4248: state.markers=_sceneSnapshot.markers;state.motionArcs=_sceneSnapshot.motionArcs;state.tweenOverrides=_sceneSnapshot.tweenOverrides;state.tweenEasing=_sceneSnapshot.tweenEasing; | src/js/app.js:4304: state.tweenEasing=m.tweenEasing||(m.tweenEasing={}); | src/js/app.js:4368: state.markers=_montageViewSnapshot.markers;state.motionArcs=_montageViewSnapshot.motionArcs;state.tweenOverrides=_montageViewSnapshot.tweenOverrides;state.tweenEasing=_montageViewSnapshot.tweenEasing; | src/js/project.js:71: state.motionArcs={};state.tweenOverrides={};state.tweenEasing={};state.currentFrame=0; | src/js/timeline.js:2563: state.motionArcs=d.motionArcs||{};state.tweenOverrides=d.tweenOverrides||{};state.tweenEasing=d.tweenEasing||{}; | src/js/timeline.js:2587: state.tweenEasing=migrate(state.tweenEasing); | src/js/timeline.js:4473: if(!state.tweenEasing)state.tweenEasing={}; | src/js/timeline.js:4685: if(!state.tweenEasing)state.tweenEasing={}; | src/js/timeline.js:4710: if(!state.tweenEasing)state.tweenEasing={}; | src/js/tweens.js:4960: if(s.tweenEasing)state.tweenEasing=JSON.parse(JSON.stringify(s.tweenEasing));. Readers — 21 reader references across 4 files: src/js/timeline.js(8), src/js/ui.js(5), src/js/app.js(4), src/js/tweens.js(4).",
+            "`showTweenCurves`: src/js/timeline.js:468: state.showTweenCurves=!state.showTweenCurves;. Readers — 4 reader references across 1 files: src/js/timeline.js(4).",
+            "`selectedStrokeIndices`: src/js/app.js:4821: state.selectedStrokeIndices=_selNext.map(function(p){return _selLayer.children.indexOf(p);}).filter(function(x){return x>=0;}); | src/js/app.js:5170: state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i){return i>=0;}); | src/js/color-manager.js:162: state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i) { return i >= 0; }); | src/js/group-bridge.js:445: selectedPaths = islands; state.selectedStrokeIndices = []; | src/js/motion.js:9807: if (window.state) state.selectedStrokeIndices = items.map(function (it) { return typeof getSI === 'function' ? getSI(it) : -1; }).filter(function (i2) { return i2 >= 0; }); | src/js/select-bridge.js:1209: state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; }); | src/js/select-bridge.js:1259: state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; }); | src/js/select-bridge.js:1280: state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; }); | src/js/select-bridge.js:1613: state.selectedStrokeIndices = []; | src/js/select-bridge.js:1645: state.selectedStrokeIndices = []; | src/js/select-bridge.js:1742: state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; }); | src/js/select-bridge.js:2520: state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; }); | src/js/select-bridge.js:2789: state.selectedStrokeIndices = spansLayers ? [] : selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; }); | src/js/select-bridge.js:2843: state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; }); | src/js/select-bridge.js:2863: state.selectedStrokeIndices = []; | src/js/select-bridge.js:2992: state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i) { return i >= 0; }); | src/js/select-bridge.js:3003: state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i) { return i >= 0; }); | src/js/select-bridge.js:3559: state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; }); | src/js/select-bridge.js:3580: state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i) { return i >= 0; }); | src/js/shapes-panel.js:104: if (window.state) state.selectedStrokeIndices = sel.map(function (it) { return typeof getSI === 'function' ? getSI(it) : -1; }).filter(function (i2) { return i2 >= 0; }); | src/js/subselect-bridge.js:325: state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; }); | src/js/subselect-bridge.js:477: state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i2) { return i2 >= 0; }); | src/js/timeline.js:1588: state.selectedStrokeIndices=[]; | src/js/timeline.js:1606: state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;}); | src/js/timeline.js:3836: state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;}); | src/js/timeline.js:5155: state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;}); | src/js/timeline.js:9725: state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;}); | src/js/tools.js:137: state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i){return i>=0;}); | src/js/tools.js:1475: function clearSel(keepLayerExplicit){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;state.xformAnchorHovered=false;state.xformRingHovered=false;if(typeof n... | src/js/tools.js:1644: state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;}); | src/js/tools.js:1710: state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;}); | src/js/tools.js:6019: selectedPaths=islands;state.selectedStrokeIndices=[]; | src/js/tools.js:7272: selectedPaths.push(subTarget);state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;}); | src/js/tools.js:7315: state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;}); | src/js/tools.js:7450: state.selectedStrokeIndices=[]; | src/js/tools.js:7471: state.selectedStrokeIndices=[]; | src/js/tools.js:7491: state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;}); | src/js/tools.js:8075: state.selectedStrokeIndices=[]; | src/js/tools.js:8104: state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;}); | src/js/tools.js:8115: state.selectedStrokeIndices=[]; | src/js/tools.js:8134: state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;}); | src/js/tools.js:8535: state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;}); | src/js/tools.js:8568: state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;}); | src/js/tools.js:8601: state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i2){return i2>=0;});. Readers — 14 reader references across 4 files: src/js/select-bridge.js(9), src/js/tweens.js(3), src/js/color-manager.js(1), src/js/subselect-bridge.js(1).",
+            "`undoStack`: src/js/bootstrap/opacity-application.js:59: root.state.undoStack = []; root.state.undoLabels = []; | src/js/history-panel.js:59: state.undoStack=[];state.undoLabels=[];state.redoStack=[];state.redoLabels=[];. Readers — 25 reader references across 6 files: src/js/tools.js(9), src/js/tweens.js(9), src/js/timeline.js(3), src/js/history-panel.js(2), src/js/brush-preset-picker.js(1), src/js/shape-bridge.js(1).",
+            "`redoStack`: src/js/bootstrap/opacity-application.js:60: root.state.redoStack = []; root.state.redoLabels = []; | src/js/history-panel.js:59: state.undoStack=[];state.undoLabels=[];state.redoStack=[];state.redoLabels=[]; | src/js/tweens.js:4846: state.redoStack=[];state.redoLabels=[]; | src/js/tweens.js:4928: function pushUndoLayers(alreadySaved){if(window._scrubLiveActive)return;if(!alreadySaved)saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());state.undoLabels.push(_actionLabelNow());if(s.... Readers — 6 reader references across 2 files: src/js/tweens.js(5), src/js/history-panel.js(1).",
+            "`maxUndo`: no writer anywhere in src/js at the frozen SHA. Readers — 2 reader references across 1 files: src/js/tweens.js(2).",
+            "`undoLabels`: src/js/bootstrap/opacity-application.js:59: root.state.undoStack = []; root.state.undoLabels = []; | src/js/history-panel.js:59: state.undoStack=[];state.undoLabels=[];state.redoStack=[];state.redoLabels=[];. Readers — 7 reader references across 2 files: src/js/tweens.js(6), src/js/history-panel.js(1).",
+            "`redoLabels`: src/js/bootstrap/opacity-application.js:60: root.state.redoStack = []; root.state.redoLabels = []; | src/js/history-panel.js:59: state.undoStack=[];state.undoLabels=[];state.redoStack=[];state.redoLabels=[]; | src/js/tweens.js:4846: state.redoStack=[];state.redoLabels=[]; | src/js/tweens.js:4928: function pushUndoLayers(alreadySaved){if(window._scrubLiveActive)return;if(!alreadySaved)saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());state.undoLabels.push(_actionLabelNow());if(s.... Readers — 4 reader references across 2 files: src/js/tweens.js(3), src/js/history-panel.js(1).",
+            "`actionLog`: src/js/feedback-bridge.js:73: if (!state.actionLog) state.actionLog = [];. Readers — 8 reader references across 2 files: src/js/feedback-bridge.js(7), src/js/history-panel.js(1)."
+          ],
+          "effects": "Of 14 fields in this packet, 5 round-trip via exportJSON/importJSON (timeline.js:2049,2354); the rest are session-only or (rulersOn) localStorage-only. No field in this packet is itself a function — all effects are plain state reads/writes; render/document consequences belong to each field's own reader sites (see callers)."
+        }
+      ]
+    },
+    {
+      "area": "state-canvas-interaction-guides",
+      "packets": [
+        {
+          "id": "C21a.state-canvas-interaction-guides",
+          "files": [
+            "src/js/app.js:232-259"
+          ],
+          "coverage_ranges": [
+            [
+              232,
+              259
+            ]
+          ],
+          "classification": {
+            "code": 17,
+            "comment": 11,
+            "whitespace": 0
+          },
+          "symbols": [
+            "waIn",
+            "waOut",
+            "isPanning",
+            "spaceDown",
+            "altDown",
+            "canvasRotation",
+            "perspectiveEnabled",
+            "perspectiveMode",
+            "perspectiveDensity",
+            "perspectiveVPs",
+            "symmetryEnabled",
+            "symmetryMode",
+            "symmetryAxis",
+            "symmetryRadialCenter",
+            "symmetryRadialSectors",
+            "symmetryExtend",
+            "audioTracks",
+            "xformAnchorKey",
+            "xformAnchorCustom",
+            "refMedia"
+          ],
+          "signature": "var state={waIn,waOut,isPanning,spaceDown,altDown,canvasRotation,perspectiveEnabled,perspectiveMode,perspectiveDensity,perspectiveVPs,symmetryEnabled,symmetryMode,symmetryAxis,symmetryRadialCenter,symmetryRadialSectors,symmetryExtend,audioTracks,xformAnchorKey,xformAnchorCustom,refMedia,...}",
+          "responsibility": "Work-area bounds, pan/space/alt interaction flags, canvas rotation, the Perspective and Symmetry drawing-guide systems, audio tracks, the transform-anchor pivot, and the rotoscopy reference-media descriptor.",
+          "behavior": [
+            "`waIn` (app.js:232, default `0`): Work-area lower frame bound. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`waOut` (app.js:232, default `23`): Work-area upper frame bound. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`isPanning` (app.js:233, default `false`): True while a hand-tool/space-drag pan gesture is active. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`spaceDown` (app.js:233, default `false`): True while the spacebar is held (temporary pan-tool override). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`altDown` (app.js:233, default `false`): True while Alt is held (modifies several tool behaviors). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`canvasRotation` (app.js:234, default `0`): Stage/canvas rotation in radians (Animate 'Rotate Stage' style), independent of zoom/pan — only the Rust engine's viewport actually rotates (see engine-bridge.js syncViewport()). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`perspectiveEnabled` (app.js:241, default `false`): Perspective drawing guide toggle (Sketchbook-style) — persists across tool switches once enabled, unlike most other tool-scoped state. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`perspectiveMode` (app.js:242, default `'2pt'`): '1pt'|'2pt'|'3pt'|'fisheye'. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`perspectiveDensity` (app.js:243, default `24`): Guide line count radiating from each vanishing point. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`perspectiveVPs` (app.js:244, default `null`): Vanishing-point positions, lazily seeded for canvasW/H on first enable (ensurePerspectiveVPs(), perspective-bridge.js) — world coordinates so they pan/zoom/rotate with the canvas. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`symmetryEnabled` (app.js:250, default `false`): Symmetry drawing guide toggle (Sketchbook-style, 2026-07), same persists-across-tools convention as perspectiveEnabled; promoted from a removed Labs prototype (labs/symmetry-mirror.js) into symmetry-bridge.js. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`symmetryMode` (app.js:251, default `'y'`): 'y'|'x'|'free'|'radial'. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`symmetryAxis` (app.js:252, default `null`): {x1,y1,x2,y2} world-coord mirror line endpoints for y/x/free modes, lazily seeded (ensureSymmetryAxis(), symmetry-bridge.js). Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`symmetryRadialCenter` (app.js:253, default `null`): {x,y} world coords, radial (mandala) mode only. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`symmetryRadialSectors` (app.js:254, default `6`): Sector count for radial symmetry (default 6). Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`symmetryExtend` (app.js:255, default `true`): true = a stroke may freely cross the mirror axis (default); false clips it the instant it crosses so original+mirror never overlap at the fold. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`audioTracks` (app.js:256, default `[]`): {name,dataB64,offsetFrames,volume,muted,...} array — playback/waveform data owned by audio-bridge.js's own tracks() lazy accessor (audio-bridge.js:28). Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`xformAnchorKey` (app.js:257, default `'mc'`): Rotate/scale pivot preset key ('tl'|'tc'|...|'mc'|...) for the 9-dot widget (tools.js xformAnchorPoint). Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`xformAnchorCustom` (app.js:258, default `null`): [x,y] world-space pivot override from Alt+click (select-bridge.js), takes priority over xformAnchorKey when set. Persisted: no (session-only; confirmed absent from both exportJSON's output-key list and importJSON's restore list, and from localStorage.setItem/getItem).",
+            "`refMedia` (app.js:259, default `null`): Rotoscopy reference media descriptor {type:'video'|'imageseq'|'image',...} (reference-bridge.js). Persisted: yes, round-trips via exportJSON/importJSON (timeline.js)."
+          ],
+          "callers": [
+            "`waIn`: src/js/app.js:4184: state.layers=sym.layers;state.totalFrames=sym.totalFrames;state.waIn=0;state.waOut=sym.totalFrames-1; | src/js/app.js:4243: state.layers=_sceneSnapshot.layers;state.totalFrames=_sceneSnapshot.totalFrames;state.waIn=_sceneSnapshot.waIn;state.waOut=_sceneSnapshot.waOut; | src/js/app.js:4344: state.layers=newLayers;state.totalFrames=total;state.waIn=0;state.waOut=total-1; | src/js/app.js:4363: state.layers=_montageViewSnapshot.layers;state.totalFrames=_montageViewSnapshot.totalFrames;state.waIn=_montageViewSnapshot.waIn;state.waOut=_montageViewSnapshot.waOut; | src/js/kitsu.js:133: state.waIn = 0; state.waOut = meta.frameCount - 1; | src/js/project.js:69: state.totalFrames=defFrames;state.waIn=0;state.waOut=defFrames-1; | src/js/timeline.js:849: setWorkArea:function(inF,outF){state.waIn=inF;state.waOut=outF;}, | src/js/timeline.js:860: if(state.waIn>=state.waOut)state.waIn=Math.max(0,state.waOut-1); | src/js/timeline.js:1115: state.waIn=0;state.waOut=n-1;window._waIn=0;window._waOut=n-1; | src/js/timeline.js:2377: state.waIn=d.waIn||0;state.waOut=d.waOut!==undefined?d.waOut:state.totalFrames-1; | src/js/timeline.js:9924: state.waIn=Math.max(0,Math.min(state.currentFrame,curOut-1));. Readers — 27 reader references across 7 files: src/js/timeline.js(15), src/js/app.js(4), src/js/ui.js(3), src/js/render-manager.js(2), src/js/export.js(1), src/js/motion.js(1), src/js/nemo-script.js(1).",
+            "`waOut`: src/js/app.js:4184: state.layers=sym.layers;state.totalFrames=sym.totalFrames;state.waIn=0;state.waOut=sym.totalFrames-1; | src/js/app.js:4243: state.layers=_sceneSnapshot.layers;state.totalFrames=_sceneSnapshot.totalFrames;state.waIn=_sceneSnapshot.waIn;state.waOut=_sceneSnapshot.waOut; | src/js/app.js:4344: state.layers=newLayers;state.totalFrames=total;state.waIn=0;state.waOut=total-1; | src/js/app.js:4363: state.layers=_montageViewSnapshot.layers;state.totalFrames=_montageViewSnapshot.totalFrames;state.waIn=_montageViewSnapshot.waIn;state.waOut=_montageViewSnapshot.waOut; | src/js/app.js:5336: state.totalFrames--;if(state.waOut>=state.totalFrames)state.waOut=state.totalFrames-1;window._waOut=state.waOut;window._totalF=state.totalFrames;if(state.currentFrame>=state.totalFrames)state.curre... | src/js/app.js:5397: if(state.waOut>=state.totalFrames)state.waOut=state.totalFrames-1;window._waOut=state.waOut;window._totalF=state.totalFrames; | src/js/kitsu.js:133: state.waIn = 0; state.waOut = meta.frameCount - 1; | src/js/labs/boil-effect.js:42: if (state.waOut < needed - 1) { state.waOut = needed - 1; window._waOut = state.waOut; } | src/js/labs/follow-path.js:84: if (state.waOut < needed - 1) { state.waOut = needed - 1; window._waOut = state.waOut; } | src/js/labs/pingpong-cycle.js:37: if (state.waOut < needed - 1) { state.waOut = needed - 1; window._waOut = state.waOut; } | src/js/labs/retime-exposure.js:50: if (state.waOut < totalNeeded - 1) { state.waOut = totalNeeded - 1; window._waOut = state.waOut; } | src/js/project.js:69: state.totalFrames=defFrames;state.waIn=0;state.waOut=defFrames-1; | src/js/timeline.js:849: setWorkArea:function(inF,outF){state.waIn=inF;state.waOut=outF;}, | src/js/timeline.js:850: setTotalFrames:function(v){v=Math.max(1,Math.min(999,v));saveAllLayerFrames();for(var i=0;i<state.layers.length;i++){while(state.layers[i].frames.length<v)state.layers[i].frames.push({strokes:[],is... | src/js/timeline.js:1115: state.waIn=0;state.waOut=n-1;window._waIn=0;window._waOut=n-1; | src/js/timeline.js:2024: if(state.waOut<state.totalFrames-1)state.waOut=state.totalFrames-1;window._waOut=state.waOut;window._totalF=state.totalFrames; | src/js/timeline.js:2265: if(state.waOut<needed-1){state.waOut=needed-1;window._waOut=state.waOut;} | src/js/timeline.js:2377: state.waIn=d.waIn||0;state.waOut=d.waOut!==undefined?d.waOut:state.totalFrames-1; | src/js/timeline.js:9931: state.waOut=Math.min(state.totalFrames-1,Math.max(state.currentFrame,curIn+1)); | src/js/tweens.js:4952: if(state.waOut>=s.totalFrames)state.waOut=s.totalFrames-1;window._waOut=state.waOut;. Readers — 31 reader references across 7 files: src/js/timeline.js(16), src/js/app.js(8), src/js/render-manager.js(2), src/js/ui.js(2), src/js/export.js(1), src/js/motion.js(1), src/js/nemo-script.js(1).",
+            "`isPanning`: src/js/timeline.js:10228: state.spaceDown=false;state.isPanning=false;state.spaceUsedForPan=false; | src/js/timeline.js:10242: state.spaceDown=false;state.isPanning=false;state.spaceUsedForPan=false;state.altDown=false; | src/js/tools.js:7160: if(state.tool==='hand'||state.spaceDown){state.isPanning=true;return;} | src/js/tools.js:7878: if(state.isPanning){state.isPanning=false;return;}if(state.playing)return; | src/js/viewtools-bridge.js:192: state.isPanning = true; | src/js/viewtools-bridge.js:306: state.isPanning = false;. Readers — 1 reader references across 1 files: src/js/tools.js(1).",
+            "`spaceDown`: src/js/timeline.js:9995: state.spaceDown=true; | src/js/timeline.js:10228: state.spaceDown=false;state.isPanning=false;state.spaceUsedForPan=false; | src/js/timeline.js:10242: state.spaceDown=false;state.isPanning=false;state.spaceUsedForPan=false;state.altDown=false;. Readers — 11 reader references across 3 files: src/js/timeline.js(6), src/js/viewtools-bridge.js(3), src/js/tools.js(2).",
+            "`altDown`: src/js/timeline.js:10001: else if(k==='Alt'){state.altDown=true;} | src/js/timeline.js:10234: }else if(event.key==='Alt'){state.altDown=false;}} | src/js/timeline.js:10242: state.spaceDown=false;state.isPanning=false;state.spaceUsedForPan=false;state.altDown=false;. Readers — 2 reader references across 2 files: src/js/layer-inout.js(1), src/js/viewtools-bridge.js(1).",
+            "`canvasRotation`: src/js/app.js:515: view.zoom=z;view.center=new Point(state.canvasW/2,state.canvasH/2);state.canvasRotation=0;updZoom(); | src/js/app.js:518: function resetView(){view.zoom=1;view.center=new Point(state.canvasW/2,state.canvasH/2);state.canvasRotation=0;updZoom();} | src/js/camera.js:373: if (!state.cameraView) { state.canvasRotation = 0; if (window.SMEngineBridge) window.SMEngineBridge.renderNow(true); } | src/js/camera.js:551: state.canvasRotation = -(cam.rot || 0) * Math.PI / 180; | src/js/project.js:75: state.canvasRotation=0; | src/js/viewtools-bridge.js:235: state.canvasRotation = newRotation;. Readers — 5 reader references across 2 files: src/js/engine-bridge.js(3), src/js/viewtools-bridge.js(2).",
+            "`perspectiveEnabled`: src/js/labs/labs-float-panel.js:102: state.perspectiveEnabled = !state.perspectiveEnabled; | src/js/project.js:81: state.perspectiveEnabled=false;state.perspectiveMode='2pt';state.perspectiveDensity=24;state.perspectiveVPs=null; | src/js/timeline.js:2680: state.perspectiveEnabled=d.perspectiveEnabled||false;state.perspectiveMode=d.perspectiveMode||'2pt';state.perspectiveDensity=d.perspectiveDensity||24;state.perspectiveVPs=d.perspectiveVPs||null;. Readers — 12 reader references across 4 files: src/js/perspective-bridge.js(7), src/js/labs/labs-float-panel.js(3), src/js/timeline.js(1), src/js/tutorial.js(1).",
+            "`perspectiveMode`: src/js/perspective-bridge.js:50: state.perspectiveMode = mode; | src/js/project.js:81: state.perspectiveEnabled=false;state.perspectiveMode='2pt';state.perspectiveDensity=24;state.perspectiveVPs=null; | src/js/timeline.js:2680: state.perspectiveEnabled=d.perspectiveEnabled||false;state.perspectiveMode=d.perspectiveMode||'2pt';state.perspectiveDensity=d.perspectiveDensity||24;state.perspectiveVPs=d.perspectiveVPs||null;. Readers — 5 reader references across 3 files: src/js/labs/labs-float-panel.js(2), src/js/perspective-bridge.js(2), src/js/timeline.js(1).",
+            "`perspectiveDensity`: src/js/project.js:81: state.perspectiveEnabled=false;state.perspectiveMode='2pt';state.perspectiveDensity=24;state.perspectiveVPs=null; | src/js/timeline.js:2680: state.perspectiveEnabled=d.perspectiveEnabled||false;state.perspectiveMode=d.perspectiveMode||'2pt';state.perspectiveDensity=d.perspectiveDensity||24;state.perspectiveVPs=d.perspectiveVPs||null;. Readers — 4 reader references across 3 files: src/js/perspective-bridge.js(2), src/js/labs/labs-float-panel.js(1), src/js/timeline.js(1).",
+            "`perspectiveVPs`: src/js/perspective-bridge.js:44: if (!state.perspectiveVPs || !state.perspectiveVPs.length) state.perspectiveVPs = defaultVPs(state.perspectiveMode); | src/js/perspective-bridge.js:48: window.resetPerspectiveVPs = function () { state.perspectiveVPs = defaultVPs(state.perspectiveMode); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); }; | src/js/perspective-bridge.js:51: state.perspectiveVPs = defaultVPs(mode); | src/js/project.js:81: state.perspectiveEnabled=false;state.perspectiveMode='2pt';state.perspectiveDensity=24;state.perspectiveVPs=null; | src/js/timeline.js:2680: state.perspectiveEnabled=d.perspectiveEnabled||false;state.perspectiveMode=d.perspectiveMode||'2pt';state.perspectiveDensity=d.perspectiveDensity||24;state.perspectiveVPs=d.perspectiveVPs||null;. Readers — 2 reader references across 2 files: src/js/perspective-bridge.js(1), src/js/timeline.js(1).",
+            "`symmetryEnabled`: src/js/labs/labs-float-panel.js:83: state.symmetryEnabled = !state.symmetryEnabled; | src/js/project.js:82: state.symmetryEnabled=false;state.symmetryMode='y';state.symmetryAxis=null;state.symmetryRadialCenter=null;state.symmetryRadialSectors=6;state.symmetryExtend=true; | src/js/timeline.js:2681: state.symmetryEnabled=d.symmetryEnabled||false;state.symmetryMode=d.symmetryMode||'y';state.symmetryAxis=d.symmetryAxis||null;state.symmetryRadialCenter=d.symmetryRadialCenter||null;state.symmetryR.... Readers — 11 reader references across 4 files: src/js/symmetry-bridge.js(6), src/js/labs/labs-float-panel.js(3), src/js/timeline.js(1), src/js/tutorial.js(1).",
+            "`symmetryMode`: src/js/project.js:82: state.symmetryEnabled=false;state.symmetryMode='y';state.symmetryAxis=null;state.symmetryRadialCenter=null;state.symmetryRadialSectors=6;state.symmetryExtend=true; | src/js/symmetry-bridge.js:113: state.symmetryMode = mode; | src/js/timeline.js:2681: state.symmetryEnabled=d.symmetryEnabled||false;state.symmetryMode=d.symmetryMode||'y';state.symmetryAxis=d.symmetryAxis||null;state.symmetryRadialCenter=d.symmetryRadialCenter||null;state.symmetryR.... Readers — 16 reader references across 3 files: src/js/symmetry-bridge.js(12), src/js/labs/labs-float-panel.js(3), src/js/timeline.js(1).",
+            "`symmetryAxis`: src/js/project.js:82: state.symmetryEnabled=false;state.symmetryMode='y';state.symmetryAxis=null;state.symmetryRadialCenter=null;state.symmetryRadialSectors=6;state.symmetryExtend=true; | src/js/symmetry-bridge.js:98: if (!state.symmetryAxis) state.symmetryAxis = defaultAxis(state.symmetryMode); | src/js/symmetry-bridge.js:109: else state.symmetryAxis = defaultAxis(state.symmetryMode); | src/js/symmetry-bridge.js:115: else state.symmetryAxis = defaultAxis(mode); | src/js/timeline.js:2681: state.symmetryEnabled=d.symmetryEnabled||false;state.symmetryMode=d.symmetryMode||'y';state.symmetryAxis=d.symmetryAxis||null;state.symmetryRadialCenter=d.symmetryRadialCenter||null;state.symmetryR.... Readers — 2 reader references across 2 files: src/js/symmetry-bridge.js(1), src/js/timeline.js(1).",
+            "`symmetryRadialCenter`: src/js/project.js:82: state.symmetryEnabled=false;state.symmetryMode='y';state.symmetryAxis=null;state.symmetryRadialCenter=null;state.symmetryRadialSectors=6;state.symmetryExtend=true; | src/js/symmetry-bridge.js:102: if (!state.symmetryRadialCenter) state.symmetryRadialCenter = defaultRadialCenter(); | src/js/symmetry-bridge.js:108: if (state.symmetryMode === 'radial') state.symmetryRadialCenter = defaultRadialCenter(); | src/js/symmetry-bridge.js:114: if (mode === 'radial') state.symmetryRadialCenter = defaultRadialCenter(); | src/js/timeline.js:2681: state.symmetryEnabled=d.symmetryEnabled||false;state.symmetryMode=d.symmetryMode||'y';state.symmetryAxis=d.symmetryAxis||null;state.symmetryRadialCenter=d.symmetryRadialCenter||null;state.symmetryR.... Readers — 2 reader references across 2 files: src/js/symmetry-bridge.js(1), src/js/timeline.js(1).",
+            "`symmetryRadialSectors`: src/js/labs/labs-float-panel.js:398: state.symmetryRadialSectors = Math.max(2, Math.min(24, v)); | src/js/project.js:82: state.symmetryEnabled=false;state.symmetryMode='y';state.symmetryAxis=null;state.symmetryRadialCenter=null;state.symmetryRadialSectors=6;state.symmetryExtend=true; | src/js/timeline.js:2681: state.symmetryEnabled=d.symmetryEnabled||false;state.symmetryMode=d.symmetryMode||'y';state.symmetryAxis=d.symmetryAxis||null;state.symmetryRadialCenter=d.symmetryRadialCenter||null;state.symmetryR.... Readers — 7 reader references across 3 files: src/js/labs/labs-float-panel.js(5), src/js/symmetry-bridge.js(1), src/js/timeline.js(1).",
+            "`symmetryExtend`: src/js/labs/labs-float-panel.js:417: state.symmetryExtend = !state.symmetryExtend; | src/js/project.js:82: state.symmetryEnabled=false;state.symmetryMode='y';state.symmetryAxis=null;state.symmetryRadialCenter=null;state.symmetryRadialSectors=6;state.symmetryExtend=true; | src/js/timeline.js:2681: state.symmetryEnabled=d.symmetryEnabled||false;state.symmetryMode=d.symmetryMode||'y';state.symmetryAxis=d.symmetryAxis||null;state.symmetryRadialCenter=d.symmetryRadialCenter||null;state.symmetryR.... Readers — 6 reader references across 3 files: src/js/symmetry-bridge.js(3), src/js/labs/labs-float-panel.js(2), src/js/timeline.js(1).",
+            "`audioTracks`: src/js/audio-bridge.js:2: // Data model: state.audioTracks = [{ name, dataB64, offsetFrames, volume, | src/js/audio-bridge.js:28: function tracks() { return state.audioTracks || (state.audioTracks = []); } | src/js/project.js:83: state.audioTracks=[];if(window.SMAudio)SMAudio.reload(); | src/js/timeline.js:2664: state.audioTracks=d.audioTracks||[];. Readers — 9 reader references across 6 files: src/js/audio-bridge.js(3), src/js/timeline.js(2), src/js/feedback-bridge.js(1), src/js/labs/lipsync-assistant.js(1), src/js/lipsync.js(1), src/js/media-library.js(1).",
+            "`xformAnchorKey`: src/js/select-bridge.js:577: state.xformAnchorKey = k; state.xformAnchorCustom = null; | src/js/select-bridge.js:3120: state.xformAnchorCustom = null; state.xformAnchorKey = 'mc'; | src/js/timeline.js:3591: if(anchorsAgree&&refAnchorCustom){state.xformAnchorCustom=refAnchorCustom.slice();state.xformAnchorKey='mc';} | src/js/timeline.js:3592: else if(anchorsAgree&&refAnchorKey){state.xformAnchorKey=refAnchorKey;state.xformAnchorCustom=null;} | src/js/timeline.js:3593: else{state.xformAnchorKey='mc';state.xformAnchorCustom=null;} | src/js/timeline.js:10737: state.xformAnchorKey=btn.dataset.key;. Readers — 7 reader references across 4 files: src/js/timeline.js(3), src/js/select-bridge.js(2), src/js/app.js(1), src/js/tools.js(1).",
+            "`xformAnchorCustom`: src/js/select-bridge.js:577: state.xformAnchorKey = k; state.xformAnchorCustom = null; | src/js/select-bridge.js:582: state.xformAnchorCustom = [pt.x, pt.y]; | src/js/select-bridge.js:2259: state.xformAnchorCustom = [state.xformAnchorCustom[0] + d.x, state.xformAnchorCustom[1] + d.y]; | src/js/select-bridge.js:3120: state.xformAnchorCustom = null; state.xformAnchorKey = 'mc'; | src/js/timeline.js:3591: if(anchorsAgree&&refAnchorCustom){state.xformAnchorCustom=refAnchorCustom.slice();state.xformAnchorKey='mc';} | src/js/timeline.js:3592: else if(anchorsAgree&&refAnchorKey){state.xformAnchorKey=refAnchorKey;state.xformAnchorCustom=null;} | src/js/timeline.js:3593: else{state.xformAnchorKey='mc';state.xformAnchorCustom=null;} | src/js/timeline.js:10738: state.xformAnchorCustom=null; // explicit preset pick always wins back over a custom point | src/js/tools.js:1475: function clearSel(keepLayerExplicit){selectedPaths=[];state.selectedStrokeIndices=[];_nodeSel=[];state.xformAnchorCustom=null;state.xformAnchorHovered=false;state.xformRingHovered=false;if(typeof n.... Readers — 11 reader references across 4 files: src/js/select-bridge.js(6), src/js/tools.js(3), src/js/engine-bridge.js(1), src/js/timeline.js(1).",
+            "`refMedia`: src/js/native-video-bridge.js:1301: state.refMedia = { | src/js/native-video-bridge.js:1319: state.refMedia = null; | src/js/project.js:84: state.refMedia=null;if(window.SMReference)SMReference.reload(); | src/js/reference-bridge.js:8: // state.refMedia = { | src/js/reference-bridge.js:207: state.refMedia = r; | src/js/timeline.js:2666: state.refMedia=d.refMedia||null;. Readers — 5 reader references across 3 files: src/js/reference-bridge.js(3), src/js/native-video-bridge.js(1), src/js/timeline.js(1)."
+          ],
+          "effects": "Of 20 fields in this packet, 14 round-trip via exportJSON/importJSON (timeline.js:2049,2354); the rest are session-only or (rulersOn) localStorage-only. No field in this packet is itself a function — all effects are plain state reads/writes; render/document consequences belong to each field's own reader sites (see callers)."
+        }
+      ]
+    },
+    {
+      "area": "state-media-symbols-registries",
+      "packets": [
+        {
+          "id": "C21a.state-media-symbols-registries",
+          "files": [
+            "src/js/app.js:260-313"
+          ],
+          "coverage_ranges": [
+            [
+              260,
+              313
+            ]
+          ],
+          "classification": {
+            "code": 8,
+            "comment": 46,
+            "whitespace": 0
+          },
+          "symbols": [
+            "mediaLibrary",
+            "mediaMode",
+            "symbols",
+            "activeSymbolId",
+            "openSymbolTabs",
+            "trackRoles",
+            "imageMeshes",
+            "activeMontageViewId",
+            "layerFolders",
+            "layerLinkGroups"
+          ],
+          "signature": "var state={mediaLibrary,mediaMode,symbols,activeSymbolId,openSymbolTabs,trackRoles,imageMeshes,activeMontageViewId,layerFolders,layerLinkGroups,...}",
+          "responsibility": "The media-library catalog, project-wide media-linking mode, the Component (symbol) registry and its session-position fields, and four project-level registries (track roles, image meshes, layer folders, stroke/fill/shadow link groups).",
+          "behavior": [
+            "`mediaLibrary` (app.js:260, default `[]`): Browsable catalog of imported media {id,name,kind,thumb,layerName,...} (media-library.js). Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`mediaMode` (app.js:268, default `'embedded'`): Project-wide 'embedded'|'linked' import setting (2026-08-29, linked-media.js) — deliberately ONE setting for the whole project (Cyril: \"un seul réglage\"), governs new imports going forward only. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`symbols` (app.js:269, default `{}`): Component (symbol) registry {symId:{layers,...}} — the shared Component object read by StoryBoard and Animation2D/Motion (2026-07 unification). Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`activeSymbolId` (app.js:269, default `null`): Id of the Component currently entered (enterSymbol/exitToScene, app.js). Reset to null on importJSON — never restored from the file's own value; a fresh load always starts at the top-level scene. Persisted: no — importJSON resets this to a fixed value (timeline.js:2688 or :2381/:2381) rather than reading it from the file; exportJSON never writes it either.",
+            "`openSymbolTabs` (app.js:269, default `[]`): List of open Component-editing tabs. Reset to [] on importJSON, same session-position category as activeSymbolId/activeLayerIdx/currentFrame. Persisted: no — importJSON resets this to a fixed value (timeline.js:2688 or :2381/:2381) rather than reading it from the file; exportJSON never writes it either.",
+            "`trackRoles` (app.js:283, default `{}`): Tracked-role registry {roleId:{name}} (2026-08-29, feedback #151) — a stable NAME a hand-redrawn (non-tweened) shape carries per-frame via data.trackRoleId; roleId IS the trimmed name itself (collision-free by construction, tagSelectionAsRole/attachSelectionToRole in select-bridge.js). Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`imageMeshes` (app.js:293, default `{}`): Image-mesh topology registry (2026-08-30, image-mesh.js) keyed by a stable id — mask outline + rest vertices + triangle indices + static pose, exactly once per mesh; a meshed raster's own stroke dict carries only meshId. Serialized through SMImageMesh.serialize() in exportJSON rather than copied wholesale because Delaunator's tris is a typed array that JSON.stringify would otherwise corrupt into an object. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`activeMontageViewId` (app.js:294, default `null`): Id of the StoryBoard montage view currently entered (enterMontageView/exitToScene, app.js). Read in exportJSON only to pick the right layers snapshot (srcSnap) — never itself written into the output JSON nor restored by importJSON; purely a live session flag, always null on load. Persisted: no — read inside exportJSON only to select the right layers snapshot (timeline.js:2069), never written to the output JSON nor restored by importJSON.",
+            "`layerFolders` (app.js:306, default `{}`): Layer-folder organizational metadata {folderId:{...}} — purely organizational (ld.folderId points into this map); state.layers/userLayers stay the same flat, 1:1-indexed arrays every other function already assumes. Serialized through NemoFolderCodec.exportFolderMap/importFolderMap rather than copied wholesale. Persisted: yes, round-trips via exportJSON/importJSON (timeline.js).",
+            "`layerLinkGroups` (app.js:313, default `{}`): Stroke/Fill/Shadow channel-linking registry {linkGroupId:{...}} — the 3 generated layers render as ordinary independent rows; only their keyframe TIMING stays synced via ld.linkGroupId, enforced in saveActiveLayerFrame/saveAllLayerFrames (app.js, out of scope, cited by name only). Persisted: yes, round-trips via exportJSON/importJSON (timeline.js)."
+          ],
+          "callers": [
+            "`mediaLibrary`: src/js/media-library.js:44: if (!state.mediaLibrary) state.mediaLibrary = []; | src/js/media-library.js:113: state.mediaLibrary = (state.mediaLibrary || []).filter(function (m) { return m.id !== id; }); | src/js/media-library.js:709: state.mediaLibrary = (state.mediaLibrary || []).filter(function (m) { | src/js/project.js:85: state.mediaLibrary=[];if(window.SMMediaLibrary)SMMediaLibrary.reload(); | src/js/timeline.js:2672: state.mediaLibrary=d.mediaLibrary||[]; | src/js/transplant.js:321: if (!state.mediaLibrary) state.mediaLibrary = [];. Readers — 21 reader references across 5 files: src/js/media-library.js(13), src/js/linked-media.js(3), src/js/native-video-bridge.js(3), src/js/timeline.js(1), src/js/transplant.js(1).",
+            "`mediaMode`: src/js/linked-media.js:686: state.mediaMode = (mode === 'linked') ? 'linked' : 'embedded'; | src/js/timeline.js:2678: state.mediaMode=d.mediaMode||'embedded';. Readers — 16 reader references across 3 files: src/js/linked-media.js(11), src/js/images.js(4), src/js/timeline.js(1).",
+            "`symbols`: src/js/app.js:3522: if(!state.symbols)state.symbols={}; | src/js/project.js:59: state.symbols={};state.openSymbolTabs=[];state.activeSymbolId=null; | src/js/timeline.js:2381: state.symbols=d.symbols||{};state.openSymbolTabs=[];state.activeSymbolId=null; | src/js/transplant.js:271: if (!state.symbols) state.symbols = {};. Readers — 74 reader references across 14 files: src/js/app.js(26), src/js/timeline.js(12), src/js/motion.js(8), src/js/storyboard.js(8), src/js/media-library.js(5), src/js/image-mesh.js(4), src/js/tweens.js(3), src/js/comp-preview.js(2), src/js/asset-tree.js(1), src/js/custom-effects.js(1), src/js/engine-bridge.js(1), src/js/lipsync.js(1), src/js/native-video-bridge.js(1), src/js/transplant.js(1).",
+            "`activeSymbolId`: src/js/app.js:4193: state.activeSymbolId=symId; | src/js/app.js:4250: state.activeSymbolId=null;_sceneSnapshot=null; | src/js/project.js:59: state.symbols={};state.openSymbolTabs=[];state.activeSymbolId=null; | src/js/timeline.js:2381: state.symbols=d.symbols||{};state.openSymbolTabs=[];state.activeSymbolId=null;. Readers — 47 reader references across 9 files: src/js/app.js(17), src/js/timeline.js(10), src/js/select-bridge.js(6), src/js/motion.js(4), src/js/tweens.js(4), src/js/layer-inout.js(3), src/js/audio-bridge.js(1), src/js/bootstrap/opacity-application.js(1), src/js/project.js(1).",
+            "`openSymbolTabs`: src/js/project.js:59: state.symbols={};state.openSymbolTabs=[];state.activeSymbolId=null; | src/js/timeline.js:2381: state.symbols=d.symbols||{};state.openSymbolTabs=[];state.activeSymbolId=null;. Readers — 3 reader references across 2 files: src/js/app.js(2), src/js/timeline.js(1).",
+            "`trackRoles`: src/js/project.js:60: state.trackRoles={}; // feedback #151 — see state.trackRoles' own comment, app.js | src/js/select-bridge.js:3388: if (!state.trackRoles) state.trackRoles = {}; | src/js/timeline.js:2633: state.trackRoles=d.trackRoles||{}; // feedback #151 — see state.trackRoles' own comment, app.js. Readers — 12 reader references across 5 files: src/js/select-bridge.js(7), src/js/timeline.js(2), src/js/app.js(1), src/js/image-mesh.js(1), src/js/tools.js(1).",
+            "`imageMeshes`: src/js/image-mesh.js:64: if (!state.imageMeshes) state.imageMeshes = {}; | src/js/image-mesh.js:531: state.imageMeshes = s; | src/js/project.js:61: state.imageMeshes={}; // image-mesh.js — project-level registry, same reset as trackRoles/symbols above | src/js/timeline.js:2640: else state.imageMeshes=d.imageMeshes||{}; | src/js/tweens.js:4981: else state.imageMeshes=JSON.parse(JSON.stringify(s.imageMeshes));. Readers — 10 reader references across 6 files: src/js/timeline.js(3), src/js/image-mesh.js(2), src/js/tweens.js(2), src/js/app.js(1), src/js/export.js(1), src/js/image-mesh-bridge.js(1).",
+            "`activeMontageViewId`: src/js/app.js:4349: state.activeMontageViewId=montageId; | src/js/app.js:4370: state.activeMontageViewId=null;_montageViewSnapshot=null;. Readers — 16 reader references across 6 files: src/js/timeline.js(6), src/js/app.js(4), src/js/tweens.js(3), src/js/audio-bridge.js(1), src/js/bootstrap/opacity-application.js(1), src/js/native-video-bridge.js(1).",
+            "`layerFolders`: src/js/project.js:86: state.layerFolders={};state.layerLinkGroups={}; | src/js/timeline.js:2562: state.layerFolders=NemoFolderCodec.importFolderMap(d.layerFolders);state.layerLinkGroups=d.layerLinkGroups||{}; | src/js/tweens.js:4957: if(NemoFolderCodec.hasFolderMap(s.layerFolders))state.layerFolders=NemoFolderCodec.restoreFolderMap(s.layerFolders);. Readers — 11 reader references across 3 files: src/js/timeline.js(9), src/js/domain/document/folder-codec.js(1), src/js/tweens.js(1).",
+            "`layerLinkGroups`: src/js/project.js:86: state.layerFolders={};state.layerLinkGroups={}; | src/js/timeline.js:2562: state.layerFolders=NemoFolderCodec.importFolderMap(d.layerFolders);state.layerLinkGroups=d.layerLinkGroups||{}; | src/js/tweens.js:4958: if(s.layerLinkGroups)state.layerLinkGroups=JSON.parse(JSON.stringify(s.layerLinkGroups));. Readers — 10 reader references across 3 files: src/js/timeline.js(6), src/js/app.js(3), src/js/tweens.js(1)."
+          ],
+          "effects": "Of 10 fields in this packet, 7 round-trip via exportJSON/importJSON (timeline.js:2049,2354); the rest are session-only or (rulersOn) localStorage-only. No field in this packet is itself a function — all effects are plain state reads/writes; render/document consequences belong to each field's own reader sites (see callers)."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save (exportJSON, timeline.js:2049-2246)",
+      "disposition": "Exactly 39 of this scope's 118 fields are literal top-level keys of the `return JSON.stringify({...})` object (independently re-derived by a bracket-depth-aware parse of the literal, not by a substring search over the whole function body, which would have produced false positives for `activeSymbolId`/`activeMontageViewId`, both read-but-not-exported): totalFrames, fps, resamplePts, tweenStep, canvasW, canvasH, canvasBg, guides, palettes, activePaletteIdx, shadowPalette, shadowActiveId, customBrushPresets, layers (re-mapped per-layer, not copied wholesale), motionArcs, easingCurve, tweenOverrides, tweenEasing, waIn, waOut, perspectiveEnabled, perspectiveMode, perspectiveDensity, perspectiveVPs, symmetryEnabled, symmetryMode, symmetryAxis, symmetryRadialCenter, symmetryRadialSectors, symmetryExtend, audioTracks, refMedia, mediaLibrary, mediaMode, symbols, trackRoles, imageMeshes, layerFolders, layerLinkGroups. The remaining 79 fields are absent from the export object literal — the majority are tool/display defaults (brush/stroke/pressure/canvas-display/onion/undo state) explicitly session-only per their own comments, VERIFIED against the actual output-key list rather than trusted from each comment."
+    },
+    {
+      "consumer": "load (importJSON, timeline.js:2354-2694)",
+      "disposition": "Restores the same 39 persisted fields from the saved `d.<field>` values, PLUS four fields reset to a fixed value on every load rather than read from the file (`currentFrame`/`activeLayerIdx` reset to 0 at timeline.js:2688, `activeSymbolId` reset to null and `openSymbolTabs` reset to [] at timeline.js:2381) — these four are NOT round-tripped project data despite being written by importJSON; a fresh load always starts at frame 0, layer 0, outside any Component, with no open Component tabs, regardless of what the session held at save time."
+    },
+    {
+      "consumer": "localStorage (outside exportJSON/importJSON)",
+      "disposition": "Exactly one field in this scope persists via localStorage rather than the project file: `rulersOn` (rulers-bridge.js:376 write under `RULERS_KEY`, :380 read at init) — confirmed by grepping every `localStorage` line in src/js for a match against all 118 field names; no other field in this scope has any localStorage reference (a `tool`-substring false positive from unrelated filenames like brush-tool-presets.js was checked and excluded)."
+    },
+    {
+      "consumer": "undo/redo (tweens.js layersSnapshotNow/restoreLayersSnapshot, pushUndoLayers)",
+      "disposition": "`layers`/`totalFrames`/`fps`/`waIn`/`waOut`/`motionArcs`/`tweenOverrides`/`tweenEasing`/`activeLayerIdx`/`currentFrame`/`layerFolders`/`layerLinkGroups`/`imageMeshes` are all captured/restored by tweens.js's snapshot machinery (writer sites tweens.js:4949-4981, cited per field under each packet's `callers`) — this is a SEPARATE mechanism from exportJSON/importJSON and covers several fields (`activeLayerIdx`, `currentFrame`) that are NOT project-file-persisted but ARE undo-tracked within a session. `undoStack`/`redoStack`/`undoLabels`/`redoLabels`/`maxUndo`/`actionLog` are the undo mechanism's OWN bookkeeping fields and are never themselves snapshotted (that would be circular)."
+    },
+    {
+      "consumer": "selection (select-bridge.js/tools.js/subselect-bridge.js/color-manager.js/group-bridge.js/motion.js/shapes-panel.js)",
+      "disposition": "`selectedStrokeIndices` is written from ~40 distinct call sites (the widest writer fan-out of any field in this scope, cited in full under the `state-layers-tween-undo` packet's `callers`) every time the live Paper.js `selectedPaths` array changes, mirroring it as stable indices. `xformAnchorCustom`/`xformAnchorKey` are select-bridge.js's own pivot-override pair, read by tools.js's `xformAnchorPoint`."
+    },
+    {
+      "consumer": "render/engine-bridge.js (buildSceneJson and viewport sync)",
+      "disposition": "`canvasRotation` (engine-bridge.js's own `syncViewport()`, cited by name only), `outlineView` (buildSceneJson's AE-vs-Illustrator hairline distinction), `previewAlphaBg` (mirrors the Export panel's own alpha-background checkbox for live editing), `canvasClip`/`safetyZones`/`currentFrameOutline`/`ghostAllFrames`/`showShadowGuides` are all read by engine-bridge.js as render-affecting toggles — cited by reader-count only, per the issue's instruction not to re-describe engine-bridge.js's own rendering logic."
+    },
+    {
+      "consumer": "export.js / rive-export.js",
+      "disposition": "`fps`/`canvasW`/`canvasH`/`canvasBg`/`exportIncludeShadowGuides` are read directly by export.js/rive-export.js at render/encode time (reader counts cited per field); no function DECLARED inside 41-313 is itself called from either export module — this scope is pure state declaration, not export logic."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-sync-canvas-size-noop-when-unchanged",
+      "proposed": "Stub `document.getElementById('canvas-area')` to return `{clientWidth:800,clientHeight:600}`; set `view.viewSize` to exactly `{width:800,height:600}` (rounded); call `syncCanvasSize()`; expect NO assignment to `view.viewSize` (the guard at app.js:61 short-circuits) — not run."
+    },
+    {
+      "id": "fx-sync-canvas-size-applies-on-mismatch",
+      "proposed": "Stub the container to `{clientWidth:1024,clientHeight:768}` while `view.viewSize` is `{width:800,height:600}`; call `syncCanvasSize()`; expect `view.viewSize` reassigned to a new `Size(1024,768)` — not run."
+    },
+    {
+      "id": "fx-sync-canvas-size-zero-dimension-guard",
+      "proposed": "Stub the container to `{clientWidth:0,clientHeight:600}` (e.g. a hidden panel); call `syncCanvasSize()`; expect NO write (the `w>0&&h>0` guard at app.js:61 rejects a zero dimension) — not run."
+    },
+    {
+      "id": "fx-fc-row-h-distinct-scopes",
+      "proposed": "Load app.js then motion.js in sequence (matching real script order) inside a fresh global scope; after both load, expect `window.ROW_H===34` (app.js's global, unaffected by motion.js's OWN local `var ROW_H=22` inside its IIFE) and expect motion.js's internal row-layout functions to still use 22 — not run, would need to intercept a motion.js-internal function's return value."
+    },
+    {
+      "id": "fx-appmode-sole-writer",
+      "proposed": "Spy on `state.appMode`'s setter (via `Object.defineProperty` or a Proxy); drive the app through every appMode-changing UI path (mode-switch buttons, `SMMotion.setAppMode` direct calls); expect the ONLY write recorded to originate from motion.js:13204 — not run."
+    },
+    {
+      "id": "fx-state-export-import-round-trip-persisted",
+      "proposed": "Construct a `state` with all 39 persisted fields set to distinctive non-default values; call `exportJSON()`; feed the result to `importJSON()` on a fresh `state`; expect all 39 fields to equal their original values, and `currentFrame`/`activeLayerIdx`/`activeSymbolId`/`openSymbolTabs` to be 0/0/null/[] regardless of what they were set to before export — not run."
+    },
+    {
+      "id": "fx-guides-locked-never-set",
+      "proposed": "Drive every rulers/guides UI control exposed in index.html/rulers-bridge.js; assert `state.guidesLocked` remains `false` throughout (no control anywhere sets it true) — not run, documents the zero-writer finding rather than testing a designed behavior."
+    },
+    {
+      "id": "fx-rulers-on-localstorage-round-trip",
+      "proposed": "Set `state.rulersOn=true` via `SMRulers`'s own toggle (rulers-bridge.js:387); reload the module fresh (simulating a new page load) with the same localStorage; expect the fresh load's `state.rulersOn` to read back `true` from `RULERS_KEY` — not run."
+    },
+    {
+      "id": "fx-selected-stroke-indices-mirrors-selection",
+      "proposed": "Populate `selectedPaths` with 3 Paper.js Path objects inserted into a layer; call any one of the ~40 writer sites (e.g. select-bridge.js:1209's pattern); expect `state.selectedStrokeIndices` to equal the 3 paths' `layer.children.indexOf` positions, filtered for `>=0` — not run."
+    },
+    {
+      "id": "fx-brush-angle-factor-clamped",
+      "proposed": "Call fill-bridge.js's brushAngleFactor input handler (fill-bridge.js:234) with values -10, 50, 150; expect `state.brushAngleFactor` clamped to 0, 50, 100 respectively (`Math.max(0,Math.min(100,v))`) — not run."
+    }
+  ],
+  "future_proposals": [
+    "`guidesLocked` (app.js:130, default false) has zero writer anywhere in src/js at the frozen SHA — declared and read twice as an early-return guard (rulers-bridge.js:155,207) but no UI control anywhere ever sets it true. Either a planned 'lock guides' control was never wired, or the field is dead. Flagged for the eventual runtime-behavior review, not claimed as a defect by this census.",
+    "`maxUndo` (app.js:218, default 60) has zero writer anywhere in src/js — a de facto constant with no UI to change the undo-history depth, despite being modeled as ordinary mutable state alongside `undoStack`/`redoStack`. Not exercised or fixed here.",
+    "`ROW_H` is declared identically-named but semantically unrelated in app.js (34, Animation 2D timeline row height) and motion.js (22, Motion property-row height, function-scoped to motion.js's own IIFE) — a future refactor renaming one (e.g. `MOTION_ROW_H`) would remove the collision risk a careless whole-repo grep for the bare symbol currently carries. Not exercised or fixed here.",
+    "`smoothing` (app.js:101) and `stabilizer` (app.js:101) are two independently-writable draw-tool smoothing parameters with overlapping purpose (a legacy trailing moving-average vs. a physical spring-damper model per the stabilizer field's own comment) — both are live simultaneously and neither reader path in draw-bridge.js was inspected here to determine whether they compose or one silently overrides the other. Flagged for the eventual runtime-behavior review."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep -n -E` was run once per state field (118 fields) plus `syncCanvasSize`/`FC`/`ROW_H`, at the frozen SHA 59a5a38c, using three regex passes per field (all references, `=`/`+=`/`-=`/`*=`//=`-style writers, `delete` statements) plus a bracket-notation writer check (`state['field']=`) — zero bracket-notation or `delete` writers found for any of the 118 fields. Results are reproduced verbatim as caller/reader citations above and are re-checkable with `git grep -n -E 'state\\.<field>([^A-Za-z0-9_]|$)' 59a5a38c514f5da830dd2f2df4c83c63b1b22fba -- src/js`.",
+    "The persisted/not-persisted disposition of all 118 fields was independently re-derived by a bracket-depth-aware parse of exportJSON's own `return JSON.stringify({...})` object literal (timeline.js:2112-2246) and importJSON's own `state.<field>=d.<field>...` assignment lines (timeline.js:2354-2694), NOT by a substring search over either function's whole body — the whole-body approach was tried first and produced two false positives (`activeSymbolId`, `activeMontageViewId`, both merely READ inside exportJSON to select the correct layers snapshot, never written to the output) that the literal-parse approach correctly excluded.",
+    "The `var state={...}` object literal's own field count was independently verified by the same bracket-depth-aware parser applied to the FULL literal (lines 79-325, i.e. this scope plus C06's continuation): 121 top-level `key:value` entries found, of which exactly 118 fall inside 78-313 (this scope) and exactly 3 (`userProfile`, `revisionView`, `comments`) fall inside 314-325 (C06's claim) — a clean, gap-free split matching the issue's stated boundary with no field double-counted or missed.",
+    "engineering/inventory/census/*.json siblings present at authoring time: C19r (timeline.js:5710-5941) and C19q (timeline.js:5421-5709) — zero overlap possible (different source_path); no other C*.json artifact targets src/js/app.js at authoring time, confirmed by the validator's own cross-sibling packet-ID-uniqueness check finding no existing app.js-scoped sibling to compare against."
+  ],
+  "validation": {
+    "expected_assigned_lines": 273,
+    "expected_classification": {
+      "code": 71,
+      "comment": 200,
+      "whitespace": 2
+    },
+    "packet_partition": [
+      [
+        41,
+        67
+      ],
+      [
+        68,
+        77
+      ],
+      [
+        78,
+        81
+      ],
+      [
+        82,
+        86
+      ],
+      [
+        87,
+        126
+      ],
+      [
+        127,
+        154
+      ],
+      [
+        155,
+        187
+      ],
+      [
+        188,
+        231
+      ],
+      [
+        232,
+        259
+      ],
+      [
+        260,
+        313
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals `classify(coverage_ranges)`, independently re-derived by script against the frozen blob: 41-67=(9,16,2); 68-77=(2,8,0); 78-81=(4,0,0); 82-86=(2,3,0); 87-126=(7,33,0); 127-154=(6,22,0); 155-187=(7,26,0); 188-231=(9,35,0); 232-259=(17,11,0); 260-313=(8,46,0); sums to (71,200,2)=273 — identical to the issue's own proposed union.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 273 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json 45cd7289c603d3d8598968e1c608d7e51edf79a3 exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19r-timeline-layer-icons-colors-parent-pickwhip.json 45cd7289c603d3d8598968e1c608d7e51edf79a3 still exits 0"
+    ]
+  }
+}
