@@ -244,6 +244,29 @@ Reviewed target layers, public APIs, provider/consumer boundaries and parsed
 bootstrap/runtime readiness remain the explicit follow-up before full graph rules can be
 claimed for the legacy files.
 
+### Rust crate module edges (P12)
+
+[`rust.coverage.json`](./profiles/rust.coverage.json) deliberately claims no layer enforcement:
+`checkProfile` is a JavaScript lexer and is never run on Rust. P12 adds a small Rust-aware
+analyzer, [`boundaries-rust.cjs`](../../scripts/nemo/lib/boundaries-rust.cjs), that reads
+`use crate::/super::/self::` statements (brace groups, multi-line), `mod name;` declarations,
+inline `crate::name::` paths and `#[cfg(...)]` gates after stripping comments and string
+literals, and resolves them against the module files [`rust.profile.json`](./profiles/rust.profile.json)
+already declares. A crate policy such as [`geometry-wasm.edges.json`](./profiles/geometry-wasm.edges.json)
+names the crate root and source dir, the permitted layer edges, the exported port (the root's
+`pub use` list, asserted exactly), the declared Cargo features (none for geometry-wasm) and the
+cfg predicates the crate may use — any `cfg(feature = …)` outside the declared set fails. The
+`boundaries` lane runs every adopted crate policy (`ci.rustBoundaries`); a removed policy is a
+failure, not a skip. Module shapes the analyzer does not understand (deeper than one nesting
+level, `super::` inside nested inline modules) are reported as `unsupported`, never accepted.
+Exceptions carry owner/issue/reason/expiry like the JS profile's. At adoption the geometry crate
+carries three recorded-debt exceptions (eraser.rs importing polygon helpers from the API root,
+and the engine.rs ↔ hit.rs / eraser.rs ↔ lib.rs cycles), all expiring 2026-12-05; they are
+visible in the lane report, not repaired here. Negative controls live in
+[`scripts/nemo/boundaries-rust.test.cjs`](../../scripts/nemo/boundaries-rust.test.cjs).
+Integration tests under `geometry-wasm/tests` reach the crate as `geometry_wasm::…`, an
+external path outside the intra-crate graph; they remain under discovery/size coverage only.
+
 The extracted `src/js/animation/curve.js` is a `domain` module with a 300-line hard
 limit and no legacy exception. The normal animation test entry runs the full import,
 global-state and size checker on this kernel, using its declaration in the application

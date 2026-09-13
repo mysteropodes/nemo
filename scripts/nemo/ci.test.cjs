@@ -71,10 +71,10 @@ test('tooling coverage profiles every current scripts/nemo CommonJS source', () 
   const profile = JSON.parse(fs.readFileSync(path.join(ROOT, ci.PROFILE), 'utf8'));
   const result = ci.toolingCoverage(profile, ROOT);
   assert.equal(result.ok, true);
-  // 60 retained tooling sources, P03A's frozen-census checker, P10's edge-gate test and
-  // P03B's three scope libraries.
-  assert.equal(result.sourcePathCount, 65);
-  assert.equal(result.declaredPathCount, 65);
+  // 60 retained tooling sources, P03A's frozen-census checker, P10's edge-gate test,
+  // P03B's three scope libraries and P12's Rust crate checker + test.
+  assert.equal(result.sourcePathCount, 67);
+  assert.equal(result.declaredPathCount, 67);
   const incomplete = structuredClone(profile);
   incomplete.modules = incomplete.modules.filter((module) => module.id !== 'nemo.lib.boundariesApplication');
   const rejected = ci.toolingCoverage(incomplete, ROOT);
@@ -276,3 +276,15 @@ test('manual validation invokes each CLI lane and aggregates exact dependencies 
     assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'aggregate.json'))).ok, status === 0);
   }
 });
+
+test('rust crate edges run inside the boundary lane and a removed adopted policy is a failure, not a skip', (t) => {
+  const real = ci.rustBoundaries(ROOT);
+  assert.equal(real.ok, true, JSON.stringify(real.crates.map((c) => c.violations)));
+  assert.deepEqual(real.crates.map((c) => c.crate), ['geometry-wasm']);
+  const root = scratch(t);
+  fs.mkdirSync(path.join(root, 'engineering/boundaries/profiles'), { recursive: true });
+  assert.equal(ci.rustBoundaries(root), null, 'no Rust profile: nothing to enforce');
+  fs.copyFileSync(path.join(ROOT, ci.RUST_PROFILE), path.join(root, ci.RUST_PROFILE));
+  assert.throws(() => ci.rustBoundaries(root), /geometry-wasm\.edges\.json was removed/);
+});
+
