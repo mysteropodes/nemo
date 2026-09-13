@@ -280,7 +280,7 @@ test('manual validation invokes each CLI lane and aggregates exact dependencies 
 test('rust crate edges run inside the boundary lane and a removed adopted policy is a failure, not a skip', (t) => {
   const real = ci.rustBoundaries(ROOT);
   assert.equal(real.ok, true, JSON.stringify(real.crates.map((c) => c.violations)));
-  assert.deepEqual(real.crates.map((c) => c.crate), ['geometry-wasm']);
+  assert.deepEqual(real.crates.map((c) => c.crate), ['geometry-wasm', 'nemo']);
   const root = scratch(t);
   fs.mkdirSync(path.join(root, 'engineering/boundaries/profiles'), { recursive: true });
   assert.equal(ci.rustBoundaries(root), null, 'no Rust profile: nothing to enforce');

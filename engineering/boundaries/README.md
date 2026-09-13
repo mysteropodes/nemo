@@ -267,6 +267,22 @@ visible in the lane report, not repaired here. Negative controls live in
 Integration tests under `geometry-wasm/tests` reach the crate as `geometry_wasm::…`, an
 external path outside the intra-crate graph; they remain under discovery/size coverage only.
 
+B01 adopts a second crate policy, [`nemo-desktop.edges.json`](./profiles/nemo-desktop.edges.json),
+for the native desktop crate (`src-tauri`): five profile modules, `desktop-shell → adapters` as the
+only cross-layer edge (`lib.rs` declares `mod application_mcp;`), an empty exported port (`lib.rs`
+re-exports nothing) and the four cfg predicates the crate uses. Two policy sections are new to the
+analyzer. `externalCratePorts` declares the native application/MCP port: the `nemo_mcp` crate may
+be referenced only from `rust.desktop.mcp.adapter`, and only through the declared items
+(`contract::ApplicationRequest`, `contract::ApplicationResponse`, `registry`, `wire`,
+`BUILD_SOURCE_ID`; an item covers any deeper path under it). Any other module importing
+`nemo_mcp::…` fails `external-crate-violation`; the adapter reaching an undeclared item such as
+`nemo_mcp::server::…` fails `private-port-access`. `unanalyzedModules` names the profile modules
+the policy deliberately leaves out of the graph (`rust.desktop.build`, the Cargo build script, and
+`rust.mcp.transport`, the whole `nemo-mcp` crate); each must exist in the profile and is echoed
+in the lane report as a census entry, never a pass. The analyzer also resolves `super::` from the
+Rust-2018 `x.rs` + `x/y.rs` shape (`task_runtime/tests.rs → task_runtime.rs`), which P12 reported
+as `unsupported`.
+
 The extracted `src/js/animation/curve.js` is a `domain` module with a 300-line hard
 limit and no legacy exception. The normal animation test entry runs the full import,
 global-state and size checker on this kernel, using its declaration in the application

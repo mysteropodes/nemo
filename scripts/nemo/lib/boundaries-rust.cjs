@@ -21,7 +21,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { findCycles } = require('./boundaries.cjs');
 
-const RULES = ['layer-violation', 'cycle', 'undeclared-feature', 'exported-port', 'unsupported'];
+const RULES = ['layer-violation', 'cycle', 'undeclared-feature', 'exported-port', 'unsupported',
+  'external-crate-violation', 'private-port-access'];
 
 function invalid(message) { throw new Error(`invalid rust crate policy: ${message}`); }
 
@@ -35,6 +36,13 @@ function validateCratePolicy(policy) {
   }
   if (!policy.exportedPort || !Array.isArray(policy.exportedPort.items)) invalid('exportedPort.items must be an array');
   if (!policy.features || !Array.isArray(policy.features.declared) || !Array.isArray(policy.features.allowedCfgs)) invalid('features.declared and features.allowedCfgs must be arrays');
+  if (policy.externalCratePorts !== undefined) {
+    if (!policy.externalCratePorts || typeof policy.externalCratePorts !== 'object' || Array.isArray(policy.externalCratePorts)) invalid('externalCratePorts must be an object');
+    for (const [name, port] of Object.entries(policy.externalCratePorts)) {
+      if (!port || !Array.isArray(port.allowedModules) || !Array.isArray(port.items)) invalid(`externalCratePorts.${name} must have allowedModules and items arrays`);
+    }
+  }
+  if (policy.unanalyzedModules !== undefined && !Array.isArray(policy.unanalyzedModules)) invalid('unanalyzedModules must be an array');
   for (const exception of policy.exceptions || []) {
     for (const key of ['path', 'rule', 'owner', 'issue', 'reason', 'expires']) if (typeof exception[key] !== 'string' || !exception[key]) invalid(`exception ${key} is required`);
     if (!RULES.includes(exception.rule)) invalid(`exception rule ${exception.rule} is not a crate rule`);
@@ -129,7 +137,7 @@ function inlineModSpans(text) {
   return spans;
 }
 
-function analyzeRustSource(source) {
+function analyzeRustSource(source, opts = {}) {
   const text = stripRust(source);
   const withStrings = stripRust(source, { keepStrings: true });
   const spans = inlineModSpans(text);
@@ -144,7 +152,11 @@ function analyzeRustSource(source) {
   }
   const modRe = /(?:^|[\s;{}])(?:pub(?:\([^)]*\))?\s+)?mod\s+([A-Za-z_]\w*)\s*(;|\{)/g;
   while ((m = modRe.exec(text))) mods.push({ name: m[1], line: lineOf(text, m.index + 1), inlineBody: m[2] === '{' });
-  const inlineRe = /\b(crate|super|self)::([A-Za-z_]\w*)/g;
+  // opts.externalCrates lets a caller widen this to named external crates (e.g. `nemo_mcp::…`)
+  // so an external-crate port policy can be enforced without walking the source twice.
+  const externalCrates = (opts.externalCrates || []).filter((c) => /^[A-Za-z_]\w*$/.test(c));
+  const inlineHeads = ['crate', 'super', 'self', ...externalCrates].join('|');
+  const inlineRe = new RegExp(`\\b(${inlineHeads})::([A-Za-z_]\\w*)`, 'g');
   while ((m = inlineRe.exec(text))) {
     // Skip the `use` statements already captured (their spans contain the same tokens).
     const before = text.lastIndexOf('use ', m.index);
@@ -188,7 +200,11 @@ function resolveSegments(segments, fromFile, policy, fileToModule, depth = 0) {
     const rel = fromFile.slice(dir.length + 1);
     const parts = rel.split('/');
     if (parts.length === 1) file = policy.root; // src/x.rs → parent is the crate root
-    else if (parts.length === 2 && parts[1] !== 'mod.rs') file = `${dir}/${parts[0]}/mod.rs`; // src/x/y.rs → src/x/mod.rs
+    else if (parts.length === 2 && parts[1] !== 'mod.rs') {
+      // src/x/y.rs → the Rust-2018 shape prefers a sibling src/x.rs over src/x/mod.rs when both could apply.
+      const flatParent = `${dir}/${parts[0]}.rs`;
+      file = fileToModule.has(flatParent) ? flatParent : `${dir}/${parts[0]}/mod.rs`;
+    }
     else reason = `super:: from ${rel} is not a supported module shape (flat crate or one nesting level only)`;
     if (file && !fileToModule.has(file)) { reason = `super:: target ${file} is not a declared profile file`; file = null; }
   } else if (head === 'self') {
@@ -207,6 +223,9 @@ function checkRustCrate(profile, policy, opts = {}) {
     const found = modules.map((m) => m.id).sort(), declared = policy.profileModules.slice().sort();
     if (JSON.stringify(found) !== JSON.stringify(declared)) invalid(`profile modules under ${policy.sourceDir} are ${found.join(', ')}; the policy declares ${declared.join(', ')}`);
   }
+  const allModuleIds = new Set(profile.modules.map((m) => m.id));
+  for (const id of policy.unanalyzedModules || []) if (!allModuleIds.has(id)) invalid(`unanalyzedModules references unknown module "${id}"`);
+  const externalCrateNames = Object.keys(policy.externalCratePorts || {});
   const violations = [], unsupported = [], exceptionsApplied = [];
   const edges = new Map(modules.map((m) => [m.id, new Set()]));
   const edgeFiles = new Map();
@@ -228,7 +247,7 @@ function checkRustCrate(profile, policy, opts = {}) {
   for (const [file, m] of fileToModule) {
     const abs = path.join(root, file);
     if (!fs.existsSync(abs)) { unsupported.push({ file, line: null, message: 'declared profile file is missing' }); continue; }
-    const analysis = analyzeRustSource(fs.readFileSync(abs, 'utf8'));
+    const analysis = analyzeRustSource(fs.readFileSync(abs, 'utf8'), { externalCrates: externalCrateNames });
     if (file === policy.root) rootAnalysis = analysis;
     // Feature gates: every cfg must be an allowed predicate or a declared feature.
     for (const cfg of analysis.cfgs) {
@@ -243,6 +262,28 @@ function checkRustCrate(profile, policy, opts = {}) {
       for (const feature of features) {
         if (!featureSet.has(feature)) report({ rule: 'undeclared-feature', module: m.id, file, line: cfg.line,
           message: `cfg(feature = ${JSON.stringify(feature)}) references a feature Cargo.toml does not declare`, detail: { feature, cfg: cfg.expr } });
+      }
+    }
+    // External-crate ports: a named crate (e.g. nemo_mcp) may only be referenced from its allowed
+    // modules, and only through its declared items (an item name covers itself and any deeper path).
+    if (externalCrateNames.length) {
+      const externalRefs = analysis.uses.filter((u) => externalCrateNames.includes(u.segments[0]))
+        .concat(analysis.inline.filter((i) => externalCrateNames.includes(i.segments[0])));
+      for (const ref of externalRefs) {
+        const crateName = ref.segments[0];
+        const port = policy.externalCratePorts[crateName];
+        const restPath = ref.segments.slice(1).join('::');
+        if (!port.allowedModules.includes(m.id)) {
+          report({ rule: 'external-crate-violation', module: m.id, file, line: ref.line,
+            message: `Module "${m.id}" may not depend on external crate "${crateName}" via ${ref.segments.join('::')}`,
+            detail: { crate: crateName, path: restPath, module: m.id } });
+          continue;
+        }
+        if (!port.items.some((item) => restPath === item || restPath.startsWith(`${item}::`))) {
+          report({ rule: 'private-port-access', module: m.id, file, line: ref.line,
+            message: `"${crateName}::${restPath}" is not part of the declared port for "${crateName}"`,
+            detail: { crate: crateName, path: restPath, module: m.id } });
+        }
       }
     }
     // Edges: use statements + inline paths + mod declarations (root only, `mod x;` loads a file).
@@ -289,7 +330,7 @@ function checkRustCrate(profile, policy, opts = {}) {
   const edgeList = [];
   for (const [from, tos] of edges) for (const to of tos) edgeList.push({ from, to, files: [...edgeFiles.get(JSON.stringify([from, to]))] });
   return { ok: violations.length === 0, crate: policy.crate, moduleCount: modules.length, edges: edgeList,
-    exportedPort: exported, violations, exceptionsApplied, unsupported };
+    exportedPort: exported, violations, exceptionsApplied, unsupported, unanalyzedModules: policy.unanalyzedModules || [] };
 }
 
 module.exports = { RULES, validateCratePolicy, stripRust, expandUseTree, analyzeRustSource, checkRustCrate };
