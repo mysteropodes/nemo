@@ -1,0 +1,578 @@
+{
+  "census_id": "C19p",
+  "issue": 1167,
+  "title": "Frame-grid mouse handlers: multi-select, keyframe drag, double-click and context menu",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C19p census only; P30 (timeline.js runtime writer), C19m/#1158 (`_tlDrag` declaration and the Motion equivalents it names), app.js's insertFrame/insertKeyframe/insertBlankKeyframe/convertToKeyframes/clearKeyframe/removeFrameSpan/removeTweenSpan/duplicateSelectedFrames, tweens.js's generateTweens/captureTweenInbetweens/rekeyTweenPairData/retimeTweenSpans, tools.js's fillPropagateAcrossFrames/describePropagateResult, and every other named owner remain separate",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "15f137570e6d95213198451f8e980743c37c78d6",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19p-timeline-frame-grid-mouse",
+  "assigned_ranges": [
+    {
+      "start": 5028,
+      "end": 5420
+    }
+  ],
+  "coverage_note": "Exactly 393 assigned lines occur once across eight packets (one coverage_range per packet, no gaps, no other-owner exclusions): 216 code, 157 full-line // comments, 20 blank. Line 5027 is C19o's trailing blank after its own mouseup listener's closing `});` (out of scope); line 5028 is the `// ---- FRAME GRID MOUSE HANDLERS (multi-select + drag) ----` section header and begins this scope. Line 5420 is the trailing blank line after the window `mouseup` commit listener's closing `});` (5419); line 5421 opens the next leaf's `_layerSel`/layer-panel-selection lead-in comment (`// Multi-selection of layer rows...`) and is excluded.",
+  "source_baselines": {
+    "pinned": "59a5a38c:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (15f137570e6d95213198451f8e980743c37c78d6, PR #1165/C19o merged) has the identical timeline.js blob (git rev-parse 15f1375:src/js/timeline.js == git rev-parse 59a5a38c:src/js/timeline.js == cc4cfd27...); this artifact branches from origin/main at 15f1375 per the issue body's explicit instruction.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes are read as authorial intent, not fresh execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19p-timeline-frame-grid-mouse.json and the eight timeline.js packets partitioning lines 5028-5420.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "owners": "C19m/#1158 (PR #1159) retains the `_tlDrag` module-level var declaration (timeline.js:3919, `{active:false,startL:-1,startF:-1,ghost:null,moved:false,mode:null}`, out of scope) and the Motion-side drag-to-move machinery it names in its own comments; this scope only WRITES/READS `_tlDrag`'s already-declared fields (arm at 5126 and 5201-5202, read/mutated throughout 5287-5379, reset at 5406-5418) and never re-declares or adds a field the declaration doesn't already have. C19o/#1164 (PR #1165) retains `_spanShrink`/`_spanShrinkFrameAt` (timeline.js:4788-5027, out of scope) and its own capture-phase `#frame-grid` mousedown listener (4819) that calls `stopImmediatePropagation()` for any mousedown landing on a `.fc.span-end` cell — this scope's own bubble-phase `#frame-grid` mousedown listener (5091, no third `true` argument, registered after C19o's) never runs for that subset of mousedowns; per C19o's own writer_guidance, at-target listeners on one element fire in registration order regardless of capture flag, so only C19o's `stopImmediatePropagation()` (not a change in this scope) explains the split. app.js retains insertFrame (app.js:5191), insertKeyframe (app.js:5258), insertBlankKeyframe (app.js:5310), clearKeyframe (app.js:5340), removeTweenSpan (app.js:5358), convertToKeyframes (app.js:5374), removeFrameSpan (app.js:5389) and duplicateSelectedFrames (app.js:5403) — all called by name from this scope's context-menu packet (5222-5264) via bare globals or `window.SM.*`, cited by call site only, not by body. timeline.js's own `window.SM` object (declared far above this scope, out of scope) owns `moveFrames` (1675), `copyFrames` (1789), `cutFrames` (1802), `pasteFrames` (1819), `setActiveLayer` (1534) and `setTool` (373) — this scope cites only its own call sites (5099,5104,5124,5139,5226 for setActiveLayer/setTool patterns and 5099/5104/5123/5137 for goToFrame's siblings, 5217-5220 for copy/cut/paste, 5413 for moveFrames), not their bodies. tweens.js retains `generateTweens` (3772, called once at 5253) and the `rekeyTweenPairData`/`retimeTweenSpans`/`captureTweenInbetweens` internals `moveFrames` itself calls (out of scope, cited only because `moveFrames` is this scope's sole mouseup-commit document write). tools.js retains `fillPropagateAcrossFrames` (3194) and `describePropagateResult` (3365), both called once each from this scope's context-menu packet (5275, 5278).",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19o/#1164 (PR #1165, existing owner)",
+      "disposition": "Retains `_spanShrink`/`_spanShrinkFrameAt` and the capture-phase `#frame-grid` mousedown listener at 4819 (timeline.js:4788-5027, out of scope). This scope's own bubble-phase `#frame-grid` mousedown listener (5091-5203, this scope's third packet) is the sibling listener C19o's own writer_guidance names and whose invocation C19o's `stopImmediatePropagation()` (4830) suppresses for any mousedown landing inside a `.fc.span-end` cell; this scope makes no change to that suppression and cites it only to describe when its own mousedown listener does NOT run for a given press."
+    },
+    {
+      "owner": "C19m/#1158 (PR #1159, existing owner)",
+      "disposition": "Retains the `_tlDrag` module-level var declaration (timeline.js:3919, out of scope) and the layer-inout.js/Motion drag-to-move state machine that consumes the same field names for its own equivalent gesture (not searched here, out of scope). This scope is `_tlDrag`'s sole arm/drive/reset site in Animation 2D's frame-grid: it writes every field this listener chain uses (5107,5126,5182-5183,5201-5202,5286-5379,5406-5418) but does not add, rename or remove a field relative to C19m's own declared shape."
+      },
+    {
+      "owner": "app.js (existing owner)",
+      "disposition": "Retains insertFrame (app.js:5191, called once at timeline.js:5241 via `insertFrame()`), insertKeyframe (app.js:5258, called once at timeline.js:5242), insertBlankKeyframe (app.js:5310, called once at timeline.js:5243), clearKeyframe (app.js:5340, called once at timeline.js:5245 via `window.SM.clearKeyframe()`), removeTweenSpan (app.js:5358, called once at timeline.js:5234 via `window.SM.removeTweenSpan(li,twPair.a,twPair.b)`), convertToKeyframes (app.js:5374, called once at timeline.js:5244 via `window.SM.convertToKeyframes()`), removeFrameSpan (app.js:5389, called once at timeline.js:5282 via `window.SM.removeFrameSpan()`) and duplicateSelectedFrames (app.js:5403, called once at timeline.js:5239 via `window.SM.duplicateSelectedFrames()`) — this scope's context-menu packet cites only these eight call sites (all inside its own context-menu action closures), never their bodies."
+    },
+    {
+      "owner": "timeline.js's own `window.SM` object (existing owner, out of scope declaration site)",
+      "disposition": "Retains `moveFrames` (1675, called once at timeline.js:5413, this scope's mouseup-commit packet — its full body is read and summarized in source_consumers below because it is this scope's sole document-write delegate, but the body itself is not claimed), `copyFrames` (1789, called once at 5236), `cutFrames` (1802, called once at 5237), `pasteFrames` (1819, called once at 5238), `setActiveLayer` (1534, called at 5099,5104,5124,5139,5226 — five call sites, one per gesture branch that can change the active layer) and `setTool` (373, called once at 5153). None of these six bodies is reproduced beyond the single-line summary needed to disclose the document write it performs."
+    },
+    {
+      "owner": "tweens.js (existing owner)",
+      "disposition": "Retains `generateTweens` (3772, called once at timeline.js:5253 via `window.SM.generateTweens()`, this scope's context-menu packet) and `rekeyTweenPairData`/`retimeTweenSpans`/`captureTweenInbetweens` (all out of scope, all called only from inside `moveFrames`'s own body, timeline.js 1675-1789, itself out of scope) — cited because `moveFrames` is the sole document-write delegate this scope's mouseup-commit packet invokes, not claimed."
+    },
+    {
+      "owner": "tools.js (existing owner)",
+      "disposition": "Retains `fillPropagateAcrossFrames` (3194, called once at timeline.js:5275) and `describePropagateResult` (3365, called once at timeline.js:5278) — both inside this scope's context-menu packet's 'Propager ce remplissage' action closure (5246-5261)."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 5027 is outside coverage (C19o's trailing blank after its own mouseup listener's closing `});` at 5026); line 5028 (the `// ---- FRAME GRID MOUSE HANDLERS (multi-select + drag) ----` section header) begins this scope.",
+    "Line 5420 (trailing blank after the window `mouseup` commit listener's closing `});` at 5419) is the last line of this scope; line 5421 opens the next leaf's `// Multi-selection of layer rows...` lead-in comment for `_layerSel` (layer-panel selection and rename) and is excluded.",
+    "No lines inside 5028-5420 are excluded for another owner: every line belongs to exactly one of the eight packets below, confirmed by the validator's packet-partition-equals-assigned-union check. `_tlDrag` (declared timeline.js:3919, C19m) and `_spanShrink`/`_spanShrinkFrameAt` (declared/defined timeline.js:4788-4904, C19o) are both READ/WRITTEN by name inside this scope's own lines but neither symbol's declaration falls inside 5028-5420 — this scope claims only the mousedown/mousemove/mouseup listener bodies and the two named functions (`syncLayerSelFromFrameSel`, `fadeDragSourceSpans`) that are wholly declared within 5028-5420."
+  ],
+  "areas": [
+    {
+      "area": "frame-grid-multi-select-and-keyframe-drag",
+      "packets": [
+        {
+          "id": "C19p.content-mousedown-reset",
+          "files": [
+            "src/js/timeline.js:5028-5063"
+          ],
+          "coverage_ranges": [
+            [5028, 5063]
+          ],
+          "classification": {"code": 7, "comment": 28, "whitespace": 1},
+          "symbols": [],
+          "signature": "document.getElementById('tl-content').addEventListener('mousedown',function(e){...})",
+          "responsibility": "Bubble-phase mousedown listener on the whole `#tl-content` wrapper (ruler, layer panel and frame-grid combined) that drops the current frame selection and the layer-panel batch selection (`_layerSel`) when the press lands on genuinely empty background, not on a frame cell, a layer row/folder header, or a layer-panel button.",
+          "behavior": [
+            "Section header (5028) plus a 9-line rationale comment (5029-5037) explaining the Animate convention this whole leaf implements: dragging from an empty/unselected frame extends a range SELECTION, dragging from an already-selected/keyframe cell RELOCATES it, and clicking anywhere outside a frame cell (ruler, layer panel, transport bar, empty grid margin) drops the frame selection so the status-bar help stops showing keyframe shortcuts after the user has moved on.",
+            "Listener registration (5038): `document.getElementById('tl-content').addEventListener('mousedown',function(e){...})` — bubble phase (no third argument), on `#tl-content`, the outer wrapper that contains both the layer panel and the frame grid.",
+            "Guard 1 (5039): `if(e.button!==0)return;` — left button only.",
+            "Guard 2 (5040): `if(e.target.closest('.fc'))return;` — any press landing inside a frame cell is not this listener's concern (the frame-grid's own mousedown listener, this scope's third packet, handles those).",
+            "Frame-selection drop (5041): `if(_sel.frames.length)selClear();` — unconditional once past the two guards above.",
+            "18-line rationale comment (5042-5059) documents the layer-panel-selection half of this listener: deselecting every layer by clicking empty background (left layer-panel list or the timeline grid area) was previously impossible; needed so F5/insertFrame and F6/insertKeyframe (app.js) can distinguish 'no layer deliberately picked, apply to ALL of them' from 'some specific layer(s) picked, apply to only those' (feedback quoted verbatim: \"peu importe le layer sélectionné ça ajoute des keyframes à tous\"); excludes actual rows/folder headers and layer-panel buttons so this never fires from something with its own meaning; explicitly leaves `state.activeLayerIdx` (drawing target) untouched, only clearing `_layerSel` (the `.sel` batch-highlight), not the `.act` current-drawing-target highlight.",
+            "Guard 3 (5060): `if(e.target.closest('.lrow,.frow,#layer-ctrls,button'))return;` — excludes layer rows, folder rows, the layer-control button strip and any button element.",
+            "Layer-selection drop (5061): `if(_layerSel.length){_layerSel=[];renderLayerList();}` — only re-renders the layer list if there was actually something to clear.",
+            "Listener closing (5062) and trailing blank (5063).",
+            "This packet performs no `ld.frames[...]`/`isKeyframe`/`strokes` write, calls no `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`loadFrame`/`goToFrame`/`renderTimeline`/`updateUI`, and touches neither `_tlDrag` nor `_spanShrink` — it only clears in-memory selection state (`_sel.frames` via `selClear()`, `_layerSel`) and re-renders the layer-panel list."
+          ],
+          "callers": [
+            "Not a function; a `#tl-content`-scoped `mousedown` event listener registered once at module load, invoked by the browser on every left-button mousedown inside that wrapper whose target is neither a `.fc` cell nor a row/button, for the lifetime of the page."
+          ],
+          "effects": "Reads `_sel.frames`/`_layerSel`/`e.button`/`e.target`. Writes: calls `selClear()` (clears `_sel.frames`, in `selHas`/`selAdd` owner's own function, out of scope of this packet) and reassigns `_layerSel=[]`. Calls `renderLayerList()` (out of scope) only when `_layerSel` was non-empty. No document-state (`ld.frames`) write, no history/save/load call."
+        },
+        {
+          "id": "C19p.layer-sel-from-frame-sel",
+          "files": [
+            "src/js/timeline.js:5064-5090"
+          ],
+          "coverage_ranges": [
+            [5064, 5090]
+          ],
+          "classification": {"code": 9, "comment": 18, "whitespace": 0},
+          "symbols": ["syncLayerSelFromFrameSel"],
+          "signature": "syncLayerSelFromFrameSel()",
+          "responsibility": "Recomputes `_layerSel` (the layer panel's batch-operation selection, also F5/F6's target per app.js) as the exact sorted set of layer indices spanned by the current `_sel.frames` frame-cell selection, called after every frame-cell selection mutation in this scope so the panel never shows a stale layer highlighted.",
+          "behavior": [
+            "12-line lead-in comment (5064-5075) states the bug this closes: clicking a keyframe in Layer 2 right after Layer 1 left Layer 1's row still showing selected in the panel (feedback verbatim: \"si je select une keyframe dans layer 1 et après select une autre keyframe dans layer 2 sans shift alors le layer 1 reste select\") because `_layerSel` was only ever written by an explicit panel row click, never by a frame-cell click — and since F5/F6 now read `_layerSel`, a stale selection could silently target the wrong layer.",
+            "Function declaration (5076).",
+            "Layer-set build (5077-5078): `var layers=[];_sel.frames.forEach(function(s){if(layers.indexOf(s.layer)<0)layers.push(s.layer);});` — the exact distinct set of layer indices touched by any entry in `_sel.frames`.",
+            "Sort (5079): `layers.sort(function(a,b){return a-b;});` — ascending numeric.",
+            "Assignment (5080): `_layerSel=layers;` — whole-array replacement, not incremental.",
+            "3-line comment (5081-5083): a multi-layer selection owns the canvas gizmo; leaving an old active-layer element in `selectedPaths` would expose a second transform target.",
+            "Sel-clear (5084): `if(_layerSel.length>1)clearSel(true);` — clears the canvas path selection (out-of-scope `clearSel`, called with `true`) only when the frame selection now spans MORE than one layer.",
+            "Panel re-render (5085): `renderLayerList();` — unconditional.",
+            "3-line comment (5086-5088): the Animation 2D canvas visualizes a multi-layer row selection as one transform box; frame-cell selection can change `_layerSel` without a scene mutation, so the overlay needs an explicit refresh here.",
+            "Engine refresh (5089): `if(window.SMEngineBridge)SMEngineBridge.renderNow();` — guarded on the bridge existing.",
+            "Closing brace (5090)."
+          ],
+          "callers": [
+            "Called from this scope's own grid-mousedown packet at timeline.js:5098 (shift-range), 5103 (ctrl/meta-toggle), 5123 (grabbed-dot select) and 5137 (plain select) — four call sites, all in the next packet.",
+            "Called from this scope's own mousemove-drag packet at timeline.js:5330 (drag-rectangle range-select, every tick while `_tlDrag.mode==='select'`).",
+            "A whole-repo git grep at the frozen SHA for `syncLayerSelFromFrameSel` (both `git grep -- src/js` and unrestricted `git grep -- .`) found exactly six matches: the declaration (5076) and these five call sites (5098,5103,5123,5137,5330) — all inside src/js/timeline.js and all inside this scope's own 5028-5420 range. One further textual mention at 5325 is inside a `//` comment (excluded per the issue's instruction to exclude `//` lines) and is not counted as a call. No other file in the repository references it."
+          ],
+          "effects": "Reads `_sel.frames`. Writes: reassigns `_layerSel` (whole-array replacement, 5080), calls `clearSel(true)` conditionally (5084, out-of-scope function — clears canvas path selection, not `ld.frames`), calls `renderLayerList()` unconditionally (5085) and `SMEngineBridge.renderNow()` conditionally (5089). No `ld.frames[...]`/`isKeyframe`/`strokes` write, no `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`loadFrame` call anywhere in this function."
+        },
+        {
+          "id": "C19p.grid-mousedown-select-drag-arm",
+          "files": [
+            "src/js/timeline.js:5091-5204"
+          ],
+          "coverage_ranges": [
+            [5091, 5204]
+          ],
+          "classification": {"code": 53, "comment": 53, "whitespace": 8},
+          "symbols": [],
+          "signature": "document.getElementById('frame-grid').addEventListener('mousedown',function(e){...})",
+          "responsibility": "Bubble-phase `#frame-grid` mousedown listener (the sibling C19o's own capture-phase span-shrink arm listener suppresses via `stopImmediatePropagation()` for `.fc.span-end` presses) that resolves the pressed cell, branches on Shift/Ctrl-Meta/keyframe-dot/plain-cell to select, range-select, toggle-select or arm a keyframe-move drag, optionally selects the frame's canvas content, and — for a lone selected keyframe with its own bordering next keyframe — extends the selection to include that bordering keyframe so a move drag preserves the gap between them (`_tlDrag` arm).",
+          "behavior": [
+            "Listener registration (5091): `document.getElementById('frame-grid').addEventListener('mousedown',function(e){...})` — bubble phase, no third argument (registered after C19o's own capture-phase listener on the same element).",
+            "Guard 1 (5092): `if(e.button!==0)return;` — left button only.",
+            "Hit-test (5093): `var cell=e.target.closest('.fc');if(!cell)return;` — any mousedown not inside a `.fc` cell is a no-op here (handled instead by C19p.content-mousedown-reset above if it lands elsewhere in `#tl-content`).",
+            "Coordinate resolution (5094): `var fi=parseInt(cell.dataset.frame),li=parseInt(cell.dataset.layer);` — from the pressed cell's own dataset.",
+            "Playback interrupt (5095): `if(state.playing)stopPlay();` — out-of-scope `stopPlay`, stops any running playback before this gesture proceeds.",
+            "SELECTION MODEL DECISION TREE (the real dispatch for this listener, in order):",
+            "  Branch A — shift-range (5097-5101, `if(e.shiftKey){...}`): `selRange(li,fi);selApplyCSS();syncLayerSelFromFrameSel();` (5098, this scope's own function, previous packet) then `if(li!==state.activeLayerIdx)window.SM.setActiveLayer(li);goToFrame(fi);return;` (5099-5100) — extends the frame-cell range selection from the last anchor to `(li,fi)` (out-of-scope `selRange`, declared timeline.js:216) and returns immediately; no `_tlDrag` arm on this branch (a shift-click is a discrete selection act, not a drag).",
+            "  Branch B — ctrl/meta-toggle (5102-5106, `if(e.metaKey||e.ctrlKey){...}`): `selToggle(li,fi);selApplyCSS();syncLayerSelFromFrameSel();` (5103) then the same activate/goToFrame/return pattern (5104-5105) — toggles this one cell in/out of `_sel.frames` (out-of-scope `selToggle`, declared timeline.js:215) and returns immediately; no `_tlDrag` arm.",
+            "  12-line comment (5108-5119) precedes Branch C: grabbing a keyframe's own dot directly (2026-07, \"petit carré draggable\") starts a MOVE drag on the very first press, no prior click-to-select needed, matching Animate/AE's keyframe-diamond convention; reuses the exact same `_tlDrag`/`moveFrames` machinery Branch D below already had; scoped to real keyframes (`.kf-full`/`.kf-empty`, not `.td` tween ticks) on a non-Component layer, since a Component layer's `ld.frames` is a placement stub whose markers are visual-only here.",
+            "  Branch C — grabbed-dot move-drag arm (5120-5128, `if(grabbedDot&&ldForDot&&!ldForDot.symbolId){...}`): hit-test `var grabbedDot=e.target.closest('.km')&&(cell.classList.contains('kf-full')||cell.classList.contains('kf-empty'));` (5120) and `var ldForDot=state.layers[li];` (5121); if the target is a keyframe dot on a non-Component layer, ensures the cell is selected (`if(!selHas(li,fi)){selClear();selAdd(li,fi);selApplyCSS();syncLayerSelFromFrameSel();}`, 5123), activates the layer and jumps to the frame (5124-5125), then arms `_tlDrag`: `_tlDrag.active=true;_tlDrag.startL=li;_tlDrag.startF=fi;_tlDrag.moved=false;_tlDrag.ghost=null;_tlDrag.mode='move';` (5126, all six fields written on one line, whole-field overwrite) and `return;` (5127) — this branch never falls through to Branch D.",
+            "  5-line comment (5130-5134) precedes Branch D: one predictable rule (Animate's) — dragging from a cell already selected before this press MOVES the selection, dragging from anything else range-SELECTS; the old \"any keyframe drag moves\" variant made range-selecting a run of keyframes impossible.",
+            "  Branch D setup (5135): `var wasSelected=selHas(li,fi);` — captured BEFORE any mutation, decides both the immediate selection update and the eventual `_tlDrag.mode`.",
+            "  Selection update (5137): `if(!wasSelected){selClear();selAdd(li,fi);selApplyCSS();syncLayerSelFromFrameSel();}` — only mutates the selection when this press starts a fresh one; an already-selected cell's selection is left untouched so a drag-to-move doesn't first collapse a multi-cell selection to one.",
+            "  Activate/jump (5139-5140): `if(li!==state.activeLayerIdx)window.SM.setActiveLayer(li);goToFrame(fi);` — same pattern as branches A/B/C.",
+            "  7-line comment (5142-5148) precedes the canvas-content auto-select sub-block: clicking directly on a full (non-empty) keyframe also selects every stroke it holds on the canvas (like clicking a layer thumbnail in Animate/AE), scoped to a plain select-click via the same `!wasSelected` precedent, since this mousedown is reused before `_tlDrag.mode` is known.",
+            "  Canvas-content sub-block (5149-5177, `if(!wasSelected){...}`): reads `var ld0=state.layers[li];var fr0=ld0&&ld0.frames[fi];` (5150-5151); if `fr0.isKeyframe&&fr0.strokes.length>0&&userLayers[li]` (5152), sets the tool to `'select'` and populates `selectedPaths`/`state.selectedStrokeIndices` from every selectable child of that layer (5153-5156, calls `renderArcs();updateUI();` at 5156), preceded by a 6-line comment (5158-5163) explaining the else-branch: `else if(selectedPaths.length){clearSel();renderArcs();updateUI();}` (5164) — landing on a non-qualifying frame (empty keyframe or a held/tween cell) drops whatever canvas selection was showing from a PREVIOUS frame's full-keyframe click, so a stale transform box never lingers over unrelated content; a 9-line comment (5166-5174) then explains the tween-jump: clicking a tween (interpolated) cell jumps the right panel straight to the Tween + Easing Curve sections and puts the Easing Curve widget into tween-pair mode scoped to THIS span (2026-07 fix, \"le easing s'applique à tous les tween du calque\" — previously it reshaped every tween on the project) via `if(fr0&&fr0.isInterpolated)editTweenSegForCell(li,fi,fr0);else if(window._curveEditor)window._curveEditor.exitTweenPair();` (5175-5176, both out-of-scope calls, `editTweenSegForCell` declared timeline.js:4680).",
+            "  14-line comment (5179-5192) precedes the outpoint-carry sub-block: relocating a single keyframe that has its own bordering next keyframe (defining hold length, which has no stored value of its own) left that hold length behind under the old behavior — moveFrames only relocates cells actually in `_sel.frames` — silently changing the gap (feedback verbatim: \"le drag de la keyframe avec un outpoint derrière elle n'entraine pas l'outpoint avec elle\"); fixed by adding the bordering keyframe to the selection too when this drag starts from exactly one selected keyframe.",
+            "  Outpoint-carry sub-block (5193-5200, `if(wasSelected&&_sel.frames.length===1&&_sel.frames[0].layer===li&&_sel.frames[0].frame===fi){...}`): only engages when the press started on an already-selected SOLE selection entry matching this exact cell; forward-scans `ldBorder.frames` from `fi+1` for the first `isKeyframe===true` and, if found, `selAdd(li,nb);selApplyCSS();break;` (5197) — adds exactly one bordering keyframe, then stops.",
+            "  Drag arm, Branch D's own `_tlDrag` write (5201-5202): `_tlDrag.active=true;_tlDrag.startL=li;_tlDrag.startF=fi;_tlDrag.moved=false;_tlDrag.ghost=null;` (5201) then `_tlDrag.mode=wasSelected?'move':'select';` (5202, on its own line, unlike Branch C's single-line six-field write) — `mode` is `'move'` if the press started on an already-selected cell, `'select'` otherwise (drag-rectangle range-select, driven by this scope's mousemove packet).",
+            "Listener closing (5203) and trailing blank (5204)."
+          ],
+          "callers": [
+            "Not a function; a `#frame-grid`-scoped `mousedown` event listener registered once at module load (bubble phase), invoked by the browser on every left-button mousedown inside `#frame-grid` whose target is a `.fc` cell — for any such press previously reaching this element, C19o's own capture-phase listener (4819, out of scope) runs first and, only for a press inside a `.fc.span-end` cell, calls `stopImmediatePropagation()` (4830) before this listener ever executes."
+          ],
+          "effects": "Reads `_sel.frames`/`state.layers`/`state.playing`/`state.activeLayerIdx`/`userLayers`/`selectedPaths`. Writes: `_tlDrag` fields (whole-field overwrites at 5126 six fields, 5201 five fields, 5202 one field — three distinct arm sites depending on branch), the selection system (`selClear`/`selAdd`/`selToggle`/`selRange`/`selApplyCSS`, all out of scope) via `syncLayerSelFromFrameSel` (in-scope, previous packet), `selectedPaths`/`state.selectedStrokeIndices`/`state.currentTool` (via `window.SM.setTool('select')`), calls `window.SM.setActiveLayer(li)` conditionally (five call sites: 5099,5104,5124,5139 — wait, only reached on the branch taken — and this listing enumerates each branch's own single call), `goToFrame(fi)` (four call sites, one per branch, out of scope), `renderArcs()`/`updateUI()` (5156,5164, out of scope), `editTweenSegForCell`/`window._curveEditor.exitTweenPair()` (5175-5176, out of scope). No `ld.frames[...]`/`isKeyframe`/`strokes` write, no `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`loadFrame` call anywhere in this packet — it only arms drag state and selection/canvas-selection state."
+        },
+        {
+          "id": "C19p.grid-dblclick-span",
+          "files": [
+            "src/js/timeline.js:5205-5220"
+          ],
+          "coverage_ranges": [
+            [5205, 5220]
+          ],
+          "classification": {"code": 12, "comment": 3, "whitespace": 1},
+          "symbols": [],
+          "signature": "document.getElementById('frame-grid').addEventListener('dblclick',function(e){...})",
+          "responsibility": "Double-click on any `.fc` cell selects the whole span that cell belongs to — the run of held frames between (and including) the preceding real keyframe and the frame just before the next real keyframe — matching Animate's span double-click.",
+          "behavior": [
+            "3-line lead-in comment (5205-5207).",
+            "Listener registration (5208): `document.getElementById('frame-grid').addEventListener('dblclick',function(e){...})` — bubble phase.",
+            "Hit-test and coordinates (5209-5211): `var cell=e.target.closest('.fc');if(!cell)return;var fi=...,li=...;var ld=state.layers[li];if(!ld)return;`.",
+            "Backward scan (5212-5213): `var start=fi;while(start>0&&!ld.frames[start].isKeyframe)start--;` — walks back to (and including) the nearest real keyframe at or before `fi`.",
+            "Forward scan (5214-5215): `var end=fi;while(end+1<state.totalFrames&&!ld.frames[end+1].isKeyframe)end++;` — walks forward up to (and including) the frame just before the next real keyframe.",
+            "Selection replacement (5216-5218): `selClear();for(var f=start;f<=end;f++)selAdd(li,f);selApplyCSS();` — the entire prior `_sel.frames` is discarded and replaced with every frame in `[start,end]` on this one layer.",
+            "Listener closing (5219) and trailing blank (5220).",
+            "This packet does NOT call `syncLayerSelFromFrameSel()` — unlike every selection-mutating branch in the mousedown packet, a double-click span-select leaves `_layerSel` unrecomputed (a single-layer selection was already true before the double-click in every case this gesture applies to, since it fires on a cell that was already `mousedown`-selected first)."
+          ],
+          "callers": [
+            "Not a function; a `#frame-grid`-scoped `dblclick` event listener registered once at module load, invoked by the browser on every double-click inside `#frame-grid` whose target is inside a `.fc` cell."
+          ],
+          "effects": "Reads `state.layers[li].frames`/`state.totalFrames`. Writes: `_sel.frames` via `selClear()`/`selAdd()` (out of scope) and applies `.sel` CSS via `selApplyCSS()` (out of scope). No `_tlDrag`/`_spanShrink` touch, no `ld.frames[...]` write, no `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`loadFrame`/`renderTimeline`/`updateUI` call."
+        },
+        {
+          "id": "C19p.grid-contextmenu",
+          "files": [
+            "src/js/timeline.js:5221-5285"
+          ],
+          "coverage_ranges": [
+            [5221, 5285]
+          ],
+          "classification": {"code": 44, "comment": 20, "whitespace": 1},
+          "symbols": [],
+          "signature": "document.getElementById('frame-grid').addEventListener('contextmenu',function(e){...})",
+          "responsibility": "Right-click on a `.fc` cell selects it if not already selected, activates/jumps to it, and opens a context menu whose items are the frame-selection commands (copy/cut/paste/duplicate/insert/convert/clear/regenerate-tween/remove) plus, conditionally, a tween-curve-edit pair and a fill-propagation action.",
+          "behavior": [
+            "Listener registration (5221): `document.getElementById('frame-grid').addEventListener('contextmenu',function(e){...})` — bubble phase.",
+            "Default-menu suppression (5222): `e.preventDefault();` — first statement, unconditional (unlike the mousedown/dblclick listeners, this runs even if the hit-test below fails).",
+            "Hit-test and coordinates (5223-5224): `var cell=e.target.closest('.fc');if(!cell)return;var fi=...,li=...;`.",
+            "Selection-ensure (5225): `if(!selHas(li,fi)){selClear();selAdd(li,fi);selApplyCSS();}` — unlike the mousedown listener's branches, this does NOT call `syncLayerSelFromFrameSel()` after selecting.",
+            "Activate/jump (5226-5227): `if(li!==state.activeLayerIdx)window.SM.setActiveLayer(li);goToFrame(fi);` — same pattern as the mousedown listener.",
+            "Clipboard flag (5228): `var hasClip=!!(_sel.clipboard&&_sel.clipboard.length);` — drives the Paste item's `disabled` state below.",
+            "4-line comment (5229-5232) precedes the tween-curve menu-item block: if this cell sits inside (or starts) a tween span, offer to edit just that pair's easing curve (`openTweenCurveInset`), reachable even with `state.showTweenCurves` off — same idea as the tween-curve-strip's own click-to-edit (C19n, out of scope).",
+            "Tween-pair lookup and conditional items (5233-5234): `var twPair=tweenPairForCell(li,fi);` (out-of-scope, declared timeline.js:4669) and `var twMenuItems=twPair?[{label:SM.t('ctxEditTweenCurve'),action:function(){openTweenCurveInset(li,twPair.a,twPair.b);}},{label:'Supprimer le tween',action:function(){window.SM.removeTweenSpan(li,twPair.a,twPair.b);}},{sep:true}]:[];` — a 3-item array (edit action, remove action, separator) when the cell is part of a tween pair, else an empty array; both actions are out-of-scope calls (`openTweenCurveInset` timeline.js:4617, `window.SM.removeTweenSpan` -> app.js:5358).",
+            "Menu construction (5235-5264): `window.showContextMenu(e.clientX,e.clientY,twMenuItems.concat([...]));` — the tween items (if any) are prepended via `.concat()` to a fixed 13-entry (11 actionable + 2 separator groups) array built at the mouse's client coordinates.",
+            "Fixed menu items, each with its own action closure and, for several, a keyboard-shortcut label (no behavior difference from the mousedown gesture — the shortcut label is purely informational text):",
+            "  Copy (5236, ⌘C): `window.SM.copyFrames()` (out of scope, timeline.js:1789).",
+            "  Cut (5237, ⌘X): `window.SM.cutFrames()` (out of scope, timeline.js:1802).",
+            "  Paste (5238, ⌘V, `disabled:!hasClip`): `window.SM.pasteFrames()` (out of scope, timeline.js:1819).",
+            "  Duplicate the selection (5239): `window.SM.duplicateSelectedFrames()` (out of scope, app.js:5403).",
+            "  Separator (5240).",
+            "  Insert Frame (5241, F5): `insertFrame()` (out of scope bare global, app.js:5191).",
+            "  Insert Keyframe (5242, F6): `insertKeyframe()` (out of scope bare global, app.js:5258).",
+            "  Insert Blank Keyframe (5243, F7): `insertBlankKeyframe()` (out of scope bare global, app.js:5310).",
+            "  Convert to Keyframes (5244): `window.SM.convertToKeyframes()` (out of scope, app.js:5374).",
+            "  Clear the Keyframe (5245): `window.SM.clearKeyframe()` (out of scope, app.js:5340).",
+            "  Separator (5246).",
+            "  6-line comment (5247-5252) precedes Regenerate Tween: `generateTweens()` already scopes itself to the current frame selection or the whole layer if nothing is selected — same behavior as the Tween panel's own button/T shortcut, just reachable without opening that panel (feedback #5qmww); works to both CREATE and REGENERATE a tween.",
+            "  Regenerate Tween (5253, T): `window.SM.generateTweens()` (out of scope, tweens.js:3772).",
+            "  Separator (5254).",
+            "  10-line comment (5255-5264) precedes the fill-propagation item: feedback #117 (\"où est la propagation de la couleur aux autres frames, il la faudrait au clic droit sur la frame\") — the command already existed (`fillPropagateAcrossFrames`, tools.js, wired to `#btn-fill-propagate` in Tool Options for the Fill tool) but wasn't reachable from here; mirrors `onPropagateClick`'s own logic (fill-bridge.js, out of scope) exactly — same 'most recently added fill on this frame' heuristic, same toasts — rather than looping over every fill on the frame, since that function's own comment measures ~3.5s per call on a 120-frame project and a bulk version needs its own progress/cost story.",
+            "  Fill-propagation item (5265-5280, label `'Propager ce remplissage → toutes les frames'`): `disabled` when the active layer's children have no `fillSeed`-tagged path (5267); action closure (5268-5279) reads `userLayers[li].children`, filters to `fillSeed`-tagged children, bails if none, targets the LAST one (`fills[fills.length-1]`), calls `pushUndo();` (5273, the ONLY `pushUndo` call anywhere in this whole scope), then `try{res=fillPropagateAcrossFrames(target);}catch(err){console.warn('[fill] propagate failed',err);}` (5275, out-of-scope, tools.js:3194), `updateUI();` (5276), conditionally `SMEngineBridge.renderNow()` (5277) and conditionally `showToast(describePropagateResult(res))` (5278, out-of-scope `describePropagateResult`, tools.js:3365).",
+            "  Separator (5281).",
+            "  Remove Frames (5282): `window.SM.removeFrameSpan()` (out of scope, app.js:5389).",
+            "Menu-array closing (5283) and listener closing (5284), trailing blank (5285)."
+          ],
+          "callers": [
+            "Not a function; a `#frame-grid`-scoped `contextmenu` event listener registered once at module load, invoked by the browser on every right-click (or platform-equivalent) inside `#frame-grid` whose target is inside a `.fc` cell (the `e.preventDefault()` at 5222 runs regardless of the hit-test, suppressing the native menu even on a right-click that then falls through the `if(!cell)return;` guard)."
+          ],
+          "effects": "Reads `_sel.clipboard`/`state.layers`/`state.activeLayerIdx`/`userLayers`. Writes on open: `_sel.frames` via `selClear()`/`selAdd()`/`selApplyCSS()` conditionally (5225, no `syncLayerSelFromFrameSel()` call). Every document write this packet can reach is inside one of eleven menu-item action closures, each firing only on that specific item's own click, not on the contextmenu event itself: Copy/Cut/Paste/Duplicate (`window.SM.*`, out of scope, own undo/save handling not inspected here), Insert Frame/Keyframe/Blank Keyframe (app.js bare globals, out of scope), Convert to Keyframes/Clear Keyframe/Remove Frames (`window.SM.*` -> app.js, out of scope), Regenerate Tween (`window.SM.generateTweens()` -> tweens.js, out of scope), the tween-pair Edit/Remove actions when `twPair` is truthy (`openTweenCurveInset`/`window.SM.removeTweenSpan`, out of scope), and the fill-propagation action (the only item whose full body is inline in this scope: `pushUndo()` then `fillPropagateAcrossFrames(target)` then `updateUI()`/`SMEngineBridge.renderNow()`/`showToast`, 5273-5278). None of these eleven action bodies (other than the fill-propagation one) is reproduced here beyond its single named call — each is cited, not claimed."
+        },
+        {
+          "id": "C19p.grid-mousemove-drag",
+          "files": [
+            "src/js/timeline.js:5286-5381"
+          ],
+          "coverage_ranges": [
+            [5286, 5381]
+          ],
+          "classification": {"code": 61, "comment": 27, "whitespace": 8},
+          "symbols": [],
+          "signature": "document.getElementById('frame-grid').addEventListener('mousemove',function(e){...})",
+          "responsibility": "`#frame-grid`-scoped mousemove listener that, while `_tlDrag.active`, resolves the pointer to a frame/layer target, decides on first real movement whether this is a range-select or a keyframe-move drag, and then either live-updates the range selection (`mode==='select'`) or renders a floating ghost preview of every selected cell's prospective new position plus a free-floating cursor dot (`mode==='move'`/`'select-turned-drag'` in general — any non-select mode) — every tick is DOM-preview only, no `ld.frames` write.",
+          "behavior": [
+            "Listener registration (5286): `document.getElementById('frame-grid').addEventListener('mousemove',function(e){...})` — bubble phase, scoped to `#frame-grid` (unlike the mouseup commit listener below, which is `window`-scoped).",
+            "Guard (5287): `if(!_tlDrag.active)return;` — no-op outside an active drag armed by the mousedown packet.",
+            "Grid rect (5288-5289): `var grid=document.getElementById('frame-grid');var gridRect=grid.getBoundingClientRect();`.",
+            "2-line comment (5290-5291): `grid.getBoundingClientRect()` already reflects `#fg-wrap`'s current scroll position, so no manual scroll/offset correction is needed for cursor-to-cell mapping.",
+            "Pointer-to-frame (5292-5295): `var xRel=e.clientX-gridRect.left;var camOff=camGridRowOffset();var yRel=e.clientY-gridRect.top-camOff;var toF=Math.max(0,Math.min(state.totalFrames-1,Math.floor(xRel/FC)));` (`camGridRowOffset`/`FC` out of scope, timeline.js:3926 and elsewhere).",
+            "4-line comment (5296-5299): grid rows run top-to-bottom from the highest layer index (renderTimeline, out of scope); `yRel` is measured past the camera row, prepended before any real layer row and not part of `state.layers`.",
+            "Pointer-to-layer (5300): `var toL=layerIndexAtGridY(yRel);` (out-of-scope, timeline.js:4415).",
+            "First-movement threshold (5302-5314, `if(!_tlDrag.moved){...}`): `var dist=Math.abs(toF-_tlDrag.startF)+Math.abs(toL-_tlDrag.startL);if(dist<1)return;` (5303-5304) — a drag that hasn't moved at least one full frame/layer unit from its start is still treated as unmoved (no ghost, no fade, no selection change yet); once past that, `_tlDrag.moved=true;` (5305), and `if(_tlDrag.mode==='move'&&!_sel.frames.length)selAdd(_tlDrag.startL,_tlDrag.startF);` (5306) defensively re-adds the start cell to the selection if it somehow ended up empty; a 6-line comment (5307-5312) explains fading the ORIGINAL held span (not just the single dragged cell) so the region visibly recedes instead of staying solid while a separate ghost tracks the cursor (real feedback: it wasn't obvious anything was being moved out of its old span until release); `if(_tlDrag.mode==='move')fadeDragSourceSpans(true);` (5313, this scope's own function, packet 7 below) — only for `'move'` mode, never `'select'`.",
+            "Select-mode branch (5316-5333, `if(_tlDrag.mode==='select'){...}`): rebuilds the ENTIRE `_sel.frames` from scratch every tick — `_sel.frames=[];selAdd(_tlDrag.startL,_tlDrag.startF);` (5317) then a rectangular fill between the drag start and the current pointer-resolved `(toL,toF)`: `var l0=Math.min(...),l1=Math.max(...);var f0=Math.min(...),f1=Math.max(...);for(var lx=l0;lx<=l1;lx++)for(var fx=f0;fx<=f1;fx++)selAdd(lx,fx);` (5318-5320), `selApplyCSS();` (5321); an 8-line comment (5322-5329) explains a drag-rectangle range-select spanning several layer rows needs every touched layer shown selected in the panel too, same reasoning as `syncLayerSelFromFrameSel`'s own comment (feedback with screenshot: dragging across Layer 1 and Layer 2 only showed Layer 2 selected); `syncLayerSelFromFrameSel();` (5330, this scope's own function, packet 2) then `_tlDrag._toL=toL;_tlDrag._toF=toF;return;` (5331-5332) — returns before reaching the ghost/move code below; this branch never creates `_tlDrag.ghost`/`_tlDrag.cursorDot`.",
+            "Ghost/cursor-dot lazy creation (5335-5345, only reached for non-'select' modes): `if(!_tlDrag.ghost){_tlDrag.ghost=document.createElement('div');_tlDrag.ghost.className='tl-drag-ghost';_tlDrag.ghost.style.position='absolute';...;document.getElementById('fg-wrap').appendChild(_tlDrag.ghost);}` (5336-5340) and an equivalent lazy-create block for `_tlDrag.cursorDot` (5341-5345), a 9px circular dot styled inline via `cssText`.",
+            "Selection-bounds guard (5347): `var b=selBounds();if(!b){_tlDrag.active=false;return;}` (out-of-scope `selBounds`, timeline.js:231) — an empty selection mid-drag aborts the drag outright by clearing `_tlDrag.active` (not resetting the other fields).",
+            "Offset computation (5348): `var offL=toL-_tlDrag.startL,offF=toF-_tlDrag.startF;`.",
+            "3-line comment (5349-5351): the ghost is a child of `#fg-wrap`, not `#frame-grid`, so its absolute coordinates must include the grid's own offset within the wrap; `offsetLeft`/`offsetTop` are layout-space (scroll-independent), unlike `getBoundingClientRect()`.",
+            "Grid offset (5352): `var gridOffLeft=grid.offsetLeft,gridOffTop=grid.offsetTop;`.",
+            "4-line comment (5354-5357): the free-floating cursor dot tracks the literal mouse position continuously (not snapped to frame columns) so the drag feels like the keyframe point follows the cursor, while the ghost cell shows the precise snapped drop target.",
+            "Cursor-dot positioning (5358-5361): `var clampedX=Math.max(0,Math.min(state.totalFrames*FC,xRel));var clampedY=Math.max(12,Math.min(frameGridTotalRowsHeight()-12,yRel));_tlDrag.cursorDot.style.left=(clampedX+gridOffLeft)+'px';_tlDrag.cursorDot.style.top=(clampedY+camOff+gridOffTop)+'px';` (`frameGridTotalRowsHeight` out-of-scope, timeline.js:4406).",
+            "Ghost rebuild, every tick (5363-5377): `_tlDrag.ghost.innerHTML='';` (5363, unconditional clear-and-rebuild, no diffing) then `_sel.frames.forEach(function(s){...})` (5364-5377) — for each selected cell, computes its prospective new `(gl,gf)` via the tick's `offL`/`offF`, skips out-of-bounds targets (5366), creates an absolutely-positioned `div` sized `FC` x `frameGridRowHeight(gl)` (out-of-scope, timeline.js:4392) tinted `rgba(74,158,255,.35)` and positioned via `visualTopOfLayer(gl)` (out-of-scope, timeline.js:4401) plus `camOff`/`gridOffTop`/`gridOffLeft` (5367-5370), and — only `if(fr&&fr.isKeyframe)` (5352, reading `state.layers[s.layer].frames[s.frame]`) — appends a small colored/hollow dot child matching the keyframe's full/empty look (5372-5375), finally `_tlDrag.ghost.appendChild(d);` (5376).",
+            "Tail update (5379): `_tlDrag._toL=toL;_tlDrag._toF=toF;` — the last-resolved pointer target, read by the mouseup commit packet's own offset computation.",
+            "Listener closing (5380) and trailing blank (5381).",
+            "This packet performs no `ld.frames[...]` write anywhere on any tick — every visual change (ghost, cursor dot, fade via `fadeDragSourceSpans(true)`) is DOM-preview-only and is either overwritten by the next tick's rebuild or torn down by the mouseup commit packet."
+          ],
+          "callers": [
+            "Not a function; a `#frame-grid`-scoped `mousemove` event listener registered once at module load, invoked by the browser on every mousemove inside `#frame-grid`, gated to a no-op by the `_tlDrag.active` guard at 5287 outside an active drag."
+          ],
+          "effects": "Reads `_tlDrag.*`/`_sel.frames`/`state.layers`/`state.totalFrames`. Writes (select mode): rebuilds `_sel.frames` wholesale every tick via `selAdd` (5317-5320), calls `selApplyCSS()` and `syncLayerSelFromFrameSel()` (5321,5330, this scope). Writes (move/other modes): `_tlDrag.moved`/`.ghost`/`.cursorDot`/`._toL`/`._toF` fields (5305,5336,5341,5379) and, on first movement only, calls `fadeDragSourceSpans(true)` (5313, this scope, next packet) and possibly `selAdd` once (5306); creates/repositions two DOM elements (`.tl-drag-ghost`, its cursor-dot sibling) and rebuilds the ghost's children every tick — pure DOM preview, no persisted write. Can also set `_tlDrag.active=false` (5347) on a selection-bounds failure. No `ld.frames[...]`/`isKeyframe`/`strokes` write, no `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`loadFrame`/`renderTimeline`/`updateUI` call anywhere in this packet."
+        },
+        {
+          "id": "C19p.drag-source-fade",
+          "files": [
+            "src/js/timeline.js:5382-5404"
+          ],
+          "coverage_ranges": [
+            [5382, 5404]
+          ],
+          "classification": {"code": 15, "comment": 8, "whitespace": 0},
+          "symbols": ["fadeDragSourceSpans"],
+          "signature": "fadeDragSourceSpans(on)",
+          "responsibility": "Toggles a `tl-drag-fading` CSS class on every `.fc` cell belonging to the full held span each currently-selected keyframe sits in, so the region a keyframe MOVE drag is pulling content out of visibly recedes for the duration of the drag; pure CSS-class toggle on existing DOM cells, no re-render.",
+          "behavior": [
+            "8-line lead-in comment (5382-5389): held-span fade for an in-progress keyframe MOVE drag (see the mousemove handler above); without it, only a small ghost box tracked the cursor while the full colored band it was being pulled out of stayed solid and unchanged-looking until drop; purely a CSS class toggle on existing DOM cells, cheap enough to call once per drag-start.",
+            "Function declaration (5390): `function fadeDragSourceSpans(on){`.",
+            "Unconditional clear (5391): `document.querySelectorAll('.fc.tl-drag-fading').forEach(function(c){c.classList.remove('tl-drag-fading');});` — every call, regardless of `on`, first strips the class from every cell currently carrying it (a full clear-and-rebuild, not incremental).",
+            "Early return (5392): `if(!on)return;` — an `off` call is the clear above and nothing else.",
+            "Dedup set (5393): `var seen={};` — keyed `layer:frame`, so a layer/frame combination whose full span has already been walked this call is not re-walked.",
+            "Per-selected-cell span walk (5394-5404, `_sel.frames.forEach(function(s){...})`): `var key=s.layer+':'+s.frame;if(seen[key])return;seen[key]=true;` (5395) then `var ld=state.layers[s.layer];if(!ld)return;` (5396); backward/forward scans identical in shape to the double-click packet's own span-boundary logic — `var start=s.frame;while(start>0&&!ld.frames[start].isKeyframe)start--;var end=s.frame;while(end+1<state.totalFrames&&!ld.frames[end+1].isKeyframe)end++;` (5397-5398) — then `for(var f=start;f<=end;f++){var c=document.querySelector('.fc[data-layer=\"'+s.layer+'\"][data-frame=\"'+f+'\"]');if(c)c.classList.add('tl-drag-fading');}` (5399-5402) — one DOM query per frame in the span.",
+            "Closing braces (5403-5404, forEach callback then function body)."
+          ],
+          "callers": [
+            "Called with `true` from this scope's own mousemove packet at timeline.js:5313 (once, on first movement of a `'move'`-mode drag).",
+            "Called with `false` from this scope's own window-mouseup commit packet at timeline.js:5407 (unconditionally, as the very first action once `_tlDrag.active` is confirmed true).",
+            "A whole-repo git grep at the frozen SHA for `fadeDragSourceSpans` (both `-- src/js` and unrestricted `-- .`) found exactly four matches: the declaration (5390) and these two call sites (5313,5407), all inside src/js/timeline.js and inside this scope's own range, plus one further textual mention in `src/css/style.css:1852` inside a CSS comment (`/* ... drag (see fadeDragSourceSpans in timeline.js) — recedes instead of ... */`, not code, not counted as a caller) — no other file calls it."
+          ],
+          "effects": "Reads `_sel.frames`/`state.layers`/`state.totalFrames`. Writes: DOM `classList` add/remove of `tl-drag-fading` on `.fc` cells only (querySelectorAll clear, then a bounded per-span querySelector-and-add loop). No `_tlDrag`/`_spanShrink` touch, no `ld.frames[...]` write, no `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`loadFrame`/`renderTimeline`/`updateUI` call — purely a DOM-preview effect, fully reversible by the next `on:true`/`on:false` call pair."
+        },
+        {
+          "id": "C19p.window-mouseup-commit",
+          "files": [
+            "src/js/timeline.js:5405-5420"
+          ],
+          "coverage_ranges": [
+            [5405, 5420]
+          ],
+          "classification": {"code": 15, "comment": 0, "whitespace": 1},
+          "symbols": [],
+          "signature": "window.addEventListener('mouseup',function(){...})",
+          "responsibility": "Global mouseup listener that ends any active `#frame-grid` drag: always fades the drag-source spans back off, and — only if the drag actually moved and produced a ghost with a non-empty selection, and the resolved offset is non-zero — commits the move by delegating to `window.SM.moveFrames` (the sole document-write this whole scope's mouseup path can reach), then tears down the ghost/cursor-dot DOM and fully resets `_tlDrag`.",
+          "behavior": [
+            "Listener registration (5405): `window.addEventListener('mouseup',function(){...})` — registered on `window`, not `#frame-grid` (unlike every other listener in this scope), so it fires for a mouseup anywhere on the page, not just inside the grid — necessary because a drag started inside the grid can legitimately end with the pointer outside it.",
+            "Guard (5406): `if(!_tlDrag.active)return;` — a mouseup with no active `#frame-grid` drag (this scope's own arm never fired) is a full no-op.",
+            "Fade-off (5407): `fadeDragSourceSpans(false);` (this scope's own function, previous packet) — unconditional once past the guard, regardless of whether the drag actually moved.",
+            "Commit condition (5408): `if(_tlDrag.moved&&_tlDrag.ghost&&_sel.frames.length>0){...}` — all three must hold: the drag crossed the first-movement threshold (mousemove packet), a ghost element was created (only happens for non-`'select'` modes), and the selection is non-empty. A `'select'`-mode drag (range-select, which returns early in the mousemove packet before creating a ghost) never satisfies this condition, so it never calls `moveFrames` — its own selection was already fully committed live, tick-by-tick, by the mousemove packet itself.",
+            "  Offset computation (5409-5410): `var offL=_tlDrag._toL-_tlDrag.startL;var offF=_tlDrag._toF-_tlDrag.startF;` — the LAST pointer-resolved target the mousemove packet recorded, minus the drag's own start.",
+            "  Zero-offset guard (5411-5414): `if(offL!==0||offF!==0){var b=selBounds();window.SM.moveFrames(_sel.frames.slice(),b.minL+offL,b.minF+offF);}` — a drag that started and ended on the identical cell (no net movement) never calls `moveFrames` at all; when it does, `_sel.frames.slice()` (a shallow copy, not the live array) is passed together with the SELECTION'S OWN bounds (`selBounds()`, out of scope, timeline.js:231) offset by `offL`/`offF` — `moveFrames` (out of scope, timeline.js:1675, this scope's sole document-write delegate) is itself responsible for `pushUndo()`/`saveAllLayerFrames()`, the locked-layer filter, the single-keyframe outpoint-ripple re-derivation, the three-pass `ld.frames` blank-then-write, `rekeyTweenPairData`/`retimeTweenSpans`/`captureTweenInbetweens` (tweens.js, out of scope) and the closing `loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(...)` — none of that body is reproduced here beyond this one-line summary; this packet's own commit path makes exactly one call into it.",
+            "  Ghost teardown (5415): `_tlDrag.ghost.remove();_tlDrag.ghost=null;` — only inside the outer `if` (5408), i.e. only for a drag that actually created a ghost.",
+            "Cursor-dot teardown (5417): `if(_tlDrag.cursorDot){_tlDrag.cursorDot.remove();_tlDrag.cursorDot=null;}` — OUTSIDE the commit-condition `if`, so this runs for any active drag regardless of whether it moved (a click-only 'drag' that never crossed the movement threshold never created a cursor dot in the first place, so this is a no-op for it, not a bug).",
+            "Full `_tlDrag` reset (5418): `_tlDrag.active=false;_tlDrag.moved=false;_tlDrag.mode=null;` — three fields explicitly reset; `startL`/`startF`/`_toL`/`_toF`/`ghost`/`cursorDot` are left at their last values (already nulled above for `ghost`/`cursorDot` when they existed) until the next mousedown's own arm (five- or six-field whole-overwrite, previous packets) replaces `startL`/`startF`/`moved`/`ghost`/`mode` again — `_toL`/`_toF` specifically are NOT reset here and are stale until the next mousemove tick overwrites them (5379).",
+            "Listener closing (5419) and trailing blank (5420)."
+          ],
+          "callers": [
+            "Not a function; a `window`-level `mouseup` event listener registered once at module load, invoked by the browser on every mouseup for the lifetime of the page, gated to a no-op by the `_tlDrag.active` guard at 5406 outside an active drag."
+          ],
+          "effects": "Reads `_tlDrag.*`/`_sel.frames`. DOM writes: calls `fadeDragSourceSpans(false)` unconditionally (5407, this scope), removes `_tlDrag.ghost`/`_tlDrag.cursorDot` elements conditionally (5415,5417). Document-state write: exactly one call, `window.SM.moveFrames(_sel.frames.slice(),b.minL+offL,b.minF+offF)` (5413, out of scope, timeline.js:1675), reached only when the commit condition (5408) and the non-zero-offset guard (5411) both hold — this is the ONLY document-state (`ld.frames[...]`) write this whole scope's mouseup/drag-commit path can reach, and it is entirely delegated, not performed inline. `_tlDrag` field resets (5418, three fields). No `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`loadFrame`/`renderTimeline`/`updateUI` call is made DIRECTLY by this packet — all such calls, if `moveFrames` is reached, happen inside `moveFrames`'s own body (out of scope)."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No packet in this scope calls a `save*`-prefixed function directly. The sole path to one is via delegation: the mouseup-commit packet's `window.SM.moveFrames(...)` call (timeline.js:5413) reaches `moveFrames`'s own `pushUndo();saveAllLayerFrames();` (timeline.js:1675 area, out of scope) only when a move-mode drag both crossed the movement threshold and resolved to a non-zero offset. Every other packet (content-mousedown-reset, layer-sel-from-frame-sel, grid-mousedown-select-drag-arm, grid-dblclick-span, grid-mousemove-drag, drag-source-fade) touches no save path at all; the context-menu packet's own inline fill-propagation action calls `pushUndo()` directly (5273) but delegates the actual save to `fillPropagateAcrossFrames` (tools.js, out of scope) internally, and its other ten menu items delegate any save entirely to their own out-of-scope target function."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No packet in this scope calls `loadFrame` directly. `moveFrames` (out of scope, reached only via the mouseup-commit packet's single delegated call, 5413) calls `loadFrame(state.currentFrame)` internally as part of its own closing render sequence; the context-menu packet's Insert Keyframe/Insert Frame/Insert Blank Keyframe items (app.js, out of scope) may call it conditionally inside their own bodies, not inspected here beyond the call site."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Exactly one direct `pushUndo()` call in this entire scope: the context-menu packet's fill-propagation action (timeline.js:5273), immediately before its own `fillPropagateAcrossFrames` call. The mouseup-commit packet's delegated `moveFrames` call reaches a second `pushUndo()` inside that out-of-scope function's own body, conditioned on the same move-mode/non-zero-offset gate described under 'save' above. A drag that ends on a no-op (zero offset, or never crossed the movement threshold, or was 'select'-mode) leaves no undo entry from this scope's own code."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "This is this scope's primary consumer. `_sel.frames`/`_layerSel` are read/written throughout: cleared on empty-background click (content-mousedown-reset), recomputed from the frame selection by `syncLayerSelFromFrameSel` (layer-sel-from-frame-sel, called from five sites across the mousedown and mousemove packets), mutated on every mousedown branch (shift-range/ctrl-toggle/grabbed-dot/plain-select), rebuilt wholesale every tick during a 'select'-mode drag (grid-mousemove-drag), replaced wholesale on double-click span-select (grid-dblclick-span), conditionally ensured (not synced to `_layerSel`) on right-click (grid-contextmenu), and read (never mutated) by the mouseup-commit packet to build the final `moveFrames` argument."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "This scope itself never writes `ld.frames[...]`/`isKeyframe`/`strokes` directly in any of its eight packets. The sole document-state mutation reachable from this scope is delegated: `window.SM.moveFrames` (mouseup-commit packet, 5413, out of scope) performs the actual keyframe-content blank-then-write plus its own single-keyframe outpoint-ripple extension and tween/arc rekeying (`rekeyTweenPairData`/`retimeTweenSpans`/`captureTweenInbetweens`, tweens.js, out of scope). Every context-menu item that mutates frame content (Insert Frame/Keyframe/Blank Keyframe, Convert to Keyframes, Clear Keyframe, Remove Frames, Regenerate Tween, tween Remove, fill-propagation) delegates its own mutation entirely to an out-of-scope function named at its single call site."
+    },
+    {
+      "consumer": "render",
+      "disposition": "The mousemove-drag and drag-source-fade packets are pure, fully self-contained DOM preview layers with no persisted effect — every ghost/cursor-dot element and `tl-drag-fading`/`span-drag-*` class is created/toggled by this scope's own code and torn down by the mouseup-commit packet's own cleanup (5407,5415,5417) or the mousemove packet's own next-tick rebuild (5363). The mousedown packet calls `renderArcs()`/`updateUI()` conditionally (5156,5164) and `renderLayerList()` conditionally (content-mousedown-reset, layer-sel-from-frame-sel via `syncLayerSelFromFrameSel`). No packet in this scope calls `renderTimeline()` directly; a subsequent full timeline rebuild (wherever triggered, e.g. inside `moveFrames`'s own `updateUI()`) re-derives the `.fc`/`.km`/span classes this scope's listeners hit-test from the now-updated `ld.frames`."
+    },
+    {
+      "consumer": "export",
+      "disposition": "No export/SMEngineBridge.render*/Tauri/native reference anywhere in this scope beyond the layer-sel-from-frame-sel packet's `SMEngineBridge.renderNow()` call (5089, a live-viewport refresh, not an export path) and the context-menu packet's identical `SMEngineBridge.renderNow()` call inside the fill-propagation action (5277). Export reads the persisted `ld.frames` data this scope's mouseup-commit path eventually writes (via `moveFrames`) or the context-menu path writes (via its own delegated targets), independently of this gesture/DOM layer."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "No direct SMEngineBridge command beyond the two `renderNow()` viewport-refresh calls above (neither is a native/Tauri bridge call), no Tauri command, filesystem or native IPC call occurs anywhere in this scope."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "content-mousedown-reset-scoped-to-empty-background",
+      "status": "proposed, unrun",
+      "initial_state": "A left-button mousedown dispatched at four targets inside `#tl-content`: a `.fc` cell, a `.lrow` layer row, a `#layer-ctrls` button, and genuinely empty background below the rows.",
+      "expected_effects": "Only the empty-background case clears `_sel.frames` (if non-empty) and `_layerSel` (if non-empty) and calls `renderLayerList()`; the other three targets leave both untouched by this listener (the `.fc` case is instead handled by the frame-grid's own mousedown listener)."
+    },
+    {
+      "id": "sync-layer-sel-collapses-to-touched-layers-sorted",
+      "status": "proposed, unrun",
+      "initial_state": "`_sel.frames` containing entries on layers 3, 1 and 3 again (duplicate layer).",
+      "expected_effects": "`_layerSel` becomes exactly `[1,3]` — deduplicated and ascending — regardless of the original insertion order in `_sel.frames`; `clearSel(true)` is called because the result has length 2 (>1)."
+    },
+    {
+      "id": "mousedown-decision-tree-branch-exclusivity",
+      "status": "proposed, unrun",
+      "initial_state": "Four mousedowns on the same `.fc` (non-`.km`) cell, one each with: shiftKey, ctrlKey/metaKey, neither modifier on an unselected cell, neither modifier on an already-selected cell.",
+      "expected_effects": "Exactly one of Branch A (shift-range)/B (ctrl-toggle)/D-select (`_tlDrag.mode='select'`)/D-move (`_tlDrag.mode='move'`) engages per press; only the two D-branches ever set `_tlDrag.active=true` here (A and B return before reaching the `_tlDrag` write) — confirmed by inspecting `_tlDrag.active` immediately after each dispatch."
+    },
+    {
+      "id": "grabbed-dot-arms-move-immediately-skips-wasSelected-branch",
+      "status": "proposed, unrun",
+      "initial_state": "A mousedown whose target is a `.km` element inside a `.fc.kf-full` cell on a layer with no `symbolId`, where that cell is NOT currently in `_sel.frames`.",
+      "expected_effects": "`_sel.frames` becomes exactly `[{layer:li,frame:fi}]` (via the `!selHas` branch at 5123, not the later Branch D `wasSelected` logic which never executes), `_tlDrag.mode` is `'move'` immediately (5126, not deferred to `wasSelected?'move':'select'` at 5202), and the listener returns at 5127 without reaching the canvas-content auto-select or outpoint-carry sub-blocks (5149-5200)."
+    },
+    {
+      "id": "outpoint-carry-only-for-lone-prior-selection-of-this-exact-cell",
+      "status": "proposed, unrun",
+      "initial_state": "Three drags starting on the same already-selected keyframe with a real bordering next keyframe: one where `_sel.frames` held exactly that one cell beforehand, one where it held that cell plus another, and one where the press cell was selected but not as the sole entry matching this exact (layer,frame).",
+      "expected_effects": "Only the first case adds the bordering next keyframe to `_sel.frames` (5197); the other two leave `_sel.frames` exactly as it was before this mousedown (the `if` at 5193 requires `_sel.frames.length===1&&_sel.frames[0].layer===li&&_sel.frames[0].frame===fi`)."
+    },
+    {
+      "id": "dblclick-span-select-replaces-not-extends",
+      "status": "proposed, unrun",
+      "initial_state": "`_sel.frames` pre-populated with an unrelated selection on a different layer, then a double-click on a cell whose own span is frames 10-14 (keyframe at 10, next real keyframe at 15).",
+      "expected_effects": "`_sel.frames` after the double-click contains exactly `{layer:li,frame:10..14}` (5 entries) — the pre-existing unrelated selection is fully discarded by `selClear()` (5216) before the span loop runs, and `syncLayerSelFromFrameSel` is NOT called (verified absent from this packet)."
+    },
+    {
+      "id": "contextmenu-preventDefault-fires-even-off-cell",
+      "status": "proposed, unrun",
+      "initial_state": "A `contextmenu` event dispatched on `#frame-grid` at a point that is not inside any `.fc` cell.",
+      "expected_effects": "The native browser context menu is still suppressed (`e.preventDefault()` at 5222 runs before the `if(!cell)return;` hit-test at 5223), but no selection change, no `showContextMenu` call, and no menu item's action closure is ever created."
+    },
+    {
+      "id": "fill-propagation-item-disabled-without-fillSeed",
+      "status": "proposed, unrun",
+      "initial_state": "A right-click context menu opened on the active layer once with no `fillSeed`-tagged child in `userLayers[li].children` and once with exactly one such child.",
+      "expected_effects": "The 'Propager ce remplissage' item's `disabled` flag is `true` in the first case and `false` in the second (5267); clicking it in the disabled case is inert (the menu framework, out of scope, is assumed to not invoke a disabled item's action) and in the enabled case calls `pushUndo()` then `fillPropagateAcrossFrames` on the LAST matching child even if several exist."
+    },
+    {
+      "id": "mousemove-select-mode-never-creates-ghost-or-fades",
+      "status": "proposed, unrun",
+      "initial_state": "An active `_tlDrag` with `mode:'select'`, moved past the threshold, across three consecutive mousemove ticks.",
+      "expected_effects": "`_tlDrag.ghost` and `_tlDrag.cursorDot` remain `null` throughout (the branch returns at 5332 before the lazy-create blocks at 5335/5341), `fadeDragSourceSpans` is never called (the `if(_tlDrag.mode==='move')` guard at 5313 excludes it), and `_sel.frames` is fully rebuilt (not appended to) on every one of the three ticks."
+    },
+    {
+      "id": "mousemove-move-mode-ghost-rebuilds-every-tick-no-diff",
+      "status": "proposed, unrun",
+      "initial_state": "Two consecutive mousemove events during an active `mode:'move'` drag with a non-empty `_sel.frames`, five frames apart in resolved `toF`.",
+      "expected_effects": "`_tlDrag.ghost.innerHTML` is fully cleared (5363) and rebuilt from `_sel.frames` before the second event's own children are added — no stale child div from the first tick survives into the second; the cursor dot's own position updates continuously (5360-5361) even for a sub-frame pointer movement that doesn't change the snapped ghost position."
+    },
+    {
+      "id": "mousemove-selBounds-failure-aborts-drag-without-cleanup",
+      "status": "proposed, unrun",
+      "initial_state": "An active `mode:'move'` drag where `_sel.frames` is externally emptied between the movement-threshold check and the `selBounds()` call (5347) on a single tick.",
+      "expected_effects": "`_tlDrag.active` becomes `false` at 5347 and the listener returns immediately — `_tlDrag.ghost`/`_tlDrag.cursorDot`, if already created on an earlier tick, are NOT removed by this packet (no cleanup call here); they are only removed by the mouseup-commit packet's own teardown, which itself requires `_tlDrag.active` to still read true at mouseup time (5406) — so an abort via this path leaves stale ghost/cursor-dot DOM elements until some other code path removes them, a latent leak this packet's own comments do not disclose."
+    },
+    {
+      "id": "fade-drag-source-spans-dedupes-shared-span-across-selected-cells",
+      "status": "proposed, unrun",
+      "initial_state": "`_sel.frames` containing two entries on the same layer that both fall inside the identical held span (e.g. the keyframe and one of its own held-continuation cells, both selected).",
+      "expected_effects": "`fadeDragSourceSpans(true)` walks that span's frame range exactly once (the `seen[key]` dedup at 5395 only prevents re-walking the IDENTICAL layer:frame pair, not a distinct pair that resolves to the same start/end span) — every `.fc` cell in `[start,end]` still ends up with `tl-drag-fading` added exactly once each, since `classList.add` on an already-present class is a no-op, not a correctness issue, but the span walk itself does run twice for two distinct selected cells sharing one span."
+    },
+    {
+      "id": "mouseup-commit-zero-offset-never-calls-moveFrames",
+      "status": "proposed, unrun",
+      "initial_state": "A `mode:'move'` drag that crosses the movement threshold (so `_tlDrag.moved=true` and a ghost is created) but whose pointer ends up back over the exact start frame/layer at mouseup (`_tlDrag._toL===_tlDrag.startL&&_tlDrag._toF===_tlDrag.startF`).",
+      "expected_effects": "`fadeDragSourceSpans(false)` still runs (5407) and the ghost/cursor-dot are still torn down (5415,5417, since the outer `if` at 5408 is satisfied), but `window.SM.moveFrames` is never called (the inner `if(offL!==0||offF!==0)` at 5411 is false) — `ld.frames` is byte-identical before and after this gesture, and no `pushUndo`/`saveAllLayerFrames` call occurs anywhere in this scope's own commit path."
+    },
+    {
+      "id": "mouseup-commit-select-mode-skips-moveFrames-entirely",
+      "status": "proposed, unrun",
+      "initial_state": "A completed `mode:'select'` drag (range-select via drag-rectangle) ended with a mouseup.",
+      "expected_effects": "`fadeDragSourceSpans(false)` still runs unconditionally (5407), but the outer commit `if` (5408) is false because `_tlDrag.ghost` was never created in this mode (per the mousemove packet's own early return at 5332) — `moveFrames` is never called, and the selection this drag already committed live tick-by-tick is left exactly as the last mousemove tick set it."
+    },
+    {
+      "id": "mouseup-commit-partial-tlDrag-reset-leaves-stale-coordinates",
+      "status": "proposed, unrun",
+      "initial_state": "A completed move-mode drag through to a successful `moveFrames` commit, then inspect `_tlDrag` immediately after the mouseup listener returns, before the next mousedown re-arms it.",
+      "expected_effects": "`_tlDrag.active`/`.moved`/`.mode` are reset to `false`/`false`/`null` (5418) and `.ghost`/`.cursorDot` are `null` (removed at 5415/5417), but `.startL`/`.startF`/`._toL`/`._toF` retain the JUST-COMPLETED drag's values until the next mousedown's own whole-field arm write (5107 or 5182-5183) overwrites `startL`/`startF` — `._toL`/`._toF` specifically are not touched by any mousedown-packet arm site and are only ever refreshed by the mousemove packet's own tick (5379), so they remain stale (equal to the just-finished drag's final target) until the next drag's own first qualifying mousemove tick."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "planFrameCellMouseDecision(pressTarget,modifiers,wasSelected,grabbedDot,layerLocked) -> {branch:'shift-range'|'ctrl-toggle'|'grabbed-dot-move'|'select'|'move',dragMode}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure decision-tree extraction from the mousedown listener's branch dispatch (5097-5202), taking already-resolved hit-test/modifier booleans instead of reading `e`/DOM directly; the actual `_tlDrag`/selection field writes and DOM class application remain in the adapter."
+    },
+    {
+      "api": "planSpanBounds(layerFrames,fi,totalFrames) -> {start,end}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure backward/forward keyframe-boundary scan extracted verbatim from the double-click packet (5212-5215) and reused as-is by `fadeDragSourceSpans`'s own per-cell span walk (5397-5398), which currently re-implements an identical scan independently rather than sharing this helper."
+    },
+    {
+      "api": "planFrameGridPointerTarget(pointerX,pointerY,gridRectLeft,gridRectTop,camOffset,frameWidthPx,totalFrames,layerRowLayout) -> {toL,toF}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure coordinate-to-cell mapping extracted from the mousemove packet's pointer-resolution prologue (5288-5300), parameterizing the DOM-read inputs instead of reading them directly — identical logic, testable without a live `#frame-grid` element."
+    },
+    {
+      "api": "planDragGhostCells(selFrames,offL,offF,layerCount,totalFrames) -> {layer,frame,isKeyframe,full}[]",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure bounds-filtered offset-application extracted from the mousemove packet's ghost-rebuild loop (5364-5377), separated from the actual DOM element creation/styling and from the `state.layers[...].frames[...]` read used only to decide the dot's full/hollow look."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "symbols": [
+      "syncLayerSelFromFrameSel",
+      "fadeDragSourceSpans"
+    ],
+    "callers": {
+      "syncLayerSelFromFrameSel": [
+        "src/js/timeline.js:5076 (declaration, in-packet, this scope's second packet)",
+        "src/js/timeline.js:5098 (grid-mousedown packet, shift-range branch, in-scope)",
+        "src/js/timeline.js:5103 (grid-mousedown packet, ctrl/meta-toggle branch, in-scope)",
+        "src/js/timeline.js:5123 (grid-mousedown packet, grabbed-dot branch, in-scope)",
+        "src/js/timeline.js:5137 (grid-mousedown packet, plain-select branch, in-scope)",
+        "src/js/timeline.js:5330 (grid-mousemove packet, drag-rectangle select-mode branch, in-scope)",
+        "no other file in the repository references syncLayerSelFromFrameSel (whole-repo git grep at the frozen SHA, both `-- src/js` and unrestricted `-- .`, confirms every match lies inside src/js/timeline.js and inside this scope's own 5028-5420 range — one further textual mention at timeline.js:5325 is inside a `//` comment and excluded per the issue's instruction; none outside this scope)"
+      ],
+      "fadeDragSourceSpans": [
+        "src/js/timeline.js:5390 (declaration, in-packet, this scope's seventh packet)",
+        "src/js/timeline.js:5313 (grid-mousemove packet, called with true on first movement of a move-mode drag, in-scope)",
+        "src/js/timeline.js:5407 (window-mouseup packet, called with false unconditionally, in-scope)",
+        "no other file's CODE references fadeDragSourceSpans (whole-repo git grep at the frozen SHA, both `-- src/js` and unrestricted `-- .`, confirms these three matches inside src/js/timeline.js and inside this scope's own range; one additional match in src/css/style.css:1852 is inside a CSS `/* ... */` comment naming the function for context, not a call, and is not counted as a caller)"
+      ],
+      "_tlDrag (declared C19m/#1158, timeline.js:3919, out of scope — cross-check only, not claimed)": [
+        "src/js/timeline.js:3919 (declaration, C19m, out of scope)",
+        "src/js/timeline.js:4799 (C19o's own rationale comment naming `_tlDrag` by name inside a `//` block, out of scope, excluded as a comment-only mention)",
+        "src/js/timeline.js:5107,5111(comment),5126,5147(comment),5182-5183(comment reference at 5147 already counted; 5111/5147 are the only comment-only textual mentions inside this scope, not field accesses),5182,5201,5202 (grid-mousedown-select-drag-arm packet, in-scope arm writes)",
+        "src/js/timeline.js:5287,5302,5303,5305,5306,5313,5316,5317,5318,5319,5320,5331,5335,5336,5337,5338,5339,5341,5342,5343,5344,5347,5348,5360,5361,5363,5379 (grid-mousemove-drag packet, in-scope reads/writes)",
+        "src/js/timeline.js:5406,5408,5409,5410,5415,5417,5418 (window-mouseup-commit packet, in-scope reads/writes plus the three-field reset)",
+        "no reader/writer of `_tlDrag` exists outside its own C19m declaration (3919), C19o's comment-only naming (4799, out of scope, not a field access), and this scope's own 5091-5420 range — the whole-repo grep (both `-- src/js` and unrestricted `-- .`) found zero matches outside src/js/timeline.js, and every in-file match outside the declaration line falls inside this scope's assigned range"
+      ]
+    },
+    "grep_method": "For each symbol declared in this scope (`syncLayerSelFromFrameSel`, `fadeDragSourceSpans`) and for `_tlDrag` (declared by C19m, cross-checked here because this scope is its sole reader/writer outside the declaration), ran `git grep -n \"<name>\" 59a5a38c514f5da830dd2f2df4c83c63b1b22fba -- src/js` (whole src/js tree at the frozen SHA) and separately `git grep -n \"<name>\" 59a5a38c514f5da830dd2f2df4c83c63b1b22fba -- .` (entire repository, no path restriction) to also catch tests/CSS/docs references. Every returned match was manually inspected; a match whose trimmed line starts with `//` or `/*`/is inside a `/* */` block, or a bare declaration line, was excluded from the caller counts per the issue's instruction — the two exclusions found (timeline.js:5325 for syncLayerSelFromFrameSel, style.css:1852 for fadeDragSourceSpans, timeline.js:4799/5111/5147 comment-only mentions of `_tlDrag`) are called out explicitly above rather than silently dropped.",
+    "cross_gesture_note": "This scope shares `state.layers`/`ld.frames`/`state.totalFrames` reads with C19o's `_spanShrink` gesture (out of scope) exactly as C19o's own writer_guidance already describes, but the two gestures' mousedown arm sites are mutually exclusive per mousedown: C19o's capture-phase listener (4819) calls `stopImmediatePropagation()` (4830) only for a `.fc.span-end` target, which prevents this scope's own bubble-phase mousedown listener (5091) from running for that same press at all — this scope's arm sites (5107,5126,5182-5183,5201-5202) are therefore never reached for a `.fc.span-end` mousedown. `window.SM.moveFrames` (timeline.js:1675, this scope's sole cross-file document-write delegate, called once at 5413) is also called from elsewhere in the app (not searched here, out of scope) — this scope cites only its own single call site."
+  },
+  "validation": {
+    "expected_assigned_lines": 393,
+    "expected_classification": {
+      "code": 216,
+      "comment": 157,
+      "whitespace": 20
+    },
+    "packet_partition": [
+      [5028, 5063],
+      [5064, 5090],
+      [5091, 5204],
+      [5205, 5220],
+      [5221, 5285],
+      [5286, 5381],
+      [5382, 5404],
+      [5405, 5420]
+    ],
+    "packet_classification": [
+      {"range": [5028, 5063], "code": 7, "comment": 28, "whitespace": 1},
+      {"range": [5064, 5090], "code": 9, "comment": 18, "whitespace": 0},
+      {"range": [5091, 5204], "code": 53, "comment": 53, "whitespace": 8},
+      {"range": [5205, 5220], "code": 12, "comment": 3, "whitespace": 1},
+      {"range": [5221, 5285], "code": 44, "comment": 20, "whitespace": 1},
+      {"range": [5286, 5381], "code": 61, "comment": 27, "whitespace": 8},
+      {"range": [5382, 5404], "code": 15, "comment": 8, "whitespace": 0},
+      {"range": [5405, 5420], "code": 15, "comment": 0, "whitespace": 1}
+    ],
+    "coverage_contract": "Validate assigned_ranges and flattened areas[].packets[].coverage_ranges independently, then use the same function for canonical, omission and overlap controls.",
+    "negative_controls": [
+      "omit5028",
+      "overlap5204"
+    ],
+    "required_checks": [
+      "pinned/current blob and base ancestry",
+      "complete symbols/helpers/callers/boundaries",
+      "eight consumers and unrun fixtures",
+      "the selection-model symbols and their owning packet, the mousedown decision tree with modifier keys and every _tlDrag field write, every document write reachable from mouseup commit and from each context-menu item with exact line numbers, DOM-preview-only effects, interaction with C19o's capture-phase _spanShrink listener",
+      "every reader of _tlDrag outside C19m/C19p and every caller of syncLayerSelFromFrameSel and fadeDragSourceSpans across the whole src/js tree (none found outside this scope and the C19m/C19o declaration/comment sites already disclosed)",
+      "no sibling overlap with C19o/C19n/other census artifacts",
+      "P30/app.js/tweens.js/tools.js/C19m/C19o preservation",
+      "JSON/private-path/trailing whitespace hygiene",
+      "sole untracked artifact or committed-clean mode"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, runtime correction, source edit or product acceptance claim."
+  }
+}
