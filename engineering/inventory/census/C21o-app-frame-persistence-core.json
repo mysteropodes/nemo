@@ -1,0 +1,913 @@
+{
+  "census_id": "C21o",
+  "issue": 1220,
+  "title": "app.js frame persistence core — change signal, `strokesEqual`, `_sceneVersion`, ghost-proxy write-back, compound flattening, `_collectLayerStrokes`, `saveActiveLayerFrame`/`saveAllLayerFrames`, `_canReuseMaterialized`",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf, fifteenth app.js slice of the C21 series (after C21n/#1214, merged as PR #1219 commit d91942cc14cc2347d7132a0f61687aa9c48c0edf). Owns app.js:4373-4728 only — the most critical WRITER in the file (CLAUDE.md §1: an item excluded from saveActiveLayerFrame disappears from persisted DATA, not just the screen), so this census is exhaustive about what is and is not persisted (see `boundaries` and each packet's own `responsibility`). Cited by name/line only, not re-mapped: serP/serR (app.js, C21c/#1204 and C21e/#1206, merged), desP (app.js, C21d/#1205, merged), loadFrame (app.js:4729+, next slice C21p, not yet filed at authoring time — its own `_smGeomDirty` clear / `_matStrokes` stamp at app.js:4796 and the second materialize helper at app.js:4999-5005, and its sole call to `_canReuseMaterialized` at app.js:4784, all belong there), getEffectiveStrokes (app.js:2882-3191, C21k/#1212, merged — its own layer-kind guard at app.js:2973 is the direct cross-check target for this scope's own guard, see `boundaries`), insertBooleanResult (tools.js:6967) and fillRegenerateLinked (tools.js), enforceChannelStrip (app.js:5034, next-slice territory, called FROM this scope's own _collectLayerStrokes at line 4574), pushUndo/pushUndoLayers and window._tweenFrameDirty's own set/clear sites (tweens.js:4818/4913, app.js:4754), engine-bridge.js's tick()/renderNow() and its own `_sceneVersion` consumption, and SMMotion.invalidateSymbolUnionBounds (motion.js). Next slice C21p should start at line 4729 (`dupOnly` lead-in comment for loadFrame's own duplicator-refresh guard rationale).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "d91942cc14cc2347d7132a0f61687aa9c48c0edf",
+  "source_path": "src/js/app.js",
+  "source_blob": "0831959f70612721f80717812838d19940d1f7c1",
+  "source_line_count": 5410,
+  "scope_files": [
+    "src/js/app.js"
+  ],
+  "intended_branch": "claude/c21o-app-frame-persistence-core-census",
+  "assigned_ranges": [
+    {
+      "start": 4373,
+      "end": 4728
+    }
+  ],
+  "coverage_note": "Exactly 356 assigned lines partitioned across twelve packets (one coverage_range per packet, no gaps, no other-owner overlap): 124 code, 231 full-line `//` comments, 1 blank — independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs, matching the issue's own proposed union AND per-packet table exactly for all twelve packets (verified line-by-line with `sed -n`/`awk` against the frozen blob, boundary-by-boundary); no boundary correction was needed anywhere in this scope. Line 4372 is C21n's own closing `}` of exitMontageView (confirmed by direct read); line 4373 is blank; line 4374 opens this scope's own lead-in comment for `_numClose`/`_deepCloseEqual`; line 4728 is this scope's own closing `}` of `_canReuseMaterialized`; line 4729 opens the `dupOnly` lead-in comment for loadFrame (next slice C21p) — all confirmed by direct `sed -n` read of the frozen blob at the exact boundary lines.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js resolves to 0831959f70612721f80717812838d19940d1f7c1, 5410 lines.",
+    "current": "This worktree's own HEAD and origin/main both resolve to d91942cc14cc2347d7132a0f61687aa9c48c0edf (`git rev-parse HEAD` == `git rev-parse d91942c`, branch reported up to date with origin/main, working tree clean). `git rev-parse 59a5a38c:src/js/app.js` == `git rev-parse d91942c:src/js/app.js` == `git rev-parse HEAD:src/js/app.js` == 0831959f70612721f80717812838d19940d1f7c1 (identical blob, all three) — verified directly in the working worktree.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `grep -nE '(^|[^a-zA-Z_.])<symbol>\\(' ` over every file under a RECURSIVE `find src -name \"*.js\"` (a flat `src/js/*.js` glob misses the `labs/`, `adapters/`, `bootstrap/`, `animation/`, `application/`, `domain/` subdirectories entirely — see `boundaries` for the exact count correction this produced versus the issue's own ~38/~26 estimates), filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`, then reading each surviving external hit's line and enclosing function directly with `sed -n` for the two external `_collectLayerStrokes` callers and every `window._sceneVersion` occurrence. `strokesEqual`/`_deepCloseEqual`/`_numClose`/`_normStrokeForCompare` were each confirmed by the SAME grep to have ZERO external callers anywhere in src — a correction to the issue's own prompt text, which named engine-bridge.js's tick() as an expected `strokesEqual`/`_deepCloseEqual` caller; tick()'s own diffing (engine-bridge.js:3947/3960/4234/4237/4325/4352) reads `window._sceneVersion` only, never calls either comparison function (see `boundaries`).",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; the in-source comments (the `_sceneVersion`/tick rationale at 4374-4384, the `_numClose`/`_deepCloseEqual` epsilon-compare rationale at 4385-4394 and its own key-union note at 4405-4416, `_normStrokeForCompare`'s own four field-group rationales at 4425-4436/4447-4452/4454-4466/4470-4486, `_writeBackGhostProxies`'s own flattening/write-back contract at 4500-4510, `_flattenCompoundChildren`'s own last-ditch-defence rationale at 4526-4546, `_collectLayerStrokes`'s own nativeVideo-mask-only rationale at 4566-4572, `_maybePromoteInterpolated`'s own two-gate rationale at 4577-4596, `_invalidateSymbolUnionIfEditingSymbol`'s own three-part rationale at 4600-4629, `saveActiveLayerFrame`'s own five inline rationales at 4637-4662/4665-4682, and `_canReuseMaterialized`'s own three-guard rationale at 4711-4713/4715-4716/4720-4721/4723-4725) are read as authorial intent and prior-session evidence, not fresh execution evidence produced by this census."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C21o-app-frame-persistence-core.json and the twelve app.js packets partitioning lines 4373-4728.",
+    "app_js": "app.js retains the whole runtime for every symbol in this scope; this JSON authoring does not authorize source changes.",
+    "c21n_boundary": "Lines 3990-4372 (C21n, merged) — convertComponentToLayer, convertLayerToLFSGroup/convertLFSGroupToLayer, propagateLFSFill, enterSymbol/exitToScene/closeSymbolTab, enterMontageView/exitMontageView — are cited by name/line only, not re-mapped. This scope's own boundary begins immediately after C21n's own closing brace at line 4372 (confirmed by direct read: line 4372 is exitMontageView's own `}`, line 4373 is blank).",
+    "c21p_boundary": "Lines 4729+ (loadFrame, next slice C21p, not yet filed as an issue at authoring time) are cited by name/line only. loadFrame is the sole reader of `_canReuseMaterialized`'s return value (app.js:4784) and the sole writer of `_smGeomDirty=false`/`_matStrokes=strokes` (app.js:4796, and the second materialize helper at app.js:4999-5005) — none of that write-side logic is reproduced here beyond the cited line numbers; see `boundaries` for why grouping it with this scope's own writes would be a mistake.",
+    "other_consumers_boundary": "engine-bridge.js (tick()'s own `window._sceneVersion` diffing and the overlay-base-prefix cache, both READERS only in this scope's own sense — see `source_consumers`), select-bridge.js/motion.js/timeline.js/tools.js/native-video-bridge.js/tweens.js/effector-layer.js/effects-panel.js/reference-bridge.js/storyboard.js (every OTHER `window._sceneVersion` writer outside this scope's own single increment at line 4635), tools.js:1715 and timeline.js:2000 (the two external `_collectLayerStrokes` callers, both bypassing saveActiveLayerFrame's own keyframe/interpolated gate for a genuinely HELD frame), and timeline.js's `selectGhostAll`/`clearGhostSelection` (timeline.js:3799-3846, the real creator of the `data.ghostFrame`-tagged proxies this scope's own `_writeBackGhostProxies` consumes, and the actual UI trigger that reaches it via a plain `saveActiveLayerFrame()` call at timeline.js:3842) all retain their own bodies in full — cited by line only for the specific findings each packet's `callers` field needed."
+  },
+  "reconciliation": [
+    {
+      "owner": "C21n / #1214 (existing owner, merged as PR #1219 commit d91942c)",
+      "disposition": "Owns app.js:3990-4372 (convertComponentToLayer, convertLayerToLFSGroup/convertLFSGroupToLayer, propagateLFSFill, enterSymbol/exitToScene/closeSymbolTab, enterMontageView/exitMontageView). Retains its own body in full — cited by line only. This scope's own boundary begins at line 4373, immediately after its own closing brace at 4372."
+    },
+    {
+      "owner": "C21k / #1212 (existing owner, merged)",
+      "disposition": "Owns app.js:2882-3193 (getEffectiveStrokes and the module vars). Retains its own body in full — cited by line only. getEffectiveStrokes' own layer-kind guard (app.js:2973: `if(ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer||ld.isEffectorLayer)return[];`) is the direct cross-check target for this scope's own two identical guards (app.js:4663/4699); the asymmetry found is recorded in `boundaries`, not fixed here."
+    },
+    {
+      "owner": "C21c/#1204, C21d/#1205, C21e/#1206 (existing owners, merged — serP/desP/serR)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `_collectLayerStrokes` (this scope) calls `serP(c)`/`serR(c)` directly (app.js:4574) as its own only two serialization outputs; `_writeBackGhostProxies` (this scope) also calls `serP(c)` directly (app.js:4523). `_normStrokeForCompare` (this scope) exists specifically to paper over serP/desP/interpStroke round-trip mismatches — its own four field-group comments each name the exact producer asymmetry being neutralized."
+    },
+    {
+      "owner": "next leaf (app.js:4729+, loadFrame's own `dupOnly` lead-in, not yet filed as an issue at authoring time)",
+      "disposition": "Cited by name/line only. This scope's own boundary ends at line 4728, `_canReuseMaterialized`'s own closing `}`; line 4729 opens loadFrame's own `dupOnly` rationale comment, confirmed by direct read. loadFrame is the sole external caller of `_canReuseMaterialized` (app.js:4784) and the sole writer of `_smGeomDirty=false`/`_matStrokes=strokes` (app.js:4796, app.js:5004-5005) — see `boundaries` for why this scope's own two save writers never themselves clear the dirty flag they help `_canReuseMaterialized` read."
+    },
+    {
+      "owner": "engine-bridge.js (existing owner, tick()'s change-signal diffing and the overlay-base-prefix drag cache)",
+      "disposition": "Retains its own body in full — cited by line only. All 9 of its own `_sceneVersion` occurrences are READS (3 comments at 3940/4205/4273, 6 code hits at 3947/3960/4234/4237/4325/4352, every one comparing against or caching `window._sceneVersion` into a local variable — `lastSceneVersion`/`overlayBaseVersion` — never itself assigning to `window._sceneVersion`). This is the packet-1 lead-in comment's own named consumer of the cheap change signal this scope's `saveActiveLayerFrame` (the ONLY `_sceneVersion++` site in this scope, line 4635) and loadFrame together provide; it does NOT call `strokesEqual`/`_deepCloseEqual` (see `boundaries`, correcting the issue's own prompt text)."
+    },
+    {
+      "owner": "select-bridge.js/motion.js/timeline.js/tools.js/native-video-bridge.js/tweens.js/effector-layer.js/effects-panel.js/reference-bridge.js/storyboard.js (existing owners, every other `window._sceneVersion` WRITER)",
+      "disposition": "Retain their own bodies in full — cited by line only. Per-file `window._sceneVersion` occurrence counts, all confirmed exactly against the issue's own estimates: select-bridge.js 9 (all 9 code, all writers: 948/981/2025/2035/2048/2057/2201/2342/2476), motion.js 6 (3 comments at 4059/4063/6541, 3 code writers at 6547/7991/8021), timeline.js 5 (all code, all writers: 2000/10069/10879/10914/10990), tools.js 3 (1 comment at 7367, 2 code writers at 1716/8436), native-video-bridge.js 3 (all code, all writers: 454/930/947), tweens.js 2 (1 comment at 4623, 1 code writer at 4630), effector-layer.js 1 (writer, 177), effects-panel.js 1 (writer, 797), reference-bridge.js 1 (writer, 79), storyboard.js 1 (writer, 717). None of these bodies are reproduced here beyond the cited line numbers."
+    },
+    {
+      "owner": "adapters/export-svg-sequence.js and second-viewer.js (existing owners, both READERS) and labs/out-of-pegs.js (existing owner, comment-only mention)",
+      "disposition": "Retain their own bodies in full — cited by line only. Both export-svg-sequence.js:22 and second-viewer.js:50 read `window._sceneVersion` into a cache-key string (never write it). labs/out-of-pegs.js:27 is a CODE COMMENT (\"renderOS already bumped _sceneVersion for its own rebuild\") with no live reference to `window._sceneVersion` anywhere in the file — a false-positive in the issue's own file list, corrected here (see `boundaries`), not silently substituted."
+    },
+    {
+      "owner": "tools.js and timeline.js (existing owners, the two external `_collectLayerStrokes` callers)",
+      "disposition": "Retain their own bodies in full — cited by line only. tools.js:1715 (a paste-into-a-held-frame path, its own comment: \"Motion, held frame: write the layer's live content into the hold's OWN keyframe... saveActiveLayerFrame would return early here, which is the whole bug\") and timeline.js:2000 (a drag-based held-frame commit, identical reasoning, `_dOrigin`/`_dLd`) both call `_collectLayerStrokes` DIRECTLY, bypassing `saveActiveLayerFrame` entirely, specifically because the target frame is neither a keyframe nor flagged `isInterpolated` — the exact case `saveActiveLayerFrame`'s own gate at line 4688 (`if(!f.isKeyframe&&!f.isInterpolated)return;`) would silently no-op on. Both also bump `window._sceneVersion` themselves immediately after (already counted in the table above), since they bypass the one increment site (line 4635) `saveActiveLayerFrame` would otherwise have provided."
+    },
+    {
+      "owner": "timeline.js (existing owner, selectGhostAll/clearGhostSelection — the real \"Select All Keyframes\" feature) and tweens.js (existing owner, renderGhostAll — the unrelated onion-style ghost display)",
+      "disposition": "Retain their own bodies in full — cited by line only. timeline.js:3799-3838 (`selectGhostAll`) inserts real, editable proxy Paths tagged `data.ghostFrame=fi` directly into `userLayers[activeLayerIdx].children` — the SAME array `_writeBackGhostProxies` (this scope) iterates; `clearGhostSelection` (timeline.js:3840-3846) is the real UI trigger, calling plain `saveActiveLayerFrame()` at timeline.js:3842 (comment: \"flush any move/scale/rotate on the proxies back to their own frames first\"), which reaches `_writeBackGhostProxies` via line 4686. tweens.js:4538-4568 (`renderGhostAll`) is an UNRELATED, read-only onion-style ghost display that reuses the SAME `data.ghostFrame` tag name but inserts its items into a dedicated overlay Paper layer (`ghostAllLayer`), never into any `userLayers[]` entry — confirmed by direct read that `renderGhostAll` calls `ghostAllLayer.removeChildren()`/`desP(sd,ghostAllLayer,op)` throughout, so this scope's own `_writeBackGhostProxies`/`_collectLayerStrokes` (both iterating `userLayers[li].children` only) structurally never encounter its output regardless of the shared tag name (see `boundaries`)."
+    },
+    {
+      "owner": "tools.js (existing owner, insertBooleanResult) and path-fx.js/motion.js (existing owners, SMPathFx.hasAny / SMMotion.invalidateSymbolUnionBounds)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `insertBooleanResult` (tools.js:6967) is `_flattenCompoundChildren`'s own sole rescue mechanism (app.js:4558); `window.SMPathFx.hasAny` (path-fx.js:198's own object literal) gates BOTH save writers' layer-kind checks (app.js:4663/4699); `window.SMMotion.invalidateSymbolUnionBounds` (motion.js, cited by name only) is `_invalidateSymbolUnionIfEditingSymbol`'s own sole side effect (app.js:4632)."
+    }
+  ],
+  "boundaries": [
+    "`saveActiveLayerFrame`'s and `saveAllLayerFrames`' shared layer-kind guard (app.js:4663 and 4699, identical field list: `symbolId||montageId||isNullLayer||isEffectLayer||isGuideLayer||isWidgetLayer||lfsGroup||(duplicator&&!_dupEditSource)||_rigPoseLive||(SMPathFx.hasAny)`) is MISSING `isEffectorLayer`, even though getEffectiveStrokes' own equivalent early-return (app.js:2973, C21k, cited by line only: `if(ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer||ld.isEffectorLayer)return[];`) treats `isEffectorLayer` IDENTICALLY to the four sibling flags that ARE checked here — the same asymmetry class C21l already documented for `badComponentSourceReason` (app.js:3212-3221), now confirmed independently in a THIRD location. Consequence: if an effector layer's live Paper layer ever holds a stray Path/Raster child (it shouldn't, by convention, but nothing in this scope enforces that), a save here would persist it into `ld.frames[i].strokes` even though getEffectiveStrokes will always render `[]` for that same layer — a write with no possible read. Not fixed here (census scope only); flagged for the next behavioral pass.",
+    "Neither guard tests `ld.locked` at all, despite CLAUDE.md's own consumer-list framing naming \"locked\" as a layer-kind gate alongside `isWidgetLayer`/`symbolId`/`montageId`/duplicator host. A manually-locked-but-otherwise-ordinary layer (locked via the eye/lock UI, unrelated to being a component instance) is saved completely normally by both writers — `locked` only ever blocks live EDITING elsewhere (editRefusalReason, tools.js, cited by name only, out of scope), never saving of whatever content already exists. The `locked:true` stamps this file's own C21l scope applies to component instances (app.js:3302/3433) are redundant with, not a substitute for, the `symbolId` gate already present here — an instance layer is skipped because of `ld.symbolId`, not because of `ld.locked`.",
+    "`_smGeomDirty` is READ but never WRITTEN anywhere in this scope: `_canReuseMaterialized` (app.js:4718) reads `lyr._smGeomDirty` as one of its three guard conditions, but the flag itself is set to `true` only by engine-bridge.js's own `_changed` hook (engine-bridge.js:328, cited by line only, CLAUDE.md §5quater) and cleared to `false` only by loadFrame's own per-layer materialize step (app.js:4796) and a second materialize helper (app.js:4999-5005) — both next-slice C21p territory. The issue's own side-effect list groups \"_smGeomDirty clear\" alongside `_sceneVersion++`/symbolUnionBounds invalidation as if all three were save-writer side effects; corrected here by direct read: neither `saveActiveLayerFrame` nor `saveAllLayerFrames` ever assigns to `_smGeomDirty` or `_matStrokes` — that pairing belongs entirely to loadFrame, the READER of what these two functions write, not to the writers themselves.",
+    "`saveAllLayerFrames` (app.js:4693-4710) never increments `window._sceneVersion` — confirmed by an exhaustive grep of every `_sceneVersion` occurrence inside 4373-4728: exactly two, the module-level `=0` declaration (line 4499) and the single `++` inside `saveActiveLayerFrame` (line 4635). This is consistent with the packet-1 lead-in comment (4374-4384), which names only \"saveActiveLayerFrame/loadFrame\" as the two checkpoints bracketing engine-bridge.js's tick() diffing target — but it means a call path that mutates frame content ONLY via `saveAllLayerFrames` (the 30s autosave interval, most bulk operations, goToFrame's per-OTHER-layer save) does not itself signal tick() that anything changed. Every `saveAllLayerFrames` call site actually read in `source_consumers`/`reconciliation` pairs it with either a `pushUndo`/`pushUndoLayers` call (which does NOT bump `_sceneVersion` either, per its own body at tweens.js:4896, cited by line only) or a sibling explicit `window._sceneVersion++`/`=(...)+1` at the same call site (e.g. timeline.js:2000, tools.js:8436) — so in every OBSERVED case the signal comes from elsewhere in the same call chain, but nothing in `saveAllLayerFrames` itself guarantees that; not verified exhaustively for every one of its ~27 calling files (out of this census's own read-only scope).",
+    "`strokesEqual`/`_deepCloseEqual`/`_numClose`/`_normStrokeForCompare` have NO external callers anywhere in the codebase — confirmed by a whole-`src` recursive grep. `strokesEqual`'s SOLE caller in the entire codebase is `_maybePromoteInterpolated` (app.js:4598, same scope); `_deepCloseEqual`'s only callers are itself (recursion, 4401/4420) and `strokesEqual` (4496); `_normStrokeForCompare`'s only caller is `strokesEqual` (4496); `_numClose`'s only caller is `_deepCloseEqual` (4398). This corrects the issue's own prompt text (\"every caller of strokesEqual/_deepCloseEqual, expect engine-bridge tick, app.js\"): engine-bridge.js's tick() diffing (engine-bridge.js:3947/3960/4234/4237/4325/4352) is driven entirely by comparing `window._sceneVersion`, a completely separate and much cheaper mechanism, and never calls either comparison function. The two comment blocks that open this scope (4374-4384 for `_sceneVersion`/tick, 4385-4394 for `_numClose`/`_deepCloseEqual`/`strokesEqual`) describe TWO UNRELATED \"cheap change signal\" purposes for two unrelated consumers (engine-bridge.js's tick() vs. `_maybePromoteInterpolated`'s own narrower \"was this specific tween frame hand-edited\" question), not one shared mechanism.",
+    "Two unrelated features share the literal `data.ghostFrame` tag. timeline.js's `selectGhostAll`/`clearGhostSelection` (timeline.js:3799-3846) inserts REAL, editable proxy Paths into `userLayers[activeLayerIdx].children` — the array this scope's own `_writeBackGhostProxies` (4511-4525) and `_collectLayerStrokes` (4563-4576) both iterate — and is the only producer/consumer pair this scope's own code actually interacts with. tweens.js's `renderGhostAll` (tweens.js:4538-4568) is an UNRELATED, read-only onion-style ghost display for OTHER keyframes of the active layer, reusing the identical `data.ghostFrame=fi` tag name (tweens.js:4568) but inserting its items into a dedicated, non-user overlay Paper layer (`ghostAllLayer`, confirmed by direct read: `ghostAllLayer.removeChildren()`/`desP(sd,ghostAllLayer,op)` throughout its own body) — never into any `userLayers[]` entry. Because both this scope's own functions iterate `userLayers[li].children` specifically, `renderGhostAll`'s own tagged items are structurally unreachable from either one, regardless of the shared tag name; a reader who assumed one tag implies one feature would be wrong here.",
+    "`_collectLayerStrokes`'s per-child filter (app.js:4574) tests exactly two conditions before accepting a child — `c.data.ghostFrame!==undefined` (skip, real Ghost-All proxy) and, ONLY when `ld.nativeVideo` is set, `!(c.data&&c.data.isMask)` (skip anything that isn't the layer's own mask) — and otherwise accepts any `c instanceof Path` with `segments.length>0` or any `c instanceof Raster`. Cross-checked against every CLAUDE.md §1 tag this scope's own issue text names as needing verification: `isDuplicatorCopy`/`dupIndex` is NEVER tested here because the exclusion happens one level up, at the LAYER, not the child — the duplicator HOST layer is fully skipped by both save writers' own `(ld.duplicator&&!ld._dupEditSource)` gate (app.js:4663/4699) before `_collectLayerStrokes` is ever called on it, and every `isDuplicatorCopy`-tagged stroke dict found in this scope's own grep (app.js:864/867/1774) belongs to `getEffectiveStrokesRendered`'s own synthetic N-way expansion (out of scope, cited by name only), not to any child this loop would ever see. `isBrushTextureCopy` and `isLinkedFillCompanion` are likewise NEVER tested here — confirmed by grep to be legitimate ordinary persisted content (brush dabs and linked-fill companion ribbons are real, independently drawn `Path` children with real segments) that this collector correctly does NOT special-case; they flow through the generic `Path`→`serP()` branch untouched, consistent with CLAUDE.md §1's own note that dabs are excluded from TWEEN MATCHING (tweens.js's `splitTweenables`) but never from persistence itself. `__osLayer`/`__osFrame` (the onion-skin tag pair, tweens.js:4588's `osTagFrame`) never appear as candidates at all: their only two producers, engine-bridge.js's own onion rendering (engine-bridge.js:2636's `onionLayerItems`, cited by line only) and `osTagFrame` itself, both operate on transient scene-graph/overlay items outside `userLayers[]`, confirmed by grep (only engine-bridge.js and tweens.js reference either tag anywhere in src).",
+    "`_collectLayerStrokes` is not a pure reader. `enforceChannelStrip(ld,c)` (app.js:5034, next-slice territory, cited by name/line only) is called on every qualifying `Path` child (line 4574) BEFORE `serP(c)` — for a channel-split layer (`ld.channel==='stroke'` or `'fill'`), this MUTATES the LIVE Paper.js item's `fillColor`/`strokeColor` to `null` in place, enforcing the Stroke/Fill/Shadow split going forward (per its own comment at app.js:5025-5033, cited by line only). A save of a channel-split layer therefore has an observable canvas side effect beyond the intended `ld.frames[i].strokes` write — not a bug (the function's own header names this as deliberate, \"ON GOING FORWARD, not just at the one-time conversion moment\"), but worth recording precisely since every other packet in this scope is otherwise read-then-write over `.data`/stored fields only, never a live-geometry mutation mid-collect.",
+    "`_flattenCompoundChildren`'s CompoundPath rescue (app.js:4526-4562) is explicitly framed as a \"LAST-DITCH defence\" by its own comment (line 4533): every known CompoundPath-producing call site already routes through `insertBooleanResult` (tools.js:6967) per convention, so this function exists purely to catch a hypothetical FUTURE producer that doesn't. It runs unconditionally at the very start of every `_collectLayerStrokes` call (line 4565), for both save writers, on EVERY layer that reaches the collector — not gated on whether that layer's content actually changed since the last save, and not gated on whether the layer even has a CompoundPath child (the `kids.forEach`/`instanceof CompoundPath` check inside is the only gate, line 4553).",
+    "Caller-count corrections to the issue's own estimates: a NON-recursive `src/js/*.js` glob undercounts both `saveActiveLayerFrame`'s and `saveAllLayerFrames`' true calling-file sets, because `src/js/labs/`, `src/js/adapters/`, `src/js/bootstrap/`, `src/js/animation/`, `src/js/application/` and `src/js/domain/` are subdirectories a flat glob misses entirely (11 of `saveActiveLayerFrame`'s 34 calling files, and 6 of `saveAllLayerFrames`'s 27, live under `labs/` alone). A RECURSIVE `find src -name \"*.js\"` scan gives `saveActiveLayerFrame` 34 distinct calling files (issue said ~38) and `saveAllLayerFrames` 27 (issue said ~26) — both close to, not identical to, the issue's own estimate; the full per-file breakdown (file:count only, per the issue's own instruction) is recorded on the two respective packets' own `callers` field.",
+    "`labs/out-of-pegs.js`'s single `_sceneVersion`-matching line (line 27) is a CODE COMMENT (\"renderOS already bumped _sceneVersion for its own rebuild; the...\") with no live reference to `window._sceneVersion` anywhere in the file — a false-positive in the issue's own named single-hit file list, corrected here by direct read, not silently substituted (the other six named singles — adapters/export-svg-sequence.js, effector-layer.js, effects-panel.js, reference-bridge.js, second-viewer.js, storyboard.js — were all confirmed to be real code references).",
+    "The two external `_collectLayerStrokes` callers (tools.js:1715, timeline.js:2000) exist for the IDENTICAL reason, confirmed by reading both in-line comments directly: `saveActiveLayerFrame`'s own gate at line 4688 (`if(!f.isKeyframe&&!f.isInterpolated)return;`) deliberately no-ops on a genuinely HELD frame (neither a keyframe nor flagged interpolated), but a paste-into-a-held-frame or a drag-based held-frame commit still needs to write real content into that exact frame's own stroke array — so both callers reach `_collectLayerStrokes` directly and bump `window._sceneVersion` themselves immediately after, bypassing `saveActiveLayerFrame` (and its own single `_sceneVersion++` at line 4635) entirely. Neither caller runs `_flattenCompoundChildren`'s CompoundPath rescue any differently than the two in-scope callers do — it is `_collectLayerStrokes`'s own line 4565, always the first statement in the function body, regardless of caller."
+  ],
+  "areas": [
+    {
+      "area": "change-signal-num-close",
+      "packets": [
+        {
+          "id": "C21o.change-signal-num-close",
+          "files": [
+            "src/js/app.js:4373-4395"
+          ],
+          "coverage_ranges": [
+            [
+              4373,
+              4395
+            ]
+          ],
+          "classification": {
+            "code": 1,
+            "comment": 21,
+            "whitespace": 1
+          },
+          "symbols": [
+            "_numClose"
+          ],
+          "signature": "function _numClose(a,b){return Math.abs(a-b)<1e-6;}",
+          "responsibility": "Line 4373 is blank (this scope's own opening line, immediately after C21n's closing brace at 4372). Lead-in (4374-4384, 11 comment lines): states WHY a cheap change signal exists at all — engine-bridge.js's tick() loop has no way to know whether a full buildSceneJson() rebuild is worth paying for without either rebuilding it anyway just to diff it, or missing a real edit; saveActiveLayerFrame/loadFrame bracket everything that can change on-screen outside an active drag (every bridge suspends tick() during a drag and renders its own overlay directly). Second lead-in (4385-4394, 10 comment lines): states WHY a numeric-epsilon deep-equal exists as a SEPARATE, narrower mechanism — used by `_maybePromoteInterpolated`'s own tween-frame-edited detection (not by the tick() signal above; see `boundaries` for the correction this implies), because plain string equality/`JSON.stringify` comparison was too strict: a loadFrame→serP() round-trip introduces float noise (~1e-10) with zero actual editing, which strict comparison flagged as a real change and permanently marked pure playhead scrubbing as a manual edit. `_numClose(a,b)` (4395): one-line numeric comparator, `Math.abs(a-b)<1e-6`, the tolerance `_deepCloseEqual` (next packet) applies to every pair of numbers it compares.",
+          "callers": [
+            "app.js:4398 — _deepCloseEqual (this scope, next packet): the function's own sole caller anywhere in the codebase (confirmed by whole-src grep)."
+          ],
+          "behavior": [
+            "Line 4373 (blank): scope-opening line.",
+            "Lines 4374-4384 (comment, 11 lines): _sceneVersion/tick() change-signal rationale.",
+            "Lines 4385-4394 (comment, 10 lines): _numClose/_deepCloseEqual epsilon-compare rationale, tween-frame-edited use case.",
+            "Line 4395 (code): _numClose — one-line numeric epsilon comparator."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "deep-close-equal",
+      "packets": [
+        {
+          "id": "C21o.deep-close-equal",
+          "files": [
+            "src/js/app.js:4396-4424"
+          ],
+          "coverage_ranges": [
+            [
+              4396,
+              4424
+            ]
+          ],
+          "classification": {
+            "code": 17,
+            "comment": 12,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_deepCloseEqual"
+          ],
+          "signature": "function _deepCloseEqual(a,b){if(a===b)return true;if(typeof a==='number'&&typeof b==='number')return _numClose(a,b);if(Array.isArray(a)){if(!Array.isArray(b)||a.length!==b.length)return false;for(var i=0;i<a.length;i++)if(!_deepCloseEqual(a[i],b[i]))return false;return true;}if(a&&b&&typeof a==='object'&&typeof b==='object'){var seen={},k;for(k in a)seen[k]=true;for(k in b)seen[k]=true;for(k in seen){if(!_deepCloseEqual(a[k],b[k]))return false;}return true;}return false;}",
+          "responsibility": "`_deepCloseEqual(a,b)` (4396-4424): recursive structural compare with three special cases over plain `===`. Identity short-circuit (4397). Numbers compared via `_numClose`'s 1e-6 tolerance (4398) rather than exact `===`, absorbing Paper.js's own Point/Segment float noise. Arrays (4399-4403): length-checked then element-wise recursive compare. Plain objects (4404-4422, preceded by its own 12-line key-union rationale at 4405-4416): compares the UNION of both objects' own keys, not a strict `Object.keys().length` match — because serP() always declares every optional field explicitly as `undefined` when not applicable, while `generateTweens()`'s own interpolated-stroke builder (tweens.js, cited by name only) only ever sets the keys it actually needs, so a tween-generated frame structurally has FEWER own keys than a serP()-produced one even when every shared value is identical — a strict key-count check flagged that as a phantom \"real change\" on the very first save after generateTweens(), permanently mislabeling freshly-generated, never -touched inbetweens as manually edited. An absent key and a key explicitly set to `undefined` are treated as equal (`obj.missing === undefined` is already true in JS). Falls through to `return false` (4423) for any other type mismatch.",
+          "callers": [
+            "app.js:4401 and app.js:4420 (this scope, same function): self-recursion over array elements and the object key union.",
+            "app.js:4496 — strokesEqual (this scope, packet 4): the function's own ONLY external-to-itself caller anywhere in the codebase (confirmed by whole-src grep — no caller outside app.js exists)."
+          ],
+          "behavior": [
+            "Line 4396 (code): function open.",
+            "Line 4397 (code): identity short-circuit `a===b`.",
+            "Line 4398 (code): numeric epsilon compare via _numClose.",
+            "Lines 4399-4403 (code, 5 lines): array branch — type/length guard, element-wise recursion, close.",
+            "Line 4404 (code): plain-object branch open.",
+            "Lines 4405-4416 (comment, 12 lines): key-union rationale — serP()'s explicit-undefined vs. tween-builder's sparse-keys asymmetry.",
+            "Lines 4417-4420 (code, 4 lines): build `seen` as the union of both objects' own keys, recurse per key.",
+            "Line 4421 (code): return true.",
+            "Line 4422 (code): object branch close.",
+            "Line 4423 (code): fallthrough return false.",
+            "Line 4424 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "norm-stroke-for-compare",
+      "packets": [
+        {
+          "id": "C21o.norm-stroke-for-compare",
+          "files": [
+            "src/js/app.js:4425-4492"
+          ],
+          "coverage_ranges": [
+            [
+              4425,
+              4492
+            ]
+          ],
+          "classification": {
+            "code": 20,
+            "comment": 48,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_normStrokeForCompare"
+          ],
+          "signature": "function _normStrokeForCompare(sd){if(!sd||typeof sd!=='object')return sd;var n={};for(var k in sd)n[k]=sd[k];n.closed=!!n.closed;n.miterLimit=n.miterLimit!==undefined?n.miterLimit:10;n.strokeWidth=n.strokeWidth||3;n.strokeCap=n.strokeCap||'round';n.strokeJoin=n.strokeJoin||'round';n.dashOffset=n.dashOffset!==undefined?n.dashOffset:0;n.opacity=n.opacity!==undefined?n.opacity:1;n.hasRealStroke=n.hasRealStroke!==undefined?n.hasRealStroke:!!n.strokeColor;if(n.isVectorBrush&&!n.isBrushTextureCopy&&!n.isFillShape){n.strokeColor='__keyline__';n.strokeWidth=0;n.strokeCap='round';n.strokeJoin='round';n.hasRealStroke='__keyline__';}if(n.isRaster){if(typeof n.width==='number')n.width=Math.floor(n.width);if(typeof n.height==='number')n.height=Math.floor(n.height);}return n;}",
+          "responsibility": "THE contract of this packet: which stored-stroke fields are normalized away before `strokesEqual` compares two stroke dicts, and why each one would otherwise be a phantom diff. Lead-in (4425-4436, 12 comment lines): `interpStroke` (tweens.js, cited by name only) only sets the fields it actually blends between two keyframes, so an interpolated frame's stored dict can lack `miterLimit`/`strokeWidth`/`strokeCap`/`strokeJoin`/`opacity` entirely while desP() defaults them internally — comparing raw values then finds a mismatch (e.g. `undefined` vs. Paper's own default `10`) with zero real editing behind it; normalizing both sides through desP()'s OWN fallbacks is safer than chasing every field through the tween builder one at a time. `_normStrokeForCompare(sd)` (4437-4491): guards non-objects through unchanged (4438); shallow-copies `sd` into `n` (4439); applies SIX unconditional field defaults matching desP()'s own fallback values exactly — `closed` boolean-coerced (4440), `miterLimit` defaulted to 10 (4441), `strokeWidth` to 3 (4442), `strokeCap`/`strokeJoin` to `'round'` (4443-4444), `dashOffset` to 0 (4445), `opacity` to 1 (4446). `hasRealStroke` (4453, preceded by its own 6-line rationale at 4447-4452): derived from `!!strokeColor` when absent, since `interpStroke` never sets it while a fresh serP() always does. Vector-brush keyline neutralization (4467-4469, preceded by its own 13-line rationale at 4454-4466 — the confirmed live 2026-07 regression \"des clés tween qui deviennent vertes\"): for a pressure-brush ribbon (`isVectorBrush` and not a texture copy or fill shape), forces `strokeColor`/`hasRealStroke` to the sentinel string `'__keyline__'` and `strokeWidth`/`strokeCap`/`strokeJoin` to neutral values, because desP() recomputes these via `applyBrushKeyline()` (cited by name only) on every load from `fillColor`+`centerSegments` — comparing that recomputed cache against a stale stored copy (e.g. fractional width 0.53) is a guaranteed phantom diff, confirmed to have promoted untouched tween frames to keyframes via `_maybePromoteInterpolated` seeing `strokeWidth 3 vs 0.53`. Raster width/height floor (4487-4490, preceded by its own 17-line rationale at 4470-4486 — measured live: Paper's `Raster.size` setter FLOORS, never rounds, 496.6→496, 497.5→497, 100.9→100 systematically; an interpolated bitmap-brush width from a float lerp essentially never lands on a whole number, so even `Math.round` on both sides still disagreed by a full pixel on any fraction ≥.5): floors BOTH sides identically, the same snap Paper itself applies, so the inherent precision ceiling can never read as an edit. `r.position` (x/y) is explicitly NOT snapped this way (float noise only, already inside `_numClose`'s tolerance).",
+          "callers": [
+            "app.js:4496 — strokesEqual (this scope, packet 4): the function's own ONLY caller anywhere in the codebase (confirmed by whole-src grep), applied to BOTH sides of every stroke-pair comparison."
+          ],
+          "behavior": [
+            "Lines 4425-4436 (comment, 12 lines): interpStroke's sparse-field rationale — why raw-value comparison phantom-diffs.",
+            "Line 4437 (code): function open.",
+            "Line 4438 (code): non-object guard.",
+            "Line 4439 (code): shallow-copy `sd` into `n`.",
+            "Lines 4440-4446 (code, 7 lines): six field defaults matching desP()'s own fallbacks — closed/miterLimit/strokeWidth/strokeCap/strokeJoin/dashOffset/opacity.",
+            "Lines 4447-4452 (comment, 6 lines): hasRealStroke derivation rationale.",
+            "Line 4453 (code): hasRealStroke derived from strokeColor when absent.",
+            "Lines 4454-4466 (comment, 13 lines): vector-brush keyline-neutralization rationale, the confirmed 2026-07 regression.",
+            "Lines 4467-4469 (code, 3 lines): keyline-field neutralization for isVectorBrush (non-texture-copy, non-fill-shape).",
+            "Lines 4470-4486 (comment, 17 lines): raster width/height floor rationale, measured Paper.js Raster.size flooring behavior.",
+            "Lines 4487-4490 (code, 4 lines): floor width/height for isRaster.",
+            "Line 4491 (code): return n.",
+            "Line 4492 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "strokes-equal-scene-version",
+      "packets": [
+        {
+          "id": "C21o.strokes-equal-scene-version",
+          "files": [
+            "src/js/app.js:4493-4499"
+          ],
+          "coverage_ranges": [
+            [
+              4493,
+              4499
+            ]
+          ],
+          "classification": {
+            "code": 7,
+            "comment": 0,
+            "whitespace": 0
+          },
+          "symbols": [
+            "strokesEqual",
+            "_sceneVersion"
+          ],
+          "signature": "function strokesEqual(a,b){if(!Array.isArray(a)||!Array.isArray(b))return _deepCloseEqual(a,b);if(a.length!==b.length)return false;for(var i=0;i<a.length;i++)if(!_deepCloseEqual(_normStrokeForCompare(a[i]),_normStrokeForCompare(b[i])))return false;return true;}window._sceneVersion=0;",
+          "responsibility": "No lead-in comment (0 comment lines — the two preceding packets' own lead-ins already cover this function's rationale). `strokesEqual(a,b)` (4493-4498): the public entry point over `_deepCloseEqual`/`_normStrokeForCompare`. Non-array inputs fall through to a plain `_deepCloseEqual(a,b)` (4494, no normalization — `_normStrokeForCompare` only makes sense for a single stroke dict, not for whatever non-array value reaches this branch). Otherwise: length mismatch is an immediate `false` (4495); every element pair is normalized through `_normStrokeForCompare` on BOTH sides before comparison via `_deepCloseEqual` (4496) — so a phantom diff neutralized by one function is neutralized identically for whichever side (stored keyframe vs. freshly-collected live strokes) happens to carry it. `window._sceneVersion=0;` (4499): the module-level render-cache version counter's ONE-TIME declaration/initialization — see `boundaries`/`source_consumers` for the complete cross-file reader/writer audit; this scope's own single increment site is `saveActiveLayerFrame` (packet 10, line 4635).",
+          "callers": [
+            "app.js:4598 — _maybePromoteInterpolated (this scope, packet 8): strokesEqual's SOLE caller anywhere in the codebase (confirmed by whole-src grep — corrects the issue's own prompt text naming engine-bridge.js's tick() as an expected caller; see `boundaries`).",
+            "window._sceneVersion readers/writers: the complete cross-file audit (engine-bridge.js 9/select-bridge.js 9/motion.js 6/timeline.js 5/tools.js 3/native-video-bridge.js 3/tweens.js 2, singles in 7 other files) is recorded on packet 10's own `callers` field alongside saveActiveLayerFrame's own single increment, and in `source_consumers`/`reconciliation` in full."
+          ],
+          "behavior": [
+            "Line 4493 (code): function open.",
+            "Line 4494 (code): non-array fallback to plain _deepCloseEqual.",
+            "Line 4495 (code): length mismatch guard.",
+            "Line 4496 (code): element-wise compare, both sides normalized via _normStrokeForCompare.",
+            "Line 4497 (code): return true.",
+            "Line 4498 (code): function close.",
+            "Line 4499 (code): window._sceneVersion module-level declaration, initialized to 0."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "write-back-ghost-proxies",
+      "packets": [
+        {
+          "id": "C21o.write-back-ghost-proxies",
+          "files": [
+            "src/js/app.js:4500-4525"
+          ],
+          "coverage_ranges": [
+            [
+              4500,
+              4525
+            ]
+          ],
+          "classification": {
+            "code": 15,
+            "comment": 11,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_writeBackGhostProxies",
+            "ghostFrame"
+          ],
+          "signature": "function _writeBackGhostProxies(layerIdx){var ld=state.layers[layerIdx];if(!ld||!userLayers[layerIdx])return;var groups={};userLayers[layerIdx].children.forEach(function(c){if(c.data&&c.data.ghostFrame!==undefined){var gf=c.data.ghostFrame;(groups[gf]=groups[gf]||[]).push(c);}});Object.keys(groups).forEach(function(gfKey){var gf=parseInt(gfKey,10);var targetFrame=ld.frames[gf];if(!targetFrame)return;targetFrame.strokes=groups[gfKey].map(function(c){return serP(c);});});}",
+          "responsibility": "Lead-in (4500-4510, 11 comment lines): states the flatten/write-back contract for timeline.js's \"Ghost All\" (Select All Keyframes, `selectGhostAll`) feature — it inserts REAL, editable proxy Paths for every OTHER keyframe of the active layer directly into `userLayers[activeLayerIdx]` alongside the current frame's own content, tagged `data.ghostFrame=<that frame's index>`, so the existing select/move/scale/rotate machinery (which only knows how to operate on \"whatever's in the active user layer\") works on them unmodified. Writing back has to UNDO that flattening before the normal save runs. `_writeBackGhostProxies(layerIdx)` (4511-4525): resolves `ld`, early-returns if either `ld` or the live Paper layer is missing (4512); groups every tagged child by its OWN `ghostFrame` index into `groups` (4513-4519, one array per distinct source frame, ordinary children with no `ghostFrame` tag are simply never added to any group and fall through untouched — they are the CURRENT frame's own real content); for each group, resolves that frame's OWN `ld.frames[gf]` object (skipping if it doesn't exist, 4522) and REPLACES its `.strokes` array wholesale with a freshly `serP()`-ed array built from that group's own proxy Paths (4523) — never merging into or appending onto whatever was already stored there.",
+          "callers": [
+            "app.js:4686 — saveActiveLayerFrame (this scope, packet 10): called AFTER the layer-kind/visibility/trim-range gates, immediately before collecting the CURRENT frame's own content — so ghost proxies are always written back before the active frame's own save reads the live layer.",
+            "app.js:4695 — saveAllLayerFrames (this scope, packet 11): called UNCONDITIONALLY at the very top of the function, before the per-layer loop even begins — a different ORDER than saveActiveLayerFrame's own placement (see `boundaries`), though both call it with the same `state.activeLayerIdx` argument (Ghost All proxies only ever exist on the active layer).",
+            "Real trigger path (not a direct caller of this function, but the actual UI action that reaches it): timeline.js:3842 — clearGhostSelection calls plain `saveActiveLayerFrame()` (\"flush any move/scale/rotate on the proxies back to their own frames first\"), which reaches this function via line 4686. The proxies themselves are CREATED by timeline.js:3799-3838 (selectGhostAll), tagging `data.ghostFrame=fi` at timeline.js:3830 — see `reconciliation` for the full producer/consumer relationship, including the UNRELATED tweens.js `renderGhostAll` feature that reuses the same tag name on a separate, non-user overlay layer (see `boundaries`)."
+          ],
+          "behavior": [
+            "Lines 4500-4510 (comment, 11 lines): Ghost All flatten/write-back contract.",
+            "Line 4511 (code): function open.",
+            "Line 4512 (code): resolve ld, early-return guard.",
+            "Line 4513 (code): init groups={}.",
+            "Lines 4514-4519 (code, 6 lines): forEach over live children, group by data.ghostFrame.",
+            "Lines 4520-4524 (code, 5 lines): forEach group key, resolve target frame, replace .strokes wholesale via serP().",
+            "Line 4525 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "flatten-compound-children",
+      "packets": [
+        {
+          "id": "C21o.flatten-compound-children",
+          "files": [
+            "src/js/app.js:4526-4562"
+          ],
+          "coverage_ranges": [
+            [
+              4526,
+              4562
+            ]
+          ],
+          "classification": {
+            "code": 16,
+            "comment": 21,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_flattenCompoundChildren",
+            "insertBooleanResult"
+          ],
+          "signature": "function _flattenCompoundChildren(li){var layer=userLayers[li];if(typeof CompoundPath==='undefined'||typeof insertBooleanResult!=='function')return;var kids=layer.children.slice();for(var i=0;i<kids.length;i++){var c=kids[i];if(!(c instanceof CompoundPath))continue;var at=layer.children.indexOf(c);if(at<0)continue;var strokeInfo=c.strokeColor?{color:c.strokeColor,width:c.strokeWidth,cap:c.strokeCap,join:c.strokeJoin}:null;try{insertBooleanResult(layer,at,c,c.fillColor,c.opacity,strokeInfo,c.data);console.warn('[save] CompoundPath aplati avant sauvegarde...');}catch(e){console.warn('[save] aplatissement du CompoundPath impossible',e);}}}",
+          "responsibility": "Lead-in (4526-4546, 21 comment lines, two paragraphs): first names WHY `_collectLayerStrokes` is a single shared function called from both save writers — CLAUDE.md's \"family of bug #1\" (an item/tag excluded in one save path but not the other) is THE single most dangerous class of bug in this codebase, since an item dropped here disappears from persisted DATA, not just the screen. Second paragraph: this specific function is a \"LAST-DITCH defence\" (see `boundaries`) for CLAUDE.md §1's CompoundPath hazard — the collect loop (next packet) only serializes `instanceof Path` and `Raster`, so a `CompoundPath` left in a layer would be dropped ENTIRELY and SILENTLY: measured on a rectangle-with-a-hole, 1 child of area 168575 → 0 strokes saved → 0 children after the next loadFrame, with no error and no warning, rendering fine right up until the save. `insertBooleanResult` is the documented convention every current CompoundPath-producing call site already uses, but flattening HERE means a future producer (a new feature, an import, a script) can never cost artwork again regardless of whether it remembers the convention. `_flattenCompoundChildren(li)` (4547-4562): no-ops if `CompoundPath`/`insertBooleanResult` aren't available (4549, defensive against a load-order edge case); snapshots `layer.children` into `kids` BEFORE mutating (4550, so the loop is stable even though `insertBooleanResult` will remove/insert children mid-iteration); for each `CompoundPath` child (4553, ordinary children `continue` immediately), re-resolves its CURRENT index via `indexOf` (4554, not the snapshot index — correct because `c` itself is still the same live object until removed), builds an optional `strokeInfo` from its OWN stroke paint (4556), then calls `insertBooleanResult(layer,at,c,c.fillColor,c.opacity,strokeInfo,c.data)` inside a `try`/`catch` (4557-4560) — logging a `console.warn` naming CLAUDE.md §1 on success, or a second warn (not a throw) if the rescue itself fails, so a pathological CompoundPath can never crash the save.",
+          "callers": [
+            "app.js:4565 — _collectLayerStrokes (this scope, next packet): the function's own SOLE caller anywhere in the codebase (confirmed by whole-src grep), run unconditionally as the first statement of every _collectLayerStrokes call."
+          ],
+          "behavior": [
+            "Lines 4526-4532 (comment, 7 lines): shared-collector/family-of-bug-#1 rationale.",
+            "Lines 4533-4538 (comment, 6 lines): CompoundPath silent-drop hazard, measured repro.",
+            "Line 4539 (comment, blank `//` line).",
+            "Lines 4540-4546 (comment, 7 lines): insertBooleanResult convention vs. last-ditch rescue rationale.",
+            "Line 4547 (code): function open.",
+            "Line 4548 (code): resolve layer.",
+            "Line 4549 (code): availability guard.",
+            "Line 4550 (code): snapshot layer.children into kids.",
+            "Lines 4551-4555 (code, 5 lines): loop open, type guard, re-resolve current index, existence guard.",
+            "Line 4556 (code): build optional strokeInfo from the CompoundPath's own stroke paint.",
+            "Lines 4557-4560 (code, 4 lines): try/catch around insertBooleanResult, console.warn on success and on rescue failure.",
+            "Lines 4561-4562 (code): loop close, function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "collect-layer-strokes",
+      "packets": [
+        {
+          "id": "C21o.collect-layer-strokes",
+          "files": [
+            "src/js/app.js:4563-4576"
+          ],
+          "coverage_ranges": [
+            [
+              4563,
+              4576
+            ]
+          ],
+          "classification": {
+            "code": 7,
+            "comment": 7,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_collectLayerStrokes",
+            "enforceChannelStrip"
+          ],
+          "signature": "function _collectLayerStrokes(li,ld){var strokes=[];_flattenCompoundChildren(li);var nativeVideoOnly=!!ld.nativeVideo;userLayers[li].children.forEach(function(c){if(c.data&&c.data.ghostFrame!==undefined)return;if(nativeVideoOnly&&!(c.data&&c.data.isMask))return;if(c instanceof Path&&c.segments.length>0){enforceChannelStrip(ld,c);strokes.push(serP(c));}else if(c instanceof Raster)strokes.push(serR(c));});return strokes;}",
+          "responsibility": "THE serialization loop this whole packet's own title names — the single COMPLETE answer to \"which `data.*` tags/item kinds are excluded from a save\" (see `boundaries` for the full CLAUDE.md §1 cross-check). `_collectLayerStrokes(li,ld)` (4563-4576): initializes `strokes=[]` (4564); runs `_flattenCompoundChildren(li)` unconditionally FIRST (4565, previous packet — every CompoundPath child is rescued into ordinary Paths before the collect loop below ever runs, so the loop itself never needs its own CompoundPath branch); resolves `nativeVideoOnly=!!ld.nativeVideo` (4573, preceded by its own 7-line rationale at 4566-4572 — a nativeVideo layer's own picture is engine-side, never a Paper child at all, per getEffectiveStrokes' own comment cited by name only; `editRefusalReason` (tools.js, cited by name only) still refuses ordinary drawing on this layer type, so a mask is the ONLY legitimate child that can ever exist here — filtered explicitly rather than trusting that invariant alone, per CLAUDE.md §1); the single-statement `forEach` (4574) is the ENTIRE per-child exclusion/inclusion logic: skip if `data.ghostFrame!== undefined` (a Ghost All proxy, previous packet's own concern — real content for THIS frame never carries this tag); skip if `nativeVideoOnly` AND the child is NOT `data.isMask` (so on a nativeVideo layer, only a mask child ever survives); otherwise, a `Path` with at least one segment gets `enforceChannelStrip(ld,c)` applied (app.js:5034, next-slice territory — a LIVE mutation of `fillColor`/`strokeColor` for a channel-split layer, see `boundaries`) THEN `serP(c)` pushed; a `Raster` gets `serR(c)` pushed directly, no channel-strip call. Returns the accumulated `strokes` array (4575) — a BRAND NEW array on every call, never a mutated copy of any previously stored array (the identity fact `_canReuseMaterialized`, packet 12, depends on for its own guard).",
+          "callers": [
+            "app.js:4689 — saveActiveLayerFrame (this scope, packet 10): the active layer's own current frame only.",
+            "app.js:4707 — saveAllLayerFrames (this scope, packet 11): once per qualifying layer, inside its own loop.",
+            "tools.js:1715 — a paste-into-a-held-frame path (existing owner, cited by line only): bypasses saveActiveLayerFrame's own keyframe/interpolated gate to write directly into a genuinely HELD frame (`_pasteHeldOrigin`) — see `boundaries`.",
+            "timeline.js:2000 — a drag-based held-frame commit (existing owner, cited by line only): identical reasoning, `_dOrigin`/`_dLd` — see `boundaries`.",
+            "app.js:4909/4911/4983 — loadFrame's own neighborhood (this file, next slice C21p, cited by name/line only, not reproduced here)."
+          ],
+          "behavior": [
+            "Line 4563 (code): function open.",
+            "Line 4564 (code): init strokes=[].",
+            "Line 4565 (code): unconditional _flattenCompoundChildren(li) call.",
+            "Lines 4566-4572 (comment, 7 lines): nativeVideo mask-only rationale.",
+            "Line 4573 (code): resolve nativeVideoOnly flag.",
+            "Line 4574 (code): the entire per-child forEach — ghostFrame skip, nativeVideo mask-only skip, Path→enforceChannelStrip+serP, Raster→serR.",
+            "Line 4575 (code): return strokes.",
+            "Line 4576 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "maybe-promote-interpolated",
+      "packets": [
+        {
+          "id": "C21o.maybe-promote-interpolated",
+          "files": [
+            "src/js/app.js:4577-4599"
+          ],
+          "coverage_ranges": [
+            [
+              4577,
+              4599
+            ]
+          ],
+          "classification": {
+            "code": 3,
+            "comment": 20,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_maybePromoteInterpolated",
+            "strokesEqual"
+          ],
+          "signature": "function _maybePromoteInterpolated(f,strokes){if(window._tweenFrameDirty&&f.isInterpolated&&!strokesEqual(strokes,f.strokes)){f.isKeyframe=true;f.isInterpolated=false;}}",
+          "responsibility": "Lead-in (4577-4596, 20 comment lines, two paragraphs): first states the FEATURE rule — a hand-edited tween frame is promoted to a full keyframe outright rather than staying flagged `isInterpolated` (feedback: \"une keyframe modifié d'une keyframe tween doit devenir une keyframe normal pleine\") — but only on a REAL content change, since these save functions also run on plain navigation (goToFrame persists whatever's on screen before switching away); promoting on every run would turn every tween frame into a real keyframe the moment it's scrubbed past. Second paragraph documents the STRUCTURAL fix (2026-07, \"une keyframe des tween est devenue verte... un bug qui revient sans cesse\"): a bare `!strokesEqual` comparison alone can never be a safe promotion trigger, because it silently depends on the serP→desP round-trip being byte-idempotent for EVERY stroke type, and every new derived/defaulted field breaks that for one producer or another (keyline widths, raster size floors, hasRealStroke, miterLimit — `_normStrokeForCompare`'s own growing list of patches, previous packets, exists for exactly this). Promotion now ALSO requires `window._tweenFrameDirty` — set by `pushUndoLayers` (tweens.js:4818/4913, cited by line only), the single choke point every real mutating action already goes through, and cleared on every loadFrame (app.js:4754, next-slice territory, cited by line only) — so pure navigation/scrubbing can never promote no matter what phantom diff a future field introduces; `strokesEqual` stays as the SECOND gate so a no-op action (a tool click that aborted, still setting the dirty flag) doesn't promote either. `_maybePromoteInterpolated(f,strokes)` (4597-4599): a single guarded statement — if `window._tweenFrameDirty` is truthy AND `f.isInterpolated` AND the newly-collected `strokes` are NOT `strokesEqual` to the frame's OWN CURRENT `f.strokes` (still the pre-write value at this point, since the caller assigns `f.strokes=strokes` only AFTER this call returns — see packet 10/11's own `behavior`), flips `f.isKeyframe=true;f.isInterpolated=false;` in place. No `else` branch and no return value — mutates `f` directly or does nothing.",
+          "callers": [
+            "app.js:4690 — saveActiveLayerFrame (this scope, packet 10): called with the freshly-collected `strokes` and the current frame's OWN (still-old) `f`, immediately BEFORE `f.strokes=strokes` overwrites it.",
+            "app.js:4708 — saveAllLayerFrames (this scope, packet 11): identical placement, once per qualifying layer inside its own loop."
+          ],
+          "behavior": [
+            "Lines 4577-4583 (comment, 7 lines): promote-on-real-edit-only feature rule.",
+            "Lines 4584-4596 (comment, 13 lines): structural fix rationale — window._tweenFrameDirty as the primary gate, strokesEqual as the secondary gate.",
+            "Line 4597 (code): function open.",
+            "Line 4598 (code): the entire guarded promotion — three-condition check, isKeyframe/isInterpolated flip.",
+            "Line 4599 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "invalidate-symbol-union",
+      "packets": [
+        {
+          "id": "C21o.invalidate-symbol-union",
+          "files": [
+            "src/js/app.js:4600-4633"
+          ],
+          "coverage_ranges": [
+            [
+              4600,
+              4633
+            ]
+          ],
+          "classification": {
+            "code": 4,
+            "comment": 30,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_invalidateSymbolUnionIfEditingSymbol",
+            "symbolUnionBounds"
+          ],
+          "signature": "function _invalidateSymbolUnionIfEditingSymbol(){if(!state.activeSymbolId)return;if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();}",
+          "responsibility": "Lead-in (4600-4629, 30 comment lines, three paragraphs — the densest rationale in this scope): paragraph one (4600-4611) explains a DIFFERENT, adjacent bug this same layer-kind guard (packet 10/11's own gate) protects against — both save functions MUST skip layers that aren't effectively visible (hidden eye, or non-soloed while another is soloed), because loadFrame deliberately leaves those layers' LIVE Paper layers EMPTY (`removeChildren`+`continue`), so \"saving\" one would read an empty live layer and overwrite the frame's real stored strokes with `[]` — confirmed live (2026-07, \"des pertes d'images après plusieurs actions\"): hide a layer with content, navigate anywhere, then any saving action (every `pushUndoLayers` — every draw/erase/edit — plus generateTweens) silently wiped it; the stored frame data is the source of truth for an unpopulated live layer. Paragraph two (4612-4614) states THIS function's own actual purpose: Motion caches a component's whole-duration union bounds (the gizmo's fixed reference box, `symbolUnionBounds` in motion.js, cited by name only) — frame content is what it's derived from, so a write to that content must drop the cache. Paragraph three (4616-4629) explains why the GATE matters as much as the call: these two writers are NOT a gesture-end path — goToFrame calls `saveAllLayerFrames` on EVERY frame advance, so invalidating unconditionally meant playback recomputed the 120-frame union on every tick (measured: 7505 `getEffectiveStrokes` calls for 63 played frames, 119 per frame = the union's whole loop, 75% of wall clock, 24fps target delivered at 20fps with a 47.7ms repaint interval — CLAUDE.md §5bis). A write can only change a SYMBOL's content while inside that symbol (`enterSymbol` swaps `state.layers`/`userLayers` to `sym.layers`), so outside one, these writers touch ordinary scene layers with no `symbolUnionBounds` derived from them; `exitToScene` is covered because it calls `saveAllLayerFrames` while `activeSymbolId` is still set; undo/redo are hooked separately (tweens.js, cited by name only) since they restore content without passing through either writer. `_invalidateSymbolUnionIfEditingSymbol()` (4630-4633): the gate IS the guard — no-ops entirely unless `state.activeSymbolId` is truthy (4631, so the 120-frame-union-per-tick cost described above literally cannot happen outside an active symbol edit); otherwise conditionally calls `SMMotion.invalidateSymbolUnionBounds()` if the module and method both exist (4632).",
+          "callers": [
+            "app.js:4636 — saveActiveLayerFrame (this scope, packet 10): called UNCONDITIONALLY, second statement in the function, BEFORE any of its own layer-kind/visibility/trim-range gates — runs even on a call that will return early without saving anything (see `boundaries`).",
+            "app.js:4694 — saveAllLayerFrames (this scope, packet 11): called UNCONDITIONALLY, first statement, before the per-layer loop even begins."
+          ],
+          "behavior": [
+            "Lines 4600-4611 (comment, 12 lines): adjacent visibility-gate rationale — why an invisible layer's live Paper layer must never be read back.",
+            "Lines 4612-4614 (comment, 3 lines): this function's own purpose — symbolUnionBounds cache invalidation.",
+            "Line 4615 (comment, blank `//` line).",
+            "Lines 4616-4621 (comment, 6 lines): the playback-cost measurement motivating the conditional gate.",
+            "Line 4622 (comment, blank `//` line).",
+            "Lines 4623-4629 (comment, 7 lines): scope-of-effect rationale — symbol-only, enterSymbol/exitToScene/undo-redo coverage.",
+            "Line 4630 (code): function open.",
+            "Line 4631 (code): activeSymbolId gate, early return.",
+            "Line 4632 (code): conditional SMMotion.invalidateSymbolUnionBounds() call.",
+            "Line 4633 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "save-active-layer-frame",
+      "packets": [
+        {
+          "id": "C21o.save-active-layer-frame",
+          "files": [
+            "src/js/app.js:4634-4692"
+          ],
+          "coverage_ranges": [
+            [
+              4634,
+              4692
+            ]
+          ],
+          "classification": {
+            "code": 15,
+            "comment": 44,
+            "whitespace": 0
+          },
+          "symbols": [
+            "saveActiveLayerFrame",
+            "_justEnsuredKeyframeAt"
+          ],
+          "signature": "function saveActiveLayerFrame(){window._sceneVersion++;_invalidateSymbolUnionIfEditingSymbol();var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.montageId||ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer||ld.lfsGroup||(ld.duplicator&&!ld._dupEditSource)||ld._rigPoseLive||(window.SMPathFx&&SMPathFx.hasAny(ld)))return;if(!layerIsEffectivelyVisible(state.activeLayerIdx))return;var freshlyEnsured=ld._justEnsuredKeyframeAt===state.currentFrame;delete ld._justEnsuredKeyframeAt;if(!freshlyEnsured&&layerHasTimeRange(ld)&&(state.currentFrame<layerInPoint(ld)||state.currentFrame>layerOutPoint(ld)))return;_writeBackGhostProxies(state.activeLayerIdx);var f=ld.frames[state.currentFrame];if(!f.isKeyframe&&!f.isInterpolated)return;var strokes=_collectLayerStrokes(state.activeLayerIdx,ld);_maybePromoteInterpolated(f,strokes);f.strokes=strokes;}",
+          "responsibility": "No lead-in comment of its own (0 lines before `function` — every rationale is INLINE, interleaved with the guards it explains). Saves the ACTIVE layer's CURRENT frame only. Exact SIDE-EFFECT ORDER (contract item b): (1) `window._sceneVersion++` (4635) and (2) `_invalidateSymbolUnionIfEditingSymbol()` (4636) run FIRST and UNCONDITIONALLY — before any gate, so both fire even on a call that ultimately saves nothing (see `boundaries`). (3) The layer-kind gate (4663, preceded by five inline rationale comments at 4637-4662: duplicator-unless-edit-source, `_rigPoseLive`, nativeVideo-dropped-2026-09, pathFx-2026-09) returns early for a synthetic/non-drawable layer kind. (4) `layerIsEffectivelyVisible` (4664) returns early for a hidden/non-soloed layer — the visibility hazard the previous packet's own lead-in comment names. (5) `_justEnsuredKeyframeAt` is captured and immediately deleted (4683-4684, preceded by its own 6-line rationale at 4677-4682 — consumed whether or not it matched, so it never lingers into a later unrelated call) — `ensureKeyframe`'s own flag (tools.js, cited by name only, 2026-08-16) marking that THIS exact frame was just promoted by a content-creating tool, so the trim-range gate right after must not reject the very save meant to persist that promotion. (6) The trim-range gate (4685, preceded by its own 12-line rationale at 4665-4676 — confirmed live regression: draw at frames 0/5/10, trim outPoint below 10, navigate away, frame 10's content silently became 0) skips a frame outside `layerInPoint`/`layerOutPoint`, UNLESS `freshlyEnsured`. (7) `_writeBackGhostProxies` (4686, previous-packet function) runs next — only reached once every earlier gate has passed. (8) `f=ld.frames[currentFrame]` resolved (4687), and (9) the keyframe/interpolated gate (4688) skips a genuinely HELD frame (the case the two external `_collectLayerStrokes` callers, previous packet's own `callers`, exist to bypass). (10) `strokes=_collectLayerStrokes(...)` (4689). (11) `_maybePromoteInterpolated(f,strokes)` (4690) — comparing against `f.strokes`'s OLD value, since (12) `f.strokes=strokes` (4691, the actual `ld.frames[i]` REPLACE-array write, contract item b's own identity contract that `_canReuseMaterialized`, packet 12, depends on) happens LAST, after the promotion decision has already been made.",
+          "callers": [
+            "34 distinct calling files, confirmed by a recursive `find src -name \"*.js\"` scan filtered for `(^|[^a-zA-Z_.])saveActiveLayerFrame\\(`, excluding comment lines and the function's own declaration (close to, not identical to, the issue's own ~38-file estimate — see `boundaries`):",
+            "src/js/app.js: 5",
+            "src/js/bitmap-brush.js: 4",
+            "src/js/color-manager.js: 1",
+            "src/js/draw-bridge.js: 1",
+            "src/js/effects-panel.js: 6",
+            "src/js/eraser-bridge.js: 2",
+            "src/js/figma-import.js: 1",
+            "src/js/fill-bridge.js: 5",
+            "src/js/group-bridge.js: 6",
+            "src/js/labs/clip-mask-bake.js: 1",
+            "src/js/labs/french-curve.js: 1",
+            "src/js/labs/layer-effects-bake.js: 1",
+            "src/js/labs/pose-library.js: 1",
+            "src/js/labs/reference-fill.js: 1",
+            "src/js/labs/rig-deform.js: 3",
+            "src/js/labs/screentone-bake.js: 1",
+            "src/js/labs/shader-effects-bake.js: 1",
+            "src/js/labs/speed-lines.js: 1",
+            "src/js/labs/vector-sculpt.js: 2",
+            "src/js/labs/vector-trim.js: 1",
+            "src/js/motion.js: 14",
+            "src/js/nemo-script.js: 1",
+            "src/js/palette-panel.js: 1",
+            "src/js/psd-import-bridge.js: 1",
+            "src/js/rig-widget.js: 1",
+            "src/js/select-bridge.js: 12",
+            "src/js/shape-bridge.js: 1",
+            "src/js/shapes-panel.js: 7",
+            "src/js/subselect-bridge.js: 1",
+            "src/js/svg-import.js: 1",
+            "src/js/text-animator-panel.js: 1",
+            "src/js/timeline.js: 51",
+            "src/js/tools.js: 25",
+            "src/js/tweens.js: 4",
+            "src/js/vectorize-bridge.js: 1",
+            "window._sceneVersion cross-file audit (this scope's own single writer is line 4635 above; every other occurrence belongs to another file, cited by name/line only, full reader/writer split in `source_consumers`/`reconciliation`): engine-bridge.js 9 (all readers), select-bridge.js 9 (all writers), motion.js 6 (3 writers), timeline.js 5 (all writers), tools.js 3 (2 writers), native-video-bridge.js 3 (all writers), tweens.js 2 (1 writer), 1 each (writers) in effector-layer.js/effects-panel.js/reference-bridge.js/storyboard.js, 1 each (readers) in adapters/export-svg-sequence.js/second-viewer.js, and 1 comment-only false-positive in labs/out-of-pegs.js."
+          ],
+          "behavior": [
+            "Line 4634 (code): function open.",
+            "Line 4635 (code): window._sceneVersion++ — unconditional, before any gate.",
+            "Line 4636 (code): _invalidateSymbolUnionIfEditingSymbol() — unconditional, before any gate.",
+            "Lines 4637-4662 (comment, 26 lines): five inline rationale notes — duplicator-unless-edit-source, _rigPoseLive, nativeVideo-dropped-2026-09, pathFx-2026-09.",
+            "Line 4663 (code): layer-kind gate, early return.",
+            "Line 4664 (code): visibility gate, early return.",
+            "Lines 4665-4682 (comment, 18 lines): trim-range hazard rationale and _justEnsuredKeyframeAt rationale.",
+            "Lines 4683-4684 (code, 2 lines): capture and delete _justEnsuredKeyframeAt.",
+            "Line 4685 (code): trim-range gate (bypassed when freshlyEnsured), early return.",
+            "Line 4686 (code): _writeBackGhostProxies(activeLayerIdx).",
+            "Line 4687 (code): resolve f = ld.frames[currentFrame].",
+            "Line 4688 (code): keyframe/interpolated gate, early return on a HELD frame.",
+            "Line 4689 (code): strokes = _collectLayerStrokes(activeLayerIdx, ld).",
+            "Line 4690 (code): _maybePromoteInterpolated(f, strokes) — compares against f.strokes' OLD value.",
+            "Line 4691 (code): f.strokes = strokes — the actual replace-array write, LAST.",
+            "Line 4692 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "save-all-layer-frames",
+      "packets": [
+        {
+          "id": "C21o.save-all-layer-frames",
+          "files": [
+            "src/js/app.js:4693-4710"
+          ],
+          "coverage_ranges": [
+            [
+              4693,
+              4710
+            ]
+          ],
+          "classification": {
+            "code": 11,
+            "comment": 7,
+            "whitespace": 0
+          },
+          "symbols": [
+            "saveAllLayerFrames"
+          ],
+          "signature": "function saveAllLayerFrames(){_invalidateSymbolUnionIfEditingSymbol();_writeBackGhostProxies(state.activeLayerIdx);for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||state.layers[i].isGuideLayer||state.layers[i].isWidgetLayer||state.layers[i].lfsGroup||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource)||state.layers[i]._rigPoseLive||(window.SMPathFx&&SMPathFx.hasAny(state.layers[i])))continue;if(!layerIsEffectivelyVisible(i))continue;if(layerHasTimeRange(state.layers[i])&&(state.currentFrame<layerInPoint(state.layers[i])||state.currentFrame>layerOutPoint(state.layers[i])))continue;var f=state.layers[i].frames[state.currentFrame];if(!f||(!f.isKeyframe&&!f.isInterpolated))continue;var strokes=_collectLayerStrokes(i,state.layers[i]);_maybePromoteInterpolated(f,strokes);f.strokes=strokes;}}",
+          "responsibility": "No lead-in comment of its own. Saves EVERY layer's current frame — the bulk counterpart to saveActiveLayerFrame, structurally near-identical per-layer logic but with two confirmed ORDER differences (contract item b, see `boundaries`): (1) NO `window._sceneVersion++` anywhere in this function — the ONLY `_sceneVersion` occurrence in this scope outside packet 4's own declaration and packet 10's own increment is absent here entirely, confirmed by exhaustive grep of the whole 4373-4728 range. (2) `_writeBackGhostProxies(state.activeLayerIdx)` (4695) runs UNCONDITIONALLY at the very top, BEFORE the per-layer loop even begins — unlike saveActiveLayerFrame, where the identical call (packet 10, line 4686) is reached only AFTER that function's own layer-kind/visibility/trim-range gates have already passed for the SAME active layer. `_invalidateSymbolUnionIfEditingSymbol()` (4694) runs first, matching saveActiveLayerFrame's own placement (both unconditional, both before any per-layer work). The `for` loop (4699-4709) applies, PER LAYER `i`, the identical three-gate/collect/promote/write sequence as saveActiveLayerFrame's own tail: layer-kind `continue` (4699, same eight-condition list, `state.layers[i]`-scoped instead of `ld`-scoped), visibility `continue` (4700), trim-range `continue` (4705, preceded by its own 4-line per-layer rationale at 4701-4704 — no `freshlyEnsured` bypass here, unlike saveActiveLayerFrame, since this loop has no single \"just-created\" frame context), `f` resolution with an EXTRA `!f` guard the single-layer version doesn't need (4706, since `state.layers[i].frames[currentFrame]` could theoretically be undefined for a malformed layer), `strokes=_collectLayerStrokes(i,state.layers[i])` (4707), `_maybePromoteInterpolated(f,strokes)` (4708), `f.strokes=strokes` (4709, LAST, same identity contract as packet 10).",
+          "callers": [
+            "27 distinct calling files, confirmed by the same recursive scan filtered for `(^|[^a-zA-Z_.])saveAllLayerFrames\\(`, excluding comment lines and the function's own declaration (close to, not identical to, the issue's own ~26-file estimate — see `boundaries`):",
+            "src/js/app.js: 19",
+            "src/js/comp-preview.js: 2",
+            "src/js/effector-layer.js: 1",
+            "src/js/images.js: 7",
+            "src/js/labs/boil-effect.js: 1",
+            "src/js/labs/follow-path.js: 1",
+            "src/js/labs/interval-assistant.js: 1",
+            "src/js/labs/move-to-layer.js: 1",
+            "src/js/labs/pingpong-cycle.js: 1",
+            "src/js/labs/retime-exposure.js: 1",
+            "src/js/labs/rig-deform.js: 1",
+            "src/js/layer-inout.js: 1",
+            "src/js/linked-media.js: 2",
+            "src/js/media-library.js: 1",
+            "src/js/motion-preset-picker.js: 1",
+            "src/js/motion.js: 1",
+            "src/js/native-video-bridge.js: 1",
+            "src/js/palette-panel.js: 1",
+            "src/js/project.js: 7",
+            "src/js/render-manager.js: 1",
+            "src/js/rig-widget.js: 1",
+            "src/js/select-bridge.js: 4",
+            "src/js/storyboard.js: 1",
+            "src/js/timeline.js: 35",
+            "src/js/tracker.js: 1",
+            "src/js/transplant.js: 1",
+            "src/js/tweens.js: 5",
+            "_collectLayerStrokes' own external callers (tools.js:1715, timeline.js:2000) are recorded on packet 7's own callers field, not repeated here."
+          ],
+          "behavior": [
+            "Line 4693 (code): function open.",
+            "Line 4694 (code): _invalidateSymbolUnionIfEditingSymbol() — unconditional.",
+            "Line 4695 (code): _writeBackGhostProxies(activeLayerIdx) — unconditional, BEFORE the per-layer loop (order differs from saveActiveLayerFrame — see `boundaries`).",
+            "Lines 4696-4698 (comment, 3 lines): duplicator/nativeVideo cross-reference to saveActiveLayerFrame's own rationale.",
+            "Line 4699 (code): for-loop open, layer-kind gate, continue.",
+            "Line 4700 (code): visibility gate, continue.",
+            "Lines 4701-4704 (comment, 4 lines): per-layer trim-range rationale.",
+            "Line 4705 (code): trim-range gate, continue.",
+            "Line 4706 (code): resolve f (with an extra !f existence guard), keyframe/interpolated gate, continue.",
+            "Line 4707 (code): strokes = _collectLayerStrokes(i, state.layers[i]).",
+            "Line 4708 (code): _maybePromoteInterpolated(f, strokes).",
+            "Lines 4709-4710 (code): f.strokes = strokes (LAST), loop close, function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "can-reuse-materialized",
+      "packets": [
+        {
+          "id": "C21o.can-reuse-materialized",
+          "files": [
+            "src/js/app.js:4711-4728"
+          ],
+          "coverage_ranges": [
+            [
+              4711,
+              4728
+            ]
+          ],
+          "classification": {
+            "code": 8,
+            "comment": 10,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_canReuseMaterialized",
+            "_matStrokes"
+          ],
+          "signature": "function _canReuseMaterialized(lyr,strokes){if(!window.__smGeomDirtyHookInstalled)return false;if(lyr._smGeomDirty)return false;if(!lyr._matStrokes||lyr._matStrokes!==strokes)return false;if(!strokes.length)return false;if(lyr.children.length!==strokes.length)return false;return true;}",
+          "responsibility": "Lead-in (4711-4713, 3 comment lines): frames the whole function's own philosophy — guards for loadFrame's rebuild-skip decision (next slice C21p, cited by name only), deliberately conservative: every `false` costs a rebuild (slow, but safe), while a wrong `true` would paint stale content (silent, and dangerous) — \"in doubt, rebuild\". `_canReuseMaterialized(lyr,strokes)` (4714-4728): READS but never WRITES `_smGeomDirty`/`_matStrokes` (see `boundaries` — the clear/stamp pair this function's own read depends on belongs entirely to loadFrame, NOT to either save writer in this scope). Guard 1 (4717, preceded by its own 2-line rationale at 4715-4716): if `window.__smGeomDirtyHookInstalled` is falsy (engine off, or the `_changed` hook probe failed, CLAUDE.md §5quater) there is NO way to know whether live items were edited — never reuse. Guard 2 (4718): if `lyr._smGeomDirty` is truthy, a live edit happened since the last materialize — never reuse. Guard 3 (4719): the CORE identity test — `lyr._matStrokes` must exist AND be REFERENCE-EQUAL (`!==`) to the `strokes` array just resolved for this frame; since `f.strokes=strokes` (packets 10/11) always assigns a BRAND NEW array object from `_collectLayerStrokes`, this can only be `true` when the layer's live Paper items were already materialized from THIS EXACT stored array object, not merely an array with equal contents. Guard 4 (4722, preceded by its own 2-line rationale at 4720-4721): an empty `strokes.length===0` result is EXCLUDED explicitly even though `_collectLayerStrokes` always returns a fresh `[]` on every call (so guard 3 could never match an empty result anyway) — kept for readability of intent, not correctness. Guard 5 (4726, preceded by its own 3-line \"paranoia\" rationale at 4723-4725): `lyr.children.length!==strokes.length` forces a rebuild if the live Paper layer's own child count has diverged from the stored array's length — a defense against any OTHER consumer having inserted/removed a child without updating `_matStrokes`, rather than trusting the identity test alone. Returns `true` (4727) only if ALL FIVE guards pass.",
+          "callers": [
+            "app.js:4784 — loadFrame (this file, next slice C21p, cited by name/line only, not reproduced here): the function's own SOLE caller anywhere in the codebase (confirmed by whole-src grep)."
+          ],
+          "behavior": [
+            "Lines 4711-4713 (comment, 3 lines): conservative-guard philosophy — \"in doubt, rebuild\".",
+            "Line 4714 (code): function open.",
+            "Lines 4715-4716 (comment, 2 lines): dirty-hook-not-installed rationale.",
+            "Line 4717 (code): guard 1 — __smGeomDirtyHookInstalled missing.",
+            "Line 4718 (code): guard 2 — lyr._smGeomDirty truthy.",
+            "Line 4719 (code): guard 3 — _matStrokes identity (reference-equality) test.",
+            "Lines 4720-4721 (comment, 2 lines): empty-result exclusion rationale.",
+            "Line 4722 (code): guard 4 — empty strokes array.",
+            "Lines 4723-4725 (comment, 3 lines): child-count paranoia rationale.",
+            "Line 4726 (code): guard 5 — children.length mismatch.",
+            "Line 4727 (code): return true — only after all five guards pass.",
+            "Line 4728 (code): function close."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "next leaf (loadFrame, app.js:4729+, C21p, not yet filed as an issue at authoring time)",
+      "disposition": "The sole downstream consumer of `_canReuseMaterialized`'s return value (app.js:4784) and the sole writer of the `_smGeomDirty=false`/`_matStrokes=strokes` pair this scope's own guard reads (app.js:4796, app.js:5004-5005) — see `boundaries` for why this pairing does NOT belong to either save writer in this scope."
+    },
+    {
+      "consumer": "engine-bridge.js (existing owner, tick()'s change signal AND the `_changed` hook that sets `_smGeomDirty`)",
+      "disposition": "A full round trip with this scope: reads `window._sceneVersion` (9 sites, all readers, engine-bridge.js:3947/3960/4234/4237/4325/4352 plus 3 comments) as the designed consumer of the change signal this scope's own `saveActiveLayerFrame` provides (line 4635); separately, its own `_changed` hook (engine-bridge.js:328, CLAUDE.md §5quater) WRITES `_smGeomDirty=true` on any live Paper.js mutation — the flag `_canReuseMaterialized` (this scope, packet 12) reads but never itself sets."
+    },
+    {
+      "consumer": "select-bridge.js/motion.js/timeline.js/tools.js/native-video-bridge.js/tweens.js/effector-layer.js/effects-panel.js/reference-bridge.js/storyboard.js (existing owners, every other `window._sceneVersion` WRITER)",
+      "disposition": "Each independently bumps `window._sceneVersion` at its own call sites, outside this scope's own single writer (saveActiveLayerFrame, line 4635) — full per-file counts and reader/writer split in `reconciliation`; not verified here whether every individual call site ALSO calls one of this scope's two save writers at the same time (out of this census's own read-only scope beyond the specific sites read for `boundaries`)."
+    },
+    {
+      "consumer": "adapters/export-svg-sequence.js and second-viewer.js (existing owners, both READERS)",
+      "disposition": "Both fold `window._sceneVersion` into a cache-key string (export-svg-sequence.js:22, second-viewer.js:50) — downstream consumers of the change signal for their own frame/render caching, structurally identical in kind to engine-bridge.js's own use but in a different subsystem."
+    },
+    {
+      "consumer": "tools.js and timeline.js (existing owners, the two external `_collectLayerStrokes` callers)",
+      "disposition": "tools.js:1715 and timeline.js:2000 both call `_collectLayerStrokes` directly to write into a genuinely HELD frame that `saveActiveLayerFrame`'s own keyframe/interpolated gate (line 4688) would otherwise skip — see `boundaries` for the shared rationale confirmed by both callers' own inline comments."
+    },
+    {
+      "consumer": "timeline.js (existing owner, selectGhostAll/clearGhostSelection)",
+      "disposition": "The real producer of the `data.ghostFrame`-tagged proxies `_writeBackGhostProxies` consumes (timeline.js:3799-3838) and the real UI trigger that reaches it via a plain `saveActiveLayerFrame()` call (timeline.js:3842) — full relationship in `reconciliation`."
+    },
+    {
+      "consumer": "tweens.js (existing owner, renderGhostAll) — NOT a consumer of this scope despite the shared tag name",
+      "disposition": "Confirmed structurally disjoint from `_writeBackGhostProxies`/`_collectLayerStrokes`: its own `data.ghostFrame`-tagged items live in a dedicated overlay Paper layer (`ghostAllLayer`), never in any `userLayers[]` entry either function iterates — see `boundaries` for the full evidence."
+    },
+    {
+      "consumer": "path-fx.js (SMPathFx.hasAny) and motion.js (SMMotion.invalidateSymbolUnionBounds) — upstream dependencies, not downstream consumers",
+      "disposition": "`SMPathFx.hasAny` (path-fx.js:198's own object literal) gates both save writers' own layer-kind checks (app.js:4663/4699); `SMMotion.invalidateSymbolUnionBounds` (motion.js, cited by name only) is the one side effect `_invalidateSymbolUnionIfEditingSymbol` triggers (app.js:4632). Both retain their own bodies in full — cited by name only."
+    },
+    {
+      "consumer": "tools.js (existing owner, insertBooleanResult) — upstream dependency of _flattenCompoundChildren",
+      "disposition": "The documented convention every current CompoundPath-producing call site already uses (tools.js:6967); `_flattenCompoundChildren` calls it directly as its own last-ditch rescue (app.js:4558) — retains its own body in full, cited by name/line only."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-numclose-epsilon-boundary",
+      "proposed": "Call _numClose(1, 1+9.9e-7) and _numClose(1, 1+1.1e-6); expect true then false — verifies the exact 1e-6 threshold at line 4395 — not run."
+    },
+    {
+      "id": "fx-deepcloseequal-key-union-missing-vs-undefined",
+      "proposed": "Call _deepCloseEqual({a:1}, {a:1,b:undefined}); expect true — verifies the key-union/missing-equals-undefined rule at lines 4417-4420 — not run."
+    },
+    {
+      "id": "fx-deepcloseequal-array-length-mismatch",
+      "proposed": "Call _deepCloseEqual([1,2],[1,2,3]); expect false without recursing into elements — verifies line 4399 — not run."
+    },
+    {
+      "id": "fx-normstrokeforcompare-six-defaults",
+      "proposed": "Call _normStrokeForCompare({}) (no fields set); expect closed:false, miterLimit:10, strokeWidth:3, strokeCap:'round', strokeJoin:'round', dashOffset:0, opacity:1 — verifies lines 4440-4446 — not run."
+    },
+    {
+      "id": "fx-normstrokeforcompare-keyline-neutralization-gated",
+      "proposed": "Call _normStrokeForCompare on an isVectorBrush dict with isBrushTextureCopy:true and distinct strokeColor/strokeWidth; expect NO neutralization (fields pass through unchanged) — verifies the compound gate at line 4467 excludes texture copies — not run."
+    },
+    {
+      "id": "fx-normstrokeforcompare-raster-floor-both-sides",
+      "proposed": "Call _normStrokeForCompare({isRaster:true,width:496.6,height:497.5}) and {isRaster:true,width:496,height:497}; expect both to normalize to width:496,height:497 (equal after normalization) — verifies lines 4487-4490's floor-both-sides fix over Math.round — not run."
+    },
+    {
+      "id": "fx-strokesequal-nonarray-fallback",
+      "proposed": "Call strokesEqual(5, 5) (non-array inputs); expect it to delegate to _deepCloseEqual directly, bypassing per-element normalization — verifies line 4494 — not run."
+    },
+    {
+      "id": "fx-strokesequal-length-mismatch-short-circuit",
+      "proposed": "Call strokesEqual([a],[a,b]) where a is any stroke dict; expect immediate false without calling _normStrokeForCompare — verifies line 4495 — not run."
+    },
+    {
+      "id": "fx-writebackghostproxies-groups-and-replaces-wholesale",
+      "proposed": "Insert two ghost-tagged proxies (ghostFrame:2) and one (ghostFrame:5) into the active layer, then call _writeBackGhostProxies; expect ld.frames[2].strokes to be a fresh 2-element array from serP() of exactly those two proxies (2-element target's PRIOR stored strokes fully discarded, not merged) and ld.frames[5].strokes similarly replaced with 1 element — verifies lines 4514-4523 — not run."
+    },
+    {
+      "id": "fx-writebackghostproxies-ignores-untagged-children",
+      "proposed": "Call _writeBackGhostProxies on a layer whose children are all untagged (ordinary current-frame content, no data.ghostFrame); expect zero ld.frames writes — verifies the forEach guard at line 4515 — not run."
+    },
+    {
+      "id": "fx-flattencompoundchildren-rescues-donut",
+      "proposed": "Insert a real donut CompoundPath (outer+inner contour) into a layer, then call _collectLayerStrokes; expect strokes.length>=1 (islands split into independent Paths via insertBooleanResult) instead of 0 — verifies the CLAUDE.md §1 hazard this function exists to prevent, lines 4547-4562 — not run."
+    },
+    {
+      "id": "fx-flattencompoundchildren-noop-without-insertbooleanresult",
+      "proposed": "Stub window.insertBooleanResult to undefined, insert a CompoundPath, call _flattenCompoundChildren; expect the CompoundPath to remain untouched (no throw, silent no-op) — verifies line 4549 — not run."
+    },
+    {
+      "id": "fx-collectlayerstrokes-skips-ghostframe-children",
+      "proposed": "Insert one ordinary Path and one ghostFrame-tagged proxy into a layer, call _collectLayerStrokes; expect strokes.length===1 (the proxy excluded) — verifies line 4574's first skip condition — not run."
+    },
+    {
+      "id": "fx-collectlayerstrokes-nativevideo-mask-only",
+      "proposed": "On a layer with ld.nativeVideo=true, insert one plain Path and one data.isMask:true Path; expect strokes to contain only the mask's serP() output — verifies line 4574's nativeVideoOnly branch — not run."
+    },
+    {
+      "id": "fx-collectlayerstrokes-returns-fresh-array-identity",
+      "proposed": "Call _collectLayerStrokes twice in a row with identical live content; expect the two returned arrays to be !== each other even though contents are deep-equal — verifies the identity contract _canReuseMaterialized depends on — not run."
+    },
+    {
+      "id": "fx-collectlayerstrokes-enforcechannelstrip-mutates-live-item",
+      "proposed": "On a layer with ld.channel='stroke', insert a Path with both fillColor and strokeColor set; call _collectLayerStrokes; expect the LIVE Path's own p.fillColor to become null as a side effect (not just the serialized dict) — verifies line 4574's enforceChannelStrip call — not run."
+    },
+    {
+      "id": "fx-maybepromoteinterpolated-requires-both-gates",
+      "proposed": "Set window._tweenFrameDirty=true and f.isInterpolated=true with strokes differing from f.strokes; call _maybePromoteInterpolated; expect f.isKeyframe=true,f.isInterpolated=false. Repeat with window._tweenFrameDirty=false; expect NO change — verifies the two-gate AND at line 4598 — not run."
+    },
+    {
+      "id": "fx-maybepromoteinterpolated-noop-on-pure-scrub",
+      "proposed": "Simulate pure playhead scrubbing (window._tweenFrameDirty left false by loadFrame's own clear) over an isInterpolated frame; call saveActiveLayerFrame; expect f.isInterpolated to remain true — verifies the structural fix this function documents — not run."
+    },
+    {
+      "id": "fx-invalidatesymbolunion-noop-outside-symbol",
+      "proposed": "With state.activeSymbolId falsy, spy on SMMotion.invalidateSymbolUnionBounds; call _invalidateSymbolUnionIfEditingSymbol; expect zero calls — verifies line 4631's gate — not run."
+    },
+    {
+      "id": "fx-saveactivelayerframe-effects-run-before-gate",
+      "proposed": "Set the active layer's ld.symbolId to a truthy value (a case the layer-kind gate will reject); spy on window._sceneVersion and SMMotion.invalidateSymbolUnionBounds; call saveActiveLayerFrame; expect BOTH to have fired even though the function returns immediately afterward with zero frame writes — verifies the unconditional-before-any-gate ordering at lines 4635-4636 — not run."
+    },
+    {
+      "id": "fx-saveactivelayerframe-freshlyensured-bypasses-trim",
+      "proposed": "Set ld._justEnsuredKeyframeAt=state.currentFrame on a frame outside the layer's own trim range; call saveActiveLayerFrame; expect the trim-range gate to be bypassed for this one call (content saved) — verifies line 4685's freshlyEnsured exception — not run."
+    },
+    {
+      "id": "fx-saveactivelayerframe-visibility-guard-prevents-wipe",
+      "proposed": "Hide a layer with real stored content, navigate frames (loadFrame empties its live Paper layer), then call saveActiveLayerFrame; expect ld.frames[currentFrame].strokes to remain UNCHANGED (not overwritten with []) — verifies the confirmed 2026-07 data-loss fix at line 4664 — not run."
+    },
+    {
+      "id": "fx-savealllayerframes-never-bumps-sceneversion",
+      "proposed": "Spy on window._sceneVersion via a setter/getter proxy; call saveAllLayerFrames() alone (no other function in the same tick); expect the counter to be UNCHANGED afterward — verifies the confirmed asymmetry with saveActiveLayerFrame in `boundaries` — not run."
+    },
+    {
+      "id": "fx-savealllayerframes-independent-trim-ranges",
+      "proposed": "Set two different layers with non-overlapping trim ranges such that state.currentFrame is inside one and outside the other; call saveAllLayerFrames; expect only the in-range layer's frame to be written — verifies line 4705's per-layer (not per-call) trim check — not run."
+    },
+    {
+      "id": "fx-canreusematerialized-all-five-guards-pass",
+      "proposed": "Materialize a layer (lyr._matStrokes=strokes, lyr._smGeomDirty=false, lyr.children.length===strokes.length, window.__smGeomDirtyHookInstalled=true, strokes non-empty), call _canReuseMaterialized(lyr,strokes) with the SAME array reference; expect true — verifies all five guards at lines 4717-4727 — not run."
+    },
+    {
+      "id": "fx-canreusematerialized-fails-on-child-count-mismatch",
+      "proposed": "Same setup as above but externally push one extra child onto lyr.children without updating _matStrokes; expect false — verifies guard 5 (line 4726) catches a divergence the identity test alone would miss — not run."
+    }
+  ],
+  "future_proposals": [
+    "The shared layer-kind guard in both saveActiveLayerFrame (app.js:4663) and saveAllLayerFrames (app.js:4699) is missing `isEffectorLayer`, unlike getEffectiveStrokes' own equivalent guard (app.js:2973, C21k) which treats it identically to isNullLayer/isEffectLayer/isGuideLayer/isWidgetLayer. A future pass should decide whether to add it to both save-writer guards (matching C21l's own already-flagged badComponentSourceReason gap) so all three guards stay in lockstep — not changed here (census scope only).",
+    "saveAllLayerFrames never increments window._sceneVersion itself, unlike saveActiveLayerFrame. Every call site actually read in this census happens to pair it with either a direct saveActiveLayerFrame call or an explicit sibling `_sceneVersion++`, but this was not verified exhaustively across all ~27 calling files. A future pass should either confirm every caller supplies its own bump, or move the increment into saveAllLayerFrames itself for the same reasoning saveActiveLayerFrame already documents (its own lead-in comment names BOTH functions as change-signal checkpoints even though only one of them fires it). Not changed here.",
+    "Two independent features (timeline.js's real, editable selectGhostAll/clearGhostSelection and tweens.js's read-only renderGhostAll onion display) both mint the tag name `data.ghostFrame`, distinguished only by which Paper.js layer the tagged item lives in. This works correctly today (structurally disjoint), but a future maintainer skimming for `data.ghostFrame` usages without also checking the enclosing layer could easily conflate the two. A future pass could rename one of the two tags to make the distinction textually visible, not just structural. Not changed here.",
+    "`ld.locked` is not tested by either save writer's own layer-kind guard, unlike CLAUDE.md's own framing which lists it alongside symbolId/montageId/duplicator-host as an expected persistence-relevant layer-kind gate. Confirmed here that locking only ever blocks live editing (editRefusalReason, out of scope) and never blocks saving of pre-existing content, which is almost certainly correct behavior (a locked layer's content should still persist) — flagged only so a future reader doesn't assume `locked` is an exclusion gate that isn't actually implemented as one."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "Every symbol's external-caller grep was run TWICE per the issue's own methodology note: once with a non-recursive `src/js/*.js` glob (matching a literal reading of the issue's own suggested command) and once with a recursive `find src -name \"*.js\"` scan — the two disagreed materially for saveActiveLayerFrame (24 vs. 34 files) and saveAllLayerFrames (19 vs. 27 files) because six subdirectories (`labs/`, `adapters/`, `bootstrap/`, `animation/`, `application/`, `domain/`) exist under src/js and are invisible to a flat glob; the recursive counts are the ones recorded on each packet's own `callers` field, and the discrepancy itself is recorded in `boundaries`.",
+    "`window._sceneVersion`'s complete cross-file occurrence count was independently re-derived by a whole-`src` recursive grep and matches the issue's own per-file estimates (engine-bridge.js 9, select-bridge.js 9, motion.js 6, timeline.js 5, tools.js 3, native-video-bridge.js 3, tweens.js 2, 7 named singles) exactly — with one correction: labs/out-of-pegs.js's single hit is a comment, not a live code reference (see `boundaries`).",
+    "`strokesEqual`'s and `_deepCloseEqual`'s complete caller lists were independently re-derived by a whole-`src` grep and found to be ENTIRELY internal to this scope (strokesEqual's sole caller is _maybePromoteInterpolated) — a correction to the issue's own prompt text naming engine-bridge.js's tick() as an expected caller (see `boundaries`; tick()'s own diffing reads window._sceneVersion only).",
+    "Every packet's own `classification` (code/comment/whitespace) was independently re-derived by classifying the frozen blob per-packet with the validator's own algorithm (a direct line-by-line `awk`/`sed -n` walk against `git show 59a5a38c:src/js/app.js`), run once per packet and once for the total — 124/231/1 over 356 lines, matching the issue's own proposed union AND per-packet table exactly for all twelve packets; no boundary correction was needed anywhere in this scope.",
+    "`window._tweenFrameDirty`'s complete set/clear site list was located by a single grep (`grep -rn _tweenFrameDirty`), returning exactly 3 hits outside this scope's own two lines (4591 comment, 4598 code): tweens.js:4818 and tweens.js:4913 (both set true, cited by line only) and app.js:4754 (clears false, next-slice loadFrame territory, cited by line only) — directly supporting `_maybePromoteInterpolated`'s own lead-in comment.",
+    "The complete `_smGeomDirty`/`_matStrokes` set/clear site list across the whole file was located by a single grep (`grep -n _smGeomDirty|_matStrokes`), confirming this scope's own `_canReuseMaterialized` (packet 12) is a pure READER of both fields — every write to either belongs to engine-bridge.js's own `_changed` hook (sets `_smGeomDirty=true`) or to loadFrame's own materialize step and a second materialize helper (both clear `_smGeomDirty`/stamp `_matStrokes`, next-slice C21p territory) — directly supporting the correction recorded in `boundaries`."
+  ],
+  "validation": {
+    "expected_assigned_lines": 356,
+    "expected_classification": {
+      "code": 124,
+      "comment": 231,
+      "whitespace": 1
+    },
+    "packet_partition": [
+      [
+        4373,
+        4395
+      ],
+      [
+        4396,
+        4424
+      ],
+      [
+        4425,
+        4492
+      ],
+      [
+        4493,
+        4499
+      ],
+      [
+        4500,
+        4525
+      ],
+      [
+        4526,
+        4562
+      ],
+      [
+        4563,
+        4576
+      ],
+      [
+        4577,
+        4599
+      ],
+      [
+        4600,
+        4633
+      ],
+      [
+        4634,
+        4692
+      ],
+      [
+        4693,
+        4710
+      ],
+      [
+        4711,
+        4728
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by a direct awk/sed-n walk against the frozen blob: 4373-4395=(1,21,1); 4396-4424=(17,12,0); 4425-4492=(20,48,0); 4493-4499=(7,0,0); 4500-4525=(15,11,0); 4526-4562=(16,21,0); 4563-4576=(7,7,0); 4577-4599=(3,20,0); 4600-4633=(4,30,0); 4634-4692=(15,44,0); 4693-4710=(11,7,0); 4711-4728=(8,10,0); sums to (124,231,1)=356 — identical to the issue's own proposed union and per-packet table exactly; no boundary correction needed.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 356 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check_c21o.py engineering/inventory/census/C21o-app-frame-persistence-core.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check_c21o.py engineering/inventory/census/C21n-app-conversions-view-switching.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21o.py engineering/inventory/census/C21m-app-release-to-layers-merge.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21o.py engineering/inventory/census/C21l-app-component-creation.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21o.py engineering/inventory/census/C21k-app-get-effective-strokes.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21o.py engineering/inventory/census/C21j-app-symbol-frame-layer-time-model.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21o.py engineering/inventory/census/C21i-app-rig-deform-ik.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21o.py engineering/inventory/census/C21h-app-rig-model-binding.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21o.py engineering/inventory/census/C21g-app-duplicator-runtime.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21o.py engineering/inventory/census/C21f-app-symbol-matrix-duplicator-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21o.py engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21o.py engineering/inventory/census/C21d-app-desp-relink-remote-merge.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21o.py engineering/inventory/census/C21c-app-path-serialisation-serp.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21o.py engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21o.py engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json <candidate-sha> still exits 0"
+    ]
+  }
+}
