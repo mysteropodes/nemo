@@ -1,0 +1,605 @@
+{
+  "census_id": "C20n",
+  "issue": 1238,
+  "title": "Motion.js valueAtFrame, ease editor entry, key writers (setKeyAtFrame, removeKeyAtCurrentFrame, toggleAnimated, setValue), render-time rotation helpers and element holders (2635-2932)",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf on the src/js/motion.js open span [1769,2932] of remediation-scope.json rangeCoverage (frozen index at 4bbe332), which the C20k-C20n series closes in four slices: C20k 1769-2130 (expression built-ins, merged PR #1261), C20l 2131-2347 (comp/self views, mesh-aware self, AE compatibility aliases, merged PR #1266), C20m 2348-2634 (expression compilation and evaluation, merged PR #1270), C20n 2635-2932 (valueAtFrame, key writers, element holders — this leaf, the fourth and last slice). Sole artifact: engineering/inventory/census/C20n-motion-value-at-frame-key-writers-element-holders.json; src/js/motion.js and all callers remain read-only. Cited by name/line only, not re-mapped: everything before 1769 (_ectx, _randomWith/exprRandom*, rawValueAtFrame motion.js:1270, interp* segment helpers, trackFor motion.js:443, ensureTrack motion.js:1178, hasExpr motion.js:1338, displayValueFor motion.js:1220, PROP_DIM/PROP_LABEL motion.js:506/449 — C02 animation-time census and C20a-j), 1769-2130 (C20k, merged), 2131-2347 (C20l, merged), 2348-2634 (compiledFnFor/evalExpressionFor/normalizeExprResult, C20m, merged), everything after 2932 (computeMotionMat motion.js:2933+, layerMotionAt/elementMotionAt, transformSegments motion.js:5116, transformImageRect motion.js:5133, enableTimeRemap/disableTimeRemap motion.js:12406/12433, meshHolder motion.js:4747, onEaseSegChanged motion.js:13879ish, anyOrderUsedAnywhere motion.js:13708 — sibling-covered), the expression editor panel (C20f, motion.js:8649-9428), expression controls UI (exprControls, C20/C13), rig-widget.js (layerControl, CLAUDE.md §13), image-mesh.js (mesh holders, CLAUDE.md §12/§12ter), engine-bridge.js (affineFromMotion engine-bridge.js:360, buildSceneJson, the render-time consumer), NemoOpacityDomain (application module, src/js/domain/animation/opacity.js) and NemoOpacityApplication (src/js/bootstrap/opacity-application.js), ui.js curve editor (_curveEditor.editMotionSeg, ui.js:679), pushUndo* (tweens.js), showToast (C19w), timeline.js (P30, renderLayerList/renderTimeline/exportJSON/importJSON/duplicateLayer/splitLayerAtPlayhead), app.js (loadFrame app.js:4746, convertLayersToComponent), transplant.js (elementMotion carry-over), tools.js (ensureStrokeId tools.js:1910, elementMotionBakedClone).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "da00405b447bfc621d9963bb48173c739e2d519d",
+  "source_path": "src/js/motion.js",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_line_count": 13914,
+  "scope_files": [
+    "src/js/motion.js"
+  ],
+  "intended_branch": "claude/c20n-motion-value-at-frame-key-writers-census",
+  "assigned_ranges": [
+    {
+      "start": 2635,
+      "end": 2932
+    }
+  ],
+  "coverage_note": "Exactly 298 assigned lines in one contiguous range and seven complete packets: 156 code, 139 full-line comments, 3 blank — independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs (a Python re-implementation executed directly against `git show 59a5a38...:src/js/motion.js`), and it matches the issue's own proposed union AND per-packet table exactly for all seven packets (22=15/6/1, 48=33/14/1, 20=16/4/0, 56=24/32/0, 68=30/37/1, 14=11/3/0, 70=27/43/0) with zero discrepancy. No boundary correction was needed: line 2634 (the trailing `var _timeoutToastPending = false;` of C20m's own evalExpressionFor closure) precedes this scope; line 2635 opens this scope's own `// Public wrapper — the ONE new branch...` lead-in of valueAtFrame (confirmed by direct `sed -n`/`awk` read of the frozen blob with real line numbers). Line 2932 (the last line of computeMotionMat's own lead-in comment, '...matching what the box already does.') closes this scope; line 2933 opens `function computeMotionMat(holder, frameIdx) {`, the sibling-covered construct's own declaration — the issue's own framing (include the lead-in so no line of the open span is orphaned) was taken as-is, re-verified by direct read, no correction needed.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/motion.js resolves to 6617bac29042c22399cac202bf054c09e4fdf30e, 13914 lines.",
+    "current": "This worktree's branch was fast-forwarded from the assigned base 350e3fa (origin/main at task start) to da00405 (origin/main after C20m's PR #1270 merged, a docs-only change to engineering/inventory/census/ that adds zero commits touching src/js/motion.js) — verified directly: `git rev-parse 350e3fa:src/js/motion.js` == `git rev-parse da00405:src/js/motion.js` == `git rev-parse 59a5a38...:src/js/motion.js` == 6617bac29042c22399cac202bf054c09e4fdf30e. `git log --oneline 350e3fa..origin/main` shows exactly one commit (da00405, docs(C20m)) and it touches only engineering/inventory/census/C20m-motion-expression-compile-eval.json.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `grep -rnE '(^|[^a-zA-Z_.])<symbol>\\(' --include=\"*.js\" src` over a recursive scan (164 files), filtered to exclude each symbol's own declaration line and comment-only hits, then reading each surviving hit directly with `sed -n` against this worktree's copy of motion.js and its siblings — confirmed byte-identical to the frozen blob above, so its line numbers are valid frozen-blob citations.",
+    "fixtures": "Every behavioral fixture is source-derived, proposed and unrun."
+  },
+  "writer_guidance": {
+    "artifact": "Only engineering/inventory/census/C20n-motion-value-at-frame-key-writers-element-holders.json is writable for this outcome.",
+    "runtime": "Historical Motion ownership retains motion.js runtime writing; P30 retains timeline.js. C20n transfers no implementation authority.",
+    "owners": "C20a-j/C02 (before line 1769) retain rawValueAtFrame (motion.js:1270), hasExpr (motion.js:1338), trackFor (motion.js:443), ensureTrack (motion.js:1178), sortKeys (motion.js:1188), isAnimated/hasKeys (motion.js:1187), staticValue (motion.js:1201), displayValueFor (motion.js:1220), cloneCurvePts (motion.js:1170), PROP_LABEL (motion.js:449), PROP_DIM/PROP_UNIT (motion.js:506-507), liveItemByStrokeId (motion.js:9732, cited by line only though physically past 2932 — a pre-existing helper this span's ensureElementHolder calls), syncBarSelToLayerSel (motion.js:6932, also physically past 2932 but pre-existing). C20k (1769-2130, merged PR #1261) retains exprNoise/exprWiggle/exprSelfAt/exprLayer/etc in full. C20l (2131-2347, merged PR #1266) retains COMP_VIEW/SELF_VIEW/the AE alias table in full. C20m (2348-2634, merged PR #1270) retains compiledFnFor/evalExpressionFor/normalizeExprResult/_ectx's own writer in full — this span's valueAtFrame is evalExpressionFor's SOLE caller (motion.js:2642) but does not duplicate its body. This artifact (C20n, 2635-2932) declares and retains valueAtFrame, segmentLeftKey, openMotionEaseEditor, opacityLegacy, opacityDomain, setKeyAtCurrentFrame, setKeyAtFrame, removeKeyAtCurrentFrame, toggleAnimated, selectLayerForEdit, setValue, _orderEngineWarnShown, rotPt, rotVec, ensureElementHolder, elementHolder, elementHasMotion — correcting a loose characterization in C20k's own writer_guidance ('C20n retains valueAtFrame/hasExpr/key writers/ensureElementHolder/meshHolder'): hasExpr is actually pre-1769 (C20a-j/C02 territory, motion.js:1338) and meshHolder is actually post-2932 (sibling-covered, motion.js:4747) — neither line falls inside 2635-2932; this is a documentation note about a prior artifact's own prose and changes nothing about that artifact's validated ranges. Sibling-covered past 2932: computeMotionMat (motion.js:2933+), layerMotionAt/elementMotionAt, transformSegments (motion.js:5116), transformImageRect (motion.js:5133), enableTimeRemap/disableTimeRemap (motion.js:12406/12433), meshHolder (motion.js:4747), onEaseSegChanged (motion.js ~13879), anyOrderUsedAnywhere (motion.js:13708). C20f (motion.js:8649-9428) retains the Transform/expression editor panel that calls setKeyAtCurrentFrame/toggleAnimated/setValue as an external caller only. rig-widget.js retains layerControl (CLAUDE.md §13) and is an external caller of SMMotion.valueAtFrame/setLayerValue only. image-mesh.js/image-mesh-bridge.js retain mesh holders (CLAUDE.md §12/§12ter) and are external callers of SMMotion.setValue(ensureElementHolder(...)) only. engine-bridge.js retains affineFromMotion (engine-bridge.js:360) and buildSceneJson, the render-time consumers of this span's output (via the sibling-covered computeMotionMat/transformSegments/transformImageRect chain) — cited by name/line only, never called from this span. app.js retains state/userLayers, loadFrame (app.js:4746), applyLayerDuplicator (app.js:1666-1688), convertLayersToComponent. NemoOpacityDomain (src/js/domain/animation/opacity.js) and NemoOpacityApplication (src/js/bootstrap/opacity-application.js, src/js/application/opacity-application.js) are application modules this span calls through opacityLegacy/opacityDomain but does not declare. timeline.js (P30) retains renderLayerList/renderTimeline/exportJSON/importJSON/duplicateLayer/splitLayerAtPlayhead and the _layerSel/_layerSelAnchor globals this span's selectLayerForEdit writes. tweens.js retains pushUndo*/_cloneLayersForUndo. ui.js retains the shared curve widget (_curveEditor.editMotionSeg, ui.js:679) this span's openMotionEaseEditor calls into. tools.js retains ensureStrokeId (tools.js:1910) and elementMotionBakedClone. transplant.js retains its own elementMotion carry-over line (transplant.js:232)."
+  },
+  "reconciliation": [
+    {
+      "owner": "P03/#1005 rangeCoverage",
+      "disposition": "remediation-scope.json lists src/js/motion.js 1769-2932 as one open 1164-line span (frozen index at 4bbe332), which the C20k-C20n series closes in four slices, all now filed: C20k 1769-2130 (merged PR #1261), C20l 2131-2347 (merged PR #1266), C20m 2348-2634 (merged PR #1270), C20n 2635-2932 (this artifact, the fourth and last slice). This artifact's own 298-line union, combined with the three already-merged siblings' 362+217+287 = 866 lines, accounts for all 1164 lines of the open span (298+866=1164) — the C20k-C20n series closes the parent span in full once this artifact merges, though this artifact alone does not certify that closure (P03's own board update does)."
+    },
+    {
+      "owner": "C20k/C20l/C20m (existing owners, motion.js:1769-2634, merged PR #1261/#1266/#1270)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. This span's own valueAtFrame (motion.js:2639-2646) is evalExpressionFor's (C20m, motion.js:2542) SOLE caller (grep-confirmed, zero other call sites in src/js), and evalExpressionFor's own compiled-function sandbox argument list (motion.js:2572-2591) never calls back into anything declared in this span — the dependency is one-directional (C20n calls into C20m, never the reverse)."
+    },
+    {
+      "owner": "C02 animation-time census and C20a-j (existing owners, motion.js:1-1768)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. This span calls seven pre-1769 helpers directly: rawValueAtFrame (motion.js:1270, valueAtFrame's own first branch), hasExpr (motion.js:1338, valueAtFrame's own expression gate), trackFor (motion.js:443, openMotionEaseEditor/removeKeyAtCurrentFrame), ensureTrack (motion.js:1178, setKeyAtCurrentFrame/setKeyAtFrame/toggleAnimated), isAnimated (motion.js:1187, toggleAnimated/setValue), displayValueFor (motion.js:1220, toggleAnimated's OFF→ON seed value), cloneCurvePts (motion.js:1170, toggleAnimated's manual key construction), plus PROP_LABEL (motion.js:449) and DEFAULT_CURVE (motion.js:935, NemoOpacityDomain.defaultCurve())."
+    },
+    {
+      "owner": "app.js (existing owner, the global state/userLayers objects, loadFrame, applyLayerDuplicator, convertLayersToComponent)",
+      "disposition": "Retains its own body in full — cited by line only. setValue's own timeRemap branch (motion.js:2843-2844) calls window.loadFrame (app.js:4746) and window.SMEngineBridge.renderNow() directly — the only two external-module calls this span makes for a document-visible refresh side effect. app.js:1666-1688 (applyLayerDuplicator) and app.js:2782/3160 are external callers of SMMotion.valueAtFrame only, reading this span's output without ever writing back into it."
+    },
+    {
+      "owner": "NemoOpacityDomain (application module, src/js/domain/animation/opacity.js) and NemoOpacityApplication (src/js/bootstrap/opacity-application.js, src/js/application/opacity-application.js)",
+      "disposition": "Retain their own bodies in full — cited by name/line only, per the issue's own exclusion list. This span's opacityLegacy/opacityDomain (motion.js:2691-2696) are the ONLY bridge points: every opacity-prop key write in this span (setKeyAtCurrentFrame, setKeyAtFrame, removeKeyAtCurrentFrame, toggleAnimated, setValue) tries opacityLegacy(kind,...) first (which forwards to window.NemoOpacityApplication.legacy, bootstrap/opacity-application.js:64, when that global exists) and falls back to calling opacityDomain() (window.NemoOpacityDomain) directly only when NemoOpacityApplication is unavailable. Every non-opacity prop write in this span calls NemoOpacityDomain.setTrackKey/removeTrackKey directly (opacity.js:44/60), bypassing the Application layer entirely — this is the feature-module boundary the issue asks to be documented, detailed in full in this artifact's ease-editor-and-opacity-domain and set-key-at-frame packets."
+    },
+    {
+      "owner": "engine-bridge.js (existing owner, affineFromMotion engine-bridge.js:360, buildSceneJson, the render-time consumer)",
+      "disposition": "Retains its own body in full — cited by name/line only. engine-bridge.js never calls anything declared in this span directly; it reaches this span's output only through the sibling-covered chain computeMotionMat (motion.js:2933+, calls this span's valueAtFrame five times at motion.js:2938-2942) → SMMotion.computeMotionMatFor (motion.js:13587, an alias export) → engine-bridge.js:1281 (SMMotion.computeMotionMatFor(sl,nvsymIi)), and through transformSegments/transformImageRect (motion.js:5116/5133, sibling-covered, themselves calling this span's rotPt/rotVec at motion.js:5119-5122/5142/5184/5188) which engine-bridge.js calls directly at ~24 call sites (e.g. engine-bridge.js:1670-1671,1711,1832-1834,2123-2124,2227,2832,2870, 3624,3778 for transformSegments; 1115,1160,1190,1193,1268,1287,1305,1309, 1431-1433 for transformImageRect). affineFromMotion (engine-bridge.js:360) is a SEPARATE, independently-written closed-form matrix computation that must mathematically mirror rotPt/rotVec's per-point results — CLAUDE.md §5ter's own invariant ('affineFromMotion DOIT rester le miroir exact de transformSegments') — documented by line only in the render-time-rotation-helpers packet below, not re-derived."
+    },
+    {
+      "owner": "rig-widget.js (existing owner, layerControl, CLAUDE.md §13) and image-mesh.js/image-mesh-bridge.js (existing owners, mesh holders, CLAUDE.md §12/§12ter)",
+      "disposition": "Retain their own bodies in full — cited by line only. rig-widget.js:112 calls SMMotion.valueAtFrame directly (a widget axis's own read); rig-widget.js:307-308,380 and 137 call SMMotion.setLayerValue (wraps this span's setValue) and SMMotion.transformSegments respectively. image-mesh-bridge.js/text-animator.js call SMMotion.setValue on a holder produced by this span's ensureElementHolder (motion.js:4716,4771, text-animator.js:213/215-216) — the per-vertex mesh case reuses the IDENTICAL element-holder machinery, keyed by meshId instead of strokeId (CLAUDE.md §12ter point 1)."
+    },
+    {
+      "owner": "timeline.js (P30, existing owner) and tweens.js (existing owner, pushUndo*/_cloneLayersForUndo)",
+      "disposition": "Retain their own bodies in full — cited by line only. This span's selectLayerForEdit (motion.js:2794-2804) writes timeline.js's own _layerSel/_layerSelAnchor globals (timeline.js:5423/5432) and calls timeline.js's setActiveLayer (timeline.js:1534), renderLayerList (timeline.js:6335) and renderTimeline (timeline.js:4026) directly — the only cross-module DOM-refresh calls in this span outside setValue's timeRemap branch. Zero calls to pushUndo/pushUndoLayers/saveActiveLayerFrame/saveAllLayerFrames anywhere in 2635-2932 (grep-confirmed) — checkpoint responsibility belongs entirely to each writer's OWN caller (e.g. motion.js:10977's context-menu action calls pushUndo() before setKeyAtCurrentFrame). ld.elementMotion's undo safety comes for free from tweens.js's own generic whole-layers JSON clone (_cloneLayersForUndo, tweens.js:4820-4831) since it lives ON the layer object, unlike cameraKeys/imageMeshes which needed a separate explicit snapshot line."
+    },
+    {
+      "owner": "tools.js (existing owner, ensureStrokeId tools.js:1910, elementMotionBakedClone) and transplant.js (existing owner)",
+      "disposition": "Retain their own bodies in full — cited by line only. ensureElementHolder (this span) is keyed by strokeId but does not itself guarantee one exists; ensureStrokeId (tools.js:1910) is the pre-existing per-item id generator every stroke already relies on (fillWalls/team-review, per this span's own lead-in comment at motion.js:2864-2865). transplant.js:232 carries clone.elementMotion onto the destination layer by reference (not a fresh JSON clone at that line) — cited by line only, not re-derived."
+    },
+    {
+      "owner": "P30/#1032 and historical Motion ownership",
+      "disposition": "P30 retains timeline.js runtime writing and historical Motion ownership retains motion.js. This artifact's authoring permits no source or behavior change."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 2634 (`var _timeoutToastPending = false;`, the trailing statement of C20m's own evalExpressionFor closure, confirmed by direct `awk`/`sed -n` read with real line numbers) precedes this scope; line 2635 opens this scope's own `// Public wrapper — the ONE new branch...` lead-in comment of valueAtFrame. Line 2932 (the last line of computeMotionMat's own lead-in comment) closes this scope; line 2933 opens `function computeMotionMat(holder, frameIdx) {`, the sibling-covered construct's own declaration (confirmed by direct read). All four boundary lines re-verified with `awk 'NR==<n>'` against the frozen blob.",
+    "Every one of the seven packet cuts in the issue's own suggested table lands exactly on a function's own lead-in comment, a blank-line/declaration seam, or (packet 6) a `// ---- ` section header in the frozen blob (2635/2657/2705/2725/2781/2849/2863) — re-verified line-by-line with `awk 'NR==<n>'` for all seven cut points before accepting the table; no correction was needed.",
+    "opacityLegacy/opacityDomain (motion.js:2691-2696) sit textually inside the ease-editor-and-opacity-domain packet's own range (2657-2704) per the issue's own table, but are called from FOUR OTHER packets in this artifact (set-key-at-frame, toggle-animated, select-layer-and-set-value) as well as from setKeyAtCurrentFrame in their own packet — documented as internal cross-packet calls (never external_calls) in each consuming packet's own external_calls/callers field, not duplicated as a second declaration.",
+    "ensureElementHolder's own strokeId parameter is not itself validated or generated by this span — it trusts whatever caller passes (a stroke's data.strokeId, or a mesh's meshId, per CLAUDE.md §12ter point 1). The pre-existing ensureStrokeId (tools.js:1910, cited by name/line only) is what actually guarantees a stroke has one before any caller in this span is reached.",
+    "valueAtFrame's render-path claim is confirmed rather than merely asserted: computeMotionMat (sibling-covered, motion.js:2938-2942) calls it five times per layer per rendered frame (position/anchor/rotation/scale/opacity), and computeMotionMat is itself SMMotion.computeMotionMatFor (motion.js:13587, a bare alias, zero wrapping logic), called from engine-bridge.js:1281 inside buildSceneJson's own per-layer nested-Component loop. The same five-call pattern recurs at motion.js:3024-3035 (layerMotionAt, 3D branch) and motion.js:3081-3090/3316-3321 (parent-blend composition), all sibling-covered but all confirmed to call THIS span's valueAtFrame, not a copy.",
+    "rotPt/rotVec's render-path claim is confirmed the same way: transformSegments (motion.js:5116-5124) and transformImageRect (motion.js:5133-5149ish), both sibling-covered and both exported as SMMotion.transformSegments/transformImageRect, call this span's rotPt at motion.js:5119,5142,5184,5188 and rotVec at motion.js:5121-5122 — and engine-bridge.js calls those two exports at roughly 24 call sites across buildSceneJson (the on-screen render path) and the export frame builder alike, per the reconciliation entry above."
+  ],
+  "areas": [
+    {
+      "area": "value-at-frame-and-segment",
+      "packets": [
+        {
+          "id": "C20n.value-at-frame-and-segment",
+          "files": [
+            "src/js/motion.js:2635-2656"
+          ],
+          "coverage_ranges": [
+            [
+              2635,
+              2656
+            ]
+          ],
+          "classification": {
+            "code": 15,
+            "comment": 6,
+            "whitespace": 1
+          },
+          "symbols": [
+            "valueAtFrame",
+            "segmentLeftKey"
+          ],
+          "signature": "valueAtFrame(ld, prop, frame) -> number[] (length PROP_DIM[prop], motion.js:506-507, pre-span); segmentLeftKey(track, frame) -> key-object | null",
+          "responsibility": "Lead-in (2635-2638, 4 lines) frames valueAtFrame as 'the ONE new branch on top of the pre-existing rawValueAtFrame, checked first so an enabled-with-error expression still falls through to the exact keyframed/static value it would have shown before expressions existed'. valueAtFrame(ld,prop,frame) (2639-2646, THE public read, exact branch order): (1) `var raw = rawValueAtFrame(ld, prop, frame)` (motion.js:1270, pre-1769/C02-C20a-j) is ALWAYS computed first, unconditionally; (2) `if (hasExpr(ld, prop))` (motion.js:1338, pre-1769) gates the ONLY other branch — hasExpr is true iff `holder.expressions[prop].enabled && holder.expressions[prop].code` are both truthy; (3) inside that gate, `var evaluated = evalExpressionFor(ld, prop, frame, raw)` (C20m, motion.js:2542) is called, passing `raw` itself as the expression's own fallback value (exposed inside the compiled function as its first positional numeric-or-array argument, C20m's own sandbox binding); (4) `if (evaluated !== null) return evaluated` — a non-null expression result WINS over the raw value; (5) otherwise (no expression, OR hasExpr false, OR evalExpressionFor itself returned null on a compile/runtime error, depth cap, or timeout — see C20m's own error paths) falls through to `return raw` at the function's very last line. This ordering is exactly what the lead-in promises: a property whose expression is enabled but currently erroring degrades to the ordinary keyframed/static value, never to a blank/NaN/frozen read. segmentLeftKey(track, frame) (2649-2656): finds the LEFT key of the segment governing `frame` — returns null if the track has fewer than 2 keys (2653, no segment exists yet); returns the second-to-last key if `frame` is at or past the last key's own frame (2654, holds the final segment open past the end); otherwise scans backward from the second-to-last key for the first key whose own `.frame` is `<= frame` (2655); falls back to `ks[0]` if the scan finds nothing (2656, `frame` is before the first key). Explicitly documented (2650-2651) as 'same contract as camera.js's segmentLeftKey, generalized to any track' — camera.js:148 declares an UNRELATED same-named function (`function segmentLeftKey(frame)`, one argument, closes over camera.js's own module-scoped keys array) in camera.js's own IIFE scope; the two are namesakes with matching algorithms, not the same declaration, and camera.js:605/609 call ONLY camera.js's own copy.",
+          "return_shape": "rawValueAtFrame (pre-span) always returns a freshly-allocated array: `.v.slice()` for a key-anchored frame, or an interpolated array built element-by-element for `d` in `0..a.v.length` (motion.js:1270-1301ish) — length equals PROP_DIM[prop] (motion.js:506): 2 for position/anchor/scale/dupOffsetPos/dupOffsetScale, 1 for every other property (rotation/opacity/order/timeRemap/positionZ/rotationX/rotationY/the corner and arc/star props/pathPercent/pathInfluence/parentBlend/matteOn/the timeLink offsets/the dupOffset scalars). When the expression branch wins, evalExpressionFor's own `normalizeExprResult` (C20m) coerces the compiled function's return value to the SAME shape — a 1D property's expression may return a bare number (wrapped to a 1-length array) while a 2D property must return `[x,y]` (rejected with `exprErrorMustReturnNumberOrXY` otherwise, C20m) — so valueAtFrame's return shape is uniform regardless of which branch produced it. expr-bake.js:180-187's own comment independently documents and relies on this same invariant ('SM.valueAtFrame ALWAYS returns an array, even for a 1D property... rawValueAtFrame stores every track as v:[n]') — cited by line only, external caller confirming the same contract from outside motion.js.",
+          "render_path": "YES — valueAtFrame is THE render-path entry for every animatable property. Direct render-path callers (all sibling-covered, motion.js past 2932): computeMotionMat (motion.js:2938-2942, 5 calls: position/anchor/rotation/scale/opacity), itself exported verbatim as SMMotion.computeMotionMatFor (motion.js:13587) and called from engine-bridge.js:1281 inside buildSceneJson's nested-Component composition loop — the actual per-frame scene-JSON build feeding the Rust/WebGPU engine (and, when the engine is off, the Paper.js fallback canvas); layerMotionAt's own 3D/parent-blend siblings (motion.js:3024-3035, 3081-3090, 3316-3321, 3787-3890, all reached from the same buildSceneJson chain). export.js reaches the identical chain through getEffectiveStrokesRendered (cited by name only, export.js's own census) — no separate export-only valueAtFrame call site exists; export and on-screen render share this one function (matching CLAUDE.md §3's single-render-path principle).",
+          "callers": "Within this artifact's own span: openMotionEaseEditor does NOT call valueAtFrame (it reads track.keys directly); toggleAnimated (motion.js:2751,2766, own effective-value read before flipping mode); computeMotionMat's own lead-in belongs to the sibling range. Internal to motion.js, past 2932 (sibling-covered, representative not exhaustive — 60+ call sites total): motion.js:1221 (displayValueFor's own animated branch, pre-span, reads OUR valueAtFrame forward), 1954-1966,2014 (layerSnapshot/exprLayer, C20l), 2938-2942/3024-3035/3081-3090/3316-3321 (computeMotionMat and 3D/parent-blend siblings), 3448,3503 (path-follow influence), 3663,3787-3890 (parent-blend composition), 4042 (anchor-array build), 4334-4403 (fill/stroke/order color and z-order reads), 4504 (setLayerParent's compensation math), 4641,4690,4761,4819 (brush size/mesh vertex/trim reads), 5062,5274,5473,5592-5736,5920-6259,6301-6706 (the on-canvas drag/gizmo machinery), 8168 (parent-blend weight), 8739-10977 (the Motion panel's own scrub/field-commit handlers, which loop back into setKeyAtCurrentFrame in THIS span), 13467/13608 (getLayerValue export, matteOn read). External to motion.js (via window.SMMotion.valueAtFrame, exported motion.js:13353): nemo-script.js:125 (scripted read), audio-bridge.js:39,336,473 (volume envelopes), rig-widget.js:112 (CLAUDE.md §13's own layerControl read), effector-layer.js:85,89,203, motion-graph.js:135, expr-bake.js:191, tracker.js:158, app.js:1666-1688 (applyLayerDuplicator's own dupOffset* reads), app.js:2782,3160, bootstrap/opacity-application.js:7 (the `read()` port every opacity Application operation uses), src/js/application/opacity-application.js:76, src/js/domain/animation/opacity.js:27 (NemoOpacityDomain.snapshot's own StoryBoard-facing opacity read). segmentLeftKey's only caller anywhere is openMotionEaseEditor (motion.js:2684, this artifact's own next packet).",
+          "external_calls": [
+            "rawValueAtFrame — motion.js:1270 (C02/C20a-j, unconditional first call)",
+            "hasExpr — motion.js:1338 (C02/C20a-j, expression-enabled gate)",
+            "evalExpressionFor — motion.js:2542 (C20m, merged PR #1270, only when hasExpr is true)"
+          ],
+          "effects": "Zero document/state writes — both functions are pure reads over `ld`/`track`, returning freshly-allocated local arrays/references. No pushUndo, no save, no render call."
+        }
+      ]
+    },
+    {
+      "area": "ease-editor-and-opacity-domain",
+      "packets": [
+        {
+          "id": "C20n.ease-editor-and-opacity-domain",
+          "files": [
+            "src/js/motion.js:2657-2704"
+          ],
+          "coverage_ranges": [
+            [
+              2657,
+              2704
+            ]
+          ],
+          "classification": {
+            "code": 33,
+            "comment": 14,
+            "whitespace": 1
+          },
+          "symbols": [
+            "openMotionEaseEditor",
+            "opacityLegacy",
+            "opacityDomain",
+            "setKeyAtCurrentFrame"
+          ],
+          "signatures": [
+            "openMotionEaseEditor(ld, prop) -> void (opens window._curveEditor in points mode)",
+            "opacityLegacy(kind, holder, values, frame, curvePoints) -> writer-result | null",
+            "opacityDomain() -> window.NemoOpacityDomain",
+            "setKeyAtCurrentFrame(ld, prop, values) -> key-object"
+          ],
+          "responsibility": "openMotionEaseEditor(ld,prop) (2664-2690): opens the SHARED curve widget (`window._curveEditor.editMotionSeg`, ui.js:679-684, cited by line only) in its points-based mode — the lead-in (2657-2663) states this reuses the Tween feature's own on-curve-waypoint model 'rather than camera.js's simpler 2-handle bezier', scoped to ONE segment's own `key.curvePoints`. Early-out (2665): if `trackFor(ld,prop)` (motion.js:443, pre-span) has no track or zero keys, shows a toast ('Anime d'abord ' + PROP_LABEL[prop] + SM.t('toastAnimIconTip')) and returns — the property must already be keyframed. Auto-create-missing-second-key (2666-2682, explicit request: 'créer les clés manquantes si il le faut'): if the track has EXACTLY one key, computes a second frame `nf` — the current playhead frame if it differs from the only key's own frame, else +12 frames (clamped to `state.totalFrames-1`), else -12 frames if the +12 attempt didn't move (2677-2678) — then pushes a new key at `nf` with the SAME value (`only.v.slice()`), `cloneCurvePts(DEFAULT_CURVE)` (motion.js:935/1170, pre-span), and zeroed `hOut`/`hIn`, sorts the track (`sortKeys`, motion.js:1188, pre-span) and calls `renderLayerList(); renderTimeline();` (timeline.js:6335/4026) to repaint the two panels immediately. Segment selection (2684-2687): `segmentLeftKey(track, state.currentFrame) || track.keys[0]` (this artifact's own packet 1) picks the governing key, `next` is whichever neighbor exists (`track.keys[idx+1] || track.keys[idx-1]`) — if neither exists (a genuinely single-key, non-editable track, which the auto-create step above should have already prevented for the 1-key case, but a 0-key track already returned earlier), shows `toastCannotCreateEditableSegment` and returns. Callback contract (2689-2690, confirmed against ui.js): `window._curveEditor.editMotionSeg(seg, label)` (ui.js:679-684) stores `seg`/`label` in ui.js's own module-scoped `motionEaseSeg`/`motionEaseLabel`, opens the 'easing-sec' panel section, and redraws — the widget then mutates `seg.curvePoints` in-place on every drag/add/delete-point gesture (2662-2663's own comment states this live-reference contract), and ui.js's own commit path (ui.js:324-331, cited by line only) calls `window.SMMotion.onEaseSegChanged(motionEaseSeg)` — a SIBLING-COVERED function (motion.js ~13879+, past 2932) that repaints and, when 2+ keys are selected, propagates the same curvePoints onto every OTHER selected key (a CLONED copy per key, never shared by reference, per that function's own comment). openMotionEaseEditor itself never calls onEaseSegChanged — that link is ui.js's own responsibility, not this span's.\nopacityLegacy(kind,holder,values,frame,curvePoints) (2691-2695) and opacityDomain() (2696) are the application-module bridge every opacity-prop key writer in this artifact goes through FIRST. opacityLegacy reads `window.NemoOpacityApplication` (bootstrap/opacity-application.js, cited by name/line only) and, if it exists AND its own `.legacy` field is a function, forwards the call verbatim and returns its result (bootstrap/opacity-application.js:64-73: maps kind 'set'|'key-current'|'key-frame'|'remove'|'animated' to `domain.setValue`/`setKeyAtFrame`/`setKeyAtFrame`/`removeKeyAtFrame`/`setAnimated` on `NemoOpacityDomain` — domain.js is the SAME module opacityDomain() below exposes directly — then calls `app.changed()`, a bare revision-counter bump, NEVER a history checkpoint, and returns the domain call's own result, which is never null for a recognized kind). opacityLegacy returns `null` ONLY when `window.NemoOpacityApplication` itself doesn't exist or lacks a callable `.legacy` — i.e. bootstrap/opacity-application.js hasn't run (or was removed). opacityDomain() is a one-line accessor returning `window.NemoOpacityDomain` (src/js/domain/animation/opacity.js) — every one of this artifact's five opacity-prop branches (setKeyAtCurrentFrame/setKeyAtFrame/removeKeyAtCurrentFrame/toggleAnimated/setValue) calls `opacityDomain()` directly ONLY as the fallback taken when `opacityLegacy(...)` returned null — in normal operation (bootstrap loaded) the Application-then-Domain path always wins and the bare opacityDomain() call beneath it is dead code kept for resilience.\nsetKeyAtCurrentFrame(ld,prop,values) (2697-2704): for `prop==='opacity'`, tries `opacityLegacy('key-current', ld, values, state.currentFrame)` first, falling back to `opacityDomain().setKeyAtFrame(ld, state.currentFrame, values)` (no explicit curvePoints — opacity.js:57-59 defaults to `DEFAULT_CURVE` when creating a new key). For every OTHER prop: `NemoOpacityDomain.setTrackKey(ensureTrack(ld, prop), state.currentFrame, values)` — calls the SAME domain module's `setTrackKey` DIRECTLY, bypassing opacityLegacy/NemoOpacityApplication entirely (the Application layer only mediates the opacity prop; every other prop's key write is a bare Domain call plus this span's own `ensureTrack`, motion.js:1178, pre-span, generic per-prop, distinct from opacity.js's own opacity-only `ensureTrack`, opacity.js:34-38).",
+          "key_writer_contract": "setTrackKey(track,frame,values,curvePoints,defaults) (opacity.js:44-56, the SHARED write primitive every non-opacity AND opacity key-write eventually reaches): looks up an existing key at `frame` via `keyAt` (opacity.js:39-43, linear scan of `track.keys`); if found, MUTATES it in place — `key.v = values.slice()` always, `key.curvePoints = curvePoints` only if a `curvePoints` argument was actually passed (an existing key's ease survives a plain value-only write) — this IS the dedupe rule: writing to an already-keyed frame updates value/curve on the SAME key object rather than creating a duplicate. If no key exists at `frame`, creates a NEW key object `{frame, v: values.slice(), curvePoints: <passed curve, or defaults.defaultCurve(), or opacity.js's own DEFAULT_CURVE>, hOut: [0,0], hIn: [0,0]}`, pushes it, then re-sorts the WHOLE `track.keys` array ascending by `.frame` (`.sort(function(a,b){return a.frame-b.frame})`) — sort-then-return, so the caller always sees keys in frame order regardless of insertion order. Zero pushUndo calls anywhere in setTrackKey, setKeyAtCurrentFrame, or this whole packet.",
+          "callers": "openMotionEaseEditor: exactly one caller anywhere in src/js — motion.js:10983 (the Motion panel's own key context-menu 'ctxEditEaseCurve' action, sibling-covered, wraps it in `pushUndo();` before calling). opacityLegacy: called only from within this artifact's own five key-writer functions (motion.js:2699,2711,2719,2752,2808). opacityDomain: same five internal call sites (motion.js:2701,2713,2721,2754,2810). setKeyAtCurrentFrame: exported as SMMotion.setKeyAtCurrentFrame (motion.js:13365); internal callers setValue (motion.js:2812, this artifact's own packet 5) and ~9 sibling-covered Motion-panel commit handlers (motion.js:8739,8755,10096,10170,10353,10660,10977 — the last one also calling openMotionEaseEditor's sibling `pushUndo()` pattern).",
+          "external_calls": [
+            "trackFor — motion.js:443 (C02/C20a-j)",
+            "sortKeys — motion.js:1188 (C02/C20a-j, inside setTrackKey via opacity.js)",
+            "cloneCurvePts / DEFAULT_CURVE — motion.js:1170 / motion.js:935 (C02/C20a-j)",
+            "renderLayerList / renderTimeline — timeline.js:6335 / timeline.js:4026 (P30)",
+            "window._curveEditor.editMotionSeg — ui.js:679 (ui.js's own census)",
+            "window.NemoOpacityApplication.legacy — src/js/bootstrap/opacity-application.js:64 (application module)",
+            "NemoOpacityDomain.setTrackKey / .setKeyAtFrame — src/js/domain/animation/opacity.js:44,57 (application module)",
+            "ensureTrack — motion.js:1178 (C02/C20a-j)"
+          ],
+          "effects": "openMotionEaseEditor: MAY push a new key onto `track.keys` (only in the 1-key auto-create path) and always re-sorts; triggers two DOM repaints (renderLayerList/renderTimeline) only in that same path; opens ui.js's own easing panel via a global side-channel object (motionEaseSeg/motionEaseLabel), not a return value. opacityLegacy/opacityDomain: no direct effects of their own — pure dispatch. setKeyAtCurrentFrame: writes/updates one key on `holder.motion[prop].keys` (or the opacity Application's own tracked copy) via the contract above; zero render/undo side effects of its own (the caller is responsible)."
+        }
+      ]
+    },
+    {
+      "area": "set-key-at-frame",
+      "packets": [
+        {
+          "id": "C20n.set-key-at-frame",
+          "files": [
+            "src/js/motion.js:2705-2724"
+          ],
+          "coverage_ranges": [
+            [
+              2705,
+              2724
+            ]
+          ],
+          "classification": {
+            "code": 16,
+            "comment": 4,
+            "whitespace": 0
+          },
+          "symbols": [
+            "setKeyAtFrame",
+            "removeKeyAtCurrentFrame"
+          ],
+          "signature": "setKeyAtFrame(holder, prop, frame, values, curvePoints) -> key-object; removeKeyAtCurrentFrame(ld, prop) -> void",
+          "responsibility": "Lead-in (2705-2708) frames setKeyAtFrame as the 'Arbitrary-frame sibling of setKeyAtCurrentFrame — for callers that build several keys across a range in ONE pass (Text Animator, below) rather than reacting to the playhead one commit at a time', with curvePoints 'defaulting to DEFAULT_CURVE when omitted'. setKeyAtFrame(holder,prop,frame,values,curvePoints) (2709-2716): for `prop==='opacity'`, `opacityLegacy('key-frame', holder, values, frame, curvePoints)` first (bootstrap/opacity-application.js:64 maps 'key-frame' to `domain.setKeyAtFrame(holder, frame, values, curvePoints)`, opacity.js:57-59 — NOTE this calls opacity.js's OWN opacity-only `ensureTrack` (opacity.js:34-38, `holder.motion.opacity`), a DIFFERENT function from motion.js's generic `ensureTrack(ld,prop)` used two lines below for the non-opacity branch — same name, two module-scoped declarations, never confused because each is called from its own branch), falling back to `opacityDomain().setKeyAtFrame(holder, frame, values, curvePoints)`. For every other prop: `NemoOpacityDomain.setTrackKey(ensureTrack(holder, prop), frame, values, curvePoints)` — motion.js's OWN generic `ensureTrack` here, curvePoints passed straight through to setTrackKey's own defaulting logic (this artifact's packet 2 key_writer_contract). removeKeyAtCurrentFrame(ld,prop) (2717-2724): for `prop==='opacity'`, `opacityLegacy('remove', ld, null, state.currentFrame)` first (maps to `domain.removeKeyAtFrame(holder, frame)`, opacity.js:69-71, itself `removeTrackKey(trackFor(holder), frame)` using opacity.js's OWN opacity-only `trackFor` (opacity.js:32) — again a distinct same-named function from motion.js's generic `trackFor`), falling back to `opacityDomain().removeKeyAtFrame(ld, state.currentFrame)`. For every other prop: `NemoOpacityDomain.removeTrackKey(trackFor(ld, prop), state.currentFrame)` — motion.js's generic `trackFor` (motion.js:443, pre-span) here.",
+          "key_writer_contract": "removeTrackKey(track,frame) (opacity.js:60-63): looks up the key at `frame` via `keyAt` (opacity.js:39-43); if found, `track.keys.splice(track.keys.indexOf(key), 1)` — removes exactly that one key object; if no key exists at that EXACT frame, silently does nothing (no error, no toast) — a caller invoking removeKeyAtCurrentFrame on a frame with no key there is a no-op. Zero pushUndo calls in either function. setKeyAtFrame's dedupe/sort rule is identical to setKeyAtCurrentFrame's (packet 2's own key_writer_contract) since both bottom out in the same `setTrackKey`/`domain.setKeyAtFrame` primitive — the only difference is the explicit `frame`/`curvePoints` arguments instead of always targeting `state.currentFrame` with an omitted curve.",
+          "callers": "setKeyAtFrame: exported as SMMotion.setKeyAtFrame (motion.js:13824, alongside ensureElementHolder — the comment at motion.js:13817-13822 states these are 'the only two pieces that weren't already exported for an external caller to build a multi-key staggered animation in one pass'). External caller: text-animator.js:215-216 (per-glyph/word/line stagger preset, writes a from/to key pair per animated property). Internal sibling-covered caller: motion.js:4515,4518 (setLayerParent's own hold-key compensation when switching parents mid-timeline — motion.js:4504-4518, seeds a HOLD key one frame earlier with the uncompensated value so frames before the switch don't retroactively move, per that function's own comment). domain.js's own `setKeyAtFrame` (opacity.js:57) additionally has one internal caller inside opacity.js itself, `setAnimated` (opacity.js:80) — a DIFFERENT declaration in a different module, not this span's. removeKeyAtCurrentFrame: not exported on SMMotion; six sibling-covered internal callers, all inside the Motion panel's own key-toggle/delete handlers (motion.js:8737,8752,10093,10167,10369,10657).",
+          "external_calls": [
+            "opacityLegacy / opacityDomain — motion.js:2691/2696 (this artifact's own packet 2)",
+            "NemoOpacityDomain.setTrackKey / .removeTrackKey / .setKeyAtFrame / .removeKeyAtFrame — src/js/domain/animation/opacity.js:44,57,60,69 (application module)",
+            "ensureTrack (generic) — motion.js:1178 (C02/C20a-j)",
+            "trackFor (generic) — motion.js:443 (C02/C20a-j)"
+          ],
+          "effects": "setKeyAtFrame: writes/updates one key at the given frame per the key_writer_contract above. removeKeyAtCurrentFrame: removes at most one key at the current frame, or no-ops. Neither calls pushUndo, save, or a render function directly — callers own that."
+        }
+      ]
+    },
+    {
+      "area": "toggle-animated",
+      "packets": [
+        {
+          "id": "C20n.toggle-animated",
+          "files": [
+            "src/js/motion.js:2725-2780"
+          ],
+          "coverage_ranges": [
+            [
+              2725,
+              2780
+            ]
+          ],
+          "classification": {
+            "code": 24,
+            "comment": 32,
+            "whitespace": 0
+          },
+          "symbols": [
+            "toggleAnimated"
+          ],
+          "signature": "toggleAnimated(ld, prop) -> void",
+          "responsibility": "Lead-in (2725-2748, 24 lines) documents two independent things: (a) the stopwatch OFF→ON/ON→OFF semantics (2725-2730): OFF→ON 'starts animating from the CURRENT effective value (matches AE: turning on keyframing never jumps the value)'; ON→OFF 'freezes at the current interpolated value as a static override', same 'manual edit wins' principle CLAUDE.md documents for fill-merge; (b) a 2026-08 historical note (2731-2748) that this function used to silently auto-convert a plain layer to a Component on its first layer-level property edit (originally 2+-element layers, later widened to ANY layer for StoryBoard eligibility, CLAUDE.md §8's own 'StoryBoard ne manipule QUE des Components' rule) — REMOVED per explicit feedback ('évite de faire automatiquement des composant dans motion, ça doit être manuelle'); rendering was NEVER affected either way (engine-bridge.js's buildSceneJson applies motionMat to every layer regardless of symbolId) — only the UX shortcut and its StoryBoard side effect were removed; the manual conversion entry point (timeline.js's convertLayerToComponent/convertLayersToComponent, cited by name only) still exists. Body (2749-2780), branch order: (1) `prop==='opacity'` (2750-2755) — computes `animated = !isAnimated(ld,prop)` (motion.js:1187, pre-span) and `effectiveValue = valueAtFrame(ld,prop,state.currentFrame)` (this artifact's own packet 1) BEFORE dispatching, then tries `opacityLegacy('animated', ld, animated, state.currentFrame, effectiveValue)` — note the `values` positional slot is reused to carry the boolean `animated` flag for this one `kind` — falling back to `opacityDomain().setAnimated(ld, animated, state.currentFrame, effectiveValue)`. (2) `prop==='timeRemap'` (2756-2762) — SPECIAL-CASED, no static fallback exists for Time Remap ('the feature is either on... or off... no \"static timeRemap\" fallback to freeze into', matching AE): resolves the layer's own index (`state.layers.indexOf(ld)`, bails if not found) and calls the sibling-covered `disableTimeRemap(tli)`/`enableTimeRemap(tli)` (motion.js:12406/12433) depending on whether `ld.timeRemap` already exists. (3) generic branch, turning OFF (2763-2769, `isAnimated(ld,prop)` true): `v = valueAtFrame(ld,prop,state.currentFrame)` (the CURRENT interpolated value, captured before wiping); `ld.motion[prop] = {keys: []}` — REPLACES the whole track object with a fresh empty one (unlike opacity.js's own `setAnimated`, which mutates `ensureTrack(holder).keys = []` on the SAME object — this span's own generic path allocates a new object instead); `ld.motionStatic[prop] = v` freezes the just-read interpolated value. (4) generic branch, turning ON (2770-2779, else): `cur = displayValueFor(ld, prop)` (motion.js:1220, pre-span) reads 'what the field was actually SHOWING' — the lead-in cites feedback #215: a property like 'order' whose untouched/natural value isn't a flat 0 (staticValue's own default) must seed from its DISPLAYED rank, not the raw static default, or turning the stopwatch on would snap it to a different value than what was on screen; `ensureTrack(ld, prop).keys = [{frame: state.currentFrame, v: cur, curvePoints: cloneCurvePts(DEFAULT_CURVE), hOut: [0,0], hIn: [0,0]}]` — seeds exactly ONE key at the CURRENT frame.",
+          "off_on_on_off_semantics": "OFF→ON: the first (and only) key takes `displayValueFor(ld,prop)`'s on-screen value (NOT `staticValue`'s raw default), placed at `state.currentFrame` — guarantees zero visual jump the instant the stopwatch is clicked, for every prop including ones whose 'natural' unedited value isn't the flat numeric default. ON→OFF: the static override left behind is `valueAtFrame(ld,prop,state.currentFrame)` — the value that WAS showing (fully resolved through interpolation/hold/expression) at the exact moment of the toggle, never the value of any one keyframe in isolation. Opacity's own ON→OFF (via NemoOpacityDomain.setAnimated, opacity.js:72-81) matches this generic contract exactly: `if (isAnimated(holder)===animated) return` is a no-op guard (toggling to the mode you're already in does nothing), then the OFF branch clears `ensureTrack(holder).keys=[]` and sets `holder.motionStatic.opacity = effectiveValue.slice()`, and the ON branch calls `setKeyAtFrame(holder, frame, effectiveValue, null, defaults)` — a single seed key, same shape as the generic path's manual object literal.",
+          "callers": "Exported as SMMotion.toggleAnimated (motion.js:13360). External caller: audio-bridge.js:333 (volume track stopwatch), text-animator-panel.js:213 (guarded behind `SMMotion.toggleAnimated` existence check at line 204). Internal sibling-covered callers, all inside the Motion panel's own stopwatch-click handlers: motion.js:8731,8738,10085,10159,10352,10649 — each of these wraps the call with its OWN pushUndo (not visible inside this span, confirmed by the zero-pushUndo grep over 2635-2932).",
+          "external_calls": [
+            "isAnimated / valueAtFrame (own packet 1) / opacityLegacy / opacityDomain (own packet 2)",
+            "disableTimeRemap / enableTimeRemap — motion.js:12406,12433 (sibling-covered)",
+            "displayValueFor — motion.js:1220 (C02/C20a-j)",
+            "ensureTrack / cloneCurvePts / DEFAULT_CURVE — motion.js:1178,1170,935 (C02/C20a-j)"
+          ],
+          "effects": "Rewrites `ld.motion[prop]` and/or `ld.motionStatic[prop]` (or, for opacity, the Domain module's equivalent tracked fields) per the OFF/ON contract above; for timeRemap, delegates entirely to the sibling-covered enable/disable functions. Zero pushUndo, zero render/repaint calls, zero save calls anywhere in this function's own body (grep-confirmed over the whole 2635-2932 span) — every caller is responsible for its own checkpoint and repaint."
+        }
+      ]
+    },
+    {
+      "area": "select-layer-and-set-value",
+      "packets": [
+        {
+          "id": "C20n.select-layer-and-set-value",
+          "files": [
+            "src/js/motion.js:2781-2848"
+          ],
+          "coverage_ranges": [
+            [
+              2781,
+              2848
+            ]
+          ],
+          "classification": {
+            "code": 30,
+            "comment": 37,
+            "whitespace": 1
+          },
+          "symbols": [
+            "selectLayerForEdit",
+            "setValue",
+            "_orderEngineWarnShown"
+          ],
+          "signatures": [
+            "selectLayerForEdit(holder) -> void",
+            "setValue(ld, prop, values) -> writer-result | undefined",
+            "_orderEngineWarnShown: boolean (module-scoped, hoisted var, initialized false at load)"
+          ],
+          "responsibility": "Lead-in (2781-2793) documents two things: (a) setValue is 'the single writer every editor goes through (fields, scrub drags, expression controls)' — if animated, editing a value is a scrub-at-the-CURRENT-frame that auto-adds/updates a key there (AE convention); if not animated, it's the static override; (b) 2026-09 feedback #761 ('à partir du moment où on change une propriété dans un calque celui-ci doit être sélectionné dans la timeline motion et dans le canvas') — the right panel edits whichever layer is ACTIVE, which need not be the one highlighted in the timeline, so a value could silently change on a seemingly-unselected row; ONE hook here rather than one per field. selectLayerForEdit(holder) (2794-2804): no-ops outside Motion mode (`state.appMode !== 'motion'`); resolves `li = state.layers.indexOf(holder)` and returns silently if negative — element holders (`ld.elementMotion[strokeId]` objects) are NOT layers and are deliberately left alone by this guard; an 'already selected' short-circuit (`state.activeLayerIdx===li && _layerSel.length===1 && _layerSel[0]===li`) makes a scrub drag (many setValue calls per gesture) pay the selection cost exactly once; otherwise sets `_layerSel=[li]` and `_layerSelAnchor=li` (timeline.js:5423/5432 globals, P30), calls `syncBarSelToLayerSel()` if it exists (motion.js:6932, sibling-covered), `window.SM.setActiveLayer(li, true)` (timeline.js:1534) and `renderLayerList(); renderTimeline();` (timeline.js:6335/4026). setValue(ld,prop,values) (2805-2846): calls `selectLayerForEdit(ld)` FIRST, unconditionally, before any write. For `prop==='opacity'` (2807-2810): `opacityLegacy('set', ld, values, state.currentFrame)` first, falling back to `opacityDomain().setValue(ld, values, state.currentFrame)` (opacity.js:64-68: if animated, delegates to `setKeyAtFrame`; else writes `holder.motionStatic.opacity = values.slice()` directly). For every other prop (2811-2812): `if (isAnimated(ld,prop)) setKeyAtCurrentFrame(ld, prop, values)` (this artifact's own packet 2) `else { if (!ld.motionStatic) ld.motionStatic={}; ld.motionStatic[prop] = values.slice() }` — the static-override write is fully inline here, no Domain module call at all for non-opacity static writes. Order engine-dependency toast (2813-2826, feedback #97, 'l'order n'a pas l'air de marcher... dans le canvas'): z-stacking (`order` prop) is engine-only, same family as 3D layers/Motion Blur (export.js's own `exportHasEngineOnlyMotion`, export.js:509-521, cited by line only) — the Paper.js fallback canvas just draws `userLayers` in natural document order and has never known about this property; `if (prop==='order' && !_orderEngineWarnShown && window.SMEngineBridge && !window.SMEngineBridge.isEnabled())` shows `toastOrderNeedsEngine` ONCE per session (`_orderEngineWarnShown=true` immediately after), so a scrub gesture (many setValue calls) doesn't spam toasts. Time Remap content-refresh (2827-2846, feedback #774, 'le timeremmaping sur une vidéo n'est toujours pas actif'): writing a new remap value at the playhead changes WHICH source frame the layer exposes, but nothing else re-resolves that on its own — the lead-in explains the video's frame sync only runs from `loadFrame` (app.js calls `SMNativeVideo.onFrameChanged` there) and a Component's content only comes from `getEffectiveStrokes`, itself only re-read by `loadFrame` — so `if (prop==='timeRemap') { if (window.loadFrame) loadFrame(state.currentFrame); if (window.SMEngineBridge) window.SMEngineBridge.renderNow(); }` forces both. `_orderEngineWarnShown` (2847) is declared `var _orderEngineWarnShown = false;` at the OUTER IIFE scope (module-level, not inside any function) — ordinary `var` hoisting means this initialization runs once at motion.js load time, well before any `setValue` call can read/write it; it is read and written ONLY inside `setValue`'s own order branch.",
+          "callers": "selectLayerForEdit: exactly one caller anywhere — setValue itself (motion.js:2806). setValue: exported as SMMotion.setValue (motion.js:13361) and wrapped as SMMotion.setLayerValue (motion.js:13552, `function(li,prop,vals){var ld=state.layers[li]; if(ld) setValue(ld,prop,vals);}` — resolves a layer INDEX to the object first). External callers via SMMotion.setLayerValue: nemo-script.js:99-100,334-335 (scripted timeLink offsets), rig-widget.js:307-308,380 (CLAUDE.md §13's own joystick/slider write path — its own comment at rig-widget.js:301 states 'ONE write path: SMMotion.setLayerValue -> setValue, which already keys...'), timeline.js:10062-10068 (a duplicator nudge), layer-inout.js:51-60,1077-1078 (in/out-point retiming), select-bridge.js:1512-2475 (11 call sites, the on-canvas transform gizmo's own commit path), audio-bridge.js:359 (volume field). Direct SMMotion.setValue callers (bypassing the by-index wrapper): none found outside motion.js itself. Internal sibling-covered callers (representative, 30+ sites): motion.js:3664,4716,4771,6534-6706 (on-canvas drag commit, including ensureElementHolder-produced element/mesh holders — this artifact's own packet 7), 8200,8572-8573,8825-8961,10121-10193 (Motion-panel field commits), 13691,13700 (color-hex field commits).",
+          "external_calls": [
+            "isAnimated — motion.js:1187 (C02/C20a-j)",
+            "opacityLegacy / opacityDomain / setKeyAtCurrentFrame — motion.js:2691,2696,2697 (this artifact's own packets 2)",
+            "window.SM.setActiveLayer — timeline.js:1534 (P30)",
+            "syncBarSelToLayerSel — motion.js:6932 (sibling-covered)",
+            "renderLayerList / renderTimeline — timeline.js:6335 / timeline.js:4026 (P30)",
+            "window.loadFrame — app.js:4746 (app.js)",
+            "window.SMEngineBridge.isEnabled / .renderNow — engine-bridge.js (engine-bridge.js's own census)",
+            "showToast / SM.t — C19w / i18n.js"
+          ],
+          "effects": "selectLayerForEdit writes timeline.js's own `_layerSel`/`_layerSelAnchor` globals and triggers two DOM repaints (only when the selection actually changes). setValue writes `ld.motion[prop]`'s current key OR `ld.motionStatic[prop]` per the animated/static branch above; for `order`, may show a one-shot toast and flip `_orderEngineWarnShown`; for `timeRemap`, forces `loadFrame` (a full frame reconstruction, app.js) and an engine render. Zero pushUndo/save calls anywhere in this packet's own body."
+        }
+      ]
+    },
+    {
+      "area": "render-time-rotation-helpers",
+      "packets": [
+        {
+          "id": "C20n.render-time-rotation-helpers",
+          "files": [
+            "src/js/motion.js:2849-2862"
+          ],
+          "coverage_ranges": [
+            [
+              2849,
+              2862
+            ]
+          ],
+          "classification": {
+            "code": 11,
+            "comment": 3,
+            "whitespace": 0
+          },
+          "symbols": [
+            "rotPt",
+            "rotVec"
+          ],
+          "signature": "rotPt(px, py, cx, cy, deg) -> [x,y] (rotate a POINT around (cx,cy)); rotVec(dx, dy, deg) -> [x,y] (rotate a free VECTOR, no pivot)",
+          "responsibility": "Section header (2849-2851) frames both as the 'render-time transform (engine-bridge.js hook — see header comment: NEVER applied to the live userLayers[i], only to the JSON items handed to the renderer, so a save can never bake this in)'. rotPt(px,py,cx,cy,deg) (2852-2857): early-out `if (!deg) return [px, py]` (zero rotation, or falsy/undefined, is the identity — no trig performed); otherwise converts `deg` to radians (`a = deg * Math.PI / 180`), translates the point into the pivot's own local frame (`dx = px-cx, dy = py-cy`), applies the standard 2D rotation matrix (`c=cos(a), s=sin(a)`; `x' = dx*c - dy*s`, `y' = dx*s + dy*c`), and translates back by adding `cx`/`cy` — pure math, no state read or write. rotVec(dx,dy,deg) (2858-2862): identical early-out and identical rotation matrix, but WITHOUT any pivot translate/untranslate step — rotates a free vector (e.g. a bezier handle's own relative offset) in place around the origin, appropriate for handles that are stored as offsets FROM their own anchor point rather than as absolute coordinates.",
+          "render_path": "YES, indirectly. Neither function is called from engine-bridge.js directly (grep-confirmed zero hits for `rotPt(`/`rotVec(` in engine-bridge.js). Both are called exclusively from two sibling-covered motion.js functions that ARE the actual render-time transform: transformSegments(segments,pivot,m) (motion.js:5116-5124, calls rotPt at motion.js:5119 for the point and rotVec at motion.js:5121-5122 for handleIn/handleOut) and transformImageRect(rb,pivot,m) (motion.js:5133-5149ish, calls rotPt at motion.js:5142 to orbit the rect's own center around the pivot). Both are exported (SMMotion.transformSegments/transformImageRect, motion.js:13714-13715) and called from engine-bridge.js at roughly two dozen sites inside buildSceneJson (e.g. engine-bridge.js:1670-1671,1711,1832-1834,2123-2124,2227,2832,2870,3624,3778 for transformSegments; engine-bridge.js:1115,1160,1190,1193,1268,1287,1305,1309,1431-1433 for transformImageRect) — the ACTUAL per-item vector-point and raster-rect transform every rendered/exported frame with any Motion applied goes through. app.js:3093,3097 and native-video-bridge.js:1068,1076 call the same two exports directly. Separately, engine-bridge.js's own `affineFromMotion(m, pivot)` (engine-bridge.js:360, cited by name/line only) is an INDEPENDENTLY-WRITTEN closed-form 2x3-matrix computation used for the retained-path fast case (CLAUDE.md §5ter) — it does not call rotPt/rotVec at all, but MUST produce mathematically identical results for the same (pivot, m) input; CLAUDE.md §5ter's own warning states this explicitly: 'affineFromMotion DOIT rester le miroir exact de transformSegments... Si les deux divergent, l'image ne change que pour les formes animées, donc silencieusement'. This span's own rotPt/rotVec are the CANONICAL per-point math both the inline (transformSegments) and matrix (affineFromMotion) render paths must agree with, though affineFromMotion's own body is out of this span's scope.",
+          "callers": "rotPt: transformSegments (motion.js:5119), transformImageRect's own orbit step (motion.js:5142), and the on-canvas drag/gizmo helpers `motionScreenToLocal`/its inverse (motion.js:5184,5188, sibling-covered — cursor↔local-space conversion for rotated layers). rotVec: transformSegments's own handleIn/handleOut lines only (motion.js:5121-5122). Namesakes exist in OTHER modules with DIFFERENT bodies/scopes — tools.js:1115-1128 declares its own `rotPt`/`rotVec` closures (closing over local `center`/`cos`/`sin` variables, a node-rotation tool helper) and camera.js:172 declares its own `rotPt(px,py,cx,cy,deg)` (IDENTICAL signature and body to this span's own, used by camera.js's own keyframe-icon/pan-tilt drawing at camera.js:181-182,240,269,307) — none of these call, or are called by, this span's own declarations; each module's IIFE scope keeps them fully separate.",
+          "external_calls": [
+            "Math.cos / Math.sin / Math.PI — JS built-in only, no project code"
+          ],
+          "effects": "Pure functions — no state read, no state write, no side effects of any kind."
+        }
+      ]
+    },
+    {
+      "area": "element-holders",
+      "packets": [
+        {
+          "id": "C20n.element-holders",
+          "files": [
+            "src/js/motion.js:2863-2932"
+          ],
+          "coverage_ranges": [
+            [
+              2863,
+              2932
+            ]
+          ],
+          "classification": {
+            "code": 27,
+            "comment": 43,
+            "whitespace": 0
+          },
+          "symbols": [
+            "ensureElementHolder",
+            "elementHolder",
+            "elementHasMotion"
+          ],
+          "signature": "ensureElementHolder(ld, strokeId) -> holder-object (creates if absent); elementHolder(ld, strokeId) -> holder-object | null (pure getter); elementHasMotion(ld, strokeId) -> boolean",
+          "responsibility": "Section header (2863-2878, 16-line design note, '2026-07, \"shape layer\" feedback'): a Nemo 'layer' is 'a loose bag of independent strokes/shapes drawn across the timeline — nothing like AE's one-cohesive-graphic layer', so pivoting Rotation/Scale around the whole layer's bounds.center 'falls apart the moment a layer holds two unrelated shapes in opposite corners: the pivot lands in empty space between them'. Fix: Motion can target one specific ELEMENT (a stroke, identified by its stable `data.strokeId` — 'same id fillWalls/team-review already rely on') INSIDE a layer, with its OWN independent Position/Anchor/Rotation/Scale/Opacity nested inside the layer's own transform — 'exactly AE's shape-group-inside-a-shape-layer model'. Storage: `ld.elementMotion[strokeId] = {motion, motionStatic}` — the IDENTICAL shape `ld` itself already has — 'every function below (valueAtFrame, isAnimated, setValue, toggleAnimated, etc.) only ever reads/writes `.motion`/`.motionStatic` on whatever object it's handed, so passing an element holder instead of `ld` just works, zero duplicated logic needed for the per-element case' — this is the exact mechanism CLAUDE.md §12ter point 1 later reuses verbatim for image-mesh vertex holders, keyed by `meshId` instead of `strokeId`. ensureElementHolder(ld,strokeId) (2879-2910): `if (!ld.elementMotion) ld.elementMotion = {}` (creates the map lazily); `if (!ld.elementMotion[strokeId])` (creates THIS holder lazily) — inside that guard, sets `ld.elementMotion[strokeId] = {}` FIRST (the base/default shape is an empty object literal, confirmed empirically by select-bridge.js:900's own comment, 'ld.elementMotion[sidEx] stayed `{}` after a full press-drag-release'), then auto-tags+seeds ONLY when the LIVE item currently exists and carries a recognized `data.paramShape.kind` (2026-08-18 dynamic shapes phase 2, found once here 'rather than re-derived on every propsFor call' since 'unlike Component exposedProps..., each rect's un-animated corner value is genuinely its OWN', so PROP_DEFAULT alone can't carry it): `li = state.layers.indexOf(ld)`, `item = li>=0 ? liveItemByStrokeId(li,strokeId) : null` (motion.js:9732, sibling-covered); for `kind==='rect'`: `paramShapeKind='rect'`, `motionStatic = {cornerTL:[tl||0], cornerTR:[tr||0], cornerBR:[br||0], cornerBL:[bl||0]}`; for `kind==='ellipse'`: `paramShapeKind='ellipse'`, `motionStatic = {arcStart:[startAngle||0], arcSweep:[sweep!==undefined?sweep:359.9], arcInner:[round(innerRadius*100)]}`; for `kind==='star'`: `paramShapeKind='star'`, `motionStatic = {starInner:[round((innerRatio!==undefined?innerRatio:0.5)*100)], starCorner:[cornerRadius||0]}`; for any other/no `paramShape`, the holder stays `{}` — no `paramShapeKind`, no `motionStatic`. Always returns `ld.elementMotion[strokeId]` — whether freshly created (seeded or bare `{}`) or a pre-existing holder from an earlier call, UNCHANGED on the pre-existing path (the seeding block is entirely inside the `if (!ld.elementMotion[strokeId])` guard). elementHolder(ld,strokeId) (2911): pure getter, `ld.elementMotion ? ld.elementMotion[strokeId] : null` — guarded so a layer with NO `elementMotion` map at all returns `null` rather than throwing; does NOT create anything (unlike ensureElementHolder) and does NOT default a missing key to `undefined` vs `null` distinctly — a strokeId with no entry in an EXISTING map returns `undefined` (property access miss), not `null`; only a wholly-absent `elementMotion` map returns the explicit `null`. elementHasMotion(ld,strokeId) (2912-2915): `h = elementHolder(ld,strokeId)`; `return !!(h && (h.motion || h.motionStatic))` — a SHALLOW existence check on the two CONTAINER fields, not a check that `.motion.<someProp>.keys.length` is actually non-zero; accurate for every write path exercised inside this artifact's own span (this artifact's own `ensureTrack` call inside `setKeyAtCurrentFrame`/`setKeyAtFrame` is always immediately followed by an actual key push via `setTrackKey`, and `toggleAnimated`'s own ON→OFF branch sets BOTH `.motion[prop]={keys:[]}` AND `.motionStatic[prop]` together in the same statement pair) but the function itself performs no `.keys.length` check of its own.",
+          "element_holder_contract": "strokeId is guaranteed to exist by the PRE-EXISTING `ensureStrokeId(p)` (tools.js:1910, cited by name/line only, 'C21' per the issue's own framing) — this span TRUSTS whatever strokeId (or meshId, for the image-mesh per-vertex reuse, CLAUDE.md §12ter point 1) the caller passes; it neither generates nor validates one itself. Persistence/undo/duplicate/transplant consumers of `ld.elementMotion` (complete, cited by line only): exportJSON (timeline.js:2117, `elementMotion:l.elementMotion` — a plain field copy into the exported layer object, no transform); importJSON (timeline.js:2482, `if(ld.elementMotion) state.layers[idx].elementMotion=ld.elementMotion` — restored by reference from the freshly-parsed JSON, no re-clone needed); duplicateLayer (timeline.js:1323, `JSON.parse(JSON.stringify(src.elementMotion))`, a full deep clone so the duplicate's element holders never alias the original's); splitLayerAtPlayhead (timeline.js:1215, same deep-clone pattern, cutting a layer at the playhead copies its element holders onto BOTH halves); convertLayersToComponent (app.js:3386, `elementMotion:src.elementMotion?JSON.parse(JSON.stringify(src.elementMotion)):undefined`, per CLAUDE.md §8's own 'Component \"lu par les 3 parties\"' section, merging Motion state into the new symbol's own layer); _cloneLayersForUndo (tweens.js:4820-4831) — needs NO special-casing for `elementMotion`: it is a plain field ON the layer object, so the GENERIC whole-layers `JSON.parse(JSON.stringify(layers))` clone already captures it, unlike `cameraKeys`/`imageMeshes` which live OUTSIDE `state.layers` and needed a separate explicit snapshot line in `layersSnapshotNow`; transplant.js:232, `if (clone.elementMotion) nl.elementMotion = clone.elementMotion` — a REFERENCE copy at that exact line (not a fresh JSON clone there), cited by line only, not re-derived.",
+          "render_path": "elementHolder is on the render path (indirectly): the sibling-covered `elementMotionAt(li,strokeId,frameIdx,sd)` (motion.js, past 2932, called from engine-bridge.js:1409,3774, export.js:279, group-bridge.js:634, tools.js:6577,6668,8237,8327 — the transform every per-element render/export/selection-overlay/boolean-op path reads) resolves through the SAME `ld.elementMotion[strokeId]` storage this packet's three functions manage, though `elementMotionAt` itself is out of this span. ensureElementHolder and elementHasMotion are EDITING-ONLY — never called from engine-bridge.js, export.js, or any render/export path; they exist to CREATE/QUERY a holder for the Motion panel and on-canvas drag machinery to write into (this artifact's own setValue, packet 5).",
+          "callers": "ensureElementHolder: exported as SMMotion.ensureElementHolder (motion.js:13823, alongside setKeyAtFrame per that comment's own framing). Internal (this span): motion.js:1115 (a sibling-covered pre-existing holder resolver, `(ld.elementMotion && ld.elementMotion[ref.elem]) || ensureElementHolder(ld, ref.elem)`, itself past line 1769 but before 2635 — cited by line only). Internal sibling-covered (representative, 12+ sites): motion.js:4716,4771 (mesh-vertex drag commit), 6165,7509,7609,7631,9945,9955,9964,9979,10023,10036,10041,11204,11240,11295 (the Motion panel's own per-element row renderers). External: text-animator.js:213 (per-glyph stagger). elementHolder: zero external callers; internal sibling-covered only (motion.js:2913 — its own elementHasMotion, 4569,4613,4630,5045,5060). elementHasMotion: exported nowhere; single sibling-covered caller motion.js:9897 ('has-motion' CSS class on a per-element color swatch).",
+          "external_calls": [
+            "liveItemByStrokeId — motion.js:9732 (sibling-covered, called by ensureElementHolder only)",
+            "state.layers.indexOf — global state array (app.js)"
+          ],
+          "effects": "ensureElementHolder MAY create `ld.elementMotion` (the map) and/or `ld.elementMotion[strokeId]` (the holder), optionally pre-populating `paramShapeKind`/`motionStatic` from the live item's own current geometry — a genuine document write, though idempotent (a second call for the same strokeId returns the SAME object unchanged). elementHolder and elementHasMotion are pure reads with zero side effects. None of the three call pushUndo, save, or a render function."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No frame-save call (saveActiveLayerFrame/saveAllLayerFrames) occurs anywhere in motion.js:2635-2932 (grep-verified). This span's writers (setKeyAtCurrentFrame/setKeyAtFrame/removeKeyAtCurrentFrame/toggleAnimated/setValue/ensureElementHolder) mutate `holder.motion[prop]`/`holder.motionStatic[prop]`/`holder.elementMotion[strokeId]` directly on the LIVE layer object — the same object a later saveActiveLayerFrame/saveAllLayerFrames call (app.js, cited by name only) will serialize; this span never itself triggers that serialization."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No parser is implemented in this span. timeline.js's importJSON (timeline.js:2354+, P30) owns restoring `motion`/`motionStatic`/`elementMotion` (timeline.js:2482 for the last one, cited by line only) — the fields this span's valueAtFrame/trackFor/ensureElementHolder read and write."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Zero calls to pushUndo/pushUndoLayers/pushUndoActiveFrame anywhere in motion.js:2635-2932 (grep-verified) — every checkpoint is the CALLER's own responsibility (e.g. motion.js:10977's context-menu action calls pushUndo() before this span's setKeyAtCurrentFrame). `ld.elementMotion` rides along for free inside tweens.js's generic whole-layers JSON clone (_cloneLayersForUndo, tweens.js:4820-4831) since it is a plain field ON the layer object — no special-casing needed, unlike `cameraKeys`/`imageMeshes` which live outside `state.layers`."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "selectLayerForEdit (this span, motion.js:2794-2804) is the ONE place in this span that writes selection state — timeline.js's own `_layerSel`/`_layerSelAnchor` globals (timeline.js:5423/5432) — called unconditionally at the top of setValue (motion.js:2806) so every value edit selects its owning layer (feedback #761). No key-level selection state (`_motionKeySel` and similar) is read or written anywhere in this span."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "This span IS the animation-state read/write surface: valueAtFrame is the sole public read (render path); setKeyAtCurrentFrame/setKeyAtFrame/removeKeyAtCurrentFrame/toggleAnimated/setValue are the complete set of key/mode writers a UI or script can use to change what a property does over time. ensureElementHolder/elementHolder/elementHasMotion extend the SAME read/write surface to a per-element (or per-mesh-vertex) target instead of a whole layer, with zero duplicated logic (CLAUDE.md §12ter point 1's own reuse of this exact mechanism)."
+    },
+    {
+      "consumer": "render",
+      "disposition": "valueAtFrame (render-path entry, packet 1) and rotPt/rotVec (render-path math via the sibling-covered transformSegments/transformImageRect, packet 6) are read on EVERY rendered/exported frame with any Motion applied, through the computeMotionMat -> buildSceneJson chain. openMotionEaseEditor/selectLayerForEdit/ensureElementHolder/elementHolder/elementHasMotion are editing-only — never called from engine-bridge.js or export.js."
+    },
+    {
+      "consumer": "export",
+      "disposition": "export.js reaches this span's valueAtFrame through the IDENTICAL getEffectiveStrokesRendered -> computeMotionMat chain the on-screen render uses (cited by name only, export.js's own census) — there is no separate export-only value read, matching CLAUDE.md §3's single-render-path principle. `order`'s engine-only dependency (this span's setValue, the `_orderEngineWarnShown` toast) is independently confirmed by export.js's own exportHasEngineOnlyMotion (export.js:509-521, cited by line only), which checks the SAME SMMotion.anyOrderUsedAnywhere (motion.js:13708, sibling-covered) to decide whether an export must route through the engine rather than the plain-Paper.js export loop."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "value-at-frame-branch-order-and-shape",
+      "status": "proposed, unrun",
+      "matrix": "A property with (a) no track and no expression, (b) a keyed track and no expression, (c) a keyed track PLUS an enabled expression that evaluates successfully, (d) a keyed track plus an enabled expression that throws/times out/exceeds depth, for both a 1D prop (rotation) and a 2D prop (position)",
+      "expected": "(a)/(b) return rawValueAtFrame's own result unchanged; (c) returns evalExpressionFor's own normalized result, NOT the raw value; (d) returns rawValueAtFrame's result (the raw fallback), never null/NaN/undefined — the whole point of the lead-in comment's own promise. Every branch returns an array of length PROP_DIM[prop] (1 for rotation, 2 for position)."
+    },
+    {
+      "id": "key-writer-dedupe-and-sort",
+      "status": "proposed, unrun",
+      "matrix": "setKeyAtCurrentFrame/setKeyAtFrame called twice at the SAME frame with different values (with and without a curvePoints argument on the second call), then a third call at an EARLIER frame than all existing keys",
+      "expected": "The second call at the same frame MUTATES the existing key's `.v` in place (never creates a duplicate key at that frame) and updates `.curvePoints` ONLY when a curvePoints argument was actually passed on that call; `track.keys.length` stays constant across the two same-frame calls. The third (earlier-frame) call inserts a new key and the whole `track.keys` array ends up frame-ascending sorted afterward, regardless of call order."
+    },
+    {
+      "id": "remove-key-no-op-on-miss",
+      "status": "proposed, unrun",
+      "matrix": "removeKeyAtCurrentFrame called on a frame with no key there, vs. a frame with a key, for both an opacity prop and a non-opacity prop",
+      "expected": "The no-key case leaves `track.keys` byte-for-byte unchanged (same length, same objects) and does not throw. The has-key case removes exactly that one key object (identity-checked via indexOf+splice) and leaves every other key untouched."
+    },
+    {
+      "id": "toggle-animated-off-on-on-off-value-continuity",
+      "status": "proposed, unrun",
+      "matrix": "toggleAnimated OFF->ON on a property whose displayValueFor differs from its PROP_DEFAULT/staticValue (e.g. 'order' on a mid-stack layer), immediately followed by ON->OFF at a DIFFERENT frame than the one used for ON",
+      "expected": "OFF->ON: the single seed key's `.v` equals displayValueFor's pre-toggle reading, NOT staticValue's/PROP_DEFAULT's flat default, and its `.frame` equals state.currentFrame at the moment of the ON toggle — valueAtFrame immediately after the ON toggle, evaluated at that SAME frame, equals the pre-toggle displayed value (zero visible jump). ON->OFF: motionStatic[prop] equals valueAtFrame evaluated at the CURRENT frame at the moment of the OFF toggle (which may differ from the ON seed value if keys were added between the two toggles), and ld.motion[prop].keys is empty afterward."
+    },
+    {
+      "id": "opacity-legacy-vs-domain-fallback",
+      "status": "proposed, unrun",
+      "matrix": "Each of the five opacity-prop key-writer call sites (setKeyAtCurrentFrame/setKeyAtFrame/removeKeyAtCurrentFrame/toggleAnimated/setValue), first with window.NemoOpacityApplication present and its .legacy a function, then with window.NemoOpacityApplication deleted/undefined",
+      "expected": "Present case: opacityLegacy's return value is NEVER null (a recognized `kind` always produces a domain result) and NemoOpacityApplication's own internal `app.changed()` (a bare revision-counter bump) fires exactly once per call, with zero calls to NemoOpacityDomain's own functions taking place OUTSIDE that indirection. Absent case: opacityLegacy returns null every time, and the SAME final document mutation happens instead via the direct `opacityDomain()` fallback call one line below — end state on `holder.motion.opacity`/`holder.motionStatic.opacity` is IDENTICAL between the two cases for the same inputs."
+    },
+    {
+      "id": "ensure-element-holder-paramshape-autoseed",
+      "status": "proposed, unrun",
+      "matrix": "ensureElementHolder called for a strokeId whose live item has data.paramShape.kind of 'rect'/'ellipse'/'star'/absent-or-unrecognized, each called TWICE in a row",
+      "expected": "First call: holder gets `paramShapeKind` + a `motionStatic` seeded from the live item's OWN current geometry for the three recognized kinds (exact field names: cornerTL/TR/BR/BL for rect, arcStart/arcSweep/arcInner for ellipse, starInner/starCorner for star); the unrecognized/absent case gets a bare `{}` with neither field. Second call: returns the IDENTICAL object reference as the first call (object-identity check, not just deep-equal) — the seeding block never re-runs once a holder exists, even if the live item's own geometry changed in between."
+    },
+    {
+      "id": "rotpt-rotvec-vs-affine-from-motion-mirror",
+      "status": "proposed, unrun",
+      "matrix": "A batch of (pivot, m) pairs covering non-trivial rotation+non-uniform scale +translation, compared between (a) rotPt/rotVec as used inline by transformSegments on a small polygon's own points/handles, and (b) engine-bridge.js's affineFromMotion applied as a single 2x3 matrix to the SAME points",
+      "expected": "Per CLAUDE.md §5ter's own documented invariant, the two must agree to floating-point precision for every sampled point when `m.sx === m.sy` (uniform scale) — any measured divergence beyond rounding noise would mean the two implementations have drifted apart, which CLAUDE.md's own warning states would silently change ONLY animated shapes' rendering."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "opacityBridge(kind, holder, payload) -> {viaApplication: boolean, result}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Makes explicit, and directly testable, which of the two paths (NemoOpacityApplication.legacy vs. bare NemoOpacityDomain) a given call actually took — today that fact is observable only by deleting window.NemoOpacityApplication and re-running, an awkward test setup for something opacityLegacy already decides internally on every call."
+    },
+    {
+      "api": "keyWriteResult(track, frame) -> {key, wasNew: boolean, wasReordered: boolean}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "setTrackKey (opacity.js, called by every writer in this span) currently returns only the key object, silently folding 'updated an existing key' and 'created and sorted a new one' into the same return shape — a caller that cares whether a NEW keyframe diamond needs a fresh render tick (vs. an existing one just moving) has no way to tell without a separate before/after length check."
+    },
+    {
+      "api": "elementHolderShape(strokeId, paramShapeKind) -> plain descriptor object",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Separates ensureElementHolder's own three near-identical kind-to-motionStatic-field-name mappings (rect/ellipse/star) from the holder-creation/live-item-lookup plumbing around them, so a fourth paramShape kind can be added by extending one small pure table instead of another copy-pasted if/else-if block."
+    },
+    {
+      "api": "toggleAnimatedResult(ld, prop) -> {becameAnimated: boolean, seedValue, frozenValue}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "toggleAnimated's own OFF/ON branches compute exactly the value a caller would want to log or animate-in (the seed key's value on ON, the frozen static value on OFF) and then discard it (the function returns undefined) — every one of its six sibling-covered UI callers has to re-derive that value itself via a second valueAtFrame call if it needs one."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "packet_symbols": [
+      "valueAtFrame",
+      "segmentLeftKey",
+      "openMotionEaseEditor",
+      "opacityLegacy",
+      "opacityDomain",
+      "setKeyAtCurrentFrame",
+      "setKeyAtFrame",
+      "removeKeyAtCurrentFrame",
+      "toggleAnimated",
+      "selectLayerForEdit",
+      "setValue",
+      "_orderEngineWarnShown",
+      "rotPt",
+      "rotVec",
+      "ensureElementHolder",
+      "elementHolder",
+      "elementHasMotion"
+    ],
+    "caller_anchors": [
+      "valueAtFrame: exported (SMMotion.valueAtFrame, motion.js:13353) with 9 external-module callers (nemo-script.js, audio-bridge.js, rig-widget.js, effector-layer.js, motion-graph.js, expr-bake.js, tracker.js, app.js, bootstrap/opacity-application.js) and 60+ internal call sites — the widest fan-out of any symbol in this artifact, consistent with it being the render-path entry.",
+      "toggleAnimated/setValue/setKeyAtCurrentFrame/removeKeyAtCurrentFrame: exported directly; setValue additionally wrapped as SMMotion.setLayerValue (motion.js:13552, index-to-object resolution) which is the form every external caller (rig-widget.js, select-bridge.js, layer-inout.js, nemo-script.js, timeline.js) actually uses — zero external callers of the bare SMMotion.setValue found.",
+      "setKeyAtFrame/ensureElementHolder: exported as a PAIR specifically for text-animator.js (motion.js:13817-13824's own comment states this explicitly) — the only two symbols in this span exported for a documented single external consumer rather than general reuse.",
+      "segmentLeftKey/opacityLegacy/opacityDomain/selectLayerForEdit/rotPt/rotVec/elementHolder/elementHasMotion/_orderEngineWarnShown: NOT exported on SMMotion; every caller is internal to this span or to sibling-covered motion.js code (segmentLeftKey and selectLayerForEdit each have exactly ONE caller anywhere).",
+      "rotPt/rotVec/segmentLeftKey have same-named, differently-scoped namesakes in camera.js/tools.js — confirmed distinct declarations by reading each module's own IIFE, not merely by name."
+    ],
+    "helper_anchors": "rawValueAtFrame:1270, hasExpr:1338, trackFor:443, ensureTrack:1178, sortKeys:1188, isAnimated/hasKeys:1187, staticValue:1201, displayValueFor:1220, cloneCurvePts:1170, PROP_LABEL:449, PROP_DIM/PROP_UNIT:506-507, DEFAULT_CURVE:935, liveItemByStrokeId:9732, syncBarSelToLayerSel:6932, disableTimeRemap/enableTimeRemap:12406/12433, evalExpressionFor:2542 (C20m) — all pre-existing, cited by line only, none re-derived.",
+    "render_path_summary": "On the render path: valueAtFrame (packet 1, direct), rotPt/rotVec (packet 6, via the sibling-covered transformSegments/transformImageRect). Editing-only, never reached from engine-bridge.js/export.js: segmentLeftKey, openMotionEaseEditor, opacityLegacy, opacityDomain, setKeyAtCurrentFrame, setKeyAtFrame, removeKeyAtCurrentFrame, toggleAnimated, selectLayerForEdit, setValue, ensureElementHolder, elementHolder, elementHasMotion."
+  },
+  "validation": {
+    "expected_assigned_lines": 298,
+    "expected_classification": {
+      "code": 156,
+      "comment": 139,
+      "whitespace": 3
+    },
+    "packet_partition": [
+      [
+        2635,
+        2656
+      ],
+      [
+        2657,
+        2704
+      ],
+      [
+        2705,
+        2724
+      ],
+      [
+        2725,
+        2780
+      ],
+      [
+        2781,
+        2848
+      ],
+      [
+        2849,
+        2862
+      ],
+      [
+        2863,
+        2932
+      ]
+    ],
+    "packet_classification": [
+      {
+        "range": [
+          2635,
+          2656
+        ],
+        "code": 15,
+        "comment": 6,
+        "whitespace": 1
+      },
+      {
+        "range": [
+          2657,
+          2704
+        ],
+        "code": 33,
+        "comment": 14,
+        "whitespace": 1
+      },
+      {
+        "range": [
+          2705,
+          2724
+        ],
+        "code": 16,
+        "comment": 4,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          2725,
+          2780
+        ],
+        "code": 24,
+        "comment": 32,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          2781,
+          2848
+        ],
+        "code": 30,
+        "comment": 37,
+        "whitespace": 1
+      },
+      {
+        "range": [
+          2849,
+          2862
+        ],
+        "code": 11,
+        "comment": 3,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          2863,
+          2932
+        ],
+        "code": 27,
+        "comment": 43,
+        "whitespace": 0
+      }
+    ],
+    "coverage_contract": "Validate assigned_ranges and flattened areas[].packets[].coverage_ranges independently with the same function; reject actual artifact omission at line 2635 and overlap at line 2932.",
+    "required_checks": [
+      "frozen/current motion.js blob and allocated-base ancestry",
+      "seven unique packet IDs, exact ranges, counts, symbols, helpers, callers and boundaries",
+      "before-2635 (C20m) preceding boundary and after-2932 (sibling-covered computeMotionMat) following boundary",
+      "seven consumer dispositions and proposed, unrun fixtures",
+      "valueAtFrame's exact branch order and PROP_DIM-shaped return; the key-writer contract (dedupe/sort/hOut-hIn shape) for every writer; the opacityLegacy/opacityDomain feature-module boundary; toggleAnimated's OFF-ON/ON-OFF value continuity; rotPt/rotVec's mirror-invariant citation against affineFromMotion; the element-holder contract (created shape, strokeId guarantee, persistence/undo consumers) against the actual source lines",
+      "JSON, private-path, secret, placeholder and trailing-whitespace hygiene",
+      "sole untracked artifact or committed-clean mode",
+      "no overlap with any merged C20* sibling artifact in the same census directory"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, GPU, runtime edit, export or product acceptance claim."
+  }
+}
