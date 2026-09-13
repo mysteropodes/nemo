@@ -22,7 +22,7 @@ const APPLICATION_POLICY = 'engineering/boundaries/profiles/app-js.coverage.json
 const APPLICATION_EDGES = 'engineering/boundaries/profiles/app-js.edges.json';
 const RUST_PROFILE = 'engineering/boundaries/profiles/rust.profile.json';
 // Rust crate edge policies (P12/#1014): one per crate whose intra-crate module graph is enforced.
-const RUST_CRATE_POLICIES = ['engineering/boundaries/profiles/geometry-wasm.edges.json'];
+const RUST_CRATE_POLICIES = ['engineering/boundaries/profiles/geometry-wasm.edges.json', 'engineering/boundaries/profiles/nemo-desktop.edges.json'];
 const LANES = ['quick', 'boundaries', 'surfaces'];
 const QUICK = ['doctor', 'check', 'test:unit', 'test:rust'];
 const SURFACES = ['test:integration', 'test:browser', 'test:rust-tauri', 'build:wasm', 'build:desktop', 'test:desktop'];

@@ -149,6 +149,42 @@ test('unsupported module shapes are declared, not silently accepted', (t) => {
   assert.match(r.violations[0].message, /not a supported module shape/);
 });
 
+test('super:: from a Rust-2018 x/y.rs shape resolves to a declared sibling x.rs, not x/mod.rs', (t) => {
+  const profile = structuredClone(PROFILE);
+  profile.modules.push({ id: 'synth.shapes.more', layer: 'engine', dir: 'synth/src/shapes', files: ['more.rs'], publicApi: ['more.rs'], sizeProfile: 'k' });
+  const r = run(scaffold(t, { 'synth/src/shapes/more.rs': 'use super::*;\n' }), POLICY, profile);
+  assert.equal(r.ok, true, JSON.stringify(r.violations));
+  assert.deepEqual(r.unsupported, []);
+  assert.ok(r.edges.some((e) => e.from === 'synth.shapes.more' && e.to === 'synth.shapes'));
+});
+
+const EXT_POLICY = { ...POLICY, externalCratePorts: { ext: { allowedModules: ['synth.shapes'], items: ['registry', 'wire'] } } };
+
+test('external-crate ports: allowed module + declared items pass, a disallowed module or undeclared item fails, a declared item covers deeper paths', (t) => {
+  const ok = run(scaffold(t, { 'synth/src/shapes.rs': 'use crate::engine::SceneIn;\nuse ext::registry;\nuse ext::registry::Endpoint;\nuse ext::wire;\npub fn rect() -> SceneIn { SceneIn }\n' }), EXT_POLICY);
+  assert.equal(ok.ok, true, JSON.stringify(ok.violations));
+
+  const disallowedModule = run(scaffold(t, { 'synth/src/lib.rs': 'mod engine;\nmod shapes;\nmod hit;\npub use engine::render;\npub use shapes::rect;\nuse ext::registry;\n' }), EXT_POLICY);
+  assert.equal(disallowedModule.ok, false);
+  assert.deepEqual(disallowedModule.violations.map((v) => [v.rule, v.module]), [['external-crate-violation', 'synth.api']]);
+
+  const privateUse = run(scaffold(t, { 'synth/src/shapes.rs': 'use crate::engine::SceneIn;\nuse ext::server::run;\npub fn rect() -> SceneIn { SceneIn }\n' }), EXT_POLICY);
+  assert.equal(privateUse.ok, false);
+  assert.deepEqual(privateUse.violations.map((v) => v.rule), ['private-port-access']);
+
+  const privateInline = run(scaffold(t, { 'synth/src/hit.rs': 'use crate::engine::SceneIn;\npub fn hit(_s: &SceneIn) { let _ = ext::server::run(); }\n' }), EXT_POLICY);
+  assert.equal(privateInline.ok, false);
+  assert.deepEqual(privateInline.violations.map((v) => [v.rule, v.detail.path]), [['private-port-access', 'server']]);
+});
+
+test('unanalyzedModules must name real profile modules, and the ids are echoed back', (t) => {
+  const root = scaffold(t, {});
+  assert.throws(() => run(root, { ...POLICY, unanalyzedModules: ['synth.nonexistent'] }), /unanalyzedModules references unknown module "synth\.nonexistent"/);
+  const r = run(root, { ...POLICY, unanalyzedModules: ['synth.other.crate'] });
+  assert.equal(r.ok, true, JSON.stringify(r.violations));
+  assert.deepEqual(r.unanalyzedModules, ['synth.other.crate']);
+});
+
 test('exceptions waive a named file+rule until they expire, then fail loudly', (t) => {
   const root = scaffold(t, { 'synth/src/engine.rs': 'pub fn render() { crate::hit::hit(&SceneIn); }\npub struct SceneIn;\n' });
   const waived = run(root, { ...POLICY, exceptions: [{ path: 'synth/src/engine.rs', rule: 'cycle', owner: 'o', issue: '1014', reason: 'known', expires: '2026-12-05' }] });
@@ -181,4 +217,27 @@ test('adopted geometry-wasm policy holds at HEAD: no violation, exactly the thre
     'rust.geometry.engine->rust.geometry.shapes', 'rust.geometry.shapes->rust.geometry.api', 'rust.geometry.shapes->rust.geometry.engine']);
   // No [features] table in Cargo.toml → the declared set is empty, and the crate uses only the two allowed predicates.
   assert.equal(/^\[features\]/m.test(fs.readFileSync(path.join(ROOT, 'geometry-wasm/Cargo.toml'), 'utf8')), false);
+});
+
+test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, external-crate port pins application_mcp.rs', () => {
+  const policy = read('nemo-desktop.edges.json');
+  const r = R.checkRustCrate(read('rust.profile.json'), policy, { root: ROOT });
+  assert.equal(r.ok, true, JSON.stringify(r.violations));
+  assert.equal(r.moduleCount, 5);
+  assert.deepEqual(r.unsupported, []);
+  assert.deepEqual(r.exceptionsApplied, []);
+  assert.deepEqual(r.exportedPort, []);
+  assert.deepEqual(r.edges.map((e) => `${e.from}->${e.to}`).sort(), [
+    'rust.desktop.shell->rust.desktop.mcp.adapter', 'rust.desktop.shell->rust.desktop.media',
+    'rust.desktop.shell->rust.desktop.tasks', 'rust.desktop.tasks.tests->rust.desktop.tasks']);
+  assert.deepEqual(r.unanalyzedModules.slice().sort(), ['rust.desktop.build', 'rust.mcp.transport']);
+  // The declared port for nemo_mcp must match what application_mcp.rs actually imports today.
+  const src = fs.readFileSync(path.join(ROOT, 'src-tauri/src/application_mcp.rs'), 'utf8');
+  assert.match(src, /use nemo_mcp::\{/);
+  assert.match(src, /contract::\{ApplicationRequest, ApplicationResponse\}/);
+  assert.match(src, /registry::\{self, Endpoint, Registration\}/);
+  assert.match(src, /\bwire,/);
+  assert.match(src, /nemo_mcp::BUILD_SOURCE_ID/);
+  assert.deepEqual(policy.externalCratePorts.nemo_mcp.items.slice().sort(),
+    ['BUILD_SOURCE_ID', 'contract::ApplicationRequest', 'contract::ApplicationResponse', 'registry', 'wire']);
 });
