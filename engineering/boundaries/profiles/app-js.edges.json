@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "policyId": "nemo.app-js.edges",
+  "status": "adopted",
+  "purpose": "P10/#1012: enforce the import/global/cycle boundary rules of app-js.profile.json for the migrated application slice through the normal local boundaries gate, while classifying the unmigrated classic-script files honestly: their relationships are not resolved by the lexical checker (script-tag globals carry no import edges), so they receive a no-growth ceiling on their existing findings instead of a fictional dependency-graph pass.",
+  "checker": {
+    "path": "scripts/nemo/lib/boundaries.cjs",
+    "export": "checkProfile",
+    "resolves": "literal require()/import specifiers between declared modules, window.SM* global access, size, expired exceptions, import cycles",
+    "doesNotResolve": "references between classic scripts through document-scope globals (e.g. NemoExportJob, SMEngineBridge without the window. prefix); those edges are NOT analyzed and are reported as unresolved, never as passing"
+  },
+  "enforcedLayers": ["domain", "application", "adapters", "bootstrap"],
+  "enforcedRules": ["layer-violation", "private-import", "global-state", "cycle", "unsupported-import", "unprofiled-local-import", "unsupported-global", "expired-exception"],
+  "legacyLayers": ["app-legacy", "app-domain", "app-presentation-adapter"],
+  "legacyUnresolvedCeiling": 449,
+  "legacyUnresolvedNote": "Count of checker findings in legacy layers at adoption (main b4a4fe249821bc534dd1a63dbb4b037df6455ec3: 439 global-state + 4 unsupported-global + 2 unsupported-import + 1 unprofiled-local-import in app-legacy, 1 global-state in app-domain, 2 global-state in app-presentation-adapter). The ceiling may only go down; lowering it is the ordinary change that accompanies a migration or repair."
+}

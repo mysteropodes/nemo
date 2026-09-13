@@ -222,9 +222,27 @@ counts and exception expiry are checked independently of the policy-to-policy ra
 The application profile labels the 140 retained legacy files `app-legacy`. Their current
 architecture-wide global and dependency findings are evidence for R01/R03 classification,
 not accepted exceptions, so the standard gate does not suppress or falsely certify them.
-The adopted gate enforces source coverage and no-growth size ceilings now. Reviewed target
-layers, public APIs, provider/consumer boundaries and parsed bootstrap/runtime readiness remain
-the explicit follow-up before the full graph rules can be enabled for application source.
+The adopted gate enforces source coverage and no-growth size ceilings now.
+
+### Dependency edges for the migrated slice (P10)
+
+[`app-js.edges.json`](./profiles/app-js.edges.json) makes the profile's edge rules part of the
+same `boundaries` lane, split honestly in two. For the **enforced layers** — `domain`,
+`application`, `adapters`, `bootstrap`, i.e. the modules the P0x extractions created — any
+`layer-violation`, `private-import`, `global-state`, `cycle`, unsupported/unprofiled import or
+expired exception fails the gate. For the **legacy layers** (`app-legacy`, `app-domain`,
+`app-presentation-adapter`) the same findings are only counted against
+`legacyUnresolvedCeiling` (449 at adoption) and reported under `application.edges.legacy`
+with an explicit `unresolved` label: the lexical checker resolves literal `require`/`import`
+specifiers, `window.SM*` access and import cycles, and cannot see the relationships classic
+scripts form through document-scope globals, so those files get a no-growth check on what the
+checker does find and no dependency-coverage claim. A profile layer the policy does not
+classify fails rather than passing silently. The ceiling may only be lowered, in the same
+change that migrates or repairs the findings it covers. Negative controls live in
+[`scripts/nemo/boundaries-edges.test.cjs`](../../scripts/nemo/boundaries-edges.test.cjs).
+Reviewed target layers, public APIs, provider/consumer boundaries and parsed
+bootstrap/runtime readiness remain the explicit follow-up before full graph rules can be
+claimed for the legacy files.
 
 The extracted `src/js/animation/curve.js` is a `domain` module with a 300-line hard
 limit and no legacy exception. The normal animation test entry runs the full import,
