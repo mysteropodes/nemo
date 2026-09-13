@@ -1,20 +1,106 @@
 {
-  "schema": "nemo.remediation-scope/1",
-  "issue": "https://github.com/mysteropodes/nemo/issues/1116",
+  "schema": "nemo.remediation-scope/2",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1170",
   "complete": false,
   "source": {
-    "commit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
-    "fileCount": 657,
-    "sha256": "08fc647c1bb9bfaf6a15cae0bfe4a4f86091bfd4c695af85e3f6386a6b65b4dc"
+    "commit": "1bfcbad1eea9ab810ee87cfd6bc18306b2533ee8",
+    "fileCount": 699,
+    "sha256": "2e8b5fbab894e6686ff56880946e86b6f5017ae51a7de27177b001f5aa473a6f"
   },
+  "amendments": [
+    {
+      "id": "P03A",
+      "issue": 1116,
+      "commit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+      "fileCount": 657,
+      "sha256": "08fc647c1bb9bfaf6a15cae0bfe4a4f86091bfd4c695af85e3f6386a6b65b4dc",
+      "reason": "Initial frozen source index (schema 1)."
+    },
+    {
+      "id": "P03B",
+      "issue": 1170,
+      "commit": "1bfcbad1eea9ab810ee87cfd6bc18306b2533ee8",
+      "from": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+      "fileCount": 699,
+      "sha256": "2e8b5fbab894e6686ff56880946e86b6f5017ae51a7de27177b001f5aa473a6f",
+      "added": [
+        "engineering/application/value-contract-v1.schema.json",
+        "engineering/boundaries/profiles/app-js.edges.json",
+        "engineering/inventory/REMEDIATION_SCOPE.md",
+        "engineering/inventory/census/C19a-timeline-foundations.json",
+        "engineering/inventory/census/C19b-timeline-work-area-duration.json",
+        "engineering/inventory/census/C19b2-timeline-frame-relocation.json",
+        "engineering/inventory/census/C19c-timeline-layer-copy-transactions.json",
+        "engineering/inventory/census/C19d-timeline-layer-lifecycle.json",
+        "engineering/inventory/census/C19e-timeline-layer-controls-and-symbol-facades.json",
+        "engineering/inventory/census/C19f-timeline-content-commands.json",
+        "engineering/inventory/census/C19g-timeline-document-codec.json",
+        "engineering/inventory/census/C19h-timeline-ui-refresh-adapters.json",
+        "engineering/inventory/census/C19i-timeline-properties-help-foundations.json",
+        "engineering/inventory/census/C19j-timeline-properties-context-router.json",
+        "engineering/inventory/census/C19k-timeline-selection-properties-adoption.json",
+        "engineering/inventory/census/C19l-timeline-fs-ghost-properties-geometry.json",
+        "engineering/inventory/census/C19m-timeline-drag-playhead-render.json",
+        "engineering/inventory/census/C19n-timeline-tween-curve-strips.json",
+        "engineering/inventory/census/C19o-timeline-span-shrink-handle.json",
+        "engineering/inventory/census/C19p-timeline-frame-grid-mouse.json",
+        "engineering/inventory/census/C19q-timeline-layer-panel-selection-folders.json",
+        "engineering/inventory/census/C20a-motion-text-animator-element-style.json",
+        "engineering/inventory/census/C20b-motion-property-edit-and-header-support.json",
+        "engineering/inventory/census/C20c-motion-key-lock-menus.json",
+        "engineering/inventory/census/C20d-motion-layer-properties-matte-blend.json",
+        "engineering/inventory/census/C20e-motion-null-follow-parent-time-panel.json",
+        "engineering/inventory/census/C20f-motion-transform-expression-panel.json",
+        "engineering/inventory/remediation-scope.json",
+        "scripts/nemo/boundaries-edges.test.cjs",
+        "scripts/nemo/remediation-scope.cjs",
+        "src/js/adapters/export-svg-frame.js",
+        "src/js/adapters/export-svg-sequence.js",
+        "src/js/application/export-job.js",
+        "src/js/application/history/frame-entry.js",
+        "src/js/application/render/image-budget.js",
+        "src/js/domain/tween/assignment.js",
+        "tests/adapter-export-svg-frame.test.cjs",
+        "tests/application-export-job.test.cjs",
+        "tests/application-history-frame-entry.test.cjs",
+        "tests/application-image-budget.test.cjs",
+        "tests/domain-tween-assignment.test.cjs",
+        "tests/nemo-remediation-scope.test.cjs"
+      ],
+      "removed": [],
+      "modified": [
+        "engineering/boundaries/README.md",
+        "engineering/boundaries/profiles/app-js.coverage.json",
+        "engineering/boundaries/profiles/app-js.profile.json",
+        "engineering/boundaries/profiles/scripts-nemo.profile.json",
+        "engineering/inventory/SURFACES.md",
+        "engineering/inventory/surfaces.csv",
+        "engineering/inventory/surfaces.json",
+        "engineering/remediation/EXECUTION_PLAN.en.md",
+        "engineering/remediation/EXECUTION_PLAN.fr.md",
+        "scripts/nemo/boundaries-application.test.cjs",
+        "scripts/nemo/ci.cjs",
+        "scripts/nemo/ci.test.cjs",
+        "scripts/nemo/lib/boundaries-application.cjs",
+        "src/index.html",
+        "src/js/engine-bridge.js",
+        "src/js/export.js",
+        "src/js/tweens.js",
+        "tests/application-opacity-bootstrap.test.cjs",
+        "tests/application-opacity-capability.test.cjs",
+        "tests/nemo-boundaries.test.cjs"
+      ],
+      "reason": "P03B refreeze at current main: pin the 24 supplemental C19/C20 censuses, index the paths added since the P03A freeze, record range coverage and reviewed dispositions."
+    }
+  ],
   "counts": {
-    "configuration": 47,
-    "documentation": 68,
+    "configuration": 49,
+    "documentation": 69,
     "generated": 14,
-    "handwritten-runtime": 195,
-    "handwritten-tooling": 52,
-    "static-data": 136,
-    "test": 138,
+    "handwritten-runtime": 201,
+    "handwritten-tooling": 53,
+    "static-data": 161,
+    "test": 145,
     "vendor": 7
   },
   "censuses": [
@@ -101,41 +187,160 @@
       "path": "engineering/inventory/census/C18-vendor-provenance.json",
       "blob": "58c4fc127112a0d4072bed800c8baf96e8c2db23",
       "sourceCommit": "391f2e347b098e0f7bb68000ebba6fc3119d28a3"
+    },
+    {
+      "id": "C19a",
+      "path": "engineering/inventory/census/C19a-timeline-foundations.json",
+      "blob": "8c71a0452e3fb803a2666cb70f1f2ea771a8a931",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19b",
+      "path": "engineering/inventory/census/C19b-timeline-work-area-duration.json",
+      "blob": "300d5277510aa96623d048ec7f5eeaf1b58e095b",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19b2",
+      "path": "engineering/inventory/census/C19b2-timeline-frame-relocation.json",
+      "blob": "dcf99133931c492a788d76c7be5b4a7a52467ab3",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19c",
+      "path": "engineering/inventory/census/C19c-timeline-layer-copy-transactions.json",
+      "blob": "be0b90975fa5aeb93b80a777c15dbf1e6fde8cf5",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19d",
+      "path": "engineering/inventory/census/C19d-timeline-layer-lifecycle.json",
+      "blob": "140adc3e576ab071a49184982e4e4a3d34982d64",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19e",
+      "path": "engineering/inventory/census/C19e-timeline-layer-controls-and-symbol-facades.json",
+      "blob": "3eead1c4d139741246c38881dc293d1b11894d0e",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19f",
+      "path": "engineering/inventory/census/C19f-timeline-content-commands.json",
+      "blob": "26db2e3b765ae6f4003468e804804f69ba01e142",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19g",
+      "path": "engineering/inventory/census/C19g-timeline-document-codec.json",
+      "blob": "53e542118ceab6994c1bc59bdca9d3f86585e831",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19h",
+      "path": "engineering/inventory/census/C19h-timeline-ui-refresh-adapters.json",
+      "blob": "70a5fddfd3670c467eae9490df45bd9914cec69c",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19i",
+      "path": "engineering/inventory/census/C19i-timeline-properties-help-foundations.json",
+      "blob": "4786c61fd890148e2e90359fe1a039133e9d6a14",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19j",
+      "path": "engineering/inventory/census/C19j-timeline-properties-context-router.json",
+      "blob": "011d88677d498006b1460e78f74380b2ad238380",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19k",
+      "path": "engineering/inventory/census/C19k-timeline-selection-properties-adoption.json",
+      "blob": "d0812cdf09442dbef31c1ed5f9e68aef8941e08f",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19l",
+      "path": "engineering/inventory/census/C19l-timeline-fs-ghost-properties-geometry.json",
+      "blob": "4de191bd5a756d4ef80fb76ed1b4de0e74056a40",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19m",
+      "path": "engineering/inventory/census/C19m-timeline-drag-playhead-render.json",
+      "blob": "7afd43ab73ca6bde93f2d5f2d94efac6f75ea7e7",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19n",
+      "path": "engineering/inventory/census/C19n-timeline-tween-curve-strips.json",
+      "blob": "64a91fa851449230ea6edccd892bddc0eb31e77b",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19o",
+      "path": "engineering/inventory/census/C19o-timeline-span-shrink-handle.json",
+      "blob": "74654915f0f62725bf15c5a9c3d3c24538e43d3b",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19p",
+      "path": "engineering/inventory/census/C19p-timeline-frame-grid-mouse.json",
+      "blob": "44c09da60589ba0889015eadaf66897622346164",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19q",
+      "path": "engineering/inventory/census/C19q-timeline-layer-panel-selection-folders.json",
+      "blob": "49bb3a80d41a8c614d7a34c501a21c169db9b59c",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20a",
+      "path": "engineering/inventory/census/C20a-motion-text-animator-element-style.json",
+      "blob": "98d7c1070f4f71dbc8c75f89ea55122bec68f6ef",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20b",
+      "path": "engineering/inventory/census/C20b-motion-property-edit-and-header-support.json",
+      "blob": "c9614b6c83b874ef6c0baabe075c57a59feb01eb",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20c",
+      "path": "engineering/inventory/census/C20c-motion-key-lock-menus.json",
+      "blob": "a4d41aaf5f29b1e50869fa6f7ff8dbc040fb0a1a",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20d",
+      "path": "engineering/inventory/census/C20d-motion-layer-properties-matte-blend.json",
+      "blob": "333ec3f4eac8cd8ca68e2f0fe517d5ba1094d93f",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20e",
+      "path": "engineering/inventory/census/C20e-motion-null-follow-parent-time-panel.json",
+      "blob": "4775da986fc8e5a9f6cf58f21fb96c2235449f9f",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20f",
+      "path": "engineering/inventory/census/C20f-motion-transform-expression-panel.json",
+      "blob": "daf82f9ec47e60c277eebc59db59a3f33a5651ab",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
     }
   ],
   "packets": [
     {
-      "id": "C01.asset-tree.folder-widget",
-      "census": "C01",
-      "admission": "pending"
-    },
-    {
-      "id": "C01.history-panel.ui",
-      "census": "C01",
-      "admission": "pending"
-    },
-    {
-      "id": "C01.idb-store.kv",
-      "census": "C01",
-      "admission": "pending"
-    },
-    {
-      "id": "C01.project-document.validation",
-      "census": "C01",
-      "admission": "pending"
-    },
-    {
-      "id": "C01.project-entry.repaint",
+      "id": "C01.project.document-io-and-dirty-tracking",
       "census": "C01",
       "admission": "pending"
     },
     {
       "id": "C01.project.close-unsaved-work-guard",
-      "census": "C01",
-      "admission": "pending"
-    },
-    {
-      "id": "C01.project.document-io-and-dirty-tracking",
       "census": "C01",
       "admission": "pending"
     },
@@ -150,12 +355,12 @@
       "admission": "pending"
     },
     {
-      "id": "C01.project.team-sync",
+      "id": "C01.project.version-history",
       "census": "C01",
       "admission": "pending"
     },
     {
-      "id": "C01.project.version-history",
+      "id": "C01.project.team-sync",
       "census": "C01",
       "admission": "pending"
     },
@@ -165,137 +370,42 @@
       "admission": "pending"
     },
     {
+      "id": "C01.project-document.validation",
+      "census": "C01",
+      "admission": "pending"
+    },
+    {
+      "id": "C01.project-entry.repaint",
+      "census": "C01",
+      "admission": "pending"
+    },
+    {
+      "id": "C01.idb-store.kv",
+      "census": "C01",
+      "admission": "pending"
+    },
+    {
+      "id": "C01.asset-tree.folder-widget",
+      "census": "C01",
+      "admission": "pending"
+    },
+    {
       "id": "C01.tweens.undo-redo-engine",
       "census": "C01",
       "admission": "pending"
     },
     {
-      "id": "C02.camera.interaction-and-overlay-render",
+      "id": "C01.history-panel.ui",
+      "census": "C01",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.properties-and-curves.properties-and-metadata",
       "census": "C02",
       "admission": "pending"
     },
     {
-      "id": "C02.camera.keyframe-model-and-viewport-lock",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.expressions.expr-bake-to-keyframes",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.expressions.expr-code-split-editor",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.expressions.expr-reference-library",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.expressions.expression-runtime",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.layer-inout.bar-rendering",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.layer-inout.drag-and-batch-ops",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.layer-inout.selection-and-marquee",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.markers-and-bpm.bpm-guides",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.markers-and-bpm.timeline-markers",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.math-kernels.curve-evaluator",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.math-kernels.opacity-domain-writers",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.motion-advanced.3d-layers-and-gizmo",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.motion-advanced.canvas-drag-interactions",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.motion-advanced.component-shape-tree",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.motion-advanced.duplicator-and-effector-props",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.motion-advanced.geometry-motion-integrations",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.motion-advanced.mode-toggle-and-workspace-continuity",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.motion-advanced.point-mapping-and-parent-chain",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.motion-advanced.time-remap",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.motion-advanced.transform-application",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.playback-integration.camera-markers-bpm-row-integration",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.playback-integration.motion-shape-tree-rendering",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.playback-integration.onion-and-tween-controls-wiring",
-      "census": "C02",
-      "admission": "pending"
-    },
-    {
-      "id": "C02.playback-integration.playback-transport",
+      "id": "C02.properties-and-curves.keyframe-track-model",
       "census": "C02",
       "admission": "pending"
     },
@@ -310,12 +420,107 @@
       "admission": "pending"
     },
     {
-      "id": "C02.properties-and-curves.keyframe-track-model",
+      "id": "C02.expressions.expression-runtime",
       "census": "C02",
       "admission": "pending"
     },
     {
-      "id": "C02.properties-and-curves.properties-and-metadata",
+      "id": "C02.expressions.expr-code-split-editor",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.expressions.expr-bake-to-keyframes",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.expressions.expr-reference-library",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.tween-engine.feature-extraction-and-matching",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.tween-engine.resampling-and-nonrigid-warping",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.tween-engine.interpolation-core",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.tween-engine.tween-generation-and-splitting",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.tween-engine.arc-rendering-and-reassignment",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.tween-engine.onion-skinning",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.playback-integration.playback-transport",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.playback-integration.onion-and-tween-controls-wiring",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.playback-integration.camera-markers-bpm-row-integration",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.playback-integration.motion-shape-tree-rendering",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.camera.keyframe-model-and-viewport-lock",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.camera.interaction-and-overlay-render",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.markers-and-bpm.timeline-markers",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.markers-and-bpm.bpm-guides",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.layer-inout.bar-rendering",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.layer-inout.selection-and-marquee",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.layer-inout.drag-and-batch-ops",
       "census": "C02",
       "admission": "pending"
     },
@@ -330,42 +535,67 @@
       "admission": "pending"
     },
     {
-      "id": "C02.tween-engine.arc-rendering-and-reassignment",
+      "id": "C02.math-kernels.curve-evaluator",
       "census": "C02",
       "admission": "pending"
     },
     {
-      "id": "C02.tween-engine.feature-extraction-and-matching",
+      "id": "C02.math-kernels.opacity-domain-writers",
       "census": "C02",
       "admission": "pending"
     },
     {
-      "id": "C02.tween-engine.interpolation-core",
+      "id": "C02.motion-advanced.component-shape-tree",
       "census": "C02",
       "admission": "pending"
     },
     {
-      "id": "C02.tween-engine.onion-skinning",
+      "id": "C02.motion-advanced.3d-layers-and-gizmo",
       "census": "C02",
       "admission": "pending"
     },
     {
-      "id": "C02.tween-engine.resampling-and-nonrigid-warping",
+      "id": "C02.motion-advanced.point-mapping-and-parent-chain",
       "census": "C02",
       "admission": "pending"
     },
     {
-      "id": "C02.tween-engine.tween-generation-and-splitting",
+      "id": "C02.motion-advanced.transform-application",
       "census": "C02",
       "admission": "pending"
     },
     {
-      "id": "C03.gpu-engine-core.composite-scene-pipeline",
+      "id": "C02.motion-advanced.duplicator-and-effector-props",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.motion-advanced.geometry-motion-integrations",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.motion-advanced.time-remap",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.motion-advanced.canvas-drag-interactions",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C02.motion-advanced.mode-toggle-and-workspace-continuity",
+      "census": "C02",
+      "admission": "pending"
+    },
+    {
+      "id": "C03.gpu-engine-core.vello-engine-state",
       "census": "C03",
       "admission": "pending"
     },
     {
-      "id": "C03.gpu-engine-core.effect-pipeline-library",
+      "id": "C03.gpu-engine-core.composite-scene-pipeline",
       "census": "C03",
       "admission": "pending"
     },
@@ -375,7 +605,7 @@
       "admission": "pending"
     },
     {
-      "id": "C03.gpu-engine-core.vello-engine-state",
+      "id": "C03.gpu-engine-core.effect-pipeline-library",
       "census": "C03",
       "admission": "pending"
     },
@@ -385,32 +615,12 @@
       "admission": "pending"
     },
     {
-      "id": "C03.js-effects-and-playback.color-manager-panel",
+      "id": "C03.js-engine-bridge.preview-scale-calibration",
       "census": "C03",
       "admission": "pending"
     },
     {
-      "id": "C03.js-effects-and-playback.custom-effects-authoring",
-      "census": "C03",
-      "admission": "pending"
-    },
-    {
-      "id": "C03.js-effects-and-playback.path-fx-stack",
-      "census": "C03",
-      "admission": "pending"
-    },
-    {
-      "id": "C03.js-effects-and-playback.playback-bake-cache",
-      "census": "C03",
-      "admission": "pending"
-    },
-    {
-      "id": "C03.js-effects-and-playback.render-manager-queue",
-      "census": "C03",
-      "admission": "pending"
-    },
-    {
-      "id": "C03.js-effects-and-playback.shader-effects-library",
+      "id": "C03.js-engine-bridge.retained-path-store",
       "census": "C03",
       "admission": "pending"
     },
@@ -430,17 +640,12 @@
       "admission": "pending"
     },
     {
+      "id": "C03.js-engine-bridge.viewport-sync-and-coords",
+      "census": "C03",
+      "admission": "pending"
+    },
+    {
       "id": "C03.js-engine-bridge.engine-lifecycle",
-      "census": "C03",
-      "admission": "pending"
-    },
-    {
-      "id": "C03.js-engine-bridge.preview-scale-calibration",
-      "census": "C03",
-      "admission": "pending"
-    },
-    {
-      "id": "C03.js-engine-bridge.public-api-surface",
       "census": "C03",
       "admission": "pending"
     },
@@ -450,32 +655,7 @@
       "admission": "pending"
     },
     {
-      "id": "C03.js-engine-bridge.retained-path-store",
-      "census": "C03",
-      "admission": "pending"
-    },
-    {
-      "id": "C03.js-engine-bridge.viewport-sync-and-coords",
-      "census": "C03",
-      "admission": "pending"
-    },
-    {
-      "id": "C03.wasm-geometry-ops.basic-shape-segments",
-      "census": "C03",
-      "admission": "pending"
-    },
-    {
-      "id": "C03.wasm-geometry-ops.crate-root-and-boolean-ops",
-      "census": "C03",
-      "admission": "pending"
-    },
-    {
-      "id": "C03.wasm-geometry-ops.eraser-boolean-subtract",
-      "census": "C03",
-      "admission": "pending"
-    },
-    {
-      "id": "C03.wasm-geometry-ops.hit-test",
+      "id": "C03.js-engine-bridge.public-api-surface",
       "census": "C03",
       "admission": "pending"
     },
@@ -490,7 +670,27 @@
       "admission": "pending"
     },
     {
+      "id": "C03.wasm-geometry-ops.eraser-boolean-subtract",
+      "census": "C03",
+      "admission": "pending"
+    },
+    {
+      "id": "C03.wasm-geometry-ops.hit-test",
+      "census": "C03",
+      "admission": "pending"
+    },
+    {
       "id": "C03.wasm-geometry-ops.timeline-frame-resolution",
+      "census": "C03",
+      "admission": "pending"
+    },
+    {
+      "id": "C03.wasm-geometry-ops.crate-root-and-boolean-ops",
+      "census": "C03",
+      "admission": "pending"
+    },
+    {
+      "id": "C03.wasm-geometry-ops.basic-shape-segments",
       "census": "C03",
       "admission": "pending"
     },
@@ -500,12 +700,47 @@
       "admission": "pending"
     },
     {
-      "id": "C03.wasm-tween-matching.align-pair",
+      "id": "C03.js-effects-and-playback.render-manager-queue",
+      "census": "C03",
+      "admission": "pending"
+    },
+    {
+      "id": "C03.js-effects-and-playback.playback-bake-cache",
+      "census": "C03",
+      "admission": "pending"
+    },
+    {
+      "id": "C03.js-effects-and-playback.color-manager-panel",
+      "census": "C03",
+      "admission": "pending"
+    },
+    {
+      "id": "C03.js-effects-and-playback.path-fx-stack",
+      "census": "C03",
+      "admission": "pending"
+    },
+    {
+      "id": "C03.js-effects-and-playback.custom-effects-authoring",
+      "census": "C03",
+      "admission": "pending"
+    },
+    {
+      "id": "C03.js-effects-and-playback.shader-effects-library",
       "census": "C03",
       "admission": "pending"
     },
     {
       "id": "C03.wasm-tween-matching.auto-match-correspondence",
+      "census": "C03",
+      "admission": "pending"
+    },
+    {
+      "id": "C03.wasm-tween-matching.resample-stroke",
+      "census": "C03",
+      "admission": "pending"
+    },
+    {
+      "id": "C03.wasm-tween-matching.align-pair",
       "census": "C03",
       "admission": "pending"
     },
@@ -520,67 +755,42 @@
       "admission": "pending"
     },
     {
-      "id": "C03.wasm-tween-matching.resample-stroke",
-      "census": "C03",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.boolean.flatten-combine",
+      "id": "C04a.tools.misc-globals",
       "census": "C04a",
       "admission": "pending"
     },
     {
-      "id": "C04a.boolean.path-operations",
+      "id": "C04a.tools.fs-select-hit-promote",
       "census": "C04a",
       "admission": "pending"
     },
     {
-      "id": "C04a.brush.centerline-width-profile",
+      "id": "C04a.tools.fs-select-region-ops",
       "census": "C04a",
       "admission": "pending"
     },
     {
-      "id": "C04a.brush.dab-shape-presets",
+      "id": "C04a.tools.node-tangent-edit",
       "census": "C04a",
       "admission": "pending"
     },
     {
-      "id": "C04a.brush.dab-stamping",
+      "id": "C04a.tools.transform-box-oriented",
       "census": "C04a",
       "admission": "pending"
     },
     {
-      "id": "C04a.brush.pressure-vector-brush-nib",
+      "id": "C04a.tools.selection-clone-clipboard",
       "census": "C04a",
       "admission": "pending"
     },
     {
-      "id": "C04a.brush.stroke-profiles",
+      "id": "C04a.tools.stylus-pressure-edit-guard",
       "census": "C04a",
       "admission": "pending"
     },
     {
-      "id": "C04a.brush.taper-width-helpers",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.brush.texture-apply-placement",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.brush.trim-rebuild-outline",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.brush.variable-width-outline",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.fill.auto-gap-closure",
+      "id": "C04a.tools.stroke-ownership-revision",
       "census": "C04a",
       "admission": "pending"
     },
@@ -590,7 +800,7 @@
       "admission": "pending"
     },
     {
-      "id": "C04a.fill.find-wasm-js-raster",
+      "id": "C04a.fill.auto-gap-closure",
       "census": "C04a",
       "admission": "pending"
     },
@@ -605,27 +815,112 @@
       "admission": "pending"
     },
     {
-      "id": "C04a.fill.propagation-frames",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
       "id": "C04a.fill.regenerate-linked",
       "census": "C04a",
       "admission": "pending"
     },
     {
-      "id": "C04a.select.combine-hit-confirm",
+      "id": "C04a.fill.propagation-frames",
       "census": "C04a",
       "admission": "pending"
     },
     {
-      "id": "C04a.select.distort",
+      "id": "C04a.fill.find-wasm-js-raster",
       "census": "C04a",
       "admission": "pending"
     },
     {
-      "id": "C04a.select.handle-computation",
+      "id": "C04a.brush.variable-width-outline",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.brush.dab-shape-presets",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.brush.dab-stamping",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.brush.texture-apply-placement",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.brush.taper-width-helpers",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.brush.centerline-width-profile",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.brush.stroke-profiles",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.brush.trim-rebuild-outline",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.tools.point-type-conversion",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.brush.pressure-vector-brush-nib",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.tools.pen-tool-finalize",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.boolean.path-operations",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.vecerase.precision-vector-eraser",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.boolean.flatten-combine",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.tools.dynamic-shapes",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.tools.core-pointer-dispatch",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.tools.cursor-hover-overlays",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.tools.component-element-hit-geometry",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.tools.double-click-dispatch-zoom",
       "census": "C04a",
       "admission": "pending"
     },
@@ -635,12 +930,27 @@
       "admission": "pending"
     },
     {
+      "id": "C04a.select.param-shape-handles",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.select.combine-hit-confirm",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
       "id": "C04a.select.multi-layer-box",
       "census": "C04a",
       "admission": "pending"
     },
     {
-      "id": "C04a.select.on-context",
+      "id": "C04a.select.handle-computation",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.select.distort",
       "census": "C04a",
       "admission": "pending"
     },
@@ -660,17 +970,12 @@
       "admission": "pending"
     },
     {
-      "id": "C04a.select.param-shape-handles",
+      "id": "C04a.select.on-context",
       "census": "C04a",
       "admission": "pending"
     },
     {
-      "id": "C04a.select.public-api-init",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.select.role-suggestions",
+      "id": "C04a.select.tween-toggle",
       "census": "C04a",
       "admission": "pending"
     },
@@ -680,7 +985,17 @@
       "admission": "pending"
     },
     {
-      "id": "C04a.select.tween-toggle",
+      "id": "C04a.select.role-suggestions",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.select.public-api-init",
+      "census": "C04a",
+      "admission": "pending"
+    },
+    {
+      "id": "C04a.subselect.space-mapping",
       "census": "C04a",
       "admission": "pending"
     },
@@ -691,11 +1006,6 @@
     },
     {
       "id": "C04a.subselect.on-move-up-init",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.subselect.space-mapping",
       "census": "C04a",
       "admission": "pending"
     },
@@ -715,306 +1025,6 @@
       "admission": "pending"
     },
     {
-      "id": "C04a.tools.component-element-hit-geometry",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.tools.core-pointer-dispatch",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.tools.cursor-hover-overlays",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.tools.double-click-dispatch-zoom",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.tools.dynamic-shapes",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.tools.fs-select-hit-promote",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.tools.fs-select-region-ops",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.tools.misc-globals",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.tools.node-tangent-edit",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.tools.pen-tool-finalize",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.tools.point-type-conversion",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.tools.selection-clone-clipboard",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.tools.stroke-ownership-revision",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.tools.stylus-pressure-edit-guard",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.tools.transform-box-oriented",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04a.vecerase.precision-vector-eraser",
-      "census": "C04a",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.animated-primitives.image-mesh",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.animated-primitives.rig-widget-interaction-authoring",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.animated-primitives.rig-widget-model-overlay",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.animated-primitives.text-animator",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.animated-primitives.text-selector",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.brush-engine.bitmap-brush-bake-engine",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.brush-engine.bitmap-brush-preview-panel",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.brush-engine.bitmap-tip-picker",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.brush-engine.brush-editor",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.brush-engine.brush-preset-picker",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.brush-engine.brush-tool-presets",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.brush-engine.path-fx",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.brush-engine.stroke-modeler",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.canvas-aids.manual-rulers-guides",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.canvas-aids.perspective-guides",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.canvas-aids.rotoscopy-reference",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.canvas-aids.smart-alignment-guides",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.canvas-aids.viewport-tools",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.color-tools.popover-picker",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.color-tools.selected-colors-panel",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.content-tools.feedback-local-log-storage",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.content-tools.feedback-triage-sync",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.content-tools.feedback-worker-publish",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.content-tools.google-fonts-live-fetch",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.content-tools.vector-text-glyphs",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.content-tools.vectorize-orchestration",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.content-tools.vectorize-shape-fitting",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.deform.image-mesh-editor",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.deform.image-mesh-shape-to-mask",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.deform.rig-tool",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.docked-panels.assets-tab-switch",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.docked-panels.effects-stack",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.docked-panels.expr-code-editor",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.docked-panels.history-panel",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.docked-panels.palette-find-replace",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.docked-panels.palette-library",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.docked-panels.path-fx-stack",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.docked-panels.scripting-panel-ui-builder",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.docked-panels.shapes-drag-reorder-engine",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.docked-panels.shapes-tree-render",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.docked-panels.text-animator-panel",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.docked-panels.tracker-panel",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.editor-shell.context-menu-system",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
-      "id": "C04b.editor-shell.detachable-panel-sections-dnd",
-      "census": "C04b",
-      "admission": "pending"
-    },
-    {
       "id": "C04b.editor-shell.easing-curve-editor",
       "census": "C04b",
       "admission": "pending"
@@ -1030,7 +1040,7 @@
       "admission": "pending"
     },
     {
-      "id": "C04b.editor-shell.scrub-input-mechanism",
+      "id": "C04b.editor-shell.work-area-and-onion-bar-drag",
       "census": "C04b",
       "admission": "pending"
     },
@@ -1040,72 +1050,82 @@
       "admission": "pending"
     },
     {
+      "id": "C04b.editor-shell.context-menu-system",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
       "id": "C04b.editor-shell.tooltip-system",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.editor-shell.work-area-and-onion-bar-drag",
+      "id": "C04b.editor-shell.detachable-panel-sections-dnd",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.paint-brush.brush-menu-popover",
+      "id": "C04b.editor-shell.scrub-input-mechanism",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.paint-brush.fill-bucket",
+      "id": "C04b.docked-panels.assets-tab-switch",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.paint-brush.gradient-fill",
+      "id": "C04b.docked-panels.effects-stack",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.paint-brush.shadow-brush",
+      "id": "C04b.docked-panels.path-fx-stack",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.presets-and-effects.custom-wgsl-authoring",
+      "id": "C04b.docked-panels.expr-code-editor",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.presets-and-effects.motion-preset-library",
+      "id": "C04b.docked-panels.history-panel",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.presets-and-effects.shader-table-data-1",
+      "id": "C04b.docked-panels.scripting-panel-ui-builder",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.presets-and-effects.shader-table-data-2",
+      "id": "C04b.docked-panels.palette-library",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.presets-and-effects.shader-table-data-3",
+      "id": "C04b.docked-panels.palette-find-replace",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.presets-and-effects.shader-table-registry",
+      "id": "C04b.docked-panels.shapes-tree-render",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.stroke-input.draw-commit-materialize",
+      "id": "C04b.docked-panels.shapes-drag-reorder-engine",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.stroke-input.draw-gesture-lifecycle",
+      "id": "C04b.docked-panels.text-animator-panel",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.docked-panels.tracker-panel",
       "census": "C04b",
       "admission": "pending"
     },
@@ -1116,6 +1136,16 @@
     },
     {
       "id": "C04b.stroke-input.draw-live-overlay",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.stroke-input.draw-gesture-lifecycle",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.stroke-input.draw-commit-materialize",
       "census": "C04b",
       "admission": "pending"
     },
@@ -1135,12 +1165,27 @@
       "admission": "pending"
     },
     {
-      "id": "C04b.structure-audio.audio-data-playback",
+      "id": "C04b.paint-brush.fill-bucket",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.structure-audio.audio-timeline-ui",
+      "id": "C04b.paint-brush.gradient-fill",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.paint-brush.shadow-brush",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.paint-brush.brush-menu-popover",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.structure-audio.group-crud-nesting",
       "census": "C04b",
       "admission": "pending"
     },
@@ -1155,22 +1200,192 @@
       "admission": "pending"
     },
     {
-      "id": "C04b.structure-audio.group-crud-nesting",
+      "id": "C04b.structure-audio.audio-data-playback",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.viewer-and-chrome.asset-tree",
+      "id": "C04b.structure-audio.audio-timeline-ui",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.viewer-and-chrome.comp-preview",
+      "id": "C04b.canvas-aids.perspective-guides",
       "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C04b.viewer-and-chrome.second-viewer",
+      "id": "C04b.canvas-aids.rotoscopy-reference",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.canvas-aids.manual-rulers-guides",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.canvas-aids.smart-alignment-guides",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.canvas-aids.viewport-tools",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.deform.rig-tool",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.deform.image-mesh-editor",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.deform.image-mesh-shape-to-mask",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.content-tools.vector-text-glyphs",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.content-tools.google-fonts-live-fetch",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.content-tools.vectorize-shape-fitting",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.content-tools.vectorize-orchestration",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.content-tools.feedback-local-log-storage",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.content-tools.feedback-worker-publish",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.content-tools.feedback-triage-sync",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.brush-engine.bitmap-brush-bake-engine",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.brush-engine.bitmap-brush-preview-panel",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.brush-engine.brush-editor",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.brush-engine.brush-preset-picker",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.brush-engine.brush-tool-presets",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.brush-engine.bitmap-tip-picker",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.brush-engine.stroke-modeler",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.brush-engine.path-fx",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.animated-primitives.text-animator",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.animated-primitives.text-selector",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.animated-primitives.rig-widget-model-overlay",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.animated-primitives.rig-widget-interaction-authoring",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.animated-primitives.image-mesh",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.color-tools.popover-picker",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.color-tools.selected-colors-panel",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.presets-and-effects.motion-preset-library",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.presets-and-effects.custom-wgsl-authoring",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.presets-and-effects.shader-table-registry",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.presets-and-effects.shader-table-data-1",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.presets-and-effects.shader-table-data-2",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.presets-and-effects.shader-table-data-3",
       "census": "C04b",
       "admission": "pending"
     },
@@ -1180,12 +1395,22 @@
       "admission": "pending"
     },
     {
-      "id": "C05.export.ae-camera-jsx",
-      "census": "C05",
+      "id": "C04b.viewer-and-chrome.second-viewer",
+      "census": "C04b",
       "admission": "pending"
     },
     {
-      "id": "C05.export.browser-native-fallbacks",
+      "id": "C04b.viewer-and-chrome.comp-preview",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C04b.viewer-and-chrome.asset-tree",
+      "census": "C04b",
+      "admission": "pending"
+    },
+    {
+      "id": "C05.export.frame-compositor",
       "census": "C05",
       "admission": "pending"
     },
@@ -1195,7 +1420,12 @@
       "admission": "pending"
     },
     {
-      "id": "C05.export.frame-compositor",
+      "id": "C05.export.tauri-io-ffmpeg",
+      "census": "C05",
+      "admission": "pending"
+    },
+    {
+      "id": "C05.export.browser-native-fallbacks",
       "census": "C05",
       "admission": "pending"
     },
@@ -1210,7 +1440,7 @@
       "admission": "pending"
     },
     {
-      "id": "C05.export.tauri-io-ffmpeg",
+      "id": "C05.export.ae-camera-jsx",
       "census": "C05",
       "admission": "pending"
     },
@@ -1245,12 +1475,7 @@
       "admission": "pending"
     },
     {
-      "id": "C05.media.library-canvas-actions",
-      "census": "C05",
-      "admission": "pending"
-    },
-    {
-      "id": "C05.media.library-panel",
+      "id": "C05.media.linked-resolve-core",
       "census": "C05",
       "admission": "pending"
     },
@@ -1260,12 +1485,37 @@
       "admission": "pending"
     },
     {
-      "id": "C05.media.linked-resolve-core",
+      "id": "C05.media.mode-setting-ui",
       "census": "C05",
       "admission": "pending"
     },
     {
-      "id": "C05.media.mode-setting-ui",
+      "id": "C05.media.library-panel",
+      "census": "C05",
+      "admission": "pending"
+    },
+    {
+      "id": "C05.media.library-canvas-actions",
+      "census": "C05",
+      "admission": "pending"
+    },
+    {
+      "id": "C05.native-video.decode-session",
+      "census": "C05",
+      "admission": "pending"
+    },
+    {
+      "id": "C05.native-video.layer-sync",
+      "census": "C05",
+      "admission": "pending"
+    },
+    {
+      "id": "C05.native-video.layer-lifecycle",
+      "census": "C05",
+      "admission": "pending"
+    },
+    {
+      "id": "C05.native-video.bench",
       "census": "C05",
       "admission": "pending"
     },
@@ -1285,11 +1535,6 @@
       "admission": "pending"
     },
     {
-      "id": "C05.native-rust.image-vectorize-command",
-      "census": "C05",
-      "admission": "pending"
-    },
-    {
       "id": "C05.native-rust.tablet-pressure-monitor",
       "census": "C05",
       "admission": "pending"
@@ -1300,32 +1545,17 @@
       "admission": "pending"
     },
     {
+      "id": "C05.native-rust.image-vectorize-command",
+      "census": "C05",
+      "admission": "pending"
+    },
+    {
       "id": "C05.native-rust.video-decode",
       "census": "C05",
       "admission": "pending"
     },
     {
-      "id": "C05.native-video.bench",
-      "census": "C05",
-      "admission": "pending"
-    },
-    {
-      "id": "C05.native-video.decode-session",
-      "census": "C05",
-      "admission": "pending"
-    },
-    {
-      "id": "C05.native-video.layer-lifecycle",
-      "census": "C05",
-      "admission": "pending"
-    },
-    {
-      "id": "C05.native-video.layer-sync",
-      "census": "C05",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.bootstrap.feature-flags",
+      "id": "C06.bootstrap.storage-key-migration",
       "census": "C06",
       "admission": "pending"
     },
@@ -1335,12 +1565,37 @@
       "admission": "pending"
     },
     {
+      "id": "C06.bootstrap.feature-flags",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
       "id": "C06.bootstrap.sm-namespace-init",
       "census": "C06",
       "admission": "pending"
     },
     {
-      "id": "C06.bootstrap.storage-key-migration",
+      "id": "C06.preferences.user-profile",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.preferences.settings-modal-shell",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.preferences.profile-fields-ui",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.preferences.sync-folder-ui",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.preferences.shortcuts-system",
       "census": "C06",
       "admission": "pending"
     },
@@ -1350,12 +1605,132 @@
       "admission": "pending"
     },
     {
-      "id": "C06.labs.boil-effect",
+      "id": "C06.labs.registry-core",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.settings-panel",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.float-panel",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.predictive-stroke",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.vector-sculpt",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.french-curve",
       "census": "C06",
       "admission": "pending"
     },
     {
       "id": "C06.labs.canvas-grid",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.view-filter",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.flip-roll",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.mirror-check",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.lagoon-menu",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.out-of-pegs",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.timeline-markers",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.xsheet-panel",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.reference-3d",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.multiframe-draw",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.move-to-layer",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.pingpong-cycle",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.retime-exposure",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.interval-assistant",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.pose-library",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.speed-lines",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.boil-effect",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.follow-path",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.reference-fill",
+      "census": "C06",
+      "admission": "pending"
+    },
+    {
+      "id": "C06.labs.vector-trim",
       "census": "C06",
       "admission": "pending"
     },
@@ -1370,148 +1745,8 @@
       "admission": "pending"
     },
     {
-      "id": "C06.labs.flip-roll",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.float-panel",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.follow-path",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.french-curve",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.interval-assistant",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.lagoon-menu",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.mirror-check",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.move-to-layer",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.multiframe-draw",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.out-of-pegs",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.pingpong-cycle",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.pose-library",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.predictive-stroke",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.reference-3d",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.reference-fill",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.registry-core",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.retime-exposure",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.settings-panel",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.speed-lines",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.timeline-markers",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.vector-sculpt",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.vector-trim",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.view-filter",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.labs.xsheet-panel",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.preferences.profile-fields-ui",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.preferences.settings-modal-shell",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.preferences.shortcuts-system",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.preferences.sync-folder-ui",
-      "census": "C06",
-      "admission": "pending"
-    },
-    {
-      "id": "C06.preferences.user-profile",
-      "census": "C06",
+      "id": "C07.application-service.command-core",
+      "census": "C07",
       "admission": "pending"
     },
     {
@@ -1520,7 +1755,12 @@
       "admission": "pending"
     },
     {
-      "id": "C07.application-service.command-core",
+      "id": "C07.native-transport.webview-adapter",
+      "census": "C07",
+      "admission": "pending"
+    },
+    {
+      "id": "C07.native-transport.tauri-listener",
       "census": "C07",
       "admission": "pending"
     },
@@ -1535,7 +1775,7 @@
       "admission": "pending"
     },
     {
-      "id": "C07.mcp-server.binary-entrypoint",
+      "id": "C07.mcp-server.tool-router",
       "census": "C07",
       "admission": "pending"
     },
@@ -1545,23 +1785,18 @@
       "admission": "pending"
     },
     {
-      "id": "C07.mcp-server.tool-router",
-      "census": "C07",
-      "admission": "pending"
-    },
-    {
       "id": "C07.mcp-server.wire-framing",
       "census": "C07",
       "admission": "pending"
     },
     {
-      "id": "C07.native-transport.tauri-listener",
+      "id": "C07.mcp-server.binary-entrypoint",
       "census": "C07",
       "admission": "pending"
     },
     {
-      "id": "C07.native-transport.webview-adapter",
-      "census": "C07",
+      "id": "C08.docs.remediation-program-docs",
+      "census": "C08",
       "admission": "pending"
     },
     {
@@ -1580,17 +1815,27 @@
       "admission": "pending"
     },
     {
-      "id": "C08.docs.remediation-program-docs",
-      "census": "C08",
-      "admission": "pending"
-    },
-    {
-      "id": "C09.app-utilities.project-transplant",
+      "id": "C09.storyboard-mode.core",
       "census": "C09",
       "admission": "pending"
     },
     {
-      "id": "C09.app-utilities.updater-bridge",
+      "id": "C09.tutorial-onboarding.core",
+      "census": "C09",
+      "admission": "pending"
+    },
+    {
+      "id": "C09.timeline-panel-support.scroll-and-zoom",
+      "census": "C09",
+      "admission": "pending"
+    },
+    {
+      "id": "C09.timeline-panel-support.layer-kind-taxonomy",
+      "census": "C09",
+      "admission": "pending"
+    },
+    {
+      "id": "C09.engine-readiness.wasm-engine-loaders",
       "census": "C09",
       "admission": "pending"
     },
@@ -1600,7 +1845,22 @@
       "admission": "pending"
     },
     {
-      "id": "C09.engine-readiness.wasm-engine-loaders",
+      "id": "C09.motion-extensions.graph-editor",
+      "census": "C09",
+      "admission": "pending"
+    },
+    {
+      "id": "C09.motion-extensions.effector-duplicator-layer",
+      "census": "C09",
+      "admission": "pending"
+    },
+    {
+      "id": "C09.app-utilities.project-transplant",
+      "census": "C09",
+      "admission": "pending"
+    },
+    {
+      "id": "C09.app-utilities.updater-bridge",
       "census": "C09",
       "admission": "pending"
     },
@@ -1615,7 +1875,7 @@
       "admission": "pending"
     },
     {
-      "id": "C09.media-misc.kitsu",
+      "id": "C09.media-misc.lottie-preview",
       "census": "C09",
       "admission": "pending"
     },
@@ -1625,7 +1885,7 @@
       "admission": "pending"
     },
     {
-      "id": "C09.media-misc.lottie-preview",
+      "id": "C09.media-misc.kitsu",
       "census": "C09",
       "admission": "pending"
     },
@@ -1637,51 +1897,6 @@
     {
       "id": "C09.media-misc.tracker",
       "census": "C09",
-      "admission": "pending"
-    },
-    {
-      "id": "C09.motion-extensions.effector-duplicator-layer",
-      "census": "C09",
-      "admission": "pending"
-    },
-    {
-      "id": "C09.motion-extensions.graph-editor",
-      "census": "C09",
-      "admission": "pending"
-    },
-    {
-      "id": "C09.storyboard-mode.core",
-      "census": "C09",
-      "admission": "pending"
-    },
-    {
-      "id": "C09.timeline-panel-support.layer-kind-taxonomy",
-      "census": "C09",
-      "admission": "pending"
-    },
-    {
-      "id": "C09.timeline-panel-support.scroll-and-zoom",
-      "census": "C09",
-      "admission": "pending"
-    },
-    {
-      "id": "C09.tutorial-onboarding.core",
-      "census": "C09",
-      "admission": "pending"
-    },
-    {
-      "id": "C13.tooling.browser-and-app-test-suites",
-      "census": "C13",
-      "admission": "pending"
-    },
-    {
-      "id": "C13.tooling.ci-workflows-and-root-config",
-      "census": "C13",
-      "admission": "pending"
-    },
-    {
-      "id": "C13.tooling.nemo-tooling-test-suite",
-      "census": "C13",
       "admission": "pending"
     },
     {
@@ -1700,7 +1915,22 @@
       "admission": "pending"
     },
     {
-      "id": "C15.native.feedback-worker-service",
+      "id": "C13.tooling.nemo-tooling-test-suite",
+      "census": "C13",
+      "admission": "pending"
+    },
+    {
+      "id": "C13.tooling.browser-and-app-test-suites",
+      "census": "C13",
+      "admission": "pending"
+    },
+    {
+      "id": "C13.tooling.ci-workflows-and-root-config",
+      "census": "C13",
+      "admission": "pending"
+    },
+    {
+      "id": "C15.native.src-tauri-build-and-config",
       "census": "C15",
       "admission": "pending"
     },
@@ -1710,17 +1940,17 @@
       "admission": "pending"
     },
     {
-      "id": "C15.native.nemo-mcp-build-metadata",
-      "census": "C15",
-      "admission": "pending"
-    },
-    {
-      "id": "C15.native.src-tauri-build-and-config",
+      "id": "C15.native.feedback-worker-service",
       "census": "C15",
       "admission": "pending"
     },
     {
       "id": "C15.native.web-deploy-worker",
+      "census": "C15",
+      "admission": "pending"
+    },
+    {
+      "id": "C15.native.nemo-mcp-build-metadata",
       "census": "C15",
       "admission": "pending"
     },
@@ -1735,11 +1965,6 @@
       "admission": "pending"
     },
     {
-      "id": "C18.vendor.static-assets",
-      "census": "C18",
-      "admission": "pending"
-    },
-    {
       "id": "C18.vendor.vendored-js-libraries",
       "census": "C18",
       "admission": "pending"
@@ -1748,98 +1973,2094 @@
       "id": "C18.vendor.wasm-generated-bindings",
       "census": "C18",
       "admission": "pending"
+    },
+    {
+      "id": "C18.vendor.static-assets",
+      "census": "C18",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.confirm-adapter",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.playback-step-wrapper",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.playhead-tail",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.frame-selection",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.tween-retime",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.tool-transition",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.sm-bootstrap-translator",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.sm-facade-core",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.onion-tail",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.timeline-view-toggles",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.playback-mode-controls",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.sm-facade-editing",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.selection-brush-width",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.selection-paint",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.brush-preset",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.stroke-style",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.stroke-smoothing",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.drawing-defaults",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.selection-fill-opacity",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19a.project-time-view-settings",
+      "census": "C19a",
+      "admission": "pending"
+    },
+    {
+      "id": "C19b.work-area-bounds",
+      "census": "C19b",
+      "admission": "pending"
+    },
+    {
+      "id": "C19b.composition-duration",
+      "census": "C19b",
+      "admission": "pending"
+    },
+    {
+      "id": "C19b.trim-work-area",
+      "census": "C19b",
+      "admission": "pending"
+    },
+    {
+      "id": "C19b2.move-selected-frames",
+      "census": "C19b2",
+      "admission": "pending"
+    },
+    {
+      "id": "C19b2.copy-frames",
+      "census": "C19b2",
+      "admission": "pending"
+    },
+    {
+      "id": "C19b2.cut-frames",
+      "census": "C19b2",
+      "admission": "pending"
+    },
+    {
+      "id": "C19b2.paste-frames",
+      "census": "C19b2",
+      "admission": "pending"
+    },
+    {
+      "id": "C19b2.delete-selected-frames",
+      "census": "C19b2",
+      "admission": "pending"
+    },
+    {
+      "id": "C19b2.move-single-keyframe",
+      "census": "C19b2",
+      "admission": "pending"
+    },
+    {
+      "id": "C19b2.shift-layer-frames",
+      "census": "C19b2",
+      "admission": "pending"
+    },
+    {
+      "id": "C19c.layer-split",
+      "census": "C19c",
+      "admission": "pending"
+    },
+    {
+      "id": "C19c.duplicate-base-copy",
+      "census": "C19c",
+      "admission": "pending"
+    },
+    {
+      "id": "C19c.duplicate-mesh-remap",
+      "census": "C19c",
+      "admission": "pending"
+    },
+    {
+      "id": "C19c.duplicate-kind-and-relationship-copy",
+      "census": "C19c",
+      "admission": "pending"
+    },
+    {
+      "id": "C19c.duplicate-folder-and-selection",
+      "census": "C19c",
+      "admission": "pending"
+    },
+    {
+      "id": "C19d.add-layer",
+      "census": "C19d",
+      "admission": "pending"
+    },
+    {
+      "id": "C19d.add-null",
+      "census": "C19d",
+      "admission": "pending"
+    },
+    {
+      "id": "C19d.folder-collapse",
+      "census": "C19d",
+      "admission": "pending"
+    },
+    {
+      "id": "C19d.folder-reparent",
+      "census": "C19d",
+      "admission": "pending"
+    },
+    {
+      "id": "C19d.folder-remove",
+      "census": "C19d",
+      "admission": "pending"
+    },
+    {
+      "id": "C19d.add-effect",
+      "census": "C19d",
+      "admission": "pending"
+    },
+    {
+      "id": "C19d.add-guide",
+      "census": "C19d",
+      "admission": "pending"
+    },
+    {
+      "id": "C19d.widget-facades",
+      "census": "C19d",
+      "admission": "pending"
+    },
+    {
+      "id": "C19d.add-folder",
+      "census": "C19d",
+      "admission": "pending"
+    },
+    {
+      "id": "C19d.delete-layer",
+      "census": "C19d",
+      "admission": "pending"
+    },
+    {
+      "id": "C19d.trailing-references",
+      "census": "C19d",
+      "admission": "pending"
+    },
+    {
+      "id": "C19e.key-lock",
+      "census": "C19e",
+      "admission": "pending"
+    },
+    {
+      "id": "C19e.motion-blur-controls",
+      "census": "C19e",
+      "admission": "pending"
+    },
+    {
+      "id": "C19e.shy-controls",
+      "census": "C19e",
+      "admission": "pending"
+    },
+    {
+      "id": "C19e.active-layer",
+      "census": "C19e",
+      "admission": "pending"
+    },
+    {
+      "id": "C19e.layer-display-lock-name",
+      "census": "C19e",
+      "admission": "pending"
+    },
+    {
+      "id": "C19e.reorder-facades",
+      "census": "C19e",
+      "admission": "pending"
+    },
+    {
+      "id": "C19e.stroke-profile",
+      "census": "C19e",
+      "admission": "pending"
+    },
+    {
+      "id": "C19e.conversion-facades",
+      "census": "C19e",
+      "admission": "pending"
+    },
+    {
+      "id": "C19e.navigation-and-structure-facades",
+      "census": "C19e",
+      "admission": "pending"
+    },
+    {
+      "id": "C19e.symbol-setting-history",
+      "census": "C19e",
+      "admission": "pending"
+    },
+    {
+      "id": "C19f.selected-stroke-delete",
+      "census": "C19f",
+      "admission": "pending"
+    },
+    {
+      "id": "C19f.duplicate-and-extend",
+      "census": "C19f",
+      "admission": "pending"
+    },
+    {
+      "id": "C19f.repeat-selection",
+      "census": "C19f",
+      "admission": "pending"
+    },
+    {
+      "id": "C19f.propagate-color",
+      "census": "C19f",
+      "admission": "pending"
+    },
+    {
+      "id": "C19g.export-transaction",
+      "census": "C19g",
+      "admission": "pending"
+    },
+    {
+      "id": "C19g.import-parse-layer-restore",
+      "census": "C19g",
+      "admission": "pending"
+    },
+    {
+      "id": "C19g.import-document-finalize",
+      "census": "C19g",
+      "admission": "pending"
+    },
+    {
+      "id": "C19g.get-state-facade",
+      "census": "C19g",
+      "admission": "pending"
+    },
+    {
+      "id": "C19h.document-field-sync",
+      "census": "C19h",
+      "admission": "pending"
+    },
+    {
+      "id": "C19h.update-ui",
+      "census": "C19h",
+      "admission": "pending"
+    },
+    {
+      "id": "C19h.mask-panel",
+      "census": "C19h",
+      "admission": "pending"
+    },
+    {
+      "id": "C19h.corner-panel",
+      "census": "C19h",
+      "admission": "pending"
+    },
+    {
+      "id": "C19h.ellipse-panel",
+      "census": "C19h",
+      "admission": "pending"
+    },
+    {
+      "id": "C19h.star-panel",
+      "census": "C19h",
+      "admission": "pending"
+    },
+    {
+      "id": "C19h.revision-panel",
+      "census": "C19h",
+      "admission": "pending"
+    },
+    {
+      "id": "C19i.properties-foundations",
+      "census": "C19i",
+      "admission": "pending"
+    },
+    {
+      "id": "C19i.contextual-statusbar-help",
+      "census": "C19i",
+      "admission": "pending"
+    },
+    {
+      "id": "C19i.tooltip-statusbar-mirror",
+      "census": "C19i",
+      "admission": "pending"
+    },
+    {
+      "id": "C19i.dom-slot-foundations",
+      "census": "C19i",
+      "admission": "pending"
+    },
+    {
+      "id": "C19j.update-props-context",
+      "census": "C19j",
+      "admission": "pending"
+    },
+    {
+      "id": "C19k.drawing-defaults",
+      "census": "C19k",
+      "admission": "pending"
+    },
+    {
+      "id": "C19k.update-selection-properties",
+      "census": "C19k",
+      "admission": "pending"
+    },
+    {
+      "id": "C19l.fsselect-panel-reflection",
+      "census": "C19l",
+      "admission": "pending"
+    },
+    {
+      "id": "C19l.ghost-proxy-selection-lifecycle",
+      "census": "C19l",
+      "admission": "pending"
+    },
+    {
+      "id": "C19l.properties-held-frame-and-move",
+      "census": "C19l",
+      "admission": "pending"
+    },
+    {
+      "id": "C19l.properties-scale-and-rotate",
+      "census": "C19l",
+      "admission": "pending"
+    },
+    {
+      "id": "C19m.timeline-drag-state",
+      "census": "C19m",
+      "admission": "pending"
+    },
+    {
+      "id": "C19m.camera-row-offset",
+      "census": "C19m",
+      "admission": "pending"
+    },
+    {
+      "id": "C19m.playhead-viewport-sync",
+      "census": "C19m",
+      "admission": "pending"
+    },
+    {
+      "id": "C19m.grid-resize-resync",
+      "census": "C19m",
+      "admission": "pending"
+    },
+    {
+      "id": "C19m.scroll-snapshot-restore",
+      "census": "C19m",
+      "admission": "pending"
+    },
+    {
+      "id": "C19m.render-timeline",
+      "census": "C19m",
+      "admission": "pending"
+    },
+    {
+      "id": "C19n.tween-span-geometry",
+      "census": "C19n",
+      "admission": "pending"
+    },
+    {
+      "id": "C19n.tween-curve-strips-render",
+      "census": "C19n",
+      "admission": "pending"
+    },
+    {
+      "id": "C19n.shared-curve-editor-svg",
+      "census": "C19n",
+      "admission": "pending"
+    },
+    {
+      "id": "C19n.inline-curve-inset",
+      "census": "C19n",
+      "admission": "pending"
+    },
+    {
+      "id": "C19n.tween-cell-selection-apply",
+      "census": "C19n",
+      "admission": "pending"
+    },
+    {
+      "id": "C19n.keyframe-cells-render",
+      "census": "C19n",
+      "admission": "pending"
+    },
+    {
+      "id": "C19o.span-shrink-state-and-arm",
+      "census": "C19o",
+      "admission": "pending"
+    },
+    {
+      "id": "C19o.span-shrink-frame-at",
+      "census": "C19o",
+      "admission": "pending"
+    },
+    {
+      "id": "C19o.span-shrink-drag",
+      "census": "C19o",
+      "admission": "pending"
+    },
+    {
+      "id": "C19o.span-shrink-commit",
+      "census": "C19o",
+      "admission": "pending"
+    },
+    {
+      "id": "C19p.content-mousedown-reset",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19p.layer-sel-from-frame-sel",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19p.grid-mousedown-select-drag-arm",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19p.grid-dblclick-span",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19p.grid-contextmenu",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19p.grid-mousemove-drag",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19p.drag-source-fade",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19p.window-mouseup-commit",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19q.layer-selection-state",
+      "census": "C19q",
+      "admission": "pending"
+    },
+    {
+      "id": "C19q.layer-rename",
+      "census": "C19q",
+      "admission": "pending"
+    },
+    {
+      "id": "C19q.shape-tree-rows",
+      "census": "C19q",
+      "admission": "pending"
+    },
+    {
+      "id": "C19q.folder-child-map",
+      "census": "C19q",
+      "admission": "pending"
+    },
+    {
+      "id": "C19q.folder-parent-index",
+      "census": "C19q",
+      "admission": "pending"
+    },
+    {
+      "id": "C19q.layer-render-order",
+      "census": "C19q",
+      "admission": "pending"
+    },
+    {
+      "id": "C19q.folder-group-ungroup-rename",
+      "census": "C19q",
+      "admission": "pending"
+    },
+    {
+      "id": "C20a.text-animator-runtime",
+      "census": "C20a",
+      "admission": "pending"
+    },
+    {
+      "id": "C20a.element-style-readers",
+      "census": "C20a",
+      "admission": "pending"
+    },
+    {
+      "id": "C20b.property-field-edit-helpers",
+      "census": "C20b",
+      "admission": "pending"
+    },
+    {
+      "id": "C20b.motion-context-header-tools",
+      "census": "C20b",
+      "admission": "pending"
+    },
+    {
+      "id": "C20c.layer-key-lock-menu",
+      "census": "C20c",
+      "admission": "pending"
+    },
+    {
+      "id": "C20c.selected-key-lock-menu",
+      "census": "C20c",
+      "admission": "pending"
+    },
+    {
+      "id": "C20d.motion-properties-panel",
+      "census": "C20d",
+      "admission": "pending"
+    },
+    {
+      "id": "C20d.matte-row",
+      "census": "C20d",
+      "admission": "pending"
+    },
+    {
+      "id": "C20d.widget-size",
+      "census": "C20d",
+      "admission": "pending"
+    },
+    {
+      "id": "C20d.blend-row",
+      "census": "C20d",
+      "admission": "pending"
+    },
+    {
+      "id": "C20d.matte-menus-refresh",
+      "census": "C20d",
+      "admission": "pending"
+    },
+    {
+      "id": "C20e.null-shape-row",
+      "census": "C20e",
+      "admission": "pending"
+    },
+    {
+      "id": "C20e.follow-path-row",
+      "census": "C20e",
+      "admission": "pending"
+    },
+    {
+      "id": "C20e.parent-row-and-blend-gesture",
+      "census": "C20e",
+      "admission": "pending"
+    },
+    {
+      "id": "C20e.extra-parent-stack",
+      "census": "C20e",
+      "admission": "pending"
+    },
+    {
+      "id": "C20e.time-link-row",
+      "census": "C20e",
+      "admission": "pending"
+    },
+    {
+      "id": "C20f.stopwatch-title",
+      "census": "C20f",
+      "admission": "pending"
+    },
+    {
+      "id": "C20f.transform-group-headers",
+      "census": "C20f",
+      "admission": "pending"
+    },
+    {
+      "id": "C20f.transform-property-rows",
+      "census": "C20f",
+      "admission": "pending"
+    },
+    {
+      "id": "C20f.anchor-grid-picker",
+      "census": "C20f",
+      "admission": "pending"
+    },
+    {
+      "id": "C20f.inline-expression-editor",
+      "census": "C20f",
+      "admission": "pending"
+    },
+    {
+      "id": "C20f.expression-pickwhip",
+      "census": "C20f",
+      "admission": "pending"
     }
   ],
   "uncoveredResponsibilities": [
     {
       "id": "C02:1",
       "note": "motion-graph.js (exists in the repo, ~26KB) is the graph-editor UI for the same track/curve model this census owns — motion.js's own comment says 'the graph editor plots both (see motion-graph.js)' for rawValueAtFrame — but is not in C02's bounded file list, and was not found claimed by any other delivered census as of this writing (grepped across every delivered census JSON). Likely needs an explicit owner in a future pass or C08's set-difference check.",
-      "disposition": "needs-reconciliation"
+      "disposition": "covered-by-packet",
+      "packets": [
+        "C09.motion-extensions.graph-editor"
+      ],
+      "evidence": "C09 (accepted supplement, #1091) declares src/js/motion-graph.js whole in C09.motion-extensions.graph-editor; the index carries that reference on the path."
     },
     {
       "id": "C02:2",
       "note": "image-mesh.js (the mesh data model/topology/masking/rendering, CLAUDE.md §12/§12bis) is a close neighbor of this census's C02.motion-advanced.geometry-motion-integrations packet (which owns only the motion-TRACK integration, meshVertexOffsetAt etc.) but the mesh model itself is out of C02's bounded files, and its ownership by another census was not verified in this pass.",
-      "disposition": "needs-reconciliation"
+      "disposition": "covered-by-packet",
+      "packets": [
+        "C04b.animated-primitives.image-mesh"
+      ],
+      "evidence": "C04b declares src/js/image-mesh.js whole in C04b.animated-primitives.image-mesh; the index carries that reference on the path."
     },
     {
       "id": "C02:3",
       "note": "bpm-grid.js's snapFrame helper has no call site anywhere inside this census's bounded files — either it is invoked from a file outside C02's scope (tools.js's or layer-inout.js's own drag code would be the natural caller) or it is currently unreachable. Not resolved by this read-only pass; worth a quick grep across the full repo before assuming either way.",
-      "disposition": "needs-reconciliation"
+      "disposition": "resolved",
+      "evidence": "git grep snapFrame at 95e4970: definition bpm-grid.js:36, export bpm-grid.js:102, one external caller src/js/nemo-script.js:543 (SMBpm.snapFrame through the scripting API, C09.extensibility-api.scripting-and-plugins). Reachable; ownership unchanged (C02.markers-and-bpm.bpm-guides)."
     },
     {
       "id": "C02:4",
       "note": "motion.js:4048-4283 — text-animator per-frame integration (taSelectorAt, taUnitCount, _taStrokeRestBounds, taUnitPivotCenter, textAnimatorContribution, addTextAnimator, removeTextAnimator, textAnimatorWeights) lives in motion.js itself and is referenced by C02.text-animation.selectors-panel's own responsibility text ('evaluated per-character via motion.js's textAnimatorWeights') but was never given a files entry by that packet or any other. Found while redrawing canvas-drag-interactions (#1084 review); belongs to text-animation.selectors-panel's ownership, not fixed here.",
-      "disposition": "needs-reconciliation"
+      "disposition": "covered-by-packet",
+      "packets": [
+        "C20a.text-animator-runtime"
+      ],
+      "evidence": "Cited 4048-4283 (ded641b) maps to 4033-4268 at 95e4970; C20a.text-animator-runtime declares 4048-4264. Residual 4033-4047 (taSelectorAt) and 4265-4268 remain open spans in rangeCoverage (see C20a:1, C20a:2)."
     },
     {
       "id": "C02:5",
       "note": "motion.js:4336-4380 — per-element fill/stroke color and width resolution (rgba255, elementFillColorAt, elementStrokeColorAt, elementStrokeWidthAt) has no packet owner in this census.",
-      "disposition": "needs-reconciliation"
+      "disposition": "covered-by-packet",
+      "packets": [
+        "C20a.element-style-readers"
+      ],
+      "evidence": "Cited 4336-4380 maps to 4321-4365; C20a.element-style-readers declares 4293-4358. Residual 4359-4365 remains an open span in rangeCoverage (see C20a:2)."
     },
     {
       "id": "C02:6",
       "note": "motion.js:6791-6869 and 6969-7046 — property-field scrub-editing helpers (fmtVal, scrubField, selectedKeysForEditableProperty, selectedDimensionDisplay, setSelectedKeyDimension, offsetSelectedKeyDimension, setSelectedKeyVector) and Motion-context-header sync (syncMotionContextHeader, ensureMotionHeaderTools) have no packet owner.",
-      "disposition": "needs-reconciliation"
+      "disposition": "covered-by-packet",
+      "packets": [
+        "C20b.property-field-edit-helpers",
+        "C20b.motion-context-header-tools"
+      ],
+      "evidence": "Cited 6791-6869 and 6969-7046 map to 6776-6854 and 6954-7031; C20b declares 6774-6831 and 6954-7031. Residual 6832-6854 remains an open span in rangeCoverage (see C20b:1)."
     },
     {
       "id": "C02:7",
       "note": "motion.js:7576-8453 (878 lines) — an entire layer-feature right-panel rendering block (renderMotionPropsPanel, renderMatteRow, renderWidgetSizeRow, renderBlendRow, openMatteConfigMenu/openExtraMatteMenu/firstFreeMatteLayer, renderNullShapeRow, renderFollowPathRow, renderParentRow/openExtraParentMenu/firstFreeParentLayer, renderTimeLinkRow) has no packet owner anywhere in this census. This was silently absorbed into canvas-drag-interactions's old 298-13134 catch-all; redrawing that packet's real range (per Pollen's #1084 review) exposes it as a genuine gap rather than fixing it — a strong candidate for its own future packet.",
-      "disposition": "needs-reconciliation"
+      "disposition": "covered-by-packet",
+      "packets": [
+        "C20d.motion-properties-panel",
+        "C20d.matte-row",
+        "C20d.widget-size",
+        "C20d.blend-row",
+        "C20d.matte-menus-refresh",
+        "C20e.null-shape-row",
+        "C20e.follow-path-row",
+        "C20e.parent-row-and-blend-gesture",
+        "C20e.extra-parent-stack",
+        "C20e.time-link-row"
+      ],
+      "evidence": "Cited 7576-8453 maps to 7561-8438; C20d covers 7554-7995 and C20e covers 7996-8434. Residual 8435-8438 remains an open span in rangeCoverage."
     },
     {
       "id": "C02:8",
       "note": "motion.js:8494-8568 — buildKeyLockMenuItems/buildKeySelectionLockMenuItems have no owner anywhere in this census; keysLockedTo in this same span is C02.properties-and-curves.key-selection-and-clipboard's own named symbol, but that packet's declared range (1033-1157) doesn't reach here — see the new cross_cutting_notes entry on declared-vs-real-location drift.",
-      "disposition": "needs-reconciliation"
+      "disposition": "covered-by-packet",
+      "packets": [
+        "C20c.layer-key-lock-menu",
+        "C20c.selected-key-lock-menu"
+      ],
+      "evidence": "Cited 8494-8568 maps to 8479-8553; C20c declares 8470-8529 (buildKeyLockMenuItems, buildKeySelectionLockMenuItems). Residual 8530-8553 remains an open span in rangeCoverage."
     },
     {
       "id": "C02:9",
       "note": "motion.js:8667-9450 (784 lines) — Transform property-group rendering plus the inline ƒx row's own expression-editor UI (renderTransformGroup, renderTransformHeader, renderDupGroupHeader, renderTransformProps, buildAnchorGridRow, exprPanelLabelFor, buildExprEditorRow, startExprPickwhip) has no packet owner.",
-      "disposition": "needs-reconciliation"
+      "disposition": "covered-by-packet",
+      "packets": [
+        "C20f.stopwatch-title",
+        "C20f.transform-group-headers",
+        "C20f.transform-property-rows",
+        "C20f.anchor-grid-picker",
+        "C20f.inline-expression-editor",
+        "C20f.expression-pickwhip"
+      ],
+      "evidence": "Cited 8667-9450 maps to 8652-9435; C20f declares 8649-9428. Residual 9429-9435 remains an open span in rangeCoverage."
     },
     {
       "id": "C02:10",
       "note": "motion.js:9841-11140 (1300 lines) — per-property row rendering (renderElementsList, renderColorRow/renderFillColorRow/renderStrokeColorRow, renderTrimScalarRow/renderTrimPathsGroup, renderTextAnimatorsList, renderPathVertexGroup/renderPathGroupTrackRow, renderMeshVertexGroup/renderVertexRow, trackRowHtml, renderTracksFor) has no packet owner.",
-      "disposition": "needs-reconciliation"
+      "disposition": "needs-reconciliation",
+      "evidence": "Cited 9841-11140 maps to 9826-11125 at 95e4970; rangeCoverage lists it as one open span of 1300 lines with no C20 supplement. Part of the P03C Motion queue (motion.js open spans total 4262 code lines)."
     },
     {
       "id": "C03:1",
       "note": "src/js/geometry-wasm-loader.js — binds every geometry-wasm wasm-bindgen export onto window.GeometryWasm.*; read for context throughout this census but not in C03's bounded source ownership. A future extraction of ANY geometry-wasm-consuming JS file must account for this loader as a shared dependency.",
-      "disposition": "needs-reconciliation"
+      "disposition": "covered-by-packet",
+      "packets": [
+        "C09.engine-readiness.wasm-engine-loaders"
+      ],
+      "evidence": "C09 (accepted supplement, #1091) declares src/js/geometry-wasm-loader.js in C09.engine-readiness.wasm-engine-loaders; the index carries that reference on the path."
     },
     {
       "id": "C03:2",
       "note": "src/js/second-viewer.js — an independent second VelloEngine instance and its own buildSceneJson call seam; read for context (see cross_cutting_notes on the shared-resource-budget question) but not in C03's bounded source ownership.",
-      "disposition": "needs-reconciliation"
+      "disposition": "covered-by-packet",
+      "packets": [
+        "C04b.viewer-and-chrome.second-viewer"
+      ],
+      "evidence": "C04b declares src/js/second-viewer.js in C04b.viewer-and-chrome.second-viewer; the index carries that reference on the path."
     },
     {
       "id": "C03:3",
       "note": "engine.rs's Phase-C3 selection API (select_at and friends, DEF-6) and engine-bridge.js's preview-calibration introspection API (DEF-7) are both fully-built but entirely unwired to any UI — flagged here in case a completeness sweep (C08) or a future feature owner wants to either finish wiring them in or explicitly deprecate/remove them, since neither decision was this census's to make.",
-      "disposition": "needs-reconciliation"
+      "disposition": "human-decision",
+      "evidence": "The code is mapped: engine.rs:3716 select_at lies in C03.gpu-engine-core.public-wasm-api (3680-4235) and the engine-bridge introspection API in C03.js-engine-bridge packets. Wiring or removing DEF-6/DEF-7 is a product decision outside remediation (plan section 1 baseline rule); recorded for the humans, no leaf created."
     },
     {
       "id": "C06:1",
       "note": "src/js/timeline.js:2354-2374 (21 lines, inside importJSON's SMLabs.resetAll()/clearRetainedPaths()/version-check block) is named in this census's own scope_files but not owned by any packet here. Not this census's job to extract — it's three statements embedded inside importJSON's own much larger, mostly out-of-scope body, not a standalone module boundary — but checked and confirmed unclaimed by any of the 5 sibling censuses merged so far (C01/C03/C04a/C05/C07) too, per Fizz's #1067 review (2026-09-09): still genuinely unowned program-wide, not silently someone else's already-documented job.",
-      "disposition": "needs-reconciliation"
+      "disposition": "covered-by-packet",
+      "packets": [
+        "C19g.import-parse-layer-restore"
+      ],
+      "evidence": "C19g.import-parse-layer-restore declares src/js/timeline.js:2354-2562 at 59a5a38, unchanged at 95e4970; the cited 2354-2374 block is inside it."
     },
     {
       "id": "C08:1",
       "note": "src/js/timeline.js's real ~11187-line gap (DEF-5) is flagged with full evidence here but NOT sized or packet-split — at over 11,000 lines with CLAUDE.md §11's documented alignment/scroll/zoom invariants, a proper packet-level treatment is itself several leaf tasks' worth of work, which would blow this census's own work-size budget. The orchestrator should treat this as its own multi-leaf mini-program (candidate: C19+), not a single proposed ID.",
-      "disposition": "needs-reconciliation"
+      "disposition": "needs-reconciliation",
+      "evidence": "Partly resolved: the accepted C19a-C19q supplements cover timeline.js 1-5709 except spans 2002-2011, 2027-2048 and 2247; 5286 uncovered code lines of 11907 remain from 5710 onward (open spans in rangeCoverage). The remainder is the P03C timeline queue."
     },
     {
       "id": "C08:2",
       "note": "vectorize-core/src/lib.rs and vectorize-wasm/src/lib.rs line counts and internal structure were not read (map-level only, per C08's own 'no packet requires days of implementation' guidance applied to the mapping step itself) — a future leaf executing C08.engines.vectorize-engine-crates should confirm actual size before committing to a single-leaf work estimate.",
-      "disposition": "needs-reconciliation"
+      "disposition": "resolved",
+      "evidence": "At 95e4970: vectorize-core/src/lib.rs is 209 lines and vectorize-wasm/src/lib.rs is 28 lines (git show | wc -l). C17.engines.vectorize-engine-crates fits one <=90-minute leaf by size."
     },
     {
       "id": "C08:3",
       "note": "40min-checkins/ (17 files) purpose is genuinely unknown to this census — not characterized as either process-live or archivable; flagged for a human decision rather than guessed.",
-      "disposition": "needs-reconciliation"
+      "disposition": "human-decision",
+      "evidence": "40min-checkins/ holds 17 Markdown files dated 2026-09-05..07 under C08.docs.periodic-checkin-logs (documentation, excluded from extraction). Whether they are process-live or archivable is a question for Ilya (raised in Buzz 2026-09-13); no code effect either way."
     },
     {
       "id": "C08:4",
       "note": "worker/index.js and root wrangler.jsonc (C08.native.web-deploy-worker) were confirmed to exist and be distinct from worker-feedback/, but not read beyond that — lowest-confidence packet in this census.",
-      "disposition": "needs-reconciliation"
+      "disposition": "resolved",
+      "evidence": "At 95e4970: worker/index.js is 101 lines and wrangler.jsonc 17 lines; both carry C15.native.web-deploy-worker (accepted supplement #1093), wrangler.jsonc also C13.tooling.ci-workflows-and-root-config."
+    },
+    {
+      "id": "C19a:1",
+      "note": "All timeline.js ranges outside 1-39, 193-348, 350-458 and 460-845 except already accepted census/leaf claims remain outside C19a and require later gap census.",
+      "disposition": "boundary",
+      "evidence": "Scope statement, not a gap of its own. C19b-C19q now cover timeline.js up to 5709 except the open spans listed in rangeCoverage; 5710 onward (5286 code lines) is the P03C timeline queue (see C08:1)."
+    },
+    {
+      "id": "C19a:2",
+      "note": "The window.SM continuation from line 846 onward is intentionally not absorbed; C02 onion lines 846-848 remain C02 and line 849 onward remains later work.",
+      "disposition": "boundary",
+      "evidence": "Lines 846-848 carry C02.playback-integration.onion-and-tween-controls-wiring and 849 is declared by C19b; no open span in 846-849 in rangeCoverage."
+    },
+    {
+      "id": "C19a:3",
+      "note": "Motion gaps are not included in C19a and remain a separate dependency-ordered census/admission sequence.",
+      "disposition": "boundary",
+      "evidence": "Motion was mapped separately by the pinned C20a-C20f supplements; the remaining motion.js open spans (4262 code lines) are listed in rangeCoverage."
+    },
+    {
+      "id": "C19a:4",
+      "note": "Public API facade consolidation across the full window.SM object requires whole-file inventory beyond this bounded leaf.",
+      "disposition": "boundary",
+      "evidence": "rangeCoverage now provides the whole-file inventory of declared timeline.js ownership; facade consolidation is an admission-time concern for P03C, not a census gap."
+    },
+    {
+      "id": "C19b:1",
+      "note": "timeline.js:862-1081 and 1121-2701 remain outside C19b except for pre-existing accepted census/leaf claims.",
+      "disposition": "boundary",
+      "evidence": "862-1081 is declared by C19d/C19e; 1121-2701 by C19e, C19c, C19b2, C19f, C19g and C19h except spans 2002-2011, 2027-2048 and 2247 (open in rangeCoverage)."
+    },
+    {
+      "id": "C19b:2",
+      "note": "Frame relocation at 1675-1976 remains the next separately admitted census slice; deleteSelStrokes, flip, duplicate/exposure, transforms and component/layer lifecycle stay separate.",
+      "disposition": "boundary",
+      "evidence": "Frame relocation 1675-1976 was admitted as C19b2 (pinned); deleteSelStrokes and duplicate/exposure are C19f (1977-2001, 2012-2026); flipPreview 2002-2011 and transforms 2027-2048 remain open spans in rangeCoverage."
+    },
+    {
+      "id": "C19b:3",
+      "note": "Any repair of trim history, Motion-key filtering, selection rebasing or audio/reference-media timing requires its own accepted behavior leaf after baseline characterization.",
+      "disposition": "boundary",
+      "evidence": "Behavior repairs are outside census scope (plan section 1: baseline preserved); no leaf created by the index."
+    },
+    {
+      "id": "C19b2:1",
+      "note": "deleteSelStrokes 1977-2001, flipPreview 2002-2010, duplicateKeyframe/extendExposure 2012-2026, transforms 2027-2048 and all other 849-2701 gaps remain outside C19b2.",
+      "disposition": "boundary",
+      "evidence": "1977-2001 and 2012-2026 are declared by C19f; 2002-2011 (flipPreview) and 2027-2048 (transforms) remain open spans in rangeCoverage."
+    },
+    {
+      "id": "C19b2:2",
+      "note": "System/SVG and canvas-shape clipboards remain owned by svg-import.js/tools.js and keyboard arbitration outside this assigned span.",
+      "disposition": "boundary",
+      "evidence": "Exclusion statement: src/js/svg-import.js carries C05.import packets and src/js/tools.js carries C04a packets in the index; no timeline responsibility is left unowned by it."
+    },
+    {
+      "id": "C19b2:3",
+      "note": "Any fixes for bounds data loss, cross-layer tween ownership, metadata preservation, locked paste selection or stale tween maps require separate accepted behavior leaves after characterization.",
+      "disposition": "boundary",
+      "evidence": "Behavior fixes are outside census scope (plan section 1); no leaf created by the index."
+    },
+    {
+      "id": "C20a:1",
+      "note": "taSelectorAt 4033-4047 remains C02 context.",
+      "disposition": "needs-reconciliation",
+      "evidence": "No C02 packet range covers taSelectorAt 4033-4047 at 95e4970 (open span in rangeCoverage): C02.text-animation.selectors-panel must be extended or a leaf admitted in P03C."
+    },
+    {
+      "id": "C20a:2",
+      "note": "C02 elementMotionAt 4265-4292 and layerOrderAt 4359-4384 excluded.",
+      "disposition": "needs-reconciliation",
+      "evidence": "C02.motion-advanced.transform-application declares 4284-4335 (ded641b) which maps to 4269-4320, leaving elementMotionAt 4265-4268 open; C02.motion-advanced.geometry-motion-integrations declares 4381-4436 which maps to 4366-4421, leaving layerOrderAt 4359-4365 open. Both are open spans in rangeCoverage for P03C range reconciliation."
+    },
+    {
+      "id": "C20a:3",
+      "note": "Remaining Motion queue and external/native validation remain outside C20a.",
+      "disposition": "boundary",
+      "evidence": "The remaining Motion open spans are listed in rangeCoverage (P03C queue); external/native validation belongs to leaf acceptance."
+    },
+    {
+      "id": "C20b:1",
+      "note": "C02.motion-advanced.component-shape-tree retains enterComponentLayer at pinned 6832-6915 (documentation 6832-6854; implementation 6855-6915); its old numeric citation requires range reconciliation, not a new owner.",
+      "disposition": "needs-reconciliation",
+      "evidence": "C02.motion-advanced.component-shape-tree declares 6870-6946 (ded641b), which maps to 6855-6931 at 95e4970; the documentation lines 6832-6854 named here are an open span in rangeCoverage. Packet range amendment pending in P03C, no new owner."
+    },
+    {
+      "id": "C20b:2",
+      "note": "C02 selection synchronization at 6916-6953 remains owned and excluded.",
+      "disposition": "boundary",
+      "evidence": "6916-6953 is covered: C02 component-shape-tree maps to 6855-6931 and C02.motion-advanced.canvas-drag-interactions 6947-6968 maps to 6932-6953; no open span there in rangeCoverage."
+    },
+    {
+      "id": "C20b:3",
+      "note": "C02 renderLayerListMotion at 7032 onward remains owned and excluded.",
+      "disposition": "boundary",
+      "evidence": "renderLayerListMotion is C02.motion-advanced.mode-toggle-and-workspace-continuity (7047-7575 maps to 7032-7560), followed by C20d from 7554; no open span before 8435 in rangeCoverage."
+    },
+    {
+      "id": "C20b:4",
+      "note": "The remaining Motion queue, runtime extraction and browser/native validation remain outside C20b.",
+      "disposition": "boundary",
+      "evidence": "The remaining Motion open spans are listed in rangeCoverage (P03C queue); runtime extraction and browser/native validation belong to the admitted leaves."
+    }
+  ],
+  "rangeCoverage": [
+    {
+      "path": "geometry-wasm/src/engine.rs",
+      "lines": 4235,
+      "uncovered": 33,
+      "overlap": 0,
+      "spans": [
+        [
+          1056,
+          1059
+        ],
+        [
+          2741,
+          2771
+        ]
+      ]
+    },
+    {
+      "path": "geometry-wasm/src/eraser.rs",
+      "lines": 153,
+      "uncovered": 9,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          9
+        ]
+      ]
+    },
+    {
+      "path": "geometry-wasm/src/fill.rs",
+      "lines": 1037,
+      "uncovered": 67,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          33
+        ],
+        [
+          1000,
+          1037
+        ]
+      ]
+    },
+    {
+      "path": "geometry-wasm/src/hit.rs",
+      "lines": 104,
+      "uncovered": 8,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          8
+        ]
+      ]
+    },
+    {
+      "path": "geometry-wasm/src/interp.rs",
+      "lines": 404,
+      "uncovered": 31,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          33
+        ]
+      ]
+    },
+    {
+      "path": "geometry-wasm/src/lib.rs",
+      "lines": 134,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "geometry-wasm/src/shapes.rs",
+      "lines": 57,
+      "uncovered": 6,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          7
+        ]
+      ]
+    },
+    {
+      "path": "geometry-wasm/src/strokemodeler.rs",
+      "lines": 315,
+      "uncovered": 13,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          13
+        ]
+      ]
+    },
+    {
+      "path": "geometry-wasm/src/timeline.rs",
+      "lines": 88,
+      "uncovered": 12,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          13
+        ]
+      ]
+    },
+    {
+      "path": "geometry-wasm/src/track.rs",
+      "lines": 432,
+      "uncovered": 88,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          21
+        ],
+        [
+          345,
+          432
+        ]
+      ]
+    },
+    {
+      "path": "geometry-wasm/src/tween.rs",
+      "lines": 164,
+      "uncovered": 15,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          16
+        ]
+      ]
+    },
+    {
+      "path": "geometry-wasm/src/tweenmatch.rs",
+      "lines": 1115,
+      "uncovered": 13,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          14
+        ]
+      ]
+    },
+    {
+      "path": "nemo-mcp/build.rs",
+      "lines": 37,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "nemo-mcp/src/contract.rs",
+      "lines": 340,
+      "uncovered": 134,
+      "overlap": 0,
+      "spans": [
+        [
+          2,
+          3
+        ],
+        [
+          8,
+          10
+        ],
+        [
+          37,
+          39
+        ],
+        [
+          91,
+          99
+        ],
+        [
+          102,
+          110
+        ],
+        [
+          112,
+          117
+        ],
+        [
+          122,
+          129
+        ],
+        [
+          131,
+          146
+        ],
+        [
+          168,
+          188
+        ],
+        [
+          196,
+          200
+        ],
+        [
+          205,
+          207
+        ],
+        [
+          215,
+          222
+        ],
+        [
+          226,
+          255
+        ],
+        [
+          257,
+          257
+        ],
+        [
+          260,
+          265
+        ],
+        [
+          268,
+          278
+        ],
+        [
+          282,
+          282
+        ],
+        [
+          286,
+          286
+        ],
+        [
+          290,
+          290
+        ],
+        [
+          292,
+          292
+        ],
+        [
+          298,
+          300
+        ],
+        [
+          308,
+          308
+        ],
+        [
+          337,
+          340
+        ]
+      ]
+    },
+    {
+      "path": "nemo-mcp/src/lib.rs",
+      "lines": 9,
+      "uncovered": 2,
+      "overlap": 0,
+      "spans": [
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "path": "nemo-mcp/src/main.rs",
+      "lines": 13,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "nemo-mcp/src/registry.rs",
+      "lines": 92,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "nemo-mcp/src/schema.rs",
+      "lines": 9,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "nemo-mcp/src/server.rs",
+      "lines": 187,
+      "uncovered": 18,
+      "overlap": 0,
+      "spans": [
+        [
+          3,
+          3
+        ],
+        [
+          128,
+          137
+        ],
+        [
+          141,
+          141
+        ],
+        [
+          160,
+          163
+        ],
+        [
+          169,
+          169
+        ],
+        [
+          179,
+          180
+        ]
+      ]
+    },
+    {
+      "path": "nemo-mcp/src/wire.rs",
+      "lines": 77,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src-tauri/src/application_mcp.rs",
+      "lines": 200,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src-tauri/src/lib.rs",
+      "lines": 284,
+      "uncovered": 151,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          13
+        ],
+        [
+          49,
+          89
+        ],
+        [
+          131,
+          137
+        ],
+        [
+          178,
+          284
+        ]
+      ]
+    },
+    {
+      "path": "src/css/style.css",
+      "lines": 2850,
+      "uncovered": 2707,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          90
+        ],
+        [
+          105,
+          421
+        ],
+        [
+          462,
+          2131
+        ],
+        [
+          2164,
+          2850
+        ]
+      ]
+    },
+    {
+      "path": "src/index.html",
+      "lines": 2485,
+      "uncovered": 2250,
+      "overlap": 8,
+      "spans": [
+        [
+          1,
+          356
+        ],
+        [
+          367,
+          1742
+        ],
+        [
+          1934,
+          2284
+        ],
+        [
+          2298,
+          2485
+        ]
+      ]
+    },
+    {
+      "path": "src/js/adapters/application-mcp.js",
+      "lines": 46,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/app.js",
+      "lines": 5410,
+      "uncovered": 5009,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          9
+        ],
+        [
+          41,
+          313
+        ],
+        [
+          360,
+          5410
+        ]
+      ]
+    },
+    {
+      "path": "src/js/application/opacity-application.js",
+      "lines": 151,
+      "uncovered": 15,
+      "overlap": 0,
+      "spans": [
+        [
+          78,
+          93
+        ],
+        [
+          96,
+          96
+        ]
+      ]
+    },
+    {
+      "path": "src/js/audio-bridge.js",
+      "lines": 640,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/bitmap-brush.js",
+      "lines": 892,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/bootstrap/opacity-application.js",
+      "lines": 90,
+      "uncovered": 13,
+      "overlap": 0,
+      "spans": [
+        [
+          30,
+          30
+        ],
+        [
+          40,
+          41
+        ],
+        [
+          44,
+          54
+        ]
+      ]
+    },
+    {
+      "path": "src/js/camera.js",
+      "lines": 670,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/draw-bridge.js",
+      "lines": 1101,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/effects-panel.js",
+      "lines": 884,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/engine-bridge.js",
+      "lines": 4678,
+      "uncovered": 226,
+      "overlap": 1,
+      "spans": [
+        [
+          1,
+          10
+        ],
+        [
+          91,
+          224
+        ],
+        [
+          260,
+          260
+        ],
+        [
+          628,
+          632
+        ],
+        [
+          634,
+          638
+        ],
+        [
+          640,
+          643
+        ],
+        [
+          645,
+          646
+        ],
+        [
+          777,
+          777
+        ],
+        [
+          2621,
+          2621
+        ],
+        [
+          4257,
+          4274
+        ],
+        [
+          4355,
+          4381
+        ],
+        [
+          4482,
+          4492
+        ],
+        [
+          4556,
+          4556
+        ],
+        [
+          4558,
+          4558
+        ],
+        [
+          4561,
+          4562
+        ],
+        [
+          4565,
+          4565
+        ],
+        [
+          4618,
+          4628
+        ]
+      ]
+    },
+    {
+      "path": "src/js/export.js",
+      "lines": 1389,
+      "uncovered": 186,
+      "overlap": 0,
+      "spans": [
+        [
+          353,
+          361
+        ],
+        [
+          369,
+          376
+        ],
+        [
+          570,
+          598
+        ],
+        [
+          873,
+          883
+        ],
+        [
+          1161,
+          1174
+        ],
+        [
+          1194,
+          1202
+        ],
+        [
+          1206,
+          1206
+        ],
+        [
+          1255,
+          1389
+        ]
+      ]
+    },
+    {
+      "path": "src/js/feedback-bridge.js",
+      "lines": 596,
+      "uncovered": 23,
+      "overlap": 35,
+      "spans": [
+        [
+          572,
+          596
+        ]
+      ]
+    },
+    {
+      "path": "src/js/group-bridge.js",
+      "lines": 845,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/idb-store.js",
+      "lines": 50,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/image-mesh-bridge.js",
+      "lines": 511,
+      "uncovered": 0,
+      "overlap": 36,
+      "spans": []
+    },
+    {
+      "path": "src/js/layer-inout.js",
+      "lines": 1660,
+      "uncovered": 74,
+      "overlap": 3,
+      "spans": [
+        [
+          1,
+          22
+        ],
+        [
+          1601,
+          1646
+        ],
+        [
+          1648,
+          1660
+        ]
+      ]
+    },
+    {
+      "path": "src/js/linked-media.js",
+      "lines": 774,
+      "uncovered": 61,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          39
+        ],
+        [
+          751,
+          774
+        ]
+      ]
+    },
+    {
+      "path": "src/js/motion.js",
+      "lines": 13914,
+      "uncovered": 4262,
+      "overlap": 239,
+      "spans": [
+        [
+          1,
+          117
+        ],
+        [
+          561,
+          580
+        ],
+        [
+          583,
+          940
+        ],
+        [
+          1562,
+          1566
+        ],
+        [
+          1571,
+          1571
+        ],
+        [
+          1578,
+          1578
+        ],
+        [
+          1712,
+          1712
+        ],
+        [
+          1719,
+          1719
+        ],
+        [
+          1724,
+          1724
+        ],
+        [
+          1743,
+          1745
+        ],
+        [
+          1748,
+          1750
+        ],
+        [
+          1752,
+          1753
+        ],
+        [
+          1759,
+          1759
+        ],
+        [
+          1769,
+          2932
+        ],
+        [
+          4033,
+          4047
+        ],
+        [
+          4265,
+          4268
+        ],
+        [
+          4359,
+          4365
+        ],
+        [
+          6832,
+          6854
+        ],
+        [
+          8435,
+          8438
+        ],
+        [
+          8530,
+          8553
+        ],
+        [
+          9429,
+          9435
+        ],
+        [
+          9826,
+          11125
+        ],
+        [
+          11412,
+          12405
+        ],
+        [
+          12685,
+          13124
+        ],
+        [
+          13256,
+          13321
+        ],
+        [
+          13351,
+          13352
+        ],
+        [
+          13372,
+          13394
+        ],
+        [
+          13455,
+          13476
+        ],
+        [
+          13565,
+          13621
+        ],
+        [
+          13808,
+          13825
+        ],
+        [
+          13854,
+          13879
+        ],
+        [
+          13896,
+          13908
+        ]
+      ]
+    },
+    {
+      "path": "src/js/palette-panel.js",
+      "lines": 286,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/playback-cache.js",
+      "lines": 164,
+      "uncovered": 19,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          19
+        ]
+      ]
+    },
+    {
+      "path": "src/js/project-document.js",
+      "lines": 23,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/project-entry.js",
+      "lines": 18,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/project.js",
+      "lines": 743,
+      "uncovered": 70,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          9
+        ],
+        [
+          11,
+          19
+        ],
+        [
+          21,
+          24
+        ],
+        [
+          51,
+          53
+        ],
+        [
+          220,
+          227
+        ],
+        [
+          311,
+          321
+        ],
+        [
+          412,
+          432
+        ],
+        [
+          486,
+          497
+        ],
+        [
+          634,
+          635
+        ]
+      ]
+    },
+    {
+      "path": "src/js/render-manager.js",
+      "lines": 501,
+      "uncovered": 33,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          33
+        ]
+      ]
+    },
+    {
+      "path": "src/js/rig-widget.js",
+      "lines": 712,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/rulers-bridge.js",
+      "lines": 409,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/select-bridge.js",
+      "lines": 3627,
+      "uncovered": 64,
+      "overlap": 0,
+      "spans": [
+        [
+          1,
+          23
+        ],
+        [
+          271,
+          279
+        ],
+        [
+          461,
+          464
+        ],
+        [
+          759,
+          763
+        ],
+        [
+          772,
+          773
+        ],
+        [
+          2905,
+          2914
+        ],
+        [
+          3293,
+          3308
+        ]
+      ]
+    },
+    {
+      "path": "src/js/shader-effects-library.js",
+      "lines": 1314,
+      "uncovered": 0,
+      "overlap": 1311,
+      "spans": []
+    },
+    {
+      "path": "src/js/shapes-panel.js",
+      "lines": 907,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/subselect-bridge.js",
+      "lines": 549,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/symmetry-bridge.js",
+      "lines": 462,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/timeline.js",
+      "lines": 11907,
+      "uncovered": 5286,
+      "overlap": 87,
+      "spans": [
+        [
+          2002,
+          2011
+        ],
+        [
+          2027,
+          2048
+        ],
+        [
+          2247,
+          2247
+        ],
+        [
+          5710,
+          7449
+        ],
+        [
+          7724,
+          8996
+        ],
+        [
+          9078,
+          9227
+        ],
+        [
+          9274,
+          9640
+        ],
+        [
+          9642,
+          9934
+        ],
+        [
+          9950,
+          11795
+        ],
+        [
+          11810,
+          11883
+        ],
+        [
+          11889,
+          11907
+        ]
+      ]
+    },
+    {
+      "path": "src/js/tools.js",
+      "lines": 8643,
+      "uncovered": 3,
+      "overlap": 4,
+      "spans": [
+        [
+          3370,
+          3372
+        ]
+      ]
+    },
+    {
+      "path": "src/js/tweens.js",
+      "lines": 5249,
+      "uncovered": 516,
+      "overlap": 158,
+      "spans": [
+        [
+          1,
+          103
+        ],
+        [
+          411,
+          415
+        ],
+        [
+          472,
+          472
+        ],
+        [
+          564,
+          564
+        ],
+        [
+          630,
+          630
+        ],
+        [
+          1020,
+          1020
+        ],
+        [
+          1564,
+          1958
+        ],
+        [
+          3735,
+          3742
+        ],
+        [
+          4810,
+          4811
+        ],
+        [
+          4860,
+          4860
+        ],
+        [
+          4925,
+          4925
+        ],
+        [
+          4977,
+          4979
+        ],
+        [
+          4992,
+          5016
+        ]
+      ]
+    },
+    {
+      "path": "src/js/ui.js",
+      "lines": 1438,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/vector-text-bridge.js",
+      "lines": 439,
+      "uncovered": 0,
+      "overlap": 0,
+      "spans": []
+    },
+    {
+      "path": "src/js/vectorize-bridge.js",
+      "lines": 598,
+      "uncovered": 5,
+      "overlap": 0,
+      "spans": [
+        [
+          72,
+          77
+        ]
+      ]
     }
   ],
   "files": [
@@ -2704,9 +4925,24 @@
       "reason": "Tracked configuration, schema, lock or metadata consumer; retained explicitly rather than excluded as documentation."
     },
     {
+      "path": "engineering/application/value-contract-v1.schema.json",
+      "mode": "100644",
+      "blob": "43e8be1952c4d954f4138669333e0329f1722b0b",
+      "classification": "configuration",
+      "censusRefs": [],
+      "reason": "Tracked configuration, schema, lock or metadata consumer; retained explicitly rather than excluded as documentation.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "D01",
+        "issue": 1044,
+        "pullRequest": 1144,
+        "evidence": "Added by docs(D01) e1b2e1d, merged via PR #1144; value-contract schema consumed by D01 tests."
+      }
+    },
+    {
       "path": "engineering/boundaries/README.md",
       "mode": "100644",
-      "blob": "b566422817113f4db2ea8546663cad9b4dda2dd1",
+      "blob": "c75ae7dde990a20712470a393569bca82ed82562",
       "classification": "documentation",
       "censusRefs": [
         "C08.docs.boundary-enforcement-config-data"
@@ -2736,7 +4972,7 @@
     {
       "path": "engineering/boundaries/profiles/app-js.coverage.json",
       "mode": "100644",
-      "blob": "c6ebee853325e76d6b9bc25973165af84da08331",
+      "blob": "1a5ebcd450e6af35f077388436dca451394f5760",
       "classification": "configuration",
       "censusRefs": [
         "C08.docs.boundary-enforcement-config-data"
@@ -2744,9 +4980,24 @@
       "reason": "Tracked configuration, schema, lock or metadata consumer; retained explicitly rather than excluded as documentation."
     },
     {
+      "path": "engineering/boundaries/profiles/app-js.edges.json",
+      "mode": "100644",
+      "blob": "fcd928a85c12e7decedb4cb89817a780c352a7a9",
+      "classification": "configuration",
+      "censusRefs": [],
+      "reason": "Tracked configuration, schema, lock or metadata consumer; retained explicitly rather than excluded as documentation.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P10",
+        "issue": 1012,
+        "pullRequest": 1173,
+        "evidence": "Added by feat(P10) da161d4, merged via PR #1173; application dependency-edge declarations read by the boundaries gate."
+      }
+    },
+    {
       "path": "engineering/boundaries/profiles/app-js.profile.json",
       "mode": "100644",
-      "blob": "977bceb0d65c025fd1d8fe0671d56bd011116b84",
+      "blob": "dd2c54b90aa2167cebd0eca6cb74730f90109b72",
       "classification": "configuration",
       "censusRefs": [
         "C08.docs.boundary-enforcement-config-data"
@@ -2936,7 +5187,7 @@
     {
       "path": "engineering/boundaries/profiles/scripts-nemo.profile.json",
       "mode": "100644",
-      "blob": "047d1ab6c4c8b406324070a88eb1ff47c67b7864",
+      "blob": "4813d87ba985e10174f81475e37def264a9a707a",
       "classification": "configuration",
       "censusRefs": [
         "C08.docs.boundary-enforcement-config-data"
@@ -2989,7 +5240,14 @@
       "blob": "cadfe0cbb94e4dd1e5652deabf4a244d94b15170",
       "classification": "configuration",
       "censusRefs": [],
-      "reason": "Tracked configuration, schema, lock or metadata consumer; retained explicitly rather than excluded as documentation."
+      "reason": "Tracked configuration, schema, lock or metadata consumer; retained explicitly rather than excluded as documentation.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "T04",
+        "issue": 1053,
+        "pullRequest": 1103,
+        "evidence": "Added by feat(T04) 56aba51, merged via PR #1103; reviewed no-regression coverage ratchet baseline read by the verify profile."
+      }
     },
     {
       "path": "engineering/inventory/BASELINE.md",
@@ -3012,9 +5270,17 @@
       "reason": "Tracked prose/license reference; not executable runtime or tooling."
     },
     {
+      "path": "engineering/inventory/REMEDIATION_SCOPE.md",
+      "mode": "100644",
+      "blob": "1f631584a373850186020f953ba51ed842254a77",
+      "classification": "documentation",
+      "censusRefs": [],
+      "reason": "Tracked prose/license reference; not executable runtime or tooling."
+    },
+    {
       "path": "engineering/inventory/SURFACES.md",
       "mode": "100644",
-      "blob": "6fc231da39b5f4a78f45b275de841f9e589fa861",
+      "blob": "c26cf3411756f50eff88fb341f89e262fe0a29f9",
       "classification": "documentation",
       "censusRefs": [
         "C08.docs.inventory-and-census-artifacts"
@@ -3160,9 +5426,209 @@
       "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
     },
     {
+      "path": "engineering/inventory/census/C19a-timeline-foundations.json",
+      "mode": "100644",
+      "blob": "8c71a0452e3fb803a2666cb70f1f2ea771a8a931",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19b-timeline-work-area-duration.json",
+      "mode": "100644",
+      "blob": "300d5277510aa96623d048ec7f5eeaf1b58e095b",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19b2-timeline-frame-relocation.json",
+      "mode": "100644",
+      "blob": "dcf99133931c492a788d76c7be5b4a7a52467ab3",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19c-timeline-layer-copy-transactions.json",
+      "mode": "100644",
+      "blob": "be0b90975fa5aeb93b80a777c15dbf1e6fde8cf5",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19d-timeline-layer-lifecycle.json",
+      "mode": "100644",
+      "blob": "140adc3e576ab071a49184982e4e4a3d34982d64",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19e-timeline-layer-controls-and-symbol-facades.json",
+      "mode": "100644",
+      "blob": "3eead1c4d139741246c38881dc293d1b11894d0e",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19f-timeline-content-commands.json",
+      "mode": "100644",
+      "blob": "26db2e3b765ae6f4003468e804804f69ba01e142",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19g-timeline-document-codec.json",
+      "mode": "100644",
+      "blob": "53e542118ceab6994c1bc59bdca9d3f86585e831",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19h-timeline-ui-refresh-adapters.json",
+      "mode": "100644",
+      "blob": "70a5fddfd3670c467eae9490df45bd9914cec69c",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19i-timeline-properties-help-foundations.json",
+      "mode": "100644",
+      "blob": "4786c61fd890148e2e90359fe1a039133e9d6a14",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19j-timeline-properties-context-router.json",
+      "mode": "100644",
+      "blob": "011d88677d498006b1460e78f74380b2ad238380",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19k-timeline-selection-properties-adoption.json",
+      "mode": "100644",
+      "blob": "d0812cdf09442dbef31c1ed5f9e68aef8941e08f",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19l-timeline-fs-ghost-properties-geometry.json",
+      "mode": "100644",
+      "blob": "4de191bd5a756d4ef80fb76ed1b4de0e74056a40",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19m-timeline-drag-playhead-render.json",
+      "mode": "100644",
+      "blob": "7afd43ab73ca6bde93f2d5f2d94efac6f75ea7e7",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19n-timeline-tween-curve-strips.json",
+      "mode": "100644",
+      "blob": "64a91fa851449230ea6edccd892bddc0eb31e77b",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19o-timeline-span-shrink-handle.json",
+      "mode": "100644",
+      "blob": "74654915f0f62725bf15c5a9c3d3c24538e43d3b",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19p-timeline-frame-grid-mouse.json",
+      "mode": "100644",
+      "blob": "44c09da60589ba0889015eadaf66897622346164",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19q-timeline-layer-panel-selection-folders.json",
+      "mode": "100644",
+      "blob": "49bb3a80d41a8c614d7a34c501a21c169db9b59c",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20a-motion-text-animator-element-style.json",
+      "mode": "100644",
+      "blob": "98d7c1070f4f71dbc8c75f89ea55122bec68f6ef",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20b-motion-property-edit-and-header-support.json",
+      "mode": "100644",
+      "blob": "c9614b6c83b874ef6c0baabe075c57a59feb01eb",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20c-motion-key-lock-menus.json",
+      "mode": "100644",
+      "blob": "a4d41aaf5f29b1e50869fa6f7ff8dbc040fb0a1a",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20d-motion-layer-properties-matte-blend.json",
+      "mode": "100644",
+      "blob": "333ec3f4eac8cd8ca68e2f0fe517d5ba1094d93f",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20e-motion-null-follow-parent-time-panel.json",
+      "mode": "100644",
+      "blob": "4775da986fc8e5a9f6cf58f21fb96c2235449f9f",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20f-motion-transform-expression-panel.json",
+      "mode": "100644",
+      "blob": "daf82f9ec47e60c277eebc59db59a3f33a5651ab",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/remediation-scope.json",
+      "mode": "100644",
+      "blob": "17f746f94fc5aa267e868f3b1010ddfa64c03110",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
       "path": "engineering/inventory/surfaces.csv",
       "mode": "100644",
-      "blob": "935a3457dafa915460adad23521b055a7c7391cb",
+      "blob": "5e056af6bfb867305a8da02c8f0839dbda135f48",
       "classification": "static-data",
       "censusRefs": [
         "C08.docs.inventory-and-census-artifacts"
@@ -3172,7 +5638,7 @@
     {
       "path": "engineering/inventory/surfaces.json",
       "mode": "100644",
-      "blob": "e1760912a8cd5bd2a09ad030db934de8f814547a",
+      "blob": "fd4714e4123e4e4656de5a81036ffc3eec3f3104",
       "classification": "static-data",
       "censusRefs": [
         "C08.docs.inventory-and-census-artifacts"
@@ -3262,7 +5728,7 @@
     {
       "path": "engineering/remediation/EXECUTION_PLAN.en.md",
       "mode": "100644",
-      "blob": "7ae4cc8ba3bbb52e31c4ff35d8f72e5d34c2eabe",
+      "blob": "6181ea3440f7f77545292dabffddde503eca0a3e",
       "classification": "documentation",
       "censusRefs": [
         "C08.docs.remediation-program-docs"
@@ -3272,7 +5738,7 @@
     {
       "path": "engineering/remediation/EXECUTION_PLAN.fr.md",
       "mode": "100644",
-      "blob": "9aa1c8c61f11278d30e5ff084f252c038873341e",
+      "blob": "545b50926d6752297d7ecb87e70948cfa52a6dfb",
       "classification": "documentation",
       "censusRefs": [
         "C08.docs.remediation-program-docs"
@@ -4111,7 +6577,14 @@
       "blob": "fb37a03b879ee832b07597f84906e82e50ab32e8",
       "classification": "handwritten-runtime",
       "censusRefs": [],
-      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
+      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P07",
+        "issue": 1009,
+        "pullRequest": 1113,
+        "evidence": "Added by feat(P07) 35d7eac, merged via PR #1113; registered capability contracts consumed by the Rust MCP dispatch."
+      }
     },
     {
       "path": "nemo-mcp/src/capability_contract.rs",
@@ -4119,7 +6592,14 @@
       "blob": "99875018e75add0f135c8cef23da426a3cc735ba",
       "classification": "handwritten-runtime",
       "censusRefs": [],
-      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
+      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P07",
+        "issue": 1009,
+        "pullRequest": 1113,
+        "evidence": "Added by fix(P07) bd907d2, merged via PR #1113."
+      }
     },
     {
       "path": "nemo-mcp/src/contract.rs",
@@ -4137,7 +6617,14 @@
       "blob": "905c1f910e3017711870f968df9bb2f5887a1a2e",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Private-surface Rust unit tests included through #[path]; test evidence, not runtime implementation."
+      "reason": "Private-surface Rust unit tests included through #[path]; test evidence, not runtime implementation.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P07",
+        "issue": 1009,
+        "pullRequest": 1113,
+        "evidence": "Added by fix(P07) 5aa8026, merged via PR #1113; #[path] unit tests for contract.rs."
+      }
     },
     {
       "path": "nemo-mcp/src/lib.rs",
@@ -4205,7 +6692,17 @@
       "blob": "56f5502091c2e65da5f67e6df7d65682a99811c3",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "oracle",
+        "packets": [
+          "C07.application-service.command-core",
+          "C07.mcp-contract.request-response-types",
+          "C07.mcp-server.discovery-registry",
+          "C07.mcp-server.tool-router"
+        ],
+        "evidence": "Named as an oracle (compiled stdio/transport test) by the listed C07 packets, not as an extraction target; pre-remediation MCP PRs #992/#1002."
+      }
     },
     {
       "path": "nemo-mcp/tests/stdio_application.rs",
@@ -4213,7 +6710,15 @@
       "blob": "1ce47adbaae67a8c7a69e9e17e5da0be2a301100",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "oracle",
+        "packets": [
+          "C07.application-service.command-core",
+          "C07.mcp-server.tool-router"
+        ],
+        "evidence": "Named as an oracle (compiled stdio/transport test) by the listed C07 packets, not as an extraction target; pre-remediation MCP PRs #992/#1002."
+      }
     },
     {
       "path": "nemo-mcp/tests/stdio_cancellation.rs",
@@ -4221,7 +6726,14 @@
       "blob": "756ee02252c1a9090ec8ee35528e5c03c4133234",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "oracle",
+        "packets": [
+          "C07.mcp-server.tool-router"
+        ],
+        "evidence": "Named as an oracle (compiled stdio/transport test) by the listed C07 packets, not as an extraction target; pre-remediation MCP PRs #992/#1002."
+      }
     },
     {
       "path": "nemo-mcp/tests/stdio_contract.rs",
@@ -4229,7 +6741,14 @@
       "blob": "e69163b4c40b863102d8f042d2fe2831b077d23d",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "oracle",
+        "packets": [
+          "C07.mcp-contract.request-response-types"
+        ],
+        "evidence": "Named as an oracle (compiled stdio/transport test) by the listed C07 packets, not as an extraction target; pre-remediation MCP PRs #992/#1002."
+      }
     },
     {
       "path": "nemo-mcp/tests/stdio_reconnect.rs",
@@ -4237,7 +6756,15 @@
       "blob": "3901d0c54adef100b255ef2ee0ba56e9eab31055",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "oracle",
+        "packets": [
+          "C07.mcp-server.discovery-registry",
+          "C07.mcp-server.tool-router"
+        ],
+        "evidence": "Named as an oracle (compiled stdio/transport test) by the listed C07 packets, not as an extraction target; pre-remediation MCP PRs #992/#1002."
+      }
     },
     {
       "path": "nemo-mcp/tests/stdio_rejection.rs",
@@ -4245,7 +6772,14 @@
       "blob": "5359726c5830382491798f1bee007748d0e34fb6",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "oracle",
+        "packets": [
+          "C07.mcp-server.tool-router"
+        ],
+        "evidence": "Named as an oracle (compiled stdio/transport test) by the listed C07 packets, not as an extraction target; pre-remediation MCP PRs #992/#1002."
+      }
     },
     {
       "path": "nemo-mcp/tests/stdio_roundtrip.rs",
@@ -4253,7 +6787,15 @@
       "blob": "ecf1ac4cc493214376dd3ca52ac8929488c0e21c",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "oracle",
+        "packets": [
+          "C07.mcp-contract.request-response-types",
+          "C07.mcp-server.tool-router"
+        ],
+        "evidence": "Named as an oracle (compiled stdio/transport test) by the listed C07 packets, not as an extraction target; pre-remediation MCP PRs #992/#1002."
+      }
     },
     {
       "path": "nemo-mcp/tests/transport.rs",
@@ -4261,7 +6803,19 @@
       "blob": "95501efbb0b2a8d8369cac557079a06a54798d41",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "oracle",
+        "packets": [
+          "C07.mcp-contract.request-response-types",
+          "C07.mcp-contract.schema-dump-binary",
+          "C07.mcp-server.discovery-registry",
+          "C07.mcp-server.tool-router",
+          "C07.mcp-server.wire-framing",
+          "C07.native-transport.webview-adapter"
+        ],
+        "evidence": "Named as an oracle (compiled stdio/transport test) by the listed C07 packets, not as an extraction target; pre-remediation MCP PRs #992/#1002."
+      }
     },
     {
       "path": "package-lock.json",
@@ -4376,7 +6930,7 @@
     {
       "path": "scripts/nemo/boundaries-application.test.cjs",
       "mode": "100644",
-      "blob": "95ef34b9c9e9c148ab59c86d779442624a976a80",
+      "blob": "e69d990ccb7ee614de42bb48cd80f038b4f825e8",
       "classification": "test",
       "censusRefs": [
         "C13.tooling.scripts-nemo-core"
@@ -4412,6 +6966,21 @@
         "C13.tooling.scripts-nemo-core"
       ],
       "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+    },
+    {
+      "path": "scripts/nemo/boundaries-edges.test.cjs",
+      "mode": "100644",
+      "blob": "33d3226a84b35b6bd7972e1f8ba10eb2bc8ac524",
+      "classification": "test",
+      "censusRefs": [],
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P10",
+        "issue": 1012,
+        "pullRequest": 1173,
+        "evidence": "Added by feat(P10) da161d4, merged via PR #1173; edge-gate regression test."
+      }
     },
     {
       "path": "scripts/nemo/boundaries-ratchet.test.cjs",
@@ -4536,7 +7105,7 @@
     {
       "path": "scripts/nemo/ci.cjs",
       "mode": "100644",
-      "blob": "804f108f5e2e5acb99e5f222e15402419cf149d8",
+      "blob": "aa57b7f50987e7eb35bee6e46168dfac1fd3f91a",
       "classification": "handwritten-tooling",
       "censusRefs": [
         "C13.tooling.scripts-nemo-core"
@@ -4546,7 +7115,7 @@
     {
       "path": "scripts/nemo/ci.test.cjs",
       "mode": "100644",
-      "blob": "e374ad897e1a7495b1d4db5880679493eb0629d2",
+      "blob": "90923ec8baa4aaaf67c57d79bc612419ee38b878",
       "classification": "test",
       "censusRefs": [
         "C13.tooling.scripts-nemo-core"
@@ -4656,7 +7225,7 @@
     {
       "path": "scripts/nemo/lib/boundaries-application.cjs",
       "mode": "100644",
-      "blob": "268e20e02614b8df20a44ac22df68261f652e439",
+      "blob": "b480f640ec749bd353472fdcba3a55114296e1da",
       "classification": "handwritten-tooling",
       "censusRefs": [
         "C13.tooling.scripts-nemo-lib"
@@ -4944,6 +7513,21 @@
       "reason": "Tracked executable tool; requires explicit boundary/admission coverage."
     },
     {
+      "path": "scripts/nemo/remediation-scope.cjs",
+      "mode": "100644",
+      "blob": "2fd8a1acf5ba84e0cfc1e64204e70044c0c754f9",
+      "classification": "handwritten-tooling",
+      "censusRefs": [],
+      "reason": "Tracked executable tool; requires explicit boundary/admission coverage.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P03A",
+        "issue": 1116,
+        "pullRequest": 1117,
+        "evidence": "Added by feat(P03A) dcda4d8, merged via PR #1117; this index checker."
+      }
+    },
+    {
       "path": "scripts/nemo/verify.cjs",
       "mode": "100755",
       "blob": "8285e47a008344c36cf9099dc3f23970d0abf87d",
@@ -5172,7 +7756,14 @@
       "blob": "b7ec336ab5f95eec1b91954775327b0108bf2f90",
       "classification": "handwritten-runtime",
       "censusRefs": [],
-      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
+      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P28",
+        "issue": 1030,
+        "pullRequest": 1100,
+        "evidence": "Extracted by refactor(P28) 61f431a, merged via PR #1100, from the src-tauri/src/lib.rs probe path (C05.native-rust packets)."
+      }
     },
     {
       "path": "src-tauri/src/task_runtime.rs",
@@ -5399,7 +7990,7 @@
     {
       "path": "src/index.html",
       "mode": "100644",
-      "blob": "8c74bf01df9bca19856e83574d4f1808c26c76ca",
+      "blob": "0f928bd885b0acd32acde1d52726f1e42f1370c5",
       "classification": "handwritten-runtime",
       "censusRefs": [
         "C06.bootstrap.feature-flags",
@@ -5428,6 +8019,36 @@
         "C07.native-transport.webview-adapter"
       ],
       "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
+    },
+    {
+      "path": "src/js/adapters/export-svg-frame.js",
+      "mode": "100644",
+      "blob": "cc6e26b3e1eca0ff66c34596b65dd6e196b0bee5",
+      "classification": "handwritten-runtime",
+      "censusRefs": [],
+      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P17",
+        "issue": 1019,
+        "pullRequest": 1160,
+        "evidence": "Extracted by refactor(P17) 6a70b09, merged via PR #1160, from src/js/export.js (C05.export packets)."
+      }
+    },
+    {
+      "path": "src/js/adapters/export-svg-sequence.js",
+      "mode": "100644",
+      "blob": "debfd01bd291c1851d6f9ec61b3db2b3d87c3871",
+      "classification": "handwritten-runtime",
+      "censusRefs": [],
+      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P18",
+        "issue": 1020,
+        "pullRequest": 1163,
+        "evidence": "Added by feat(P18) 35dac5f, merged via PR #1163; bounded SVG sequence export job adapter."
+      }
     },
     {
       "path": "src/js/ae-camera-export.js",
@@ -5477,7 +8098,44 @@
       "blob": "984fd5981f4e1e011a0f4f99482bd422e82eb983",
       "classification": "handwritten-runtime",
       "censusRefs": [],
-      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
+      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P05",
+        "issue": 1007,
+        "pullRequest": 1111,
+        "evidence": "Added by feat(P05) 81b1d95, merged via PR #1111; deterministic capability registration."
+      }
+    },
+    {
+      "path": "src/js/application/export-job.js",
+      "mode": "100644",
+      "blob": "affec7a6c4a08368ad5b058d70756c3434207f2c",
+      "classification": "handwritten-runtime",
+      "censusRefs": [],
+      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P18",
+        "issue": 1020,
+        "pullRequest": 1163,
+        "evidence": "Added by feat(P18) 35dac5f, merged via PR #1163; start/status/cancel export job."
+      }
+    },
+    {
+      "path": "src/js/application/history/frame-entry.js",
+      "mode": "100644",
+      "blob": "b619d697b8c87cc9ae7a542c92715072893038ed",
+      "classification": "handwritten-runtime",
+      "censusRefs": [],
+      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P21",
+        "issue": 1023,
+        "pullRequest": 1171,
+        "evidence": "Extracted by refactor(P21) 0f805b9, merged via PR #1171, from the tweens.js undo section (C01 history packets); the packet itself is not fully delivered."
+      }
     },
     {
       "path": "src/js/application/opacity-application.js",
@@ -5495,7 +8153,29 @@
       "blob": "6e6d99fcc9ff6fb441b42377355424e1b4b8964b",
       "classification": "handwritten-runtime",
       "censusRefs": [],
-      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
+      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P06",
+        "issue": 1008,
+        "pullRequest": 1112,
+        "evidence": "Added by feat(P06) da2314f, merged via PR #1112; opacity self-registration through the registry."
+      }
+    },
+    {
+      "path": "src/js/application/render/image-budget.js",
+      "mode": "100644",
+      "blob": "0f6351e33b318930e27f544e134fe72dcb3decb3",
+      "classification": "handwritten-runtime",
+      "censusRefs": [],
+      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P26",
+        "issue": 1028,
+        "pullRequest": 1168,
+        "evidence": "Extracted by refactor(P26) 0628d15, merged via PR #1168, from src/js/engine-bridge.js (C03.js-engine-bridge.bounded-image-store); the packet itself is not fully delivered."
+      }
     },
     {
       "path": "src/js/asset-tree.js",
@@ -5679,7 +8359,14 @@
       "blob": "0772395cd6398173e2984788916d96bc7dceec4a",
       "classification": "handwritten-runtime",
       "censusRefs": [],
-      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
+      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "A01",
+        "issue": 1061,
+        "pullRequest": 1108,
+        "evidence": "Extracted by feat(A01) de130fa, merged via PR #1108, from the expression runtime (C02.expressions.expression-runtime); the packet itself is not fully delivered."
+      }
     },
     {
       "path": "src/js/domain/animation/expression-time.js",
@@ -5687,7 +8374,14 @@
       "blob": "701d0c772e7b36397fec316e926394d9f54986c4",
       "classification": "handwritten-runtime",
       "censusRefs": [],
-      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
+      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P22",
+        "issue": 1024,
+        "pullRequest": 1107,
+        "evidence": "Extracted by feat(P22) 2f85439, merged via PR #1107, from the expression runtime (C02.expressions.expression-runtime); the packet itself is not fully delivered."
+      }
     },
     {
       "path": "src/js/domain/animation/opacity.js",
@@ -5705,7 +8399,29 @@
       "blob": "80c6948c5409cd20e0d98054cc66db421ac3ce73",
       "classification": "handwritten-runtime",
       "censusRefs": [],
-      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
+      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P20",
+        "issue": 1022,
+        "pullRequest": 1109,
+        "evidence": "Extracted by refactor(P20) 1f7d4d2, merged via PR #1109, from SM.exportJSON/importJSON (timeline.js, C19g packets)."
+      }
+    },
+    {
+      "path": "src/js/domain/tween/assignment.js",
+      "mode": "100644",
+      "blob": "65b9da0676cbdbb8aeb87032382275cbb9466fca",
+      "classification": "handwritten-runtime",
+      "censusRefs": [],
+      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P23",
+        "issue": 1025,
+        "pullRequest": 1166,
+        "evidence": "Extracted by refactor(P23) 6db6546, merged via PR #1166, from src/js/tweens.js (C02.tween-engine.feature-extraction-and-matching); the packet itself is not fully delivered."
+      }
     },
     {
       "path": "src/js/draw-bridge.js",
@@ -5754,7 +8470,7 @@
     {
       "path": "src/js/engine-bridge.js",
       "mode": "100644",
-      "blob": "76bf313230872704017fdde97d6dbdc63dc7de6a",
+      "blob": "4a69ad760e8b7c26d6b9d2a39746a50716f376af",
       "classification": "handwritten-runtime",
       "censusRefs": [
         "C03.js-engine-bridge.bounded-image-store",
@@ -5782,7 +8498,7 @@
     {
       "path": "src/js/export.js",
       "mode": "100644",
-      "blob": "81f8a62d08fd23bd0a3797e175338cfbd393cc31",
+      "blob": "2a78b54812c4fec920e9c7b3b8af340194475e07",
       "classification": "handwritten-runtime",
       "censusRefs": [
         "C05.export.browser-native-fallbacks",
@@ -6486,7 +9202,29 @@
         "C02.properties-and-curves.curves-and-easing",
         "C02.properties-and-curves.key-selection-and-clipboard",
         "C02.properties-and-curves.keyframe-track-model",
-        "C02.properties-and-curves.properties-and-metadata"
+        "C02.properties-and-curves.properties-and-metadata",
+        "C20a.element-style-readers",
+        "C20a.text-animator-runtime",
+        "C20b.motion-context-header-tools",
+        "C20b.property-field-edit-helpers",
+        "C20c.layer-key-lock-menu",
+        "C20c.selected-key-lock-menu",
+        "C20d.blend-row",
+        "C20d.matte-menus-refresh",
+        "C20d.matte-row",
+        "C20d.motion-properties-panel",
+        "C20d.widget-size",
+        "C20e.extra-parent-stack",
+        "C20e.follow-path-row",
+        "C20e.null-shape-row",
+        "C20e.parent-row-and-blend-gesture",
+        "C20e.time-link-row",
+        "C20f.anchor-grid-picker",
+        "C20f.expression-pickwhip",
+        "C20f.inline-expression-editor",
+        "C20f.stopwatch-title",
+        "C20f.transform-group-headers",
+        "C20f.transform-property-rows"
       ],
       "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
     },
@@ -6921,7 +9659,120 @@
         "C06.preferences.profile-fields-ui",
         "C06.preferences.settings-modal-shell",
         "C06.preferences.shortcuts-system",
-        "C06.preferences.sync-folder-ui"
+        "C06.preferences.sync-folder-ui",
+        "C19a.brush-preset",
+        "C19a.confirm-adapter",
+        "C19a.drawing-defaults",
+        "C19a.frame-selection",
+        "C19a.onion-tail",
+        "C19a.playback-mode-controls",
+        "C19a.playback-step-wrapper",
+        "C19a.playhead-tail",
+        "C19a.project-time-view-settings",
+        "C19a.selection-brush-width",
+        "C19a.selection-fill-opacity",
+        "C19a.selection-paint",
+        "C19a.sm-bootstrap-translator",
+        "C19a.sm-facade-core",
+        "C19a.sm-facade-editing",
+        "C19a.stroke-smoothing",
+        "C19a.stroke-style",
+        "C19a.timeline-view-toggles",
+        "C19a.tool-transition",
+        "C19a.tween-retime",
+        "C19b.composition-duration",
+        "C19b.trim-work-area",
+        "C19b.work-area-bounds",
+        "C19b2.copy-frames",
+        "C19b2.cut-frames",
+        "C19b2.delete-selected-frames",
+        "C19b2.move-selected-frames",
+        "C19b2.move-single-keyframe",
+        "C19b2.paste-frames",
+        "C19b2.shift-layer-frames",
+        "C19c.duplicate-base-copy",
+        "C19c.duplicate-folder-and-selection",
+        "C19c.duplicate-kind-and-relationship-copy",
+        "C19c.duplicate-mesh-remap",
+        "C19c.layer-split",
+        "C19d.add-effect",
+        "C19d.add-folder",
+        "C19d.add-guide",
+        "C19d.add-layer",
+        "C19d.add-null",
+        "C19d.delete-layer",
+        "C19d.folder-collapse",
+        "C19d.folder-remove",
+        "C19d.folder-reparent",
+        "C19d.trailing-references",
+        "C19d.widget-facades",
+        "C19e.active-layer",
+        "C19e.conversion-facades",
+        "C19e.key-lock",
+        "C19e.layer-display-lock-name",
+        "C19e.motion-blur-controls",
+        "C19e.navigation-and-structure-facades",
+        "C19e.reorder-facades",
+        "C19e.shy-controls",
+        "C19e.stroke-profile",
+        "C19e.symbol-setting-history",
+        "C19f.duplicate-and-extend",
+        "C19f.propagate-color",
+        "C19f.repeat-selection",
+        "C19f.selected-stroke-delete",
+        "C19g.export-transaction",
+        "C19g.get-state-facade",
+        "C19g.import-document-finalize",
+        "C19g.import-parse-layer-restore",
+        "C19h.corner-panel",
+        "C19h.document-field-sync",
+        "C19h.ellipse-panel",
+        "C19h.mask-panel",
+        "C19h.revision-panel",
+        "C19h.star-panel",
+        "C19h.update-ui",
+        "C19i.contextual-statusbar-help",
+        "C19i.dom-slot-foundations",
+        "C19i.properties-foundations",
+        "C19i.tooltip-statusbar-mirror",
+        "C19j.update-props-context",
+        "C19k.drawing-defaults",
+        "C19k.update-selection-properties",
+        "C19l.fsselect-panel-reflection",
+        "C19l.ghost-proxy-selection-lifecycle",
+        "C19l.properties-held-frame-and-move",
+        "C19l.properties-scale-and-rotate",
+        "C19m.camera-row-offset",
+        "C19m.grid-resize-resync",
+        "C19m.playhead-viewport-sync",
+        "C19m.render-timeline",
+        "C19m.scroll-snapshot-restore",
+        "C19m.timeline-drag-state",
+        "C19n.inline-curve-inset",
+        "C19n.keyframe-cells-render",
+        "C19n.shared-curve-editor-svg",
+        "C19n.tween-cell-selection-apply",
+        "C19n.tween-curve-strips-render",
+        "C19n.tween-span-geometry",
+        "C19o.span-shrink-commit",
+        "C19o.span-shrink-drag",
+        "C19o.span-shrink-frame-at",
+        "C19o.span-shrink-state-and-arm",
+        "C19p.content-mousedown-reset",
+        "C19p.drag-source-fade",
+        "C19p.grid-contextmenu",
+        "C19p.grid-dblclick-span",
+        "C19p.grid-mousedown-select-drag-arm",
+        "C19p.grid-mousemove-drag",
+        "C19p.layer-sel-from-frame-sel",
+        "C19p.window-mouseup-commit",
+        "C19q.folder-child-map",
+        "C19q.folder-group-ungroup-rename",
+        "C19q.folder-parent-index",
+        "C19q.layer-rename",
+        "C19q.layer-render-order",
+        "C19q.layer-selection-state",
+        "C19q.shape-tree-rows"
       ],
       "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
     },
@@ -7021,7 +9872,7 @@
     {
       "path": "src/js/tweens.js",
       "mode": "100644",
-      "blob": "861d37fc02242a5eac6b71daab811979e5ab9408",
+      "blob": "6eca7339bbd608b98676b600c9e2f42ca9ce1863",
       "classification": "handwritten-runtime",
       "censusRefs": [
         "C01.tweens.undo-redo-engine",
@@ -7245,6 +10096,21 @@
       "reason": "Generated bindings/schema output; provenance retained in C18/C15 and existing build metadata."
     },
     {
+      "path": "tests/adapter-export-svg-frame.test.cjs",
+      "mode": "100644",
+      "blob": "c127780104ac15d48cf696df3ad0799cabf2fb68",
+      "classification": "test",
+      "censusRefs": [],
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P17",
+        "issue": 1019,
+        "pullRequest": 1160,
+        "evidence": "Added by refactor(P17) 6a70b09, merged via PR #1160."
+      }
+    },
+    {
       "path": "tests/animation/boundaries.test.cjs",
       "mode": "100644",
       "blob": "d3a320f07c0ff360ebc73dd64e40445541caf309",
@@ -7310,12 +10176,64 @@
       "blob": "1d9d33c8c6bae22eb766a9e81d1fa65299ee41ee",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P05",
+        "issue": 1007,
+        "pullRequest": 1111,
+        "evidence": "Added by feat(P05) 81b1d95, merged via PR #1111."
+      }
+    },
+    {
+      "path": "tests/application-export-job.test.cjs",
+      "mode": "100644",
+      "blob": "56252758f6b816cf71f2a49df046acbd0fb21c26",
+      "classification": "test",
+      "censusRefs": [],
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P18",
+        "issue": 1020,
+        "pullRequest": 1163,
+        "evidence": "Added by feat(P18) 35dac5f, merged via PR #1163."
+      }
+    },
+    {
+      "path": "tests/application-history-frame-entry.test.cjs",
+      "mode": "100644",
+      "blob": "623402ab32112959b78096c5e820e92a0125e381",
+      "classification": "test",
+      "censusRefs": [],
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P21",
+        "issue": 1023,
+        "pullRequest": 1171,
+        "evidence": "Added by refactor(P21) 0f805b9, merged via PR #1171."
+      }
+    },
+    {
+      "path": "tests/application-image-budget.test.cjs",
+      "mode": "100644",
+      "blob": "1afde67598218b8c1619897309e8382b9dc9228e",
+      "classification": "test",
+      "censusRefs": [],
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P26",
+        "issue": 1028,
+        "pullRequest": 1168,
+        "evidence": "Added by refactor(P26) 0628d15, merged via PR #1168."
+      }
     },
     {
       "path": "tests/application-opacity-bootstrap.test.cjs",
       "mode": "100644",
-      "blob": "b4d93f0e3348464430b47b2060d50246537ebcb8",
+      "blob": "892099e1e91786083dbd2e2e07a5ee22dfcc3caa",
       "classification": "test",
       "censusRefs": [
         "C13.tooling.browser-and-app-test-suites"
@@ -7325,10 +10243,17 @@
     {
       "path": "tests/application-opacity-capability.test.cjs",
       "mode": "100644",
-      "blob": "7f69fc8e110b9ac11e70f608d32834c8ead89883",
+      "blob": "c2c6b4420ddfaa79eab2eb533fc3d396d7947560",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P06",
+        "issue": 1008,
+        "pullRequest": 1112,
+        "evidence": "Added by feat(P06) da2314f, merged via PR #1112."
+      }
     },
     {
       "path": "tests/application-opacity-replay.test.cjs",
@@ -7456,7 +10381,14 @@
       "blob": "82d5806e75c87cf6637b6bbf79cfeb4e05220654",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P04",
+        "issue": 1006,
+        "pullRequest": 1086,
+        "evidence": "Added by feat(P04) 1ef8b6c, merged via PR #1086; capability descriptor v1 schema tests."
+      }
     },
     {
       "path": "tests/desktop/README.md",
@@ -7504,7 +10436,14 @@
       "blob": "e98867471483a863a6ccd31119b61513a9a51c0e",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "A01",
+        "issue": 1061,
+        "pullRequest": 1108,
+        "evidence": "Added by feat(A01) de130fa, merged via PR #1108."
+      }
     },
     {
       "path": "tests/domain-expression-time.test.cjs",
@@ -7512,7 +10451,14 @@
       "blob": "3f78c04f40a809e82bbb445d770ca03a9c375357",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P22",
+        "issue": 1024,
+        "pullRequest": 1107,
+        "evidence": "Added by feat(P22) 2f85439, merged via PR #1107."
+      }
     },
     {
       "path": "tests/domain-folder-codec.test.cjs",
@@ -7520,7 +10466,14 @@
       "blob": "246b45b636ec974ed57885830231887a5d3feb63",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P20",
+        "issue": 1022,
+        "pullRequest": 1109,
+        "evidence": "Added by refactor(P20) 1f7d4d2, merged via PR #1109."
+      }
     },
     {
       "path": "tests/domain-opacity.test.cjs",
@@ -7531,6 +10484,21 @@
         "C13.tooling.browser-and-app-test-suites"
       ],
       "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+    },
+    {
+      "path": "tests/domain-tween-assignment.test.cjs",
+      "mode": "100644",
+      "blob": "1ea29bbf1b7eee895d7646c599b88c72a2eb5e04",
+      "classification": "test",
+      "censusRefs": [],
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P23",
+        "issue": 1025,
+        "pullRequest": 1166,
+        "evidence": "Added by refactor(P23) 6db6546, merged via PR #1166."
+      }
     },
     {
       "path": "tests/duplicator-hue.test.cjs",
@@ -8155,7 +11123,7 @@
     {
       "path": "tests/nemo-boundaries.test.cjs",
       "mode": "100644",
-      "blob": "e940f10e0fd65fa8a955ece8db7341b0508d83d5",
+      "blob": "7cc61c4bf0e8b71e9f67690b54fa0eb0157eb77a",
       "classification": "test",
       "censusRefs": [
         "C13.tooling.nemo-tooling-test-suite"
@@ -8351,6 +11319,21 @@
         "C13.tooling.nemo-tooling-test-suite"
       ],
       "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+    },
+    {
+      "path": "tests/nemo-remediation-scope.test.cjs",
+      "mode": "100644",
+      "blob": "751f73cffed1dc71bd42c11b76a68b2c4135d316",
+      "classification": "test",
+      "censusRefs": [],
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P03A",
+        "issue": 1116,
+        "pullRequest": 1117,
+        "evidence": "Added by feat(P03A) dcda4d8, merged via PR #1117; checker regression suite."
+      }
     },
     {
       "path": "tests/nemo-third-party-notices.test.cjs",
