@@ -1,0 +1,708 @@
+{
+  "census_id": "C21l",
+  "issue": 1210,
+  "title": "app.js component creation — ensureSymbolPaperLayers, badComponentSourceReason, cloneRigForSymbol, exposeSymbolProperty, convertLayerToComponent/convertLayersToComponent, cross-project compositions",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf, twelfth app.js slice of the C21 series (after C21k/#1212). Owns app.js:3194-3556 only. Cited by name/line only, not re-mapped: getEffectiveStrokes and the module vars _symbolPaperLayers/_sceneSnapshot/_montageViewSnapshot (app.js:3192-3193, C21k), the rig model (ensureLayerRig/relinkRigBinds, C21h) and the rig deformer (applyRigDeform, C21i), mergeLayersIntoOne/splitLayerIntoElements(Core) (app.js:3557+, next slice C21m, not yet filed at authoring time), convertLayerToLFSGroup (app.js:4020+, later slice), enterSymbol/exitToScene (app.js:4151+, later slice), exportJSON's per-layer field list (timeline.js:2117, later slice), SM.t/i18n, and every external caller in select-bridge.js/motion.js/media-library.js/timeline.js/images.js.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "ab85947271a7724d4cde08e1ead0f93e2d812223",
+  "source_path": "src/js/app.js",
+  "source_blob": "0831959f70612721f80717812838d19940d1f7c1",
+  "source_line_count": 5410,
+  "scope_files": [
+    "src/js/app.js"
+  ],
+  "intended_branch": "claude/c21l-app-component-creation-census",
+  "assigned_ranges": [
+    {
+      "start": 3194,
+      "end": 3556
+    }
+  ],
+  "coverage_note": "Exactly 363 assigned lines partitioned across nine packets (one coverage_range per packet, no gaps, no other-owner overlap): 162 code, 201 full-line `//` comments, 0 blank — independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs, matching the issue's own proposed union and per-packet table exactly; no boundary correction needed. Line 3193 is C21k's own module-var declaration (`var _montageViewSnapshot=null; // enterMontageView/exitMontageView — see below`), out of coverage; line 3194 opens this scope's own `function ensureSymbolPaperLayers(symId){`. Line 3556 is this scope's own closing `}` of instantiateForeignProjectAsComponent; line 3557 opens the 'Release to Layers' lead-in comment for splitLayerIntoElements, C21m's own territory, confirmed by direct read.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js resolves to 0831959f70612721f80717812838d19940d1f7c1, 5410 lines.",
+    "current": "origin/main advanced to 4dcdb22 (C21k/#1212 merged) after this worktree's branch point; this worktree's own HEAD is ab85947271a7724d4cde08e1ead0f93e2d812223 (C21i/#1209 merged), per the task's own frozen-base instruction. `git rev-parse ab85947:src/js/app.js` == `git rev-parse 59a5a38c:src/js/app.js` == 0831959f70612721f80717812838d19940d1f7c1 (identical blob) — verified directly in the working worktree, HEAD matches, blob matches, working tree clean.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' 59a5a38c -- src` for each of this scope's eleven function symbols, filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`, then reading each surviving hit's line and enclosing function directly with `sed -n`. Two of the eleven symbols (exposeSymbolProperty, instantiateForeignProjectAsComponent) have real external callers this literal grep pattern MISSES because the call site accesses the function as a property (`window.SM.exposeSymbolProperty(...)`, `window.instantiateForeignProjectAsComponent(...)`) rather than as a bare identifier — found instead by a plain `grep -rn` for the symbol name across src/js/*.js and confirmed by direct read; recorded under `boundaries` as a correction to the issue's own suggested grep command.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; the in-source comments (badComponentSourceReason's own refusal-list rationale at 3203-3211, cloneRigForSymbol's whitelist rationale at 3223-3234/3238-3244, exposeSymbolProperty's own contract at 3247-3256, the window.SM attachment-timing comment at 3266-3270, convertLayerToComponent's groups/rig/componentFrame rationale at 3278-3312, convertLayersToComponent's guard-order note at 3328-3339, its combine-group-remap rationale at 3347-3355, its per-symLayer field-drop rationale at 3374-3380/3389-3398, its exportJSON-diffed field-transfer rationale at 3402-3413/3416-3420, its topmost-source-wins rationale at 3435-3441/3448-3451/3453-3457, and the cross-project design-decision block at 3471-3502) are read as authorial intent and prior-session evidence, not fresh execution evidence produced by this census."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C21l-app-component-creation.json and the nine app.js packets partitioning lines 3194-3556.",
+    "app_js": "app.js retains the whole runtime for these eleven symbols; this JSON authoring does not authorize source changes.",
+    "c21k_boundary": "Lines 3192-3193 (module vars) and getEffectiveStrokes (app.js:2882-3191, C21k, merged) are cited by name/line only. getEffectiveStrokes' own symbolId branch (reads sym.layers, sym.cameraKeys via SMCamera, ld.symMatrix, sym.exposedProps at 3152-3167) is THE consumer of every symbol-shape field this scope writes; none of its own body is reproduced here beyond the cited line numbers.",
+    "c21m_boundary": "Lines 3557+ (splitLayerIntoElements/splitLayerIntoElementsCore at 3583/3600, mergeLayersIntoOne at 3767, the next leaf C21m, not yet filed as an issue at authoring time) are cited by name/line only. mergeLayersIntoOne carries its OWN inline copy of badComponentSourceReason's exact eight-reason refusal list (app.js:3780-3787, identical strings and order, confirmed by direct read) rather than calling badComponentSourceReason itself — this scope's own lead-in comment at 3203-3211 calls this a mirror, and the read confirms it is a literal duplicate, not a shared call.",
+    "other_consumers_boundary": "select-bridge.js (the two 'Exposer...comme propriété de Component' context-menu items, :3270-3288), motion.js (propsFor's exposedProps branch, :179-181, and registerExposedPropMeta, :124), media-library.js (the Compositions-tab drop handler, :796), images.js (the video-import-to-component wrapper, :450), and timeline.js (the convertActiveLayerToComponent/convertComponentToLayer SM-literal entries, :1629-1633, the exportJSON rig-clean pass, :2095-2110, and the split/cut-layer rig carry-over, :1235-1243) retain their own bodies in full — cited by line only for the specific findings each packet's `callers` field needed."
+  },
+  "reconciliation": [
+    {
+      "owner": "C21k / #1212 (existing owner, merged on origin/main after this worktree's own base)",
+      "disposition": "Owns app.js:2882-3193 (getEffectiveStrokes and the module vars this scope's own ensureSymbolPaperLayers reads/writes into). getEffectiveStrokes' symbolId branch and exposedProps block are this scope's own primary reader; recorded here by line only, no body reproduced. This scope's own boundary begins at line 3194, immediately after C21k's module-var declarations."
+    },
+    {
+      "owner": "C21m (next leaf, splitLayerIntoElements(Core)/mergeLayersIntoOne, not yet filed as an issue at authoring time)",
+      "disposition": "Owns app.js:3557+. mergeLayersIntoOne (app.js:3767) carries an inline duplicate of badComponentSourceReason's own eight-reason refusal list (3780-3787) rather than calling it — confirmed call-graph-disjoint from this scope's own symbols in both directions by whole-range grep. This scope's own boundary ends at line 3556, instantiateForeignProjectAsComponent's own closing brace."
+    },
+    {
+      "owner": "select-bridge.js (existing owner, the shape right-click context menu)",
+      "disposition": "Retains its own body in full — cited by line only. The complete external caller of exposeSymbolProperty: :3277 (exposes fillColor's own `opacity` field as a Motion property, defaultVal = the shape's current opacity×100) and :3286 (exposes the `__visible` sentinel, defaultVal=100/visible). Both reached only while `state.activeSymbolId` is set (editing inside a symbol) and `p0.data.strokeId` exists on a single selected item; both call through `window.SM.exposeSymbolProperty`, the timeline.js-attached copy (see `boundaries`), not a bare call — MISSED by the issue's own suggested literal grep pattern."
+    },
+    {
+      "owner": "motion.js (existing owner, propsFor/registerExposedPropMeta)",
+      "disposition": "Retains its own body in full — cited by line/name only. propsFor (:176-182) is the sole reader of `state.symbols[holder.symbolId].exposedProps` outside app.js itself, concatenating each entry's `.key` onto the instance's own Motion property list and re-registering its display metadata (label/default) via registerExposedPropMeta (:124) every call — the same idempotent-re-registration pattern getEffectiveStrokes' own exposedProps block (app.js:3153, C21k) already uses."
+    },
+    {
+      "owner": "media-library.js (existing owner, the Compositions folder-group drop handler)",
+      "disposition": "Retains its own body in full — cited by line only. `window.instantiateForeignProjectAsComponent(foreignData, tab.name||'Untitled')` (:796) is the SOLE external caller of instantiateForeignProjectAsComponent — reached as a `window.`-qualified property access, not a bare call, so it is MISSED by the issue's own suggested grep pattern `(^|[^a-zA-Z_.])name\\(`; found instead by a plain-text grep across src/js and confirmed by direct read (see `boundaries`)."
+    },
+    {
+      "owner": "images.js (existing owner, the video-frame-sequence import path) and timeline.js (existing owner, the layer-context-menu Convert-to-Component action and exportJSON's rig-clean pass)",
+      "disposition": "Retain their own bodies in full — cited by line only. convertLayerToComponent's three external callers: images.js:450 (wraps a freshly-imported video-frame layer as a component immediately after its raster finishes decoding, so the whole clip becomes one uniformly transformable object) and timeline.js:1631 (`SM.convertActiveLayerToComponent`'s single-layer branch). convertLayersToComponent's sole external caller: timeline.js:1630 (the same SM-literal entry's multi-selection branch, `if(_layerSel.length>1)`). cloneRigForSymbol's two external callers: timeline.js:1243 (a layer-split/cut helper that carries a rig across the cut) and timeline.js:2107 (exportJSON's own pre-serialize rig-clean pass over every symLayer that still carries a rig) — both reached via a `window.cloneRigForSymbol` existence guard followed by a bare call, matched correctly by the issue's own grep pattern."
+    }
+  ],
+  "boundaries": [
+    "badComponentSourceReason's refusal list (3212-3221: symbolId, lfsGroup, montageId, nativeVideo, isNullLayer, isEffectLayer, isGuideLayer, isWidgetLayer — 8 checks) is MISSING `isEffectorLayer`, even though getEffectiveStrokes' own equivalent early-return (app.js:2973, C21k, cited by line only: `if(ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer||ld.isEffectorLayer)return[];`) treats `isEffectorLayer` IDENTICALLY to the four sibling flags that ARE refused here — all five mean 'no real strokes to speak of'. Confirmed NOT a redundant case (unlike a folder layer, which timeline.js:1011 always sets `isNullLayer=true` alongside `isFolderLayer=true`, so folder layers are already caught via isNullLayer): timeline.js:2452 sets `isEffectorLayer=true` standalone, with no accompanying isNullLayer. An effector layer converted via convertLayerToComponent/convertLayersToComponent would silently pass the guard and get its (contentless) `.frames` cloned into a symLayer — the exact 'silently drop what it actually stands for' failure mode this function's own header comment (3203-3211) was written to prevent for the eight refused kinds. Not fixed here (census scope only); flagged for the next behavioral pass.",
+    "Every LIVE write into `state.symbols`: convertLayerToComponent (3295, `state.symbols[symId]={name,totalFrames,fps,layers:[symLayer]}`), convertLayersToComponent (3428, `state.symbols[symId]={name:'Composant',totalFrames,fps,layers:symLayers}`), importForeignSymbolTree (3511, `state.symbols[newId]={name,totalFrames,fps,layers:clonedLayers}`, one call per foreign symbol node in the tree, recursive), createComponentFromForeignProject (3527, `state.symbols[symId]={name,totalFrames,fps,layers:clonedLayers}` for the foreign project's OWN root). exposeSymbolProperty mutates an EXISTING entry only (`sym.exposedProps.push(entry)`, 3262) and never creates one.",
+    "Every LIVE write into `state.layers`/`userLayers` (the INSTANCE side): convertLayerToComponent mutates `ld` IN PLACE (no splice) — `ld.symbolId=symId;ld.locked=true;ld.symPlayMode='once';ld.symSpeed=1;ld.symPlacedAt=0;ld.symSingleFrame=0` (3302), then `ld.frames=[]` followed by a fresh all-empty/keyframe-0 array (3313); `delete ld.rig` (3294) beforehand. convertLayersToComponent removes every selected source (`state.layers.splice(indices[k],1);userLayers.splice(indices[k],1)`, descending k, 3432) THEN inserts one brand-new `newLd`/`newUl` at `insertAt=indices[0]` (3463-3464): `newLd={name:'Composant',symbolId:symId,locked:true,visible:true,symPlayMode:'once',symSpeed:1,symPlacedAt:0,symSingleFrame:0,frames:[],groups:...}` (3433-3434), then the firstSrc field-lift block (3442-3460, see below). placeComponentInstance creates a fresh layer via `createUserLayer(layerName)` (app.js:377, out of scope, cited by name only) and stamps the SAME six instance fields (`symbolId,locked,symPlayMode,symSpeed,symPlacedAt,symSingleFrame`, 3539) with no `symMatrix` (left unset = identity placement, per its own lead-in comment 3530-3531) and no rig/frames work (createUserLayer's own frames are already correctly-sized and empty).",
+    "NO componentFrame stamp is ever written by any of the three instance-creating paths (convertLayerToComponent 3302, convertLayersToComponent 3433, placeComponentInstance 3539) — each one's own comment (3303-3312 is the fullest) explains why: resolveSymbolFrameIdx (app.js:3557+ vicinity, cited by name only) checks an explicit componentFrame BEFORE symPlayMode, so stamping frame 0 on a freshly-created instance would pin it there for the whole timeline and defeat the just-set `symPlayMode:'once'` — a previously-shipped bug (2026-07-28) this scope's own comment documents as already fixed.",
+    "The guard-order fix at 3328-3339 (convertLayersToComponent): documents that the pre-filter at 3327 (`indices=...filter(function(i){return !!state.layers[i];})`) USED TO also silently drop already-`symbolId` layers as part of the SAME filter, BEFORE the type-guard loop (3340-3343, calling badComponentSourceReason per index) ever ran — so badComponentSourceReason's own 'un composant' refusal toast was unreachable for that specific case, and a selection of [instance, plain layer] silently produced a one-layer component with the instance discarded and no toast (measured live per the comment, 2 selected → 1 inside, no toast). Fixed by narrowing the filter to existence-only (3327) and running the full type-guard loop (3340-3343) AFTER it, over the still-symbolId-inclusive set.",
+    "The COMPLETE per-symLayer field-transfer field list in the 3402-3470 tail (the IIFE at 3414-3427, run once per symLayer `sl`/source `src` pair, k=index): deep-cloned when `src[f]!=null&&sl[f]==null&&!skip(f)` (3424) — effects, pathFx, blendKeys, parentKeys, parentsMore, expressions, exprControls, timeLink, markers, followPath, textAnimators, shapeNames (12 fields); primitive-copied under the same guard (3425) — layerUid, parentLayerUid, parentLayerUidB, matteSourceLayerUid, inPoint, outPoint, threeD, motionBlur, shy, keyLock, channel, isTextLayer, color, effectsFrom (14 fields). `skip(f)` (3423) is true only for symLayer k===0 (the topmost/first selected source) AND only for the 10 fields in `lifted` (3420: duplicator, exprControls, expressions, inPoint, outPoint, motionBlur, parentLayerUid, parentLayerUidB, threeD, timeLink) — of these, 9 actually intersect one of the two field lists above (duplicator intersects neither list, so its own `lifted` membership is a no-op inside the IIFE; it is dropped from every inner symLayer regardless of k, consistent with duplicator being outer-instance-only). For symLayer k>=1 (non-topmost sources), these same 9 fields ARE copied onto that source's OWN inner symLayer if present — i.e. only the TOPMOST selected source's matching fields get promoted to the outer instance; every other selected source's own copies of the same fields land on ITS OWN symLayer instead, neither lost nor double-applied.",
+    "Fields set on every symLayer OUTSIDE the IIFE, in the `.map()` builder itself (3357-3400), unconditionally: name, visible, locked(=false), frames (deep clone), motion/motionStatic/elementMotion (deep clone if present), groups (remapped clone, see below), rig (via cloneRigForSymbol, then deleted from src), matteMode, blendMode, mattesMore (uid/mode pairs only, per-entry).",
+    "`lipSync` (a real per-layer field — set by lipsync.js:46-48, read back by timeline.js:2540 and included in exportJSON's own complete per-layer field list, timeline.js:2117) is ABSENT from BOTH forEach field lists (3424/3425) and from the `.map()` builder (3357-3400) — silently dropped by convertLayersToComponent for every selected source, unlike the sibling layer-split helper (timeline.js:1235's own field list, which explicitly includes 'lipSync' alongside 'blendKeys'/'expressions'/etc.). Not fixed here; the complete per-layer field-list comparison this scope's own lead-in comment (3402-3413) already performed against exportJSON evidently did not include this field. convertLayerToComponent has no equivalent gap for `lipSync` (or any other ld-level field) since the original `ld` object is reused in place as the outer instance — its own `.lipSync` (if any) simply stays on it untouched; only frames/groups/rig are physically relocated into the new symLayer (3284-3294).",
+    "\"Topmost source wins\" precedence, the newLd (outer instance) field-lift block (3442-3460), all reading `firstSrc=state.layers[indices[0]]` captured at 3431 BEFORE the splice-out loop (3432) removes it from state.layers: inPoint/outPoint (3442-3443, `!=null` guard), timeLink (3444, deep clone), parentLayerUid/parentLayerUidB (3445-3446), expressions (3447, deep clone), exprControls (3452, deep clone, guarded additionally on `.length`), threeD/motionBlur (3458-3459, boolean-coerced via truthy-guard-then-`=true`, never explicitly reset to false/omitted), duplicator (3460, deep clone). Exactly the 10 fields named in `lifted` (3420) land here and ONLY here for symLayer k=0's own matching values — every other selected source's copy of the same 10 fields (if any) is preserved on ITS OWN inner symLayer per the previous finding, not discarded and not promoted.",
+    "`exposeSymbolProperty`'s written entry shape (3261): `{key,label,targetStrokeId,targetField,default}` — `key` is minted here (`'ep_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6)`, 3260), not caller-supplied. Pushed onto `sym.exposedProps` (3259/3262, lazily initialized array). Readers: getEffectiveStrokes' own exposedProps block (app.js:3152-3167, C21k, cited by line only) — the SOLE evaluator of `targetField`, resolving `SMMotion.valueAtFrame(ld,ep.key,frameIdx)` per instance per frame, treating the `'__visible'` sentinel as 'drop this stroke from the output entirely when val<50' (never writing it onto the stroke dict) and every OTHER targetField as a real serialized-stroke-dict field to overwrite (opacity divided by 100 and clamped to [0,1]; anything else written verbatim) — and motion.js's propsFor (:179-182), which lists every `ep.key` as an ordinary keyable Motion property on any holder whose `.symbolId` resolves to this symbol, re-registering display metadata (label/default) via registerExposedPropMeta every call rather than once at exposure time (matching this function's own idempotent-registration call at 3263).",
+    "`instantiateForeignProjectAsComponent` and `createComponentFromForeignProject`/`importForeignSymbolTree` have NO try/catch anywhere in this scope, and NEITHER `pushUndoLayers` (tweens.js:4896, cited by name only) NOR its own snapshot builder `layersSnapshotNow` (tweens.js:4845, cited by line only, confirmed by direct read) ever serializes `state.symbols` — only `state.layers`, `cameraKeys`, `imageMeshes`, folder/link-group metadata, `motionArcs`, `tweenEasing`, `tweenOverrides` are captured, and `restoreLayersSnapshot` (tweens.js:4915, cited by line only) never touches `state.symbols` either. Consequence, confirmed by reading both functions directly rather than assumed: `pushUndo(true)` at 3550 (called BEFORE any state.symbols mutation) means an undo AFTER instantiateForeignProjectAsComponent restores `state.layers` (removing the newly-placed instance layer) but leaves EVERY `state.symbols` entry this call tree created — the top-level component from createComponentFromForeignProject (3527) plus one entry per nested foreign component recursively deep-copied by importForeignSymbolTree (3511) — as permanent orphans, unreferenced by any instance and never cleaned up. The identical orphan risk applies to convertLayerToComponent/convertLayersToComponent's own state.symbols writes (3295/3428) for the same reason (no state.symbols coverage in the undo snapshot at all), not specific to the foreign-import path or to a thrown exception — 'partial failure' and 'ordinary undo after success' land in the exact same orphaned-symbol state, since nothing here ever removes a `state.symbols[id]` entry once created.",
+    "`importForeignSymbolTree`'s idMap remaps ONLY symbol ids (`foreignSymId -> newId`, stamped at 3508 before recursing, to guard the shouldn't-happen cyclic case) — every `l.symbolId` inside a cloned layer is rewritten through it (3510/3526), but `layerUid`, `parentLayerUid`/`parentLayerUidB`, every `strokeId` inside `l.frames[*].strokes[*]`, `groups` keys, and `matteSourceLayerUid` are copied VERBATIM from the foreign project's JSON (plain `JSON.parse(JSON.stringify(...))`, 3509/3525) with no remap at all. The comment at 3498-3502 only claims the SYMBOL-id collision is impossible ('both projects mint ids from the same genSymbolId() scheme') — genSymbolId (3202) mints from `Date.now()+Math.random()`, and layerUid/strokeId are minted by other, unexamined generators (out of scope) that are not shown to share this same collision-avoidance property; a raw id collision on any of the un-remapped fields between the importing project and the foreign one is not ruled out by anything in this scope.",
+    "`_symbolPaperLayers` (module var, declared app.js:3192, C21k) is read-then-lazily-populated by ONE function in this scope, ensureSymbolPaperLayers (3195 read/early-return, 3196-3200 populate, 3201 write back to `_symbolPaperLayers[symId]`) — its own body creates one real `new Layer(...)` per symbol sub-layer (3198, `insertBelow(arcLayer)`, initially `.visible=false`), inserted into the live Paper.js document immediately (not a throwaway/uninserted query object, unlike C21i's own `boneCache` temp paths). No other function in this scope reads or writes `_symbolPaperLayers`; its own sole external caller is enterSymbol (app.js:4182, cited by line only, later slice), which flips the returned layers' visibility/opacity on when entering the symbol.",
+    "Call order inside every one of the three top-level entry points (convertLayerToComponent 3276/3314, convertLayersToComponent 3345/3468, instantiateForeignProjectAsComponent 3550/3554) is IDENTICAL and appears exactly once per function, at the very start and very end: `saveAllLayerFrames();pushUndo(true);` first (before any state.symbols/state.layers mutation — `pushUndo(true)`'s own `true` argument is `pushUndoLayers`'s `alreadySaved` parameter, tweens.js:4896, cited by line only, skipping its own internal saveAllLayerFrames call since the caller already made one explicitly, avoiding a double save), then `loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();` last, immediately before the function's own showToast call. NONE of the three calls `SMEngineBridge.renderNow()` or `renderTimeline()` directly in this scope — both are presumed reached indirectly through `updateUI()` (timeline.js, cited by name only), not reproduced here. `SMStoryboard.addInstanceAuto(symId)` (cited by name only) is called once per entry point, keyed by `symId` alone (not by instance), at a point where the NEW component exists in `state.symbols` but the corresponding INSTANCE may not yet exist in `state.layers`/have its `symbolId` stamped yet: convertLayerToComponent calls it at 3296, one line after the state.symbols write (3295) and BEFORE `ld.symbolId=symId` is set (3302); convertLayersToComponent calls it at 3429, right after the state.symbols write (3428) and BEFORE the source splice-out (3432)/newLd creation (3463); instantiateForeignProjectAsComponent calls it at 3552, after createComponentFromForeignProject (3551) returns symId and BEFORE placeComponentInstance (3553) creates the instance layer."
+  ],
+  "areas": [
+    {
+      "area": "ensure-symbol-paper-layers-gen-id",
+      "packets": [
+        {
+          "id": "C21l.ensure-symbol-paper-layers-gen-id",
+          "files": [
+            "src/js/app.js:3194-3202"
+          ],
+          "coverage_ranges": [
+            [
+              3194,
+              3202
+            ]
+          ],
+          "classification": {
+            "code": 9,
+            "comment": 0,
+            "whitespace": 0
+          },
+          "symbols": [
+            "ensureSymbolPaperLayers",
+            "genSymbolId"
+          ],
+          "signature": "function ensureSymbolPaperLayers(symId){if(_symbolPaperLayers[symId])return _symbolPaperLayers[symId];var sym=state.symbols[symId];var arr=[];arcLayer.activate();sym.layers.forEach(function(ld,idx){var l=new Layer({name:'sym-'+symId+'-'+idx});l.insertBelow(arcLayer);l.visible=false;arr.push(l);});_symbolPaperLayers[symId]=arr;return arr;} function genSymbolId(){return 'sym_'+Date.now()+'_'+Math.floor(Math.random()*10000);}",
+          "responsibility": "No lead-in comment (0 comment lines). `ensureSymbolPaperLayers(symId)` (3194-3201): memoized lazy builder — returns the cached array immediately if `_symbolPaperLayers[symId]` already exists (3195); otherwise activates `arcLayer` (3197, so every `new Layer` below is created inside the same Paper.js project context) and creates ONE real, INSERTED `paper.Layer` per entry in `sym.layers` (3198, named `'sym-'+symId+'-'+idx`, `insertBelow(arcLayer)`, initially `visible=false`) — these are the actual live Paper.js layers a symbol's own content gets drawn into once entered, not throwaway query objects. Caches and returns the array (3200-3201). `genSymbolId()` (3202): one-line id minter, `'sym_'+Date.now()+'_'+Math.floor(Math.random()*10000)`.",
+          "callers": [
+            "app.js:4182 — enterSymbol (this file, later slice, cited by line only): `var symPaperLayers=ensureSymbolPaperLayers(symId);` immediately followed by `symPaperLayers.forEach(function(l){l.visible=true;l.opacity=1;});` — the visibility flip that actually shows the symbol's own layers once inside it.",
+            "app.js:3277 — convertLayerToComponent (this scope, packet 5): `var symId=genSymbolId();` before building the new symbol.",
+            "app.js:3346 — convertLayersToComponent (this scope, packet 6): same pattern.",
+            "app.js:3507 — importForeignSymbolTree (this scope, packet 8): mints the LOCAL id for a remapped foreign symbol.",
+            "app.js:3524 — createComponentFromForeignProject (this scope, packet 9): mints the id for the foreign project's own root component.",
+            "app.js:4026 — convertLayerToLFSGroup (this file, later slice, cited by line only): mints three ids, one per Ligne/Plein/Ombre sub-symbol."
+          ],
+          "behavior": [
+            "Lines 3194-3195 (code): function open, memoized-cache early return.",
+            "Line 3196 (code): resolve `sym`/init `arr`.",
+            "Line 3197 (code): `arcLayer.activate()`.",
+            "Line 3198 (code): per-sub-layer `new Layer(...)`, insertBelow, visible=false, push.",
+            "Lines 3199-3201 (code): forEach close, cache write, return.",
+            "Line 3202 (code): `genSymbolId` — one-line id minter, own function statement."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "bad-component-source-reason",
+      "packets": [
+        {
+          "id": "C21l.bad-component-source-reason",
+          "files": [
+            "src/js/app.js:3203-3222"
+          ],
+          "coverage_ranges": [
+            [
+              3203,
+              3222
+            ]
+          ],
+          "classification": {
+            "code": 11,
+            "comment": 9,
+            "whitespace": 0
+          },
+          "symbols": [
+            "badComponentSourceReason"
+          ],
+          "signature": "function badComponentSourceReason(l){if(l.symbolId)return'un composant';if(l.lfsGroup)return'un groupe Ligne/Plein/Ombre';if(l.montageId)return'un calque de montage StoryBoard';if(l.nativeVideo)return'un calque vidéo';if(l.isNullLayer)return'un calque Null';if(l.isEffectLayer)return'un calque d\\'effet';if(l.isGuideLayer)return'un calque Guide';if(l.isWidgetLayer)return'un calque Widget';return null;}",
+          "responsibility": "Lead-in (3203-3211, 9 comment lines): states the refusal rationale up front — a source whose 'content' isn't the plain `.frames` array a symLayer clone captures would either silently drop what it actually stands for (a montage's StoryBoard graph, a native video's decode source) or double-wrap something already symbol-shaped; missing entirely before the 2026-07-30 fix this comment documents, unlike every sibling structural op (mergeLayersIntoOne already had its own such guard). `badComponentSourceReason(l)` (3212-3221): eight sequential checks in a fixed if-return chain, first match wins, each returning a French user-facing noun phrase: `l.symbolId` → 'un composant' (3213), `l.lfsGroup` → 'un groupe Ligne/Plein/Ombre' (3214), `l.montageId` → 'un calque de montage StoryBoard' (3215), `l.nativeVideo` → 'un calque vidéo' (3216), `l.isNullLayer` → 'un calque Null' (3217), `l.isEffectLayer` → \"un calque d'effet\" (3218), `l.isGuideLayer` → 'un calque Guide' (3219), `l.isWidgetLayer` → 'un calque Widget' (3220); falls through to `return null` (3221, meaning 'this source is acceptable') if none match. See `boundaries` for the confirmed gap: `isEffectorLayer` is not checked, unlike its treatment in getEffectiveStrokes' own equivalent guard.",
+          "callers": [
+            "app.js:3274 — convertLayerToComponent (this scope, packet 5): single-source guard, `var bad=badComponentSourceReason(ld);if(bad){showToast('Impossible de convertir : '+bad);return;}`.",
+            "app.js:3341 — convertLayersToComponent (this scope, packet 6): per-index guard inside the type-guard loop (3340-3343), `var badReason=badComponentSourceReason(state.layers[indices[bi]]);if(badReason){showToast(...+badReason);return;}` — run AFTER the guard-order fix moved it past the existence-only pre-filter (see `boundaries`)."
+          ],
+          "behavior": [
+            "Lines 3203-3211 (comment, 9 lines): refusal-list rationale, mirrors mergeLayersIntoOne (cited by line only, C21m).",
+            "Line 3212 (code): function open.",
+            "Lines 3213-3220 (code, 8 lines): the eight sequential type checks, one return each.",
+            "Line 3221 (code): fallthrough `return null`.",
+            "Line 3222 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "clone-rig-for-symbol",
+      "packets": [
+        {
+          "id": "C21l.clone-rig-for-symbol",
+          "files": [
+            "src/js/app.js:3223-3246"
+          ],
+          "coverage_ranges": [
+            [
+              3223,
+              3246
+            ]
+          ],
+          "classification": {
+            "code": 5,
+            "comment": 19,
+            "whitespace": 0
+          },
+          "symbols": [
+            "cloneRigForSymbol"
+          ],
+          "signature": "function cloneRigForSymbol(rig){if(!rig)return undefined;return{bones:rig.bones,ikChains:rig.ikChains,nextId:rig.nextId,binds:(rig.binds||[]).map(function(b){return{strokeId:b.strokeId,meshId:b.meshId,rest:b.rest,restHandles:b.restHandles,weights:b.weights,rotate:b.rotate};})};}",
+          "responsibility": "Lead-in (3223-3234, 12 comment lines): states the whitelist-clone rationale — drops `binds[i]._live` (the live Paper.js Path reference relinkRigBinds, C21h, rebuilds after every loadFrame), same shape as exportJSON's own identical clone (timeline.js), found missing entirely by live testing (2026-07-30): rigging a shape then converting to Component silently dropped every bone/bind/IK chain, leaving the symbol's inner layer with `rig:undefined` while the outer instance kept orphaned rig data on a locked, content-wiped layer. `cloneRigForSymbol(rig)` (3235-3246): returns `undefined` on a falsy `rig` (3236, so a caller doing `rig:cloneRigForSymbol(ld.rig)` on a rig-less layer gets a clean `undefined` field rather than an object). Otherwise returns a NEW object sharing `bones`/`ikChains`/`nextId` BY REFERENCE (3237, NOT deep-cloned — the bone-pose/IK-chain data itself is plain JSON with no live references, so a shallow share is sufficient here; contrast with `binds`, which DOES need per-entry reconstruction to drop `_live`). `binds` (3245, preceded by its own 7-line comment at 3238-3244 about `restHandles`, a 2026-09 QA-sweep addition — dropped by an EARLIER version of this whitelist, silently disabling the immutable rest-tangent handle rotation applyRigDeform performs) is rebuilt via `.map()`, one whitelisted object per bind: `{strokeId,meshId,rest,restHandles,weights,rotate}` — six fields, explicitly excluding `_live`/`_liveRaster` (C21h/C21i's own runtime-only fields) and any other field a bind object might carry.",
+          "callers": [
+            "app.js:3285 — convertLayerToComponent (this scope, packet 5): `rig:cloneRigForSymbol(ld.rig)` while building the new symLayer, immediately before `delete ld.rig` (3294) removes the original.",
+            "app.js:3381 — convertLayersToComponent (this scope, packet 6): `var rigClone=cloneRigForSymbol(src.rig);delete src.rig;` per selected source inside the `.map()` builder.",
+            "timeline.js:1243 — a layer-split/cut helper (existing owner, cited by line only): `if(ld.rig&&window.cloneRigForSymbol)dst.rig=cloneRigForSymbol(ld.rig);` — carries a rig across a cut so the second half of a split rigged character keeps its skeleton (2026-09 sweep fix, per its own comment).",
+            "timeline.js:2107 — exportJSON's own pre-serialize rig-clean pass (existing owner, cited by line only): `return sl.rig?Object.assign({},sl,{rig:cloneRigForSymbol(sl.rig)}):sl;` over every symLayer of every symbol whose layers carry a rig, immediately before `JSON.stringify` — the same reasoning this function's own lead-in comment already names ('same cloneRigForSymbol used when a rig first moves into a symLayer')."
+          ],
+          "behavior": [
+            "Lines 3223-3234 (comment, 12 lines): whitelist-clone rationale, the 2026-07-30 dropped-rig bug this function fixes.",
+            "Line 3235 (code): function open.",
+            "Line 3236 (code): falsy-rig guard, return undefined.",
+            "Line 3237 (code): return-object open, bones/ikChains/nextId shared by reference.",
+            "Lines 3238-3244 (comment, 7 lines): restHandles rationale, the 2026-09 QA-sweep addition.",
+            "Line 3245 (code): binds rebuilt via `.map()`, six-field whitelist per entry.",
+            "Line 3246 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "expose-symbol-property",
+      "packets": [
+        {
+          "id": "C21l.expose-symbol-property",
+          "files": [
+            "src/js/app.js:3247-3265"
+          ],
+          "coverage_ranges": [
+            [
+              3247,
+              3265
+            ]
+          ],
+          "classification": {
+            "code": 9,
+            "comment": 10,
+            "whitespace": 0
+          },
+          "symbols": [
+            "exposeSymbolProperty"
+          ],
+          "signature": "function exposeSymbolProperty(symId,targetStrokeId,targetField,label,defaultVal){var sym=state.symbols[symId];if(!sym)return null;if(!sym.exposedProps)sym.exposedProps=[];var key='ep_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);var entry={key:key,label:label,targetStrokeId:targetStrokeId,targetField:targetField,default:defaultVal};sym.exposedProps.push(entry);if(window.SMMotion&&SMMotion.registerExposedPropMeta)SMMotion.registerExposedPropMeta(key,label,defaultVal);return entry;}",
+          "responsibility": "Lead-in (3247-3256, 10 comment lines): states the Component-exposed-property contract (2026-08-18) — declares a property on the SYMBOL (`state.symbols[symId].exposedProps`), bound to one stroke inside it by its stable `strokeId`; every instance then gets it as an ordinary Motion property via propsFor (motion.js), which registers display metadata there rather than here, so a project reload rehydrates it the first time propsFor runs. `targetField` is a real serialized-stroke-dict field name EXCEPT the `'__visible'` sentinel, which getEffectiveStrokes (C21k) reads as 'drop this stroke from the instance's output entirely'. `exposeSymbolProperty(symId,targetStrokeId,targetField,label,defaultVal)` (3257-3264): resolves `sym`, returns `null` if the symId doesn't resolve (3258); lazily initializes `sym.exposedProps` (3259); mints a fresh `key` (`'ep_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6)`, 3260 — caller never supplies one); builds and pushes `entry={key,label,targetStrokeId,targetField,default:defaultVal}` (3261-3262); if `window.SMMotion` exists, immediately registers the new key's display metadata via `SMMotion.registerExposedPropMeta` (3263, the same call getEffectiveStrokes' own exposedProps block, C21k, repeats every frame — idempotent by design); returns the new `entry` (3264).",
+          "callers": [
+            "select-bridge.js:3277 — the shape context-menu's 'Exposer l'opacité...' action (existing owner, cited by line only): `window.SM.exposeSymbolProperty(state.activeSymbolId,p0.data.strokeId,'opacity',label,Math.round((p0.opacity!==undefined?p0.opacity:1)*100))`.",
+            "select-bridge.js:3286 — the same menu's 'Exposer la visibilité...' action (existing owner, cited by line only): `window.SM.exposeSymbolProperty(state.activeSymbolId,p0.data.strokeId,'__visible',label,100)`.",
+            "Both call sites reach this function ONLY through `window.SM.exposeSymbolProperty` (the timeline.js-attached copy, see this scope's own next packet's lead-in comment) — a `.`-qualified property access that the issue's own suggested literal grep pattern `(^|[^a-zA-Z_.])name\\(` does not match; confirmed instead by a plain-text grep and direct read (see `boundaries`)."
+          ],
+          "behavior": [
+            "Lines 3247-3256 (comment, 10 lines): the exposed-property contract — declared on the symbol, read as an ordinary Motion prop per instance, `__visible` sentinel carve-out.",
+            "Line 3257 (code): function open.",
+            "Line 3258 (code): resolve sym, null guard.",
+            "Line 3259 (code): lazy-init `sym.exposedProps`.",
+            "Line 3260 (code): mint `key`.",
+            "Line 3261 (code): build `entry`.",
+            "Line 3262 (code): push onto `sym.exposedProps`.",
+            "Line 3263 (code): conditional `registerExposedPropMeta` call.",
+            "Line 3264 (code): return entry.",
+            "Line 3265 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "convert-layer-to-component",
+      "packets": [
+        {
+          "id": "C21l.convert-layer-to-component",
+          "files": [
+            "src/js/app.js:3266-3316"
+          ],
+          "coverage_ranges": [
+            [
+              3266,
+              3316
+            ]
+          ],
+          "classification": {
+            "code": 17,
+            "comment": 34,
+            "whitespace": 0
+          },
+          "symbols": [
+            "convertLayerToComponent"
+          ],
+          "signature": "function convertLayerToComponent(layerIdx){if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}var ld=state.layers[layerIdx];if(!ld){showToast(SM.t('labsToastLayerInvalid'));return;}var bad=badComponentSourceReason(ld);if(bad){showToast('Impossible de convertir : '+bad);return;}saveAllLayerFrames();pushUndo(true);var symId=genSymbolId();var symLayer={name:'Layer 1',visible:true,locked:false,frames:JSON.parse(JSON.stringify(ld.frames)),groups:ld.groups?JSON.parse(JSON.stringify(ld.groups)):undefined,rig:cloneRigForSymbol(ld.rig)};delete ld.rig;state.symbols[symId]={name:ld.name+' (Comp)',totalFrames:state.totalFrames,fps:state.fps,layers:[symLayer]};if(window.SMStoryboard)SMStoryboard.addInstanceAuto(symId);ld.symbolId=symId;ld.locked=true;ld.symPlayMode='once';ld.symSpeed=1;ld.symPlacedAt=0;ld.symSingleFrame=0;ld.frames=[];for(var i=0;i<state.totalFrames;i++)ld.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();showToast(SM.t('toastComponentCreated')+state.symbols[symId].name);}",
+          "responsibility": "Lead-in (3266-3270, 5 comment lines): explains why this function is NOT attached to `window.SM` here — timeline.js's own `window.SM={...}` literal (loaded after app.js) wipes anything attached earlier; registered in that literal instead. `convertLayerToComponent(layerIdx)` (3271-3316): guards on already-editing-a-symbol (toast+return, 3272), invalid `layerIdx` (toast+return, 3273), and `badComponentSourceReason` (toast+return, 3274-3275). `saveAllLayerFrames();pushUndo(true);` (3276). Mints `symId` (3277). Builds `symLayer` (3284-3285, preceded by its own 6-line groups-preservation comment at 3278-3283 about the combine-group regression this fixed): `name:'Layer 1'`, `visible:true`, `locked:false`, a DEEP CLONE of `ld.frames`, a deep clone of `ld.groups` if present, and `rig:cloneRigForSymbol(ld.rig)`. `delete ld.rig` (3294, preceded by its own 9-line comment at 3286-3293 distinguishing this from `ld.motion`, deliberately KEPT — CLAUDE.md §8's own single-layer-conversion convention: `ld` stays the instance and its motion IS the instance's own transform, but a rig has no equivalent instance-level meaning once its bound strokes move into the symLayer). Writes `state.symbols[symId]` (3295, `name:ld.name+' (Comp)'`, current `totalFrames`/`fps`, `layers:[symLayer]`). Conditionally calls `SMStoryboard.addInstanceAuto(symId)` (3296). Stamps `ld` as the instance in place (3302, preceded by its own 5-line 'once'-default-rationale comment at 3297-3301): `symbolId,locked:true,symPlayMode:'once',symSpeed:1,symPlacedAt:0,symSingleFrame:0`. Wipes `ld.frames` to an all-empty/keyframe-0-only array sized to `state.totalFrames` (3313, preceded by its own 10-line no-componentFrame-stamp rationale at 3303-3312 — the 2026-07-28 'ne lit pas toutes les frames' bug this documents fixing). Closes with `loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();` (3314) and a success toast naming the new symbol (3315).",
+          "callers": [
+            "images.js:450 — the video-frame-sequence import wrapper (existing owner, cited by line only): `convertLayerToComponent(idx);`, called only AFTER the freshly-created layer's raster has been awaited to finish decoding (its own comment explains why: saveAllLayerFrames inside this function would otherwise serialize a still-unsized 0x0 raster).",
+            "timeline.js:1631 — `SM.convertActiveLayerToComponent`'s single-selection branch (existing owner, cited by line only): `else convertLayerToComponent(state.activeLayerIdx);`.",
+            "app.js:3344 — convertLayersToComponent (this scope, packet 6), its own `indices.length<2` fallback: `convertLayerToComponent(indices[0]!==undefined?indices[0]:state.activeLayerIdx);return;`."
+          ],
+          "behavior": [
+            "Lines 3266-3270 (comment, 5 lines): window.SM attachment-timing note.",
+            "Line 3271 (code): function open.",
+            "Line 3272 (code): active-symbol guard.",
+            "Line 3273 (code): invalid-layerIdx guard.",
+            "Lines 3274-3275 (code): badComponentSourceReason guard.",
+            "Line 3276 (code): saveAllLayerFrames + pushUndo(true).",
+            "Line 3277 (code): mint symId.",
+            "Lines 3278-3283 (comment, 6 lines): groups-preservation rationale.",
+            "Lines 3284-3285 (code): build symLayer.",
+            "Lines 3286-3293 (comment, 8 lines): rig delete-not-keep rationale, CLAUDE.md §8 distinction.",
+            "Line 3294 (code): delete ld.rig.",
+            "Line 3295 (code): write state.symbols[symId].",
+            "Line 3296 (code): conditional SMStoryboard.addInstanceAuto.",
+            "Lines 3297-3301 (comment, 5 lines): 'once' play-mode default rationale.",
+            "Line 3302 (code): stamp ld as instance (six fields).",
+            "Lines 3303-3312 (comment, 10 lines): no-componentFrame-stamp rationale, the 2026-07-28 bug fixed.",
+            "Line 3313 (code): wipe ld.frames to blank/keyframe-0 array.",
+            "Line 3314 (code): loadFrame/renderOS/renderArcs/updateUI/renderSymbolTabs.",
+            "Line 3315 (code): success toast.",
+            "Line 3316 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "convert-layers-to-component-guard-merge",
+      "packets": [
+        {
+          "id": "C21l.convert-layers-to-component-guard-merge",
+          "files": [
+            "src/js/app.js:3317-3401"
+          ],
+          "coverage_ranges": [
+            [
+              3317,
+              3401
+            ]
+          ],
+          "classification": {
+            "code": 39,
+            "comment": 46,
+            "whitespace": 0
+          },
+          "symbols": [
+            "convertLayersToComponent"
+          ],
+          "signature": "function convertLayersToComponent(indices){if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}indices=indices.slice().sort(function(a,b){return a-b;}).filter(function(i){return !!state.layers[i];});for(var bi=0;bi<indices.length;bi++){var badReason=badComponentSourceReason(state.layers[indices[bi]]);if(badReason){showToast(SM.t('toastCannotConvertSelectionContains')+badReason);return;}}if(indices.length<2){convertLayerToComponent(indices[0]!==undefined?indices[0]:state.activeLayerIdx);return;}saveAllLayerFrames();pushUndo(true);var symId=genSymbolId();var mergedGroups={};var symLayers=indices.map(function(i){/* per-source clone, groups remap, rig clone/delete, motion/matte/blend fields */});}",
+          "responsibility": "Lead-in (3317-3324, 8 comment lines): batch-version rationale — one N-layer component instead of N one-layer components for a multi-selection. Head of `convertLayersToComponent(indices)` (3325-3401, this packet's own half; the field-transfer tail continues in the next packet): guards on already-editing-a-symbol (3326); sorts+dedupes-by-existence `indices` (3327); the guard-order fix (3328-3339, 12 comment lines — see `boundaries` for the full 2026-09 QA-sweep rationale) followed by the type-guard loop itself (3340-3343, one `badComponentSourceReason` call per index, toast+return on first refusal); the `indices.length<2` single-layer fallback (3344, delegates to convertLayerToComponent). `saveAllLayerFrames();pushUndo(true);var symId=genSymbolId();` (3345-3346). The combine-group remap+merge lead-in (3347-3355, 9 comment lines — the getEffectiveStrokes symbolId-branch flattening rationale: the outer instance needs the UNION of every source's own group registry, not just whichever survived). `symLayers=indices.map(...)` (3356-3401): per selected source `i`, clones `frames` (3359), remaps `groups` keys to fresh `grp_...` ids and rewrites every stroke's `groupId` through the SAME remap so cross-references inside one source's own frames stay internally consistent (3360-3372), accumulating every remapped group into the OUTER `mergedGroups` (3371); clones+deletes the source's own rig via `cloneRigForSymbol` (3381-3382, preceded by its own 6-line instance-vs-content-level comment at 3374-3380 — unlike convertLayerToComponent's `ld.motion`, here there is no surviving single instance for a rig to belong to); returns the symLayer literal itself (3383-3400): `name,visible,locked:false,frames`, deep-cloned `motion`/`motionStatic`/`elementMotion` (3384-3386), the remapped `groupsClone` (3387), `rigClone` (3388), and — preceded by its own 10-line matteMode/blendMode-drop rationale at 3389-3398 (the 2026-07-30 Cyril-reported matte-loss fix) — `matteMode,blendMode` (3399) and a `uid`/`mode`-only `mattesMore` clone (3400).",
+          "callers": [
+            "timeline.js:1630 — `SM.convertActiveLayerToComponent`'s multi-selection branch (existing owner, cited by line only): `if(_layerSel.length>1)convertLayersToComponent(_layerSel);` — the SOLE external caller."
+          ],
+          "behavior": [
+            "Lines 3317-3324 (comment, 8 lines): batch-version rationale.",
+            "Line 3325 (code): function open.",
+            "Line 3326 (code): active-symbol guard.",
+            "Line 3327 (code): sort + existence-filter indices.",
+            "Lines 3328-3339 (comment, 12 lines): guard-order fix rationale — see `boundaries`.",
+            "Lines 3340-3343 (code, 4 lines): type-guard loop over indices, toast+return on first refusal.",
+            "Line 3344 (code): `indices.length<2` single-layer fallback.",
+            "Line 3345 (code): saveAllLayerFrames + pushUndo(true).",
+            "Line 3346 (code): mint symId.",
+            "Lines 3347-3355 (comment, 9 lines): combine-group remap+merge rationale.",
+            "Line 3356 (code): `mergedGroups={}` init.",
+            "Lines 3357-3358 (code): `symLayers=indices.map(...)` open, resolve `src`.",
+            "Line 3359 (code): clone `src.frames`.",
+            "Lines 3360-3373 (code, 14 lines): per-source groups remap (fresh grp ids, stroke groupId rewrite, mergedGroups accumulation), conditional on `src.groups`.",
+            "Lines 3374-3380 (comment, 7 lines): rig instance-vs-content-level rationale.",
+            "Lines 3381-3382 (code): clone+delete `src.rig`.",
+            "Lines 3383-3388 (code, 6 lines): symLayer literal open — name/visible/locked/frames/motion/motionStatic/elementMotion/groups/rig.",
+            "Lines 3389-3398 (comment, 10 lines): matteMode/blendMode-drop fix rationale.",
+            "Lines 3399-3400 (code): matteMode/blendMode/mattesMore fields, symLayer literal close.",
+            "Line 3401 (code): `.map()` close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "convert-layers-to-component-field-transfer",
+      "packets": [
+        {
+          "id": "C21l.convert-layers-to-component-field-transfer",
+          "files": [
+            "src/js/app.js:3402-3470"
+          ],
+          "coverage_ranges": [
+            [
+              3402,
+              3470
+            ]
+          ],
+          "classification": {
+            "code": 37,
+            "comment": 32,
+            "whitespace": 0
+          },
+          "symbols": [
+            "exprControls",
+            "motionBlur",
+            "duplicator"
+          ],
+          "signature": "(function(){var deep=function(v){return JSON.parse(JSON.stringify(v));};var lifted=[\"duplicator\",\"exprControls\",\"expressions\",\"inPoint\",\"outPoint\",\"motionBlur\",\"parentLayerUid\",\"parentLayerUidB\",\"threeD\",\"timeLink\"];symLayers.forEach(function(sl,k){var src=state.layers[indices[k]];var skip=function(f){return k===0&&lifted.indexOf(f)>=0;};['effects','pathFx','blendKeys','parentKeys','parentsMore','expressions','exprControls','timeLink','markers','followPath','textAnimators','shapeNames'].forEach(function(f){if(!skip(f)&&src[f]!=null&&sl[f]==null)sl[f]=deep(src[f]);});['layerUid','parentLayerUid','parentLayerUidB','matteSourceLayerUid','inPoint','outPoint','threeD','motionBlur','shy','keyLock','channel','isTextLayer','color','effectsFrom'].forEach(function(f){if(!skip(f)&&src[f]!=null&&sl[f]==null)sl[f]=src[f];});});})();state.symbols[symId]={name:'Composant',totalFrames:state.totalFrames,fps:state.fps,layers:symLayers};if(window.SMStoryboard)SMStoryboard.addInstanceAuto(symId);var insertAt=indices[0];var firstSrc=state.layers[indices[0]];for(var k=indices.length-1;k>=0;k--){state.layers.splice(indices[k],1);userLayers.splice(indices[k],1);}var newLd={name:'Composant',symbolId:symId,locked:true,visible:true,symPlayMode:'once',symSpeed:1,symPlacedAt:0,symSingleFrame:0,frames:[],groups:Object.keys(mergedGroups).length?mergedGroups:undefined};if(firstSrc.inPoint!=null)newLd.inPoint=firstSrc.inPoint;/* ...outPoint,timeLink,parentLayerUid,parentLayerUidB,expressions,exprControls,threeD,motionBlur,duplicator... */for(var i=0;i<state.totalFrames;i++)newLd.frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});var newUl=new Layer({name:'layer-'+state.layers.length});state.layers.splice(insertAt,0,newLd);userLayers.splice(insertAt,0,newUl);userLayers.forEach(function(l){l.insertBelow(arcLayer);});state.activeLayerIdx=insertAt;_layerSel=[insertAt];activateUL(state.activeLayerIdx);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();showToast(SM.t('toastComponentCreatedWith')+indices.length+' calques');}",
+          "responsibility": "The tail half of convertLayersToComponent, starting at its own internal seam — the exportJSON-diffed per-layer field-transfer IIFE (3402-3413 lead-in, 13 comment lines, naming the exact fields a QA sweep found lost: layerUid, parentLayerUid, effects, blend/parent keyframes, in/out window, expressions, Parent-in-Time/timeLink, markers, 3D/motion-blur/shy/keyLock, text identity, layer color, plus a same-day fuzz-pass addendum for matteSourceLayerUid and custom shape names). The IIFE itself (3414-3427): a `deep()` helper (3415), a `lifted` list of 10 fields reserved for the OUTER instance only (3420, preceded by its own 4-line rationale at 3416-3419 — skipping them for symLayer k=0 avoids double-application once outside, once inside), then `symLayers.forEach` (3421-3426) running the two field-copy loops detailed in `boundaries` (deep-clone list, 3424; primitive-copy list, 3425) under the `skip(f)` guard (3423). Writes `state.symbols[symId]` (3428, `name:'Composant'`, current `totalFrames`/`fps`, `layers:symLayers`) and conditionally calls `SMStoryboard.addInstanceAuto(symId)` (3429). Captures `insertAt`/`firstSrc` (3430-3431) BEFORE the descending splice-out of every selected source from `state.layers`/`userLayers` (3432). Builds `newLd` (3433-3434, the outer instance literal) then the 'topmost source wins' field-lift block (3442-3460, preceded by its own 6-line rationale at 3435-3441 and a further 4-line exprControls-specific note at 3448-3451 and 4-line threeD/motionBlur/duplicator note at 3453-3457 — see `boundaries` for the complete enumeration). Pads `newLd.frames` to `state.totalFrames` with blank/keyframe-0 entries (3461, no componentFrame stamp, same convention as convertLayerToComponent). Creates the real Paper `newUl` layer (3462), splices `newLd`/`newUl` into `state.layers`/`userLayers` at `insertAt` (3463-3464), re-parents every userLayer under `arcLayer` (3465), selects the new instance (3466-3467), then the same closing sequence as every other entry point in this scope (3468) and a success toast naming the layer count (3469).",
+          "callers": [
+            "No independent external callers — this range is the tail continuation of the SAME `convertLayersToComponent` function whose head is packet 6 (C21l.convert-layers-to-component-guard-merge); its own external caller list is recorded there (timeline.js:1630)."
+          ],
+          "behavior": [
+            "Lines 3402-3413 (comment, 12 lines): exportJSON-diffed field-list rationale, plus the same-day fuzz-pass addendum.",
+            "Lines 3414-3420 (code, 7 lines): IIFE open, `deep()` helper, `lifted` list (preceded by its own 4-line note at 3416-3419).",
+            "Lines 3421-3423 (code, 3 lines): `symLayers.forEach` open, resolve `src`, `skip(f)` closure.",
+            "Line 3424 (code): deep-clone field-copy loop, 12 fields.",
+            "Line 3425 (code): primitive field-copy loop, 14 fields.",
+            "Lines 3426-3427 (code): forEach close, IIFE invocation close.",
+            "Line 3428 (code): write state.symbols[symId].",
+            "Line 3429 (code): conditional SMStoryboard.addInstanceAuto.",
+            "Lines 3430-3432 (code, 3 lines): capture insertAt/firstSrc, descending splice-out of sources.",
+            "Lines 3433-3434 (code): build newLd literal.",
+            "Lines 3435-3441 (comment, 7 lines): topmost-source-wins rationale.",
+            "Lines 3442-3447 (code, 6 lines): inPoint/outPoint/timeLink/parentLayerUid/parentLayerUidB/expressions lift.",
+            "Lines 3448-3451 (comment, 4 lines): exprControls-travels-with-expressions rationale.",
+            "Line 3452 (code): exprControls lift.",
+            "Lines 3453-3457 (comment, 5 lines): threeD/motionBlur/duplicator topmost-wins rationale.",
+            "Lines 3458-3460 (code, 3 lines): threeD/motionBlur/duplicator lift.",
+            "Line 3461 (code): pad newLd.frames to totalFrames.",
+            "Lines 3462-3467 (code, 6 lines): create newUl, splice both arrays, re-parent, select.",
+            "Line 3468 (code): loadFrame/renderOS/renderArcs/updateUI/renderSymbolTabs.",
+            "Line 3469 (code): success toast.",
+            "Line 3470 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "cross-project-header-import-foreign-tree",
+      "packets": [
+        {
+          "id": "C21l.cross-project-header-import-foreign-tree",
+          "files": [
+            "src/js/app.js:3471-3513"
+          ],
+          "coverage_ranges": [
+            [
+              3471,
+              3513
+            ]
+          ],
+          "classification": {
+            "code": 11,
+            "comment": 32,
+            "whitespace": 0
+          },
+          "symbols": [
+            "importForeignSymbolTree"
+          ],
+          "signature": "function importForeignSymbolTree(foreignData,foreignSymId,idMap){if(idMap[foreignSymId])return idMap[foreignSymId];var foreignSym=(foreignData.symbols||{})[foreignSymId];if(!foreignSym)return null;var newId=genSymbolId();idMap[foreignSymId]=newId;var clonedLayers=JSON.parse(JSON.stringify(foreignSym.layers||[]));clonedLayers.forEach(function(l){if(l.symbolId)l.symbolId=importForeignSymbolTree(foreignData,l.symbolId,idMap);});state.symbols[newId]={name:foreignSym.name,totalFrames:foreignSym.totalFrames||state.totalFrames,fps:foreignSym.fps||state.fps,layers:clonedLayers};return newId;}",
+          "responsibility": "Section header + design-decision block (3471-3502, 30 comment lines, the fullest lead-in in this scope) — states the feedback #140 origin (open project tabs should drag into media/preset as 'Compositions'), and the explicit ONE-TIME-DEEP-COPY design decision: a dropped composition becomes a brand-new `state.symbols[]` entry via the SAME Component construct convertLayerToComponent/convertLayersToComponent already build, never a live pointer back at the source tab — a live link was considered and rejected as unprecedented plumbing this codebase has never needed. `importForeignSymbolTree(foreignData,foreignSymId,idMap)` (3503-3513, preceded by its own 4-line function-level comment at 3498-3502): memoized via `idMap` — returns the already-mapped local id immediately if present (3504, also guards the shouldn't-happen cyclic case since the id is stamped BEFORE recursing); resolves `foreignSym` from `foreignData.symbols`, returns `null` if absent (3505-3506); mints `newId` and stamps `idMap[foreignSymId]=newId` (3507-3508) BEFORE recursing; deep-clones `foreignSym.layers` (3509); recursively remaps every nested `l.symbolId` through itself (3510); writes `state.symbols[newId]` (3511, `name,totalFrames:(foreignSym.totalFrames||state.totalFrames),fps:(foreignSym.fps||state.fps),layers:clonedLayers`); returns `newId` (3512). See `boundaries` for exactly which ids this remaps (symbolId only) and which it does not (layerUid, strokeId, parentLayerUid(B), matteSourceLayerUid, group keys).",
+          "callers": [
+            "app.js:3510 — importForeignSymbolTree itself (this packet, recursive): remaps a nested `l.symbolId` found inside an already-being-imported symbol's own cloned layers.",
+            "app.js:3526 — createComponentFromForeignProject (this scope, packet 9): remaps every root-layer `l.symbolId` of the foreign project's OWN top-level layer list."
+          ],
+          "behavior": [
+            "Lines 3471-3479 (comment, 8 lines): section header, feedback #140 origin, media-library.js Compositions-group context.",
+            "Lines 3480-3496 (comment, 15 lines): one-time-deep-copy design decision, live-link-rejected rationale.",
+            "Lines 3497-3502 (comment, 6 lines, including a blank-comment separator line 3497): function-level summary — recursive deep-copy, idMap collision-avoidance, return contract.",
+            "Line 3503 (code): function open.",
+            "Line 3504 (code): idMap memoization/cyclic guard.",
+            "Lines 3505-3506 (code): resolve foreignSym, null guard.",
+            "Lines 3507-3508 (code): mint newId, stamp idMap before recursing.",
+            "Line 3509 (code): deep-clone foreignSym.layers.",
+            "Line 3510 (code): recursive symbolId remap over cloned layers.",
+            "Line 3511 (code): write state.symbols[newId].",
+            "Line 3512 (code): return newId.",
+            "Line 3513 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "foreign-component-create-place-instantiate",
+      "packets": [
+        {
+          "id": "C21l.foreign-component-create-place-instantiate",
+          "files": [
+            "src/js/app.js:3514-3556"
+          ],
+          "coverage_ranges": [
+            [
+              3514,
+              3556
+            ]
+          ],
+          "classification": {
+            "code": 24,
+            "comment": 19,
+            "whitespace": 0
+          },
+          "symbols": [
+            "createComponentFromForeignProject",
+            "placeComponentInstance",
+            "instantiateForeignProjectAsComponent"
+          ],
+          "signature": "function createComponentFromForeignProject(foreignData,name){if(!state.symbols)state.symbols={};var idMap={};var symId=genSymbolId();var clonedLayers=JSON.parse(JSON.stringify(foreignData.layers||[]));clonedLayers.forEach(function(l){if(l.symbolId)l.symbolId=importForeignSymbolTree(foreignData,l.symbolId,idMap);});state.symbols[symId]={name:name,totalFrames:foreignData.totalFrames||state.totalFrames,fps:foreignData.fps||state.fps,layers:clonedLayers};return symId;} function placeComponentInstance(symId,layerName){var idx=createUserLayer(layerName);var nl=state.layers[idx];nl.symbolId=symId;nl.locked=true;nl.symPlayMode='once';nl.symSpeed=1;nl.symPlacedAt=0;nl.symSingleFrame=0;return idx;} function instantiateForeignProjectAsComponent(foreignData,name){if(state.activeSymbolId){showToast(SM.t?SM.t('toastCloseComponentFirst'):'Close the component you\\'re currently editing first');return;}saveAllLayerFrames();pushUndo(true);var symId=createComponentFromForeignProject(foreignData,name+' (Comp)');if(window.SMStoryboard)SMStoryboard.addInstanceAuto(symId);placeComponentInstance(symId,name);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderSymbolTabs)renderSymbolTabs();showToast((SM.t?SM.t('toastComponentCreated'):'Component created: ')+name);}",
+          "responsibility": "`createComponentFromForeignProject(foreignData,name)` (3521-3529, preceded by its own 6-line lead-in at 3514-3520): builds a brand-new `state.symbols[]` Component from ANOTHER project's full exportJSON()-format snapshot — every root layer of `foreignData` becomes a symLayer; lazily inits `state.symbols` if absent (3522); mints `idMap`/`symId` (3523-3524); deep-clones `foreignData.layers` (3525); remaps every root-layer `l.symbolId` via importForeignSymbolTree (3526, so nested components survive); writes `state.symbols[symId]` (3527); returns `symId` (3528). `placeComponentInstance(symId,layerName)` (3536-3540, preceded by its own 6-line lead-in at 3530-3535 noting `createUserLayer` already builds a correctly-sized empty frames array, so — unlike convertLayerToComponent's in-place conversion — there is no existing content to wipe first): creates a fresh layer via `createUserLayer(layerName)` (app.js:377, cited by name only) and stamps the six instance fields (`symbolId,locked,symPlayMode,symSpeed,symPlacedAt,symSingleFrame`) with `symMatrix` left unset (identity placement); returns the new index. `instantiateForeignProjectAsComponent(foreignData,name)` (3548-3556, preceded by its own 6-line lead-in at 3542-3547 naming media-library.js's Compositions-row drop handler as its entry point and transplant.js's feedback #109 picker as the same source-tab data, just auto-placed instead of cherry-picked): guards on already-editing-a-symbol (3549, with an inline `SM.t?SM.t(...):'...'`fallback string for when SM.t isn't yet available); `saveAllLayerFrames();pushUndo(true);` (3550); creates the component (3551) and conditionally registers it with StoryBoard (3552); places the instance (3553); runs the same closing sequence as every other entry point in this scope (3554) and a success toast with the same SM.t-or-fallback pattern (3555).",
+          "callers": [
+            "app.js:3551 — instantiateForeignProjectAsComponent itself (this packet): the sole caller of createComponentFromForeignProject.",
+            "app.js:3553 — instantiateForeignProjectAsComponent itself (this packet): the sole caller of placeComponentInstance.",
+            "media-library.js:796 — the Compositions folder-group drop handler (existing owner, cited by line only): `if(window.instantiateForeignProjectAsComponent)window.instantiateForeignProjectAsComponent(foreignData,tab.name||'Untitled');` — the SOLE external caller, reached as a `window.`-qualified property access rather than a bare call, MISSED by the issue's own suggested literal grep pattern `(^|[^a-zA-Z_.])name\\(` (see `boundaries`)."
+          ],
+          "behavior": [
+            "Lines 3514-3520 (comment, 7 lines): createComponentFromForeignProject's own lead-in.",
+            "Line 3521 (code): function open.",
+            "Line 3522 (code): lazy-init state.symbols.",
+            "Lines 3523-3524 (code): mint idMap/symId.",
+            "Line 3525 (code): deep-clone foreignData.layers.",
+            "Line 3526 (code): root-layer symbolId remap.",
+            "Line 3527 (code): write state.symbols[symId].",
+            "Line 3528 (code): return symId.",
+            "Line 3529 (code): function close.",
+            "Lines 3530-3535 (comment, 6 lines): placeComponentInstance's own lead-in.",
+            "Line 3536 (code): function open.",
+            "Line 3537 (code): createUserLayer, resolve idx.",
+            "Line 3538 (code): resolve nl.",
+            "Line 3539 (code): stamp six instance fields.",
+            "Line 3540 (code): return idx.",
+            "Line 3541 (code): function close.",
+            "Lines 3542-3547 (comment, 6 lines): instantiateForeignProjectAsComponent's own lead-in.",
+            "Line 3548 (code): function open.",
+            "Line 3549 (code): active-symbol guard with inline SM.t fallback.",
+            "Line 3550 (code): saveAllLayerFrames + pushUndo(true).",
+            "Line 3551 (code): createComponentFromForeignProject call.",
+            "Line 3552 (code): conditional SMStoryboard.addInstanceAuto.",
+            "Line 3553 (code): placeComponentInstance call.",
+            "Line 3554 (code): loadFrame/renderOS/renderArcs/updateUI/renderSymbolTabs.",
+            "Line 3555 (code): success toast with inline SM.t fallback.",
+            "Line 3556 (code): function close."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "select-bridge.js (the shape right-click context menu)",
+      "disposition": "Retains its own body in full — cited by line only. The complete external caller of exposeSymbolProperty (:3277 opacity, :3286 __visible), both via window.SM.exposeSymbolProperty (a property access, not a bare call)."
+    },
+    {
+      "consumer": "motion.js (propsFor/registerExposedPropMeta)",
+      "disposition": "Retains its own body in full — cited by line/name only. propsFor (:176-182) reads state.symbols[holder.symbolId].exposedProps and re-registers each entry's display metadata every call."
+    },
+    {
+      "consumer": "media-library.js (the Compositions folder-group drop handler)",
+      "disposition": "Retains its own body in full — cited by line only. window.instantiateForeignProjectAsComponent(foreignData, tab.name||'Untitled') (:796) is the sole external caller of instantiateForeignProjectAsComponent."
+    },
+    {
+      "consumer": "images.js (video-frame-sequence import) and timeline.js (Convert-to-Component menu action, exportJSON's rig-clean pass, the split/cut-layer rig carry-over)",
+      "disposition": "Retain their own bodies in full — cited by line only. convertLayerToComponent's callers: images.js:450, timeline.js:1631. convertLayersToComponent's sole caller: timeline.js:1630. cloneRigForSymbol's callers: timeline.js:1243, timeline.js:2107."
+    },
+    {
+      "consumer": "app.js:2882-3193 getEffectiveStrokes and module vars _symbolPaperLayers/_sceneSnapshot/_montageViewSnapshot (C21k, merged on origin/main after this worktree's own base)",
+      "disposition": "Retains its own body in full — cited by line only. The SOLE reader of every symbol-shape field this scope writes (sym.layers, sym.cameraKeys, sym.exposedProps) and the sole external caller of ensureSymbolPaperLayers's own module-var cache (declared there, populated here)."
+    },
+    {
+      "consumer": "app.js:3557+ splitLayerIntoElements(Core)/mergeLayersIntoOne (C21m, next leaf, not yet filed as an issue at authoring time)",
+      "disposition": "Retains its own body in full — cited by line only. mergeLayersIntoOne (:3767) carries an inline duplicate of badComponentSourceReason's own eight-reason refusal list (:3780-3787) rather than calling it. Confirmed call-graph-disjoint from this scope in both directions."
+    },
+    {
+      "consumer": "app.js:1884-2599 ensureLayerRig/relinkRigBinds (C21h) and applyRigDeform (C21i)",
+      "disposition": "Retain their own bodies in full — cited by name only. Neither is called from this scope; this scope's own cloneRigForSymbol produces the persisted rig shape relinkRigBinds re-hydrates after a loadFrame, and applyRigDeform re-renders it — no call in either direction confirmed by whole-scope grep."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-ensuresymbolpaperlayers-memoized",
+      "proposed": "Call ensureSymbolPaperLayers(symId) twice for the same symId; expect the SAME array reference both times (no duplicate Layer creation on the second call) — verifies the cache guard at line 3195 — not run."
+    },
+    {
+      "id": "fx-ensuresymbolpaperlayers-one-layer-per-sublayer",
+      "proposed": "Call ensureSymbolPaperLayers on a symbol with 3 sub-layers; expect exactly 3 new paper.Layer objects, each inserted below arcLayer, each initially visible:false — verifies line 3198 — not run."
+    },
+    {
+      "id": "fx-badcomponentsourcereason-eight-reasons",
+      "proposed": "Call badComponentSourceReason on 8 synthetic layer objects, each with exactly one of symbolId/lfsGroup/montageId/nativeVideo/isNullLayer/isEffectLayer/isGuideLayer/isWidgetLayer set; expect the 8 documented French strings in order, and null for a plain layer with none set — verifies 3213-3221 — not run."
+    },
+    {
+      "id": "fx-badcomponentsourcereason-effectorlayer-gap",
+      "proposed": "Call badComponentSourceReason on a layer with only isEffectorLayer:true set; expect null (acceptable) at this SHA — a regression guard documenting the confirmed gap in `boundaries`, not a claim this is desired behavior — not run."
+    },
+    {
+      "id": "fx-clonerigforsymbol-drops-live-keeps-resthandles",
+      "proposed": "Call cloneRigForSymbol on a rig whose one bind has both `_live`/`_liveRaster` set and `restHandles` set; expect the returned bind to have `restHandles` present and NO `_live`/`_liveRaster` key at all — verifies the whitelist at line 3245 — not run."
+    },
+    {
+      "id": "fx-clonerigforsymbol-undefined-on-falsy",
+      "proposed": "Call cloneRigForSymbol(null) and cloneRigForSymbol(undefined); expect undefined both times, no exception — verifies line 3236 — not run."
+    },
+    {
+      "id": "fx-exposesymbolproperty-entry-shape-and-key-uniqueness",
+      "proposed": "Call exposeSymbolProperty twice on the same symId with different labels; expect two distinct entries in sym.exposedProps, each with a UNIQUE `key` (no collision even when called in the same millisecond) and the exact {key,label,targetStrokeId,targetField,default} shape — verifies 3260-3262 — not run."
+    },
+    {
+      "id": "fx-exposesymbolproperty-null-on-missing-symbol",
+      "proposed": "Call exposeSymbolProperty('nonexistent-sym-id', ...); expect null, no exception, no mutation — verifies line 3258 — not run."
+    },
+    {
+      "id": "fx-convertlayertocomponent-motion-stays-on-instance-rig-moves-to-symlayer",
+      "proposed": "Convert a layer that has BOTH `.motion` (a keyframed position) and `.rig` set; expect the resulting instance `ld` to still have its OWN `.motion` untouched, `ld.rig` to be `undefined` (deleted), and `state.symbols[symId].layers[0].rig` to be the cloned rig — verifies 3284-3294 and the CLAUDE.md §8 distinction cited in the lead-in — not run."
+    },
+    {
+      "id": "fx-convertlayertocomponent-no-componentframe-plays-through",
+      "proposed": "Convert a layer at state.currentFrame=5 with symPlayMode left at its default; expect NO `componentFrame` field on the resulting `ld`, and `symPlayMode==='once'` — regression guard for the 2026-07-28 pinned-frame bug named at 3303-3312 — not run."
+    },
+    {
+      "id": "fx-convertlayerstocomponent-guard-order-toast-reachable",
+      "proposed": "Call convertLayersToComponent with indices selecting one plain layer and one layer with .symbolId already set; expect the 'un composant' toast to fire and NO component to be created — regression guard for the guard-order bug documented at 3328-3339 — not run."
+    },
+    {
+      "id": "fx-convertlayerstocomponent-groups-remap-no-collision",
+      "proposed": "Select two source layers that each have a group keyed 'g1' with different combineModes; expect the merged component's outer `newLd.groups` (via mergedGroups) to contain TWO distinct fresh grp_ ids, each preserving its own source's combineMode, with no key collision — verifies 3360-3372 — not run."
+    },
+    {
+      "id": "fx-convertlayerstocomponent-lipsync-dropped",
+      "proposed": "Select two source layers, the first (topmost) with a real `.lipSync` object set; convert; expect NEITHER the resulting symLayers NOR the outer newLd to carry a `.lipSync` field anywhere — regression guard for the confirmed field-drop finding in `boundaries` (not a claim this should be fixed here) — not run."
+    },
+    {
+      "id": "fx-convertlayerstocomponent-topmost-wins-inpoint",
+      "proposed": "Select three source layers with DIFFERENT inPoint values, topmost (indices[0]) = 5; convert; expect newLd.inPoint===5 (the topmost source's own value), and expect symLayers[0] (built from the SAME topmost source) to have NO inPoint field of its own (skipped via `lifted`) while symLayers[1]/[2] keep their OWN source inPoint values on their own symLayer if set — verifies the skip(f) branching at 3423-3425 and 3442 — not run."
+    },
+    {
+      "id": "fx-convertlayerstocomponent-exprcontrols-travels-with-expressions",
+      "proposed": "Select sources where the topmost has both `.expressions` and `.exprControls` set; convert; expect BOTH to land on the outer newLd together (never one without the other) — verifies 3447/3452 — not run."
+    },
+    {
+      "id": "fx-convertlayerstocomponent-undo-orphans-symbol",
+      "proposed": "Call convertLayersToComponent, record state.symbols keys before/after, then call the app's own undo; expect state.layers to be restored to its pre-conversion shape (instance layer gone) while the NEW state.symbols[symId] entry from the conversion STILL EXISTS in state.symbols afterward — regression guard for the undo-orphan finding in `boundaries` (layersSnapshotNow never serializes state.symbols) — not run."
+    },
+    {
+      "id": "fx-importforeignsymboltree-idmap-memoizes-and-guards-cycles",
+      "proposed": "Call importForeignSymbolTree twice with the SAME foreignSymId and idMap; expect the SAME returned local id both times, and expect a synthetic foreignData where symbol A references itself via `layers[0].symbolId==='A'` to terminate (not infinite-recurse) because idMap['A'] is stamped before the recursive call — verifies 3504/3508 — not run."
+    },
+    {
+      "id": "fx-importforeignsymboltree-remaps-only-symbolid",
+      "proposed": "Import a foreign symbol whose one layer has both `.symbolId` (pointing at a nested foreign symbol) and a `.layerUid`/a stroke with a `.strokeId`; expect the imported local layer's `.symbolId` to differ from the foreign value (remapped) while `.layerUid` and every `.strokeId` are BYTE-IDENTICAL to the foreign source (not remapped) — verifies the remap-scope finding in `boundaries` — not run."
+    },
+    {
+      "id": "fx-createcomponentfromforeignproject-nested-components-survive",
+      "proposed": "Build a synthetic foreignData whose root layer[0].symbolId points at a nested symbol; call createComponentFromForeignProject; expect state.symbols to gain TWO new entries (the root and the nested one), with the root's own layer[0].symbolId equal to the nested entry's own new local id — verifies 3526 plus importForeignSymbolTree's own recursion — not run."
+    },
+    {
+      "id": "fx-placecomponentinstance-no-symmatrix-identity-placement",
+      "proposed": "Call placeComponentInstance(symId,'Test'); expect the returned layer to have symbolId/locked/symPlayMode/symSpeed/symPlacedAt/symSingleFrame set and NO symMatrix field at all (identity placement, not an explicit identity matrix object) — verifies line 3539 — not run."
+    },
+    {
+      "id": "fx-instantiateforeignprojectascomponent-blocked-while-editing-symbol",
+      "proposed": "Set state.activeSymbolId to a truthy value, call instantiateForeignProjectAsComponent; expect a toast and NO state.symbols/state.layers mutation at all — verifies line 3549 — not run."
+    }
+  ],
+  "future_proposals": [
+    "badComponentSourceReason's refusal list omits `isEffectorLayer`, unlike getEffectiveStrokes' own equivalent 'no real strokes' guard (app.js:2973, C21k) which treats it identically to the four sibling flags badComponentSourceReason DOES refuse. A future behavioral pass should add an `if(l.isEffectorLayer)return'un calque d\\'effecteur';` (or equivalent) check, mirrored into mergeLayersIntoOne's own duplicate list (app.js:3780-3787, C21m) for consistency — not changed here (census scope only).",
+    "convertLayersToComponent's per-symLayer field-transfer (3402-3470) omits `lipSync`, present in the sibling layer-split helper's own field list (timeline.js:1235) and in exportJSON's own complete per-layer field list (timeline.js:2117). A future pass should add it to either the deep-clone loop (3424) or a dedicated line, matching the sibling helper's own treatment — not changed here.",
+    "Neither `layersSnapshotNow` (tweens.js:4845) nor `restoreLayersSnapshot` (tweens.js:4915) ever reads or writes `state.symbols` — every state.symbols-creating construct in this scope (convertLayerToComponent, convertLayersToComponent, createComponentFromForeignProject/importForeignSymbolTree) leaves a permanent orphan entry behind after any undo of the action that created it, with no code path anywhere that removes a state.symbols[id] entry once minted. This is the same class of bug CLAUDE.md §1 names for 'a live reference never survives save/reload' — except here it survives TOO WELL (an entry nothing references any more is never garbage-collected, growing the exported project file's `symbols` object indefinitely across repeated convert/undo cycles). Not changed here; flagged as a real memory/file-size leak worth its own behavioral pass, not just a census note.",
+    "importForeignSymbolTree/createComponentFromForeignProject remap only `symbolId` through `idMap`; every other id-bearing field (layerUid, parentLayerUid(B), matteSourceLayerUid, per-stroke strokeId, group keys) is copied verbatim from the foreign project's JSON. The design comment's own collision-avoidance claim (3498-3502) covers only the symbolId case; a future audit should confirm whether layerUid/strokeId collisions between two independently-authored projects are actually impossible (e.g. if their minting scheme also derives from Date.now()+random) or whether importing two projects with overlapping ids could silently merge unrelated parent-links/mattes/groups once inside the SAME state.layers array (a nested component's own OWN layers stay isolated inside state.symbols, but the outer instance layerUid created by createComponentFromForeignProject/placeComponentInstance is fresh via createUserLayer — the risk is confined to ids INSIDE the deep-copied symbol trees, never surfaced into the importing project's own top-level state.layers). Not verified further here.",
+    "convertLayerToComponent never transfers `effects`/`pathFx`/`blendKeys`/`expressions`/`markers`/etc. into the new symLayer (only frames/groups/rig move) — by design, since `ld` itself stays the instance and keeps those fields (CLAUDE.md §8). Whether any of those ld-level fields (particularly `pathFx`, a per-shape path effect) are still meaningfully applied to the FLATTENED inner content once getEffectiveStrokes' symbolId branch (C21k) takes over rendering was not traced in this census (would require reading pathFx's own render-time consumer, out of scope) — flagged as worth checking in a future pass, not claimed as a confirmed bug."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src` `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\('` was run once for each of this scope's eleven function symbols, at the frozen SHA, filtering out each symbol's own declaration line and any hit whose trimmed content starts with `//` — results are reproduced verbatim under each packet's own `callers` field. TWO symbols (exposeSymbolProperty, instantiateForeignProjectAsComponent) have a real external caller this exact pattern misses because the call site is a `.`-qualified property access (`window.SM.exposeSymbolProperty(...)`, `window.instantiateForeignProjectAsComponent(...)`) rather than a bare identifier call — found instead by a supplementary plain-text `grep -rn <symbol>` across `src/js/*.js` and confirmed by direct `sed -n` read of each hit; recorded as a correction to the issue's own suggested command in `boundaries`/`reconciliation`, not silently substituted.",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's own classify() algorithm against a direct `git show 59a5a38c:src/js/app.js` dump, run once per packet and once for the total — 162/201/0 over 363 lines, matching the issue's own proposed union exactly, and matching the issue's own proposed per-packet table exactly for all nine packets; no boundary correction was needed.",
+    "The `isEffectorLayer` refusal-list gap was confirmed by a direct read of getEffectiveStrokes' own equivalent guard (app.js:2973, C21k, cited by line only) and by two independent `grep -n` searches for `isEffectorLayer=true` (timeline.js:1482, timeline.js:2452) and for `isNullLayer=true` alongside `isFolderLayer=true` (timeline.js:1011) confirming isEffectorLayer is set STANDALONE (unlike a folder layer, which is always ALSO isNullLayer and therefore already caught) — not assumed from the issue's own prompt text, which did not mention this specific gap.",
+    "The `lipSync` field-drop finding was confirmed by cross-referencing three independent line hits: lipsync.js:46-48 (where the field is set), timeline.js:2540 (where it is read back on a split layer), and timeline.js:1235 (the sibling layer-split helper's own explicit field list including 'lipSync') against a direct read of convertLayersToComponent's own two field-copy loops (app.js:3424/3425), neither of which mentions it.",
+    "The state.symbols/undo-orphan finding was confirmed by a direct read of `layersSnapshotNow` (tweens.js:4845-4863, cited by line only) and `restoreLayersSnapshot` (tweens.js:4915-4930+, cited by line only) in full, plus a whole-`tweens.js` grep for the literal string `state.symbols` returning exactly the three hits recorded in `boundaries` (none inside either function) — not assumed from the issue's own prompt, which asked specifically about the foreign-import partial-failure case; the finding generalizes to every state.symbols-creating construct in this scope."
+  ],
+  "validation": {
+    "expected_assigned_lines": 363,
+    "expected_classification": {
+      "code": 162,
+      "comment": 201,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        3194,
+        3202
+      ],
+      [
+        3203,
+        3222
+      ],
+      [
+        3223,
+        3246
+      ],
+      [
+        3247,
+        3265
+      ],
+      [
+        3266,
+        3316
+      ],
+      [
+        3317,
+        3401
+      ],
+      [
+        3402,
+        3470
+      ],
+      [
+        3471,
+        3513
+      ],
+      [
+        3514,
+        3556
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by a Python re-implementation of the validator's own classify() run against the frozen blob: 3194-3202=(9,0,0); 3203-3222=(11,9,0); 3223-3246=(5,19,0); 3247-3265=(9,10,0); 3266-3316=(17,34,0); 3317-3401=(39,46,0); 3402-3470=(37,32,0); 3471-3513=(11,32,0); 3514-3556=(24,19,0); sums to (162,201,0)=363 — identical to the issue's own proposed union and per-packet table exactly.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 363 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check_c21l.py engineering/inventory/census/C21l-app-component-creation.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check_c21l.py engineering/inventory/census/C21j-app-symbol-frame-layer-time-model.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21l.py engineering/inventory/census/C21i-app-rig-deform-ik.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21l.py engineering/inventory/census/C21h-app-rig-model-binding.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21l.py engineering/inventory/census/C21g-app-duplicator-runtime.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21l.py engineering/inventory/census/C21f-app-symbol-matrix-duplicator-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21l.py engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21l.py engineering/inventory/census/C21d-app-desp-relink-remote-merge.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21l.py engineering/inventory/census/C21c-app-path-serialisation-serp.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21l.py engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21l.py engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json <candidate-sha> still exits 0"
+    ]
+  }
+}
