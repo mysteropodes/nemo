@@ -1,0 +1,785 @@
+{
+  "census_id": "C19u",
+  "issue": 1194,
+  "title": "Timeline renderLayerList — the layer-panel row builder",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C19u census only; P30 (timeline.js runtime writer). This scope is the single function `renderLayerList` itself; every helper it calls is owned elsewhere and cited by line only, never re-mapped: `computeLayerRenderOrder`/`folderMemberIndices`/`startFolderRename`/`ungroupFolder`/`folderLayerParentIdx`/`renderShapeTreeRowsInto`/`groupSelectionIntoFolder`/`_layerSel`/`_layerSelAnchor`/`startLayerRename` (C19q), the `ICO_*` icon SVG constants/`openLayerColorSwatches`/`applyLayerColor`/`selectLayersByColor`/`_layerIndexByUid` (C19r), `matteSourceIndicesInUse`/`buildParentCell`/`buildMatteMenuItems` (C19s), `reconcileLayerIndexState`/`reconcileFrameSelection`/`_idxShadow` (C19t), `layerCurveRowExtraHeight` (C19n), `ROW_H`/`state.layerFolders`/`state.layerLinkGroups` (app.js state definition, out of scope), `armLayerReorder` (timeline.js:6798-6980, the NEXT leaf C19v, out of scope), Motion's own `renderLayerListMotion`/`toggleLayer3D`/`toggleLayerDuplicator`/`layerBlendModeAt` (motion.js), `SMLayerKind.of` (layer-kind.js), `unlinkTimeLinkPreserveRange`/`convertSelectionToObjectDuplicator`/`splitLayerIntoElements`/`mergeLayersIntoOne` (app.js), `pushUndoLayers`/`pushUndo` (tweens.js), `EFFECT_LABELS` (effects-panel.js), `matteModeLabel`/`openMatteDropdownAt` (timeline.js, later uncensused lines), and every `window.SM.*` method the row wiring calls (the `window.SM={...}` object literal, an earlier packet). None of these bodies are reproduced here.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "6f19673d2a9d5d66f23109da0afdce2f618989a1",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19u-timeline-render-layer-list",
+  "assigned_ranges": [
+    {
+      "start": 6335,
+      "end": 6793
+    }
+  ],
+  "coverage_note": "Exactly 459 assigned lines occur once across eleven packets (one coverage_range per packet, no gaps, no other-owner exclusions): 243 code, 216 full-line comment, 0 blank — independently re-derived by classifying the frozen blob programmatically (a Python re-implementation of the validator's own classify()), and equal to the issue's proposed table exactly (no boundary correction needed). Line 6334 is C19t's closing brace of reconcileFrameSelection (out of scope, confirmed against C19t's own assigned_ranges end=6334, sole sibling in this directory claiming any part of src/js/timeline.js immediately before this scope). Line 6335 opens this scope's `function renderLayerList(frameOnly){`. Line 6793 is its closing brace; line 6794 opens the next leaf's (C19v, not yet a merged artifact at authoring time) `_layerDrag`/`armLayerReorder` lead-in comment. A sweep of every C*.json in this directory sharing source_path: src/js/timeline.js (C19d through C19t) confirms the existing coverage is contiguous through line 6334 and this artifact is the immediate next contiguous span.",
+  "source_baselines": {
+    "pinned": "59a5a38c:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (6f19673d2a9d5d66f23109da0afdce2f618989a1, the merge of PR #1191) has the identical timeline.js blob (git rev-parse 6f19673:src/js/timeline.js == git rev-parse 59a5a38c:src/js/timeline.js == cc4cfd27...); this artifact branches from origin/main at 6f19673.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes (2026-07-09, 2026-07-25, 2026-07-28 through -31, 2026-08-29/30, 2026-09) are read as authorial intent, not independently re-verified execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19u-timeline-render-layer-list.json and the eleven timeline.js packets partitioning lines 6335-6793.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "function_boundary": "renderLayerList(frameOnly) is Animation 2D's ENTIRE layer-panel row builder: it wipes #layer-list and rebuilds every row (folder headers, ordinary layer rows with their full icon/badge/context-menu wiring, and — when Motion mode is active — a single early-return delegation to SMMotion.renderLayerListMotion instead of any of its own row-building code). It owns almost no direct document mutation itself: the row handlers it wires up overwhelmingly DELEGATE writes to window.SM.* methods, motion.js's SMMotion.* methods, or app.js helpers (all out of scope, cited by line only) — the two exceptions where THIS function's own closure directly assigns a state field are the null-shape-cycle handler (state.layers[i].nullShape=..., packet C19u.type-null-guide-effect-badges) and two bare `delete l4.folderId`/`delete l4.channel;delete l4.linkGroupId` context-menu actions (packet C19u.row-context-menu) that carry NO pushUndo call of their own.",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19v (next census leaf, not yet numbered/merged at authoring time)",
+      "disposition": "Retains timeline.js:6798 onward (armLayerReorder and _layerDrag, the manual layer drag-to-reorder machinery this scope's row.addEventListener('mousedown'/'pointerdown', beginLayerReorder) at 6663-6672 wires each row into). Cited here as callee by line only, not reproduced."
+    },
+    {
+      "owner": "C19q (existing owner, timeline.js:5421-5709)",
+      "disposition": "Retains computeLayerRenderOrder (5600, called once at 6357), folderMemberIndices (5684), ungroupFolder (5689), startFolderRename (5697, called from the folder header's dblclick/contextmenu, 6387/6391), folderLayerParentIdx (5593, read by the 'Retirer du dossier parent' menu entry, 6721), renderShapeTreeRowsInto (5459, called at the very end of the per-row build, 6784), groupSelectionIntoFolder (5669, called from the context menu's 'Grouper dans un dossier' entry, 6709), and the module-scope `_layerSel`/`_layerSelAnchor` arrays (5423/5432) this scope's row click handler (packet C19u.row-click-select) reads and mutates directly."
+    },
+    {
+      "owner": "C19r (existing owner, timeline.js:5710-5941)",
+      "disposition": "Retains the six ICO_* icon SVG string constants (ICO_EYE/ICO_EYE_CLOSED/ICO_LOCK/ICO_UNLOCK/ICO_3D/ICO_DUP, 5713-5733) this scope's icon-row packet assigns as innerHTML, openLayerColorSwatches (5769, the popover the layer-color-dot click opens), applyLayerColor (5806, its onPick callback), selectLayersByColor (5818, the Shift-click branch on the color dot) and _layerIndexByUid (5882, resolving a ld.timeLink.uid back to a display index/name for the Parent-in-Time badge)."
+    },
+    {
+      "owner": "C19s (existing owner, timeline.js:5942-6155)",
+      "disposition": "Retains matteSourceIndicesInUse (6056, called once at 6362 before the render loop to compute _matteSrcMap, consumed by the track-matte badge), buildParentCell (6105, called once per row at 6614) and buildMatteMenuItems (6079, called from the context menu's 'Source de matte' entry, 6765-6766)."
+    },
+    {
+      "owner": "C19t (existing owner, timeline.js:6156-6334)",
+      "disposition": "Retains reconcileLayerIndexState/reconcileFrameSelection (6276/6317) — this scope's OWN first two statements (6336-6337, before the frameOnly early-return at 6338) are their only call sites anywhere in src/js, cited here as caller by line number only, matching C19t's own reconciliation entry for this scope."
+    },
+    {
+      "owner": "motion.js (existing owner, out of scope)",
+      "disposition": "Retains SMMotion.renderLayerListMotion (the entire Motion-mode row builder this scope delegates to unconditionally at 6355 and never touches again in the same render pass), toggleLayer3D/toggleLayerDuplicator (delegated to by the 3D/duplicator icon clicks) and layerBlendModeAt (read once, inside the context menu's Blend label string, 6752)."
+    },
+    {
+      "owner": "app.js (existing owner, out of scope)",
+      "disposition": "Retains unlinkTimeLinkPreserveRange (2923, the time-link badge's right-click action), convertSelectionToObjectDuplicator (1830), splitLayerIntoElements (3583) and mergeLayersIntoOne (3767), all four reached only through window.SM.* wrappers from context-menu entries."
+    },
+    {
+      "owner": "tweens.js (existing owner, out of scope)",
+      "disposition": "Retains pushUndoLayers (4741 region, delegates to layersSnapshotNow) and pushUndo — called once each inside this scope's own two genuine document-mutating handlers (the null-shape cycle at 6526, the time-link unlink at 6584); the module-scope undo stack itself is never touched anywhere else in this function."
+    },
+    {
+      "owner": "layer-kind.js (existing owner, out of scope)",
+      "disposition": "Retains SMLayerKind.of(ld), read once per row (6477) to decide the type badge/icon shown just before the layer name."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 6334 (C19t's closing brace of reconcileFrameSelection) is outside coverage; line 6335 (this scope's `function renderLayerList(frameOnly){`) begins this scope, confirmed against C19t's own declared assigned_ranges end (6334).",
+    "Line 6793 (closing brace of renderLayerList) is the last line of this scope; line 6794 opens the next leaf's (C19v) `_layerDrag`/`armLayerReorder` lead-in — confirmed by reading the frozen blob at 6793-6798 (armLayerReorder itself declares at 6798, with a short lead-in comment 6794-6797 immediately after this scope's closing brace).",
+    "No lines inside 6335-6793 are excluded for another owner: every line belongs to exactly one of the eleven packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "This is a single function (one construct per the issue's instruction), so packets are its own internal sections, cut at its own multi-line comment lead-ins — the issue's candidate list (6339, 6350, 6358, 6370, 6402, 6411, 6439, 6454, 6485, 6501, 6541, 6564, 6592, 6616, 6643, 6677, 6786) was checked against the frozen blob and merged into eleven packets so each is one coherent responsibility (entry/frameOnly path is one packet rather than splitting at 6339 mid-setup; the four icon-row lead-ins at 6454/6459/6465/6470 stay one packet with their shared 6439 lead-in since they are one uninterrupted per-row icon sequence; the badge lead-ins at 6485/6494/6501/6509 similarly stay one packet; the click-handler's own two internal comments at 6616 and 6643 stay inside the single row-click-select packet since both describe the SAME handler; the row-context-menu packet (6673-6785) is intentionally one packet for the whole menu tree despite its size, matching the issue's 'one coherent responsibility' guidance over a fixed line-count target)."
+  ],
+  "areas": [
+    {
+      "area": "entry-and-setup",
+      "packets": [
+        {
+          "id": "C19u.entry-frame-only-scroll-snapshot",
+          "files": [
+            "src/js/timeline.js:6335-6349"
+          ],
+          "coverage_ranges": [
+            [
+              6335,
+              6349
+            ]
+          ],
+          "classification": {
+            "code": 7,
+            "comment": 8,
+            "whitespace": 0
+          },
+          "symbols": [
+            "renderLayerList",
+            "reconcileLayerIndexState",
+            "reconcileFrameSelection",
+            "SMExprPanel",
+            "_tlScrollSnapshot"
+          ],
+          "signature": "function renderLayerList(frameOnly)",
+          "responsibility": "The function's own entry sequence: reconcile the layer-index-keyed UI globals and the frame selection (C19t, unconditionally, before any early return), decide whether this call can skip a full rebuild (the frameOnly contract), close a stale expression-editor panel, and snapshot the scroll position before the DOM is wiped.",
+          "behavior": [
+            "Function declaration (6335): `function renderLayerList(frameOnly){`.",
+            "The FIRST two statements in the body (6336-6337), unconditionally, before any other check: `reconcileLayerIndexState();reconcileFrameSelection();` — both C19t functions, called from nowhere else in src/js; this is their only call site.",
+            "frameOnly early return (6338): `if(frameOnly&&state.appMode!=='motion')return;` — a call with `frameOnly` truthy skips the ENTIRE rest of this function (the DOM wipe/rebuild below) UNLESS Animation 2D mode has already been left for Motion, in which case it falls through so Motion's own delegate branch (next packet) still runs. The two reconcile calls above ran regardless of this return, since a layer reorder/delete/etc. can happen on a frame-only tick too.",
+            "9-line comment (6339-6346, dated 2026-08-30): documents `SMExprPanel.refresh()`'s own contract (an editor panel left open on a deleted layer's expression was a zombie silently swallowing edits) and why the hook lives here rather than at each individual mutation site — every path that could make the panel stale (layer deletion, undo/redo, project load) already funnels through this function.",
+            "`if(window.SMExprPanel&&SMExprPanel.isOpen())SMExprPanel.refresh();` (6347) — one snapshot read when the panel is open, nothing when it is closed; `refresh()` itself (out of scope) closes the panel if its expression no longer resolves.",
+            "`var _scroll=_tlScrollSnapshot();` (6348, trailing comment 'see _tlScrollSnapshot — same wipe, same jump') — captures the current scroll offset of #layer-list BEFORE it is wiped, since `list.innerHTML=''` on the next line resets scrollTop to 0 the same way `renderTimeline`'s own DOM wipe does (CLAUDE.md §11 — restored at the very end of this function, packet C19u.audio-rows-scroll-restore).",
+            "`var list=document.getElementById('layer-list');list.innerHTML='';` (6349) — the single DOM wipe every row this function builds is rebuilt into from scratch; no incremental patch path exists."
+          ],
+          "callers": [
+            "This packet contains no external call sites of its own beyond the two C19t reconcilers (cited above); the complete inventory of renderLayerList's OWN external callers is recorded once, in full, on the last packet of this artifact (C19u.audio-rows-scroll-restore) rather than repeated on every packet."
+          ],
+          "effects": "Mutates the C19t-owned `_idxShadow`/UI-index globals indirectly via the two reconcile calls (their own effects are documented in C19t, not reproduced here). Reads `state.appMode`. Calls `SMExprPanel.refresh()` (out of scope) conditionally. Wipes `#layer-list`'s DOM (`innerHTML=''`) unconditionally once the frameOnly guard is passed. No `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames` call in this packet."
+        }
+      ]
+    },
+    {
+      "area": "mode-dispatch-and-render-order",
+      "packets": [
+        {
+          "id": "C19u.motion-mode-delegate-render-order-matte-map",
+          "files": [
+            "src/js/timeline.js:6350-6362"
+          ],
+          "coverage_ranges": [
+            [
+              6350,
+              6362
+            ]
+          ],
+          "classification": {
+            "code": 4,
+            "comment": 9,
+            "whitespace": 0
+          },
+          "symbols": [
+            "SMMotion",
+            "renderLayerListMotion",
+            "_tlScrollRestore",
+            "SMCamera",
+            "renderPanelRow",
+            "computeLayerRenderOrder",
+            "matteSourceIndicesInUse"
+          ],
+          "signature": "renderLayerListMotion(list); renderPanelRow(list); computeLayerRenderOrder(); matteSourceIndicesInUse()",
+          "responsibility": "The Motion/Animation-2D mode fork (a full early return, not a branch woven through the rest of the function) and, for the Animation 2D path that continues past it, the two setup reads every row in the render loop depends on: the folder-aware render order and the matte-source membership map.",
+          "behavior": [
+            "5-line comment (6350-6354): Motion mode uses expandable Transform property rows instead of the plain per-layer row list this function builds — a full early return rather than a branch woven through the rest of this function, because folders/link-groups/components have no meaning yet in Motion mode's v1 scope; points to motion.js's own header comment for the rationale.",
+            "`if(state.appMode==='motion'){if(window.SMMotion)SMMotion.renderLayerListMotion(list);_tlScrollRestore(_scroll);return;}` (6355) — the fork itself: delegates the ENTIRE row-building job to motion.js (out of scope) on the same already-wiped `list` element, restores the scroll position captured in the previous packet, and returns before ANY of this function's own folder/badge/context-menu code runs. Guarded on `window.SMMotion` existing at all (module-load-order defensive, not a normal-path branch).",
+            "`if(window.SMCamera)SMCamera.renderPanelRow(list);` (6356) — Animation-2D-only: prepends the camera's own panel row (out of scope, camera.js) ahead of the ordinary layer rows; never reached on the Motion path above since that branch already returned.",
+            "`var order=computeLayerRenderOrder();` (6357) — C19q, out of scope: resolves `state.layers` plus `state.layerFolders` into the flat, folder-aware render sequence (folder headers interleaved with member rows, collapsed folders' members flagged hidden) every row in the next packets iterates.",
+            "4-line comment (6358-6361): documents `_matteSrcMap`'s own contract — which layer indices are consumed as a matte SOURCE, computed once per render (uid-resolved with legacy i+1 fallback), consumed by the per-row matte badge later in this function (packet C19u.matte-badge-time-link-badge); the SAME helper export.js uses to skip painting a consumed source, so the two readers can't drift.",
+            "`var _matteSrcMap=matteSourceIndicesInUse();` (6362) — C19s, out of scope."
+          ],
+          "callers": [
+            "See C19u.audio-rows-scroll-restore for the complete external-caller inventory of renderLayerList itself."
+          ],
+          "effects": "Reads `state.appMode`, `state.layers`, `state.layerFolders`. On the Motion path, delegates all rendering to `SMMotion.renderLayerListMotion` (out of scope, its own document/DOM effects not reproduced here) and calls `_tlScrollRestore` before returning — no further code in this function runs for that call. On the Animation 2D path, `SMCamera.renderPanelRow` (out of scope) may append one DOM row; `computeLayerRenderOrder`/`matteSourceIndicesInUse` are both read-only against `state.*` (no document write) and only build local variables (`order`, `_matteSrcMap`) consumed by the packets that follow."
+        }
+      ]
+    },
+    {
+      "area": "folder-header-row",
+      "packets": [
+        {
+          "id": "C19u.folder-header-row",
+          "files": [
+            "src/js/timeline.js:6363-6396"
+          ],
+          "coverage_ranges": [
+            [
+              6363,
+              6396
+            ]
+          ],
+          "classification": {
+            "code": 28,
+            "comment": 6,
+            "whitespace": 0
+          },
+          "symbols": [
+            "folderMemberIndices",
+            "toggleLayerVis",
+            "toggleLayerLock",
+            "toggleLayerSolo",
+            "startFolderRename",
+            "ungroupFolder",
+            "showContextMenu"
+          ],
+          "signature": "order.forEach(function(entry){ if(entry.type==='folder'){ ... return; } ... })",
+          "responsibility": "Builds ONE row per folder entry in the render order — a row that looks and behaves like a single ordinary layer (own arrow/eye/lock/solo/name), but whose eye/lock/solo toggles apply to every member layer at once, and whose rename/dissolve actions live in a right-click menu instead of the ordinary layer row's much larger one (next packets).",
+          "behavior": [
+            "`order.forEach(function(entry){` (6363) — the single loop every remaining packet's per-row code lives inside, until its closing `});` at 6785 (packet C19u.row-context-menu).",
+            "Folder branch guard and setup (6364-6367): `if(entry.type==='folder'){` — `fmeta=state.layerFolders[fid]` (6365, missing-folder guard `if(!fmeta)return;`), `members=folderMemberIndices(fid)` (6366, C19q), creates `frow` with class `lrow lfolder`+(collapsed?' collapsed':'') (6367).",
+            "Disclosure arrow (6368-6369): `▸`/`▾` glyph by `fmeta.collapsed`, click toggles `fmeta.collapsed` DIRECTLY (a document write with no pushUndo, matching the ordinary link-group arrow later in this function) and calls `renderLayerList();renderTimeline();` — a folder's collapse state is deliberately not an undoable user action, same as every other disclosure-arrow toggle in this function.",
+            "6-line comment (6370-6375): a collapsed Stroke/Fill/Shadow folder should look and behave like ONE ordinary layer — same eye/lock/solo icon set as a normal row, each toggling that property on EVERY member at once, set to the OPPOSITE of the current aggregate state (not each member independently inverted) so a mixed on/off state always lands on a single clean result.",
+            "Aggregate state reads (6376-6378): `allVisible`/`allLocked`/`allSolo` — `.every()` over `members` against `state.layers[mi].visible/.locked/.solo`; `allLocked`/`allSolo` additionally require `members.length>0` (an empty folder is never treated as 'all locked').",
+            "Three icon buttons (6379-6384), each delegating its per-member write to the same out-of-scope `window.SM.*` toggle the ordinary per-row icons use (next packets), looping `members.forEach` and calling it ONLY on a member whose current value differs from the computed target — `feye`/`window.SM.toggleLayerVis`, `flock`/`toggleLayerLock`, `fsolo` (text badge 'S', not an SVG icon, same convention the ordinary row's own solo badge uses)/`toggleLayerSolo`.",
+            "Name and assembly (6385-6387): `nm` (bold folder name), `frow.appendChild` chain, `dblclick` wired to `startFolderRename(fid)` (C19q).",
+            "Right-click menu (6388-6394): two entries, 'Renommer le dossier' → `startFolderRename(fid)`, 'Dissoudre le dossier' → `ungroupFolder(fid)` (both C19q) — via the global `window.showContextMenu`, not the row's own local `_sub`/nested-menu helper the ordinary row's context menu builds (that helper is declared later, packet C19u.row-context-menu, and is local to that row's own listener closure).",
+            "`list.appendChild(frow);return;` (6395-6396) — the `return` here is a `forEach` callback return (skips to the next `order` entry), not a function return; nothing below this folder branch runs for a folder entry."
+          ],
+          "callers": [
+            "See C19u.audio-rows-scroll-restore for the complete external-caller inventory of renderLayerList itself."
+          ],
+          "effects": "Reads `state.layerFolders`, `state.layers` (visible/locked/solo per member). Writes `fmeta.collapsed` directly (no pushUndo) on the disclosure-arrow click. The three aggregate icon clicks write `state.layers[mi].visible/.locked/.solo` INDIRECTLY, through the out-of-scope `window.SM.toggleLayerVis/toggleLayerLock/toggleLayerSolo` (their own undo/save behavior is not reproduced here). `startFolderRename`/`ungroupFolder` (C19q) own whatever document effects renaming/dissolving a folder has; not reproduced here."
+        }
+      ]
+    },
+    {
+      "area": "row-skeleton-and-disclosure-arrow-slot",
+      "packets": [
+        {
+          "id": "C19u.row-skeleton-height-arrow-slot",
+          "files": [
+            "src/js/timeline.js:6397-6438"
+          ],
+          "coverage_ranges": [
+            [
+              6397,
+              6438
+            ]
+          ],
+          "classification": {
+            "code": 21,
+            "comment": 21,
+            "whitespace": 0
+          },
+          "symbols": [
+            "layerCurveRowExtraHeight",
+            "ROW_H",
+            "toggleFolderLayerCollapsed",
+            "layerLinkGroups"
+          ],
+          "signature": "row = document.createElement('div'); row.style.height; farr|garr|spacer",
+          "responsibility": "For an ordinary (non-folder) entry: creates the row element with its selection/kind CSS classes, reserves the same extra height renderTimeline's own tween-curve strip reserves (the #layer-list / #frame-grid alignment invariant), and fills the same arrow slot a folder header uses — a real disclosure arrow for a folder LAYER or a link-group head, an inert spacer otherwise — so icons never shift horizontally depending on what row happens to be above.",
+          "behavior": [
+            "`if(entry.hidden)return;` (6398) — a member of a COLLAPSED folder is marked hidden by `computeLayerRenderOrder` (C19q) and produces no row at all, not even a hidden one.",
+            "`var i=entry.idx;var ld=state.layers[i];` (6399) then row creation (6400): class `lrow` plus conditional `is-comp` (ld.symbolId), `in-folder` (ld.folderId or entry.folderLayerParent!=null), `in-linkgroup` (ld.linkGroupId); `row.dataset.layer=i`; `act` class added if `i===state.activeLayerIdx`.",
+            "`if(_layerSel.indexOf(i)>=0)row.classList.add('sel');` (6401) — C19q's module-scope multi-selection array, read only here (written later in this function, packet C19u.row-click-select-drag-wiring).",
+            "7-line comment (6402-6408): mirror renderTimeline's own per-row tween-curve extra height EXACTLY (same layerCurveRowExtraHeight source, C19n) — the #layer-list/#frame-grid alignment invariant (CLAUDE.md §11) requires both sides reserve the same height for any row; align-items:center (the row's own CSS) would otherwise vertically center the icons in the middle of the taller box, so they are pinned to the top instead to stay level with the frame-grid's own unchanged, ROW_H-tall keyframe cells.",
+            "`var lrowExtraH=layerCurveRowExtraHeight(i);if(lrowExtraH>0){row.style.height=(ROW_H+lrowExtraH)+'px';row.style.alignItems='flex-start';row.style.paddingTop='8px';}` (6409-6410) — C19n/app.js constant, out of scope; a DOM style write only, no document mutation.",
+            "9-line comment (6411-6420): every row reserves the SAME arrow slot a folder header uses, even when it does nothing here — otherwise every other icon shifts left by one slot's width depending on whether the row above happens to be a folder. The head row of a Stroke/Fill/Shadow link group gets a REAL collapse arrow here (toggles state.layerLinkGroups[gid].collapsed) instead of the inert spacer — the 'open/close' affordance for the group, deliberately NOT a folder header: the row underneath it is still this same real layer's own normal row.",
+            "Folder-LAYER arrow branch (6421-6430, dated 2026-08): a 4-line inner comment documents the 'hidden not omitted' collapse technique, same as the link-group head right below; real disclosure arrow toggling `ld.folderCollapsed` via `window.SM.toggleFolderLayerCollapsed(i)` (out of scope, window.SM literal, an earlier packet) which `computeLayerRenderOrder` (C19q) reads back to mark children hidden.",
+            "Link-group head arrow branch (6431-6437): `else if(entry.linkGroupHead){` — reads `state.layerLinkGroups[entry.linkGroupId]`, click toggles `gmeta.collapsed` DIRECTLY (no pushUndo, same convention as the folder disclosure arrow in the previous packet) and calls `renderLayerList();renderTimeline();`.",
+            "Inert spacer branch (6438): `else if(!ld.folderId){var spacer=...className='lico larrow-spacer';...}` — a layer that is itself inside a folder (ld.folderId set) gets NEITHER the real arrow NOR the spacer here, since its indentation already comes from being nested under a folder header."
+          ],
+          "callers": [
+            "See C19u.audio-rows-scroll-restore for the complete external-caller inventory of renderLayerList itself."
+          ],
+          "effects": "Reads `state.layers`, `state.activeLayerIdx`, `_layerSel` (C19q), `state.layerLinkGroups`. Writes `gmeta.collapsed` directly (no pushUndo) on the link-group arrow click. `window.SM.toggleFolderLayerCollapsed` (out of scope) owns whatever document effect a folder-layer collapse toggle has; not reproduced here. All `row.style.*` writes are DOM-only, not document/undo state."
+        }
+      ]
+    },
+    {
+      "area": "color-dot-and-icon-row",
+      "packets": [
+        {
+          "id": "C19u.color-dot-eye-lock-solo-3d-duplicator-icons",
+          "files": [
+            "src/js/timeline.js:6439-6484"
+          ],
+          "coverage_ranges": [
+            [
+              6439,
+              6484
+            ]
+          ],
+          "classification": {
+            "code": 23,
+            "comment": 23,
+            "whitespace": 0
+          },
+          "symbols": [
+            "openLayerColorSwatches",
+            "applyLayerColor",
+            "selectLayersByColor",
+            "toggleLayerVis",
+            "toggleLayerLock",
+            "toggleLayerSolo",
+            "toggleLayer3D",
+            "toggleLayerDuplicator",
+            "SMLayerKind"
+          ],
+          "signature": "cdot; eye; lock; solo; d3; ddup; kind=SMLayerKind.of(ld); nm",
+          "responsibility": "The six always-present per-row controls, in DOM order: the layer-color dot, eye (visibility), lock, solo, 3D toggle and Mograph duplicator toggle, plus the conditional type-kind icon and the (not yet appended) name element — every one of the six delegates its actual state write to an out-of-scope function, this packet only builds the icon/listener wiring.",
+          "behavior": [
+            "4-line comment (6439-6442, dated 2026-07-09): the layer color label opens the SAME color-picker popover used for stroke/fill swatches; every layer already has SOME color (assigned at creation, app.js nextLayerColor), this only ever changes which one, never turns it off.",
+            "`cdot` (6443-6452): `--dot-color` CSS var set from `ld.color||'#8b8b9e'`; click handler (6446-6451) reads `myLi` back off `this.dataset.layer` (not the closed-over `i`, so the handler stays correct even if rows are rebuilt between creation and click), Shift-click calls `selectLayersByColor` (C19r) and returns early WITHOUT opening the popover, plain click opens `openLayerColorSwatches` (C19r) whose onPick callback calls `applyLayerColor(myLi,hex)` (C19r) — none of the three write anything in this packet's own closure.",
+            "`eye` (6453): visible/hidden icon (`ICO_EYE`/`ICO_EYE_CLOSED`, C19r), click delegates to `window.SM.toggleLayerVis(parseInt(this.dataset.layer))` (out of scope).",
+            "4-line comment (6454-6457): the lock/unlock icon PAIR is a v5 fix — the old single-glyph-dimmed-via-.off workaround existed because Material Symbols' lock_open codepoint wasn't in this project's subsetted embedded font (rendered totally blank); actual distinct shapes now, no font risk.",
+            "`lock` (6458): `ICO_LOCK`/`ICO_UNLOCK` (C19r), delegates to `window.SM.toggleLayerLock(...)`.",
+            "5-line comment (6459-6463): plain text badge ('S'), not a Material Symbols glyph, for the SAME subsetted-font reason as the lock-icon fix — matches the existing text-badge convention (LFS, the component badge) already used for icons outside that font.",
+            "`solo` (6464): text content 'S', on/off class by `ld.solo`, delegates to `window.SM.toggleLayerSolo(...)`.",
+            "4-line comment (6465-6468, dated 2026-07-28): 3D layer toggle, After-Effects-style, same `.lico` convention as eye/lock above, delegating to motion.js's toggleLayer3D — the state mutation + re-render live there, not inline here, matching every other icon button's own convention.",
+            "`d3` (6469): `ICO_3D` (C19r), delegates to `SMMotion.toggleLayer3D(...)` guarded on `window.SMMotion`.",
+            "2-line comment (6470-6471): Mograph duplicator toggle, same `.lico` convention, delegates to motion.js's toggleLayerDuplicator (lock + config init live there).",
+            "`ddup` (6472): `ICO_DUP` (C19r), title text falls back to a hard-coded English string if `SM.t` isn't available yet, delegates to `SMMotion.toggleLayerDuplicator(...)`.",
+            "5-line comment (6473-6476): the type badge sits just before the name so the eye reads 'what' then 'which', carrying the kind as a CSS class so styling can tint it per type (a video/sequence/hand-drawn layer were three identical rows before this — layer-kind.js decides which).",
+            "`kind=window.SMLayerKind?SMLayerKind.of(ld):null;if(kind&&kind.key!=='draw'){...}` (6477-6482) — only shown for a non-'draw' kind (the common case, an ordinary hand-drawn layer, gets no extra badge here).",
+            "`var nm=document.createElement('div');nm.className='lnm';nm.textContent=ld.name;` (6483) — created here but NOT appended yet (appended later, packet C19u.shape-tree-disclosure-name-parent-cell, after the type/component badges below have had their chance to insert before it in DOM order).",
+            "`row.appendChild` chain (6484): eye, lock, solo, d3, ddup, in that fixed DOM order — the color dot and any kind badge were already appended above/will be inserted around this point respectively."
+          ],
+          "callers": [
+            "See C19u.audio-rows-scroll-restore for the complete external-caller inventory of renderLayerList itself."
+          ],
+          "effects": "Reads `ld.color`/`.visible`/`.locked`/`.solo`/`.name`, `SM.t`. Writes NOTHING directly in this packet's own closures — every icon's actual state change happens inside an out-of-scope function (`applyLayerColor`, `window.SM.toggleLayerVis/toggleLayerLock/toggleLayerSolo`, `SMMotion.toggleLayer3D/toggleLayerDuplicator`) called from the click handler; this packet only builds and wires the DOM."
+        }
+      ]
+    },
+    {
+      "area": "type-component-lfs-text-null-guide-effect-channel-badges",
+      "packets": [
+        {
+          "id": "C19u.type-null-guide-effect-badges",
+          "files": [
+            "src/js/timeline.js:6485-6540"
+          ],
+          "coverage_ranges": [
+            [
+              6485,
+              6540
+            ]
+          ],
+          "classification": {
+            "code": 29,
+            "comment": 27,
+            "whitespace": 0
+          },
+          "symbols": [
+            "symbolId",
+            "lfsGroup",
+            "montageId",
+            "isTextLayer",
+            "isNullLayer",
+            "nullShape",
+            "pushUndoLayers",
+            "isGuideLayer",
+            "isEffectLayer",
+            "EFFECT_LABELS"
+          ],
+          "signature": "cb|lb|mtb|txb|nlb|glb|fxb|chb conditional badges",
+          "responsibility": "The row's conditional single-letter/glyph text badges — one per layer-level flag (symbolId/lfsGroup/montageId/isTextLayer/isNullLayer/isGuideLayer/isEffectLayer/channel) — each occupying a DOM slot ONLY when the flag is actually set, so an ordinary layer with none of these shows no extra badges at all.",
+          "behavior": [
+            "7-line comment (6485-6491, dated 2026-07-29, feedback quote 'l'icon component du calque est le meme que celui pour le 3D layer'): the Component badge is a text badge ('C'), not the ◈ glyph it used to be — the diamond glyph read as visually identical to ICO_3D's hexagon wireframe at 14px next to each other.",
+            "`if(ld.symbolId){...'C'...}` (6492) and `if(ld.lfsGroup){...'LFS'...}` (6493) — both `lico comp-badge` text badges, unconditional titles, appended immediately if their flag is set.",
+            "6-line comment (6494-6499): the Stroke/Fill/Shadow channel badge — a fully normal layer row, just visually labeled so its role in the split is obvious; letter matches the channel initial (S/F/O for Ombre), avoiding a clash with the Solo 'S' badge's own convention (needs 2 letters here anyway since Fill/Shadow both start differently in French).",
+            "`if(ld.montageId){...'MT'...}` (6500) — title built from `SM.t('titleMontageLayerPrefix')+ld.name+SM.t('titleMontageLayerSuffix')`.",
+            "6-line comment (6501-6507, dated 2026-07): text-layer badge — same 'layer-level flag, not a new item type' precedent as symbolId/lfsGroup/montageId, distinguishing the layer visually without touching any layer.children consumer (CLAUDE.md family-of-bug §1 never applies — a text layer's items are still ordinary Rasters); auto-set the first time text lands on an empty layer, or explicitly via the row's context menu.",
+            "`if(ld.isTextLayer){...'T'...}` (6508).",
+            "7-line comment (6509-6515, dated 2026-07/2026-08, feedback #59): Null/Effect badges use the same text-glyph 'lico comp-badge' convention as every badge above, since the project's embedded icon font is subsetted and silently renders blank for un-included codepoints; the Null badge is clickable since 2026-08 and cycles ld.nullShape, mirroring the same glyph the canvas marker itself uses.",
+            "Null-layer badge (6516-6532): `NULL_SHAPE_GLYPHS`/`NULL_SHAPE_ORDER` local maps (cross/square/circle/diamond); click handler (6523-6530) is this packet's ONLY genuine document-mutating handler: `pushUndoLayers(true)` (tweens.js, `alreadySaved=true` so its own internal saveAllLayerFrames call is SKIPPED) THEN `state.layers[i].nullShape=NEXT_SHAPE` (a direct write) THEN `window.SMEngineBridge.renderNow()` THEN `renderLayerList()` — pushUndo, direct state write, engine repaint, self-rebuild, all four present around the one write.",
+            "`if(ld.isGuideLayer){...'┆'...glb.style.color=ld.color||'#00baff'...}` (6533) — one line, no separate comment (the 6509-6515 lead-in above covers it).",
+            "Effect-layer badge (6534-6539): `fxLabels=window.EFFECT_LABELS||{}` (effects-panel.js, out of scope) — builds a French description string from every enabled effect's label, joined with ', ', falling back to 'aucun effet'; title reads 'Calque d'effet — <desc> — appliqué à tout ce qui est en dessous'.",
+            "`if(ld.channel){...}` (6540) — Stroke/Fill/Shadow channel badge ('Tr'/'Pl'/'Om' by `ld.channel`), title spells out the full French word plus '(Stroke/Fill/Shadow) — calque normal, keyframes liées'."
+          ],
+          "callers": [
+            "See C19u.audio-rows-scroll-restore for the complete external-caller inventory of renderLayerList itself."
+          ],
+          "effects": "Reads `ld.symbolId/.lfsGroup/.montageId/.isTextLayer/.isNullLayer/.nullShape/.isGuideLayer/.color/.isEffectLayer/.effects/.channel`, `window.EFFECT_LABELS` (out of scope). Writes `state.layers[i].nullShape` directly, guarded by `pushUndoLayers(true)` before and `SMEngineBridge.renderNow()`+`renderLayerList()` after — the ONLY document mutation in this packet; every other badge in this packet is read-only DOM."
+        }
+      ]
+    },
+    {
+      "area": "matte-badge-and-time-link-badge",
+      "packets": [
+        {
+          "id": "C19u.matte-badge-time-link-badge",
+          "files": [
+            "src/js/timeline.js:6541-6591"
+          ],
+          "coverage_ranges": [
+            [
+              6541,
+              6591
+            ]
+          ],
+          "classification": {
+            "code": 25,
+            "comment": 26,
+            "whitespace": 0
+          },
+          "symbols": [
+            "matteModeLabel",
+            "openMatteDropdownAt",
+            "timeLink",
+            "_layerIndexByUid",
+            "unlinkTimeLinkPreserveRange",
+            "loadFrame",
+            "SMEngineBridge"
+          ],
+          "signature": "mb (track-matte badge); tlb (Parent-in-Time badge)",
+          "responsibility": "Two conditional badges that surface state otherwise buried in the right panel's fallback context: the track-matte relationship (source vs. masked, dimmed 'M▲' for an implicit source) and a time-linked layer's target — the always-reachable entry points feedback found were otherwise too easy to miss.",
+          "behavior": [
+            "15-line comment (6541-6555, dated 2026-07, feedback quote 'je vois pas où appliqué les track matte'): the Blend/Matte dropdowns only surface in the right panel's Document-fallback context (nothing selected, no draw tool active), too easy to miss entirely; this badge is visible REGARDLESS of tool/selection state and click opens the exact same picker the right-panel dropdown does. A masked layer shows 'M'; the layer directly above a masked one (its IMPLICIT source, AE convention) shows a dimmed 'M▲' even though nothing is actually set on that layer's own data. A layer is a matte SOURCE when ANY layer's resolved source is this index (uid-based since 2026-07-31, legacy i+1 fallback for pre-migration data) — see matteSourceIndicesInUse (C19s), computed once before the render loop (packet C19u.motion-mode-delegate-render-order-matte-map).",
+            "`var isMatteSource=!!_matteSrcMap[i];if(ld.matteMode||isMatteSource){...}` (6556-6563) — badge shown when EITHER this layer has its own matteMode set OR it is used as another layer's source; class gets ' off' when it's a source but has no matteMode of its own (the dimmed 'M▲' case); title built via `matteModeLabel` (timeline.js, later uncensused line, out of scope) when matteMode is set; click ONLY wired when matteMode is actually set (a pure-source badge is not clickable here — reaching a source's own matte assignment goes through the context menu instead, next packet) — sets `state.activeLayerIdx=i` DIRECTLY, calls `activateUL(i)` (out of scope), `updatePropsContext()` (out of scope) and `openMatteDropdownAt(mb)` (timeline.js, out of scope, declared later at 11063).",
+            "17-line comment (6564-6574, dated 2026-07-30, feedback quote 'on ne sait pas si c'est parent ou pas'): unlike the spatial Parent (always shows a pill via buildParentCell just below, C19s), a time-linked layer had NO indicator anywhere outside the Motion panel's own expanded Temps row — collapsing that row (the default) made the link completely invisible in the layer list; same conditional-badge convention as text/null/effect/matte above. Right-click unlinks directly (Cyril: 'ça peut être un raccourci ou clic droit sur les boutons de parent') — no menu detour needed.",
+            "`if(ld.timeLink){...}` (6575-6591) — resolves `tlIdx=_layerIndexByUid(ld.timeLink.uid)` (C19r) and `tlName` (falls back to 'source introuvable' if the source layer is gone); badge text 'Tp'; plain click is a no-op (`e.stopPropagation()` only, 6581) — this badge's ONLY interaction is the right-click unlink.",
+            "Right-click unlink (6582-6590): `pushUndo();unlinkTimeLinkPreserveRange(ld);` (app.js, out of scope) THEN `renderLayerList();renderTimeline();` THEN, CONDITIONALLY, `if(window.loadFrame)loadFrame(state.currentFrame)` — the ONLY `state.currentFrame` read anywhere in this function's own body, and it is inside a click-handler closure that runs later on right-click, not during the synchronous render pass itself — THEN `SMEngineBridge.renderNow()` THEN `showToast(SM.t('toastTimeLinkRemoved'))`."
+          ],
+          "callers": [
+            "See C19u.audio-rows-scroll-restore for the complete external-caller inventory of renderLayerList itself."
+          ],
+          "effects": "Reads `_matteSrcMap` (local, from the earlier packet), `ld.matteMode`/`.timeLink`. Writes `state.activeLayerIdx` directly on the matte badge click (no pushUndo — opening a picker is not itself an undoable action). The time-link unlink handler is this packet's one document-mutating path: `pushUndo()` then `unlinkTimeLinkPreserveRange(ld)` (app.js, out of scope, owns the actual field removal) — followed by `renderLayerList`/`renderTimeline`/`loadFrame`/`SMEngineBridge.renderNow`/`showToast`, all five present around the one write."
+        }
+      ]
+    },
+    {
+      "area": "shape-tree-disclosure-name-parent-cell",
+      "packets": [
+        {
+          "id": "C19u.shape-tree-disclosure-name-parent-cell",
+          "files": [
+            "src/js/timeline.js:6592-6614"
+          ],
+          "coverage_ranges": [
+            [
+              6592,
+              6614
+            ]
+          ],
+          "classification": {
+            "code": 15,
+            "comment": 8,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_layerShapesExpanded",
+            "buildParentCell"
+          ],
+          "signature": "shArrow; row.appendChild(nm); buildParentCell(row,ld,i)",
+          "responsibility": "The optional group/shape-tree disclosure arrow, finally appending the (already-built, packet C19u.color-dot-eye-lock-solo-3d-duplicator-icons) name element, and delegating the spatial-parent pill/pickwhip cell entirely to C19s.",
+          "behavior": [
+            "8-line comment (6592-6599, dated 2026-07-31): Animation 2D half of the panel Cyril asked for — Motion's own version already ships this (commit 1a8c99a); this is the same idea with no per-shape expand-to-Transform sub-state, since Animation 2D doesn't key individual shapes. Only shown when the layer actually has selectable content to browse — an empty layer or a symbol/lfs/montage layer (whose real content lives elsewhere entirely) has nothing for buildShapeTree (out of scope, not called from within this function's own body) to enumerate.",
+            "`if(!ld.symbolId&&!ld.lfsGroup&&!ld.montageId){...}` (6600-6612) — arrow glyph/title by `window._layerShapesExpanded[i]` (a window-scoped UI global, not `state`); click handler (6605-6610) flips `window._layerShapesExpanded[i]` DIRECTLY (initializing the map if absent) and calls `renderLayerList();renderTimeline()` — no pushUndo, since this is UI-only expand/collapse state, not a document field.",
+            "`row.appendChild(nm);` (6613) — the layer-name element built earlier (packet C19u.color-dot-eye-lock-solo-3d-duplicator-icons, 6483) is appended here, AFTER the type/component/text/null/guide/effect/channel/matte/time-link badges above have had their chance to insert before it in DOM order — the fixed visual sequence is icons, then badges, then name, then parent cell.",
+            "`buildParentCell(row,ld,i);` (6614) — C19s, out of scope: the entire spatial-parent pill and its pickwhip interaction, appended as the row's last element."
+          ],
+          "callers": [
+            "See C19u.audio-rows-scroll-restore for the complete external-caller inventory of renderLayerList itself."
+          ],
+          "effects": "Reads `ld.symbolId/.lfsGroup/.montageId`, `window._layerShapesExpanded`. Writes `window._layerShapesExpanded[i]` directly (a UI-only global, no pushUndo/saveActiveLayerFrame). `buildParentCell` (C19s) owns whatever document effects the parent pill/pickwhip has; not reproduced here."
+        }
+      ]
+    },
+    {
+      "area": "row-click-select-and-drag-wiring",
+      "packets": [
+        {
+          "id": "C19u.row-click-select-drag-wiring",
+          "files": [
+            "src/js/timeline.js:6615-6672"
+          ],
+          "coverage_ranges": [
+            [
+              6615,
+              6672
+            ]
+          ],
+          "classification": {
+            "code": 21,
+            "comment": 37,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_layerDragJustEnded",
+            "_layerSel",
+            "_layerSelAnchor",
+            "setActiveLayer",
+            "startLayerRename",
+            "enterSymbol",
+            "armLayerReorder",
+            "beginLayerReorder"
+          ],
+          "signature": "row.addEventListener('click'|'dblclick'|'mousedown'|'pointerdown', ...); function beginLayerReorder(e)",
+          "responsibility": "The row's own click-to-select (single, Cmd/Ctrl toggle, Shift range), double-click (rename or enter a component/LFS group), and the wiring (not the implementation — C19v owns that) that arms a manual drag-to-reorder gesture on mousedown/pointerdown.",
+          "behavior": [
+            "Click listener (6615-6661): 12-line comment (6616-6627, undated but describing a fix) — a completed drag-drop still fires a trailing native 'click' on mouseup (browsers do this whenever mousedown/mouseup land on related targets); by the time it fires, `_layerDrag.moved` (C19v, out of scope) has ALREADY been reset to false by the drag's own mouseup handler, so this handler had no way to tell 'a drag just ended' and unconditionally ran the plain-click branch, collapsing a multi-selection back to one row immediately after every successful batch reorder — the reorder itself worked, but the NEXT drag attempt then looked like 'batch reorder doesn't work' since the selection had silently shrunk. Same fix pattern as `_secDragJustEnded` elsewhere in this file (floating-section drag).",
+            "`if(window._layerDragJustEnded){window._layerDragJustEnded=false;return;}` (6628) — the fix itself: a flag set by C19v's own drag mouseup handler (out of scope), consumed and cleared here on the very next click.",
+            "Modifier branches (6629-6642): plain `idx=parseInt(this.dataset.layer)`; Cmd/Ctrl (6630-6633) toggles `idx` in `_layerSel` (C19q), ensuring `state.activeLayerIdx` is itself present first if the array was empty, sets `_layerSelAnchor=idx`; Shift (6634-6642, own 6-line comment on the frozen-anchor fallback: the OLD `&&_layerSel.length` guard made the very first Shift-click a plain select instead of a range from the active layer) rebuilds `_layerSel` as the full inclusive range between the anchor and `idx`; plain click (6642) collapses `_layerSel=[idx]` and resets the anchor.",
+            "17-line comment (6643-6659, dated 2026-08-29, feedback #147 'impossible de faire du multi select de calque dans animation 2D'; references fix commit 16f606b): the three branches above already build a correct multi-item `_layerSel` — but `setActiveLayer`'s OWN default behavior (out of scope) is to immediately collapse `_layerSel` back to `[idx]` unless told not to, since every OTHER caller (canvas hit, camera/media-library/nemo-script/shapes-panel) wants exactly that single-row reset; 16f606b updated motion.js's own Cmd/Shift branches to pass `true` but never touched THIS Animation 2D handler, so a Cmd- or Shift-click here built the right `_layerSel` for one tick and then immediately wiped it via this same trailing call — confirmed live: a Cmd-click on a second row ended with `_layerSel===[thatRow]` instead of both.",
+            "`window.SM.setActiveLayer(idx,e.metaKey||e.ctrlKey||e.shiftKey);` (6660) — the `true` (preserveLayerSel) argument is passed for ANY modifier click, only omitted (defaulting falsy) for a plain click, which IS meant to collapse to one row.",
+            "`row.addEventListener('dblclick',...)` (6662) — one line: resolves `idx3`/`l2`, enters the component (`window.SM.enterSymbol(l2.symbolId)`) or LFS full-channel group (`enterSymbol(l2.lfsIds.full)`) if either flag is set, else `startLayerRename(idx3)` (C19q) — all three out of scope, called not implemented here.",
+            "`function beginLayerReorder(e){if(e.button!==0||e.target.closest('.lico'))return;armLayerReorder(e,parseInt(this.dataset.layer),'panel',this);}` (6663-6666) — guards on left-button-only and NOT starting from an icon (`.lico`, so clicking eye/lock/etc. never also arms a drag); `armLayerReorder` itself is C19v, the next census leaf, out of scope — cited here as callee by line only.",
+            "4-line comment (6667-6670): keeps both event families — Tauri's WKWebView reliably emits the legacy mouse sequence for this custom drag while browser automation and some pen devices only emit pointer events; the shared active flag (inside `armLayerReorder`, out of scope) makes the compatibility mouse event that follows `pointerdown` harmless.",
+            "`row.addEventListener('mousedown',beginLayerReorder);row.addEventListener('pointerdown',beginLayerReorder);` (6671-6672)."
+          ],
+          "callers": [
+            "See C19u.audio-rows-scroll-restore for the complete external-caller inventory of renderLayerList itself."
+          ],
+          "effects": "Reads/writes `_layerSel`/`_layerSelAnchor` (C19q, module-scope arrays) directly — the only selection-state writer in this function's own body outside the context-menu packet. Reads/clears `window._layerDragJustEnded` (C19v-owned flag). Delegates the actual active-layer/rename/enter-symbol document effects entirely to `window.SM.setActiveLayer`/`startLayerRename`/`enterSymbol` (out of scope); no `pushUndo`/`saveActiveLayerFrame` call anywhere in this packet — selecting/renaming-trigger/entering a component are not, by themselves, undoable document writes at this call site."
+        }
+      ]
+    },
+    {
+      "area": "row-context-menu",
+      "packets": [
+        {
+          "id": "C19u.row-context-menu",
+          "files": [
+            "src/js/timeline.js:6673-6785"
+          ],
+          "coverage_ranges": [
+            [
+              6673,
+              6785
+            ]
+          ],
+          "classification": {
+            "code": 67,
+            "comment": 46,
+            "whitespace": 0
+          },
+          "symbols": [
+            "showContextMenu",
+            "addLayer",
+            "addNullLayer",
+            "addFolderLayer",
+            "addEffectLayer",
+            "addGuideLayer",
+            "addJoystickLayer",
+            "addSliderLayer",
+            "SMRigWidget",
+            "duplicateLayer",
+            "deleteLayer",
+            "groupSelectionIntoFolder",
+            "convertSelectionToObjectDuplicator",
+            "splitLayerIntoElements",
+            "splitLayerAtPlayhead",
+            "toggleLayerShy",
+            "mergeLayersIntoOne",
+            "removeLayerFromFolder",
+            "convertActiveLayerToComponent",
+            "convertComponentToLayer",
+            "convertActiveLayerToStrokeFillShadow",
+            "convertActiveLayerToLFSGroup",
+            "propagateLFSFill",
+            "convertLFSGroupToLayer",
+            "layerBlendModeAt",
+            "openBlendDropdownAt",
+            "buildMatteMenuItems",
+            "openMatteDropdownAt",
+            "renderShapeTreeRowsInto"
+          ],
+          "signature": "row.addEventListener('contextmenu', function(e){ ... showContextMenu(...) ... }); list.appendChild(row)",
+          "responsibility": "The row's full right-click menu — every layer-level action reachable from the layer panel that ISN'T already a dedicated icon/badge — nested into four submenus (Insérer, Organiser, LFS, Appearance) since a flat 35-entry/901px-tall menu was found unreachable at the bottom; then the loop's own tail (append the finished row, optionally recurse into the shape tree, close the forEach).",
+          "behavior": [
+            "Setup (6673-6676): `e.preventDefault()`, `idx4=parseInt(this.dataset.layer)`, `window.SM.setActiveLayer(idx4)` (unconditional, NO preserveLayerSel argument — a right-click always makes this row the sole active layer, unlike a modified left-click), `l4=state.layers[idx4]`.",
+            "11-line comment (6677-6687, dated 2026-08-30, feedback quote 'un peu lourd comme clic droit y a pas moyen de classer mieux dans des sous menu ?'): measured BEFORE this change, 35 entries, 901px tall — taller than most windows, so the bottom of the menu was effectively unreachable; `showContextMenu` has no hover-submenus, but opening a SECOND menu from an entry is a pattern this file already uses (Parent in Time, 'Color the keys…'), reused here rather than inventing a new one. What stays at top level is what you reach for constantly (duplicate, delete, rename, the two marks) plus whatever is contextual to THIS layer; the rest is one click deeper. Entries themselves are untouched — only their nesting changed.",
+            "`var _sub=function(items){return function(){window.showContextMenu(e.clientX+8,e.clientY+8,items);};};` (6688) — local helper, opens a SECOND `showContextMenu` call offset 8px from the first, closing over the ORIGINAL click's `e.clientX/clientY` so every submenu opens from the same anchor point regardless of which top-level entry was clicked.",
+            "Top-level menu array (6689-6781), built via `window.showContextMenu(e.clientX,e.clientY,[...])`:",
+            "  'Insérer' submenu (6690-6698): addLayer/addNullLayer/addFolderLayer/addEffectLayer/addGuideLayer/addJoystickLayer/addSliderLayer, all `window.SM.*` (out of scope) with no arguments.",
+            "  Widget settings entry (6699-6703, dated 2026-08-30): spread-conditional (`...(cond?[{...}]:[])`) — only present at all when `l4.isWidgetLayer&&window.SMRigWidget`; same 'shown when its prerequisite is set' convention as Time Remap's own entries below; delegates to `SMRigWidget.openWidgetMenu` (rig-widget.js, out of scope) so the numeric range/size fields are edited in exactly one place.",
+            "  Flat top-level entries (6704-6717): Dupliquer/Supprimer (`window.SM.duplicateLayer`/`deleteLayer`), separator, Renommer (`startLayerRename(idx4)`, C19q), Marquer/Retirer comme calque texte (`l4.isTextLayer=!l4.isTextLayer` — a DIRECT write with NO pushUndo, unlike the null-shape cycle in an earlier packet — followed only by `renderLayerList()`, no `renderTimeline()`/save call), Grouper dans un dossier (disabled unless `_layerSel.length>=2`, `groupSelectionIntoFolder()`, C19q), Dupliquer en objet (same 2+ guard, `window.SM.convertSelectionToObjectDuplicator(_layerSel.slice())`), a 4-line comment (6711-6714, dated 2026-07-25) on Split/merge as a reversible PAIR — 'Éclater' existed only as a Motion double-click with no visible entry point and no inverse; both directions now sit next to each other in both timelines — Éclater en calques (`window.SM.splitLayerIntoElements(idx4)`, app.js), Couper au playhead (`window.SM.splitLayerAtPlayhead(idx4)`, window.SM literal, out of scope), Marquer/Retirer Shy (`window.SM.toggleLayerShy(idx4)`).",
+            "  'Organiser' submenu (6718-6724): Fusionner les calques sélectionnés (2+ guard, `window.SM.mergeLayersIntoOne(_layerSel.slice())`, app.js), Retirer du dossier (`disabled:!l4.folderId`, `delete l4.folderId` — a DIRECT write with no pushUndo — then `renderLayerList();renderTimeline();`), Retirer du dossier parent (`disabled:folderLayerParentIdx(idx4)<0`, C19q, `window.SM.removeLayerFromFolder(idx4)`), Convertir en composant (`disabled` when already symbolId/lfsGroup, `window.SM.convertActiveLayerToComponent()`), Décomposer le composant (`disabled:!l4.symbolId`, `window.SM.convertComponentToLayer()`).",
+            "  'LFS' submenu (6726-6736): Séparer Trait/Plein/Ombre (`window.SM.convertActiveLayerToStrokeFillShadow()`), Délier du groupe LFS (`disabled:!l4.linkGroupId`, `delete l4.channel;delete l4.linkGroupId;` — TWO direct deletes, no pushUndo — then `renderLayerList();renderTimeline();showToast(SM.t('toastLayerUnlinkedNormal'))`), Grouper en LFS (`window.SM.convertActiveLayerToLFSGroup()`), Éditer Trait/Plein/Ombre (three entries, each `disabled:!l4.lfsGroup`, `window.SM.enterSymbol(l4.lfsIds.line|full|shadow)`), Propager Plein/Ombre autres frames (`window.SM.propagateLFSFill('full'|'shadow')`), Décomposer le groupe (`window.SM.convertLFSGroupToLayer()`).",
+            "  'Appearance' submenu (6738-6780): 12-line comment (6739-6751, dated 2026-08-30, feedback #172 'en animation 2D ça peut être un menu qui s'affiche sur le calque en option clic droit', and feedback #213 'l'animation du blend mode n'est pas synchro') — the Blend entry lives here now that the Layer tab holding it is gone; anchored on the CLICK point (`_bx`/`_by` captured from `e`), not a captured row node, since `setActiveLayer` re-renders the list and by the time the action fires that node is detached with an all-zero rect — pinning the popup to the corner at (8,4), found by driving; the label itself reads `layerBlendModeAt(idx4,state.currentFrame)` (motion.js, out of scope — the SECOND and last `state.currentFrame` read in this function's body, again inside a menu-open-time label computation, not the render pass) FIRST, falling back to the static `l4.blendMode` only if that resolver is unavailable — the animated-blend-mode fix feedback #207 already applied to the Motion panel's own pill.",
+            "  Blend action (6752-6756): `window.SM.setActiveLayer(idx4);updatePropsContext();` then `openBlendDropdownAt` (out of scope) given a synthetic zero-size rect anchored at the captured click point.",
+            "  Track-matte comment (6757-6764, dated 2026-07/2026-07-31): the discoverable entry point, works whether or not the layer already has a matte, unlike the badge (only shows once one exists) or the right-panel dropdown (buried in the fallback context); needs a layer above to draw the mask FROM in spirit, but since 2026-07-31 the source no longer needs to be the layer directly above — any other layer works, so the only impossible case is 'no other layer exists at all'.",
+            "  'Source de matte' entry (6765-6767): `disabled:state.layers.length<2`, opens a SECOND showContextMenu populated by `buildMatteMenuItems(idx4,l4,function(){renderLayerList();renderTimeline();})` (C19s).",
+            "  Matte apply/change entry (6768-6779): label switches on `state.layers.length<2` / `l4.matteMode` between 'no other layer' / 'change' / 'apply'; action sets active layer + `updatePropsContext()`, then a 6-line comment (6770-6775) on why the anchor falls back to the row itself when the right panel's own `#p-mattemode` element is display:none (a draw tool active) — its `getBoundingClientRect()` would be all-zero, pinning the popup to the top-left corner — before calling `openMatteDropdownAt(anchor)` (timeline.js, out of scope, declared later at 11063).",
+            "Loop tail (6783-6785): `list.appendChild(row);` — the row built across every packet since C19u.row-skeleton-height-arrow-slot is committed to the DOM here; `if(window._layerShapesExpanded&&window._layerShapesExpanded[i])renderShapeTreeRowsInto(list,i,ld);` (C19q, out of scope) recurses into the shape-tree rows immediately after, if the disclosure arrow packet left this row expanded; `});` closes the `order.forEach` opened at 6363 (packet C19u.folder-header-row)."
+          ],
+          "callers": [
+            "See C19u.audio-rows-scroll-restore for the complete external-caller inventory of renderLayerList itself."
+          ],
+          "effects": "Reads `l4.*` (isWidgetLayer/isTextLayer/folderId/linkGroupId/symbolId/lfsGroup/matteMode/blendMode/lfsIds), `_layerSel`, `state.layers.length`, `_matteSrcMap`-adjacent `state.currentFrame` (menu-label-only). Direct document writes with NO pushUndo of their own: `l4.isTextLayer=!l4.isTextLayer` (6708), `delete l4.folderId` (6720), `delete l4.channel;delete l4.linkGroupId` (6728) — each followed only by a `renderLayerList()`/`renderTimeline()` re-render, no `saveActiveLayerFrame`/`saveAllLayerFrames` call anywhere in this packet either; every other menu entry delegates its actual write to an out-of-scope `window.SM.*`/app.js/motion.js function whose own undo/save behavior is not reproduced here. `state.activeLayerIdx` is written indirectly via `window.SM.setActiveLayer(idx4)`, called unconditionally at the top of the handler and again inside the Blend/Matte-apply actions."
+        }
+      ]
+    },
+    {
+      "area": "audio-rows-and-scroll-restore",
+      "packets": [
+        {
+          "id": "C19u.audio-rows-scroll-restore",
+          "files": [
+            "src/js/timeline.js:6786-6793"
+          ],
+          "coverage_ranges": [
+            [
+              6786,
+              6793
+            ]
+          ],
+          "classification": {
+            "code": 3,
+            "comment": 5,
+            "whitespace": 0
+          },
+          "symbols": [
+            "SMAudio",
+            "renderStrip",
+            "_tlScrollRestore"
+          ],
+          "signature": "SMAudio.renderStrip(); _tlScrollRestore(_scroll)",
+          "responsibility": "Appends the synthetic audio-track rows after every real layer row, and restores the scroll position snapshotted at function entry — the function's own exit sequence.",
+          "behavior": [
+            "5-line comment (6786-6790, 'v14'): audio tracks get their own rows appended AFTER the real layers — synthetic (not part of state.layers, so none of the layer.children consumers CLAUDE.md warns about need to know they exist), but visually and interactively a layer row: name + mute + volume live here now instead of overlapping the waveform strip in the frame grid.",
+            "`if(window.SMAudio)window.SMAudio.renderStrip();` (6791) — audio-bridge.js, out of scope; appends its own rows directly to `#layer-list` (the same `list` element this function wiped at entry), guarded on the module existing.",
+            "`_tlScrollRestore(_scroll);` (6792) — restores the scroll offset captured in the entry packet (C19u.entry-frame-only-scroll-snapshot, 6348) now that the DOM has been fully rebuilt; the SAME restore call the Motion-mode early-return branch (packet C19u.motion-mode-delegate-render-order-matte-map) already made on its own, earlier-returning path.",
+            "`}` (6793) — closing brace of `renderLayerList`."
+          ],
+          "callers": [
+            "Complete external-caller inventory for `renderLayerList` across src/js, from a whole-repo `git grep -n -w renderLayerList` at the frozen SHA (59a5a38c), filtered to lines that syntactically CALL it (`renderLayerList(`), excluding `//`-only mentions and this function's own declaration line (6335): 163 external call sites plus 9 self-recursive call sites made from WITHIN this function's own body (already cited on the specific packet each one occurs in: C19u.folder-header-row 6369/6436, C19u.type-null-guide-effect-badges 6529, C19u.matte-badge-time-link-badge 6585, C19u.shape-tree-disclosure-name-parent-cell 6609, C19u.row-context-menu 6708/6720/6728/6766) — 172 total call sites found, none of them a comment.",
+            "src/js/app.js — 2 call site(s): lines 1879, 5109.",
+            "src/js/bootstrap/opacity-application.js — 1 call site(s): lines 11.",
+            "src/js/camera.js — 6 call site(s): lines 376, 387, 393, 397, 624, 627.",
+            "src/js/expr-code-panel.js — 1 call site(s): lines 318.",
+            "src/js/layer-inout.js — 3 call site(s): lines 1302, 1509, 1565.",
+            "src/js/motion-graph.js — 2 call site(s): lines 400, 446.",
+            "src/js/motion.js — 101 call site(s): lines 341, 691, 712, 819, 872, 890, 1024, 1061, 1077, 1148, 2620, 2681, 2803, 3212, 3273, 3289, 6759, 6952, 7017, 7054, 7152, 7191, 7228, 7269, 7289, 7326, 7412, 7419, 7431, 7789, 7846, 7993, 8023, 8055, 8063, 8076, 8122, 8206, 8216, 8230, 8252, 8317, 8339, 8380, 8421, 8574, 8678, 8696, 8757, 8784, 8803, 8826, 8901, 8922, 8962, 9006, 9203, 9420, 9607, 9722, 9726, 9820, 9821, 9865, 9882, 9904, 9912, 9921, 9936, 10098, 10122, 10172, 10194, 10221, 10288, 10389, 10397, 10583, 10622, 10662, 10977, 10989, 11041, 11132, 11471, 11516, 11591, 11607, 11785, 11884, 12290, 12427, 12438, 12698, 12771, 12797, 13245, 13641, 13652, 13736, 13891.",
+            "src/js/nemo-script.js — 10 call site(s): lines 54, 58, 62, 73, 288, 437, 446, 593, 606, 664.",
+            "src/js/rig-bridge.js — 1 call site(s): lines 535.",
+            "src/js/rig-widget.js — 1 call site(s): lines 546.",
+            "src/js/select-bridge.js — 1 call site(s): lines 949.",
+            "src/js/text-animator-panel.js — 1 call site(s): lines 84.",
+            "src/js/text-animator.js — 1 call site(s): lines 243.",
+            "src/js/timeline.js — 30 call site(s): lines 478, 918, 942, 954, 1034, 1117, 1126, 1158, 1166, 1188, 1194, 1267, 2757, 5061, 5085, 5486, 5499, 5517, 5524, 5535, 5682, 5695, 5706, 5810, 5825, 5933, 6132, 6150, 10940, 11045.",
+            "src/js/tools.js — 2 call site(s): lines 8437, 8466.",
+            "motion.js alone accounts for 101 of the 163 external call sites (62%) — overwhelmingly the fixed pair `renderLayerList();renderTimeline();` run together after almost every Motion-side document mutation (keyframe add/remove/drag, parent/blend/matte/time-link changes, shape-tree rename, layer-order drag-drop, mode switch) so both panels stay in sync; motion.js:11097 has its own comment noting `renderLayerList()` always runs before `renderTimeline()` in every call site it could find, a convention this function's own callers preserve.",
+            "timeline.js's own 30 external call sites are this file's OTHER functions (an earlier packet in this same census run, C19a-C19t, or a later uncensused function) — e.g. updateUI (2757, the primary non-Motion re-render path, itself called from many places), folder/link-group rename commits (5486/5499/5517/5524/5535/5706), layer-property toggles (5061/5085/5682/5695/5810/5825/5933), parent-menu callbacks (6132/6150) and the two boot-time calls (478, and 918/942/954/... during initial layer setup).",
+            "nemo-script.js's 10 call sites are its scripting-API property setters (name/visible/locked/color and others) — every external nemo-script write that changes what a layer row displays re-renders through here. camera.js's 6 call sites are the camera-layer row's own toggle/insert/delete actions (out of scope, C19-camera not yet censused). select-bridge.js/rig-bridge.js/rig-widget.js/text-animator.js/text-animator-panel.js/layer-inout.js/motion-graph.js/expr-code-panel.js/tools.js/app.js/bootstrap/opacity-application.js each call it 1-3 times, from their own respective UI actions that add/remove/rename/reorder a layer or change a flag this row displays."
+          ],
+          "effects": "Delegates to `SMAudio.renderStrip()` (out of scope) for the audio rows' own DOM/document effects, not reproduced here. `_tlScrollRestore` writes `#layer-list`'s `scrollTop`/`scrollLeft` (DOM-only, not document/undo state) back to the value captured at function entry. No `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames` call in this packet."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "renderLayerList never calls saveActiveLayerFrame/saveAllLayerFrames itself. Its ONE genuine direct-document-write handler that IS guarded by pushUndoLayers (the null-shape cycle, packet C19u.type-null-guide-effect-badges) calls pushUndoLayers(true) — the `alreadySaved=true` argument SKIPS pushUndoLayers' own internal saveAllLayerFrames call, relying on the caller having already saved (or not needing to, since a nullShape cycle is a per-layer flag, not per-frame stroke data). The two bare-`delete` context-menu actions (l4.isTextLayer flip at 6708, l4.folderId at 6720, l4.channel/l4.linkGroupId at 6728) call NEITHER pushUndo NOR any save function — they write a layer-level flag directly and only re-render."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No function in this scope calls loadFrame directly except the time-link unlink handler (packet C19u.matte-badge-time-link-badge, `if(window.loadFrame)loadFrame(state.currentFrame)`, 6586) — and it is not reachable from importJSON at the frozen SHA (confirmed: renderLayerList's own name does not appear in the import code paths). renderLayerList itself is called AFTER every loadFrame-driven state change (see the caller inventory, packet C19u.audio-rows-scroll-restore) rather than calling loadFrame on its own initiative."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Exactly two `pushUndo`-family calls anywhere in this function's own body: `pushUndoLayers(true)` (6526, null-shape cycle) and `pushUndo()` (6584, time-link unlink) — both inside packets already documented above. Every other document-shaped write in this function either delegates to an out-of-scope function that owns its own undo call, or (the three bare-`delete`/flip context-menu actions) pushes no undo entry at all — flagged, not confirmed as a defect, in future_proposals below."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "This function is the primary WRITER of `_layerSel`/`_layerSelAnchor` (C19q's module-scope arrays) for Animation 2D's layer panel: the row click handler (packet C19u.row-click-select-drag-wiring) is the only place in this function that mutates them directly, on every plain/Cmd/Shift click. `window._layerShapesExpanded` (a separate, UI-only per-layer expansion map, not a selection) is written by the shape-tree disclosure arrow (packet C19u.shape-tree-disclosure-name-parent-cell). `state.activeLayerIdx` is written indirectly through `window.SM.setActiveLayer`, called from the row click, dblclick-adjacent (implicitly via enterSymbol/startLayerRename out of scope) and unconditionally at the top of the context-menu handler."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "The Motion-mode branch (packet C19u.motion-mode-delegate-render-order-matte-map) is a full early return delegating the ENTIRE row-building job to `SMMotion.renderLayerListMotion` — none of this function's own folder/badge/context-menu code runs in Motion mode. Within the Animation 2D path that continues, the function's OWN body reads `state.currentFrame` exactly twice (6586, 6752), both inside click-handler/menu-label closures that execute LATER (on click, at menu-open time), never during the synchronous render pass itself — confirmed by grep within 6335-6793 and manual inspection of both sites. This IS the frameOnly contract's own foundation: Animation 2D's rows are genuinely frame-INDEPENDENT during the render pass, which is exactly why `frameOnly&&state.appMode!=='motion'` (6338) can skip the entire rebuild on a frame-only tick — the 'Motion exception' the frameOnly comment (C19t's own lead-in, 6239-6247) describes lives entirely inside `SMMotion.renderLayerListMotion` (motion.js, out of scope), not in this function's own body."
+    },
+    {
+      "consumer": "export",
+      "disposition": "renderLayerList is not called from export.js or rive-export.js at the frozen SHA (confirmed: no match in either file) — it is an editor-UI-only function, called from user-interaction and document-mutation call sites (the caller inventory, packet C19u.audio-rows-scroll-restore), never from a render/export pass."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "`window.SMEngineBridge.renderNow()` is called twice inside this function's own body, both already-documented handlers: the null-shape cycle (6528, unconditional) and the time-link unlink (6587, conditional on `window.SMEngineBridge`) — both force an immediate Rust/vello repaint after a document write this function made directly. No other engine-bridge call appears in this function's own body; every other row action that would need a repaint delegates that call to the out-of-scope function it calls into."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-frame-only-skips-rebuild-outside-motion",
+      "proposed": "`state.appMode='2d'`; populate `#layer-list` with a marker child; call `renderLayerList(true)`; expect the marker child STILL present (no `innerHTML=''`, the frameOnly early return at 6338 fired before any DOM wipe) and `reconcileLayerIndexState`/`reconcileFrameSelection` to have STILL been called once each (they run before the early return) — not run."
+    },
+    {
+      "id": "fx-frame-only-falls-through-in-motion-mode",
+      "proposed": "`state.appMode='motion'`; stub `SMMotion.renderLayerListMotion` to a spy; call `renderLayerList(true)`; expect the spy called exactly once (the `frameOnly&&state.appMode!=='motion'` guard is false in Motion mode, so execution falls through to the Motion delegate branch) despite `frameOnly` being truthy — not run."
+    },
+    {
+      "id": "fx-folder-aggregate-eye-toggles-only-mismatched-members",
+      "proposed": "A folder with three members, visibility [true,false,true]; click the folder header's aggregate eye icon; expect `window.SM.toggleLayerVis` called exactly ONCE, for the single member whose current value (false) differs from the computed target (`!allVisible` — false since not all were visible, so target is true) — not the two already-visible members — not run."
+    },
+    {
+      "id": "fx-null-shape-cycle-pushes-undo-without-double-save",
+      "proposed": "Stub `pushUndoLayers` and `saveAllLayerFrames` as spies; `ld.nullShape='cross'`; click the null-shape badge; expect `pushUndoLayers` called once with `true`, `saveAllLayerFrames` NEVER called (the `alreadySaved=true` argument skips it), `state.layers[i].nullShape==='square'` (NULL_SHAPE_ORDER's next entry after 'cross'), and `SMEngineBridge.renderNow()` called once — not run."
+    },
+    {
+      "id": "fx-context-menu-text-layer-flip-has-no-undo",
+      "proposed": "Stub `pushUndo`/`pushUndoLayers` as spies; right-click a layer, choose 'Marquer comme calque texte'; expect `l4.isTextLayer` flipped to `true`, `renderLayerList` called, and NEITHER spy called — documenting the asymmetry with the null-shape cycle above rather than asserting either is a confirmed defect — not run."
+    },
+    {
+      "id": "fx-timelink-badge-click-noop-rightclick-unlinks",
+      "proposed": "`ld.timeLink={uid:'x'}`; plain click the Tp badge; expect no state change (only `e.stopPropagation()`); right-click it; stub `unlinkTimeLinkPreserveRange`/`loadFrame`/`SMEngineBridge.renderNow`/`showToast` as spies; expect `pushUndo` called once BEFORE `unlinkTimeLinkPreserveRange(ld)`, then `renderLayerList`/`renderTimeline`/`loadFrame(state.currentFrame)`/`SMEngineBridge.renderNow`/`showToast` each called exactly once, in that order — not run."
+    },
+    {
+      "id": "fx-shift-click-range-select-from-cold-start",
+      "proposed": "`_layerSel=[]`; `_layerSelAnchor=-1`; `state.activeLayerIdx=2`; Shift-click row index 5; expect `_layerSel===[2,3,4,5]` (the cold-start fallback anchor is `state.activeLayerIdx` since `_layerSelAnchor` is out of range and `_layerSel` was empty, per the 6639 fallback chain) — not run."
+    },
+    {
+      "id": "fx-drag-just-ended-swallows-trailing-click",
+      "proposed": "`window._layerDragJustEnded=true`; `_layerSel=[0,1,2]`; click row 0 with no modifier; expect `_layerSel` UNCHANGED (still `[0,1,2]`, the plain-click collapse branch never runs) and `window._layerDragJustEnded===false` after the click (consumed and cleared) — not run."
+    },
+    {
+      "id": "fx-matte-source-badge-dimmed-when-not-own-matte",
+      "proposed": "Layer 0 has no `matteMode`; layer 1's resolved matte source is layer 0 (via `matteSourceIndicesInUse`); render; expect layer 0's row to show the matte badge with the `off` CSS class and text 'M▲' (isMatteSource true, ld.matteMode falsy) and NO click listener attached (the `if(ld.matteMode)` guard at 6561 gates the click wiring) — not run."
+    }
+  ],
+  "future_proposals": [
+    "Three context-menu actions (l4.isTextLayer flip at 6708, `delete l4.folderId` at 6720, `delete l4.channel;delete l4.linkGroupId` at 6728) write a layer-level document field directly with NO pushUndo call, unlike this function's OTHER direct-write handler (the null-shape cycle, guarded by pushUndoLayers) and unlike every sibling action in the SAME submenus that instead delegates to a `window.SM.*` wrapper (which may push its own undo, out of scope, not independently confirmed here). Flagged for the eventual runtime-behavior review as a possible missing-undo-entry source for these three specific actions; not exercised or confirmed as a defect by this census (no execution was performed).",
+    "The folder disclosure arrow (6369) and link-group head arrow (6436) both write `fmeta.collapsed`/`gmeta.collapsed` directly with no pushUndo, consistent with treating a pure UI-disclosure toggle as non-undoable — but this means a user who collapses a folder cannot Ctrl+Z it back open, which may or may not match user expectation. Noted for awareness, not a defect (no execution was performed).",
+    "The row-context-menu packet (6673-6785) is unusually large for a single packet (113 lines, roughly a quarter of the whole function) because it is genuinely one flat `showContextMenu` call tree with four inline submenus — splitting it further would have cut through the middle of a single JS object-literal array, producing packets that are not independently meaningful. Flagged for awareness in case a future finer-grained census of JUST this menu (mirroring C19s's own link-picker-menu treatment) is wanted; not attempted here per the issue's 'one coherent responsibility' guidance."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-src/js `git grep -n -w` was run once per symbol declared or read in this scope, plus every callee it calls into (all symbols listed in each packet's own `symbols` array, plus `state.currentFrame`, `pushUndo`, `pushUndoLayers`, `saveActiveLayerFrame`, `saveAllLayerFrames`, `loadFrame`, `SMEngineBridge`) at the frozen SHA 59a5a38c; results are reproduced verbatim as caller/owner citations above and are re-checkable with `git grep -n -w '<symbol>' 59a5a38c514f5da830dd2f2df4c83c63b1b22fba -- src/js`.",
+    "`renderLayerList` itself was separately grepped for its COMPLETE external caller inventory (172 total call sites: 163 external plus 9 self-recursive from within its own body), reproduced in full on the last packet (C19u.audio-rows-scroll-restore) rather than duplicated on every packet, per the issue's 'complete file:line list, expect many' instruction.",
+    "`export.js` and `rive-export.js` were separately grepped for `renderLayerList` and found to contain no match at the frozen SHA, supporting the export source_consumers entry above.",
+    "engineering/inventory/census/*.json siblings present at authoring time sharing `source_path: src/js/timeline.js`: C19d through C19t, forming a contiguous run from line 862 through line 6334 with zero gaps and zero overlaps (independently confirmed by listing every sibling's own `assigned_ranges` and checking adjacency) — this artifact's own range (6335-6793) is the immediate next contiguous span; the validator's cross-sibling overlap check additionally confirms this programmatically against every C*.json in the directory."
+  ],
+  "validation": {
+    "expected_assigned_lines": 459,
+    "expected_classification": {
+      "code": 243,
+      "comment": 216,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        6335,
+        6349
+      ],
+      [
+        6350,
+        6362
+      ],
+      [
+        6363,
+        6396
+      ],
+      [
+        6397,
+        6438
+      ],
+      [
+        6439,
+        6484
+      ],
+      [
+        6485,
+        6540
+      ],
+      [
+        6541,
+        6591
+      ],
+      [
+        6592,
+        6614
+      ],
+      [
+        6615,
+        6672
+      ],
+      [
+        6673,
+        6785
+      ],
+      [
+        6786,
+        6793
+      ]
+    ],
+    "packet_classification": "Each packet's own classification field equals classify(coverage_ranges), independently re-derived by script against the frozen blob: 6335-6349=(7,8,0); 6350-6362=(4,9,0); 6363-6396=(28,6,0); 6397-6438=(21,21,0); 6439-6484=(23,23,0); 6485-6540=(29,27,0); 6541-6591=(25,26,0); 6592-6614=(15,8,0); 6615-6672=(21,37,0); 6673-6785=(67,46,0); 6786-6793=(3,5,0); sums to (243,216,0)=459 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 459 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C19u-timeline-render-layer-list.json 6f19673 exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19t-timeline-color-surfaces-index-reconcile.json 6f19673 still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19s-timeline-layer-link-pickers-parent-cell.json 6f19673 still exits 0"
+    ]
+  }
+}
