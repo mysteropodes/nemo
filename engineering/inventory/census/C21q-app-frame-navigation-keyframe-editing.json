@@ -1,0 +1,727 @@
+{
+  "census_id": "C21q",
+  "issue": 1223,
+  "title": "app.js frame navigation and keyframe editing — `goToFrame`, `insertFrame`, `_insertKeyframeCore`/`insertKeyframe`/`insertKeyframeAt`, `insertBlankKeyframe`, `removeFrame`, `clearKeyframe`, `removeTweenSpan`, `convertToKeyframes`, `removeFrameSpan`, `duplicateSelectedFrames`",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf, seventeenth and LAST `app.js` slice of the C21 series (after C21p/#1222, open PR at authoring time, not yet merged — cited by name/line only). Owns app.js:5112-5410 only — the closing slice of the file: with C21a-C21q filed, src/js/app.js is censused 41-313 and 360-5410 (lines 1-40/314-359 reconciled separately by the P03C refreeze, out of this scope). No further app.js census leaf remains to be filed after this one. Cited by name/line only, not re-mapped: loadFrame/saveActiveLayerFrameOrPromote/syncLinkedKeyframeFolder (C21p/#1222, app.js:4729-5111, open PR — its own `_smGeomDirty`/`_matStrokes` materialize step and its own gates are NOT reproduced here), saveActiveLayerFrame/saveAllLayerFrames/_maybePromoteInterpolated (C21o/#1220, merged as PR #1221 commit a155706, app.js:4634-4710 — both `goToFrame` and every keyframe editor in this scope call straight through to these two writers without reproducing their own five-writer identity contract, see `boundaries`), getEffectiveStrokes (C21k/#1212, merged, app.js:2882-3193 — `_insertKeyframeCore`/`convertToKeyframes` both call it directly to bake the currently-displayed content into a real keyframe), resolveSymbolFrameIdx/layerInPoint/layerOutPoint (C21j/#1211, merged), pushUndoLayers/pushUndo/layersSnapshotNow (tweens.js — see `boundaries` for the `pushUndo` alias finding), updateUI/updatePlayhead/renderTimeline (timeline.js, C19 series — the `frameOnly` contract of CLAUDE.md §5bis), SMEngineBridge.renderNow, generateTweens/tweenPairForCell/tween spans (tweens.js, timeline.js).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "a155706476b26b0bd03dc502a7e4168d5e941f20",
+  "source_path": "src/js/app.js",
+  "source_blob": "0831959f70612721f80717812838d19940d1f7c1",
+  "source_line_count": 5410,
+  "scope_files": [
+    "src/js/app.js"
+  ],
+  "intended_branch": "claude/c21q-app-frame-navigation-keyframe-census",
+  "assigned_ranges": [
+    {
+      "start": 5112,
+      "end": 5410
+    }
+  ],
+  "coverage_note": "Exactly 299 assigned lines partitioned across eight packets (one coverage_range per packet, no gaps, no other-owner overlap): 172 code, 126 full-line `//` comments, 1 blank — independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs, matching the issue's own proposed union AND per-packet table exactly for all eight packets (verified line-by-line with `sed -n`/`awk` against the frozen blob, boundary-by-boundary); no boundary correction was needed anywhere in this scope — the issue's own proposed packet table is adopted verbatim. Line 5111 is C21p's own closing `}` of convertLayerToStrokeFillShadowFolder (confirmed by direct read); line 5112 opens this scope's own `function goToFrame(idx){`; line 5175 is the single blank line (the gap between goToFrame's own closing `}` at 5174 and insertFrame's lead-in comment at 5176); line 5410 is this scope's own closing `}` of `duplicateSelectedFrames` — the FILE'S OWN LAST LINE, confirmed by `wc -l` (5410) and by direct read (no trailing content after this brace).",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js resolves to 0831959f70612721f80717812838d19940d1f7c1, 5410 lines.",
+    "current": "This worktree's own HEAD, origin/main, and `a155706` all resolve to a155706476b26b0bd03dc502a7e4168d5e941f20 (branch reported up to date with origin/main, working tree clean at authoring time). `git rev-parse 59a5a38c:src/js/app.js` == `git rev-parse a155706:src/js/app.js` == 0831959f70612721f80717812838d19940d1f7c1 (identical blob, both) — verified directly in the working worktree.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `grep -rnE '(^|[^a-zA-Z_.])<symbol>\\(' --include='*.js' src/js` run RECURSIVELY (a flat `src/js/*.js` glob misses `labs/`, `adapters/`, `bootstrap/`, `animation/`, `application/`, `domain/` entirely — per C21o's own precedent), plus a separate grep for `window.`/`SM.` property forms and a direct read of the `window.SM={...}` object-literal block (timeline.js:349-880-ish) to determine which of this scope's ten public functions are actually exposed there. `bootstrap/`, `animation/`, `application/`, and `domain/` were each confirmed to contain ZERO hits for any of this scope's twelve symbols (unlike C21o's own experience with `saveActiveLayerFrame`, which had many hits under `labs/`) — see `boundaries`. The playback duplication finding (goToFrame vs. timeline.js's own `_advanceToFrame`) was confirmed by directly reading `startPlay`/`playStep`/`advancePlayFrame` (timeline.js:17-125) in full, not by grep alone.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; the in-source comments (goToFrame's own two 2026-07-29-QA-sweep rationale blocks and its 2026-08-30 feedback #155 selection-restore rationale at 5114-5146/5157-5161, insertFrame's own length-pad-vs-splice rationale at 5176-5190 and its 2026-08-16 marker-shift correction at 5210-5217, insertKeyframe's own _layerSel-targeting rationale at 5250-5257, prevKeyframeFrame/nextKeyframeFrame's own J/K-transport rationale at 5277-5288, insertBlankKeyframe's own component-blankOverride rationale at 5315-5320, removeFrame's own marker-shift mirror rationale at 5326-5330, clearKeyframe's own one-line header at 5337-5339, removeTweenSpan's own feedback #92 rationale at 5348-5357, convertToKeyframes's own header at 5369-5373, removeFrameSpan's own header at 5386-5388, duplicateSelectedFrames's own header at 5401-5402) are read as authorial intent and prior-session evidence, not fresh execution evidence produced by this census."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C21q-app-frame-navigation-keyframe-editing.json and the eight app.js packets partitioning lines 5112-5410.",
+    "app_js": "app.js retains the whole runtime for every symbol in this scope; this JSON authoring does not authorize source changes.",
+    "c21p_boundary": "Lines 4729-5111 (C21p/#1222, open PR at authoring time, not yet merged) — loadFrame, element eye/solo, layerIsEffectivelyVisible, saveActiveLayerFrameOrPromote, syncLinkedKeyframeFolder, enforceChannelStrip, convertLayerToStrokeFillShadowFolder — are cited by name/line only, not re-mapped. This scope's own boundary begins immediately after C21p's own closing brace at line 5111 (confirmed by direct read: line 5111 is convertLayerToStrokeFillShadowFolder's own `}`, line 5112 is `function goToFrame(idx){`).",
+    "no_further_boundary": "This scope's own range ends at line 5410, the file's own LAST line (`wc -l src/js/app.js` == 5410, confirmed). There is no next app.js slice — C21q is the seventeenth and final leaf of the C21 series covering app.js.",
+    "other_consumers_boundary": "nemo-script.js/lottie-preview.js/tools.js/effects-panel.js/timeline.js/camera.js/motion.js/tweens.js/comp-preview.js/markers.js/ui.js/labs/lipsync-assistant.js/labs/xsheet-panel.js/labs/storyboard-mode.js/labs/flip-roll.js/labs/command-palette.js/select-bridge.js (every external caller of the ten public functions plus the `window.SM` literal in timeline.js) all retain their own bodies in full — cited by name/line only for the specific caller-list findings each packet's `callers` field needed. `lottie-preview.js` additionally defines its OWN, unrelated local `function goToFrame(f)` (lottie-preview.js:94) — a false-positive name collision, not a caller of this scope's `goToFrame` at all; see `boundaries`."
+  },
+  "reconciliation": [
+    {
+      "owner": "C21p / #1222 (existing owner, open PR at authoring time, not yet merged)",
+      "disposition": "Owns app.js:4729-5111 (loadFrame, element eye/solo, layerIsEffectivelyVisible, saveActiveLayerFrameOrPromote, syncLinkedKeyframeFolder, enforceChannelStrip, convertLayerToStrokeFillShadowFolder). Retains its own body in full — cited by line only. `syncLinkedKeyframeFolder` (C21p) is called by THREE packets in this scope (_insertKeyframeCore twice at app.js:5243/5248, clearKeyframe once at app.js:5345) — every place this scope creates or clears a keyframe on a layer that may have a linked folder keeps that folder's own frame list in sync; not reproduced here beyond the call sites."
+    },
+    {
+      "owner": "C21o / #1220 (existing owner, merged as PR #1221 commit a155706)",
+      "disposition": "Owns app.js:4373-4728 (saveActiveLayerFrame/saveAllLayerFrames/_maybePromoteInterpolated/_canReuseMaterialized and the change-signal helpers). Retains its own body in full — cited by name/line only. Every `saveAllLayerFrames()` call in this scope (goToFrame:5153, insertKeyframe:5259, insertKeyframeAt:5300, insertBlankKeyframe:5313, convertToKeyframes:5379) and every `pushUndo`/`pushUndoLayers` call that runs one internally (see `boundaries`) reaches C21o's own five-writer identity contract (`_matStrokes`/`_smGeomDirty`-adjacent `f.strokes=strokes` replace-array write) unmodified; this scope never itself constructs or replaces a `ld.frames[i].strokes` array via that path — only via its OWN direct assignments (`f.strokes=[]`, `f.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(...)))`) documented per-packet below."
+    },
+    {
+      "owner": "C21k / #1212 (existing owner, merged)",
+      "disposition": "Owns app.js:2882-3193 (getEffectiveStrokes). Retains its own body in full — cited by line only. `_insertKeyframeCore` (app.js:5246) and `convertToKeyframes` (app.js:5382) both call it directly to snapshot whatever is CURRENTLY DISPLAYED for a frame (a tween inbetween, an inherited hold, or an empty component slot) into a brand-new, independently-owned keyframe array via `JSON.parse(JSON.stringify(...))` — never a live reference to whatever `getEffectiveStrokes` itself returned."
+    },
+    {
+      "owner": "C21j / #1211 (existing owner, merged)",
+      "disposition": "Owns resolveSymbolFrameIdx/layerInPoint/layerOutPoint. Retains its own body in full — cited by name only. `_insertKeyframeCore`'s own symbolId branch (app.js:5240) calls `resolveSymbolFrameIdx(sym,ld,frameIdx)` to resolve which frame of the COMPONENT's own timeline this new outer keyframe should point at (`f.componentFrame`) — this scope never itself resolves that mapping."
+    },
+    {
+      "owner": "tweens.js (existing owner, pushUndo/pushUndoLayers/layersSnapshotNow/generateTweens/tweenPairForCell)",
+      "disposition": "Retains its own body in full — cited by name/line only. Confirmed by direct read (tweens.js:4741/4896): `pushUndo(alreadySaved)` is a ONE-LINE ALIAS — `function pushUndo(alreadySaved){pushUndoLayers(alreadySaved);}` — not a separate, lighter single-layer undo mechanism; every `pushUndo()` call in this scope (clearKeyframe:5344, removeTweenSpan:5361, convertToKeyframes:5379) takes the SAME full-layers `layersSnapshotNow()` snapshot as every `pushUndoLayers()` call, and — because `alreadySaved` is omitted (undefined/falsy) in all three — each ALSO triggers its own internal `saveAllLayerFrames()` call. See `boundaries` for the full cross-packet double-save-call audit this implies. `tweenPairForCell` (timeline.js, cited by name only) is `removeTweenSpan`'s own real trigger's source of `li`/`fromF`/`toF` — not reproduced here."
+    },
+    {
+      "owner": "timeline.js (existing owner, window.SM literal, playback loop, copyFrames/pasteFrames, context-menu/shortcut wiring)",
+      "disposition": "Retains its own body in full — cited by name/line only. Confirmed by direct read of the `window.SM={...}` literal (timeline.js:349-880, specifically lines 515-516): `insertFrame`/`insertKeyframe`/`insertBlankKeyframe`/`removeFrame`/`clearKeyframe`/`convertToKeyframes`/`removeFrameSpan`/`removeTweenSpan`/`duplicateSelectedFrames` are ALL exposed as `window.SM.<name>` (the SAME bare global function, not a wrapper) — only `prevKeyframeFrame`/`nextKeyframeFrame`/`insertKeyframeAt`/`_insertKeyframeCore` are NOT in that literal (called only by bare name from within the same global script scope). `goToFrame` is exposed via a THIN WRAPPER at line 372 (`goToFrame:function(idx){goToFrame(idx);}`), unlike the nine functions above which are assigned directly. `duplicateSelectedFrames`'s own two calls to `window.SM.copyFrames()`/`window.SM.pasteFrames()` (app.js:5406/5409) reach timeline.js:1789/1819 — `pasteFrames` itself calls `pushUndo();saveAllLayerFrames();` (timeline.js:1819-1820), so a duplicate-frames action's undo/save happens ENTIRELY inside timeline.js, not in this scope's own `duplicateSelectedFrames` body at all (it has no `pushUndo`/`saveAllLayerFrames` call of its own — see `boundaries`). Playback (`startPlay`/`playStep`/`advancePlayFrame`, timeline.js:17-125) does NOT call this scope's `goToFrame` at all — see `boundaries` for the full evidence."
+    },
+    {
+      "owner": "select-bridge.js (existing owner, the multi-layer marquee's own held-frame promotion)",
+      "disposition": "Retains its own body in full — cited by line only. select-bridge.js:1005-1011 wraps `_insertKeyframeCore` with its own `saveAllLayerFrames(); pushUndoLayers(true);` BEFORE calling it per-target — the `true` argument suppresses `pushUndoLayers`'s own internal re-save, the same correct pattern this scope's own `insertBlankKeyframe` (app.js:5313) uses and the only pattern in this scope that avoids the double-save (see `boundaries`)."
+    },
+    {
+      "owner": "nemo-script.js/lottie-preview.js/tools.js/effects-panel.js/camera.js/motion.js/comp-preview.js/markers.js/ui.js/labs/lipsync-assistant.js/labs/xsheet-panel.js/labs/storyboard-mode.js/labs/flip-roll.js/labs/command-palette.js (existing owners, external callers)",
+      "disposition": "Retain their own bodies in full — cited by name/line only; full per-file `goToFrame`/`insertFrame`/`insertKeyframe`/`insertBlankKeyframe`/`removeFrame` occurrence counts recorded on each function's own packet `callers` field. `lottie-preview.js` defines an UNRELATED local `function goToFrame(f)` of its own (lottie-preview.js:94, a Lottie-JSON scrub helper, confirmed by direct read to have nothing to do with `state.layers`/Paper.js) — a false-positive in a naive whole-repo name grep, corrected here."
+    }
+  ],
+  "boundaries": [
+    "`goToFrame`'s own inline comment (app.js:5145-5146: \"Skipped during playback: goToFrame runs per displayed frame there\") is STALE relative to the 2026-07 wall-clock-playback rewrite (CLAUDE.md §11-adjacent). Confirmed by direct read of `startPlay`/`playStep`/`advancePlayFrame` (timeline.js:17-125): playback advances via its OWN closure, `_advanceToFrame(next)` (timeline.js:71-83) — `saveAllLayerFrames();state.currentFrame=next;window._curFrame=next;` then a cache-blit or `loadFrame(next)`, then `updatePlayhead()` — a SEPARATE, independently-written duplicate of goToFrame's own save+advance+load+render sequence, not a call to `goToFrame` at all (confirmed by grep: zero `goToFrame(` occurrences inside `startPlay`'s own body). This scope's own `goToFrame` is therefore NEVER invoked by a genuine rAF playback tick; its three `!state.playing` guards (5148/5154/5173) only matter for a `goToFrame` call that happens to fire while `state.playing` is somehow already true from an UNRELATED caller (e.g. a script/API-driven `SM.frame=f`/`goToFrame(f)` call, nemo-script.js, mid-playback) — not for playback's own per-frame advance, contradicting the comment's own framing. Not fixed here (census scope only); flagged for a future pass — CLAUDE.md §3's warning about duplicated twin functions applies here in JS as much as it does to the Rust render()/render_to_pixels() pair it was written about.",
+    "`pushUndo(alreadySaved)` is a ONE-LINE ALIAS for `pushUndoLayers(alreadySaved)` (tweens.js:4741/4896, confirmed by direct read) — NOT a lighter, single-layer-scoped undo mechanism the name might suggest. Both take the SAME full `layersSnapshotNow()` snapshot, and both call `saveAllLayerFrames()` internally UNLESS their own `alreadySaved` argument is truthy. Across this scope's eight save/undo call sites the pattern is inconsistent: `insertKeyframe` (saveAllLayerFrames():5259, then bare pushUndoLayers():5272) and `insertKeyframeAt` (saveAllLayerFrames():5300, then bare pushUndoLayers():5304) each redundantly save all layers TWICE in a row; `convertToKeyframes` does the same in the OPPOSITE order (bare pushUndo():5379, which itself saves, immediately followed by an explicit `saveAllLayerFrames()` on the SAME line); `clearKeyframe` (pushUndo() alone:5344) and `removeTweenSpan` (pushUndo() alone:5361) and `insertFrame`/`removeFrame`/`removeFrameSpan` (bare pushUndoLayers() alone:5203/5325/5394) all rely SOLELY on the internal save, with no explicit call of their own. Only `insertBlankKeyframe` (saveAllLayerFrames():5313 then `pushUndoLayers(true)` on the SAME line) and the external caller select-bridge.js:1005-1011 (`saveAllLayerFrames(); pushUndoLayers(true);`, the wrapper around `_insertKeyframeCore`) pass `true` to suppress the redundant re-save — the only two call sites touching this scope's own functions that avoid it. Harmless (both save functions are idempotent replays over an already-consistent frame set — no data is lost or duplicated, only wall-clock wasted re-collecting every layer's strokes a second time), but not a pattern any comment in this scope is self-aware of. Not fixed here; flagged for a future pass.",
+    "`removeFrame` (app.js:5325-5336) and `removeFrameSpan` (app.js:5389-5400) splice content out of EVERY layer's `frames` array unconditionally, with NO `ld.locked` check anywhere in either function — confirmed by direct read (neither function references `.locked` at all). This is the OPPOSITE convention from three siblings in this same scope: `insertFrame`'s own explicit comment (5194-5200) states a locked layer must never get the real splice, only the harmless length-pad; `insertKeyframe`/`insertKeyframeAt` both explicitly skip `ld.locked&&!ld.symbolId` layers (5268/5302); and the external `cutFrames` (timeline.js:1802-1814, cited by line only) has its own explicit comment (\"keep it in the clipboard..., just don't blank out a locked layer's own content\") skipping the actual mutation for a locked layer while still recording it in the clipboard. `removeFrame`/`removeFrameSpan` instead delete a frame SLOT from a locked layer exactly like an unlocked one — arguably correct (removing a shared timeline column is a structural operation, not a content edit `editRefusalReason` would gate), but the asymmetry with `insertFrame`'s own explicit reasoning for the identical shared-column operation is not itself documented anywhere. Not fixed here; flagged for a future pass.",
+    "Contract item (c)'s own premise (\"tweenMeta/pair data\") does not correspond to any field in this codebase — confirmed by a whole-`src` grep for `tweenMeta`: zero hits anywhere. Tween pairs are never stored as metadata on a frame object; `removeTweenSpan`'s own two frame-index parameters (`fromF`/`toF`) are resolved by its caller from `tweenPairForCell` (timeline.js, cited by name only) at CLICK TIME by scanning forward/backward for the nearest bracketing keyframes, not read back from any persisted pair record. `removeTweenSpan` itself only ever mutates `f.strokes`/`f.isKeyframe`/`f.isInterpolated` on the frames strictly between the pair (5362-5365) — there is no separate pair-tracking structure to update or clear.",
+    "`convertToKeyframes`'s own guard (app.js:5381: `if(!f||f.isKeyframe)return;`) is BROADER than its own header comment implies. The comment (5369-5373) frames the feature as converting \"a tweened inbetween, or content inherited from an earlier keyframe\" into a real keyframe — but the guard only excludes frames that are ALREADY a keyframe; it does not require `f.isInterpolated` to be true. An ordinary, never-tweened HOLD frame (isKeyframe:false, isInterpolated:false, simply inheriting the previous keyframe's content per getEffectiveStrokes) is converted identically to a genuine tween inbetween — both end up with `f.isKeyframe=true;f.isInterpolated=false;count++` (5382). Not a bug (the header's own framing, \"or content inherited from an earlier keyframe\", already covers this case in prose even though the CODE comment block's own title emphasizes the tween case) — flagged only so a future reader doesn't assume the guard is narrower than it is.",
+    "A recursive `find src -name \"*.js\"` scan (matching C21o's own corrected methodology, not a flat `src/js/*.js` glob) confirms `bootstrap/`, `animation/`, `application/`, and `domain/` — the four subdirectories C21o found to be invisible to a flat glob for `saveActiveLayerFrame` — contain ZERO occurrences of any of this scope's twelve symbols. Unlike C21o's own experience (`saveActiveLayerFrame`/`saveAllLayerFrames` had many hits under `labs/` specifically), this scope's own callers are concentrated in `timeline.js`/`motion.js`/`tools.js` and a handful of `labs/` files (`lipsync-assistant.js`, `xsheet-panel.js`, `storyboard-mode.js`, `flip-roll.js`, `command-palette.js`) — the recursive scan changes the FILE COUNT for `goToFrame` only marginally versus a flat glob (a flat glob would already have found every non-`labs/` caller; the five `labs/` files are the only ones a flat glob would have missed), unlike C21o's own 34-vs-24 and 27-vs-19 discrepancies.",
+    "`goToFrame` has 14 distinct external calling files by bare-name grep plus `window.SM.goToFrame` property-form calls in `ui.js` (2 sites) — close to, not identical to, the issue's own `~15 files` estimate (see each packet's own `callers` field for the full file:count list). `lottie-preview.js`'s own SEPARATELY-DEFINED local `function goToFrame(f)` (lottie-preview.js:94, a Lottie-JSON playhead scrub helper, confirmed unrelated to `state.layers`/Paper.js by direct read) is excluded from this count as a name collision, not a real caller — a naive whole-repo grep for the bare identifier would have overcounted by including it.",
+    "`insertKeyframeAt`'s own single external caller (timeline.js:5024, the frame-grid's span-shrink drag handle) and `_insertKeyframeCore`'s own single external caller (select-bridge.js:1005-1011, the multi-layer marquee's held-frame promotion) are BOTH gated by the same `!f.isKeyframe` check this scope's own `insertKeyframe` (5269) already uses — three independent call sites converging on the identical `_insertKeyframeCore` precondition, confirmed by direct read of each, none of them sharing a common wrapper beyond `_insertKeyframeCore` itself."
+  ],
+  "areas": [
+    {
+      "area": "go-to-frame",
+      "packets": [
+        {
+          "id": "C21q.go-to-frame",
+          "files": [
+            "src/js/app.js:5112-5175"
+          ],
+          "coverage_ranges": [
+            [
+              5112,
+              5175
+            ]
+          ],
+          "classification": {
+            "code": 27,
+            "comment": 36,
+            "whitespace": 1
+          },
+          "symbols": [
+            "goToFrame"
+          ],
+          "signature": "function goToFrame(idx){if(idx<0||idx>=state.totalFrames)return;if(idx===state.currentFrame)return;if(typeof _nodeDrag!=='undefined'){_nodeDrag.active=false;_nodeDrag.path=null;}if(typeof _nmq!=='undefined'){if(_nmq.rect){_nmq.rect.remove();_nmq.rect=null;}_nmq.active=false;}var _selIdsToRestore=null;if(selectedPaths.length&&!state.playing){_selIdsToRestore=selectedPaths.map(function(p){return p&&p.data&&p.data.strokeId;}).filter(Boolean);if(!_selIdsToRestore.length)_selIdsToRestore=null;}if(selectedPaths.length||_nodeSel.length)clearSel(true);saveAllLayerFrames();state.currentFrame=idx;window._curFrame=idx;if(window.SMAudio&&!state.playing)SMAudio.scrubAt(idx);loadFrame(idx);if(_selIdsToRestore&&userLayers[state.activeLayerIdx]){var _kids=userLayers[state.activeLayerIdx].children,_restored=[];for(var _si=0;_si<_kids.length;_si++){var _k=_kids[_si];if(_k&&_k.data&&_k.data.strokeId&&_selIdsToRestore.indexOf(_k.data.strokeId)>=0)_restored.push(_k);}if(_restored.length){selectedPaths=_restored;state.selectedStrokeIndices=selectedPaths.map(getSI).filter(function(i){return i>=0;});}}if(!state.playing){renderOS();renderArcs();updateUI(true);}else{updatePlayhead();}}",
+          "responsibility": "The file's own SINGLE frame-navigation entry point, contract item (a)'s own subject. No lead-in comment before `function` (5112) — every rationale is inline, next to the guard it explains. ORDERED SEQUENCE, exact lines: (1) out-of-range guard, early return (5113). (2) same-frame guard, early return (5116, preceded by its own 2-line rationale at 5114-5115 — a live-scrub tick re-dispatching 'change' without the value moving must not pay for a redundant save+reload). (3) sever an in-progress Subselect node-drag/marquee (5124-5125, preceded by its own 7-line 2026-07-29-QA-sweep rationale at 5117-5123 — loadFrame below rebuilds every Path with a brand-new identity, so a stray pointermove/up after this point must not keep applying a delta by segIndex to whatever now occupies that slot). (4) capture `_selIdsToRestore` from `selectedPaths` — ONLY if `!state.playing` (5147-5151, preceded by its own 20-line rationale at 5126-5146 spanning a second 2026-07-29 ghost-pointer hazard AND the 2026-08-30 feedback #155 fix layered on top of it: dropping the selection via clearSel is not the same as never needing to rebuild it, so strokeId-stable strokes are remembered for re-pointing after the rebuild). (5) `clearSel(true)` — UNCONDITIONAL on whether there is a selection, NOT gated on `state.playing` at all (5152; see `boundaries` for why this is the one guard that runs even mid-play, unlike steps 4/6/9 below). (6) `saveAllLayerFrames()`, THEN `state.currentFrame=idx`, THEN `window._curFrame=idx` — all three on the SAME statement line (5153), UNCONDITIONAL — confirms CLAUDE.md §5bis's own claim exactly: every `goToFrame` advance calls `saveAllLayerFrames()` (never `saveActiveLayerFrame`, and never gated on `state.playing`) BEFORE the frame pointer itself moves. (7) `SMAudio.scrubAt(idx)` — ONLY if `!state.playing` (5154, trailing comment 'scrub audio au deplacement du playhead (v19)' — audio during real playback is driven by its own transport, not per-frame scrub seeks). (8) `loadFrame(idx)` (5156, preceded by the one-line `frameOnly` contract note at 5155 — cited by name only, C19/timeline.js: goToFrame changes the frame and nothing else, so its own `updateUI` call below must pass `frameOnly=true`). (9) re-point the selection at the freshly-rebuilt objects by `data.strokeId` match, SCOPED TO `state.activeLayerIdx` ONLY — again gated implicitly by `_selIdsToRestore` being null when `state.playing` was true at step 4 (5162-5172, preceded by its own 5-line placement rationale at 5157-5161 — done BEFORE the render calls below so the transform box appears in the same pass). (10) the terminal branch (5173): if `!state.playing`, `renderOS();renderArcs();updateUI(true);` (the `frameOnly` render pass); ELSE (playing), `updatePlayhead()` ONLY (cited by name only, timeline.js:192+) — the ONE explicit playback/non-playback fork this function's own body makes. See `boundaries` for the finding that a genuine rAF playback tick never actually reaches this function at all — the ELSE branch here is reachable only if some OTHER caller invokes `goToFrame` while `state.playing` happens to already be true.",
+          "callers": [
+            "Internal: app.js:5228 — insertFrame (this scope, packet 2): `goToFrame(cf+1)` after inserting a frame column, moving the playhead onto the newly-inserted frame.",
+            "14 distinct external calling files by bare-name grep (recursive `find src -name \"*.js\"`, excluding the declaration line, comment lines, and lottie-preview.js's own unrelated same-named local function — see `boundaries`), plus 2 `window.SM.goToFrame` property-form sites — close to, not identical to, the issue's own ~15-file estimate:",
+            "src/js/nemo-script.js: 4 (387/420/451/515 — a scripting-API `frame` setter and `goToFrame(f)` method; line 488 is a doc-string listing method names, not a call, excluded)",
+            "src/js/tools.js: 2 (3237/3350)",
+            "src/js/effects-panel.js: 1 (571)",
+            "src/js/timeline.js: 24 (bare-name calls: 372/861/2007/2009/2019/5100/5105/5125/5140/5227/7509-7514 J/K/,/./Home/End shortcut table/9395/10076/10077/11389/11390/11392/11393/11405 — the window.SM literal's own goToFrame entry at 372 is a thin wrapper, `goToFrame:function(idx){goToFrame(idx);}`, not a re-export of a different function)",
+            "src/js/camera.js: 4 (416/424/465/470 — camera-track click/ease-editor open)",
+            "src/js/motion.js: 7 (6869/10430/10572/10789/10925/10966/10970)",
+            "src/js/tweens.js: 3 (5048/5217/5245 — Ghost-All reassign, tween-curve inset navigation)",
+            "src/js/labs/lipsync-assistant.js: 2 (66/70)",
+            "src/js/comp-preview.js: 3 (122/123/207, each guarded by `typeof goToFrame==='function'`)",
+            "src/js/markers.js: 2 (80/146, each guarded by `window.goToFrame`)",
+            "src/js/labs/xsheet-panel.js: 1 (61)",
+            "src/js/labs/storyboard-mode.js: 1 (254)",
+            "src/js/labs/flip-roll.js: 2 (37/44)",
+            "src/js/ui.js: 2, property form only (1082/1096 — `window.SM.goToFrame(f)`, the timeline scrub-bar drag handler)"
+          ],
+          "behavior": [
+            "Line 5112 (code): function open.",
+            "Line 5113 (code): out-of-range guard, early return.",
+            "Lines 5114-5115 (comment, 2 lines): same-frame-return rationale.",
+            "Line 5116 (code): same-frame guard, early return.",
+            "Lines 5117-5123 (comment, 7 lines): interrupted-node-drag QA-sweep rationale.",
+            "Lines 5124-5125 (code, 2 lines): sever _nodeDrag/_nmq state.",
+            "Lines 5126-5146 (comment, 21 lines): ghost-pointer-selection hazard + feedback #155 selection-restore rationale.",
+            "Lines 5147-5151 (code, 5 lines): capture _selIdsToRestore, gated !state.playing.",
+            "Line 5152 (code): clearSel(true), gated only on having a selection — NOT on state.playing.",
+            "Line 5153 (code): saveAllLayerFrames(); state.currentFrame=idx; window._curFrame=idx — unconditional.",
+            "Line 5154 (code): SMAudio.scrubAt(idx), gated !state.playing.",
+            "Line 5155 (comment, 1 line): frameOnly contract note.",
+            "Line 5156 (code): loadFrame(idx).",
+            "Lines 5157-5161 (comment, 5 lines): selection re-point placement rationale.",
+            "Lines 5162-5172 (code, 11 lines): re-point selectedPaths/selectedStrokeIndices by strokeId match, scoped to active layer.",
+            "Line 5173 (code): terminal fork — renderOS/renderArcs/updateUI(true) if !playing, else updatePlayhead() only.",
+            "Line 5174 (code): function close.",
+            "Line 5175 (blank): scope-internal gap before insertFrame's own lead-in."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "insert-frame",
+      "packets": [
+        {
+          "id": "C21q.insert-frame",
+          "files": [
+            "src/js/app.js:5176-5230"
+          ],
+          "coverage_ranges": [
+            [
+              5176,
+              5230
+            ]
+          ],
+          "classification": {
+            "code": 25,
+            "comment": 30,
+            "whitespace": 0
+          },
+          "symbols": [
+            "insertFrame"
+          ],
+          "signature": "function insertFrame(){var explicitSel=(typeof _layerSel!=='undefined'&&_layerSel.length);var targets=explicitSel?_layerSel.slice():state.layers.map(function(_ld,i){return i;});targets=targets.filter(function(i){return !state.layers[i].locked;});if(explicitSel&&!targets.length){showToast(SM.t('toastLayerLocked'));return;}pushUndoLayers();var cf=state.currentFrame;for(var i=0;i<state.layers.length;i++){var blank={strokes:[],isKeyframe:false,isInterpolated:false};var lyr=state.layers[i];if(targets.indexOf(i)>=0){lyr.frames.splice(cf+1,0,blank);if(lyr.inPoint!=null&&lyr.inPoint>cf)lyr.inPoint++;if(lyr.outPoint!=null&&lyr.outPoint>cf)lyr.outPoint++;if(lyr.markers)lyr.markers.forEach(function(m){if(m.frame>cf)m.frame++;});}else lyr.frames.push(blank);}if(state.markers)state.markers.forEach(function(m){if(m.frame>cf)m.frame++;});state.totalFrames++;if(state.waOut<state.totalFrames-1)state.waOut++;window._waOut=state.waOut;window._totalF=state.totalFrames;goToFrame(cf+1);showToast(SM.t('toastFrameInsertedF5')+(targets.length<state.layers.length?' — '+targets.length+' calque(s)':''));}",
+          "responsibility": "F5 — Animate's own insert-frame convention. Lead-in (5176-5190, 15 comment lines): states the invariant EVERY layer's `frames` array must stay EXACTLY `state.totalFrames` long (frame navigation/getEffectiveStrokes/save-load all assume it everywhere), so a non-targeted layer still grows by one slot — but PUSHED at its own array's end (a pure length pad, since getEffectiveStrokes treats anything past a layer's last real keyframe as an ongoing hold) — while only a TARGETED layer gets the real splice at `cf+1`, shifting its own later keyframes right by one. `insertFrame()` (5191-5230), touches ALL layers (TARGETED ones get the real splice, every OTHER layer gets the harmless end-push): resolves `targets` from `_layerSel` if non-empty, else every layer index (5192-5193); FILTERS OUT locked layers from `targets` (5201, preceded by its own 7-line 2026-07 feedback rationale at 5194-5200: a locked layer must never get the real splice, and an explicit selection of ONLY locked layer(s) aborts with a toast rather than silently falling back to 'insert into every layer', 5202); `pushUndoLayers()` (5203, bare — see `boundaries` for the pushUndo/pushUndoLayers double-save finding); per-layer loop (5205-5223): builds a fresh `blank={strokes:[],isKeyframe:false,isInterpolated:false}` object PER LAYER (5206, never shared between layers); a targeted layer gets `lyr.frames.splice(cf+1,0,blank)` (5209) plus `inPoint`/`outPoint`/`markers` shifted forward by one WHEN their own frame number is strictly greater than `cf` (5218-5220, preceded by its own 8-line 2026-08-16 rationale at 5210-5217: a manual trim/marker is a raw frame NUMBER, not an array reference, so splicing shifts everything after it but leaves anything at or before `cf` untouched); a non-targeted layer gets `lyr.frames.push(blank)` instead (5222, appended at the array's own end, never at `cf+1`). After the loop: `state.markers` (the COMP-level marker list, distinct from a per-layer `lyr.markers`) shifted the same way (5224); `state.totalFrames++` (5225); `state.waOut` bumped if it was sitting at the old last frame (5226); `window._waOut`/`window._totalF` mirrors updated (5227); `goToFrame(cf+1)` (5228, packet 1 — moves the playhead onto the newly-inserted frame, itself triggering ANOTHER `saveAllLayerFrames()`+`loadFrame` pass); toast naming how many layers were targeted if fewer than all (5229).",
+          "callers": [
+            "Internal: none (insertFrame is not called from elsewhere in this scope).",
+            "src/js/timeline.js: 2 (5241 context-menu 'Insérer une image' F5 item, 7515 the F5 shortcut-table entry)",
+            "src/js/labs/command-palette.js: 1 (31)",
+            "Also exposed as window.SM.insertFrame (timeline.js:515) — same bare global, not a wrapper."
+          ],
+          "behavior": [
+            "Lines 5176-5190 (comment, 15 lines): length-pad-vs-splice invariant rationale.",
+            "Line 5191 (code): function open.",
+            "Lines 5192-5193 (code, 2 lines): resolve targets from _layerSel or all layers.",
+            "Lines 5194-5200 (comment, 7 lines): 2026-07 locked-layer feedback rationale.",
+            "Line 5201 (code): filter out locked layers.",
+            "Line 5202 (code): abort-with-toast if an explicit all-locked selection has nothing left.",
+            "Line 5203 (code): pushUndoLayers() (bare).",
+            "Line 5204 (code): resolve cf.",
+            "Lines 5205-5209 (code, 5 lines): loop open, build blank, resolve lyr, targeted branch open, splice at cf+1.",
+            "Lines 5210-5217 (comment, 8 lines): 2026-08-16 marker/trim-shift correction rationale.",
+            "Lines 5218-5220 (code, 3 lines): shift inPoint/outPoint/markers for entries strictly after cf.",
+            "Lines 5221-5223 (code, 3 lines): targeted-branch close, non-targeted push(blank), loop close.",
+            "Line 5224 (code): shift state.markers.",
+            "Lines 5225-5227 (code, 3 lines): totalFrames++, waOut bump, window mirrors.",
+            "Line 5228 (code): goToFrame(cf+1).",
+            "Line 5229 (code): toast, naming targeted-layer count if partial.",
+            "Line 5230 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "insert-keyframe-core",
+      "packets": [
+        {
+          "id": "C21q.insert-keyframe-core",
+          "files": [
+            "src/js/app.js:5231-5249"
+          ],
+          "coverage_ranges": [
+            [
+              5231,
+              5249
+            ]
+          ],
+          "classification": {
+            "code": 15,
+            "comment": 4,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_insertKeyframeCore"
+          ],
+          "signature": "function _insertKeyframeCore(layerIdx,frameIdx){var ld=state.layers[layerIdx];var f=ld.frames[frameIdx];if(ld.symbolId){var sym=state.symbols[ld.symbolId];f.strokes=[];f.componentFrame=sym?resolveSymbolFrameIdx(sym,ld,frameIdx):0;delete f.blankOverride;f.isKeyframe=true;f.isInterpolated=false;syncLinkedKeyframeFolder(layerIdx,frameIdx);return;}f.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(layerIdx,frameIdx)));f.isKeyframe=true;f.isInterpolated=false;syncLinkedKeyframeFolder(layerIdx,frameIdx);}",
+          "responsibility": "The SHARED per-layer mutation step contract item (b) asks for by name — lead-in (5231-5234, 4 comment lines) states it is reused by `insertKeyframeAt` (single layer+frame, own undo/render — the span-end drag handle) and `insertKeyframe` below (multi-layer, ONE undo/render for the whole batch), and explicitly has NO undo/render side effects of its own — every caller owns that. `_insertKeyframeCore(layerIdx,frameIdx)` (5235-5249), touches EXACTLY ONE `ld.frames[frameIdx]` object, mutated IN PLACE (never replaced/spliced): resolves `ld`/`f` (5236). TWO DISJOINT BRANCHES on `ld.symbolId` (contract item (b)'s own `ld.frames[]` mutation table): (A) component branch (5237-5245) — `f.strokes=[]` (5239, a component-instance keyframe never stores drawn content of its own — getEffectiveStrokes' own symbolId branch, C21k, renders from `f.componentFrame` instead); `f.componentFrame=sym?resolveSymbolFrameIdx(sym,ld,frameIdx):0` (5240, cited by name only, C21j — resolves which frame of the COMPONENT's own inner timeline this outer keyframe should display, falling back to 0 if the symbol was somehow deleted); `delete f.blankOverride` (5241, clears any prior F7 blank-hide flag — inserting a real keyframe here must not leave a stale hide-flag behind); `f.isKeyframe=true;f.isInterpolated=false;` (5242); `syncLinkedKeyframeFolder(layerIdx,frameIdx)` (5243, cited by name only, C21p); `return` (5244, the component branch never falls through to the plain-layer branch below). (B) plain-layer branch (5246-5248, reached only when `ld.symbolId` is falsy) — `f.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(layerIdx,frameIdx)))` (5246, cited by name only, C21k — a full deep-clone snapshot of WHATEVER IS CURRENTLY DISPLAYED for this frame, whether that's an inherited hold or a tween inbetween, baked into an independently-owned array, never a live reference); `f.isKeyframe=true;f.isInterpolated=false;` (5247, identical flag flip to the component branch); `syncLinkedKeyframeFolder(layerIdx,frameIdx)` (5248, same call as the component branch, cited by name only).",
+          "callers": [
+            "Internal: app.js:5273 — insertKeyframe (this scope, packet 4): once per eligible layer inside its own forEach, same frame (cf) for every layer.",
+            "Internal: app.js:5305 — insertKeyframeAt (this scope, packet 5): once, for the caller-supplied layerIdx/frameIdx pair.",
+            "src/js/select-bridge.js: 1 (1011 — the multi-layer marquee's own held-frame promotion inside `mlBox.targets.forEach`, wrapped in its own `saveAllLayerFrames(); pushUndoLayers(true);` per its own comment at select-bridge.js:1005-1007 warning that _insertKeyframeCore/loadFrame rebuilds all Paper items and would otherwise leave a snapshot stale)."
+          ],
+          "behavior": [
+            "Lines 5231-5234 (comment, 4 lines): shared-step/no-own-undo contract.",
+            "Line 5235 (code): function open.",
+            "Line 5236 (code): resolve ld, f.",
+            "Line 5237 (code): symbolId branch open.",
+            "Line 5238 (code): resolve sym.",
+            "Line 5239 (code): f.strokes=[].",
+            "Line 5240 (code): f.componentFrame via resolveSymbolFrameIdx or 0.",
+            "Line 5241 (code): delete f.blankOverride.",
+            "Line 5242 (code): isKeyframe=true, isInterpolated=false.",
+            "Line 5243 (code): syncLinkedKeyframeFolder call.",
+            "Line 5244 (code): return (component branch ends here).",
+            "Line 5245 (code): symbolId branch close.",
+            "Line 5246 (code): plain-layer branch — deep-clone getEffectiveStrokes into f.strokes.",
+            "Line 5247 (code): isKeyframe=true, isInterpolated=false.",
+            "Line 5248 (code): syncLinkedKeyframeFolder call.",
+            "Line 5249 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "insert-keyframe",
+      "packets": [
+        {
+          "id": "C21q.insert-keyframe",
+          "files": [
+            "src/js/app.js:5250-5276"
+          ],
+          "coverage_ranges": [
+            [
+              5250,
+              5276
+            ]
+          ],
+          "classification": {
+            "code": 17,
+            "comment": 10,
+            "whitespace": 0
+          },
+          "symbols": [
+            "insertKeyframe"
+          ],
+          "signature": "function insertKeyframe(){saveAllLayerFrames();var targets=(typeof _layerSel!=='undefined'&&_layerSel.length)?_layerSel.slice():state.layers.map(function(_ld,i){return i;});var cf=state.currentFrame;var lockedHit=false;var eligible=targets.filter(function(li){var ld=state.layers[li];if(!ld)return false;if(ld.locked&&!ld.symbolId){lockedHit=true;return false;}return !ld.frames[cf].isKeyframe;});if(!eligible.length){showToast(lockedHit?SM.t('toastLayerLocked'):SM.t('toastAlreadyAKeyframe'));return;}pushUndoLayers();eligible.forEach(function(li){_insertKeyframeCore(li,cf);});loadFrame(cf);renderOS();renderArcs();updateUI();showToast(eligible.length>1?eligible.length+SM.t('toastKeyframesInsertedSuffix'):SM.t('toastKeyframeInserted'));}",
+          "responsibility": "F6 — lead-in (5250-5257, 8 comment lines) states the feature targets `_layerSel` (the layer-panel batch selection) when the user has explicitly picked layer(s), otherwise EVERY layer, matching Animate/Harmony's 'no selection = affects everything' convention — and names the bug this replaced (2026-07 feedback: previously always hit only `state.activeLayerIdx` regardless of panel selection). `insertKeyframe()` (5258-5276), touches MULTIPLE layers, ONE shared undo/render for the whole batch: `saveAllLayerFrames()` first (5259, unconditional, flushes any live-canvas edit before computing eligibility below — see `boundaries` for the double-save this creates once `pushUndoLayers()` runs further down); resolves `targets` identically to `insertFrame` (5260, `_layerSel` or all layers); `eligible` computed via `.filter()` (5263-5270): a missing layer excluded (5265, defensive); a layer that is `locked` AND NOT a component instance sets `lockedHit=true` and is excluded (5268, preceded by its own 2-line rationale at 5266-5267 — a component instance's OUTER timing row must stay editable even though its internal drawing is locked); otherwise a layer is eligible only if its CURRENT frame is NOT already a keyframe (5269, `!ld.frames[cf].isKeyframe`); an empty `eligible` list aborts with a toast naming EITHER 'layer locked' or 'already a keyframe' depending on which reason applied (5271, `lockedHit` decides the message even though both filters can reject different layers in the same call — the toast reports only ONE reason); `pushUndoLayers()` (5272, bare — see `boundaries`, this is the SECOND save-triggering call in this function); `eligible.forEach(function(li){_insertKeyframeCore(li,cf);})` (5273, previous packet, one call per eligible layer, same frame `cf` for all); `loadFrame(cf);renderOS();renderArcs();updateUI();` (5274, the standard non-frameOnly full render+UI refresh, cited by name only for updateUI/renderOS/renderArcs elsewhere); pluralized toast (5275).",
+          "callers": [
+            "Internal: none.",
+            "src/js/timeline.js: 2 (5242 context-menu 'Insérer une keyframe' F6 item, 7516 the F6 shortcut-table entry)",
+            "src/js/labs/command-palette.js: 1 (29)",
+            "Also exposed as window.SM.insertKeyframe (timeline.js:515) — same bare global."
+          ],
+          "behavior": [
+            "Lines 5250-5257 (comment, 8 lines): _layerSel-targeting/no-selection-means-all rationale, 2026-07 bug-fix framing.",
+            "Line 5258 (code): function open.",
+            "Line 5259 (code): saveAllLayerFrames() — unconditional, before eligibility is computed.",
+            "Line 5260 (code): resolve targets from _layerSel or all layers.",
+            "Lines 5261-5262 (code, 2 lines): resolve cf, init lockedHit=false.",
+            "Line 5263 (code): eligible = targets.filter(... open.",
+            "Lines 5264-5265 (code, 2 lines): resolve ld, missing-layer guard.",
+            "Lines 5266-5267 (comment, 2 lines): component-instance outer-row-stays-editable rationale.",
+            "Line 5268 (code): locked-and-not-component exclusion, sets lockedHit.",
+            "Line 5269 (code): return !isKeyframe eligibility test.",
+            "Line 5270 (code): filter close.",
+            "Line 5271 (code): empty-eligible abort, toast picks message by lockedHit.",
+            "Line 5272 (code): pushUndoLayers() (bare).",
+            "Line 5273 (code): forEach eligible layer, _insertKeyframeCore(li,cf).",
+            "Line 5274 (code): loadFrame(cf); renderOS(); renderArcs(); updateUI().",
+            "Line 5275 (code): pluralized toast.",
+            "Line 5276 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "prev-next-keyframe-frame-insert-at",
+      "packets": [
+        {
+          "id": "C21q.prev-next-keyframe-frame-insert-at",
+          "files": [
+            "src/js/app.js:5277-5309"
+          ],
+          "coverage_ranges": [
+            [
+              5277,
+              5309
+            ]
+          ],
+          "classification": {
+            "code": 21,
+            "comment": 12,
+            "whitespace": 0
+          },
+          "symbols": [
+            "prevKeyframeFrame",
+            "nextKeyframeFrame",
+            "insertKeyframeAt"
+          ],
+          "signature": "function prevKeyframeFrame(layerIdx,fromFrame){var ld=state.layers[layerIdx];if(!ld)return fromFrame;for(var i=fromFrame-1;i>=0;i--)if(ld.frames[i].isKeyframe)return i;return fromFrame;}function nextKeyframeFrame(layerIdx,fromFrame){var ld=state.layers[layerIdx];if(!ld)return fromFrame;for(var i=fromFrame+1;i<ld.frames.length;i++)if(ld.frames[i].isKeyframe)return i;return fromFrame;}function insertKeyframeAt(layerIdx,frameIdx){saveAllLayerFrames();var ld=state.layers[layerIdx];var f=ld.frames[frameIdx];if(ld.locked&&!ld.symbolId){showToast(SM.t('toastLayerLocked'));return false;}if(f.isKeyframe){showToast(SM.t('toastAlreadyAKeyframe'));return false;}pushUndoLayers();_insertKeyframeCore(layerIdx,frameIdx);if(layerIdx===state.activeLayerIdx)loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(SM.t('toastKeyframeInserted'));return true;}",
+          "responsibility": "Shared 12-line lead-in (5277-5288, two paragraphs) covers all three functions: paragraph one (5277-5284) frames `insertKeyframeAt` as `insertKeyframe`'s own single-layer/single-frame twin, used to shorten a held/extended keyframe's span by dropping a new keyframe partway through it (the frame grid's span-end drag handle) — since a hold span has no stored length of its own, it is purely derived by scanning forward to the next real keyframe (`renderTimeline()`, timeline.js, cited by name only), so 'shrinking' one is really 'insert a keyframe earlier, which becomes the new boundary'. Paragraph two (5285-5288) frames `prevKeyframeFrame`/`nextKeyframeFrame` as J/K transport's own (timeline.js `onKeyDown`, cited by name only) nearest-real-keyframe lookup, clamped rather than wrapping so repeated J/K at either end holds still instead of jumping to the opposite end. `prevKeyframeFrame(layerIdx,fromFrame)` (5289-5293): resolves `ld`, returns `fromFrame` unchanged if the layer is missing (5290, defensive); scans BACKWARD from `fromFrame-1` to 0, returning the first index whose `isKeyframe` is true (5291); falls through to `fromFrame` unchanged if none found (5292, the clamp). `nextKeyframeFrame(layerIdx,fromFrame)` (5294-5298): the mirror, scanning FORWARD from `fromFrame+1` to `ld.frames.length`. Neither function reads or writes any `ld.frames[]` field beyond `.isKeyframe` — pure read-only lookups, no undo/render, no mutation at all. `insertKeyframeAt(layerIdx,frameIdx)` (5299-5309), touches EXACTLY ONE layer+frame, OWN undo/render (unlike `insertKeyframe`'s shared batch pass): `saveAllLayerFrames()` first (5300, unconditional — see `boundaries`); resolves `ld`/`f` (5301); locked-and-not-component guard, returns `false` with a toast (5302, IDENTICAL condition to `insertKeyframe`'s own per-layer filter at 5268, but expressed as a direct early return here since there is only one layer); already-a-keyframe guard, returns `false` with a toast (5303); `pushUndoLayers()` (5304, bare — the SECOND save-triggering call, same pattern as `insertKeyframe`); `_insertKeyframeCore(layerIdx,frameIdx)` (5305, previous packet); `loadFrame(state.currentFrame)` ONLY IF `layerIdx===state.activeLayerIdx` (5306 — a keyframe inserted on a NON-active layer never needs the live Paper.js document reloaded, since that layer's own live children aren't materialized into `userLayers[]` for the active layer's own canvas view); `renderOS();renderArcs();updateUI();showToast(...)` unconditionally (5307); returns `true` on success (5308) — the ONLY function in this scope with a meaningful boolean return value, consumed by its own caller (timeline.js:5024) to decide whether the drag gesture succeeded.",
+          "callers": [
+            "prevKeyframeFrame — Internal: none. External: src/js/timeline.js: 1 (7509, the 'j' J/K-transport shortcut-table entry, wrapped in `goToFrame(prevKeyframeFrame(state.activeLayerIdx,state.currentFrame))` — this scope's own packet 1 composed directly with this packet's own function).",
+            "nextKeyframeFrame — Internal: none. External: src/js/timeline.js: 1 (7510, the 'k' shortcut-table entry, same composition pattern with goToFrame).",
+            "insertKeyframeAt — Internal: none. External: src/js/timeline.js: 1 (5024, the frame grid's span-shrink drag-drop handler — 'dropped on the existing (open-ended) end' is a no-op per its own guard at timeline.js:5023, otherwise calls insertKeyframeAt(li,fi))."
+          ],
+          "behavior": [
+            "Lines 5277-5284 (comment, 8 lines): insertKeyframeAt/span-shrink rationale.",
+            "Lines 5285-5288 (comment, 4 lines): J/K transport clamp-not-wrap rationale.",
+            "Line 5289 (code): prevKeyframeFrame open.",
+            "Line 5290 (code): resolve ld, missing-layer guard.",
+            "Line 5291 (code): backward scan for isKeyframe.",
+            "Lines 5292-5293 (code, 2 lines): fallback return, function close.",
+            "Line 5294 (code): nextKeyframeFrame open.",
+            "Line 5295 (code): resolve ld, missing-layer guard.",
+            "Line 5296 (code): forward scan for isKeyframe.",
+            "Lines 5297-5298 (code, 2 lines): fallback return, function close.",
+            "Line 5299 (code): insertKeyframeAt open.",
+            "Line 5300 (code): saveAllLayerFrames() — unconditional.",
+            "Line 5301 (code): resolve ld, f.",
+            "Line 5302 (code): locked-and-not-component guard, return false.",
+            "Line 5303 (code): already-a-keyframe guard, return false.",
+            "Line 5304 (code): pushUndoLayers() (bare).",
+            "Line 5305 (code): _insertKeyframeCore(layerIdx,frameIdx).",
+            "Line 5306 (code): loadFrame(state.currentFrame) only if layerIdx is the active layer.",
+            "Line 5307 (code): renderOS/renderArcs/updateUI/showToast, unconditional.",
+            "Line 5308 (code): return true.",
+            "Line 5309 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "insert-blank-keyframe-remove-frame",
+      "packets": [
+        {
+          "id": "C21q.insert-blank-keyframe-remove-frame",
+          "files": [
+            "src/js/app.js:5310-5336"
+          ],
+          "coverage_ranges": [
+            [
+              5310,
+              5336
+            ]
+          ],
+          "classification": {
+            "code": 16,
+            "comment": 11,
+            "whitespace": 0
+          },
+          "symbols": [
+            "insertBlankKeyframe",
+            "removeFrame"
+          ],
+          "signature": "function insertBlankKeyframe(){var ld=state.layers[state.activeLayerIdx];if(ld.locked&&!ld.symbolId){showToast(SM.t('toastLayerLocked'));return;}saveAllLayerFrames();pushUndoLayers(true);var f={strokes:[],isKeyframe:true,isInterpolated:false};if(ld.symbolId)f.blankOverride=true;ld.frames[state.currentFrame]=f;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Blank keyframe (F7)');}function removeFrame(){if(state.totalFrames<=1)return;pushUndoLayers();var cf=state.currentFrame;for(var i=0;i<state.layers.length;i++){var lyr=state.layers[i];lyr.frames.splice(cf,1);if(lyr.inPoint!=null&&lyr.inPoint>cf)lyr.inPoint--;if(lyr.outPoint!=null&&lyr.outPoint>cf)lyr.outPoint--;if(lyr.markers)lyr.markers.forEach(function(m){if(m.frame>cf)m.frame--;});}if(state.markers)state.markers.forEach(function(m){if(m.frame>cf)m.frame--;});state.totalFrames--;if(state.waOut>=state.totalFrames)state.waOut=state.totalFrames-1;window._waOut=state.waOut;window._totalF=state.totalFrames;if(state.currentFrame>=state.totalFrames)state.currentFrame=state.totalFrames-1;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(SM.t('toastFrameDeleted'));}",
+          "responsibility": "No shared lead-in — two unrelated F7/removal operations grouped by proximity. `insertBlankKeyframe()` (5310-5324), touches ONE layer (`state.activeLayerIdx`) — F7: resolves `ld` (5311); locked-and-not-component guard (5312, identical condition to packet 5's `insertKeyframeAt`); `saveAllLayerFrames();pushUndoLayers(true);` on the SAME line (5313 — the ONLY call site in this scope's own eight save/undo sites that passes `true` to suppress `pushUndoLayers`'s own redundant internal re-save, see `boundaries`); builds a brand-new `f={strokes:[],isKeyframe:true,isInterpolated:false}` (5314); `f.blankOverride=true` ONLY if `ld.symbolId` (5321, preceded by its own 6-line rationale at 5315-5320 — on a component layer this outer-timeline row is otherwise dead timing decoration, since getEffectiveStrokes' own symbolId branch never reads `isKeyframe` alone to decide visibility; the explicit flag is what makes THIS blank keyframe actually hide the component for its span, without also treating the harmless `isKeyframe:true` seed every component starts with at frame 0 as an accidental hide); `ld.frames[state.currentFrame]=f` (5322, a WHOLE-OBJECT REPLACE of the frame slot, not a field-by-field mutation — unlike `_insertKeyframeCore`'s in-place field writes, this one discards whatever the previous frame object held entirely, including any fields this scope doesn't itself know about); `loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Blank keyframe (F7)')` (5323, note the toast string is a HARD-CODED English literal, not routed through `SM.t(...)` like every other toast in this scope — see `boundaries`). `removeFrame()` (5325-5336), touches ALL layers, NO locked-layer check at all (see `boundaries` for the asymmetry with insertFrame/insertKeyframe/insertKeyframeAt/cutFrames): `state.totalFrames<=1` guard, early return before any mutation (5325, keeps at least one frame in the document); `pushUndoLayers()` (5325, bare, on the SAME line as the guard — see `boundaries`); per-layer loop (5325-5334, note the loop's OWN opening brace is on the declaration line 5325, its per-layer trim-shift block spans 5326-5334 as a separate visual block though it is the SAME statement group): `lyr.frames.splice(cf,1)` (5325, removes the slot AT `cf` — every later frame silently shifts down by one, a pure array splice with no replacement); `inPoint`/`outPoint`/`markers` shifted DOWN by one for entries strictly after `cf` (5331-5333, preceded by its own 5-line 2026-08-16 mirror rationale at 5326-5330 — the exact inverse of insertFrame's own shift, and explicitly notes a value AT `cf` needs no adjustment since whatever sat at `cf+1` now occupies `cf`). After the loop: `state.markers` shifted down the same way (5335); `state.totalFrames--` (5336); `state.waOut` clamped if it now exceeds the new total; `window._waOut`/`window._totalF` mirrors; `state.currentFrame` clamped if it now exceeds the new total; `loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(...)` — all on the SAME final statement line (5336).",
+          "callers": [
+            "insertBlankKeyframe — Internal: none. External: src/js/timeline.js: 2 (5243 context-menu F7 item, 7517 the F7 shortcut-table entry); src/js/labs/command-palette.js: 1 (30). Also exposed as window.SM.insertBlankKeyframe (timeline.js:515).",
+            "removeFrame — Internal: app.js:5391 — removeFrameSpan (this scope, packet 8): fallback path when `selBounds()` returns null (no multi-frame selection), delegates to a single-frame removal at the current playhead. External: src/js/timeline.js: 1 (10201, Shift+Delete keyboard handler); src/js/labs/command-palette.js: 1 (32). Also exposed as window.SM.removeFrame (timeline.js:515)."
+          ],
+          "behavior": [
+            "Line 5310 (code): insertBlankKeyframe open.",
+            "Line 5311 (code): resolve ld.",
+            "Line 5312 (code): locked-and-not-component guard.",
+            "Line 5313 (code): saveAllLayerFrames(); pushUndoLayers(true) — the one call site avoiding the double-save.",
+            "Line 5314 (code): build fresh blank-keyframe object.",
+            "Lines 5315-5320 (comment, 6 lines): component blankOverride rationale.",
+            "Line 5321 (code): set blankOverride only for a component layer.",
+            "Line 5322 (code): whole-object replace of ld.frames[currentFrame].",
+            "Line 5323 (code): loadFrame/renderOS/renderArcs/updateUI/hard-coded-English toast.",
+            "Line 5324 (code): function close.",
+            "Line 5325 (code): removeFrame open, totalFrames<=1 guard, pushUndoLayers() (bare), loop open, splice(cf,1).",
+            "Lines 5326-5330 (comment, 5 lines): 2026-08-16 mirror-of-insertFrame trim-shift rationale.",
+            "Lines 5331-5333 (code, 3 lines): shift inPoint/outPoint/markers down for entries after cf.",
+            "Line 5334 (code): loop close.",
+            "Line 5335 (code): shift state.markers down.",
+            "Line 5336 (code): totalFrames--, waOut/currentFrame clamps, window mirrors, loadFrame/renderOS/renderArcs/updateUI/toast, function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "clear-keyframe-remove-tween-span",
+      "packets": [
+        {
+          "id": "C21q.clear-keyframe-remove-tween-span",
+          "files": [
+            "src/js/app.js:5337-5368"
+          ],
+          "coverage_ranges": [
+            [
+              5337,
+              5368
+            ]
+          ],
+          "classification": {
+            "code": 19,
+            "comment": 13,
+            "whitespace": 0
+          },
+          "symbols": [
+            "clearKeyframe",
+            "removeTweenSpan"
+          ],
+          "signature": "function clearKeyframe(){var ld=state.layers[state.activeLayerIdx];var cf=state.currentFrame;var f=ld.frames[cf];if(ld.locked){showToast(SM.t('toastLayerLocked'));return;}if(!f||!f.isKeyframe){showToast(SM.t('toastNotAKeyframe'));return;}pushUndo();f.strokes=[];f.isKeyframe=false;f.isInterpolated=false;syncLinkedKeyframeFolder(state.activeLayerIdx,cf);loadFrame(cf);renderOS();renderArcs();updateUI();showToast(SM.t('toastKeyframeCleared'));}function removeTweenSpan(li,fromF,toF){var ld=state.layers[li];if(!ld||ld.locked){showToast(SM.t('toastLayerLocked'));return;}pushUndo();for(var fi=fromF+1;fi<toF;fi++){var f=ld.frames[fi];if(!f)continue;f.strokes=[];f.isKeyframe=false;f.isInterpolated=false;}loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(SM.t('toastTweenRemoved'));}",
+          "responsibility": "`clearKeyframe()` (5340-5347, preceded by its own 3-line lead-in at 5337-5339: Animate's 'Clear Keyframe' — demotes a keyframe back into a plain extended frame, content reverting to whatever the PREVIOUS keyframe holds, WITHOUT removing the frame slot itself, unlike removeFrame/removeFrameSpan), touches ONE layer (`state.activeLayerIdx`) and ONE frame (`state.currentFrame`): resolves `ld`/`cf`/`f` (5341); locked guard — note this is `ld.locked` ALONE, with NO `&&!ld.symbolId` exemption unlike `insertKeyframe`/`insertKeyframeAt` (5342, so a component instance's own outer keyframe can NOT be cleared while the instance is locked, an asymmetry with the insert-side functions — see `boundaries`); not-a-keyframe guard, `!f||!f.isKeyframe` (5343); `pushUndo();f.strokes=[];f.isKeyframe=false;f.isInterpolated=false;` all on the SAME line (5344 — `pushUndo()` bare, see `boundaries` for the alias/double-save finding; the three field writes are the ENTIRE `ld.frames[]` mutation: strokes emptied, BOTH flags cleared, so the frame reverts to an ordinary hold exactly like any never-keyed gap); `syncLinkedKeyframeFolder(state.activeLayerIdx,cf)` (5345, cited by name only, C21p); `loadFrame(cf);renderOS();renderArcs();updateUI();showToast(...)` (5346). `removeTweenSpan(li,fromF,toF)` (5358-5368, preceded by its own 10-line lead-in at 5348-5357 — feedback #92: distinguishes itself from `removeFrameSpan` by NOT deleting frames or shifting `state.totalFrames`; instead un-tweens a span IN PLACE, reverting the STRICTLY-BETWEEN frames to a plain hold of the START keyframe's own content, deliberately leaving the END keyframe `toF` untouched since only what's strictly between the pair was ever tween-generated), touches ONE layer (`li`, an explicit parameter — NOT necessarily the active layer) and a RANGE of frames: resolves `ld` (5359); `!ld||ld.locked` guard (5360, note this ALSO has no `symbolId` exemption, same asymmetry as clearKeyframe); `pushUndo()` bare (5361, see `boundaries`); loop `fi` from `fromF+1` (EXCLUSIVE of the start keyframe) to STRICTLY LESS THAN `toF` (EXCLUSIVE of the end keyframe) (5362): `f=ld.frames[fi];if(!f)continue;` (5363, defensive); `f.strokes=[];f.isKeyframe=false;f.isInterpolated=false;` (5364, the identical three-field flatten `clearKeyframe` applies to a single frame, applied here to every frame in the open interval `(fromF,toF)`); `loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();` (5366, reloads the CURRENT playhead frame, not necessarily `li`/a frame in the cleared range — correct only because `li` is typically the active layer and the cleared range typically brackets `state.currentFrame`, neither of which this function itself verifies); toast (5367). Contract item (c): NEITHER function ever sets `isInterpolated` to `true` — both only ever CLEAR it to `false` alongside `isKeyframe`, since both represent 'this frame is no longer anything special, just an ordinary hold'; there is no `tweenMeta`/pair-data field anywhere in this codebase to update (see `boundaries`, whole-file grep).",
+          "callers": [
+            "clearKeyframe — Internal: none. External: src/js/timeline.js: 2 (10207, Shift+F6 keyboard handler as a direct bare-name call; 5245, `window.SM.clearKeyframe()` context-menu item — the two forms are the SAME underlying global, cited separately since one is a property-form call).",
+            "removeTweenSpan — Internal: none. External: src/js/timeline.js: 1, property form only (5234, `window.SM.removeTweenSpan(li,twPair.a,twPair.b)` context-menu 'Supprimer le tween' item, `twPair` resolved by `tweenPairForCell` — no bare-name external caller exists anywhere in src)."
+          ],
+          "behavior": [
+            "Lines 5337-5339 (comment, 3 lines): clearKeyframe's own Animate-convention header.",
+            "Line 5340 (code): clearKeyframe open.",
+            "Line 5341 (code): resolve ld, cf, f.",
+            "Line 5342 (code): locked guard (no symbolId exemption).",
+            "Line 5343 (code): not-a-keyframe guard.",
+            "Line 5344 (code): pushUndo() (bare); flatten strokes/isKeyframe/isInterpolated.",
+            "Line 5345 (code): syncLinkedKeyframeFolder call.",
+            "Line 5346 (code): loadFrame/renderOS/renderArcs/updateUI/toast.",
+            "Line 5347 (code): function close.",
+            "Lines 5348-5357 (comment, 10 lines): removeTweenSpan feedback #92 header — distinguishes from removeFrameSpan, end-keyframe left untouched.",
+            "Line 5358 (code): removeTweenSpan open.",
+            "Line 5359 (code): resolve ld.",
+            "Line 5360 (code): missing-or-locked guard (no symbolId exemption).",
+            "Line 5361 (code): pushUndo() (bare).",
+            "Line 5362 (code): loop open, (fromF,toF) exclusive range.",
+            "Line 5363 (code): resolve f, missing-frame guard.",
+            "Line 5364 (code): flatten strokes/isKeyframe/isInterpolated.",
+            "Line 5365 (code): loop close.",
+            "Line 5366 (code): loadFrame(currentFrame)/renderOS/renderArcs/updateUI.",
+            "Line 5367 (code): toast.",
+            "Line 5368 (code): function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "convert-to-keyframes-remove-span-duplicate",
+      "packets": [
+        {
+          "id": "C21q.convert-to-keyframes-remove-span-duplicate",
+          "files": [
+            "src/js/app.js:5369-5410"
+          ],
+          "coverage_ranges": [
+            [
+              5369,
+              5410
+            ]
+          ],
+          "classification": {
+            "code": 32,
+            "comment": 10,
+            "whitespace": 0
+          },
+          "symbols": [
+            "convertToKeyframes",
+            "removeFrameSpan",
+            "duplicateSelectedFrames"
+          ],
+          "signature": "function convertToKeyframes(){var li=state.activeLayerIdx;var ld=state.layers[li];if(ld.locked){showToast(SM.t('toastLayerLocked'));return;}var frames=_sel.frames.length?_sel.frames.filter(function(s){return s.layer===li;}).map(function(s){return s.frame;}):[state.currentFrame];if(!frames.length){showToast(SM.t('toastNoSelection'));return;}pushUndo();saveAllLayerFrames();var count=0;frames.forEach(function(fi){var f=ld.frames[fi];if(!f||f.isKeyframe)return;f.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(li,fi)));f.isKeyframe=true;f.isInterpolated=false;count++;});loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(count+SM.t('toastKeyframesCreatedSuffix'));}function removeFrameSpan(){var b=selBounds();if(!b){removeFrame();return;}var count=b.maxF-b.minF+1;if(state.totalFrames-count<1){showToast('Il faut garder au moins 1 frame');return;}pushUndoLayers();for(var i=0;i<state.layers.length;i++)state.layers[i].frames.splice(b.minF,count);state.totalFrames-=count;if(state.waOut>=state.totalFrames)state.waOut=state.totalFrames-1;window._waOut=state.waOut;window._totalF=state.totalFrames;if(state.currentFrame>=state.totalFrames)state.currentFrame=state.totalFrames-1;selClear();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(count+SM.t('toastFramesDeletedSuffix'));}function duplicateSelectedFrames(){var b=selBounds();if(!b){showToast(SM.t('toastNoSelection'));return;}window.SM.copyFrames();var span=b.maxF-b.minF+1;state.currentFrame=b.minF+span;window._curFrame=state.currentFrame;window.SM.pasteFrames();}",
+          "responsibility": "`convertToKeyframes()` (5374-5385, preceded by its own 5-line lead-in at 5369-5373 — Animate's 'Convert to Keyframes': bakes whatever's currently displayed — a tweened inbetween OR content merely inherited from an earlier keyframe — into an independent real keyframe on every frame in the selection, or just the current frame if nothing's selected), touches ONE layer (`state.activeLayerIdx`) but POTENTIALLY MULTIPLE frames: resolves `li`/`ld` (5375); locked guard, no symbolId exemption (5376, same asymmetry as clearKeyframe/removeTweenSpan); `frames` resolved from `_sel.frames` FILTERED to THIS layer only, mapped to frame indices — OR, if `_sel.frames` is empty, just `[state.currentFrame]` (5377, contract item (d): the multi-frame selection field IS `_sel.frames`, an array of `{layer,frame}` pairs, cited by name/line only for its own mutators — timeline.js `selAdd`/`selRemove`/`selClear`); empty-after-filter guard (5378, can happen if every selected cell belongs to a DIFFERENT layer than the active one); `pushUndo();saveAllLayerFrames();` on the SAME line (5379 — `pushUndo()` bare already triggers its own internal `saveAllLayerFrames()` per the alias finding, so this line runs the save TWICE in a row, in the OPPOSITE order from insertKeyframe/insertKeyframeAt's own double-save — see `boundaries`); `frames.forEach` (5380-5383): skips a frame that's missing or ALREADY a keyframe (5381, `!f||f.isKeyframe` — NOTE this does not require `f.isInterpolated`, so an ordinary un-tweened hold converts identically to a genuine tween inbetween, see `boundaries`); for every OTHER frame, `f.strokes=JSON.parse(JSON.stringify(getEffectiveStrokes(li,fi)));f.isKeyframe=true;f.isInterpolated=false;count++;` (5382, cited by name only for getEffectiveStrokes, C21k — the IDENTICAL deep-clone-and-flag pattern `_insertKeyframeCore`'s own plain-layer branch uses, packet 3); `loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(count+...)` (5384). `removeFrameSpan()` (5389-5400, preceded by its own 3-line lead-in at 5386-5388 — Animate's 'Remove Frames' on a range selection: removes the whole selected span across EVERY layer, since frame count is global, rather than clearing content in place like `deleteSelectedFrames`, cited by name only), touches ALL layers, NO locked check anywhere (same asymmetry as removeFrame, see `boundaries`): `b=selBounds()` (5390, contract item (d) — `selBounds()`, timeline.js, reduces `_sel.frames` to `{minL,maxL,minF,maxF}`); FALLS BACK to `removeFrame()` (packet 6) if there is no selection at all (5391 — the ONLY cross-packet delegation in this whole scope); `count=b.maxF-b.minF+1` (5392, the span's own frame count — `minL`/`maxL` from `selBounds()` are computed but NEVER READ by this function, since the frame span it removes is the SAME across every layer regardless of which layers the selection happened to span); guard against removing down to zero frames, a HARD-CODED French toast literal (5393, `'Il faut garder au moins 1 frame'` — not routed through `SM.t(...)`, same class of finding as insertBlankKeyframe's own hard-coded English toast, see `boundaries`); `pushUndoLayers()` bare (5394); `state.layers[i].frames.splice(b.minF,count)` for EVERY layer (5395, a single splice removing the WHOLE span in one call per layer, unlike removeFrame's own one-frame-at-a-time splice); `state.totalFrames-=count` (5396); `waOut`/`window` mirrors clamped (5397); `currentFrame` clamped (5398); `selClear();loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(...)` (5399, contract item (d) again — `selClear()` empties `_sel.frames` AND clears the `.fc.sel` DOM class, timeline.js, cited by name only). `duplicateSelectedFrames()` (5403-5410, preceded by its own 2-line lead-in at 5401-5402 — equivalent to copy + paste-at-selection-end, exposed as one menu action), touches whichever layers `_sel.frames` spans (via the clipboard's own relative-layer offsets, timeline.js, cited by name only) — the ONLY function in this scope with NO `pushUndo`/`pushUndoLayers` call of its OWN anywhere in its own body (see `boundaries`): `b=selBounds()` (5404); no-selection guard (5405); `window.SM.copyFrames()` (5406, timeline.js:1789, cited by name/line only — snapshots every selected `{layer,frame}` cell's own CURRENT `ld.frames[s.frame]` via a fresh `JSON.parse(JSON.stringify(...))` into `_sel.clipboard`, each entry keyed by its OWN offset relative to the selection's `{minL,minF}` corner; also runs its own `saveAllLayerFrames()` first, timeline.js:1790); `span=b.maxF-b.minF+1` (5407, the selection's own frame-count width); `state.currentFrame=b.minF+span;window._curFrame=...` (5408 — moves the playhead to LAND EXACTLY ONE SPAN PAST the selection's own end, WITHOUT calling `goToFrame` at all — no save/load/render happens at this exact step, only the raw pointer move); `window.SM.pasteFrames()` (5409, timeline.js:1819, cited by name/line only — its OWN `pushUndo();saveAllLayerFrames();` runs the undo/save for this ENTIRE duplicate-frames action; pastes each clipboard entry at `state.activeLayerIdx+rl`/`state.currentFrame+rf` via a WHOLE-OBJECT `state.layers[tl].frames[tf]=pasted` replace — NOT a splice/insert, so `state.totalFrames` never changes and whatever previously occupied those target slots is simply overwritten; a pasted frame that was `isInterpolated` is forced to a real keyframe per its own 2026-07-16 comment, timeline.js:1830-1836, cited by line only — 'a copied tween frame pastes as a normal full keyframe'; re-selects the newly-pasted cells; `loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast(...)`).",
+          "callers": [
+            "convertToKeyframes — Internal: none. External: src/js/timeline.js: 1, property form only (5244, `window.SM.convertToKeyframes()` context-menu 'Convertir en keyframes' item — no bare-name external caller exists).",
+            "removeFrameSpan — Internal: none (removeFrameSpan itself CALLS removeFrame, packet 6, as a fallback — see `responsibility`). External: src/js/timeline.js: 1, property form only (5282, `window.SM.removeFrameSpan()` context-menu 'Supprimer les images' item).",
+            "duplicateSelectedFrames — Internal: none. External: src/js/timeline.js: 2, property form only (5239, `window.SM.duplicateSelectedFrames()` context-menu 'Dupliquer la sélection' item; 9772, the Cmd/Ctrl+D-adjacent keyboard branch when `_sel.frames.length`)."
+          ],
+          "behavior": [
+            "Lines 5369-5373 (comment, 5 lines): convertToKeyframes Animate-convention header.",
+            "Line 5374 (code): convertToKeyframes open.",
+            "Line 5375 (code): resolve li, ld.",
+            "Line 5376 (code): locked guard (no symbolId exemption).",
+            "Line 5377 (code): resolve frames from _sel.frames filtered to li, or [currentFrame].",
+            "Line 5378 (code): empty-after-filter guard.",
+            "Line 5379 (code): pushUndo() then saveAllLayerFrames() — both on one line, double-save.",
+            "Line 5380 (code): frames.forEach open.",
+            "Line 5381 (code): skip missing-or-already-keyframe (no isInterpolated requirement).",
+            "Line 5382 (code): deep-clone getEffectiveStrokes into f.strokes, flip flags, count++.",
+            "Line 5383 (code): forEach close.",
+            "Line 5384 (code): loadFrame/renderOS/renderArcs/updateUI/count toast.",
+            "Line 5385 (code): function close.",
+            "Lines 5386-5388 (comment, 3 lines): removeFrameSpan Animate-convention header.",
+            "Line 5389 (code): removeFrameSpan open.",
+            "Line 5390 (code): resolve b=selBounds().",
+            "Line 5391 (code): fallback to removeFrame() when no selection.",
+            "Line 5392 (code): resolve count from span width.",
+            "Line 5393 (code): minimum-1-frame guard, hard-coded French toast.",
+            "Line 5394 (code): pushUndoLayers() (bare).",
+            "Line 5395 (code): splice(b.minF,count) on every layer.",
+            "Line 5396 (code): totalFrames-=count.",
+            "Line 5397 (code): waOut clamp, window mirrors.",
+            "Line 5398 (code): currentFrame clamp.",
+            "Line 5399 (code): selClear/loadFrame/renderOS/renderArcs/updateUI/count toast.",
+            "Line 5400 (code): function close.",
+            "Lines 5401-5402 (comment, 2 lines): duplicateSelectedFrames copy+paste-at-end header.",
+            "Line 5403 (code): duplicateSelectedFrames open.",
+            "Line 5404 (code): resolve b=selBounds().",
+            "Line 5405 (code): no-selection guard.",
+            "Line 5406 (code): window.SM.copyFrames().",
+            "Line 5407 (code): resolve span width.",
+            "Line 5408 (code): move currentFrame one span past the selection's own end (no goToFrame call).",
+            "Line 5409 (code): window.SM.pasteFrames().",
+            "Line 5410 (code): function close — file's own last line."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "C21p / #1222 (existing owner, open PR at authoring time — loadFrame, syncLinkedKeyframeFolder, saveActiveLayerFrameOrPromote)",
+      "disposition": "The sole downstream reader of every `ld.frames[]` mutation this scope makes: `loadFrame` (app.js:4729+) materializes whatever `f.strokes` this scope just wrote (or wholesale-replaced) into live Paper.js children on every `goToFrame`/keyframe-editor call in this scope; `syncLinkedKeyframeFolder` (called from `_insertKeyframeCore` twice and `clearKeyframe` once, this scope) keeps a linked folder's own frame bookkeeping in step with every keyframe this scope creates or clears — neither body is reproduced here."
+    },
+    {
+      "consumer": "C21o / #1220 (existing owner, merged — saveActiveLayerFrame/saveAllLayerFrames/_maybePromoteInterpolated)",
+      "disposition": "Every `saveAllLayerFrames()`/`pushUndo`/`pushUndoLayers` call in this scope (see each packet's own `callers`/`behavior`) reaches this pair's own five-writer identity contract (`f.strokes=strokes` LAST, after `_maybePromoteInterpolated`) — this scope never itself replaces a frame's `strokes` array via that path, only via its own direct `_insertKeyframeCore`/`clearKeyframe`/`removeTweenSpan`/`convertToKeyframes` writes documented per-packet."
+    },
+    {
+      "consumer": "C21k / #1212 (existing owner, merged — getEffectiveStrokes)",
+      "disposition": "`_insertKeyframeCore`'s plain-layer branch (app.js:5246) and `convertToKeyframes` (app.js:5382) both call it to snapshot the CURRENTLY DISPLAYED content of a frame (tween inbetween or inherited hold) into a brand-new independent keyframe array."
+    },
+    {
+      "consumer": "timeline.js (existing owner — window.SM literal, playback loop, copyFrames/pasteFrames, context menus, shortcut tables, tweenPairForCell, selBounds/_sel.frames/selClear)",
+      "disposition": "The primary UI surface reaching every function in this scope, either as a direct bare-name global call or via the `window.SM.<name>` property form (nine of this scope's ten public functions are in the literal; `prevKeyframeFrame`/`nextKeyframeFrame`/`insertKeyframeAt`/`_insertKeyframeCore` are not, see `reconciliation`). Also the SEPARATE playback implementation (`_advanceToFrame`, timeline.js:71-83) that duplicates goToFrame's own save+load+render sequence rather than calling it — see `boundaries`."
+    },
+    {
+      "consumer": "select-bridge.js (existing owner — multi-layer marquee's own held-frame promotion)",
+      "disposition": "The sole external caller of `_insertKeyframeCore` (select-bridge.js:1011), wrapped in its own `saveAllLayerFrames(); pushUndoLayers(true);` (select-bridge.js:1005-1007) — the correct double-save-avoiding pattern."
+    },
+    {
+      "consumer": "nemo-script.js (existing owner — scripting API `frame` setter/getter and `goToFrame(f)` method)",
+      "disposition": "Exposes `goToFrame` to user scripts as both a property setter (`set frame(f)`) and a named method — the ONLY external consumer that could plausibly call `goToFrame` while `state.playing` is already true from an unrelated cause (a script running mid-playback), the scenario `boundaries` names as the one case where goToFrame's own `!state.playing` branches still matter."
+    },
+    {
+      "consumer": "camera.js/motion.js/tweens.js/comp-preview.js/markers.js/labs/lipsync-assistant.js/labs/xsheet-panel.js/labs/storyboard-mode.js/labs/flip-roll.js/labs/command-palette.js/tools.js/effects-panel.js/ui.js (existing owners, remaining external callers)",
+      "disposition": "Each reaches `goToFrame` and/or `insertFrame`/`insertKeyframe`/`insertBlankKeyframe`/`removeFrame` for its own feature-specific reason (camera track scrubbing, Motion timeline navigation, Ghost-All reassignment, lipsync/xsheet/storyboard/flip-roll frame stepping, command-palette menu items, effects-panel best-match seek, the scrub-bar drag handle) — full per-file counts on each function's own packet `callers` field; bodies retained in full, cited by name/line only."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-gotoframe-out-of-range-noop",
+      "proposed": "Call goToFrame(-1) and goToFrame(state.totalFrames); expect no state change (state.currentFrame unchanged, no saveAllLayerFrames/loadFrame call) — verifies line 5113 — not run."
+    },
+    {
+      "id": "fx-gotoframe-same-frame-noop",
+      "proposed": "Call goToFrame(state.currentFrame); expect saveAllLayerFrames/loadFrame NOT called — verifies line 5116 — not run."
+    },
+    {
+      "id": "fx-gotoframe-always-saves-all-layers",
+      "proposed": "Spy on saveAllLayerFrames and saveActiveLayerFrame; call goToFrame(idx) for a valid idx!=currentFrame; expect saveAllLayerFrames called exactly once and saveActiveLayerFrame NOT called — verifies CLAUDE.md §5bis's own claim at line 5153 — not run."
+    },
+    {
+      "id": "fx-gotoframe-selection-restore-by-strokeid",
+      "proposed": "Select two strokes by data.strokeId on the active layer, call goToFrame to a different frame containing strokes with the same strokeIds, then back; expect selectedPaths to reference the NEW rebuilt objects (not the stale pre-loadFrame ones) with the same strokeIds — verifies lines 5147-5151/5162-5172 — not run."
+    },
+    {
+      "id": "fx-gotoframe-selection-not-restored-while-playing",
+      "proposed": "Set state.playing=true with a non-empty selection, call goToFrame; expect selectedPaths to be cleared (via clearSel) but NOT repopulated afterward — verifies the !state.playing gates at 5148 vs. the unconditional clearSel at 5152 — not run."
+    },
+    {
+      "id": "fx-gotoframe-playback-never-calls-gotoframe",
+      "proposed": "Spy on goToFrame; call startPlay() and let playStep advance several ticks; expect ZERO calls to goToFrame (timeline.js's own _advanceToFrame is used instead) — verifies the boundaries finding — not run."
+    },
+    {
+      "id": "fx-insertframe-locked-layer-length-pad-only",
+      "proposed": "Lock one of two layers, call insertFrame() with no explicit _layerSel; expect the locked layer's frames.length to grow by one via push (end-append) while the unlocked layer gets a real splice at cf+1 — verifies lines 5201/5209/5222 — not run."
+    },
+    {
+      "id": "fx-insertframe-explicit-all-locked-aborts",
+      "proposed": "Set _layerSel to exactly one locked layer's index, call insertFrame(); expect a toast and totalFrames UNCHANGED — verifies line 5202 — not run."
+    },
+    {
+      "id": "fx-insertframe-inpoint-outpoint-shift",
+      "proposed": "Set a layer's inPoint=5,outPoint=10, call insertFrame() at currentFrame=2 (targeted); expect inPoint=6,outPoint=11 — verifies lines 5218-5219 — not run."
+    },
+    {
+      "id": "fx-insertkeyframecore-component-branch-sets-componentframe",
+      "proposed": "Call _insertKeyframeCore on a layer with symbolId set; expect f.strokes=[], f.componentFrame set via resolveSymbolFrameIdx, f.blankOverride deleted, isKeyframe=true — verifies lines 5237-5244 — not run."
+    },
+    {
+      "id": "fx-insertkeyframe-locked-component-instance-still-eligible",
+      "proposed": "Lock a component-instance layer (ld.locked=true, ld.symbolId set), call insertKeyframe(); expect it included in eligible (not rejected as lockedHit) — verifies line 5268's `&&!ld.symbolId` exemption — not run."
+    },
+    {
+      "id": "fx-insertkeyframeat-skips-loadframe-for-inactive-layer",
+      "proposed": "Call insertKeyframeAt on a layerIdx different from state.activeLayerIdx; spy on loadFrame; expect loadFrame NOT called, but renderOS/renderArcs/updateUI still called — verifies line 5306 — not run."
+    },
+    {
+      "id": "fx-prevnextkeyframeframe-clamp-at-edges",
+      "proposed": "On a layer with keyframes only at 0 and 10, call prevKeyframeFrame(li,0) and nextKeyframeFrame(li,10); expect both to return the SAME frame unchanged (clamped, not wrapped) — verifies lines 5292/5297 — not run."
+    },
+    {
+      "id": "fx-insertblankkeyframe-single-save-not-double",
+      "proposed": "Spy on saveAllLayerFrames (the one inside pushUndoLayers, and the explicit one); call insertBlankKeyframe(); expect saveAllLayerFrames called exactly ONCE (the explicit call at 5313, suppressed inside pushUndoLayers(true)) — verifies the boundaries double-save finding's one exception — not run."
+    },
+    {
+      "id": "fx-insertkeyframe-double-save-occurs",
+      "proposed": "Spy on saveAllLayerFrames; call insertKeyframe(); expect it called TWICE (once explicit at 5259, once inside bare pushUndoLayers() at 5272) — verifies the boundaries double-save finding — not run."
+    },
+    {
+      "id": "fx-removeframe-ignores-lock",
+      "proposed": "Lock a layer with content on multiple frames, call removeFrame() at some frame; expect the locked layer's own frames array to still be spliced (length reduced) exactly like an unlocked layer — verifies the boundaries no-lock-check finding — not run."
+    },
+    {
+      "id": "fx-clearkeyframe-locked-component-instance-blocked",
+      "proposed": "Lock a component-instance layer, call clearKeyframe() on its own outer keyframe; expect the toastLayerLocked toast and NO field mutation — verifies line 5342 has no symbolId exemption, unlike insertKeyframe — not run."
+    },
+    {
+      "id": "fx-removetweenspan-end-keyframe-untouched",
+      "proposed": "Call removeTweenSpan(li,2,8) on a layer with keyframes at 2 and 8; expect frames 3-7 flattened (strokes=[],isKeyframe=false,isInterpolated=false) and frame 8 UNCHANGED — verifies the exclusive-toF loop bound at line 5362 — not run."
+    },
+    {
+      "id": "fx-converttokeyframes-converts-plain-hold-too",
+      "proposed": "Select a frame that is a plain never-tweened hold (isKeyframe=false,isInterpolated=false), call convertToKeyframes(); expect it converted to a real keyframe exactly like a genuine tween inbetween would be — verifies the boundaries broader-than-header-comment finding at line 5381 — not run."
+    },
+    {
+      "id": "fx-removeframespan-falls-back-to-removeframe",
+      "proposed": "Call removeFrameSpan() with an empty _sel.frames; spy on removeFrame; expect removeFrame() called and removeFrameSpan's own splice-loop code NOT reached — verifies line 5391 — not run."
+    },
+    {
+      "id": "fx-removeframespan-ignores-lock",
+      "proposed": "Lock one of several layers, select a multi-frame span, call removeFrameSpan(); expect the locked layer's frames array ALSO spliced by `count`, same as every other layer — verifies the boundaries no-lock-check finding — not run."
+    },
+    {
+      "id": "fx-duplicateselectedframes-no-own-pushundo",
+      "proposed": "Spy on pushUndo/pushUndoLayers; call duplicateSelectedFrames() with a valid selection; expect the ONLY invocation to occur inside pasteFrames (timeline.js), not inside duplicateSelectedFrames's own body — verifies the boundaries finding that this function has no undo call of its own — not run."
+    },
+    {
+      "id": "fx-duplicateselectedframes-lands-one-span-past-selection",
+      "proposed": "Select frames 3-5 (span=3), call duplicateSelectedFrames(); expect state.currentFrame to become 6 (minF+span) immediately before pasteFrames runs, with no goToFrame/loadFrame call at that exact step — verifies line 5408 — not run."
+    }
+  ],
+  "future_proposals": [
+    "`removeFrame`/`removeFrameSpan` have no `ld.locked` guard, unlike `insertFrame`/`insertKeyframe`/`insertKeyframeAt`/`cutFrames` (timeline.js) which all explicitly protect a locked layer's own content or timing. A future pass should decide whether removing a shared timeline column from a locked layer is intentional (structural, not a content edit) and, if so, document it explicitly the way insertFrame's own comment already documents the opposite choice for insertion. Not changed here.",
+    "`clearKeyframe`/`removeTweenSpan`/`convertToKeyframes` gate on `ld.locked` alone, with no `&&!ld.symbolId` exemption — unlike `insertKeyframe`/`insertKeyframeAt`, which explicitly exempt a locked COMPONENT INSTANCE's own outer timing row. A future pass should decide whether a locked component instance's keyframes should be clearable/convertible (matching the insert-side exemption) or whether the asymmetry is intentional (clearing/converting could be considered closer to a content edit than inserting an empty slot). Not changed here.",
+    "Two hard-coded, non-`SM.t(...)`-routed toast strings live in this scope: `insertBlankKeyframe`'s own `'Blank keyframe (F7)'` (English, line 5323) and `removeFrameSpan`'s own `'Il faut garder au moins 1 frame'` (French, line 5393) — every other toast in this scope routes through `SM.t('toastXxx')`. A future i18n pass should add proper translation keys for both. Not changed here.",
+    "`convertToKeyframes`'s own guard (`!f||f.isKeyframe`, line 5381) converts an ordinary never-tweened hold frame identically to a genuine tween inbetween, which is broader than its own header comment's framing emphasizes. Not a bug, but a future documentation pass could tighten the header comment to match the actual (correct, and arguably more useful) guard. Not changed here.",
+    "The double-save pattern (`saveAllLayerFrames()` explicit call followed by a bare `pushUndo()`/`pushUndoLayers()` that triggers its own internal one, or vice-versa) recurs in six of this scope's eight save/undo call sites (`insertKeyframe`, `insertKeyframeAt`, `convertToKeyframes`, plus `pasteFrames`/`cutFrames`/`copyFrames` in timeline.js reached via `duplicateSelectedFrames`) — harmless (idempotent replay) but consistently wasted wall-clock time re-collecting every layer's strokes a second time on every one of these actions. A future pass could either always pass `true` when an explicit save already ran immediately before/after (matching `insertBlankKeyframe`'s own correct pattern), or move the internal save out of `pushUndo`/`pushUndoLayers` entirely and require every caller to save explicitly. Not changed here."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "Every symbol's external-caller grep was run with a RECURSIVE `find src -name \"*.js\"` scan from the outset (per C21o's own corrected methodology) rather than a flat `src/js/*.js` glob; `bootstrap/`, `animation/`, `application/`, and `domain/` were confirmed to contribute ZERO hits for any of this scope's twelve symbols — unlike C21o's own experience with `saveActiveLayerFrame`/`saveAllLayerFrames`, which had many `labs/` hits a flat glob would have missed, this scope's own callers are concentrated in `timeline.js`/`motion.js`/`tools.js` plus five specific `labs/` files, all of which a flat `src/js/*.js` glob would already have missed too (see `boundaries`).",
+    "The `window.SM={...}` object-literal block (timeline.js:349-880) was read in full to determine exposure: nine of this scope's ten public functions (`insertFrame`/`insertKeyframe`/`insertBlankKeyframe`/`removeFrame`/`clearKeyframe`/`convertToKeyframes`/`removeFrameSpan`/`removeTweenSpan`/`duplicateSelectedFrames`) are assigned directly at lines 515-516; `goToFrame` is exposed via a thin wrapper at line 372; `prevKeyframeFrame`/`nextKeyframeFrame`/`insertKeyframeAt`/`_insertKeyframeCore` are absent from the literal entirely and are reachable only as bare globals within the same script scope — confirmed by a targeted `awk`/`grep` walk of the entire literal body, not just its opening lines, per the issue's own instruction to check the `window.SM={...}` literal block before calling any of these functions internal-only.",
+    "`startPlay`/`playStep`/`advancePlayFrame`/`_advanceToFrame` (timeline.js:17-125) were read in full, not just grepped, to confirm the playback-duplication finding: zero `goToFrame(` occurrences anywhere inside `startPlay`'s own body, confirming playback never calls this scope's `goToFrame` despite that function's own inline comment claiming otherwise (see `boundaries`).",
+    "`pushUndo`/`pushUndoLayers` (tweens.js:4741/4896) were read in full to confirm the alias finding (`pushUndo` is a one-line pass-through to `pushUndoLayers`, not a separate lighter mechanism) and the `alreadySaved` parameter's own effect (suppresses the internal `saveAllLayerFrames()` call when truthy) — a whole-`src` grep for every call site of both functions from within this scope's own eight functions confirmed the double-save pattern described in `boundaries` is real and reproducible from source alone, not merely inferred from naming.",
+    "A whole-`src` grep for `tweenMeta` returned zero hits anywhere in the codebase, confirming contract item (c)'s own premise about a stored pair-metadata field does not correspond to any actual field name — see `boundaries`."
+  ],
+  "validation": {
+    "expected_assigned_lines": 299,
+    "expected_classification": {
+      "code": 172,
+      "comment": 126,
+      "whitespace": 1
+    },
+    "packet_partition": [
+      [
+        5112,
+        5175
+      ],
+      [
+        5176,
+        5230
+      ],
+      [
+        5231,
+        5249
+      ],
+      [
+        5250,
+        5276
+      ],
+      [
+        5277,
+        5309
+      ],
+      [
+        5310,
+        5336
+      ],
+      [
+        5337,
+        5368
+      ],
+      [
+        5369,
+        5410
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by a direct awk/sed-n walk against the frozen blob: 5112-5175=(27,36,1); 5176-5230=(25,30,0); 5231-5249=(15,4,0); 5250-5276=(17,10,0); 5277-5309=(21,12,0); 5310-5336=(16,11,0); 5337-5368=(19,13,0); 5369-5410=(32,10,0); sums to (172,126,1)=299 — identical to the issue's own proposed union and per-packet table exactly; no boundary correction needed anywhere in this scope.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 299 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check_c21q.py engineering/inventory/census/C21q-app-frame-navigation-keyframe-editing.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check_c21q.py engineering/inventory/census/C21p-app-frame-materialisation-visibility.json <candidate-sha> still exits 0 (if merged by candidate time)",
+      "python3 /tmp/census_check_c21q.py engineering/inventory/census/C21o-app-frame-persistence-core.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21q.py engineering/inventory/census/C21n-app-conversions-view-switching.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21q.py engineering/inventory/census/C21m-app-release-to-layers-merge.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21q.py engineering/inventory/census/C21l-app-component-creation.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21q.py engineering/inventory/census/C21k-app-get-effective-strokes.json <candidate-sha> still exits 0",
+      "and so on for every remaining C21*/C20*/C19* sibling artifact sharing source_path=src/js/app.js"
+    ]
+  }
+}
