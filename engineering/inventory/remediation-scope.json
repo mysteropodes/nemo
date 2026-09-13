@@ -3,9 +3,9 @@
   "issue": "https://github.com/mysteropodes/nemo/issues/1170",
   "complete": false,
   "source": {
-    "commit": "95e4970754f27162553f4025ded42f964cb2079b",
-    "fileCount": 693,
-    "sha256": "9c93a96c69703f46b412dc7743208ef7bc29921522467d87bc1dab9bec5944a1"
+    "commit": "1bfcbad1eea9ab810ee87cfd6bc18306b2533ee8",
+    "fileCount": 699,
+    "sha256": "2e8b5fbab894e6686ff56880946e86b6f5017ae51a7de27177b001f5aa473a6f"
   },
   "amendments": [
     {
@@ -19,12 +19,13 @@
     {
       "id": "P03B",
       "issue": 1170,
-      "commit": "95e4970754f27162553f4025ded42f964cb2079b",
+      "commit": "1bfcbad1eea9ab810ee87cfd6bc18306b2533ee8",
       "from": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
-      "fileCount": 693,
-      "sha256": "9c93a96c69703f46b412dc7743208ef7bc29921522467d87bc1dab9bec5944a1",
+      "fileCount": 699,
+      "sha256": "2e8b5fbab894e6686ff56880946e86b6f5017ae51a7de27177b001f5aa473a6f",
       "added": [
         "engineering/application/value-contract-v1.schema.json",
+        "engineering/boundaries/profiles/app-js.edges.json",
         "engineering/inventory/REMEDIATION_SCOPE.md",
         "engineering/inventory/census/C19a-timeline-foundations.json",
         "engineering/inventory/census/C19b-timeline-work-area-duration.json",
@@ -42,6 +43,8 @@
         "engineering/inventory/census/C19m-timeline-drag-playhead-render.json",
         "engineering/inventory/census/C19n-timeline-tween-curve-strips.json",
         "engineering/inventory/census/C19o-timeline-span-shrink-handle.json",
+        "engineering/inventory/census/C19p-timeline-frame-grid-mouse.json",
+        "engineering/inventory/census/C19q-timeline-layer-panel-selection-folders.json",
         "engineering/inventory/census/C20a-motion-text-animator-element-style.json",
         "engineering/inventory/census/C20b-motion-property-edit-and-header-support.json",
         "engineering/inventory/census/C20c-motion-key-lock-menus.json",
@@ -49,20 +52,24 @@
         "engineering/inventory/census/C20e-motion-null-follow-parent-time-panel.json",
         "engineering/inventory/census/C20f-motion-transform-expression-panel.json",
         "engineering/inventory/remediation-scope.json",
+        "scripts/nemo/boundaries-edges.test.cjs",
         "scripts/nemo/remediation-scope.cjs",
         "src/js/adapters/export-svg-frame.js",
         "src/js/adapters/export-svg-sequence.js",
         "src/js/application/export-job.js",
+        "src/js/application/history/frame-entry.js",
         "src/js/application/render/image-budget.js",
         "src/js/domain/tween/assignment.js",
         "tests/adapter-export-svg-frame.test.cjs",
         "tests/application-export-job.test.cjs",
+        "tests/application-history-frame-entry.test.cjs",
         "tests/application-image-budget.test.cjs",
         "tests/domain-tween-assignment.test.cjs",
         "tests/nemo-remediation-scope.test.cjs"
       ],
       "removed": [],
       "modified": [
+        "engineering/boundaries/README.md",
         "engineering/boundaries/profiles/app-js.coverage.json",
         "engineering/boundaries/profiles/app-js.profile.json",
         "engineering/boundaries/profiles/scripts-nemo.profile.json",
@@ -72,25 +79,28 @@
         "engineering/remediation/EXECUTION_PLAN.en.md",
         "engineering/remediation/EXECUTION_PLAN.fr.md",
         "scripts/nemo/boundaries-application.test.cjs",
+        "scripts/nemo/ci.cjs",
         "scripts/nemo/ci.test.cjs",
+        "scripts/nemo/lib/boundaries-application.cjs",
         "src/index.html",
         "src/js/engine-bridge.js",
         "src/js/export.js",
         "src/js/tweens.js",
         "tests/application-opacity-bootstrap.test.cjs",
-        "tests/application-opacity-capability.test.cjs"
+        "tests/application-opacity-capability.test.cjs",
+        "tests/nemo-boundaries.test.cjs"
       ],
-      "reason": "P03B refreeze at current main: pin the 22 supplemental C19/C20 censuses, index the 36 paths added since the P03A freeze, record range coverage and reviewed dispositions."
+      "reason": "P03B refreeze at current main: pin the 24 supplemental C19/C20 censuses, index the paths added since the P03A freeze, record range coverage and reviewed dispositions."
     }
   ],
   "counts": {
-    "configuration": 48,
+    "configuration": 49,
     "documentation": 69,
     "generated": 14,
-    "handwritten-runtime": 200,
+    "handwritten-runtime": 201,
     "handwritten-tooling": 53,
-    "static-data": 159,
-    "test": 143,
+    "static-data": 161,
+    "test": 145,
     "vendor": 7
   },
   "censuses": [
@@ -272,6 +282,18 @@
       "id": "C19o",
       "path": "engineering/inventory/census/C19o-timeline-span-shrink-handle.json",
       "blob": "74654915f0f62725bf15c5a9c3d3c24538e43d3b",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19p",
+      "path": "engineering/inventory/census/C19p-timeline-frame-grid-mouse.json",
+      "blob": "44c09da60589ba0889015eadaf66897622346164",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19q",
+      "path": "engineering/inventory/census/C19q-timeline-layer-panel-selection-folders.json",
+      "blob": "49bb3a80d41a8c614d7a34c501a21c169db9b59c",
       "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
     },
     {
@@ -2448,6 +2470,81 @@
       "admission": "pending"
     },
     {
+      "id": "C19p.content-mousedown-reset",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19p.layer-sel-from-frame-sel",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19p.grid-mousedown-select-drag-arm",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19p.grid-dblclick-span",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19p.grid-contextmenu",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19p.grid-mousemove-drag",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19p.drag-source-fade",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19p.window-mouseup-commit",
+      "census": "C19p",
+      "admission": "pending"
+    },
+    {
+      "id": "C19q.layer-selection-state",
+      "census": "C19q",
+      "admission": "pending"
+    },
+    {
+      "id": "C19q.layer-rename",
+      "census": "C19q",
+      "admission": "pending"
+    },
+    {
+      "id": "C19q.shape-tree-rows",
+      "census": "C19q",
+      "admission": "pending"
+    },
+    {
+      "id": "C19q.folder-child-map",
+      "census": "C19q",
+      "admission": "pending"
+    },
+    {
+      "id": "C19q.folder-parent-index",
+      "census": "C19q",
+      "admission": "pending"
+    },
+    {
+      "id": "C19q.layer-render-order",
+      "census": "C19q",
+      "admission": "pending"
+    },
+    {
+      "id": "C19q.folder-group-ungroup-rename",
+      "census": "C19q",
+      "admission": "pending"
+    },
+    {
       "id": "C20a.text-animator-runtime",
       "census": "C20a",
       "admission": "pending"
@@ -2696,7 +2793,7 @@
       "id": "C08:1",
       "note": "src/js/timeline.js's real ~11187-line gap (DEF-5) is flagged with full evidence here but NOT sized or packet-split — at over 11,000 lines with CLAUDE.md §11's documented alignment/scroll/zoom invariants, a proper packet-level treatment is itself several leaf tasks' worth of work, which would blow this census's own work-size budget. The orchestrator should treat this as its own multi-leaf mini-program (candidate: C19+), not a single proposed ID.",
       "disposition": "needs-reconciliation",
-      "evidence": "Partly resolved: the accepted C19a-C19o supplements cover timeline.js 1-5027 except spans 2002-2011, 2027-2048, 2247, 2695-2696 and 2948; 5806 uncovered code lines of 11907 remain from 5028 onward (open spans in rangeCoverage). The remainder is the P03C timeline queue; C19p is in progress."
+      "evidence": "Partly resolved: the accepted C19a-C19q supplements cover timeline.js 1-5709 except spans 2002-2011, 2027-2048 and 2247; 5286 uncovered code lines of 11907 remain from 5710 onward (open spans in rangeCoverage). The remainder is the P03C timeline queue."
     },
     {
       "id": "C08:2",
@@ -2720,7 +2817,7 @@
       "id": "C19a:1",
       "note": "All timeline.js ranges outside 1-39, 193-348, 350-458 and 460-845 except already accepted census/leaf claims remain outside C19a and require later gap census.",
       "disposition": "boundary",
-      "evidence": "Scope statement, not a gap of its own. C19b-C19o now cover timeline.js up to 5027 except the open spans listed in rangeCoverage; 5028 onward (5806 code lines) is the P03C timeline queue (see C08:1)."
+      "evidence": "Scope statement, not a gap of its own. C19b-C19q now cover timeline.js up to 5709 except the open spans listed in rangeCoverage; 5710 onward (5286 code lines) is the P03C timeline queue (see C08:1)."
     },
     {
       "id": "C19a:2",
@@ -2744,7 +2841,7 @@
       "id": "C19b:1",
       "note": "timeline.js:862-1081 and 1121-2701 remain outside C19b except for pre-existing accepted census/leaf claims.",
       "disposition": "boundary",
-      "evidence": "862-1081 is declared by C19d/C19e; 1121-2701 by C19e, C19c, C19b2, C19f, C19g and C19h except spans 2002-2011, 2027-2048, 2247 and 2695-2696 (open in rangeCoverage)."
+      "evidence": "862-1081 is declared by C19d/C19e; 1121-2701 by C19e, C19c, C19b2, C19f, C19g and C19h except spans 2002-2011, 2027-2048 and 2247 (open in rangeCoverage)."
     },
     {
       "id": "C19b:2",
@@ -3207,8 +3304,8 @@
     },
     {
       "path": "src/index.html",
-      "lines": 2483,
-      "uncovered": 2248,
+      "lines": 2485,
+      "uncovered": 2250,
       "overlap": 8,
       "spans": [
         [
@@ -3225,7 +3322,7 @@
         ],
         [
           2298,
-          2483
+          2485
         ]
       ]
     },
@@ -3818,8 +3915,8 @@
     {
       "path": "src/js/timeline.js",
       "lines": 11907,
-      "uncovered": 5806,
-      "overlap": 0,
+      "uncovered": 5286,
+      "overlap": 87,
       "spans": [
         [
           2002,
@@ -3834,15 +3931,7 @@
           2247
         ],
         [
-          5028,
-          5252
-        ],
-        [
-          5254,
-          5449
-        ],
-        [
-          5536,
+          5710,
           7449
         ],
         [
@@ -3890,7 +3979,7 @@
     {
       "path": "src/js/tweens.js",
       "lines": 5249,
-      "uncovered": 509,
+      "uncovered": 516,
       "overlap": 158,
       "spans": [
         [
@@ -3926,15 +4015,23 @@
           3742
         ],
         [
-          4863,
-          4863
+          4810,
+          4811
         ],
         [
-          4928,
-          4928
+          4860,
+          4860
         ],
         [
-          4994,
+          4925,
+          4925
+        ],
+        [
+          4977,
+          4979
+        ],
+        [
+          4992,
           5016
         ]
       ]
@@ -4845,7 +4942,7 @@
     {
       "path": "engineering/boundaries/README.md",
       "mode": "100644",
-      "blob": "b566422817113f4db2ea8546663cad9b4dda2dd1",
+      "blob": "c75ae7dde990a20712470a393569bca82ed82562",
       "classification": "documentation",
       "censusRefs": [
         "C08.docs.boundary-enforcement-config-data"
@@ -4875,7 +4972,7 @@
     {
       "path": "engineering/boundaries/profiles/app-js.coverage.json",
       "mode": "100644",
-      "blob": "a20fbb9528ae778a61427bd2146c6e0ec1ac4a54",
+      "blob": "1a5ebcd450e6af35f077388436dca451394f5760",
       "classification": "configuration",
       "censusRefs": [
         "C08.docs.boundary-enforcement-config-data"
@@ -4883,9 +4980,24 @@
       "reason": "Tracked configuration, schema, lock or metadata consumer; retained explicitly rather than excluded as documentation."
     },
     {
+      "path": "engineering/boundaries/profiles/app-js.edges.json",
+      "mode": "100644",
+      "blob": "fcd928a85c12e7decedb4cb89817a780c352a7a9",
+      "classification": "configuration",
+      "censusRefs": [],
+      "reason": "Tracked configuration, schema, lock or metadata consumer; retained explicitly rather than excluded as documentation.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P10",
+        "issue": 1012,
+        "pullRequest": 1173,
+        "evidence": "Added by feat(P10) da161d4, merged via PR #1173; application dependency-edge declarations read by the boundaries gate."
+      }
+    },
+    {
       "path": "engineering/boundaries/profiles/app-js.profile.json",
       "mode": "100644",
-      "blob": "bcdb94c9b0d8b4243dd42d638ad006d8b599df56",
+      "blob": "dd2c54b90aa2167cebd0eca6cb74730f90109b72",
       "classification": "configuration",
       "censusRefs": [
         "C08.docs.boundary-enforcement-config-data"
@@ -5075,7 +5187,7 @@
     {
       "path": "engineering/boundaries/profiles/scripts-nemo.profile.json",
       "mode": "100644",
-      "blob": "8f46f50267f51d3ae25a4474f8d2535b254064fb",
+      "blob": "4813d87ba985e10174f81475e37def264a9a707a",
       "classification": "configuration",
       "censusRefs": [
         "C08.docs.boundary-enforcement-config-data"
@@ -5168,7 +5280,7 @@
     {
       "path": "engineering/inventory/SURFACES.md",
       "mode": "100644",
-      "blob": "cb4bcfeec09782e2c6f866b21ad6cdbd59ff33ea",
+      "blob": "c26cf3411756f50eff88fb341f89e262fe0a29f9",
       "classification": "documentation",
       "censusRefs": [
         "C08.docs.inventory-and-census-artifacts"
@@ -5442,6 +5554,22 @@
       "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
     },
     {
+      "path": "engineering/inventory/census/C19p-timeline-frame-grid-mouse.json",
+      "mode": "100644",
+      "blob": "44c09da60589ba0889015eadaf66897622346164",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19q-timeline-layer-panel-selection-folders.json",
+      "mode": "100644",
+      "blob": "49bb3a80d41a8c614d7a34c501a21c169db9b59c",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
       "path": "engineering/inventory/census/C20a-motion-text-animator-element-style.json",
       "mode": "100644",
       "blob": "98d7c1070f4f71dbc8c75f89ea55122bec68f6ef",
@@ -5500,7 +5628,7 @@
     {
       "path": "engineering/inventory/surfaces.csv",
       "mode": "100644",
-      "blob": "6dbf1212b7364b02ce1b6570e8c869d3bc9a4ef6",
+      "blob": "5e056af6bfb867305a8da02c8f0839dbda135f48",
       "classification": "static-data",
       "censusRefs": [
         "C08.docs.inventory-and-census-artifacts"
@@ -5510,7 +5638,7 @@
     {
       "path": "engineering/inventory/surfaces.json",
       "mode": "100644",
-      "blob": "bae69a76dfe67d4f8c8a5e6081d3ed65ff599e19",
+      "blob": "fd4714e4123e4e4656de5a81036ffc3eec3f3104",
       "classification": "static-data",
       "censusRefs": [
         "C08.docs.inventory-and-census-artifacts"
@@ -6802,7 +6930,7 @@
     {
       "path": "scripts/nemo/boundaries-application.test.cjs",
       "mode": "100644",
-      "blob": "6522f8bbb4136450c34d6016de43ca94f1015327",
+      "blob": "e69d990ccb7ee614de42bb48cd80f038b4f825e8",
       "classification": "test",
       "censusRefs": [
         "C13.tooling.scripts-nemo-core"
@@ -6838,6 +6966,21 @@
         "C13.tooling.scripts-nemo-core"
       ],
       "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+    },
+    {
+      "path": "scripts/nemo/boundaries-edges.test.cjs",
+      "mode": "100644",
+      "blob": "33d3226a84b35b6bd7972e1f8ba10eb2bc8ac524",
+      "classification": "test",
+      "censusRefs": [],
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P10",
+        "issue": 1012,
+        "pullRequest": 1173,
+        "evidence": "Added by feat(P10) da161d4, merged via PR #1173; edge-gate regression test."
+      }
     },
     {
       "path": "scripts/nemo/boundaries-ratchet.test.cjs",
@@ -6962,7 +7105,7 @@
     {
       "path": "scripts/nemo/ci.cjs",
       "mode": "100644",
-      "blob": "804f108f5e2e5acb99e5f222e15402419cf149d8",
+      "blob": "aa57b7f50987e7eb35bee6e46168dfac1fd3f91a",
       "classification": "handwritten-tooling",
       "censusRefs": [
         "C13.tooling.scripts-nemo-core"
@@ -6972,7 +7115,7 @@
     {
       "path": "scripts/nemo/ci.test.cjs",
       "mode": "100644",
-      "blob": "fb06f3ff1f143378767aec6f42bd0a5b98e14c9c",
+      "blob": "90923ec8baa4aaaf67c57d79bc612419ee38b878",
       "classification": "test",
       "censusRefs": [
         "C13.tooling.scripts-nemo-core"
@@ -7082,7 +7225,7 @@
     {
       "path": "scripts/nemo/lib/boundaries-application.cjs",
       "mode": "100644",
-      "blob": "268e20e02614b8df20a44ac22df68261f652e439",
+      "blob": "b480f640ec749bd353472fdcba3a55114296e1da",
       "classification": "handwritten-tooling",
       "censusRefs": [
         "C13.tooling.scripts-nemo-lib"
@@ -7847,7 +7990,7 @@
     {
       "path": "src/index.html",
       "mode": "100644",
-      "blob": "79ed8f039c4f4b5f4cc987de546aa0cbc6076184",
+      "blob": "0f928bd885b0acd32acde1d52726f1e42f1370c5",
       "classification": "handwritten-runtime",
       "censusRefs": [
         "C06.bootstrap.feature-flags",
@@ -7977,6 +8120,21 @@
         "issue": 1020,
         "pullRequest": 1163,
         "evidence": "Added by feat(P18) 35dac5f, merged via PR #1163; start/status/cancel export job."
+      }
+    },
+    {
+      "path": "src/js/application/history/frame-entry.js",
+      "mode": "100644",
+      "blob": "b619d697b8c87cc9ae7a542c92715072893038ed",
+      "classification": "handwritten-runtime",
+      "censusRefs": [],
+      "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P21",
+        "issue": 1023,
+        "pullRequest": 1171,
+        "evidence": "Extracted by refactor(P21) 0f805b9, merged via PR #1171, from the tweens.js undo section (C01 history packets); the packet itself is not fully delivered."
       }
     },
     {
@@ -9599,7 +9757,22 @@
         "C19o.span-shrink-commit",
         "C19o.span-shrink-drag",
         "C19o.span-shrink-frame-at",
-        "C19o.span-shrink-state-and-arm"
+        "C19o.span-shrink-state-and-arm",
+        "C19p.content-mousedown-reset",
+        "C19p.drag-source-fade",
+        "C19p.grid-contextmenu",
+        "C19p.grid-dblclick-span",
+        "C19p.grid-mousedown-select-drag-arm",
+        "C19p.grid-mousemove-drag",
+        "C19p.layer-sel-from-frame-sel",
+        "C19p.window-mouseup-commit",
+        "C19q.folder-child-map",
+        "C19q.folder-group-ungroup-rename",
+        "C19q.folder-parent-index",
+        "C19q.layer-rename",
+        "C19q.layer-render-order",
+        "C19q.layer-selection-state",
+        "C19q.shape-tree-rows"
       ],
       "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
     },
@@ -9699,7 +9872,7 @@
     {
       "path": "src/js/tweens.js",
       "mode": "100644",
-      "blob": "9cfc9b64fe4f06d2645f505f05d667c50a4f302c",
+      "blob": "6eca7339bbd608b98676b600c9e2f42ca9ce1863",
       "classification": "handwritten-runtime",
       "censusRefs": [
         "C01.tweens.undo-redo-engine",
@@ -10028,6 +10201,21 @@
       }
     },
     {
+      "path": "tests/application-history-frame-entry.test.cjs",
+      "mode": "100644",
+      "blob": "623402ab32112959b78096c5e820e92a0125e381",
+      "classification": "test",
+      "censusRefs": [],
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P21",
+        "issue": 1023,
+        "pullRequest": 1171,
+        "evidence": "Added by refactor(P21) 0f805b9, merged via PR #1171."
+      }
+    },
+    {
       "path": "tests/application-image-budget.test.cjs",
       "mode": "100644",
       "blob": "1afde67598218b8c1619897309e8382b9dc9228e",
@@ -10045,7 +10233,7 @@
     {
       "path": "tests/application-opacity-bootstrap.test.cjs",
       "mode": "100644",
-      "blob": "06d7c7751f96fdb979668ddd1284a61f863eb193",
+      "blob": "892099e1e91786083dbd2e2e07a5ee22dfcc3caa",
       "classification": "test",
       "censusRefs": [
         "C13.tooling.browser-and-app-test-suites"
@@ -10055,7 +10243,7 @@
     {
       "path": "tests/application-opacity-capability.test.cjs",
       "mode": "100644",
-      "blob": "dc297a4071ccdf9a23ca1cfd1e6143e3ed39b697",
+      "blob": "c2c6b4420ddfaa79eab2eb533fc3d396d7947560",
       "classification": "test",
       "censusRefs": [],
       "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
@@ -10935,7 +11123,7 @@
     {
       "path": "tests/nemo-boundaries.test.cjs",
       "mode": "100644",
-      "blob": "e940f10e0fd65fa8a955ece8db7341b0508d83d5",
+      "blob": "7cc61c4bf0e8b71e9f67690b54fa0eb0157eb77a",
       "classification": "test",
       "censusRefs": [
         "C13.tooling.nemo-tooling-test-suite"
