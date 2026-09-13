@@ -1,0 +1,634 @@
+{
+  "census_id": "C21m",
+  "issue": 1211,
+  "title": "app.js \"Release to Layers\" split and its inverse merge — splitLayerIntoElements, splitLayerIntoElementsCore, mergeLayersIntoOne",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C21m census only; app.js:3557-3989 (the \"Release to Layers\" split and its inverse mergeLayersIntoOne) is cited by name/line only, not re-mapped, in this artifact's own upstream/downstream boundary citations: badComponentSourceReason/convertLayersToComponent/cloneRigForSymbol (app.js:3194-3556, C21l/#1210, concurrently authored by another worker, not yet merged at authoring time — mergeLayersIntoOne's own inline 8-check guard chain (3780-3787) is a verbatim field-for-field, order-for-order duplicate of badComponentSourceReason's own body (3212-3221), NOT a call to it; recorded in `boundaries` and `future_proposals`, badComponentSourceReason's own body is not reproduced here beyond the comparison). getEffectiveStrokes (app.js:2949, C21k/#1212, merged — cited by line only; this scope's own mergeLayersIntoOne deliberately does NOT call it, see `boundaries`). resolveSymbolFrameIdx and the layer time model (C21j/#1208, merged, app.js:2600-2928). cloneStrokeForTransform/applyMatrixToStrokeData (C21f, merged). layerElements/elementLabel (motion.js:9436/9533) and ensureStrokeId (tools.js:1910 — confirmed by grep NOT called anywhere in this scope's own 433 lines; see `boundaries`). createUserLayer/activateUL (app.js:377/410 — createUserLayer itself is never called by either function in this scope; both mint their own Paper `Layer` objects directly, see `boundaries`)/saveAllLayerFrames (app.js:4693)/loadFrame (app.js:4746). pushUndo (tweens.js:4741, thin wrapper over pushUndoLayers). SMMotion (motion.js — enterComponentLayer, motion.js:6855-6915, is the documented reuser of splitLayerIntoElementsCore per CLAUDE.md §8). exportJSON's per-layer field list (timeline.js:2049, the field object at timeline.js:2117-2169). and convertComponentToLayer/the LFS converters (app.js:3990+, next slice C21n, not yet filed as an issue at authoring time).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "ab85947271a7724d4cde08e1ead0f93e2d812223",
+  "source_path": "src/js/app.js",
+  "source_blob": "0831959f70612721f80717812838d19940d1f7c1",
+  "source_line_count": 5410,
+  "scope_files": [
+    "src/js/app.js"
+  ],
+  "intended_branch": "claude/c21m-app-release-to-layers-merge-census",
+  "assigned_ranges": [
+    {
+      "start": 3557,
+      "end": 3989
+    }
+  ],
+  "coverage_note": "Exactly 433 assigned lines occur once across eight packets (one coverage_range per packet, no gaps, no other-owner overlap): 219 code, 214 full-line `//` comments, 0 blank — matches the issue's own proposed union exactly. Independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs: 4+49+22+21+41+36+12+34=219 code; 26+72+8+33+10+28+19+18=214 comment; 0 blank across all eight packets — matching the issue's own proposed per-packet table exactly (219/214/0 total, packet-by-packet identical to the issue's suggested table); no boundary correction was needed. The three function-level cuts (3557, 3587, 3738) and the five internal section-comment cuts inside splitLayerIntoElementsCore (3708) and mergeLayersIntoOne (3792, 3843, 3907, 3938) proposed by the issue were verified with `sed -n` directly against the frozen blob and kept as-is — each falls exactly on the function's own 2-space-indented section comment or (for 3738) the function's own lead-in comment, confirmed by direct read. Line 3556 is C21l's own closing `}` of instantiateForeignProjectAsComponent (out of scope, confirmed by direct read of app.js:3550-3556); line 3557 opens this scope's own lead-in comment for splitLayerIntoElements. Line 3989 is this scope's own closing `}` of mergeLayersIntoOne; line 3990 opens `// Inverse of convertLayerToComponent...`, C21n's own lead-in for convertComponentToLayer (the next leaf, not yet filed as an issue at authoring time), confirmed by direct read of app.js:3989-3995.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js resolves to 0831959f70612721f80717812838d19940d1f7c1, 5410 lines.",
+    "current": "origin/main at ab85947271a7724d4cde08e1ead0f93e2d812223 (C21i/#1209 merged, the base the orchestrator fixed for this task) has the identical app.js blob (git rev-parse ab85947:src/js/app.js == git rev-parse 59a5a38c:src/js/app.js == 0831959f70612721f80717812838d19940d1f7c1); this artifact's branch was created from origin/main at ab85947, verified directly in the working worktree before authoring (HEAD matched, blob matched, working tree clean). During authoring, origin/main advanced further to 4dcdb223c6c1e37ae827780bc2430796b0235539 (C21k/#1212, getEffectiveStrokes, merged); re-verified directly (`git fetch origin` then `git rev-parse 4dcdb22:src/js/app.js`) that the app.js blob is STILL 0831959f70612721f80717812838d19940d1f7c1 — no source drift. This branch was intentionally NOT rebased onto 4dcdb22 (the orchestrator's fixed base is ab85947 and this artifact's own single new file cannot conflict with any prior census JSON); the PR will be opened against `main` as-is.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n -P` for each of the three function symbols this scope defines, filtered to exclude each symbol's own declaration line and any hit whose trimmed content starts with `//`. The issue's own suggested pattern `(^|[^a-zA-Z_.])name\\(` was tried first and found to systematically MISS every `window.SM.<name>(` call site — the character immediately before `<name>` in that call form is `.`, which is inside the pattern's own excluded class `[^a-zA-Z_.]`, so the alternation never matches there. Re-run with a lookbehind pattern that only excludes an identifier character immediately before the symbol (`(?<![a-zA-Z0-9_])name\\(`, allowing a preceding `.`) surfaces the full, corrected caller list, including three call sites the literal issue-suggested pattern would have silently dropped: timeline.js:6715/6719 and motion.js:7407/7467 (`window.SM.splitLayerIntoElements`/`window.SM.mergeLayersIntoOne`, the actual context-menu entry points in both timelines) and — not anticipated by the issue's own caller-file guess of \"motion.js, timeline.js, app.js\" — nemo-script.js:395 (`window.SM.mergeLayersIntoOne`, inside `Layer.prototype.mergeWith`, the scripting-console API's own merge wrapper). This correction is recorded per-packet under `callers` and summarized in `surface_inventory_cross_check`. Field-level read/write claims (the `nl`/`merged` object literals, `opts.` reads, `ld.motion`/`ld.elementMotion` reads and writes) were derived by a plain-pattern grep restricted to the frozen blob's own lines 3557-3989, cross-checked line-by-line against a direct `sed -n` read of the same range."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C21m-app-release-to-layers-merge.json and the eight app.js packets partitioning lines 3557-3989.",
+    "app_js": "app.js retains the whole runtime for these two functions; this JSON authoring does not authorize source changes.",
+    "c21l_boundary": "Lines 3194-3556 (badComponentSourceReason/convertLayersToComponent/cloneRigForSymbol, C21l/#1210, concurrently authored, not yet merged in this directory at authoring time) are cited by name/line only. This scope's own mergeLayersIntoOne re-implements badComponentSourceReason's own 8-check body inline (3780-3787) rather than calling it — the comparison is recorded here and in `future_proposals`; badComponentSourceReason's own body (3212-3221) is not reproduced beyond that comparison.",
+    "c21n_boundary": "Lines 3990+ (`convertComponentToLayer`/the LFS converters, the next leaf C21n, not yet filed as an issue at authoring time) are cited by name only — confirmed by a whole-src grep that neither `splitLayerIntoElements(Core)?` nor `mergeLayersIntoOne` is ever called from within `convertComponentToLayer`'s own body, and `convertComponentToLayer` is never called from within this scope's own lines 3557-3989.",
+    "other_consumers_boundary": "motion.js (enterComponentLayer's silent auto-split, and both timelines' own layer context menus), timeline.js (the SM-attach wrappers and its own layer context menu, and exportJSON's per-layer field list), nemo-script.js (Layer.prototype.mergeWith), tools.js (ensureStrokeId's own definition, and two comment-only cross-references to mergeLayersIntoOne — one of which cites a STALE line number, see `boundaries`), select-bridge.js (one comment-only cross-reference, no call) and tweens.js (pushUndo/pushUndoLayers) retain their own bodies in full — cited by name/line only for the specific findings each packet's `callers`/`behavior` needed."
+  },
+  "reconciliation": [
+    {
+      "owner": "C21l / #1210 (upstream, concurrently authored, not yet merged in this directory at authoring time)",
+      "disposition": "Owns app.js:3194-3556 (badComponentSourceReason, convertLayersToComponent, cloneRigForSymbol). This scope's own mergeLayersIntoOne re-implements badComponentSourceReason's own 8-check body inline (3780-3787) instead of calling it — same 8 fields, same order, same French reason strings (symbolId/lfsGroup/montageId/nativeVideo/isNullLayer/isEffectLayer/isGuideLayer/isWidgetLayer), confirmed by direct comparison of both bodies. This scope's own boundary begins at line 3557, the lead-in comment for splitLayerIntoElements, immediately after C21l's own instantiateForeignProjectAsComponent closing brace at 3556."
+    },
+    {
+      "owner": "C21n (next leaf, convertComponentToLayer/the LFS converters, not yet filed as an issue at authoring time)",
+      "disposition": "Owns app.js:3990+. Confirmed call-graph-disjoint from this scope in both directions by whole-range grep. This scope's own boundary ends at line 3989, mergeLayersIntoOne's own closing brace."
+    },
+    {
+      "owner": "C21k / #1212 (existing owner, merged — getEffectiveStrokes)",
+      "disposition": "Owns app.js:2929-3193 including getEffectiveStrokes (app.js:2949). This scope's own mergeLayersIntoOne deliberately does NOT call getEffectiveStrokes — it reads the RAW stored `strokes` via its own local `rawAt(ld,fi)` helper (3817-3822) instead, per its own in-source rationale (3754-3757): getEffectiveStrokes bakes layer/element motion into geometry, which would freeze the animation into the drawing rather than preserving it as editable per-element keys. getEffectiveStrokes's own body is not reproduced here beyond this by-line contrast."
+    },
+    {
+      "owner": "C21j / #1208 (existing owner, merged — resolveSymbolFrameIdx and the layer time model)",
+      "disposition": "Retains its own body in full — cited by name only. Confirmed call-graph-disjoint from this scope in both directions."
+    },
+    {
+      "owner": "motion.js (existing owner — enterComponentLayer, layerElements/elementLabel, both timelines' own layer context menus)",
+      "disposition": "Retains its own body in full — cited by line only. enterComponentLayer (motion.js:6855-6915) is splitLayerIntoElementsCore's documented silent reuser (motion.js:6910, `window.SM.splitLayerIntoElementsCore(i,{silent:true})`, guarded on `state.layers.length===1`, CLAUDE.md §8) and pre-counts+pushes ONE undo entry itself (motion.js:6902-6909) before the silent loop, since `silent:true` also skips this scope's own conditional `pushUndo()`. layerElements (motion.js:9436) is the reference-frame reader splitLayerIntoElementsCore calls at 3604 (`SMMotion.layerElements(li,ld)`, internally `getEffectiveStrokes(li,state.currentFrame)` — the reference frame IS `state.currentFrame`, confirmed by direct read); elementLabel (motion.js:9533) is the naming-scheme source called at 3624. Both timelines' own layer context menus (motion.js:7407/7467) call `window.SM.splitLayerIntoElements`/`window.SM.mergeLayersIntoOne` directly, gated only on `!!ld.symbolId||!!ld.lfsGroup` (split) or a `multi` (`_layerSel.length>1`) flag (merge) — neither gate checks `.locked`, see `boundaries`."
+    },
+    {
+      "owner": "timeline.js (existing owner — the SM-attach wrappers, its own layer context menu, exportJSON's per-layer field list)",
+      "disposition": "Retains its own body in full — cited by line only. `window.SM.splitLayerIntoElementsCore`/`splitLayerIntoElements`/`mergeLayersIntoOne` are attached at timeline.js:1639-1641 as thin pass-through wrappers. Its own layer context menu (timeline.js:6715/6719) calls `window.SM.splitLayerIntoElements`/`window.SM.mergeLayersIntoOne`, gated the same way as motion.js's own menu (symbolId/lfsGroup for split, `_layerSel.length<2` for merge — neither checks `.locked`). exportJSON's per-layer field object (timeline.js:2117-2169, inside exportJSON at timeline.js:2049) is the field list this scope's own 2026-09 QA-sweep comment (3920-3928) says it was diffed against — `groups:l.groups||undefined` at timeline.js:2169 confirms `ld.groups` (the combine-group definitions both functions carry) IS one of the persisted fields."
+    },
+    {
+      "owner": "nemo-script.js (existing owner — the scripting console's Layer.prototype.mergeWith)",
+      "disposition": "Retains its own body in full — cited by line only. `Layer.prototype.mergeWith` (nemo-script.js:392-397) is mergeLayersIntoOne's ONLY caller outside motion.js/timeline.js — it calls `window.SM.mergeLayersIntoOne(idx)` (nemo-script.js:395) and `fail('fusion impossible')` on a `false` return, otherwise returning `new Layer(...)` for the survivor index. Not anticipated by the issue's own caller-file guess of \"motion.js, timeline.js, app.js\" — see `surface_inventory_cross_check`."
+    },
+    {
+      "owner": "tools.js (existing owner — ensureStrokeId's own definition, two comment-only cross-references) and select-bridge.js (one comment-only cross-reference)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. ensureStrokeId (tools.js:1910) is NEVER called by either function in this scope (confirmed by grep over the exact assigned range) — see `boundaries` for what each function does instead. tools.js:1534 cross-references mergeLayersIntoOne's own group-remap fix by name (no call). tools.js:6465 cross-references mergeLayersIntoOne by name with the claim \"nothing else mints [a strokeId] on save — app.js:1479 only does so inside mergeLayersIntoOne\" — app.js:1479 is STALE at this SHA (it now falls inside C21g's own duplicator-runtime territory, unrelated content, confirmed by direct read); the actual strokeId-minting line in this scope is app.js:3852. Recorded as a found stale cross-file citation, not corrected here (tools.js is out of scope). select-bridge.js:2772 cross-references splitLayerIntoElementsCore by name only (marquee-selection scoping rationale, no call)."
+    },
+    {
+      "owner": "tweens.js (existing owner — pushUndo/pushUndoLayers)",
+      "disposition": "Retains its own body in full — cited by name/line only. pushUndo (tweens.js:4741, a thin wrapper over pushUndoLayers) is called conditionally by both functions in this scope (`if(!silent)pushUndo()`, 3606 and 3791) — the sole undo checkpoint either function creates itself; motion.js's own enterComponentLayer creates a SEPARATE checkpoint before calling the Core silently (see the motion.js reconciliation entry above)."
+    }
+  ],
+  "boundaries": [
+    "Line 3556 (C21l's own closing brace of instantiateForeignProjectAsComponent) is outside coverage; line 3557 (the lead-in comment for splitLayerIntoElements) begins this scope.",
+    "Line 3989 (mergeLayersIntoOne's own closing `}`) is the last line of this scope; line 3990 opens `// Inverse of convertLayerToComponent...`, C21n's own territory, and is excluded — confirmed by reading through line 3995.",
+    "No lines inside 3557-3989 are excluded for another owner: every line belongs to exactly one of the eight packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "The `opts` contract of BOTH functions is identical and minimal: `splitLayerIntoElementsCore(li,opts)` reads only `opts.silent` (3601, `var silent=!!(opts&&opts.silent);`), and `mergeLayersIntoOne(indices,opts)` reads only `opts.silent` (3768, the identical idiom). A whole-range grep for `opts.` inside 3557-3989 returns exactly these two lines — no other `opts.` key is ever read by either function; `splitLayerIntoElements(li)` itself (3583) takes no `opts` at all. Confirmed callers passing `{silent:true}`: motion.js:6910 (`window.SM.splitLayerIntoElementsCore(i,{silent:true})`, enterComponentLayer, per CLAUDE.md §8). No observed caller of `splitLayerIntoElements` (the guarded entry, not Core) or of `mergeLayersIntoOne` passes `{silent:true}` at this SHA — every one of their external callers (motion.js:7363/7407/7467, timeline.js:6715/6719, nemo-script.js:395) calls with no second argument or an argument that is not `{silent:true}`, so `silent` is `false` (default toasts/undo apply) on every observed non-Core call site.",
+    "Reference-frame semantics: `els=SMMotion.layerElements(li,ld)` (3604) is evaluated at `state.currentFrame` — layerElements' own first line (motion.js:9437) is `getEffectiveStrokes(li,state.currentFrame)` — matching this scope's own lead-in comment (3577-3578, \"the reference frame (state.currentFrame, where layerElements() is evaluated)\"). The fewer/more-strokes distribution rule is stated at 3567-3575 and implemented at 3609-3617: each of `ld.frames`' own keyframes is split by POSITION, not by strokeId — for element index `e<n-1`, the new layer gets `strokes[e]` if present, else `[]` (a keyframe with FEWER strokes than the reference leaves the extra new layers blank at that frame, same as any other blank keyframe); for the LAST element (`e===n-1`), the new layer gets `strokes.slice(n-1)` — every stroke from index n-1 onward, so a keyframe with MORE strokes than the reference keeps the overflow grouped into the last new layer rather than losing it. A non-keyframe/non-interpolated frame is passed through unchanged as an empty placeholder (3613, `{strokes:[],isKeyframe:false,isInterpolated:false}`) for every new layer, not distributed.",
+    "Idempotence: the ONLY guard is `if(!els||els.length<2){...;return false;}` (3605) — there is no separate \"already split\" check. The idempotence claim (3597-3599, \"once split, each resulting layer has exactly 1 element, so a later re-entry's auto-split pass no-ops via the els.length<2 guard below\") relies on this same guard: after a split, every resulting layer holds exactly 1 element by construction (each new layer's frames carry either one positional stroke or, for the last layer, the overflow slice — but a layer that was itself one of N new layers from a PRIOR split has n=1 in its own subsequent `layerElements()` read unless new content was added), so `els.length<2` is true and the function returns `false` with a toast (or silently when `silent:true`) without mutating anything.",
+    "The strokeId dependency is NOT `ensureStrokeId` (tools.js:1910) — confirmed by a whole-range grep over 3557-3989 for `ensureStrokeId` returning zero hits. `splitLayerIntoElementsCore` relies entirely on `entry.strokeId` (3619, 3624) from `els[e]`, which `layerElements` itself lazily stamps inline (motion.js's own `sd.strokeId = 's'+Date.now().toString(36)+'_'+ci+'_'+Math.floor(Math.random()*1e6)'` idiom, motion.js, cited by name only) — a SEPARATE lazy-stamp mechanism from `ensureStrokeId`, not a call to it. `mergeLayersIntoOne` mints its OWN fresh strokeId inline with the IDENTICAL idiom at 3852 (`if(!sd.strokeId)sd.strokeId='s'+Date.now().toString(36)+'_'+i+'_'+Math.floor(Math.random()*1e6);`) — again not a call to `ensureStrokeId` or to `layerElements`' own stamp code, a third independent copy of the same minting pattern.",
+    "Per-element `elementMotion[strokeId]` → new-layer `motion`/`motionStatic` promotion is written at 3626-3627: `motion:(emh&&emh.motion)?JSON.parse(JSON.stringify(emh.motion)):undefined,motionStatic:(emh&&emh.motionStatic)?JSON.parse(JSON.stringify(emh.motionStatic)):undefined,` where `emh=ld.elementMotion&&ld.elementMotion[entry.strokeId]` (3619). Deep-cloned, so the new layer's own motion track never aliases the source's `elementMotion` map. GAP (confirmed by a whole-range grep over 3557-3737 for `ld.motion`/`ld.motionStatic`, returning zero hits besides the unrelated `motionBlur` field at 3664): the ORIGINAL layer-level `ld.motion`/`ld.motionStatic` — Motion keyed on the WHOLE source layer, which can exist independently of any per-element entry — is never read by splitLayerIntoElementsCore at all, and is silently dropped from every resulting new layer on a first split. This is the exact mirror of the merge's own symmetric gap noted below; flagged in `future_proposals`, not fixed here.",
+    "The merge's own demotion is the mirror: `mergeLayersIntoOne` NEVER sets `merged.motion`/`merged.motionStatic` (confirmed by a whole-range grep over 3767-3989 for `merged.motion`/`merged.motionStatic`, zero hits) — it only ever writes `merged.elementMotion` (3936, `if(Object.keys(elMotion).length)merged.elementMotion=elMotion;`), demoted from each source's OWN layer-level `l.motion`/`l.motionStatic` at 3844-3861: for every source with non-empty `motion` or `motionStatic` (3845), every distinct `strokeId` collected from its own keyframes/interpolated frames (3847-3855, excluding `isBrushTextureCopy` dabs at 3851 — the same dabs-excluded-from-per-element-machinery convention CLAUDE.md documents for tween matching) gets that source's entire layer-level `motion`/`motionStatic` deep-copied onto `elMotion[sid]` (3857-3861). `approximated` (3856, incremented when a source contributes MORE than one distinct strokeId) counts sources whose layer-level transform is being copied onto several independent shapes rather than pivoting around one — the multi-shape-source caveat the merge's own lead-in comment (3763-3766) names explicitly, surfaced in the success toast (3984-3986) rather than silently approximated.",
+    "The naming scheme: `elementLabel(entry,e,ld)` (motion.js:9533, cited by name only) produces `ld.shapeNames[strokeId]` if custom-named, else `'Image '+(idx+1)` for a raster, else `SM.t(sd.fillColor?'autoNameShape':'autoNameStroke')+' '+(idx+1)` — an i18n-KEYED label (`autoNameShape`='Shape'/en, 'Forme'/fr, 'Forma'/es; `autoNameStroke`='Stroke'/en, 'Trait'/fr). The new layer's own name is `(ld.name||'Layer')+' — '+SMMotion.elementLabel(...)` (3624), e.g. \"Layer 1 — Forme 3\" under a French locale. The merge's OWN name-recovery regex (3866) is `/^(.*?)\\s+—\\s+(Forme|Image|Texte)\\s+\\d+$/` — hardcoded to the FRENCH literals \"Forme\"/\"Image\"/\"Texte\" only, and does not even cover all four label kinds `elementLabel` can produce (`autoNameStroke`='Trait' in French is absent from the alternation entirely, alongside every non-French locale's own translated word for \"Shape\"/\"Stroke\"/\"Text\"). A GAP: the round-trip-name-recovery claim (3863-3864, \"a split/merge round-trip is invisible\") only actually holds under the French locale, and only for shape-, image- or text-labeled split-off layers — a stroke-labeled (\"— Trait N\") layer, or ANY split-off layer under a non-French UI locale, fails the regex match at 3867 (`m&&srcs.every(...)`) and the merge falls through to keeping `srcs[0].name` verbatim (3865, the pre-match default), so the merged layer's name literally reads e.g. \"Layer 1 — Shape 3\" instead of recovering \"Layer 1\". Flagged in `future_proposals`.",
+    "Neither function checks `.locked` (or calls `canEditActiveLayer`, the gate C21i's own Rig tool uses) anywhere in its own body — confirmed by a whole-range grep over 3557-3989 for `locked`, which only matches the new-layer-reset assignments `locked:false`/`locked:true` (3625, 3911), never a guard read of an EXISTING layer's own `.locked`. All four external context-menu entry points (timeline.js:6715/6719, motion.js:7407/7467) likewise gate only on `!!ld.symbolId||!!ld.lfsGroup` (split) or a selection-count flag (merge), never on `.locked`. A locked layer — including one force-locked because it carries an active mograph `duplicator` (the invariant `merged.duplicator` truthy ⇒ `merged.locked=true` at 3911 exists to PRESERVE, not create) — can therefore be split or merged today with no refusal at any layer of gating observed. Flagged in `future_proposals`, not fixed here.",
+    "`ld.groups` (combine-group definitions) round-trips through BOTH functions and IS one of exportJSON's own persisted per-layer fields (`groups:l.groups||undefined`, timeline.js:2169, inside the field object at timeline.js:2117-2169) — confirmed by direct read, closing the loop on the merge's own \"diffed against exportJSON's per-layer field list\" comment (3920-3928).",
+    "Neither function calls `createUserLayer` (app.js:377) — both mint their own bare Paper `Layer` objects directly: split (3726) `new Layer({name:'user-split-'+Date.now()+'-'+e2})` once per new element layer, and merge (3970) `new Layer({name:'user-merge-'+Date.now()})` once for the survivor. Neither calls `activateUL` more than once (split: 3733; merge: 3981), after all Paper/state splicing is complete, matching the general splice-then-activate-then-render ordering both functions share (see the commit-ordering finding below).",
+    "Commit/undo ordering, split (`splitLayerIntoElementsCore`): `saveAllLayerFrames()` (3606) → `if(!silent)pushUndo()` (3606, same line) → mutate Paper (`userLayers[li].remove()`+`splice`, 3727-3729) and `state.layers`/`_layerSel`/`state.activeLayerIdx` (3730-3732) → `activateUL(state.activeLayerIdx)` (3733) → `loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();` (3734, all four on one line, no `renderTimeline()` call from inside this scope) → conditional toast (3735) → `return true` (3736).",
+    "Commit/undo ordering, merge (`mergeLayersIntoOne`): `saveAllLayerFrames()` (3791) → `if(!silent)pushUndo()` (3791, same line, identical idiom to split) → the group-remap/held-frame/motion-demote/field-transfer/re-parent work (3792-3965, all pure JS-object construction, no Paper mutation yet) → Paper mutation (`userLayers[idx[r]].remove()`+`splice`+`state.layers.splice` in a REVERSE index loop, 3971-3975, then a single `userLayers.splice(target,0,newUL);state.layers.splice(target,0,merged);`, 3976-3977) → `state.activeLayerIdx=target;_layerSel=[target];` (3979-3980) → `activateUL(state.activeLayerIdx)` (3981) → `loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();` (3982, byte-identical call sequence to split's own 3734, again no `renderTimeline()`) → conditional toast (3983-3987) → `return true` (3988). Divergence from split: merge's own removal loop runs newest-index-first (`for(var r=idx.length-1;r>=0;r--)`) specifically so earlier splices in the SAME loop don't shift the indices still queued for removal — split's own single-point replacement (`userLayers.splice.apply(userLayers,[li,1].concat(newLayers))`, 3728) never needs this discipline because it removes/inserts at exactly ONE index.",
+    "Render-path vs gesture-path: NONE of this scope's own functions is ever called from `getEffectiveStrokes` (app.js:2949, cited by line only) or from `buildSceneJson`/`scenePayload` (engine-bridge.js, cited by name only) — confirmed by a whole-src grep over engine-bridge.js and export.js for all three symbol names, zero hits. Every one of the observed external call sites (motion.js:7363/7407/7467/6910, timeline.js:6715/6719, nemo-script.js:395) is a user-gesture, context-menu action, or explicit scripting-console call, not a render-time call."
+  ],
+  "areas": [
+    {
+      "area": "release-to-layers-split",
+      "packets": [
+        {
+          "id": "C21m.release-to-layers-entry",
+          "files": [
+            "src/js/app.js:3557-3586"
+          ],
+          "coverage_ranges": [
+            [
+              3557,
+              3586
+            ]
+          ],
+          "classification": {
+            "code": 4,
+            "comment": 26,
+            "whitespace": 0
+          },
+          "symbols": [
+            "splitLayerIntoElements"
+          ],
+          "signature": "function splitLayerIntoElements(li){if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}splitLayerIntoElementsCore(li);}",
+          "responsibility": "Lead-in (3557-3582, 26 comment lines): states the \"Release to Layers\" (Illustrator-style) rationale — Motion's double-click-a-layer-row gesture (2026-07) EXPLODES a layer into N real top-level layers rather than an in-place grouped view (an explicit reversal of an earlier same-day \"affichage seulement\" attempt), explains WHY the split is positional rather than strokeId-matched (strokeId is a lazy per-frame stamp, not a stable cross-frame identity for a never-Motion-opened layer), states the fewer/more-strokes distribution rule, and states that per-element Motion keys ARE reliable at the reference frame and are promoted straight to the new layer's own track. `splitLayerIntoElements(li)` (3583-3586) is the guarded, user-facing entry: refuses with a toast while `state.activeSymbolId` is set (3584, the guard `splitLayerIntoElementsCore` itself deliberately omits, see packet 2), otherwise delegates straight to the Core with no `opts` (3585, so `silent` is always false through this path).",
+          "callers": [
+            "motion.js:7363 — inside SMMotion's own double-click-a-layer-row handler (the ORIGINAL Motion gesture this whole feature is named after): `splitLayerIntoElements(li);` (bare call).",
+            "motion.js:7407 — Motion's own layer context menu, `ctxSplitIntoLayers` entry, `disabled:!!ld.symbolId||!!ld.lfsGroup`: `window.SM.splitLayerIntoElements(li);`.",
+            "timeline.js:1640 — the `window.SM` attach: `splitLayerIntoElements:function(li){return splitLayerIntoElements(li);},`.",
+            "timeline.js:6715 — Animation 2D's own layer context menu, `ctxSplitIntoLayers` entry, same gate as motion.js's own copy: `window.SM.splitLayerIntoElements(idx4);`."
+          ],
+          "behavior": [
+            "Lines 3557-3562 (comment, 6 lines): \"Release to Layers\" (Illustrator-style) framing — Motion's double-click gesture EXPLODES into N real layers, reversing an earlier \"affichage seulement\" attempt.",
+            "Lines 3563-3576 (comment, 14 lines): why the split is POSITIONAL not strokeId-matched (strokeId is a lazy per-frame stamp, not stable across keyframes for an unopened layer), plus the fewer/more-strokes distribution rule stated in prose.",
+            "Lines 3577-3582 (comment, 6 lines): per-element Motion keys ARE reliable at the reference frame (state.currentFrame) and are promoted straight to the new layer's own motion/motionStatic track.",
+            "Lines 3583-3584 (code, 2 lines): function open; `state.activeSymbolId` guard (toast + bare return).",
+            "Line 3585 (code, 1 line): delegates to `splitLayerIntoElementsCore(li)` with no opts.",
+            "Line 3586 (code, 1 line): function close."
+          ]
+        },
+        {
+          "id": "C21m.release-to-layers-core-split",
+          "files": [
+            "src/js/app.js:3587-3707"
+          ],
+          "coverage_ranges": [
+            [
+              3587,
+              3707
+            ]
+          ],
+          "classification": {
+            "code": 49,
+            "comment": 72,
+            "whitespace": 0
+          },
+          "symbols": [
+            "splitLayerIntoElementsCore",
+            "els",
+            "newLayers",
+            "entry",
+            "emh"
+          ],
+          "signature": "function splitLayerIntoElementsCore(li,opts){var silent=!!(opts&&opts.silent);var ld=state.layers[li];if(!ld||ld.symbolId){...;return false;}if(!window.SMMotion)return false;var els=SMMotion.layerElements(li,ld);if(!els||els.length<2){...;return false;}saveAllLayerFrames();if(!silent)pushUndo();var n=els.length;var newLayers=[];for(var e=0;e<n;e++){/* build frames[] by position, build nl={name,motion,motionStatic,blendMode,parentLayerUid...,inPoint,outPoint,expressions,exprControls,threeD,motionBlur,...deep/shallow field-transfer IIFE...,matte fields conditionally,layerUid+matteMode legacy only on last piece}; newLayers.push(nl);} /* groups filter, see packet 3 */}",
+          "responsibility": "Lead-in (3587-3599, 13 comment lines): states this is the Core, with NO `activeSymbolId` guard (unlike packet 1's entry), reused by `enterComponentLayer` (motion.js) to SILENTLY auto-split a Component's own single layer into one real layer per shape on entry (2026-07-17), safe while `activeSymbolId` is set because this function only ever touches `state.layers`/`userLayers`, which by then ARE the entered symbol's own swapped arrays; states the idempotence claim (a layer already split has exactly 1 element, so re-entry's auto-split no-ops via the `els.length<2` guard). `splitLayerIntoElementsCore(li,opts)` body (3600-3707): reads `opts.silent` (3601); refuses if `ld` is missing or is itself a Component (`ld.symbolId`, 3602); refuses if `SMMotion` isn't loaded (3603); reads `els=SMMotion.layerElements(li,ld)` at the reference frame `state.currentFrame` (3604) and refuses below 2 elements (3605); commits `saveAllLayerFrames()` and a conditional `pushUndo()` (3606) BEFORE any mutation; then for each of the `n=els.length` elements (3607-3707) builds that element's own `frames[]` by POSITIONAL split of every source keyframe (3609-3617, held frames passed through as empty placeholders) and a new-layer descriptor `nl` (3618-3706) carrying: the element's own name via `elementLabel` (3624, with the ORIGINAL `ld.name` or 'Layer' prefixed and a custom-tree-panel-name override preserved via `ld.name` itself, 3621-3623), per-element Motion promoted from `ld.elementMotion[entry.strokeId]` (3626-3627), and a large set of \"outward\" fields documented as copied to EVERY split-off piece because they describe the whole original layer's spatial/time parenting or render toggles rather than which piece a stroke landed in (blendMode/parentLayerUid(+B)/timeLink 3628-3642; inPoint/outPoint 3643-3648; expressions 3649; exprControls 3650-3655; threeD/motionBlur 3656-3664, with `duplicator` explicitly excluded here, 3659-3663, because applying one duplicator descriptor to N independent split-off layers would multiply each piece separately rather than reproduce the single original N-way expansion); a further deep/shallow field-transfer IIFE (3672-3676, the PR #814/#815 audit fields: effects/pathFx/blendKeys/parentKeys/parentsMore/followPath/markers/textAnimators deep-copied, shy/keyLock/channel/effectsFrom/folderId/linkGroupId/isTextLayer shallow-copied); and matte fields, conditional on `ld.matteSourceLayerUid` (uid-based mattes travel to EVERY piece, 3684-3693) with a legacy positional-matte fallback and `ld.layerUid` itself surviving only on the LAST piece (3694-3705, so any other layer's uid-reference to `ld` keeps resolving with zero re-point pass needed). The groups filter and Paper/state commit that follow this per-element loop are packet 3's own territory.",
+          "callers": [],
+          "behavior": [
+            "Lines 3587-3599 (comment, 13 lines): Core lead-in — no activeSymbolId guard, reused by enterComponentLayer, idempotence via the els.length<2 guard below.",
+            "Lines 3600-3608 (code, 9 lines): function open; silent; ld+ld.symbolId guard; SMMotion guard; els=layerElements(li,ld) at the reference frame; els.length<2 guard; saveAllLayerFrames()+conditional pushUndo(); n=els.length; newLayers=[].",
+            "Lines 3609-3617 (code, 9 lines): outer for(e) open; per-keyframe frames[] build — held-frame passthrough (empty placeholder), positional split (index<n-1 gets strokes[e] or [], last index gets strokes.slice(n-1)), deep-cloned via JSON.parse(JSON.stringify(part)).",
+            "Lines 3618-3620 (code, 3 lines): entry=els[e]; emh=ld.elementMotion&&ld.elementMotion[entry.strokeId]; nl={ open.",
+            "Lines 3621-3627 (comment 3 + code 4, 7 lines): ld-passthrough-name rationale (custom tree-panel rename survives); name/visible/locked/frames/color; motion/motionStatic promoted from emh, deep-cloned.",
+            "Lines 3628-3642 (comment 12 + code 3, 15 lines): blendMode/parentLayerUid(+B)/timeLink rationale (outward references describe the WHOLE original layer, unrelated to which piece a stroke landed in) + the three field writes.",
+            "Lines 3643-3649 (comment 5 + code 2, 7 lines): inPoint/outPoint gap-fix rationale (2026-08-16 QA sweep) + inPoint/outPoint/expressions writes.",
+            "Lines 3650-3655 (comment 5 + code 1, 6 lines): exprControls carry-over rationale (2026-08-30) + the write.",
+            "Lines 3656-3665 (comment 8 + code 2, 10 lines): threeD/motionBlur rationale AND the explicit duplicator-exclusion rationale (multiplying N independent pieces would differ from one N-way expansion) + threeD/motionBlur writes + nl object literal close.",
+            "Lines 3666-3676 (comment 6 + code 5, 11 lines): PR #814/#815 audit rationale (effects stack, Blend/parent keyframes, follow-path, Instance-Effect link, markers, LFS channel, shy/keyLock, text identity+animators, folder membership) + the deep-copy/shallow-copy field-transfer IIFE.",
+            "Lines 3677-3693 (comment 10 + code 7, 17 lines): matteMode/matteSourceLayerUid/mattesMore rationale (uid-based mattes removed the old adjacency-only limitation) + the conditional copy code, deep-cloning mattesMore's own {uid,mode} pairs.",
+            "Lines 3694-3707 (code 6 + comment 8, 14 lines): legacy positional-matte fallback and layerUid-survives-only-on-last-piece rationale + the two conditional writes (matteMode fallback, layerUid) + newLayers.push(nl) + for(e) loop close."
+          ]
+        },
+        {
+          "id": "C21m.release-to-layers-groups-and-commit",
+          "files": [
+            "src/js/app.js:3708-3737"
+          ],
+          "coverage_ranges": [
+            [
+              3708,
+              3737
+            ]
+          ],
+          "classification": {
+            "code": 22,
+            "comment": 8,
+            "whitespace": 0
+          },
+          "symbols": [
+            "newLayers",
+            "arcLayer",
+            "activateUL",
+            "loadFrame"
+          ],
+          "signature": "/* tail of splitLayerIntoElementsCore */ if(ld.groups&&newLayers.length){/* keep only the last layer's own gids */} arcLayer.activate();var newUls=[];for(...)newUls.push(new Layer(...)); userLayers[li].remove();userLayers.splice.apply(...);userLayers.forEach(insertBelow(arcLayer)); state.layers.splice.apply(...);state.activeLayerIdx=li;_layerSel=[...];activateUL(...); loadFrame(...);renderOS();renderArcs();updateUI();if(!silent)showToast(...);return true;}",
+          "responsibility": "Continuation of `splitLayerIntoElementsCore` (packet 2's own function; not independently callable). Combine-group ownership (3708-3723): only the LAST new layer can hold 2+ strokes (the overflow slice `strokes.slice(n-1)`) — every other new layer holds exactly 1 stroke by construction and can never combine with anything. Even for that last layer, `ld.groups` entries are kept ONLY if their `gid` still appears on one of the last layer's OWN strokes (3716-3722, `keepGids` scan then filter into `keptGroups`) — a combine spanning what are now two different layers is unrepresentable (the same limitation matteMode has pre-uid, just data-driven here). Paper/state commit (3724-3737): activates `arcLayer` and mints N fresh Paper `Layer` objects named `'user-split-'+Date.now()+'-'+e2` (3724-3726); removes and splices out the ORIGINAL single Paper layer at index `li`, replacing it in place with all N new ones (3727-3728); re-stacks every user layer below `arcLayer` (3729); mirrors the same single-point splice on `state.layers` (3730); sets `state.activeLayerIdx=li` and `_layerSel` to the full new index range (3731-3732); calls `activateUL` once (3733); calls `loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();` (3734, all on one line, no `renderTimeline()` from inside this scope); shows a conditional success toast naming the count `n` (3735); returns `true` (3736); function close (3737).",
+          "callers": [],
+          "behavior": [
+            "Lines 3708-3715 (comment, 8 lines): combine-group ownership rationale — only the last new layer can hold a combine (the overflow slice), every other new layer holds exactly 1 stroke by construction.",
+            "Lines 3716-3723 (code, 8 lines): groups filter — keepGids scan of the last layer's own strokes' groupId, keptGroups built from ld.groups filtered to those gids, assigned onto lastLayer.groups only if non-empty.",
+            "Lines 3724-3737 (code, 14 lines): Paper layer replacement and commit — arcLayer.activate(); N new Layer() objects named 'user-split-<ts>-<e2>'; old single Paper layer removed+spliced out, replaced in place by the N new ones; re-stack under arcLayer; single-point state.layers splice; activeLayerIdx/_layerSel set to the new range; activateUL; loadFrame+renderOS+renderArcs+updateUI; conditional toast naming the split count; return true; function close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "merge-layers-into-one",
+      "packets": [
+        {
+          "id": "C21m.merge-lead-in-guards-dedup",
+          "files": [
+            "src/js/app.js:3738-3791"
+          ],
+          "coverage_ranges": [
+            [
+              3738,
+              3791
+            ]
+          ],
+          "classification": {
+            "code": 21,
+            "comment": 33,
+            "whitespace": 0
+          },
+          "symbols": [
+            "mergeLayersIntoOne",
+            "idx",
+            "srcs",
+            "bad"
+          ],
+          "signature": "function mergeLayersIntoOne(indices,opts){var silent=!!(opts&&opts.silent);var idx=(indices||[]).slice().sort(function(a,b){return a-b;});idx=idx.filter(function(v,i){return i===0||v!==idx[i-1];});if(idx.length<2){...;return false;}var srcs=[],bad=null;for(...){var l=state.layers[idx[a]];if(!l){...;return false;}if(l.symbolId)bad=bad||'un composant';else if(l.lfsGroup)...;...else if(l.isWidgetLayer)bad=bad||'un calque Widget';srcs.push(l);}if(bad){...;return false;}saveAllLayerFrames();if(!silent)pushUndo();",
+          "responsibility": "Lead-in (3738-3766, 29 comment lines incl. two bare `//` separators): states this is the TRUE inverse of `splitLayerIntoElementsCore`, added 2026-07-25 after a feedback report that the split had no inverse ANYWHERE in the app and `enterComponentLayer`'s own silent auto-split permanently rewrote a Component's layer structure with no undo entry to walk back (the split side of that gap is fixed at ITS call site, motion.js; this function is the explicit way back, reachable from both timelines' layer context menu). States the frame model: a merged frame is a keyframe if ANY source has one there; its strokes are every source's strokes AT that frame, HELD-FRAME semantics included (a source with no keyframe at `fi` still contributes what it visibly shows, inherited from its last keyframe — the exact CLAUDE.md §1 \"handled in one reader but not the others\" family this function's own comment names explicitly); deliberately reads RAW stored strokes rather than `getEffectiveStrokes` (C21k, cited by line only) because the latter bakes motion into geometry, which would freeze the animation rather than preserve it as editable keys. States that layer-level Motion is DEMOTED to per-element motion (the mirror of the split's own promotion) — lossless for the round-trip case (each source holding exactly 1 shape, what a split produces), an approximation flagged in the toast for a multi-shape source. `mergeLayersIntoOne(indices,opts)` body (3767-3791): reads `opts.silent` (3768); sorts a defensive copy of `indices` ascending (3769); de-dups adjacent duplicates (3770-3771, \"a caller can easily pass the active layer twice\"); refuses below 2 distinct indices (3772); resolves each index to a layer, refusing on a missing one (3774-3776); refuses the WHOLE selection with a named reason if ANY source is a non-stroke-holder — an 8-way type chain (symbolId/lfsGroup/montageId/nativeVideo/isNullLayer/isEffectLayer/isGuideLayer/isWidgetLayer, 3780-3787) that is a VERBATIM, order-for-order duplicate of `badComponentSourceReason`'s own body (app.js:3212-3221, C21l, cited by name only) rather than a call to it (3790, refusal toast+return false); commits `saveAllLayerFrames()` and a conditional `pushUndo()` (3791) BEFORE any of the group-remap/held-frame/field-transfer work that follows in packets 5-8.",
+          "callers": [
+            "timeline.js:1641 — the window.SM attach: `mergeLayersIntoOne:function(indices,opts){return mergeLayersIntoOne(indices,opts);},`.",
+            "timeline.js:6719 — Animation 2D's own layer context menu, `ctxMergeSelectedLayers` entry, `disabled:_layerSel.length<2`: `window.SM.mergeLayersIntoOne(_layerSel.slice());`.",
+            "motion.js:7467 — Motion's own layer context menu, `ctxMergeSelectedLayers` entry, `disabled:!multi`: `window.SM.mergeLayersIntoOne(_layerSel.slice());`.",
+            "nemo-script.js:395 — `Layer.prototype.mergeWith` (the scripting console's own wrapper, nemo-script.js:392-397): `if(!window.SM.mergeLayersIntoOne(idx))fail('fusion impossible');` then returns `new Layer(Math.min.apply(null,idx))` for the survivor."
+          ],
+          "behavior": [
+            "Lines 3738-3746 (comment, 9 lines): \"true inverse\" framing — the feedback quote, the silent-auto-split-had-no-undo problem this function was added to fix.",
+            "Lines 3747-3757 (comment, 11 lines incl. separator): frame model — keyframe-if-ANY-source-has-one, held-frame semantics named against CLAUDE.md §1, raw-strokes-not-getEffectiveStrokes rationale.",
+            "Lines 3758-3766 (comment, 9 lines incl. separator): layer-level Motion DEMOTED to per-element (mirror of the split's promotion), lossless-for-1-shape-sources claim, multi-shape-source caveat flagged in the toast.",
+            "Lines 3767-3769 (code, 3 lines): function open; silent; idx=indices sliced+sorted ascending.",
+            "Lines 3770-3772 (comment 1 + code 2, 3 lines): de-dup rationale + adjacent-duplicate filter + <2-distinct-indices guard/toast/return false.",
+            "Lines 3773-3789 (code 14 + comment 3, 17 lines): srcs/bad build loop — per-index layer lookup + missing-layer guard; non-stroke-holder refusal rationale; the 8-way type-check chain (verbatim duplicate of badComponentSourceReason); srcs.push; loop close.",
+            "Lines 3790-3791 (code, 2 lines): bad-selection refusal toast+return false; saveAllLayerFrames();if(!silent)pushUndo()."
+          ]
+        },
+        {
+          "id": "C21m.merge-group-remap-and-held-frames",
+          "files": [
+            "src/js/app.js:3792-3842"
+          ],
+          "coverage_ranges": [
+            [
+              3792,
+              3842
+            ]
+          ],
+          "classification": {
+            "code": 41,
+            "comment": 10,
+            "whitespace": 0
+          },
+          "symbols": [
+            "mergedGroups",
+            "srcs",
+            "rawAt",
+            "elMotion"
+          ],
+          "signature": "var mergedGroups={};srcs.forEach(function(l){if(!l.groups)return;var remap={};Object.keys(l.groups).forEach(...);(l.frames||[]).forEach(function(f){(f.strokes||[]).forEach(function(sd){if(sd.groupId&&remap[sd.groupId])sd.groupId=remap[sd.groupId];});});Object.keys(l.groups).forEach(function(oldGid){mergedGroups[remap[oldGid]]={combineMode:...,order:newOrder};});});var target=idx[0];function rawAt(ld,fi){var f=ld.frames[fi];if(!f)return null;if(f.isKeyframe||f.isInterpolated)return f.strokes||[];for(...)if(pf&&pf.isKeyframe)return pf.strokes||[];return null;}var nf=...;var elMotion=JSON.parse(JSON.stringify(state.layers[target].elementMotion||{}));var approximated=0;var frames=[];for(var fi=0;fi<nf;fi++){...frames.push({strokes,isKeyframe:anyKey,isInterpolated:!anyKey&&anyInterp});}",
+          "responsibility": "Continuation of `mergeLayersIntoOne` (packet 4's own function; not independently callable). Combine-group remap (3792-3813): each source layer's OWN `ld.groups` may share id STRINGS with another source's — e.g. merging a layer with its own `duplicateLayer()` clone, which deliberately keeps the same groupId strings (cited by name only). Mints a fresh `grp_<ts36>_<rand>` gid per group PER SOURCE (3804) before any stroke concatenation, rewrites every one of that source's own strokes' `sd.groupId` in place (3805-3807), then rebuilds `mergedGroups[newGid]={combineMode,order:[remapped members]}` from the source's own `ld.groups[oldGid]` (3808-3812) — mirroring the strokeId collision-avoidance used elsewhere for the identical reason (reusing an id string across two originally-separate things would silently fuse them). `target=idx[0]` (3814) is the merge survivor's index, always the LOWEST selected index post-sort. Held-frame resolution WITHOUT motion baking (3815-3842): `rawAt(ld,fi)` (3817-3822) is the \"plain-layer tail of getEffectiveStrokes\" kept separate on purpose (C21k, cited by line only) — for a real keyframe/interpolated frame it returns that frame's OWN `strokes`, otherwise it walks backward to the nearest prior `isKeyframe` and returns THAT frame's strokes (a held frame's visible content), or `null` if none exists. `nf` (3823) is the LONGEST of every source's own `frames.length` (falling back to `state.totalFrames` if all sources report 0, 3824) — unlike the split, which never needs to reconcile differing frame counts since it has exactly one source. `elMotion` (3825) seeds from a deep clone of the SURVIVOR's own pre-existing `elementMotion` (so a target that already carried per-element keys before the merge keeps them, and the demotion loop in packet 6 ADDS to this map rather than replacing it). `approximated` (3826) and `frames` (3827) are counters/accumulators consumed here and in packet 6/8. The per-frame loop (3828-3842): for every `fi` in `0..nf-1`, scans EVERY source's own `frames[fi]` for `isKeyframe`/`isInterpolated` (3830-3834, a source shorter than `nf` yields `undefined` there, contributing nothing, no crash); if either is true for ANY source, concatenates every source's `rawAt(...)` result, deep-cloned (3836-3839); pushes `{strokes,isKeyframe:anyKey,isInterpolated:!anyKey&&anyInterp}` (3841) — a frame with no source contributing anything is pushed as an empty non-keyframe placeholder, the same shape the split's own held-frame passthrough (3613) produces.",
+          "callers": [],
+          "behavior": [
+            "Lines 3792-3799 (comment, 8 lines): combine-group remap rationale (2026-07-29) — id-collision-across-sources risk (e.g. merging a layer with its own duplicateLayer() clone), mint-fresh-gid-per-source before concatenating.",
+            "Lines 3800-3813 (code, 14 lines): mergedGroups build — per-source remap map (oldGid to fresh grp_ id), rewrite sd.groupId on every stroke of every frame, rebuild each group's own order array through the remap, merge into mergedGroups.",
+            "Line 3814 (code, 1 line): target=idx[0], the merge survivor index.",
+            "Lines 3815-3816 (comment, 2 lines): held-frame-without-motion-baking rationale, \"plain-layer tail of getEffectiveStrokes\" cross-reference (C21k, cited by line only).",
+            "Lines 3817-3822 (code, 6 lines): rawAt(ld,fi) helper — real key/interpolated frame returns its own strokes, held frame walks backward to the last isKeyframe, else null.",
+            "Lines 3823-3827 (code, 5 lines): nf = max source frame-count (falls back to state.totalFrames if 0); elMotion seeded from a deep clone of the survivor's own pre-existing elementMotion; approximated counter; frames=[].",
+            "Lines 3828-3842 (code, 15 lines): per-frame loop — anyKey/anyInterp scan across all srcs; strokes concatenation via rawAt() (deep-cloned) when either is true; frames.push({strokes,isKeyframe:anyKey,isInterpolated:!anyKey&&anyInterp})."
+          ]
+        },
+        {
+          "id": "C21m.merge-motion-demote-and-naming",
+          "files": [
+            "src/js/app.js:3843-3906"
+          ],
+          "coverage_ranges": [
+            [
+              3843,
+              3906
+            ]
+          ],
+          "classification": {
+            "code": 36,
+            "comment": 28,
+            "whitespace": 0
+          },
+          "symbols": [
+            "elMotion",
+            "approximated",
+            "merged"
+          ],
+          "signature": "srcs.forEach(function(l){var hasMotion=(l.motion&&Object.keys(l.motion).length)||(l.motionStatic&&Object.keys(l.motionStatic).length);if(!hasMotion)return;var seen={},ids=[];(l.frames||[]).forEach(function(f){...(f.strokes||[]).forEach(function(sd,i){if(sd.isBrushTextureCopy)return;if(!sd.strokeId)sd.strokeId='s'+Date.now().toString(36)+...;if(!seen[sd.strokeId]){seen[sd.strokeId]=1;ids.push(sd.strokeId);}});});if(ids.length>1)approximated++;ids.forEach(function(sid){var h=elMotion[sid]||(elMotion[sid]={});if(l.motion)h.motion=JSON.parse(JSON.stringify(l.motion));if(l.motionStatic)h.motionStatic=JSON.parse(JSON.stringify(l.motionStatic));});});var name=srcs[0].name||'Layer 1';var m=/^(.*?)\\s+—\\s+(Forme|Image|Texte)\\s+\\d+$/.exec(name);if(m&&srcs.every(...))name=m[1];var merged={name,visible:true,locked:false,frames,color:srcs[0].color||nextLayerColor(),layerUid:srcs[0].layerUid,parentLayerUid:srcs[0].parentLayerUid,parentLayerUidB:...,timeLink:...expressions:...,exprControls:...,matteMode:...,blendMode:...,threeD:...,motionBlur:...,duplicator:...,matteSourceLayerUid:...,mattesMore:...};",
+          "responsibility": "Continuation of `mergeLayersIntoOne` (packet 4's own function; not independently callable). Motion demotion (3843-3862): for every source with non-empty layer-level `motion` OR `motionStatic` (3845), collects every DISTINCT `strokeId` its own keyframes/interpolated frames carry (3848-3855) — `isBrushTextureCopy` dabs are explicitly excluded from this scan (3851, the same dabs-excluded-from-per-element-machinery convention CLAUDE.md documents for tween matching), and a stroke with no `strokeId` yet gets one minted INLINE (3852, the same idiom `layerElements` itself uses, NOT a call to `ensureStrokeId`, see `boundaries`). `approximated` (3856) counts sources contributing MORE than one distinct id — a source bundling several shapes under one layer-level transform, the multi-shape caveat the lead-in comment names. For every collected id, the source's ENTIRE layer-level `motion`/`motionStatic` is deep-copied onto `elMotion[sid]` (3857-3861) — so a multi-shape source's several ids each receive an IDENTICAL copy of the same transform (a real approximation of a true group pivot, flagged rather than silently produced). Name recovery (3863-3867): the regex `/^(.*?)\\s+—\\s+(Forme|Image|Texte)\\s+\\d+$/` (3866, hardcoded to French literals ONLY — see `boundaries` for the locale/type gap) is matched against `srcs[0].name`; if it matches AND every OTHER source's own name shares the same recovered prefix (`m[1]+' — '`, 3867), the merged layer's name recovers to that prefix, making a same-locale, Forme/Image/Texte-labeled split/merge round-trip's name invisible; otherwise `name` falls through to `srcs[0].name||'Layer 1'` (3865) verbatim. Field transfer, first half (3868-3906): the `merged` object literal opens with name/visible/locked/frames/color (3869-3870, color falling back to a fresh `nextLayerColor()` only if `srcs[0]` had none), then a long \"topmost source (`srcs[0]`) wins\" chain — layerUid/parentLayerUid (3871), parentLayerUidB (3877, a 2026-08-16 gap-fix, own comment 3872-3876), timeLink (3878), expressions (3879, deep-cloned), exprControls (3885, deep-cloned, own comment 3880-3884), matteMode/blendMode (3891, a RECURRENCE of the same field-drop bug already fixed once in `convertLayersToComponent`, own comment 3886-3890), threeD/motionBlur/duplicator (3898-3899, duplicator DEEP-cloned — unlike the split, which explicitly excludes duplicator entirely, own comment 3892-3897 on the 2026-08-16 combo-testing find), matteSourceLayerUid (3903, \"travels with matteMode\" rationale 3900-3902) and mattesMore (3905, same travels-with rationale 3904, mapped to fresh `{uid,mode}` pairs) — object literal closes at 3906.",
+          "callers": [],
+          "behavior": [
+            "Line 3843 (comment, 1 line): section marker — \"Demote each source's layer-level Motion onto its own strokes.\"",
+            "Lines 3844-3862 (code, 19 lines): srcs.forEach demote loop — hasMotion check; per-frame per-stroke strokeId collection (isBrushTextureCopy excluded, fresh strokeId minted inline, NOT via ensureStrokeId); approximated++ for a source contributing 2+ distinct ids; elMotion[sid] demotion write, motion/motionStatic deep-cloned.",
+            "Lines 3863-3867 (comment 2 + code 3, 5 lines): \"Layer 1 — Forme 3\"+\"Layer 1 — Forme 4\" to \"Layer 1\" name-recovery rationale + the French-literal-only regex applied to srcs[0].name, accepted only if every source shares the recovered prefix.",
+            "Lines 3868-3871 (code, 4 lines): merged object open — name/visible/locked/frames/color (srcs[0].color fallback)/layerUid/parentLayerUid, all topmost-source-wins.",
+            "Lines 3872-3878 (comment 5 + code 2, 7 lines): parentLayerUidB gap-fix rationale + parentLayerUidB/timeLink writes.",
+            "Lines 3879-3885 (code 1 + comment 5 + code 1, 7 lines): expressions deep-copy; exprControls topmost-wins rationale + exprControls deep-copy.",
+            "Lines 3886-3891 (comment 5 + code 1, 6 lines): matteMode/blendMode field-drop-bug-recurrence rationale + the writes.",
+            "Lines 3892-3899 (comment 6 + code 2, 8 lines): threeD/duplicator/motionBlur rationale (2026-08-16 combination-testing find) + the writes, duplicator deep-cloned.",
+            "Lines 3900-3906 (comment 3 + code 1 + comment 1 + code 2, 7 lines): matteSourceLayerUid + mattesMore \"travels with matteMode\" rationale + the writes; merged object literal close."
+          ]
+        },
+        {
+          "id": "C21m.merge-field-transfer",
+          "files": [
+            "src/js/app.js:3907-3937"
+          ],
+          "coverage_ranges": [
+            [
+              3907,
+              3937
+            ]
+          ],
+          "classification": {
+            "code": 12,
+            "comment": 19,
+            "whitespace": 0
+          },
+          "symbols": [
+            "merged",
+            "srcs",
+            "elMotion",
+            "mergedGroups"
+          ],
+          "signature": "if(merged.duplicator)merged.locked=true;if(srcs[0].inPoint!=null)merged.inPoint=srcs[0].inPoint;if(srcs[0].outPoint!=null)merged.outPoint=srcs[0].outPoint;(function(){var deep=function(v){return JSON.parse(JSON.stringify(v));};['effects','pathFx','blendKeys','parentKeys','parentsMore','followPath','textAnimators','effectsFrom'].forEach(function(k){if(srcs[0][k]!=null)merged[k]=deep(srcs[0][k]);});['folderId','channel','shy','keyLock','isTextLayer','linkGroupId'].forEach(function(k){if(srcs[0][k]!=null)merged[k]=srcs[0][k];});var mk=[];srcs.forEach(function(l){(l.markers||[]).forEach(function(m){if(!mk.some(...))mk.push(deep(m));});});if(mk.length){mk.sort(...);merged.markers=mk;}})();if(Object.keys(elMotion).length)merged.elementMotion=elMotion;if(Object.keys(mergedGroups).length)merged.groups=mergedGroups;",
+          "responsibility": "Continuation of `mergeLayersIntoOne` (packet 4's own function; not independently callable). Duplicator force-lock invariant (3907-3911): `duplicateLayer`/`applyLayerDuplicator` (cited by name only) always force-lock a layer carrying an active mograph `duplicator` descriptor — packet 6 already copies `srcs[0].duplicator` onto `merged.duplicator` wholesale, so this line (3911, `if(merged.duplicator)merged.locked=true;`) PRESERVES that invariant rather than creating it, avoiding the one combination the rest of the app never expects: an EDITABLE layer with an active N-way expansion. Trimmed-source field-drop fix (3912-3919, 2026-08-16 QA sweep): a source manually trimmed to an in/out window (`inPoint`/`outPoint`) wasn't carried at all before this fix, so merging it silently un-trimmed it back to the full timeline; now conditionally inherited from `srcs[0]` (3918-3919), same topmost-wins convention as every other field. exportJSON-diffed field transfer (3920-3937, 2026-09 QA sweep, same audit that fixed `splitLayerAtPlayhead`/`duplicateLayer`, PR #814, cited by name only): the comment (3920-3928) names the COMPLETE set of fields the merged layer was ALSO dropping before this fix — the effects stack, Blend/parent keyframes, follow-path, text identity+animators, the Instance-Effect link, LFS channel, shy/keyLock, link-group, and the layer's own FOLDER (so merging two layers inside a folder used to pop the result out of it) — with markers named as the ONE exception (unioned across every source rather than topmost-wins, since there is nothing for timestamped annotations to conflict over). The fix itself (3929-3935): an 8-field deep-copy list (effects/pathFx/blendKeys/parentKeys/parentsMore/followPath/textAnimators/effectsFrom, 3931) and a 6-field shallow-copy list (folderId/channel/shy/keyLock/isTextLayer/linkGroupId, 3932), both from `srcs[0]` only; markers built SEPARATELY (3933-3934) by unioning every source's own `markers` array, de-duplicated by `(frame,label)` pairs, deep-cloned, then sorted by frame and assigned only if non-empty. Closing writes (3936-3937): `merged.elementMotion=elMotion` (the demotion map packets 5-6 built) and `merged.groups=mergedGroups` (the remapped combine groups packet 5 built), BOTH gated on a non-empty `Object.keys(...).length` check so an unremarkable merge never grows an empty `elementMotion`/`groups` field on the resulting layer.",
+          "callers": [],
+          "behavior": [
+            "Lines 3907-3911 (comment 4 + code 1, 5 lines): duplicator-always-force-locked-elsewhere rationale (cross-ref duplicateLayer/applyLayerDuplicator, out of scope) + merged.locked=true when merged.duplicator is truthy.",
+            "Lines 3912-3919 (comment 6 + code 2, 8 lines): in/out-point field-drop-bug rationale (2026-08-16 QA sweep) + conditional inPoint/outPoint assignment from srcs[0].",
+            "Lines 3920-3928 (comment, 9 lines): \"diffed against exportJSON's per-layer field list\" rationale (2026-09 QA sweep, PR #814 audit) — names every field still missing before this fix (effects/pathFx/blendKeys/parentKeys/parentsMore/followPath/textAnimators/effectsFrom/folderId/channel/shy/keyLock/linkGroupId/folder membership), markers called out as the ONE union-not-topmost-wins exception.",
+            "Lines 3929-3935 (code, 7 lines): IIFE — 8-field deep-copy list from srcs[0], 6-field shallow-copy list from srcs[0], markers union-by-(frame,label)-dedup across ALL srcs (deep-cloned, sorted by frame, assigned only if non-empty).",
+            "Lines 3936-3937 (code, 2 lines): merged.elementMotion assigned only if non-empty; merged.groups assigned only if non-empty."
+          ]
+        },
+        {
+          "id": "C21m.merge-reparent-paper-and-commit",
+          "files": [
+            "src/js/app.js:3938-3989"
+          ],
+          "coverage_ranges": [
+            [
+              3938,
+              3989
+            ]
+          ],
+          "classification": {
+            "code": 34,
+            "comment": 18,
+            "whitespace": 0
+          },
+          "symbols": [
+            "goneUids",
+            "merged",
+            "newUL",
+            "target"
+          ],
+          "signature": "var goneUids={};for(var g=1;g<idx.length;g++){var gu=state.layers[idx[g]].layerUid;if(gu)goneUids[gu]=1;}state.layers.forEach(function(other,oi){if(idx.indexOf(oi)>=0)return;if(other.parentLayerUid&&goneUids[...])other.parentLayerUid=merged.layerUid||null;if(other.parentLayerUidB&&goneUids[...])other.parentLayerUidB=merged.layerUid||null;if(other.timeLink&&...)...;if(other.matteSourceLayerUid&&...)...;});arcLayer.activate();var newUL=new Layer({name:'user-merge-'+Date.now()});for(var r=idx.length-1;r>=0;r--){userLayers[idx[r]].remove();userLayers.splice(idx[r],1);state.layers.splice(idx[r],1);}userLayers.splice(target,0,newUL);state.layers.splice(target,0,merged);userLayers.forEach(insertBelow(arcLayer));state.activeLayerIdx=target;_layerSel=[target];activateUL(...);loadFrame(...);renderOS();renderArcs();updateUI();if(!silent){showToast(...);}return true;}",
+          "responsibility": "Continuation of `mergeLayersIntoOne` (packet 4's own function; the LAST packet — closes the function). Re-parent dependants (3938-3965): any OTHER layer parented to one of the layers about to disappear must be re-pointed at the survivor or its parenting silently goes dead — the exact CLAUDE.md §1 \"one consumer updated and the rest left dangling\" shape this function's own comment names explicitly. `goneUids` (3943-3944) collects the `layerUid` of every NON-survivor source (`idx[1..]`, i.e. every index except `target=idx[0]`). A single `state.layers.forEach` (3945-3965, skipping every layer that is ITSELF one of the merging sources, 3946) re-points FOUR distinct uid-reference fields at `merged.layerUid` (or clears them if the merged layer ends up with none): `parentLayerUid` (3947), `parentLayerUidB` (3952, a 2026-07-30 multi-parent-blend gap-fix, own comment 3948-3951), `timeLink.uid` (3956-3958, own comment 3953-3955 — the ONLY one of the four that `delete`s the whole link object rather than nulling a field when there's no survivor uid to point to), and `matteSourceLayerUid` (3962-3964, own comment 3959-3961, same delete-if-unresolvable shape as timeLink). Paper layer replacement and commit (3966-3989): one fresh Paper `Layer` replaces the N being removed (3966-3968, own comment — inserted where the topmost source sat, same splice-from-the-end discipline the split uses so no index shifts under an iteration still in progress); `arcLayer.activate()` (3969) then `new Layer({name:'user-merge-'+Date.now()})` (3970); a REVERSE-index removal loop (3971-3975, `for(var r=idx.length-1;r>=0;r--)`, specifically newest-index-first so an earlier splice in the SAME loop never shifts an index still queued for removal — split's own single-point replacement never needed this because it touches exactly one index); a single `userLayers.splice(target,0,newUL);state.layers.splice(target,0,merged);` (3976-3977) inserts the new Paper layer and the `merged` descriptor at the SAME `target` index; re-stacks every user layer below `arcLayer` (3978); sets `state.activeLayerIdx=target;_layerSel=[target];` (3979-3980); calls `activateUL` (3981); calls `loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();` (3982, byte-identical call sequence to the split's own 3734); shows a conditional toast that branches on `approximated` (3983-3987 — a \"N calque(s) multi-formes\" warning if any source's transform was copied onto multiple shapes, else a plain \"merged into «name»\" success message); returns `true` (3988); function close (3989) — the last line of this scope.",
+          "callers": [],
+          "behavior": [
+            "Lines 3938-3947 (comment 5 + code 5, 10 lines): re-parent-dependants rationale (CLAUDE.md §1 cross-ref, \"exact shape of bug\") + goneUids set (layerUid of every non-survivor source) + forEach-other-layer parentLayerUid re-point.",
+            "Lines 3948-3952 (comment 4 + code 1, 5 lines): parentLayerUidB (multi-parent blend) re-point rationale + the write.",
+            "Lines 3953-3958 (comment 3 + code 3, 6 lines): timeLink re-point rationale + the write (re-point to merged.layerUid, or delete the whole link if merged has no layerUid).",
+            "Lines 3959-3965 (comment 3 + code 4, 7 lines): matteSourceLayerUid re-point rationale + the write + forEach close.",
+            "Lines 3966-3982 (comment 3 + code 14, 17 lines): Paper layer replacement rationale (one fresh Layer for the N removed, splice-from-the-end discipline) + arcLayer.activate(); new Layer named 'user-merge-<ts>'; reverse-index removal loop (remove+splice userLayers and state.layers); single splice-in of newUL/merged at target; re-stack under arcLayer; activeLayerIdx/_layerSel set to target; activateUL; loadFrame+renderOS+renderArcs+updateUI.",
+            "Lines 3983-3989 (code, 7 lines): conditional toast (approximated multi-shape-source warning vs plain merged-into-name message); return true; function close."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "motion.js (enterComponentLayer's silent auto-split; layerElements/elementLabel; both timelines' own layer context menus)",
+      "disposition": "Retains its own body in full — cited by line only. enterComponentLayer (6855-6915) is splitLayerIntoElementsCore's documented silent reuser (6910, {silent:true}, guarded on state.layers.length===1, CLAUDE.md §8), pre-counting and pushing its own single undo entry before the silent loop. layerElements (9436) is the reference-frame reader called at 3604; elementLabel (9533) is the naming-scheme source called at 3624. Both layer context menus (7407/7467) call window.SM.splitLayerIntoElements/mergeLayersIntoOne directly, gated only on symbolId/lfsGroup or a selection-count flag, never on .locked."
+    },
+    {
+      "consumer": "timeline.js (the window.SM attach wrappers; its own layer context menu; exportJSON's per-layer field list)",
+      "disposition": "Retains its own body in full — cited by line only. window.SM.splitLayerIntoElementsCore/splitLayerIntoElements/mergeLayersIntoOne attach at 1639-1641. Its own layer context menu (6715/6719) mirrors motion.js's own gating exactly. exportJSON's per-layer field object (2117-2169, inside exportJSON at 2049) is the field list this scope's own 2026-09 QA-sweep comment says it was diffed against; groups:l.groups||undefined at 2169 confirms ld.groups is persisted."
+    },
+    {
+      "consumer": "nemo-script.js (Layer.prototype.mergeWith)",
+      "disposition": "Retains its own body in full — cited by line only. mergeWith (392-397) is mergeLayersIntoOne's only caller outside motion.js/timeline.js — window.SM.mergeLayersIntoOne(idx) at 395, fail('fusion impossible') on false. Not anticipated by the issue's own caller-file guess of 'motion.js, timeline.js, app.js'."
+    },
+    {
+      "consumer": "app.js:3194-3556 badComponentSourceReason/convertLayersToComponent/cloneRigForSymbol (C21l/#1210, concurrently authored, not yet merged at authoring time)",
+      "disposition": "Retains its own body in full — cited by name/line only. This scope's own mergeLayersIntoOne re-implements badComponentSourceReason's own 8-check body inline (3780-3787) instead of calling it — same 8 fields, same order, same reason strings, confirmed by direct comparison; badComponentSourceReason's own body (3212-3221) is not reproduced here beyond that comparison."
+    },
+    {
+      "consumer": "app.js:2929-3193 getEffectiveStrokes (C21k/#1212, merged)",
+      "disposition": "Retains its own body in full — cited by line only. This scope's own mergeLayersIntoOne deliberately does NOT call getEffectiveStrokes (2949) — it reads raw stored strokes via its own local rawAt(ld,fi) helper (3817-3822) instead, per its own in-source rationale (3754-3757: getEffectiveStrokes bakes motion into geometry, which would freeze the animation rather than preserve it as editable keys)."
+    },
+    {
+      "consumer": "tools.js (ensureStrokeId's own definition; two comment-only cross-references) and select-bridge.js (one comment-only cross-reference)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. ensureStrokeId (1910) is never called by either function in this scope (confirmed by grep). tools.js:6465's own claim 'app.js:1479 only does so inside mergeLayersIntoOne' cites a STALE line number at this SHA (1479 now falls inside C21g's own duplicator-runtime territory, unrelated content) — the actual strokeId-minting line in this scope is 3852. select-bridge.js:2772 cross-references splitLayerIntoElementsCore by name only, no call."
+    },
+    {
+      "consumer": "tweens.js (pushUndo/pushUndoLayers)",
+      "disposition": "Retains its own body in full — cited by name/line only. pushUndo (4741) is called conditionally by both functions in this scope (3606, 3791) — the sole undo checkpoint either creates itself; enterComponentLayer (motion.js) creates a separate checkpoint before calling the Core silently."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-split-entry-refuses-inside-component",
+      "proposed": "Call splitLayerIntoElements(li) with state.activeSymbolId set; expect a toastCloseComponentFirst toast and no call into splitLayerIntoElementsCore — verifies the guard at line 3584 — not run."
+    },
+    {
+      "id": "fx-split-core-no-symbol-guard",
+      "proposed": "Call splitLayerIntoElementsCore(li) directly with state.activeSymbolId set and ld pointing at one of the entered symbol's own layers; expect it to proceed (no activeSymbolId check) — verifies the Core's own guard at 3602 checks only ld/ld.symbolId, not state.activeSymbolId, matching enterComponentLayer's own safety argument — not run."
+    },
+    {
+      "id": "fx-split-needs-2-elements",
+      "proposed": "Call splitLayerIntoElementsCore on a layer whose layerElements() returns 0 or 1 entries; expect false, a toastNeedAtLeast2ElementsToSplit toast (unless silent), and no mutation — verifies line 3605 — not run."
+    },
+    {
+      "id": "fx-split-positional-distribution-fewer-strokes",
+      "proposed": "Split a 3-element layer whose keyframe at frame 5 has only 2 strokes; expect the 3rd new layer's frame 5 to be blank (isKeyframe:true, strokes:[]) rather than throwing or duplicating — verifies the strokes[e]?[strokes[e]]:[] branch at 3615 for e<n-1 — not run."
+    },
+    {
+      "id": "fx-split-positional-distribution-more-strokes",
+      "proposed": "Split a 2-element layer whose keyframe at frame 5 has 4 strokes; expect the LAST new layer's frame 5 to carry strokes[1..3] (the slice(n-1) overflow), not just stroke[1] — verifies line 3615's e===n-1 branch — not run."
+    },
+    {
+      "id": "fx-split-held-frame-passthrough",
+      "proposed": "Split a layer with a non-keyframe, non-interpolated frame at index k; expect every new layer's frame k to be {strokes:[],isKeyframe:false,isInterpolated:false} — verifies line 3613 — not run."
+    },
+    {
+      "id": "fx-split-elementmotion-promotion",
+      "proposed": "Set ld.elementMotion[strokeId]={motion:{...},motionStatic:{...}} for one element before splitting; expect that element's new layer to carry an identical (deep-cloned, not same-reference) motion/motionStatic and every OTHER new layer to have motion/motionStatic===undefined — verifies 3619/3626-3627 — not run."
+    },
+    {
+      "id": "fx-split-drops-layer-level-motion",
+      "proposed": "Set ld.motion={position:{...}} (layer-level, no per-element entries) before splitting; expect every resulting new layer's own motion field to be undefined — verifies the GAP recorded in boundaries (ld.motion is never read by splitLayerIntoElementsCore) — not run."
+    },
+    {
+      "id": "fx-split-duplicator-excluded",
+      "proposed": "Set ld.duplicator={...} before splitting a 2+-element layer; expect no new layer to carry a duplicator field — verifies the explicit exclusion at 3659-3663 — not run."
+    },
+    {
+      "id": "fx-split-layeruid-last-piece-only",
+      "proposed": "Split a layer with ld.layerUid set and another layer's parentLayerUid pointing at it; expect only the LAST new layer to carry layerUid, and the other layer's parentLayerUid to still resolve — verifies 3698-3704 — not run."
+    },
+    {
+      "id": "fx-split-groups-kept-only-on-last-layer-own-gids",
+      "proposed": "Split a 3-element layer with a combine group spanning strokes that land on the last layer AND a group whose gid appears only on an earlier (single-stroke) layer; expect only the first group to survive on the last new layer's own groups, the second to be dropped entirely — verifies 3716-3722 — not run."
+    },
+    {
+      "id": "fx-split-idempotent-reentry",
+      "proposed": "Split a layer, then call splitLayerIntoElementsCore again on one of the resulting single-element layers; expect false and no mutation (els.length<2) — verifies the idempotence claim at 3597-3599/3605 — not run."
+    },
+    {
+      "id": "fx-split-reference-frame-is-currentframe",
+      "proposed": "Set state.currentFrame to a frame where a layer has 3 strokes, then scrub to a different frame where it has 2, then call splitLayerIntoElementsCore without moving the playhead again; expect exactly 3 new layers (n derived from the CURRENT reference frame) — verifies layerElements is evaluated at state.currentFrame (3604, motion.js:9437) — not run."
+    },
+    {
+      "id": "fx-split-locked-layer-not-refused",
+      "proposed": "Lock a 2+-element layer (ld.locked=true), call splitLayerIntoElementsCore on it directly; expect it to proceed and split (no .locked guard anywhere in the function) — verifies the gap recorded in boundaries — not run."
+    },
+    {
+      "id": "fx-merge-needs-2-distinct-indices",
+      "proposed": "Call mergeLayersIntoOne([5,5]) (the same index twice); expect the de-dup at 3771 to collapse it to length 1, then the <2 guard at 3772 to refuse with a toastSelectAtLeast2LayersToMerge toast — not run."
+    },
+    {
+      "id": "fx-merge-refuses-mixed-selection",
+      "proposed": "Call mergeLayersIntoOne with one plain layer index and one Component (symbolId set) layer index; expect false, a toastCannotMergeSelectionContains+'un composant' toast, and no mutation — verifies 3780/3790 — not run."
+    },
+    {
+      "id": "fx-merge-locked-layer-not-refused",
+      "proposed": "Lock one of two plain layers (l.locked=true, no symbolId/lfsGroup/etc.), call mergeLayersIntoOne on both; expect it to proceed and merge (no .locked check in the 8-way guard chain) — verifies the gap recorded in boundaries — not run."
+    },
+    {
+      "id": "fx-merge-groups-remapped-not-collided",
+      "proposed": "Merge a layer with a duplicateLayer() clone of itself sharing the same original groupId string; expect mergedGroups to contain TWO distinct fresh gids (not one fused group) and every stroke's own sd.groupId rewritten to the correct one of the two — verifies 3792-3813 — not run."
+    },
+    {
+      "id": "fx-merge-held-frame-uses-rawat-not-geteffectivestrokes",
+      "proposed": "Merge two sources where one has no keyframe at frame k but a keyframe with motion-transformed content earlier; expect the merged frame k's strokes to be the RAW (untransformed) stroke geometry from the last keyframe, not the motion-baked geometry getEffectiveStrokes would produce — verifies 3754-3757/3817-3822 — not run."
+    },
+    {
+      "id": "fx-merge-frame-count-uses-longest-source",
+      "proposed": "Merge a 10-frame source with a 20-frame source; expect the merged layer's own frames.length to be 20 (nf=max), with the shorter source contributing nothing past frame 10 — verifies 3823-3824/3830-3834 — not run."
+    },
+    {
+      "id": "fx-merge-motion-demoted-per-strokeid",
+      "proposed": "Set l.motion on a source with exactly 1 stroke; merge it; expect merged.elementMotion[thatStrokeId] to equal a deep clone of l.motion, and merged.motion to be undefined — verifies 3844-3861/boundaries — not run."
+    },
+    {
+      "id": "fx-merge-motion-demote-excludes-brush-texture-copies",
+      "proposed": "Set l.motion on a source whose strokes include one isBrushTextureCopy dab alongside its real anchor stroke; expect only the real anchor's strokeId to receive the demoted motion, the dab's strokeId never collected — verifies line 3851 — not run."
+    },
+    {
+      "id": "fx-merge-approximated-flag-on-multishape-source",
+      "proposed": "Set l.motion on a source with 3 distinct strokes (no per-element split); merge it; expect approximated to increment by 1 and all 3 strokeIds to receive an IDENTICAL copy of l.motion — verifies 3856-3861 — not run."
+    },
+    {
+      "id": "fx-merge-name-recovery-french-only",
+      "proposed": "Merge two sources named 'Layer 1 — Forme 1' and 'Layer 1 — Forme 2' under French locale; expect merged.name==='Layer 1'. Repeat under English locale with sources named 'Layer 1 — Shape 1'/'Layer 1 — Shape 2'; expect merged.name to be the LITERAL srcs[0].name ('Layer 1 — Shape 1'), NOT recovered to 'Layer 1' — verifies the locale gap recorded in boundaries/future_proposals (regex hardcoded to Forme|Image|Texte) — not run."
+    },
+    {
+      "id": "fx-merge-name-recovery-excludes-trait",
+      "proposed": "Merge two sources named 'Layer 1 — Trait 1'/'Layer 1 — Trait 2' (French Stroke label) under French locale; expect merged.name to remain the literal srcs[0].name, NOT recovered — verifies the regex alternation at 3866 omits Trait entirely — not run."
+    },
+    {
+      "id": "fx-merge-field-transfer-topmost-wins",
+      "proposed": "Merge two sources with different blendMode/matteMode/threeD/motionBlur/inPoint/outPoint values; expect the merged layer to carry EXACTLY srcs[0]'s own values for each, never srcs[1]'s — verifies the topmost-wins convention across 3891/3898-3899/3918-3919 — not run."
+    },
+    {
+      "id": "fx-merge-markers-unioned-across-all-sources",
+      "proposed": "Give two sources each a distinct marker at different frames plus one identical (same frame+label) marker on both; merge them; expect merged.markers to contain 3 entries (the duplicate deduplicated), sorted by frame — verifies 3933-3934, the ONE union-not-topmost-wins field — not run."
+    },
+    {
+      "id": "fx-merge-duplicator-force-locks-result",
+      "proposed": "Merge two sources where srcs[0] carries a duplicator descriptor; expect merged.duplicator to be a deep clone of srcs[0].duplicator AND merged.locked===true — verifies 3899/3911 — not run."
+    },
+    {
+      "id": "fx-merge-folder-and-effects-preserved",
+      "proposed": "Merge two sources where srcs[0] has folderId set and a non-empty effects array; expect merged.folderId===srcs[0].folderId and merged.effects to deep-equal (not same-reference) srcs[0].effects — verifies the 2026-09 QA-sweep fix at 3929-3932 — not run."
+    },
+    {
+      "id": "fx-merge-reparents-dependants-all-four-uid-fields",
+      "proposed": "Set up one other layer with parentLayerUid, one with parentLayerUidB, one with timeLink.uid, and one with matteSourceLayerUid all pointing at a NON-survivor source's layerUid; merge that source away; expect all four other layers' own uid references to now equal the merged layer's layerUid — verifies 3945-3965 — not run."
+    },
+    {
+      "id": "fx-merge-timelink-deleted-when-no-survivor-uid",
+      "proposed": "Merge two sources where neither srcs[0] nor any survivor ends up with a layerUid, with another layer's timeLink.uid pointing at a removed source; expect that other layer's own timeLink property to be deleted entirely (not left dangling with a null uid) — verifies 3957 — not run."
+    },
+    {
+      "id": "fx-merge-reverse-index-removal-no-shift",
+      "proposed": "Merge indices [2,5,8] from a 10-layer document; expect the survivor to land at index 2 and the final document to have exactly 8 layers with no off-by-one corruption from the removal loop — verifies the reverse-order removal discipline at 3971-3977 — not run."
+    },
+    {
+      "id": "fx-merge-never-calls-geteffectivestrokes",
+      "proposed": "Spy on getEffectiveStrokes, call mergeLayersIntoOne on two plain layers; expect zero invocations of getEffectiveStrokes throughout the whole call — verifies the deliberate raw-strokes choice recorded in boundaries — not run."
+    },
+    {
+      "id": "fx-neither-function-reachable-from-render-path",
+      "proposed": "Spy on splitLayerIntoElements/splitLayerIntoElementsCore/mergeLayersIntoOne, call buildSceneJson()/getEffectiveStrokes() for an ordinary frame render; expect zero invocations of any of the three — verifies the render-path-vs-gesture-path claim in boundaries — not run."
+    }
+  ],
+  "future_proposals": [
+    "GAP, symmetric: layer-level Motion (`ld.motion`/`ld.motionStatic`, keyed on the WHOLE source layer rather than any one element) is silently DROPPED by the split (never read at all inside splitLayerIntoElementsCore's own 3557-3737, confirmed by grep) and never SET by the merge (merged.motion/merged.motionStatic are never assigned, confirmed by grep) — only per-element `elementMotion` round-trips in either direction. A layer that has BOTH its own layer-level Motion AND at least one per-element entry loses the layer-level half on its very first split, with no toast or other signal. A future fix could fold the source's own layer-level motion into the LAST new layer (mirroring where matteMode/layerUid already land on split) or refuse the split with a toast while layer-level Motion is present, the same explicit-refusal-over-silent-drop convention the merge's own 8-way type guard already uses for non-stroke-holders. Not changed here.",
+    "GAP: the merge's own name-recovery regex (3866, `/^(.*?)\\s+—\\s+(Forme|Image|Texte)\\s+\\d+$/`) is hardcoded to FRENCH literals, while the split's own naming (`elementLabel`, motion.js:9533) is i18n-keyed via `SM.t('autoNameShape'/'autoNameStroke')` — under any non-French locale, or for ANY stroke-labeled (`autoNameStroke`='Trait' in French, entirely absent from the regex's own alternation alongside every locale) split-off layer, the round-trip-invisible claim (3863-3864) does not hold: the merge falls through to keeping `srcs[0].name` verbatim, e.g. \"Layer 1 — Shape 3\" under English rather than recovering \"Layer 1\". A future fix could either read the SAME i18n keys (`SM.t('autoNameShape')` etc.) to build a locale-aware alternation, or persist the un-localized label kind separately so the recovery regex never needs to know the current locale at all. Not changed here.",
+    "GAP: neither function checks `.locked` (nor calls `canEditActiveLayer`, the gate C21i's own Rig-tool commit/reset functions use) anywhere in its own body, and none of the four external context-menu entry points gate on `.locked` either — confirmed by a whole-range grep. A locked layer, including one force-locked specifically because it carries an active mograph `duplicator` (the very invariant `merged.duplicator`⇒`merged.locked=true` at 3911 exists to preserve), can be split or merged today with no refusal observed at any layer of gating. A future fix could add the same `canEditActiveLayer()`-style guard the Rig tool uses (C21i, app.js:2538, cited by line only) to both entry points. Not changed here.",
+    "Three independent copies of the SAME `'s'+Date.now().toString(36)+'_'+i+'_'+Math.floor(Math.random()*1e6)` lazy-strokeId-minting idiom exist across this scope and its immediate neighbors: `layerElements`'s own inline stamp (motion.js, called from split's packet 2), this scope's own merge-demotion loop (3852), and `ensureStrokeId` itself (tools.js:1910) — none of the three CALLS any of the others. A shared helper (already possible: `ensureStrokeId(sd)` takes exactly the shape needed) would remove the risk of the three drifting apart (e.g. a future change to the id format landing in only one of the three copies). Not changed here — recorded as a candidate simplification, not a bug: all three currently produce functionally-equivalent, collision-safe ids.",
+    "A cross-file citation was found STALE while tracing the strokeId-minting claim: tools.js:6465's own comment (\"nothing else mints one on save — app.js:1479 only does so inside mergeLayersIntoOne\") points at app.js:1479, which at this SHA falls inside C21g's own duplicator-runtime territory (unrelated content, confirmed by direct read) — the actual strokeId-minting line in THIS scope is app.js:3852. Likely a leftover from before app.js grew between when that tools.js comment was written and now. Not this artifact's file to correct (tools.js is out of scope) — flagged here as a discovered inaccuracy for whoever next touches tools.js's own comment.",
+    "mergeLayersIntoOne's own 8-way non-stroke-holder guard chain (3780-3787) is a VERBATIM, field-for-field, order-for-order, string-for-string duplicate of badComponentSourceReason's own body (app.js:3212-3221, C21l) rather than a call to it, despite badComponentSourceReason already existing in the SAME file at a lower line number by the time mergeLayersIntoOne was written (2026-07-25 per this scope's own lead-in date, vs. badComponentSourceReason's own 2026-07-30 comment date — meaning mergeLayersIntoOne's chain actually PRE-DATES badComponentSourceReason's extraction, so this is not a missed refactor opportunity so much as a not-yet-backfilled one). Two lists that must be kept in sync by hand whenever a new non-mergeable/non-convertible layer TYPE is added — exactly the CLAUDE.md §1 \"family of bug #1\" shape (a new tag handled in one consumer but not verified in its sibling). A future fix could replace 3780-3787 with a single `bad=badComponentSourceReason(l);` call. Not changed here."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src` `git grep -n -P` was run once for each of the three function symbols this scope defines (splitLayerIntoElements, splitLayerIntoElementsCore, mergeLayersIntoOne), at the frozen SHA. The issue's OWN suggested pattern `(^|[^a-zA-Z_.])name\\(` was tried FIRST and found to silently miss every `window.SM.<name>(` call site (the `.` immediately preceding `<name>` in that form falls inside the pattern's own excluded character class). Re-run with a lookbehind `(?<![a-zA-Z0-9_])name\\(` (excluding only an identifier character immediately before, not a `.`) surfaces the corrected, complete list — three call sites the literal issue pattern would have dropped (timeline.js:6715/6719, motion.js:7407/7467) plus one caller FILE not anticipated by the issue's own guess of \"motion.js, timeline.js, app.js\": nemo-script.js:395 (Layer.prototype.mergeWith). Results are reproduced verbatim under each defining packet's own `callers` field and are re-checkable with the corrected command.",
+    "A SEPARATE whole-src `grep -ln` for all three symbol names, run once, returned six files (app.js, motion.js, timeline.js, nemo-script.js, select-bridge.js, tools.js); the latter two were confirmed by direct read to be COMMENT-ONLY cross-references (select-bridge.js:2772, tools.js:1534/6465), not calls — recorded in `boundaries`/`future_proposals` (including the stale-line-number finding at tools.js:6465).",
+    "A whole-src grep restricted to engine-bridge.js and export.js for all three symbol names returned ZERO hits, directly supporting the render-path-vs-gesture-path claim in `boundaries` (none of the three symbols is reachable from getEffectiveStrokes or buildSceneJson/scenePayload).",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's own classify() algorithm against a direct `git show 59a5a38c:src/js/app.js` dump, run once per packet and once for the total — 219/214/0 over 433 lines, matching the issue's own proposed union exactly, and matching the issue's own proposed per-packet table exactly for all eight packets; no boundary correction was needed. The five internal section-comment seams the issue offered for re-cutting with evidence (3708, 3792, 3843, 3907, 3938) were each verified with `sed -n` to fall exactly on the function's own 2-space-indented section comment and kept as proposed.",
+    "The `opts.silent`-only contract claim in `boundaries` was confirmed by a whole-range grep for the literal substring `opts.` inside 3557-3989, returning exactly the two declared reads (3601, 3768) and no others.",
+    "The `ld.motion`/`ld.motionStatic` (layer-level Motion) drop/never-set claim in `boundaries` and `future_proposals` was confirmed by two separate whole-range greps: one over 3557-3737 for `ld.motion`, returning only the unrelated `motionBlur` field match at 3664; one over 3767-3989 for `merged.motion`, returning zero hits.",
+    "The `ensureStrokeId`-not-called claim was confirmed by a whole-range grep over 3557-3989 for the literal string `ensureStrokeId`, returning zero hits — both functions' own strokeId handling was traced by direct read to `layerElements`'s own inline stamp (split, via entry.strokeId) and this scope's own inline mint at 3852 (merge), neither of which is a call to `ensureStrokeId` (tools.js:1910).",
+    "The `.locked`-never-checked claim was confirmed by a whole-range grep over 3557-3989 for the literal string `locked`, returning only the two new-layer-reset value assignments (`locked:false` at 3625, `locked:true` at 3911) and no guard READ of any existing layer's own `.locked` field; the four external context-menu `disabled:` expressions (timeline.js:6715/6719, motion.js:7407/7467) were read directly and confirmed to gate only on symbolId/lfsGroup or a selection-count flag.",
+    "The `exportJSON` field-list cross-reference (timeline.js:2117-2169, inside exportJSON at timeline.js:2049) was located by direct grep for `groups:` within that range, confirming `groups:l.groups||undefined` at timeline.js:2169 — closing the loop on this scope's own 3920-3928 comment."
+  ],
+  "validation": {
+    "expected_assigned_lines": 433,
+    "expected_classification": {
+      "code": 219,
+      "comment": 214,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        3557,
+        3586
+      ],
+      [
+        3587,
+        3707
+      ],
+      [
+        3708,
+        3737
+      ],
+      [
+        3738,
+        3791
+      ],
+      [
+        3792,
+        3842
+      ],
+      [
+        3843,
+        3906
+      ],
+      [
+        3907,
+        3937
+      ],
+      [
+        3938,
+        3989
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by a Python re-implementation of the validator's own classify() run against the frozen blob: 3557-3586=(4,26,0); 3587-3707=(49,72,0); 3708-3737=(22,8,0); 3738-3791=(21,33,0); 3792-3842=(41,10,0); 3843-3906=(36,28,0); 3907-3937=(12,19,0); 3938-3989=(34,18,0); sums to (219,214,0)=433 — identical to the issue's own proposed union and per-packet table exactly, no boundary correction needed.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 433 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check_c21m.py engineering/inventory/census/C21m-app-release-to-layers-merge.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check_c21m.py engineering/inventory/census/C21j-app-symbol-frame-layer-time-model.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21m.py engineering/inventory/census/C21i-app-rig-deform-ik.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21m.py engineering/inventory/census/C21h-app-rig-model-binding.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21m.py engineering/inventory/census/C21g-app-duplicator-runtime.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21m.py engineering/inventory/census/C21f-app-symbol-matrix-duplicator-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21m.py engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21m.py engineering/inventory/census/C21d-app-desp-relink-remote-merge.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21m.py engineering/inventory/census/C21c-app-path-serialisation-serp.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21m.py engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21m.py engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json <candidate-sha> still exits 0"
+    ]
+  }
+}
