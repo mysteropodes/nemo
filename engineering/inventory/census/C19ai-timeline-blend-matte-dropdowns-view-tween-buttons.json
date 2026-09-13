@@ -1,0 +1,557 @@
+{
+  "census_id": "C19ai",
+  "issue": 1254,
+  "title": "Timeline.js blend-mode and track-matte dropdowns, document FPS/Frames + fit/reset + zoom scrub, canvas-fit view menu, tween/onion/ghost/bake buttons",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf following C19ah/#1253. Scope is timeline.js:10864-11146 (283 lines: 177 code, 105 comment, 1 blank, independently re-derived by script against the frozen blob and matching the issue's own proposed union exactly, no boundary correction needed). It starts at `BLEND_MODE_LABELS` (10864), immediately after C19ah's own trailing comment at 10863, and ends at the `#btn-bake-cache` click listener (11146); line 11147 opens `initToolbarCustomization`'s own lead-in comment (next leaf C19aj/#1255, disjoint range, run concurrently on the same frozen blob). Cited by name/line only, not re-mapped: `SMMotion.layerBlendModeAt` (motion.js:4422)/`.upsertBlendKeyAt` (motion.js:4438)/`.renderMotionPropsPanel` (motion.js:7561), all exported at `window.SMMotion={...}` (motion.js:13352, C20d lineage); the `ld.blendMode`/`ld.matteMode`/`ld.matteSourceLayerUid` readers in engine-bridge.js's `buildSceneJson` (blend read 2150, matte read 2158, composition write 2258, matte-source resolution 2522-2523/2545); the `window.SM={...}` object literal itself (timeline.js:349) and the nine setter bodies this scope's own listeners call — `setFps` (839), `setResamplePts`/`setTweenStep` (841), `fitCanvas`/`resetView` (845, dispatching to app.js:510/518), `setTotalFrames` (850), `toggleOnion` (459), `toggleGhostAll` (480), `generateTweens` (515, dispatching to tweens.js:3743) — all pre-existing, out of scope, part of an earlier census leaf; `manualBakeCache` (timeline.js:156 — NOT playback-cache.js as a plain read of the call site alone might suggest; confirmed by direct `grep -n 'function manualBakeCache'`, the function itself dispatches into `SMPlaybackCache.bakeRange`, playback-cache.js, out of scope); `syncDocFields` (timeline.js:2702, keeps `#proj-fps`/`#proj-frames`/`#tl-fps`/`#tl-total` mirrored from `state` on every `updateUI`); `showContextMenu` (ui.js:1136 — NOT timeline.js; confirmed by grep restricted to the actual `function`/`=function` declaration, timeline.js only ever CALLS `window.showContextMenu`, eleven call sites, one of them this scope's own 11092); the view-flag render-side readers — `state.outlineView` (engine-bridge.js:2604), `state.guidesSnap` (rulers-bridge.js:249, `snapPoint`), `state.smartGuides` (rulers-bridge.js:285, `smartAlignDelta`), `state.pixelGridSnap` (rulers-bridge.js:352, `snapToPixelGrid`), `state.rulersOn` (rulers-bridge.js, multiple draw-gate sites 60/129/207/249/358 plus the `toggleOn`/persistence block 376-400) and their move-drag call sites in select-bridge.js (`SMRulers.snapPoint` 1936, `SMRulers.snapToPixelGrid` 1941); `initToolbarCustomization` (11149+, next leaf C19aj); and the `#p-blendmode`/`#p-mattemode`/`#proj-fps`/`#proj-frames`/`#btn-fit`/`#btn-resetv`/`#zoom-scrub`/`#canvas-fit-btn`/`#p-resamp`/`#p-step`/`#p-skipmanual`/`#p-harmonize-tween`/`#btn-tw`/`#btn-os`/`#btn-ghost-all`/`#btn-bake-cache` markup (src/index.html, all ids confirmed present by direct grep). This JSON authoring does not authorize source changes.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "9b31fe8edf091ad0247d5b46872e141299437092",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19ai-timeline-blend-matte-view-tween-census",
+  "assigned_ranges": [
+    {
+      "start": 10864,
+      "end": 11146
+    }
+  ],
+  "coverage_note": "283 assigned lines occur once across five packets (one coverage_range per packet, no gaps, no other-owner exclusions): 177 code, 105 full-line comment, 1 blank — independently re-derived by running a Python re-implementation of the validator's own classify() against `git show 59a5a38c:src/js/timeline.js`, once per packet and once for the whole span. Result equals the issue's own proposed table exactly (177/105/1 over 283 lines) and the issue's own proposed per-packet breakdown exactly (96(64/32/0), 105(69/35/1), 17(8/9/0), 57(28/29/0), 8(8/0/0)) — no boundary correction needed. Line 10863 is C19ah's own trailing comment (out of scope, confirmed against C19ah's own declared assigned_ranges end at authoring time — C19ah exists in a sibling worktree, not yet merged, so this artifact's own overlap check only binds against ALREADY-MERGED siblings at validation time per the validator's own directory scan). Line 11147 opens `initToolbarCustomization`'s own lead-in comment (next leaf C19aj/#1255, confirmed by direct read of 11147-11149: the toolbar-customization header names `#tl-toolbar` and 'the overflow button', neither of which appears anywhere in 10864-11146 by direct grep).",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (9b31fe8edf091ad0247d5b46872e141299437092 at authoring time) has the identical timeline.js blob (git rev-parse 9b31fe8...:src/js/timeline.js == git rev-parse 59a5a38c...:src/js/timeline.js == cc4cfd27dc59d797c911d840dc46e2f816942123); this artifact branches from origin/main at that SHA, verified directly in the working worktree before authoring (fresh worktree at /Users/ivg/github/nemo-worktrees/c19ai-census-20260913, HEAD matches, blob matches, working tree clean).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller/reader findings were derived by `grep -n` against the frozen blob and the current worktree for every symbol this scope defines or reads/writes (`BLEND_MODE_LABELS`, `initBlendDropdown`, `openBlendDropdownAt`, `MATTE_MODES`, `MATTE_MODE_I18N_KEYS`, `matteModeLabel`, `initMatteDropdown`, `openMatteDropdownAt`, `ld.blendMode`/`ld.blendKeys`/`ld.matteMode`/`ld.matteSourceLayerUid`, `state.rulersOn`/`outlineView`/`smartGuides`/`guidesSnap`/`pixelGridSnap`, `state.tweenSkipManual`/`tweenHarmonizeEdits`), each cross-checked by a direct `sed -n`/Read of the same range and, for every external symbol, of its own defining file. `manualBakeCache`'s actual location (timeline.js:156, not playback-cache.js) and `showContextMenu`'s actual location (ui.js:1136, not timeline.js) were both confirmed by grepping for the literal `function <name>`/`<name>=function` declaration rather than trusting the call-site's file — see `owner` for both corrections.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun. In-source feedback quotes (feedback #207/#213, 2026-08-27/2026-08-30/2026-09 dated comments) are read as authorial intent, not independently re-verified execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19ai-timeline-blend-matte-dropdowns-view-tween-buttons.json and the five timeline.js packets partitioning lines 10864-11146.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "function_boundary": "Five packets by construct: the blend-mode dropdown IIFE (`initBlendDropdown`, its own labels table, and the Motion-keyed hover/commit branch); the track-matte dropdown IIFE (`initMatteDropdown`, its own i18n-aware label function and per-layer matte-source freezing), deliberately NOT factored with the blend dropdown despite an identical open/preview/commit/revert shape — the two read/write different layer fields and have already diverged once (matte has a 'which OTHER layer' concept blend does not); the Document FPS/Frames fields plus Fit/Reset View buttons and the zoom-scrub input, all thin `window.SM.*` dispatches except zoom-scrub's own inline `view.zoom` write; the `#canvas-fit-btn` split control (left-click fit vs. its `showContextMenu` view-flags menu — Rulers & Guides, Snap to Guides, Smart Guides, Snap to Pixel Grid, Outline View); and the six tween/onion/ghost/bake-cache control listeners, two of which (`p-skipmanual`, `p-harmonize-tween`) write `state.tween*` fields directly with no setter and no `pushUndo`.",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19ah (existing owner, timeline.js:?-10863, sibling worktree at authoring time, not yet merged)",
+      "disposition": "Retains its own trailing comment and everything before it. This scope's own boundary begins at line 10864, the `BLEND_MODE_LABELS` declaration, immediately after C19ah's own last line — confirmed against C19ah's own declared assigned_ranges end at authoring time; the validator's own cross-sibling overlap check binds against whichever C19*.json files are actually merged and present at validation time."
+    },
+    {
+      "owner": "C19aj/#1255 (next leaf, `initToolbarCustomization`, timeline.js:11147+, run concurrently against the same frozen blob on a disjoint range)",
+      "disposition": "Owns timeline.js:11147+ in full. Confirmed disjoint by direct read: line 11147 opens its own 'Persistent toolbar customization' lead-in comment naming `#tl-toolbar` and the overflow button, neither of which appears anywhere in this scope's own 283 lines by direct grep; none of this scope's declared symbols appears past 11146 by a whole-scope grep restricted to lines 11147+."
+    },
+    {
+      "owner": "motion.js (`SMMotion.layerBlendModeAt`/`upsertBlendKeyAt`/`renderMotionPropsPanel`, existing owner, C20d lineage, out of scope)",
+      "disposition": "Retains its own bodies in full — cited by name/line only (`layerBlendModeAt`: motion.js:4422; `upsertBlendKeyAt`: motion.js:4438; `renderMotionPropsPanel`: motion.js:7561; all exported via `window.SMMotion={...}`, motion.js:13352). Called from this scope at: blend dropdown's `open()` (10898, reads the keyed value at the playhead instead of the static field when `ld.blendKeys` exists), blend dropdown's click commit (10913, `upsertBlendKeyAt` — snaps a hold-key at the current frame rather than overwriting the static field), blend dropdown's click commit (10939, `renderMotionPropsPanel` — refreshes Motion's own panel so a pill label/new key marker shows immediately; this call was the fix for feedback #213, per the in-source comment at 10926-10938). The matte dropdown has NO equivalent keyed/animated branch anywhere in its own IIFE (10982-11064) — `ld.matteMode` is always a plain static per-layer field in this scope, confirmed by the absence of any `SMMotion`/`blendKeys`-shaped reference inside `initMatteDropdown`'s own body; this is a genuine asymmetry between the two otherwise-parallel dropdowns, not an oversight of this census (see `boundaries` (c) and `future_proposals`)."
+    },
+    {
+      "owner": "engine-bridge.js (`buildSceneJson`'s blend/matte composition, existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only. Reads the exact fields this scope's two dropdowns write: `bm` (2150, prefers `SMMotion.layerBlendModeAt` over the static `ld.blendMode` when Motion is present), `mm` (2158, `state.layers[i].matteMode`, no Motion equivalent), the composed layer-stack entry (2258, `blendMode`/`matteMode` normalized to `undefined` when 'normal'/'none'), and the matte-source resolution pass (2522-2523/2545, `state.layers[mi].matteSourceLayerUid`). This scope's own writes therefore ARE render/export-relevant (unlike a purely UI-local scope): `buildSceneJson` is on both the live-render and the export path (export.js calls it too, cited by name/line only), so this scope's `ld.blendMode`/`ld.matteMode`/`ld.matteSourceLayerUid` writes propagate to exported frames even though none of this scope's OWN functions are called from export.js directly (confirmed by a whole-src grep of every symbol this scope declares, restricted to export.js/rive-export.js: zero hits)."
+    },
+    {
+      "owner": "the `window.SM={...}` object literal (timeline.js:349) and its nine setter bodies this scope's own listeners dispatch to, existing owner, out of scope",
+      "disposition": "Retains its own bodies in full — cited by name/line only: `toggleOnion` (459), `toggleGhostAll` (480), `generateTweens` (515, dispatching to tweens.js:3743), `setFps` (839, clamps 1-60, restarts playback if running, invalidates audio waveforms, calls `syncDocFields`), `setResamplePts`/`setTweenStep` (841), `fitCanvas`/`resetView` (845, dispatching to app.js:510/518), `setTotalFrames` (850, clamps 1-999, calls `saveAllLayerFrames` and pads every layer's frame array). This scope's own five listeners (`#proj-fps` 11069, `#proj-frames` 11070, `#btn-fit` 11071, `#btn-resetv` 11072, `#btn-tw` 11143, `#btn-os` 11144, `#btn-ghost-all` 11145) call these by name only; none of the nine setter bodies is reproduced here."
+    },
+    {
+      "owner": "manualBakeCache (timeline.js:156, existing owner, earlier census leaf, out of scope) and playback-cache.js (`SMPlaybackCache.bakeRange`/`.isBaking`, out of scope)",
+      "disposition": "Retains its own body in full — cited by line only. Correction to the issue's own text: `manualBakeCache` is itself defined in timeline.js (line 156, well before this scope's own range, part of an earlier census leaf), not in playback-cache.js — confirmed by `grep -n 'function manualBakeCache'` returning exactly one hit, in timeline.js. `manualBakeCache`'s own body dispatches into `window.SMPlaybackCache.bakeRange`/`.isBaking` (playback-cache.js, genuinely out of scope, cited by name only). This scope's own sole call site is `#btn-bake-cache`'s click listener (11146)."
+    },
+    {
+      "owner": "syncDocFields (timeline.js:2702, existing owner, earlier census leaf, out of scope)",
+      "disposition": "Retains its own body in full — cited by line only. Mirrors `state.fps`/`state.totalFrames` (among other Document fields) into `#proj-fps`/`#proj-frames`/`#tl-fps`/`#tl-total` on every `updateUI`; this scope's own `#proj-fps`/`#proj-frames` change listeners (11069-11070) never call it directly — `setFps` (839) does, on the writer side, so the two ids this scope owns stay in sync with the Document panel's own fields without this scope reproducing that logic."
+    },
+    {
+      "owner": "showContextMenu (ui.js:1136, existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by line only. Correction to the issue's own text: defined in ui.js (line 1136, `window.showContextMenu=function(x,y,items){...}`), not timeline.js — confirmed by grepping for the literal declaration; timeline.js contains eleven CALL sites (5235, 5491-5492 region, 5522-5523 region, 6390, 6688-6689, 6766, 9107/9214 region, 11092, 11414) but no declaration. This scope's own sole call site is `#canvas-fit-btn`'s click listener (11092), building the Fit/Reset/Rulers/Snap-to-Guides/Smart-Guides/Snap-to-Pixel-Grid/Outline-View item array."
+    },
+    {
+      "owner": "rulers-bridge.js (`SMRulers.toggleOn`/`.snapPoint`/`.smartAlignDelta`/`.snapToPixelGrid`, existing owner, out of scope) and select-bridge.js (the move-drag call sites, existing owner, out of scope)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. This scope's own `#canvas-fit-btn` menu toggles four `state.*` flags whose render-side readers live entirely in rulers-bridge.js: `state.rulersOn` (multiple gate sites: 60, 129, 207, 249, 358; persistence/toggle block 376-400, `SMRulers.toggleOn` called from this scope at 11097), `state.guidesSnap` (rulers-bridge.js:249, `snapPoint`'s own early-return gate — this scope only flips the flag at 11109, it never calls `snapPoint` itself), `state.smartGuides` (rulers-bridge.js:285, `smartAlignDelta`'s own early-return gate; this scope's own toggle at 11112 additionally nulls `window._smartGuideLines` and calls `SMEngineBridge.renderNow()` directly, since Outline View is a rendering MODE needing an immediate repaint rather than the next natural invalidation), `state.pixelGridSnap` (rulers-bridge.js:352, `snapToPixelGrid`'s own early-return gate; this scope only flips the flag at 11124, no direct render call). The two snap flags are actually CONSUMED at drag time in select-bridge.js's own move-drag branch (`SMRulers.snapPoint` at select-bridge.js:1936, `SMRulers.snapToPixelGrid` at select-bridge.js:1941, both gated `state.appMode!=='motion'`, guide-snap applied before pixel-grid-snap so a nearby guide wins the tie) — neither call site is inside this scope's own range, cited by line only. `state.outlineView`'s own render-side reader is separately in engine-bridge.js (`buildSceneJson`, 2604, gated additionally on `includeEditorOverlays`), not rulers-bridge.js — a rendering MODE rather than a drag-time snap preference, consistent with this scope's own comment (11127-11132) distinguishing it from the two AE-style snap toggles above it in the same menu. None of `rulersOn`/`guidesSnap`/`smartGuides`/`pixelGridSnap`/`outlineView` is persisted by anything in this scope's own 283 lines except `rulersOn`, which `SMRulers.toggleOn` itself persists to `localStorage` (rulers-bridge.js:376, out of scope, cited by line only) — the other three flags are session-only unless some other out-of-scope writer persists them, not established by this census."
+    },
+    {
+      "owner": "tweens.js (`pushUndo`, `state.tweenSkipManual`/`state.tweenHarmonizeEdits` readers), existing owner, out of scope",
+      "disposition": "Retains its own bodies in full — cited by line only. `pushUndo` (tweens.js:4741, thin wrapper over `pushUndoLayers`) is called three times in this scope's own body: blend dropdown's keyed commit (10912) and non-keyed commit (10920), matte dropdown's commit (11029) — always immediately before the actual field write, so the undo snapshot captures the PRE-pick state. `state.tweenSkipManual` (11141, written directly with no setter and no `pushUndo`) is read at tweens.js:4222 inside `generateTweens`'s own per-frame loop (`if(state.tweenSkipManual&&ld.frames[fi].isManualEdit)continue;`), out of scope. `state.tweenHarmonizeEdits` (11142, same direct-write shape) is read at tweens.js:4371 as `harmonizeAfterEdit`'s own early-return gate, out of scope — this scope never calls `harmonizeAfterEdit` itself."
+    },
+    {
+      "owner": "i18n.js (`SM.t`, four locale tables) and src/index.html (markup ids), existing owner, out of scope",
+      "disposition": "Retain their own bodies/markup in full — cited by name/line only. `matteModeLabel` (10978-10981) and the view menu's five item labels (10896, 11108, 11111, 11123, 11133) all call `SM.t` live with keys `matteNone`/`matteAlpha`/`matteAlphaInverted`/`matteLuma`/`matteLumaInverted` (i18n keys, out of scope) and `rulersMenuLabel`/`snapToGuidesMenuLabel`/`smartGuidesMenuLabel`/`snapToPixelGridMenuLabel`/`outlineViewMenuLabel` respectively — all five confirmed present in all four bundled locale tables (i18n.js:489-492 en, 1545-1548 fr, 2590-2593 ja, 3616-3619 es) by direct grep. `BLEND_MODE_LABELS` (10864) is by contrast a static English-only object with no i18n hook at all — see `boundaries` (c) for the asymmetry this scope's own comment (10969-10975) explicitly documents. The sixteen DOM ids this scope reads/writes (`#p-blendmode`, `#p-mattemode`, `#proj-fps`, `#proj-frames`, `#btn-fit`, `#btn-resetv`, `#zoom-scrub`, `#canvas-fit-btn`, `#p-resamp`, `#p-step`, `#p-skipmanual`, `#p-harmonize-tween`, `#btn-tw`, `#btn-os`, `#btn-ghost-all`, `#btn-bake-cache`) are all confirmed present in src/index.html by direct grep (lines 333-334, 680, 686, 776-777, 820-821, 1341-1346, 2148-2160); none of their markup is declared by this scope."
+    },
+    {
+      "owner": "timeline.js-internal, earlier census leaves (out of scope, same file)",
+      "disposition": "`BLEND_MODE_LABELS` and `matteModeLabel` are each read from several OTHER, earlier locations in this same file, all out of this scope's own range: timeline.js:361 (comment only, no code reference), 3261/3267 (a layer-row label refresh), 6559/6561 (the matte badge's own title/click-to-reopen), 6752/6755/6778 (the layer row's own context menu, which also calls `openBlendDropdownAt`/`openMatteDropdownAt`, this scope's own exports at 10958/11063). These are all pre-existing CALLERS into this scope's own exported globals and static tables, not re-mapped here — cited by line only, confirming (per contract item (h)) that `BLEND_MODE_LABELS`/`matteModeLabel` have external readers beyond Motion's own panel, as the issue anticipated ('expect layer-list rendering / Motion props panel')."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 10863 (C19ah's own trailing comment) is outside coverage; line 10864 (this scope's own `BLEND_MODE_LABELS` declaration) begins this scope. Line 11146 (`#btn-bake-cache`'s click listener) is the last line of this scope; line 11147 opens the next leaf's (C19aj) `initToolbarCustomization` lead-in comment, confirmed disjoint by direct read (neither `#tl-toolbar` nor 'overflow button' appears anywhere in 10864-11146).",
+    "No lines inside 10864-11146 are excluded for another owner: every line belongs to exactly one of the five packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "(a) Both dropdowns' full lifecycle as a state table. BLEND: open (`open(anchorEl)`, 10893-10951) sets `origMode` from `SMMotion.layerBlendModeAt` at the playhead if `ld.blendKeys` exists (10898, keyed-at-open), else the static `ld.blendMode||'normal'`; builds the option list from `BLEND_MODE_LABELS` marking the current value `.sel`. Hover-preview (`applyPreview(v)`, 10870-10881, wired to each option's `mouseenter` at 10904 and to the whole popup's `mouseleave` at 10954 with `v=origMode`) is a NO-OP whenever `ld.blendKeys&&ld.blendKeys.length` (10877, since `layerBlendModeAt` ignores the static field once keyed — writing it would have zero visible effect), otherwise writes `ld.blendMode=v==='normal'?undefined:v` (10878) and bumps `_sceneVersion`+`renderNow`. Commit (click, 10905-10942): keyed layers `pushUndo()` (10912) then `SMMotion.upsertBlendKeyAt(ld2,state.currentFrame,v)` (10913, snaps a hold-key at the CURRENT frame rather than overwriting the static field); non-keyed layers first restore `ld2.blendMode=origMode` (10919, so `pushUndo` snapshots the true pre-preview state) then `pushUndo()` (10920) then `applyPreview(v)` (10921, the real static write). Either path then `setLabel(v)`, nulls `origMode`, `close(false)`, and refreshes THREE surfaces (10939-10941: `SMMotion.renderMotionPropsPanel`, `renderLayerList`, `renderTimeline` — the 10926-10938 comment attributes the third refresh to feedback #213, a prior fix for the layer-list's own Blend pill going stale). Escape/outside-close (`close(revert)`, 10883-10887, wired to `document`'s `pointerdown` at 10956 and `window`'s `keydown` Escape at 10957): hides the popup and, if `revert&&origMode!==null`, calls `applyPreview(origMode)` to restore the pre-hover value. MATTE: identical shape (`open`/`applyPreview`/`setLabel`/`close`, 10982-11064) with two differences — `origMode=ld.matteMode||'none'` (11019, no keyed branch, no `SMMotion` reference anywhere in this IIFE) and a single-layer-document guard (`state.layers.length<2`, 11015-11018, shows a toast and returns before opening at all, since a matte source requires at least one other layer). Commit (11026-11046): restore-then-`pushUndo()`-then-`applyPreview(v)` (11028-11030, same shape as blend's non-keyed path — matte has no keyed path at all), then freezes `matteSourceLayerUid` at commit time (11031-11041: if `v!=='none'` and no source is set yet and there IS a layer above, stamps that layer's `layerUid` — generating one via `'ly_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6)` if it lacks one — into `ld3.matteSourceLayerUid`; if `v==='none'`, deletes `matteSourceLayerUid` outright), then `setLabel(v)`, nulls `origMode`, `close(false)`, and refreshes only `renderLayerList()` (11045, for the matte badge) — no `renderMotionPropsPanel`/`renderTimeline` refresh, since matte has no Motion-panel pill and no per-frame animated representation to redraw.",
+    "(b) The deliberate non-factoring rationale (10960-10968, the lead-in comment immediately after the blend IIFE's closing `})();`): the two dropdowns are 'independent small pieces of UI logic that happen to look alike today but read/write different layer fields and have already diverged once' — matte has no 'which other layer' concept, blend does not. Concrete divergences, diffed line-by-line: (1) matte's `open()` takes an `anchor` default of `dd` itself computed as a local var (11006) vs. blend's `open()` computing the anchor rect inline at use-time (10945) with no named local; (2) matte's `open()` has the single-layer-document early-return guard (11015-11018) with no blend equivalent; (3) blend's `applyPreview` has the keyed-layer no-op guard (10877) with no matte equivalent (matte's `applyPreview`, 10987-10992, is three lines, unconditional); (4) blend's commit branches on `ld2.blendKeys` to choose `upsertBlendKeyAt` vs. a plain restore-then-pushUndo-then-apply (10908-10922) — matte's commit (11026-11040) has only the one restore-then-pushUndo-then-apply shape, PLUS the source-freeze block blend has no equivalent of; (5) blend's post-commit refresh touches three surfaces (10939-10941), matte's touches one (11045); (6) blend's `setLabel` reads a static table (10882: `BLEND_MODE_LABELS[v]`), matte's reads a live-translated function (10993: `matteModeLabel(v)`, see (c)).",
+    "(c) The i18n fix (10969-10975, dated 2026-08): `matteModeLabel(mode)` (10978-10981) reads `SM.t(key)` live via `MATTE_MODE_I18N_KEYS[mode]` so it always reflects the CURRENT language including a runtime switch, replacing a prior static hardcoded-French object; `MATTE_MODES` (10976) is now just the fixed key ORDER the dropdown lists, decoupled from label lookup. `BLEND_MODE_LABELS` (10864) by direct contrast remains a single static English-only object with zero `SM.t`/i18n hook anywhere in the blend IIFE — every blend-mode label (`setLabel` at 10882, the option-list build at 10900-10903, the context-menu label at timeline.js:6752 out of scope) is hardcoded English regardless of app language. This asymmetry is exactly what the matte comment (10969-10972) describes matte USED to have and was fixed for — blend has not received the equivalent fix as of this frozen blob, confirmed by the complete absence of any `SM.t`/`SM &&SM.t` reference inside 10864-10959 (not established by this census whether that is a known gap or accepted scope; flagged in `future_proposals`).",
+    "(d) The control table for 11065-11148, id/event/value/setter (owner file:line): `#proj-fps` change → `window.SM.setFps(parseInt(this.value))` (11069, setter: timeline.js:839, dispatches into `syncDocFields`, timeline.js:2702, out of scope). `#proj-frames` change → `window.SM.setTotalFrames(parseInt(this.value))` (11070, setter: timeline.js:850). `#btn-fit` click → `window.SM.fitCanvas()` (11071, setter: timeline.js:845 dispatching to app.js:510). `#btn-resetv` click → `window.SM.resetView()` (11072, setter: timeline.js:845 dispatching to app.js:518). `#zoom-scrub` input → inline (11078-11081, no named setter): parses `pct`, bails if falsy/<=0, then `view.zoom=pct/100;renderArcs();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();` — see (e). `#canvas-fit-btn` click → `showContextMenu` (11092, ui.js:1136) with a seven-item array: `Fit`→`SM.fitCanvas()` (11093), `Reset View (100%)`→`SM.resetView()` (11094), separator (11095), Rulers & Guides toggle → `SMRulers.toggleOn()` + `#btn-rulers` class sync (11096-11099, `state.rulersOn` reader: rulers-bridge.js, persisted via `localStorage`, rulers-bridge.js:376), Snap to Guides toggle → `state.guidesSnap=!state.guidesSnap` direct write, no setter, no render call (11108-11110, reader: rulers-bridge.js:249, session-only), Smart Guides toggle → `state.smartGuides=!state.smartGuides` direct write plus `window._smartGuideLines=null` and an unconditional `SMEngineBridge.renderNow()` (11111-11115, reader: rulers-bridge.js:285, session-only), Snap to Pixel Grid toggle → `state.pixelGridSnap=!state.pixelGridSnap` direct write, no setter, no render call (11123-11125, reader: rulers-bridge.js:352, session-only), separator (11126), Outline View toggle → `state.outlineView=!state.outlineView` direct write plus an unconditional `SMEngineBridge.renderNow()` (11133-11136, reader: engine-bridge.js:2604, gated on `includeEditorOverlays`, session-only). None of `guidesSnap`/`smartGuides`/`pixelGridSnap`/`outlineView` is confirmed persisted anywhere in this scope or its cited readers; only `rulersOn` persists, via `SMRulers.toggleOn` itself (out of scope).",
+    "(e) The `#zoom-scrub` math (11078-11081): `pct=parseFloat(this.value)`; guard `if(!pct||pct<=0)return;` rejects 0/NaN/negative but not, e.g., a value above the input's own `max=800` HTML attribute (no JS-side clamp — the browser's native number-input clamp is the only ceiling, and a manually-typed out-of-range value bypassing the native UI is not excluded by this code); `view.zoom=pct/100` (a direct Paper.js `View.zoom` write, percent-to-fraction); `renderArcs()` (timeline.js, out of scope, a Paper.js-side repaint); then `if(window.SMEngineBridge)window.SMEngineBridge.renderNow();` — called with NO arguments, i.e. NOT `renderNow(true)`. Per CLAUDE.md §5's `renderNow(true)` (viewportOnly) contract, a pure zoom change is exactly the kind of viewport-only mutation that contract exists for (no scene item depends on `view.zoom` the way it depends on `view.center`/rotation, per that same section's own note that viewport-only handles pan/rotate AND zoom-dependent handle scaling) — this call site does the more expensive full rebuild instead. Not flagged as a defect (no execution performed to measure the actual cost delta, and dragging the scrub is likely coalesced by rAF per CLAUDE.md §5.2 regardless), but the divergence from the viewportOnly contract's own stated applicability is a direct-read fact, recorded here and in `future_proposals`.",
+    "(f) The two `state.tween*` direct writes (11141-11142): `#p-skipmanual` change → `state.tweenSkipManual=this.checked` (11141); `#p-harmonize-tween` change → `state.tweenHarmonizeEdits=this.checked` (11142). Neither goes through a `window.SM.*` setter, neither calls `pushUndo`, and neither triggers any render call — a toggle of either checkbox is invisible to undo/redo and to the canvas until the next unrelated render. Readers (both out of scope, tweens.js): `tweenSkipManual` at tweens.js:4222, `generateTweens`'s own per-frame loop, `if(state.tweenSkipManual&&ld.frames[fi].isManualEdit)continue;` — skips re-tweening a frame the user hand-corrected. `tweenHarmonizeEdits` at tweens.js:4371, `harmonizeAfterEdit`'s own early-return gate (`if(!state.tweenHarmonizeEdits)return;`) — this scope never calls `harmonizeAfterEdit` itself (it is called from elsewhere after a manual point edit on a tween frame, out of scope).",
+    "(g) Every external function called from this span, owning module cited by name/line only, bodies not reproduced: `document`/DOM built-ins. `window.SMMotion.layerBlendModeAt` (motion.js:4422, called 10898) and `.upsertBlendKeyAt` (motion.js:4438, called 10913) and `.renderMotionPropsPanel` (motion.js:7561, called 10939). `renderLayerList` (timeline.js, out of scope, called 10940, 11045). `renderTimeline` (timeline.js, out of scope, called 10941). `pushUndo` (tweens.js:4741, called 10912, 10920, 11029). `SM.t` (i18n.js, called 10896/10980/11096/11108/11111/11123/11133). `window.showToast` (out of scope, called 11016). `window.SMEngineBridge.renderNow` (out of scope, called 10880/10915/10991/11080/11114/11135, all guarded but with two slightly different guard shapes: `if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)` at 10880/10915/10991/11080 vs. the shorter `if(window.SMEngineBridge)` at 11114/11135 — both reach the same call in practice since `SMEngineBridge` either exists with `renderNow` or does not exist at all in this codebase's own boot sequence, not confirmed by execution). `window.SM.fitCanvas`/`.resetView`/`.setFps`/`.setTotalFrames`/`.setResamplePts`/`.setTweenStep`/`.generateTweens`/`.toggleOnion`/`.toggleGhostAll` (timeline.js:349 block, called 11071/11072/11069/11070/11139/11140/11143/11144/11145). `window.showContextMenu` (ui.js:1136, called 11092). `window.SMRulers.toggleOn` (rulers-bridge.js, called 11097). `manualBakeCache` (timeline.js:156, called 11146). No other external function is called anywhere in lines 10864-11146 — confirmed by reading every statement in the span directly.",
+    "(h) The complete caller list for this scope's own exported/declared symbols, confirmed by `grep -n` against the current worktree filtered to exclude each symbol's own declaration and any `//`-only hit: `BLEND_MODE_LABELS` — read externally at motion.js:7857/7865/7869/7875 (Motion's own blend pill, C20d, reopens this scope's popover via `window.openBlendDropdownAt`) and timeline.js:361 (comment only)/3261/6752 (a layer-row label refresh and the row's own context menu, both out of scope, earlier in this same file). `matteModeLabel` — read externally at motion.js:7690/7735/7753-7754 (Motion's own matte pill, via a local `matteModeLabelSafe` wrapper that falls back to the raw mode string if `matteModeLabel` is somehow undefined) and timeline.js:3267/6559/6561 (a layer-row label refresh and the matte badge's own title/click handler, out of scope, earlier in this same file). `openBlendDropdownAt`/`openMatteDropdownAt` (window-exported at 10958/11063) — called from motion.js:7875 (Motion's own blend pill click) and timeline.js:6755/6778 (the layer row's own context menu 'Blend'/'Source de la matte' entries), all out of scope, all confirmed reaching the SAME popover this scope defines rather than a duplicate. `MATTE_MODES`/`MATTE_MODE_I18N_KEYS` — internal-only to this scope's own matte IIFE, no external reader found. None of this scope's own eleven top-level symbols is ever called from `getEffectiveStrokes`/`getEffectiveStrokesRendered` (app.js) or `buildSceneJson`/`scenePayload` (engine-bridge.js) directly — confirmed by a whole-src grep restricted to those two files (zero hits for the function/variable names themselves); the render/export path instead reads the FIELDS this scope writes (`ld.blendMode`/`matteMode`/`matteSourceLayerUid`), per `reconciliation`'s engine-bridge.js entry — a real but indirect dependency, not a direct call."
+  ],
+  "areas": [
+    {
+      "area": "blend-mode-dropdown",
+      "packets": [
+        {
+          "id": "C19ai.blend-mode-dropdown",
+          "files": [
+            "src/js/timeline.js:10864-10959"
+          ],
+          "coverage_ranges": [
+            [
+              10864,
+              10959
+            ]
+          ],
+          "classification": {
+            "code": 64,
+            "comment": 32,
+            "whitespace": 0
+          },
+          "symbols": [
+            "BLEND_MODE_LABELS",
+            "initBlendDropdown",
+            "currentLd",
+            "applyPreview",
+            "setLabel",
+            "close",
+            "open",
+            "pushUndo",
+            "SMMotion",
+            "layerBlendModeAt",
+            "upsertBlendKeyAt",
+            "renderMotionPropsPanel",
+            "renderLayerList",
+            "renderTimeline",
+            "openBlendDropdownAt",
+            "SMEngineBridge",
+            "renderNow"
+          ],
+          "signature": "var BLEND_MODE_LABELS={...}; (function initBlendDropdown(){ function currentLd(); function applyPreview(v); function setLabel(v); function close(revert); function open(anchorEl); window.openBlendDropdownAt=open; })();",
+          "responsibility": "The blend-mode dropdown: a hand-rolled popover (`#blend-pop`, appended to `document.body`) reproducing hover-preview/click-commit/Escape-revert UX a native `<select>` cannot (per the C19ah-owned lead-in comment immediately preceding line 10864, out of scope). `BLEND_MODE_LABELS` is the static English label table for all sixteen Paper.js/CSS-compositing blend modes. `initBlendDropdown` IIFE owns: `applyPreview` (hover write, no-ops when the layer is Motion-keyed), `setLabel`, `close(revert)` (Escape/outside-click, optionally reverting), `open(anchorEl)` (builds the option list, resolves `origMode` from the keyed value at the playhead when applicable, wires per-option `mouseenter`/`click`, positions the popup clamped to the viewport). See `boundaries` (a)/(b)/(c) for the full lifecycle, the deliberate non-factoring vs. the matte dropdown, and the i18n asymmetry.",
+          "callers": [
+            "`BLEND_MODE_LABELS` — motion.js:7857/7865/7869/7875 (Motion's own blend pill, C20d, out of scope) and timeline.js:361/3261/6752 (out of scope, earlier in this same file, see `boundaries` (h)).",
+            "`openBlendDropdownAt` (exported 10958) — motion.js:7875 and timeline.js:6755, both out of scope (see `boundaries` (h)).",
+            "`currentLd`/`applyPreview`/`setLabel`/`close`/`open` — internal to this IIFE only; no external caller (closure-scoped, not attached to `window` except via `openBlendDropdownAt`)."
+          ],
+          "behavior": [
+            "Line 10864 (code): `var BLEND_MODE_LABELS={normal:'Normal',multiply:'Multiply',...,luminosity:'Luminosity'};` — sixteen-entry static English label table.",
+            "Line 10865 (code): `(function initBlendDropdown(){` — IIFE open.",
+            "Line 10866 (code): guard — `#p-blendmode` element missing, return (no-op on a page without the panel).",
+            "Line 10867 (code): create `#blend-pop` div, append to `document.body`.",
+            "Line 10868 (code+comment): `var origMode=null;` — 'layer's mode when the list opened — the revert target while previewing'.",
+            "Line 10869 (code): `function currentLd(){return state.layers[state.activeLayerIdx];}`.",
+            "Lines 10870-10881 (code+comment, 12 lines): `applyPreview(v)` — no layer, return; keyed-layer no-op guard (10872-10877, comment explains `layerBlendModeAt` ignores the static field once keyed); else writes `ld.blendMode=v==='normal'?undefined:v` (10878), bumps `window._sceneVersion` (10879), calls `SMEngineBridge.renderNow()` if present (10880).",
+            "Line 10882 (code): `setLabel(v){dd.dataset.value=v;dd.textContent=BLEND_MODE_LABELS[v]||v;}`.",
+            "Lines 10883-10887 (code, 5 lines): `close(revert)` — hides `pop`; if `revert&&origMode!==null`, reverts via `applyPreview(origMode)`; nulls `origMode`.",
+            "Lines 10888-10892 (comment, 5 lines): `anchorEl` rationale — mirrors `initMatteDropdown`'s own signature since the Layer tab is gone and this also opens from the row's context menu; accepts anything with `getBoundingClientRect` since a captured DOM node goes stale on re-render.",
+            "Lines 10893-10898 (code+comment, 6 lines): `open(anchorEl)` start — no layer, return; keyed-at-open detection (`keyedAtOpen`); `origMode` resolved from `SMMotion.layerBlendModeAt` at the playhead if keyed, else the static field.",
+            "Lines 10899-10904 (code, 6 lines): clears `pop`, builds one `.blend-opt` div per `BLEND_MODE_LABELS` key marking the current one `.sel`, wires `mouseenter`→`applyPreview(v)`.",
+            "Lines 10905-10922 (code+comment, 18 lines): click handler — `stopPropagation`; no live layer, `close(false)`+return; keyed branch (10908-10915): `pushUndo()` then `SMMotion.upsertBlendKeyAt(ld2,state.currentFrame,v)` then bump `_sceneVersion`+`renderNow`; non-keyed branch (10916-10922): restore `ld2.blendMode=origMode` first, `pushUndo()`, then `applyPreview(v)` for the real write.",
+            "Lines 10923-10925 (code): `setLabel(v);origMode=null;close(false);`.",
+            "Lines 10926-10938 (comment, 13 lines): feedback #213 rationale for the three-surface refresh that follows — the layer-list's own Blend pill (`renderBlendRow` via `renderLayerListMotion`) was the one surface not already covered.",
+            "Lines 10939-10941 (code, 3 lines): `SMMotion.renderMotionPropsPanel()`, `renderLayerList()`, `renderTimeline()`, each guarded by existence.",
+            "Line 10942 (code): closing braces of the click handler.",
+            "Line 10943 (code): `pop.appendChild(it);` — end of the `forEach` per-option build.",
+            "Lines 10944-10951 (code, 8 lines): popup positioning — anchor rect from `anchorEl` or `dd`; `left` clamped `[8, window.innerWidth-pop.offsetWidth-8]`; `top` = `r.bottom+4`, flipped above the anchor if it would overflow the viewport bottom.",
+            "Line 10952-10954 (comment+code, 3 lines): `pop`'s own `mouseleave` reverts to `origMode` via `applyPreview` if still non-null — 'the canvas never lingers on a mode the user merely passed over'.",
+            "Line 10955 (code): `dd`'s own click toggles open/close(revert=true).",
+            "Line 10956 (code): `document`'s `pointerdown` closes(revert=true) on outside click while open.",
+            "Line 10957 (code): `window`'s `keydown` Escape closes(revert=true) while open.",
+            "Line 10958 (code): `window.openBlendDropdownAt=open;` — the cross-file/cross-call-site export.",
+            "Line 10959 (code): `})();` — IIFE close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "matte-mode-dropdown",
+      "packets": [
+        {
+          "id": "C19ai.matte-mode-dropdown",
+          "files": [
+            "src/js/timeline.js:10960-11064"
+          ],
+          "coverage_ranges": [
+            [
+              10960,
+              11064
+            ]
+          ],
+          "classification": {
+            "code": 69,
+            "comment": 35,
+            "whitespace": 1
+          },
+          "symbols": [
+            "MATTE_MODES",
+            "MATTE_MODE_I18N_KEYS",
+            "matteModeLabel",
+            "initMatteDropdown",
+            "currentLd",
+            "applyPreview",
+            "setLabel",
+            "close",
+            "open",
+            "pushUndo",
+            "matteSourceLayerUid",
+            "showToast",
+            "renderLayerList",
+            "openMatteDropdownAt",
+            "SMEngineBridge",
+            "renderNow",
+            "SM"
+          ],
+          "signature": "var MATTE_MODES=[...]; var MATTE_MODE_I18N_KEYS={...}; function matteModeLabel(mode); (function initMatteDropdown(){ ... window.openMatteDropdownAt=open; })();",
+          "responsibility": "The track-matte dropdown: wired identically in shape to `initBlendDropdown` (same hover-preview/click-commit/Escape-revert UX, deliberately not factored into a shared helper — `boundaries` (b)) but reading/writing `ld.matteMode`/`ld.matteSourceLayerUid` instead of `ld.blendMode`, with a live-translated label function (`matteModeLabel`, `boundaries` (c)) and a per-layer matte-source freeze-on-commit (`boundaries` (a)). Includes a single-layer-document guard absent from the blend dropdown.",
+          "callers": [
+            "`matteModeLabel` — motion.js:7690/7735/7753-7754 (via `matteModeLabelSafe`, C20d, out of scope) and timeline.js:3267/6559/6561 (out of scope, earlier in this same file, see `boundaries` (h)).",
+            "`openMatteDropdownAt` (exported 11063) — timeline.js:6778 (the layer row's own context menu 'Source de la matte' entry, out of scope) and the layer-row badge click at timeline.js:6561 (out of scope).",
+            "`MATTE_MODES`/`MATTE_MODE_I18N_KEYS`/`currentLd`/`applyPreview`/`setLabel`/`close`/`open` — internal to this IIFE/module scope only; no other external caller found."
+          ],
+          "behavior": [
+            "Lines 10960-10968 (comment, 9 lines): deliberate-non-factoring lead-in — see `boundaries` (b) for the full diff against the blend dropdown.",
+            "Lines 10969-10975 (comment, 7 lines): 2026-08 i18n fix rationale — see `boundaries` (c).",
+            "Line 10976 (code): `var MATTE_MODES=['none','alpha','alphaInverted','luma','lumaInverted'];` — fixed dropdown key order.",
+            "Line 10977 (code): `var MATTE_MODE_I18N_KEYS={none:'matteNone',alpha:'matteAlpha',alphaInverted:'matteAlphaInverted',luma:'matteLuma',lumaInverted:'matteLumaInverted'};`.",
+            "Lines 10978-10981 (code, 4 lines): `matteModeLabel(mode)` — looks up the i18n key, returns `SM.t(key)` live if both the key and `SM.t` exist, else the raw mode string.",
+            "Line 10982 (code): `(function initMatteDropdown(){` — IIFE open.",
+            "Line 10983 (code): guard — `#p-mattemode` missing, return.",
+            "Line 10984 (code): create `#matte-pop`, append to `document.body`.",
+            "Line 10985 (code): `var origMode=null;`.",
+            "Line 10986 (code): `function currentLd(){return state.layers[state.activeLayerIdx];}`.",
+            "Lines 10987-10992 (code, 6 lines): `applyPreview(v)` — no layer, return; writes `ld.matteMode=v==='none'?undefined:v`, bumps `_sceneVersion`, calls `renderNow` if present — unconditional, no keyed-layer branch (matte has none).",
+            "Line 10993 (code): `setLabel(v){dd.dataset.value=v;dd.textContent=matteModeLabel(v)||v;}` — reads the LIVE-translated label, unlike blend's static-table `setLabel`.",
+            "Lines 10994-10998 (code, 5 lines): `close(revert)` — same shape as blend's.",
+            "Lines 10999-11004 (comment, 6 lines): `anchorEl` default rationale — the layer-row badge/context-menu pass their own element so the popup opens next to whatever was actually clicked rather than the (possibly hidden) right panel.",
+            "Line 11005 (code): `function open(anchorEl){`.",
+            "Line 11006 (code): `var anchor=anchorEl||dd;` — named local, unlike blend's inline anchor resolution.",
+            "Line 11007 (code): guard — no layer, return.",
+            "Lines 11008-11014 (comment, 7 lines): uid-based matte-source rationale — any layer can serve as source since 2026-07-31 (picked via the row context menu's own 'Source de la matte…'), legacy adjacent-layer behavior preserved as the default and frozen at commit.",
+            "Lines 11015-11018 (code, 4 lines): single-layer-document guard — `state.layers.length<2`, shows `SM.t('hsNoOtherLayerForMatte')` toast via `window.showToast`, returns (never opens).",
+            "Line 11019 (code): `origMode=ld.matteMode||'none';`.",
+            "Lines 11020-11024 (code, 5 lines): clears `pop`, builds one `.blend-opt` div per `MATTE_MODES` entry (reusing the SAME CSS class as blend's own options) marking the current one `.sel`.",
+            "Line 11025 (code): `mouseenter`→`applyPreview(v)`.",
+            "Lines 11026-11046 (code+comment, 21 lines): click handler — `stopPropagation`; restore `ld2.matteMode=origMode` then `pushUndo()` then `applyPreview(v)` (11028-11030, the sole commit shape, no keyed branch); source-freeze block (11031-11041, comment 11031-11034 + code 11035-11041): if a new non-'none' mode has no existing `matteSourceLayerUid` and a layer exists directly above, stamps that layer's `layerUid` (generating one if absent) into `matteSourceLayerUid`; if the mode is 'none', deletes `matteSourceLayerUid`; then `setLabel(v);origMode=null;close(false);renderLayerList();` (11042-11045, badge refresh comment: 'must reflect the new mode immediately').",
+            "Line 11047 (code): `pop.appendChild(it);` — end of the `forEach` per-option build.",
+            "Lines 11048-11049 (code): `var r=anchor.getBoundingClientRect();pop.style.display='block';`.",
+            "Lines 11050-11054 (code, 5 lines): positioning clamp, identical shape to blend's own (8/left, bottom+4/top with overflow flip).",
+            "Line 11055 (code): closing brace of `open`.",
+            "Line 11056 (code): `pop`'s own `mouseleave` reverts via `applyPreview(origMode)` if non-null.",
+            "Line 11057 (code): `dd`'s own click toggles open/close(revert=true).",
+            "Line 11058 (code): `document`'s `pointerdown` closes(revert=true) on outside click.",
+            "Line 11059 (code): `window`'s `keydown` Escape closes(revert=true).",
+            "Lines 11060-11062 (comment, 3 lines): export rationale — 'same picker, different trigger... behavior... identical everywhere it opens' (the layer-row badge and context-menu entry points).",
+            "Line 11063 (code): `window.openMatteDropdownAt=open;`.",
+            "Line 11064 (code): `})();` — IIFE close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "document-fps-frames-fit-reset",
+      "packets": [
+        {
+          "id": "C19ai.document-fps-frames-fit-reset",
+          "files": [
+            "src/js/timeline.js:11065-11081"
+          ],
+          "coverage_ranges": [
+            [
+              11065,
+              11081
+            ]
+          ],
+          "classification": {
+            "code": 8,
+            "comment": 9,
+            "whitespace": 0
+          },
+          "symbols": [
+            "proj-fps",
+            "proj-frames",
+            "setFps",
+            "setTotalFrames",
+            "btn-fit",
+            "fitCanvas",
+            "btn-resetv",
+            "resetView",
+            "zoom-scrub",
+            "view",
+            "renderArcs",
+            "SMEngineBridge",
+            "renderNow"
+          ],
+          "signature": "document.getElementById('proj-fps').addEventListener('change',...); document.getElementById('proj-frames').addEventListener('change',...); document.getElementById('btn-fit').addEventListener('click',...); document.getElementById('btn-resetv').addEventListener('click',...); document.getElementById('zoom-scrub').addEventListener('input',...);",
+          "responsibility": "Five thin listeners bridging Document-panel FPS/Frames fields and the Fit/Reset View buttons to the pre-existing `window.SM.*` setters, plus the zoom-scrub input's own inline `view.zoom` write. See `boundaries` (d)/(e).",
+          "callers": [
+            "No external caller — these are top-level self-wiring `addEventListener` calls, executed once at script load."
+          ],
+          "behavior": [
+            "Lines 11065-11068 (comment, 4 lines): lead-in — FPS/Frames now live in the Document section alongside Width/Height; the old separate proj-w/proj-h duplicate pair was removed 2026-07-17; `syncDocFields()` (timeline.js:2702, out of scope) keeps these two ids in sync with `state`.",
+            "Line 11069 (code): `#proj-fps` change → `window.SM.setFps(parseInt(this.value));`.",
+            "Line 11070 (code): `#proj-frames` change → `window.SM.setTotalFrames(parseInt(this.value));`.",
+            "Line 11071 (code): `#btn-fit` click → `window.SM.fitCanvas();`.",
+            "Line 11072 (code): `#btn-resetv` click → `window.SM.resetView();`.",
+            "Lines 11073-11077 (comment, 5 lines): `#zoom-scrub` rationale — `class=\"scrub\"` alone makes it pick up ui.js's generic pointer-scrub handler (CLAUDE.md §10); this listener applies the resulting value to the live view on every drag tick (`'input'`, not `'change'`) so the canvas visibly zooms while scrubbing, not only on release.",
+            "Lines 11078-11081 (code, 4 lines): `pct=parseFloat(this.value)`; guard `if(!pct||pct<=0)return;`; `view.zoom=pct/100;renderArcs();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();` — see `boundaries` (e) for the no-`true`-argument observation."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "canvas-fit-view-menu",
+      "packets": [
+        {
+          "id": "C19ai.canvas-fit-view-menu",
+          "files": [
+            "src/js/timeline.js:11082-11138"
+          ],
+          "coverage_ranges": [
+            [
+              11082,
+              11138
+            ]
+          ],
+          "classification": {
+            "code": 28,
+            "comment": 29,
+            "whitespace": 0
+          },
+          "symbols": [
+            "canvas-fit-btn",
+            "showContextMenu",
+            "fitCanvas",
+            "resetView",
+            "rulersMenuLabel",
+            "SMRulers",
+            "toggleOn",
+            "btn-rulers",
+            "guidesSnap",
+            "snapToGuidesMenuLabel",
+            "smartGuides",
+            "smartGuidesMenuLabel",
+            "_smartGuideLines",
+            "SMEngineBridge",
+            "renderNow",
+            "pixelGridSnap",
+            "snapToPixelGridMenuLabel",
+            "outlineView",
+            "outlineViewMenuLabel",
+            "state",
+            "SM"
+          ],
+          "signature": "document.getElementById('canvas-fit-btn').addEventListener('click',function(e){ window.showContextMenu(r.left,r.top-98,[...]); });",
+          "responsibility": "The `#canvas-fit-btn` split control's own view menu: Fit/Reset View at the top, then four independent `state.*` checkmark-prefixed toggles (Rulers & Guides, Snap to Guides, Smart Guides, Snap to Pixel Grid, Outline View — five items, four of them are the toggles, Rulers & Guides being the fifth counting Fit/Reset) built fresh on every click via `showContextMenu`. See `boundaries` (d) for the full id/event/state-flag/reader table.",
+          "callers": [
+            "No external caller — top-level self-wiring `addEventListener`, executed once at script load."
+          ],
+          "behavior": [
+            "Lines 11082-11083 (code): click handler open; `var r=this.getBoundingClientRect();`.",
+            "Lines 11084-11091 (comment, 8 lines): Rulers/guides-toggle placement rationale (2026-08-27) — added to this exact menu alongside the pre-existing standalone toolbar button, both read/write the same `state.rulersOn` via `SMRulers.toggleOn`; `showContextMenu` has no native checkbox item type, so ON state is a plain checkmark prefix.",
+            "Line 11092 (code): `window.showContextMenu(r.left,r.top-98,[` — opens the menu array.",
+            "Line 11093 (code): `{label:'Fit',action:function(){window.SM.fitCanvas();}}`.",
+            "Line 11094 (code): `{label:'Reset View (100%)',action:function(){window.SM.resetView();}}`.",
+            "Line 11095 (code): `{sep:true}`.",
+            "Lines 11096-11099 (code, 4 lines): Rulers & Guides item — checkmark-prefixed label via `SM.t('rulersMenuLabel')`; action calls `SMRulers.toggleOn()` then syncs `#btn-rulers`'s own `.active` class from `state.rulersOn`.",
+            "Lines 11100-11107 (comment, 8 lines): Snap-to-guides rationale (2026-09) — the actual snap (`SMRulers.snapPoint`, already wired into select-bridge.js's move-drag) had no on/off UI anywhere, defaulting permanently true.",
+            "Lines 11108-11110 (code): Snap to Guides item — checkmark-prefixed label via `SM.t('snapToGuidesMenuLabel')`; action is a bare `state.guidesSnap=!state.guidesSnap;` toggle, no render call; note the trailing `,,` (an elided array element) immediately after this item's own closing `}}` — see `future_proposals`.",
+            "Lines 11111-11115 (code, 5 lines): Smart Guides item — checkmark-prefixed label via `SM.t('smartGuidesMenuLabel')`; action toggles `state.smartGuides`, nulls `window._smartGuideLines` when turning off, calls `SMEngineBridge.renderNow()` if present.",
+            "Lines 11116-11122 (comment, 7 lines): Snap-to-pixel-grid rationale (2026-09, AE help sweep) — distinct from guide-snapping (AE's own 'Snap to Grid'), independent of Rulers/guides on purpose, scoped to Animation 2D's own 'move' drag only.",
+            "Lines 11123-11125 (code): Snap to Pixel Grid item — checkmark-prefixed label via `SM.t('snapToPixelGridMenuLabel')`; action is a bare `state.pixelGridSnap=!state.pixelGridSnap;` toggle, no render call.",
+            "Line 11126 (code): `{sep:true}`.",
+            "Lines 11127-11132 (comment, 6 lines): Outline View rationale (2026-09) — Illustrator's View>Outline, distinct from AE's own automatic wireframe performance fallback; a rendering MODE needing an immediate re-render rather than the next natural invalidation.",
+            "Lines 11133-11136 (code, 4 lines): Outline View item — checkmark-prefixed label via `SM.t('outlineViewMenuLabel')`; action toggles `state.outlineView`, calls `SMEngineBridge.renderNow()` if present.",
+            "Line 11137 (code): `]);` — closes the menu-item array and the `showContextMenu` call.",
+            "Line 11138 (code): `}` — closes the click handler."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "tween-onion-ghost-bake-buttons",
+      "packets": [
+        {
+          "id": "C19ai.tween-onion-ghost-bake-buttons",
+          "files": [
+            "src/js/timeline.js:11139-11146"
+          ],
+          "coverage_ranges": [
+            [
+              11139,
+              11146
+            ]
+          ],
+          "classification": {
+            "code": 8,
+            "comment": 0,
+            "whitespace": 0
+          },
+          "symbols": [
+            "p-resamp",
+            "setResamplePts",
+            "p-step",
+            "setTweenStep",
+            "p-skipmanual",
+            "tweenSkipManual",
+            "p-harmonize-tween",
+            "tweenHarmonizeEdits",
+            "btn-tw",
+            "generateTweens",
+            "btn-os",
+            "toggleOnion",
+            "btn-ghost-all",
+            "toggleGhostAll",
+            "btn-bake-cache",
+            "manualBakeCache"
+          ],
+          "signature": "document.getElementById('p-resamp'|'p-step'|'p-skipmanual'|'p-harmonize-tween'|'btn-tw'|'btn-os'|'btn-ghost-all'|'btn-bake-cache').addEventListener(...);",
+          "responsibility": "Eight thin listeners: two `window.SM.*` setter dispatches (`setResamplePts`, `setTweenStep`), two direct `state.tween*` writes with no setter and no undo (`boundaries` (f)), and four action-button dispatches (`generateTweens`, `toggleOnion`, `toggleGhostAll`, `manualBakeCache`). No comment lines in this packet — the whole eight-line block is pure wiring with no lead-in of its own (the preceding comment, at 11127-11132, belongs to the prior packet's Outline View item).",
+          "callers": [
+            "No external caller — top-level self-wiring `addEventListener` calls, executed once at script load."
+          ],
+          "behavior": [
+            "Line 11139 (code): `#p-resamp` input → `window.SM.setResamplePts(parseInt(this.value));`.",
+            "Line 11140 (code): `#p-step` change → `window.SM.setTweenStep(this.value);`.",
+            "Line 11141 (code): `#p-skipmanual` change → `state.tweenSkipManual=this.checked;` — direct write, no setter, no `pushUndo`, no render call.",
+            "Line 11142 (code): `#p-harmonize-tween` change → `state.tweenHarmonizeEdits=this.checked;` — same shape as 11141.",
+            "Line 11143 (code): `#btn-tw` click → `window.SM.generateTweens();`.",
+            "Line 11144 (code): `#btn-os` click → `window.SM.toggleOnion();`.",
+            "Line 11145 (code): `#btn-ghost-all` click → `window.SM.toggleGhostAll();`.",
+            "Line 11146 (code): `#btn-bake-cache` click → `manualBakeCache();` — direct call, not through `window.SM.*` (the only one of the eight buttons in this packet that bypasses the SM API object; `manualBakeCache` is itself a plain top-level function, timeline.js:156, out of scope)."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No `saveActiveLayerFrame`/`saveAllLayerFrames` call exists anywhere in this scope's own 283 lines (confirmed by grep) — every write in this span mutates a live `ld.*`/`state.*` field directly; persistence of `ld.blendMode`/`ld.matteMode`/`ld.matteSourceLayerUid` across a save is handled entirely by whichever out-of-scope frame-save path serializes the layer object itself (not this scope's own concern, not traced here)."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No load/import function is called anywhere in this scope's own body. Both dropdowns' `open()` reads FROM an already-loaded live `ld` (`state.layers[state.activeLayerIdx]`) — neither re-triggers a frame load."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Three `pushUndo()` calls total (tweens.js:4741): blend's keyed commit (10912), blend's non-keyed commit (10920), matte's commit (11029) — always immediately before the real field write, snapshotting the pre-pick state. The matte-source freeze (11031-11041) piggybacks on matte's own 11029 snapshot rather than taking a second one. By contrast, EVERY write in the remaining four packets (11065-11146: FPS/Frames/fit/reset/zoom, all four view-menu toggles, both direct `state.tween*` writes, and the four tween/onion/ghost/bake action dispatches) has NO `pushUndo` call anywhere in this scope's own body — undo coverage for those, if any, lives entirely in the out-of-scope setter bodies this scope only calls by name (`setTotalFrames` calls `saveAllLayerFrames` itself, timeline.js:850, which is not the same as an undo snapshot) or is simply absent, as `boundaries` (f) establishes directly for the two `state.tween*` writes."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "No `selectedPaths`/`_layerSel`/`_layerSelAnchor` read or write anywhere in this scope's own 283 lines (confirmed by grep) — neither dropdown, nor any of the Document/view/tween controls, touches the current selection."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "The blend dropdown is the ONLY control in this scope with a Motion-aware branch: `open()` reads `SMMotion.layerBlendModeAt` at the playhead when `ld.blendKeys` exists (10898), `applyPreview` no-ops for a keyed layer (10877), and the click commit calls `SMMotion.upsertBlendKeyAt` instead of writing the static field (10913) — three distinct Motion-awareness points for one control. The matte dropdown has NONE of these — `ld.matteMode` is always the plain static field, with no keyed/animated representation anywhere in this scope, confirmed by the total absence of `SMMotion`/`blendKeys`-shaped code inside `initMatteDropdown`'s own 10982-11064 body (see `boundaries` (c) and `future_proposals`). None of the remaining three packets reference Motion, keys, or per-frame animation at all."
+    },
+    {
+      "consumer": "export",
+      "disposition": "None of this scope's own function/variable symbols are called from `export.js`/`rive-export.js` directly (confirmed: zero matches for every declared symbol in either file). However, unlike a purely UI-local scope, the FIELDS the two dropdowns write (`ld.blendMode`, `ld.matteMode`, `ld.matteSourceLayerUid`) ARE read by `buildSceneJson` (engine-bridge.js:2150/2158/2258/2522-2523/2545), which IS on the export path — so a blend/matte pick made through this scope's UI does propagate into an exported frame, even though the export call graph never touches this scope's own code. The Document/view/tween controls in the remaining three packets have no equivalent export-relevant field write of their own within this scope (their downstream setter bodies are out of scope and not traced for export relevance here)."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "`window.SMEngineBridge.renderNow()` is called six times across this scope's own body: 10880 (blend `applyPreview`), 10915 (blend keyed commit), 10991 (matte `applyPreview`), 11080 (`#zoom-scrub`, called with NO `true` argument — see `boundaries` (e)), 11114 (Smart Guides toggle), 11135 (Outline View toggle) — always guarded by `SMEngineBridge`'s own existence, with two slightly different guard shapes noted in `boundaries` (g). No Tauri-specific API and no other bridge module is referenced anywhere in 10864-11146."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-blend-keyed-vs-static-hover-and-commit",
+      "proposed": "On a layer with `ld.blendKeys=[]` (empty but present) vs. `ld.blendKeys` undefined: open the blend dropdown on each; expect `origMode` sourced from `SMMotion.layerBlendModeAt` (mocked) for the keyed case and from `ld.blendMode||'normal'` for the non-keyed case. Hover a different option on each: expect NO write to `ld.blendMode` for the (non-empty) keyed case, and a live write for the non-keyed case. Click-commit on each: expect `SMMotion.upsertBlendKeyAt` called (keyed) vs. `ld.blendMode` written directly (non-keyed), and in both cases `renderMotionPropsPanel`/`renderLayerList`/`renderTimeline` all invoked once — verifies `boundaries` (a)'s BLEND state table — not run."
+    },
+    {
+      "id": "fx-matte-single-layer-guard-and-source-freeze",
+      "proposed": "With `state.layers.length===1`, call the matte dropdown's `open()`; expect a `showToast('hsNoOtherLayerForMatte')` call and the popup NEVER shown (no `pop.style.display='block'`). With ≥2 layers and no `matteSourceLayerUid` set, commit a non-'none' mode; expect the layer directly above to be stamped as source (generating a `layerUid` if it lacked one). Commit 'none' afterward; expect `matteSourceLayerUid` deleted — verifies `boundaries` (a)'s MATTE state table and the source-freeze block (11031-11041) — not run."
+    },
+    {
+      "id": "fx-blend-mode-labels-static-vs-matte-live-i18n",
+      "proposed": "Switch `SM.t`'s active language mid-session; expect `matteModeLabel('luma')` to return the NEW language's translation on the very next call (no cache to invalidate), while `BLEND_MODE_LABELS['multiply']` continues to return the static English string `'Multiply'` regardless of the language switch — verifies the asymmetry in `boundaries` (c) — not run."
+    },
+    {
+      "id": "fx-zoom-scrub-writes-view-zoom-and-renderNow-arity",
+      "proposed": "Drive `#zoom-scrub`'s `input` event with value `'150'`; expect `view.zoom===1.5` and `SMEngineBridge.renderNow` called with ZERO arguments (spy the call's own `arguments.length`), confirming the no-`true` observation in `boundaries` (e). Drive with `'0'` and `'-10'`; expect `view.zoom` UNCHANGED (the guard rejects both) — not run."
+    },
+    {
+      "id": "fx-view-menu-four-toggles-flip-and-render",
+      "proposed": "Click each of the four view-menu toggle items in turn (mocked `showContextMenu` capturing the item array); expect `state.guidesSnap`/`state.smartGuides`/`state.pixelGridSnap`/`state.outlineView` each to flip exactly once per click, with `SMEngineBridge.renderNow()` called for the Smart Guides and Outline View items only (not for Snap to Guides or Snap to Pixel Grid) — verifies `boundaries` (d)'s per-item render-call table — not run."
+    },
+    {
+      "id": "fx-tween-checkbox-writes-bypass-undo",
+      "proposed": "Snapshot `state.undoStack.length`; toggle `#p-skipmanual` and `#p-harmonize-tween` in turn; expect the undo stack length UNCHANGED after both (no `pushUndo` call), while toggling the blend or matte dropdown's own value in the same test DOES grow the stack by exactly one — verifies `boundaries` (f)'s no-undo observation by direct contrast with the two dropdowns' own commit paths — not run."
+    },
+    {
+      "id": "fx-elided-array-slot-is-silently-skipped",
+      "proposed": "Call the real `showContextMenu` (not mocked) with the exact seven-element-with-one-hole array this scope's own `#canvas-fit-btn` handler builds (11092-11137); expect exactly SIX rendered `.ctx-item`/`.ctx-sep` DOM nodes (the elided slot produces no row and no thrown error, since `Array.prototype.forEach` skips holes per spec), confirming the trailing `,,` at line 11110 has no user-visible effect beyond the source-level anomaly itself — verifies the `future_proposals` note on 11110 — not run."
+    }
+  ],
+  "future_proposals": [
+    "Line 11110 ends with `}},,` — a doubled comma inside the `showContextMenu` item array, immediately after the Snap to Guides item and before Smart Guides. This creates one ELIDED array slot (a genuine 'hole', not an `undefined` element) between the two items. `Array.prototype.forEach` (used by `showContextMenu`'s own render loop, ui.js:1139) skips holes without invoking its callback for them, per the ECMAScript spec — so this has NO observed functional effect (no extra menu row, no thrown error) by direct reading of the spec-defined behavior, not by execution. Still worth a one-character cleanup whenever this file is next touched for an unrelated reason — flagged for awareness, not treated as a defect requiring a fix under this remediation's baseline-preservation rule.",
+    "The blend dropdown has three Motion-awareness points (keyed-at-open read, keyed-hover no-op, keyed-commit via `upsertBlendKeyAt`) that the matte dropdown has none of (`boundaries` (c)/`reconciliation`'s motion.js entry). Whether track-matte SHOULD gain an equivalent per-frame animated representation is a product question this census does not answer — noted as a structural asymmetry between two otherwise near-identical controls, not confirmed as a gap requiring a fix.",
+    "`BLEND_MODE_LABELS` remains a static English-only table with no `SM.t` hook, while `matteModeLabel` was fixed for exactly this class of bug in 2026-08 (10969-10975's own comment). A blend-mode label is therefore hardcoded English in every locale, including everywhere `BLEND_MODE_LABELS[...]` is read externally (motion.js's own blend pill, this scope's own `setLabel`/option list, the layer-row context menu at timeline.js:6752) — the same class of defect the matte fix's own comment describes ('always showed... regardless of app language'), left unaddressed on the blend side as of this frozen blob. Not confirmed whether this is a known, accepted gap or simply not yet reached — flagged for awareness only.",
+    "`#zoom-scrub`'s own `renderNow()` call (11080) passes no argument, i.e. does not use the `renderNow(true)` viewportOnly fast path CLAUDE.md §5 documents for exactly this class of view-only mutation (zoom, alongside pan/rotate). Not confirmed as a measurable regression by this census (no execution performed), but a direct-read fact worth a follow-up perf pass given the same section's own emphasis on this exact optimization's prior payoff (19fps→60fps on a comparable interaction).",
+    "The two `state.tween*` checkbox writes (11141-11142) and the two view-menu snap-toggle writes (11108-11110, 11123-11125) are, between them, four separate instances of a direct `state.*=...` write with no setter, no `pushUndo`, and (for the two tween checkboxes and the two snap toggles) no render call either — a a consistent pattern across this scope of 'settings' toggles that bypass the `window.SM.*` API entirely, unlike the FPS/Frames/Fit/Reset controls in the same file region which all go through named setters. Not flagged as a defect (settings-class toggles arguably don't need undo), but noted as a pattern worth a consistency pass if `window.SM.*` is ever meant to be the sole write surface."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `grep -n` was run for every symbol this scope declares or exports (`BLEND_MODE_LABELS`, `openBlendDropdownAt`, `matteModeLabel`, `openMatteDropdownAt`, `MATTE_MODES`, `MATTE_MODE_I18N_KEYS`), filtered to exclude each symbol's own declaration line — results are reproduced under each packet's own `callers` field and `boundaries` (h), and are re-checkable with the same command.",
+    "A SEPARATE whole-src grep restricted to `export.js`/`rive-export.js`/`engine-bridge.js` for all seven top-level symbol names this scope declares returned ZERO hits — directly supporting the `export` `source_consumers` entry's claim that this scope's own code is never called from the render/export path (the FIELDS it writes are read there instead, a distinct and separately confirmed fact via the `ld.blendMode`/`matteMode`/`matteSourceLayerUid` grep in engine-bridge.js).",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's own `classify()` algorithm against a direct `git show 59a5a38c:src/js/timeline.js` dump, run once per packet and once for the whole span — 177/105/1 over 283 lines, matching the issue's own proposed union exactly and matching the issue's own proposed per-packet table exactly for all five packets; no boundary correction was needed.",
+    "`manualBakeCache`'s actual defining location (timeline.js:156) and `showContextMenu`'s actual defining location (ui.js:1136) were both confirmed by grepping for the literal `function <name>`/`<name>=function` declaration form, rather than trusting the issue's own prose (which named playback-cache.js and implied timeline.js respectively) — both corrections are recorded in `owner` with the grep evidence.",
+    "The four `state.*` view-menu flags' render-side readers (`rulersOn`, `guidesSnap`, `smartGuides`, `pixelGridSnap`, `outlineView`) were located directly in rulers-bridge.js and engine-bridge.js by grep, distinguishing `outlineView`'s reader (engine-bridge.js:2604, a render-mode gate) from the other four's readers (rulers-bridge.js, drag-time snap/draw gates) rather than assuming all five live in the same file.",
+    "engineering/inventory/census/*.json siblings present at authoring time sharing `source_path: src/js/timeline.js`: C19a through C19aa/C19af/C19ak/C19al are merged; C19ah (this scope's immediate predecessor, timeline.js:?-10863) and C19aj (this scope's immediate successor, timeline.js:11147+) exist in sibling worktrees at authoring time, not yet merged, but both declared ranges are disjoint from and adjacent to this artifact's own 10864-11146 by direct read — the validator's own cross-sibling overlap check binds against whichever C19*.json files are ACTUALLY present in the directory at validation time."
+  ],
+  "validation": {
+    "expected_assigned_lines": 283,
+    "expected_classification": {
+      "code": 177,
+      "comment": 105,
+      "whitespace": 1
+    },
+    "packet_partition": [
+      [
+        10864,
+        10959
+      ],
+      [
+        10960,
+        11064
+      ],
+      [
+        11065,
+        11081
+      ],
+      [
+        11082,
+        11138
+      ],
+      [
+        11139,
+        11146
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by script against the frozen blob: 10864-10959=(64,32,0); 10960-11064=(69,35,1); 11065-11081=(8,9,0); 11082-11138=(28,29,0); 11139-11146=(8,0,0); sums to (177,105,1)=283 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 283 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C19ai-timeline-blend-matte-dropdowns-view-tween-buttons.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19z-timeline-text-bake-commit-split.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19aa-timeline-typography-panels-gradient-button.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19af-timeline-keyup-cmdhold-shape-flyout-colour-fields.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19ak-timeline-duplicator-rig-combine-panel-wiring.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19al-timeline-export-modal-panel-rail-bootstrap.json <candidate-sha> still exits 0"
+    ]
+  }
+}
