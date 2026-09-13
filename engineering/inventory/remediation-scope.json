@@ -1,11 +1,11 @@
 {
   "schema": "nemo.remediation-scope/2",
-  "issue": "https://github.com/mysteropodes/nemo/issues/1179",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1278",
   "complete": false,
   "source": {
-    "commit": "4bbe332332075d9a25793a58998ea99b33d48538",
-    "fileCount": 703,
-    "sha256": "d336b3b3fd35632e0adf587ecff912fbd61e3a715fe206cc88c1f2047951a33f"
+    "commit": "3f6eed2a500f2ce868b711e063816029eb8fefa5",
+    "fileCount": 756,
+    "sha256": "5d3b7b36da7bf43bb8d2dcea1d7a1331469a7b877d1d5ef3cea911f18a33d972"
   },
   "amendments": [
     {
@@ -119,16 +119,90 @@
         "tests/nemo-remediation-scope.test.cjs"
       ],
       "reason": "Reconcile C02/C06/C20 packet range drift (taSelectorAt, elementMotionAt/layerOrderAt doc lead-ins, enterComponentLayer documentation, C06 storage-key-migration lead-in) and pin C19r into the scope index."
+    },
+    {
+      "id": "P03C-b",
+      "issue": 1278,
+      "commit": "3f6eed2a500f2ce868b711e063816029eb8fefa5",
+      "from": "4bbe332332075d9a25793a58998ea99b33d48538",
+      "fileCount": 756,
+      "sha256": "5d3b7b36da7bf43bb8d2dcea1d7a1331469a7b877d1d5ef3cea911f18a33d972",
+      "added": [
+        "engineering/boundaries/profiles/geometry-wasm.edges.json",
+        "engineering/inventory/census/C19aa-timeline-typography-panels-gradient-button.json",
+        "engineering/inventory/census/C19ab-timeline-app-menu-entry-points.json",
+        "engineering/inventory/census/C19ac-timeline-feedback-inbox-avatars-dashboard.json",
+        "engineering/inventory/census/C19ad-timeline-onkeydown-chords-motion-overrides.json",
+        "engineering/inventory/census/C19ae-timeline-onkeydown-editing-navigation-delete.json",
+        "engineering/inventory/census/C19af-timeline-keyup-cmdhold-shape-flyout-colour-fields.json",
+        "engineering/inventory/census/C19ag-timeline-fill-stroke-panel-wiring.json",
+        "engineering/inventory/census/C19ah-timeline-xform-bool-brush-canvas-wiring.json",
+        "engineering/inventory/census/C19ai-timeline-blend-matte-dropdowns-view-tween-buttons.json",
+        "engineering/inventory/census/C19aj-timeline-toolbar-onion-transport-layer-buttons.json",
+        "engineering/inventory/census/C19ak-timeline-duplicator-rig-combine-panel-wiring.json",
+        "engineering/inventory/census/C19al-timeline-export-modal-panel-rail-bootstrap.json",
+        "engineering/inventory/census/C19s-timeline-layer-link-pickers-parent-cell.json",
+        "engineering/inventory/census/C19t-timeline-color-surfaces-index-reconcile.json",
+        "engineering/inventory/census/C19u-timeline-render-layer-list.json",
+        "engineering/inventory/census/C19v-timeline-layer-reorder-symbol-tabs-side-panels.json",
+        "engineering/inventory/census/C19w-timeline-duplicator-panel.json",
+        "engineering/inventory/census/C19x-timeline-comment-popover-feedback-capture.json",
+        "engineering/inventory/census/C19y-timeline-text-popover-inplace-editors.json",
+        "engineering/inventory/census/C19z-timeline-text-bake-commit-split.json",
+        "engineering/inventory/census/C20g-motion-elements-list-color-trim-rows.json",
+        "engineering/inventory/census/C20h-motion-text-animator-path-mesh-vertex-rows.json",
+        "engineering/inventory/census/C20i-motion-track-row-html-render-tracks-for.json",
+        "engineering/inventory/census/C20j-motion-header-tables-reveal-shortcuts-view-filters.json",
+        "engineering/inventory/census/C20k-motion-expression-builtins.json",
+        "engineering/inventory/census/C20l-motion-expression-views-aliases.json",
+        "engineering/inventory/census/C20m-motion-expression-compile-eval.json",
+        "engineering/inventory/census/C20n-motion-value-at-frame-key-writers-element-holders.json",
+        "engineering/inventory/census/C20o-motion-key-property-selection-widget-wiring.json",
+        "engineering/inventory/census/C20p-motion-ease-influence-key-ease-boxes.json",
+        "engineering/inventory/census/C20q-motion-key-marquee-selection-box.json",
+        "engineering/inventory/census/C20r-motion-layer-stagger-skew-box.json",
+        "engineering/inventory/census/C20s-motion-key-drag-engine.json",
+        "engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json",
+        "engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json",
+        "engineering/inventory/census/C21c-app-path-serialisation-serp.json",
+        "engineering/inventory/census/C21d-app-desp-relink-remote-merge.json",
+        "engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json",
+        "engineering/inventory/census/C21f-app-symbol-matrix-duplicator-helpers.json",
+        "engineering/inventory/census/C21g-app-duplicator-runtime.json",
+        "engineering/inventory/census/C21h-app-rig-model-binding.json",
+        "engineering/inventory/census/C21i-app-rig-deform-ik.json",
+        "engineering/inventory/census/C21j-app-symbol-frame-layer-time-model.json",
+        "engineering/inventory/census/C21k-app-get-effective-strokes.json",
+        "engineering/inventory/census/C21l-app-component-creation.json",
+        "engineering/inventory/census/C21m-app-release-to-layers-merge.json",
+        "engineering/inventory/census/C21n-app-conversions-view-switching.json",
+        "engineering/inventory/census/C21o-app-frame-persistence-core.json",
+        "engineering/inventory/census/C21p-app-frame-materialisation-visibility.json",
+        "engineering/inventory/census/C21q-app-frame-navigation-keyframe-editing.json",
+        "scripts/nemo/boundaries-rust.test.cjs",
+        "scripts/nemo/lib/boundaries-rust.cjs"
+      ],
+      "removed": [],
+      "modified": [
+        "engineering/boundaries/README.md",
+        "engineering/boundaries/profiles/scripts-nemo.profile.json",
+        "engineering/inventory/REMEDIATION_SCOPE.md",
+        "engineering/inventory/remediation-scope.json",
+        "scripts/nemo/ci.cjs",
+        "scripts/nemo/ci.test.cjs",
+        "tests/nemo-boundaries.test.cjs"
+      ],
+      "reason": "pin the 50 census supplements merged after P03C-a"
     }
   ],
   "counts": {
-    "configuration": 49,
+    "configuration": 50,
     "documentation": 69,
     "generated": 14,
     "handwritten-runtime": 201,
-    "handwritten-tooling": 56,
-    "static-data": 162,
-    "test": 145,
+    "handwritten-tooling": 57,
+    "static-data": 212,
+    "test": 146,
     "vendor": 7
   },
   "censuses": [
@@ -220,6 +294,78 @@
       "id": "C19a",
       "path": "engineering/inventory/census/C19a-timeline-foundations.json",
       "blob": "8c71a0452e3fb803a2666cb70f1f2ea771a8a931",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19aa",
+      "path": "engineering/inventory/census/C19aa-timeline-typography-panels-gradient-button.json",
+      "blob": "fc3cab2bde78309338038e8c40ffeadd2204f87f",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19ab",
+      "path": "engineering/inventory/census/C19ab-timeline-app-menu-entry-points.json",
+      "blob": "5d7b1bdd28d8401618e57fd32ab522dc6324c798",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19ac",
+      "path": "engineering/inventory/census/C19ac-timeline-feedback-inbox-avatars-dashboard.json",
+      "blob": "40eb86651e17444821952341f6b2464a6628b3cd",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19ad",
+      "path": "engineering/inventory/census/C19ad-timeline-onkeydown-chords-motion-overrides.json",
+      "blob": "6d457abda2a166cdd8384039524279b0d023baa8",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19ae",
+      "path": "engineering/inventory/census/C19ae-timeline-onkeydown-editing-navigation-delete.json",
+      "blob": "b097a761866e549cba02b6cc1989977a7c066af7",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19af",
+      "path": "engineering/inventory/census/C19af-timeline-keyup-cmdhold-shape-flyout-colour-fields.json",
+      "blob": "3a067b68ac34b5672d9806364e2cd13fa739f763",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19ag",
+      "path": "engineering/inventory/census/C19ag-timeline-fill-stroke-panel-wiring.json",
+      "blob": "6496abc353150dac89f7e41cad25d20b458390ce",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19ah",
+      "path": "engineering/inventory/census/C19ah-timeline-xform-bool-brush-canvas-wiring.json",
+      "blob": "c74704d26343a1953ee91e0dc48410f70d01a9f3",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19ai",
+      "path": "engineering/inventory/census/C19ai-timeline-blend-matte-dropdowns-view-tween-buttons.json",
+      "blob": "aa94fd4d4e2d82eda5ae42c912a043e0a48a891d",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19aj",
+      "path": "engineering/inventory/census/C19aj-timeline-toolbar-onion-transport-layer-buttons.json",
+      "blob": "17689c31bcd4d83d182881230826c9181ab7bb62",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19ak",
+      "path": "engineering/inventory/census/C19ak-timeline-duplicator-rig-combine-panel-wiring.json",
+      "blob": "3269d192e9189290c44450212bdef8ea8722662d",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19al",
+      "path": "engineering/inventory/census/C19al-timeline-export-modal-panel-rail-bootstrap.json",
+      "blob": "6cfe9507e3328afeae35f7d1794042d3331ea95b",
       "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
     },
     {
@@ -331,6 +477,54 @@
       "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
     },
     {
+      "id": "C19s",
+      "path": "engineering/inventory/census/C19s-timeline-layer-link-pickers-parent-cell.json",
+      "blob": "84ed3f1445448b4a142213881929348d34cd9f71",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19t",
+      "path": "engineering/inventory/census/C19t-timeline-color-surfaces-index-reconcile.json",
+      "blob": "0d36bd52ddbe56174d63a1ccfc3cb8999b8cbf8d",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19u",
+      "path": "engineering/inventory/census/C19u-timeline-render-layer-list.json",
+      "blob": "eb30432292556e4177cd12be1c747a792faefc3f",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19v",
+      "path": "engineering/inventory/census/C19v-timeline-layer-reorder-symbol-tabs-side-panels.json",
+      "blob": "0c923aa15cb9474649ed75482947587b3a9a66b2",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19w",
+      "path": "engineering/inventory/census/C19w-timeline-duplicator-panel.json",
+      "blob": "560e959393cf2ab0baa826bcf20733295076f0e9",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19x",
+      "path": "engineering/inventory/census/C19x-timeline-comment-popover-feedback-capture.json",
+      "blob": "3f9627260b9e55aad9df50de8cbd7e730f630438",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19y",
+      "path": "engineering/inventory/census/C19y-timeline-text-popover-inplace-editors.json",
+      "blob": "599e67a04f1c84dadfdf160fa9db3192f1a23581",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19z",
+      "path": "engineering/inventory/census/C19z-timeline-text-bake-commit-split.json",
+      "blob": "a3f3996d2abf86814fea544e44b2645714ed6295",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
       "id": "C20a",
       "path": "engineering/inventory/census/C20a-motion-text-animator-element-style.json",
       "blob": "98d7c1070f4f71dbc8c75f89ea55122bec68f6ef",
@@ -364,6 +558,186 @@
       "id": "C20f",
       "path": "engineering/inventory/census/C20f-motion-transform-expression-panel.json",
       "blob": "daf82f9ec47e60c277eebc59db59a3f33a5651ab",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20g",
+      "path": "engineering/inventory/census/C20g-motion-elements-list-color-trim-rows.json",
+      "blob": "ea03e0b06fce2ebc6bab525adfac822eaaab4f3d",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20h",
+      "path": "engineering/inventory/census/C20h-motion-text-animator-path-mesh-vertex-rows.json",
+      "blob": "d0db47bf5218a5429d5be12e2220b0af097d0a7a",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20i",
+      "path": "engineering/inventory/census/C20i-motion-track-row-html-render-tracks-for.json",
+      "blob": "ab785bcddc340837793c177d262d40e376d5e558",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20j",
+      "path": "engineering/inventory/census/C20j-motion-header-tables-reveal-shortcuts-view-filters.json",
+      "blob": "97336a9c5600e90f37390cdbd89aff0591478dc5",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20k",
+      "path": "engineering/inventory/census/C20k-motion-expression-builtins.json",
+      "blob": "640853b9e927d3323dead31590316a00cdd87356",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20l",
+      "path": "engineering/inventory/census/C20l-motion-expression-views-aliases.json",
+      "blob": "0b32530527c23908cea78a414eb6aaa3d2bf5105",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20m",
+      "path": "engineering/inventory/census/C20m-motion-expression-compile-eval.json",
+      "blob": "49a4ccad5e481d0c39772b85edbae09cd66add6c",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20n",
+      "path": "engineering/inventory/census/C20n-motion-value-at-frame-key-writers-element-holders.json",
+      "blob": "d56fcb3e442735cb6707d818f61eec9728bdc4a6",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20o",
+      "path": "engineering/inventory/census/C20o-motion-key-property-selection-widget-wiring.json",
+      "blob": "80fb263f278f272f344adf5b68feb13e1e1ebbc5",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20p",
+      "path": "engineering/inventory/census/C20p-motion-ease-influence-key-ease-boxes.json",
+      "blob": "53195519d0db89e01f21957fed3538129fbabc22",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20q",
+      "path": "engineering/inventory/census/C20q-motion-key-marquee-selection-box.json",
+      "blob": "ad749ceaca494fbd0ecc679cd4911aab3f70bb81",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20r",
+      "path": "engineering/inventory/census/C20r-motion-layer-stagger-skew-box.json",
+      "blob": "4f76f1b3b6164dcd3bb69d36758b5c6580530675",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C20s",
+      "path": "engineering/inventory/census/C20s-motion-key-drag-engine.json",
+      "blob": "391043ca77e6414cd389c975edcc770917825698",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21a",
+      "path": "engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json",
+      "blob": "8f42a85cbcce71c6721e70cfe6f4e125858afd81",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21b",
+      "path": "engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json",
+      "blob": "cd22cad6633c1092697913b3dfa276633ff8a93c",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21c",
+      "path": "engineering/inventory/census/C21c-app-path-serialisation-serp.json",
+      "blob": "4e5badacd41e1ea00e205d341339ca1a7176b257",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21d",
+      "path": "engineering/inventory/census/C21d-app-desp-relink-remote-merge.json",
+      "blob": "e76443e8e564f61e73c44a9da15f638727f6aba9",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21e",
+      "path": "engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json",
+      "blob": "4a55cc6e453e8f80b908b16daf9385fef36a09c8",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21f",
+      "path": "engineering/inventory/census/C21f-app-symbol-matrix-duplicator-helpers.json",
+      "blob": "14ac107f6c22b5aa0deb372eaa1bcb2dadd1eda3",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21g",
+      "path": "engineering/inventory/census/C21g-app-duplicator-runtime.json",
+      "blob": "f42ff1171caec952a42d27b84816150667fa881a",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21h",
+      "path": "engineering/inventory/census/C21h-app-rig-model-binding.json",
+      "blob": "83c0a7f2ce1ad33a9ca2a3c296c189f7d042e1eb",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21i",
+      "path": "engineering/inventory/census/C21i-app-rig-deform-ik.json",
+      "blob": "f334b426ff6e66b9644c9e58ab4444f5e79d7ebb",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21j",
+      "path": "engineering/inventory/census/C21j-app-symbol-frame-layer-time-model.json",
+      "blob": "96018b55f13af2ccef8f39cedfed077d003d4f2a",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21k",
+      "path": "engineering/inventory/census/C21k-app-get-effective-strokes.json",
+      "blob": "154a61623bf141aae906735e1137f0bde7b7bbe8",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21l",
+      "path": "engineering/inventory/census/C21l-app-component-creation.json",
+      "blob": "c5b0cf8c486f7fe73bd7d61c97722faa1206eaa2",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21m",
+      "path": "engineering/inventory/census/C21m-app-release-to-layers-merge.json",
+      "blob": "7dc21ca2f28387698ebe63050d32fb2a38effaac",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21n",
+      "path": "engineering/inventory/census/C21n-app-conversions-view-switching.json",
+      "blob": "359d2c63d12a4ec459131250673499a21e91db09",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21o",
+      "path": "engineering/inventory/census/C21o-app-frame-persistence-core.json",
+      "blob": "4f36cf513a42bc2283aea79f0d2bf9f7490c5f7f",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21p",
+      "path": "engineering/inventory/census/C21p-app-frame-materialisation-visibility.json",
+      "blob": "595cd265a3158cd1a2094e41b2b40cc288ea284c",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C21q",
+      "path": "engineering/inventory/census/C21q-app-frame-navigation-keyframe-editing.json",
+      "blob": "0b5bfa5f6a0d2d375f99d4a529a1c7f3c08879fc",
       "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
     }
   ],
@@ -2114,6 +2488,276 @@
       "admission": "pending"
     },
     {
+      "id": "C19aa.text-actions-panel",
+      "census": "C19aa",
+      "admission": "pending"
+    },
+    {
+      "id": "C19aa.text-props-root-and-panel",
+      "census": "C19aa",
+      "admission": "pending"
+    },
+    {
+      "id": "C19aa.apply-text-props-edit",
+      "census": "C19aa",
+      "admission": "pending"
+    },
+    {
+      "id": "C19aa.typography-panel-wiring-iife",
+      "census": "C19aa",
+      "admission": "pending"
+    },
+    {
+      "id": "C19aa.fill-gradient-button-cycle-propagate",
+      "census": "C19aa",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ab.app-menu-motion-blur-shy-buttons",
+      "census": "C19ab",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ab.app-menu-obj-reference-import",
+      "census": "C19ab",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ab.app-menu-items-and-registration",
+      "census": "C19ab",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ab.team-sync-rel-time",
+      "census": "C19ab",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ac.sync-ui-registration-tail",
+      "census": "C19ac",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ac.feedback-inbox",
+      "census": "C19ac",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ac.collaborator-avatar-stack",
+      "census": "C19ac",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ac.github-feedback-triage-dashboard",
+      "census": "C19ac",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ac.timeline-hover-flag-and-step-active-layer",
+      "census": "C19ac",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ad.onkeydown-field-guards-undo-save-clipboard",
+      "census": "C19ad",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ad.onkeydown-select-all-duplicate-group-lock-zoom",
+      "census": "C19ad",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ad.onkeydown-generic-field-guard-and-k",
+      "census": "C19ad",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ad.onkeydown-motion-overrides-key-selection-work-area",
+      "census": "C19ad",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ae.onkeydown-x-flip-and-bracket-sizes",
+      "census": "C19ae",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ae.onkeydown-space-alt-enter-escape",
+      "census": "C19ae",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ae.onkeydown-arrows-pageupdown-alt-brackets-trim",
+      "census": "C19ae",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ae.onkeydown-delete-cascade-and-shift-f6",
+      "census": "C19ae",
+      "admission": "pending"
+    },
+    {
+      "id": "C19af.space-tap-hold-keyup-and-key-registration",
+      "census": "C19af",
+      "admission": "pending"
+    },
+    {
+      "id": "C19af.cmd-hold-temporary-select",
+      "census": "C19af",
+      "admission": "pending"
+    },
+    {
+      "id": "C19af.shape-tool-flyout-iife",
+      "census": "C19af",
+      "admission": "pending"
+    },
+    {
+      "id": "C19af.brush-size-and-fill-stroke-colour-fields",
+      "census": "C19af",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ag.stroke-gradient-along-and-legacy-enable-toggles",
+      "census": "C19ag",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ag.hex-alpha-fields",
+      "census": "C19ag",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ag.dimensions-lock-and-initial-swatch-paint",
+      "census": "C19ag",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ag.stroke-fields-and-icon-groups",
+      "census": "C19ag",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ag.miter-limit-and-join-enable-sync",
+      "census": "C19ag",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ag.vector-brush-stroke-props-sync",
+      "census": "C19ag",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ah.live-xform-fields-and-vertex-mode-dispatch",
+      "census": "C19ah",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ah.anchor-grid-align-toolbar-point-type",
+      "census": "C19ah",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ah.boolean-buttons-and-brush-size-preset-fields",
+      "census": "C19ah",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ah.apply-vector-brush-pressure-mask-canvas-toggles",
+      "census": "C19ah",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ai.blend-mode-dropdown",
+      "census": "C19ai",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ai.matte-mode-dropdown",
+      "census": "C19ai",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ai.document-fps-frames-fit-reset",
+      "census": "C19ai",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ai.canvas-fit-view-menu",
+      "census": "C19ai",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ai.tween-onion-ghost-bake-buttons",
+      "census": "C19ai",
+      "admission": "pending"
+    },
+    {
+      "id": "C19aj.toolbar-customization-and-review-toggles",
+      "census": "C19aj",
+      "admission": "pending"
+    },
+    {
+      "id": "C19aj.revision-view-and-outline-toggles",
+      "census": "C19aj",
+      "admission": "pending"
+    },
+    {
+      "id": "C19aj.onion-markers-span-follow-loop",
+      "census": "C19aj",
+      "admission": "pending"
+    },
+    {
+      "id": "C19aj.onion-popover-and-comp-preview",
+      "census": "C19aj",
+      "admission": "pending"
+    },
+    {
+      "id": "C19aj.lip-sync-panel",
+      "census": "C19aj",
+      "admission": "pending"
+    },
+    {
+      "id": "C19aj.onion-mode-tint-shift-opacity",
+      "census": "C19aj",
+      "admission": "pending"
+    },
+    {
+      "id": "C19aj.transport-frame-fields-add-layer-menu-component-fields",
+      "census": "C19aj",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ak.duplicator-static-field-wiring",
+      "census": "C19ak",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ak.rig-tool-panel",
+      "census": "C19ak",
+      "admission": "pending"
+    },
+    {
+      "id": "C19ak.combine-group-panel",
+      "census": "C19ak",
+      "admission": "pending"
+    },
+    {
+      "id": "C19al.export-modal",
+      "census": "C19al",
+      "admission": "pending"
+    },
+    {
+      "id": "C19al.last-session-restore-and-panel-rail",
+      "census": "C19al",
+      "admission": "pending"
+    },
+    {
+      "id": "C19al.props-panel-collapse-init-tail-and-bootstrap",
+      "census": "C19al",
+      "admission": "pending"
+    },
+    {
       "id": "C19b.work-area-bounds",
       "census": "C19b",
       "admission": "pending"
@@ -2609,6 +3253,241 @@
       "admission": "pending"
     },
     {
+      "id": "C19s.parent-menu",
+      "census": "C19s",
+      "admission": "pending"
+    },
+    {
+      "id": "C19s.follow-path-menu",
+      "census": "C19s",
+      "admission": "pending"
+    },
+    {
+      "id": "C19s.time-link-menu",
+      "census": "C19s",
+      "admission": "pending"
+    },
+    {
+      "id": "C19s.matte-sources-in-use",
+      "census": "C19s",
+      "admission": "pending"
+    },
+    {
+      "id": "C19s.matte-menu",
+      "census": "C19s",
+      "admission": "pending"
+    },
+    {
+      "id": "C19s.parent-cell",
+      "census": "C19s",
+      "admission": "pending"
+    },
+    {
+      "id": "C19t.color-surface-writers",
+      "census": "C19t",
+      "admission": "pending"
+    },
+    {
+      "id": "C19t.layer-index-shadow",
+      "census": "C19t",
+      "admission": "pending"
+    },
+    {
+      "id": "C19t.reconcile-layer-index-state",
+      "census": "C19t",
+      "admission": "pending"
+    },
+    {
+      "id": "C19t.reconcile-frame-selection",
+      "census": "C19t",
+      "admission": "pending"
+    },
+    {
+      "id": "C19u.entry-frame-only-scroll-snapshot",
+      "census": "C19u",
+      "admission": "pending"
+    },
+    {
+      "id": "C19u.motion-mode-delegate-render-order-matte-map",
+      "census": "C19u",
+      "admission": "pending"
+    },
+    {
+      "id": "C19u.folder-header-row",
+      "census": "C19u",
+      "admission": "pending"
+    },
+    {
+      "id": "C19u.row-skeleton-height-arrow-slot",
+      "census": "C19u",
+      "admission": "pending"
+    },
+    {
+      "id": "C19u.color-dot-eye-lock-solo-3d-duplicator-icons",
+      "census": "C19u",
+      "admission": "pending"
+    },
+    {
+      "id": "C19u.type-null-guide-effect-badges",
+      "census": "C19u",
+      "admission": "pending"
+    },
+    {
+      "id": "C19u.matte-badge-time-link-badge",
+      "census": "C19u",
+      "admission": "pending"
+    },
+    {
+      "id": "C19u.shape-tree-disclosure-name-parent-cell",
+      "census": "C19u",
+      "admission": "pending"
+    },
+    {
+      "id": "C19u.row-click-select-drag-wiring",
+      "census": "C19u",
+      "admission": "pending"
+    },
+    {
+      "id": "C19u.row-context-menu",
+      "census": "C19u",
+      "admission": "pending"
+    },
+    {
+      "id": "C19u.audio-rows-scroll-restore",
+      "census": "C19u",
+      "admission": "pending"
+    },
+    {
+      "id": "C19v.layer-drag-state-arm",
+      "census": "C19v",
+      "admission": "pending"
+    },
+    {
+      "id": "C19v.reorder-grip",
+      "census": "C19v",
+      "admission": "pending"
+    },
+    {
+      "id": "C19v.drag-ghost-indicator",
+      "census": "C19v",
+      "admission": "pending"
+    },
+    {
+      "id": "C19v.move-layer-reorder",
+      "census": "C19v",
+      "admission": "pending"
+    },
+    {
+      "id": "C19v.finish-layer-reorder",
+      "census": "C19v",
+      "admission": "pending"
+    },
+    {
+      "id": "C19v.symbol-tabs",
+      "census": "C19v",
+      "admission": "pending"
+    },
+    {
+      "id": "C19v.footage-panel",
+      "census": "C19v",
+      "admission": "pending"
+    },
+    {
+      "id": "C19v.comp-instance-panel",
+      "census": "C19v",
+      "admission": "pending"
+    },
+    {
+      "id": "C19v.lip-sync-panel",
+      "census": "C19v",
+      "admission": "pending"
+    },
+    {
+      "id": "C19v.comp-frame-strip",
+      "census": "C19v",
+      "admission": "pending"
+    },
+    {
+      "id": "C19w.duplicator-panel-lead-in-and-update",
+      "census": "C19w",
+      "admission": "pending"
+    },
+    {
+      "id": "C19w.duplicator-source-pool",
+      "census": "C19w",
+      "admission": "pending"
+    },
+    {
+      "id": "C19w.duplicator-effectors",
+      "census": "C19w",
+      "admission": "pending"
+    },
+    {
+      "id": "C19w.duplicator-refresh-registration-toast",
+      "census": "C19w",
+      "admission": "pending"
+    },
+    {
+      "id": "C19x.comment-state-and-screenshot-strip",
+      "census": "C19x",
+      "admission": "pending"
+    },
+    {
+      "id": "C19x.action-trail-recording",
+      "census": "C19x",
+      "admission": "pending"
+    },
+    {
+      "id": "C19x.open-close-comment-popover",
+      "census": "C19x",
+      "admission": "pending"
+    },
+    {
+      "id": "C19x.init-comment-popover",
+      "census": "C19x",
+      "admission": "pending"
+    },
+    {
+      "id": "C19y.text-tool-popover-open-close",
+      "census": "C19y",
+      "admission": "pending"
+    },
+    {
+      "id": "C19y.inplace-vector-text-state-and-creation",
+      "census": "C19y",
+      "admission": "pending"
+    },
+    {
+      "id": "C19y.inplace-vector-text-editor-open-close",
+      "census": "C19y",
+      "admission": "pending"
+    },
+    {
+      "id": "C19y.inplace-raster-text-editor-and-gate",
+      "census": "C19y",
+      "admission": "pending"
+    },
+    {
+      "id": "C19z.text-layout-and-line-x",
+      "census": "C19z",
+      "admission": "pending"
+    },
+    {
+      "id": "C19z.commit-vector-text",
+      "census": "C19z",
+      "admission": "pending"
+    },
+    {
+      "id": "C19z.commit-text-popover-init-registrations",
+      "census": "C19z",
+      "admission": "pending"
+    },
+    {
+      "id": "C19z.split-text-into-characters",
+      "census": "C19z",
+      "admission": "pending"
+    },
+    {
       "id": "C20a.text-animator-runtime",
       "census": "C20a",
       "admission": "pending"
@@ -2716,6 +3595,961 @@
     {
       "id": "C20f.expression-pickwhip",
       "census": "C20f",
+      "admission": "pending"
+    },
+    {
+      "id": "C20g.render-elements-list",
+      "census": "C20g",
+      "admission": "pending"
+    },
+    {
+      "id": "C20g.color-hex-helpers-and-color-rows",
+      "census": "C20g",
+      "admission": "pending"
+    },
+    {
+      "id": "C20g.trim-scalar-row-and-trim-paths-group",
+      "census": "C20g",
+      "admission": "pending"
+    },
+    {
+      "id": "C20h.text-animator-timeline-rows",
+      "census": "C20h",
+      "admission": "pending"
+    },
+    {
+      "id": "C20h.path-group-expand-state",
+      "census": "C20h",
+      "admission": "pending"
+    },
+    {
+      "id": "C20h.path-as-one-property-key-helpers",
+      "census": "C20h",
+      "admission": "pending"
+    },
+    {
+      "id": "C20h.path-vertex-group-panel-and-grid-rows",
+      "census": "C20h",
+      "admission": "pending"
+    },
+    {
+      "id": "C20h.discrete-key-grid-row",
+      "census": "C20h",
+      "admission": "pending"
+    },
+    {
+      "id": "C20h.mesh-vertex-group-and-vertex-row",
+      "census": "C20h",
+      "admission": "pending"
+    },
+    {
+      "id": "C20i.track-row-html",
+      "census": "C20i",
+      "admission": "pending"
+    },
+    {
+      "id": "C20i.render-tracks-for-and-grid-select-lead-in",
+      "census": "C20i",
+      "admission": "pending"
+    },
+    {
+      "id": "C20j.module-header-and-property-tables",
+      "census": "C20j",
+      "admission": "pending"
+    },
+    {
+      "id": "C20j.reveal-shortcut-table-and-view-state",
+      "census": "C20j",
+      "admission": "pending"
+    },
+    {
+      "id": "C20j.view-filter-predicates",
+      "census": "C20j",
+      "admission": "pending"
+    },
+    {
+      "id": "C20j.property-shortcut-targets-and-handler",
+      "census": "C20j",
+      "admission": "pending"
+    },
+    {
+      "id": "C20j.reveal-animated-u-shortcut",
+      "census": "C20j",
+      "admission": "pending"
+    },
+    {
+      "id": "C20j.reveal-effects-mattes-shortcuts",
+      "census": "C20j",
+      "admission": "pending"
+    },
+    {
+      "id": "C20j.easing-curve-constants",
+      "census": "C20j",
+      "admission": "pending"
+    },
+    {
+      "id": "C20k.noise",
+      "census": "C20k",
+      "admission": "pending"
+    },
+    {
+      "id": "C20k.wiggle",
+      "census": "C20k",
+      "admission": "pending"
+    },
+    {
+      "id": "C20k.self-sampling",
+      "census": "C20k",
+      "admission": "pending"
+    },
+    {
+      "id": "C20k.looping",
+      "census": "C20k",
+      "admission": "pending"
+    },
+    {
+      "id": "C20k.other-layers",
+      "census": "C20k",
+      "admission": "pending"
+    },
+    {
+      "id": "C20k.expression-controls",
+      "census": "C20k",
+      "admission": "pending"
+    },
+    {
+      "id": "C20k.keyframe-introspection",
+      "census": "C20k",
+      "admission": "pending"
+    },
+    {
+      "id": "C20k.markers",
+      "census": "C20k",
+      "admission": "pending"
+    },
+    {
+      "id": "C20l.comp-and-self-views",
+      "census": "C20l",
+      "admission": "pending"
+    },
+    {
+      "id": "C20l.mesh-aware-self-and-content-box",
+      "census": "C20l",
+      "admission": "pending"
+    },
+    {
+      "id": "C20l.ae-compatibility-aliases",
+      "census": "C20l",
+      "admission": "pending"
+    },
+    {
+      "id": "C20m.sandbox-surface-and-compile",
+      "census": "C20m",
+      "admission": "pending"
+    },
+    {
+      "id": "C20m.normalize-and-evaluate",
+      "census": "C20m",
+      "admission": "pending"
+    },
+    {
+      "id": "C20n.value-at-frame-and-segment",
+      "census": "C20n",
+      "admission": "pending"
+    },
+    {
+      "id": "C20n.ease-editor-and-opacity-domain",
+      "census": "C20n",
+      "admission": "pending"
+    },
+    {
+      "id": "C20n.set-key-at-frame",
+      "census": "C20n",
+      "admission": "pending"
+    },
+    {
+      "id": "C20n.toggle-animated",
+      "census": "C20n",
+      "admission": "pending"
+    },
+    {
+      "id": "C20n.select-layer-and-set-value",
+      "census": "C20n",
+      "admission": "pending"
+    },
+    {
+      "id": "C20n.render-time-rotation-helpers",
+      "census": "C20n",
+      "admission": "pending"
+    },
+    {
+      "id": "C20n.element-holders",
+      "census": "C20n",
+      "admission": "pending"
+    },
+    {
+      "id": "C20o.key-selection-model",
+      "census": "C20o",
+      "admission": "pending"
+    },
+    {
+      "id": "C20o.holder-layer-sync-and-property-selection",
+      "census": "C20o",
+      "admission": "pending"
+    },
+    {
+      "id": "C20o.decorate-property-row",
+      "census": "C20o",
+      "admission": "pending"
+    },
+    {
+      "id": "C20o.widget-wiring-and-expression-bake",
+      "census": "C20o",
+      "admission": "pending"
+    },
+    {
+      "id": "C20o.batch-key-operations",
+      "census": "C20o",
+      "admission": "pending"
+    },
+    {
+      "id": "C20p.ease-influence-model",
+      "census": "C20p",
+      "admission": "pending"
+    },
+    {
+      "id": "C20p.key-ease-box-and-selection-ops",
+      "census": "C20p",
+      "admission": "pending"
+    },
+    {
+      "id": "C20q.marquee-start-and-apply",
+      "census": "C20q",
+      "admission": "pending"
+    },
+    {
+      "id": "C20q.selection-box-edges",
+      "census": "C20q",
+      "admission": "pending"
+    },
+    {
+      "id": "C20q.key-selection-box",
+      "census": "C20q",
+      "admission": "pending"
+    },
+    {
+      "id": "C20r.layer-stagger-box-rows",
+      "census": "C20r",
+      "admission": "pending"
+    },
+    {
+      "id": "C20r.layer-skew-drag",
+      "census": "C20r",
+      "admission": "pending"
+    },
+    {
+      "id": "C20r.update-layer-stagger-box-and-time-remap-lead-in",
+      "census": "C20r",
+      "admission": "pending"
+    },
+    {
+      "id": "C20s.stagger-step-and-marquee-update-end",
+      "census": "C20s",
+      "admission": "pending"
+    },
+    {
+      "id": "C20s.drag-timeline-render-coalescing",
+      "census": "C20s",
+      "admission": "pending"
+    },
+    {
+      "id": "C20s.drag-auto-scroll",
+      "census": "C20s",
+      "admission": "pending"
+    },
+    {
+      "id": "C20s.drag-snap",
+      "census": "C20s",
+      "admission": "pending"
+    },
+    {
+      "id": "C20s.on-drag-move-up",
+      "census": "C20s",
+      "admission": "pending"
+    },
+    {
+      "id": "C21a.canvas-backing-size",
+      "census": "C21a",
+      "admission": "pending"
+    },
+    {
+      "id": "C21a.timeline-row-metrics",
+      "census": "C21a",
+      "admission": "pending"
+    },
+    {
+      "id": "C21a.state-playback-mode",
+      "census": "C21a",
+      "admission": "pending"
+    },
+    {
+      "id": "C21a.state-onion",
+      "census": "C21a",
+      "admission": "pending"
+    },
+    {
+      "id": "C21a.state-brush-stroke-defaults",
+      "census": "C21a",
+      "admission": "pending"
+    },
+    {
+      "id": "C21a.state-canvas-rulers-guides-display",
+      "census": "C21a",
+      "admission": "pending"
+    },
+    {
+      "id": "C21a.state-palettes-shadow-guides",
+      "census": "C21a",
+      "admission": "pending"
+    },
+    {
+      "id": "C21a.state-layers-tween-undo",
+      "census": "C21a",
+      "admission": "pending"
+    },
+    {
+      "id": "C21a.state-canvas-interaction-guides",
+      "census": "C21a",
+      "admission": "pending"
+    },
+    {
+      "id": "C21a.state-media-symbols-registries",
+      "census": "C21a",
+      "admission": "pending"
+    },
+    {
+      "id": "C21b.paper-layer-stack",
+      "census": "C21b",
+      "admission": "pending"
+    },
+    {
+      "id": "C21b.user-layer-create-name",
+      "census": "C21b",
+      "admission": "pending"
+    },
+    {
+      "id": "C21b.user-layer-reorder",
+      "census": "C21b",
+      "admission": "pending"
+    },
+    {
+      "id": "C21b.stage",
+      "census": "C21b",
+      "admission": "pending"
+    },
+    {
+      "id": "C21b.view-zoom",
+      "census": "C21b",
+      "admission": "pending"
+    },
+    {
+      "id": "C21b.color-hex8-helpers",
+      "census": "C21b",
+      "admission": "pending"
+    },
+    {
+      "id": "C21b.brush-keyline-selectable",
+      "census": "C21b",
+      "admission": "pending"
+    },
+    {
+      "id": "C21c.coordinate-rounding",
+      "census": "C21c",
+      "admission": "pending"
+    },
+    {
+      "id": "C21c.serp-vector-brush-fill-link-vars",
+      "census": "C21c",
+      "admission": "pending"
+    },
+    {
+      "id": "C21c.serp-texture-anchor-channel-shadow-vars",
+      "census": "C21c",
+      "admission": "pending"
+    },
+    {
+      "id": "C21c.serp-owner-revision-vars",
+      "census": "C21c",
+      "admission": "pending"
+    },
+    {
+      "id": "C21c.serp-core-return-fields",
+      "census": "C21c",
+      "admission": "pending"
+    },
+    {
+      "id": "C21c.serp-gradient-group-trackrole-fields",
+      "census": "C21c",
+      "admission": "pending"
+    },
+    {
+      "id": "C21c.serp-paramshape-text-fields",
+      "census": "C21c",
+      "admission": "pending"
+    },
+    {
+      "id": "C21c.serp-typography-mask-gradient-fields",
+      "census": "C21c",
+      "admission": "pending"
+    },
+    {
+      "id": "C21d.desp",
+      "census": "C21d",
+      "admission": "pending"
+    },
+    {
+      "id": "C21d.merge-remote-snapshot",
+      "census": "C21d",
+      "admission": "pending"
+    },
+    {
+      "id": "C21d.relink-brush-companions",
+      "census": "C21d",
+      "admission": "pending"
+    },
+    {
+      "id": "C21d.relink-linked-fills",
+      "census": "C21d",
+      "admission": "pending"
+    },
+    {
+      "id": "C21d.strip-brush-texture",
+      "census": "C21d",
+      "admission": "pending"
+    },
+    {
+      "id": "C21e.serr",
+      "census": "C21e",
+      "admission": "pending"
+    },
+    {
+      "id": "C21e.image-cache",
+      "census": "C21e",
+      "admission": "pending"
+    },
+    {
+      "id": "C21e.desr",
+      "census": "C21e",
+      "admission": "pending"
+    },
+    {
+      "id": "C21f.symbol-matrix",
+      "census": "C21f",
+      "admission": "pending"
+    },
+    {
+      "id": "C21f.symbol-gesture-accumulate",
+      "census": "C21f",
+      "admission": "pending"
+    },
+    {
+      "id": "C21f.heavy-fields-clone",
+      "census": "C21f",
+      "admission": "pending"
+    },
+    {
+      "id": "C21f.apply-matrix-stroke-data",
+      "census": "C21f",
+      "admission": "pending"
+    },
+    {
+      "id": "C21f.effector-channels",
+      "census": "C21f",
+      "admission": "pending"
+    },
+    {
+      "id": "C21f.hex-hue-rotate",
+      "census": "C21f",
+      "admission": "pending"
+    },
+    {
+      "id": "C21f.dup-matrix-from-descriptor",
+      "census": "C21f",
+      "admission": "pending"
+    },
+    {
+      "id": "C21f.bounds-center-of-strokes",
+      "census": "C21f",
+      "admission": "pending"
+    },
+    {
+      "id": "C21g.resolve-duplicator-path",
+      "census": "C21g",
+      "admission": "pending"
+    },
+    {
+      "id": "C21g.clone-placement",
+      "census": "C21g",
+      "admission": "pending"
+    },
+    {
+      "id": "C21g.duplicator-count",
+      "census": "C21g",
+      "admission": "pending"
+    },
+    {
+      "id": "C21g.mode-offset",
+      "census": "C21g",
+      "admission": "pending"
+    },
+    {
+      "id": "C21g.apply-duplicator-setup",
+      "census": "C21g",
+      "admission": "pending"
+    },
+    {
+      "id": "C21g.apply-duplicator-clone-loop",
+      "census": "C21g",
+      "admission": "pending"
+    },
+    {
+      "id": "C21g.effective-strokes-rendered",
+      "census": "C21g",
+      "admission": "pending"
+    },
+    {
+      "id": "C21g.convert-selection-to-object-duplicator",
+      "census": "C21g",
+      "admission": "pending"
+    },
+    {
+      "id": "C21h.rig-header-ensure-fresh-id",
+      "census": "C21h",
+      "admission": "pending"
+    },
+    {
+      "id": "C21h.bone-segs-to-path",
+      "census": "C21h",
+      "admission": "pending"
+    },
+    {
+      "id": "C21h.relink-rig-binds",
+      "census": "C21h",
+      "admission": "pending"
+    },
+    {
+      "id": "C21h.weigh-one-point",
+      "census": "C21h",
+      "admission": "pending"
+    },
+    {
+      "id": "C21h.weigh-one-point-by-control",
+      "census": "C21h",
+      "admission": "pending"
+    },
+    {
+      "id": "C21h.chord-angle-normalize",
+      "census": "C21h",
+      "admission": "pending"
+    },
+    {
+      "id": "C21h.bind-stroke",
+      "census": "C21h",
+      "admission": "pending"
+    },
+    {
+      "id": "C21h.bind-mesh",
+      "census": "C21h",
+      "admission": "pending"
+    },
+    {
+      "id": "C21h.auto-assign-layer",
+      "census": "C21h",
+      "admission": "pending"
+    },
+    {
+      "id": "C21i.apply-rig-deform",
+      "census": "C21i",
+      "admission": "pending"
+    },
+    {
+      "id": "C21i.rig-reset-pose",
+      "census": "C21i",
+      "admission": "pending"
+    },
+    {
+      "id": "C21i.rig-commit-frame",
+      "census": "C21i",
+      "admission": "pending"
+    },
+    {
+      "id": "C21i.ik-set-and-anchor",
+      "census": "C21i",
+      "admission": "pending"
+    },
+    {
+      "id": "C21i.ik-drag-end",
+      "census": "C21i",
+      "admission": "pending"
+    },
+    {
+      "id": "C21j.resolve-symbol-frame-idx",
+      "census": "C21j",
+      "admission": "pending"
+    },
+    {
+      "id": "C21j.lfs-sub-strokes",
+      "census": "C21j",
+      "admission": "pending"
+    },
+    {
+      "id": "C21j.auto-in-point-blank-keyframe",
+      "census": "C21j",
+      "admission": "pending"
+    },
+    {
+      "id": "C21j.parent-in-time-header-source-of",
+      "census": "C21j",
+      "admission": "pending"
+    },
+    {
+      "id": "C21j.migrate-time-link-offsets",
+      "census": "C21j",
+      "admission": "pending"
+    },
+    {
+      "id": "C21j.resolve-linked-time",
+      "census": "C21j",
+      "admission": "pending"
+    },
+    {
+      "id": "C21j.layer-has-time-range-clamp",
+      "census": "C21j",
+      "admission": "pending"
+    },
+    {
+      "id": "C21j.folder-parent-and-in-point",
+      "census": "C21j",
+      "admission": "pending"
+    },
+    {
+      "id": "C21j.in-point-raw-and-auto-out",
+      "census": "C21j",
+      "admission": "pending"
+    },
+    {
+      "id": "C21j.out-point-and-raw",
+      "census": "C21j",
+      "admission": "pending"
+    },
+    {
+      "id": "C21j.unlink-time-link-preserve-range",
+      "census": "C21j",
+      "admission": "pending"
+    },
+    {
+      "id": "C21k.lead-in-and-gates",
+      "census": "C21k",
+      "admission": "pending"
+    },
+    {
+      "id": "C21k.component-own-frames-and-resolve",
+      "census": "C21k",
+      "admission": "pending"
+    },
+    {
+      "id": "C21k.component-composite-loop",
+      "census": "C21k",
+      "admission": "pending"
+    },
+    {
+      "id": "C21k.component-camera-matrix-exposed",
+      "census": "C21k",
+      "admission": "pending"
+    },
+    {
+      "id": "C21k.plain-layer-hot-path-module-vars",
+      "census": "C21k",
+      "admission": "pending"
+    },
+    {
+      "id": "C21l.ensure-symbol-paper-layers-gen-id",
+      "census": "C21l",
+      "admission": "pending"
+    },
+    {
+      "id": "C21l.bad-component-source-reason",
+      "census": "C21l",
+      "admission": "pending"
+    },
+    {
+      "id": "C21l.clone-rig-for-symbol",
+      "census": "C21l",
+      "admission": "pending"
+    },
+    {
+      "id": "C21l.expose-symbol-property",
+      "census": "C21l",
+      "admission": "pending"
+    },
+    {
+      "id": "C21l.convert-layer-to-component",
+      "census": "C21l",
+      "admission": "pending"
+    },
+    {
+      "id": "C21l.convert-layers-to-component-guard-merge",
+      "census": "C21l",
+      "admission": "pending"
+    },
+    {
+      "id": "C21l.convert-layers-to-component-field-transfer",
+      "census": "C21l",
+      "admission": "pending"
+    },
+    {
+      "id": "C21l.cross-project-header-import-foreign-tree",
+      "census": "C21l",
+      "admission": "pending"
+    },
+    {
+      "id": "C21l.foreign-component-create-place-instantiate",
+      "census": "C21l",
+      "admission": "pending"
+    },
+    {
+      "id": "C21m.release-to-layers-entry",
+      "census": "C21m",
+      "admission": "pending"
+    },
+    {
+      "id": "C21m.release-to-layers-core-split",
+      "census": "C21m",
+      "admission": "pending"
+    },
+    {
+      "id": "C21m.release-to-layers-groups-and-commit",
+      "census": "C21m",
+      "admission": "pending"
+    },
+    {
+      "id": "C21m.merge-lead-in-guards-dedup",
+      "census": "C21m",
+      "admission": "pending"
+    },
+    {
+      "id": "C21m.merge-group-remap-and-held-frames",
+      "census": "C21m",
+      "admission": "pending"
+    },
+    {
+      "id": "C21m.merge-motion-demote-and-naming",
+      "census": "C21m",
+      "admission": "pending"
+    },
+    {
+      "id": "C21m.merge-field-transfer",
+      "census": "C21m",
+      "admission": "pending"
+    },
+    {
+      "id": "C21m.merge-reparent-paper-and-commit",
+      "census": "C21m",
+      "admission": "pending"
+    },
+    {
+      "id": "C21n.convert-component-to-layer",
+      "census": "C21n",
+      "admission": "pending"
+    },
+    {
+      "id": "C21n.convert-layer-to-lfs-group",
+      "census": "C21n",
+      "admission": "pending"
+    },
+    {
+      "id": "C21n.convert-lfs-group-to-layer",
+      "census": "C21n",
+      "admission": "pending"
+    },
+    {
+      "id": "C21n.line-bounds-from-strokes",
+      "census": "C21n",
+      "admission": "pending"
+    },
+    {
+      "id": "C21n.propagate-lfs-fill",
+      "census": "C21n",
+      "admission": "pending"
+    },
+    {
+      "id": "C21n.enter-symbol",
+      "census": "C21n",
+      "admission": "pending"
+    },
+    {
+      "id": "C21n.exit-to-scene",
+      "census": "C21n",
+      "admission": "pending"
+    },
+    {
+      "id": "C21n.close-symbol-tab-enter-montage-view",
+      "census": "C21n",
+      "admission": "pending"
+    },
+    {
+      "id": "C21n.exit-montage-view",
+      "census": "C21n",
+      "admission": "pending"
+    },
+    {
+      "id": "C21o.change-signal-num-close",
+      "census": "C21o",
+      "admission": "pending"
+    },
+    {
+      "id": "C21o.deep-close-equal",
+      "census": "C21o",
+      "admission": "pending"
+    },
+    {
+      "id": "C21o.norm-stroke-for-compare",
+      "census": "C21o",
+      "admission": "pending"
+    },
+    {
+      "id": "C21o.strokes-equal-scene-version",
+      "census": "C21o",
+      "admission": "pending"
+    },
+    {
+      "id": "C21o.write-back-ghost-proxies",
+      "census": "C21o",
+      "admission": "pending"
+    },
+    {
+      "id": "C21o.flatten-compound-children",
+      "census": "C21o",
+      "admission": "pending"
+    },
+    {
+      "id": "C21o.collect-layer-strokes",
+      "census": "C21o",
+      "admission": "pending"
+    },
+    {
+      "id": "C21o.maybe-promote-interpolated",
+      "census": "C21o",
+      "admission": "pending"
+    },
+    {
+      "id": "C21o.invalidate-symbol-union",
+      "census": "C21o",
+      "admission": "pending"
+    },
+    {
+      "id": "C21o.save-active-layer-frame",
+      "census": "C21o",
+      "admission": "pending"
+    },
+    {
+      "id": "C21o.save-all-layer-frames",
+      "census": "C21o",
+      "admission": "pending"
+    },
+    {
+      "id": "C21o.can-reuse-materialized",
+      "census": "C21o",
+      "admission": "pending"
+    },
+    {
+      "id": "C21p.load-frame",
+      "census": "C21p",
+      "admission": "pending"
+    },
+    {
+      "id": "C21p.any-layer-soloed-elem-solo-header",
+      "census": "C21p",
+      "admission": "pending"
+    },
+    {
+      "id": "C21p.elem-visibility-helpers",
+      "census": "C21p",
+      "admission": "pending"
+    },
+    {
+      "id": "C21p.set-elem-hidden",
+      "census": "C21p",
+      "admission": "pending"
+    },
+    {
+      "id": "C21p.set-elem-solo-layer-effectively-visible",
+      "census": "C21p",
+      "admission": "pending"
+    },
+    {
+      "id": "C21p.save-active-layer-frame-or-promote",
+      "census": "C21p",
+      "admission": "pending"
+    },
+    {
+      "id": "C21p.reanchor-materialized",
+      "census": "C21p",
+      "admission": "pending"
+    },
+    {
+      "id": "C21p.sync-linked-keyframe-folder",
+      "census": "C21p",
+      "admission": "pending"
+    },
+    {
+      "id": "C21p.enforce-channel-strip",
+      "census": "C21p",
+      "admission": "pending"
+    },
+    {
+      "id": "C21p.convert-layer-to-stroke-fill-shadow-folder",
+      "census": "C21p",
+      "admission": "pending"
+    },
+    {
+      "id": "C21q.go-to-frame",
+      "census": "C21q",
+      "admission": "pending"
+    },
+    {
+      "id": "C21q.insert-frame",
+      "census": "C21q",
+      "admission": "pending"
+    },
+    {
+      "id": "C21q.insert-keyframe-core",
+      "census": "C21q",
+      "admission": "pending"
+    },
+    {
+      "id": "C21q.insert-keyframe",
+      "census": "C21q",
+      "admission": "pending"
+    },
+    {
+      "id": "C21q.prev-next-keyframe-frame-insert-at",
+      "census": "C21q",
+      "admission": "pending"
+    },
+    {
+      "id": "C21q.insert-blank-keyframe-remove-frame",
+      "census": "C21q",
+      "admission": "pending"
+    },
+    {
+      "id": "C21q.clear-keyframe-remove-tween-span",
+      "census": "C21q",
+      "admission": "pending"
+    },
+    {
+      "id": "C21q.convert-to-keyframes-remove-span-duplicate",
+      "census": "C21q",
       "admission": "pending"
     }
   ],
@@ -3410,18 +5244,9 @@
     {
       "path": "src/js/app.js",
       "lines": 5410,
-      "uncovered": 5000,
+      "uncovered": 0,
       "overlap": 0,
-      "spans": [
-        [
-          41,
-          313
-        ],
-        [
-          360,
-          5410
-        ]
-      ]
+      "spans": []
     },
     {
       "path": "src/js/application/opacity-application.js",
@@ -3682,20 +5507,12 @@
     {
       "path": "src/js/motion.js",
       "lines": 13914,
-      "uncovered": 4217,
+      "uncovered": 293,
       "overlap": 190,
       "spans": [
         [
-          1,
-          117
-        ],
-        [
           561,
           580
-        ],
-        [
-          583,
-          940
         ],
         [
           1562,
@@ -3738,10 +5555,6 @@
           1759
         ],
         [
-          1769,
-          2932
-        ],
-        [
           8435,
           8438
         ],
@@ -3752,18 +5565,6 @@
         [
           9429,
           9435
-        ],
-        [
-          9826,
-          11125
-        ],
-        [
-          11412,
-          12405
-        ],
-        [
-          12685,
-          13124
         ],
         [
           13256,
@@ -3969,7 +5770,7 @@
     {
       "path": "src/js/timeline.js",
       "lines": 11907,
-      "uncovered": 5071,
+      "uncovered": 27,
       "overlap": 86,
       "spans": [
         [
@@ -3985,36 +5786,8 @@
           2247
         ],
         [
-          5942,
+          7449,
           7449
-        ],
-        [
-          7724,
-          8996
-        ],
-        [
-          9078,
-          9227
-        ],
-        [
-          9274,
-          9640
-        ],
-        [
-          9642,
-          9934
-        ],
-        [
-          9950,
-          11795
-        ],
-        [
-          11810,
-          11883
-        ],
-        [
-          11889,
-          11907
         ]
       ]
     },
@@ -4996,7 +6769,7 @@
     {
       "path": "engineering/boundaries/README.md",
       "mode": "100644",
-      "blob": "c75ae7dde990a20712470a393569bca82ed82562",
+      "blob": "5a8693bdc8218221a4a3d8a9b1b2a3066a9c9b8e",
       "classification": "documentation",
       "censusRefs": [
         "C08.docs.boundary-enforcement-config-data"
@@ -5067,6 +6840,14 @@
         "C08.docs.boundary-enforcement-config-data"
       ],
       "reason": "Tracked prose/license reference; not executable runtime or tooling."
+    },
+    {
+      "path": "engineering/boundaries/profiles/geometry-wasm.edges.json",
+      "mode": "100644",
+      "blob": "bb1cf50f43228324eea5b21a8c88671259cbf835",
+      "classification": "configuration",
+      "censusRefs": [],
+      "reason": "Tracked configuration, schema, lock or metadata consumer; retained explicitly rather than excluded as documentation."
     },
     {
       "path": "engineering/boundaries/profiles/mcp-rust.profile.json",
@@ -5241,7 +7022,7 @@
     {
       "path": "engineering/boundaries/profiles/scripts-nemo.profile.json",
       "mode": "100644",
-      "blob": "78447cde32728b9ac49fbe77deb5481ee481e13a",
+      "blob": "ab874e31a7bc31919e0b7780046713dc6bdd52ba",
       "classification": "configuration",
       "censusRefs": [
         "C08.docs.boundary-enforcement-config-data"
@@ -5326,7 +7107,7 @@
     {
       "path": "engineering/inventory/REMEDIATION_SCOPE.md",
       "mode": "100644",
-      "blob": "58518b9b84ace65dfbabbb97af3c9d35d3b834d9",
+      "blob": "2e907ca54673807dc3316b3bedfdec716fdf21dd",
       "classification": "documentation",
       "censusRefs": [],
       "reason": "Tracked prose/license reference; not executable runtime or tooling."
@@ -5488,6 +7269,102 @@
       "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
     },
     {
+      "path": "engineering/inventory/census/C19aa-timeline-typography-panels-gradient-button.json",
+      "mode": "100644",
+      "blob": "fc3cab2bde78309338038e8c40ffeadd2204f87f",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19ab-timeline-app-menu-entry-points.json",
+      "mode": "100644",
+      "blob": "5d7b1bdd28d8401618e57fd32ab522dc6324c798",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19ac-timeline-feedback-inbox-avatars-dashboard.json",
+      "mode": "100644",
+      "blob": "40eb86651e17444821952341f6b2464a6628b3cd",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19ad-timeline-onkeydown-chords-motion-overrides.json",
+      "mode": "100644",
+      "blob": "6d457abda2a166cdd8384039524279b0d023baa8",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19ae-timeline-onkeydown-editing-navigation-delete.json",
+      "mode": "100644",
+      "blob": "b097a761866e549cba02b6cc1989977a7c066af7",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19af-timeline-keyup-cmdhold-shape-flyout-colour-fields.json",
+      "mode": "100644",
+      "blob": "3a067b68ac34b5672d9806364e2cd13fa739f763",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19ag-timeline-fill-stroke-panel-wiring.json",
+      "mode": "100644",
+      "blob": "6496abc353150dac89f7e41cad25d20b458390ce",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19ah-timeline-xform-bool-brush-canvas-wiring.json",
+      "mode": "100644",
+      "blob": "c74704d26343a1953ee91e0dc48410f70d01a9f3",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19ai-timeline-blend-matte-dropdowns-view-tween-buttons.json",
+      "mode": "100644",
+      "blob": "aa94fd4d4e2d82eda5ae42c912a043e0a48a891d",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19aj-timeline-toolbar-onion-transport-layer-buttons.json",
+      "mode": "100644",
+      "blob": "17689c31bcd4d83d182881230826c9181ab7bb62",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19ak-timeline-duplicator-rig-combine-panel-wiring.json",
+      "mode": "100644",
+      "blob": "3269d192e9189290c44450212bdef8ea8722662d",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19al-timeline-export-modal-panel-rail-bootstrap.json",
+      "mode": "100644",
+      "blob": "6cfe9507e3328afeae35f7d1794042d3331ea95b",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
       "path": "engineering/inventory/census/C19b-timeline-work-area-duration.json",
       "mode": "100644",
       "blob": "300d5277510aa96623d048ec7f5eeaf1b58e095b",
@@ -5632,6 +7509,70 @@
       "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
     },
     {
+      "path": "engineering/inventory/census/C19s-timeline-layer-link-pickers-parent-cell.json",
+      "mode": "100644",
+      "blob": "84ed3f1445448b4a142213881929348d34cd9f71",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19t-timeline-color-surfaces-index-reconcile.json",
+      "mode": "100644",
+      "blob": "0d36bd52ddbe56174d63a1ccfc3cb8999b8cbf8d",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19u-timeline-render-layer-list.json",
+      "mode": "100644",
+      "blob": "eb30432292556e4177cd12be1c747a792faefc3f",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19v-timeline-layer-reorder-symbol-tabs-side-panels.json",
+      "mode": "100644",
+      "blob": "0c923aa15cb9474649ed75482947587b3a9a66b2",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19w-timeline-duplicator-panel.json",
+      "mode": "100644",
+      "blob": "560e959393cf2ab0baa826bcf20733295076f0e9",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19x-timeline-comment-popover-feedback-capture.json",
+      "mode": "100644",
+      "blob": "3f9627260b9e55aad9df50de8cbd7e730f630438",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19y-timeline-text-popover-inplace-editors.json",
+      "mode": "100644",
+      "blob": "599e67a04f1c84dadfdf160fa9db3192f1a23581",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C19z-timeline-text-bake-commit-split.json",
+      "mode": "100644",
+      "blob": "a3f3996d2abf86814fea544e44b2645714ed6295",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
       "path": "engineering/inventory/census/C20a-motion-text-animator-element-style.json",
       "mode": "100644",
       "blob": "98d7c1070f4f71dbc8c75f89ea55122bec68f6ef",
@@ -5680,9 +7621,249 @@
       "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
     },
     {
+      "path": "engineering/inventory/census/C20g-motion-elements-list-color-trim-rows.json",
+      "mode": "100644",
+      "blob": "ea03e0b06fce2ebc6bab525adfac822eaaab4f3d",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20h-motion-text-animator-path-mesh-vertex-rows.json",
+      "mode": "100644",
+      "blob": "d0db47bf5218a5429d5be12e2220b0af097d0a7a",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20i-motion-track-row-html-render-tracks-for.json",
+      "mode": "100644",
+      "blob": "ab785bcddc340837793c177d262d40e376d5e558",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20j-motion-header-tables-reveal-shortcuts-view-filters.json",
+      "mode": "100644",
+      "blob": "97336a9c5600e90f37390cdbd89aff0591478dc5",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20k-motion-expression-builtins.json",
+      "mode": "100644",
+      "blob": "640853b9e927d3323dead31590316a00cdd87356",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20l-motion-expression-views-aliases.json",
+      "mode": "100644",
+      "blob": "0b32530527c23908cea78a414eb6aaa3d2bf5105",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20m-motion-expression-compile-eval.json",
+      "mode": "100644",
+      "blob": "49a4ccad5e481d0c39772b85edbae09cd66add6c",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20n-motion-value-at-frame-key-writers-element-holders.json",
+      "mode": "100644",
+      "blob": "d56fcb3e442735cb6707d818f61eec9728bdc4a6",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20o-motion-key-property-selection-widget-wiring.json",
+      "mode": "100644",
+      "blob": "80fb263f278f272f344adf5b68feb13e1e1ebbc5",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20p-motion-ease-influence-key-ease-boxes.json",
+      "mode": "100644",
+      "blob": "53195519d0db89e01f21957fed3538129fbabc22",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20q-motion-key-marquee-selection-box.json",
+      "mode": "100644",
+      "blob": "ad749ceaca494fbd0ecc679cd4911aab3f70bb81",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20r-motion-layer-stagger-skew-box.json",
+      "mode": "100644",
+      "blob": "4f76f1b3b6164dcd3bb69d36758b5c6580530675",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C20s-motion-key-drag-engine.json",
+      "mode": "100644",
+      "blob": "391043ca77e6414cd389c975edcc770917825698",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json",
+      "mode": "100644",
+      "blob": "8f42a85cbcce71c6721e70cfe6f4e125858afd81",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json",
+      "mode": "100644",
+      "blob": "cd22cad6633c1092697913b3dfa276633ff8a93c",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21c-app-path-serialisation-serp.json",
+      "mode": "100644",
+      "blob": "4e5badacd41e1ea00e205d341339ca1a7176b257",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21d-app-desp-relink-remote-merge.json",
+      "mode": "100644",
+      "blob": "e76443e8e564f61e73c44a9da15f638727f6aba9",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json",
+      "mode": "100644",
+      "blob": "4a55cc6e453e8f80b908b16daf9385fef36a09c8",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21f-app-symbol-matrix-duplicator-helpers.json",
+      "mode": "100644",
+      "blob": "14ac107f6c22b5aa0deb372eaa1bcb2dadd1eda3",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21g-app-duplicator-runtime.json",
+      "mode": "100644",
+      "blob": "f42ff1171caec952a42d27b84816150667fa881a",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21h-app-rig-model-binding.json",
+      "mode": "100644",
+      "blob": "83c0a7f2ce1ad33a9ca2a3c296c189f7d042e1eb",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21i-app-rig-deform-ik.json",
+      "mode": "100644",
+      "blob": "f334b426ff6e66b9644c9e58ab4444f5e79d7ebb",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21j-app-symbol-frame-layer-time-model.json",
+      "mode": "100644",
+      "blob": "96018b55f13af2ccef8f39cedfed077d003d4f2a",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21k-app-get-effective-strokes.json",
+      "mode": "100644",
+      "blob": "154a61623bf141aae906735e1137f0bde7b7bbe8",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21l-app-component-creation.json",
+      "mode": "100644",
+      "blob": "c5b0cf8c486f7fe73bd7d61c97722faa1206eaa2",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21m-app-release-to-layers-merge.json",
+      "mode": "100644",
+      "blob": "7dc21ca2f28387698ebe63050d32fb2a38effaac",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21n-app-conversions-view-switching.json",
+      "mode": "100644",
+      "blob": "359d2c63d12a4ec459131250673499a21e91db09",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21o-app-frame-persistence-core.json",
+      "mode": "100644",
+      "blob": "4f36cf513a42bc2283aea79f0d2bf9f7490c5f7f",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21p-app-frame-materialisation-visibility.json",
+      "mode": "100644",
+      "blob": "595cd265a3158cd1a2094e41b2b40cc288ea284c",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
+      "path": "engineering/inventory/census/C21q-app-frame-navigation-keyframe-editing.json",
+      "mode": "100644",
+      "blob": "0b5bfa5f6a0d2d375f99d4a529a1c7f3c08879fc",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
       "path": "engineering/inventory/remediation-scope.json",
       "mode": "100644",
-      "blob": "654cd57e601b84482c869de35700723190b6a09b",
+      "blob": "03764c0953eae044c0e2f7aa83955dea5212769f",
       "classification": "static-data",
       "censusRefs": [],
       "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
@@ -7065,6 +9246,14 @@
       "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
     },
     {
+      "path": "scripts/nemo/boundaries-rust.test.cjs",
+      "mode": "100644",
+      "blob": "83d14161e87e1956098d36800e1f1684cdca2841",
+      "classification": "test",
+      "censusRefs": [],
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+    },
+    {
       "path": "scripts/nemo/boundaries-size.test.cjs",
       "mode": "100644",
       "blob": "a1b20f229b35d452a6bc4de8356e22e070ab6b01",
@@ -7167,7 +9356,7 @@
     {
       "path": "scripts/nemo/ci.cjs",
       "mode": "100644",
-      "blob": "aa57b7f50987e7eb35bee6e46168dfac1fd3f91a",
+      "blob": "28886852ae8af3d08bf9bd7eb92fc52e74536824",
       "classification": "handwritten-tooling",
       "censusRefs": [
         "C13.tooling.scripts-nemo-core"
@@ -7177,7 +9366,7 @@
     {
       "path": "scripts/nemo/ci.test.cjs",
       "mode": "100644",
-      "blob": "05667711f5f2839b70437918929eed9e78f3f1e7",
+      "blob": "163d5ee9f73ad1a01f1ec4d91dc35166ddf3a712",
       "classification": "test",
       "censusRefs": [
         "C13.tooling.scripts-nemo-core"
@@ -7342,6 +9531,14 @@
       "censusRefs": [
         "C13.tooling.scripts-nemo-lib"
       ],
+      "reason": "Tracked executable tool; requires explicit boundary/admission coverage."
+    },
+    {
+      "path": "scripts/nemo/lib/boundaries-rust.cjs",
+      "mode": "100644",
+      "blob": "95c0878df0efd6ce113a270f7fbf1b9688a0c92e",
+      "classification": "handwritten-tooling",
+      "censusRefs": [],
       "reason": "Tracked executable tool; requires explicit boundary/admission coverage."
     },
     {
@@ -8174,7 +10371,142 @@
       "censusRefs": [
         "C06.bootstrap.paper-dom-setup",
         "C06.bootstrap.storage-key-migration",
-        "C06.preferences.user-profile"
+        "C06.preferences.user-profile",
+        "C21a.canvas-backing-size",
+        "C21a.state-brush-stroke-defaults",
+        "C21a.state-canvas-interaction-guides",
+        "C21a.state-canvas-rulers-guides-display",
+        "C21a.state-layers-tween-undo",
+        "C21a.state-media-symbols-registries",
+        "C21a.state-onion",
+        "C21a.state-palettes-shadow-guides",
+        "C21a.state-playback-mode",
+        "C21a.timeline-row-metrics",
+        "C21b.brush-keyline-selectable",
+        "C21b.color-hex8-helpers",
+        "C21b.paper-layer-stack",
+        "C21b.stage",
+        "C21b.user-layer-create-name",
+        "C21b.user-layer-reorder",
+        "C21b.view-zoom",
+        "C21c.coordinate-rounding",
+        "C21c.serp-core-return-fields",
+        "C21c.serp-gradient-group-trackrole-fields",
+        "C21c.serp-owner-revision-vars",
+        "C21c.serp-paramshape-text-fields",
+        "C21c.serp-texture-anchor-channel-shadow-vars",
+        "C21c.serp-typography-mask-gradient-fields",
+        "C21c.serp-vector-brush-fill-link-vars",
+        "C21d.desp",
+        "C21d.merge-remote-snapshot",
+        "C21d.relink-brush-companions",
+        "C21d.relink-linked-fills",
+        "C21d.strip-brush-texture",
+        "C21e.desr",
+        "C21e.image-cache",
+        "C21e.serr",
+        "C21f.apply-matrix-stroke-data",
+        "C21f.bounds-center-of-strokes",
+        "C21f.dup-matrix-from-descriptor",
+        "C21f.effector-channels",
+        "C21f.heavy-fields-clone",
+        "C21f.hex-hue-rotate",
+        "C21f.symbol-gesture-accumulate",
+        "C21f.symbol-matrix",
+        "C21g.apply-duplicator-clone-loop",
+        "C21g.apply-duplicator-setup",
+        "C21g.clone-placement",
+        "C21g.convert-selection-to-object-duplicator",
+        "C21g.duplicator-count",
+        "C21g.effective-strokes-rendered",
+        "C21g.mode-offset",
+        "C21g.resolve-duplicator-path",
+        "C21h.auto-assign-layer",
+        "C21h.bind-mesh",
+        "C21h.bind-stroke",
+        "C21h.bone-segs-to-path",
+        "C21h.chord-angle-normalize",
+        "C21h.relink-rig-binds",
+        "C21h.rig-header-ensure-fresh-id",
+        "C21h.weigh-one-point",
+        "C21h.weigh-one-point-by-control",
+        "C21i.apply-rig-deform",
+        "C21i.ik-drag-end",
+        "C21i.ik-set-and-anchor",
+        "C21i.rig-commit-frame",
+        "C21i.rig-reset-pose",
+        "C21j.auto-in-point-blank-keyframe",
+        "C21j.folder-parent-and-in-point",
+        "C21j.in-point-raw-and-auto-out",
+        "C21j.layer-has-time-range-clamp",
+        "C21j.lfs-sub-strokes",
+        "C21j.migrate-time-link-offsets",
+        "C21j.out-point-and-raw",
+        "C21j.parent-in-time-header-source-of",
+        "C21j.resolve-linked-time",
+        "C21j.resolve-symbol-frame-idx",
+        "C21j.unlink-time-link-preserve-range",
+        "C21k.component-camera-matrix-exposed",
+        "C21k.component-composite-loop",
+        "C21k.component-own-frames-and-resolve",
+        "C21k.lead-in-and-gates",
+        "C21k.plain-layer-hot-path-module-vars",
+        "C21l.bad-component-source-reason",
+        "C21l.clone-rig-for-symbol",
+        "C21l.convert-layer-to-component",
+        "C21l.convert-layers-to-component-field-transfer",
+        "C21l.convert-layers-to-component-guard-merge",
+        "C21l.cross-project-header-import-foreign-tree",
+        "C21l.ensure-symbol-paper-layers-gen-id",
+        "C21l.expose-symbol-property",
+        "C21l.foreign-component-create-place-instantiate",
+        "C21m.merge-field-transfer",
+        "C21m.merge-group-remap-and-held-frames",
+        "C21m.merge-lead-in-guards-dedup",
+        "C21m.merge-motion-demote-and-naming",
+        "C21m.merge-reparent-paper-and-commit",
+        "C21m.release-to-layers-core-split",
+        "C21m.release-to-layers-entry",
+        "C21m.release-to-layers-groups-and-commit",
+        "C21n.close-symbol-tab-enter-montage-view",
+        "C21n.convert-component-to-layer",
+        "C21n.convert-layer-to-lfs-group",
+        "C21n.convert-lfs-group-to-layer",
+        "C21n.enter-symbol",
+        "C21n.exit-montage-view",
+        "C21n.exit-to-scene",
+        "C21n.line-bounds-from-strokes",
+        "C21n.propagate-lfs-fill",
+        "C21o.can-reuse-materialized",
+        "C21o.change-signal-num-close",
+        "C21o.collect-layer-strokes",
+        "C21o.deep-close-equal",
+        "C21o.flatten-compound-children",
+        "C21o.invalidate-symbol-union",
+        "C21o.maybe-promote-interpolated",
+        "C21o.norm-stroke-for-compare",
+        "C21o.save-active-layer-frame",
+        "C21o.save-all-layer-frames",
+        "C21o.strokes-equal-scene-version",
+        "C21o.write-back-ghost-proxies",
+        "C21p.any-layer-soloed-elem-solo-header",
+        "C21p.convert-layer-to-stroke-fill-shadow-folder",
+        "C21p.elem-visibility-helpers",
+        "C21p.enforce-channel-strip",
+        "C21p.load-frame",
+        "C21p.reanchor-materialized",
+        "C21p.save-active-layer-frame-or-promote",
+        "C21p.set-elem-hidden",
+        "C21p.set-elem-solo-layer-effectively-visible",
+        "C21p.sync-linked-keyframe-folder",
+        "C21q.clear-keyframe-remove-tween-span",
+        "C21q.convert-to-keyframes-remove-span-duplicate",
+        "C21q.go-to-frame",
+        "C21q.insert-blank-keyframe-remove-frame",
+        "C21q.insert-frame",
+        "C21q.insert-keyframe",
+        "C21q.insert-keyframe-core",
+        "C21q.prev-next-keyframe-frame-insert-at"
       ],
       "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
     },
@@ -9311,7 +11643,63 @@
         "C20f.inline-expression-editor",
         "C20f.stopwatch-title",
         "C20f.transform-group-headers",
-        "C20f.transform-property-rows"
+        "C20f.transform-property-rows",
+        "C20g.color-hex-helpers-and-color-rows",
+        "C20g.render-elements-list",
+        "C20g.trim-scalar-row-and-trim-paths-group",
+        "C20h.discrete-key-grid-row",
+        "C20h.mesh-vertex-group-and-vertex-row",
+        "C20h.path-as-one-property-key-helpers",
+        "C20h.path-group-expand-state",
+        "C20h.path-vertex-group-panel-and-grid-rows",
+        "C20h.text-animator-timeline-rows",
+        "C20i.render-tracks-for-and-grid-select-lead-in",
+        "C20i.track-row-html",
+        "C20j.easing-curve-constants",
+        "C20j.module-header-and-property-tables",
+        "C20j.property-shortcut-targets-and-handler",
+        "C20j.reveal-animated-u-shortcut",
+        "C20j.reveal-effects-mattes-shortcuts",
+        "C20j.reveal-shortcut-table-and-view-state",
+        "C20j.view-filter-predicates",
+        "C20k.expression-controls",
+        "C20k.keyframe-introspection",
+        "C20k.looping",
+        "C20k.markers",
+        "C20k.noise",
+        "C20k.other-layers",
+        "C20k.self-sampling",
+        "C20k.wiggle",
+        "C20l.ae-compatibility-aliases",
+        "C20l.comp-and-self-views",
+        "C20l.mesh-aware-self-and-content-box",
+        "C20m.normalize-and-evaluate",
+        "C20m.sandbox-surface-and-compile",
+        "C20n.ease-editor-and-opacity-domain",
+        "C20n.element-holders",
+        "C20n.render-time-rotation-helpers",
+        "C20n.select-layer-and-set-value",
+        "C20n.set-key-at-frame",
+        "C20n.toggle-animated",
+        "C20n.value-at-frame-and-segment",
+        "C20o.batch-key-operations",
+        "C20o.decorate-property-row",
+        "C20o.holder-layer-sync-and-property-selection",
+        "C20o.key-selection-model",
+        "C20o.widget-wiring-and-expression-bake",
+        "C20p.ease-influence-model",
+        "C20p.key-ease-box-and-selection-ops",
+        "C20q.key-selection-box",
+        "C20q.marquee-start-and-apply",
+        "C20q.selection-box-edges",
+        "C20r.layer-skew-drag",
+        "C20r.layer-stagger-box-rows",
+        "C20r.update-layer-stagger-box-and-time-remap-lead-in",
+        "C20s.drag-auto-scroll",
+        "C20s.drag-snap",
+        "C20s.drag-timeline-render-coalescing",
+        "C20s.on-drag-move-up",
+        "C20s.stagger-step-and-marquee-update-end"
       ],
       "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
     },
@@ -9767,6 +12155,60 @@
         "C19a.timeline-view-toggles",
         "C19a.tool-transition",
         "C19a.tween-retime",
+        "C19aa.apply-text-props-edit",
+        "C19aa.fill-gradient-button-cycle-propagate",
+        "C19aa.text-actions-panel",
+        "C19aa.text-props-root-and-panel",
+        "C19aa.typography-panel-wiring-iife",
+        "C19ab.app-menu-items-and-registration",
+        "C19ab.app-menu-motion-blur-shy-buttons",
+        "C19ab.app-menu-obj-reference-import",
+        "C19ab.team-sync-rel-time",
+        "C19ac.collaborator-avatar-stack",
+        "C19ac.feedback-inbox",
+        "C19ac.github-feedback-triage-dashboard",
+        "C19ac.sync-ui-registration-tail",
+        "C19ac.timeline-hover-flag-and-step-active-layer",
+        "C19ad.onkeydown-field-guards-undo-save-clipboard",
+        "C19ad.onkeydown-generic-field-guard-and-k",
+        "C19ad.onkeydown-motion-overrides-key-selection-work-area",
+        "C19ad.onkeydown-select-all-duplicate-group-lock-zoom",
+        "C19ae.onkeydown-arrows-pageupdown-alt-brackets-trim",
+        "C19ae.onkeydown-delete-cascade-and-shift-f6",
+        "C19ae.onkeydown-space-alt-enter-escape",
+        "C19ae.onkeydown-x-flip-and-bracket-sizes",
+        "C19af.brush-size-and-fill-stroke-colour-fields",
+        "C19af.cmd-hold-temporary-select",
+        "C19af.shape-tool-flyout-iife",
+        "C19af.space-tap-hold-keyup-and-key-registration",
+        "C19ag.dimensions-lock-and-initial-swatch-paint",
+        "C19ag.hex-alpha-fields",
+        "C19ag.miter-limit-and-join-enable-sync",
+        "C19ag.stroke-fields-and-icon-groups",
+        "C19ag.stroke-gradient-along-and-legacy-enable-toggles",
+        "C19ag.vector-brush-stroke-props-sync",
+        "C19ah.anchor-grid-align-toolbar-point-type",
+        "C19ah.apply-vector-brush-pressure-mask-canvas-toggles",
+        "C19ah.boolean-buttons-and-brush-size-preset-fields",
+        "C19ah.live-xform-fields-and-vertex-mode-dispatch",
+        "C19ai.blend-mode-dropdown",
+        "C19ai.canvas-fit-view-menu",
+        "C19ai.document-fps-frames-fit-reset",
+        "C19ai.matte-mode-dropdown",
+        "C19ai.tween-onion-ghost-bake-buttons",
+        "C19aj.lip-sync-panel",
+        "C19aj.onion-markers-span-follow-loop",
+        "C19aj.onion-mode-tint-shift-opacity",
+        "C19aj.onion-popover-and-comp-preview",
+        "C19aj.revision-view-and-outline-toggles",
+        "C19aj.toolbar-customization-and-review-toggles",
+        "C19aj.transport-frame-fields-add-layer-menu-component-fields",
+        "C19ak.combine-group-panel",
+        "C19ak.duplicator-static-field-wiring",
+        "C19ak.rig-tool-panel",
+        "C19al.export-modal",
+        "C19al.last-session-restore-and-panel-rail",
+        "C19al.props-panel-collapse-init-tail-and-bootstrap",
         "C19b.composition-duration",
         "C19b.trim-work-area",
         "C19b.work-area-bounds",
@@ -9865,7 +12307,54 @@
         "C19r.layer-color-swatches",
         "C19r.layer-index-by-uid",
         "C19r.parent-descendants",
-        "C19r.parent-pickwhip"
+        "C19r.parent-pickwhip",
+        "C19s.follow-path-menu",
+        "C19s.matte-menu",
+        "C19s.matte-sources-in-use",
+        "C19s.parent-cell",
+        "C19s.parent-menu",
+        "C19s.time-link-menu",
+        "C19t.color-surface-writers",
+        "C19t.layer-index-shadow",
+        "C19t.reconcile-frame-selection",
+        "C19t.reconcile-layer-index-state",
+        "C19u.audio-rows-scroll-restore",
+        "C19u.color-dot-eye-lock-solo-3d-duplicator-icons",
+        "C19u.entry-frame-only-scroll-snapshot",
+        "C19u.folder-header-row",
+        "C19u.matte-badge-time-link-badge",
+        "C19u.motion-mode-delegate-render-order-matte-map",
+        "C19u.row-click-select-drag-wiring",
+        "C19u.row-context-menu",
+        "C19u.row-skeleton-height-arrow-slot",
+        "C19u.shape-tree-disclosure-name-parent-cell",
+        "C19u.type-null-guide-effect-badges",
+        "C19v.comp-frame-strip",
+        "C19v.comp-instance-panel",
+        "C19v.drag-ghost-indicator",
+        "C19v.finish-layer-reorder",
+        "C19v.footage-panel",
+        "C19v.layer-drag-state-arm",
+        "C19v.lip-sync-panel",
+        "C19v.move-layer-reorder",
+        "C19v.reorder-grip",
+        "C19v.symbol-tabs",
+        "C19w.duplicator-effectors",
+        "C19w.duplicator-panel-lead-in-and-update",
+        "C19w.duplicator-refresh-registration-toast",
+        "C19w.duplicator-source-pool",
+        "C19x.action-trail-recording",
+        "C19x.comment-state-and-screenshot-strip",
+        "C19x.init-comment-popover",
+        "C19x.open-close-comment-popover",
+        "C19y.inplace-raster-text-editor-and-gate",
+        "C19y.inplace-vector-text-editor-open-close",
+        "C19y.inplace-vector-text-state-and-creation",
+        "C19y.text-tool-popover-open-close",
+        "C19z.commit-text-popover-init-registrations",
+        "C19z.commit-vector-text",
+        "C19z.split-text-into-characters",
+        "C19z.text-layout-and-line-x"
       ],
       "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
     },
@@ -11216,7 +13705,7 @@
     {
       "path": "tests/nemo-boundaries.test.cjs",
       "mode": "100644",
-      "blob": "7cc61c4bf0e8b71e9f67690b54fa0eb0157eb77a",
+      "blob": "d108d6f18c552ec78589c6f263b01d91e6ea3a9a",
       "classification": "test",
       "censusRefs": [
         "C13.tooling.nemo-tooling-test-suite"
