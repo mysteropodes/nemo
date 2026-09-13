@@ -1,0 +1,400 @@
+{
+  "census_id": "C21e",
+  "issue": 1193,
+  "title": "app.js raster round-trip: `serR`, the decoded-image cache and `desR`",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C21e census only; app.js:586-826 (`serP`, C21c/#1186, PR #1188 merged) and app.js:827-1024 (`desP`/`mergeRemoteSnapshot`/`relinkBrushCompanions`/`relinkLinkedFills`/`stripAnyBrushTexture`, C21d/#1190, PR #1192 merged) remain separate owners, cited by line only. app.js:1252+ (COMPONENTS/SYMBOLS: `symMatrixOf`...`applyMatrixToStrokeData`...duplicator helpers, the next leaf C21f) is out of scope and cited by line only where a packet's own `callers`/`behavior` needed to name a sibling consumer sharing a `forEach`/branch with this scope's own functions (e.g. app.js:4574's `_collectLayerStrokes`, app.js:4795's `loadFrame`, app.js:1330's `applyMatrixToStrokeData`, app.js:1434's `_boundsCenterOfStrokes`, app.js:4437's `_normStrokeForCompare`, app.js:5070's `splitFrame`, app.js:2949's `getEffectiveStrokes`). The engine-side image store (`register_image`/`retire_images`, engine-bridge.js/engine.rs, CLAUDE.md §5quinquies) and `buildSceneJson`'s own `_changed`-hook/retained-path machinery (CLAUDE.md §5ter) are engine-bridge.js/engine.rs territory, cited by line only. linked-media.js (`SMLinkedMedia.getCachedSrc`/`resolveAsync`), bitmap-brush.js (`eraseBite`/`flushEraseDirty`/`liveRestamp`/`regenerate`/`applyBitmapBrushTexture`), images.js (video-frame import's own onLoad-race guard), export.js, tweens.js, storyboard.js and the labs/*.js prototypes retain their own bodies in full — cited by call site only as callers of this scope's `serR`/`desR`/cache functions.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "da8f4b62c5319c570f9ef3fa181c8092349d554b",
+  "source_path": "src/js/app.js",
+  "source_blob": "0831959f70612721f80717812838d19940d1f7c1",
+  "source_line_count": 5410,
+  "scope_files": [
+    "src/js/app.js"
+  ],
+  "intended_branch": "claude/c21e-app-raster-image-cache-census",
+  "assigned_ranges": [
+    {
+      "start": 1025,
+      "end": 1251
+    }
+  ],
+  "coverage_note": "Exactly 227 assigned lines occur once across three packets (one coverage_range per packet, no gaps, no other-owner overlap): 85 code, 140 full-line `//` comments, 2 blank — matches the issue's own proposed union exactly (independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own `classify()` runs: 31+31+23=85 code; 66+43+31=140 comment; 0+0+2=2 blank). Line 1024 (`stripAnyBrushTexture`'s own closing `}`, C21d's last line) is out of scope; line 1025 opens this scope's own bitmap-import lead-in comment for `serR`. Line 1251 (blank) is the last line of this scope; line 1252 opens the `// ---- COMPONENTS / SYMBOLS ----` header, C21f's own territory.",
+  "source_baselines": {
+    "pinned": "59a5a38c:src/js/app.js resolves to 0831959f70612721f80717812838d19940d1f7c1, 5410 lines.",
+    "current": "origin/main (da8f4b62c5319c570f9ef3fa181c8092349d554b) has the identical app.js blob (git rev-parse da8f4b62:src/js/app.js == git rev-parse 59a5a38c:src/js/app.js == 0831959f70612721f80717812838d19940d1f7c1); this artifact branches from origin/main at da8f4b62.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n '<symbol>('` (word-boundary variants `(^|[^a-zA-Z_.])serR\\(` / `\\bdesR(` / `\\b_imgCacheGet(` / `\\b_imgCacheWarm(` / `\\b_imgCacheWarming\\b` / `\\b_imgCachePut(` / `\\b_imgCacheHits\\b` / `\\b_imgCacheMisses\\b` / `\\bisRaster\\b`) against the frozen blob at 59a5a38c across all of src/js, filtering out each symbol's own declaration line and any hit whose trimmed line starts with `//` (comment-only mention), then reading each surviving hit's line and enclosing function directly (enclosing function located by scanning backward from the call-site line for the nearest preceding `function <name>(` declaration or `forEach(function(...){` closure, confirmed by checking no closer function declaration intervenes).",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; the in-source comments (bug #9, the mid-decode race, the 'il redessine à chaque fois' measurement, the pixel-erase deferred-toDataURL note) are read as authorial intent and prior-session evidence, not fresh execution evidence produced by this census."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json and the three app.js packets partitioning lines 1025-1251.",
+    "app_js": "app.js retains the whole runtime writer for `serR`/`desR`/the six decoded-image-cache symbols; this JSON authoring does not authorize source changes.",
+    "c21d_boundary": "Lines 827-1024 (`desP`, `mergeRemoteSnapshot`, `relinkBrushCompanions`, `relinkLinkedFills`, `stripAnyBrushTexture`) belong to C21d/#1190 (PR #1192, merged) — cited by line only; every citation of those functions in this artifact points into that scope without re-describing their bodies.",
+    "c21f_boundary": "Lines 1252+ (COMPONENTS/SYMBOLS header, `symMatrixOf`, the duplicator helpers) are the next leaf's territory — this artifact cites sibling functions co-located elsewhere in app.js (`applyMatrixToStrokeData` at 1329, `_boundsCenterOfStrokes` at 1434, `_normStrokeForCompare` at 4437, `getEffectiveStrokes` at 2949, `splitFrame` at 5070, all OUTSIDE 1025-1251) by name/line only where a packet's own `callers`/`behavior` needed to name an `isRaster`-discriminator reader; none of their bodies are reproduced.",
+    "other_consumers_boundary": "linked-media.js, reference-bridge.js, bitmap-brush.js, images.js, engine-bridge.js, export.js, tweens.js, storyboard.js and the labs/*.js prototypes retain their own bodies in full — cited by line/call-site only for the specific findings each packet's `callers`/`behavior` needed."
+  },
+  "reconciliation": [
+    {
+      "owner": "C21d / #1190 (existing owner, PR #1192 merged)",
+      "disposition": "Retains app.js:827-1024 (`desP`, `mergeRemoteSnapshot`, `relinkBrushCompanions`, `relinkLinkedFills`, `stripAnyBrushTexture`). This scope's own boundary begins at line 1025 (the bitmap-import lead-in comment immediately after `stripAnyBrushTexture`'s own closing `}` at line 1024)."
+    },
+    {
+      "owner": "C21f (next leaf, not yet filed as an issue at authoring time)",
+      "disposition": "Owns app.js:1252+ (the `// ---- COMPONENTS / SYMBOLS ----` header, then `symMatrixOf`…`applyMatrixToStrokeData`…the duplicator helpers) — this scope's last line (1251, blank) is followed immediately by C21f's own header at line 1252; no packet in this scope reproduces or reads past line 1251 for mapping purposes. `applyMatrixToStrokeData` (app.js:1329) and `_boundsCenterOfStrokes` (app.js:1434) are cited by name/line only, as `isRaster`-discriminator readers co-located in the same file but outside this scope's range."
+    },
+    {
+      "owner": "engine-bridge.js (existing owner, `buildSceneJson`/`registerRasterIfNeeded`/image store consumer)",
+      "disposition": "Retains, in full, `buildSceneJson`'s own `c instanceof Raster` branches (engine-bridge.js:1441, 2694) and `registerRasterIfNeeded` (engine-bridge.js:440, called from 1454 and 2695) — cited by line only. This scope's own finding is limited to noting that `buildSceneJson` discriminates a raster via a LIVE `instanceof Raster` check on the Paper.js item, not via the persisted dict's `isRaster` flag this scope's `serR` emits — the two are different manifestations of the same discriminator, not the same code path."
+    },
+    {
+      "owner": "bitmap-brush.js (existing owner, `eraseBite`/`flushEraseDirty`/`liveRestamp`/`regenerate`/`applyBitmapBrushTexture`)",
+      "disposition": "Retains its own body in full — cited by line only for the image-cache packet's own verification of the lead-in comment's staleness claim (see `boundaries` below): `eraseBite` (bitmap-brush.js:493-512) and `liveRestamp` (bitmap-brush.js:462-478) mutate `raster.canvas` pixels directly WITHOUT refreshing `data.src`/calling `toDataURL` (deliberately deferred, per their own comments); only `flushEraseDirty` (bitmap-brush.js:514-521) and `regenerate`'s own call into `applyBitmapBrushTexture` (bitmap-brush.js:599-609, which itself calls `toDataURL` at line 525) actually mint a fresh `data.src` string key."
+    },
+    {
+      "owner": "linked-media.js (existing owner, `SMLinkedMedia.getCachedSrc`/`resolveAsync`/`primeCache`)",
+      "disposition": "Retains its own body in full — cited by line only. Its own comment (linked-media.js:77-81) states its `_resolved` cache (keyed on the persisted reference: path or handle id) and this scope's `_imgCache` (keyed on the resolved data: URL content) are deliberately keyed the OPPOSITE way and COMPOSE rather than duplicate — confirmed by direct read of both files, not re-described here beyond that cross-reference."
+    },
+    {
+      "owner": "reference-bridge.js (existing owner, Reference-image tool's own per-object cache)",
+      "disposition": "Retains its own body in full — cited by line only. reference-bridge.js:65-74 defines an UNRELATED field also named `_imgCache`, but as a per-object property (`r._imgCache[idx]`, keyed by sequence index, one per reference-image Raster) rather than this scope's module-level `Map` keyed by data-URL content — a name collision, not a second consumer of this scope's cache; flagged in `boundaries` to avoid a future grep confusing the two."
+    },
+    {
+      "owner": "images.js / export.js / tweens.js / storyboard.js / labs/*.js (existing owners, callers of `desR`/`serR`)",
+      "disposition": "Retain their own bodies in full — cited by line/call-site only under each packet's complete caller list below."
+    }
+  ],
+  "boundaries": [
+    "Line 1024 (`stripAnyBrushTexture`'s own closing `}`, C21d's last line) is outside coverage; line 1025 (a full-line `//` comment, the bitmap-import lead-in) begins this scope.",
+    "Line 1251 (blank) is the last line of this scope; line 1252 opens the `// ---- COMPONENTS / SYMBOLS ----` header, C21f's own territory, and is excluded — confirmed by reading through line 1258.",
+    "No lines inside 1025-1251 are excluded for another owner: every line belongs to exactly one of the three packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "The serR/desR field map is a CLEAN BIJECTION, unlike the several serP/desP write/read asymmetries C21c/C21d documented: every key `serR` emits (`isRaster`, `x`, `y`, `width`, `height`, `opacity`, `isBitmapBrush`, `linked`, `linkedPath`, `linkedHandleId`, `src`, `rotation`, `brushGroupId`, `isBrushTextureCopy`, `meshId`, `groupId`, `isText`, `text`, `font`, `size`, `color`, `align`, `fixedWidth`, `isTextChar`, `textGroupId`, `charIndex`, `wordIndex`, `lineIndex`) is read by `desR` (directly, or — for `isRaster` — by desR's own EXTERNAL callers as the discriminator that decides whether to call `desR` at all, app.js:4795/tweens.js:4748-4749/export.js:239/labs+storyboard call sites below), and no field `desR` reads (app.js:1196-1250) is absent from `serR`'s own emission set (app.js:1036-1121) — confirmed by manual enumeration of every `d.<field>` read in `desR`'s body against every field name in `serR`'s own return-object construction, cross-checked both directions. The two exceptions are not stored fields at all: `op` (desR's third formal parameter, a caller-supplied opacity OVERRIDE with no corresponding key in `d` — same shape as C21d's own `desP` `op` parameter finding) and the two live-object-only communication tags `r.data._pendingGeom` (written by `desR` at line 1227, read only by `serR` at line 1048, cleared by `desR`'s own `place()` at line 1231 — never part of the persisted dict `d` itself) and `r.data.linkedMissing` (written by `desR` at line 1218 when a linked source can't be resolved synchronously; `serR` never reads or re-emits it).",
+    "`r.data.linkedMissing` (app.js:1218) has ZERO readers anywhere else in `src/js` at this SHA — confirmed by `git grep -n 'linkedMissing' 59a5a38c -- src/js` returning only its own write site. Either a dead write, or a UI hook (e.g. a broken-link badge on a linked-media layer) that was planned but never wired at this SHA; not reproduced or fixed here.",
+    "`op` parameter semantics mirror `desP`'s own `op` (C21d, cited by line only): `r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);` (app.js:1222) — the formal parameter takes priority over the stored `d.opacity`, which itself defaults to `1` only when BOTH are undefined. Of the scope's 9 confirmed call sites (see the `desr` packet's own `callers`), exactly ONE passes an explicit `op` — export.js:239 (`sd.isRaster?desR(sd,L,sd.opacity!==undefined?sd.opacity:1):desP(...)`, inside `exportBuildFrame`'s per-stroke `forEach`) — the other 8 call sites are 2-argument calls, so `op` is always `undefined` there and `desR` falls through to `d.opacity`. tweens.js's onion-skin renderer (`renderOS`, lines 4748-4749) uses a THIRD pattern: it calls `desR(sd,onionPrevLayer)` with no third argument, then overwrites the returned Raster's `.opacity` directly (`pr.opacity=op;`/`nr.opacity=op2;`) AFTER the call — bypassing the `op` parameter entirely rather than passing the onion-skin fade fraction through it.",
+    "The `isRaster` discriminator has TWO distinct manifestations, not one code path: (1) a DICT-LEVEL boolean flag on a persisted stroke dict, read by `getEffectiveStrokes` (app.js:2949, reads at 3059/3092), `loadFrame` (app.js:4746, reads at 4795), `applyMatrixToStrokeData` (app.js:1329, reads at 1330/1437 — the latter inside `_boundsCenterOfStrokes`, app.js:1434), `_normStrokeForCompare` (app.js:4437, reads at 4487), `splitFrame` (app.js:5070, reads at 5074/5084), export.js (`exportBuildFrame`, reads at 189/198/202/218/239/248/268/1115) and tweens.js (`splitTweenables`/onion-skin/others, reads at 3634/3663/3674/4586/4748/4749); (2) a LIVE `instanceof Raster` check on the actual Paper.js item, used by `buildSceneJson` (engine-bridge.js:1441, 2694 — cite by line only, engine-bridge.js territory) and by this scope's own `serR` caller `_collectLayerStrokes` (app.js:4563, branch at 4574: `else if(c instanceof Raster)strokes.push(serR(c));`). The two never need to agree with each other directly — the dict flag is manufactured BY `serR` FROM the live-object check — but a future consumer reading `sd.isRaster` on a hand-built dict that skipped `serR` would not be covered by this equivalence.",
+    "Image-cache contract, verified by direct read (app.js:1131-1195): key is the raster's data: URL string itself (`src`, the same value `serR`/`desR` round-trip as `d.src`); caps are `_imgCacheMax=120` entries AND `_imgCacheMaxBytes=192*1024*1024` (192MB, approximated as `src.length` — the base64 STRING length, not decoded pixel bytes) — `_imgCachePut` (app.js:1181-1191) evicts OLDEST-FIRST (`_imgCache.keys().next()`, a `Map` preserves insertion order) in a `while` loop until BOTH caps are satisfied, after every insert; `_imgCacheGet` (app.js:1157-1165) re-inserts a hit (`delete` then `set`) to mark it most-recently-used, so the eviction order is LRU by last-GET-or-PUT, not pure insertion order despite the comment's own 'LRU by insertion order' phrasing — re-insertion on read IS the LRU mechanism.",
+    "The lead-in's own claim (app.js:1140-1143: 'Every path that CHANGES a raster's pixels — eraseBite, flushEraseDirty, liveRestamp, regenerate — writes a fresh toDataURL string...a mutated image can never read a stale entry') is VERIFIED TRUE IN EFFECT but OVER-ATTRIBUTED TO ALL FOUR names: direct read of bitmap-brush.js shows only `flushEraseDirty` (bitmap-brush.js:514-521, `c.data.src=c.canvas.toDataURL('image/png')`) and `regenerate`'s own downstream call into `applyBitmapBrushTexture` (which itself calls `toDataURL` at bitmap-brush.js:525) actually mint a fresh string key. `eraseBite` (bitmap-brush.js:493-512) and `liveRestamp` (bitmap-brush.js:462-478) mutate `raster.canvas` pixels DIRECTLY and explicitly do NOT call `toDataURL` — bitmap-brush.js's own comments state this is deliberate ('data.src...intentionally NOT refreshed per bite', 'NO toDataURL — the persistable data.src is only refreshed by the full regenerate() at drag end'), to avoid a synchronous encode per pointermove. The invariant still holds in EFFECT in current code because `_imgCacheGet`/`desR` are only consulted at Raster RECONSTRUCTION time (a fresh `desR` call, e.g. during `loadFrame`/onion-skin/export), never against the SAME live object mid-drag — no code path in this scope reads the cache against a raster whose canvas has been mutated but whose `data.src` has not yet been refreshed. The claim is therefore correct about the OUTCOME (no stale read is observable) but imprecise about the MECHANISM (2 of the 4 named functions defer the key refresh rather than performing it inline).",
+    "`_imgCacheWarm`'s own async decode (app.js:1172-1179) is guarded by `_imgCacheWarming[src]` (app.js:1173, checked; 1174, set) so a second `desR` call for the SAME still-decoding `src` (e.g. two rasters sharing one image within the same `loadFrame` pass) does not start a second `Image()` decode — `_imgCacheGet` reports a miss for a pending entry regardless (line 1164's `.complete&&.naturalWidth` check), so the caller always falls through to the synchronous `new Raster(srcForRaster)` path (app.js:1216) for that raster while the warm decode races in the background for the NEXT `desR` call on the same key; the guard is cleared in both the `onload`/`onerror` handlers (app.js:1176/1177) so a failed decode can be retried on a later call.",
+    "None of the six decoded-image-cache symbols (`_imgCacheMax`/`_imgCacheMaxBytes`/`_imgCache`/`_imgCacheBytes`/`_imgCacheGet`/`_imgCacheWarm`/`_imgCacheWarming`/`_imgCachePut`/`_imgCacheHits`/`_imgCacheMisses` — the issue's own packet table names six but the module actually declares ten identifiers across those six roles, see the `image-cache` packet's own `symbols` list) has any caller OUTSIDE app.js itself at this SHA — confirmed by `git grep -n '_imgCache' 59a5a38c -- . ':!src/js/app.js'`, whose only hits are reference-bridge.js's unrelated same-named field (see `reconciliation` above) and comments in linked-media.js/a census artifact. Within app.js, the ONLY caller of `_imgCacheGet`/`_imgCacheWarm` is `desR` itself (lines 1214-1215); `_imgCacheWarm` is the only caller of `_imgCachePut` (line 1176); `window.__imgCacheStats`/`window.__imgCacheReset` (lines 1193-1194) are the only readers of `_imgCacheHits`/`_imgCacheMisses` outside `desR`'s own increment at line 1215, and have no caller anywhere in `src/js` at this SHA either (exposed for external/console-driven measurement only, per their own comment). This CORRECTS the issue's own hinted expectation ('expect... images.js/media-library.js/video bridges — complete file:line'): no such calls exist. images.js:418 is a `//`-comment MENTIONING `desR()`, not a call to it or to any cache symbol; media-library.js and native-video-bridge.js contain no reference to `desR`, `serR`, or any `_imgCache*` symbol at all.",
+    "The onLoad-after-construction race (app.js:1122-1130's own lead-in) is handled at THREE independent sites, not one: (1) `desR`'s own `onLoad` hook (app.js:1233-1249) re-renders via `SMEngineBridge.renderNow()` once decode completes, to self-heal a scrub that outran the decode; (2) `serR`'s own `_pendingGeom` synchronous fallback (app.js:1037-1048) reads the INTENDED geometry `desR` stashed synchronously, for the case where `serR` is asked to re-serialize a still-`!r.loaded` Raster (the bug #9 mid-decode race); (3) images.js's video-frame importer (`importVideoFrames`, images.js:403-427) awaits `r.on('load',...)` with an explicit 1.5s timeout fallback BEFORE calling `saveAllLayerFrames()` (via `convertLayerToComponent`), guarding the SAME underlying async-decode concern from the caller side of `loadFrame`/`desR` rather than from inside either function — confirmed this is a THIRD, independent guard (not a call into `desR`'s own `onLoad` or `serR`'s own `_pendingGeom`) by direct read."
+  ],
+  "areas": [
+    {
+      "area": "raster-serialisation",
+      "packets": [
+        {
+          "id": "C21e.serr",
+          "files": [
+            "src/js/app.js:1025-1121"
+          ],
+          "coverage_ranges": [
+            [
+              1025,
+              1121
+            ]
+          ],
+          "classification": {
+            "code": 31,
+            "comment": 66,
+            "whitespace": 0
+          },
+          "symbols": [
+            "serR",
+            "isRaster",
+            "isBitmapBrush",
+            "linked",
+            "linkedPath",
+            "linkedHandleId",
+            "src",
+            "rotation",
+            "brushGroupId",
+            "isBrushTextureCopy",
+            "meshId",
+            "groupId",
+            "isText",
+            "text",
+            "font",
+            "size",
+            "color",
+            "align",
+            "fixedWidth",
+            "isTextChar",
+            "textGroupId",
+            "charIndex",
+            "wordIndex",
+            "lineIndex",
+            "_pendingGeom"
+          ],
+          "signature": "function serR(r){var pending=r.data&&r.data._pendingGeom;...var d={isRaster:true,x:useX,y:useY,width:useW,height:useH,opacity:...};if(r.data&&r.data.isBitmapBrush)d.isBitmapBrush=true;...return d;}",
+          "responsibility": "Serializes one live Paper.js `Raster` (an imported image, video frame, baked bitmap-brush texture, baked text block, or split text character) into a plain persistable dict, applying a mid-decode geometry fallback (`_pendingGeom`) and a rotation-aware size decomposition before emitting the position/size/opacity core, then additively emitting every optional tag a raster may carry on its live `.data` — linked-media reference, brush-texture companion linkage, image-mesh id, group membership, and the full text-tool field set — each independently gated on its own truthy check.",
+          "callers": [
+            "src/js/app.js:4574 — `_collectLayerStrokes(li,ld)` (app.js:4563-4576), the branch `else if(c instanceof Raster)strokes.push(serR(c));` inside its own `forEach` over `userLayers[li].children`. `_collectLayerStrokes` itself is called from FOUR sites, none of which pass extra arguments to the `serR` call itself (the branch takes only `c`): app.js:4689 (`saveActiveLayerFrame`, app.js:4634-4692 — the current frame's own re-serialize, CLAUDE.md §1's 'le plus critique' consumer), app.js:4707 (`saveAllLayerFrames`, app.js:4693-...), app.js:4909/4911 (`setElemHidden`, app.js:4881-..., the held-origin and keyframe/interpolated-frame re-serialize branches after an eye/solo toggle), and app.js:4983 (`saveActiveLayerFrameOrPromote`, app.js:4969-...)."
+          ],
+          "behavior": [
+            "Lines 1025-1035 (comment, 11 lines): the bitmap-import lead-in — a Raster round-trips as a self-contained data: URL plus explicit x/y/width/height (re-applied on load since decode is async and may transiently report natural size). States `isBitmapBrush` round-trips through this same path as a plain import, citing CLAUDE.md §1's family-of-bug-#1 (a tag handled at the write site but forgotten at the read site).",
+            "Lines 1036-1047 (declaration + comment, 12 lines): `function serR(r){` — one formal parameter, the live Paper.js `Raster` to serialize. Documents 'bug #9' (2026-07): a Raster built by `desR` mid-scrub may still be `!r.loaded` when `saveAllLayerFrames()` re-serializes it (goToFrame saves the LEFT frame before navigating) — reading `r.position`/`r.bounds` at that moment returns the pre-resize placeholder geometry, producing a spurious divergence from stored frame data that `_maybePromoteInterpolated()` (app.js, outside this scope, cited by name only) misreads as a real edit, permanently flipping an untouched tween in-between to `isKeyframe:true`. `desR` stashes the INTENDED geometry on `r.data._pendingGeom` synchronously (before its own async gap) precisely so this fallback has something correct to read.",
+            "Line 1048 (code): `var pending=r.data&&r.data._pendingGeom;` — reads the live tag `desR` wrote (app.js:1227) and `desR`'s own `place()` clears (app.js:1231); no default, `pending` is simply `undefined`/falsy once decode has completed and `place()` has run.",
+            "Lines 1049-1059 (comment 1049-1054, code 1055-1059): rotation-aware sizing (2026-07) — once the select tool's rotate ring has spun a Raster, `r.bounds` is the INFLATED axis-aligned envelope; the honest display size is the un-rotated natural size times `|scaling|`. `rot=(!r.loaded&&pending)?(pending.rotation||0):((r.matrix&&r.matrix.rotation)||0);` — reads `pending.rotation` (default `0`) when mid-decode, else the live matrix's own rotation (default `0` via the `||0`, e.g. an un-rotated Raster). `useX`/`useY`/`useW`/`useH` follow the SAME `(!r.loaded&&pending)?pending.<field>:<live read>` ternary shape, with the live-read branch for width/height itself branching on `rot`: `rot?Math.abs(r.scaling.x)*r.width:r.bounds.width` (and the `.y`/`.height` mirror) — an un-rotated Raster keeps the historical `r.bounds` read untouched; a rotated one uses natural size × |scaling| instead of the inflated bounds.",
+            "Line 1060 (code, the densest line in this packet): `var d={isRaster:true,x:useX,y:useY,width:useW,height:useH,opacity:r.opacity!==undefined?r.opacity:1};if(r.data&&r.data.isBitmapBrush)d.isBitmapBrush=true;` — `isRaster:true` is ALWAYS emitted (the discriminator this scope's `boundaries` finding documents both manifestations of); `x`/`y`/`width`/`height` are ALWAYS emitted from the `use*` locals just derived; `opacity` is ALWAYS emitted, default `1` when `r.opacity` is undefined; `isBitmapBrush` is emitted ONLY when truthy on `r.data` (condition: `r.data&&r.data.isBitmapBrush`), a boolean literal `true` (not a passthrough of the source value), else the key is absent entirely.",
+            "Lines 1061-1077 (comment 1061-1070, code 1071-1077): linked media (2026-08-29) — when `r.data.linked` is truthy, `d.linked=true` and `d.linkedPath`/`d.linkedHandleId` are each emitted ONLY if truthy on `r.data` (both may be absent if neither backend field is set, though in practice exactly one is per `linked-media.js`'s own `keyFor`); `d.src` is DELIBERATELY OMITTED on this branch so the base64 payload never round-trips into the saved JSON — the entire weight win of linked mode. On the ELSE branch (not linked), `d.src=r.data&&r.data.src?r.data.src:r.source;` is always emitted, preferring the in-memory `r.data.src` (kept fresh by every pixel-mutating path, see `image-cache`'s own `boundaries` finding) over Paper's own `r.source` (the original construction argument, which for a `new Raster(dataURLstring)` is the same string but for a `new Raster(<img>)` element-based construction would be the element itself, not a string — not observed as a live hazard in this census, since `desR` (this scope's own `desr` packet) always constructs from a string/decoded `<img>`/`Size`, never a bare element from outside this pair).",
+            "Line 1078 (code): `if(rot)d.rotation=rot;` — emitted only when the just-computed `rot` local is truthy (non-zero); absent (default: no rotation) when `rot===0`.",
+            "Lines 1079-1085 (comment 1079-1083, code 1084-1085): companion linkage (bitmap-brush.js's v2 anchor+companion architecture) — `d.brushGroupId` emitted only if truthy on `r.data`; `d.isBrushTextureCopy` emitted as boolean literal `true` only if truthy on `r.data`. This is the id `relinkBrushCompanions` (C21d's own scope, cited by line only) regroups a texture Raster with its anchor Path by, after `desR`/`desP` rebuild everything fresh on `loadFrame`.",
+            "Lines 1086-1094 (comment 1086-1093, code 1094): image mesh (2026-08-30) — `d.meshId` emitted only if truthy on `r.data`; deliberately the ONLY mesh-related field on the stroke dict (the mesh geometry itself lives in `state.imageMeshes`, per CLAUDE.md §12's own note that this dict is duplicated per-frame and the mesh must not be).",
+            "Lines 1095-1097 (comment 1095-1096, code 1097): group membership (group-bridge.js's Cmd+G) — `d.groupId` emitted only if truthy on `r.data`, same stable-id convention as `serP`'s own `groupId` (C21c, cited by line only) so a group can freely mix `Path` and `Raster` members.",
+            "Lines 1098-1120 (comment 1098-1103, code 1104-1120): text tool (2026-07 rework) — the entire block is gated on `r.data&&r.data.isText`; when truthy, `d.isText=true` and `d.text`/`d.font`/`d.size`/`d.color`/`d.align` are ALWAYS emitted together (each with its own read-side default already applied on the WRITE side: `r.data.text||''`, `r.data.font||'sans-serif'`, `r.data.size||48`, `r.data.color||'#000000'`, `r.data.align||'left'` — so a genuinely-falsy stored value is promoted to the same literal `desR` would ALSO default to on a totally-absent field, a harmless but real double-default). `d.fixedWidth` emitted only if truthy (world-space units, null/absent for point text). Nested further: `d.isTextChar` (boolean literal, only if truthy — per-character split, 'Découper par caractère'), `d.textGroupId` (only if truthy), `d.charIndex`/`d.wordIndex`/`d.lineIndex` (each only if `!=null`, i.e. a genuine `0` index DOES round-trip on these three, unlike the `||`-defaulted quintet above — Text Animator grouping, 2026-08-17, same contract as `serP`'s own `charIndex` comment, C21c, cited by line only).",
+            "Line 1121 (code): `return d;}` — the sole return path; every field above is additive, there is no field this function ever explicitly deletes or nulls on the returned dict."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "decoded-image-cache",
+      "packets": [
+        {
+          "id": "C21e.image-cache",
+          "files": [
+            "src/js/app.js:1122-1195"
+          ],
+          "coverage_ranges": [
+            [
+              1122,
+              1195
+            ]
+          ],
+          "classification": {
+            "code": 31,
+            "comment": 43,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_imgCacheMax",
+            "_imgCacheMaxBytes",
+            "_imgCache",
+            "_imgCacheBytes",
+            "_imgCacheGet",
+            "_imgCacheWarm",
+            "_imgCacheWarming",
+            "_imgCachePut",
+            "__imgCacheStats",
+            "__imgCacheReset",
+            "_imgCacheHits",
+            "_imgCacheMisses"
+          ],
+          "signature": "var _imgCacheMax=120, _imgCacheMaxBytes=192*1024*1024;var _imgCache=new Map(), _imgCacheBytes=0;function _imgCacheGet(src){...}function _imgCacheWarm(src){...}var _imgCacheWarming={};function _imgCachePut(src,img){...}window.__imgCacheStats=function(){...};window.__imgCacheReset=function(){...};var _imgCacheHits=0,_imgCacheMisses=0;",
+          "responsibility": "A module-scoped LRU cache of DECODED `<img>` elements keyed on the raster's own data: URL string, sitting between `desR` and Paper.js's `Raster` constructor — avoids re-decoding the same PNG/JPEG bytes on every scrub tick when `loadFrame` rebuilds every item fresh via `desR`. Bounded on both entry count and approximate byte size (encoded-string length), evicting least-recently-used first; exposes hit/miss counters and a manual reset for measurement.",
+          "callers": [
+            "`_imgCacheGet`: src/js/app.js:1214 — `desR` (this scope's own `desr` packet), `var _cached=srcForRaster?_imgCacheGet(srcForRaster):null;`. No other caller anywhere in src/js at this SHA (confirmed by `git grep -n '\\b_imgCacheGet('`).",
+            "`_imgCacheWarm`: src/js/app.js:1215 — `desR`, on a cache MISS: `_imgCacheMisses++;_imgCacheWarm(srcForRaster);`. No other caller anywhere in src/js at this SHA (confirmed by `git grep -n '\\b_imgCacheWarm('`).",
+            "`_imgCacheWarming` (a plain object used as a set, not a function): read at app.js:1173 (`_imgCacheWarm`'s own re-entrancy guard: `||_imgCacheWarming[src]`), written at app.js:1174 (`_imgCacheWarm`, sets the in-flight flag) and deleted at app.js:1176/1177 (`_imgCacheWarm`'s own `im.onload`/`im.onerror` handlers). Every access is INSIDE `_imgCacheWarm` itself — no external reader or writer anywhere in src/js at this SHA.",
+            "`_imgCachePut`: src/js/app.js:1176 — `_imgCacheWarm`'s own `im.onload` handler, `_imgCachePut(src,im);`. No other caller anywhere in src/js at this SHA (confirmed by `git grep -n '\\b_imgCachePut('`).",
+            "`_imgCacheHits`/`_imgCacheMisses`: incremented only at app.js:1215 inside `desR` (`if(_cached)_imgCacheHits++;else{_imgCacheMisses++;...}`); read only at app.js:1193 (`window.__imgCacheStats`) and reset only at app.js:1194 (`window.__imgCacheReset`). Neither `window.__imgCacheStats` nor `window.__imgCacheReset` itself has any caller anywhere in src/js at this SHA (confirmed by `git grep -n '__imgCacheStats\\|__imgCacheReset'`) — both are exposed for external/console-driven measurement only, per their own comment at app.js:1192.",
+            "Cross-file check: `git grep -n '_imgCache' 59a5a38c -- . ':!src/js/app.js'` returns only reference-bridge.js's UNRELATED same-named per-object field (`r._imgCache[idx]`, reference-bridge.js:65/66/74 — a name collision, not a second consumer, see this artifact's own `reconciliation` entry) and a comment in linked-media.js:79 describing the two caches' deliberate composition. No file in `src/js` other than app.js calls any of the six symbols."
+          ],
+          "behavior": [
+            "Lines 1122-1130 (comment, 9 lines): documents the SAME onLoad-after-construction race this packet's own `_imgCacheWarm`/`desR`'s `onLoad` hook (desr packet) exist to paper over — `r.onLoad` attached AFTER `new Raster(d.src)` can miss an ALREADY-loaded image (a data: URI often decodes fast enough to race the handler attachment) — found live via bitmap-brush.js's own baked-texture stamp having the identical bug. Checking `.loaded` FIRST (desR's own `if(r.loaded)place();else r.onLoad=...`, desr packet) covers both the race and the normal-async case.",
+            "Lines 1131-1154 (comment, 24 lines, the `---- DECODED-IMAGE CACHE (2026-07-28) ----` header): states the motivating measurement — `loadFrame()` rebuilds every item through `desR` on EVERY scrub tick, and `desR` used to hand Paper a data: URL directly, meaning one fresh PNG decode per raster per frame forever; measured on a real 15.9MB project: 57 raster reads across a component's keyframes for only 24 distinct images, 4.7MB of base64 decoded just to visit frame 0. States the cache is keyed on the data URL itself (already this codebase's image identity, matching engine-bridge.js's own `registerRasterIfNeeded` GPU-texture keying, cited by line only), states the mutated-raster-never-stale claim (verified with a caveat in this artifact's own `boundaries`), states sharing one decoded `<img>` across many Rasters is safe because Paper's `_setImage` COPIES the element into each Raster's own canvas (`setSize` does `getCanvas`+`drawImage(previousElement)`), so one Raster's later `.size`/`.rotate` cannot disturb another sharing the same cache entry, and states the cache is bounded (an imported video mints ~one distinct frame per video frame, so an unbounded map would grow to the whole decoded movie) — LRU by insertion order (see this packet's own boundaries note on how a GET re-insertion actually drives the LRU), capped on both count and approximate bytes.",
+            "Line 1155 (code): `var _imgCacheMax=120, _imgCacheMaxBytes=192*1024*1024;` — the two caps: 120 entries, 192MB approximate (byte count is `src.length`, the base64 STRING length, not decoded pixel bytes — see `_imgCachePut`'s own line below).",
+            "Line 1156 (code): `var _imgCache=new Map(), _imgCacheBytes=0;` — the cache store itself (a `Map`, chosen specifically because it preserves insertion order, load-bearing for the LRU eviction in `_imgCachePut`) and a running byte total.",
+            "Lines 1157-1165 (code, `_imgCacheGet`): `var e=_imgCache.get(src);if(!e)return null;` — a plain miss on an absent key returns `null`. `_imgCache.delete(src);_imgCache.set(src,e);` re-inserts the SAME entry object to mark it most-recently-used (a `Map`'s iteration/insertion order is what `_imgCachePut`'s eviction loop walks). `return (e.img&&e.img.complete&&e.img.naturalWidth)?e.img:null;` — an entry whose `Image` has not finished decoding yet (`_imgCacheWarm`'s own background decode still in flight) is reported as a MISS even though a `Map` entry exists, so the caller always takes the normal (possibly-async) construction path for a pending entry; only a fully-decoded element with a real `naturalWidth` is handed back synchronously.",
+            "Lines 1166-1180 (comment 1166-1171, code 1172-1180, `_imgCacheWarm`): decodes ONE image the cache module OWNS, in the background, deliberately NOT reusing Paper's own `r.image` — after decode Paper swaps its internal element for a canvas (`_setImage`->`setSize`->`getCanvas`+`drawImage`), so the element reachable from an already-loaded Raster has no `.complete`/`.naturalWidth` and is useless as a cache entry (stated as verified live: `loaded:true, complete:false, naturalWidth:null`). Owning the element also means Paper can never mutate it under the cache. `if(!src||src.indexOf('data:')!==0||_imgCache.has(src)||_imgCacheWarming[src])return;` — bails out for a falsy src, a NON-data:-URL src (linked-media's resolved value is always a data: URL once resolved, but a not-yet-resolved linked raster's `srcForRaster` can be falsy/null and never reaches here), an already-cached src, or a src already warming. `_imgCacheWarming[src]=1;` sets the guard; `var im=new Image();im.onload=function(){delete _imgCacheWarming[src];_imgCachePut(src,im);};im.onerror=function(){delete _imgCacheWarming[src];};im.src=src;` — starts the decode; a failed decode clears the guard but does NOT call `_imgCachePut`, so the src remains eligible for a retry on a future call (no negative-cache/cooldown for a warm failure, unlike linked-media.js's own `_failed` cooldown map, cited by line only).",
+            "Line 1180 (code): `var _imgCacheWarming={};` — the in-flight guard object itself, a plain object used as a set (truthy value at each in-flight key).",
+            "Lines 1181-1191 (code, `_imgCachePut`): `if(!src||!img||_imgCache.has(src))return;` — a no-op if the src is already present (the FIRST decode to finish for a given src wins; a second `_imgCacheWarm` call for the same key never reaches this far anyway, per its own guard). `var bytes=src.length;` — the byte-cost APPROXIMATION is the encoded string's character count, not the decoded image's actual pixel byte count (`naturalWidth*naturalHeight*4`), an explicit simplification. `_imgCache.set(src,{img:img,bytes:bytes});_imgCacheBytes+=bytes;` — inserts and accounts. `while(_imgCache.size>_imgCacheMax||_imgCacheBytes>_imgCacheMaxBytes){...}` — evicts the OLDEST entry (`_imgCache.keys().next()`, the first key in `Map` iteration order — the least-recently-used entry, since `_imgCacheGet` re-inserts on every hit) repeatedly until BOTH caps are satisfied; `if(oldest.done)break;` guards an empty map (defensive, cannot actually trigger while either cap is still exceeded and the map is non-empty, but prevents an infinite loop if `_imgCacheBytes` accounting ever drifted positive on an empty map).",
+            "Lines 1192-1195 (comment 1192, code 1193-1195): `window.__imgCacheStats=function(){return{entries:_imgCache.size,mo:+(_imgCacheBytes/1e6).toFixed(2),hits:_imgCacheHits,misses:_imgCacheMisses};};` — exposed for measurement (the comment's own words: 'for the tests that prove the hit rate'); `mo` is megabytes (decimal, `/1e6`) rounded to 2 decimals despite the caps themselves using binary `*1024*1024`. `window.__imgCacheReset=function(){_imgCache.clear();_imgCacheBytes=0;_imgCacheHits=0;_imgCacheMisses=0;};` — clears everything including the counters. `var _imgCacheHits=0,_imgCacheMisses=0;` — the two counters, both module-scoped, both incremented exclusively inside `desR` (this scope's own `desr` packet, line 1215)."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "raster-deserialisation",
+      "packets": [
+        {
+          "id": "C21e.desr",
+          "files": [
+            "src/js/app.js:1196-1251"
+          ],
+          "coverage_ranges": [
+            [
+              1196,
+              1251
+            ]
+          ],
+          "classification": {
+            "code": 23,
+            "comment": 31,
+            "whitespace": 2
+          },
+          "symbols": [
+            "desR",
+            "op",
+            "srcForRaster",
+            "linked",
+            "linkedPath",
+            "linkedHandleId",
+            "linkedMissing",
+            "SMLinkedMedia",
+            "getCachedSrc",
+            "resolveAsync",
+            "isBitmapBrush",
+            "brushGroupId",
+            "isBrushTextureCopy",
+            "groupId",
+            "meshId",
+            "isText",
+            "_pendingGeom",
+            "place",
+            "onLoad",
+            "renderNow"
+          ],
+          "signature": "function desR(d,layer,op){var prev=project.activeLayer;layer.activate();var srcForRaster=d.src;if(d.linked&&window.SMLinkedMedia){...}var _cached=...;var r=new Raster(_cached||srcForRaster||new Size(...));...r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);...var place=function(){...};if(r.loaded)place();else r.onLoad=function(){place();...};prev.activate();return r;}",
+          "responsibility": "Deserializes one persisted raster dict `d` (serR's own shape) back into a live Paper.js Raster inserted into `layer`, resolving a linked-media reference through `SMLinkedMedia` when needed, consulting the decoded-image cache (this scope's own `image-cache` packet) to avoid a redundant PNG/JPEG decode, restoring every optional `.data` tag serR's own emission chain wrote, stashing a synchronous geometry fallback (`_pendingGeom`) for `serR` itself to read if asked to re-serialize before decode completes, and self-healing a missed repaint once an async decode finishes via `SMEngineBridge.renderNow()`.",
+          "callers": [
+            "src/js/app.js:4795 — `loadFrame(idx,dupOnly)` (app.js:4746-...), inside `strokes.forEach(function(sd){if(sd.isRaster)desR(sd,userLayers[i]);else desP(sd,userLayers[i]);});` — 2-argument call, `op` undefined, opacity falls to `d.opacity`. `loadFrame` is the per-scrub-tick reconstruction path CLAUDE.md §5quater documents at length (cited by name only); it is itself called from many sites across app.js/timeline.js/tweens.js not individually enumerated here (out of this scope's own boundary — `loadFrame`'s OWN caller graph belongs to whichever leaf maps app.js:1252+ /timeline.js, not this scope's `serR`/`desR` mapping).",
+            "src/js/export.js:239 — `exportBuildFrame(frameIdx,alpha)` (export.js:15-...), inside `strokes.forEach(function(sd){...})` (export.js:137), the ternary `var p=sd.isRaster?desR(sd,L,sd.opacity!==undefined?sd.opacity:1):desP(sd,L,...);` — the ONLY call site in this census that passes an explicit `op` (see this artifact's own `boundaries` note on `op` semantics).",
+            "src/js/labs/layer-effects-bake.js:30 — `rasterizeLayer(layerIdx, frame, cssFilter, overscanPx)` (labs/layer-effects-bake.js:26-...), inside `strokes.forEach(function (sd) { if (sd.isRaster) desR(sd, scratch); else desP(sd, scratch); });` — 2-argument call.",
+            "src/js/labs/layer-effects-bake.js:73 — same `rasterizeLayer` function, a second, single (non-`forEach`) call: `desR(rd, layer);` — 2-argument call.",
+            "src/js/labs/oca-export.js:117 — `pngBytesFor(frame, w, h)` (labs/oca-export.js:110-...), inside `strokes.forEach(function (sd) { if (sd.isRaster) desR(sd, scratch); else desP(sd, scratch); });` — 2-argument call.",
+            "src/js/labs/shader-effects-bake.js:178 — `rasterizeLayer(layerIdx, frame)` (labs/shader-effects-bake.js:174-...), inside `strokes.forEach(function (sd) { if (sd.isRaster) desR(sd, scratch); else desP(sd, scratch); });` — 2-argument call.",
+            "src/js/labs/shader-effects-bake.js:294 — `ensureKeyframeAt(layerIdx, frame)` (labs/shader-effects-bake.js:270-...), a single call: `desR(rd, layer);` — 2-argument call.",
+            "src/js/labs/storyboard-mode.js:149 — `thumbFor(frame, w, h)` (labs/storyboard-mode.js:141-...), inside `if (sd.isRaster) desR(sd, scratch); else desP(sd, scratch);` — 2-argument call.",
+            "src/js/storyboard.js:140 — `thumbDataUrl(symbolId, frame, bypassCache, maxPx)` (storyboard.js:117-...), inside `strokes.forEach(function (sd) { if (sd.isRaster) desR(sd, _thumbLayer); else desP(sd, _thumbLayer); });` — 2-argument call.",
+            "src/js/storyboard.js:715 — `updatePreview()` (storyboard.js:702-...), inside `strokes.forEach(function (sd) { if (sd.isRaster) desR(sd, previewLayer); else desP(sd, previewLayer); });` — 2-argument call.",
+            "src/js/tweens.js:4748 — `renderOS()` (tweens.js:4649-...), the previous-onion-skin loop's branch `if(sd.isRaster){var pr=desR(sd,onionPrevLayer);pr.opacity=op;osTagFrame(pr,li,fi);return;}` — 2-argument call to `desR` itself; the onion-skin fade fraction `op` is applied by OVERWRITING `pr.opacity` directly AFTER the call, not by passing it as `desR`'s own third parameter (see this artifact's own `boundaries` note distinguishing this from export.js:239's pattern).",
+            "src/js/tweens.js:4749 — same `renderOS()`, the next-onion-skin loop's mirror branch: `if(sd.isRaster){var nr=desR(sd,onionNextLayer);nr.opacity=op2;osTagFrame(nr,li,fi2);return;}` — 2-argument call, same post-hoc `.opacity` overwrite pattern."
+          ],
+          "behavior": [
+            "Line 1196 (code, the declaration line): `function desR(d,layer,op){var prev=project.activeLayer;layer.activate();` — three formal parameters, mirroring `desP`'s own shape (C21d, cited by line only): `d` (the persisted raster dict, `serR`'s own return value or an equivalent plain object), `layer` (the Paper.js Layer to activate and construct the new Raster INTO — `new Raster(...)` inserts into whichever layer is `project.activeLayer` at construction time), `op` (an optional opacity OVERRIDE, see this artifact's own `boundaries` finding for its complete semantics and caller table). `prev=project.activeLayer` is restored via `prev.activate()` at the function's own return (line 1250), same transparency-to-caller convention as `desP`.",
+            "Lines 1197-1210 (comment 1197-1205, code 1206-1210): linked media — `d.src` is absent for a linked raster (per `serR`'s own emission condition); `d.linkedPath`(desktop)/`d.linkedHandleId`(web) is the reference instead. `var srcForRaster=d.src;` defaults to the plain embedded src for a non-linked raster. `if(d.linked&&window.SMLinkedMedia){srcForRaster=SMLinkedMedia.getCachedSrc(d);if(!srcForRaster)SMLinkedMedia.resolveAsync(d);}` — for a linked raster, `getCachedSrc` (linked-media.js:94, cited by line only) returns an already-resolved data: URL SYNCHRONOUSLY if one was cached from a prior resolve THIS session (keyed the opposite way from this scope's own `_imgCache`, per that file's own comment, cited in this artifact's `reconciliation`); a cache miss kicks off `resolveAsync` (linked-media.js, cited by line only) in the background and this call falls through to a correctly-sized placeholder (see the `new Raster(...)` line below) until the resolve lands and forces a rebuild (outside this scope — whatever triggers that rebuild is a caller-side concern).",
+            "Lines 1211-1217 (comment 1211-1213, code 1214-1217): the cache lookup — `var _cached=srcForRaster?_imgCacheGet(srcForRaster):null;` (no lookup at all for a falsy/unresolved `srcForRaster`, e.g. a linked raster still awaiting resolve). `if(srcForRaster){if(_cached)_imgCacheHits++;else{_imgCacheMisses++;_imgCacheWarm(srcForRaster);}}` — the hit/miss counters (this artifact's own `image-cache` packet) are incremented ONLY when there IS a `srcForRaster` to look up; a miss immediately kicks off `_imgCacheWarm` so the NEXT `desR` call for the same key can hit. `var r=new Raster(_cached||srcForRaster||new Size(Math.max(1,d.width||1),Math.max(1,d.height||1)));` — THREE-WAY fallback: a cache HIT hands Paper the already-decoded `<img>` element directly (making the Raster synchronously `loaded`, skipping the async `onLoad` path entirely, per the comment at 1211-1213); otherwise a resolved `srcForRaster` string constructs the normal async-decoding Raster; otherwise (no src at all, e.g. an unresolved linked raster) a blank placeholder `Size` sized from the PERSISTED `d.width`/`d.height` (each floored to a minimum of `1` via `Math.max(1,...||1)` — an absent or zero stored dimension becomes a 1×1 placeholder rather than an invalid/zero-size Raster) is used instead — Paper.js reports a `Size`-constructed Raster as synchronously `loaded` too (no `onLoad` wait for a blank placeholder).",
+            "Line 1217 (code): `r.data.src=srcForRaster||null;` — always written, `null` when unresolved. This is the field `serR` itself reads back on a LATER re-serialize as `r.data.src` (this packet's own line 1076 in the `serr` packet, `d.src=r.data&&r.data.src?r.data.src:r.source;`) — establishing the round-trip identity even through an intermediate cache-hit Raster construction.",
+            "Line 1218 (code): `if(d.linked){r.data.linked=true;if(d.linkedPath)r.data.linkedPath=d.linkedPath;if(d.linkedHandleId)r.data.linkedHandleId=d.linkedHandleId;if(!srcForRaster)r.data.linkedMissing=true;}` — each field mirrors `serR`'s own emission condition on read (default: absent when the corresponding `d.*` field is absent), EXCEPT `linkedMissing`, which `serR` never emits and no consumer in `src/js` reads at this SHA (this artifact's own `boundaries` finding) — a live-object-only tag set when a linked source could not be resolved synchronously.",
+            "Line 1219 (code): `if(d.isBitmapBrush)r.data.isBitmapBrush=true;if(d.brushGroupId)r.data.brushGroupId=d.brushGroupId;if(d.isBrushTextureCopy)r.data.isBrushTextureCopy=true;if(d.groupId)r.data.groupId=d.groupId;` — four independent truthy-gated restores, each mirroring `serR`'s own emission condition exactly (default: absent on the live Raster when the corresponding `d.*` field is absent/falsy).",
+            "Line 1220 (code + trailing comment): `if(d.meshId)r.data.meshId=d.meshId; // image mesh — see serR's own comment` — same truthy-gated restore, default absent; the trailing comment cross-references `serR`'s own image-mesh comment (this packet's `serr` packet, lines 1086-1093) rather than re-explaining the `state.imageMeshes` architecture here.",
+            "Line 1221 (code, the second-densest line in this scope): `if(d.isText){r.data.isText=true;r.data.text=d.text||'';r.data.font=d.font||'sans-serif';r.data.size=d.size||48;r.data.color=d.color||'#000000';r.data.align=d.align||'left';if(d.fixedWidth)r.data.fixedWidth=d.fixedWidth;if(d.isTextChar)r.data.isTextChar=true;if(d.textGroupId)r.data.textGroupId=d.textGroupId;if(d.charIndex!=null)r.data.charIndex=d.charIndex;if(d.wordIndex!=null)r.data.wordIndex=d.wordIndex;if(d.lineIndex!=null)r.data.lineIndex=d.lineIndex;}` — the whole block gated on `d.isText`; `text`/`font`/`size`/`color`/`align` restored with the SAME literal defaults `serR` already applied on write (`''`, `'sans-serif'`, `48`, `'#000000'`, `'left'` respectively — belt-and-suspenders against legacy data that set `isText` without ever routing through `serR`'s own defaulting); `fixedWidth`/`isTextChar`/`textGroupId` truthy-gated (default absent); `charIndex`/`wordIndex`/`lineIndex` each gated on `!=null` (a genuine `0` round-trips, matching `serR`'s own read-side gate exactly).",
+            "Line 1222 (code): `r.position=new Point(d.x,d.y);r.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);var w=d.width,h=d.height;` — position always restored from `d.x`/`d.y` (no default — both are always emitted by `serR`); opacity per the `op`-override contract this artifact's own `boundaries` documents in full; `w`/`h` locals captured for `place()`'s own later use.",
+            "Lines 1223-1227 (comment 1223-1226, code 1227): `r.data._pendingGeom={x:d.x,y:d.y,width:w,height:h,rotation:d.rotation||0};` — the mid-decode fallback `serR` itself reads (this packet's own `serr` packet, line 1048); `d.rotation` defaults to `0` when absent. The comment states this is cleared once `place()` actually applies the real geometry, so `serR` immediately goes back to trusting live `r.position`/`r.bounds` afterward — a POST-load drag/edit must still be captured normally by `serR`'s own live-read branch.",
+            "Lines 1228-1234 (comment 1228-1230, code 1231-1234): `var place=function(){r.size=new Size(w,h);r.position=new Point(d.x,d.y);if(d.rotation)r.rotate(d.rotation);r.data._pendingGeom=null;};` — rotation applied AFTER size+position, on a fresh un-rotated object; `r.rotate`'s default pivot is `r.position` (the rect center at that point), matching `serR`'s own decomposition and 'the engine's own draw pivot' per the comment. `if(r.loaded)place();` — a cache-hit or placeholder-`Size` Raster is synchronously loaded, so `place()` runs INLINE, no async gap at all for those two paths.",
+            "Lines 1235-1249 (blank line 1235, comment 1236-1247, code 1233/1248-1249 straddling): `else r.onLoad=function(){place();...if(window.SMEngineBridge)SMEngineBridge.renderNow();};` — the async decode path (a genuine cache-miss string construction that hasn't finished decoding yet). The comment documents a SEPARATE found-live bug (2026-07-17, 'un scrub dans la timeline fait disparaitre la texture'): `loadFrame` rebuilds every item fresh via `desR`/`desP` on every scrub tick, so a bitmap-brush texture's Raster is a BRAND NEW object each time; decode is async, and engine-bridge.js's `registerRasterIfNeeded` (cited by line only) SKIPS (`continue`, no retry loop) any raster that isn't `.loaded` yet at serialize time — a fast scrub reliably outran the decode, so the very frame that should show the texture rendered without it, and since `place()` alone never told the engine anything changed, nothing repainted it once decode DID finish; it silently stayed missing instead of popping back in. Calling `SMEngineBridge.renderNow()` (cited by line only) once decode completes makes the picture self-heal instead of depending on the next unrelated repaint.",
+            "Line 1250 (code): `prev.activate();return r;}` — restores the previously-active layer (see line 1196's own note) and returns the constructed Raster.",
+            "Line 1251 (blank): the last line of this scope; line 1252 opens C21f's own `// ---- COMPONENTS / SYMBOLS ----` header."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "engine-bridge.js (`buildSceneJson`'s own `instanceof Raster` branches, `registerRasterIfNeeded`)",
+      "disposition": "Retains, in full, `buildSceneJson`'s own live `c instanceof Raster` branches (engine-bridge.js:1441, 2694) and `registerRasterIfNeeded` (engine-bridge.js:440, called at 1454/2695) — cited by line only. This scope's own finding is limited to the discriminator-shape distinction recorded in `boundaries` (live `instanceof` check vs. this scope's own persisted `isRaster` dict flag) and to noting that `registerRasterIfNeeded` skips (no retry) a raster that is not yet `.loaded` — the exact condition `desR`'s own `onLoad` self-heal (this scope's `desr` packet) exists to correct after the fact."
+    },
+    {
+      "consumer": "bitmap-brush.js (`eraseBite`/`flushEraseDirty`/`liveRestamp`/`regenerate`/`applyBitmapBrushTexture`)",
+      "disposition": "Retains its own body in full — cited by line only. Confirmed by direct read (this artifact's own `boundaries`) that only `flushEraseDirty` and `regenerate`'s own downstream `applyBitmapBrushTexture` call refresh `data.src` via `toDataURL`; `eraseBite`/`liveRestamp` mutate `raster.canvas` pixels without doing so, by design."
+    },
+    {
+      "consumer": "linked-media.js (`SMLinkedMedia.getCachedSrc`/`resolveAsync`/`primeCache`/`keyFor`)",
+      "disposition": "Retains its own body in full — cited by line only. `desR` (this scope) is the sole caller of `getCachedSrc`/`resolveAsync` at app.js:1208-1209; linked-media.js's own `_resolved` cache (keyed on the persisted reference) is confirmed distinct from and COMPOSING with this scope's own `_imgCache` (keyed on resolved data: URL content), per linked-media.js's own comment at lines 77-81."
+    },
+    {
+      "consumer": "reference-bridge.js (Reference-image tool, unrelated same-named `_imgCache` field)",
+      "disposition": "Retains its own body in full — cited by line only. Its per-object `r._imgCache[idx]` field (reference-bridge.js:65-74) is NOT a consumer of this scope's module-level `_imgCache`/`_imgCacheGet`/`_imgCacheWarm`/`_imgCachePut` — a name collision flagged in `boundaries` and `reconciliation` to prevent a future grep from conflating the two."
+    },
+    {
+      "consumer": "images.js (`importVideoFrames`'s own onLoad-race guard)",
+      "disposition": "Retains its own body in full — cited by line only. images.js:403-427 awaits a decoded Raster (via `r.on('load',...)` plus a 1.5s timeout) before calling `saveAllLayerFrames()` — a THIRD independent site guarding the same underlying async-decode race `serR`'s own `_pendingGeom` fallback and `desR`'s own `onLoad` hook guard from the inside; images.js:418 is a comment MENTIONING `desR()`, not a call to it or to any cache symbol (this artifact's own `boundaries` correction of the issue's own hinted expectation)."
+    },
+    {
+      "consumer": "export.js / tweens.js / storyboard.js / labs/*.js (existing owners, callers of `desR`)",
+      "disposition": "Retain their own bodies in full — cited by line/call-site only under the `desr` packet's own complete `callers` list above."
+    },
+    {
+      "consumer": "getEffectiveStrokes / loadFrame / applyMatrixToStrokeData / _boundsCenterOfStrokes / _normStrokeForCompare / splitFrame (app.js, outside this scope, cited by line only)",
+      "disposition": "The confirmed dict-flag readers of `isRaster` co-located elsewhere in app.js (lines 3059/3092, 4795, 1330, 1437, 4487, 5074/5084 respectively) — retain their own bodies in full; this scope cites only the exact lines where each reads `sd.isRaster`/`n.isRaster`, per the `boundaries` finding distinguishing this from the live `instanceof Raster` manifestation."
+    },
+    {
+      "consumer": "_collectLayerStrokes / saveActiveLayerFrame / saveAllLayerFrames / setElemHidden / saveActiveLayerFrameOrPromote (app.js, outside this scope, cited by line only)",
+      "disposition": "The complete transitive caller chain reaching `serR`'s own sole call site (app.js:4574) — retain their own bodies in full; see the `serr` packet's own `callers` field for the exact line numbers of each."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-serr-pending-geom-fallback",
+      "proposed": "Construct a Raster via `desR({src:'data:image/png;base64,...',x:10,y:10,width:100,height:50},layer)` on a slow-decoding source, immediately call `serR(r)` before `onLoad` fires; expect the returned dict's `x/y/width/height` to equal the ORIGINAL `d.x/d.y/d.width/d.height`, not the placeholder Raster's own `r.position`/`r.bounds` — verifies the `_pendingGeom` mid-decode fallback (bug #9) — not run."
+    },
+    {
+      "id": "fx-serr-rotation-aware-sizing",
+      "proposed": "Rotate a loaded Raster 30° via the select tool's rotate ring, then call `serR(r)`; expect `d.width`/`d.height` to equal the UN-rotated natural size × |scaling|, not `r.bounds.width/height` (the inflated axis-aligned envelope), and `d.rotation===30` — verifies the rotation-aware sizing decomposition (app.js:1055-1059) — not run."
+    },
+    {
+      "id": "fx-serr-linked-omits-src",
+      "proposed": "Call `serR(r)` on a Raster with `r.data.linked=true,r.data.linkedPath='/tmp/x.png'`; expect the returned dict to have `linked:true,linkedPath:'/tmp/x.png'` and NO `src` key at all (not even `undefined`) — verifies the deliberate omission that gives linked mode its weight win — not run."
+    },
+    {
+      "id": "fx-desr-cache-hit-skips-onload",
+      "proposed": "Call `desR({src:X,...},layer)` twice for the SAME `src` in the same session (second call after the first's decode completes and `_imgCachePut` has run); expect the second call's returned Raster to be synchronously `.loaded===true` immediately (no `onLoad` wait) and `window.__imgCacheStats().hits===1` — verifies the cache-hit fast path — not run."
+    },
+    {
+      "id": "fx-desr-op-overrides-stored-opacity",
+      "proposed": "Call `desR({src:X,x:0,y:0,width:10,height:10,opacity:0.3},layer,0.9)`; expect the returned Raster's `.opacity===0.9` (the `op` parameter wins over the stored `0.3`) — verifies the `op`-override contract, mirroring C21d's own `desP` `op` fixture — not run."
+    },
+    {
+      "id": "fx-desr-linkedmissing-set-when-unresolved",
+      "proposed": "Call `desR({linked:true,linkedPath:'/does/not/exist.png',x:0,y:0,width:10,height:10},layer)` where `SMLinkedMedia.getCachedSrc` returns falsy; expect the returned Raster's `.data.linkedMissing===true` and a blank 1×1-scaled placeholder sized from d.width/d.height — verifies the linked-unresolved placeholder path and the (currently unread) `linkedMissing` tag — not run."
+    },
+    {
+      "id": "fx-desr-cache-eviction-lru",
+      "proposed": "Call `window.__imgCacheReset()`, then `desR` for 121 distinct data: URL sources in sequence (each awaited past decode via `onLoad`); expect `window.__imgCacheStats().entries<=120` and that the FIRST source's cache entry is gone (a fresh `desR` call for it counts as a miss) while the most-recently-inserted 120 remain — verifies the count-cap LRU eviction — not run."
+    },
+    {
+      "id": "fx-erasebite-defers-todataurl",
+      "proposed": "Call `SMBitmapBrush` internals: stamp a bitmap-brush companion, note `raster.data.src`, call `eraseBite(raster,pt,radius)` once, then read `raster.data.src` again before `flushEraseDirty` runs; expect it UNCHANGED (still the pre-erase string) despite the canvas pixels having visibly changed, then call `flushEraseDirty(layer)` and expect `raster.data.src` to now be a NEW string — verifies the deferred-toDataURL boundary finding — not run."
+    },
+    {
+      "id": "fx-desr-isRaster-dict-vs-instanceof",
+      "proposed": "Hand-construct a stroke dict with `isRaster:true` but never route it through `serR`, insert it directly into a frame's `strokes` array, then call `loadFrame`; separately construct a live `Raster` and insert it into a layer without ever calling `serR`, then call `_collectLayerStrokes`; expect BOTH paths to still correctly treat the item as a raster (the dict-flag reader for the first, the `instanceof Raster` check for the second) — verifies the two discriminator manifestations are independently robust, not run."
+    }
+  ],
+  "future_proposals": [
+    "`r.data.linkedMissing` (app.js:1218) has no reader anywhere in `src/js` at this SHA — either a dead write or a planned-but-unwired UI hook (a broken-link badge on a linked-media layer). Worth either wiring a consumer or removing the write, flagged as a discussion point, not reproduced or changed here.",
+    "The lead-in comment for the decoded-image cache (app.js:1140-1143) attributes the 'mutated raster never reads a stale entry' invariant to FOUR named functions (`eraseBite`/`flushEraseDirty`/`liveRestamp`/`regenerate`) as if all four refresh the cache key; only two of the four (`flushEraseDirty`, `regenerate`'s own downstream `applyBitmapBrushTexture`) actually call `toDataURL`. The invariant still holds in effect today because the cache is only consulted at `desR` reconstruction time, never against a live mid-drag object — but the comment itself is imprecise about mechanism and could mislead a future reader into assuming `eraseBite`/`liveRestamp` also refresh the key. Worth tightening the comment's wording; not changed here (comment-only, out of this census's write scope).",
+    "`_imgCachePut`'s own byte accounting (`bytes=src.length`, app.js:1183) approximates cache cost by the base64 STRING length rather than decoded pixel bytes (`naturalWidth*naturalHeight*4`) — a 192MB string-length budget can correspond to a much larger or smaller actual decoded-pixel footprint depending on image compressibility/format, unlike the engine-side image store's own byte budget (CLAUDE.md §5quinquies, `setImageBudgetBytes`, engine-bridge.js/engine.rs, cited by line only) which is documented there as tracking real decoded bytes. Not confirmed as a live problem in this census (no measurement was run), flagged as a latent asymmetry between the two same-shaped caches.",
+    "`window.__imgCacheStats`/`window.__imgCacheReset` (app.js:1193-1194) have no caller anywhere in `src/js` at this SHA — exposed for external/console-driven measurement only, per their own comment ('for the tests that prove the hit rate'). No such test file was found in this census's own read of the frozen tree; if one exists outside `src/js` it was not searched (out of this artifact's own `scope_files`)."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep -n '\\bserR('` / `'\\bdesR('` / `'\\b_imgCacheGet('` / `'\\b_imgCacheWarm('` / `'\\b_imgCacheWarming\\b'` / `'\\b_imgCachePut('` / `'\\b_imgCacheHits\\b'` / `'\\b_imgCacheMisses\\b'` / `'\\bisRaster\\b'` was run once each at the frozen SHA, filtering out each symbol's own declaration line and any hit whose trimmed content starts with `//`, then reading each surviving hit's line and enclosing function directly — results are reproduced verbatim under each packet's own `callers`/`behavior` fields and are re-checkable with the same commands. Enclosing function names were located by scanning backward from each call-site line for the nearest preceding `function <name>(` declaration or `forEach(function(...)` closure, confirmed by checking no closer function declaration intervenes.",
+    "Every packet's `classification` (code/comment/whitespace) was independently computed by a Python script implementing the SAME blank/`//`-line/`/*...*/`-block algorithm as the validator's own `classify()` function, run against the frozen blob per coverage_range — not eyeballed from the source dump — and matches the issue's own proposed 85/140/2 total exactly (31+31+23=85 code; 66+43+31=140 comment; 0+0+2=2 blank).",
+    "The `serR`-emits vs. `desR`-reads field cross-check (the `boundaries` bijection finding) was produced by manually enumerating every `d.<field>` read in `desR`'s body (1196-1250) and every field name in `serR`'s own return-object construction (1036-1121), then diffing the two sets by hand — not by an automated script — and re-checkable by the same manual comparison against both packets' own `behavior` fields.",
+    "The 'mutated raster never reads a stale entry' claim was checked by reading the FULL bodies of `eraseBite`, `flushEraseDirty`, `liveRestamp`, and `regenerate` in bitmap-brush.js directly (not merely grepping `toDataURL`), confirmed with `git grep -n 'toDataURL' 59a5a38c -- src/js/bitmap-brush.js src/js/images.js` and cross-reading each hit's enclosing function.",
+    "The six cache symbols' 'no external caller' finding was checked with `git grep -n '_imgCache' 59a5a38c -- . ':!src/js/app.js'` (whole repo, not just src/js) and by individually re-running `git grep -n '\\b<symbol>\\b' 59a5a38c -- src/js` for each of the six — no file named `media-library.js`/`native-video-bridge.js` reference contains any hit for any of the six, correcting the issue's own hinted expectation of callers there."
+  ],
+  "validation": {
+    "expected_assigned_lines": 227,
+    "expected_classification": {
+      "code": 85,
+      "comment": 140,
+      "whitespace": 2
+    },
+    "packet_partition": [
+      [
+        1025,
+        1121
+      ],
+      [
+        1122,
+        1195
+      ],
+      [
+        1196,
+        1251
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals `classify(coverage_ranges)`, independently re-derived by script against the frozen blob: 1025-1121=(31,66,0); 1122-1195=(31,43,0); 1196-1251=(23,31,2); sums to (85,140,2)=227 — identical to the issue's own proposed union exactly.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 227 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check_c21e.py engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check_c21e.py engineering/inventory/census/C21d-app-desp-relink-remote-merge.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21e.py engineering/inventory/census/C21c-app-path-serialisation-serp.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21e.py engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21e.py engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json <candidate-sha> still exits 0"
+    ]
+  }
+}
