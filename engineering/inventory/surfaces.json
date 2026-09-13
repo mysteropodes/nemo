@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "579bfe814427f39478083ab91fcf96d8559aec7a",
-  "describe": "v0.7.0-alpha.4-343-g579bfe8-dirty"
+  "head": "95e4970754f27162553f4025ded42f964cb2079b",
+  "describe": "v0.7.0-alpha.4-345-g95e4970-dirty"
  },
- "inputsDigest": "c1e609b02844fd45478979aa6e072d0b362c156f0f72bda22c63babdd53adb31",
+ "inputsDigest": "b6f427618ad1d5ad3b5fc1f7820a7e2fa9601da930ad1ef56b47990caeb25ac1",
  "states": [
   "inventoried",
   "characterized",
@@ -54,7 +54,7 @@
   "byConsumer": {
    "native": 256,
    "export": 4,
-   "render": 554,
+   "render": 548,
    "persist": 435,
    "history": 362,
    "animation": 477,
@@ -1880,7 +1880,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 153,
+    "functionsVisited": 150,
     "via": "chain",
     "references": []
    },
@@ -2853,7 +2853,7 @@
     "container": "comp-instance-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 425,
+    "functionsVisited": 423,
     "via": "variable btn",
     "references": []
    },
@@ -4760,7 +4760,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 134,
+    "functionsVisited": 136,
     "via": "variable btn",
     "references": [
      "src/js/timeline.js:9177 action()",
@@ -4933,7 +4933,7 @@
     "container": "p-textanim-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 62,
+    "functionsVisited": 58,
     "via": "variable animBtn",
     "references": []
    },
@@ -5006,9 +5006,7 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "render": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
@@ -5019,7 +5017,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 44,
+    "functionsVisited": 35,
     "via": "variable trigger",
     "references": []
    },
@@ -7827,7 +7825,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 201,
+    "functionsVisited": 195,
     "via": "chain",
     "references": [
      "src/js/project.js:215 openDialog()"
@@ -13515,7 +13513,7 @@
     "container": "p-widget-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 148,
+    "functionsVisited": 147,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:569 renderWidgetPanel()"
@@ -13565,7 +13563,7 @@
     "container": "p-widget-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 148,
+    "functionsVisited": 147,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:569 renderWidgetPanel()"
@@ -13660,7 +13658,7 @@
     "container": "p-widget-xrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 148,
+    "functionsVisited": 147,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:573 renderWidgetPanel()"
@@ -13710,7 +13708,7 @@
     "container": "p-widget-xrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 148,
+    "functionsVisited": 147,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:573 renderWidgetPanel()"
@@ -13760,7 +13758,7 @@
     "container": "p-widget-xrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 148,
+    "functionsVisited": 147,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:573 renderWidgetPanel()"
@@ -13855,7 +13853,7 @@
     "container": "p-widget-yrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 148,
+    "functionsVisited": 147,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:583 renderWidgetPanel()"
@@ -13905,7 +13903,7 @@
     "container": "p-widget-yrange-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 148,
+    "functionsVisited": 147,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:583 renderWidgetPanel()"
@@ -13955,7 +13953,7 @@
     "container": "p-widget-yrest-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 148,
+    "functionsVisited": 147,
     "via": "helper bindWidgetField()",
     "references": [
      "src/js/rig-widget.js:583 renderWidgetPanel()"
@@ -15415,7 +15413,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 64,
+    "functionsVisited": 66,
     "via": "variable resetBtn",
     "references": []
    },
@@ -15440,9 +15438,7 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "render": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
@@ -15455,7 +15451,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 15,
+    "functionsVisited": 5,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3755 updateSelPropsPanel()",
@@ -15488,9 +15484,7 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "render": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
@@ -15503,7 +15497,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 15,
+    "functionsVisited": 5,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3756 updateSelPropsPanel()"
@@ -15535,9 +15529,7 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "render": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
@@ -15550,7 +15542,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 15,
+    "functionsVisited": 5,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3754 updateSelPropsPanel()",
@@ -15583,9 +15575,7 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "render": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
@@ -15598,7 +15588,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 15,
+    "functionsVisited": 5,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3752 updateSelPropsPanel()"
@@ -15630,9 +15620,7 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "render": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
@@ -15645,7 +15633,7 @@
     "container": "sel-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 15,
+    "functionsVisited": 5,
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3753 updateSelPropsPanel()"
@@ -15845,7 +15833,7 @@
     "container": "start-cards",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 182,
+    "functionsVisited": 178,
     "via": "chain",
     "references": [
      "src/js/project.js:664 initStartScreen()"
@@ -22163,7 +22151,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/timeline-zoom.js:220",
    "meta": {
-    "functionsVisited": 34
+    "functionsVisited": 35
    },
    "fixtures": []
   },
@@ -23222,7 +23210,7 @@
    "source": "src/js/layer-inout.js:1573",
    "meta": {
     "i18n": null,
-    "functionsVisited": 27
+    "functionsVisited": 23
    },
    "fixtures": [
     "static-props",
@@ -23260,7 +23248,7 @@
    "source": "src/js/layer-inout.js:1574",
    "meta": {
     "i18n": null,
-    "functionsVisited": 27
+    "functionsVisited": 23
    },
    "fixtures": [
     "static-props",
@@ -23298,7 +23286,7 @@
    "source": "src/js/layer-inout.js:1575",
    "meta": {
     "i18n": null,
-    "functionsVisited": 27
+    "functionsVisited": 23
    },
    "fixtures": [
     "static-props",
@@ -28216,7 +28204,7 @@
    "source": "src/js/select-bridge.js:3256",
    "meta": {
     "i18n": null,
-    "functionsVisited": 62
+    "functionsVisited": 58
    },
    "fixtures": [
     "static-props",
@@ -28558,7 +28546,7 @@
    "source": "src/js/shapes-panel.js:870",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 283
+    "functionsVisited": 279
    },
    "fixtures": [
     "static-props",
@@ -32583,7 +32571,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 315
+    "functionsVisited": 314
    },
    "fixtures": [
     "media",
@@ -33304,7 +33292,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:393",
    "meta": {
-    "functionsVisited": 124
+    "functionsVisited": 116
    },
    "fixtures": [
     "media",

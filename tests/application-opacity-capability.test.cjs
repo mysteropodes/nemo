@@ -39,7 +39,7 @@ function application() {
   ctx.window = ctx;
   vm.createContext(ctx);
   for (const file of ['animation/curve.js', 'domain/animation/opacity.js', 'motion.js',
-    'domain/document/folder-codec.js', 'domain/tween/assignment.js', 'tweens.js', 'application/opacity-application.js',
+    'domain/document/folder-codec.js', 'domain/tween/assignment.js', 'application/history/frame-entry.js', 'tweens.js', 'application/opacity-application.js',
     'application/capability-registry.js', 'application/opacity-capability.js',
     'bootstrap/opacity-application.js']) {
     const filename = path.resolve(ROOT, 'src/js', file);

@@ -4807,11 +4807,8 @@ function _cloneStrokesForUndo(strokes){
 function pushUndoActiveFrame(){
   if(window._scrubLiveActive)return;
   if(typeof saveActiveLayerFrame==='function')saveActiveLayerFrame();
-  var frame=state.currentFrame;
-  var snap={frame:frame,layers:state.layers.map(function(ld){
-    var f=ld.frames[frame]||{};
-    return{strokes:_cloneStrokesForUndo(f.strokes),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated};
-  })};
+  // Entry kind + capture live in application/history/frame-entry.js (P21).
+  var snap=NemoFrameHistoryEntry.capture(state,state.currentFrame,_cloneStrokesForUndo);
   state.undoStack.push(snap);state.undoLabels.push(_actionLabelNow());
   if(state.undoStack.length>state.maxUndo){state.undoStack.shift();state.undoLabels.shift();}
   state.redoStack=[];state.redoLabels=[];
@@ -4977,7 +4974,9 @@ if(top.type==='layers'&&((top.symbolId||null)!==(state.activeSymbolId||null)||(t
 }
 var s=state.undoStack.pop();var sl=state.undoLabels.pop()||_actionLabelNow();
 if(s.type==='layers'){state.redoStack.push(layersSnapshotNow());state.redoLabels.push(sl);restoreLayersSnapshot(s);if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();return;}
-var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});}state.redoStack.push(cur);state.redoLabels.push(sl);for(var i2=0;i2<s.layers.length&&i2<state.layers.length;i2++){var tf=state.layers[i2].frames[s.frame];tf.strokes=s.layers[i2].strokes;tf.isKeyframe=s.layers[i2].isKeyframe;tf.isInterpolated=s.layers[i2].isInterpolated;}if(s.frame!==state.currentFrame)state.currentFrame=s.frame;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
+// Frame-only entry (no `type`): apply through the extracted entry kind (P21);
+// its inverse goes on the redo stack, then the same UI refresh as before.
+var applied=NemoFrameHistoryEntry.apply(state,s);state.redoStack.push(applied.inverse);state.redoLabels.push(sl);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
 // Both branches below rewrite frame strokes; Motion's component union-bounds
 // cache is derived from those, so drop it here rather than in each branch.
 function redo(){if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
@@ -4990,7 +4989,8 @@ if(top.type==='layers'&&((top.symbolId||null)!==(state.activeSymbolId||null)||(t
 }
 var s=state.redoStack.pop();var sl=state.redoLabels.pop()||_actionLabelNow();
 if(s.type==='layers'){state.undoStack.push(layersSnapshotNow());state.undoLabels.push(sl);restoreLayersSnapshot(s);if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();return;}
-var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});}state.undoStack.push(cur);state.undoLabels.push(sl);for(var i2=0;i2<s.layers.length&&i2<state.layers.length;i2++){var tf=state.layers[i2].frames[s.frame];tf.strokes=s.layers[i2].strokes;tf.isKeyframe=s.layers[i2].isKeyframe;tf.isInterpolated=s.layers[i2].isInterpolated;}if(s.frame!==state.currentFrame)state.currentFrame=s.frame;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
+// Mirror of undo()'s frame-only branch: apply, inverse onto the undo stack, refresh.
+var applied=NemoFrameHistoryEntry.apply(state,s);state.undoStack.push(applied.inverse);state.undoLabels.push(sl);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
 
 // ---- MANUAL INBETWEEN REASSIGNMENT (v16) ----
 // autoMatch (top of this file) sometimes misidentifies correspondence when
