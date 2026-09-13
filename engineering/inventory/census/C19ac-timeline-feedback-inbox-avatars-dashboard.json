@@ -1,0 +1,581 @@
+{
+  "census_id": "C19ac",
+  "issue": 1240,
+  "title": "Timeline.js feedback inbox (feedback-bridge.js reader/UI), collaborator avatar stack (state.comments), GitHub feedback triage dashboard (public read + Cyril's token for write ops), timeline-hover B/N flag, and stepActiveLayer",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf following C19ab/#1234; the open span between the C06-owned Collaboration slice (timeline.js:9228-9273, initSyncUI, merged/declared) and the C06-owned Settings/Labs slice (timeline.js:9641-9949, merged/declared). Scope is five packets across timeline.js:9274-9640 (367 lines: 322 code / 40 comment / 5 blank, independently re-derived by a Python re-implementation of the validator's own classify(), matching the issue's own proposed union exactly): the orphaned `initSyncUI` closing brace+registration tail, the local debug-feedback inbox (`fbTagLabel`/`renderFeedbackList`/`refreshFeedbackList`/`initFeedbackUI`), the team-comment collaborator avatar stack (`fbInitial`/`refreshFbAvatars`/`renderFbAvatarPopover`/`toggleFbAvatarsPopover`/`initFbAvatars`), the GitHub feedback triage dashboard (`ghFbLabelEmoji`/`fbDashIssueStatus`/`fbDashAllTags`/`renderFbDashFilters`/`fbDashFiltered`/`fbDashCardEl`/`renderFbDashList`/`refreshFbDashboard`/`openFbDashboard`/`closeFbDashboard`/`initGithubFeedbackUI`), and the timeline-hover B/N work-area flag plus `stepActiveLayer` — matching the issue's own proposed packet table exactly, boundary-verified with `sed -n` and a direct Python classify() re-run; no boundary correction was needed, and the issue's own optional split of the fourth packet at `fbDashCardEl` (9482) and/or `initGithubFeedbackUI` (9584) was evaluated and NOT taken (all eleven dashboard functions share the same three module-scope filter variables `_fbDashIssues`/`_fbDashStatus`/`_fbDashTags`/`_fbDashOpenForms` declared once at the top of the packet; splitting would either duplicate that shared-state citation across packets or leave one half referencing state declared in the other, and would not change the union). P30/#1032 retains the timeline.js runtime writer; this JSON authoring does not authorize source changes. Cited by name/line only, not re-mapped: `feedback-bridge.js` (`SMFeedback.readAllLocal`/`pullAllIncoming`/`approveFeedback`, `fetchGithubIssues`/`approveGithubIssue`/`resolveGithubIssue`/`editGithubIssueBody`/`deleteGithubIssue`, `githubTriageToken`/`setGithubTriageToken` — CLAUDE.md §6; `worker-feedback/` is the trust boundary, out of scope), `initSyncUI`/`renderSyncUpdates` (timeline.js:9228-9273, C06 — lines 9274-9276 are its own closing brace/registration/blank, left uncovered by C06's own declared span and therefore included here), `state.comments` writers (C19x comment popover, timeline.js:7960-7980) and `state.userProfile` (C06), `goToFrame` (app.js:5112, C21q), `computeLayerRenderOrder` (timeline.js:5600) and `window.SM.setActiveLayer` (method body timeline.js:1534, `window.SM={` object literal opened timeline.js:349), `onKeyDown` (timeline.js:9641, the keyboard handler that reads `_pointerOverTimeline` — its own enclosing range 9641-9949 is separately declared as C06's Settings/Labs slice per this issue's own owner paragraph, while its body is described in the same paragraph only as 'a later C19 slice'; this artifact does not resolve that discrepancy, cites `onKeyDown` by name/line only), `TOOL_SHORTCUTS` (C06, timeline.js 7450+), `showToast` (timeline.js:7447, C19w), `smConfirm` (timeline.js:10), `SM.t` (i18n.js:4239), and the `#fb-list`/`#fb-pull`/`#fb-avatars`/`#fb-avatars-pop`/`#fb-dashboard-*`/`#fb-dash-*`/`#gh-token*`/`#fg-wrap` markup (src/index.html).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "4aa9cd3eaa548af6c7bea88b6f3951c7c5025d0c",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19ac-timeline-feedback-avatars-dashboard-census",
+  "assigned_ranges": [
+    {
+      "start": 9274,
+      "end": 9640
+    }
+  ],
+  "coverage_note": "Exactly 367 assigned lines occur once across five packets (one coverage_range per packet, no gaps, no other-owner exclusions): 322 code, 40 full-line comment, 5 blank — independently re-derived by classifying the frozen blob programmatically (a Python re-implementation of the validator's own classify(), run once per packet and once for the whole span: 9274-9640=(322,40,5) both ways) — equal to the issue's own proposed table exactly for every one of the five packets, no boundary correction needed. Line 9273 is C06's own `initSyncUI`'s `checkSharedUpdates().then(...)` closing `});` (out of scope, declared range 9228-9273). Line 9274 opens this scope with `initSyncUI`'s own closing brace `}` (an orphan left uncovered by C06's own declared span). Line 9640 is `stepActiveLayer`'s closing brace; line 9641 opens `function onKeyDown(event){`, the first line of C06's own declared Settings/Labs span (9641-9949) — confirmed by direct read of both lines, not against a merged JSON.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main at the branch point (4aa9cd3eaa548af6c7bea88b6f3951c7c5025d0c, merge of PR #1260/C19aa) has the identical timeline.js blob (git rev-parse 4aa9cd3eaa548af6c7bea88b6f3951c7c5025d0c:src/js/timeline.js == git rev-parse 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js == cc4cfd27dc59d797c911d840dc46e2f816942123); this artifact's branch was created from origin/main at that same commit, verified directly in the working worktree before authoring (HEAD matches, blob matches, working tree clean).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' -- src/js` (recursive, includes labs/ and adapters/) for the twenty function symbols this scope declares, each cross-checked against `\\.<symbol>\\b` for property-form calls (`window.SM.<name>` etc.), filtered to exclude each symbol's own comment-only mentions (lines whose trimmed content starts with `//`). A SEPARATE grep of `initSyncUI`/`stepActiveLayer`/`computeLayerRenderOrder`/`onKeyDown` confirmed the boundary claims above. Field-level behavior (the three feedback/comment populations, the complete `SMFeedback.*` surface by line, the dashboard's client-side filter state machine, the avatar stack's dedupe rule, `stepActiveLayer`'s algorithm) was derived by a direct `sed -n`/`grep -n` read of the frozen blob's own lines 9274-9640, cross-checked line-by-line against `feedback-bridge.js` (read directly for the `window.SMFeedback={...}` export block and each named method's own declaration line, not assumed from a JSON).",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes (2026-07 design audit for the B/N work-area override, feedback #86-family for the panel-sync history) are read as authorial intent, not independently re-verified execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19ac-timeline-feedback-inbox-avatars-dashboard.json and the five timeline.js packets partitioning lines 9274-9640.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "function_boundary": "This scope covers FOUR independent UI features that happen to sit adjacent in the file, plus one orphan tail, split into five packets purely by which construct/module-scope-state group each covers: the `initSyncUI` closing-brace/registration orphan (belongs to C06's own Collaboration packet by feature, included here only because C06's own declared range stops one line short); the local debug-feedback inbox (reads/writes `SMFeedback.readAllLocal`/`pullAllIncoming`/`approveFeedback` only — never touches `state.comments` or GitHub); the team-comment avatar stack (reads `state.comments`/`state.userProfile` only — never touches `SMFeedback` or GitHub, confirmed by grep: neither `SMFeedback` nor `fetchGithubIssues` appears in 9336-9422, and neither `state.comments` nor `state.userProfile` appears in 9277-9335 or 9423-9598); the GitHub triage dashboard (its own module-scope `_fbDashIssues`/`_fbDashStatus`/`_fbDashTags`/`_fbDashOpenForms`, touches neither `state.comments` nor the local-feedback `SMFeedback.readAllLocal`/`approveFeedback` pair); and the timeline-hover B/N flag plus `stepActiveLayer` (a keyboard-shortcut helper pair, call-graph-disjoint from the three feedback/comment packets before it — confirmed by grep: none of `_pointerOverTimeline`/`stepActiveLayer` appears in 9277-9422 or 9423-9598, and vice versa).",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C06 preferences.settings-modal-shell / Collaboration packet (timeline.js:9228-9273, `initSyncUI`, merged/declared)",
+      "disposition": "Owns `initSyncUI`'s own body (9260-9273 in this artifact's own read window) and `renderSyncUpdates` in full, cited by name/line only. This scope's own boundary begins at line 9274, `initSyncUI`'s own closing brace — an orphan left uncovered by C06's own declared 9228-9273 span, confirmed by direct read of both C06's declared end and the frozen blob's own line 9274 (not against a merged JSON, C06's own artifact was not re-read beyond its declared range citation in this issue)."
+    },
+    {
+      "owner": "C06 Settings/Labs (timeline.js:9641-9949, `onKeyDown` opening line, merged/declared)",
+      "disposition": "Owns the span beginning immediately after this scope. Confirmed call-graph-disjoint: none of this scope's twenty symbols appears past line 9640 in a whole-file grep restricted to lines 9641+ (the two `onKeyDown` reads of `_pointerOverTimeline`, 9921/9928, sit INSIDE that later span, not this one). This scope's own boundary ends at line 9640, `stepActiveLayer`'s closing brace. This issue's own owner paragraph names `onKeyDown` only as 'a later C19 slice' rather than C06, an apparent inconsistency with the same paragraph's declared C06 Settings/Labs range starting at the very same line (9641) that `onKeyDown` opens — not resolved by this artifact, `onKeyDown` is cited by name/line only either way."
+    },
+    {
+      "owner": "feedback-bridge.js (`window.SMFeedback={...}`, export block feedback-bridge.js:573-599, CLAUDE.md §6)",
+      "disposition": "Retains its own full body — cited by name/line only, read directly to confirm each exported method's own declaration line (not assumed from a JSON): `readAllLocal` (feedback-bridge.js:210), `githubTriageToken`/`setGithubTriageToken` (433-434), `fetchGithubIssues` (442), `approveGithubIssue` (472), `resolveGithubIssue` (476), `editGithubIssueBody` (486), `deleteGithubIssue` (495), `pullAllIncoming` (546), `approveFeedback` (553). This scope's own packets call all nine of these methods, by line, in `boundaries`(b); none of their own bodies is reproduced here. `worker-feedback/` (the GitHub-write trust boundary, CLAUDE.md §6) is not read by this census at all — this scope only ever calls the client-side `SMFeedback.*` wrapper."
+    },
+    {
+      "owner": "C19x (comment popover, `state.comments` writers, timeline.js:7960-7980, merged)",
+      "disposition": "Retains its own body in full — cited by name/line only. `state.comments` is written at timeline.js:7964 (`if(!state.comments)state.comments=[];`, lazy-init) and mutated inside the comment-popover's own save/resolve handlers (7960-7980, out of scope), which both call `refreshFbAvatars()` afterward (7970, 7977) — the ONLY two cross-file callers of this scope's own `refreshFbAvatars` beyond timeline.js's own project-import call site (2647) and this scope's own `initFbAvatars` self-call (9419)."
+    },
+    {
+      "owner": "C06 (`state.userProfile`, out of scope)",
+      "disposition": "Retains its own writer(s) in full — cited by name only. This scope only READS `state.userProfile` once, in `refreshFbAvatars` (9349), to seed the avatar list with the current user (flagged `me:true`) ahead of every distinct comment author."
+    },
+    {
+      "owner": "app.js (`goToFrame`, app.js:5112, C21q, merged)",
+      "disposition": "Retains its own body in full — cited by name/line only. Called once in this scope, from the avatar popover's own per-comment click handler (`renderFbAvatarPopover`, 9395), guarded `typeof cm.frame==='number'`."
+    },
+    {
+      "owner": "timeline.js (`computeLayerRenderOrder`:5600, `window.SM.setActiveLayer` method body:1534, `window.SM={` object literal opened:349, all out of scope/uncensused by this artifact)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `computeLayerRenderOrder()` is called once in this scope, from `stepActiveLayer` (9624), guarded `typeof computeLayerRenderOrder==='function'` with an explicit fallback (9627-9628: walk `state.layers` highest-index-first) if absent. `window.SM.setActiveLayer(idxs[np])` is called once, from `stepActiveLayer`'s own tail (9638), deliberately NOT assigning `state.activeLayerIdx` directly — the comment at 9635-9637 explains `setActiveLayer` also saves the outgoing layer's frame, clears the selection, and unsticks the camera row."
+    },
+    {
+      "owner": "timeline.js (`showToast`:7447, C19w, merged; `smConfirm`:10; `SM.t`, i18n.js:4239)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `showToast` is called UNGUARDED directly six times in this scope (9329, 9331 via `SM.t('toastRetrievalFailed')`, 9505/9527/9538/9548 each inside a `.catch(function(e){showToast(e.message);})`) and never guarded via `window.showToast` anywhere in this scope. `smConfirm` is called exactly once, from `fbDashCardEl`'s own delete-button handler (9525), with a confirm string composed from FOUR `SM.t` keys concatenated in one expression — `fbDeleteConfirmPrefix`+`issue.number`+`fbDeleteConfirmMiddle`+`issue.title`+`fbDeleteConfirmSuffix` as the message, `fbDeleteConfirmTitle` as the title — and only proceeds (`window.SMFeedback.deleteGithubIssue`, 9527) if the returned promise resolves truthy. `SM.t` supplies every OTHER user-facing string in this scope; no hard-coded-French gap was found in this span (unlike C19aa's `syncFillGradientButton` finding)."
+    },
+    {
+      "owner": "src/index.html (`#fb-list`/`#fb-pull`/`#fb-avatars`/`#fb-avatars-pop`/`#fb-dashboard-*`/`#fb-dash-*`/`#gh-token*`/`#fg-wrap` markup)",
+      "disposition": "Retains the static DOM structure in full — cited by line only (`#fb-avatars` 151, `#fb-avatars-pop` 152, `#fb-pull` 1849, `#fb-list` 1851, `#gh-token`/`#gh-token-save` 1855-1856, `#fb-dashboard-open` 1859, `#fb-dashboard-modal`/`#fb-dashboard-close` 1941-1943, `#fb-dash-filters`/`#fb-dash-status-tabs` 1945-1946, `#fb-dash-tag-chips` 1948, `#fb-dash-refresh` 1950, `#fb-dash-list` 1952, `#fg-wrap` 2233). This scope only reads/writes these elements' `.value`/`.disabled`/`.textContent`/`.innerHTML`/`.style`/`.classList` properties and appends dynamic children; it declares no markup of its own."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 9273 (C06's own `initSyncUI` `checkSharedUpdates().then(...)` closing `});`, declared range 9228-9273) is outside coverage; line 9274 (this scope's own `initSyncUI` closing brace, an orphan of C06's own declared span) begins this scope.",
+    "Line 9640 (`stepActiveLayer`'s own closing brace) is the last line of this scope; line 9641 opens `function onKeyDown(event){`, the first line of C06's own declared Settings/Labs span (9641-9949) — confirmed by reading the frozen blob at 9635-9645.",
+    "No lines inside 9274-9640 are excluded for another owner: every line belongs to exactly one of the five packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "(a) THREE distinct feedback/comment populations this span renders and never mixes, by field: (i) local debug-feedback entries (`SMFeedback.readAllLocal`, `renderFeedbackList`/`refreshFeedbackList`/`initFeedbackUI`, 9277-9335) — fields `entry.author.{name,color}`, `entry.tags`, `entry.status` (pending/resolved, chip logic at 9299 `statusTxt=entry.status==='pending'?'⏳ en attente':(entry.status==='resolved'?'✓ résolu':'')`), `entry.blocking`, `entry.note`, `entry.frame`, `entry.id`; the pending-vs-approved trust boundary is explained in this packet's own lead-in (9278-9282: your own entries are already 'approved', a teammate's pulled entry lands 'pending' until clicked Approuver, 9308). (ii) in-project team comments (`state.comments`, avatar stack, 9336-9422) — fields `c.authorId`/`authorName`/`authorColor`, `cm.text`, `cm.frame`, `cm.createdAt`, `cm.resolved` (visual effect at 9389-9390: `st.className='fb-pop-status'+(cm.resolved?' resolved':'')`, `st.textContent=cm.resolved?'résolu':'à traiter'`). (iii) GitHub Issues (`SMFeedback.fetchGithubIssues`, dashboard, 9423-9598) — fields `issue.number`/`title`/`body`/`labels`/`state`/`createdAt`/`url`/`nodeId`; status DERIVED (not a stored field) by `fbDashIssueStatus` (9438-9442).",
+    "(b) Complete `SMFeedback.*` surface consumed, by call-site line (method bodies retained by feedback-bridge.js, cited by name/line only): `approveFeedback(entry.id)` (9308, local-feedback trust promotion, no GitHub token needed), `readAllLocal()` (9320), `pullAllIncoming()` (9327) — none of these three needs Cyril's token, they operate on local/synced-folder debug-feedback JSON files, unrelated to GitHub auth. `fetchGithubIssues()` (9573) needs NO auth per this packet's own header (9430: 'Reading needs no auth (public repo)'). `approveGithubIssue(issue.number,issue.labels)` (9505), `resolveGithubIssue(issue.number,issue.labels,rta.value)` (9538), `editGithubIssueBody(issue.number,eta.value)` (9548), `deleteGithubIssue(issue.nodeId)` (9527) ALL need Cyril's own token per the same header (9430-9432: 'labeling/closing/commenting/editing needs Cyril's own token') — each is a labeling/closing/body-edit operation. `githubTriageToken()` (9588, read into `#gh-token` on init) and `setGithubTriageToken(tokenInput.value.trim())` (9590, on Save click) manage the token itself, kept in `localStorage` on Cyril's own machine only (9431-9432).",
+    "(c) Dashboard's client-side state machine: `_fbDashStatus` (9434, values `'all'|'pending'|'approved'|'resolved'`) is written ONLY by the status-tab click handler (9458: `_fbDashStatus=s[0];renderFbDashFilters();renderFbDashList();`) inside `renderFbDashFilters`'s own `statuses.forEach`. `_fbDashTags` (9435, array of active tag filters) is toggled by the tag-chip click handler (9467-9469: `var idx=_fbDashTags.indexOf(tag); if(idx>=0)_fbDashTags.splice(idx,1);else _fbDashTags.push(tag);`), also inside `renderFbDashFilters`. `_fbDashOpenForms` (9436, keyed by `issue.number`, values `null|'resolve'|'edit'`) is toggled by `fbDashCardEl`'s own Résoudre (9512) and Éditer (9519) button handlers, and cleared back to `null` on each form's own successful submit (9539, 9549). `fbDashIssueStatus(issue)` (9438-9442): `labels.indexOf('pending')>=0` -> `'pending'`; else `state==='closed'||labels.indexOf('resolved')>=0` -> `'resolved'`; else `'approved'` — a pure function of the issue's own fields, never itself mutated. Filtering (`fbDashFiltered`, 9475-9481, and the tab/chip click handlers above) only ever re-filters the already-fetched `_fbDashIssues` array in memory — `fetchGithubIssues()` is called ONLY from `refreshFbDashboard` (9573), itself called only from `openFbDashboard` (9581) and the toolbar's own Refresh button (9595); no filter/tab/chip interaction anywhere in 9448-9481 calls it. The delete-confirm string (9525) is composed from FOUR `SM.t` keys concatenated with `issue.number` and `issue.title`: `SM.t('fbDeleteConfirmPrefix')+issue.number+SM.t('fbDeleteConfirmMiddle')+issue.title+SM.t('fbDeleteConfirmSuffix')` as the `smConfirm` message, `SM.t('fbDeleteConfirmTitle')` as its title.",
+    "(d) Avatar stack's author-dedupe rule (`refreshFbAvatars`, 9347-9351): starts from `state.comments||[]`; seeds `seen`/`people` with `state.userProfile` if present (`me:true`, 9349); then iterates comments, adding a person ONLY the first time a given `c.authorId` is seen (`if(c.authorId&&!seen[c.authorId])`, 9351) — so N comments from the same author contribute exactly one avatar. The popover's click -> `goToFrame` path (`renderFbAvatarPopover`, 9394-9397): each comment item's click handler calls `goToFrame(cm.frame)` guarded `typeof cm.frame==='number'` (9395), then closes the popover (9396). What 'resolved' changes visually (9389-9390): the status pill's own CSS class gains `' resolved'` and its text switches from `'à traiter'` to `'résolu'` — no other visual field (avatar color, note text, author name) changes based on `resolved`.",
+    "(e) `stepActiveLayer`'s exact algorithm (9621-9640): builds `idxs` from `computeLayerRenderOrder()` filtered to `type==='layer'&&!hidden` entries mapped to their own `idx` (9624-9626, matching the panel's own displayed order, skipping collapsed-folder members), with an explicit fallback (9627-9628, `typeof computeLayerRenderOrder!=='function'`) that walks `state.layers` highest-index-first; bails `false` if fewer than 2 steppable layers (9630); finds the current position (`idxs.indexOf(state.activeLayerIdx)`, defaulting to 0 if not found, 9631-9632); computes `np=pos+dir`; bails `false` with NO WRAP if `np` runs past either end (9634, comment: 'already at the end — stop, don't wrap'); else calls `window.SM.setActiveLayer(idxs[np])` (9638, NOT a raw `state.activeLayerIdx` assignment — comment 9635-9637 explains `setActiveLayer` also saves the outgoing layer's frame, clears the selection, and unsticks the camera row) and returns `true`. Its own caller (grep, confirmed): `onKeyDown` (timeline.js:10088, `else if(k==='PageUp'||k==='PageDown'){event.preventDefault();stepActiveLayer(k==='PageUp'?-1:1);}`) — the ONLY caller found anywhere in src/js. `_pointerOverTimeline`'s single reader (grep, confirmed): `onKeyDown` (timeline.js:9921, 9928 — both inside its own B/N work-area override, immediately below this scope's own boundary) — no other reader anywhere in src/js.",
+    "(f) Every DOM id/class touched per packet (for the `src/index.html` consumer): `feedback-inbox` — `#fb-list` (9285, 9288, 9313, 9318-9320), `#fb-pull` (9323). `collaborator-avatar-stack` — `#fb-avatars` (9345, 9406, 9412), `#fb-avatars-pop` (9369, 9396, 9402, 9416, `.open` class 9404, 9409, 9417). `github-feedback-triage-dashboard` — `#fb-dash-status-tabs` (9449), `#fb-dash-tag-chips` (9450), `#fb-dash-list` (9563, 9571), `#fb-dashboard-modal` (9580, 9582), `#gh-token`/`#gh-token-save` (9585), `#fb-dashboard-open`/`#fb-dashboard-close`/`#fb-dash-refresh` (9586), plus CSS classes `.fb-chip`/`.fb-card`/`.fb-card-head`/`.fb-card-title`/`.fb-card-actions`/`.fb-card-inline-form`/`.label-<tag>`/`.pbtn` (throughout 9448-9561). `timeline-hover-flag-and-step-active-layer` — `#fg-wrap` (9610).",
+    "(g) Every external function called from the span with owning census/module, in call order of first appearance: `document.getElementById`/`querySelector`/`createElement`/`addEventListener`/`classList` (browser built-ins). `SM.t` (i18n.js:4239). `window.SMFeedback.approveFeedback`/`.readAllLocal`/`.pullAllIncoming`/`.fetchGithubIssues`/`.approveGithubIssue`/`.resolveGithubIssue`/`.editGithubIssueBody`/`.deleteGithubIssue`/`.githubTriageToken`/`.setGithubTriageToken` (feedback-bridge.js, CLAUDE.md §6). `showToast` (timeline.js:7447, C19w). `state.comments`/`state.userProfile` (module state, this file's own, read-only in this scope except the lazy-init at 7964, out of scope). `goToFrame` (app.js:5112, C21q). `computeLayerRenderOrder` (timeline.js:5600). `window.SM.setActiveLayer` (method body timeline.js:1534). `smConfirm` (timeline.js:10). No other external function is called anywhere in lines 9274-9640 — confirmed by reading every statement in the span directly (reproduced in each packet's own `behavior` field below).",
+    "(h) Complete caller inventory (each derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' -- src/js`, recursive over src/js incl. labs/ and adapters/, filtered to exclude comment-only mentions): `initSyncUI` — self-registration only (9275), no external caller found (its own body, 9260-9273, is C06's, out of scope). `refreshFeedbackList` — TWO callers beyond its own declaration (9316): `initSettingsModal`'s own Settings-open click handler (timeline.js:9017, `renderShortcutsList();syncProfileFields();syncFolderFields();refreshFeedbackList();...`, C06 out of scope) and its own `initFeedbackUI` pull-success callback (9330). `initFeedbackUI` — self-registration only (9334). `refreshFbAvatars` — FOUR callers beyond its own declaration (9344): timeline.js:2647 (project-import success path, `if(typeof refreshFbAvatars==='function')refreshFbAvatars();`, out of scope) and timeline.js:7970/7977 (the comment popover's own save/resolve handlers, C19x, out of scope) plus its own `initFbAvatars` self-call (9419) — matching this issue's own expectation exactly. `renderFbAvatarPopover` — ONE caller beyond its own declaration (9368): its own `toggleFbAvatarsPopover` (9405). `toggleFbAvatarsPopover` — ONE caller beyond its own declaration (9401): its own `initFbAvatars` click listener (9414). `initFbAvatars` — self-registration only (9421). `fbDashIssueStatus` — ONE caller beyond its own declaration (9438): `fbDashFiltered` (9477). `fbDashAllTags` — ONE caller beyond its own declaration (9443): `renderFbDashFilters` (9462). `renderFbDashFilters` — THREE callers beyond its own declaration (9448): its own status-tab handler (9458, self-recursive), its own tag-chip handler (9470, self-recursive), and `refreshFbDashboard`'s own fetch-success callback (9574). `fbDashFiltered` — ONE caller beyond its own declaration (9475): `renderFbDashList` (9564). `fbDashCardEl` — ONE caller beyond its own declaration (9482): `renderFbDashList` (9567). `renderFbDashList` — FOUR callers beyond its own declaration (9562): the same three call sites as `renderFbDashFilters` above (9458, 9470, 9574) plus `fbDashCardEl`'s own Résoudre/Éditer toggle handlers (9513, 9520). `refreshFbDashboard` — THREE callers beyond its own declaration (9569): `fbDashCardEl`'s own Résoudre/Éditer submit success callbacks (9539, 9549) and `openFbDashboard` (9581) — no cross-file caller found for any of the eleven dashboard symbols, confirming panel/UI-only reach. `openFbDashboard` — ONE caller beyond its own declaration (9579): `initGithubFeedbackUI`'s own open-button handler (9593). `closeFbDashboard` — ONE caller beyond its own declaration (9583): `initGithubFeedbackUI`'s own close-button handler (9594). `initGithubFeedbackUI` — self-registration only (9597). `stepActiveLayer` — ONE caller beyond its own declaration (9621): `onKeyDown` (timeline.js:10088, PageUp/PageDown). None of these twenty symbols is ever called from `getEffectiveStrokes`/`getEffectiveStrokesRendered` (app.js) or `buildSceneJson`/`scenePayload` (engine-bridge.js) — confirmed by a separate whole-src grep of all twenty names restricted to engine-bridge.js/export.js/rive-export.js (zero hits): panels/top-bar UI only, matching the issue's own expectation."
+  ],
+  "areas": [
+    {
+      "area": "sync-ui-registration-tail",
+      "packets": [
+        {
+          "id": "C19ac.sync-ui-registration-tail",
+          "files": [
+            "src/js/timeline.js:9274-9276"
+          ],
+          "coverage_ranges": [
+            [
+              9274,
+              9276
+            ]
+          ],
+          "classification": {
+            "code": 2,
+            "comment": 0,
+            "whitespace": 1
+          },
+          "symbols": [
+            "initSyncUI"
+          ],
+          "signature": "(no construct of its own — closing brace + registration of C06's `initSyncUI`)",
+          "responsibility": "Three-line orphan: `initSyncUI`'s own closing brace (9274), its `DOMContentLoaded`-or-immediate self-registration (9275), and a trailing blank line (9276) before this scope's own `Feedback inbox` header comment begins at 9277. `initSyncUI`'s own body (9260-9273) belongs to C06's Collaboration packet (declared range 9228-9273) and is not reproduced here — this packet exists solely so no line in 9274-9640 is left unassigned.",
+          "callers": [
+            "`initSyncUI` — self-registration only (9275), no external caller found; its own body is C06's, out of scope (see `reconciliation`)."
+          ],
+          "behavior": [
+            "Line 9274 (code): `}` — closing brace of C06's own `initSyncUI` (body 9260-9273, out of scope).",
+            "Line 9275 (code): `if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initSyncUI);else initSyncUI();` — self-registration.",
+            "Line 9276 (blank)."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "feedback-inbox",
+      "packets": [
+        {
+          "id": "C19ac.feedback-inbox",
+          "files": [
+            "src/js/timeline.js:9277-9335"
+          ],
+          "coverage_ranges": [
+            [
+              9277,
+              9335
+            ]
+          ],
+          "classification": {
+            "code": 52,
+            "comment": 6,
+            "whitespace": 1
+          },
+          "symbols": [
+            "fbTagLabel",
+            "renderFeedbackList",
+            "refreshFeedbackList",
+            "initFeedbackUI",
+            "SMFeedback",
+            "approveFeedback",
+            "readAllLocal",
+            "pullAllIncoming",
+            "showToast",
+            "SM"
+          ],
+          "signature": "function fbTagLabel(t); function renderFeedbackList(entries); function refreshFeedbackList(); function initFeedbackUI()",
+          "responsibility": "6-line lead-in (9277-9282): local debug-feedback list, sourced from `feedback-bridge.js`'s own local-file store (CLAUDE.md §6) — NOT team comments, NOT GitHub Issues (see `boundaries`(a)). Pending vs approved trust boundary explained: your own entries are already 'approved', a teammate's PULLED entry lands 'pending' until approved here. `fbTagLabel(t)` (9283): tag-to-emoji map. `renderFeedbackList(entries)` (9284-9315): renders `#fb-list` rows with status/tag/blocking chips and, for pending entries, an Approuver button wired to `SMFeedback.approveFeedback`. `refreshFeedbackList()` (9316-9321): re-fetches via `SMFeedback.readAllLocal` and re-renders. `initFeedbackUI()` (9322-9333): wires `#fb-pull` to `SMFeedback.pullAllIncoming`, with a disabled/loading button state and success/failure toasts.",
+          "callers": [
+            "`fbTagLabel` — used only inside this same packet's own `renderFeedbackList` (9298), no external caller found.",
+            "`renderFeedbackList` — ONE caller beyond its own declaration (9284): this packet's own `refreshFeedbackList` (9320, as the `.then` callback of `SMFeedback.readAllLocal()`).",
+            "`refreshFeedbackList` — TWO callers beyond its own declaration (9316): `initSettingsModal`'s own Settings-open click handler (timeline.js:9017, C06, out of scope) and this packet's own `initFeedbackUI` pull-success callback (9330).",
+            "`initFeedbackUI` — self-registration only (9334), no cross-file caller found."
+          ],
+          "behavior": [
+            "Lines 9277-9282 (comment, 6 lines): lead-in — local debug-feedback, pending-vs-approved trust boundary, mirrors the Sync updates list above it in the same panel.",
+            "Line 9283 (code): `function fbTagLabel(t){return {bug:'🐞',perf:'⚡',idea:'💡',polish:'✨'}[t]||t;}`.",
+            "Line 9284 (code): `function renderFeedbackList(entries){`.",
+            "Line 9285 (code): `#fb-list` DOM-existence guard.",
+            "Line 9286 (code): `listEl.innerHTML='';`.",
+            "Lines 9287-9290 (code, 4 lines): empty-state message and early return if `!entries||!entries.length`.",
+            "Line 9291 (code): `entries.forEach(function(entry){`.",
+            "Lines 9292-9297 (code, 6 lines): build `row`/`head`/`dot` elements, dot background from `entry.author.color||'#888'`.",
+            "Line 9298 (code): `tagsTxt=(entry.tags||[]).map(fbTagLabel).join(' ');`.",
+            "Line 9299 (code): `statusTxt` — `'⏳ en attente'` if pending, `'✓ résolu'` if resolved, else `''`.",
+            "Line 9300 (code): head text node — author name, frame number, tags, blocking flag, status, all concatenated conditionally.",
+            "Lines 9301-9303 (code, 3 lines): append `head`; build+append the note text from `entry.note`.",
+            "Lines 9304-9312 (code, 9 lines): if `entry.status==='pending'`, build an Approuver button (`SM.t('fbApproveBtn')`) whose click calls `window.SMFeedback.approveFeedback(entry.id).then(refreshFeedbackList)` (9308), append it.",
+            "Line 9313 (code): `listEl.appendChild(row);`.",
+            "Line 9314 (code): `});` closes the `entries.forEach`.",
+            "Line 9315 (code): `}` closing brace of `renderFeedbackList`.",
+            "Line 9316 (code): `function refreshFeedbackList(){`.",
+            "Line 9317 (code): bail if `!window.SMFeedback`.",
+            "Lines 9318-9319 (code, 2 lines): show a loading placeholder in `#fb-list`.",
+            "Line 9320 (code): `window.SMFeedback.readAllLocal().then(renderFeedbackList);`.",
+            "Line 9321 (code): `}` closing brace of `refreshFeedbackList`.",
+            "Line 9322 (code): `function initFeedbackUI(){`.",
+            "Lines 9323-9324 (code, 2 lines): resolve `#fb-pull`; bail if missing or no `SMFeedback`.",
+            "Line 9325 (code): click listener open.",
+            "Line 9326 (code): disable button, swap text to 'Recherche…'.",
+            "Line 9327 (code): `window.SMFeedback.pullAllIncoming().then(function(imported){`.",
+            "Lines 9328-9330 (code, 3 lines): on success — restore button, toast the imported count or 'Rien de nouveau' (`SM.t('toastFeedbackRetrievedSuffix')`), `refreshFeedbackList()`.",
+            "Line 9331 (code): `.catch(...)` — restore button, `console.warn`, toast `SM.t('toastRetrievalFailed')`.",
+            "Line 9332 (code): `});` closes the click listener.",
+            "Line 9333 (code): `}` closing brace of `initFeedbackUI`.",
+            "Line 9334 (code): `DOMContentLoaded`-or-immediate self-registration of `initFeedbackUI`.",
+            "Line 9335 (blank)."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "collaborator-avatar-stack",
+      "packets": [
+        {
+          "id": "C19ac.collaborator-avatar-stack",
+          "files": [
+            "src/js/timeline.js:9336-9422"
+          ],
+          "coverage_ranges": [
+            [
+              9336,
+              9422
+            ]
+          ],
+          "classification": {
+            "code": 79,
+            "comment": 7,
+            "whitespace": 1
+          },
+          "symbols": [
+            "fbInitial",
+            "refreshFbAvatars",
+            "renderFbAvatarPopover",
+            "toggleFbAvatarsPopover",
+            "initFbAvatars",
+            "goToFrame",
+            "state",
+            "comments",
+            "userProfile"
+          ],
+          "signature": "function fbInitial(name); function refreshFbAvatars(); function renderFbAvatarPopover(); function toggleFbAvatarsPopover(); function initFbAvatars()",
+          "responsibility": "7-line lead-in (9336-9342): TEAM COMMENTS ONLY (`state.comments`, shared via Sync équipe), explicitly NOT the debug-feedback entries — read-only glance, editing/resolving still happens on the pin itself. `fbInitial(name)` (9343): initial-letter helper. `refreshFbAvatars()` (9344-9367): builds `#fb-avatars` from the current profile plus every distinct comment author (dedupe rule in `boundaries`(d)), capped at 4 shown plus a '+N' overflow chip. `renderFbAvatarPopover()` (9368-9400): lists every comment newest-first, click -> `goToFrame`. `toggleFbAvatarsPopover()` (9401-9410): open/close + position the popover under `#fb-avatars`. `initFbAvatars()` (9411-9420): wires the click-to-open and outside-click-to-close handlers, initial `refreshFbAvatars()` call.",
+          "callers": [
+            "`fbInitial` — used only inside this packet (9358, 9381), no external caller found.",
+            "`refreshFbAvatars` — FOUR callers beyond its own declaration (9344): timeline.js:2647 (project-import success path, out of scope), timeline.js:7970 and 7977 (comment popover's own save/resolve handlers, C19x, out of scope), and this packet's own `initFbAvatars` (9419).",
+            "`renderFbAvatarPopover` — ONE caller beyond its own declaration (9368): this packet's own `toggleFbAvatarsPopover` (9405).",
+            "`toggleFbAvatarsPopover` — ONE caller beyond its own declaration (9401): this packet's own `initFbAvatars` click listener (9414).",
+            "`initFbAvatars` — self-registration only (9421), no cross-file caller found."
+          ],
+          "behavior": [
+            "Lines 9336-9342 (comment, 7 lines): lead-in — top-bar avatar stack, TEAM comments only (state.comments, Sync équipe pins), not SMFeedback; click opens a compact jump-to-frame list; editing stays on the pin itself.",
+            "Line 9343 (code): `function fbInitial(name){return (name||'?').trim().charAt(0).toUpperCase()||'?';}`.",
+            "Line 9344 (code): `function refreshFbAvatars(){`.",
+            "Lines 9345-9346 (code, 2 lines): `#fb-avatars` DOM-existence guard.",
+            "Line 9347 (code): `comments=state.comments||[];`.",
+            "Line 9348 (code): `seen={},people=[];`.",
+            "Line 9349 (code): seed `people`/`seen` with `state.userProfile` if present, `me:true`.",
+            "Lines 9350-9352 (code, 3 lines): dedupe-by-`authorId` loop over `comments` — see `boundaries`(d).",
+            "Line 9353 (code): `el.innerHTML='';`.",
+            "Line 9354 (code): `maxShown=4;`.",
+            "Lines 9355-9361 (code, 7 lines): render up to 4 avatar chips (`.fb-av`), background from `p.color||'#888'`, initial text, title with '(toi)' suffix for the current user.",
+            "Lines 9362-9366 (code, 5 lines): if more than 4 people, append a `.fb-av-more` '+N' overflow chip.",
+            "Line 9367 (code): `}` closing brace of `refreshFbAvatars`.",
+            "Line 9368 (code): `function renderFbAvatarPopover(){`.",
+            "Lines 9369-9371 (code, 3 lines): `#fb-avatars-pop` DOM-existence guard; clear it.",
+            "Line 9372 (code): `comments=(state.comments||[]).slice().sort(...)` — newest-first by `createdAt`.",
+            "Lines 9373-9376 (code, 4 lines): empty-state message and early return if no comments.",
+            "Line 9377 (code): `comments.forEach(function(cm){`.",
+            "Lines 9378-9382 (code, 5 lines): build the per-comment avatar (`.fb-pop-av`, background `cm.authorColor`, initial from `cm.authorName`).",
+            "Lines 9383-9386 (code, 4 lines): build note text and meta (author name + frame number).",
+            "Lines 9387-9391 (code+comment mix, 5 lines): resolved-status pill — see `boundaries`(d) for the exact visual change.",
+            "Line 9392 (code): `body.appendChild(meta);`.",
+            "Line 9393 (code): `item.appendChild(body);`.",
+            "Lines 9394-9397 (code, 4 lines): click handler — `goToFrame(cm.frame)` guarded on `typeof cm.frame==='number'`, then close the popover.",
+            "Line 9398 (code): `pop.appendChild(item);`.",
+            "Line 9399 (code): `});` closes the `comments.forEach`.",
+            "Line 9400 (code): `}` closing brace of `renderFbAvatarPopover`.",
+            "Line 9401 (code): `function toggleFbAvatarsPopover(){`.",
+            "Lines 9402-9404 (code, 3 lines): `#fb-avatars-pop` guard; if already open, close and return.",
+            "Line 9405 (code): `renderFbAvatarPopover();` — re-render fresh.",
+            "Lines 9406-9409 (code, 4 lines): position the popover under `#fb-avatars`'s own bounding rect, then add `.open`.",
+            "Line 9410 (code): `}` closing brace of `toggleFbAvatarsPopover`.",
+            "Line 9411 (code): `function initFbAvatars(){`.",
+            "Lines 9412-9413 (code, 2 lines): `#fb-avatars` DOM-existence guard.",
+            "Line 9414 (code): click listener — `stopPropagation`, `toggleFbAvatarsPopover()`.",
+            "Lines 9415-9418 (code, 4 lines): document-level outside-click listener closes the popover if open and the click target is outside it.",
+            "Line 9419 (code): `refreshFbAvatars();` — initial render at wiring time.",
+            "Line 9420 (code): `}` closing brace of `initFbAvatars`.",
+            "Line 9421 (code): `DOMContentLoaded`-or-immediate self-registration of `initFbAvatars`.",
+            "Line 9422 (blank)."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "github-feedback-triage-dashboard",
+      "packets": [
+        {
+          "id": "C19ac.github-feedback-triage-dashboard",
+          "files": [
+            "src/js/timeline.js:9423-9598"
+          ],
+          "coverage_ranges": [
+            [
+              9423,
+              9598
+            ]
+          ],
+          "classification": {
+            "code": 165,
+            "comment": 10,
+            "whitespace": 1
+          },
+          "symbols": [
+            "ghFbLabelEmoji",
+            "fbDashIssueStatus",
+            "fbDashAllTags",
+            "renderFbDashFilters",
+            "fbDashFiltered",
+            "fbDashCardEl",
+            "renderFbDashList",
+            "refreshFbDashboard",
+            "openFbDashboard",
+            "closeFbDashboard",
+            "initGithubFeedbackUI",
+            "SMFeedback",
+            "fetchGithubIssues",
+            "approveGithubIssue",
+            "resolveGithubIssue",
+            "editGithubIssueBody",
+            "deleteGithubIssue",
+            "githubTriageToken",
+            "setGithubTriageToken",
+            "smConfirm",
+            "showToast",
+            "SM"
+          ],
+          "signature": "function fbDashIssueStatus(issue); function fbDashAllTags(); function renderFbDashFilters(); function fbDashFiltered(); function fbDashCardEl(issue); function renderFbDashList(); function refreshFbDashboard(); function openFbDashboard(); function closeFbDashboard(); function initGithubFeedbackUI()",
+          "responsibility": "10-line lead-in (9423-9432): a dedicated wide modal for beta-tester GitHub Issues, status tabs + tag chips filtering the already-fetched list CLIENT-SIDE (no refetch per click), Résoudre/Éditer as inline textareas rather than native prompt()/confirm(). Reading needs no auth (public repo); labeling/closing/commenting/editing needs Cyril's own token (localStorage, his machine only). Four module-scope state vars (9433-9436), `ghFbLabelEmoji` (9437) tag/label emoji map, `fbDashIssueStatus(issue)` (9438-9442) label/state -> status, `fbDashAllTags()` (9443-9447), `renderFbDashFilters()` (9448-9474) status tabs + tag chips, `fbDashFiltered()` (9475-9481), `fbDashCardEl(issue)` (9482-9561) the per-issue card with Approve/Resolve/Edit/Delete actions and inline forms, `renderFbDashList()` (9562-9568), `refreshFbDashboard()` (9569-9578) the sole `fetchGithubIssues` call site, `openFbDashboard`/`closeFbDashboard` (9579-9583), and `initGithubFeedbackUI()` (9584-9596) wiring the token field and open/close/refresh buttons — full state-machine and surface detail in `boundaries`(b)/(c).",
+          "callers": [
+            "`fbDashIssueStatus` — ONE caller beyond its own declaration (9438): `fbDashFiltered` (9477).",
+            "`fbDashAllTags` — ONE caller beyond its own declaration (9443): `renderFbDashFilters` (9462).",
+            "`renderFbDashFilters` — THREE callers beyond its own declaration (9448): its own status-tab handler (9458), its own tag-chip handler (9470), and `refreshFbDashboard`'s own fetch-success callback (9574).",
+            "`fbDashFiltered` — ONE caller beyond its own declaration (9475): `renderFbDashList` (9564).",
+            "`fbDashCardEl` — ONE caller beyond its own declaration (9482): `renderFbDashList` (9567).",
+            "`renderFbDashList` — FOUR callers beyond its own declaration (9562): 9458, 9470, 9574 (same as `renderFbDashFilters`) plus `fbDashCardEl`'s own Résoudre/Éditer toggle handlers (9513, 9520).",
+            "`refreshFbDashboard` — THREE callers beyond its own declaration (9569): `fbDashCardEl`'s own Résoudre/Éditer submit success callbacks (9539, 9549) and `openFbDashboard` (9581). Also wired to `#fb-dash-refresh` from `initGithubFeedbackUI` (9595).",
+            "`openFbDashboard` — ONE caller beyond its own declaration (9579): `initGithubFeedbackUI`'s own open-button handler (9593).",
+            "`closeFbDashboard` — ONE caller beyond its own declaration (9583): `initGithubFeedbackUI`'s own close-button handler (9594).",
+            "`initGithubFeedbackUI` — self-registration only (9597), no cross-file caller found. No cross-file caller found for any of these eleven symbols — panel/UI-only reach, confirmed by a whole-src grep restricted to engine-bridge.js/export.js/rive-export.js (zero hits)."
+          ],
+          "behavior": [
+            "Lines 9423-9432 (comment, 10 lines): lead-in — dedicated wide modal, client-side filtering (no refetch per click), inline textarea forms instead of prompt/confirm; public read vs Cyril's-token write split.",
+            "Line 9433 (code): `var _fbDashIssues=[];`.",
+            "Line 9434 (code): `var _fbDashStatus='all';` + comment listing the four values.",
+            "Line 9435 (code): `var _fbDashTags=[];` + comment.",
+            "Line 9436 (code): `var _fbDashOpenForms={};` + comment.",
+            "Line 9437 (code): `function ghFbLabelEmoji(l){...}` — label/tag emoji map (bug/perf/idée/polish/blocking/pending/resolved).",
+            "Line 9438 (code): `function fbDashIssueStatus(issue){`.",
+            "Lines 9439-9441 (code, 3 lines): decision — 'pending' label wins first, else closed-or-'resolved'-label -> 'resolved', else 'approved'.",
+            "Line 9442 (code): `}` closing brace of `fbDashIssueStatus`.",
+            "Line 9443 (code): `function fbDashAllTags(){`.",
+            "Lines 9444-9446 (code, 3 lines): collect every label across `_fbDashIssues` excluding `pending`/`resolved`, return as array.",
+            "Line 9447 (code): `}` closing brace of `fbDashAllTags`.",
+            "Line 9448 (code): `function renderFbDashFilters(){`.",
+            "Lines 9449-9451 (code, 3 lines): resolve `#fb-dash-status-tabs`/`#fb-dash-tag-chips`; bail if either missing.",
+            "Line 9452 (code): `statuses` array — 4 [value,label] pairs.",
+            "Lines 9453-9460 (code, 8 lines): render status tabs, `active` class from `_fbDashStatus`, click writes `_fbDashStatus` (9458) then re-renders filters+list.",
+            "Lines 9461-9473 (code, 13 lines): render tag chips from `fbDashAllTags()`, click toggles membership in `_fbDashTags` (9467-9469) then re-renders filters+list.",
+            "Line 9474 (code): `}` closing brace of `renderFbDashFilters`.",
+            "Line 9475 (code): `function fbDashFiltered(){`.",
+            "Lines 9476-9479 (code, 4 lines): filter `_fbDashIssues` by `_fbDashStatus` (via `fbDashIssueStatus`) and by every active tag in `_fbDashTags` (AND semantics, `.every`).",
+            "Line 9480 (code): `});` closes the `.filter` callback.",
+            "Line 9481 (code): `}` closing brace of `fbDashFiltered`.",
+            "Lines 9482-9500 (code, 19 lines): `fbDashCardEl` header — issue-number link, label chips, closed-chip, date; title; optional 'Note' excerpt parsed out of `issue.body` via regex, shown only if it differs from the title.",
+            "Lines 9501-9508 (code, 8 lines): Approve button, shown only if `labels` includes `'pending'`; click -> `SMFeedback.approveGithubIssue(issue.number,issue.labels)` (9505) -> `refreshFbDashboard`, `.catch` toasts `e.message`.",
+            "Lines 9509-9516 (code, 8 lines): Résoudre button, shown unless closed; click toggles `_fbDashOpenForms[issue.number]` between `null`/`'resolve'` (9512) and re-renders the list.",
+            "Lines 9517-9522 (code, 6 lines): Éditer button (always shown); click toggles `_fbDashOpenForms[issue.number]` between `null`/`'edit'` (9519) and re-renders.",
+            "Lines 9523-9530 (code, 8 lines): Delete button; click -> `smConfirm` with the four-`SM.t`-key message (9525) -> on confirm, `SMFeedback.deleteGithubIssue(issue.nodeId)` (9527) -> `refreshFbDashboard`, `.catch` toasts.",
+            "Lines 9531-9532 (code, 2 lines): append `actions`; read `openForm=_fbDashOpenForms[issue.number]`.",
+            "Lines 9533-9542 (code, 10 lines): if `openForm==='resolve'`, build an inline textarea+confirm-button form; submit -> `SMFeedback.resolveGithubIssue(issue.number,issue.labels,rta.value)` (9538) -> clear the open-form flag + `refreshFbDashboard`, `.catch` toasts.",
+            "Lines 9543-9552 (code, 10 lines): else if `openForm==='edit'`, build an inline textarea (pre-filled `issue.body`) + save button; submit -> `SMFeedback.editGithubIssueBody(issue.number,eta.value)` (9548) -> clear the open-form flag + `refreshFbDashboard`, `.catch` toasts.",
+            "Lines 9553-9559 (code, 7 lines): if `issue.body`, append a collapsible `<details>` full-trail block.",
+            "Lines 9560-9561 (code, 2 lines): `return card;` and `}` closing brace of `fbDashCardEl`.",
+            "Line 9562 (code): `function renderFbDashList(){`.",
+            "Lines 9563-9567 (code, 5 lines): resolve `#fb-dash-list`; compute `fbDashFiltered()`; clear the list; empty-state message and return if none; else append one `fbDashCardEl(issue)` per filtered issue.",
+            "Line 9568 (code): `}` closing brace of `renderFbDashList`.",
+            "Line 9569 (code): `function refreshFbDashboard(){`.",
+            "Lines 9570-9572 (code, 3 lines): bail if no `SMFeedback`; resolve `#fb-dash-list`; show a loading placeholder.",
+            "Lines 9573-9574 (code, 2 lines): `SMFeedback.fetchGithubIssues().then(function(issues){ _fbDashIssues=issues;renderFbDashFilters();renderFbDashList(); })` — the SOLE fetch call site.",
+            "Lines 9575-9577 (code, 3 lines): `.catch` — show an inline error message with `e.message`.",
+            "Line 9578 (code): `}` closing brace of `refreshFbDashboard`.",
+            "Lines 9579-9582 (code, 4 lines): `openFbDashboard` — show `#fb-dashboard-modal`, call `refreshFbDashboard()`.",
+            "Line 9583 (code): `function closeFbDashboard(){document.getElementById('fb-dashboard-modal').style.display='none';}`.",
+            "Line 9584 (code): `function initGithubFeedbackUI(){`.",
+            "Lines 9585-9586 (code, 2 lines): resolve `#gh-token`/`#gh-token-save`/`#fb-dashboard-open`/`#fb-dashboard-close`/`#fb-dash-refresh`.",
+            "Line 9587 (code): bail if no token input or no `SMFeedback`.",
+            "Line 9588 (code): `tokenInput.value=window.SMFeedback.githubTriageToken();` — seed the field from localStorage.",
+            "Lines 9589-9592 (code, 4 lines): Save-button click -> `SMFeedback.setGithubTriageToken(tokenInput.value.trim())` (9590) -> toast `SM.t('toastTokenSavedLocalOnly')`.",
+            "Lines 9593-9595 (code, 3 lines): wire open/close/refresh buttons if present.",
+            "Line 9596 (code): `}` closing brace of `initGithubFeedbackUI`.",
+            "Line 9597 (code): `DOMContentLoaded`-or-immediate self-registration of `initGithubFeedbackUI`.",
+            "Line 9598 (blank)."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "timeline-hover-flag-and-step-active-layer",
+      "packets": [
+        {
+          "id": "C19ac.timeline-hover-flag-and-step-active-layer",
+          "files": [
+            "src/js/timeline.js:9599-9640"
+          ],
+          "coverage_ranges": [
+            [
+              9599,
+              9640
+            ]
+          ],
+          "classification": {
+            "code": 24,
+            "comment": 17,
+            "whitespace": 1
+          },
+          "symbols": [
+            "_pointerOverTimeline",
+            "stepActiveLayer",
+            "computeLayerRenderOrder",
+            "SM",
+            "setActiveLayer"
+          ],
+          "signature": "var _pointerOverTimeline; (function(){...})(); function stepActiveLayer(dir)",
+          "responsibility": "8-line lead-in (9599-9607, 2026-07 design audit): B/N are ALREADY `TOOL_SHORTCUTS` here (draw/fillbrush), so the work-area override in `onKeyDown` only fires while the pointer is over the timeline — hover-gated rather than mode-gated, since work area is timeline-wide (both Animation 2D and Motion). `_pointerOverTimeline` (9608) plus a self-invoking IIFE (9609-9614) that sets it true/false on `#fg-wrap`'s own `pointerenter`/`pointerleave`. 4-line lead-in (9616-9620) plus `stepActiveLayer(dir)` (9621-9640): steps the active layer up/down through the panel's own DISPLAYED order (via `computeLayerRenderOrder`, skipping hidden folder members), no wrap — full algorithm in `boundaries`(e).",
+          "callers": [
+            "`stepActiveLayer` — ONE caller beyond its own declaration (9621): `onKeyDown` (timeline.js:10088, PageUp/PageDown, out of scope).",
+            "`_pointerOverTimeline`'s single reader: `onKeyDown` (timeline.js:9921, 9928, its own B/N work-area override, out of scope) — no other reader found anywhere in src/js."
+          ],
+          "behavior": [
+            "Lines 9599-9607 (comment, 9 lines): lead-in — 2026-07 design-audit B/N shortcut request; B/N already claimed by TOOL_SHORTCUTS (draw/fillbrush), so the work-area override is hover-gated via this flag rather than mode-gated, mirroring the Motion-only P/A/R/S/T/U overrides in onKeyDown.",
+            "Line 9608 (code): `var _pointerOverTimeline=false;`.",
+            "Line 9609 (code): `(function(){`.",
+            "Lines 9610-9611 (code, 2 lines): resolve `#fg-wrap`; bail if missing.",
+            "Lines 9612-9613 (code, 2 lines): `pointerenter`/`pointerleave` listeners set `_pointerOverTimeline` true/false.",
+            "Line 9614 (code): `})();` closing the IIFE.",
+            "Line 9615 (blank).",
+            "Lines 9616-9620 (comment, 5 lines): lead-in — walks the layer list AS DISPLAYED (highest index first), skips hidden folder members, dir -1 up / +1 down.",
+            "Line 9621 (code): `function stepActiveLayer(dir){`.",
+            "Line 9622 (code): `var idxs;`.",
+            "Lines 9623-9626 (code, 4 lines): if `computeLayerRenderOrder` exists, build `idxs` from its own output filtered to `type==='layer'&&!hidden`, mapped to `idx`.",
+            "Lines 9627-9629 (code, 3 lines): else, fallback — walk `state.layers` highest-index-first.",
+            "Line 9630 (code): `if(idxs.length<2)return false;`.",
+            "Lines 9631-9632 (code, 2 lines): `pos=idxs.indexOf(state.activeLayerIdx); if(pos<0)pos=0;`.",
+            "Line 9633 (code): `var np=pos+dir;`.",
+            "Line 9634 (code): `if(np<0||np>=idxs.length)return false;` + trailing comment 'already at the end — stop, don't wrap'.",
+            "Lines 9635-9637 (comment, 3 lines): explains why `window.SM.setActiveLayer` is used rather than a raw `state.activeLayerIdx` assignment — it also saves the outgoing layer's frame, clears the selection, and unsticks the camera row.",
+            "Line 9638 (code): `window.SM.setActiveLayer(idxs[np]);`.",
+            "Line 9639 (code): `return true;`.",
+            "Line 9640 (code): `}` closing brace of `stepActiveLayer`."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No function in this scope calls `saveActiveLayerFrame`/`saveAllLayerFrames` — every write in this scope is either module-scope UI state (`_fbDashStatus`/`_fbDashTags`/`_fbDashOpenForms`), a DOM mutation, or a delegated write through `SMFeedback.*`/`window.SM.setActiveLayer` (which itself calls `saveAllLayerFrames`, out of scope, see `reconciliation`). This scope never mutates `state.layers`/`ld.frames` directly."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No function in this scope calls `loadFrame`/`importJSON` directly. The one indirect touch-point is the OTHER direction: `refreshFbAvatars` is itself called FROM the project-import success path (timeline.js:2647, out of scope) to resync the avatar stack after `state.comments` is replaced by the imported document — this scope's own function is the CALLEE there, not the caller."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "No `pushUndo`/`pushUndoLayers` call anywhere in this scope — every mutation here is either panel/modal presentation state (this scope's own module-scope vars), a GitHub Issue write delegated to `feedback-bridge.js` (its own undo semantics, if any, are out of scope), or `window.SM.setActiveLayer` (out of scope, its own body handles the active-layer-change side effects including any frame-save, not an undo-stack push)."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "This scope never reads or writes `selectedPaths`/`_layerSel`. `stepActiveLayer` changes `state.activeLayerIdx` only indirectly, through `window.SM.setActiveLayer` (out of scope), which the comment at 9635-9637 states also clears the selection — this scope's own body does not perform that clear itself."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "None of this scope's twenty functions branches on `state.appMode`; `stepActiveLayer` and the hover flag apply identically in both modes (the lead-in at 9606-9607 explicitly states work area is a timeline-wide concept, not mode-specific). None reads or writes `state.currentFrame` except via the delegated `goToFrame(cm.frame)` call in the avatar popover (9395, out of scope body)."
+    },
+    {
+      "consumer": "export",
+      "disposition": "None of this scope's twenty declared functions are called from `export.js`, `rive-export.js`, or `engine-bridge.js`'s `buildSceneJson`/`scenePayload` at the frozen SHA (confirmed: zero matches for any of the twenty symbol names in all three files) — every function here is editor-UI-only: the feedback inbox, avatar stack and triage dashboard are Réglages-panel/top-bar/modal surfaces, and the hover flag + `stepActiveLayer` are keyboard-shortcut helpers, never reached from a render/export pass."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "No `window.SMEngineBridge`/`window.__TAURI__` reference anywhere in this scope. The only network-adjacent calls are `window.SMFeedback.*` (feedback-bridge.js's own HTTP/fs layer, out of scope) — this scope itself performs no direct native/bridge call."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-feedback-inbox-pending-approve-flow",
+      "proposed": "Seed `SMFeedback.readAllLocal()` to resolve with one entry of `status:'pending'`; call `refreshFeedbackList()`; expect `renderFeedbackList` to show an Approuver button (9304-9312); click it; expect `SMFeedback.approveFeedback(entry.id)` invoked once, then `refreshFeedbackList` invoked again on resolve (9308) — verifies the trust-boundary chip logic in `boundaries`(a)/(b) — not run."
+    },
+    {
+      "id": "fx-feedback-inbox-pull-toast-and-disable",
+      "proposed": "Click `#fb-pull`; expect the button disabled and its text swapped to 'Recherche…' synchronously (9326), `SMFeedback.pullAllIncoming()` invoked once; on resolve with `imported=[{},{}]`, expect the button restored, a toast reading '2'+`SM.t('toastFeedbackRetrievedSuffix')`, and `refreshFeedbackList()` called once more (9328-9330) — not run."
+    },
+    {
+      "id": "fx-avatar-stack-dedupe-and-overflow",
+      "proposed": "Set `state.userProfile={id:'u0',name:'Me'}` and `state.comments` to 6 comments from 5 distinct `authorId`s (one author appearing twice); call `refreshFbAvatars()`; expect exactly 6 people resolved to unique avatars (1 profile + 5 distinct authors, the repeated author contributing only once, 9350-9351), `#fb-avatars` showing 4 chips plus a '+2' overflow chip (9354, 9362-9366) — verifies `boundaries`(d) — not run."
+    },
+    {
+      "id": "fx-avatar-popover-click-jumps-frame-and-closes",
+      "proposed": "Open the avatar popover with 3 comments at frames 2/9/15; click the item for frame 9; expect `goToFrame(9)` called exactly once (9395) and `#fb-avatars-pop` to lose its `.open` class (9396) — not run."
+    },
+    {
+      "id": "fx-dashboard-filter-never-refetches",
+      "proposed": "Spy on `SMFeedback.fetchGithubIssues`; call `openFbDashboard()` (one fetch); then click a status tab and a tag chip several times in sequence; expect `fetchGithubIssues` to have been called EXACTLY ONCE across the whole sequence (verifies `boundaries`(c)'s 'filtering never refetches' claim) while `renderFbDashList`'s own rendered card count changes with each filter click — not run."
+    },
+    {
+      "id": "fx-dashboard-delete-confirm-string-composition",
+      "proposed": "Stub `SM.t` to return its own key name; click Delete on an issue `{number:42,title:'Crash on export'}`; expect `smConfirm` called with message `'fbDeleteConfirmPrefix'+42+'fbDeleteConfirmMiddle'+'Crash on export'+'fbDeleteConfirmSuffix'` and title `'fbDeleteConfirmTitle'` (9525); resolve the confirm promise `false`; expect `SMFeedback.deleteGithubIssue` NEVER called (9526 guard) — not run."
+    },
+    {
+      "id": "fx-dashboard-resolve-edit-form-toggle-and-clear",
+      "proposed": "Click Résoudre on issue #7; expect `_fbDashOpenForms[7]==='resolve'` and an inline textarea rendered (9512-9513); click Résoudre again; expect the flag cleared to `null` and the form gone; click Résoudre then submit with text 'fixed'; expect `SMFeedback.resolveGithubIssue(7,labels,'fixed')` called once, then `_fbDashOpenForms[7]` reset to `null` and `refreshFbDashboard()` called (9538-9539) — not run."
+    },
+    {
+      "id": "fx-step-active-layer-no-wrap-and-hidden-skip",
+      "proposed": "Build `state.layers` with 4 layers where `computeLayerRenderOrder()` marks layer at panel-position 1 as `hidden:true` (collapsed-folder member); set `state.activeLayerIdx` to the topmost steppable layer; call `stepActiveLayer(-1)`; expect `false` returned and `window.SM.setActiveLayer` NOT called (9634, no-wrap guard) — then call `stepActiveLayer(1)` from the same position; expect it to skip the hidden entry and land on the next VISIBLE one, `window.SM.setActiveLayer` called with that index — verifies `boundaries`(e) — not run."
+    },
+    {
+      "id": "fx-pointer-over-timeline-gates-bn-shortcut",
+      "proposed": "Dispatch `pointerenter` on `#fg-wrap`; expect `_pointerOverTimeline===true` (9612); dispatch `pointerleave`; expect `false` (9613) — this fixture only exercises the flag itself; the B/N override it gates lives in `onKeyDown`, out of this scope, and would need its own fixture in that later census leaf — not run."
+    }
+  ],
+  "future_proposals": [
+    "`fbDashCardEl`'s note-excerpt regex (`/\\*\\*Note\\*\\*\\n([\\s\\S]*?)\\n\\n\\*\\*Contexte\\*\\*/`, 9496) silently shows nothing if a future issue-body template changes either heading's exact text or spacing — not a live defect (the template is presumably stable, feedback-bridge.js was not read as part of this census beyond its exported method surface), but worth a cross-check against feedback-bridge.js's own issue-body composer whenever that file's own census leaf is authored.",
+    "This issue's own owner paragraph describes `onKeyDown` (timeline.js:9641) only as belonging to 'a later C19 slice' while ALSO declaring the enclosing 9641-9949 range as C06's own Settings/Labs slice — the same paragraph appears to name two different owners for the same opening line. Not resolved by this artifact (cited by name/line only per instruction); flagged for whichever leaf's own artifact ends up covering timeline.js:9641 to confirm which owner is correct before that leaf's own `assigned_ranges` is finalized.",
+    "`stepActiveLayer`'s own fallback branch (9627-9628, `typeof computeLayerRenderOrder!=='function'`) walks `state.layers` highest-index-first with NO `hidden`-member skip at all — if `computeLayerRenderOrder` were ever absent at runtime (not observed, it is declared unconditionally at timeline.js:5600 in the same file), PageUp/PageDown would behave differently (stepping onto hidden folder members) than the normal path. Not exercised or confirmed as a live defect — `computeLayerRenderOrder` is always defined in every currently shipped build, this is a purely theoretical fallback-path divergence noted for completeness."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' -- src/js` (recursive, includes labs/ and adapters/) was run once for each of the twenty function symbols this scope defines, plus a separate `\\.<symbol>\\b` pass for property-form calls (`window.SM.setActiveLayer`, `window.SMFeedback.*`), at the current worktree HEAD (4aa9cd3, identical timeline.js blob to the frozen SHA), filtering out each symbol's own comment-only mentions — results are reproduced verbatim under each packet's own `callers` field and are re-checkable with the same command.",
+    "A SEPARATE whole-src grep restricted to `engine-bridge.js`/`export.js`/`rive-export.js` for all twenty symbol names returned ZERO hits, directly supporting the export/render-path `source_consumers` entry above.",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's OWN `classify()` algorithm against a direct `git show 59a5a38c:src/js/timeline.js` dump, run once per packet and once for the whole span — 322/40/5 over 367 lines, matching the issue's own proposed union exactly and matching the issue's own proposed per-packet table exactly for all five packets; no boundary correction was needed.",
+    "The `feedback-bridge.js` `window.SMFeedback={...}` export-block and each named method's own declaration line (readAllLocal:210, githubTriageToken/setGithubTriageToken:433-434, fetchGithubIssues:442, approveGithubIssue:472, resolveGithubIssue:476, editGithubIssueBody:486, deleteGithubIssue:495, pullAllIncoming:546, approveFeedback:553) were confirmed by direct `grep -n` against feedback-bridge.js itself, not assumed from a JSON or from memory.",
+    "The DOM-id inventory in `boundaries`(f) was confirmed against `src/index.html` directly (`grep -n 'id=\"fb-|id=\"gh-token|id=\"fg-wrap'`), not assumed.",
+    "The `onKeyDown` owner-paragraph inconsistency (flagged in `future_proposals`) was confirmed by re-reading this issue's own owner paragraph text verbatim, not inferred.",
+    "engineering/inventory/census/*.json siblings present at authoring time sharing `source_path: src/js/timeline.js`: C19a through C19ab (C19ac's own immediate predecessor). This artifact's own range (9274-9640) does not overlap any of them, confirmed by the validator's own cross-sibling overlap check against every `C*.json` present in the directory at run time."
+  ],
+  "validation": {
+    "expected_assigned_lines": 367,
+    "expected_classification": {
+      "code": 322,
+      "comment": 40,
+      "whitespace": 5
+    },
+    "packet_partition": [
+      [
+        9274,
+        9276
+      ],
+      [
+        9277,
+        9335
+      ],
+      [
+        9336,
+        9422
+      ],
+      [
+        9423,
+        9598
+      ],
+      [
+        9599,
+        9640
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by script against the frozen blob: 9274-9276=(2,0,1); 9277-9335=(52,6,1); 9336-9422=(79,7,1); 9423-9598=(165,10,1); 9599-9640=(24,17,1); sums to (322,40,5)=367 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 367 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check_c19ac.py engineering/inventory/census/C19ac-timeline-feedback-inbox-avatars-dashboard.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check_c19ac.py engineering/inventory/census/C19aa-timeline-typography-panels-gradient-button.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c19ac.py engineering/inventory/census/C19z-timeline-text-bake-commit-split.json <candidate-sha> still exits 0"
+    ]
+  }
+}
