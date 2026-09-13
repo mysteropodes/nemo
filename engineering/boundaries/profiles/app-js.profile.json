@@ -1801,6 +1801,18 @@
       ]
     },
     {
+      "id": "app.export.svgframe.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "export-svg-frame.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "export-svg-frame.js"
+      ]
+    },
+    {
       "id": "app.project.document",
       "layer": "app-domain",
       "dir": "src/js",

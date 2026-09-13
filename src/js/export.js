@@ -350,16 +350,15 @@ function exportFrameDataURL(frameIdx,scale,alpha){
   return url;
 }
 function exportFrameSVGString(frameIdx){
-  var L=exportBuildFrame(frameIdx);
-  // Same rule as rasterize(): exportSVG() skips invisible items too, so the
-  // hidden export layer must be flipped visible for the call itself (see
-  // exportFrameDataURL for why this never flashes on screen).
-  L.visible=true;
-  var inner=L.exportSVG({asString:true,bounds:new Rectangle(0,0,state.canvasW,state.canvasH)});
-  L.visible=false;
-  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
-    '<svg xmlns="http://www.w3.org/2000/svg" width="'+state.canvasW+'" height="'+state.canvasH+'" '+
-    'viewBox="0 0 '+state.canvasW+' '+state.canvasH+'">\n'+inner+'\n</svg>';
+  // The wrapper (visibility flip around exportSVG, XML preamble, root <svg>
+  // sized to the canvas) lives in adapters/export-svg-frame.js (P17); this
+  // function only binds its ports to the live document. The frame builder
+  // itself is still exportBuildFrame above, unchanged.
+  return NemoExportSvgFrame.exportFrameSVGString(frameIdx,{
+    buildFrame:exportBuildFrame,
+    dimensions:function(){return{width:state.canvasW,height:state.canvasH};},
+    Rectangle:Rectangle
+  });
 }
 function exportDataURLToBytes(dataURL){
   var b64=dataURL.split(',')[1];
