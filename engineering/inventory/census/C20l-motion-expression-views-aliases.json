@@ -1,0 +1,483 @@
+{
+  "census_id": "C20l",
+  "issue": 1236,
+  "title": "Census motion.js expression `comp`/`self` views, mesh-aware `self`, content box and AE compatibility aliases (2131-2347)",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf on the src/js/motion.js open span [1769,2932] of remediation-scope.json rangeCoverage (frozen index at 4bbe332), which the C20k-C20n series closes in four slices: C20k 1769-2130 (expression built-ins, merged as PR #1261/#1235), C20l 2131-2347 (comp/self views, mesh-aware self, AE compatibility aliases — this leaf), C20m 2348-2634 (expression compilation and evaluation, not yet filed), C20n 2635-2932 (valueAtFrame, key writers, element holders, not yet filed). Sole artifact: engineering/inventory/census/C20l-motion-expression-views-aliases.json; src/js/motion.js and all callers remain read-only. Cited by name/line only, not re-mapped: everything before 1769 (_ectx motion.js:1365, _num motion.js:1591, _exprFps motion.js:1371, the remap/vector-math block motion.js:1623-1693, exprSeed motion.js:1733, exprStepTime motion.js:1709, holderRefOf/holderFromRef motion.js:1104-1130 — C02 animation-time census and C20a-j), everything in 1769-2130 (exprSelfAt/exprSelfVelocity/exprSelfSpeed, exprLayer, layerSnapshot, exprSelfControl/exprLayerControl, exprKeyAt/exprNumKeys/exprNearestKeyAtFrame, _markerApi, exprWiggle/exprNoise, exprLoopAfter/exprLoopBefore — C20k, PR #1261, merged), everything after 2932 (computeMotionMat, layerMotionAt/elementMotionAt — sibling-covered, C20n territory), the expression editor panel (C20f, motion.js:8649-9428, PR #1225), expression controls UI (exprControls, C20/C13), rig-widget.js (layerControl, CLAUDE.md §13), image-mesh.js (mesh holders and SMImageMesh, CLAUDE.md §12/§12ter), engine-bridge.js (affineFromMotion, the render-time consumer of computeMotionMat's output), app.js (state, userLayers, layerInPoint/layerOutPoint, findLayerIndexByUid, applyLayerDuplicator), NemoOpacityDomain (application module), ui.js curve editor, pushUndo* (tweens.js), showToast (C19w).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "2efa6e7584105469ce9e8a93b5bee82643c3c848",
+  "source_path": "src/js/motion.js",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_line_count": 13914,
+  "scope_files": [
+    "src/js/motion.js"
+  ],
+  "intended_branch": "claude/c20l-motion-expression-views-aliases-census",
+  "assigned_ranges": [
+    {
+      "start": 2131,
+      "end": 2347
+    }
+  ],
+  "coverage_note": "Exactly 217 assigned lines in one contiguous range and three complete packets: 169 code, 45 full-line comments, 3 blank — independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs (a Python re-implementation run directly against the frozen blob via `git show 59a5a38...:src/js/motion.js`), and it matches the issue's own proposed union AND per-packet table exactly for all three packets (53=44/9/0, 89=63/24/2, 75=62/12/1) with zero discrepancy. No boundary correction was needed: line 2130 (blank, the trailing line of C20k's own _markerEntry/_markerApi closure) precedes this scope; line 2131 opens this scope's own `// ---- \\`comp\\` and \\`self\\` views` header (confirmed by direct `awk`/`sed -n` read of the frozen blob with real line numbers, not the relative numbering `git show | sed -n` alone would give). Line 2347 (blank) closes this scope; line 2348 opens C20m's own `// ---- compilation` header (confirmed by direct read). The issue's own three suggested internal packet cuts (at the mesh-aware-self header line 2184 and the compatibility-aliases header line 2273) were evaluated and taken as-is: both are the construct's own `// ----`/`// ====` section header, the same cut rule every other C20 sibling in this family uses, and each packet's own classification counts reproduced by direct computation without adjustment.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/motion.js resolves to 6617bac29042c22399cac202bf054c09e4fdf30e, 13914 lines.",
+    "current": "This worktree's HEAD and the allocated base 2efa6e7584105469ce9e8a93b5bee82643c3c848 (2efa6e7, PR #1256, merged) both resolve motion.js to the identical blob 6617bac29042c22399cac202bf054c09e4fdf30e — verified directly (`git rev-parse <pin>:src/js/motion.js` == `git rev-parse 2efa6e7:src/js/motion.js`).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `grep -rnE \"(^|[^a-zA-Z_.])<symbol>\\(\" --include='*.js' src/js` and plain-word `grep -rn '\\b<symbol>\\b' --include='*.js' src/js` for the three object-shaped singletons (COMP_VIEW/SELF_KEYS/SELF_VIEW, which are never called with `(`), each filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`, then confirmed by reading each surviving hit directly with `awk`/`sed -n` against this worktree's copy of motion.js and image-mesh.js/app.js — the worktree copy confirmed byte-identical to the frozen blob above for motion.js, so its line numbers are valid frozen-blob citations.",
+    "fixtures": "Every behavioral fixture is source-derived, proposed and unrun."
+  },
+  "writer_guidance": {
+    "artifact": "Only engineering/inventory/census/C20l-motion-expression-views-aliases.json is writable for this outcome.",
+    "runtime": "Historical Motion ownership retains motion.js runtime writing; P30 retains timeline.js. C20l transfers no implementation authority.",
+    "owners": "C20k (PR #1261, merged) retains motion.js:1769-2130 in full; C02 animation-time census retains everything before 1769; C20m/C20n (not yet filed) retain motion.js:2348-2932; C20f (PR #1225, merged) retains the expression editor panel at motion.js:8649-9428; app.js and image-mesh.js retain their own bodies in full.",
+    "reservations": "D01, T05/Pollen, C04, historical Motion and every named reservation remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C20k (existing owner, motion.js:1769-2130, PR #1261/#1235, merged)",
+      "disposition": "Retains its own body in full — cited by name/line only. This scope's own accessors are thin wrappers over C20k's built-ins, never duplicating their bodies: SELF_KEYS.at/nearest/count (motion.js:2173-2176) call exprKeyAt/exprNearestKeyAtFrame/exprNumKeys (C20k.keyframe-introspection, motion.js:2064/2091/2070) directly; SELF_VIEW.at/velocity/speed/control (motion.js:2178-2182) are bare references to exprSelfAt/exprSelfVelocity/exprSelfSpeed/exprSelfControl (C20k.self-sampling and C20k.expression-controls, motion.js:1823/1834/1844/2020); COMP_VIEW.marker (motion.js:2170) calls _markerApi (C20k.markers, motion.js:2107). The compatibility-alias packet (packet 3) is entirely built on C20k built-ins with unit conversion added here: aliasValueAtTime/aliasVelocityAtTime/aliasSpeedAtTime (motion.js:2287-2289) call exprSelfAt/exprSelfVelocity/exprSelfSpeed after converting seconds to frames; aliasKey/aliasNearestKey (motion.js:2290-2294) call exprKeyAt/exprNearestKeyAtFrame; aliasSeedRandom (motion.js:2295-2299) calls exprSeed (pre-C20k, see below); loopOut/loopIn (the AE alias names themselves, bound in C20m's sandbox call at motion.js:2583) are exprLoopAfter/exprLoopBefore (C20k.looping, motion.js:1909/1915) reused VERBATIM with no wrapper of any kind in this scope — see the AE alias table in packet 3's own responsibility field."
+    },
+    {
+      "owner": "C02 animation-time census and C20a-j (existing owners, motion.js:1-1768, everything before C20k)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. This scope calls four pre-C20k helpers directly: _exprFps (motion.js:1371, COMP_VIEW.fps getter and throughout packet 3's fps conversions), _num (motion.js:1591, every alias function's own argument coercion), exprSeed (motion.js:1733, aliasSeedRandom) and exprStepTime (motion.js:1709, aliasPosterizeTime, which mutates the shared ephemeral _ectx.frame/_ectx.time — see boundaries). The remap/vector-math block (exprRemap/exprRemapEase/exprRemapEaseIn/exprRemapEaseOut/exprClamp/exprDegrees/exprRadians/exprAngleTo, motion.js:1623-1693) supplies six more AE alias targets (linear/ease/easeIn/easeOut/degreesToRadians/radiansToDegrees/lookAt) bound only in C20m's sandbox call, never referenced by name inside this scope's own two-range union. holderRefOf (motion.js:1104-1108, immediately before C20k, its own comment at motion.js:1100-1103 already names 'a strokeId, or a meshId for an image mesh' as the element-holder key space this scope's own mesh-aware self relies on) is an external caller of resolveHolderLayer — see packet 1's own callers list."
+    },
+    {
+      "owner": "C20m (not yet filed at authoring time, motion.js:2348-2634, expression compilation and evaluation)",
+      "disposition": "Cited by name/line only. evalExpressionFor (motion.js:2542-2542+) is the SOLE caller of every one of this scope's own declared symbols, through one positional argument list handed to the compiled `fn(...)` call at motion.js:2572-2591 — the exact binding is transcribed verbatim in each packet's own responsibility/callers fields. compiledFnFor (motion.js:2388-2490) declares EXPR_PUBLIC_NAMES/EXPR_ARG_NAMES (motion.js:2360-2386, the public AE-facing parameter names 'self'/'comp'/'contentBox'/'loopOut'/.../'thisComp'/'thisLayer') and computes entry.needsAliasComp/entry.needsAliasLayer (motion.js:2484-2485, `/\\bthisComp\\b/.test(body)` / `/\\bthisLayer\\b/.test(body)`) — the lazy gate this scope's own buildAliasComp/buildAliasLayer (packet 3) depend on to cost nothing when an expression never names them."
+    },
+    {
+      "owner": "C20n (not yet filed at authoring time, motion.js:2635-2932, valueAtFrame, key writers, element holders)",
+      "disposition": "Cited by name/line only. valueAtFrame (motion.js:2639-2650ish) calls evalExpressionFor once per property per frame and is itself called from computeMotionMat (motion.js:2933-2951, immediately after this scope's own sibling C20n's own range starts, itself sibling-covered per the issue's own framing) — confirming this scope runs on the actual RENDER path (engine-bridge.js's buildSceneJson consumes computeMotionMat's output for every frame), not merely a live UI preview. See source_consumers/render and boundaries for the full external caller fan-out of valueAtFrame."
+    },
+    {
+      "owner": "app.js (existing owner, the global state/userLayers objects, layerInPoint/layerOutPoint, findLayerIndexByUid, applyLayerDuplicator)",
+      "disposition": "Retains its own body in full — cited by line only. resolveHolderLayer (packet 1) reads `state.layers`/`state.layers[i].elementMotion` directly (app.js:78 declares the global `state` object; app.js:365 declares the global `userLayers` array read by exprContentBox, packet 2). SELF_VIEW.inPoint/outPoint and buildAliasLayer (packets 1 and 3) call `window.layerInPoint`/`window.layerOutPoint` (app.js:2838/2889) behind an existence guard. SELF_VIEW.parent and buildAliasLayer also call findLayerIndexByUid (app.js is NOT its owner — motion.js:3564, sibling-covered, out of this scope's own range). applyLayerDuplicator (app.js:1616-1688, cited in C20j's own reconciliation) is one of several out-of-Motion-panel external callers of valueAtFrame, which in turn is the sole caller of evalExpressionFor, which in turn is the sole caller of every symbol in this scope — see boundaries for the full fan-out."
+    },
+    {
+      "owner": "image-mesh.js (existing owner, SMImageMesh, CLAUDE.md §12/§12ter, PR1+PR2+PR3)",
+      "disposition": "Retains its own body in full — cited by line only. SMImageMesh.get (image-mesh.js:73, exported at image-mesh.js:547) is _selfMesh's (packet 2) sole data source, called behind a `window.SMImageMesh` existence guard (motion.js:2199). No other symbol in image-mesh.js is referenced anywhere in this scope's own two-range union."
+    },
+    {
+      "owner": "C20f (existing owner, motion.js:8649-9428, PR #1225, merged)",
+      "disposition": "Retains its own body in full — cited by line only. Two of resolveHolderLayer's (packet 1) three out-of-scope external callers live here: exprPanelLabelFor (motion.js:8981-8990, the split expression editor's own breadcrumb label builder) and an anonymous example-snippet closure (motion.js:9165-9172, the expression-control example builder) — both resolve a per-shape row's owning layer through resolveHolderLayer exactly as packet 1 documents, confirmed by direct read."
+    },
+    {
+      "owner": "P30/#1032 and historical Motion ownership",
+      "disposition": "P30 retains timeline.js runtime writing and historical Motion ownership retains motion.js. This artifact authoring permits no source or behavior change."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "areas": [
+    {
+      "area": "comp-and-self-views",
+      "packets": [
+        {
+          "id": "C20l.comp-and-self-views",
+          "files": [
+            "src/js/motion.js:2131-2183"
+          ],
+          "coverage_ranges": [
+            [
+              2131,
+              2183
+            ]
+          ],
+          "classification": {
+            "code": 44,
+            "comment": 9,
+            "whitespace": 0
+          },
+          "symbols": [
+            "resolveHolderLayer",
+            "_selfResolved",
+            "_selfLd",
+            "COMP_VIEW",
+            "SELF_KEYS",
+            "SELF_VIEW"
+          ],
+          "signatures": [
+            "function resolveHolderLayer(holder) -> {ld, index, strokeId}|null",
+            "function _selfResolved() -> {ld, index, strokeId}|null (memoized once per evaluation on _ectx._resolved)",
+            "function _selfLd() -> layer object (ld) | null",
+            "var COMP_VIEW = {} — module-level singleton; width/height/fps/frames/layers/name/marker are Object.defineProperty ES5 getters reading state/`_exprFps()`/`_markerApi()` at call time",
+            "var SELF_KEYS = {at(i), nearest(f)} plus a `count` ES5 getter",
+            "var SELF_VIEW = {at, velocity, speed, keys, control} — base shape; packet 2 adds fourteen more ES5 getters to the SAME object"
+          ],
+          "responsibility": "Section header (2131-2136, 6 lines): states the module-level SINGLETON design — COMP_VIEW/SELF_KEYS/SELF_VIEW are built ONCE at script-load time and their accessors read `_ectx`/`state` at the moment an expression touches them, not per-evaluation objects; this keeps the hot compiled-expression path allocation-free, and the two genuinely expensive operations (resolving which layer a per-shape holder belongs to; building a marker list) run only when an expression actually reads a field that needs them. resolveHolderLayer(holder) (2137-2146): an exact-match scan of `state.layers` for a LAYER holder (returns {ld:holder, index, strokeId:null} immediately), else a scan of every layer's own `elementMotion` map for an ELEMENT holder (value-identity match via `em[k]===holder`, returns {ld, index, strokeId:k}); returns null if holder is neither. See boundaries for why this is exactly TWO branches, not three, despite mesh holders reusing the second one. Lead-in (2147-2148, 2 lines): the scan is O(layers x shapes) and several `self` fields want the identical answer within one evaluation. _selfResolved() (2149-2154): memoizes resolveHolderLayer(ctx.holder) onto `ctx._resolved` (undefined check, not truthy check — so a real `null` result, e.g. a stray/detached holder, is cached too and never re-scanned within the same evaluation) — the cache key IS the ephemeral per-evaluation `_ectx` object itself (C20m, motion.js:2563-2569), so it never survives past one compiled-function call. _selfLd() (2155, one line): `r ? r.ld : null` — the layer object regardless of holder kind. COMP_VIEW (2156-2170): width/height read state.canvasW/canvasH directly; fps delegates to _exprFps() (pre-C20k, motion.js:1371, itself `state.fps || 24`); frames/layers read state.totalFrames/state.layers.length; name (2162-2169, the only multi-line getter) returns the ACTIVE COMPONENT's own name when `state.activeSymbolId` names a live entry in `state.symbols`, else the literal string 'Scene' — so an expression's `comp.name` reflects whichever Component the user is currently editing INSIDE (CLAUDE.md §8's Component-scoped editing), not always the top-level project; marker delegates to _markerApi(state.markers) (C20k.markers, motion.js:2107), the project-level marker list. SELF_KEYS (2171-2176): 'self.keys — the current property's own keyframes' (2171); at(i) floors i and calls exprKeyAt(c.holder, c.prop, ...) (C20k, motion.js:2064); nearest(f) calls exprNearestKeyAtFrame(c.holder, c.prop, f) (C20k, motion.js:2091) with f taken as FRAMES, no conversion; count is an ES5 getter calling exprNumKeys(c.holder, c.prop) (C20k, motion.js:2070) LIVE on every read — unlike packet 3's own `numKeys` alias, which is evaluated once and bound as a plain number (see boundaries). All three silently return null/0 if `_ectx` is absent (an accessor read outside any expression evaluation, which cannot normally happen but is guarded anyway). SELF_VIEW (2177-2183): the base object literal — at/velocity/speed/control are bare references to exprSelfAt/exprSelfVelocity/exprSelfSpeed/exprSelfControl (C20k, motion.js:1823/1834/1844/2020), keys is the SELF_KEYS object just built. Packet 2 (2184-2249) adds fourteen more properties to this SAME object via Object.defineProperty after it is constructed — SELF_VIEW is one object, built in two packets.",
+          "callers": [
+            "resolveHolderLayer: internal caller _selfResolved (motion.js:2152, this scope, same file). Three external callers, all inside motion.js but outside this scope's own range — none in another file: holderRefOf (motion.js:1105, pre-C20k cross-layer-reference helper, builds a {uid,elem} reference used to construct `layer(ref)` expression text, not persisted to project JSON), exprPanelLabelFor (motion.js:8982, C20f expression editor panel, builds the split-editor's own breadcrumb label), and an anonymous example-snippet closure (motion.js:9166, C20f, builds a `self.control(...)` example string). Confirmed by `grep -rnE \"(^|[^a-zA-Z_.])resolveHolderLayer\\(\"` across src/js — zero hits outside motion.js.",
+            "_selfResolved: internal callers only, all this scope or packet 2/3, same file — _selfLd (motion.js:2155), SELF_VIEW.index/isShape getters (motion.js:2228/2232, packet 2), exprContentBox (motion.js:2258, packet 2), buildAliasLayer (motion.js:2326, packet 3). Zero callers outside motion.js.",
+            "_selfLd: internal callers only — SELF_VIEW.name/inPoint/outPoint/hasParent/parent/marker getters (motion.js:2227/2234/2237/2239/2242/2249, packet 2) and buildAliasLayer (motion.js:2326, packet 3). Zero callers outside motion.js.",
+            "COMP_VIEW: read internally at motion.js:2316/2320 (buildAliasComp, packet 3, `.width`/`.height`/`.name`) and bound whole into the compiled-expression sandbox as the public name `comp` at motion.js:2576 (C20m, evalExpressionFor's own fn() call — `exprLayer, SELF_VIEW, COMP_VIEW, COMP_VIEW.marker,`). Confirmed by plain-word grep: zero references outside motion.js.",
+            "SELF_KEYS: read only as `keys: SELF_KEYS` at motion.js:2181 (this scope, part of SELF_VIEW's own construction). Never referenced by name anywhere else — reached by user code only via `self.keys.*`. Zero references outside motion.js.",
+            "SELF_VIEW: bound whole into the sandbox as the public name `self` at motion.js:2576 (same C20m call as COMP_VIEW above) and read internally at motion.js:2333 (buildAliasLayer's own `parent: SELF_VIEW.parent`, packet 3). Confirmed by plain-word grep: zero references outside motion.js."
+          ],
+          "external_calls": [
+            "_exprFps() — motion.js:1371 (pre-C20k, called from COMP_VIEW.fps).",
+            "_markerApi(list) — motion.js:2107 (C20k.markers, called from COMP_VIEW.marker).",
+            "exprKeyAt(holder,prop,i) — motion.js:2064 (C20k.keyframe-introspection, called from SELF_KEYS.at).",
+            "exprNearestKeyAtFrame(holder,prop,frame) — motion.js:2091 (C20k.keyframe-introspection, called from SELF_KEYS.nearest).",
+            "exprNumKeys(holder,prop) — motion.js:2070 (C20k.keyframe-introspection, called from SELF_KEYS.count).",
+            "_num(v) — motion.js:1591 (pre-C20k, called from SELF_KEYS.at/nearest).",
+            "exprSelfAt/exprSelfVelocity/exprSelfSpeed — motion.js:1823/1834/1844 (C20k.self-sampling, referenced as SELF_VIEW.at/velocity/speed, not called at declaration time).",
+            "exprSelfControl — motion.js:2020 (C20k.expression-controls, referenced as SELF_VIEW.control).",
+            "state.layers / state.layers[i].elementMotion / state.canvasW / state.canvasH / state.totalFrames / state.activeSymbolId / state.symbols / state.markers — app.js:78 global `state` object, read-only field access, not function calls."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "mesh-aware-self-and-content-box",
+      "packets": [
+        {
+          "id": "C20l.mesh-aware-self-and-content-box",
+          "files": [
+            "src/js/motion.js:2184-2272"
+          ],
+          "coverage_ranges": [
+            [
+              2184,
+              2272
+            ]
+          ],
+          "classification": {
+            "code": 63,
+            "comment": 24,
+            "whitespace": 2
+          },
+          "symbols": [
+            "_selfMesh",
+            "_selfVertexIndex",
+            "SELF_VIEW",
+            "exprContentBox"
+          ],
+          "signatures": [
+            "function _selfMesh() -> ImageMesh object (image-mesh.js shape) | null",
+            "function _selfVertexIndex() -> integer vertex index, or -1 if the current property is not `vtxN`",
+            "SELF_VIEW += {isMesh, vertexIndex, vertexCount, vertexUV, isOutlineVertex, property, name, index, isShape, inPoint, outPoint, hasParent, parent, marker} — 14 more ES5 getters on the SAME object packet 1 built",
+            "function exprContentBox() -> {x, y, width, height, top, left}"
+          ],
+          "responsibility": "Section header + narrative comment (2184-2196, 13 lines, 2026-08-30): image meshes became animatable per vertex (CLAUDE.md §12ter), but an expression had no way to know WHICH vertex it was running on, so animating a whole mesh surface by hand meant keying every vertex individually (75 tracks for a 10-column mesh); with the vertex index and its own REST position available, one expression (`var uv = self.vertexUV; [0, Math.sin(uv[0]*6+time*3)*8]`) describes the whole surface. The comment is explicit that vertexUV is the REST position (normalized 0..1 over the image), never the POSED one, because an expression reading its own output would feed back on itself frame after frame. _selfMesh() (2197-2201): returns null unless `_selfResolved()` yields a holder with a non-null strokeId AND `window.SMImageMesh` exists, else `SMImageMesh.get(r.strokeId) || null` (image-mesh.js:73) — here `r.strokeId` is read as if it MIGHT be a meshId, which is exactly the reuse boundaries documents: resolveHolderLayer never knows or cares that the string is a meshId, only SMImageMesh.get's own lookup determines that. _selfVertexIndex() (2202-2207): reads `_ectx.prop`, matches it against `/^vtx(\\d+)$/`, returns the captured integer or -1 — this is the SAME `vtxN` naming convention CLAUDE.md §12ter documents for per-vertex motion tracks. The fourteen SELF_VIEW getters added here (2208-2249) fall into four groups: (a) mesh identity — isMesh (2208, `!!_selfMesh()`), vertexIndex (2209, a direct getter alias of _selfVertexIndex), vertexCount (2210-2212, `m.verts.length` or 0), vertexUV (2213-2219, `[m.verts[i][0], m.verts[i][1]]` or `[0,0]` — the RAW 0..1 rest-position pair, a DIFFERENT unit from the per-vertex ANIMATION offset elsewhere in the app, which CLAUDE.md §12ter documents as stored in PERCENT (0-100) of image size), isOutlineVertex (2220-2225, `i < m.outline.length` — true only for the contour/mask vertices CLAUDE.md §12 describes as square orange handles in the editor); (b) generic holder identity, unrelated to mesh — property (2226, bare `_ectx.prop`), name (2227, `_selfLd().name`), index (2228, `_selfResolved().index`); (c) the mesh-vs-shape disambiguation — a 3-line comment (2229-2231) states a mesh holder used to answer `isShape:true` (it is 'keyed like an element holder' — same map, see boundaries), which made `self.isShape` useless once meshes and shapes could both be present; isShape (2232) is now `!!(r && r.strokeId != null) && !_selfMesh()` — true only for an ACTUAL per-shape element holder; (d) layer-context passthroughs — inPoint/outPoint (2233-2238, delegate to window.layerInPoint/layerOutPoint, app.js:2838/2889, guarded by existence, default 0 / state.totalFrames-1), hasParent (2239, `!!ld.parentLayerUid`), parent (2240-2248, resolves the parent layer's UID via findLayerIndexByUid — motion.js:3564, sibling-covered — and returns a full layerSnapshot, C20k.other-layers, motion.js:1957, AT THE CURRENTLY-EVALUATING frame, `_ectx.frame`), marker (2249, `_markerApi(ld.markers)` — this LAYER's own markers, distinct from COMP_VIEW.marker's project-level list). Lead-in (2251-2256, 6 lines): frames exprContentBox's own SCOPE honestly — Paper.js only materializes geometry for the CURRENTLY LOADED frame, so this always reports the box of whichever frame is being evaluated, 'stated rather than faked'. exprContentBox() (2257-2271): resolves the holder; for a per-shape element holder with a live Paper item, calls liveItemByStrokeId(r.index, r.strokeId) (declared later in the SAME file at motion.js:9732, guarded by `typeof liveItemByStrokeId === 'function'` — a defensive check that is effectively always true once the enclosing IIFE has finished executing, since function declarations hoist regardless of their own source-order position) and reads its `.bounds`; otherwise falls back to the WHOLE layer's own Paper.js layer bounds (`userLayers[r.index].bounds`, app.js:365 global); returns an all-zero box shape if neither resolves; otherwise returns `{x,y,width,height,top,left}` with top/left DUPLICATING y/x on purpose (2268-2269 comment) so the AE-alias `sourceRectAtTime` (packet 3) needs no separate implementation.",
+          "callers": [
+            "_selfMesh: internal callers only, this scope — SELF_VIEW.isMesh/vertexCount/vertexUV/isOutlineVertex/isShape getters (motion.js:2208/2211/2215/2222/2232). Zero callers outside motion.js.",
+            "_selfVertexIndex: internal callers only, this scope — SELF_VIEW.vertexIndex getter (motion.js:2209, passed as the getter function itself, `{ get: _selfVertexIndex }`, not invoked at that line) and SELF_VIEW.vertexUV/isOutlineVertex getters (motion.js:2215/2222). Zero callers outside motion.js.",
+            "SELF_VIEW: see packet 1's own callers entry — this packet only ADDS properties to the identical object, it introduces no new external reference path.",
+            "exprContentBox: bound into the compiled-expression sandbox under TWO public names at once — `contentBox` (motion.js:2580) and the AE alias `sourceRectAtTime` (motion.js:2587), both C20m, evalExpressionFor's own fn() call. No other reference anywhere in src/js — confirmed by grep."
+          ],
+          "external_calls": [
+            "window.SMImageMesh.get(meshId) — image-mesh.js:73, exported image-mesh.js:547 (called from _selfMesh, behind an existence guard).",
+            "_selfResolved()/_selfLd() — this scope's own packet 1 (motion.js:2149/2155).",
+            "window.layerInPoint(ld) / window.layerOutPoint(ld) — app.js:2838 / app.js:2889 (called from SELF_VIEW.inPoint/outPoint, behind existence guards).",
+            "findLayerIndexByUid(uid) — motion.js:3564 (sibling-covered, called from SELF_VIEW.parent).",
+            "layerSnapshot(ref, frame) — motion.js:1957 (C20k.other-layers, called from SELF_VIEW.parent).",
+            "_markerApi(list) — motion.js:2107 (C20k.markers, called from SELF_VIEW.marker).",
+            "liveItemByStrokeId(li, strokeId) — motion.js:9732, exported motion.js:13419 (sibling-covered, called from exprContentBox behind a `typeof` guard).",
+            "window.userLayers[r.index] — app.js:365 global array, `.bounds` is a native Paper.js Item accessor, not a Nemo function (read from exprContentBox)."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "ae-compatibility-aliases",
+      "packets": [
+        {
+          "id": "C20l.ae-compatibility-aliases",
+          "files": [
+            "src/js/motion.js:2273-2347"
+          ],
+          "coverage_ranges": [
+            [
+              2273,
+              2347
+            ]
+          ],
+          "classification": {
+            "code": 62,
+            "comment": 12,
+            "whitespace": 1
+          },
+          "symbols": [
+            "aliasPosterizeTime",
+            "aliasValueAtTime",
+            "aliasVelocityAtTime",
+            "aliasSpeedAtTime",
+            "aliasNearestKey",
+            "aliasKey",
+            "aliasSeedRandom",
+            "aliasTimeToFrames",
+            "aliasFramesToTime",
+            "buildAliasComp",
+            "buildAliasLayer",
+            "_aliasMarkerApi"
+          ],
+          "signatures": [
+            "function aliasPosterizeTime(samplesPerSecond) -> number (seconds, ctx.time)",
+            "function aliasValueAtTime(t) -> same shape as self.at()",
+            "function aliasVelocityAtTime(t) -> same shape as self.velocity()",
+            "function aliasSpeedAtTime(t) -> number",
+            "function aliasNearestKey(t) -> key object | null",
+            "function aliasKey(i) -> key object | null",
+            "function aliasSeedRandom(seed, timeless) -> undefined (mutates _ectx)",
+            "function aliasTimeToFrames(t, fps) -> number",
+            "function aliasFramesToTime(f, fps) -> number",
+            "function buildAliasComp() -> {width,height,frameDuration,duration,numLayers,name,marker,layer}",
+            "function buildAliasLayer() -> {name,index,inPoint,outPoint,hasParent,parent,marker} | null",
+            "function _aliasMarkerApi(list) -> {numKeys,key,nearestKey}"
+          ],
+          "responsibility": "Section header (2273-2279, 7 lines): 'Undocumented on purpose' — these exist for ONE reason, so a snippet pasted from another application doesn't strand the person who pasted it; absent from the help tooltip, the examples menu and every user-facing string, unlike Nemo's own documented vocabulary (EXPR_PUBLIC_NAMES, C20m, motion.js:2360-2376). Where an alias speaks SECONDS and the Nemo primary speaks FRAMES, the conversion happens HERE — 'a silent factor-of-fps error would be nasty'. aliasPosterizeTime(samplesPerSecond) (2280-2286): converts a samples-per-second rate to a frame interval (`ctx.fps / s`) and calls exprStepTime (pre-C20k, motion.js:1709) with it, which snaps the SHARED ephemeral `_ectx.frame`/`_ectx.time` in place — every later call in the SAME expression evaluation that reads the clock then sees the stepped value; returns `ctx.time` in SECONDS 'as the original does'. aliasValueAtTime/aliasVelocityAtTime/aliasSpeedAtTime (2287-2289, one line each): each multiplies its own `t` argument by `c.fps` (or `_exprFps()` if no live `_ectx`) and forwards to exprSelfAt/exprSelfVelocity/exprSelfSpeed (C20k.self-sampling). aliasNearestKey(t) (2290-2293): same seconds-to-frames conversion, forwards to exprNearestKeyAtFrame (C20k). aliasKey(i) (2294, one line): NO conversion — `i` is already a plain keyframe INDEX, forwards to exprKeyAt (C20k) after `Math.floor`. aliasSeedRandom(seed,timeless) (2295-2299): calls exprSeed(seed) (pre-C20k, motion.js:1733) then sets `ctx.rngTimeless = !!timeless` directly on the shared ephemeral context — the second of this scope's own two total mutations (see boundaries). aliasTimeToFrames(t,fps)/aliasFramesToTime(f,fps) (2300-2310): both accept EITHER argument as `undefined` and fall back to the live `_ectx`'s own time/frame/fps in that case, otherwise coerce with `_num`; framesToTime additionally guards `r===0` to avoid a divide-by-zero. Lead-in (2311-2313, 3 lines): 'a comp/layer view shaped the way the pasted snippet expects... built only when an expression actually names one (see compiledFnFor's usage scan), so the alias layer costs nothing on the hot path' — the usage scan is C20m's own `needsAliasComp`/`needsAliasLayer` regex test (motion.js:2484-2485). buildAliasComp() (2314-2324): a FRESH object literal built on every call (not memoized) with width/height/name read from COMP_VIEW (packet 1), frameDuration/duration computed from `_exprFps()`, numLayers from `state.layers.length`, marker from `_aliasMarkerApi(state.markers)` (this scope), and `layer: exprLayer` (C20k.other-layers, motion.js:1986) bound as a bare function reference so `thisComp.layer(index)` works exactly like the documented `layer(ref)`. buildAliasLayer() (2325-2336): returns null if `_selfLd()`/`_selfResolved()` yield nothing (an expression on a holder resolveHolderLayer cannot place, e.g. a detached/orphaned holder); otherwise name/index from the resolved holder, inPoint/outPoint DIVIDED by fps (AE's own inPoint/outPoint are SECONDS, unlike this scope's SELF_VIEW.inPoint/outPoint which are frames — packet 2), hasParent/parent read straight from `ld.parentLayerUid`/`SELF_VIEW.parent` (packet 2, so `thisLayer.parent` and `self.parent` return the identical value at the identical unit), marker via `_aliasMarkerApi(ld.markers)`. Lead-in (2337-2338, 2 lines): 'same entries, under the numKeys/key/nearestKey names and with nearestKey taking seconds.' _aliasMarkerApi(list) (2339-2346): wraps `_markerApi(list)` (C20k.markers) and re-exposes its `count`/`at`/`nearest` API under the AE names `numKeys`/`key`/`nearestKey`, with `nearestKey` ALSO converting its own argument from seconds to frames (`_num(t) * _exprFps()`) before delegating — this is the marker-list counterpart of the same seconds/frames split the key-level aliases (aliasKey/aliasNearestKey) apply, kept as one small wrapper rather than duplicated inline at both of buildAliasComp/buildAliasLayer's own call sites. The full public AE-facing alias table (positional correspondence between EXPR_ARG_NAMES's own alias segment, C20m motion.js:2378-2386, and the fn() call's own compatibility-alias argument block, C20m motion.js:2582-2591 — transcribed verbatim, both cited by line only since the binding itself is C20m territory): loopOut -> exprLoopAfter (C20k, motion.js:1909, reused with NO wrapper); loopIn -> exprLoopBefore (C20k, motion.js:1915, no wrapper); key -> aliasKey (this scope, motion.js:2294); nearestKey -> aliasNearestKey (this scope, motion.js:2290-2293); numKeys -> exprNumKeys(holder,prop) (C20k, motion.js:2070) invoked EAGERLY at motion.js:2583, bound as a plain number — see boundaries; posterizeTime -> aliasPosterizeTime (this scope, motion.js:2280-2286); linear -> exprRemap (pre-C20k, motion.js:1623); ease -> exprRemapEase (pre-C20k, motion.js:1624); easeIn -> exprRemapEaseIn (pre-C20k, motion.js:1625); easeOut -> exprRemapEaseOut (pre-C20k, motion.js:1626); degreesToRadians -> exprRadians (pre-C20k, motion.js:1639); radiansToDegrees -> exprDegrees (pre-C20k, motion.js:1640); lookAt -> exprAngleTo (pre-C20k, motion.js:1693, a 2D degrees function — see boundaries for the 3D-orientation semantic gap); seedRandom -> aliasSeedRandom (this scope, motion.js:2295-2299); gaussRandom -> exprRandomGauss (pre-C20k, motion.js:1767); valueAtTime -> aliasValueAtTime (this scope, motion.js:2287); valueAtFrame -> exprSelfAt (C20k, motion.js:1823, reused directly, no wrapper — this one Nemo-native-sounding name is actually part of the alias block, not the documented vocabulary); velocityAtTime -> aliasVelocityAtTime (this scope, motion.js:2288); speedAtTime -> aliasSpeedAtTime (this scope, motion.js:2289); timeToFrames -> aliasTimeToFrames (this scope, motion.js:2300-2304); framesToTime -> aliasFramesToTime (this scope, motion.js:2305-2310); sourceRectAtTime -> exprContentBox (packet 2, motion.js:2257, ignores its own time argument — see boundaries); thisComp -> buildAliasComp() (this scope, motion.js:2314-2324, called only if entry.needsAliasComp); thisLayer -> buildAliasLayer() (this scope, motion.js:2325-2336, called only if entry.needsAliasLayer); __tick -> _exprTick (C20m/out of scope, the runaway-loop counter instrumentLoops() injects, not itself a compatibility alias despite living in the same argument block, motion.js:2384-2385/2590).",
+          "callers": [
+            "All twelve symbols in this packet (aliasPosterizeTime, aliasValueAtTime, aliasVelocityAtTime, aliasSpeedAtTime, aliasNearestKey, aliasKey, aliasSeedRandom, aliasTimeToFrames, aliasFramesToTime, buildAliasComp, buildAliasLayer): each has EXACTLY ONE call site in the entire codebase — its own single positional slot in evalExpressionFor's fn() call (C20m, motion.js:2583/2585-2589). Confirmed by `grep -rnE \"(^|[^a-zA-Z_.])<name>\\(\"` across src/js for each name: the only two hits are the function's own declaration and that one call site (buildAliasComp/buildAliasLayer are additionally guarded by `entry.needsAliasComp`/`entry.needsAliasLayer`, motion.js:2588-2589).",
+            "_aliasMarkerApi: called twice, both internal to this packet — buildAliasComp (motion.js:2321, `marker: _aliasMarkerApi(state.markers)`) and buildAliasLayer (motion.js:2334, `marker: _aliasMarkerApi(ld.markers)`). Zero callers outside motion.js."
+          ],
+          "external_calls": [
+            "exprStepTime(everyNFrames) — motion.js:1709 (pre-C20k, called from aliasPosterizeTime; mutates the shared ephemeral _ectx.frame/_ectx.time).",
+            "exprSelfAt/exprSelfVelocity/exprSelfSpeed — motion.js:1823/1834/1844 (C20k.self-sampling, called from aliasValueAtTime/aliasVelocityAtTime/aliasSpeedAtTime).",
+            "exprNearestKeyAtFrame(holder,prop,frame) — motion.js:2091 (C20k.keyframe-introspection, called from aliasNearestKey).",
+            "exprKeyAt(holder,prop,i) — motion.js:2064 (C20k.keyframe-introspection, called from aliasKey).",
+            "exprSeed(n) — motion.js:1733 (pre-C20k, called from aliasSeedRandom).",
+            "_num(v) / _exprFps() — motion.js:1591 / motion.js:1371 (pre-C20k, called throughout every alias function's own argument coercion).",
+            "_markerApi(list) — motion.js:2107 (C20k.markers, called from _aliasMarkerApi).",
+            "exprLayer — motion.js:1986 (C20k.other-layers, referenced as buildAliasComp's own `layer` field, not invoked at that line).",
+            "COMP_VIEW.width/height/name — this scope's own packet 1 (motion.js:2157/2158/2162-2169), read from buildAliasComp.",
+            "_selfLd()/_selfResolved() — this scope's own packet 1 (motion.js:2149/2155), read from buildAliasLayer.",
+            "window.layerInPoint/window.layerOutPoint — app.js:2838/2889, called from buildAliasLayer.",
+            "SELF_VIEW.parent — this scope's own packet 2 (motion.js:2240-2248), read from buildAliasLayer.",
+            "state.layers.length / state.totalFrames / state.markers — app.js:78 global `state` object, read-only field access."
+          ]
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    "Line 2130 (blank, the trailing line of C20k's own _markerEntry/_markerApi closure, confirmed by direct `awk` read with real line numbers) precedes this scope; line 2131 opens this scope's own `// ---- \\`comp\\` and \\`self\\` views` header. Line 2347 (blank) closes this scope; line 2348 opens `// ---- compilation`, C20m's own section header (confirmed by direct read). Internally, line 2183 (the closing `};` of `var SELF_VIEW = {...}`) is the packet 1/packet 2 seam — line 2184 opens `// ---- Mesh-aware \\`self\\` (2026-08-30)`; line 2272 (blank) is the packet 2/packet 3 seam — line 2273 opens `// ==== Compatibility aliases`. All four boundary lines confirmed by direct `awk -v`/`sed -n` read of the frozen blob with real (not relative) line numbers.",
+    "resolveHolderLayer does NOT structurally distinguish three holder kinds the issue's own prompt names ('layer ld, element holder ld.elementMotion[strokeId], mesh holder keyed by meshId') — it has exactly TWO branches: an exact match against `state.layers` (a layer holder, strokeId:null), and a scan of every layer's own `elementMotion` map for a value-identity match (an element holder, strokeId:<map key>). A 'mesh holder' is NOT a third branch: it is the identical second branch where the map key happens to be a meshId string instead of a per-shape strokeId string — confirmed by motion.js:1101 ('by the element-holder KEY (a strokeId, or a meshId for an image mesh)', holderRefOf's own comment) and by meshHolder() (motion.js:4747-4750, `return ld.elementMotion[meshId] || null;`) using the EXACT SAME `ld.elementMotion[...]` access elementHolder() (motion.js:2911, `return ld.elementMotion ? ld.elementMotion[strokeId] : null;`) uses for an ordinary per-shape holder. This scope's own mesh-aware `self` accessors (packet 2) build meaning on top of resolveHolderLayer's generic, mesh-unaware result by feeding `r.strokeId` (whatever string it is) to `SMImageMesh.get()` and letting a miss (a real strokeId that is not also a registered meshId) fall through to `null` — resolveHolderLayer itself never asks the question.",
+    "Zero external (outside motion.js) callers exist for ANY symbol in this scope. Confirmed by grep across the same recursive `src/js` scan used for every other C20 sibling: COMP_VIEW/SELF_KEYS/SELF_VIEW (bare-word grep, since they are objects, never called with `(`), _selfResolved/_selfLd/_selfMesh/_selfVertexIndex/exprContentBox and all twelve packet-3 alias functions have EXACTLY the internal call sites documented in each packet's own callers field, and none outside motion.js. This corrects nothing the issue asked about, but is worth stating plainly: unlike C20j's four exported shortcut handlers (window.SMMotion.handlePropShortcut/revealAnimated/revealEffects/revealMattes) or C20i's exported liveItemByStrokeId, NOTHING declared in 2131-2347 appears in motion.js's own `window.SMMotion = {...}` export object near end-of-file (confirmed: zero hits for any of the twenty declared symbol names past line 13000). The only symbol with external callers is resolveHolderLayer itself (three: holderRefOf motion.js:1105, exprPanelLabelFor motion.js:8982, an anonymous example-builder closure motion.js:9166 — all three still inside motion.js, none in another file), because it is called directly by name from elsewhere in the SAME closure, not exported.",
+    "Every one of the twelve packet-3 alias functions, plus aliasPosterizeTime, has EXACTLY ONE call site in the entire codebase: its own single positional slot in evalExpressionFor's sandbox argument list (C20m, motion.js:2572-2591). This is a stronger and more uniform statement than the issue's own framing ('argument unit conversion... seconds<->frames rounding') suggests in isolation — these functions exist ONLY to be handed to `new Function(...)` under an AE-shaped public name; none is ever called as an ordinary JS function from application code.",
+    "The AE alias table (packet 3's own responsibility field transcribes it verbatim by position) contains two genuine semantic gaps versus real After Effects behavior, neither previously flagged: (1) `sourceRectAtTime(t)` is bound directly to exprContentBox — a ZERO-ARGUMENT function (motion.js:2257) — so any `t` argument passed by a pasted AE snippet is silently discarded; the alias always returns the box of whatever frame is CURRENTLY being evaluated (exprContentBox's own comment at motion.js:2251-2256 states this scope honestly, but the alias binding does not warn a caller who expects AE's own per-time sampling). (2) `lookAt` is bound to exprAngleTo (motion.js:1693, pre-C20k), a 2D function returning a single DEGREES value (`Math.atan2(...)*180/Math.PI`) — a reasonable 2D substitute, but not AE's own lookAt(), which returns a 3-component 3D orientation vector for a 3D layer's Orient Rotation; a snippet written for a 3D AE rig that destructures lookAt's return as `[rx,ry,rz]` will silently receive a bare number instead.",
+    "`numKeys` is the only sandbox binding evaluated EAGERLY, at compile-of-argument-list time, rather than passed as a callable/getter: `exprNumKeys(holder, prop)` (C20k, motion.js:2070) is invoked once inline in the fn() call (motion.js:2583) and its RESULT — a plain number — is what the compiled expression sees bound to the name `numKeys`. Every other name in the same argument list (including this scope's own eleven alias functions) is a function reference the compiled code calls itself. Contrast self.keys.count (packet 1, SELF_VIEW.keys.count, an ES5 getter on SELF_KEYS) which IS re-evaluated live on every read within the same expression body.",
+    "`key`/`nearestKey` (the bare AE alias names) do not delegate to SELF_KEYS.at/nearest (packet 1) — aliasKey (motion.js:2294) and SELF_KEYS.at (motion.js:2173) are two independent one-line bodies with IDENTICAL logic (`exprKeyAt(c.holder, c.prop, Math.floor(_num(i)))`), not a shared helper. aliasNearestKey (motion.js:2290-2293) additionally converts its own argument from SECONDS to frames (`_num(t) * c.fps`) before calling exprNearestKeyAtFrame, while SELF_KEYS.nearest (motion.js:2174) takes frames directly with no conversion — the two sibling names speak different units on the SAME underlying built-in, which is the entire reason the compatibility-alias block exists (packet 3's own lead-in comment, motion.js:2277-2279, states this explicitly for the alias family as a whole).",
+    "Zero document/project writes anywhere in this scope, confirmed by grep for `pushUndo`/`saveActiveLayerFrame`/`saveAllLayerFrames`/`exportJSON` (zero hits) and by reading every assignment statement in the span by hand: the only two are `ctx._resolved = resolveHolderLayer(ctx.holder)` (motion.js:2152, packet 1) and `c.rngTimeless = !!timeless` (motion.js:2298, packet 3, inside aliasSeedRandom) — both target fields of the single ephemeral `_ectx` object C20m allocates fresh on every evaluation (motion.js:2563-2569) and restores to its PREVIOUS value immediately after (`_ectx = prev`, evalExpressionFor's own cleanup, out of scope) — neither field survives past the evaluation that wrote it, and neither is ever serialized. This confirms the issue's own 'expect none — pure reads' framing without correction.",
+    "The render-path claim, confirmed rather than merely asserted: valueAtFrame (C20n, motion.js:2639) is the sole caller of evalExpressionFor (C20m, motion.js:2542), which is the sole caller of every symbol in this scope. valueAtFrame's OWN callers reach far outside Motion's own panel: computeMotionMat (motion.js:2938-2942, feeds engine-bridge.js's buildSceneJson on every rendered frame), app.js's applyLayerDuplicator (app.js:1666-1688), effector-layer.js:85/89/203, audio-bridge.js:39/336/473 (volume envelopes), tracker.js:158, rig-widget.js:112 (CLAUDE.md §13's own layerControl), expr-bake.js (2026-09-01, export-time expression-to-keyframe baking — samples an expression-driven property across every frame to bake it), and three opacity-domain modules (domain/animation/opacity.js:27, application/opacity-application.js:76, bootstrap/opacity-application.js:7). A unit mistake anywhere in this scope's own alias table can therefore surface in export renders, audio envelopes, motion-tracker overlays, mograph-duplicator staggers and rig widgets — not merely in the Motion panel's own live preview, correcting any reading of the issue's own title as 'UI only'."
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No frame-save call (saveActiveLayerFrame/saveAllLayerFrames) appears anywhere in this span, confirmed by grep. The only two field writes in the whole span (ctx._resolved at motion.js:2152, ctx.rngTimeless at motion.js:2298) target the single ephemeral _ectx object C20m allocates fresh per evaluation and discards after — neither is project data, neither survives past the evaluation that wrote it."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No parser is implemented in this span. Nothing here participates in project-file import; every accessor reads already-loaded state/layers/expressions live."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Zero pushUndo calls anywhere in this span (confirmed by grep). Nothing here is undo-tracked because nothing here writes project data — the ephemeral _ectx mutations are not undoable state by design."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "This span never reads the global layer-selection array (_layerSel/window._layerSel) — unlike C20j's shortcut handlers, resolveHolderLayer resolves a holder by scanning EVERY layer/element in state.layers regardless of what is selected, and the AE alias views operate on `_ectx.holder` (the property currently being evaluated), never on the current UI selection."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "This span reads the C20k track/key-introspection machinery (exprKeyAt/exprNumKeys/exprNearestKeyAtFrame, exprSelfAt/exprSelfVelocity/exprSelfSpeed) and the mesh-vertex machinery (SMImageMesh) entirely read-only. No key is created, moved or removed; no track is mutated. The one exception to 'purely reactive' is aliasPosterizeTime's own call to exprStepTime, which mutates the CURRENT EVALUATION's own clock (_ectx.frame/_ectx.time) — a within-evaluation time-warp, not a persisted animation change."
+    },
+    {
+      "consumer": "render",
+      "disposition": "Runs on the ACTUAL RENDER PATH, not merely a UI preview: valueAtFrame (C20n, motion.js:2639) calls evalExpressionFor (C20m, motion.js:2542), the sole caller of every symbol in this span, and valueAtFrame is itself called from computeMotionMat (motion.js:2938-2942) which feeds engine-bridge.js's buildSceneJson on every rendered frame. See boundaries for the full external fan-out (applyLayerDuplicator, effector-layer.js, audio-bridge.js, tracker.js, rig-widget.js, three opacity-domain modules)."
+    },
+    {
+      "consumer": "export",
+      "disposition": "Reached during export through the identical valueAtFrame/evalExpressionFor path render uses (engine-bridge.js's export/render_to_pixels calls the same buildSceneJson-derived pipeline, CLAUDE.md §3), and additionally by expr-bake.js (2026-09-01), which samples an expression-driven property across every frame via SM.valueAtFrame specifically to BAKE it into keyframes for export/portability — so this span's own alias-unit correctness directly affects the accuracy of a baked export, not only a live render."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "No Tauri command, filesystem call or SMEngineBridge call appears anywhere in this span, confirmed by grep for `invoke(`/`__TAURI__`/`SMEngineBridge` — zero hits."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "resolve-holder-layer-and-mesh-reuse",
+      "status": "proposed, unrun",
+      "matrix": "a plain layer holder, a per-shape element holder (ld.elementMotion[strokeId]), a mesh-vertex holder (ld.elementMotion[meshId] for an attached image mesh), a detached/orphaned holder object not present in state.layers or any elementMotion map",
+      "expected": "resolveHolderLayer returns {ld,index,strokeId:null} for the layer case and {ld,index,strokeId:<key>} identically for BOTH the per-shape and the mesh case (same branch, see boundaries); returns null for the detached holder; _selfResolved caches the result (including a null result) on ctx._resolved for the remainder of one evaluation, verified by counting resolveHolderLayer invocations across multiple self.* reads in a single expression body."
+    },
+    {
+      "id": "mesh-self-accessors-on-non-mesh-holder",
+      "status": "proposed, unrun",
+      "matrix": "self.isMesh/vertexIndex/vertexCount/vertexUV/isOutlineVertex/isShape evaluated on a plain layer holder, a per-shape shape holder, and a real mesh holder with prop='vtx3' on an 8-vertex mesh",
+      "expected": "Non-mesh holders: isMesh=false, vertexIndex=-1, vertexCount=0, vertexUV=[0,0], isOutlineVertex=false, isShape=true only for the per-shape holder. Mesh holder: isMesh=true, vertexIndex=3, vertexCount=8, vertexUV=mesh.verts[3] (0..1 pair), isOutlineVertex=true only if index 3 is within mesh.outline.length, isShape=false regardless of strokeId being non-null."
+    },
+    {
+      "id": "content-box-scope-and-fallback",
+      "status": "proposed, unrun",
+      "matrix": "a per-shape holder with a live Paper item present, a per-shape holder whose item is momentarily absent (mid-rebuild), a whole-layer holder with no strokeId, a holder that resolves to nothing (window.userLayers absent or index out of range)",
+      "expected": "Per-shape success returns the live item's own .bounds; the shape-absent case falls back to the whole layer's own bounds (userLayers[index].bounds); the unresolved case returns the all-zero {x:0,y:0,width:0,height:0,top:0,left:0} shape; top/left always exactly equal y/x in every non-zero case."
+    },
+    {
+      "id": "ae-alias-unit-crossing",
+      "status": "proposed, unrun",
+      "matrix": "valueAtTime(t)/velocityAtTime(t)/speedAtTime(t)/nearestKey(t) at a chosen seconds value t, crossed against self.at(f)/self.velocity(f)/self.speed(f)/self.keys.nearest(f) at f=t*fps on the SAME property/frame; key(i) crossed against self.keys.at(i); posterizeTime(n) crossed against a manual stepTime(fps/n) call; seedRandom(seed,true) crossed against seed(seed) followed by a manual rngTimeless flag read",
+      "expected": "Each alias produces the IDENTICAL result to its underlying C20k built-in once the seconds<->frames conversion is applied by hand; no alias silently applies fps twice or omits the conversion."
+    },
+    {
+      "id": "source-rect-at-time-ignores-argument",
+      "status": "proposed, unrun",
+      "matrix": "sourceRectAtTime(0) vs sourceRectAtTime(<some other time far from the current frame>) evaluated within the SAME expression evaluation (same _ectx.frame)",
+      "expected": "Both calls return the IDENTICAL box — the box of whatever frame is CURRENTLY being evaluated — confirming the alias silently discards its own time argument rather than sampling geometry at another frame, per the boundaries finding."
+    },
+    {
+      "id": "look-at-returns-2d-degrees-not-3d-vector",
+      "status": "proposed, unrun",
+      "matrix": "lookAt(fromPoint, toPoint) on a 2D layer vs a 3D-enabled layer, with a snippet that destructures the result as an array",
+      "expected": "lookAt always returns a single number (degrees, exprAngleTo's own atan2-based result) in both cases — a snippet written for AE's own 3-component 3D orientation vector receives a bare number and any array-destructuring in user code fails or silently reads undefined for the missing components."
+    },
+    {
+      "id": "this-comp-this-layer-lazy-build-cost",
+      "status": "proposed, unrun",
+      "matrix": "an expression body that never mentions thisComp/thisLayer vs one that mentions only thisComp vs one that mentions only thisLayer vs one that mentions both, each evaluated many times",
+      "expected": "buildAliasComp/buildAliasLayer are invoked (and therefore allocate a fresh object) ONLY when compiledFnFor's own needsAliasComp/needsAliasLayer regex test matched the compiled body text at compile time — an expression that never names either pays zero allocation cost for this pair, confirmed by an invocation counter."
+    },
+    {
+      "id": "num-keys-eager-vs-self-keys-count-live",
+      "status": "proposed, unrun",
+      "matrix": "an expression reading the bare `numKeys` binding twice in its own body vs one reading `self.keys.count` twice, evaluated once with a fixed keyframe count",
+      "expected": "Both reads of `numKeys` within one evaluation return the SAME value captured once when the sandbox argument list was built (motion.js:2583); both reads of `self.keys.count` independently re-invoke exprNumKeys via the live SELF_KEYS getter — the two differ only if exprNumKeys's own inputs could change mid-evaluation, which is not currently possible in this sandbox but is a real ordering difference worth confirming holds at the API boundary."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "resolveHolderKind(holder) -> {kind:'layer'|'element'|'mesh', ld, index, key}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Makes the mesh-vs-per-shape ambiguity resolveHolderLayer currently leaves implicit (both are the SAME 'element' branch, distinguished only downstream by whether SMImageMesh.get(key) hits) an explicit, queryable third case, so a future caller does not need to re-derive isMesh/isShape from _selfMesh()/_selfResolved() by hand the way this scope's own SELF_VIEW getters do."
+    },
+    {
+      "api": "AE_ALIAS_TABLE — a single exported map {aeName -> {impl, unitConversion, knownGap}}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Would make the sourceRectAtTime-ignores-its-argument and lookAt-returns-2D-not-3D gaps this scope's own boundaries documents queryable/testable data instead of narrative-only findings, and would give a single place to extend if a THIRD gap is found later."
+    },
+    {
+      "api": "buildAliasComp/buildAliasLayer memoized per-evaluation (cached on _ectx like _selfResolved)",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Currently a SECOND read of thisComp/thisLayer within the same expression body would allocate a second fresh object (the needsAliasComp/needsAliasLayer gate only controls whether the FIRST call happens at all, not repeat calls) — not observed as a real cost anywhere in this span since each is called exactly once per evaluation by the sandbox's own fn() call, but a future multi-statement expression body that references thisComp twice would not reuse the first object."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "packet_symbols": [
+      "resolveHolderLayer",
+      "_selfResolved",
+      "_selfLd",
+      "COMP_VIEW",
+      "SELF_KEYS",
+      "SELF_VIEW",
+      "_selfMesh",
+      "_selfVertexIndex",
+      "exprContentBox",
+      "aliasPosterizeTime",
+      "aliasValueAtTime",
+      "aliasVelocityAtTime",
+      "aliasSpeedAtTime",
+      "aliasNearestKey",
+      "aliasKey",
+      "aliasSeedRandom",
+      "aliasTimeToFrames",
+      "aliasFramesToTime",
+      "buildAliasComp",
+      "buildAliasLayer",
+      "_aliasMarkerApi"
+    ],
+    "caller_anchors": [
+      "resolveHolderLayer's three external (but still motion.js-internal) callers: holderRefOf motion.js:1105, exprPanelLabelFor motion.js:8982 (C20f), an anonymous example closure motion.js:9166 (C20f)",
+      "Every other symbol in this scope has EXACTLY ONE call site: its own positional slot in evalExpressionFor's fn() call (C20m, motion.js:2572-2591) — self/comp/comp.marker/contentBox at motion.js:2576/2580, the twelve compatibility-alias bindings at motion.js:2582-2591",
+      "compiledFnFor declares EXPR_PUBLIC_NAMES/EXPR_ARG_NAMES (C20m, motion.js:2360-2386) and needsAliasComp/needsAliasLayer (motion.js:2484-2485), the lazy gate for buildAliasComp/buildAliasLayer",
+      "valueAtFrame (C20n, motion.js:2639) -> evalExpressionFor (C20m, motion.js:2542) is the sole path any symbol in this scope is reached through; valueAtFrame's own external callers: computeMotionMat motion.js:2938-2942, app.js:1666-1688 (applyLayerDuplicator), effector-layer.js:85/89/203, audio-bridge.js:39/336/473, tracker.js:158, rig-widget.js:112, expr-bake.js, domain/animation/opacity.js:27, application/opacity-application.js:76, bootstrap/opacity-application.js:7",
+      "Zero symbols in this scope appear in motion.js's own window.SMMotion export object (confirmed by grep past line 13000) — unlike C20j's four reveal-shortcut exports or C20i's liveItemByStrokeId export"
+    ],
+    "helper_anchors": [
+      "_exprFps — motion.js:1371 (pre-C20k)",
+      "_num — motion.js:1591 (pre-C20k)",
+      "exprSeed / exprStepTime — motion.js:1733 / motion.js:1709 (pre-C20k)",
+      "exprRemap/exprRemapEase/exprRemapEaseIn/exprRemapEaseOut/exprClamp/exprDegrees/exprRadians/exprAngleTo — motion.js:1623-1693 (pre-C20k)",
+      "exprSelfAt/exprSelfVelocity/exprSelfSpeed — motion.js:1823/1834/1844 (C20k.self-sampling)",
+      "exprLayer/layerSnapshot — motion.js:1986/1957 (C20k.other-layers)",
+      "exprSelfControl/exprLayerControl — motion.js:2020/2047 (C20k.expression-controls)",
+      "exprKeyAt/exprNumKeys/exprNearestKeyAtFrame — motion.js:2064/2070/2091 (C20k.keyframe-introspection)",
+      "_markerApi — motion.js:2107 (C20k.markers)",
+      "exprLoopAfter/exprLoopBefore — motion.js:1909/1915 (C20k.looping)",
+      "SMImageMesh.get — image-mesh.js:73, exported image-mesh.js:547",
+      "window.layerInPoint/window.layerOutPoint — app.js:2838/app.js:2889",
+      "findLayerIndexByUid — motion.js:3564 (sibling-covered)",
+      "liveItemByStrokeId — motion.js:9732, exported motion.js:13419 (sibling-covered)",
+      "state / userLayers globals — app.js:78 / app.js:365",
+      "evalExpressionFor / compiledFnFor / EXPR_ARG_NAMES — motion.js:2542 / motion.js:2388 / motion.js:2377 (C20m, not yet filed)",
+      "valueAtFrame / computeMotionMat — motion.js:2639 / motion.js:2933 (C20n, not yet filed)"
+    ],
+    "boundary_assertion": "Line 2130 (blank, C20k's own trailing line) closes C20k and precedes this scope; line 2131 (this scope's own comp/self header) opens it. Line 2183/2184 is the packet 1/packet 2 seam (SELF_VIEW's closing `};` / the mesh-aware-self header). Line 2272/2273 is the packet 2/packet 3 seam (blank / the compatibility-aliases header). Line 2347 (blank) closes this scope; line 2348 (C20m's own compilation header) opens the next span."
+  },
+  "validation": {
+    "expected_assigned_lines": 217,
+    "expected_classification": {
+      "code": 169,
+      "comment": 45,
+      "whitespace": 3
+    },
+    "packet_partition": [
+      [
+        2131,
+        2183
+      ],
+      [
+        2184,
+        2272
+      ],
+      [
+        2273,
+        2347
+      ]
+    ],
+    "packet_classification": [
+      {
+        "range": [
+          2131,
+          2183
+        ],
+        "code": 44,
+        "comment": 9,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          2184,
+          2272
+        ],
+        "code": 63,
+        "comment": 24,
+        "whitespace": 2
+      },
+      {
+        "range": [
+          2273,
+          2347
+        ],
+        "code": 62,
+        "comment": 12,
+        "whitespace": 1
+      }
+    ],
+    "coverage_contract": "Validate assigned_ranges (one contiguous span, 2131-2347) and flattened areas[].packets[].coverage_ranges independently with the same function; reject actual artifact omission at line 2131 (or 2273) and overlap at line 2183/2184 (or 2272/2273).",
+    "required_checks": [
+      "frozen/current motion.js blob and allocated-base ancestry",
+      "three unique packet IDs, exact ranges, counts, symbols, helpers, callers and boundaries",
+      "sibling boundaries at lines 2130/2131 and 2347/2348",
+      "eight consumer dispositions and proposed, unrun fixtures",
+      "the resolveHolderLayer two-branch (not three-holder-kind) correction and the mesh-reuses-element-holder finding",
+      "the sourceRectAtTime-ignores-its-argument and lookAt-returns-2D-not-3D-vector findings",
+      "the numKeys-eager-vs-live-getter and key/nearestKey-duplicated-not-shared findings",
+      "JSON, private-path, secret, placeholder and trailing-whitespace hygiene",
+      "sole untracked artifact or committed-clean mode",
+      "no overlap with any sibling C2*.json artifact's own assigned_ranges over the same source_path"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, GPU, runtime edit, export or product acceptance claim."
+  }
+}
