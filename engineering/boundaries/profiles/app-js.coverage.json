@@ -20,28 +20,28 @@
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
     "candidateCommit": "35bcb02392bdd44c8d341c94c3ae6b505eb3379a",
-    "sourceRootTree": "61ab0ca2c2a2de10b92dd718a4cf3d4d4a5d20d4",
+    "sourceRootTree": "09b3d66bf98ab42fde21bbf8e11d1a0da838cbf3",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "e8cd181ff3ac092800044b7b6e958bfb027df5fe",
+      "gitTree": "34ddd16a79b607db3894c9075fc372780a2824ed",
       "lastChangedCommit": "35bcb02392bdd44c8d341c94c3ae6b505eb3379a"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "59a425d2da4dbd98a9ee36b0e87773d46fa2e195",
-      "sha256": "cdf066549296ef686c3778d19384844af8d8f87cfacfd8d3d0097e2c8b14b215",
+      "gitBlob": "9a337340211ef6d15557ba4c87286509a34de64a",
+      "sha256": "61449ebf812effc55c9811b943a49563b6b6a03271a3f21522daec610eba3e37",
       "lastChangedCommit": "9e5daae92a68799c8ba108064ddac8066af209e9"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "f1050ca11dddd4b283ef78e0819f2e89cd0c1059e0efca72aaf6b27789d1d983"
+      "value": "c49e975e2de7943500abe6df110cac95543649d32e8f5dabf8126afa901ab5a2"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "77988f029c462e8bb3a2ff6049f65a398829a936",
-        "sha256": "67eb4292862b69b3bcf5e88c589f7c0f8f486bbbecee6c6e0c3b2790026089ff",
+        "gitBlob": "29b40973ff32ee3e0e594e348c6f71b696ca887d",
+        "sha256": "ace9a4cca71409b23bbdf1f3ae616f55db5b4dbdd673699b9df388786416f688",
         "moduleCount": 149,
         "basedOnCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1"
       },
@@ -574,6 +574,18 @@
           "path": "src/index.html",
           "line": 2305,
           "scriptOrdinal": 7
+        }
+      ]
+    },
+    {
+      "path": "src/js/domain/tween/assignment.js",
+      "moduleId": "app.tween.assignment.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2307,
+          "scriptOrdinal": 8
         }
       ]
     },
@@ -2626,19 +2638,19 @@
     }
   ],
   "snapshotCounts": {
-    "selectedSources": 167,
+    "selectedSources": 168,
     "bySourceKind": {
-      ".js": 161,
+      ".js": 162,
       ".mjs": 2,
       ".cjs": 0,
       ".ts": 4
     },
-    "retainedSources": 155,
+    "retainedSources": 156,
     "exclusions": 12,
     "vendorExclusions": 6,
     "generatedExclusions": 6,
     "retainedExecutionClasses": {
-      "document-classic": 140,
+      "document-classic": 141,
       "document-module": 2,
       "classic-without-load-site": 12,
       "module-worker": 1
