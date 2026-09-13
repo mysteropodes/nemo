@@ -1,0 +1,492 @@
+{
+  "census_id": "C19z",
+  "issue": 1229,
+  "title": "Timeline.js text bake, commit and per-character split — computeTextLayout, lineDrawX, commitVectorText, commitText, initTextPopover, splitTextIntoCharacters",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf following C19y/#1228; third open slice of the timeline.js tail. Scope is timeline.js:8383-8662 (280 lines: 207 code, 73 comment, 0 blank), six own symbols across four packets, matching the issue's own suggested packet table exactly (no boundary correction — every cut verified against the frozen blob with `sed -n`: 8434/8435, 8500/8501, 8556/8572-8577, 8590/8591, 8661/8662/8663 all land exactly where the issue states). The issue's own permission to split `commit-text-popover-init-registrations` at `initTextPopover` (8556) with sed -n evidence was evaluated and NOT taken: `initTextPopover` (8556-8572) is a pure DOM-listener-wiring function with zero symbols/state shared with `commitText` beyond the fact that its own listeners CALL `commitText` (8558, 8570) — the issue's own proposed single packet already reads as one coherent 'popover lifecycle' unit (write handler + its own registration + its own wiring), and splitting it would only separate a function from its sole registration call (8573) and the three window.* exports (8574-8576) that belong with it either way — so the union stays identical and the four-packet table is kept as proposed. Cited by name/line only, not re-mapped, per the issue's own instruction: the popover openers and both in-place editors (7995-8382, C19y/#1228, not yet merged at authoring time — `closeInPlaceRasterTextEditor` is the second caller of `commitText`, confirmed at timeline.js:8376), the Typography/text-actions panels (8663+, next leaf C19aa — `updateTextActionsPanel` is the UI that offers the split, confirmed caller of `splitTextIntoCharacters` at timeline.js:8694), `vector-text-bridge.js` (`SMVectorText.buildVectorTextGroup` at vector-text-bridge.js:208, `vectorTextGroupMembers` at vector-text-bridge.js:350), `serR`/`desR` + `registerImagePixels` (app.js:1036/1196 C21e, engine-bridge.js:656 — where `r.data.src`/`isText`/`textGroupId`/`isTextChar` persist and upload, confirmed at app.js:1104-1118 and app.js:1221), `layerElements`/`elementMotion` (motion.js C20 — why a split character is an ordinary Motion Element), `group-bridge.js` (the `data.groupId` \"stable id groups members\" precedent, group-bridge.js:15-16, that `textGroupId` follows), `pushUndo` (tweens.js:4741), `saveActiveLayerFrame` (app.js:4634, C21o) and `updateUI` (timeline.js:2727, C19h — a correction to the issue's own owner-line grouping of the two under 'app.js C21o': `updateUI` is defined in timeline.js itself, owned by C19h-timeline-ui-refresh-adapters (assigned_ranges 2697-2947), not app.js; `saveActiveLayerFrame` is correctly app.js/C21o, assigned_ranges 4373-4728), `showToast` (timeline.js:7447, C19w, merged), the `#text-popover` controls (`#text-apply` index.html:2006, `#text-cancel` index.html:2005, `#text-input` index.html:1989, `#text-size` index.html:1991, `#text-font` index.html:1992, `#text-align` index.html:2000, `#text-color` index.html:1997), and `tagOwner` (tools.js:1984, called once from `splitTextIntoCharacters` at 8617).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "7e341fa59c6d8f12a0c9680f1aaa8441bdb6990b",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19z-timeline-text-bake-commit-census",
+  "assigned_ranges": [
+    {
+      "start": 8383,
+      "end": 8662
+    }
+  ],
+  "coverage_note": "Exactly 280 assigned lines occur once across four packets (one coverage_range per packet, no gaps, no other-owner exclusions): 207 code, 73 full-line comment, 0 blank — independently re-derived by classifying the frozen blob programmatically (a Python re-implementation of the validator's own classify(), run once per packet and once for the whole span: 8383-8434=(37,15,0), 8435-8500=(47,19,0), 8501-8576=(61,15,0), 8577-8662=(62,24,0), summing to (207,73,0)=280) — equal to the issue's own proposed union and per-packet table exactly, no boundary correction needed. Line 8382 is the last line of the combined `window.isInPlaceTextEditing` gate (C19y's own closing statement for both in-place editors, out of scope, not yet merged as a filed artifact at authoring time — confirmed by direct `sed -n` read of 8375-8382, which shows the gate assignment ending at 8382 and this scope's own lead-in comment for `computeTextLayout` beginning immediately at 8383). Line 8662 is `window.splitTextIntoCharacters=splitTextIntoCharacters;`; line 8663 opens the next leaf's (C19aa, not yet filed as a merged artifact at authoring time) own lead-in comment for `updateTextActionsPanel`'s Text Animator section toggle — confirmed by direct read of 8660-8664. A sweep of every C19*.json in this directory sharing source_path: src/js/timeline.js (C19a through C19w) confirms the existing coverage is contiguous through line 7448 (C19w's own declared end) with zero gaps/overlaps; C19x and C19y are not yet present as merged artifacts in this directory at authoring time (no C19x-*.json/C19y-*.json file exists here), so this scope is NOT the immediate next contiguous span on disk — it is the third of three sibling leaves opened over the same tail of the file (C19x:7449-7994 proposed, C19y:7995-8382 proposed, this scope:8383-8662), each independently claimable and each disjoint from the others by proposed line range, confirmed by reading the issue's own text for #1229 and the neighbouring issues' line citations.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "This worktree's own branch (claude/c19z-timeline-text-bake-commit-census) HEAD is 7e341fa59c6d8f12a0c9680f1aaa8441bdb6990b, created from origin/main at that same SHA; `git rev-parse 7e341fa:src/js/timeline.js` resolves to the identical blob cc4cfd27dc59d797c911d840dc46e2f816942123 — confirmed directly in the working worktree before authoring (HEAD matches, blob matches, working tree clean).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `grep -rn -P '(^|[^a-zA-Z_.])<symbol>\\(' src/js` (recursive, includes labs/ and adapters/) for the six function symbols this scope defines (computeTextLayout, lineDrawX, commitVectorText, commitText, initTextPopover, splitTextIntoCharacters), each filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`. Field-level read/write claims (r.data.* writes, module-state reads/writes, DOM ids) were derived by a plain-pattern grep restricted to the frozen blob's own lines 8383-8662, cross-checked line-by-line against a direct `sed -n`/`awk` read of the same range, and cross-cited against `serR`/`desR` (app.js:1036/1196/1104-1118/1221, C21e, read directly) to confirm the writer (this scope) and the persistence layer agree on every field name.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback/design comments (2026-07 ×5 including the SS 2→3 bump, the vector-text escape hatch, the isTextLayer auto-tag precedent, and the per-character-split header; 2026-08-17 Text Animator wordCursor grouping) are read as authorial intent, not independently re-verified execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19z-timeline-text-bake-commit-split.json and the four timeline.js packets partitioning lines 8383-8662.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "function_boundary": "This scope is a single coherent feature (the text tool's raster bake pipeline and its one-way per-character split) divided into four packets by which construct each covers: the layout primitives shared by both consumers (`computeTextLayout`/`lineDrawX`), the async vector-text commit path (`commitVectorText`), the synchronous raster commit path plus the popover's own DOM wiring (`commitText`/`initTextPopover`), and the one-way split (`splitTextIntoCharacters`). `commitText` calls `computeTextLayout`/`lineDrawX` (both this scope's own first packet) and, for the `vector:` escape hatch, `commitVectorText` (this scope's own second packet) — all three self-contained within this scope. `splitTextIntoCharacters` independently calls the SAME `computeTextLayout`/`lineDrawX` pair, which is the entire point of the shared-layout-pass lead-in comment (8383-8387): a split must match the flattened bake pixel-for-pixel.",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19y (#1228, proposed owner of timeline.js:7995-8382, not yet merged as a filed artifact at authoring time)",
+      "disposition": "Owns the popover openers (`openTextPopover`/`openTextPopoverForBox`/`openTextPopoverForEdit`, module state `_textPendingPt`/`_textPendingBox`/`_textEditingRaster` declared at 8010, `closeTextPopover` at 8059) and both in-place editors (raster in-place textarea editor including `closeInPlaceRasterTextEditor`, and the combined `window.isInPlaceTextEditing` gate ending at 8382). `closeInPlaceRasterTextEditor` (timeline.js:8358-8376) is confirmed the SECOND caller of this scope's own `commitText`: it sets `_textPendingPt=null;_textEditingRaster=raster;_textPendingBox=...` (8372-8374) then calls `commitText()` (8376) — the in-place editor only ever collects the new string and hands the edit to the popover's own writer, same fields/branch/undo. `closeTextPopover` (8059) is confirmed the ONLY function that resets all three module-state variables to null together (the other writers — 8027, 8037, 8046-8053, and this scope's own 8372-8374 — set them for OPENING, never all three to null at once). This scope's own boundary begins at line 8383, the lead-in comment for `computeTextLayout`, immediately after C19y's own combined gate assignment ending at 8382 — confirmed by direct `sed -n` read of 8375-8388."
+    },
+    {
+      "owner": "C19aa (next leaf, timeline.js:8663+, the Typography/text-actions panels, not yet filed as a merged artifact at authoring time)",
+      "disposition": "Owns `updateTextActionsPanel` and the rest of the Typography/text-actions panel starting at 8663. Confirmed the ONE call site of this scope's own `splitTextIntoCharacters` outside its own declaration: timeline.js:8694, `if(isWholeText)document.getElementById('btn-text-split-chars').onclick=function(){splitTextIntoCharacters(p);};` — a button click handler inside that panel, not a context menu (no other caller of `splitTextIntoCharacters` was found anywhere in a recursive src/js grep, including labs/ and adapters/). This scope's own boundary ends at line 8662, `window.splitTextIntoCharacters=splitTextIntoCharacters;` — confirmed by direct read of 8660-8664."
+    },
+    {
+      "owner": "vector-text-bridge.js (SMVectorText.buildVectorTextGroup at vector-text-bridge.js:208, SMVectorText.vectorTextGroupMembers at vector-text-bridge.js:350; existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only. `buildVectorTextGroup(text,fontKey,size,color,align,fixedWidthWorld,topLeftWorld,layer,opts)` is called once in this scope, from `commitVectorText` (8475), and returns a Promise this scope's own `.then()`/`.catch()` (8475-8499) consumes. `vectorTextGroupMembers(root)` is called three times in this scope, all from `commitVectorText` (8443, 8467, 8471) — twice to walk the editing root's own existing glyphs (union bounds at 8443, per-character strokeId harvest at 8467) and once to remove them all before rebuild (8471). Neither function's body is reproduced here."
+    },
+    {
+      "owner": "app.js:1036/1196 serR/desR (C21e, merged) and engine-bridge.js:656 registerImagePixels",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `serR` (app.js:1104-1118) is the RUNTIME WRITER of the persisted shape this scope's `commitText`/`commitVectorText`-adjacent... — precisely: `serR` persists `r.data.isText`/`.text`/`.font`/`.size`/`.color`/`.align`/`.fixedWidth` (app.js:1104-1107) plus `.isTextChar`/`.textGroupId` (app.js:1113-1114) and `.charIndex`/`.wordIndex` (app.js:1117-1118) — matching field-for-field every `r.data.*`/`r2.data.*`/`cr.data.*` write this scope's own `commitText` (8526-8527, 8543-8544) and `splitTextIntoCharacters` (8643-8645) perform. `desR` (app.js:1221) is the matching reader, restoring the identical field set onto a freshly-built Raster at `loadFrame` time — confirmed both bodies read verbatim (`sed -n`/`awk`), not assumed from either artifact's own JSON. `registerImagePixels` (engine-bridge.js:656) is the GPU-texture-upload path a re-baked or freshly-baked text Raster's `.source=url`/`new Raster(url)` reaches indirectly through the existing raster pipeline — this scope never calls it directly; cited by name only per the issue's own instruction."
+    },
+    {
+      "owner": "motion.js (layerElements/elementMotion, C20 lineage; existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name only, per the issue's own instruction. A split character (`cr`, tagged `isTextChar`+`textGroupId`+`charIndex`+`wordIndex`, 8643-8645) is, once inserted into the layer via `insertAbove` (8646) and persisted through `serR`, indistinguishable from any other Raster stroke to `layerElements`/`elementMotion` — no special-case branch for split text exists in this scope or (per the issue's own framing) in motion.js; this is the entire point of choosing 'ordinary Motion Element sharing a stable id' over a parallel text-animator system (see this scope's own 8577-8590 lead-in comment)."
+    },
+    {
+      "owner": "group-bridge.js (data.groupId \"stable id groups members\" precedent, group-bridge.js:15-16; existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name only. group-bridge.js's own comment (lines 15-16) states its `data.groupId` is 'the same stable-id pattern as data.strokeId/data.brushGroupId elsewhere in this file' — this scope's own `textGroupId` (generated once per split at 8600, `'txt'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6)`, written onto every resulting character at 8643) follows the identical precedent: a plain string tag shared by every member, not a new item type or wrapper class, matching this scope's own 8577-8590 lead-in comment verbatim ('same \"stable id groups members, not a new item type/class\" pattern already established for Cmd+G groups, group-bridge.js')."
+    },
+    {
+      "owner": "tweens.js:4741 pushUndo (existing owner, out of scope) and app.js:4634 saveActiveLayerFrame / timeline.js:2727 updateUI",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `pushUndo(alreadySaved)` (tweens.js:4741, a thin wrapper over `pushUndoLayers`) is called once each from `commitVectorText` (8453), `commitText` (8521, inside the shared bake path before either branch) and `splitTextIntoCharacters` (8611) — three call sites total in this scope, one per top-level mutating action, never per-item inside a loop. `saveActiveLayerFrame()` (app.js:4634, C21o) is called from `commitVectorText`'s own `.then()` (8494), `commitText`'s two `onLoad` callbacks (8528, 8550), and `splitTextIntoCharacters`'s own shared `onOneLoaded()` (8618) — always paired on the SAME line with `updateUI()`. `updateUI()` is a CORRECTION to the issue's own owner-line grouping ('app.js C21o'): it is defined in timeline.js itself (line 2727), owned by the sibling artifact C19h-timeline-ui-refresh-adapters (assigned_ranges 2697-2947, confirmed by direct lookup), not app.js — `saveActiveLayerFrame` alone is app.js/C21o (assigned_ranges 4373-4728, confirmed by direct lookup). Neither body is reproduced here."
+    },
+    {
+      "owner": "C19w (showToast, timeline.js:7447, merged)",
+      "disposition": "Retains its own body in full — cited by name/line only. `showToast(SM.t('toastVectorTextFontLoadFailed'))` is called exactly once in this scope, from `commitVectorText`'s own `.catch()` handler (8498) — the sole error-path notification in this whole span."
+    },
+    {
+      "owner": "src/index.html (`#text-popover` controls; existing owner, out of scope)",
+      "disposition": "Retains the static DOM structure in full — cited by line only (`#text-popover` 1988, `#text-input` 1989, `#text-size` 1991, `#text-font` 1992, `#text-color` 1997, `#text-align` 2000, `#text-cancel` 2005, `#text-apply` 2006). This scope only reads `.value`/`.checked` off these elements (`commitText`, 8502-8508) and attaches click/keydown listeners to `#text-apply`/`#text-cancel`/`#text-input` (`initTextPopover`, 8557-8571); it declares no markup of its own."
+    },
+    {
+      "owner": "tools.js:1984 tagOwner (existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only. Called once in this scope, from `splitTextIntoCharacters`'s own shared `onOneLoaded()` callback (8617), inside a `newRasters.forEach(function(cr){tagOwner(cr);})` loop run ONLY after every character has finished decoding (`loaded>=totalChars`) — not per-character synchronously, avoiding a partially-tagged set if the loop were interrupted."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 8382 (C19y's own closing statement of the combined `window.isInPlaceTextEditing` gate) is outside coverage; line 8383 (this scope's `computeTextLayout` lead-in comment) begins this scope — confirmed by direct `sed -n` read of 8375-8388, matching the issue's own boundary exactly.",
+    "Line 8662 (`window.splitTextIntoCharacters=splitTextIntoCharacters;`) is the last line of this scope; line 8663 opens the next leaf's (C19aa) own lead-in comment for the Typography/text-actions panel's Text Animator section toggle — confirmed by direct read of 8660-8664, matching the issue's own boundary exactly.",
+    "No lines inside 8383-8662 are excluded for another owner: every line belongs to exactly one of the four packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "(a) `computeTextLayout(text,font,size,fixedWidthWorld)` (8388-8428) is a PURE function — no read of `state`/`project`/DOM beyond a scratch `document.createElement('canvas')` (8398), no write of any external variable. `SS=3` (8396, comment 8389-8395 explains the 2->3 bump, 2026-07: the only crispness lever available without vector glyph rendering in the Rust/vello engine). Canvas sizing: `off.width=Math.ceil(wMax)+16;off.height=Math.ceil(wrapped.length*lineH)+16` (8419) — 16px total padding (8px each side) baked directly into the offscreen canvas dimensions, matching `lineDrawX`'s own 8px left/right insets (8433-8434). Wrap algorithm: only runs when `fixedWidthWorld` is truthy (8403); greedy word-wrap by splitting each input line on `' '` (8407), accumulating words into `cur` while `octx.measureText(test).width<=fixedWidthPx-16` (8409), else pushing `cur` and starting a new line with the overflowing word (8409-8410) — a SINGLE word wider than the box is never itself split; it is pushed alone as its own line once `cur` is empty (the `cur?cur+' '+w:w` ternary at 8408 means the first word of a fresh line is never rejected by the width check, since `cur` is falsy and the `if` condition requires `cur&&...`). Return shape: `{off:off,octx:octx,wrapped:wrapped,lineH:lineH,SS:SS}` (8428) — `off`/`octx` are the SAME offscreen canvas/context object handed back to the caller for the actual `fillText` pass (the layout pass measures with `octx` before the canvas is resized to its final dimensions at 8419-8422, then re-fetches `octx` afterward at 8425-8426 since 'resizing the canvas resets its context/state', comment 8425).",
+    "(a continued) `lineDrawX(off,octx,line,align)` (8429-8434) is likewise pure: given the ALREADY-sized `off`/`octx`, returns the left-edge x for one line of text per `align` — `(off.width-tw)/2` for center (8431), `off.width-8-tw` for right (8432), `8` for left/default (8433) — `tw` is `octx.measureText(line).width` (8430).",
+    "(b) The raster bake pipeline, in order, for BOTH `commitText` branches (8501-8555): read the five popover fields — `txt` (8502), `size` (8504, `parseInt(...)||48`), `font` (8505, `||'sans-serif'`), `align` (8506, `||'left'`), `color` (8507-8508, `colorInp.value||state.strokeColor||'#000000'`) — then `fixedWidthWorld=_textPendingBox?_textPendingBox.width:null` (8509); the `vector:` dispatch to `commitVectorText` and early `return` (8510-8513); `L=computeTextLayout(...)` (8514) then the actual `fillText` bake — `wrapped.forEach` calling `octx.fillText(l,lineDrawX(off,octx,l,align),8+i*lineH)` per line (8516-8519, note the SAME `8` top padding `lineDrawX`'s own left/right 8px insets mirror vertically); `off.toDataURL('image/png')` (8520); `pushUndo()` (8521); `textMeta={text,font,size,color,align,fixedWidth}` built once (8522) and written identically onto whichever Raster is chosen below. Branch A — re-edit, `_textEditingRaster&&_textEditingRaster.parent` truthy (8523): writes `r.data.isText=true;r.data.src=url` plus all five `textMeta` fields onto the SAME `r` (8526-8527), keeps `r.bounds.topLeft` as the anchor (8525, comment: 'doesn't re-center on the old click point'), then `r.source=url` (8529) — reassigning `.source` keeps the same item identity (index/parent/references), the SAME edit-in-place pattern any other Raster in this codebase uses; `r.onLoad` (8528) resizes/repositions then calls `saveActiveLayerFrame();updateUI()` and a guarded `renderNow()`. Branch B — new item, `_textEditingRaster` falsy (8530-8553): the `isTextLayer` auto-tag fires ONLY when the active layer is currently empty and not already tagged (8540, `layer.children.length===0&&!ldForTag.isTextLayer`) — never overriding a layer the user already filled with other content; `project.activeLayer` is swapped to the target layer (`prev=project.activeLayer;layer.activate()`, 8541) so `new Raster(url)` (8542) lands in the RIGHT layer regardless of which layer Paper.js currently has active, then swapped back (`prev.activate()`, 8552) immediately after construction — the swap brackets only the `new Raster` call, not the async `onLoad`. The `isBox` centre-vs-point rule (8546, 8549): `pt=_textPendingBox?_textPendingBox.topLeft.clone():_textPendingPt` (8545) — for a fixed-width box, `r2.position` becomes `pt.add(half-size)` (centring the baked bitmap inside the box's own top-left-anchored footprint, 8549); for point text, `r2.position=pt` directly (no centring — matches raster point-text's OWN convention, distinct from `commitVectorText`'s point-click placement which anchors top-left, 8445-8449). Both branches converge on `closeTextPopover()` as the LAST statement of `commitText` (8554) — confirmed the only `closeTextPopover` call in `commitText`'s own body.",
+    "(c) `commitVectorText`'s edit path (8441, 8463-8472) vs create path (8444/8449, then straight to 8474-8475): edit fires when `_textEditingRaster` exists, has a `.parent`, and carries `.data.isTextRoot` (8441, `editingRoot`) — topLeft is then the UNION of every existing member's bounds via `vectorTextGroupMembers(editingRoot).reduce(...)` (8443), every member's `charIndex`->`strokeId` list is harvested into `_oldIdByChar` BEFORE removal (8466-8470, a LIST per index since 'a character can be several paths — a counter, an accent', comment 8464-8465), then every member is removed (`.forEach(function(p){p.remove();})`, 8471) — remove-all-then-rebuild, confirmed. Create path skips all of that: topLeft comes from `_textPendingBox.topLeft` (8444) or, failing that, `_textPendingPt` itself, anchored TOP-LEFT unlike raster point-text's own centring (8445-8449, comment explicits the divergence from Branch B above). `charIndex` handling on rebuild (8476-8492, inside `buildVectorTextGroup`'s own `.then()`): for each NEW character carrying a `charIndex`, the corresponding OLD `strokeId` queue for that index is popped FIFO (`queues[ci].shift()`, implicit via `q.shift()` at 8483) and reassigned onto the new path (`p.data.strokeId=oid`, 8484) — reused ids are tracked (`reused[oid]=1`) so any OLD id left over (a character that disappeared) has its `elementMotion`/`shapeNames` entries explicitly deleted (8489-8490) rather than left as dead weight, matching the 2026-07 comment's own stated motivation (8454-8461: a rename previously left 9 orphaned animation entries). Divergence from `closeInPlaceTextEditor`'s own rebuild (C19y, cited by name/line only, not reproduced here — its own function name per C19y's own scope description is `closeInPlaceTextEditor`, distinct from the RASTER editor's `closeInPlaceRasterTextEditor` this scope's `commitText` is called from at 8376): no duplicated logic was found — `closeInPlaceTextEditor`'s scope is out of this artifact's own read boundary (7995-8382) and is cited by name only per the issue's own instruction; a full comparison of its rebuild path against this scope's `commitVectorText` is therefore not performed here (would require reading C19y's own body, out of scope for this leaf).",
+    "(d) `commitText`'s two callers: `initTextPopover`'s own click handler on `#text-apply` (8558, `save.addEventListener('click',commitText)`, a bare reference — no matching `commitText(` call pattern, confirmed by the caller-grep excluding non-parenthesized references) and its own keydown handler (8570, `commitText()`, Cmd/Ctrl+Enter) — both internal to this scope; and `closeInPlaceRasterTextEditor` (C19y, timeline.js:8376) — external, confirmed the SECOND caller. Module state `commitText` consumes: `_textPendingPt`/`_textPendingBox`/`_textEditingRaster` (all three, C19y, declared 8010) — read at 8503-8509 is NOT direct (the five DOM-field reads), but the branch dispatch at 8523 (`_textEditingRaster&&_textEditingRaster.parent`) and the Branch-B point/box read at 8545-8546 both read this module state directly. `closeTextPopover` (C19y, 8059) is confirmed the ONLY function in the whole codebase search performed for this scope that resets all three to null together — every other write (8027, 8037, 8046-8053, and this scope's own 8372-8374 inside `closeInPlaceRasterTextEditor`) sets a SUBSET for an OPENING action, never all three to null in one call.",
+    "(e) The split's exact output contract (`splitTextIntoCharacters`, 8591-8661): one Raster per NON-WHITESPACE character — whitespace is explicitly skipped from producing a Raster (`if(ch.trim()===''){cursor+=chW;atWordStart=true;return;}`, 8632, still advances the draw cursor and word-boundary tracking, just never calls `new Raster`) and excluded from the `totalChars` count that gates the shared completion callback (8601-8602, `if(ch.trim()!=='')totalChars++`). The shared `textGroupId` (8600, `'txt'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6)`) is generated exactly ONCE per split call, before the per-character loop, and written identically onto every resulting character's `cr.data.textGroupId` (8643). `isTextChar`(8643)/`charIndex`(8645, incremented once per non-whitespace character via the module-scope `charCursor`, 8626/8641) are per-item; `wordIndex`(8645, incremented once per whitespace-delimited run via `wordCursor`, 8626/8634) and `lineIndex`(8645, the `wrapped.forEach` outer index `li`) round out the per-character tag set. Z-order/insertion: each new character is inserted via `cr.insertAbove(raster)` (8646) — ABOVE the original, in creation order (line-major, then character-major within a line) — so by the time all characters are inserted the stack order (bottom to top) is: everything below the original, the original itself, then every character in reading order. The original item is REMOVED AFTER all new ones are inserted: `raster.remove()` is the LAST statement in the function (8660), after the per-character loop (8624-8659) has already run to completion synchronously (the `new Raster(curl)`/`insertAbove` calls are synchronous; only each `cr.onLoad` — sizing/positioning — is async) — confirmed by direct read of the function's own statement order. `pushUndo()` (8611) runs ONCE, before the loop; `saveActiveLayerFrame()`/`updateUI()` (8618) and the guarded `renderNow()` (8619) run ONCE too, but only inside the shared `onOneLoaded()` callback once `loaded>=totalChars` (8616-8620) — i.e. after every character's own async `onLoad` has fired, not per character and not synchronously with the removal.",
+    "(f) The complete external function-call inventory from this span (owning module/census cited by name only, bodies not reproduced): `document.getElementById`/`document.createElement`/Canvas2D APIs (browser built-in). `SM.t` (i18n.js, existing owner, out of scope) — `commitVectorText`'s own toast string (8498) and `initTextPopover`'s implicit reliance on the popover's own static/translated labels (none read directly in this span beyond the toast). `window.SMVectorText.buildVectorTextGroup`/`.vectorTextGroupMembers` (vector-text-bridge.js:208/350) — `commitVectorText` only. `pushUndo` (tweens.js:4741) — three call sites (8453, 8521, 8611), one per top-level action. `saveActiveLayerFrame` (app.js:4634, C21o) and `updateUI` (timeline.js:2727, C19h) — always paired: 8494-8495 (`commitVectorText`), 8528/8550 (`commitText`'s two `onLoad`s), 8618-8619 (`splitTextIntoCharacters`'s shared `onOneLoaded`). `window.SMEngineBridge.renderNow` — guarded, same four call sites as the previous pair. `showToast` (timeline.js:7447, C19w) — `commitVectorText`'s own `.catch()` only (8498). `tagOwner` (tools.js:1984) — `splitTextIntoCharacters`'s shared completion callback only (8617). No other external function is called anywhere in lines 8383-8662 — confirmed by reading every statement in the span directly (reproduced verbatim in each packet's own `behavior` field below).",
+    "(g) The complete caller list, confirmed by `grep -rn -P '(^|[^a-zA-Z_.])<symbol>\\(' src/js` (recursive, includes labs/ and adapters/), each filtered to exclude the symbol's own declaration line and any `//`-prefixed hit, plus a separate check of every file for the literal `window.SM={` block (none of these six symbols appear inside it): `computeTextLayout` — 2 internal call sites confirmed (8514 `commitText`, 8597 `splitTextIntoCharacters`), matching the issue's own expectation exactly, zero external callers found. `lineDrawX` — 2 internal call sites confirmed (8518 `commitText`, 8629 `splitTextIntoCharacters`), matching the issue's own expectation exactly, zero external callers found. `commitVectorText` — 1 internal call site confirmed (8511, `commitText`'s own `vector:` dispatch), matching the issue's own expectation ('internal') exactly. `commitText` — 2 call sites beyond its own declaration: 8570 (internal, `initTextPopover`'s own keydown handler) and 8376 (external, C19y's `closeInPlaceRasterTextEditor`) — plus the bare-reference registration at 8558 (not a `commitText(` call pattern, excluded by the grep filter but functionally a third caller via `addEventListener`) — matching the issue's own expectation ('internal + C19y') exactly. `initTextPopover` — 1 call site beyond its own declaration, its OWN registration line (8573, `if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initTextPopover);else initTextPopover();`) — self-registration only, zero external callers found, matching the issue's own expectation exactly. `splitTextIntoCharacters` — 1 call site beyond its own declaration and the `window.*` export: timeline.js:8694 (`updateTextActionsPanel`, C19aa, next leaf, a button-click handler — NOT a context menu; a recursive src/js grep including labs/ and adapters/ found no second caller) — the issue's own expectation ('expect text-actions panel 8674+ and/or a context menu') is therefore CONFIRMED for the text-actions-panel half and CORRECTED for the context-menu half: no context-menu caller exists anywhere in src/js at the frozen SHA.",
+    "Render-path confirmation: NONE of this scope's six symbols (`computeTextLayout`, `lineDrawX`, `commitVectorText`, `commitText`, `initTextPopover`, `splitTextIntoCharacters`) is ever called from `getEffectiveStrokes`/`getEffectiveStrokesRendered` (app.js, C21k/C21g) or from `buildSceneJson`/`scenePayload` (engine-bridge.js) or from export.js/rive-export.js — confirmed by a direct grep of all six names restricted to engine-bridge.js/export.js/rive-export.js (zero hits). Every call into this scope is either a user-gesture DOM handler (button click, keydown, textarea input) or an internal call from another function in this same scope — this span produces ordinary Raster items (tagged `isText`/`isTextChar`/`textGroupId` via `r.data`) that the EXISTING image-rendering pipeline (Raster handling in `buildSceneJson`, out of scope) draws with no special-case branch, matching the issue's own expectation exactly."
+  ],
+  "areas": [
+    {
+      "area": "text-layout-and-line-x",
+      "packets": [
+        {
+          "id": "C19z.text-layout-and-line-x",
+          "files": [
+            "src/js/timeline.js:8383-8434"
+          ],
+          "coverage_ranges": [
+            [
+              8383,
+              8434
+            ]
+          ],
+          "classification": {
+            "code": 37,
+            "comment": 15,
+            "whitespace": 0
+          },
+          "symbols": [
+            "computeTextLayout",
+            "lineDrawX"
+          ],
+          "signature": "function computeTextLayout(text,font,size,fixedWidthWorld); function lineDrawX(off,octx,line,align)",
+          "responsibility": "5-line lead-in (8383-8387): one shared layout pass used by BOTH `commitText`'s flattened bake AND `splitTextIntoCharacters`'s per-character split, so a split always matches the flattened text pixel-for-pixel instead of drifting from a second, slightly-different word-wrap implementation. `computeTextLayout(text,font,size,fixedWidthWorld)` (8388-8428): a PURE function — offscreen canvas creation, supersample factor `SS=3` (bumped from 2, 2026-07, comment 8389-8395), greedy word-wrap when `fixedWidthWorld` is truthy, final canvas sizing with 16px total padding, returns `{off,octx,wrapped,lineH,SS}`. `lineDrawX(off,octx,line,align)` (8429-8434): left/center/right x for one already-measured line.",
+          "callers": [
+            "`computeTextLayout` — 2 internal call sites confirmed by `grep -rn -P '(^|[^a-zA-Z_.])computeTextLayout\\(' src/js` (recursive, incl. labs/ and adapters/), both within this artifact's OWN later packets: timeline.js:8514 (`commitText`) and timeline.js:8597 (`splitTextIntoCharacters`). Zero external callers found.",
+            "`lineDrawX` — 2 internal call sites confirmed by the same grep pattern, both within this artifact's own later packets: timeline.js:8518 (`commitText`) and timeline.js:8629 (`splitTextIntoCharacters`). Zero external callers found."
+          ],
+          "behavior": [
+            "Lines 8383-8387 (comment, 5 lines): lead-in — one layout pass shared by the flattened bake and the per-character split, pixel-identical wrap decisions.",
+            "Line 8388 (code): `function computeTextLayout(text,font,size,fixedWidthWorld){`.",
+            "Lines 8389-8395 (comment, 7 lines): supersample rationale — SS bumped 2->3 (2026-07); since real vector glyph rendering is out of scope this session, baking at higher fixed resolution is the only crispness lever for zoom/export.",
+            "Line 8396 (code): `var SS=3;`.",
+            "Lines 8397-8402 (code, 6 lines): `lines=text.split('\\n')`; offscreen `canvas`/`getContext('2d')`; `octx.font=size*SS+'px '+font`; `lineH=size*SS*1.25`; `fixedWidthPx=fixedWidthWorld?Math.max(20,fixedWidthWorld*SS):null`.",
+            "Line 8403 (code): `var wrapped=[];`.",
+            "Lines 8404-8406 (comment, 3 lines): greedy word-wrap rationale — Figma/Illustrator area-text behavior; point text (fixedWidthPx null) keeps one-line-per-input-line auto-width behavior.",
+            "Lines 8407-8416 (code, 10 lines): `if(fixedWidthPx)` branch — per input line, split on `' '`, accumulate `cur`, push+reset when `octx.measureText(test).width>fixedWidthPx-16` (16px total inset), push the final `cur` per line; `else wrapped=lines` (unwrapped passthrough).",
+            "Line 8417 (code): `}` closes the if/else.",
+            "Lines 8418-8419 (code): `wMax` from `fixedWidthPx` or the widest wrapped line's own `measureText`; `off.width=Math.ceil(wMax)+16;off.height=Math.ceil(wrapped.length*lineH)+16`.",
+            "Lines 8420-8422 (code, comment interleaved): `octx=off.getContext('2d');` (8425 in source order — resizing the canvas resets its context/state, comment 8425) then `octx.font=...;octx.textBaseline='top';` (8426).",
+            "Line 8428 (code): `return {off:off,octx:octx,wrapped:wrapped,lineH:lineH,SS:SS};`.",
+            "Line 8429 (code): `function lineDrawX(off,octx,line,align){`.",
+            "Lines 8430-8433 (code, 4 lines): `tw=octx.measureText(line).width`; center `(off.width-tw)/2`; right `off.width-8-tw`; default/left `8`.",
+            "Line 8434 (code): `}` closing brace of `lineDrawX`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "commit-vector-text",
+      "packets": [
+        {
+          "id": "C19z.commit-vector-text",
+          "files": [
+            "src/js/timeline.js:8435-8500"
+          ],
+          "coverage_ranges": [
+            [
+              8435,
+              8500
+            ]
+          ],
+          "classification": {
+            "code": 47,
+            "comment": 19,
+            "whitespace": 0
+          },
+          "symbols": [
+            "commitVectorText",
+            "SMVectorText",
+            "pushUndo",
+            "closeTextPopover",
+            "showToast",
+            "SM"
+          ],
+          "signature": "function commitVectorText(txt,fontKey,size,align,color,fixedWidthWorld)",
+          "responsibility": "5-line lead-in (8435-8439): `vector:<fontKey>` is the #text-font select's escape hatch into real glyph outlines (vector-text-bridge.js) instead of a Canvas2D bake; kept as its own function since it is async (font fetch) and its editing case is remove-all-members-then-rebuild rather than reassign-one-Raster's-source. `commitVectorText` (8440-8499): resolves the placement anchor (editing an existing vector-text root vs. a fixed box vs. a point click), harvests old per-character strokeIds before removing existing members on edit, auto-tags an empty layer, calls `buildVectorTextGroup` and reconciles strokeIds by character index once it resolves, or shows a toast on font-load failure.",
+          "callers": [
+            "`commitVectorText` — 1 internal call site confirmed by `grep -rn -P '(^|[^a-zA-Z_.])commitVectorText\\(' src/js`: timeline.js:8511, `commitText`'s own `vector:` dispatch (this artifact's own next packet). Zero external callers found."
+          ],
+          "behavior": [
+            "Lines 8435-8439 (comment, 5 lines): lead-in — vector:<fontKey> escape hatch, async, edit = remove-all-members-then-rebuild, kept separate from the raster branch.",
+            "Line 8440 (code): `function commitVectorText(txt,fontKey,size,align,color,fixedWidthWorld){`.",
+            "Line 8441 (code): `editingRoot` — truthy only if `_textEditingRaster` has a `.parent` and `.data.isTextRoot`.",
+            "Line 8442 (code): `var topLeft;`.",
+            "Line 8443 (code): editing-root branch — topLeft is the union of every existing member's bounds (`vectorTextGroupMembers(editingRoot).reduce(...)`), then `.topLeft.clone()`.",
+            "Line 8444 (code): else-if `_textPendingBox` — topLeft = the box's own `.topLeft.clone()`.",
+            "Lines 8445-8448 (comment, 4 lines): point-click placement rationale — anchors TOP-LEFT (unlike raster point-text's centring), matching Illustrator's point-text tool; no pre-existing raster-mode convention to match since this is a separate placement mode.",
+            "Line 8449 (code): else `topLeft=_textPendingPt.clone()`.",
+            "Lines 8450-8452 (code, 3 lines): `layer=userLayers[state.activeLayerIdx]`; `ldForTag=state.layers[state.activeLayerIdx]`; `wasEmpty=layer.children.length===0`.",
+            "Line 8453 (code): `pushUndo();`.",
+            "Lines 8454-8461 (comment, 8 lines): strokeId-by-character-index rationale — editing rebuilds every glyph with fresh ids, but per-character animation is keyed by strokeId; a measured live regression (fadeIn + rename) left 9 orphaned entries and a dead animation, so ids travel by character index across the rebuild.",
+            "Line 8462 (code): `var _oldIdByChar=null;`.",
+            "Line 8463 (code): `if(editingRoot){`.",
+            "Lines 8464-8465 (comment, 2 lines): a character can be several paths (counter, accent) — hence a LIST per character index, consumed in document order on the way back.",
+            "Lines 8466-8471 (code, 6 lines): `_oldIdByChar={}`; harvest every member's `charIndex`->`strokeId` (guarded on both being present) into the list; then remove every member (`.forEach(function(p){p.remove();})`).",
+            "Line 8472 (code): `}` closes the `if(editingRoot)`.",
+            "Line 8473 (code): `else if(wasEmpty&&!ldForTag.isTextLayer)ldForTag.isTextLayer=true;` — same auto-tag precedent as `commitText`'s own Branch B, only on the CREATE path (never when editing an existing root).",
+            "Line 8474 (code): `closeTextPopover();` — called BEFORE the async build starts (unlike `commitText`, which calls it LAST).",
+            "Line 8475 (code): `window.SMVectorText.buildVectorTextGroup(txt,fontKey,size,color,align,fixedWidthWorld,topLeft,layer).then(function(){`.",
+            "Line 8476 (code): `if(_oldIdByChar){`.",
+            "Lines 8477-8478 (code, 2 lines): `reused={},queues={}`; `queues[ci]=_oldIdByChar[ci].slice()` per index — a fresh FIFO copy per index.",
+            "Lines 8479-8485 (code, 7 lines): for every newly-built path carrying a `charIndex`, pop the matching queue (`q.shift()`) and reassign `p.data.strokeId=oid`, marking `reused[oid]=1`.",
+            "Lines 8486-8492 (code, 7 lines): for every OLD id never reused, delete its `elementMotion`/`shapeNames` entries on `ldForTag` — dropped instead of lingering as dead weight.",
+            "Line 8493 (code): `}` closes the `if(_oldIdByChar)`.",
+            "Lines 8494-8495 (code, 2 lines): `saveActiveLayerFrame();updateUI();` then a guarded `window.SMEngineBridge.renderNow()`.",
+            "Line 8496 (code): `}).catch(function(e){`.",
+            "Lines 8497-8498 (code, 2 lines): `console.warn('[vector-text] build failed',e);` then `showToast(SM.t('toastVectorTextFontLoadFailed'));`.",
+            "Line 8499 (code): `});` closes the `.catch()`.",
+            "Line 8500 (code): `}` closing brace of `commitVectorText`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "commit-text-popover-init-registrations",
+      "packets": [
+        {
+          "id": "C19z.commit-text-popover-init-registrations",
+          "files": [
+            "src/js/timeline.js:8501-8576"
+          ],
+          "coverage_ranges": [
+            [
+              8501,
+              8576
+            ]
+          ],
+          "classification": {
+            "code": 61,
+            "comment": 15,
+            "whitespace": 0
+          },
+          "symbols": [
+            "commitText",
+            "initTextPopover",
+            "computeTextLayout",
+            "lineDrawX",
+            "commitVectorText",
+            "closeTextPopover",
+            "openTextPopover",
+            "openTextPopoverForBox",
+            "openTextPopoverForEdit"
+          ],
+          "signature": "function commitText(); function initTextPopover()",
+          "responsibility": "`commitText()` (8501-8555): reads the five popover fields, dispatches to `commitVectorText` for the `vector:` escape hatch, otherwise bakes via `computeTextLayout`/`lineDrawX`+`fillText`, then either re-baks an existing Raster in place (identity-preserving) or creates a brand-new tagged Raster with the isBox centre-vs-point placement rule, auto-tagging an empty layer along the way. `initTextPopover()` (8556-8572): wires the popover's own Apply/Cancel clicks and an Escape/Cmd-Ctrl+Enter keyboard path onto the textarea. Followed by this function's own DOMContentLoaded-or-immediate self-registration (8573) and the three `window.openTextPopover*` exports (8574-8576, C19y's own functions, cited by name only).",
+          "callers": [
+            "`commitText` — 2 call sites beyond its own declaration confirmed by `grep -rn -P '(^|[^a-zA-Z_.])commitText\\(' src/js`: timeline.js:8570 (internal, this same packet's own `initTextPopover` keydown handler) and timeline.js:8376 (external, C19y's `closeInPlaceRasterTextEditor`) — plus a bare-reference registration at timeline.js:8558 (`save.addEventListener('click',commitText)`, excluded by the grep's own `commitText\\(` pattern but a functional third caller via the DOM event system).",
+            "`initTextPopover` — 1 call site beyond its own declaration, its OWN self-registration at timeline.js:8573 (`if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initTextPopover);else initTextPopover();`). Zero external callers found."
+          ],
+          "behavior": [
+            "Line 8501 (code): `function commitText(){`.",
+            "Line 8502 (code): `var txt=document.getElementById('text-input').value;`.",
+            "Line 8503 (code): guard — return via `closeTextPopover()` if `txt` is blank/whitespace-only or none of the three pending-placement variables is set.",
+            "Line 8504 (code): `size=parseInt(document.getElementById('text-size').value,10)||48;`.",
+            "Line 8505 (code): `font=document.getElementById('text-font').value||'sans-serif';`.",
+            "Line 8506 (code): `align=document.getElementById('text-align').value||'left';`.",
+            "Lines 8507-8508 (code, 2 lines): `colorInp=document.getElementById('text-color')`; `color=(colorInp&&colorInp.value)||state.strokeColor||'#000000'`.",
+            "Line 8509 (code): `fixedWidthWorld=_textPendingBox?_textPendingBox.width:null;`.",
+            "Lines 8510-8513 (code, 4 lines): `vector:` escape hatch — `if(font.indexOf('vector:')===0){commitVectorText(txt,font.slice(7),size,align,color,fixedWidthWorld);return;}`.",
+            "Line 8514 (code): `L=computeTextLayout(txt,font,size,fixedWidthWorld);`.",
+            "Line 8515 (code): destructure `off,octx,wrapped,lineH,SS` from `L`.",
+            "Lines 8516-8519 (code, 4 lines): `octx.fillStyle=color;` then the actual bake — `wrapped.forEach` calling `octx.fillText(l,lineDrawX(off,octx,l,align),8+i*lineH)`.",
+            "Line 8520 (code): `url=off.toDataURL('image/png');`.",
+            "Line 8521 (code): `pushUndo();`.",
+            "Line 8522 (code): `textMeta={text:txt,font:font,size:size,color:color,align:align,fixedWidth:fixedWidthWorld||null};`.",
+            "Line 8523 (code): `if(_textEditingRaster&&_textEditingRaster.parent){` — Branch A, re-edit.",
+            "Line 8524 (code): `var r=_textEditingRaster;`.",
+            "Line 8525 (code): `topLeft=r.bounds.topLeft.clone();` — re-bake keeps its top-left anchor fixed, doesn't re-center on the old click point.",
+            "Lines 8526-8527 (code, 2 lines): `r.data.isText=true;r.data.src=url;` then all five `textMeta` fields onto `r.data`.",
+            "Line 8528 (code): `r.onLoad=function(){...}` — resize, reposition centred on the kept `topLeft`, `saveActiveLayerFrame();updateUI();` then guarded `renderNow()`.",
+            "Line 8529 (code): `r.source=url;` — reassigning `.source` keeps the same item identity (index/parent/references), same edit-in-place pattern as any other Raster in this codebase.",
+            "Line 8530 (code): `}else{` — Branch B, new item.",
+            "Line 8531 (code): `var layer=userLayers[state.activeLayerIdx];`.",
+            "Lines 8532-8538 (comment, 7 lines): auto-tag rationale — same 'auto-convert on first qualifying action' precedent as Motion's layer->Component conversion (CLAUDE.md 8); only the FIRST text on an otherwise-empty layer marks it, never overriding a layer already filled with other content.",
+            "Line 8539 (code): `var ldForTag=state.layers[state.activeLayerIdx];`.",
+            "Line 8540 (code): `if(layer.children.length===0&&!ldForTag.isTextLayer)ldForTag.isTextLayer=true;`.",
+            "Line 8541 (code): `var prev=project.activeLayer;layer.activate();` — brackets the `new Raster` call only.",
+            "Line 8542 (code): `var r2=new Raster(url);`.",
+            "Lines 8543-8544 (code, 2 lines): `r2.data.src=url;r2.data.isText=true;` then all five `textMeta` fields onto `r2.data`.",
+            "Lines 8545-8546 (code, 2 lines): `pt=_textPendingBox?_textPendingBox.topLeft.clone():_textPendingPt;` `isBox=!!_textPendingBox;`.",
+            "Lines 8547-8551 (code, 5 lines): `r2.onLoad=function(){...}` — resize; `r2.position=isBox?pt.add(half-size):pt` (the centre-vs-point rule); `saveActiveLayerFrame();updateUI();` then guarded `renderNow()`.",
+            "Line 8552 (code): `prev.activate();` — restores the previously active layer immediately after construction.",
+            "Line 8553 (code): `}` closes the if/else.",
+            "Line 8554 (code): `closeTextPopover();` — the LAST statement, common to both branches.",
+            "Line 8555 (code): `}` closing brace of `commitText`.",
+            "Line 8556 (code): `function initTextPopover(){`.",
+            "Line 8557 (code): `var save=document.getElementById('text-apply');if(!save)return;`.",
+            "Line 8558 (code): `save.addEventListener('click',commitText);`.",
+            "Line 8559 (code): `document.getElementById('text-cancel').addEventListener('click',closeTextPopover);`.",
+            "Lines 8560-8567 (comment, 8 lines): UX audit (2026-07) — the popover was mouse-only, no keyboard path at all; Escape-to-cancel and Cmd/Ctrl+Enter-to-place match the app's own existing convention elsewhere (frame/layer rename fields); plain Enter is left alone since the textarea is explicitly multi-line.",
+            "Lines 8568-8571 (code, 4 lines): `#text-input`'s own `keydown` listener — Escape stops propagation and cancels; Cmd/Ctrl+Enter stops propagation, prevents default, and commits.",
+            "Line 8572 (code): `}` closing brace of `initTextPopover`.",
+            "Line 8573 (code): `if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initTextPopover);else initTextPopover();` — self-registration.",
+            "Lines 8574-8576 (code, 3 lines): `window.openTextPopover=openTextPopover;` `window.openTextPopoverForBox=openTextPopoverForBox;` `window.openTextPopoverForEdit=openTextPopoverForEdit;` — the three C19y-owned exports, cited by name only."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "split-text-into-characters",
+      "packets": [
+        {
+          "id": "C19z.split-text-into-characters",
+          "files": [
+            "src/js/timeline.js:8577-8662"
+          ],
+          "coverage_ranges": [
+            [
+              8577,
+              8662
+            ]
+          ],
+          "classification": {
+            "code": 62,
+            "comment": 24,
+            "whitespace": 0
+          },
+          "symbols": [
+            "splitTextIntoCharacters",
+            "computeTextLayout",
+            "lineDrawX",
+            "pushUndo",
+            "tagOwner",
+            "saveActiveLayerFrame",
+            "updateUI",
+            "SMEngineBridge"
+          ],
+          "signature": "function splitTextIntoCharacters(raster)",
+          "responsibility": "14-line section header (8577-8590, 'Decouper par caractere', 2026-07): a split text block becomes ordinary per-character Raster items sharing a textGroupId — the same stable-id-groups-members pattern as Cmd+G groups (group-bridge.js) — rather than a parallel text-animator system; deliberately irreversible, same 'Release to Layers' precedent as splitLayerIntoElements. `splitTextIntoCharacters(raster)` (8591-8661): guards on isText/isTextChar/parent, re-derives the exact same layout via `computeTextLayout`, generates one shared `textGroupId`, counts non-whitespace characters up front to gate the shared completion callback, bakes one small canvas per character with running word/char cursors for the Text Animator's own grouping contract, inserts each new Raster above the original, and removes the original only after every new one has been created. `window.splitTextIntoCharacters=splitTextIntoCharacters;` (8662) is the cross-file export C19aa's own text-actions panel reaches through.",
+          "callers": [
+            "`splitTextIntoCharacters` — 1 call site beyond its own declaration and export, confirmed by `grep -rn -P '(^|[^a-zA-Z_.])splitTextIntoCharacters\\(' src/js` (recursive, incl. labs/ and adapters/): timeline.js:8694, `updateTextActionsPanel`'s own `#btn-text-split-chars` click handler (C19aa, next leaf, not yet merged as a filed artifact at authoring time) — a button-click handler, NOT a context menu; no second caller was found anywhere in src/js, correcting the issue's own 'expect ... and/or a context menu' framing for the context-menu half."
+          ],
+          "behavior": [
+            "Lines 8577-8590 (comment, 14 lines): section header — per-character split becomes ordinary Motion Elements sharing a textGroupId (group-bridge.js precedent), avoiding a parallel text-animator system; each character can carry its own keys/expression; deliberately irreversible (Release to Layers precedent).",
+            "Line 8591 (code): `function splitTextIntoCharacters(raster){`.",
+            "Line 8592 (code): `var d=raster.data;`.",
+            "Line 8593 (code): `if(!d||!d.isText||d.isTextChar||!raster.parent)return;` — guards against a non-text raster, an already-split character, or a detached item.",
+            "Lines 8594-8596 (code, 3 lines): `layer=raster.parent;` `topLeft=raster.bounds.topLeft.clone();` `insertIdx=layer.children.indexOf(raster);` (computed but not read again in this span — the actual insertion uses `insertAbove` at 8646, not this index).",
+            "Line 8597 (code): `L=computeTextLayout(d.text||'',d.font||'sans-serif',d.size||48,d.fixedWidth||null);` — the SAME shared layout pass, re-derived from the persisted `d.*` fields rather than the live popover state.",
+            "Line 8598 (code): destructure `off,octx,wrapped,lineH,SS` from `L`.",
+            "Line 8599 (code): `color=d.color||'#000000';`.",
+            "Line 8600 (code): `textGroupId='txt'+Date.now().toString(36)+'_'+Math.floor(Math.random()*1e6);` — generated once per split call.",
+            "Lines 8601-8608 (comment, code interleaved; comment 8601-8607, 7 lines): rationale for counting characters up front — async onLoad callbacks must know when EVERY character has finished decoding before the single shared save/render at the end, else a premature save would persist each Raster's pre-onLoad placeholder geometry (0x0 at origin), same race serR's own _pendingGeom comment (app.js) warns about, multiplied per character.",
+            "Line 8608 (code): `var totalChars=0;`.",
+            "Line 8609 (code): `wrapped.forEach(function(line){line.split('').forEach(function(ch){if(ch.trim()!=='')totalChars++;});});` — counts non-whitespace characters only.",
+            "Line 8610 (code): `if(!totalChars)return;` — nothing to split (an all-whitespace block).",
+            "Line 8611 (code): `pushUndo();` — once, before the per-character loop.",
+            "Lines 8612-8613 (code, 2 lines): `var loaded=0;` `var newRasters=[];`.",
+            "Lines 8614-8620 (code, 7 lines): `function onOneLoaded(){loaded++;if(loaded>=totalChars){newRasters.forEach(function(cr){tagOwner(cr);});saveActiveLayerFrame();updateUI();if(window.SMEngineBridge)window.SMEngineBridge.renderNow();}}` — the shared completion callback: only once every character's async onLoad has fired does it tag every new Raster via `tagOwner` (tools.js) and run the single save/UI-refresh/render pass.",
+            "Line 8621 (code): `var prev=project.activeLayer;layer.activate();` — brackets the whole synchronous creation loop below.",
+            "Lines 8622-8625 (comment, 4 lines): Text Animator grouping rationale (2026-08-17) — same running-word-index contract as the vector path (vector-text-bridge.js): incremented once per whitespace-delimited run across the WHOLE block, not reset per line.",
+            "Line 8626 (code): `var wordCursor=0,charCursor=0;`.",
+            "Line 8627 (code): `wrapped.forEach(function(line,li){` — outer per-line loop.",
+            "Line 8628 (code): `if(!line)return;` — skip an empty wrapped line.",
+            "Line 8629 (code): `startX=lineDrawX(off,octx,line,d.align||'left');` — the SAME shared x-alignment helper the flattened bake uses.",
+            "Lines 8630-8631 (code, 2 lines): `cursor=startX;` `atWordStart=true;`.",
+            "Line 8632 (code): `line.split('').forEach(function(ch){` — inner per-character loop.",
+            "Line 8633 (code): `chW=octx.measureText(ch).width;`.",
+            "Line 8634 (code): `if(ch.trim()===''){cursor+=chW;atWordStart=true;return;}` — whitespace: advance the cursor and flag a new word boundary, but never bakes a Raster for it.",
+            "Line 8635 (code): `if(atWordStart){wordCursor++;atWordStart=false;}` — increments once per run of non-whitespace, at the FIRST character of that run.",
+            "Lines 8636-8639 (code, 4 lines): `co=document.createElement('canvas');` sized to `ceil(chW)+8` x `ceil(lineH)`; `cctx=co.getContext('2d');` `cctx.font=...;cctx.fillStyle=color;cctx.textBaseline='top';`.",
+            "Line 8640 (code): `cctx.fillText(ch,4,0);` — per-character bake with a 4px inset.",
+            "Line 8641 (code): `curl=co.toDataURL('image/png');`.",
+            "Line 8642 (code): `var cr=new Raster(curl);`.",
+            "Line 8643 (code): `cr.data.src=curl;cr.data.isText=true;cr.data.isTextChar=true;cr.data.textGroupId=textGroupId;`.",
+            "Line 8644 (code): `cr.data.text=ch;cr.data.font=d.font||'sans-serif';cr.data.size=d.size||48;cr.data.color=color;`.",
+            "Line 8645 (code): `cr.data.charIndex=charCursor;cr.data.wordIndex=wordCursor;cr.data.lineIndex=li;`.",
+            "Line 8646 (code): `charCursor++;` — advances the running per-character index (all non-whitespace characters counted, spanning line boundaries).",
+            "Line 8647 (code): `cr.insertAbove(raster);` — every new character is stacked directly above the ORIGINAL, in creation order.",
+            "Lines 8648-8654 (code, 7 lines): an IIFE closing over `(cr,cursorX,lineIdx,coW,coH)` sets `cr.onLoad=function(){cr.size=new Size(coW/SS,coH/SS);cr.position=topLeft.add(new Point(cursorX/SS+cr.size.width/2,lineIdx*lineH/SS+cr.size.height/2));onOneLoaded();}` — positions relative to the ORIGINAL's own topLeft, then signals completion.",
+            "Line 8655 (code): `newRasters.push(cr);`.",
+            "Line 8656 (code): `cursor+=chW;` — advances the draw cursor past this character.",
+            "Line 8657 (code): `});` closes the inner per-character `forEach`.",
+            "Line 8658 (code): `});` closes the outer per-line `forEach`.",
+            "Line 8659 (code): `prev.activate();` — restores the previously active layer.",
+            "Line 8660 (code): `raster.remove();` — the ORIGINAL is removed LAST, after every new character Raster has already been synchronously created and inserted (only each one's own async onLoad is still pending at this point).",
+            "Line 8661 (code): `}` closing brace of `splitTextIntoCharacters`.",
+            "Line 8662 (code): `window.splitTextIntoCharacters=splitTextIntoCharacters;` — the cross-file export C19aa's text-actions panel reaches through."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "`saveActiveLayerFrame()` is called from all three top-level actions in this scope: `commitVectorText`'s own `.then()` (8494), `commitText`'s two `onLoad` callbacks (8528, 8550), and `splitTextIntoCharacters`'s shared `onOneLoaded()` (8618) — always immediately followed by `updateUI()` on the same line, and always AFTER the underlying Raster(s) have finished decoding (async `onLoad`/`.then()`), never synchronously with construction. This mirrors the persisted field set `serR`/`desR` (app.js:1104-1118/1221, C21e) read/write for `isText`/`text`/`font`/`size`/`color`/`align`/`fixedWidth`/`isTextChar`/`textGroupId`/`charIndex`/`wordIndex` — every field this scope writes onto `r.data`/`r2.data`/`cr.data` has a matching persisted field, confirmed by direct read of both bodies."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No function named `importJSON` exists anywhere in the codebase at the frozen SHA (confirmed by a whole-src `git grep -n 'function importJSON'`, zero hits, matching C19w's own prior finding) — none of this scope's six symbols appear in the project-load path either way. `desR` (app.js:1221, C21e) is the actual reader that restores the persisted text/split fields onto a freshly-built Raster at `loadFrame` time — cited by line only, body not reproduced."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Exactly THREE `pushUndo()` calls in this scope's own body (tweens.js:4741, a thin wrapper over `pushUndoLayers`): 8453 (`commitVectorText`, before either its edit-remove or create branch), 8521 (`commitText`, before either its re-edit or new-item branch), 8611 (`splitTextIntoCharacters`, once before the whole per-character creation loop, not once per character). Every top-level mutating action in this scope is preceded by exactly one `pushUndo()` call — none is per-item inside a loop, confirmed by direct read of all three call sites."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "This scope never reads `_layerSel`/`_layerSelAnchor` (C19q's module-scope selection state). It reads `state.activeLayerIdx` (8450-8452, 8531/8539, `commitVectorText`/`commitText`'s own new-item branches) to resolve the layer a new Raster/vector-text group is placed into, and takes an explicit `raster` argument (`splitTextIntoCharacters`) rather than reading any selection state directly — the caller (C19aa's text-actions panel, next leaf) is responsible for supplying the correct target."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "No mode branch anywhere in this scope's six functions — both `commitText`/`commitVectorText` produce ordinary tagged Rasters, and `splitTextIntoCharacters` produces N ordinary tagged Rasters, all reachable identically from either mode's own timeline machinery. `layerElements`/`elementMotion` (motion.js, C20) treat a split character as an ordinary Motion Element with no special-case branch — cited by name only, per the issue's own instruction; this is the entire architectural point of the section header comment (8577-8590)."
+    },
+    {
+      "consumer": "export",
+      "disposition": "None of this scope's six declared functions are called from `export.js`, `rive-export.js`, or `engine-bridge.js` at the frozen SHA (confirmed: zero matches for any of the six symbol names in any of the three files). Every function here is editor-UI-only, reached from a user gesture (popover Apply/Escape/Cmd-Enter, or the text-actions panel's split button) or an internal call within this same scope. The Rasters this scope produces are rendered by the EXISTING image pipeline (`buildSceneJson`'s own Raster handling, out of scope) with no text-specific branch."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "`window.SMEngineBridge.renderNow()` is called exactly four times in this scope, always guarded on `window.SMEngineBridge` and always paired with a preceding `saveActiveLayerFrame();updateUI();` on the SAME or the immediately preceding statement: `commitVectorText` (8495), `commitText`'s two `onLoad`s (8528, 8550), `splitTextIntoCharacters`'s shared `onOneLoaded()` (8619). No Tauri-specific API, no `window.__TAURI__` reference, is touched anywhere in 8383-8662."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-layout-single-word-wider-than-box-not-split",
+      "proposed": "Call `computeTextLayout('averylongunbrokenword',font,size,fixedWidthWorld=50)`; expect `wrapped` to contain that single word as its OWN one-element line (never split mid-word) — verifies the `cur?cur+' '+w:w` ternary (8408) never rejects the first word of a fresh line regardless of width — not run."
+    },
+    {
+      "id": "fx-commit-text-reedit-preserves-identity",
+      "proposed": "Create a text Raster via the new-item branch, capture its `.index`/`.parent`, then re-open it for edit (`_textEditingRaster` set) and call `commitText()` with different text; expect the SAME Raster object (`===`), same `.index`/`.parent`, only `.source`/`.data.*` changed, and `.bounds.topLeft` unchanged from before the re-bake — verifies 8523-8529 — not run."
+    },
+    {
+      "id": "fx-commit-text-isbox-vs-point-placement",
+      "proposed": "Call `commitText()` once with `_textPendingBox` set (a fixed-width box at a known topLeft) and once with only `_textPendingPt` set (a point); expect the box case's final `.position` to be `topLeft + half-baked-size` (centred) and the point case's final `.position` to equal the point EXACTLY (no centring) — verifies the isBox ternary at 8549 — not run."
+    },
+    {
+      "id": "fx-commit-vector-text-edit-reuses-strokeid-by-charindex",
+      "proposed": "Build a vector-text group via `commitVectorText` with 3 characters, record each path's `.data.strokeId`, then re-edit (same `_textEditingRaster.data.isTextRoot`) to a 2-character string that is a PREFIX of the original; expect the two surviving characters to keep their ORIGINAL strokeIds (by charIndex), and expect the third (dropped) character's old strokeId to have its `elementMotion`/`shapeNames` entries deleted from `ldForTag` — verifies 8466-8492 — not run."
+    },
+    {
+      "id": "fx-split-text-whitespace-produces-no-raster",
+      "proposed": "Call `splitTextIntoCharacters(raster)` on a Raster whose `d.text==='a b'`; expect exactly 2 new Rasters created (not 3), `totalChars===2`, and the shared `textGroupId` identical across both — verifies the whitespace skip at 8634 and the totalChars count at 8609 — not run."
+    },
+    {
+      "id": "fx-split-text-original-removed-after-all-children-inserted",
+      "proposed": "Call `splitTextIntoCharacters(raster)` on a 5-character text block; inside a monkey-patched `Raster.prototype.insertAbove`, assert `raster.removed===false` on every call (confirming insertion happens before removal); after the function returns, assert `raster.removed===true` and `layer.children.length` increased by exactly (charCount-1) — verifies the removal-last statement order at 8660 — not run."
+    },
+    {
+      "id": "fx-split-text-save-render-once-not-per-character",
+      "proposed": "Spy on `saveActiveLayerFrame`/`updateUI`/`SMEngineBridge.renderNow`; call `splitTextIntoCharacters(raster)` on a multi-character block, then synchronously fire every character's own `onLoad` in sequence; expect all three spies called EXACTLY ONCE, only after the LAST `onLoad` fires (loaded>=totalChars) — verifies `onOneLoaded`'s own gate at 8616 — not run."
+    }
+  ],
+  "future_proposals": [
+    "`commitVectorText`'s edit path (remove-all-members-then-rebuild) was not directly compared line-by-line against C19y's own `closeInPlaceTextEditor` rebuild (cited by name only per this issue's own instruction, out of scope for this leaf's own read boundary of 8383-8662) — the artifact contract's own item (c) asks for this comparison; a full CLAUDE.md 3 twin-function-hazard check would require reading C19y's own body once it is filed/merged, and is flagged here for whoever authors or reviews C19y rather than performed by this leaf.",
+    "The issue's own owner-line groups `saveActiveLayerFrame`/`updateUI` together under 'app.js C21o' — this census found `updateUI` is actually defined in timeline.js (line 2727), owned by the sibling artifact C19h-timeline-ui-refresh-adapters (assigned_ranges 2697-2947), not app.js/C21o. Flagged as a citation correction for whoever maintains the issue text or a future cross-reference audit; it does not affect this leaf's own assigned range, packet boundaries, or validator result.",
+    "The issue's own artifact-contract item (g) asks to 'confirm or correct' whether `splitTextIntoCharacters` has a text-actions-panel caller AND/OR a context-menu caller; this census found only the text-actions-panel caller (timeline.js:8694, C19aa) and no context-menu caller anywhere in a recursive src/js grep (including labs/ and adapters/) — noted as a correction, not confirmed as a permanent absence (a context-menu entry could be added later without this leaf's own knowledge)."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A recursive `grep -rn -P '(^|[^a-zA-Z_.])<symbol>\\(' src/js` (includes labs/ and adapters/) was run once for each of the six function symbols this scope defines (computeTextLayout, lineDrawX, commitVectorText, commitText, initTextPopover, splitTextIntoCharacters), at the frozen SHA's own working-tree content (verified identical blob to the frozen SHA before running), filtering out each symbol's own declaration line and any hit whose trimmed content starts with `//` — results are reproduced verbatim under each packet's own `callers` field and are re-checkable with the same command. A separate check confirmed none of the six symbols appear inside a `window.SM={...}` literal block anywhere in src/js.",
+    "A SEPARATE grep restricted to engine-bridge.js/export.js/rive-export.js for all six symbol names returned ZERO hits, directly supporting the export/render-path source_consumers entries above.",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's OWN classify() algorithm against a direct `git show 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js` dump, run once per packet and once for the whole span — 207/73/0 over 280 lines, matching the issue's own proposed union exactly and matching the issue's own proposed per-packet table exactly for all four packets; no boundary correction was needed (every cut point named in the issue's own table was verified byte-for-byte against the frozen blob with sed -n/awk before this artifact was written).",
+    "The persisted-field claims (serR/desR field lists) were cross-checked directly against app.js:1104-1118 and app.js:1221 (read verbatim via awk/sed -n, not assumed from that artifact's own JSON) — every field this scope writes onto r.data/r2.data/cr.data (isText, src, text, font, size, color, align, fixedWidth, isTextChar, textGroupId, charIndex, wordIndex) has a matching read/write in serR/desR with no discrepancy found.",
+    "The `updateUI`-ownership correction (timeline.js:2727, C19h, not app.js/C21o) was produced by loading every C19*.json in this directory and checking which one's own `assigned_ranges` contains line 2727 programmatically, not by re-reading the issue's own prose assumption.",
+    "engineering/inventory/census/*.json siblings present at authoring time sharing `source_path: src/js/timeline.js`: C19a through C19w, forming a contiguous run through line 7448 with zero gaps/overlaps (independently confirmed by listing every sibling's own `assigned_ranges` and checking adjacency); C19x and C19y are NOT present as merged artifacts in this directory at authoring time — this scope's own range (8383-8662) is therefore NOT contiguous with the on-disk sibling set, by design (three sibling leaves opened over the same file tail, each independently claimable); the validator's cross-sibling overlap check still confirms no line-level overlap with any C*.json actually present on disk."
+  ],
+  "validation": {
+    "expected_assigned_lines": 280,
+    "expected_classification": {
+      "code": 207,
+      "comment": 73,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        8383,
+        8434
+      ],
+      [
+        8435,
+        8500
+      ],
+      [
+        8501,
+        8576
+      ],
+      [
+        8577,
+        8662
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by script against the frozen blob: 8383-8434=(37,15,0); 8435-8500=(47,19,0); 8501-8576=(61,15,0); 8577-8662=(62,24,0); sums to (207,73,0)=280 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 280 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check_c19z.py engineering/inventory/census/C19z-timeline-text-bake-commit-split.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check_c19z.py engineering/inventory/census/C19w-timeline-duplicator-panel.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c19z.py engineering/inventory/census/C19v-timeline-layer-reorder-symbol-tabs-side-panels.json <candidate-sha> still exits 0"
+    ]
+  }
+}
