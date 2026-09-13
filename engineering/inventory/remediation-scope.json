@@ -1,11 +1,11 @@
 {
   "schema": "nemo.remediation-scope/2",
-  "issue": "https://github.com/mysteropodes/nemo/issues/1170",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1179",
   "complete": false,
   "source": {
-    "commit": "1bfcbad1eea9ab810ee87cfd6bc18306b2533ee8",
-    "fileCount": 699,
-    "sha256": "2e8b5fbab894e6686ff56880946e86b6f5017ae51a7de27177b001f5aa473a6f"
+    "commit": "4bbe332332075d9a25793a58998ea99b33d48538",
+    "fileCount": 703,
+    "sha256": "d336b3b3fd35632e0adf587ecff912fbd61e3a715fe206cc88c1f2047951a33f"
   },
   "amendments": [
     {
@@ -91,6 +91,34 @@
         "tests/nemo-boundaries.test.cjs"
       ],
       "reason": "P03B refreeze at current main: pin the 24 supplemental C19/C20 censuses, index the paths added since the P03A freeze, record range coverage and reviewed dispositions."
+    },
+    {
+      "id": "P03C-a",
+      "issue": 1179,
+      "commit": "4bbe332332075d9a25793a58998ea99b33d48538",
+      "from": "1bfcbad1eea9ab810ee87cfd6bc18306b2533ee8",
+      "fileCount": 703,
+      "sha256": "d336b3b3fd35632e0adf587ecff912fbd61e3a715fe206cc88c1f2047951a33f",
+      "added": [
+        "engineering/inventory/census/C19r-timeline-layer-icons-colors-parent-pickwhip.json",
+        "scripts/nemo/lib/remediation-scope-build.cjs",
+        "scripts/nemo/lib/remediation-scope-census.cjs",
+        "scripts/nemo/lib/remediation-scope-verify.cjs"
+      ],
+      "removed": [],
+      "modified": [
+        "engineering/boundaries/profiles/scripts-nemo.profile.json",
+        "engineering/inventory/REMEDIATION_SCOPE.md",
+        "engineering/inventory/census/C02-animation-time.json",
+        "engineering/inventory/census/C06-preferences-labs-bootstrap.json",
+        "engineering/inventory/remediation-scope.json",
+        "engineering/remediation/EXECUTION_PLAN.en.md",
+        "engineering/remediation/EXECUTION_PLAN.fr.md",
+        "scripts/nemo/ci.test.cjs",
+        "scripts/nemo/remediation-scope.cjs",
+        "tests/nemo-remediation-scope.test.cjs"
+      ],
+      "reason": "Reconcile C02/C06/C20 packet range drift (taSelectorAt, elementMotionAt/layerOrderAt doc lead-ins, enterComponentLayer documentation, C06 storage-key-migration lead-in) and pin C19r into the scope index."
     }
   ],
   "counts": {
@@ -98,8 +126,8 @@
     "documentation": 69,
     "generated": 14,
     "handwritten-runtime": 201,
-    "handwritten-tooling": 53,
-    "static-data": 161,
+    "handwritten-tooling": 56,
+    "static-data": 162,
     "test": 145,
     "vendor": 7
   },
@@ -113,7 +141,7 @@
     {
       "id": "C02",
       "path": "engineering/inventory/census/C02-animation-time.json",
-      "blob": "70bdb5abec721a248fbe89228182f501f8ca1f35",
+      "blob": "3e920d4f112028ed486df697b5885aa4c67df316",
       "sourceCommit": "ded641bd763379f36d629bf1686fcce8a6137a66"
     },
     {
@@ -143,7 +171,7 @@
     {
       "id": "C06",
       "path": "engineering/inventory/census/C06-preferences-labs-bootstrap.json",
-      "blob": "1e57da9181bf436c67f058354c95760a3ac29988",
+      "blob": "a5f902a7060bd84d613d6b2c91d4d5ab4134000c",
       "sourceCommit": "419f192631b715b3a6c763575dac29162aefa2d9"
     },
     {
@@ -294,6 +322,12 @@
       "id": "C19q",
       "path": "engineering/inventory/census/C19q-timeline-layer-panel-selection-folders.json",
       "blob": "49bb3a80d41a8c614d7a34c501a21c169db9b59c",
+      "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
+    },
+    {
+      "id": "C19r",
+      "path": "engineering/inventory/census/C19r-timeline-layer-icons-colors-parent-pickwhip.json",
+      "blob": "4b37d604892d5296b203d41bd866fef8b7ab7b9f",
       "sourceCommit": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba"
     },
     {
@@ -2545,6 +2579,36 @@
       "admission": "pending"
     },
     {
+      "id": "C19r.icon-svg-constants",
+      "census": "C19r",
+      "admission": "pending"
+    },
+    {
+      "id": "C19r.layer-color-swatches",
+      "census": "C19r",
+      "admission": "pending"
+    },
+    {
+      "id": "C19r.layer-color-apply-select",
+      "census": "C19r",
+      "admission": "pending"
+    },
+    {
+      "id": "C19r.parent-descendants",
+      "census": "C19r",
+      "admission": "pending"
+    },
+    {
+      "id": "C19r.layer-index-by-uid",
+      "census": "C19r",
+      "admission": "pending"
+    },
+    {
+      "id": "C19r.parent-pickwhip",
+      "census": "C19r",
+      "admission": "pending"
+    },
+    {
       "id": "C20a.text-animator-runtime",
       "census": "C20a",
       "admission": "pending"
@@ -3346,13 +3410,9 @@
     {
       "path": "src/js/app.js",
       "lines": 5410,
-      "uncovered": 5009,
+      "uncovered": 5000,
       "overlap": 0,
       "spans": [
-        [
-          1,
-          9
-        ],
         [
           41,
           313
@@ -3622,8 +3682,8 @@
     {
       "path": "src/js/motion.js",
       "lines": 13914,
-      "uncovered": 4262,
-      "overlap": 239,
+      "uncovered": 4217,
+      "overlap": 190,
       "spans": [
         [
           1,
@@ -3680,22 +3740,6 @@
         [
           1769,
           2932
-        ],
-        [
-          4033,
-          4047
-        ],
-        [
-          4265,
-          4268
-        ],
-        [
-          4359,
-          4365
-        ],
-        [
-          6832,
-          6854
         ],
         [
           8435,
@@ -3925,8 +3969,8 @@
     {
       "path": "src/js/timeline.js",
       "lines": 11907,
-      "uncovered": 5286,
-      "overlap": 87,
+      "uncovered": 5071,
+      "overlap": 86,
       "spans": [
         [
           2002,
@@ -3941,7 +3985,7 @@
           2247
         ],
         [
-          5710,
+          5942,
           7449
         ],
         [
@@ -5197,7 +5241,7 @@
     {
       "path": "engineering/boundaries/profiles/scripts-nemo.profile.json",
       "mode": "100644",
-      "blob": "4813d87ba985e10174f81475e37def264a9a707a",
+      "blob": "78447cde32728b9ac49fbe77deb5481ee481e13a",
       "classification": "configuration",
       "censusRefs": [
         "C08.docs.boundary-enforcement-config-data"
@@ -5282,7 +5326,7 @@
     {
       "path": "engineering/inventory/REMEDIATION_SCOPE.md",
       "mode": "100644",
-      "blob": "1f631584a373850186020f953ba51ed842254a77",
+      "blob": "58518b9b84ace65dfbabbb97af3c9d35d3b834d9",
       "classification": "documentation",
       "censusRefs": [],
       "reason": "Tracked prose/license reference; not executable runtime or tooling."
@@ -5320,7 +5364,7 @@
     {
       "path": "engineering/inventory/census/C02-animation-time.json",
       "mode": "100644",
-      "blob": "70bdb5abec721a248fbe89228182f501f8ca1f35",
+      "blob": "3e920d4f112028ed486df697b5885aa4c67df316",
       "classification": "static-data",
       "censusRefs": [
         "C08.docs.inventory-and-census-artifacts"
@@ -5370,7 +5414,7 @@
     {
       "path": "engineering/inventory/census/C06-preferences-labs-bootstrap.json",
       "mode": "100644",
-      "blob": "1e57da9181bf436c67f058354c95760a3ac29988",
+      "blob": "a5f902a7060bd84d613d6b2c91d4d5ab4134000c",
       "classification": "static-data",
       "censusRefs": [
         "C08.docs.inventory-and-census-artifacts"
@@ -5580,6 +5624,14 @@
       "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
     },
     {
+      "path": "engineering/inventory/census/C19r-timeline-layer-icons-colors-parent-pickwhip.json",
+      "mode": "100644",
+      "blob": "4b37d604892d5296b203d41bd866fef8b7ab7b9f",
+      "classification": "static-data",
+      "censusRefs": [],
+      "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
+    },
+    {
       "path": "engineering/inventory/census/C20a-motion-text-animator-element-style.json",
       "mode": "100644",
       "blob": "98d7c1070f4f71dbc8c75f89ea55122bec68f6ef",
@@ -5630,7 +5682,7 @@
     {
       "path": "engineering/inventory/remediation-scope.json",
       "mode": "100644",
-      "blob": "17f746f94fc5aa267e868f3b1010ddfa64c03110",
+      "blob": "654cd57e601b84482c869de35700723190b6a09b",
       "classification": "static-data",
       "censusRefs": [],
       "reason": "Recorded evidence or census data; identity frozen with the source set, no handwritten control logic."
@@ -5738,7 +5790,7 @@
     {
       "path": "engineering/remediation/EXECUTION_PLAN.en.md",
       "mode": "100644",
-      "blob": "6181ea3440f7f77545292dabffddde503eca0a3e",
+      "blob": "10e0a35b3f8877a68c3c865b369a58585966f25f",
       "classification": "documentation",
       "censusRefs": [
         "C08.docs.remediation-program-docs"
@@ -5748,7 +5800,7 @@
     {
       "path": "engineering/remediation/EXECUTION_PLAN.fr.md",
       "mode": "100644",
-      "blob": "545b50926d6752297d7ecb87e70948cfa52a6dfb",
+      "blob": "2a17311aad10b898cd12bcd0aadd9cbb6dcee7af",
       "classification": "documentation",
       "censusRefs": [
         "C08.docs.remediation-program-docs"
@@ -7125,7 +7177,7 @@
     {
       "path": "scripts/nemo/ci.test.cjs",
       "mode": "100644",
-      "blob": "90923ec8baa4aaaf67c57d79bc612419ee38b878",
+      "blob": "05667711f5f2839b70437918929eed9e78f3f1e7",
       "classification": "test",
       "censusRefs": [
         "C13.tooling.scripts-nemo-core"
@@ -7493,6 +7545,30 @@
       "reason": "Tracked executable tool; requires explicit boundary/admission coverage."
     },
     {
+      "path": "scripts/nemo/lib/remediation-scope-build.cjs",
+      "mode": "100644",
+      "blob": "b3dbb5ca2070ffef02dcc56188e49a473da0ad18",
+      "classification": "handwritten-tooling",
+      "censusRefs": [],
+      "reason": "Tracked executable tool; requires explicit boundary/admission coverage."
+    },
+    {
+      "path": "scripts/nemo/lib/remediation-scope-census.cjs",
+      "mode": "100644",
+      "blob": "41164827eeea8c765db117ce21ea591a415e91c3",
+      "classification": "handwritten-tooling",
+      "censusRefs": [],
+      "reason": "Tracked executable tool; requires explicit boundary/admission coverage."
+    },
+    {
+      "path": "scripts/nemo/lib/remediation-scope-verify.cjs",
+      "mode": "100644",
+      "blob": "8b685b840b2141e817c8b9e6e5bf9b86fc4452db",
+      "classification": "handwritten-tooling",
+      "censusRefs": [],
+      "reason": "Tracked executable tool; requires explicit boundary/admission coverage."
+    },
+    {
       "path": "scripts/nemo/lib/util.cjs",
       "mode": "100644",
       "blob": "e9a4eb12ad383dd6a3f8698a7975a448ad9a57d3",
@@ -7525,7 +7601,7 @@
     {
       "path": "scripts/nemo/remediation-scope.cjs",
       "mode": "100644",
-      "blob": "2fd8a1acf5ba84e0cfc1e64204e70044c0c754f9",
+      "blob": "cefab1f5c7395b8bb24f65969a5fb63d9484f214",
       "classification": "handwritten-tooling",
       "censusRefs": [],
       "reason": "Tracked executable tool; requires explicit boundary/admission coverage.",
@@ -9213,6 +9289,7 @@
         "C02.properties-and-curves.key-selection-and-clipboard",
         "C02.properties-and-curves.keyframe-track-model",
         "C02.properties-and-curves.properties-and-metadata",
+        "C02.text-animation.selectors-panel",
         "C20a.element-style-readers",
         "C20a.text-animator-runtime",
         "C20b.motion-context-header-tools",
@@ -9782,7 +9859,13 @@
         "C19q.layer-rename",
         "C19q.layer-render-order",
         "C19q.layer-selection-state",
-        "C19q.shape-tree-rows"
+        "C19q.shape-tree-rows",
+        "C19r.icon-svg-constants",
+        "C19r.layer-color-apply-select",
+        "C19r.layer-color-swatches",
+        "C19r.layer-index-by-uid",
+        "C19r.parent-descendants",
+        "C19r.parent-pickwhip"
       ],
       "reason": "Tracked handwritten runtime/presentation/shader source; inclusion does not establish a complete responsibility map."
     },
@@ -11333,7 +11416,7 @@
     {
       "path": "tests/nemo-remediation-scope.test.cjs",
       "mode": "100644",
-      "blob": "751f73cffed1dc71bd42c11b76a68b2c4135d316",
+      "blob": "9325706d22279f24fe9974c64067a5c14f1e6fa1",
       "classification": "test",
       "censusRefs": [],
       "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
