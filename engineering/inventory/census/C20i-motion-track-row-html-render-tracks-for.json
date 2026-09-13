@@ -1,0 +1,387 @@
+{
+  "census_id": "C20i",
+  "issue": 1227,
+  "title": "Motion keyframe-track grid rows: trackRowHtml (row builder + key-interaction pipeline) and renderTracksFor (grid-row entry point)",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C20i census only; C02/C20f/C20g/C20h/C19u/P30 and other runtime owners remain separate",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "b74df7893015b87b10b16c3d125350e94150ba29",
+  "source_path": "src/js/motion.js",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_line_count": 13914,
+  "scope_files": [
+    "src/js/motion.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 10672,
+      "end": 11125
+    }
+  ],
+  "coverage_note": "Exactly 454 assigned lines occur once in two complete packets: 232 code, 222 full-line comments and 0 whitespace. The preceding construct (C20h-proposed, issue #1224 open/unclaimed) closes at line 10671; this span starts at the '// ---- Motion mode UI: keyframe tracks (mirrors the layer list's rows) ----' header on line 10672 and ends at line 11125, the last line of selectLayerFromGrid's own lead-in comment (its declaration at 11126 and everything after is sibling-covered, C02, not re-mapped here).",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/motion.js resolves to 6617bac29042c22399cac202bf054c09e4fdf30e.",
+    "current": "Allocated base b74df7893015b87b10b16c3d125350e94150ba29 has the identical Motion blob (also a155706, d91942c, ea7ea0c, 6c6d579, eb96451 per the issue and repo history).",
+    "runtime": "No browser, Tauri, expression runtime, export, native, GPU or application behavior was executed.",
+    "fixtures": "Every behavioral fixture is source-derived, proposed and unrun."
+  },
+  "writer_guidance": {
+    "artifact": "Only engineering/inventory/census/C20i-motion-track-row-html-render-tracks-for.json is writable for this outcome.",
+    "runtime": "Historical Motion ownership retains motion.js runtime writing; P30 retains timeline.js. C20i transfers no implementation authority.",
+    "owners": "C02 retains trackFor/isAnimated/valueAtFrame/keyAt/setKeySel/isKeySelected/_motionKeySel/_keyAnchor/buildKeyEaseBox/buildKeyRows/startSkewDrag/applyMarqueeSelection/startMarquee/distributeKeys/flipKeys/subdivideKeys/colorSelectedKeys/selectEveryNthKey/grabRandomKeys/invertKeySelection/openMotionEaseEditor/applyEasyEase/setKeyInterp/onDragMove/onDragUp/window._motionKeyDrag consumption, plus renderTimelineMotion and selectLayerFromGrid (11126+); C20f retains stopwatchTitle/renderTransformGroup/the Transform panel; C20g retains renderElementsList/color-and-trim rows (merged, #1225); C20h (proposed, issue #1224, unclaimed, no artifact yet) retains the preceding Elements construct (text-animator timeline rows, path-as-one-property group, discrete key grid row, mesh vertex rows, renderDiscreteKeyGridRow/renderPathGroupTrackRow/renderVertexRow); C19u retains renderLayerList/renderShapeTreeRowsInto (timeline.js); C01 retains pushUndo/history; C19g retains document codecs.",
+    "reservations": "D01, T05/Pollen, C04, historical Motion and every named reservation remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "P03/#1005 rangeCoverage",
+      "disposition": "remediation-scope.json lists src/js/motion.js 9826-11125 as one open 1300-line span. C20g (merged, #1225) took the first 403 lines (9826-10228); C20h (proposed, issue #1224, unclaimed) is proposed for 10229-10671; this artifact takes the last 454 lines, 10672-11125. This artifact does not close the parent span."
+    },
+    {
+      "owner": "C20g.motion-elements-list-color-trim-rows (merged, #1225)",
+      "disposition": "Owns motion.js:9826-10228 (renderElementsList, hex/rgba helpers, renderColorRow/renderFillColorRow/renderStrokeColorRow, renderTrimScalarRow/renderTrimPathsGroup). No overlap: C20g's assigned union ends at 10228, this artifact starts at 10672, and C20g's own surface_inventory_cross_check already names trackRowHtml (motion.js:10677) and renderTracksFor (motion.js:11077) as C20i-proposed, cited by name/line only there."
+    },
+    {
+      "owner": "C20h (proposed, issue #1224, open/unclaimed, no artifact file yet)",
+      "disposition": "Proposed to own motion.js:10229-10671 (text-animator timeline rows, path-as-one-property group, renderDiscreteKeyGridRow, renderVertexRow/renderMeshVertexGroup, renderPathGroupTrackRow). renderPathGroupTrackRow and renderDiscreteKeyGridRow are called from renderTimelineMotion (11136+, sibling-covered, out of every C20g/h/i span) alongside this artifact's renderTracksFor — recorded under row_count_mirror below by name/line only, not re-mapped. No line overlap with this artifact (10229-10671 vs 10672-11125)."
+    },
+    {
+      "owner": "C02 (historical motion.js coverage, trackFor/isAnimated/valueAtFrame/selection primitives area, plus 11388-13108)",
+      "disposition": "Retains trackFor (443), isAnimated (1187), keyAt (1189), displayValueFor (1220), valueAtFrame (2639), openMotionEaseEditor (2664), setKeyAtCurrentFrame (2697), _motionKeySel/_keyAnchor/isKeySelected/setKeySel/isMotionPropSelected/isPrimarySelectedKey/buildKeyEaseBox/startMarquee/applyMarqueeSelection/distributeKeys/flipKeys/selectEveryNthKey/colorSelectedKeys/subdivideKeys/grabRandomKeys/invertKeySelection/startSkewDrag/buildKeyRows/motionDragScrollLeft (11388-12832), plus onDragMove (12934) and onDragUp (13101) which read the window._motionKeyDrag/_motionSkewDrag/_motionConnectDrag objects this span writes, and renderTimelineMotion (11136)/selectLayerFromGrid (11126) which call/follow this span's functions. All cited by name/line only, not re-mapped here."
+    },
+    {
+      "owner": "C20f.motion-transform-expression-panel",
+      "disposition": "Retains renderTransformGroup/stopwatchTitle/the Transform panel (motion.js:8649-9428). transformRowPlan (called from renderTimelineMotion at 11193/11269, out of this span) supplies the per-property row plan this artifact's renderTracksFor is invoked against; not re-mapped here."
+    },
+    {
+      "owner": "timeline.js / C19u",
+      "disposition": "buildTimeLinkMenuItems (timeline.js:6029) is called by name from this span's context-menu builder (line 11040-11041), not re-mapped. Grep across src/js found no call to trackRowHtml or renderTracksFor outside motion.js; renderLayerList/renderTimeline (timeline.js-owned rendering entry points) are called from this span by name only."
+    },
+    {
+      "owner": "C01/tweens.js",
+      "disposition": "Retains pushUndo (tweens.js:4741, delegates to pushUndoLayers). This artifact records only call sites and the presence/absence of pushUndo relative to writes within this span."
+    },
+    {
+      "owner": "C19g/#1136",
+      "disposition": "Retains save/load codecs. This artifact records that NO call to saveActiveLayerFrame or any other persistence function occurs anywhere in motion.js:10672-11125 (grep-verified) — every write this span performs (key.hold, tr.keys.splice, drag-state globals) rides on whatever later save path C19g already owns for holder.motion[prop].keys, with zero local persistence call."
+    },
+    {
+      "owner": "engine-bridge.js (buildSceneJson) / app.js (getEffectiveStrokes)",
+      "disposition": "Grep across src/js found zero call to trackRowHtml or renderTracksFor from engine-bridge.js or app.js, and zero call to buildSceneJson/getEffectiveStrokes from this span — confirms this span is #frame-grid timeline UI only, never on the render path."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 10671 closes the preceding construct (C20h-proposed); this artifact begins at the '// ---- Motion mode UI: keyframe tracks (mirrors the layer list's rows) ----' section header on line 10672, immediately followed by trackRowHtml's own lead-in comment (10673-10676) and declaration (10677).",
+    "Line 11076 closes trackRowHtml (the re-parented overlay svg's closing brace); line 11077 opens renderTracksFor.",
+    "Line 11118 closes renderTracksFor; lines 11119-11125 are selectLayerFromGrid's own lead-in comment (its declaration at 11126 and body are sibling-covered, C02, not re-mapped) — included here only so no line of the open span is orphaned, per the issue's explicit instruction.",
+    "Rendering is not pure: every mousedown/contextmenu handler installed here can pushUndo(), mutate track.keys or key.hold directly, or arm a window._motion*Drag global that a later, sibling-owned pointermove/pointerup pipeline (onDragMove/onDragUp, 12934/13101) will read and act on — this span only ARMS that state, it never itself completes a drag.",
+    "Callbacks have no catch or rollback. History, holder.motion[prop].keys, selection globals (_motionKeySel/_keyAnchor), DOM and delegated bridge/render effects before a failure remain."
+  ],
+  "areas": [
+    {
+      "area": "motion-track-row-grid",
+      "packets": [
+        {
+          "id": "C20i.track-row-html",
+          "files": [
+            "src/js/motion.js:10672-11076"
+          ],
+          "coverage_ranges": [
+            [
+              10672,
+              11076
+            ]
+          ],
+          "classification": {
+            "code": 214,
+            "comment": 191,
+            "whitespace": 0
+          },
+          "symbols": [
+            "trackRowHtml"
+          ],
+          "signature": "trackRowHtml(ld, prop, rowEl) -> undefined (mutates rowEl in place; `ld` is really \"the holder\" — the layer object itself or ld.elementMotion[strokeId], same generic contract as renderTransformGroup/isAnimated/valueAtFrame)",
+          "responsibility": "Builds the #frame-grid keyframe-track row for one holder/prop pair: an absolutely-positioned overlay <svg> (per-frame duration blocks + inter-key change connectors), one '.fc' cell per project frame carrying a keyframe diamond (or ease boxes) when a key exists there, the complete key-selection/drag/context-menu pipeline, and a final re-parent of the svg to the end of rowEl so it paints (and hit-tests) above every '.fc' cell.",
+          "dom_contract": [
+            "rowEl itself: innerHTML cleared, position:relative set, then tagged with plain JS properties rowEl._smHolder=ld and rowEl._smProp=prop (10684) — NOT a WeakMap, so the marquee/selection code can recover 'which holder/prop does this row belong to' from a bare DOM hit-test; rowEl.classList.toggle('prop-selected', isMotionPropSelected(ld,prop)) (10685).",
+            "Overlay <svg> (10688-10691, appended first at 10691, RE-APPENDED last at 11075): width=state.totalFrames*FC, height=ROW_H, inline style position:absolute;left:0;top:0;pointer-events:none.",
+            "Duration-block <rect class=\"motion-key-durblock\" data-ki=\"<index>\">, one per key, only when FC>=18 (10705-10716): x=k.frame*FC, width=FC, height=ROW_H, fill=k.color||'var(--accent)', opacity 0.13.",
+            "Connector <rect class=\"motion-key-connect\"> between consecutive keys whose value actually differs (10732-10794): height 5 (barH), border-radius 2, x/width span the two keys' frames*FC, class gains ' sel' when both endpoint keys are isKeySelected, and ' tinted' (+ CSS var --key-color) only when both endpoints share the SAME k.color; data-i=<segment index>; pointer-events:auto punches through the parent svg's pointer-events:none so only this rect is a real hit target.",
+            "One '.fc.motion-fc' div per frame (10796-10799, appended at 11057), class gains ' cur' on state.currentFrame, dataset.frame=fi.",
+            "Keyframe diamond <div class=\"motion-key <hold|linear|smooth>\"> when a key exists at that frame (10800-10828): class also gains ' cur'/' sel'; class 'tinted' + CSS var --key-color when k.color is set; title = '<prop label> · image <n+1> · <interpolation label>'; inline width/height override (Math.max(3,FC)) only when 0<FC<7, to keep the fixed 7px CSS diamond from visually overlapping its neighbor at low zoom.",
+            "Ease boxes (10860-10863): buildKeyEaseBox(ld,prop,k,'in'|'out') (C02-owned, motion.js:11801, cited by name/line only) appended into the same '.fc' cell, gated on isPrimarySelectedKey(ld,prop,k) plus NEITHER window._motionKeyDrag nor window._motionSkewDrag being active, and on room ('minGapPx'=46 screen px against the neighboring key at the current window.FC zoom) — this span only calls and appends the box; its own input/drag handlers are defined at buildKeyEaseBox's own line, out of this span."
+          ],
+          "layout_constants_and_globals": [
+            "FC (bare identifier, timeline-zoom.js-owned, cited by line only) and ROW_H (motion.js:43, ROW_H=22, out of this span) drive every pixel dimension; window.FC is read separately (10824) for the diamond-shrink threshold.",
+            "state.totalFrames (10687, 10796 loop bound), state.currentFrame (10798, 10924 'cur' class / navigation compare) are the only state.* fields read.",
+            "motionDragScrollLeft() (C02-owned, 12832, cited by line only) is read at every drag-state-arming site (10785, 10941, 10944, 10954) to snapshot scroll position at gesture start.",
+            "Globals READ: window._motionKeyDrag, window._motionSkewDrag (10833, gate on ease-box construction), window._exprEditorOpen/window._anchorGridOpenFor (read only in the sibling packet, renderTracksFor). Globals WRITTEN: window._motionConnectDrag (10782-10787), window._motionSkewDrag (10941), window._motionKeyDrag (10943-10946 group form, 10954 single form), _keyAnchor (module-level var, 10781/10882/10912/10938/10953)."
+          ],
+          "gesture_pipeline": [
+            "Connector mousedown (10777-10791): e.stopPropagation(); pushUndo(); sets _keyAnchor to the FIRST key's frame; arms window._motionConnectDrag={ld,prop,a:keyA,b:keyB,startX,startAFrame,startBFrame,startScrollLeft,retime:e.altKey}; sets cursor to 'e-resize' (retime) or 'ew-resize'; goToFrame(keyA.frame); renderTimeline(). No key.frame write here — the actual segment move/retime happens in onDragMove/onDragUp (12936+, sibling-owned, reads window._motionConnectDrag).",
+            "Cmd/Ctrl-click a diamond (10874-10887): selection-only — toggles this key in/out of _motionKeySel via setKeySel, sets _keyAnchor, renderTimeline(). No pushUndo, no drag armed, no document write beyond the selection array.",
+            "Shift-click a diamond (10888-10916): selection-only — reuses the marquee's own applyMarqueeSelection(x0,y0,x1,y1) between the frozen _keyAnchor cell and the clicked cell (byte-identical to a literal marquee drag over the currently-rendered rows), or falls back to a plain single-key select+anchor when no anchor cell is resolvable; renderTimeline(). No pushUndo.",
+            "Plain click on an ALREADY-selected diamond (10924-10950): navigates via goToFrame first and re-reads the live key object off the refreshed track; pushUndo(); Alt+drag with >=2 selected keys builds skew rows (buildKeyRows(), C02-owned) and arms window._motionSkewDrag (mode:'bottom'); otherwise arms window._motionKeyDrag as a GROUP drag (fields below); renderTimeline().",
+            "Plain click on an UNSELECTED diamond (10951-10962): pushUndo() (shared with the branch above, line 10936, before the isKeySelected branch); setKeySel to just this key; sets _keyAnchor; arms window._motionKeyDrag as a SINGLE-key drag; renderTimeline().",
+            "Click on empty '.fc' (no key, 10963-10965): startMarquee(e) (C02-owned) — a rectangular multi-key marquee select, not a drag of an existing key.",
+            "Every '.fc' mousedown branch ends with goToFrame(frameIdx) (10966), unconditionally, even the marquee/no-key branch — the playhead always follows a click on the grid.",
+            "Right-click / contextmenu on a '.fc' cell (10968-11055): e.preventDefault()+stopPropagation(); goToFrame(frameIdx) unconditionally; builds a menu whose items are enumerated in context_menu_writes below; ends with window.showContextMenu(e.clientX,e.clientY,menu)."
+          ],
+          "context_menu_writes": [
+            "'Delete this key' (key present, 10974): pushUndo(); tr.keys.splice(tr.keys.indexOf(key),1) — DIRECT mutation of holder.motion[prop].keys, bypassing any C02 remove-key helper; renderTimeline() only (NO renderLayerList() call here, unlike every other write branch in this span) + conditional SMEngineBridge.renderNow(); no saveActiveLayerFrame anywhere.",
+            "'Add key here' (no key present, 10977): pushUndo(); setKeyAtCurrentFrame(ld,prop, isAnimated(ld,prop)?valueAtFrame(ld,prop,frameIdx):displayValueFor(ld,prop)) (both C02-owned) — seeds from the live displayed value, not a hardcoded default (feedback #215 follow-up per the inline comment); renderLayerList()+renderTimeline()+conditional renderNow().",
+            "'Edit ease curve' (track has >=1 key, 10983): pushUndo(); openMotionEaseEditor(ld,prop) (C02-owned, 2664) — no renderLayerList/renderTimeline call here; the editor owns its own refresh.",
+            "'Make/Remove Hold' (key present, 10989): pushUndo(); key.hold=!key.hold — DIRECT mutation of the key object's own field (no helper); renderLayerList()+renderTimeline()+conditional renderNow().",
+            "Interpolation presets and batch ops (Easy Ease/In/Out, Linear, Distribute Evenly, Flip Order, Subdivide Midpoint, Color Keys, Select Every 2nd/Nth, Keep Random %, Invert Selection, 10999-11030) all delegate to C02-owned functions (applyEasyEase/setKeyInterp/distributeKeys/flipKeys/subdivideKeys/colorSelectedKeys/selectEveryNthKey/grabRandomKeys/invertKeySelection) with no local pushUndo/render call in this span — each function owns its own undo/render per its own definition, cited by name/line only, not re-mapped.",
+            "Parent-in-Time menu entry (11038-11043, gated on window.buildTimeLinkMenuItems existing and state.layers[state.activeLayerIdx]): opens a submenu built by buildTimeLinkMenuItems (timeline.js:6029, not re-mapped) targeting the ACTIVE layer, not necessarily the row's own holder — the keyframe selection is 'incidental context' per the inline comment, confirmed with Cyril.",
+            "Key-selection lock items (11052-11053): buildKeySelectionLockMenuItems() (motion.js:8508, not re-mapped) supplies menu entries locking key.lockTo on whatever is currently selected — independent of the Parent-in-Time gate above."
+          ],
+          "drag_state_shapes": [
+            "window._motionConnectDrag = {ld,prop,a,b,startX,startAFrame,startBFrame,startScrollLeft,retime} (10782-10787) — armed by the connector mousedown; read at onDragMove (motion.js:12936, cd=window._motionConnectDrag) and cleared at onDragUp (motion.js:13106), both sibling-owned, cited by line only.",
+            "window._motionSkewDrag = {startX,startScrollLeft,mode:'bottom',rows:skewRows} (10941) — armed by an Alt+drag on an already-selected key with >=2 selected keys; read at onDragMove (motion.js:12982, sk=window._motionSkewDrag) and cleared at onDragUp (motion.js:13105), sibling-owned.",
+            "window._motionKeyDrag, GROUP form = {group:true,startX,startScrollLeft,keys:[{holder,prop,key,origFrame}, ...]} (10943-10946) — one entry per currently-selected key, snapshotting each key's starting frame; read/cleared at onDragUp (motion.js:13108, 'var dragged = window._motionKeyDrag.keys').",
+            "window._motionKeyDrag, SINGLE form = {ld,prop,key,startX,startScrollLeft,startFrame} (10954) — armed when clicking an unselected key (which becomes the sole selection); shares the same onDragMove/onDragUp read path as the group form, sibling-owned."
+          ],
+          "callers": "trackRowHtml is called exactly once in all of src/js: from renderTracksFor at line 11083 (this artifact's own second packet). Grep across src/js for the pattern found no other call site; the only other textual occurrences are comments referencing it by name (motion.js:4654, 10470, 10593, 10773, 12524, 13331), none of which are calls.",
+          "effects": "DOM construction (svg + one '.fc' per frame + diamonds/ease-boxes as gated); direct mutation of holder.motion[prop].keys (splice on delete) and of a key's own .hold field; arming of window._motionConnectDrag/_motionSkewDrag/_motionKeyDrag and _keyAnchor; selection-array writes via setKeySel (C02-owned); pushUndo() calls as itemized in gesture_pipeline/context_menu_writes; renderLayerList()/renderTimeline()/conditional SMEngineBridge.renderNow() calls as itemized; zero calls to saveActiveLayerFrame anywhere in this packet."
+        },
+        {
+          "id": "C20i.render-tracks-for-and-grid-select-lead-in",
+          "files": [
+            "src/js/motion.js:11077-11125"
+          ],
+          "coverage_ranges": [
+            [
+              11077,
+              11125
+            ]
+          ],
+          "classification": {
+            "code": 18,
+            "comment": 31,
+            "whitespace": 0
+          },
+          "symbols": [
+            "renderTracksFor"
+          ],
+          "signature": "renderTracksFor(grid, holder, prop) -> undefined",
+          "responsibility": "The '#frame-grid' entry point for one property track: skips filtered/hidden props (mirroring renderTransformGroup's own skip condition exactly, per the CLAUDE.md §11 panel/grid alignment invariant), creates one '.frow.motion-track-row' div, delegates its content to trackRowHtml, appends it to the grid, and inserts variable-height spacer rows so the grid stays line-for-line aligned with two specific variable-height panel-side rows (the expression editor and the anchor-point grid) when either is open for this exact holder/prop.",
+          "renderTracksFor_contract": [
+            "Early return (11081) when isPropFiltered(prop) (C02-owned, motion.js:625) or when (_hideUnanimated (module var, motion.js:599) is true AND propHasContent(holder,prop) (motion.js:624) is false) — for a non-animated, non-static prop under the 'hide unanimated' toggle, renderTracksFor emits ZERO rows and returns before creating the row div.",
+            "Otherwise emits exactly one '.frow.motion-track-row' row (11082-11084) plus at most two additional '.frow.motion-track-spacer' rows (11099-11104 for an open expression editor on this exact holder+prop; 11112-11117 for an open anchor-grid on this exact holder when prop==='anchor') — so one call emits 1, 2 or 3 rows total, never more.",
+            "Spacer height is read live off the PANEL side's own rendered element (document.querySelector('#layer-list .motion-expr-editor') / '.motion-anchor-grid-row'), falling back to a hardcoded 90px / 60px only when that element is absent — relies on renderLayerList() always having already run before renderTimeline() in every call site in this file (per the inline comment, 11097-11098), a cross-file ordering invariant this packet does not itself enforce.",
+            "window._exprEditorOpen (read only, gate: .holder===holder && .prop===prop) and window._anchorGridOpenFor (read only, gate: ===holder, combined with prop==='anchor') are the two globals read here; neither is written by this packet."
+          ],
+          "row_count_mirror": [
+            "renderTracksFor is called ONLY from renderTimelineMotion (motion.js:11136, sibling-covered/C02, cited by line only) — every call site is enumerated here to record the panel/grid row-count mirror contract (CLAUDE.md §11) for this leaf's half of it:",
+            "Layer-level Transform props: renderTracksFor(grid, ld, entry.prop) once per transformRowPlan(ld) entry (11195) — mirrors renderTransformGroup's own layer-level rows (C20f-owned).",
+            "Layer-level control/VM vertex rows: renderTracksFor(grid, vmHolder, 'vtx'+vmi) in a vmRows loop (11208).",
+            "Element-holder Transform props: renderTracksFor(grid, elHolder, entry.prop) once per transformRowPlan(elHolder) entry (11271).",
+            "Element path-vertex rows: renderPathGroupTrackRow(grid, elHolder, vtxRows) (11282, C20h-proposed) followed by renderTracksFor(grid, elHolder, 'vtx'+vi) in a vtxRows loop (11284).",
+            "Element mesh-vertex rows: renderTracksFor(grid, meshHolderEl, 'vtx'+mvi) in an mCount loop (11300) — the grid-side counterpart of C20h-proposed renderMeshVertexGroup/renderVertexRow.",
+            "Element fill/stroke/trim rows: renderTracksFor(grid, elHolder, 'fillColor') (11312), 'strokeColor' (11324), 'strokeWidth' (11325), 'brushSize' (11330), 'trimStart'/'trimEnd'/'trimOffset' (11350-11352) — mirror C20g's renderFillColorRow/renderStrokeColorRow/renderTrimScalarRow/renderTrimPathsGroup panel rows.",
+            "Text-animator fields: TA_TIMELINE_FIELDS.forEach(f => renderTracksFor(grid, an, f.prop)) per animator (11370) — mirrors C20h-proposed's text-animator panel rows via the same TA_TIMELINE_FIELDS list.",
+            "Discrete Blend/Parent rows (parentKeys/blendKeys, 11175-11176) do NOT go through renderTracksFor at all — they call renderDiscreteKeyGridRow (C20h-proposed) directly, a separate grid-row builder outside this artifact's scope, recorded here only to make the row-count mirror table complete."
+          ],
+          "lead_in_note": "Lines 11119-11125 are the full lead-in comment of selectLayerFromGrid, whose declaration (11126) and body are sibling-covered (C02) and not re-mapped here; the comment documents that clicking a layer's bar on the GRID side selects the layer WITHOUT the accordion-expand toggle the panel-side row click performs, because the grid row IS the in/out bar (whose own gesture is dragging timing).",
+          "callers": "renderTracksFor is called only from renderTimelineMotion (11136+, sibling-covered), at the 13 call sites itemized in row_count_mirror above (11195, 11208, 11271, 11284, 11300, 11312, 11324, 11325, 11330, 11350, 11351, 11352, 11370). Grep across src/js found no caller outside motion.js and no other definition.",
+          "effects": "DOM row/spacer construction only (delegates all key/selection/document writes to trackRowHtml); no state.*/window.* global is written by this packet, only read."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "Zero calls to saveActiveLayerFrame (or any other persistence function) occur anywhere in motion.js:10672-11125 (grep-verified). Every document write in this span — direct tr.keys.splice on delete, direct key.hold flip, and the C02-owned setKeyAtCurrentFrame/openMotionEaseEditor/applyEasyEase/etc. delegated writes — lands on holder.motion[prop] (or a live key object inside it), which C19g's already-existing exportJSON/save path serializes without any local save call from this span."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No parser is implemented in this span. C19g's exportJSON/import already serializes/restores the whole elementMotion/motion object this span reads and mutates (cited by name only, not re-mapped)."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "pushUndo() precedes every DIRECT write in this span (connector-drag arm 10779, plain-click drag arm 10936, delete-key 10974/menu, add-key 10977/menu, edit-ease-curve 10983/menu, make/remove-hold 10989/menu) — six call sites. Cmd/Ctrl-click and Shift-click (selection-only) never call pushUndo. The 'Delete this key' branch has NO renderLayerList() call unlike every sibling write branch (asymmetry recorded, not asserted as a bug) — it still gets renderTimeline()+conditional renderNow(). Interpolation-preset/batch-op menu items (Easy Ease, Linear, Distribute, Flip, Subdivide, Color, Select-Nth, Keep-Random, Invert) have NO local pushUndo in this span; each delegates entirely to its own C02-owned function, which is expected to own its own undo per that function's own definition (not re-verified here)."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "setKeySel (C02-owned) is the sole selection-array writer, called from Cmd/Ctrl-click, Shift-click (fallback branch), and both plain-click branches (selected/unselected). _keyAnchor (module-level var) is set at five sites (10781, 10882, 10912, 10938, 10953) tracking the last-clicked key's frame for the next Shift-click's rectangle anchor. isKeySelected/isPrimarySelectedKey (C02-owned) gate rendering only, never mutate selection."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "A key's .frame is never written directly by this span (only origFrame is SNAPSHOTTED into the drag-state objects for a later sibling-owned pointermove/pointerup to apply the delta); a key's .hold is toggled directly (context menu); a key is deleted via direct tr.keys.splice; a key is added via the C02-owned setKeyAtCurrentFrame; ease/interpolation edits delegate entirely to C02-owned openMotionEaseEditor/applyEasyEase/setKeyInterp. Ease boxes (buildKeyEaseBox) are only APPENDED here, gated on isPrimarySelectedKey and the absence of an active window._motionKeyDrag/_motionSkewDrag; their own value-edit handlers are out of this span."
+    },
+    {
+      "consumer": "render",
+      "disposition": "renderLayerList()+renderTimeline() are paired at every write branch EXCEPT the two exceptions recorded above ('Delete this key' calls renderTimeline() alone; 'Edit ease curve' calls neither, delegating to openMotionEaseEditor's own refresh) and EXCEPT the selection-only Cmd/Shift-click branches (renderTimeline() alone, correctly — selection changes only the grid side's .sel classes/ease-box visibility, never a panel-side row's content). A conditional SMEngineBridge.renderNow() (object-truthiness only) follows most but not all write branches (absent after 'Edit ease curve' and after the interpolation-preset/batch-op delegations)."
+    },
+    {
+      "consumer": "export",
+      "disposition": "No export payload is emitted from this span. C19g-owned exportJSON later serializes whatever holder.motion[prop].keys this span (or its C02-delegated helpers) leaves behind; this artifact does not verify that serialization."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "Multiple callbacks conditionally call SMEngineBridge.renderNow(), testing object truthiness only — a shared render-request bridge, not proof of native IPC. No Tauri command or filesystem call is reachable from this span."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "track-row-svg-overlay-gating",
+      "status": "proposed, unrun",
+      "matrix": "FC below/at/above 18 (duration-block visibility), consecutive-key value-changed vs unchanged (connector presence), matching vs differing vs one-null key.color (tinted connector)",
+      "expected": "Duration blocks render only at FC>=18; a connector is drawn only between keys whose .v arrays actually differ in some dimension; 'tinted' + --key-color applied only when BOTH endpoint keys share the identical non-null color."
+    },
+    {
+      "id": "diamond-shape-and-shrink",
+      "status": "proposed, unrun",
+      "matrix": "key.hold true/false, curvePoints matching CURVE_LINEAR vs not (interpKind hold/linear/smooth), FC in (0,7) vs >=7 vs <=0",
+      "expected": "Class is exactly 'motion-key '+interpKind with hold rendering square via CSS, not diamond; inline width/height override applied only for 0<FC<7, floored at 3px."
+    },
+    {
+      "id": "ease-box-room-gating",
+      "status": "proposed, unrun",
+      "matrix": "isPrimarySelectedKey true/false, window._motionKeyDrag/_motionSkewDrag active/inactive, neighboring key within/beyond 46px at current window.FC, key at track start/end (no prev/next)",
+      "expected": "Ease boxes never appear during an active key or skew drag; a side's box is suppressed only when its OWN neighbor is too close, independent of the other side."
+    },
+    {
+      "id": "click-modifier-matrix",
+      "status": "proposed, unrun",
+      "matrix": "Cmd/Ctrl-click, Shift-click with/without a resolvable anchor cell, plain click on selected (Alt/no-Alt) vs unselected key, click on empty cell",
+      "expected": "Cmd/Ctrl toggles one key with no pushUndo/drag; Shift reproduces the marquee's own rectangle selection or falls back to single-select when no anchor row is found; plain click on an unselected key resets selection to it and always pushUndo()s before arming a single-key drag; plain click with Alt on a >=2-key selection arms a skew drag instead of a group drag; empty-cell click starts a marquee, not a key drag; every branch ends with goToFrame(frameIdx)."
+    },
+    {
+      "id": "connector-drag-arm",
+      "status": "proposed, unrun",
+      "matrix": "Alt held vs not at mousedown (retime flag), keyA/keyB frame values",
+      "expected": "window._motionConnectDrag captures both start frames and the retime flag exactly once at mousedown; cursor is 'e-resize' under Alt else 'ew-resize'; no key.frame write occurs until a later sibling-owned onDragMove/onDragUp reads this object."
+    },
+    {
+      "id": "context-menu-write-asymmetry",
+      "status": "proposed, unrun",
+      "matrix": "delete-key vs add-key vs make/remove-hold vs edit-ease-curve, with/without SMEngineBridge present",
+      "expected": "Exactly as itemized in context_menu_writes: delete-key omits renderLayerList(); edit-ease-curve omits both renderLayerList() and renderTimeline(), delegating refresh to openMotionEaseEditor; make/remove-hold and add-key both call renderLayerList()+renderTimeline(); every branch pushUndo()s first; none call saveActiveLayerFrame."
+    },
+    {
+      "id": "render-tracks-for-gating-and-spacers",
+      "status": "proposed, unrun",
+      "matrix": "isPropFiltered true/false, _hideUnanimated on/off crossed with propHasContent true/false, exprEditorOpen matching/mismatching holder+prop, anchorGridOpenFor matching holder with prop!=='anchor' vs ==='anchor'",
+      "expected": "Zero rows on the filtered/hidden branch; exactly one row otherwise; a second spacer row appended only on an exact holder+prop match for the expr editor, and only when prop==='anchor' AND anchorGridOpenFor===holder for the anchor-grid spacer; spacer height falls back to the hardcoded default only when the referenced panel-side element is absent from the DOM."
+    },
+    {
+      "id": "render-tracks-for-caller-matrix",
+      "status": "proposed, unrun",
+      "matrix": "layer Transform prop vs element Transform prop vs vtx-index prop (VM/path/mesh) vs fillColor/strokeColor/strokeWidth/brushSize/trim prop vs text-animator field, each from its own renderTimelineMotion call site",
+      "expected": "Identical row/spacer behavior regardless of caller (grid/holder/prop are the only inputs that vary) — confirms renderTracksFor is one shared grid-row builder for every property kind renderTimelineMotion enumerates except the two discrete Blend/Parent rows, which bypass it entirely."
+    },
+    {
+      "id": "consumer-round-trips",
+      "status": "proposed, unrun",
+      "matrix": "Separately owned save/load/undo/export flows for holder.motion[prop].keys mutated by this span's direct splice/hold-flip and its C02-delegated helpers.",
+      "expected": "Fields follow C19g codecs even without a local frame save on every write path in this span. Fixtures do not certify browser, native, export or product behavior."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "planTrackRow(holder,prop,zoomState) -> TrackRowPlan",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure geometry/gating plan (duration blocks, connectors, diamond shape/size, ease-box room) derived from trackFor's keys and the zoom constants, separating layout math from the DOM-construction and event-wiring trackRowHtml currently interleaves."
+    },
+    {
+      "api": "applyTrackKeyGesture(gesture,historyPort,selectionPort,dragPort) -> GestureReceipt",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Makes the click-modifier matrix (toggle/range/group-drag/skew-drag/marquee) and the pushUndo-or-not asymmetry between them explicit and testable without a real DOM/pointer harness."
+    },
+    {
+      "api": "createTrackContextMenuAdapter(holder,prop,key,historyPort,refreshPort) -> MenuItems[]",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Separates menu-item enumeration (delete/add/hold/ease/interpolation-presets/batch-ops/parent-in-time/lock) from the direct tr.keys.splice / key.hold mutations, and would let the delete-key/renderLayerList asymmetry recorded here be fixed or intentionally documented in one place."
+    },
+    {
+      "api": "planGridRowsForHolder(holder,rowPlan,uiState) -> GridRowPlan",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Centralizes renderTracksFor's own gating + the two ad hoc spacer-row special cases (expr editor, anchor grid) into one declarative plan the panel side (renderTransformGroup et al.) and the grid side could both consume, closing the CLAUDE.md §11 mirror gap structurally instead of by convention."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "packet_symbols": [
+      "trackRowHtml",
+      "renderTracksFor"
+    ],
+    "caller_anchors": [
+      "trackRowHtml called exactly once in src/js, from renderTracksFor at motion.js:11083 (this artifact); six comment-only mentions (4654, 10470, 10593, 10773, 12524, 13331) verified NOT to be calls",
+      "renderTracksFor called only from renderTimelineMotion (motion.js:11136, sibling-covered) at 13 call sites: 11195, 11208, 11271, 11284, 11300, 11312, 11324, 11325, 11330, 11350, 11351, 11352, 11370",
+      "no caller of either symbol found in timeline.js or elsewhere in src/js outside motion.js (grep-verified)"
+    ],
+    "row_count_mirror_anchors": [
+      "Layer Transform rows: renderTracksFor@11195 mirrors renderTransformGroup (C20f, layer side)",
+      "Control/VM vertex rows: renderTracksFor@11208",
+      "Element Transform rows: renderTracksFor@11271 mirrors renderTransformGroup called on an element holder (C20f)",
+      "Element path-vertex rows: renderPathGroupTrackRow@11282 (C20h-proposed) + renderTracksFor@11284 loop",
+      "Element mesh-vertex rows: renderTracksFor@11300 mirrors C20h-proposed renderMeshVertexGroup/renderVertexRow",
+      "Fill/Stroke/Trim rows: renderTracksFor@11312/11324/11325/11330/11350-11352 mirror C20g's renderFillColorRow/renderStrokeColorRow/renderTrimScalarRow/renderTrimPathsGroup",
+      "Text-animator fields: renderTracksFor@11370 via TA_TIMELINE_FIELDS, mirrors C20h-proposed's text-animator panel rows",
+      "Discrete Blend/Parent rows: renderDiscreteKeyGridRow@11175-11176 (C20h-proposed) bypasses renderTracksFor entirely — recorded for completeness of the mirror table, not owned here"
+    ],
+    "helper_anchors": [
+      "trackFor motion.js:443, isAnimated:1187, keyAt:1189, displayValueFor:1220, valueAtFrame:2639, openMotionEaseEditor:2664, setKeyAtCurrentFrame:2697 (all C02-owned, cited by name/line only)",
+      "isMotionPropSelected:11415, isKeySelected:11412, isPrimarySelectedKey:11790, buildKeyEaseBox:11801, startMarquee:11926, applyMarqueeSelection:11936, buildKeyRows:12089, startSkewDrag:12070, motionDragScrollLeft:12832, distributeKeys:11649, flipKeys:11663, selectEveryNthKey:11676, colorSelectedKeys:11853, subdivideKeys:11860, grabRandomKeys:11892, invertKeySelection:11905, onDragMove:12934, onDragUp:13101 (all C02-owned, cited by name/line only)",
+      "isPropFiltered:625, propHasContent:624, _hideUnanimated:599 (C02-owned, cited by name/line only)",
+      "buildTimeLinkMenuItems timeline.js:6029, buildKeySelectionLockMenuItems motion.js:8508 (cited by name/line only)",
+      "pushUndo tweens.js:4741 (C01-owned, delegates to pushUndoLayers)",
+      "ROW_H motion.js:43 (=22); FC (bare identifier, timeline-zoom.js-owned)"
+    ],
+    "boundary_assertion": "Line 10671 closes the preceding C20h-proposed construct; line 10672 starts this artifact's section header. Line 11125 is the last line of selectLayerFromGrid's own lead-in comment; its declaration at 11126 and renderTimelineMotion at 11136 are both sibling-covered (C02) and excluded."
+  },
+  "validation": {
+    "expected_assigned_lines": 454,
+    "expected_classification": {
+      "code": 232,
+      "comment": 222,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        10672,
+        11076
+      ],
+      [
+        11077,
+        11125
+      ]
+    ],
+    "packet_classification": [
+      {
+        "range": [
+          10672,
+          11076
+        ],
+        "code": 214,
+        "comment": 191,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          11077,
+          11125
+        ],
+        "code": 18,
+        "comment": 31,
+        "whitespace": 0
+      }
+    ],
+    "coverage_contract": "Validate assigned_ranges and flattened areas[].packets[].coverage_ranges independently with the same function; reject actual artifact omission at line 10672 and overlap at line 11076.",
+    "required_checks": [
+      "frozen/current Motion blob and allocated-base ancestry",
+      "two unique packet IDs, exact ranges, counts, symbols, helpers, callers and boundaries",
+      "no overlap with sibling C20*/C21*/C19* artifacts sharing src/js/motion.js",
+      "eight consumer dispositions and proposed, unrun fixtures",
+      "DOM contract, gesture pipeline and drag-state-shape citations against the actual source lines",
+      "JSON, private-path, secret, placeholder and trailing-whitespace hygiene",
+      "sole untracked artifact or committed-clean mode"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, GPU, runtime edit, export or product acceptance claim."
+  }
+}
