@@ -1,0 +1,495 @@
+{
+  "census_id": "C20o",
+  "issue": 1245,
+  "title": "Motion.js key/property selection model, holder→layer sync, property-row decoration, rig-widget wiring menu and batch key operations (11412-11682)",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf on the src/js/motion.js open span [11412,12405] of remediation-scope.json rangeCoverage (frozen index at 4bbe332), which the C20o-C20r series closes in four slices: C20o 11412-11682 (this artifact: key/property selection model, row decoration, widget wiring, batch key ops), C20p 11683-11924 (ease influence, ease boxes, selection ops — not yet filed), C20q 11925-12174 (marquee and the key selection box — not yet filed), C20r 12175-12405 (layer stagger/skew boxes — not yet filed). This is the first of the four slices; the parent [11412,12405] span is NOT closed by this artifact alone. Sole artifact: engineering/inventory/census/C20o-motion-key-property-selection-widget-wiring.json; src/js/motion.js and all callers remain read-only. Cited by name/line only, not re-mapped: trackRowHtml/renderTracksFor (C20i, motion.js:10672-11125), renderVertexRow/renderColorRow/renderTrimScalarRow (C20h/C20g, the four external callers of decorateMotionPropertyRow), the Transform/expression panel (C20f, motion.js:8649-9428), trackFor/ensureExpr/hasExpr/reloadIfTimeLinkOffset/controlTypeOf/controlsOf/openExprControlsMenu/sortKeys (pre-1769, C02/C20a-j), layerControl/exprSelfAt/EXPR_PUBLIC_NAMES (C20k, motion.js:1769-2130), compiledFnFor/evalExpressionFor/_exprCompiled cache (C20m, motion.js:2348-2634), setKeyAtFrame/toggleAnimated/valueAtFrame/isAnimated (C20n, motion.js:2635-2932), updateKeySelectionBox/_motionMarquee (C20q, motion.js:11925-12174, not yet filed), _keyAnchor/subdivideKeys/invertKeySelection/window._motionKeyDrag (C20p, motion.js:11683-11924, not yet filed), layer-inout.js (SMLayerInOut.marqueeSelect, group-bar drag — CLAUDE.md §11 \"one gesture, one rectangle\"), ui.js (window.showContextMenu, global pointer handlers and curve editor), rig-widget.js (SMRigWidget.axisChoices/axisRef, censused in C04b-editor-presentation-support.json, CLAUDE.md §13 widget wiring menu), expr-bake.js (SMExprBake.bakeExpressionToKeyframes, uncensused separate module), timeline.js (P30: _layerSel/_layerSelAnchor, SM.setActiveLayer, renderLayerList, renderTimeline, showToast — C19w), tweens.js (pushUndo), i18n.js (SM.t), everything before 11412 and after 12405/13124 (_keyAnchor, _motionKeySel's declaration, _layerSel's declaration, enableTimeRemap, setAppMode, the SMMotion export list — sibling-covered).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "697eb53d7816d902b1f3e182040557c86e18cfb9",
+  "source_path": "src/js/motion.js",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_line_count": 13914,
+  "scope_files": [
+    "src/js/motion.js"
+  ],
+  "intended_branch": "claude/c20o-motion-key-selection-widget-wiring-census",
+  "assigned_ranges": [
+    {
+      "start": 11412,
+      "end": 11682
+    }
+  ],
+  "coverage_note": "Exactly 271 assigned lines in one contiguous range and five complete packets: 208 code, 63 full-line comments, 0 blank — independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs (a Python re-implementation executed directly against `git show 59a5a38...:src/js/motion.js`), and it matches the issue's own proposed union AND per-packet table exactly for all five packets (19=19/0/0, 88=74/14/0, 41=28/13/0, 74=44/30/0, 49=43/6/0) with zero discrepancy. No boundary correction was needed: line 11411 (`var _keyAnchor = null;`, sibling-covered) precedes this scope; line 11412 opens this scope's own `function isKeySelected(...)`. Line 11682 (the closing `}` of selectEveryNthKey) closes this scope; line 11683 opens the \"Subdivide\" lead-in comment, sibling-covered C20p territory — confirmed by direct `awk`/`sed -n` read of the frozen blob with real line numbers, matching the issue's own framing exactly.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/motion.js resolves to 6617bac29042c22399cac202bf054c09e4fdf30e, 13914 lines.",
+    "current": "This worktree's branch was created at the assigned base 1459508 (origin/main at task start, docs(C19ag)). origin/main has since advanced by exactly one commit, 697eb53 (docs(C19ae), a census-only change to engineering/inventory/census/C19ae-....json) — verified directly: `git rev-parse 1459508:src/js/motion.js` == `git rev-parse 697eb53:src/js/motion.js` == `git rev-parse 59a5a38...:src/js/motion.js` == 6617bac29042c22399cac202bf054c09e4fdf30e, and `git diff --stat 1459508 697eb53 -- src/js/motion.js` is empty. The candidate commit is built on 1459508; validator run against HEAD (this artifact's own commit) confirms the pinned and current blobs are identical.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `grep -rnE \"(^|[^a-zA-Z_.])<symbol>\\(\" --include=\"*.js\" src` over the recursive src/js tree, filtered to exclude each symbol's own declaration line and comment-only hits, then reading each surviving hit directly with `sed -n` against this worktree's copy of motion.js and its siblings (rig-widget.js, expr-bake.js, timeline.js, i18n.js, ui.js, layer-inout.js) — confirmed byte-identical to the frozen blob above via `diff -q`, so its line numbers are valid frozen-blob citations.",
+    "fixtures": "Every behavioral fixture is source-derived, proposed and unrun."
+  },
+  "writer_guidance": {
+    "artifact": "Only engineering/inventory/census/C20o-motion-key-property-selection-widget-wiring.json is writable for this outcome.",
+    "runtime": "Historical Motion ownership retains motion.js runtime writing; P30 retains timeline.js. C20o transfers no implementation authority.",
+    "owners": "C20a-n/C02/C20k/C20l/C20m/C20n (before line 1769, and 1769-2932) retain rawValueAtFrame, hasExpr, trackFor, ensureExpr (motion.js:1333), sortKeys, isAnimated, controlTypeOf (motion.js:175), controlsOf (motion.js:164), openExprControlsMenu (motion.js:350), reloadIfTimeLinkOffset (motion.js:560), layerControl (motion.js:2028, C20k), exprSelfAt (motion.js:1823, C20k), EXPR_PUBLIC_NAMES/EXPR_ARG_NAMES's own 'layerControl' entry (motion.js:2375, C20m — note: this line falls in C20m's 2348-2634 range, NOT C20k's 1769-2130, correcting a naive assumption that everything expression-vocabulary-shaped sits in C20k), compiledFnFor/_exprCompiled cache (motion.js:2391-2488, C20m), setKeyAtCurrentFrame/setKeyAtFrame/toggleAnimated/valueAtFrame/isAnimated (C20n, motion.js:2635-2932) in full — cited by name/line only. C20h/C20g/C20f (motion.js:8649-9428, 9826-10228, 10229-10671) retain renderVertexRow/renderColorRow/renderTrimScalarRow/the Transform panel's own property-row builders in full; each of these four is an external caller of THIS artifact's decorateMotionPropertyRow only, never the reverse. C20i (motion.js:10672-11125) retains trackRowHtml/renderTracksFor in full, including the context-menu block (~motion.js:10995-11026) that wires THIS artifact's own distributeKeys/flipKeys/selectEveryNthKey as menu actions — an external caller relationship, not a re-declaration. C20p/C20q (not yet filed, motion.js:11683-11924/11925-12174) will retain _keyAnchor's own reads/writes, subdivideKeys, invertKeySelection, window._motionKeyDrag, _motionMarquee's declaration, and updateKeySelectionBox — all called FROM or alongside this artifact's own span but declared outside it. This artifact (C20o, 11412-11682) declares and retains isKeySelected, isMotionPropSelected, uniquePropSelection, paintMotionPropertySelection, layerIndexOfHolder, syncLayerSelToKeySel, setKeySel, keysForPropertySelection, visibleMotionPropertySelectionOrder, selectMotionProperty, decorateMotionPropertyRow, setExpressionCode, bakeExpressionOnRow, widgetWiringMenuItems, _groupKeySelByTrack, distributeKeys, flipKeys, selectEveryNthKey. rig-widget.js (censused in C04b-editor-presentation-support.json) retains SMRigWidget.axisChoices/axisRef in full — this artifact's own widgetWiringMenuItems is an external caller of both, never a re-declaration. expr-bake.js (uncensused) retains bakeExpressionToKeyframes in full — this artifact's own bakeExpressionOnRow is its external caller. timeline.js (P30) retains renderLayerList/renderTimeline/SM.setActiveLayer/_layerSel/_layerSelAnchor/showToast (the last censused in C19w) in full. tweens.js retains pushUndo/pushUndoLayers in full. i18n.js retains SM.t in full. ui.js retains window.showContextMenu in full."
+  },
+  "reconciliation": [
+    {
+      "owner": "P03/#1005 rangeCoverage",
+      "disposition": "remediation-scope.json lists src/js/motion.js 11412-12405 as one open 994-line span (frozen index at 4bbe332), which the C20o-C20r series closes in four slices: C20o 11412-11682 (this artifact, the first slice, 271 lines), C20p 11683-11924 (242 lines, not yet filed), C20q 11925-12174 (250 lines, not yet filed), C20r 12175-12405 (231 lines, not yet filed). 271+242+250+231=994, matching the parent span exactly. This artifact alone does not certify closure of the parent span — three more leaves remain to be filed and merged before the C20o-C20r series closes it (P03's own board update certifies that closure, not this artifact)."
+    },
+    {
+      "owner": "C20k/C20l/C20m/C20n (existing owners, motion.js:1769-2932, merged PR #1261/#1266/#1270/pending)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. This artifact's own setExpressionCode (motion.js:11579-11593) writes holder.expressions[prop] using the exact same shape ensureExpr (C02/pre-1769) lazily creates it with ({code,enabled,lastError}, plus errorLine which C20m's own error paths also write); setExpressionCode deletes holder._exprCompiled[prop] (C20m's own compile cache) rather than mutating it, so the two never race. widgetWiringMenuItems (this artifact) emits `layerControl(uid, name)`-shaped expression TEXT via SMRigWidget.axisRef — it never calls motion.js's own layerControl function (C20k, motion.js:2028) directly; that function is only reached later, as one of C20m's own sandboxed built-ins, when the resulting expression string is compiled and evaluated by evalExpressionFor (C20m, motion.js:2542) on a subsequent valueAtFrame (C20n, motion.js:2639) read. bakeExpressionOnRow (this artifact) calls into expr-bake.js, which itself calls SM.setKeyAtFrame (C20n, motion.js:2709) per baked segment — a one-directional dependency (C20o calls into C20k/C20m/C20n, never the reverse)."
+    },
+    {
+      "owner": "C20f/C20g/C20h (existing owners, motion.js:8649-9428/9826-10228/10229-10671, merged)",
+      "disposition": "Retain their own bodies in full — cited by line only. Each is an external caller of this artifact's own decorateMotionPropertyRow: motion.js:8762 (C20f, the Transform panel's own property row), motion.js:10102 (C20g, renderColorRow), motion.js:10176 (C20g, renderTrimScalarRow), motion.js:10667 (C20h, renderVertexRow) — grep-confirmed these are the ONLY four call sites of decorateMotionPropertyRow anywhere in src/js, all passing an explicit labelEl argument (none rely on the `row` fallback)."
+    },
+    {
+      "owner": "C20i (existing owner, motion.js:10672-11125, merged)",
+      "disposition": "Retains trackRowHtml/renderTracksFor in full — cited by line only. trackRowHtml's own key-row context-menu builder (~motion.js:10995-11026, inside its own range) wires this artifact's distributeKeys/flipKeys/selectEveryNthKey as menu actions (`menu.push({label:..., action: distributeKeys})` etc., motion.js:11010-11023) and is an external caller of this artifact's own isKeySelected (motion.js:10506,10516,10555,10762,10807,10875,10937) and isMotionPropSelected (motion.js:10685) as well — in every case a read/action-wiring caller, never a re-declaration."
+    },
+    {
+      "owner": "C20p/C20q (not yet filed, motion.js:11683-11924/11925-12174)",
+      "disposition": "Will retain _keyAnchor's own reads/writes (all at motion.js:10521-10953 pre-span and motion.js:11792-11796 post-span — grep-confirmed ZERO uses of _keyAnchor anywhere inside 11412-11682 itself, despite the issue's own framing listing it among globals 'this span reads/writes'; this artifact documents the correction: _keyAnchor is declared immediately before this span (motion.js:11411) but neither read nor written inside it), subdivideKeys (motion.js:11684+), invertKeySelection (motion.js:11905), window._motionKeyDrag (also grep-confirmed absent from 11412-11682; all 9 uses are pre-span in trackRowHtml or post-span in C20p/q territory), _motionMarquee's own declaration (motion.js:11925) — read (not written) by this artifact's own syncLayerSelToKeySel (motion.js:11456) as a forward reference (see boundaries), and updateKeySelectionBox (motion.js:12107) — called by this artifact's own setKeySel (motion.js:11478) but declared outside this span."
+    },
+    {
+      "owner": "rig-widget.js (existing owner, censused C04b-editor-presentation-support.json, CLAUDE.md §13)",
+      "disposition": "Retains SMRigWidget.axisChoices (rig-widget.js:480-493) and SMRigWidget.axisRef (rig-widget.js:499-501) in full — cited by name/line only. This artifact's own widgetWiringMenuItems (motion.js:11615-11633) is their ONLY caller from motion.js's own key/property-selection span; axisRef's own comment (rig-widget.js:494-498) independently documents why it emits the LEAN `layerControl(uid,name)` string rather than motion.js's own heavier `layer(uid).control(name)` snapshot form (CLAUDE.md §13's own ×2.45 measurement)."
+    },
+    {
+      "owner": "expr-bake.js (existing owner, uncensused separate module)",
+      "disposition": "Retains bakeExpressionToKeyframes (expr-bake.js:165-327) in full — cited by name/line only, not re-derived. This artifact's own bakeExpressionOnRow (motion.js:11602-11614) is its sole caller from this span. Confirmed by direct read (not re-derived as this artifact's own claim): the sampled range is walked at every integer frame from frameStart..frameEnd inclusive (expr-bake.js:179-197), a degenerate near-constant result short-circuits to a SINGLE holder.motionStatic[prop] write plus toggleAnimated-off (expr-bake.js:230-237, only if the property was already animated) rather than any keyframes, and the non-constant path REPLACES holder.motion[prop] wholesale with `{keys:[]}` before writing the merged/fitted segments via SM.setKeyAtFrame per segment (expr-bake.js:301-322, C20n) — any pre-existing keys OUTSIDE [frameStart,frameEnd] are dropped by design (expr-bake.js:298-300's own comment: 'the bake replaces the expression as the SOLE source of truth'). Both outcomes set `ex.enabled = false` (expr-bake.js:236/322) and expr-bake.js itself calls `pushUndo()` (expr-bake.js:229, NOT this artifact's own bakeExpressionOnRow) before performing either write — the undo checkpoint for a bake lives in expr-bake.js, not in this span."
+    },
+    {
+      "owner": "timeline.js (P30, existing owner) and tweens.js (existing owner, pushUndo/pushUndoLayers)",
+      "disposition": "Retain their own bodies in full — cited by line only. This artifact's syncLayerSelToKeySel (motion.js:11451-11472) writes timeline.js's own _layerSel/_layerSelAnchor globals (timeline.js:5423/5432) directly and calls timeline.js's SM.setActiveLayer (timeline.js:1534), syncBarSelToLayerSel (motion.js:6932, pre-span but functionally part of the same funnel), renderLayerList (timeline.js:6335) and renderTimeline (timeline.js:4026). IMPORTANT, VERIFIED SIDE EFFECT: SM.setActiveLayer's OWN first statement is `saveAllLayerFrames()` (timeline.js:1534) — so syncLayerSelToKeySel (and therefore setKeySel, and every one of its ~20 callers listed in the key-selection-model/holder-layer-sync packets below) can trigger a full active-layer-frame SAVE purely as a side effect of a KEY selection whose owning layer differs from the current _layerSel. This is a real document-write path reachable from selection state, not merely a UI repaint — see source_consumers/save below. tweens.js's pushUndo/pushUndoLayers are called directly by setExpressionCode (motion.js:11580), distributeKeys (motion.js:11651) and flipKeys (motion.js:11665) — three of this span's five packets checkpoint before mutating; decorateMotionPropertyRow/the key-selection-model/holder-layer-sync packets/selectEveryNthKey never call pushUndo (selection-only, no document mutation, grep-confirmed zero pushUndo calls in those packets)."
+    },
+    {
+      "owner": "i18n.js (existing owner, SM.t) and ui.js (existing owner, window.showContextMenu)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. i18n.js:4239 assigns SM.t onto the SAME window.SM object timeline.js:349 declares (confirmed by direct read); all 13 SM.t keys this span reads (propRowSelectHint, titleControlRowContextHint, ctxExprControlsEllipsis, ctxBakeExpressionEllipsis, ctxLinkToWidgetAxisEllipsis, ctxDriveFromWidgetAxisEllipsis, ctxWidgetNoneYet, toastLinkedToWidget, toastPoseDrivenByWidget, toastSelectAtLeast2Keys, toastKeysSelectedSuffix, toastBakedConstant, toastBakedKeyframes) exist in i18n.js, confirmed present exactly 4 times each (grep-verified, one per locale block). ui.js:1136 declares window.showContextMenu; this span's decorateMotionPropertyRow (motion.js:11540-11557) and widgetWiringMenuItems (motion.js:11621-11624) are two of its callers, guarded by `if (!window.showContextMenu) return` and an implicit truthy check respectively."
+    },
+    {
+      "owner": "P03/#1005",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 11411 (`var _keyAnchor = null;`, sibling-covered, its own declaration's lead-in comment block runs 11406-11410) precedes this scope; line 11412 opens this scope's own `function isKeySelected(holder, prop, key) {`. Line 11682 (the closing `}` of selectEveryNthKey) closes this scope; line 11683 opens the \"Subdivide\" lead-in comment, sibling-covered C20p territory. All four boundary lines re-verified with `awk 'NR==<n>'` against the frozen blob.",
+    "Every one of the five packet cuts in the issue's own suggested table lands exactly on a function's own declaration or a `// ---- ` section header in the frozen blob (11412/11431/11519/11560/11634) — re-verified line-by-line with `awk 'NR==<n>'` for all five cut points before accepting the table; no correction was needed.",
+    "CORRECTION to the issue's own framing: the issue's owner paragraph lists `window._motionKeyDrag` and `_keyAnchor` among the globals \"this span reads/writes\". Grep-verified against the frozen blob: neither symbol is read OR written anywhere inside 11412-11682. `_keyAnchor`'s 15 total occurrences in motion.js are all pre-span (10521-10953, inside trackRowHtml, C20i) or post-span (11792-11796, C20p territory) plus its own declaration at 11411 (immediately before this span, sibling-covered). `window._motionKeyDrag`'s 9 occurrences are all pre-span (10438-10954, trackRowHtml) or post-span (12822/12839, C20p/q territory). This span's OWN selection globals are exactly: `_motionKeySel`, `_motionPropSel`, `_motionPropAnchor` (read AND written here), `_layerSel`/`_layerSelAnchor` (read and written here, declared in timeline.js), and `_motionMarquee` (read only, as a guard — see next entry). This is a documentation correction to the issue's own prose, changes nothing about the validated ranges, and is analogous to C20n's own writer_guidance correction of C20k's prose.",
+    "Genuine forward reference, verified safe: syncLayerSelToKeySel (motion.js:11456) reads `_motionMarquee`, a global not declared until motion.js:11925 (`var _motionMarquee = null;`, C20q territory, not yet filed) — i.e. textually LATER in the same IIFE than this span. This is safe only because (a) `var` is hoisted to the top of the IIFE's own function scope, so the binding exists (as `undefined`, falsy) from the very first line of the IIFE, and (b) syncLayerSelToKeySel's own BODY is not evaluated until it is CALLED (from setKeySel, this span), by which point the whole IIFE has finished its top-level execution and `_motionMarquee` holds whatever value the marquee-drag code (C20q) has actually assigned. No call site anywhere in this artifact's own span invokes syncLayerSelToKeySel synchronously during the IIFE's OWN initial execution (verified: the only caller is setKeySel, itself only ever called from event-handler closures built later).",
+    "CORRECTION to the issue's own framing: the issue's spec text describes `setKeySel` as \"the single writer\" of `_motionKeySel`. Grep-verified direct-assignment sites of `_motionKeySel =` across the WHOLE file: motion.js:11388 (its own `var` declaration, `[]`), motion.js:11474 (inside setKeySel — the designated funnel, reached by ~20 call sites across this span and C20i/C20p/C20q's own key-click/drag/context-menu code), motion.js:11515 (inside selectMotionProperty, THIS span, bypassing setKeySel entirely — its own repaint is renderLayerList()+renderTimeline()+updateKeySelectionBox(), with NO call to syncLayerSelToKeySel, so clicking a property row does NOT trigger the layer-sync/saveAllLayerFrames side effect that clicking a KEY does), motion.js:11679 (inside selectEveryNthKey, THIS span, also bypassing setKeySel — its own repaint is renderTimeline()+a toast only, with NO call to updateKeySelectionBox or syncLayerSelToKeySel), and motion.js:11920 (inside invertKeySelection, C20p territory, not yet filed, same bypass pattern). So `setKeySel` is accurately described as the FUNNEL every EXTERNAL/cross-cutting caller (key clicks, drag-drop, context-menu actions, the SMMotion.selectKeys/clearKeySelection exports) is routed through, but it is NOT the sole assignment site of `_motionKeySel` at the source level — two of this artifact's OWN five packets (selectMotionProperty in holder-layer-sync-and-property-selection, selectEveryNthKey in batch-key-operations) assign it directly, each with a narrower, documented repaint policy. `_motionPropSel` and `_motionPropAnchor`, by contrast, genuinely ARE single-span-owned: every assignment to either (grep-verified) lives inside 11412-11682 (motion.js:11475-11476, 11504-11514), with no writer anywhere else in the file.",
+    "flipKeys' own trailing `sortKeys(trackFor(g.holder, g.prop))` call (motion.js:11674) is NOT merely defensive symmetry with distributeKeys — it is functionally required. Traced by hand on a 3-key example with frames [10,20,30]: `slots = [10,20,30].reverse() = [30,20,10]`; the forEach then assigns rank0(originally frame 10) → 30, rank1(originally frame 20) → 20, rank2(originally frame 30) → 10 — the resulting `track.keys` ARRAY order (unchanged, still rank0/1/2) now holds frames [30,20,10], descending, no longer matching frame-ascending order. Without the sortKeys call immediately after, every OTHER reader of `track.keys` that assumes frame-ascending order (segmentLeftKey, C20n; the timeline row renderers, C20h/C20i) would misbehave on a freshly-flipped track until some unrelated write happened to re-sort it.",
+    "widgetWiringMenuItems (motion.js:11615-11633) never calls motion.js's own `layerControl` function (C20k, motion.js:2028) at menu-build OR menu-pick time. `SMRigWidget.axisRef` (rig-widget.js:499-501) returns a TEXT STRING shaped like a call to it (`'layerControl(' + JSON.stringify(uid) + ', ' + JSON.stringify(name) + ')'`), which `setExpressionCode` (this span) stores verbatim as `holder.expressions[prop].code` — a plain string, not a function reference. The actual function-call only happens later, when C20m's own evalExpressionFor/compiledFnFor machinery (motion.js:2348-2634) compiles that code string and executes it with `layerControl` bound as one of its sandboxed argument names (EXPR_ARG_NAMES, motion.js:2375-2384, C20m's own range)."
+  ],
+  "areas": [
+    {
+      "area": "key-selection-model",
+      "packets": [
+        {
+          "id": "C20o.key-selection-model",
+          "files": [
+            "src/js/motion.js:11412-11430"
+          ],
+          "coverage_ranges": [
+            [
+              11412,
+              11430
+            ]
+          ],
+          "classification": {
+            "code": 19,
+            "comment": 0,
+            "whitespace": 0
+          },
+          "symbols": [
+            "isKeySelected",
+            "isMotionPropSelected",
+            "uniquePropSelection",
+            "paintMotionPropertySelection"
+          ],
+          "signature": "isKeySelected(holder, prop, key) -> boolean; isMotionPropSelected(holder, prop) -> boolean; uniquePropSelection(sel) -> Array<{holder,prop}>; paintMotionPropertySelection() -> void (DOM only)",
+          "responsibility": "Four pure/DOM-only helpers, zero lead-in comment (no comment lines in this packet at all — the whole 19-line packet is code). isKeySelected(holder,prop,key) (11412-11414): `_motionKeySel.some(s => s.holder === holder && s.prop === prop && s.key === key)` — an IDENTITY match on the literal `key` object reference (not `.frame`), against `_motionKeySel` (declared motion.js:11388, sibling-covered, [{holder,prop,key}]). isMotionPropSelected(holder,prop) (11415-11417): the same `.some()` identity pattern against `_motionPropSel` (declared motion.js:11404, sibling-covered, [{holder,prop}]), matching on holder+prop only (no key). uniquePropSelection(sel) (11418-11425): builds and returns a FRESH array, skipping any entry missing `holder`/`prop` and de-duplicating by (holder,prop) pair via a `.some()` scan of the output-so-far — never mutates its `sel` argument, preserves first-occurrence order. paintMotionPropertySelection() (11426-11430): `document.querySelectorAll('.motion-prop-row,.motion-track-row')`, toggling the 'prop-selected' CSS class on each row using that row's OWN `_smHolder`/`_smProp` DOM-node tags (set by decorateMotionPropertyRow, next packet) run through isMotionPropSelected — a DOM-only repaint that touches neither `state.layers` nor any holder object, and does NOT call renderLayerList/renderTimeline (the cheaper alternative setKeySel, next packet, uses for a plain key-selection change).",
+          "render_path": "NO. Selection/UI painting only; none of these four helpers are reachable from buildSceneJson/getEffectiveStrokes/export.js.",
+          "callers": "isKeySelected: motion.js:10506,10516,10555,10762(x2),10807,10875,10937 (all pre-span, inside trackRowHtml, C20i, sibling-covered) and motion.js:11791 (C20p, not yet filed) and motion.js:12541 (C20q, not yet filed). isMotionPropSelected: motion.js:6801 (pre-span, sibling-covered), motion.js:10685 (pre-span trackRowHtml, C20i), plus internal-to-this-artifact calls at motion.js:11428 (paintMotionPropertySelection, same packet) and motion.js:11522 (decorateMotionPropertyRow, packet 3). uniquePropSelection: called only internally, at motion.js:11475 (setKeySel, packet 2) and motion.js:11514 (selectMotionProperty, packet 2). paintMotionPropertySelection: called only internally, at motion.js:11477 (setKeySel, packet 2). None of the four is exported on window.SMMotion; zero external-file (outside motion.js) callers, grep-confirmed.",
+          "external_calls": [
+            "document.querySelectorAll (DOM API, no owning module)"
+          ],
+          "effects": "Zero document/state writes. isKeySelected/isMotionPropSelected are pure boolean reads over module-scoped arrays declared just before this span (sibling-covered); uniquePropSelection returns a freshly-built array without mutating its input; paintMotionPropertySelection mutates only DOM `classList` (CSS-visible selection highlighting), never `holder`/`state.layers`/any persisted field."
+        }
+      ]
+    },
+    {
+      "area": "holder-layer-sync-and-property-selection",
+      "packets": [
+        {
+          "id": "C20o.holder-layer-sync-and-property-selection",
+          "files": [
+            "src/js/motion.js:11431-11518"
+          ],
+          "coverage_ranges": [
+            [
+              11431,
+              11518
+            ]
+          ],
+          "classification": {
+            "code": 74,
+            "comment": 14,
+            "whitespace": 0
+          },
+          "symbols": [
+            "layerIndexOfHolder",
+            "syncLayerSelToKeySel",
+            "setKeySel",
+            "keysForPropertySelection",
+            "visibleMotionPropertySelectionOrder",
+            "selectMotionProperty"
+          ],
+          "signature": "layerIndexOfHolder(holder) -> number (layer index, or -1); syncLayerSelToKeySel() -> void; setKeySel(sel) -> void (THE designated selection-change funnel); keysForPropertySelection() -> Array<{holder,prop,key}>; visibleMotionPropertySelectionOrder() -> Array<{holder,prop}> (DOM order); selectMotionProperty(holder, prop, e) -> void",
+          "responsibility": "layerIndexOfHolder(holder) (11434-11444, lead-in 11431-11433): returns `state.layers.indexOf(holder)` directly if `holder` IS a layer object (owns its own tracks); otherwise scans every layer's own `elementMotion` dict values (`for (var k in em)`, own-property guarded) for an identity match, returning the OWNING layer's index; -1 if not found anywhere. Pure input->output, and uniform across element/mesh/text-animator holders because all three live in the SAME `ld.elementMotion[id]` dict regardless of whether `id` is a shape's strokeId, a mesh vertex-group's meshId, or a text-animator character's strokeId (CLAUDE.md §12ter point 1; construction site motion.js:2881-2897, C20n, sibling-covered) — this function performs no id-kind-specific branching of its own. syncLayerSelToKeySel() (11451-11472, lead-in 11445-11450 citing feedback #791): guarded no-op outside Motion mode (`state.appMode !== 'motion'`) and during an active marquee drag (`if (_motionMarquee) return`, a genuine forward reference to a global declared later at motion.js:11925, C20q — see boundaries); early-returns if `_motionKeySel` is empty (comment: clearing a key selection never clears layers). Maps every selected key's holder through layerIndexOfHolder into a deduped `lis` array; returns early if `lis` is empty OR already set-equal to `_layerSel` (order-independent length+indexOf check) — skipping a gratuitous rebuild when the key selection changes within the SAME already-selected layer set. Otherwise: calls `SM.setActiveLayer(lis[0], true)` FIRST (timeline.js:1534, `preserveLayerSel=true`) — ordered first per its own comment because setActiveLayer collapses `_layerSel` to just its own target layer; THEN overwrites `_layerSel = lis.slice()` and `_layerSelAnchor = lis[0]` directly (both timeline.js's own globals, timeline.js:5423/5432) to restore the FULL multi-layer set setActiveLayer's own collapse would otherwise have narrowed to one; calls `syncBarSelToLayerSel()` if defined (motion.js:6932, pre-span, keeps the layer-bar highlight in step); calls `renderLayerList()` ALONE — its own comment states the grid half is repainted by the CALLER's own subsequent renderTimeline() (verified at motion.js:10441-10442, sibling-covered, which calls setKeySel(picked) then renderTimeline() three lines later). VERIFIED DOCUMENT-VISIBLE SIDE EFFECT: SM.setActiveLayer's own FIRST statement is `saveAllLayerFrames()` (timeline.js:1534) — so this function, reached through setKeySel, can trigger a full frame SAVE purely from a key-selection change whose owning layer differs from `_layerSel` (see source_consumers/save). setKeySel(sel) (11473-11480): the DESIGNATED funnel for cross-cutting callers (see boundaries for the precise single-writer nuance). Sets `_motionKeySel = sel || []`; derives `_motionPropSel` from it via uniquePropSelection (packet 1); if any prop survives, re-anchors `_motionPropAnchor` to the LAST entry of the new `_motionPropSel` (most-recently-touched property, not the first); repaints via the cheap paintMotionPropertySelection (packet 1, DOM-class-only); calls updateKeySelectionBox() (motion.js:12107, C20q, sibling-covered, the on-canvas selection-box overlay); calls syncLayerSelToKeySel() LAST. keysForPropertySelection() (11481-11489): pure read, expands `_motionPropSel` into the flat list of every individual key on each selected property's own track via trackFor (motion.js:443, pre-span), skipping a property with no track/no keys. visibleMotionPropertySelectionOrder() (11490-11497): pure DOM read — walks `#layer-list .motion-prop-row` in RENDERED DOM order (not model-array order) and collects each row's `_smHolder`/`_smProp` tags into a deduped ordered list; THIS order, not any underlying array order, is what a Shift-click range (below) walks between two anchors, so a Shift-range follows whatever is currently visible/rendered (collapsed sections, filters) rather than a fixed model order. selectMotionProperty(holder, prop, e) (11498-11518): the property-ROW click handler's actual selection-state writer (its caller, decorateMotionPropertyRow, packet 3, forwards the raw event `e` here unmodified — it does not itself interpret modifiers). Three mutually exclusive branches on `e`'s own modifiers: (1) Shift + an existing `_motionPropAnchor` -> ranges via visibleMotionPropertySelectionOrder() between the anchor's index and the clicked property's index (Math.min/max, order-independent, inclusive), falling back to selecting just the clicked property if either endpoint is missing from the visible order (e.g. the anchor's row scrolled out); (2) Cmd/Ctrl -> toggles the clicked property out of `_motionPropSel` if already present, else appends it, and re-anchors to the clicked property; (3) plain click (else) -> replaces the whole selection with just the clicked property and re-anchors to it. After the branch: re-dedupes via uniquePropSelection, THEN assigns `_motionKeySel = keysForPropertySelection()` DIRECTLY — a second, narrower write path to `_motionKeySel` that bypasses setKeySel entirely (see boundaries) — then manually calls `renderLayerList(); renderTimeline();` (a FULL rebuild, not the cheap paint) and updateKeySelectionBox() itself, and notably never calls syncLayerSelToKeySel() — clicking a property row does not trigger the layer-sync/saveAllLayerFrames side effect that clicking a KEY (via setKeySel) does.",
+          "render_path": "NO. All six functions are selection-state/UI-repaint only; none is reachable from buildSceneJson/getEffectiveStrokes/export.js.",
+          "callers": "layerIndexOfHolder: called only internally, at motion.js:11460 (syncLayerSelToKeySel, same packet). syncLayerSelToKeySel: called only internally, at motion.js:11479 (setKeySel, same packet). setKeySel: ~20 call sites, ALL internal to motion.js — motion.js:327,1077,7053,7314,10437,10517,10519,10548,10565,10582,10780,10876,10880,10911,10952,11130,11883,11899,11955,12785 (pre-span trackRowHtml/other UI handlers, and C20p/C20q territory at 11883-11955, all sibling-covered) — plus two exports past 13124 (sibling-covered): `SMMotion.clearKeySelection` (motion.js:13788, `()=>setKeySel([])`) and `SMMotion.selectKeys` (motion.js:13858, `(sel)=>setKeySel(sel||[])`). Exactly one EXTERNAL (outside motion.js) caller of either export is grep-confirmed: layer-inout.js:504 calls `SMMotion.clearKeySelection()` when a bar-drag clears the key selection. keysForPropertySelection: called only internally, at motion.js:11515 (selectMotionProperty, same packet). visibleMotionPropertySelectionOrder: called only internally, at motion.js:11501 (selectMotionProperty, same packet). selectMotionProperty: called only internally, at motion.js:11528 (decorateMotionPropertyRow, packet 3).",
+          "external_calls": [
+            "trackFor — motion.js:443 (pre-1769, C02/C20a-j)",
+            "SM.setActiveLayer — timeline.js:1534 (P30, itself calls saveAllLayerFrames() first)",
+            "syncBarSelToLayerSel — motion.js:6932 (pre-span, sibling-covered)",
+            "renderLayerList — timeline.js:6335 (P30)",
+            "renderTimeline — timeline.js:4026 (P30)",
+            "updateKeySelectionBox — motion.js:12107 (C20q, not yet filed)"
+          ],
+          "effects": "setKeySel/syncLayerSelToKeySel are the only writers here with document-visible effects: setKeySel writes `_motionKeySel`/`_motionPropSel`/`_motionPropAnchor` (module-scoped selection state, not persisted); syncLayerSelToKeySel writes timeline.js's `_layerSel`/`_layerSelAnchor` directly AND, via SM.setActiveLayer, can trigger `saveAllLayerFrames()` — a real frame-data save, not merely a UI repaint, though the DATA being saved is whatever the active layer's frame already held (this function does not itself construct new frame content). selectMotionProperty writes `_motionPropSel`/`_motionPropAnchor`/`_motionKeySel` (module-scoped selection state only, no document field). layerIndexOfHolder/keysForPropertySelection/visibleMotionPropertySelectionOrder are pure reads, zero writes."
+        }
+      ]
+    },
+    {
+      "area": "decorate-property-row",
+      "packets": [
+        {
+          "id": "C20o.decorate-property-row",
+          "files": [
+            "src/js/motion.js:11519-11559"
+          ],
+          "coverage_ranges": [
+            [
+              11519,
+              11559
+            ]
+          ],
+          "classification": {
+            "code": 28,
+            "comment": 13,
+            "whitespace": 0
+          },
+          "symbols": [
+            "decorateMotionPropertyRow"
+          ],
+          "signature": "decorateMotionPropertyRow(row, holder, prop, labelEl) -> void (wires click + contextmenu listeners on a built row)",
+          "responsibility": "One construct, no-op guarded on missing row/holder/prop. Tags `row._smHolder = holder; row._smProp = prop` — the SAME DOM-node tag paintMotionPropertySelection (packet 1) and every pre-span row builder's own isKeySelected/isMotionPropSelected call sites read to identify a row's holder/prop without re-deriving it. Sets the row's initial 'prop-selected' class via isMotionPropSelected (packet 1) — a one-time paint at row-build time, refreshed later only by paintMotionPropertySelection's own full-DOM sweep (not incrementally patched by this function itself). `target = labelEl || row` lets a caller narrow the click/title target to a label span while still tagging the WHOLE row; grep-confirmed all 4 real call sites (motion.js:8762,10102,10176,10667) pass an explicit labelEl, so the `row` fallback is unexercised by any current caller. Adds 'motion-prop-select-target' CSS class to `target` and appends SM.t('propRowSelectHint') to any pre-existing title (joined with ' · '). CLICK listener on `target`: `e.stopPropagation()` then forwards the raw event unmodified to `selectMotionProperty(holder, prop, e)` (packet 2) — this function does NOT itself interpret Shift/Ctrl; it is a pure forwarding wrapper. If this row's own property is itself a rig-widget-backed control (`controlTypeOf(prop) && controlsOf(holder).length`, both pre-span, motion.js:175/164), an extra title hint (titleControlRowContextHint) is appended. CONTEXTMENU listener on `target` (the single listener building the ENTIRE menu, per its own comment rationale at 11531-11539: two listeners on one element would both fire and the second showContextMenu call would simply replace the first's menu): preventDefault+stopPropagation; bails silently if `window.showContextMenu` is absent; builds `items = widgetWiringMenuItems(holder, prop, e.clientX, e.clientY)` (packet 4) UNCONDITIONALLY as the menu's first section; if this row is a control row (same guard as above), appends a separator (only when items already has entries) + one 'ctxExprControlsEllipsis' entry opening `openExprControlsMenu(e.clientX, e.clientY, holder)` (pre-span, motion.js:350); if `hasExpr(holder, prop)` is true (pre-span, motion.js:1338), appends a separator (only when items already has entries — no leading separator if this is the list's first section) + one 'ctxBakeExpressionEllipsis' entry wired to `bakeExpressionOnRow(holder, prop)` (packet 4); if `items.length` is STILL 0 (no SMRigWidget, not a control row, no expression), returns WITHOUT opening any menu — a right-click on an ordinary un-wired property row is a silent no-op, never an empty flash. Otherwise opens via `window.showContextMenu(e.clientX, e.clientY, items)`.",
+          "render_path": "NO. Attaches DOM listeners only; not reachable from buildSceneJson/getEffectiveStrokes/export.js.",
+          "callers": "Exactly 4 call sites, all pre-span and sibling-covered, grep-confirmed as the ONLY callers in src/js: motion.js:8762 (C20f, the Transform/expression panel's own property row), motion.js:10102 (C20g, renderColorRow), motion.js:10176 (C20g, renderTrimScalarRow), motion.js:10667 (C20h, renderVertexRow).",
+          "external_calls": [
+            "isMotionPropSelected — motion.js:11415 (this artifact's own packet 1)",
+            "SM.t — i18n.js:4185/4239",
+            "controlTypeOf — motion.js:175 (pre-1769, C02/C20a-j)",
+            "controlsOf — motion.js:164 (pre-1769, C02/C20a-j)",
+            "openExprControlsMenu — motion.js:350 (pre-1769, C02/C20a-j)",
+            "hasExpr — motion.js:1338 (pre-1769, C02/C20a-j)",
+            "widgetWiringMenuItems — motion.js:11615 (this artifact's own packet 4)",
+            "bakeExpressionOnRow — motion.js:11602 (this artifact's own packet 4)",
+            "window.showContextMenu — ui.js:1136",
+            "selectMotionProperty — motion.js:11498 (this artifact's own packet 2)"
+          ],
+          "effects": "Zero document/state writes directly — this function only tags DOM nodes and attaches event listeners; all actual selection/document mutation happens inside the handlers it wires (selectMotionProperty, openExprControlsMenu, bakeExpressionOnRow), each accounted for in its own packet/owning census."
+        }
+      ]
+    },
+    {
+      "area": "widget-wiring-and-expression-bake",
+      "packets": [
+        {
+          "id": "C20o.widget-wiring-and-expression-bake",
+          "files": [
+            "src/js/motion.js:11560-11633"
+          ],
+          "coverage_ranges": [
+            [
+              11560,
+              11633
+            ]
+          ],
+          "classification": {
+            "code": 44,
+            "comment": 30,
+            "whitespace": 0
+          },
+          "symbols": [
+            "setExpressionCode",
+            "bakeExpressionOnRow",
+            "widgetWiringMenuItems"
+          ],
+          "signature": "setExpressionCode(holder, prop, code) -> void (the SOLE expression-code writer); bakeExpressionOnRow(holder, prop) -> void; widgetWiringMenuItems(holder, prop, x, y) -> Array<menuItem>",
+          "responsibility": "Section lead-in (11560-11576, 17 comment lines) frames the widget-wiring feature's whole point: two right-click gestures — 'Link to a widget axis…' (the property BECOMES the axis' number) and 'Drive this pose from a widget axis…' (`self.at(layerControl(...))`, turning the property's own keyframes into a pose library scrubbed by the widget, CLAUDE.md §13) — both routed through the SAME setExpressionCode, i.e. the same `holder.expressions[prop]` the expression editor's own textarea (C20f) commits to; there is no second expression writer. setExpressionCode(holder, prop, code) (11579-11593): `pushUndo()` FIRST (checkpoint before mutating); `ex = ensureExpr(holder, prop)` (pre-span, motion.js:1333, lazily creates {code:'',enabled:false,lastError:null} if absent); writes exactly THREE fields unconditionally: `ex.code = code`, `ex.enabled = true` (ALWAYS force-enables — there is no call path that sets code while leaving it disabled), `ex.lastError = null` and `ex.errorLine = -1` (both reset, clearing any prior error state even if the NEW code will itself error on next evaluation); deletes `holder._exprCompiled[prop]` if present (C20m's own compile cache, motion.js:2391-2488, keyed on the code STRING, so changing it is already enough to force a recompile — the delete only prevents a stale prefixLines/exprMode read in the meantime, per its own comment); calls `reloadIfTimeLinkOffset(prop)` (pre-span, motion.js:560) — a narrow special case that is a no-op for every prop except 'timeLinkInOffset'/'timeLinkOutOffset', for which it calls `window.loadFrame(state.currentFrame)` (app.js:4746), a full frame reconstruction; then `renderLayerList(); renderTimeline();` (bare, full rebuild — content changed) and, if `window.SMEngineBridge` exists, `.renderNow()` (repaints the CURRENT frame with the new expression's effect, independent of the timeLink-only loadFrame call above). bakeExpressionOnRow(holder, prop) (11602-11614, lead-in 11594-11601 quoting Cyril's own feedback: 'j'aimerais un baking optimisé...'): no-op if `window.SMExprBake` is absent. Calls `SMExprBake.bakeExpressionToKeyframes(holder, prop, 0, state.totalFrames - 1)` (expr-bake.js:165, external module) over the WHOLE comp range (not just the layer's own in/out range — a shape-level element holder has no inPoint/outPoint of its own, per its own comment). Result may be null (guarded no-op) or `{keyframeCount, sampledFrameCount, curvedSegments, constant}`. Deletes the SAME `holder._exprCompiled[prop]` cache entry setExpressionCode does (necessary since the bake internally sets `ex.enabled=false`, expr-bake.js:236/322, orphaning any cached compiled function). Same render trio as setExpressionCode (renderLayerList/renderTimeline/SMEngineBridge.renderNow, no timeLink special-case here). Toast: TWO different message templates depending on outcome — `SM.t('toastBakedConstant')` if `result.constant`, else `SM.t('toastBakedKeyframes')` with '{n}'->keyframeCount and '{m}'->sampledFrameCount substituted. widgetWiringMenuItems(holder, prop, x, y) (11615-11633): returns `[]` if `window.SMRigWidget` is absent — so decorateMotionPropertyRow's own items.length checks (packet 3) correctly fall through to the control-menu/bake-menu sections, or show no menu at all if neither applies. `choices = SMRigWidget.axisChoices()` (rig-widget.js:480-493, censused C04b) is recomputed FRESH on every right-click (not cached) — the list of every widget layer's every named axis. Local helper `sub(label, wrap, toastKey)` builds ONE menu entry whose `action` — invoked on click — shows `SM.t('ctxWidgetNoneYet')` and bails if `choices.length` is 0, else opens a SECOND, nested context menu (offset +8/+8 px) listing every choice as `'<layerName> · <axisName>  (<min>…<max>)'`; picking one calls `setExpressionCode(holder, prop, wrap(SMRigWidget.axisRef(c)))` followed by a toast. Returns exactly TWO such entries: 'ctxLinkToWidgetAxisEllipsis' (`wrap` = identity — the axis value BECOMES the property) and 'ctxDriveFromWidgetAxisEllipsis' (`wrap` wraps the ref in `self.at(...)`). The exact expression TEXT is produced by `SMRigWidget.axisRef` (rig-widget.js:499-501): `'layerControl(' + JSON.stringify(uid) + ', ' + JSON.stringify(name) + ')'` — a literal `layerControl(\"ly_x9\",\"Turn\")`-shaped string (JSON.stringify supplies the quoting); this is TEXT stored as `expressions[prop].code`, not a call into motion.js's own `layerControl` function (motion.js:2028, C20k) at build time — that function is only reached later, as one of C20m's own sandboxed built-ins, when the stored code is compiled and evaluated (see boundaries).",
+          "render_path": "NO — none of the three functions is called from buildSceneJson/getEffectiveStrokes/export.js. However, setExpressionCode and bakeExpressionOnRow WRITE document data (`holder.expressions[prop]`, `holder.motion[prop]`/`holder.motionStatic[prop]` via expr-bake.js) that a LATER frame's render WILL read through valueAtFrame (C20n, motion.js:2639) — an indirect DATA dependency on the render path, not a call dependency from this span itself.",
+          "callers": "setExpressionCode: called only internally, at motion.js:11623 (widgetWiringMenuItems's own nested-menu action, same packet). No other caller anywhere in src/js, grep-confirmed — this is the SOLE UI entry point to it (the expression editor panel, C20f, commits code via a different path not covered by this artifact). bakeExpressionOnRow: called only internally, at motion.js:11554 (decorateMotionPropertyRow, packet 3). widgetWiringMenuItems: called only internally, at motion.js:11543 (decorateMotionPropertyRow, packet 3). None of the three is exported on window.SMMotion; zero external-file callers, grep-confirmed.",
+          "external_calls": [
+            "pushUndo — tweens.js:4741",
+            "ensureExpr — motion.js:1333 (pre-1769, C02/C20a-j)",
+            "reloadIfTimeLinkOffset — motion.js:560 (pre-1769, C02/C20a-j; internally calls window.loadFrame, app.js:4746)",
+            "renderLayerList — timeline.js:6335 (P30)",
+            "renderTimeline — timeline.js:4026 (P30)",
+            "window.SMEngineBridge.renderNow — engine-bridge.js",
+            "SMExprBake.bakeExpressionToKeyframes — expr-bake.js:165 (uncensused, internally calls pushUndo and SM.setKeyAtFrame, C20n motion.js:2709)",
+            "showToast — timeline.js:7447 (C19w)",
+            "SM.t — i18n.js:4185/4239",
+            "SMRigWidget.axisChoices — rig-widget.js:480 (censused C04b)",
+            "SMRigWidget.axisRef — rig-widget.js:499 (censused C04b)",
+            "window.showContextMenu — ui.js:1136 (nested nested-choice menu)"
+          ],
+          "effects": "setExpressionCode writes `holder.expressions[prop].code/.enabled/.lastError/.errorLine` (document data) and deletes a compile-cache entry; pushUndo() checkpoints before the write. bakeExpressionOnRow itself writes nothing directly — it delegates the actual `holder.motion[prop]`/`holder.motionStatic[prop]`/`ex.enabled` writes to expr-bake.js (which checkpoints its own pushUndo() before writing, NOT this function), and only deletes the same compile-cache entry as setExpressionCode plus triggers the render trio and a toast. widgetWiringMenuItems itself writes nothing — it only builds menu-item descriptors whose `action` callbacks (when later invoked by a user pick) call setExpressionCode."
+        }
+      ]
+    },
+    {
+      "area": "batch-key-operations",
+      "packets": [
+        {
+          "id": "C20o.batch-key-operations",
+          "files": [
+            "src/js/motion.js:11634-11682"
+          ],
+          "coverage_ranges": [
+            [
+              11634,
+              11682
+            ]
+          ],
+          "classification": {
+            "code": 43,
+            "comment": 6,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_groupKeySelByTrack",
+            "distributeKeys",
+            "flipKeys",
+            "selectEveryNthKey"
+          ],
+          "signature": "_groupKeySelByTrack() -> Array<{holder,prop,items:Array<key>}>; distributeKeys() -> void; flipKeys() -> void; selectEveryNthKey(n) -> void",
+          "responsibility": "Section lead-in (11634-11639, 6 comment lines): frames Distribute/Flip/Select-Every as the keyframe equivalents of the layer-bar batch ops, explicitly noting no 'Align' exists here (a keyframe has no duration) and that operations are grouped PER TRACK first so two selected keys on DIFFERENT properties never collide with each other. _groupKeySelByTrack() (11640-11648): pure grouping helper — walks `_motionKeySel` (flat {holder,prop,key} list) and groups by (holder,prop) identity via a `.filter()[0]` lookup per item (O(n²) but n is a bounded UI selection), returning `[{holder,prop,items:[key,...]}]`; preserves each group's items in the ORIGINAL `_motionKeySel` order (selection order), not frame order — every caller below re-sorts by frame itself. distributeKeys() (11649-11662): guarded — needs `_motionKeySel.length >= 2` overall (else `SM.t('toastSelectAtLeast2Keys')` and return); `pushUndo()`; for each per-track group with >=2 items (single-item groups are skipped — no interval to distribute across), sorts that group's own items by CURRENT `.frame`, computes `step = (last-first)/(count-1)` and reassigns EVERY key's own `.frame` to `Math.round(first + step*i)` for its rank `i` — spreading the group's existing keys evenly between its own existing first/last frame (an in-place AE-style 'distribute'), touching ONLY `.frame` (never `.v`/`.curvePoints`/any other field). Calls `sortKeys(trackFor(g.holder,g.prop))` per group afterward (pre-span helpers) — necessary rather than defensive, since `Math.round` on a computed step CAN produce colliding/reordered integer frames when source keys started less than one step apart. `renderTimeline()` only (not renderLayerList — no property/holder identity changed, only frame positions) + `SMEngineBridge.renderNow()` if present. flipKeys() (11663-11675): identical guard/pushUndo/per-track-grouping/render structure to distributeKeys. The actual transform REVERSES the ORDER of each group's own existing frame VALUES onto its keys sorted by frame (`slots = sorted.map(k=>k.frame).reverse(); sorted.forEach((k,i)=>k.frame=slots[i])`) — the SET of frame numbers used is unchanged, only which key sits at which frame is mirrored (first<->last, etc.), a true 'flip order' rather than a mirror-around-center computation. Its own trailing `sortKeys(...)` call is NOT merely defensive here — see boundaries: reversing frame values without re-sorting leaves the `track.keys` array's OWN order mismatched with frame-ascending order, a real invariant this call restores. selectEveryNthKey(n) (11676-11682): the ONLY one of the four with NO minimum-selection guard and NO pushUndo (selection-only, no document mutation). Clamps `n = Math.max(2, parseInt(n,10) || 2)` — a non-numeric or <2 input silently floors to 2 (n=1 would trivially keep everything, already offered elsewhere as a no-op, so unsupported here). Sorts a COPY of `_motionKeySel` by `key.frame` ascending, then assigns `_motionKeySel = sorted.filter((_,i) => i % n === 0)` DIRECTLY — a second, narrower write path to `_motionKeySel` that bypasses setKeySel (packet 2) entirely, keeping the first of the sorted set and every nth one after it by RANK (not by absolute frame gap). Calls `renderTimeline()` and a toast reporting the resulting count (`_motionKeySel.length + SM.t('toastKeysSelectedSuffix')` — a suffix-only i18n string concatenated after a raw number, unlike the '{n}'/'{m}'-placeholder templates packet 4 uses). Does NOT call updateKeySelectionBox() or syncLayerSelToKeySel() — both are setKeySel-only side effects this direct-write path skips, same bypass pattern as selectMotionProperty (packet 2).",
+          "render_path": "NO. All four functions are selection/timeline-editing only; none is reachable from buildSceneJson/getEffectiveStrokes/export.js.",
+          "callers": "_groupKeySelByTrack: called internally at motion.js:11652 (distributeKeys, same packet) and motion.js:11666 (flipKeys, same packet); also at motion.js:11864 (C20p's own invertKeySelection territory... correction: 11864 falls inside 11683-11924, i.e. C20p, not yet filed — an external caller of this artifact's own helper, cited by line only). distributeKeys/flipKeys: each has exactly one caller anywhere in src/js, grep-confirmed: motion.js:11010/11011, inside trackRowHtml's own key-row context-menu builder (C20i, motion.js:10672-11125, sibling-covered) as `menu.push({label:SM.t('ctxDistributeEvenly'), action: distributeKeys})` / `...action: flipKeys})`; both are also exported bare on `SMMotion` at motion.js:13826 (sibling-covered, past 13124) with zero external (outside motion.js) callers of that export, grep-confirmed. selectEveryNthKey: two callers, both inside the SAME trackRowHtml context menu (C20i, sibling-covered): motion.js:11020 ('Select every 2nd', hardcoded n=2) and motion.js:11023 ('Select every Nth…', reads a `prompt()` value); also exported bare on SMMotion at motion.js:13826, zero external callers.",
+          "external_calls": [
+            "showToast — timeline.js:7447 (C19w)",
+            "SM.t — i18n.js:4185/4239",
+            "pushUndo — tweens.js:4741 (distributeKeys/flipKeys only)",
+            "sortKeys — motion.js:1188 (pre-1769, C02/C20a-j)",
+            "trackFor — motion.js:443 (pre-1769, C02/C20a-j)",
+            "renderTimeline — timeline.js:4026 (P30)",
+            "window.SMEngineBridge.renderNow — engine-bridge.js (distributeKeys/flipKeys only)"
+          ],
+          "effects": "distributeKeys/flipKeys mutate EXISTING key objects' `.frame` field in place (never create/remove keys), re-sort `track.keys` afterward, and checkpoint via pushUndo() BEFORE mutating — document data changes. selectEveryNthKey mutates only the module-scoped `_motionKeySel` selection array (filters it down) and calls no pushUndo — selection-only, zero document/persisted-field writes. _groupKeySelByTrack is a pure read, zero writes."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No DIRECT frame-save call (saveActiveLayerFrame/saveAllLayerFrames) is written by any function this artifact declares itself (grep-verified over 11412-11682). However, syncLayerSelToKeySel (packet 2) calls `SM.setActiveLayer(lis[0], true)` (timeline.js:1534), whose OWN first statement is `saveAllLayerFrames()` — so a full frame SAVE is reachable, transitively, from a plain KEY-selection change (via setKeySel) whenever the selected key's owning layer differs from the current `_layerSel`. This is a genuine, externally-triggered save path that a strict grep for 'saveA' inside THIS span alone would miss — recorded precisely rather than glossed as 'no save calls' the way C20n's own span (which genuinely has none) does."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No parser is implemented in this span. timeline.js's importJSON owns restoring `motion`/`motionStatic`/`elementMotion`/`expressions` (cited by name only) — the fields setExpressionCode/bakeExpressionOnRow (packet 4) and distributeKeys/flipKeys (packet 5) write."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Three of this span's five packets checkpoint via pushUndo() before mutating document data: setExpressionCode (motion.js:11580, before writing holder.expressions[prop]), distributeKeys (motion.js:11651, before reassigning key.frame values) and flipKeys (motion.js:11665, same). bakeExpressionOnRow itself calls NO pushUndo — the checkpoint for a bake lives one level down, inside expr-bake.js's own bakeExpressionToKeyframes (expr-bake.js:229), which is called before it performs its own write. Every purely-selection-state function in this span (isKeySelected/isMotionPropSelected/uniquePropSelection/paintMotionPropertySelection/layerIndexOfHolder/syncLayerSelToKeySel/setKeySel/keysForPropertySelection/visibleMotionPropertySelectionOrder/selectMotionProperty/decorateMotionPropertyRow/widgetWiringMenuItems/_groupKeySelByTrack/selectEveryNthKey) calls NO pushUndo anywhere — grep-confirmed — consistent with `_motionKeySel`/`_motionPropSel`/`_motionPropAnchor`/`_layerSel` being ephemeral UI selection state, not persisted document fields tweens.js's generic whole-layers JSON clone needs to cover."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "This artifact IS the key/property selection-state read/write surface for Motion mode: setKeySel (packet 2) is the designated cross-cutting funnel (paint + selection-box refresh + layer-sync, reached by ~20 call sites); selectMotionProperty (packet 2) and selectEveryNthKey (packet 5) are two DIRECT, narrower writers of `_motionKeySel` that bypass that funnel (see boundaries for the precise single-writer correction); decorateMotionPropertyRow (packet 3) is the DOM wiring that turns a property row's click/right-click into calls on this surface. `_motionPropSel`/`_motionPropAnchor` are genuinely single-span-owned (every assignment to either lives inside 11412-11682, grep-verified)."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "setExpressionCode and bakeExpressionOnRow (packet 4) are the two writers of `holder.expressions[prop]`/`holder.motion[prop]`/`holder.motionStatic[prop]` reachable from this span — the ONLY UI entry points to wiring a property's expression to a rig-widget axis (CLAUDE.md §13) or converting an expression to keyframes. distributeKeys/flipKeys (packet 5) rewrite `key.frame` values on EXISTING keys without changing which properties are animated or how many keys exist."
+    },
+    {
+      "consumer": "render",
+      "disposition": "NO function in this span is itself on the render path (confirmed: zero occurrences of buildSceneJson/getEffectiveStrokes anywhere in 11412-11682, grep-verified). setExpressionCode/bakeExpressionOnRow write document data (holder.expressions/.motion/.motionStatic) that a LATER rendered/exported frame reads through valueAtFrame (C20n, sibling-covered, motion.js:2639) — an indirect data dependency, not a call dependency. distributeKeys/flipKeys similarly only rewrite `.frame` on data a later render will read the same way. This span's own render-adjacent calls (`SMEngineBridge.renderNow()` in setExpressionCode/bakeExpressionOnRow/distributeKeys/flipKeys) are CONSUMERS of the render path (asking it to repaint the current frame with newly-written data), never participants in it."
+    },
+    {
+      "consumer": "export",
+      "disposition": "Not reached from export.js at all — none of this span's 17 declared symbols appears in export.js (grep-confirmed). Any effect on an exported frame is purely through the same indirect data dependency described under 'render' above (an expression baked or wired here changes what valueAtFrame later returns, which export.js's own getEffectiveStrokesRendered chain reads identically to the on-screen render, per CLAUDE.md §3's single-render-path principle, cited by name only, not re-derived here)."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "key-vs-property-selection-write-paths",
+      "status": "proposed, unrun",
+      "matrix": "(a) click a key directly (routes through setKeySel), (b) click a property row (routes through selectMotionProperty), (c) invoke 'Select every 2nd' from the batch-ops context menu (routes through selectEveryNthKey) — each starting from a key selection whose owning layer is NOT the current active layer",
+      "expected": "(a) triggers syncLayerSelToKeySel -> SM.setActiveLayer -> saveAllLayerFrames AND repaints via the cheap paintMotionPropertySelection (no full renderLayerList/renderTimeline from setKeySel itself, though most callers of setKeySel additionally call renderTimeline() themselves); `_layerSel` ends up equal to the deduped set of layers owning the newly selected keys. (b) and (c) do NOT call SM.setActiveLayer/saveAllLayerFrames at all — `_layerSel` is left untouched regardless of which layer the newly selected property/keys belong to, and the repaint is always a full renderLayerList()+renderTimeline() (b) or renderTimeline() alone (c)."
+    },
+    {
+      "id": "distribute-and-flip-per-track-isolation",
+      "status": "proposed, unrun",
+      "matrix": "Select 2 keys on track A (frames 10,30) and 3 keys on track B (frames 5,8,50) simultaneously, then call distributeKeys, then (starting over from the same selection) flipKeys",
+      "expected": "distributeKeys: track A's two keys are untouched (already exactly 2 points, step covers the same 10..30 span, i.e. a no-visible-change round-trip); track B's three keys move to 5, 27.5->28 (rounded), 50 (evenly spaced between its own 5..50). Track A never reads or is perturbed by track B's own frame values or vice versa. flipKeys: track A's keys swap to 30,10 in VALUE terms but `track.keys` ends up re-sorted ascending as 10,30 again (values unchanged since only 2 points, reversing 2 elements is its own inverse); track B's keys become 50,8,5 in rank order pre-sort, re-sorted to 5,8,50 by array position but now holding the REVERSED value assignment (first-ranked original key, at original frame 5, now sits at frame 50, and vice versa) — verifying flipKeys is a value-swap-then-resort, not a no-op on an odd-length group."
+    },
+    {
+      "id": "select-every-nth-rank-not-gap",
+      "status": "proposed, unrun",
+      "matrix": "5 selected keys at frames 1, 2, 3, 100, 101 (uneven gaps), selectEveryNthKey(2)",
+      "expected": "Keeps ranks 0,2,4 after sorting by frame ascending -> frames 1, 3, 101 survive; frames 2 and 100 are dropped from `_motionKeySel` (rank-based stride, NOT a fixed frame-distance stride) — and updateKeySelectionBox is NOT called by this function itself (only renderTimeline + a toast), unlike every setKeySel-routed selection change."
+    },
+    {
+      "id": "widget-wiring-expression-text-round-trip",
+      "status": "proposed, unrun",
+      "matrix": "Right-click a property row with one widget layer present (axis 'Turn', uid 'ly_x9', range -90..90), pick 'Link to a widget axis…' -> 'Turn', vs. pick 'Drive this pose from a widget axis…' -> 'Turn'",
+      "expected": "First case: holder.expressions[prop].code === 'layerControl(\"ly_x9\", \"Turn\")' (exact string, JSON.stringify-quoted) and .enabled === true. Second case: holder.expressions[prop].code === 'self.at(layerControl(\"ly_x9\", \"Turn\"))'. Both cases: .lastError === null, .errorLine === -1, and the holder's own `_exprCompiled[prop]` cache entry (if any existed before) is gone immediately after, forcing a recompile on the next valueAtFrame read. If NO widget layer exists, right-clicking the SAME row shows no 'Link/Drive' entries at all (widgetWiringMenuItems returns []); if a widget layer exists but has zero named axes, the menu entries exist but clicking either shows toastWidgetNoneYet and performs no write."
+    },
+    {
+      "id": "bake-constant-vs-keyframes-toast-and-fields",
+      "status": "proposed, unrun",
+      "matrix": "bakeExpressionOnRow on (a) an expression that evaluates to the exact same [x,y] on every sampled frame, vs. (b) an expression that varies meaningfully across the sampled range",
+      "expected": "(a): holder.motion[prop] is NOT touched; holder.motionStatic[prop] is set to the flat value; if the property was previously animated, toggleAnimated is called to turn animation OFF; toast is SM.t('toastBakedConstant') with no interpolated numbers. (b): holder.motion[prop] = {keys:[...]} entirely REPLACES any prior track content (any keys outside [0, state.totalFrames-1] are dropped); toast is SM.t('toastBakedKeyframes') with '{n}' and '{m}' substituted by the actual keyframeCount/sampledFrameCount. Both cases: ex.enabled becomes false afterward (the expression is disabled, not deleted — its code text remains readable/re-enable-able), and the holder's `_exprCompiled[prop]` cache entry is removed."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "keySelectionWrite(sel, opts:{paint,box,sync}) -> void",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Today three different functions write `_motionKeySel` with three different, hand-picked subsets of side effects (setKeySel: paint+box+sync; selectMotionProperty: full render+box, no sync; selectEveryNthKey: render only, no box, no sync) — a fourth future writer has no principled way to pick the RIGHT subset short of reading all three existing bodies and guessing which one it resembles most."
+    },
+    {
+      "api": "propertyRowMenuSections(holder, prop, x, y) -> {widget, controls, bake}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "decorateMotionPropertyRow's own contextmenu listener currently interleaves the three menu SOURCES (widgetWiringMenuItems, the control-management entry, the bake entry) with manual separator bookkeeping ('only push a separator if items already has entries') inline in the listener body — a fourth future menu source would need to repeat that same manual bookkeeping rather than compose against a shared assembler."
+    },
+    {
+      "api": "bakeUndoOwnership: move expr-bake.js's own pushUndo() call site into bakeExpressionOnRow",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Every OTHER document-mutating function in this span (setExpressionCode, distributeKeys, flipKeys) checkpoints its OWN pushUndo() at its own call site, immediately before mutating; bakeExpressionOnRow is the one exception, relying on expr-bake.js's own internal pushUndo() call — correct today (verified, section reconciliation above) but a future refactor of expr-bake.js that removed or reordered that call would silently break undo for baking with no compile-time signal from this span."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "packet_symbols": [
+      "isKeySelected",
+      "isMotionPropSelected",
+      "uniquePropSelection",
+      "paintMotionPropertySelection",
+      "layerIndexOfHolder",
+      "syncLayerSelToKeySel",
+      "setKeySel",
+      "keysForPropertySelection",
+      "visibleMotionPropertySelectionOrder",
+      "selectMotionProperty",
+      "decorateMotionPropertyRow",
+      "setExpressionCode",
+      "bakeExpressionOnRow",
+      "widgetWiringMenuItems",
+      "_groupKeySelByTrack",
+      "distributeKeys",
+      "flipKeys",
+      "selectEveryNthKey"
+    ],
+    "caller_anchors": [
+      "setKeySel: NOT exported directly, but wrapped as SMMotion.clearKeySelection (motion.js:13788) and SMMotion.selectKeys (motion.js:13858), both sibling-covered past 13124; exactly one external (outside motion.js) caller found, layer-inout.js:504 (SMMotion.clearKeySelection), the widest fan-out of any symbol in this artifact.",
+      "distributeKeys/flipKeys/selectEveryNthKey: exported bare on SMMotion (motion.js:13826, sibling-covered) with ZERO external callers of that export found (grep-confirmed) — their only real callers are the three context-menu wirings inside trackRowHtml (C20i, sibling-covered).",
+      "isKeySelected/isMotionPropSelected: NOT exported; every caller is internal to motion.js, split between this artifact's own packets and pre-span (trackRowHtml, C20i) / post-span (C20p/C20q, not yet filed) row-painting code.",
+      "decorateMotionPropertyRow: NOT exported; exactly 4 callers, all pre-span row builders (C20f/C20g/C20h).",
+      "setExpressionCode/bakeExpressionOnRow/widgetWiringMenuItems/layerIndexOfHolder/keysForPropertySelection/visibleMotionPropertySelectionOrder/selectMotionProperty/_groupKeySelByTrack/syncLayerSelToKeySel/uniquePropSelection/paintMotionPropertySelection: NOT exported and have NO caller outside this artifact's own span or its own internal cross-packet calls — the narrowest-fan-out group in this artifact, consistent with being private selection/wiring plumbing rather than a public API surface."
+    ],
+    "helper_anchors": "trackFor:443, ensureExpr:1333, hasExpr:1338, sortKeys:1188, controlTypeOf:175, controlsOf:164, openExprControlsMenu:350, reloadIfTimeLinkOffset:560, layerControl:2028 (C20k), exprSelfAt:1823 (C20k), EXPR_ARG_NAMES's own 'layerControl' entry:2375 (C20m, NOT C20k), compiledFnFor/_exprCompiled cache:2391-2488 (C20m), setKeyAtFrame:2709/valueAtFrame:2639/toggleAnimated (C20n), updateKeySelectionBox:12107 (C20q, not yet filed), _keyAnchor:11411/subdivideKeys/invertKeySelection:11905/window._motionKeyDrag/_motionMarquee:11925 (C20p/C20q, not yet filed) — all pre-existing, cited by line only, none re-derived.",
+    "render_path_summary": "Nothing in this artifact's own span is called from buildSceneJson/getEffectiveStrokes/export.js — confirmed by direct grep over the whole span for both symbols, zero hits. setExpressionCode and bakeExpressionOnRow are the only two functions with a document-data write that a LATER render will read indirectly (through C20n's valueAtFrame); distributeKeys/flipKeys similarly rewrite `.frame` fields a later render reads the same way. Every other symbol in this artifact is selection-state/DOM-repaint only, with no persisted-data footprint at all."
+  },
+  "validation": {
+    "expected_assigned_lines": 271,
+    "expected_classification": {
+      "code": 208,
+      "comment": 63,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        11412,
+        11430
+      ],
+      [
+        11431,
+        11518
+      ],
+      [
+        11519,
+        11559
+      ],
+      [
+        11560,
+        11633
+      ],
+      [
+        11634,
+        11682
+      ]
+    ],
+    "packet_classification": [
+      {
+        "range": [
+          11412,
+          11430
+        ],
+        "code": 19,
+        "comment": 0,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          11431,
+          11518
+        ],
+        "code": 74,
+        "comment": 14,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          11519,
+          11559
+        ],
+        "code": 28,
+        "comment": 13,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          11560,
+          11633
+        ],
+        "code": 44,
+        "comment": 30,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          11634,
+          11682
+        ],
+        "code": 43,
+        "comment": 6,
+        "whitespace": 0
+      }
+    ],
+    "coverage_contract": "Validate assigned_ranges and flattened areas[].packets[].coverage_ranges independently with the same function; reject actual artifact omission at line 11412 and overlap at line 11682.",
+    "required_checks": [
+      "frozen/current motion.js blob and allocated-base ancestry",
+      "five unique packet IDs, exact ranges, counts, symbols, helpers, callers and boundaries",
+      "before-11412 (sibling _keyAnchor declaration) preceding boundary and after-11682 (sibling C20p Subdivide lead-in) following boundary",
+      "seven consumer dispositions and proposed, unrun fixtures",
+      "the exact entry shape of _motionKeySel/_motionPropSel and the _motionPropAnchor/_keyAnchor semantics; the single-writer nuance of setKeySel vs the two direct-assignment bypasses (selectMotionProperty, selectEveryNthKey); layerIndexOfHolder as pure input->output for layer/element/mesh/text-animator holders; syncLayerSelToKeySel's effect on _layerSel and its saveAllLayerFrames side effect (feedback #791); decorateMotionPropertyRow's gesture contract and complete context-menu item list with each SM.t key and handler; setExpressionCode's exact written fields and bakeExpressionOnRow's frame range/writer/toast outcomes; the widget-wiring menu's exact expression strings and picker; the batch operations' pure input->output behavior, pushUndo disposition and render/showToast follow-ups — all against the actual source lines",
+      "JSON, private-path, secret, placeholder and trailing-whitespace hygiene",
+      "sole untracked artifact or committed-clean mode",
+      "no overlap with any merged C20* sibling artifact in the same census directory"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, GPU, runtime edit, export or product acceptance claim."
+  }
+}
