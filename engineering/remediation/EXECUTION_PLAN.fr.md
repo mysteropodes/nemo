@@ -350,7 +350,7 @@ Le tableau initial contient **59 tâches élémentaires : 33 sous la responsabil
 
   Limite : Ne pas confondre les 902 lignes d’inventaire avec 902 capacités distinctes, ni classer chaque grande table de données comme monolithe de code.
 
-  Admission découpée avant implémentation : [P03A / #1116](https://github.com/mysteropodes/nemo/issues/1116) fige l’index source et rejette les déclarations de complétude non prouvées. [Contrat de l’index](../inventory/REMEDIATION_SCOPE.md). P03 reste ouvert pour la cartographie bornée des lacunes timeline/Motion et l’admission des feuilles d’extraction liées ; les références de paquets en attente ne sont pas des tâches Ready.
+  Admission découpée avant implémentation : [P03A / #1116](https://github.com/mysteropodes/nemo/issues/1116) fige l’index source et rejette les déclarations de complétude non prouvées ; [P03B / #1170](https://github.com/mysteropodes/nemo/issues/1170) le refige sur `main` courant avec les suppléments C19/C20 épinglés, enregistre la couverture par plages recalculée fichier par fichier (21 932 lignes de code en 168 plages n’appartiennent encore à aucun paquet — `app.js`, la fin de `timeline.js` et `motion.js` d’abord) et n’admet les dispositions relues qu’avec leurs preuves. [Contrat de l’index](../inventory/REMEDIATION_SCOPE.md). P03 reste ouvert pour P03C : réconcilier les cinq notes ouvertes et la dérive des plages, cartographier les monolithes non couverts en tranches de recensement bornées, puis découper les paquets en attente en feuilles de ≤90 minutes ou les dispositionner ; les références de paquets en attente ne sont pas des tâches Ready.
 
 - [ ] **[F01 / #1047](https://github.com/mysteropodes/nemo/issues/1047) — Examiner les preuves existantes de Honey sur le paquet installé**
 
