@@ -45,7 +45,7 @@
     "scope": "none",
     "lifecycle": ["start", "status", "cancel"]
   },
-  "availability": { "state": "unavailable", "reason": "missing-dependency" },
+  "availability": { "state": "available", "reason": null },
   "handlerKey": "application.export.svgFrame",
   "fixture": {
     "label": "export frame 10 as SVG, complete",
@@ -60,6 +60,7 @@
       "input": { "jobId": "job-1" },
       "output": { "jobId": "job-1", "status": "succeeded", "progress": 1, "artifact": { "mimeType": "image/svg+xml", "data": "<svg></svg>" } }
     },
-    { "label": "cancel before completion", "input": { "jobId": "job-1" }, "output": { "jobId": "job-1", "status": "cancelled", "progress": 0.5 } }
+    { "label": "cancel requested — cancellation takes effect at the next batch boundary, so this response still reports the current state", "input": { "jobId": "job-1" }, "output": { "jobId": "job-1", "status": "running", "progress": 0.5 } },
+    { "label": "status after a cancel, once it has taken effect", "input": { "jobId": "job-1" }, "output": { "jobId": "job-1", "status": "cancelled", "progress": 0.5 } }
   ]
 }

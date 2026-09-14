@@ -41,6 +41,8 @@ function application() {
   for (const file of ['animation/curve.js', 'domain/animation/opacity.js', 'motion.js',
     'domain/document/folder-codec.js', 'domain/tween/assignment.js', 'application/history/frame-entry.js', 'tweens.js', 'application/opacity-application.js',
     'application/capability-registry.js', 'application/opacity-capability.js',
+    // P19: the bootstrap also registers the export capability and routes by it.
+    'application/export-job.js', 'adapters/export-svg-sequence.js',
     'bootstrap/opacity-application.js']) {
     const filename = path.resolve(ROOT, 'src/js', file);
     vm.runInContext(fs.readFileSync(filename, 'utf8'), ctx, { filename });
@@ -82,13 +84,16 @@ test('opacity is registered at boot and discoverable', () => {
   // Array.from: the vm realm has its own Array.prototype, so a strict
   // deepEqual against a literal from this realm fails on prototype identity
   // alone even when the contents match (same trap as P20's `{}` default).
-  assert.deepEqual(Array.from(ctx.NemoCapabilities.ids()), ['opacity']);
+  // Two capabilities since P19/#1021 — the export job registers itself the
+  // same way opacity does — and `ids()` is sorted, so export sorts first.
+  assert.deepEqual(Array.from(ctx.NemoCapabilities.ids()), ['export.svg.frame', 'opacity']);
   const listed = ctx.NemoApplication.capabilities();
-  assert.equal(listed.length, 1);
-  assert.equal(listed[0].id, 'opacity');
-  assert.equal(listed[0].handlerKey, 'application.opacity.property');
-  assert.equal(listed[0].bound, true);
-  assert.deepEqual(JSON.parse(JSON.stringify(listed[0].descriptor)), capability.DESCRIPTOR);
+  assert.equal(listed.length, 2);
+  const opacityEntry = listed.find((entry) => entry.id === 'opacity');
+  assert.ok(opacityEntry);
+  assert.equal(opacityEntry.handlerKey, 'application.opacity.property');
+  assert.equal(opacityEntry.bound, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(opacityEntry.descriptor)), capability.DESCRIPTOR);
 });
 
 test('the production capabilities operation derives its legacy projection and full contract from registration', () => {
@@ -97,19 +102,24 @@ test('the production capabilities operation derives its legacy projection and fu
   assert.deepEqual(JSON.parse(JSON.stringify(result.properties)), [
     { id: 'opacity', min: 0, max: 100, unit: 'percent', animated: true },
   ]);
-  assert.deepEqual(JSON.parse(JSON.stringify(result.descriptors)), [capability.DESCRIPTOR]);
+  // `properties` is derived from the descriptors whose lifecycle contains
+  // `property.get`, so the export job (start/status/cancel) correctly does not
+  // appear above — but it does appear in the full descriptor list.
+  assert.deepEqual(JSON.parse(JSON.stringify(result.descriptors.map((d) => d.id))), ['export.svg.frame', 'opacity']);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.descriptors.find((d) => d.id === 'opacity'))), capability.DESCRIPTOR);
 
   // Prove the public response performs a fresh registry read and is not the old
   // hard-coded opacity metadata: changing discovery changes the returned data.
   const original = ctx.NemoCapabilities.list;
   ctx.NemoCapabilities.list = function () {
     const entries = original.call(this);
-    entries[0].descriptor = Object.assign({}, entries[0].descriptor,
+    const opacityEntry = entries.find((entry) => entry.id === 'opacity');
+    opacityEntry.descriptor = Object.assign({}, opacityEntry.descriptor,
       { id: 'opacity-from-registry', units: { value: 'ratio' } });
     return entries;
   };
   const changed = ctx.NemoApplication.handle(command(ctx, 'discover-again', 'capabilities')).result;
-  assert.equal(changed.descriptors[0].id, 'opacity-from-registry');
+  assert.ok(changed.descriptors.some((d) => d.id === 'opacity-from-registry'));
   assert.equal(changed.properties[0].id, 'opacity-from-registry');
   assert.equal(changed.properties[0].unit, 'ratio');
 });
